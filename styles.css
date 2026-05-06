@@ -466,6 +466,79 @@ a {
     border: 1px solid rgba(43, 108, 176, 0.14);
 }
 
+.site-footer {
+    margin-top: 24px;
+    padding: 18px 22px;
+    border-radius: var(--radius-lg);
+    background: rgba(255, 255, 255, 0.76);
+    border: 1px solid rgba(43, 108, 176, 0.14);
+    box-shadow: 0 12px 30px rgba(18, 58, 97, 0.08);
+}
+
+.footer-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    flex-wrap: wrap;
+}
+
+.footer-title {
+    margin: 0;
+    font-family: "Fraunces", serif;
+    font-size: 1.1rem;
+    color: var(--ink-strong);
+}
+
+.footer-copy {
+    margin: 6px 0 0;
+    color: var(--ink-mid);
+}
+
+.footer-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.footer-links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 38px;
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(43, 108, 176, 0.16);
+    background: #f7fbff;
+    color: var(--accent-deep);
+    font-weight: 700;
+}
+
+.not-found-main {
+    min-height: 46vh;
+    display: grid;
+    place-items: center;
+}
+
+.not-found-card {
+    text-align: center;
+    width: min(780px, 100%);
+}
+
+.not-found-code {
+    margin: 0;
+    color: var(--accent);
+    font-family: "Fraunces", serif;
+    font-size: clamp(2rem, 6vw, 3.6rem);
+}
+
+.not-found-actions {
+    margin-top: 18px;
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
 .visually-hidden {
     position: absolute;
     width: 1px;
@@ -507,7 +580,8 @@ a {
 
     .hero-panel,
     .panel-section,
-    .about-card {
+    .about-card,
+    .site-footer {
         padding: 20px;
     }
 
