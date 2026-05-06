@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DTECH Hub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="page-shell">
+        <header class="hero">
+            <nav class="topbar" aria-label="Primary">
+                <a class="brand" href="index.html">DTECH Hub</a>
+                <div class="topbar-links">
+                    <a href="#current-projects">Current Projects</a>
+                    <a href="#project-library">Project Library</a>
+                    <a href="https://sites.google.com/westlandhigh.school.nz/dtec/home" target="_blank" rel="noreferrer">Learning Site</a>
+                    <a href="#about-hub">About</a>
+                </div>
+            </nav>
+
+            <div class="hero-panel">
+                <div class="hero-copy">
+                    <p class="eyebrow">WESTLAND HIGH SCHOOL</p>
+                    <h1>One hub for every class project your students are building.</h1>
+                    <p class="hero-text">
+                        Give students and staff a single place to find active projects, revisit past work, and jump straight into the right class space.
+                    </p>
+                    <div class="hero-actions">
+                        <a class="button button-primary" href="#current-projects">See What Is Live</a>
+                        <a class="button button-secondary" href="#project-library">Browse All Projects</a>
+                    </div>
+                </div>
+
+                <aside class="hero-stats" aria-label="Hub summary">
+                    <div class="stat-card">
+                        <span class="stat-label">Active this term</span>
+                        <strong id="stat-active-count">0</strong>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Project spaces</span>
+                        <strong id="stat-total-count">0</strong>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Learning areas</span>
+                        <strong id="stat-category-count">0</strong>
+                    </div>
+                </aside>
+            </div>
+        </header>
+
+        <main>
+            <section id="current-projects" class="panel-section current-work">
+                <div class="section-heading">
+                    <div>
+                        <p class="section-kicker">Students Working On Right Now</p>
+                        <h2>Current class projects</h2>
+                    </div>
+                    <p class="section-copy">
+                        These are the spaces students are actively using this term. Keep this area focused on what staff and learners need to access quickly.
+                    </p>
+                </div>
+
+                <div id="current-project-grid" class="project-grid" aria-live="polite"></div>
+            </section>
+
+            <section id="project-library" class="panel-section library-section">
+                <div class="section-heading library-heading">
+                    <div>
+                        <p class="section-kicker">Project Library</p>
+                        <h2>Browse every DTECH project space</h2>
+                    </div>
+                    <p class="section-copy">
+                        Search by project title, class, or keywords, then sort the library to quickly find what you need.
+                    </p>
+                </div>
+
+                <div class="controls-panel" role="search">
+                    <label class="search-field" for="project-search">
+                        <span class="visually-hidden">Search projects</span>
+                        <input id="project-search" type="search" placeholder="Search projects, classes, or keywords">
+                    </label>
+
+                    <label class="sort-field" for="sort-order">
+                        <span class="visually-hidden">Sort projects</span>
+                        <select id="sort-order">
+                            <option value="name-asc">Sort: A to Z</option>
+                            <option value="name-desc">Sort: Z to A</option>
+                            <option value="status">Sort: Status</option>
+                            <option value="recent">Sort: Most recent</option>
+                        </select>
+                    </label>
+
+                    <div id="category-filters" class="filter-chips" aria-label="Filter projects by learning area"></div>
+                </div>
+
+                <div id="library-results-meta" class="results-meta" aria-live="polite"></div>
+                <div id="project-library-grid" class="project-grid" aria-live="polite"></div>
+            </section>
+
+            <section id="about-hub" class="panel-section about-section">
+                <div class="about-card">
+                    <p class="section-kicker">Why This Layout Works</p>
+                    <h2>Fast access first, archives second.</h2>
+                    <p>
+                        The homepage separates current activity from the full archive so students are not forced to search for what is happening now. The same card style works for live classes, portfolios, resource spaces, and showcase projects.
+                    </p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
