@@ -141,8 +141,6 @@ const baseProjects = [
     }
 ];
 
-const LOCAL_ACTIVITY_STORAGE_KEY = "dtechHub:activities";
-
 let projects = [...baseProjects];
 
 function colorToPalette(colorName) {
@@ -174,53 +172,60 @@ function slugify(value) {
         .replace(/^-+|-+$/g, "");
 }
 
-function loadLocalProjects() {
-    const raw = localStorage.getItem(LOCAL_ACTIVITY_STORAGE_KEY);
-    if (!raw) return [];
-
-    let parsed;
+async function loadSharedProjects() {
     try {
-        parsed = JSON.parse(raw);
+        const response = await fetch("/api/activities");
+        if (!response.ok) return [];
+
+        const parsed = await response.json();
+        if (!Array.isArray(parsed)) return [];
+
+        return parsed
+            .map((item) => {
+                const title = String(item.name || "").trim();
+                if (!title) return null;
+
+                const id = String(item.id || slugify(title) || `activity-${Date.now()}`);
+                const yearLevel = String(item.year_level || "Year 9").trim();
+                const type = String(item.type || "Digital Learning").trim();
+                const category = String(item.activity_category || "Practice").trim();
+                const summary = String(item.description || "Teacher-uploaded activity").trim();
+                const created = String(item.created_at || new Date().toISOString()).slice(0, 10);
+
+                return {
+                    id,
+                    title,
+                    className: `${yearLevel} Computer Lab`,
+                    area: type,
+                    activityCategory: category,
+                    showThisWeek: Boolean(item.show_in_this_week),
+                    status: item.show_in_this_week ? "active" : "planning",
+                    term: String(item.term || "Term 2"),
+                    updated: created,
+                    href: `ProjectPages/custom-activity.html?id=${encodeURIComponent(id)}`,
+                    external: false,
+                    summary,
+                    keywords: [type, category, String(item.difficulty || ""), "teacher upload"].filter(Boolean),
+                    visual: {
+                        icon: textToIcon(type),
+                        label: "Teacher Upload",
+                        palette: colorToPalette(item.card_color)
+                    }
+                };
+            })
+            .filter(Boolean);
     } catch (_error) {
         return [];
     }
+}
 
-    if (!Array.isArray(parsed)) return [];
+function mergeProjects(sharedProjects) {
+    const byId = new Map();
+    [...baseProjects, ...sharedProjects].forEach((project) => {
+        byId.set(project.id, project);
+    });
 
-    return parsed
-        .map((item) => {
-            const title = String(item.name || "").trim();
-            if (!title) return null;
-
-            const id = String(item.id || slugify(title) || `activity-${Date.now()}`);
-            const yearLevel = String(item.year_level || "Year 9").trim();
-            const type = String(item.type || "Digital Learning").trim();
-            const category = String(item.activity_category || "Practice").trim();
-            const summary = String(item.description || "Teacher-uploaded activity").trim();
-            const created = String(item.created_at || new Date().toISOString()).slice(0, 10);
-
-            return {
-                id,
-                title,
-                className: `${yearLevel} Computer Lab`,
-                area: type,
-                activityCategory: category,
-                showThisWeek: Boolean(item.show_in_this_week),
-                status: item.show_in_this_week ? "active" : "planning",
-                term: String(item.term || "Term 2"),
-                updated: created,
-                href: `ProjectPages/custom-activity.html?id=${encodeURIComponent(id)}`,
-                external: false,
-                summary,
-                keywords: [type, category, String(item.difficulty || ""), "teacher upload"].filter(Boolean),
-                visual: {
-                    icon: textToIcon(type),
-                    label: "Teacher Upload",
-                    palette: colorToPalette(item.card_color)
-                }
-            };
-        })
-        .filter(Boolean);
+    return Array.from(byId.values());
 }
 
 const state = {
@@ -456,8 +461,9 @@ function bindControls() {
     });
 }
 
-function init() {
-    projects = [...baseProjects, ...loadLocalProjects()];
+async function init() {
+    const sharedProjects = await loadSharedProjects();
+    projects = mergeProjects(sharedProjects);
     renderStats();
     populateFilters();
     renderCurrentProjects();

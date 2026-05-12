@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: dtech-hub
+    runtime: node
+    repo: https://github.com/WHS-DTECH/DTECH-HUB
+    branch: main
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        sync: false

@@ -85,21 +85,17 @@ const DETAIL_DATA = {
     }
 };
 
-const LOCAL_ACTIVITY_STORAGE_KEY = "dtechHub:activities";
-
-function readLocalActivity(activityId) {
+async function readSharedActivity(activityId) {
     if (!activityId) return null;
 
-    let parsed;
+    let found;
     try {
-        parsed = JSON.parse(localStorage.getItem(LOCAL_ACTIVITY_STORAGE_KEY) || "[]");
+        const response = await fetch(`/api/activities/${encodeURIComponent(activityId)}`);
+        if (!response.ok) return null;
+        found = await response.json();
     } catch (_error) {
         return null;
     }
-
-    if (!Array.isArray(parsed)) return null;
-
-    const found = parsed.find((item) => item && item.id === activityId);
     if (!found) return null;
 
     const toArray = (value) => Array.isArray(value) ? value : [];
@@ -122,7 +118,7 @@ function renderList(items) {
     return items.map((item) => `<li>${item}</li>`).join("");
 }
 
-function initDetail() {
+async function initDetail() {
     const root = document.querySelector("[data-activity-id]");
     const queryRoot = document.querySelector(".page");
     const host = root || queryRoot;
@@ -130,7 +126,7 @@ function initDetail() {
 
     const params = new URLSearchParams(window.location.search);
     const id = host.getAttribute("data-activity-id") || params.get("id");
-    const data = DETAIL_DATA[id] || readLocalActivity(id);
+    const data = DETAIL_DATA[id] || await readSharedActivity(id);
     if (!data) return;
 
     document.title = `${data.title} | Computer Lab`;

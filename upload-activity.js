@@ -1,7 +1,6 @@
 const CLOUDINARY_CLOUD_NAME = "dq1ndhl3t";
 const CLOUDINARY_API_KEY = "769919346521166";
 const CLOUDINARY_UPLOAD_PRESET = "dtech_hub_unsigned";
-const LOCAL_ACTIVITY_STORAGE_KEY = "dtechHub:activities";
 
 const form = document.querySelector("#upload-activity-form");
 const fileInput = document.querySelector("#outcome-image-file");
@@ -83,23 +82,19 @@ function createActivityPayload() {
     };
 }
 
-function saveActivityLocally(payload) {
-    let existing = [];
-    try {
-        existing = JSON.parse(localStorage.getItem(LOCAL_ACTIVITY_STORAGE_KEY) || "[]");
-    } catch (_error) {
-        existing = [];
-    }
+async function saveActivityShared(payload) {
+    const response = await fetch("/api/activities", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+    });
 
-    const list = Array.isArray(existing) ? existing : [];
-    const index = list.findIndex((item) => item && item.id === payload.id);
-    if (index >= 0) {
-        list[index] = payload;
-    } else {
-        list.push(payload);
+    if (!response.ok) {
+        const details = await response.text();
+        throw new Error(details || "Could not save activity");
     }
-
-    localStorage.setItem(LOCAL_ACTIVITY_STORAGE_KEY, JSON.stringify(list));
 }
 
 function downloadPayload(payload) {
@@ -145,7 +140,7 @@ if (cancelButton) {
 }
 
 if (form) {
-    form.addEventListener("submit", (event) => {
+    form.addEventListener("submit", async (event) => {
         event.preventDefault();
 
         const payload = createActivityPayload();
@@ -154,12 +149,15 @@ if (form) {
             return;
         }
 
-        localStorage.setItem("dtechHub:lastActivityDraft", JSON.stringify(payload));
-        saveActivityLocally(payload);
-        preview.hidden = false;
-        preview.textContent = JSON.stringify(payload, null, 2);
-
-        downloadPayload(payload);
-        setStatus("Activity saved for this browser, added to the hub list, and JSON exported.");
+        try {
+            await saveActivityShared(payload);
+            localStorage.setItem("dtechHub:lastActivityDraft", JSON.stringify(payload));
+            preview.hidden = false;
+            preview.textContent = JSON.stringify(payload, null, 2);
+            downloadPayload(payload);
+            setStatus("Activity saved to shared database and JSON exported.");
+        } catch (error) {
+            setStatus(`Save failed: ${error.message}`, true);
+        }
     });
 }
