@@ -383,9 +383,63 @@ const runningDetail = document.querySelector("#stat-running-detail");
 const totalCount = document.querySelector("#stat-total-count");
 const categoryCount = document.querySelector("#stat-category-count");
 const hubStaffLink = document.querySelector("#hub-staff-link");
+const hubAdminLink = document.querySelector("#hub-admin-link");
 const hubSignInButton = document.querySelector("#hub-google-signin");
 const hubSignOutButton = document.querySelector("#hub-google-signout");
 const hubUserBadge = document.querySelector("#hub-user-badge");
+const hubProfilePanel = document.querySelector("#hub-user-profile");
+const hubProfileAvatar = document.querySelector("#hub-profile-avatar");
+const hubProfileName = document.querySelector("#hub-profile-name");
+const hubProfileEmail = document.querySelector("#hub-profile-email");
+const hubProfileDisplayName = document.querySelector("#hub-profile-display-name");
+const hubProfileDisplayEmail = document.querySelector("#hub-profile-display-email");
+const hubProfileDomain = document.querySelector("#hub-profile-domain");
+const hubProfileClose = document.querySelector("#hub-profile-close");
+
+function getHubDisplayName(profile) {
+    if (!profile) return "";
+    return String(profile.name || profile.given_name || profile.email || "").trim();
+}
+
+function getHubUserInitials(profile) {
+    const name = getHubDisplayName(profile);
+    if (!name) return "--";
+
+    const parts = name.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+        return `${parts[0][0] || ""}${parts[1][0] || ""}`.toUpperCase();
+    }
+
+    return String(name.slice(0, 2)).toUpperCase();
+}
+
+function populateHubProfilePanel() {
+    if (!hubAuthState.profile) {
+        return;
+    }
+
+    const displayName = getHubDisplayName(hubAuthState.profile);
+    const email = hubAuthState.profile.email || "-";
+    const domain = email.includes("@") ? email.split("@")[1] : "-";
+    const initials = getHubUserInitials(hubAuthState.profile);
+
+    if (hubProfileAvatar) hubProfileAvatar.textContent = initials;
+    if (hubProfileName) hubProfileName.textContent = displayName || "Staff User";
+    if (hubProfileEmail) hubProfileEmail.textContent = email;
+    if (hubProfileDisplayName) hubProfileDisplayName.textContent = displayName || "-";
+    if (hubProfileDisplayEmail) hubProfileDisplayEmail.textContent = email;
+    if (hubProfileDomain) hubProfileDomain.textContent = domain;
+}
+
+function setHubProfileOpen(isOpen) {
+    if (!hubProfilePanel || !hubUserBadge) {
+        return;
+    }
+
+    const canOpen = Boolean(hubAuthState.profile?.email);
+    hubProfilePanel.hidden = !isOpen || !canOpen;
+    hubUserBadge.setAttribute("aria-expanded", String(isOpen && canOpen));
+}
 
 function saveHubAuthState() {
     if (!hubAuthState.accessToken || !hubAuthState.profile) {
@@ -406,6 +460,7 @@ function clearHubAuthState() {
     hubAuthState.expiresAt = 0;
     hubAuthState.profile = null;
     sessionStorage.removeItem(HUB_AUTH_STORAGE_KEY);
+    setHubProfileOpen(false);
 }
 
 function loadHubAuthState() {
@@ -451,11 +506,22 @@ function renderHubAuthUi() {
     }
     if (hubUserBadge) {
         hubUserBadge.hidden = !signedIn;
-        hubUserBadge.textContent = signedIn ? hubAuthState.profile.email : "";
+        hubUserBadge.textContent = signedIn ? getHubUserInitials(hubAuthState.profile) : "";
+        hubUserBadge.title = signedIn ? getHubDisplayName(hubAuthState.profile) : "";
     }
     if (hubStaffLink) {
         hubStaffLink.hidden = !signedIn;
     }
+    if (hubAdminLink) {
+        hubAdminLink.hidden = !signedIn;
+    }
+
+    if (!signedIn) {
+        setHubProfileOpen(false);
+        return;
+    }
+
+    populateHubProfilePanel();
 }
 
 async function fetchGoogleUserProfile(accessToken) {
@@ -514,6 +580,20 @@ function bindHubAuthControls() {
 
     if (hubSignOutButton) {
         hubSignOutButton.addEventListener("click", signOutHubGoogle);
+    }
+
+    if (hubUserBadge) {
+        hubUserBadge.addEventListener("click", () => {
+            const currentlyOpen = hubProfilePanel ? !hubProfilePanel.hidden : false;
+            setHubProfileOpen(!currentlyOpen);
+            if (!currentlyOpen) {
+                populateHubProfilePanel();
+            }
+        });
+    }
+
+    if (hubProfileClose) {
+        hubProfileClose.addEventListener("click", () => setHubProfileOpen(false));
     }
 }
 

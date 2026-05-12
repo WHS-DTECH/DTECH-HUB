@@ -175,8 +175,10 @@ a {
 .user-badge {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     min-height: 22px;
-    padding: 3px 8px;
+    min-width: 22px;
+    padding: 3px 7px;
     border-radius: 999px;
     color: #ffffff;
     font-size: 0.62rem;
@@ -185,6 +187,73 @@ a {
     background: rgba(255, 255, 255, 0.16);
     text-transform: none;
     letter-spacing: 0.02em;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.hub-profile {
+    width: min(1500px, calc(100% - 28px));
+    margin: 18px auto 0;
+    background: linear-gradient(145deg, #f4f8ff 0%, #eef6f2 100%);
+}
+
+.hub-profile-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 12px;
+}
+
+.hub-profile-avatar {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, #5a2891 0%, #7c49b6 100%);
+    color: #ffffff;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+
+.hub-profile-email {
+    margin: 4px 0 0;
+    color: var(--ink-mid);
+    font-size: 0.83rem;
+}
+
+.hub-profile-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.hub-profile-item {
+    border: 1px solid #ccd7e8;
+    border-radius: 8px;
+    background: #ffffff;
+    padding: 10px;
+    display: grid;
+    gap: 3px;
+}
+
+.hub-profile-item span {
+    color: var(--ink-soft);
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.hub-profile-item strong {
+    color: var(--ink-strong);
+    font-size: 0.87rem;
+}
+
+.hub-profile-actions {
+    margin-top: 12px;
+    display: flex;
+    justify-content: flex-end;
 }
 
 .hero-panel {
@@ -783,6 +852,10 @@ a {
     .project-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+
+    .hub-profile-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
 @media (max-width: 720px) {
@@ -823,6 +896,10 @@ a {
     }
 
     .controls-panel {
+        grid-template-columns: 1fr;
+    }
+
+    .hub-profile-grid {
         grid-template-columns: 1fr;
     }
 
@@ -1095,7 +1172,7 @@ a {
 
 .admin-form-row {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
     gap: 8px;
     align-items: end;
 }
@@ -1119,6 +1196,30 @@ a {
     color: #223653;
     padding: 8px 10px;
     min-height: 36px;
+    font-size: 0.8rem;
+}
+
+.admin-email-field {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px;
+    align-items: center;
+}
+
+.admin-email-picker {
+    min-height: 36px;
+    min-width: 36px;
+    border-radius: 6px;
+    border: 1px solid #d98f8f;
+    background: #da4d4d;
+    color: #ffffff;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.admin-inline-note {
+    margin: 10px 0 0;
+    color: #5b7693;
     font-size: 0.8rem;
 }
 

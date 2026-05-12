@@ -15,7 +15,7 @@
     <header class="admin-page-header">
       <h1>User Role Management</h1>
       <p>Assign additional roles to users beyond their primary Google account role.</p>
-      <a class="button button-secondary" href="admin-menu.html">Back to Admin</a>
+      <a class="button button-secondary" href="admin-menu.html">Back to Hub</a>
     </header>
 
     <div class="admin-layout">
@@ -43,7 +43,10 @@
             </label>
             <label>
               User Email
-              <input type="email" name="userEmail" placeholder="name@westlandhigh.school.nz" required>
+              <div class="admin-email-field">
+                <input type="email" name="userEmail" placeholder="name@westlandhigh.school.nz" required>
+                <button type="button" class="admin-email-picker" title="Pick user">...</button>
+              </div>
             </label>
             <label>
               Role to Add
@@ -56,12 +59,9 @@
                 <option>Technician</option>
               </select>
             </label>
-            <label>
-              Display Name
-              <input type="text" name="displayName" placeholder="Optional display name">
-            </label>
             <button type="submit" class="button button-primary">Add Role</button>
           </form>
+          <p class="admin-inline-note">Google login hook: Replace typed email with currently selected Google user from your admin directory picker.</p>
           <p id="user-role-status" class="upload-status" aria-live="polite"></p>
         </section>
 
@@ -73,7 +73,6 @@
                 <tr>
                   <th>Type</th>
                   <th>User</th>
-                  <th>Email</th>
                   <th>Additional Roles</th>
                   <th>Actions</th>
                 </tr>

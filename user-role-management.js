@@ -21,7 +21,7 @@ function renderRows(rows) {
 
   if (!rows.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="5">No additional roles assigned yet.</td>`;
+    tr.innerHTML = `<td colspan="4">No additional roles assigned yet.</td>`;
     roleTableBody.appendChild(tr);
     return;
   }
@@ -30,8 +30,10 @@ function renderRows(rows) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td><span class="project-tag">${row.user_type || ""}</span></td>
-      <td>${row.display_name || "-"}</td>
-      <td>${row.user_email || ""}</td>
+      <td>
+        <strong>${row.user_email || ""}</strong>
+        <div>${row.display_name || "-"}</div>
+      </td>
       <td><span class="status-tag status-planning">${row.additional_role || "None"}</span></td>
       <td><button type="button" class="button button-secondary" data-remove="${row.user_email}">Remove</button></td>
     `;
@@ -70,8 +72,17 @@ if (roleForm) {
       user_type: String(formData.get("userType") || "").trim(),
       user_email: String(formData.get("userEmail") || "").trim().toLowerCase(),
       additional_role: String(formData.get("roleToAdd") || "").trim(),
-      display_name: String(formData.get("displayName") || "").trim()
+      display_name: ""
     };
+
+    if (!payload.display_name && payload.user_email.includes("@")) {
+      const localPart = payload.user_email.split("@")[0] || "";
+      payload.display_name = localPart
+        .split(/[._-]+/)
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ");
+    }
 
     if (!payload.user_type || !payload.user_email || !payload.additional_role) {
       setStatus("User type, email, and role are required.", true);
