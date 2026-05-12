@@ -171,6 +171,10 @@ async function refreshStaff() {
   renderStaffList(cachedStaffRows);
 }
 
+function bootAdminData() {
+  Promise.allSettled([refresh(), refreshStaff()]);
+}
+
 if (roleForm) {
   roleForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -225,5 +229,4 @@ if (staffSearch) {
   staffSearch.addEventListener("input", () => renderStaffList(cachedStaffRows));
 }
 
-refresh().catch(() => {});
-refreshStaff().catch(() => {});
+bootAdminData();
