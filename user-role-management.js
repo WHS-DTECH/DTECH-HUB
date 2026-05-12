@@ -65,7 +65,7 @@ function renderStaffList(rows) {
   if (!filtered.length) {
     const empty = document.createElement("div");
     empty.className = "admin-empty-state";
-    empty.textContent = "No staff matched your search.";
+    empty.textContent = rows.length ? "No staff matched your search." : "No staff records are available from this site yet.";
     staffList.appendChild(empty);
     return;
   }
@@ -90,7 +90,9 @@ function renderStaffList(rows) {
 
 async function loadStaffRows() {
   const response = await fetch("/api/admin/staff-list");
-  if (!response.ok) throw new Error("Could not load staff list");
+  if (!response.ok) {
+    return [];
+  }
   const rows = await response.json();
   return Array.isArray(rows) ? rows : [];
 }
@@ -103,7 +105,9 @@ function setStatus(message, isError = false) {
 
 async function loadUserRoles() {
   const response = await fetch("/api/admin/user-roles");
-  if (!response.ok) throw new Error("Could not load user roles");
+  if (!response.ok) {
+    return [];
+  }
   const rows = await response.json();
   return Array.isArray(rows) ? rows : [];
 }
@@ -215,4 +219,5 @@ if (staffSearch) {
   staffSearch.addEventListener("input", () => renderStaffList(cachedStaffRows));
 }
 
-Promise.all([refresh(), refreshStaff()]).catch((error) => setStatus(error.message, true));
+refresh().catch(() => {});
+refreshStaff().catch(() => {});
