@@ -4,10 +4,12 @@ const projects = [
         title: "Python Debug Lab",
         className: "Year 11 Computer Lab",
         area: "Programming",
+        activityCategory: "Practice",
+        showThisWeek: false,
         status: "active",
         term: "Term 2",
         updated: "2026-05-06",
-        href: "ClassTrainingSystem/app/templates/module2/debugging_intro.html",
+        href: "ProjectPages/python-debug-lab.html",
         external: false,
         summary: "Track down logic bugs, run tests, and improve code quality with guided debugging missions.",
         keywords: ["python", "debugging", "logic", "troubleshooting", "code fixes"],
@@ -22,10 +24,12 @@ const projects = [
         title: "Web UI Remix",
         className: "Year 10 Computer Lab",
         area: "Web Design",
+        activityCategory: "Practice",
+        showThisWeek: false,
         status: "active",
         term: "Term 2",
         updated: "2026-05-05",
-        href: "index.html",
+        href: "ProjectPages/web-ui-remix.html",
         external: false,
         summary: "Re-style an existing page with stronger visual hierarchy, accessibility checks, and responsive layout improvements.",
         keywords: ["html", "css", "ui", "layout", "responsive"],
@@ -40,10 +44,12 @@ const projects = [
         title: "Robotics Control Board",
         className: "Year 12 Computer Lab",
         area: "Physical Computing",
+        activityCategory: "Practice",
+        showThisWeek: false,
         status: "active",
         term: "Term 2",
         updated: "2026-05-04",
-        href: "ProjectPages/maker-lab-builds.html",
+        href: "ProjectPages/robotics-control-board.html",
         external: false,
         summary: "Build and monitor microcontroller projects, capture test data, and document each hardware iteration.",
         keywords: ["robotics", "microcontroller", "hardware", "prototyping", "testing"],
@@ -58,10 +64,12 @@ const projects = [
         title: "Data Visual Story",
         className: "Year 12 Computer Lab",
         area: "Data Skills",
+        activityCategory: "Practice",
+        showThisWeek: false,
         status: "planning",
         term: "Term 2",
         updated: "2026-05-03",
-        href: "ProjectPages/digital-portfolio-studio.html",
+        href: "ProjectPages/data-visual-story.html",
         external: false,
         summary: "Convert class data into clear visual dashboards and short evidence-based stories for assessment.",
         keywords: ["data", "charts", "dashboard", "analysis", "storytelling"],
@@ -76,11 +84,13 @@ const projects = [
         title: "Cyber Safety Lab",
         className: "Year 9 Computer Lab",
         area: "Cyber Security",
+        activityCategory: "Practice",
+        showThisWeek: false,
         status: "planning",
         term: "Term 2",
         updated: "2026-05-01",
-        href: "https://sites.google.com/westlandhigh.school.nz/dtec/home",
-        external: true,
+        href: "ProjectPages/cyber-safety-lab.html",
+        external: false,
         summary: "Learn password hygiene, phishing detection, and practical online safety routines through mini challenges.",
         keywords: ["cyber", "security", "phishing", "privacy", "safety"],
         visual: {
@@ -94,6 +104,8 @@ const projects = [
         title: "Digital Portfolio Studio",
         className: "Year 11 Computer Lab",
         area: "Digital Learning",
+        activityCategory: "Practice",
+        showThisWeek: false,
         status: "archive",
         term: "Term 1",
         updated: "2026-03-28",
@@ -112,6 +124,8 @@ const projects = [
         title: "Maker Lab Builds",
         className: "Year 13 Computer Lab",
         area: "STEM Projects",
+        activityCategory: "Practice",
+        showThisWeek: false,
         status: "archive",
         term: "Term 1",
         updated: "2026-02-14",
@@ -174,7 +188,7 @@ function getTypes() {
 }
 
 function getCategories() {
-    return ["All", ...new Set(projects.map((project) => project.area)).values()];
+    return ["All", ...new Set(projects.map((project) => project.activityCategory)).values()];
 }
 
 function buildSelectOptions(selectElement, options, allLabel, formatter = (value) => value) {
@@ -222,8 +236,8 @@ function filterProjects(items) {
         const projectYear = yearMatch ? yearMatch[0] : "Other";
         const matchesYear = state.year === "All" || projectYear === state.year;
         const matchesType = state.type === "All" || project.status === state.type;
-        const matchesCategory = state.category === "All" || project.area === state.category;
-        const haystack = [project.title, project.className, project.area, project.summary, ...project.keywords]
+        const matchesCategory = state.category === "All" || project.activityCategory === state.category;
+        const haystack = [project.title, project.className, project.area, project.activityCategory, project.summary, ...project.keywords]
             .join(" ")
             .toLowerCase();
         const matchesSearch = !query || haystack.includes(query);
@@ -250,7 +264,7 @@ function createProjectCard(project) {
         <div class="project-body">
             <div class="project-tags">
                 <span class="status-tag status-${project.status}">${formatStatus(project.status)}</span>
-                <span class="project-tag">${project.area}</span>
+                <span class="project-tag">${project.activityCategory}</span>
                 <span class="project-tag">${project.term}</span>
             </div>
             <h3>${project.title}</h3>
@@ -284,7 +298,19 @@ function populateFilters() {
 
 function renderCurrentProjects() {
     currentProjectGrid.innerHTML = "";
-    const activeProjects = sortProjects(projects.filter((project) => project.status === "active"));
+    const activeProjects = sortProjects(projects.filter((project) => project.showThisWeek));
+
+    if (!activeProjects.length) {
+        const emptyState = document.createElement("div");
+        emptyState.className = "about-card";
+        emptyState.innerHTML = `
+            <p class="section-kicker">No Activities Scheduled</p>
+            <h2>This week has no pinned activities yet.</h2>
+            <p>Use Staff View to add or update activities and tick Show in This Week when ready.</p>
+        `;
+        currentProjectGrid.appendChild(emptyState);
+        return;
+    }
 
     activeProjects.forEach((project) => {
         currentProjectGrid.appendChild(createProjectCard(project));
@@ -315,7 +341,7 @@ function renderLibrary() {
 }
 
 function renderStats() {
-    activeCount.textContent = projects.filter((project) => project.status === "active").length;
+    activeCount.textContent = projects.filter((project) => project.showThisWeek).length;
     totalCount.textContent = projects.length;
     categoryCount.textContent = new Set(projects.map((project) => project.area)).size;
 }
