@@ -130,6 +130,8 @@ const projects = [
 const state = {
     search: "",
     sort: "name-asc",
+    year: "All",
+    type: "All",
     category: "All"
 };
 
@@ -143,14 +145,48 @@ const currentProjectGrid = document.querySelector("#current-project-grid");
 const libraryGrid = document.querySelector("#project-library-grid");
 const searchInput = document.querySelector("#project-search");
 const sortSelect = document.querySelector("#sort-order");
-const categoryFilters = document.querySelector("#category-filters");
+const yearSelect = document.querySelector("#year-filter");
+const typeSelect = document.querySelector("#type-filter");
+const categorySelect = document.querySelector("#category-filter");
 const libraryResultsMeta = document.querySelector("#library-results-meta");
 const activeCount = document.querySelector("#stat-active-count");
 const totalCount = document.querySelector("#stat-total-count");
 const categoryCount = document.querySelector("#stat-category-count");
 
+function getYearLevels() {
+    return [...new Set(projects.map((project) => {
+        const match = project.className.match(/Year\s+\d+/i);
+        return match ? match[0] : "Other";
+    }))].sort((left, right) => {
+        const leftYear = Number.parseInt(left.replace(/\D+/g, ""), 10);
+        const rightYear = Number.parseInt(right.replace(/\D+/g, ""), 10);
+
+        if (Number.isNaN(leftYear) || Number.isNaN(rightYear)) {
+            return left.localeCompare(right);
+        }
+
+        return leftYear - rightYear;
+    });
+}
+
+function getTypes() {
+    return ["All", "active", "planning", "archive"];
+}
+
 function getCategories() {
-    return ["All", ...new Set(projects.map((project) => project.area))];
+    return ["All", ...new Set(projects.map((project) => project.area)).values()];
+}
+
+function buildSelectOptions(selectElement, options, allLabel, formatter = (value) => value) {
+    if (!selectElement) return;
+
+    selectElement.innerHTML = "";
+    options.forEach((optionValue) => {
+        const option = document.createElement("option");
+        option.value = optionValue;
+        option.textContent = optionValue === "All" ? allLabel : formatter(optionValue);
+        selectElement.appendChild(option);
+    });
 }
 
 function sortProjects(items) {
@@ -182,13 +218,17 @@ function filterProjects(items) {
     const query = state.search.trim().toLowerCase();
 
     return items.filter((project) => {
+        const yearMatch = project.className.match(/Year\s+\d+/i);
+        const projectYear = yearMatch ? yearMatch[0] : "Other";
+        const matchesYear = state.year === "All" || projectYear === state.year;
+        const matchesType = state.type === "All" || project.status === state.type;
         const matchesCategory = state.category === "All" || project.area === state.category;
         const haystack = [project.title, project.className, project.area, project.summary, ...project.keywords]
             .join(" ")
             .toLowerCase();
         const matchesSearch = !query || haystack.includes(query);
 
-        return matchesCategory && matchesSearch;
+        return matchesYear && matchesType && matchesCategory && matchesSearch;
     });
 }
 
@@ -232,21 +272,14 @@ function formatStatus(status) {
     return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
-function renderCategoryFilters() {
-    categoryFilters.innerHTML = "";
+function populateFilters() {
+    buildSelectOptions(yearSelect, ["All", ...getYearLevels()], "All levels");
+    buildSelectOptions(typeSelect, getTypes(), "All types", (value) => formatStatus(value));
+    buildSelectOptions(categorySelect, getCategories(), "All activities");
 
-    getCategories().forEach((category) => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = `filter-chip${state.category === category ? " is-active" : ""}`;
-        button.textContent = category;
-        button.addEventListener("click", () => {
-            state.category = category;
-            renderLibrary();
-            renderCategoryFilters();
-        });
-        categoryFilters.appendChild(button);
-    });
+    yearSelect.value = state.year;
+    typeSelect.value = state.type;
+    categorySelect.value = state.category;
 }
 
 function renderCurrentProjects() {
@@ -293,6 +326,21 @@ function bindControls() {
         renderLibrary();
     });
 
+    yearSelect.addEventListener("change", (event) => {
+        state.year = event.target.value;
+        renderLibrary();
+    });
+
+    typeSelect.addEventListener("change", (event) => {
+        state.type = event.target.value;
+        renderLibrary();
+    });
+
+    categorySelect.addEventListener("change", (event) => {
+        state.category = event.target.value;
+        renderLibrary();
+    });
+
     sortSelect.addEventListener("change", (event) => {
         state.sort = event.target.value;
         renderLibrary();
@@ -302,7 +350,7 @@ function bindControls() {
 
 function init() {
     renderStats();
-    renderCategoryFilters();
+    populateFilters();
     renderCurrentProjects();
     renderLibrary();
     bindControls();

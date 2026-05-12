@@ -82,31 +82,49 @@
                         <p class="section-kicker">Activity Library Students Can Choose</p>
                         <h2>Browse every computer lab activity</h2>
                     </div>
+                    <p id="library-results-meta" class="results-meta" aria-live="polite"></p>
                     <p class="section-copy">
                         Search by activity title, year level, or keywords, then sort to quickly find the right task.
                     </p>
                 </div>
 
                 <div class="controls-panel" role="search">
-                    <label class="search-field" for="project-search">
-                        <span class="visually-hidden">Search activities</span>
-                        <input id="project-search" type="search" placeholder="Search activities, year levels, or keywords">
+                    <label class="control-field search-field" for="project-search">
+                        <span>Search</span>
+                        <input id="project-search" type="search" placeholder="Search activities (e.g., zip, app, web)">
                     </label>
 
-                    <label class="sort-field" for="sort-order">
-                        <span class="visually-hidden">Sort activities</span>
-                        <select id="sort-order">
-                            <option value="name-asc">Sort: A to Z</option>
-                            <option value="name-desc">Sort: Z to A</option>
-                            <option value="status">Sort: Session Status</option>
-                            <option value="recent">Sort: Most recent</option>
+                    <label class="control-field" for="year-filter">
+                        <span>Year Level</span>
+                        <select id="year-filter">
+                            <option value="All">All levels</option>
                         </select>
                     </label>
 
-                    <div id="category-filters" class="filter-chips" aria-label="Filter activities by learning strand"></div>
-                </div>
+                    <label class="control-field" for="type-filter">
+                        <span>Type</span>
+                        <select id="type-filter">
+                            <option value="All">All types</option>
+                        </select>
+                    </label>
 
-                <div id="library-results-meta" class="results-meta" aria-live="polite"></div>
+                    <label class="control-field" for="category-filter">
+                        <span>Activity Category</span>
+                        <select id="category-filter">
+                            <option value="All">All activities</option>
+                        </select>
+                    </label>
+
+                    <label class="control-field sort-field" for="sort-order">
+                        <span>Sort</span>
+                        <select id="sort-order">
+                            <option value="name-asc">Name (A-Z)</option>
+                            <option value="name-desc">Name (Z-A)</option>
+                            <option value="status">Session Status</option>
+                            <option value="recent">Most recent</option>
+                        </select>
+                    </label>
+                </div>
                 <div id="project-library-grid" class="project-grid" aria-live="polite"></div>
             </section>
 
