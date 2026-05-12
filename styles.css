@@ -97,6 +97,10 @@ a {
     gap: 6px;
 }
 
+.utility-actions [hidden] {
+    display: none !important;
+}
+
 .utility-actions a {
     display: inline-flex;
     align-items: center;
