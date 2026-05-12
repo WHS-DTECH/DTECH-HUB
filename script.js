@@ -1,110 +1,128 @@
 const projects = [
     {
-        id: "food-room-recipe-book",
-        title: "Food Room Recipe Book",
-        className: "Hospitality and Food Technology",
-        area: "Food Technology",
+        id: "python-debug-lab",
+        title: "Python Debug Lab",
+        className: "Year 11 Computer Lab",
+        area: "Programming",
         status: "active",
         term: "Term 2",
         updated: "2026-05-06",
-        href: "https://recipe-calculator-backend.onrender.com/index.html",
-        external: true,
-        summary: "A searchable class cookbook with practical recipes, student-friendly filters, and fast access to current weekly cooking tasks.",
-        keywords: ["recipe", "cooking", "hospitality", "food room", "showcase"],
+        href: "ClassTrainingSystem/app/templates/module2/debugging_intro.html",
+        external: false,
+        summary: "Track down logic bugs, run tests, and improve code quality with guided debugging missions.",
+        keywords: ["python", "debugging", "logic", "troubleshooting", "code fixes"],
         visual: {
-            icon: "FR",
-            label: "Recipe Book",
-            palette: "linear-gradient(135deg, #155694 0%, #3da6ea 58%, #ffb26f 100%)"
+            icon: "PY",
+            label: "Debug Mission",
+            palette: "linear-gradient(135deg, #8d316f 0%, #b15186 56%, #c96e9c 100%)"
         }
     },
     {
-        id: "detention-tracker",
-        title: "Detention Tracker",
-        className: "Student Support Systems",
-        area: "Administration",
-        status: "planning",
+        id: "web-ui-remix",
+        title: "Web UI Remix",
+        className: "Year 10 Computer Lab",
+        area: "Web Design",
+        status: "active",
         term: "Term 2",
         updated: "2026-05-05",
-        href: "Detention/index.html",
+        href: "index.html",
         external: false,
-        summary: "A project space for recording incidents, assigning follow-up actions, and helping staff manage student accountability clearly.",
-        keywords: ["detention", "support", "tracking", "student management"],
+        summary: "Re-style an existing page with stronger visual hierarchy, accessibility checks, and responsive layout improvements.",
+        keywords: ["html", "css", "ui", "layout", "responsive"],
         visual: {
-            icon: "DT",
-            label: "Support Workflow",
-            palette: "linear-gradient(135deg, #254c6d 0%, #4f89ba 55%, #d8eefb 100%)"
+            icon: "UI",
+            label: "Design Sprint",
+            palette: "linear-gradient(135deg, #8c5a2a 0%, #b67a3c 52%, #d39552 100%)"
         }
     },
     {
-        id: "guidance-counsellor-portal",
-        title: "Guidance Counsellor Portal",
-        className: "Wellbeing and Pastoral Care",
-        area: "Student Support",
+        id: "robotics-control-board",
+        title: "Robotics Control Board",
+        className: "Year 12 Computer Lab",
+        area: "Physical Computing",
         status: "active",
         term: "Term 2",
         updated: "2026-05-04",
-        href: "GuidanceCounsellor/index.html",
+        href: "ProjectPages/maker-lab-builds.html",
         external: false,
-        summary: "A student support hub for referrals, wellbeing check-ins, and shared access to counselling resources and processes.",
-        keywords: ["guidance", "counsellor", "wellbeing", "referral", "support"],
+        summary: "Build and monitor microcontroller projects, capture test data, and document each hardware iteration.",
+        keywords: ["robotics", "microcontroller", "hardware", "prototyping", "testing"],
         visual: {
-            icon: "GC",
-            label: "Wellbeing Hub",
-            palette: "linear-gradient(135deg, #0d5b59 0%, #57b8ad 52%, #dff5e8 100%)"
+            icon: "RB",
+            label: "Control Build",
+            palette: "linear-gradient(135deg, #236d8c 0%, #2f95b2 48%, #4ab5cc 100%)"
         }
     },
     {
-        id: "interhapu-collaboration",
-        title: "InterHapu Collaboration",
-        className: "Culture, Community and Design",
-        area: "Community Projects",
-        status: "active",
+        id: "data-visual-story",
+        title: "Data Visual Story",
+        className: "Year 12 Computer Lab",
+        area: "Data Skills",
+        status: "planning",
         term: "Term 2",
         updated: "2026-05-03",
-        href: "InterHapu/index.html",
+        href: "ProjectPages/digital-portfolio-studio.html",
         external: false,
-        summary: "A collaborative project space for community storytelling, planning, resources, and student-led design work across groups.",
-        keywords: ["interhapu", "community", "culture", "collaboration", "design"],
+        summary: "Convert class data into clear visual dashboards and short evidence-based stories for assessment.",
+        keywords: ["data", "charts", "dashboard", "analysis", "storytelling"],
         visual: {
-            icon: "IH",
-            label: "Community Design",
-            palette: "linear-gradient(135deg, #6d3d1f 0%, #c5773b 45%, #f3ddc2 100%)"
+            icon: "DS",
+            label: "Data Narrative",
+            palette: "linear-gradient(135deg, #2e7a56 0%, #3f9e70 52%, #5fbf8a 100%)"
+        }
+    },
+    {
+        id: "cyber-safety-lab",
+        title: "Cyber Safety Lab",
+        className: "Year 9 Computer Lab",
+        area: "Cyber Security",
+        status: "planning",
+        term: "Term 2",
+        updated: "2026-05-01",
+        href: "https://sites.google.com/westlandhigh.school.nz/dtec/home",
+        external: true,
+        summary: "Learn password hygiene, phishing detection, and practical online safety routines through mini challenges.",
+        keywords: ["cyber", "security", "phishing", "privacy", "safety"],
+        visual: {
+            icon: "CS",
+            label: "Cyber Basics",
+            palette: "linear-gradient(135deg, #5d267d 0%, #7f35a8 54%, #9a4bc0 100%)"
         }
     },
     {
         id: "digital-portfolio-studio",
         title: "Digital Portfolio Studio",
-        className: "Digital Technologies",
+        className: "Year 11 Computer Lab",
         area: "Digital Learning",
         status: "archive",
         term: "Term 1",
         updated: "2026-03-28",
         href: "ProjectPages/digital-portfolio-studio.html",
         external: false,
-        summary: "A portfolio space where students published project reflections, media evidence, and final showcase artifacts from earlier work.",
-        keywords: ["portfolio", "digital", "showcase", "reflection"],
+        summary: "An archive of published reflections, checkpoints, and final showcase evidence from prior units.",
+        keywords: ["portfolio", "digital", "showcase", "reflection", "archive"],
         visual: {
             icon: "DP",
-            label: "Showcase Archive",
-            palette: "linear-gradient(135deg, #4437a8 0%, #7a74e8 52%, #ddd9ff 100%)"
+            label: "Portfolio Archive",
+            palette: "linear-gradient(135deg, #4d3ba0 0%, #6a58b5 52%, #8a75c4 100%)"
         }
     },
     {
         id: "maker-lab-builds",
         title: "Maker Lab Builds",
-        className: "Engineering and Fabrication",
+        className: "Year 13 Computer Lab",
         area: "STEM Projects",
         status: "archive",
         term: "Term 1",
         updated: "2026-02-14",
         href: "ProjectPages/maker-lab-builds.html",
         external: false,
-        summary: "An archive of prototypes, build journals, and workshop documentation for practical engineering projects completed this year.",
+        summary: "Archived prototypes, sprint notes, and build logs from fabrication and automation challenges.",
         keywords: ["maker", "engineering", "builds", "prototypes", "stem"],
         visual: {
             icon: "ML",
             label: "Prototype Archive",
-            palette: "linear-gradient(135deg, #1e2f55 0%, #4c73a8 50%, #d9e7fb 100%)"
+            palette: "linear-gradient(135deg, #4d4f67 0%, #676c86 50%, #8b90a8 100%)"
         }
     }
 ];
@@ -200,9 +218,9 @@ function createProjectCard(project) {
             <div class="project-footer">
                 <div>
                     <div class="project-meta">${project.className}</div>
-                    <div class="project-path">${project.external ? "External project link" : project.href}</div>
+                    <div class="project-path">${project.external ? "External activity link" : project.href}</div>
                 </div>
-                <span class="project-link">Open project</span>
+                <span class="project-link">Open activity</span>
             </div>
         </div>
     `;
@@ -244,14 +262,14 @@ function renderLibrary() {
     libraryGrid.innerHTML = "";
     const visibleProjects = sortProjects(filterProjects(projects));
 
-    libraryResultsMeta.textContent = `${visibleProjects.length} project${visibleProjects.length === 1 ? "" : "s"} shown`;
+    libraryResultsMeta.textContent = `${visibleProjects.length} activit${visibleProjects.length === 1 ? "y" : "ies"} shown`;
 
     if (!visibleProjects.length) {
         const emptyState = document.createElement("div");
         emptyState.className = "about-card";
         emptyState.innerHTML = `
             <p class="section-kicker">No Results</p>
-            <h2>No projects matched that search.</h2>
+            <h2>No activities matched that search.</h2>
             <p>Try a different keyword or switch back to the All filter to widen the library.</p>
         `;
         libraryGrid.appendChild(emptyState);

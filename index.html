@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DTECH Hub</title>
-    <meta name="description" content="DTECH Hub connects current class projects and the full project library for students and staff at Westland High School.">
-    <meta name="theme-color" content="#1877c9">
+    <title>Computer Lab Activity Hub</title>
+    <meta name="description" content="Computer Lab Activity Hub connects current digital technology activities and the full activity library for students and staff at Westland High School.">
+    <meta name="theme-color" content="#4a1b6f">
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,39 +16,45 @@
     <div class="page-shell">
         <header class="hero">
             <nav class="topbar" aria-label="Primary">
-                <a class="brand" href="index.html">DTECH Hub</a>
-                <div class="topbar-links">
-                    <a href="#current-projects">Current Projects</a>
-                    <a href="#project-library">Project Library</a>
-                    <a href="https://sites.google.com/westlandhigh.school.nz/dtec/home" target="_blank" rel="noreferrer">Learning Site</a>
-                    <a href="#about-hub">About</a>
+                <a class="brand" href="index.html">Computer Lab</a>
+                <div class="topbar-right">
+                    <div class="topbar-links">
+                        <a href="#current-projects">This Week</a>
+                        <a href="#project-library">Activity Library</a>
+                        <a href="https://sites.google.com/westlandhigh.school.nz/dtec/home" target="_blank" rel="noreferrer">Learning Site</a>
+                        <a href="#about-hub">Lab Notes</a>
+                    </div>
+                    <div class="utility-actions" aria-label="Utility actions">
+                        <a href="#">Staff View</a>
+                        <a href="#">Sign out</a>
+                    </div>
                 </div>
             </nav>
 
             <div class="hero-panel">
                 <div class="hero-copy">
-                    <p class="eyebrow">WESTLAND HIGH SCHOOL</p>
-                    <h1>One hub for every class project your students are building.</h1>
+                    <p class="eyebrow">WESTLAND HIGH SCHOOL | DIGITAL TECHNOLOGIES</p>
+                    <h1>Computer Lab Activity Hub</h1>
                     <p class="hero-text">
-                        Give students and staff a single place to find active projects, revisit past work, and jump straight into the right class space.
+                        Explore practical coding and design activities students are completing this term, then browse the full activity library by strand, level, and focus.
                     </p>
                     <div class="hero-actions">
-                        <a class="button button-primary" href="#current-projects">See What Is Live</a>
-                        <a class="button button-secondary" href="#project-library">Browse All Projects</a>
+                        <a class="button button-primary" href="#current-projects">See This Week</a>
+                        <a class="button button-secondary" href="#project-library">Browse Activities</a>
                     </div>
                 </div>
 
                 <aside class="hero-stats" aria-label="Hub summary">
                     <div class="stat-card">
-                        <span class="stat-label">Active this term</span>
+                        <span class="stat-label">Running this week</span>
                         <strong id="stat-active-count">0</strong>
                     </div>
                     <div class="stat-card">
-                        <span class="stat-label">Project spaces</span>
+                        <span class="stat-label">Activities in library</span>
                         <strong id="stat-total-count">0</strong>
                     </div>
                     <div class="stat-card">
-                        <span class="stat-label">Learning areas</span>
+                        <span class="stat-label">Learning strands</span>
                         <strong id="stat-category-count">0</strong>
                     </div>
                 </aside>
@@ -59,11 +65,11 @@
             <section id="current-projects" class="panel-section current-work">
                 <div class="section-heading">
                     <div>
-                        <p class="section-kicker">Students Working On Right Now</p>
-                        <h2>Current class projects</h2>
+                        <p class="section-kicker">Activities Running This Week</p>
+                        <h2>Current computer lab sessions</h2>
                     </div>
                     <p class="section-copy">
-                        These are the spaces students are actively using this term. Keep this area focused on what staff and learners need to access quickly.
+                        These are the active sessions students can join now. Keep this area focused on tasks students need during the week.
                     </p>
                 </div>
 
@@ -73,31 +79,31 @@
             <section id="project-library" class="panel-section library-section">
                 <div class="section-heading library-heading">
                     <div>
-                        <p class="section-kicker">Project Library</p>
-                        <h2>Browse every DTECH project space</h2>
+                        <p class="section-kicker">Activity Library Students Can Choose</p>
+                        <h2>Browse every computer lab activity</h2>
                     </div>
                     <p class="section-copy">
-                        Search by project title, class, or keywords, then sort the library to quickly find what you need.
+                        Search by activity title, year level, or keywords, then sort to quickly find the right task.
                     </p>
                 </div>
 
                 <div class="controls-panel" role="search">
                     <label class="search-field" for="project-search">
-                        <span class="visually-hidden">Search projects</span>
-                        <input id="project-search" type="search" placeholder="Search projects, classes, or keywords">
+                        <span class="visually-hidden">Search activities</span>
+                        <input id="project-search" type="search" placeholder="Search activities, year levels, or keywords">
                     </label>
 
                     <label class="sort-field" for="sort-order">
-                        <span class="visually-hidden">Sort projects</span>
+                        <span class="visually-hidden">Sort activities</span>
                         <select id="sort-order">
                             <option value="name-asc">Sort: A to Z</option>
                             <option value="name-desc">Sort: Z to A</option>
-                            <option value="status">Sort: Status</option>
+                            <option value="status">Sort: Session Status</option>
                             <option value="recent">Sort: Most recent</option>
                         </select>
                     </label>
 
-                    <div id="category-filters" class="filter-chips" aria-label="Filter projects by learning area"></div>
+                    <div id="category-filters" class="filter-chips" aria-label="Filter activities by learning strand"></div>
                 </div>
 
                 <div id="library-results-meta" class="results-meta" aria-live="polite"></div>
@@ -107,9 +113,9 @@
             <section id="about-hub" class="panel-section about-section">
                 <div class="about-card">
                     <p class="section-kicker">Why This Layout Works</p>
-                    <h2>Fast access first, archives second.</h2>
+                    <h2>Live sessions first, full library second.</h2>
                     <p>
-                        The homepage separates current activity from the full archive so students are not forced to search for what is happening now. The same card style works for live classes, portfolios, resource spaces, and showcase projects.
+                        The homepage separates weekly activity from the full library so students can jump into today\'s task without searching. The same card pattern supports coding practice, design challenges, robotics, and digital portfolio work.
                     </p>
                 </div>
             </section>
@@ -118,8 +124,8 @@
         <footer class="site-footer" aria-label="School contacts">
             <div class="footer-inner">
                 <div>
-                    <p class="footer-title">Westland High School DTECH Hub</p>
-                    <p class="footer-copy">Keeping student project spaces, support systems, and learning resources connected in one place.</p>
+                    <p class="footer-title">Westland High School Computer Lab Activity Hub</p>
+                    <p class="footer-copy">Keeping digital technology activities, support resources, and class pathways connected in one place.</p>
                 </div>
                 <div class="footer-links">
                     <a href="https://www.westlandhigh.school.nz" target="_blank" rel="noreferrer">School Website</a>
@@ -128,6 +134,10 @@
                 </div>
             </div>
         </footer>
+
+        <noscript>
+            <p class="noscript-note">JavaScript is disabled. Activity cards and filters need JavaScript to display.</p>
+        </noscript>
     </div>
 
     <script src="script.js"></script>
