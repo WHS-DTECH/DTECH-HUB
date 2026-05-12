@@ -89,12 +89,18 @@ function renderStaffList(rows) {
 }
 
 async function loadStaffRows() {
-  const response = await fetch("/api/admin/staff-list");
+  const response = await fetch("/api/staff_upload/all");
   if (!response.ok) {
     return [];
   }
-  const rows = await response.json();
-  return Array.isArray(rows) ? rows : [];
+  const data = await response.json();
+  if (Array.isArray(data)) {
+    return data;
+  }
+  if (Array.isArray(data?.staff)) {
+    return data.staff;
+  }
+  return [];
 }
 
 function setStatus(message, isError = false) {

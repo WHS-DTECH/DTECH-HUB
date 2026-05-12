@@ -291,10 +291,52 @@ app.get("/api/admin/staff-list", async (_req, res) => {
   }
 
   try {
-    const result = await pool.query("SELECT * FROM upload_staff");
+    const result = await pool.query(`
+      SELECT
+        id,
+        code,
+        last_name,
+        first_name,
+        title,
+        email_school,
+        status,
+        upload_year,
+        upload_term,
+        upload_date
+      FROM upload_staff
+      ORDER BY last_name ASC, first_name ASC, id ASC
+    `);
     res.json(result.rows);
   } catch (_error) {
     res.json([]);
+  }
+});
+
+app.get("/api/staff_upload/all", async (_req, res) => {
+  if (!hasDatabase) {
+    res.json({ staff: [] });
+    return;
+  }
+
+  try {
+    const result = await pool.query(`
+      SELECT
+        id,
+        code,
+        last_name,
+        first_name,
+        title,
+        email_school,
+        status,
+        upload_year,
+        upload_term,
+        upload_date
+      FROM upload_staff
+      ORDER BY last_name ASC, first_name ASC, id ASC
+    `);
+    res.json({ staff: result.rows });
+  } catch (_error) {
+    res.status(500).json({ error: "Failed to load staff upload data." });
   }
 });
 
