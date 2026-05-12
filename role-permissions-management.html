@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Role Permissions Management | Computer Lab</title>
+  <link rel="icon" type="image/x-icon" href="images/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="admin-page-wrap">
+    <header class="admin-page-header">
+      <h1>Role Permissions Management</h1>
+      <p>Control which pages each role can access. Check a box to grant access, uncheck to remove access.</p>
+      <a class="button button-secondary" href="admin-menu.html">Back to Admin</a>
+    </header>
+
+    <section class="admin-panel">
+      <div class="admin-table-wrap">
+        <table class="admin-table" id="permissions-table">
+          <thead>
+            <tr>
+              <th>Role</th>
+              <th>Home Page</th>
+              <th>Upload Activity</th>
+              <th>Browse Activities</th>
+              <th>Planning</th>
+              <th>Admin</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="teacher-actions">
+        <button id="save-permissions" type="button" class="button button-primary">Save Changes</button>
+        <button id="reset-permissions" type="button" class="button button-secondary">Reset to Defaults</button>
+      </div>
+      <p id="permissions-status" class="upload-status" aria-live="polite"></p>
+    </section>
+
+    <section class="admin-panel">
+      <h2>Page Descriptions</h2>
+      <ul class="admin-notes-list">
+        <li><strong>Home Page:</strong> Main Computer Lab activity hub page.</li>
+        <li><strong>Upload Activity:</strong> Upload and create new practical activity entries.</li>
+        <li><strong>Browse Activities:</strong> View and search the full activity library.</li>
+        <li><strong>Planning:</strong> Access planning tools for scheduling and project management.</li>
+        <li><strong>Admin:</strong> Administrative functions, including user roles and permission settings.</li>
+      </ul>
+    </section>
+
+    <section class="admin-panel admin-notes-warning">
+      <h2>Important Notes</h2>
+      <ul class="admin-notes-list">
+        <li><strong>Admin role</strong> should always have access to all pages.</li>
+        <li><strong>Public Access</strong> is assigned to all logged-out visitors by default.</li>
+        <li>Additional roles are managed on User Role Management.</li>
+        <li>When connected to Google login, changes should apply on the user's next token refresh.</li>
+      </ul>
+    </section>
+  </div>
+
+  <script src="role-permissions-management.js"></script>
+</body>
+</html>

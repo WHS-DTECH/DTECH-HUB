@@ -21,12 +21,14 @@
                     <div class="topbar-links">
                         <a href="#current-projects">This Week</a>
                         <a href="#project-library">Activity Library</a>
+                        <a href="#current-lab-projects">Lab Projects</a>
                         <a href="#teacher-tools">Teacher Tools</a>
                         <a href="#about-hub">Lab Notes</a>
                     </div>
                     <div class="utility-actions" aria-label="Utility actions">
                         <a href="index.html">Student View</a>
                         <a href="upload-activity.html">Upload Activity</a>
+                        <a href="admin-menu.html">Admin Menu</a>
                     </div>
                 </div>
             </nav>
@@ -80,71 +82,115 @@
                 <p id="teacher-status" class="upload-status" aria-live="polite"></p>
             </section>
 
-            <section id="current-projects" class="panel-section current-work">
-                <div class="section-heading">
-                    <div>
-                        <p class="section-kicker">Activities Running This Week</p>
-                        <h2>Current computer lab sessions</h2>
-                    </div>
-                    <p class="section-copy">
-                        These are the active sessions students can join now. Keep this area focused on tasks students need during the week.
-                    </p>
+            <div class="home-grid">
+                <div class="hub-column activities-column">
+                    <section id="current-projects" class="panel-section current-work">
+                        <div class="section-heading">
+                            <div>
+                                <p class="section-kicker">Activities Running This Week</p>
+                                <h2>Current computer lab sessions</h2>
+                            </div>
+                            <p class="section-copy">
+                                These are the active sessions students can join now. Keep this area focused on tasks students need during the week.
+                            </p>
+                        </div>
+
+                        <div id="current-project-grid" class="project-grid" aria-live="polite"></div>
+                    </section>
+
+                    <section id="project-library" class="panel-section library-section">
+                        <div class="section-heading library-heading">
+                            <div>
+                                <p class="section-kicker">Activity Library Students Can Choose</p>
+                                <h2>Browse every computer lab activity</h2>
+                            </div>
+                            <p id="library-results-meta" class="results-meta" aria-live="polite"></p>
+                            <p class="section-copy">
+                                Search by activity title, year level, or keywords, then sort to quickly find the right task.
+                            </p>
+                        </div>
+
+                        <div class="controls-panel" role="search">
+                            <label class="control-field search-field" for="project-search">
+                                <span>Search</span>
+                                <input id="project-search" type="search" placeholder="Search activities (e.g., zip, app, web)">
+                            </label>
+
+                            <label class="control-field" for="year-filter">
+                                <span>Year Level</span>
+                                <select id="year-filter">
+                                    <option value="All">All levels</option>
+                                </select>
+                            </label>
+
+                            <label class="control-field" for="type-filter">
+                                <span>Type</span>
+                                <select id="type-filter">
+                                    <option value="All">All types</option>
+                                </select>
+                            </label>
+
+                            <label class="control-field" for="category-filter">
+                                <span>Activity Category</span>
+                                <select id="category-filter">
+                                    <option value="All">All activities</option>
+                                </select>
+                            </label>
+
+                            <label class="control-field sort-field" for="sort-order">
+                                <span>Sort</span>
+                                <select id="sort-order">
+                                    <option value="name-asc">Name (A-Z)</option>
+                                    <option value="name-desc">Name (Z-A)</option>
+                                    <option value="status">Session Status</option>
+                                    <option value="recent">Most recent</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div id="project-library-grid" class="project-grid" aria-live="polite"></div>
+                    </section>
                 </div>
 
-                <div id="current-project-grid" class="project-grid" aria-live="polite"></div>
-            </section>
+                <div class="hub-column projects-column">
+                    <section id="current-lab-projects" class="panel-section current-lab-projects">
+                        <div class="section-heading">
+                            <div>
+                                <p class="section-kicker">Lab Projects Running This Week</p>
+                                <h2>Current lab projects</h2>
+                            </div>
+                            <p class="section-copy">Live projects students are currently building, testing, and documenting.</p>
+                        </div>
+                        <div id="current-lab-project-grid" class="project-grid" aria-live="polite"></div>
+                    </section>
 
-            <section id="project-library" class="panel-section library-section">
-                <div class="section-heading library-heading">
-                    <div>
-                        <p class="section-kicker">Activity Library Students Can Choose</p>
-                        <h2>Browse every computer lab activity</h2>
-                    </div>
-                    <p id="library-results-meta" class="results-meta" aria-live="polite"></p>
-                    <p class="section-copy">
-                        Search by activity title, year level, or keywords, then sort to quickly find the right task.
-                    </p>
+                    <section id="browse-lab-projects" class="panel-section browse-lab-projects">
+                        <div class="section-heading library-heading">
+                            <div>
+                                <p class="section-kicker">Project Library</p>
+                                <h2>Browse projects</h2>
+                            </div>
+                            <p id="lab-project-results-meta" class="results-meta" aria-live="polite"></p>
+                        </div>
+                        <div class="controls-panel project-controls" role="search">
+                            <label class="control-field search-field" for="lab-project-search">
+                                <span>Search</span>
+                                <input id="lab-project-search" type="search" placeholder="Search projects (e.g., robotics, portfolio)">
+                            </label>
+
+                            <label class="control-field" for="lab-project-sort">
+                                <span>Sort</span>
+                                <select id="lab-project-sort">
+                                    <option value="name-asc">Name (A-Z)</option>
+                                    <option value="name-desc">Name (Z-A)</option>
+                                    <option value="recent">Most recent</option>
+                                    <option value="phase">Project phase</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div id="lab-project-library-grid" class="project-grid" aria-live="polite"></div>
+                    </section>
                 </div>
-
-                <div class="controls-panel" role="search">
-                    <label class="control-field search-field" for="project-search">
-                        <span>Search</span>
-                        <input id="project-search" type="search" placeholder="Search activities (e.g., zip, app, web)">
-                    </label>
-
-                    <label class="control-field" for="year-filter">
-                        <span>Year Level</span>
-                        <select id="year-filter">
-                            <option value="All">All levels</option>
-                        </select>
-                    </label>
-
-                    <label class="control-field" for="type-filter">
-                        <span>Type</span>
-                        <select id="type-filter">
-                            <option value="All">All types</option>
-                        </select>
-                    </label>
-
-                    <label class="control-field" for="category-filter">
-                        <span>Activity Category</span>
-                        <select id="category-filter">
-                            <option value="All">All activities</option>
-                        </select>
-                    </label>
-
-                    <label class="control-field sort-field" for="sort-order">
-                        <span>Sort</span>
-                        <select id="sort-order">
-                            <option value="name-asc">Name (A-Z)</option>
-                            <option value="name-desc">Name (Z-A)</option>
-                            <option value="status">Session Status</option>
-                            <option value="recent">Most recent</option>
-                        </select>
-                    </label>
-                </div>
-                <div id="project-library-grid" class="project-grid" aria-live="polite"></div>
-            </section>
+            </div>
 
             <section id="about-hub" class="panel-section about-section">
                 <div class="about-card">

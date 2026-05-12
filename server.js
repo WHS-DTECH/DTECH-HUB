@@ -6,11 +6,24 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const hasDatabase = Boolean(process.env.DATABASE_URL);
 const memoryActivities = new Map();
+const memoryUserRoles = new Map();
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
+
+const DEFAULT_ROLE_PERMISSIONS = [
+  { role_name: "Admin", home_page: true, upload_activity: true, browse_activities: true, planning: true, admin: true },
+  { role_name: "Lead Teacher", home_page: true, upload_activity: true, browse_activities: true, planning: true, admin: false },
+  { role_name: "Public Access", home_page: true, upload_activity: false, browse_activities: false, planning: false, admin: false },
+  { role_name: "Staff", home_page: true, upload_activity: false, browse_activities: true, planning: false, admin: false },
+  { role_name: "Student", home_page: true, upload_activity: false, browse_activities: true, planning: false, admin: false },
+  { role_name: "Teacher", home_page: true, upload_activity: false, browse_activities: true, planning: false, admin: false },
+  { role_name: "Technician", home_page: true, upload_activity: false, browse_activities: true, planning: false, admin: false }
+];
+
+let memoryRolePermissions = DEFAULT_ROLE_PERMISSIONS.map((row) => ({ ...row }));
 
 function slugify(value) {
   return String(value || "")
@@ -32,6 +45,10 @@ function normalizeArray(value) {
   }
 
   return [];
+}
+
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
 }
 
 async function ensureSchema() {
@@ -61,6 +78,42 @@ async function ensureSchema() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_additional_roles (
+      user_email TEXT PRIMARY KEY,
+      user_type TEXT NOT NULL,
+      display_name TEXT,
+      additional_role TEXT NOT NULL,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS role_permissions (
+      role_name TEXT PRIMARY KEY,
+      home_page BOOLEAN NOT NULL DEFAULT FALSE,
+      upload_activity BOOLEAN NOT NULL DEFAULT FALSE,
+      browse_activities BOOLEAN NOT NULL DEFAULT FALSE,
+      planning BOOLEAN NOT NULL DEFAULT FALSE,
+      admin BOOLEAN NOT NULL DEFAULT FALSE,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  for (const row of DEFAULT_ROLE_PERMISSIONS) {
+    await pool.query(
+      `
+        INSERT INTO role_permissions (
+          role_name, home_page, upload_activity, browse_activities, planning, admin, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, NOW()
+        )
+        ON CONFLICT (role_name) DO NOTHING
+      `,
+      [row.role_name, row.home_page, row.upload_activity, row.browse_activities, row.planning, row.admin]
+    );
+  }
 }
 
 app.use(express.json({ limit: "2mb" }));
@@ -228,6 +281,202 @@ app.delete("/api/activities", async (_req, res) => {
     res.status(204).send();
   } catch (error) {
     res.status(500).send("Could not clear activities");
+  }
+});
+
+app.get("/api/admin/user-roles", async (_req, res) => {
+  if (!hasDatabase) {
+    res.json(Array.from(memoryUserRoles.values()));
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT user_type, user_email, display_name, additional_role
+        FROM user_additional_roles
+        ORDER BY user_type ASC, user_email ASC
+      `
+    );
+    res.json(result.rows);
+  } catch (_error) {
+    res.status(500).json({ error: "Could not load user roles" });
+  }
+});
+
+app.post("/api/admin/user-roles", async (req, res) => {
+  const body = req.body || {};
+  const userType = String(body.user_type || "").trim();
+  const userEmail = normalizeEmail(body.user_email);
+  const additionalRole = String(body.additional_role || "").trim();
+  const displayName = String(body.display_name || "").trim();
+
+  if (!userType || !userEmail || !additionalRole) {
+    res.status(400).send("user_type, user_email and additional_role are required");
+    return;
+  }
+
+  const payload = {
+    user_type: userType,
+    user_email: userEmail,
+    display_name: displayName,
+    additional_role: additionalRole
+  };
+
+  if (!hasDatabase) {
+    memoryUserRoles.set(userEmail, payload);
+    res.status(201).json(payload);
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        INSERT INTO user_additional_roles (
+          user_type, user_email, display_name, additional_role, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, NOW()
+        )
+        ON CONFLICT (user_email) DO UPDATE SET
+          user_type = EXCLUDED.user_type,
+          display_name = EXCLUDED.display_name,
+          additional_role = EXCLUDED.additional_role,
+          updated_at = NOW()
+        RETURNING user_type, user_email, display_name, additional_role
+      `,
+      [userType, userEmail, displayName, additionalRole]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (_error) {
+    res.status(500).send("Could not save user role");
+  }
+});
+
+app.delete("/api/admin/user-roles/:email", async (req, res) => {
+  const email = normalizeEmail(req.params.email);
+  if (!email) {
+    res.status(400).send("email is required");
+    return;
+  }
+
+  if (!hasDatabase) {
+    memoryUserRoles.delete(email);
+    res.status(204).send();
+    return;
+  }
+
+  try {
+    await pool.query("DELETE FROM user_additional_roles WHERE user_email = $1", [email]);
+    res.status(204).send();
+  } catch (_error) {
+    res.status(500).send("Could not remove user role");
+  }
+});
+
+app.get("/api/admin/role-permissions", async (_req, res) => {
+  if (!hasDatabase) {
+    res.json(memoryRolePermissions);
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT role_name, home_page, upload_activity, browse_activities, planning, admin
+        FROM role_permissions
+        ORDER BY role_name ASC
+      `
+    );
+    res.json(result.rows);
+  } catch (_error) {
+    res.status(500).json({ error: "Could not load role permissions" });
+  }
+});
+
+app.put("/api/admin/role-permissions", async (req, res) => {
+  const rows = Array.isArray(req.body?.permissions) ? req.body.permissions : [];
+  if (!rows.length) {
+    res.status(400).send("permissions array is required");
+    return;
+  }
+
+  const normalized = rows.map((row) => ({
+    role_name: String(row.role_name || "").trim(),
+    home_page: Boolean(row.home_page),
+    upload_activity: Boolean(row.upload_activity),
+    browse_activities: Boolean(row.browse_activities),
+    planning: Boolean(row.planning),
+    admin: Boolean(row.admin)
+  })).filter((row) => row.role_name);
+
+  if (!normalized.length) {
+    res.status(400).send("at least one valid role permission row is required");
+    return;
+  }
+
+  if (!hasDatabase) {
+    memoryRolePermissions = normalized;
+    res.json({ ok: true });
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("DELETE FROM role_permissions");
+
+    for (const row of normalized) {
+      await client.query(
+        `
+          INSERT INTO role_permissions (
+            role_name, home_page, upload_activity, browse_activities, planning, admin, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
+        `,
+        [row.role_name, row.home_page, row.upload_activity, row.browse_activities, row.planning, row.admin]
+      );
+    }
+
+    await client.query("COMMIT");
+    res.json({ ok: true });
+  } catch (_error) {
+    await client.query("ROLLBACK");
+    res.status(500).send("Could not update role permissions");
+  } finally {
+    client.release();
+  }
+});
+
+app.post("/api/admin/role-permissions/reset", async (_req, res) => {
+  if (!hasDatabase) {
+    memoryRolePermissions = DEFAULT_ROLE_PERMISSIONS.map((row) => ({ ...row }));
+    res.json({ ok: true, permissions: memoryRolePermissions });
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("DELETE FROM role_permissions");
+
+    for (const row of DEFAULT_ROLE_PERMISSIONS) {
+      await client.query(
+        `
+          INSERT INTO role_permissions (
+            role_name, home_page, upload_activity, browse_activities, planning, admin, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, NOW())
+        `,
+        [row.role_name, row.home_page, row.upload_activity, row.browse_activities, row.planning, row.admin]
+      );
+    }
+
+    await client.query("COMMIT");
+    res.json({ ok: true, permissions: DEFAULT_ROLE_PERMISSIONS });
+  } catch (_error) {
+    await client.query("ROLLBACK");
+    res.status(500).send("Could not reset role permissions");
+  } finally {
+    client.release();
   }
 });
 

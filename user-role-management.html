@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Role Management | Computer Lab</title>
+  <link rel="icon" type="image/x-icon" href="images/favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="admin-page-wrap">
+    <header class="admin-page-header">
+      <h1>User Role Management</h1>
+      <p>Assign additional roles to users beyond their primary Google account role.</p>
+      <a class="button button-secondary" href="admin-menu.html">Back to Admin</a>
+    </header>
+
+    <div class="admin-layout">
+      <aside class="admin-side-nav">
+        <a href="#add-role">Add Role to User</a>
+        <a href="#roles-table">Users with Roles</a>
+        <a href="#how-it-works">How It Works</a>
+      </aside>
+
+      <div class="admin-main-stack">
+        <section id="add-role" class="admin-panel">
+          <h2>Add Role to User</h2>
+          <form id="add-role-form" class="admin-form-row">
+            <label>
+              User Type
+              <select name="userType" required>
+                <option value="">Select type</option>
+                <option>Staff</option>
+                <option>Student</option>
+                <option>Teacher</option>
+                <option>Lead Teacher</option>
+                <option>Technician</option>
+                <option>Admin</option>
+              </select>
+            </label>
+            <label>
+              User Email
+              <input type="email" name="userEmail" placeholder="name@westlandhigh.school.nz" required>
+            </label>
+            <label>
+              Role to Add
+              <select name="roleToAdd" required>
+                <option value="">Select role</option>
+                <option>None</option>
+                <option>Admin</option>
+                <option>Lead Teacher</option>
+                <option>Teacher</option>
+                <option>Technician</option>
+              </select>
+            </label>
+            <label>
+              Display Name
+              <input type="text" name="displayName" placeholder="Optional display name">
+            </label>
+            <button type="submit" class="button button-primary">Add Role</button>
+          </form>
+          <p id="user-role-status" class="upload-status" aria-live="polite"></p>
+        </section>
+
+        <section id="roles-table" class="admin-panel">
+          <h2>Users with Additional Roles</h2>
+          <div class="admin-table-wrap">
+            <table class="admin-table" id="user-role-table">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>User</th>
+                  <th>Email</th>
+                  <th>Additional Roles</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="how-it-works" class="admin-panel">
+          <h2>How It Works</h2>
+          <ul class="admin-notes-list">
+            <li><strong>Primary Role:</strong> Users automatically get their primary role from Google login and domain mapping rules.</li>
+            <li><strong>Additional Roles:</strong> You can assign extra roles for special permissions without changing the base role.</li>
+            <li><strong>Combined Access:</strong> Users can access all routes granted by any of their assigned roles.</li>
+            <li><strong>Email Notification:</strong> You can hook up Gmail API to send role change emails later.</li>
+          </ul>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script src="user-role-management.js"></script>
+</body>
+</html>
