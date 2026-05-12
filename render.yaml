@@ -9,3 +9,11 @@ services:
     envVars:
       - key: DATABASE_URL
         sync: false
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_OAUTH_ALLOWED_DOMAINS
+        sync: false
+      - key: HUB_GOOGLE_CLIENT_ID
+        sync: false
