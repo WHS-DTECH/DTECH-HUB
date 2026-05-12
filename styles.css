@@ -345,6 +345,11 @@ a {
     display: grid;
     gap: 18px;
     align-content: start;
+    min-width: 0;
+}
+
+.projects-column {
+    min-width: 0;
 }
 
 @media (min-width: 1200px) {
@@ -447,6 +452,7 @@ a {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 10px;
     margin-top: 10px;
+    min-width: 0;
 }
 
 .projects-column .project-grid {
@@ -465,6 +471,8 @@ a {
     display: flex;
     flex-direction: column;
     min-height: 100%;
+    width: 100%;
+    min-width: 0;
     padding: 10px;
     border-radius: var(--radius-md);
     background: #ffffff;
