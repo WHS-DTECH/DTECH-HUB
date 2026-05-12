@@ -284,6 +284,20 @@ app.delete("/api/activities", async (_req, res) => {
   }
 });
 
+app.get("/api/admin/staff-list", async (_req, res) => {
+  if (!hasDatabase) {
+    res.json([]);
+    return;
+  }
+
+  try {
+    const result = await pool.query("SELECT * FROM upload_staff");
+    res.json(result.rows);
+  } catch (_error) {
+    res.json([]);
+  }
+});
+
 app.get("/api/admin/user-roles", async (_req, res) => {
   if (!hasDatabase) {
     res.json(Array.from(memoryUserRoles.values()));

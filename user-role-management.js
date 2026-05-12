@@ -1,6 +1,99 @@
 const roleForm = document.querySelector("#add-role-form");
 const roleStatus = document.querySelector("#user-role-status");
 const roleTableBody = document.querySelector("#user-role-table tbody");
+const staffList = document.querySelector("#staff-list");
+const staffSearch = document.querySelector("#staff-search");
+
+let cachedStaffRows = [];
+let selectedStaffEmail = "";
+
+function getStaffDisplayName(row) {
+  const firstName = String(row.first_name || row.firstname || row.first || "").trim();
+  const lastName = String(row.last_name || row.lastname || row.surname || "").trim();
+  const displayName = String(row.display_name || row.name || "").trim();
+
+  if (displayName) return displayName;
+  return [firstName, lastName].filter(Boolean).join(" ") || String(row.email || row.email_school || row.user_email || "").split("@")[0];
+}
+
+function getStaffEmail(row) {
+  return String(row.email_school || row.email || row.user_email || row.staff_email || "").trim().toLowerCase();
+}
+
+function getStaffCode(row) {
+  return String(row.code || row.staff_code || row.employee_code || "").trim();
+}
+
+function getStaffType(row) {
+  return String(row.title || row.user_type || row.staff_type || "Staff").trim() || "Staff";
+}
+
+function populateRoleFormFromStaff(row) {
+  if (!roleForm) return;
+
+  const userEmailField = roleForm.querySelector('[name="userEmail"]');
+  const userTypeField = roleForm.querySelector('[name="userType"]');
+  const displayName = getStaffDisplayName(row);
+  const email = getStaffEmail(row);
+  const code = getStaffCode(row);
+
+  if (userEmailField) userEmailField.value = email || "";
+  if (userTypeField) userTypeField.value = getStaffType(row);
+
+  selectedStaffEmail = email;
+  if (staffList) {
+    staffList.querySelectorAll(".staff-chip").forEach((chip) => {
+      chip.classList.toggle("is-selected", chip.dataset.email === selectedStaffEmail);
+    });
+  }
+
+  setStatus(`Selected ${displayName}${code ? ` (${code})` : ""}. Choose an additional role to add.`);
+}
+
+function renderStaffList(rows) {
+  if (!staffList) return;
+
+  const query = String(staffSearch?.value || "").trim().toLowerCase();
+  const filtered = rows.filter((row) => {
+    const name = getStaffDisplayName(row).toLowerCase();
+    const email = getStaffEmail(row);
+    return !query || name.includes(query) || email.includes(query);
+  });
+
+  staffList.innerHTML = "";
+
+  if (!filtered.length) {
+    const empty = document.createElement("div");
+    empty.className = "admin-empty-state";
+    empty.textContent = "No staff matched your search.";
+    staffList.appendChild(empty);
+    return;
+  }
+
+  filtered.forEach((row) => {
+    const name = getStaffDisplayName(row);
+    const email = getStaffEmail(row);
+    const code = getStaffCode(row);
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "staff-chip";
+    chip.dataset.email = email;
+    chip.innerHTML = `
+      <strong>${name}</strong>
+      <span>${email}</span>
+      ${code ? `<small>${code}</small>` : ""}
+    `;
+    chip.addEventListener("click", () => populateRoleFormFromStaff(row));
+    staffList.appendChild(chip);
+  });
+}
+
+async function loadStaffRows() {
+  const response = await fetch("/api/admin/staff-list");
+  if (!response.ok) throw new Error("Could not load staff list");
+  const rows = await response.json();
+  return Array.isArray(rows) ? rows : [];
+}
 
 function setStatus(message, isError = false) {
   if (!roleStatus) return;
@@ -63,6 +156,11 @@ async function refresh() {
   renderRows(rows);
 }
 
+async function refreshStaff() {
+  cachedStaffRows = await loadStaffRows();
+  renderStaffList(cachedStaffRows);
+}
+
 if (roleForm) {
   roleForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -102,6 +200,10 @@ if (roleForm) {
 
       setStatus(`Saved role ${payload.additional_role} for ${payload.user_email}.`);
       roleForm.reset();
+      selectedStaffEmail = "";
+      if (staffList) {
+        staffList.querySelectorAll(".staff-chip").forEach((chip) => chip.classList.remove("is-selected"));
+      }
       await refresh();
     } catch (error) {
       setStatus(error.message, true);
@@ -109,4 +211,8 @@ if (roleForm) {
   });
 }
 
-refresh().catch((error) => setStatus(error.message, true));
+if (staffSearch) {
+  staffSearch.addEventListener("input", () => renderStaffList(cachedStaffRows));
+}
+
+Promise.all([refresh(), refreshStaff()]).catch((error) => setStatus(error.message, true));
