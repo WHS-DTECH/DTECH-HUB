@@ -26,3 +26,6 @@ coverage/
 
 # Dependencies
 node_modules/
+
+# Nested training repositories managed separately
+ClassTraining/
