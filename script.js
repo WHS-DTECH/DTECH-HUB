@@ -141,7 +141,106 @@ const baseProjects = [
     }
 ];
 
+const baseLabProjects = [
+    {
+        id: "lab-project-maker-builds",
+        title: "Maker Lab Builds",
+        className: "Year 13 Computer Lab",
+        projectPhase: "Build",
+        status: "active",
+        showThisWeek: true,
+        term: "Term 2",
+        updated: "2026-05-09",
+        href: "ProjectPages/maker-lab-builds.html",
+        external: false,
+        summary: "Teams are fabricating prototypes and logging workshop test cycles for automation concepts.",
+        keywords: ["maker", "prototype", "build", "workshop"],
+        visual: {
+            icon: "ML",
+            label: "Build Phase",
+            palette: "linear-gradient(135deg, #4d4f67 0%, #676c86 50%, #8b90a8 100%)"
+        }
+    },
+    {
+        id: "lab-project-robotics-iterations",
+        title: "Robotics Iterations",
+        className: "Year 12 Computer Lab",
+        projectPhase: "Testing",
+        status: "active",
+        showThisWeek: true,
+        term: "Term 2",
+        updated: "2026-05-08",
+        href: "ProjectPages/robotics-control-board.html",
+        external: false,
+        summary: "Control boards are being tested and tuned using repeated sensor calibration loops.",
+        keywords: ["robotics", "testing", "sensors", "microcontroller"],
+        visual: {
+            icon: "RB",
+            label: "Testing Sprint",
+            palette: "linear-gradient(135deg, #236d8c 0%, #2f95b2 48%, #4ab5cc 100%)"
+        }
+    },
+    {
+        id: "lab-project-digital-portfolio-showcase",
+        title: "Portfolio Showcase Build",
+        className: "Year 11 Computer Lab",
+        projectPhase: "Showcase",
+        status: "planning",
+        showThisWeek: false,
+        term: "Term 2",
+        updated: "2026-05-07",
+        href: "ProjectPages/digital-portfolio-studio.html",
+        external: false,
+        summary: "Students are curating evidence and preparing public-facing portfolio displays.",
+        keywords: ["portfolio", "showcase", "presentation", "evidence"],
+        visual: {
+            icon: "DP",
+            label: "Showcase Prep",
+            palette: "linear-gradient(135deg, #4d3ba0 0%, #6a58b5 52%, #8a75c4 100%)"
+        }
+    },
+    {
+        id: "lab-project-ui-redesign-track",
+        title: "UI Redesign Track",
+        className: "Year 10 Computer Lab",
+        projectPhase: "Prototype",
+        status: "planning",
+        showThisWeek: false,
+        term: "Term 2",
+        updated: "2026-05-05",
+        href: "ProjectPages/web-ui-remix.html",
+        external: false,
+        summary: "Interface concepts are being prototyped and reviewed before final implementation.",
+        keywords: ["ui", "prototype", "web", "design"],
+        visual: {
+            icon: "UI",
+            label: "Prototype",
+            palette: "linear-gradient(135deg, #8c5a2a 0%, #b67a3c 52%, #d39552 100%)"
+        }
+    },
+    {
+        id: "lab-project-cyber-challenge",
+        title: "Cyber Challenge Series",
+        className: "Year 9 Computer Lab",
+        projectPhase: "Planning",
+        status: "archive",
+        showThisWeek: false,
+        term: "Term 1",
+        updated: "2026-04-28",
+        href: "ProjectPages/cyber-safety-lab.html",
+        external: false,
+        summary: "Archived challenge banks and reflective writeups from prior cyber missions.",
+        keywords: ["cyber", "challenge", "security", "archive"],
+        visual: {
+            icon: "CS",
+            label: "Challenge Track",
+            palette: "linear-gradient(135deg, #5d267d 0%, #7f35a8 54%, #9a4bc0 100%)"
+        }
+    }
+];
+
 let projects = [...baseProjects];
+let labProjects = [...baseLabProjects];
 
 function colorToPalette(colorName) {
     const palettes = {
@@ -236,6 +335,11 @@ const state = {
     category: "All"
 };
 
+const labProjectState = {
+    search: "",
+    sort: "name-asc"
+};
+
 const statusOrder = {
     active: 0,
     planning: 1,
@@ -244,12 +348,17 @@ const statusOrder = {
 
 const currentProjectGrid = document.querySelector("#current-project-grid");
 const libraryGrid = document.querySelector("#project-library-grid");
+const currentLabProjectGrid = document.querySelector("#current-lab-project-grid");
+const labProjectLibraryGrid = document.querySelector("#lab-project-library-grid");
 const searchInput = document.querySelector("#project-search");
 const sortSelect = document.querySelector("#sort-order");
+const labProjectSearchInput = document.querySelector("#lab-project-search");
+const labProjectSortSelect = document.querySelector("#lab-project-sort");
 const yearSelect = document.querySelector("#year-filter");
 const typeSelect = document.querySelector("#type-filter");
 const categorySelect = document.querySelector("#category-filter");
 const libraryResultsMeta = document.querySelector("#library-results-meta");
+const labProjectResultsMeta = document.querySelector("#lab-project-results-meta");
 const activeCount = document.querySelector("#stat-active-count");
 const totalCount = document.querySelector("#stat-total-count");
 const categoryCount = document.querySelector("#stat-category-count");
@@ -369,6 +478,42 @@ function createProjectCard(project) {
     return card;
 }
 
+function createLabProjectCard(project) {
+    const card = document.createElement("a");
+    card.className = "project-card";
+    card.href = project.href;
+    card.target = project.external ? "_blank" : "_self";
+    card.rel = project.external ? "noreferrer" : "";
+    card.setAttribute("aria-label", `Open ${project.title}`);
+
+    card.innerHTML = `
+        <div class="project-visual" style="background: ${project.visual.palette};">
+            <span class="visual-label">
+                <span class="visual-mark">${project.visual.icon}</span>
+                ${project.visual.label}
+            </span>
+        </div>
+        <div class="project-body">
+            <div class="project-tags">
+                <span class="status-tag status-${project.status}">${formatStatus(project.status)}</span>
+                <span class="project-tag">${project.projectPhase}</span>
+                <span class="project-tag">${project.term}</span>
+            </div>
+            <h3>${project.title}</h3>
+            <p class="project-description">${project.summary}</p>
+            <div class="project-footer">
+                <div>
+                    <div class="project-meta">${project.className}</div>
+                    <div class="project-path">${project.href}</div>
+                </div>
+                <span class="project-link">Open project</span>
+            </div>
+        </div>
+    `;
+
+    return card;
+}
+
 function formatStatus(status) {
     return status.charAt(0).toUpperCase() + status.slice(1);
 }
@@ -427,6 +572,101 @@ function renderLibrary() {
     });
 }
 
+function sortLabProjects(items) {
+    const phaseOrder = {
+        planning: 0,
+        prototype: 1,
+        build: 2,
+        testing: 3,
+        showcase: 4
+    };
+
+    const sorted = [...items];
+    switch (labProjectState.sort) {
+        case "name-desc":
+            sorted.sort((left, right) => right.title.localeCompare(left.title));
+            break;
+        case "recent":
+            sorted.sort((left, right) => new Date(right.updated) - new Date(left.updated));
+            break;
+        case "phase":
+            sorted.sort((left, right) => {
+                const leftOrder = phaseOrder[String(left.projectPhase || "").toLowerCase()] ?? 99;
+                const rightOrder = phaseOrder[String(right.projectPhase || "").toLowerCase()] ?? 99;
+                return leftOrder - rightOrder || left.title.localeCompare(right.title);
+            });
+            break;
+        case "name-asc":
+        default:
+            sorted.sort((left, right) => left.title.localeCompare(right.title));
+            break;
+    }
+
+    return sorted;
+}
+
+function filterLabProjects(items) {
+    const query = labProjectState.search.trim().toLowerCase();
+    if (!query) return items;
+
+    return items.filter((project) => {
+        const haystack = [project.title, project.className, project.projectPhase, project.summary, ...project.keywords]
+            .join(" ")
+            .toLowerCase();
+        return haystack.includes(query);
+    });
+}
+
+function renderCurrentLabProjects() {
+    if (!currentLabProjectGrid) return;
+
+    currentLabProjectGrid.innerHTML = "";
+    const visible = sortLabProjects(labProjects.filter((project) => project.showThisWeek));
+
+    if (!visible.length) {
+        const emptyState = document.createElement("div");
+        emptyState.className = "about-card";
+        emptyState.innerHTML = `
+            <p class="section-kicker">No Live Projects</p>
+            <h2>No lab projects are pinned for this week.</h2>
+            <p>Use Teacher View to feature projects in the right column.</p>
+        `;
+        currentLabProjectGrid.appendChild(emptyState);
+        return;
+    }
+
+    visible.forEach((project) => {
+        currentLabProjectGrid.appendChild(createLabProjectCard(project));
+    });
+}
+
+function renderLabProjectLibrary() {
+    if (!labProjectLibraryGrid) return;
+
+    labProjectLibraryGrid.innerHTML = "";
+    const visible = sortLabProjects(filterLabProjects(labProjects));
+
+    if (labProjectResultsMeta) {
+        labProjectResultsMeta.textContent = `${visible.length} project${visible.length === 1 ? "" : "s"} shown`;
+    }
+
+    if (!visible.length) {
+        const emptyState = document.createElement("div");
+        emptyState.className = "about-card";
+        emptyState.innerHTML = `
+            <p class="section-kicker">No Results</p>
+            <h2>No projects matched that search.</h2>
+            <p>Try another keyword or sort option.</p>
+        `;
+        labProjectLibraryGrid.appendChild(emptyState);
+        return;
+    }
+
+    visible.forEach((project) => {
+        labProjectLibraryGrid.appendChild(createLabProjectCard(project));
+    });
+}
+
 function renderStats() {
     activeCount.textContent = projects.filter((project) => project.showThisWeek).length;
     totalCount.textContent = projects.length;
@@ -434,6 +674,8 @@ function renderStats() {
 }
 
 function bindControls() {
+    if (!searchInput || !sortSelect || !yearSelect || !typeSelect || !categorySelect) return;
+
     searchInput.addEventListener("input", (event) => {
         state.search = event.target.value;
         renderLibrary();
@@ -461,14 +703,33 @@ function bindControls() {
     });
 }
 
+function bindLabProjectControls() {
+    if (!labProjectSearchInput || !labProjectSortSelect) return;
+
+    labProjectSearchInput.addEventListener("input", (event) => {
+        labProjectState.search = event.target.value;
+        renderLabProjectLibrary();
+    });
+
+    labProjectSortSelect.addEventListener("change", (event) => {
+        labProjectState.sort = event.target.value;
+        renderCurrentLabProjects();
+        renderLabProjectLibrary();
+    });
+}
+
 async function init() {
     const sharedProjects = await loadSharedProjects();
     projects = mergeProjects(sharedProjects);
+    labProjects = [...baseLabProjects];
     renderStats();
     populateFilters();
     renderCurrentProjects();
     renderLibrary();
+    renderCurrentLabProjects();
+    renderLabProjectLibrary();
     bindControls();
+    bindLabProjectControls();
 }
 
 init();
