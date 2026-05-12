@@ -1,4 +1,4 @@
-const projects = [
+const baseProjects = [
     {
         id: "python-debug-lab",
         title: "Python Debug Lab",
@@ -140,6 +140,88 @@ const projects = [
         }
     }
 ];
+
+const LOCAL_ACTIVITY_STORAGE_KEY = "dtechHub:activities";
+
+let projects = [...baseProjects];
+
+function colorToPalette(colorName) {
+    const palettes = {
+        rose: "linear-gradient(135deg, #8d316f 0%, #b15186 56%, #c96e9c 100%)",
+        azure: "linear-gradient(135deg, #236d8c 0%, #2f95b2 48%, #4ab5cc 100%)",
+        amber: "linear-gradient(135deg, #8c5a2a 0%, #b67a3c 52%, #d39552 100%)",
+        violet: "linear-gradient(135deg, #5d267d 0%, #7f35a8 54%, #9a4bc0 100%)",
+        teal: "linear-gradient(135deg, #2e7a56 0%, #3f9e70 52%, #5fbf8a 100%)",
+        slate: "linear-gradient(135deg, #4d4f67 0%, #676c86 50%, #8b90a8 100%)"
+    };
+
+    return palettes[String(colorName || "").toLowerCase()] || palettes.rose;
+}
+
+function textToIcon(text) {
+    return String(text || "CL")
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0].toUpperCase())
+        .join("") || "CL";
+}
+
+function slugify(value) {
+    return String(value || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+}
+
+function loadLocalProjects() {
+    const raw = localStorage.getItem(LOCAL_ACTIVITY_STORAGE_KEY);
+    if (!raw) return [];
+
+    let parsed;
+    try {
+        parsed = JSON.parse(raw);
+    } catch (_error) {
+        return [];
+    }
+
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+        .map((item) => {
+            const title = String(item.name || "").trim();
+            if (!title) return null;
+
+            const id = String(item.id || slugify(title) || `activity-${Date.now()}`);
+            const yearLevel = String(item.year_level || "Year 9").trim();
+            const type = String(item.type || "Digital Learning").trim();
+            const category = String(item.activity_category || "Practice").trim();
+            const summary = String(item.description || "Teacher-uploaded activity").trim();
+            const created = String(item.created_at || new Date().toISOString()).slice(0, 10);
+
+            return {
+                id,
+                title,
+                className: `${yearLevel} Computer Lab`,
+                area: type,
+                activityCategory: category,
+                showThisWeek: Boolean(item.show_in_this_week),
+                status: item.show_in_this_week ? "active" : "planning",
+                term: String(item.term || "Term 2"),
+                updated: created,
+                href: `ProjectPages/custom-activity.html?id=${encodeURIComponent(id)}`,
+                external: false,
+                summary,
+                keywords: [type, category, String(item.difficulty || ""), "teacher upload"].filter(Boolean),
+                visual: {
+                    icon: textToIcon(type),
+                    label: "Teacher Upload",
+                    palette: colorToPalette(item.card_color)
+                }
+            };
+        })
+        .filter(Boolean);
+}
 
 const state = {
     search: "",
@@ -306,7 +388,7 @@ function renderCurrentProjects() {
         emptyState.innerHTML = `
             <p class="section-kicker">No Activities Scheduled</p>
             <h2>This week has no pinned activities yet.</h2>
-            <p>Use Staff View to add or update activities and tick Show in This Week when ready.</p>
+            <p>Use Teacher View to add or update activities and tick Show in This Week when ready.</p>
         `;
         currentProjectGrid.appendChild(emptyState);
         return;
@@ -375,6 +457,7 @@ function bindControls() {
 }
 
 function init() {
+    projects = [...baseProjects, ...loadLocalProjects()];
     renderStats();
     populateFilters();
     renderCurrentProjects();

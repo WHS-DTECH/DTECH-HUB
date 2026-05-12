@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Computer Lab</title>
-    <meta name="description" content="Computer Lab connects current digital technology activities and the full activity library for students and staff at Westland High School.">
+    <title>Teacher View | Computer Lab</title>
+    <meta name="description" content="Teacher view for managing computer lab activities.">
     <meta name="theme-color" content="#4a1b6f">
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -16,17 +16,17 @@
     <div class="page-shell">
         <header class="hero">
             <nav class="topbar" aria-label="Primary">
-                <a class="brand" href="index.html">Computer Lab</a>
+                <a class="brand" href="teacher-view.html">Computer Lab</a>
                 <div class="topbar-right">
                     <div class="topbar-links">
                         <a href="#current-projects">This Week</a>
                         <a href="#project-library">Activity Library</a>
-                        <a href="https://sites.google.com/westlandhigh.school.nz/dtec/home" target="_blank" rel="noreferrer">Learning Site</a>
+                        <a href="#teacher-tools">Teacher Tools</a>
                         <a href="#about-hub">Lab Notes</a>
                     </div>
                     <div class="utility-actions" aria-label="Utility actions">
-                        <a href="teacher-view.html">Teacher View</a>
-                        <a href="#">Sign out</a>
+                        <a href="index.html">Student View</a>
+                        <a href="upload-activity.html">Upload Activity</a>
                     </div>
                 </div>
             </nav>
@@ -36,11 +36,11 @@
                     <p class="eyebrow">WESTLAND HIGH SCHOOL | DIGITAL TECHNOLOGIES</p>
                     <h1>Computer Lab</h1>
                     <p class="hero-text">
-                        Explore practical coding and design activities students are completing this term, then browse the full activity library by strand, level, and focus.
+                        Teacher view mirrors the student hub while adding management controls, draft visibility, and upload workflows.
                     </p>
                     <div class="hero-actions">
-                        <a class="button button-primary" href="#current-projects">See This Week</a>
-                        <a class="button button-secondary" href="#project-library">Browse Activities</a>
+                        <a class="button button-primary" href="#teacher-tools">Open Teacher Tools</a>
+                        <a class="button button-secondary" href="upload-activity.html">Create New Activity</a>
                     </div>
                 </div>
 
@@ -62,6 +62,24 @@
         </header>
 
         <main>
+            <section id="teacher-tools" class="panel-section teacher-panel">
+                <div class="section-heading">
+                    <div>
+                        <p class="section-kicker">Teacher Controls</p>
+                        <h2>Manage teacher-only activity content</h2>
+                    </div>
+                    <p class="section-copy">
+                        These tools are only visible in teacher view. Use them to create activities and manage local drafts.
+                    </p>
+                </div>
+                <div class="teacher-actions">
+                    <a class="button button-primary" href="upload-activity.html">Upload Activity</a>
+                    <button class="button button-secondary" id="teacher-export" type="button">Export Local Activities</button>
+                    <button class="button button-secondary" id="teacher-clear" type="button">Clear Local Activities</button>
+                </div>
+                <p id="teacher-status" class="upload-status" aria-live="polite"></p>
+            </section>
+
             <section id="current-projects" class="panel-section current-work">
                 <div class="section-heading">
                     <div>
@@ -130,10 +148,10 @@
 
             <section id="about-hub" class="panel-section about-section">
                 <div class="about-card">
-                    <p class="section-kicker">Why This Layout Works</p>
-                    <h2>Live sessions first, full library second.</h2>
+                    <p class="section-kicker">Teacher Notes</p>
+                    <h2>Student view is intentionally simpler.</h2>
                     <p>
-                        The homepage separates weekly activity from the full library so students can jump into today\'s task without searching. The same card pattern supports coding practice, design challenges, robotics, and digital portfolio work.
+                        Teacher view includes management tools and local draft controls that students do not see. Student-facing content remains focused on activities and instructions.
                     </p>
                 </div>
             </section>
@@ -143,7 +161,7 @@
             <div class="footer-inner">
                 <div>
                     <p class="footer-title">Westland High School Computer Lab</p>
-                    <p class="footer-copy">Keeping digital technology activities, support resources, and class pathways connected in one place.</p>
+                    <p class="footer-copy">Teacher management and student activity pathways in one place.</p>
                 </div>
                 <div class="footer-links">
                     <a href="https://www.westlandhigh.school.nz" target="_blank" rel="noreferrer">School Website</a>
@@ -152,12 +170,9 @@
                 </div>
             </div>
         </footer>
-
-        <noscript>
-            <p class="noscript-note">JavaScript is disabled. Activity cards and filters need JavaScript to display.</p>
-        </noscript>
     </div>
 
     <script src="script.js"></script>
+    <script src="teacher-view.js"></script>
 </body>
 </html>

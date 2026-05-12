@@ -85,21 +85,57 @@ const DETAIL_DATA = {
     }
 };
 
+const LOCAL_ACTIVITY_STORAGE_KEY = "dtechHub:activities";
+
+function readLocalActivity(activityId) {
+    if (!activityId) return null;
+
+    let parsed;
+    try {
+        parsed = JSON.parse(localStorage.getItem(LOCAL_ACTIVITY_STORAGE_KEY) || "[]");
+    } catch (_error) {
+        return null;
+    }
+
+    if (!Array.isArray(parsed)) return null;
+
+    const found = parsed.find((item) => item && item.id === activityId);
+    if (!found) return null;
+
+    const toArray = (value) => Array.isArray(value) ? value : [];
+
+    return {
+        title: found.name || "Uploaded Activity",
+        yearLevel: found.year_level || "Year level",
+        type: found.type || "Digital Learning",
+        duration: found.duration_hours ? `${found.duration_hours} hrs` : "2 hrs",
+        term: found.term || "Term 2",
+        summary: found.description || "Teacher-uploaded activity.",
+        resources: toArray(found.resources),
+        equipment: toArray(found.equipment),
+        instructions: toArray(found.instructions),
+        image: found.outcome_image_url || "https://placehold.co/900x560/3f89cf/ffffff?text=Uploaded+Activity"
+    };
+}
+
 function renderList(items) {
     return items.map((item) => `<li>${item}</li>`).join("");
 }
 
 function initDetail() {
     const root = document.querySelector("[data-activity-id]");
-    if (!root) return;
+    const queryRoot = document.querySelector(".page");
+    const host = root || queryRoot;
+    if (!host) return;
 
-    const id = root.getAttribute("data-activity-id");
-    const data = DETAIL_DATA[id];
+    const params = new URLSearchParams(window.location.search);
+    const id = host.getAttribute("data-activity-id") || params.get("id");
+    const data = DETAIL_DATA[id] || readLocalActivity(id);
     if (!data) return;
 
     document.title = `${data.title} | Computer Lab`;
 
-    root.innerHTML = `
+    host.innerHTML = `
         <header class="toolbar">
             <span class="toolbar-label">Teacher View</span>
             <a href="../index.html">Back to Hub</a>

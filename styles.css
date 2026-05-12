@@ -833,6 +833,22 @@ a {
     font-weight: 600;
 }
 
+.teacher-panel {
+    border-color: #bfcbe0;
+    background: #f1f5fb;
+}
+
+.teacher-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.teacher-panel .button {
+    min-height: 36px;
+}
+
 .export-preview {
     margin: 8px 0 0;
     padding: 10px;

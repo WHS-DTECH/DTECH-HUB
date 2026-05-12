@@ -1,6 +1,7 @@
 const CLOUDINARY_CLOUD_NAME = "dq1ndhl3t";
 const CLOUDINARY_API_KEY = "769919346521166";
 const CLOUDINARY_UPLOAD_PRESET = "dtech_hub_unsigned";
+const LOCAL_ACTIVITY_STORAGE_KEY = "dtechHub:activities";
 
 const form = document.querySelector("#upload-activity-form");
 const fileInput = document.querySelector("#outcome-image-file");
@@ -8,6 +9,13 @@ const imageUrlInput = document.querySelector("#outcome-image-url");
 const uploadStatus = document.querySelector("#upload-status");
 const preview = document.querySelector("#export-preview");
 const cancelButton = document.querySelector("#cancel-upload");
+
+function slugify(value) {
+    return String(value || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+}
 
 function linesToArray(value) {
     return String(value || "")
@@ -51,9 +59,11 @@ async function uploadToCloudinary(file) {
 
 function createActivityPayload() {
     const formData = new FormData(form);
+    const name = String(formData.get("activityName") || "").trim();
 
     return {
-        name: String(formData.get("activityName") || "").trim(),
+        id: slugify(name),
+        name,
         year_level: String(formData.get("yearLevel") || "").trim(),
         type: String(formData.get("type") || "").trim(),
         activity_category: String(formData.get("activityCategory") || "").trim(),
@@ -71,6 +81,25 @@ function createActivityPayload() {
         show_in_this_week: Boolean(formData.get("showThisWeek")),
         created_at: new Date().toISOString()
     };
+}
+
+function saveActivityLocally(payload) {
+    let existing = [];
+    try {
+        existing = JSON.parse(localStorage.getItem(LOCAL_ACTIVITY_STORAGE_KEY) || "[]");
+    } catch (_error) {
+        existing = [];
+    }
+
+    const list = Array.isArray(existing) ? existing : [];
+    const index = list.findIndex((item) => item && item.id === payload.id);
+    if (index >= 0) {
+        list[index] = payload;
+    } else {
+        list.push(payload);
+    }
+
+    localStorage.setItem(LOCAL_ACTIVITY_STORAGE_KEY, JSON.stringify(list));
 }
 
 function downloadPayload(payload) {
@@ -111,7 +140,7 @@ if (fileInput) {
 
 if (cancelButton) {
     cancelButton.addEventListener("click", () => {
-        window.location.href = "index.html";
+        window.location.href = "teacher-view.html";
     });
 }
 
@@ -126,10 +155,11 @@ if (form) {
         }
 
         localStorage.setItem("dtechHub:lastActivityDraft", JSON.stringify(payload));
+        saveActivityLocally(payload);
         preview.hidden = false;
         preview.textContent = JSON.stringify(payload, null, 2);
 
         downloadPayload(payload);
-        setStatus("Activity JSON exported and draft saved in this browser.");
+        setStatus("Activity saved for this browser, added to the hub list, and JSON exported.");
     });
 }
