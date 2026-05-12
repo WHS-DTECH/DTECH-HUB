@@ -263,6 +263,13 @@ a {
     align-content: start;
 }
 
+@media (min-width: 1200px) {
+    .projects-column {
+        position: sticky;
+        top: 14px;
+    }
+}
+
 .home-grid .panel-section {
     width: auto;
     margin: 0;
