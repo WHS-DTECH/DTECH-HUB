@@ -360,6 +360,7 @@ const categorySelect = document.querySelector("#category-filter");
 const libraryResultsMeta = document.querySelector("#library-results-meta");
 const labProjectResultsMeta = document.querySelector("#lab-project-results-meta");
 const activeCount = document.querySelector("#stat-active-count");
+const runningDetail = document.querySelector("#stat-running-detail");
 const totalCount = document.querySelector("#stat-total-count");
 const categoryCount = document.querySelector("#stat-category-count");
 
@@ -668,9 +669,16 @@ function renderLabProjectLibrary() {
 }
 
 function renderStats() {
-    activeCount.textContent = projects.filter((project) => project.showThisWeek).length;
+    const runningActivities = projects.filter((project) => project.showThisWeek).length;
+    const runningLabProjects = labProjects.filter((project) => project.showThisWeek).length;
+
+    activeCount.textContent = runningActivities + runningLabProjects;
+    if (runningDetail) {
+        runningDetail.textContent = `Activities: ${runningActivities} | Projects: ${runningLabProjects}`;
+    }
+
     totalCount.textContent = projects.length;
-    categoryCount.textContent = new Set(projects.map((project) => project.area)).size;
+    categoryCount.textContent = labProjects.length;
 }
 
 function bindControls() {

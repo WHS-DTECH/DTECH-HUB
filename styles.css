@@ -238,6 +238,15 @@ a {
     font-size: 1.62rem;
 }
 
+.stat-subline {
+    display: block;
+    margin-top: 4px;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+
 .panel-section {
     width: min(920px, calc(100% - 28px));
     margin: 18px auto 0;
