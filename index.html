@@ -6,6 +6,8 @@
     <title>Computer Lab</title>
     <meta name="description" content="Computer Lab connects current digital technology activities and the full activity library for students and staff at Westland High School.">
     <meta name="theme-color" content="#4a1b6f">
+    <meta name="hub-google-client-id" content="239433605438-ur2omagmkluhhn7i319g0i82l4l5l1j8.apps.googleusercontent.com">
+    <meta name="hub-google-allowed-domain" content="westlandhigh.school.nz">
     <link rel="icon" type="image/x-icon" href="images/favicon.ico">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,8 +28,10 @@
                         <a href="#about-hub">Lab Notes</a>
                     </div>
                     <div class="utility-actions" aria-label="Utility actions">
-                        <a href="teacher-view.html">Teacher View</a>
-                        <a href="#">Sign out</a>
+                        <a id="hub-staff-link" href="teacher-view.html" hidden>Teacher View</a>
+                        <button id="hub-google-signin" type="button">Sign in</button>
+                        <button id="hub-google-signout" type="button" hidden>Sign out</button>
+                        <span id="hub-user-badge" class="user-badge" hidden></span>
                     </div>
                 </div>
             </nav>
@@ -202,6 +206,7 @@
         </noscript>
     </div>
 
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="script.js"></script>
 </body>
 </html>

@@ -327,6 +327,25 @@ function mergeProjects(sharedProjects) {
     return Array.from(byId.values());
 }
 
+const HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
+
+const hubGoogleClientId =
+    document.querySelector('meta[name="hub-google-client-id"]')?.content.trim() ||
+    window.HUB_GOOGLE_CLIENT_ID ||
+    "";
+
+const hubAllowedDomain =
+    (document.querySelector('meta[name="hub-google-allowed-domain"]')?.content || "")
+        .trim()
+        .toLowerCase();
+
+const hubAuthState = {
+    accessToken: null,
+    expiresAt: 0,
+    profile: null,
+    tokenClient: null
+};
+
 const state = {
     search: "",
     sort: "name-asc",
@@ -363,6 +382,176 @@ const activeCount = document.querySelector("#stat-active-count");
 const runningDetail = document.querySelector("#stat-running-detail");
 const totalCount = document.querySelector("#stat-total-count");
 const categoryCount = document.querySelector("#stat-category-count");
+const hubStaffLink = document.querySelector("#hub-staff-link");
+const hubSignInButton = document.querySelector("#hub-google-signin");
+const hubSignOutButton = document.querySelector("#hub-google-signout");
+const hubUserBadge = document.querySelector("#hub-user-badge");
+
+function saveHubAuthState() {
+    if (!hubAuthState.accessToken || !hubAuthState.profile) {
+        sessionStorage.removeItem(HUB_AUTH_STORAGE_KEY);
+        return;
+    }
+
+    const payload = {
+        accessToken: hubAuthState.accessToken,
+        expiresAt: hubAuthState.expiresAt,
+        profile: hubAuthState.profile
+    };
+    sessionStorage.setItem(HUB_AUTH_STORAGE_KEY, JSON.stringify(payload));
+}
+
+function clearHubAuthState() {
+    hubAuthState.accessToken = null;
+    hubAuthState.expiresAt = 0;
+    hubAuthState.profile = null;
+    sessionStorage.removeItem(HUB_AUTH_STORAGE_KEY);
+}
+
+function loadHubAuthState() {
+    const raw = sessionStorage.getItem(HUB_AUTH_STORAGE_KEY);
+    if (!raw) {
+        return;
+    }
+
+    try {
+        const parsed = JSON.parse(raw);
+        if (!parsed.accessToken || !parsed.expiresAt || parsed.expiresAt <= Date.now()) {
+            sessionStorage.removeItem(HUB_AUTH_STORAGE_KEY);
+            return;
+        }
+        hubAuthState.accessToken = parsed.accessToken;
+        hubAuthState.expiresAt = parsed.expiresAt;
+        hubAuthState.profile = parsed.profile || null;
+    } catch (_error) {
+        sessionStorage.removeItem(HUB_AUTH_STORAGE_KEY);
+    }
+}
+
+function isAllowedHubAccount(profile) {
+    if (!profile?.email || !profile?.email_verified) {
+        return false;
+    }
+
+    if (!hubAllowedDomain) {
+        return true;
+    }
+
+    return profile.email.toLowerCase().endsWith(`@${hubAllowedDomain}`);
+}
+
+function renderHubAuthUi() {
+    const signedIn = Boolean(hubAuthState.profile?.email);
+
+    if (hubSignInButton) {
+        hubSignInButton.hidden = signedIn;
+    }
+    if (hubSignOutButton) {
+        hubSignOutButton.hidden = !signedIn;
+    }
+    if (hubUserBadge) {
+        hubUserBadge.hidden = !signedIn;
+        hubUserBadge.textContent = signedIn ? hubAuthState.profile.email : "";
+    }
+    if (hubStaffLink) {
+        hubStaffLink.hidden = !signedIn;
+    }
+}
+
+async function fetchGoogleUserProfile(accessToken) {
+    const response = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+        headers: {
+            Authorization: `Bearer ${accessToken}`
+        }
+    });
+
+    if (!response.ok) {
+        throw new Error("Could not fetch Google profile.");
+    }
+    return response.json();
+}
+
+async function handleHubGoogleToken(tokenResponse) {
+    if (!tokenResponse?.access_token) {
+        throw new Error("Google sign-in did not return an access token.");
+    }
+
+    const profile = await fetchGoogleUserProfile(tokenResponse.access_token);
+    if (!isAllowedHubAccount(profile)) {
+        throw new Error("This Google account is not allowed for this hub.");
+    }
+
+    hubAuthState.accessToken = tokenResponse.access_token;
+    hubAuthState.expiresAt = Date.now() + (Number(tokenResponse.expires_in) || 3600) * 1000;
+    hubAuthState.profile = profile;
+    saveHubAuthState();
+    renderHubAuthUi();
+}
+
+function signOutHubGoogle() {
+    if (window.google?.accounts?.oauth2 && hubAuthState.accessToken) {
+        window.google.accounts.oauth2.revoke(hubAuthState.accessToken, () => {
+            clearHubAuthState();
+            renderHubAuthUi();
+        });
+        return;
+    }
+
+    clearHubAuthState();
+    renderHubAuthUi();
+}
+
+function bindHubAuthControls() {
+    if (hubSignInButton) {
+        hubSignInButton.addEventListener("click", () => {
+            if (!hubAuthState.tokenClient) {
+                alert("Google sign-in is not configured yet. Add your Google client ID in the page metadata.");
+                return;
+            }
+            hubAuthState.tokenClient.requestAccessToken({ prompt: "consent" });
+        });
+    }
+
+    if (hubSignOutButton) {
+        hubSignOutButton.addEventListener("click", signOutHubGoogle);
+    }
+}
+
+function initHubGoogleAuth() {
+    loadHubAuthState();
+    renderHubAuthUi();
+    bindHubAuthControls();
+
+    if (!hubGoogleClientId) {
+        return;
+    }
+
+    const waitForGoogleLibrary = (attemptsLeft = 30) => {
+        if (window.google?.accounts?.oauth2) {
+            hubAuthState.tokenClient = window.google.accounts.oauth2.initTokenClient({
+                client_id: hubGoogleClientId,
+                scope: "openid email profile",
+                callback: async (tokenResponse) => {
+                    try {
+                        await handleHubGoogleToken(tokenResponse);
+                    } catch (error) {
+                        clearHubAuthState();
+                        renderHubAuthUi();
+                        alert(error.message || "Google sign-in failed.");
+                    }
+                }
+            });
+            return;
+        }
+
+        if (attemptsLeft <= 0) {
+            return;
+        }
+        setTimeout(() => waitForGoogleLibrary(attemptsLeft - 1), 200);
+    };
+
+    waitForGoogleLibrary();
+}
 
 function getYearLevels() {
     return [...new Set(projects.map((project) => {
@@ -738,6 +927,7 @@ async function init() {
     renderLabProjectLibrary();
     bindControls();
     bindLabProjectControls();
+    initHubGoogleAuth();
 }
 
 init();

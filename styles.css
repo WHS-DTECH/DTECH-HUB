@@ -112,6 +112,38 @@ a {
     letter-spacing: 0.04em;
 }
 
+.utility-actions button {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    color: rgba(255, 255, 255, 0.94);
+    font-size: 0.62rem;
+    font-weight: 700;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    background: rgba(255, 255, 255, 0.1);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.user-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    color: #ffffff;
+    font-size: 0.62rem;
+    font-weight: 700;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.16);
+    text-transform: none;
+    letter-spacing: 0.02em;
+}
+
 .hero-panel {
     width: min(1200px, calc(100% - 24px));
     margin: 0 auto;
@@ -622,6 +654,7 @@ a {
 
 .topbar-links a:focus-visible,
 .utility-actions a:focus-visible,
+.utility-actions button:focus-visible,
 .button:focus-visible,
 .search-field input:focus-visible,
 .control-field select:focus-visible,
