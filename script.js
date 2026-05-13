@@ -384,6 +384,25 @@ const hubGoogleClientId =
     window.HUB_GOOGLE_CLIENT_ID ||
     "";
 
+function enforceCanonicalHubOrigin() {
+    if (typeof window === "undefined") {
+        return;
+    }
+
+    const legacyHosts = new Set(["dtech-hub.onrender.com"]);
+    const canonicalHost = "dtech-hub2.onrender.com";
+    const currentHost = window.location.hostname.toLowerCase();
+
+    if (!legacyHosts.has(currentHost)) {
+        return;
+    }
+
+    const targetUrl = `https://${canonicalHost}${window.location.pathname}${window.location.search}${window.location.hash}`;
+    window.location.replace(targetUrl);
+}
+
+enforceCanonicalHubOrigin();
+
 const hubAllowedDomain =
     (document.querySelector('meta[name="hub-google-allowed-domain"]')?.content || "")
         .trim()
