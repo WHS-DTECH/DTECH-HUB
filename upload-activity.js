@@ -1,8 +1,49 @@
+
 const form = document.querySelector("#upload-activity-form");
 const fileInput = document.querySelector("#outcome-image-file");
 const imageUrlInput = document.querySelector("#outcome-image-url");
 const uploadStatus = document.querySelector("#upload-status");
 const cancelButton = document.querySelector("#cancel-upload");
+
+function setStatus(message, isError = false) {
+    if (!uploadStatus) return;
+    uploadStatus.textContent = message;
+    uploadStatus.hidden = !message;
+    uploadStatus.classList.remove("is-success", "is-error");
+    uploadStatus.classList.add(isError ? "is-error" : "is-success");
+}
+
+async function uploadActivityImage(file, activityName) {
+    if (!activityName) throw new Error("Activity name is required before uploading images.");
+    const activityId = slugify(activityName);
+    const formData = new FormData();
+    formData.append("image", file);
+    const response = await fetch(`/api/activities/${activityId}/upload-image`, {
+        method: "POST",
+        body: formData
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        throw new Error(data.error || "Image upload failed");
+    }
+    return data.imageUrl || data.url || data.path;
+}
+
+if (fileInput) {
+    fileInput.addEventListener("change", async () => {
+        const file = fileInput.files && fileInput.files[0];
+        const activityName = form?.activityName?.value || "";
+        if (!file) return;
+        setStatus("Uploading image...", false);
+        try {
+            const imageUrl = await uploadActivityImage(file, activityName);
+            if (imageUrlInput) imageUrlInput.value = imageUrl;
+            setStatus("Image uploaded. You can now save the activity.", false);
+        } catch (err) {
+            setStatus(err.message || "Image upload failed", true);
+        }
+    });
+}
 
 function slugify(value) {
     return String(value || "")
@@ -133,19 +174,21 @@ if (cancelButton) {
 if (form) {
     form.addEventListener("submit", async (event) => {
         event.preventDefault();
-
         const payload = createActivityPayload();
         if (!payload.name) {
             setStatus("Activity name is required.", true);
             return;
         }
-
+        setStatus("Saving activity...", false);
         try {
             await saveActivityShared(payload);
             localStorage.setItem("dtechHub:lastActivityDraft", JSON.stringify(payload));
-            setStatus("Activity saved to Activities Library.");
+            setStatus("Activity saved! Redirecting to Activities Library...", false);
+            setTimeout(() => {
+                window.location.href = "/index.html#project-library";
+            }, 1000);
         } catch (error) {
-            setStatus(`Save failed: ${error.message}`, true);
+            setStatus(`Save failed: ${error.message}", true);
         }
     });
 }
