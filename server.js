@@ -806,6 +806,20 @@ async function ensureSchema() {
     );
   `);
 
+  // Add proposal fields if they don't exist
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS start_date TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS contact_name TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS contact_phone TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS contact_email TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS company TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS address TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS overview JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS services JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS costs JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS outcomes JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS withdrawal_date TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS client_id TEXT`);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS activity_hub_visibility (
       activity_id TEXT NOT NULL,
@@ -1235,7 +1249,21 @@ app.post("/api/activities", async (req, res) => {
     show_in_this_week: Boolean(body.show_in_this_week),
     term: String(body.term || "Term 2").trim() || "Term 2",
     created_at: String(body.created_at || new Date().toISOString()),
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
+    
+    // Proposal fields
+    start_date: String(body.start_date || "").trim(),
+    contact_name: String(body.contact_name || "").trim(),
+    contact_phone: String(body.contact_phone || "").trim(),
+    contact_email: String(body.contact_email || "").trim(),
+    company: String(body.company || "").trim(),
+    address: String(body.address || "").trim(),
+    overview: normalizeArray(body.overview),
+    services: normalizeArray(body.services),
+    costs: normalizeArray(body.costs),
+    outcomes: normalizeArray(body.outcomes),
+    withdrawal_date: String(body.withdrawal_date || "").trim(),
+    client_id: String(body.client_id || "").trim()
   };
 
   if (isExcludedNonDtechActivity(payload)) {
@@ -1278,6 +1306,20 @@ app.post("/api/activities", async (req, res) => {
     const showInWeekColumn = pickExistingColumn(activityColumns, ["show_in_this_week", "show_this_week", "is_pinned"]);
     const termColumn = pickExistingColumn(activityColumns, ["term"]);
     const updatedAtColumn = pickExistingColumn(activityColumns, ["updated_at", "updatedon", "modified_at"]);
+    
+    // Proposal fields
+    const startDateColumn = pickExistingColumn(activityColumns, ["start_date"]);
+    const contactNameColumn = pickExistingColumn(activityColumns, ["contact_name"]);
+    const contactPhoneColumn = pickExistingColumn(activityColumns, ["contact_phone"]);
+    const contactEmailColumn = pickExistingColumn(activityColumns, ["contact_email"]);
+    const companyColumn = pickExistingColumn(activityColumns, ["company"]);
+    const addressColumn = pickExistingColumn(activityColumns, ["address"]);
+    const overviewColumn = pickExistingColumn(activityColumns, ["overview"]);
+    const servicesColumn = pickExistingColumn(activityColumns, ["services"]);
+    const costsColumn = pickExistingColumn(activityColumns, ["costs"]);
+    const outcomesColumn = pickExistingColumn(activityColumns, ["outcomes"]);
+    const withdrawalDateColumn = pickExistingColumn(activityColumns, ["withdrawal_date"]);
+    const clientIdColumn = pickExistingColumn(activityColumns, ["client_id"]);
 
     const idMetadata = idColumn ? activityColumnMetadata.get(String(idColumn).toLowerCase()) : null;
     const idIsInteger = isIntegerLikeColumn(idMetadata);
@@ -1310,6 +1352,20 @@ app.post("/api/activities", async (req, res) => {
     if (assessmentFocusColumn) sqlColumns.push({ name: assessmentFocusColumn, value: JSON.stringify(payload.assessment_focus), cast: "jsonb" });
     if (showInWeekColumn) sqlColumns.push({ name: showInWeekColumn, value: payload.show_in_this_week });
     if (termColumn) sqlColumns.push({ name: termColumn, value: payload.term });
+    
+    // Add proposal fields
+    if (startDateColumn) sqlColumns.push({ name: startDateColumn, value: payload.start_date });
+    if (contactNameColumn) sqlColumns.push({ name: contactNameColumn, value: payload.contact_name });
+    if (contactPhoneColumn) sqlColumns.push({ name: contactPhoneColumn, value: payload.contact_phone });
+    if (contactEmailColumn) sqlColumns.push({ name: contactEmailColumn, value: payload.contact_email });
+    if (companyColumn) sqlColumns.push({ name: companyColumn, value: payload.company });
+    if (addressColumn) sqlColumns.push({ name: addressColumn, value: payload.address });
+    if (overviewColumn) sqlColumns.push({ name: overviewColumn, value: JSON.stringify(payload.overview), cast: "jsonb" });
+    if (servicesColumn) sqlColumns.push({ name: servicesColumn, value: JSON.stringify(payload.services), cast: "jsonb" });
+    if (costsColumn) sqlColumns.push({ name: costsColumn, value: JSON.stringify(payload.costs), cast: "jsonb" });
+    if (outcomesColumn) sqlColumns.push({ name: outcomesColumn, value: JSON.stringify(payload.outcomes), cast: "jsonb" });
+    if (withdrawalDateColumn) sqlColumns.push({ name: withdrawalDateColumn, value: payload.withdrawal_date });
+    if (clientIdColumn) sqlColumns.push({ name: clientIdColumn, value: payload.client_id });
 
     const insertColumnsSql = sqlColumns.map((column) => quoteIdentifier(column.name)).join(", ");
     const insertValuesSql = sqlColumns
