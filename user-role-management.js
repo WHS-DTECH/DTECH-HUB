@@ -156,7 +156,34 @@ function getStaffCode(row) {
 }
 
 function getStaffType(row) {
-  return String(row.primary_role || row.user_type || row.staff_type || row.title || "Staff").trim() || "Staff";
+  const rawType = String(row.primary_role || row.user_type || row.staff_type || row.title || "Staff").trim();
+  const normalizedType = rawType.toLowerCase();
+
+  if (!normalizedType) {
+    return "Staff";
+  }
+
+  if (normalizedType.includes("student")) {
+    return "Student";
+  }
+
+  if (normalizedType.includes("admin")) {
+    return "Admin";
+  }
+
+  if (normalizedType.includes("technician") || normalizedType.includes("tech")) {
+    return "Technician";
+  }
+
+  if (normalizedType.includes("lead")) {
+    return "Lead Teacher";
+  }
+
+  if (normalizedType.includes("teacher") || normalizedType === "vp" || normalizedType === "principal") {
+    return "Teacher";
+  }
+
+  return "Staff";
 }
 
 function populateRoleFormFromStaff(row) {
