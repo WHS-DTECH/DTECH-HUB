@@ -433,7 +433,7 @@ function renderRows(rows) {
         <div>${row.display_name || "-"}</div>
       </td>
       <td><span class="status-tag status-planning">${row.additional_role || "None"}</span></td>
-      <td><button type="button" class="button button-secondary" data-remove="${row.user_email}">Remove</button></td>
+      <td><button type="button" class="button button-danger" data-remove="${row.user_email}">Remove</button></td>
     `;
 
     const removeButton = tr.querySelector("[data-remove]");

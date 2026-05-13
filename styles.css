@@ -358,6 +358,22 @@ a {
     border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
+.button-danger {
+    color: #ffffff;
+    background: #c62828;
+    border: 1px solid #8e1c1c;
+    box-shadow: 0 6px 14px rgba(163, 21, 21, 0.22);
+}
+
+.button-danger:hover {
+    background: #ad1f1f;
+    box-shadow: 0 9px 18px rgba(163, 21, 21, 0.32);
+}
+
+.button-danger:focus-visible {
+    outline-color: #ff9f9f;
+}
+
 .hero-stats {
     display: grid;
     gap: 10px;
