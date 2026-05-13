@@ -433,19 +433,7 @@ function renderGlobalNavbar() {
         return;
     }
 
-    const browseMenu = `
-        <details class="nav-dropdown" id="hub-browse-menu" data-nav-dropdown hidden>
-            <summary>Browse</summary>
-            <div class="nav-drawer" role="menu">
-                <a role="menuitem" href="/index.html#current-week">This Week</a>
-                <a role="menuitem" href="/index.html#project-library">Activity Library</a>
-                <a role="menuitem" href="/index.html#project-library">Projects</a>
-                <a role="menuitem" href="/browse-practicals.html">Browse Practicals</a>
-                <a role="menuitem" href="https://sites.google.com/westlandhigh.school.nz/dtec/home" target="_blank" rel="noreferrer">Learning Site</a>
-                <a role="menuitem" href="/index.html#global-footer">Lab Notes</a>
-            </div>
-        </details>
-    `;
+    const browseMenu = `<a id="hub-browse-practicals-link" data-auth-browse href="/browse-practicals.html" hidden>Browse Practicals</a>`;
 
     const uploadMenu = `
         <details class="nav-dropdown" id="hub-upload-menu" data-nav-dropdown hidden>
