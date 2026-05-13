@@ -534,6 +534,43 @@ async function getAllTableColumns(tableName) {
     .filter(Boolean);
 }
 
+async function getTableColumnMetadata(tableName) {
+  const result = await pool.query(
+    `
+      SELECT column_name, data_type, udt_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = $1
+    `,
+    [tableName]
+  );
+
+  const metadata = new Map();
+  result.rows.forEach((row) => {
+    const name = String(row.column_name || "").trim().toLowerCase();
+    if (!name) return;
+    metadata.set(name, {
+      dataType: String(row.data_type || "").trim().toLowerCase(),
+      udtName: String(row.udt_name || "").trim().toLowerCase()
+    });
+  });
+
+  return metadata;
+}
+
+function isIntegerLikeColumn(metadataRow) {
+  if (!metadataRow) return false;
+  const dataType = String(metadataRow.dataType || "").toLowerCase();
+  const udtName = String(metadataRow.udtName || "").toLowerCase();
+
+  return dataType === "integer" ||
+    dataType === "smallint" ||
+    dataType === "bigint" ||
+    udtName === "int2" ||
+    udtName === "int4" ||
+    udtName === "int8";
+}
+
 function quoteIdentifier(identifier) {
   const value = String(identifier || "").trim();
   if (!/^[a-z_][a-z0-9_]*$/i.test(value)) {
@@ -1214,6 +1251,7 @@ app.post("/api/activities", async (req, res) => {
 
   try {
     const activityColumns = await getAllTableColumns("activities");
+    const activityColumnMetadata = await getTableColumnMetadata("activities");
     const idColumn = pickExistingColumn(activityColumns, ["id"]);
     const nameColumn = pickExistingColumn(activityColumns, ["name", "activity_name", "title"]);
     const yearLevelColumn = pickExistingColumn(activityColumns, ["year_level", "year", "yeargroup"]);
@@ -1241,12 +1279,21 @@ app.post("/api/activities", async (req, res) => {
     const termColumn = pickExistingColumn(activityColumns, ["term"]);
     const updatedAtColumn = pickExistingColumn(activityColumns, ["updated_at", "updatedon", "modified_at"]);
 
+    const idMetadata = idColumn ? activityColumnMetadata.get(String(idColumn).toLowerCase()) : null;
+    const idIsInteger = isIntegerLikeColumn(idMetadata);
+    const numericBodyId = Number.parseInt(body.id, 10);
+    const canUseExplicitId = Boolean(idColumn) && (!idIsInteger || Number.isInteger(numericBodyId));
+    const idValueToSave = idIsInteger ? numericBodyId : payload.id;
+
     const sqlColumns = [
-      { name: idColumn, value: payload.id },
       { name: nameColumn, value: payload.name },
       { name: yearLevelColumn, value: payload.year_level },
       { name: typeColumn, value: payload.type }
     ];
+
+    if (canUseExplicitId) {
+      sqlColumns.unshift({ name: idColumn, value: idValueToSave });
+    }
 
     if (activityCategoryColumn) sqlColumns.push({ name: activityCategoryColumn, value: payload.activity_category });
     if (durationColumn) sqlColumns.push({ name: durationColumn, value: payload.duration_hours });
@@ -1269,7 +1316,7 @@ app.post("/api/activities", async (req, res) => {
       .map((column, index) => `$${index + 1}${column.cast ? `::${column.cast}` : ""}`)
       .join(", ");
     const updateAssignments = sqlColumns
-      .filter((column) => column.name !== "id")
+      .filter((column) => column.name !== idColumn)
       .map((column) => `${quoteIdentifier(column.name)} = EXCLUDED.${quoteIdentifier(column.name)}`);
 
     if (updatedAtColumn) {
@@ -1278,7 +1325,7 @@ app.post("/api/activities", async (req, res) => {
 
     const updateSql = updateAssignments.length
       ? updateAssignments.join(",\n              ")
-      : `${quoteIdentifier(idColumn)} = EXCLUDED.${quoteIdentifier(idColumn)}`;
+      : `${quoteIdentifier(nameColumn)} = EXCLUDED.${quoteIdentifier(nameColumn)}`;
 
     const insertColumnsWithAudit = updatedAtColumn
       ? `${insertColumnsSql},\n          ${quoteIdentifier(updatedAtColumn)}`
@@ -1288,20 +1335,32 @@ app.post("/api/activities", async (req, res) => {
       ? `${insertValuesSql},\n          NOW()`
       : insertValuesSql;
 
-    const result = await pool.query(
-      `
-        INSERT INTO activities (
-          ${insertColumnsWithAudit}
-        ) VALUES (
-          ${insertValuesWithAudit}
+    const result = canUseExplicitId
+      ? await pool.query(
+          `
+            INSERT INTO activities (
+              ${insertColumnsWithAudit}
+            ) VALUES (
+              ${insertValuesWithAudit}
+            )
+            ON CONFLICT (${quoteIdentifier(idColumn)}) DO UPDATE SET
+              ${updateSql},
+              ${quoteIdentifier(idColumn)} = EXCLUDED.${quoteIdentifier(idColumn)}
+            RETURNING *
+          `,
+          sqlColumns.map((column) => column.value)
         )
-        ON CONFLICT (${quoteIdentifier(idColumn)}) DO UPDATE SET
-          ${updateSql},
-          ${quoteIdentifier(idColumn)} = EXCLUDED.${quoteIdentifier(idColumn)}
-        RETURNING *
-      `,
-      sqlColumns.map((column) => column.value)
-    );
+      : await pool.query(
+          `
+            INSERT INTO activities (
+              ${insertColumnsWithAudit}
+            ) VALUES (
+              ${insertValuesWithAudit}
+            )
+            RETURNING *
+          `,
+          sqlColumns.map((column) => column.value)
+        );
 
     await upsertHubVisibility([result.rows[0].id], DTECH_HUB_NAME, true);
 
