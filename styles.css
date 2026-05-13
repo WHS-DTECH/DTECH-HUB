@@ -396,6 +396,26 @@ a {
     max-width: 10ch;
 }
 
+.hero-title-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    margin: 12px 0 12px;
+}
+
+.hero-title-row h1 {
+    margin: 0;
+}
+
+.hero-title-logo {
+    width: clamp(56px, 8vw, 86px);
+    height: clamp(56px, 8vw, 86px);
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid rgba(255, 255, 255, 0.45);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
 .hero-text {
     max-width: 50ch;
     line-height: 1.62;
