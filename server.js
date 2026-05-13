@@ -17,6 +17,7 @@ const pool = new Pool({
 });
 
 const STAFF_TABLE_CANDIDATES = ["staff_upload", "upload_staff"];
+const STUDENT_TABLE_CANDIDATES = ["student_timetable"];
 
 const DEFAULT_ROLE_PERMISSIONS = [
   { role_name: "Admin", home_page: true, upload_activity: true, browse_activities: true, planning: true, admin: true },
@@ -217,6 +218,53 @@ async function resolveStaffTableName() {
 
   const availableTables = new Set(result.rows.map((row) => String(row.table_name || "").toLowerCase()));
   return STAFF_TABLE_CANDIDATES.find((tableName) => availableTables.has(tableName)) || "staff_upload";
+}
+
+async function resolveStudentTableName() {
+  const result = await pool.query(
+    `
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+        AND table_name = ANY($1::text[])
+    `,
+    [STUDENT_TABLE_CANDIDATES]
+  );
+
+  const availableTables = new Set(result.rows.map((row) => String(row.table_name || "").toLowerCase()));
+  return STUDENT_TABLE_CANDIDATES.find((tableName) => availableTables.has(tableName)) || "student_timetable";
+}
+
+async function getStudentDirectoryRows() {
+  if (!hasDatabase) {
+    return [];
+  }
+
+  const studentTableName = await resolveStudentTableName();
+  const availableColumns = await getExistingTableColumns(studentTableName, [
+    "id",
+    "student_name",
+    "id_number",
+    "form_class",
+    "year_level",
+    "status",
+    "primary_role",
+    "upload_year",
+    "upload_term",
+    "upload_date",
+    "email_school",
+    "student_email",
+    "email"
+  ]);
+
+  if (!availableColumns.length) {
+    return [];
+  }
+
+  const result = await pool.query(
+    `SELECT ${availableColumns.join(", ")} FROM ${studentTableName}${buildOrderByClause(availableColumns)}`
+  );
+  return result.rows;
 }
 
 function buildOrderByClause(availableColumns) {
@@ -693,6 +741,15 @@ app.get("/api/staff_upload/all", async (_req, res) => {
     res.json({ staff: rows });
   } catch (_error) {
     res.json({ staff: [] });
+  }
+});
+
+app.get("/api/student_timetable/all", async (_req, res) => {
+  try {
+    const rows = await getStudentDirectoryRows();
+    res.json({ students: rows });
+  } catch (_error) {
+    res.json({ students: [] });
   }
 });
 

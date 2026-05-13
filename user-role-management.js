@@ -3,6 +3,8 @@ const roleStatus = document.querySelector("#user-role-status");
 const roleTableBody = document.querySelector("#user-role-table tbody");
 const staffList = document.querySelector("#staff-list");
 const staffSearch = document.querySelector("#staff-search");
+const studentList = document.querySelector("#student-list");
+const studentSearch = document.querySelector("#student-search");
 const hubAuthSummary = document.querySelector("#hub-auth-summary");
 const hubRoleAuthNote = document.querySelector("#hub-role-auth-note");
 const hubSignOutButton = document.querySelector("#hub-google-signout");
@@ -14,7 +16,9 @@ const hubAllowedDomain = String(document.querySelector('meta[name="hub-google-al
   .toLowerCase();
 
 let cachedStaffRows = [];
+let cachedStudentRows = [];
 let selectedStaffEmail = "";
+let selectedStudentKey = "";
 let activeHubProfile = null;
 
 function getHubDisplayName(profile) {
@@ -186,6 +190,26 @@ function getStaffType(row) {
   return "Staff";
 }
 
+function getStudentDisplayName(row) {
+  return String(row.student_name || row.name || row.display_name || "").trim();
+}
+
+function getStudentIdNumber(row) {
+  return String(row.id_number || row.student_id || row.idnumber || "").trim();
+}
+
+function getStudentFormClass(row) {
+  return String(row.form_class || row.formclass || "").trim();
+}
+
+function getStudentEmail(row) {
+  return String(row.email_school || row.student_email || row.email || row.user_email || "").trim().toLowerCase();
+}
+
+function getStudentKey(row) {
+  return getStudentEmail(row) || getStudentIdNumber(row) || getStudentDisplayName(row);
+}
+
 function populateRoleFormFromStaff(row) {
   if (!roleForm) return;
 
@@ -199,13 +223,52 @@ function populateRoleFormFromStaff(row) {
   if (userTypeField) userTypeField.value = getStaffType(row);
 
   selectedStaffEmail = email;
+  selectedStudentKey = "";
   if (staffList) {
     staffList.querySelectorAll(".staff-chip").forEach((chip) => {
       chip.classList.toggle("is-selected", chip.dataset.email === selectedStaffEmail);
     });
   }
+  if (studentList) {
+    studentList.querySelectorAll(".staff-chip").forEach((chip) => chip.classList.remove("is-selected"));
+  }
 
   setStatus(`Selected ${displayName}${code ? ` (${code})` : ""}. Choose an additional role to add.`);
+}
+
+function populateRoleFormFromStudent(row) {
+  if (!roleForm) return;
+
+  const userEmailField = roleForm.querySelector('[name="userEmail"]');
+  const userTypeField = roleForm.querySelector('[name="userType"]');
+  const displayName = getStudentDisplayName(row);
+  const idNumber = getStudentIdNumber(row);
+  const formClass = getStudentFormClass(row);
+  const email = getStudentEmail(row);
+
+  if (userEmailField) userEmailField.value = email || "";
+  if (userTypeField) userTypeField.value = "Student";
+
+  selectedStudentKey = getStudentKey(row);
+  selectedStaffEmail = "";
+
+  if (studentList) {
+    studentList.querySelectorAll(".staff-chip").forEach((chip) => {
+      chip.classList.toggle("is-selected", chip.dataset.studentKey === selectedStudentKey);
+    });
+  }
+  if (staffList) {
+    staffList.querySelectorAll(".staff-chip").forEach((chip) => chip.classList.remove("is-selected"));
+  }
+
+  if (email) {
+    setStatus(`Selected ${displayName}${idNumber ? ` (${idNumber})` : ""}. Choose an additional role to add.`);
+    return;
+  }
+
+  setStatus(
+    `Selected ${displayName}${idNumber ? ` (${idNumber})` : ""}${formClass ? ` from ${formClass}` : ""}. Enter the student's Google email, then choose an additional role to add.`
+  );
 }
 
 function renderStaffList(rows) {
@@ -247,6 +310,46 @@ function renderStaffList(rows) {
   });
 }
 
+function renderStudentList(rows) {
+  if (!studentList) return;
+
+  const query = String(studentSearch?.value || "").trim().toLowerCase();
+  const filtered = rows.filter((row) => {
+    const name = getStudentDisplayName(row).toLowerCase();
+    const idNumber = getStudentIdNumber(row).toLowerCase();
+    const formClass = getStudentFormClass(row).toLowerCase();
+    return !query || name.includes(query) || idNumber.includes(query) || formClass.includes(query);
+  });
+
+  studentList.innerHTML = "";
+
+  if (!filtered.length) {
+    const empty = document.createElement("div");
+    empty.className = "admin-empty-state";
+    empty.textContent = rows.length ? "No students matched your search." : "No students are available from this site yet.";
+    studentList.appendChild(empty);
+    return;
+  }
+
+  filtered.forEach((row) => {
+    const name = getStudentDisplayName(row);
+    const idNumber = getStudentIdNumber(row);
+    const formClass = getStudentFormClass(row);
+    const email = getStudentEmail(row);
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "staff-chip";
+    chip.dataset.studentKey = getStudentKey(row);
+    chip.innerHTML = `
+      <strong>${name}</strong>
+      <span>${formClass || "Student"}</span>
+      <small>${email || idNumber || "Enter email manually"}</small>
+    `;
+    chip.addEventListener("click", () => populateRoleFormFromStudent(row));
+    studentList.appendChild(chip);
+  });
+}
+
 async function loadStaffRows() {
   const response = await fetch("/api/staff_upload/all");
   if (!response.ok) {
@@ -258,6 +361,21 @@ async function loadStaffRows() {
   }
   if (Array.isArray(data?.staff)) {
     return data.staff;
+  }
+  return [];
+}
+
+async function loadStudentRows() {
+  const response = await fetch("/api/student_timetable/all");
+  if (!response.ok) {
+    return [];
+  }
+  const data = await response.json();
+  if (Array.isArray(data)) {
+    return data;
+  }
+  if (Array.isArray(data?.students)) {
+    return data.students;
   }
   return [];
 }
@@ -330,6 +448,11 @@ async function refreshStaff() {
   renderStaffList(cachedStaffRows);
 }
 
+async function refreshStudents() {
+  cachedStudentRows = await loadStudentRows();
+  renderStudentList(cachedStudentRows);
+}
+
 function attachAuthActions() {
   if (!hubSignOutButton) {
     return;
@@ -348,7 +471,7 @@ function attachAuthActions() {
 function bootAdminData() {
   renderHubAuthState();
   attachAuthActions();
-  Promise.allSettled([refresh(), refreshStaff()]);
+  Promise.allSettled([refresh(), refreshStaff(), refreshStudents()]);
 }
 
 if (roleForm) {
@@ -391,8 +514,12 @@ if (roleForm) {
       setStatus(`Saved role ${payload.additional_role} for ${payload.user_email}.`);
       roleForm.reset();
       selectedStaffEmail = "";
+      selectedStudentKey = "";
       if (staffList) {
         staffList.querySelectorAll(".staff-chip").forEach((chip) => chip.classList.remove("is-selected"));
+      }
+      if (studentList) {
+        studentList.querySelectorAll(".staff-chip").forEach((chip) => chip.classList.remove("is-selected"));
       }
       await refresh();
     } catch (error) {
@@ -403,6 +530,10 @@ if (roleForm) {
 
 if (staffSearch) {
   staffSearch.addEventListener("input", () => renderStaffList(cachedStaffRows));
+}
+
+if (studentSearch) {
+  studentSearch.addEventListener("input", () => renderStudentList(cachedStudentRows));
 }
 
 bootAdminData();

@@ -1184,6 +1184,12 @@ a {
     line-height: 1.45;
 }
 
+.admin-side-panel-section + .admin-side-panel-section {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #d9e3f0;
+}
+
 .admin-staff-toolbar input {
     width: 100%;
     min-height: 36px;
