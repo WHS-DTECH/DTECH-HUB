@@ -1214,121 +1214,63 @@ app.post("/api/activities", async (req, res) => {
 
   try {
     const activityColumns = await getAllTableColumns("activities");
-    const supportsCardUrl = activityColumns.includes("card_url");
+    const cardColorColumn = pickExistingColumn(activityColumns, ["card_color", "card_colour", "color"]);
+    const cardUrlColumn = pickExistingColumn(activityColumns, ["card_url", "activity_url", "url"]);
 
-    const result = supportsCardUrl
-      ? await pool.query(
-          `
-            INSERT INTO activities (
-              id, name, year_level, type, activity_category, duration_hours, difficulty,
-              card_color, card_url, outcome_image_url, description, resources, equipment, instructions,
-              class_management_notes, class_preparation, assessment_focus, show_in_this_week,
-              term, updated_at
-            ) VALUES (
-              $1, $2, $3, $4, $5, $6, $7,
-              $8, $9, $10, $11, $12::jsonb, $13::jsonb, $14::jsonb,
-              $15::jsonb, $16::jsonb, $17::jsonb, $18,
-              $19, NOW()
-            )
-            ON CONFLICT (id) DO UPDATE SET
-              name = EXCLUDED.name,
-              year_level = EXCLUDED.year_level,
-              type = EXCLUDED.type,
-              activity_category = EXCLUDED.activity_category,
-              duration_hours = EXCLUDED.duration_hours,
-              difficulty = EXCLUDED.difficulty,
-              card_color = EXCLUDED.card_color,
-              card_url = EXCLUDED.card_url,
-              outcome_image_url = EXCLUDED.outcome_image_url,
-              description = EXCLUDED.description,
-              resources = EXCLUDED.resources,
-              equipment = EXCLUDED.equipment,
-              instructions = EXCLUDED.instructions,
-              class_management_notes = EXCLUDED.class_management_notes,
-              class_preparation = EXCLUDED.class_preparation,
-              assessment_focus = EXCLUDED.assessment_focus,
-              show_in_this_week = EXCLUDED.show_in_this_week,
-              term = EXCLUDED.term,
-              updated_at = NOW()
-            RETURNING *
-          `,
-          [
-            payload.id,
-            payload.name,
-            payload.year_level,
-            payload.type,
-            payload.activity_category,
-            payload.duration_hours,
-            payload.difficulty,
-            payload.card_color,
-            payload.card_url,
-            payload.outcome_image_url,
-            payload.description,
-            JSON.stringify(payload.resources),
-            JSON.stringify(payload.equipment),
-            JSON.stringify(payload.instructions),
-            JSON.stringify(payload.class_management_notes),
-            JSON.stringify(payload.class_preparation),
-            JSON.stringify(payload.assessment_focus),
-            payload.show_in_this_week,
-            payload.term
-          ]
+    const sqlColumns = [
+      { name: "id", value: payload.id },
+      { name: "name", value: payload.name },
+      { name: "year_level", value: payload.year_level },
+      { name: "type", value: payload.type },
+      { name: "activity_category", value: payload.activity_category },
+      { name: "duration_hours", value: payload.duration_hours },
+      { name: "difficulty", value: payload.difficulty },
+      { name: "outcome_image_url", value: payload.outcome_image_url },
+      { name: "description", value: payload.description },
+      { name: "resources", value: JSON.stringify(payload.resources), cast: "jsonb" },
+      { name: "equipment", value: JSON.stringify(payload.equipment), cast: "jsonb" },
+      { name: "instructions", value: JSON.stringify(payload.instructions), cast: "jsonb" },
+      { name: "class_management_notes", value: JSON.stringify(payload.class_management_notes), cast: "jsonb" },
+      { name: "class_preparation", value: JSON.stringify(payload.class_preparation), cast: "jsonb" },
+      { name: "assessment_focus", value: JSON.stringify(payload.assessment_focus), cast: "jsonb" },
+      { name: "show_in_this_week", value: payload.show_in_this_week },
+      { name: "term", value: payload.term }
+    ];
+
+    if (cardColorColumn) {
+      sqlColumns.splice(7, 0, { name: cardColorColumn, value: payload.card_color });
+    }
+
+    if (cardUrlColumn) {
+      const insertIndex = cardColorColumn ? 8 : 7;
+      sqlColumns.splice(insertIndex, 0, { name: cardUrlColumn, value: payload.card_url });
+    }
+
+    const insertColumnsSql = sqlColumns.map((column) => quoteIdentifier(column.name)).join(", ");
+    const insertValuesSql = sqlColumns
+      .map((column, index) => `$${index + 1}${column.cast ? `::${column.cast}` : ""}`)
+      .join(", ");
+    const updateSql = sqlColumns
+      .filter((column) => column.name !== "id")
+      .map((column) => `${quoteIdentifier(column.name)} = EXCLUDED.${quoteIdentifier(column.name)}`)
+      .join(",\n              ");
+
+    const result = await pool.query(
+      `
+        INSERT INTO activities (
+          ${insertColumnsSql},
+          updated_at
+        ) VALUES (
+          ${insertValuesSql},
+          NOW()
         )
-      : await pool.query(
-          `
-            INSERT INTO activities (
-              id, name, year_level, type, activity_category, duration_hours, difficulty,
-              card_color, outcome_image_url, description, resources, equipment, instructions,
-              class_management_notes, class_preparation, assessment_focus, show_in_this_week,
-              term, updated_at
-            ) VALUES (
-              $1, $2, $3, $4, $5, $6, $7,
-              $8, $9, $10, $11::jsonb, $12::jsonb, $13::jsonb,
-              $14::jsonb, $15::jsonb, $16::jsonb, $17,
-              $18, NOW()
-            )
-            ON CONFLICT (id) DO UPDATE SET
-              name = EXCLUDED.name,
-              year_level = EXCLUDED.year_level,
-              type = EXCLUDED.type,
-              activity_category = EXCLUDED.activity_category,
-              duration_hours = EXCLUDED.duration_hours,
-              difficulty = EXCLUDED.difficulty,
-              card_color = EXCLUDED.card_color,
-              outcome_image_url = EXCLUDED.outcome_image_url,
-              description = EXCLUDED.description,
-              resources = EXCLUDED.resources,
-              equipment = EXCLUDED.equipment,
-              instructions = EXCLUDED.instructions,
-              class_management_notes = EXCLUDED.class_management_notes,
-              class_preparation = EXCLUDED.class_preparation,
-              assessment_focus = EXCLUDED.assessment_focus,
-              show_in_this_week = EXCLUDED.show_in_this_week,
-              term = EXCLUDED.term,
-              updated_at = NOW()
-            RETURNING *
-          `,
-          [
-            payload.id,
-            payload.name,
-            payload.year_level,
-            payload.type,
-            payload.activity_category,
-            payload.duration_hours,
-            payload.difficulty,
-            payload.card_color,
-            payload.outcome_image_url,
-            payload.description,
-            JSON.stringify(payload.resources),
-            JSON.stringify(payload.equipment),
-            JSON.stringify(payload.instructions),
-            JSON.stringify(payload.class_management_notes),
-            JSON.stringify(payload.class_preparation),
-            JSON.stringify(payload.assessment_focus),
-            payload.show_in_this_week,
-            payload.term
-          ]
-        );
+        ON CONFLICT (id) DO UPDATE SET
+          ${updateSql},
+          updated_at = NOW()
+        RETURNING *
+      `,
+      sqlColumns.map((column) => column.value)
+    );
 
     await upsertHubVisibility([result.rows[0].id], DTECH_HUB_NAME, true);
 

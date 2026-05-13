@@ -434,7 +434,6 @@ function renderGlobalNavbar() {
     }
 
     const browseMenu = `<a id="hub-browse-practicals-link" data-auth-browse href="/browse-practicals.html" hidden>Browse Practicals</a>`;
-    const profileMenu = `<a href="/user-profile.html">User Profile</a>`;
 
     const uploadMenu = `
         <details class="nav-dropdown" id="hub-upload-menu" data-nav-dropdown hidden>
@@ -446,7 +445,7 @@ function renderGlobalNavbar() {
             </div>
         </details>
     `;
-    const topbarMenu = `${browseMenu}${profileMenu}${uploadMenu}`;
+    const topbarMenu = `${browseMenu}${uploadMenu}`;
 
     topbar.dataset.globalNavbar = "true";
     topbar.setAttribute("aria-label", "Primary");
