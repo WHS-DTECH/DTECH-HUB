@@ -15,6 +15,44 @@ const hubAllowedDomain = String(document.querySelector('meta[name="hub-google-al
   .trim()
   .toLowerCase();
 
+function getHubStoredAuthRaw() {
+  let localValue = null;
+  let sessionValue = null;
+
+  try {
+    localValue = localStorage.getItem(HUB_AUTH_STORAGE_KEY);
+  } catch (_error) {
+    localValue = null;
+  }
+
+  try {
+    sessionValue = sessionStorage.getItem(HUB_AUTH_STORAGE_KEY);
+  } catch (_error) {
+    sessionValue = null;
+  }
+
+  if (!localValue && sessionValue) {
+    try {
+      localStorage.setItem(HUB_AUTH_STORAGE_KEY, sessionValue);
+    } catch (_error) {
+    }
+  }
+
+  return localValue || sessionValue;
+}
+
+function clearHubStoredAuthRaw() {
+  try {
+    localStorage.removeItem(HUB_AUTH_STORAGE_KEY);
+  } catch (_error) {
+  }
+
+  try {
+    sessionStorage.removeItem(HUB_AUTH_STORAGE_KEY);
+  } catch (_error) {
+  }
+}
+
 let cachedStaffRows = [];
 let cachedStudentRows = [];
 let selectedStaffEmail = "";
@@ -61,7 +99,7 @@ function normalizeHubAuthProfile(rawProfile) {
 }
 
 function loadHubProfile() {
-  const raw = sessionStorage.getItem(HUB_AUTH_STORAGE_KEY);
+  const raw = getHubStoredAuthRaw();
   if (!raw) {
     return null;
   }
@@ -69,12 +107,12 @@ function loadHubProfile() {
   try {
     const parsed = JSON.parse(raw);
     if (!parsed?.expiresAt || parsed.expiresAt <= Date.now()) {
-      sessionStorage.removeItem(HUB_AUTH_STORAGE_KEY);
+      clearHubStoredAuthRaw();
       return null;
     }
     return normalizeHubAuthProfile(parsed.profile);
   } catch (_error) {
-    sessionStorage.removeItem(HUB_AUTH_STORAGE_KEY);
+    clearHubStoredAuthRaw();
     return null;
   }
 }
@@ -577,7 +615,7 @@ function attachAuthActions() {
   }
 
   hubSignOutButton.addEventListener("click", () => {
-    sessionStorage.removeItem(HUB_AUTH_STORAGE_KEY);
+    clearHubStoredAuthRaw();
     activeHubProfile = null;
     selectedStaffEmail = "";
     cachedStaffRows = [];

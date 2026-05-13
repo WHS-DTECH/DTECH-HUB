@@ -329,6 +329,56 @@ function mergeProjects(sharedProjects) {
 
 const HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 
+function getHubStoredAuthRaw() {
+    let localValue = null;
+    let sessionValue = null;
+
+    try {
+        localValue = localStorage.getItem(HUB_AUTH_STORAGE_KEY);
+    } catch (_error) {
+        localValue = null;
+    }
+
+    try {
+        sessionValue = sessionStorage.getItem(HUB_AUTH_STORAGE_KEY);
+    } catch (_error) {
+        sessionValue = null;
+    }
+
+    // One-time migration from older session storage key usage.
+    if (!localValue && sessionValue) {
+        try {
+            localStorage.setItem(HUB_AUTH_STORAGE_KEY, sessionValue);
+        } catch (_error) {
+        }
+    }
+
+    return localValue || sessionValue;
+}
+
+function setHubStoredAuthRaw(value) {
+    try {
+        localStorage.setItem(HUB_AUTH_STORAGE_KEY, value);
+    } catch (_error) {
+        try {
+            sessionStorage.setItem(HUB_AUTH_STORAGE_KEY, value);
+        } catch (_innerError) {
+        }
+    }
+}
+
+function clearHubStoredAuthRaw() {
+    try {
+        localStorage.removeItem(HUB_AUTH_STORAGE_KEY);
+    } catch (_error) {
+    }
+
+    try {
+        sessionStorage.removeItem(HUB_AUTH_STORAGE_KEY);
+    } catch (_error) {
+    }
+}
+
 const hubGoogleClientId =
     document.querySelector('meta[name="hub-google-client-id"]')?.content.trim() ||
     window.HUB_GOOGLE_CLIENT_ID ||
@@ -443,7 +493,7 @@ function setHubProfileOpen(isOpen) {
 
 function saveHubAuthState() {
     if (!hubAuthState.accessToken || !hubAuthState.profile) {
-        sessionStorage.removeItem(HUB_AUTH_STORAGE_KEY);
+        clearHubStoredAuthRaw();
         return;
     }
 
@@ -452,19 +502,19 @@ function saveHubAuthState() {
         expiresAt: hubAuthState.expiresAt,
         profile: hubAuthState.profile
     };
-    sessionStorage.setItem(HUB_AUTH_STORAGE_KEY, JSON.stringify(payload));
+    setHubStoredAuthRaw(JSON.stringify(payload));
 }
 
 function clearHubAuthState() {
     hubAuthState.accessToken = null;
     hubAuthState.expiresAt = 0;
     hubAuthState.profile = null;
-    sessionStorage.removeItem(HUB_AUTH_STORAGE_KEY);
+    clearHubStoredAuthRaw();
     setHubProfileOpen(false);
 }
 
 function loadHubAuthState() {
-    const raw = sessionStorage.getItem(HUB_AUTH_STORAGE_KEY);
+    const raw = getHubStoredAuthRaw();
     if (!raw) {
         return;
     }
@@ -472,14 +522,14 @@ function loadHubAuthState() {
     try {
         const parsed = JSON.parse(raw);
         if (!parsed.accessToken || !parsed.expiresAt || parsed.expiresAt <= Date.now()) {
-            sessionStorage.removeItem(HUB_AUTH_STORAGE_KEY);
+            clearHubStoredAuthRaw();
             return;
         }
         hubAuthState.accessToken = parsed.accessToken;
         hubAuthState.expiresAt = parsed.expiresAt;
         hubAuthState.profile = parsed.profile || null;
     } catch (_error) {
-        sessionStorage.removeItem(HUB_AUTH_STORAGE_KEY);
+        clearHubStoredAuthRaw();
     }
 }
 
