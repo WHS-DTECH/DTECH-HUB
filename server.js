@@ -51,6 +51,31 @@ function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+async function getExistingTableColumns(tableName, candidateColumns) {
+  const result = await pool.query(
+    `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = $1
+    `,
+    [tableName]
+  );
+
+  const available = new Set(result.rows.map((row) => String(row.column_name || "").toLowerCase()));
+  return candidateColumns.filter((columnName) => available.has(String(columnName).toLowerCase()));
+}
+
+function buildOrderByClause(availableColumns) {
+  const preferredOrder = ["last_name", "first_name", "user_type", "user_email", "id"];
+  const orderColumns = preferredOrder.filter((columnName) => availableColumns.includes(columnName));
+  if (!orderColumns.length) {
+    return "";
+  }
+
+  return ` ORDER BY ${orderColumns.map((columnName) => `${columnName} ASC`).join(", ")}`;
+}
+
 async function ensureSchema() {
   if (!hasDatabase) return;
 
@@ -303,21 +328,28 @@ app.get("/api/admin/staff-list", async (_req, res) => {
   }
 
   try {
-    const result = await pool.query(`
-      SELECT
-        id,
-        code,
-        last_name,
-        first_name,
-        title,
-        email_school,
-        status,
-        upload_year,
-        upload_term,
-        upload_date
-      FROM upload_staff
-      ORDER BY last_name ASC, first_name ASC, id ASC
-    `);
+    const availableColumns = await getExistingTableColumns("upload_staff", [
+      "id",
+      "code",
+      "last_name",
+      "first_name",
+      "title",
+      "email_school",
+      "status",
+      "primary_role",
+      "upload_year",
+      "upload_term",
+      "upload_date"
+    ]);
+
+    if (!availableColumns.length) {
+      res.json([]);
+      return;
+    }
+
+    const result = await pool.query(
+      `SELECT ${availableColumns.join(", ")} FROM upload_staff${buildOrderByClause(availableColumns)}`
+    );
     res.json(result.rows);
   } catch (_error) {
     res.json([]);
@@ -331,24 +363,31 @@ app.get("/api/staff_upload/all", async (_req, res) => {
   }
 
   try {
-    const result = await pool.query(`
-      SELECT
-        id,
-        code,
-        last_name,
-        first_name,
-        title,
-        email_school,
-        status,
-        upload_year,
-        upload_term,
-        upload_date
-      FROM upload_staff
-      ORDER BY last_name ASC, first_name ASC, id ASC
-    `);
+    const availableColumns = await getExistingTableColumns("upload_staff", [
+      "id",
+      "code",
+      "last_name",
+      "first_name",
+      "title",
+      "email_school",
+      "status",
+      "primary_role",
+      "upload_year",
+      "upload_term",
+      "upload_date"
+    ]);
+
+    if (!availableColumns.length) {
+      res.json({ staff: [] });
+      return;
+    }
+
+    const result = await pool.query(
+      `SELECT ${availableColumns.join(", ")} FROM upload_staff${buildOrderByClause(availableColumns)}`
+    );
     res.json({ staff: result.rows });
   } catch (_error) {
-    res.status(500).json({ error: "Failed to load staff upload data." });
+    res.json({ staff: [] });
   }
 });
 
@@ -359,16 +398,31 @@ app.get("/api/admin/user-roles", async (_req, res) => {
   }
 
   try {
+    const availableColumns = await getExistingTableColumns("user_additional_roles", [
+      "user_type",
+      "user_email",
+      "display_name",
+      "additional_role"
+    ]);
+
+    if (!availableColumns.includes("user_email")) {
+      res.json([]);
+      return;
+    }
+
+    const selectColumns = [
+      availableColumns.includes("user_type") ? "user_type" : `'Staff' AS user_type`,
+      "user_email",
+      availableColumns.includes("display_name") ? "display_name" : `'' AS display_name`,
+      availableColumns.includes("additional_role") ? "additional_role" : `'' AS additional_role`
+    ];
+
     const result = await pool.query(
-      `
-        SELECT user_type, user_email, display_name, additional_role
-        FROM user_additional_roles
-        ORDER BY user_type ASC, user_email ASC
-      `
+      `SELECT ${selectColumns.join(", ")} FROM user_additional_roles${buildOrderByClause(availableColumns)}`
     );
     res.json(result.rows);
   } catch (_error) {
-    res.status(500).json({ error: "Could not load user roles" });
+    res.json([]);
   }
 });
 
