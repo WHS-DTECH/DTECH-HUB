@@ -327,6 +327,30 @@ function mergeProjects(sharedProjects) {
     return Array.from(byId.values());
 }
 
+function mapLabProjectToLibraryItem(project) {
+    return {
+        id: `lab-${project.id}`,
+        title: project.title,
+        className: project.className,
+        area: "Lab Project",
+        activityCategory: `Project ${project.projectPhase}`,
+        showThisWeek: Boolean(project.showThisWeek),
+        status: project.status,
+        term: project.term,
+        updated: project.updated,
+        href: project.href,
+        external: project.external,
+        summary: project.summary,
+        keywords: [...(Array.isArray(project.keywords) ? project.keywords : []), "project", "lab project"],
+        visual: project.visual,
+        linkLabel: "Open project"
+    };
+}
+
+function getUnifiedLibraryItems() {
+    return [...projects, ...labProjects.map(mapLabProjectToLibraryItem)];
+}
+
 const HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 
 function getHubStoredAuthRaw() {
@@ -423,7 +447,7 @@ function renderGlobalNavbar() {
             <div class="nav-drawer" role="menu">
                 <a role="menuitem" href="/index.html#current-week">This Week</a>
                 <a role="menuitem" href="/index.html#project-library">Activity Library</a>
-                <a role="menuitem" href="/index.html#browse-lab-projects">Lab Projects</a>
+                <a role="menuitem" href="/index.html#project-library">Projects</a>
                 <a role="menuitem" href="/browse-practicals.html">Browse Practicals</a>
                 <a role="menuitem" href="https://sites.google.com/westlandhigh.school.nz/dtec/home" target="_blank" rel="noreferrer">Learning Site</a>
                 <a role="menuitem" href="/index.html#global-footer">Lab Notes</a>
@@ -926,7 +950,7 @@ function initHubGoogleAuth() {
 }
 
 function getYearLevels() {
-    return [...new Set(projects.map((project) => {
+    return [...new Set(getUnifiedLibraryItems().map((project) => {
         const match = project.className.match(/Year\s+\d+/i);
         return match ? match[0] : "Other";
     }))].sort((left, right) => {
@@ -946,7 +970,7 @@ function getTypes() {
 }
 
 function getCategories() {
-    return ["All", ...new Set(projects.map((project) => project.activityCategory)).values()];
+    return ["All", ...new Set(getUnifiedLibraryItems().map((project) => project.activityCategory)).values()];
 }
 
 function buildSelectOptions(selectElement, options, allLabel, formatter = (value) => value) {
@@ -1036,7 +1060,7 @@ function createProjectCard(project) {
                     <div class="project-meta">${project.className}</div>
                     <div class="project-path">${project.external ? "External activity link" : project.href}</div>
                 </div>
-                <span class="project-link">Open activity</span>
+                <span class="project-link">${project.linkLabel || "Open activity"}</span>
             </div>
         </div>
     `;
@@ -1163,16 +1187,16 @@ function renderCurrentWeek() {
 
 function renderLibrary() {
     libraryGrid.innerHTML = "";
-    const visibleProjects = sortProjects(filterProjects(projects));
+    const visibleProjects = sortProjects(filterProjects(getUnifiedLibraryItems()));
 
-    libraryResultsMeta.textContent = `${visibleProjects.length} activit${visibleProjects.length === 1 ? "y" : "ies"} shown`;
+    libraryResultsMeta.textContent = `${visibleProjects.length} item${visibleProjects.length === 1 ? "" : "s"} shown`;
 
     if (!visibleProjects.length) {
         const emptyState = document.createElement("div");
         emptyState.className = "about-card";
         emptyState.innerHTML = `
             <p class="section-kicker">No Results</p>
-            <h2>No activities matched that search.</h2>
+            <h2>No items matched that search.</h2>
             <p>Try a different keyword or switch back to the All filter to widen the library.</p>
         `;
         libraryGrid.appendChild(emptyState);
@@ -1339,16 +1363,13 @@ function bindLabProjectControls() {
 
 async function init() {
     const hasDashboardLayout = Boolean(
-        (currentWeekGrid || currentProjectGrid || currentLabProjectGrid) &&
+        (currentWeekGrid || currentProjectGrid) &&
         libraryGrid &&
-        labProjectLibraryGrid &&
         searchInput &&
         sortSelect &&
         yearSelect &&
         typeSelect &&
         categorySelect &&
-        labProjectSearchInput &&
-        labProjectSortSelect &&
         activeCount &&
         totalCount &&
         categoryCount
@@ -1367,10 +1388,7 @@ async function init() {
     renderCurrentWeek();
     renderCurrentProjects();
     renderLibrary();
-    renderCurrentLabProjects();
-    renderLabProjectLibrary();
     bindControls();
-    bindLabProjectControls();
     initHubGoogleAuth();
 }
 

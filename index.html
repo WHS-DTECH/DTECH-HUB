@@ -23,7 +23,7 @@
                     <div class="topbar-links">
                         <a href="#current-week">This Week</a>
                         <a href="#project-library">Activity Library</a>
-                        <a href="#browse-lab-projects">Lab Projects</a>
+                        <a href="#project-library">Projects</a>
                         <a href="browse-practicals.html">Browse Practicals</a>
                         <a href="https://sites.google.com/westlandhigh.school.nz/dtec/home" target="_blank" rel="noreferrer">Learning Site</a>
                         <a href="#global-footer">Lab Notes</a>
@@ -80,7 +80,6 @@
                 <div>
                     <p class="section-kicker">Google Profile</p>
                     <h2 id="hub-profile-name">Staff User</h2>
-                    <p id="hub-profile-email" class="hub-profile-email"></p>
                 </div>
             </div>
             <div class="hub-profile-grid">
@@ -106,7 +105,7 @@
             </div>
         </section>
 
-        <main class="home-grid">
+        <main class="home-grid single-column">
             <div class="hub-column activities-column">
                 <section id="current-week" class="panel-section current-work">
                     <div class="section-heading">
@@ -125,19 +124,19 @@
                 <section id="project-library" class="panel-section library-section">
                     <div class="section-heading library-heading">
                         <div>
-                            <p class="section-kicker">Activity Library Students Can Choose</p>
-                            <h2>Browse every computer lab activity</h2>
+                            <p class="section-kicker">Activity And Project Library Students Can Choose</p>
+                            <h2>Browse every computer lab activity and project</h2>
                         </div>
                         <p id="library-results-meta" class="results-meta" aria-live="polite"></p>
                         <p class="section-copy">
-                            Search by activity title, year level, or keywords, then sort to quickly find the right task.
+                            Search by title, year level, or keywords, then sort to quickly find the right task.
                         </p>
                     </div>
 
                     <div class="controls-panel" role="search">
                         <label class="control-field search-field" for="project-search">
                             <span>Search</span>
-                            <input id="project-search" type="search" placeholder="Search activities (e.g., zip, app, web)">
+                            <input id="project-search" type="search" placeholder="Search activities or projects (e.g., zip, app, robotics)">
                         </label>
 
                         <label class="control-field" for="year-filter">
@@ -157,7 +156,7 @@
                         <label class="control-field" for="category-filter">
                             <span>Activity Category</span>
                             <select id="category-filter">
-                                <option value="All">All activities</option>
+                                <option value="All">All items</option>
                             </select>
                         </label>
 
@@ -172,35 +171,6 @@
                         </label>
                     </div>
                     <div id="project-library-grid" class="project-grid" aria-live="polite"></div>
-                </section>
-            </div>
-
-            <div class="hub-column projects-column">
-                <section id="browse-lab-projects" class="panel-section browse-lab-projects">
-                    <div class="section-heading library-heading">
-                        <div>
-                            <p class="section-kicker">Project Library</p>
-                            <h2>Browse projects</h2>
-                        </div>
-                        <p id="lab-project-results-meta" class="results-meta" aria-live="polite"></p>
-                    </div>
-                    <div class="controls-panel project-controls" role="search">
-                        <label class="control-field search-field" for="lab-project-search">
-                            <span>Search</span>
-                            <input id="lab-project-search" type="search" placeholder="Search projects (e.g., robotics, portfolio)">
-                        </label>
-
-                        <label class="control-field" for="lab-project-sort">
-                            <span>Sort</span>
-                            <select id="lab-project-sort">
-                                <option value="name-asc">Name (A-Z)</option>
-                                <option value="name-desc">Name (Z-A)</option>
-                                <option value="recent">Most recent</option>
-                                <option value="phase">Project phase</option>
-                            </select>
-                        </label>
-                    </div>
-                    <div id="lab-project-library-grid" class="project-grid" aria-live="polite"></div>
                 </section>
             </div>
         </main>

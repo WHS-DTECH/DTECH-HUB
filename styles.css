@@ -510,6 +510,10 @@ a {
     align-items: start;
 }
 
+.home-grid.single-column {
+    grid-template-columns: minmax(0, 1fr);
+}
+
 .hub-column {
     display: grid;
     gap: 18px;
