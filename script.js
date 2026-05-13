@@ -816,6 +816,11 @@ function renderHubAuthUi() {
     const canTeacherView = signedIn && hubAccessState.canTeacherView;
     const canAdmin = signedIn && hubAccessState.canAdmin;
     const canToggleView = canTeacherView || canAdmin;
+
+    if (canToggleView && isTeacherWorkspacePath()) {
+        writeStoredHubViewMode("teacher");
+    }
+
     const inTeacherMode = canToggleView && getEffectiveHubViewMode() === "teacher";
 
     let badgeLabel = "";
@@ -844,7 +849,7 @@ function renderHubAuthUi() {
     if (hubStaffLink) {
         hubStaffLink.hidden = !canToggleView;
         if (canToggleView) {
-            hubStaffLink.textContent = inTeacherMode ? "Student View" : "Teacher View";
+            hubStaffLink.textContent = inTeacherMode ? "Switch to Student View" : "Switch to Teacher View";
             hubStaffLink.href = inTeacherMode ? "/index.html" : "/teacher-view.html";
         }
     }
