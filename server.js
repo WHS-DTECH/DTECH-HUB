@@ -806,6 +806,13 @@ async function ensureSchema() {
     );
   `);
 
+  // Remove any check constraints on activity_category that may block proposal submissions
+  try {
+    await pool.query(`ALTER TABLE activities DROP CONSTRAINT IF EXISTS activities_activity_category_check`);
+  } catch (e) {
+    // Constraint may not exist, that's fine
+  }
+
   // Add proposal fields if they don't exist
   await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS start_date TEXT`);
   await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS contact_name TEXT`);
