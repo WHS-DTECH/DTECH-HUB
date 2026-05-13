@@ -17,3 +17,7 @@ services:
         sync: false
       - key: HUB_GOOGLE_CLIENT_ID
         sync: false
+      - key: STAFF_DIRECTORY_API_URL
+        sync: false
+      - key: STAFF_DIRECTORY_API_KEY
+        sync: false

@@ -5,6 +5,8 @@ const { Pool } = require("pg");
 const app = express();
 const PORT = process.env.PORT || 3000;
 const hasDatabase = Boolean(process.env.DATABASE_URL);
+const staffDirectoryApiUrl = String(process.env.STAFF_DIRECTORY_API_URL || "").trim();
+const staffDirectoryApiKey = String(process.env.STAFF_DIRECTORY_API_KEY || "").trim();
 const memoryActivities = new Map();
 const memoryUserRoles = new Map();
 const memoryStaffDirectory = new Map();
@@ -99,6 +101,89 @@ function upsertMemoryStaffRows(rows) {
       memoryStaffDirectory.set(row.email_school, { ...row });
     }
   });
+}
+
+function normalizeStaffDirectoryRows(payload) {
+  const rows = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.staff)
+      ? payload.staff
+      : [];
+
+  return rows
+    .map((row) => ({
+      id: row.id ?? null,
+      code: String(row.code || row.staff_code || "").trim(),
+      last_name: String(row.last_name || row.lastname || row.surname || "").trim(),
+      first_name: String(row.first_name || row.firstname || row.first || "").trim(),
+      title: String(row.title || "").trim(),
+      email_school: normalizeEmail(row.email_school || row.email || row.user_email || row.staff_email),
+      status: String(row.status || "Current").trim() || "Current",
+      primary_role: String(row.primary_role || row.user_type || "Staff").trim() || "Staff",
+      upload_year: row.upload_year ?? null,
+      upload_term: String(row.upload_term || "").trim(),
+      upload_date: String(row.upload_date || "").trim()
+    }))
+    .filter((row) => row.email_school);
+}
+
+async function loadRemoteStaffDirectory() {
+  if (!staffDirectoryApiUrl) {
+    return [];
+  }
+
+  try {
+    const headers = {};
+    if (staffDirectoryApiKey) {
+      headers["x-api-key"] = staffDirectoryApiKey;
+    }
+
+    const response = await fetch(staffDirectoryApiUrl, { headers });
+    if (!response.ok) {
+      return [];
+    }
+
+    const payload = await response.json();
+    return normalizeStaffDirectoryRows(payload);
+  } catch (_error) {
+    return [];
+  }
+}
+
+async function getStaffDirectoryRows() {
+  if (!hasDatabase) {
+    const memoryRows = Array.from(memoryStaffDirectory.values());
+    return memoryRows.length ? memoryRows : loadRemoteStaffDirectory();
+  }
+
+  try {
+    const availableColumns = await getExistingTableColumns("upload_staff", [
+      "id",
+      "code",
+      "last_name",
+      "first_name",
+      "title",
+      "email_school",
+      "status",
+      "primary_role",
+      "upload_year",
+      "upload_term",
+      "upload_date"
+    ]);
+
+    if (availableColumns.length) {
+      const result = await pool.query(
+        `SELECT ${availableColumns.join(", ")} FROM upload_staff${buildOrderByClause(availableColumns)}`
+      );
+
+      if (result.rows.length) {
+        return result.rows;
+      }
+    }
+  } catch (_error) {
+  }
+
+  return loadRemoteStaffDirectory();
 }
 
 async function getExistingTableColumns(tableName, candidateColumns) {
@@ -575,70 +660,18 @@ app.post("/api/staff_upload", async (req, res) => {
 });
 
 app.get("/api/admin/staff-list", async (_req, res) => {
-  if (!hasDatabase) {
-    res.json(Array.from(memoryStaffDirectory.values()));
-    return;
-  }
-
   try {
-    const availableColumns = await getExistingTableColumns("upload_staff", [
-      "id",
-      "code",
-      "last_name",
-      "first_name",
-      "title",
-      "email_school",
-      "status",
-      "primary_role",
-      "upload_year",
-      "upload_term",
-      "upload_date"
-    ]);
-
-    if (!availableColumns.length) {
-      res.json([]);
-      return;
-    }
-
-    const result = await pool.query(
-      `SELECT ${availableColumns.join(", ")} FROM upload_staff${buildOrderByClause(availableColumns)}`
-    );
-    res.json(result.rows);
+    const rows = await getStaffDirectoryRows();
+    res.json(rows);
   } catch (_error) {
     res.json([]);
   }
 });
 
 app.get("/api/staff_upload/all", async (_req, res) => {
-  if (!hasDatabase) {
-    res.json({ staff: Array.from(memoryStaffDirectory.values()) });
-    return;
-  }
-
   try {
-    const availableColumns = await getExistingTableColumns("upload_staff", [
-      "id",
-      "code",
-      "last_name",
-      "first_name",
-      "title",
-      "email_school",
-      "status",
-      "primary_role",
-      "upload_year",
-      "upload_term",
-      "upload_date"
-    ]);
-
-    if (!availableColumns.length) {
-      res.json({ staff: [] });
-      return;
-    }
-
-    const result = await pool.query(
-      `SELECT ${availableColumns.join(", ")} FROM upload_staff${buildOrderByClause(availableColumns)}`
-    );
-    res.json({ staff: result.rows });
+    const rows = await getStaffDirectoryRows();
+    res.json({ staff: rows });
   } catch (_error) {
     res.json({ staff: [] });
   }
