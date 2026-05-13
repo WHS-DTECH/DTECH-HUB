@@ -1,5 +1,4 @@
 const CLOUDINARY_CLOUD_NAME = "dq1ndhl3t";
-const CLOUDINARY_API_KEY = "769919346521166";
 const CLOUDINARY_UPLOAD_PRESET = "dtech_hub_unsigned";
 
 const form = document.querySelector("#upload-activity-form");
@@ -36,7 +35,6 @@ async function uploadToCloudinary(file) {
     const body = new FormData();
     body.append("file", file);
     body.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
-    body.append("api_key", CLOUDINARY_API_KEY);
 
     setStatus("Uploading image to Cloudinary...");
 
