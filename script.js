@@ -418,7 +418,7 @@ function renderGlobalNavbar() {
     ].some((suffix) => path.endsWith(suffix));
 
     const browseMenu = `
-        <details class="nav-dropdown" data-nav-dropdown>
+        <details class="nav-dropdown" id="hub-browse-menu" data-nav-dropdown hidden>
             <summary>Browse</summary>
             <div class="nav-drawer" role="menu">
                 <a role="menuitem" href="/index.html#current-week">This Week</a>
@@ -569,6 +569,8 @@ const hubProfileDisplayName = document.querySelector("#hub-profile-display-name"
 const hubProfileDisplayEmail = document.querySelector("#hub-profile-display-email");
 const hubProfileDomain = document.querySelector("#hub-profile-domain");
 const hubProfileClose = document.querySelector("#hub-profile-close");
+const hubBrowseMenu = document.querySelector("#hub-browse-menu");
+const hubBrowseButtons = Array.from(document.querySelectorAll("[data-auth-browse]"));
 
 function normalizeEmail(value) {
     return String(value || "").trim().toLowerCase();
@@ -751,7 +753,7 @@ function isAllowedHubAccount(profile) {
 }
 
 function renderHubAuthUi() {
-    const signedIn = Boolean(hubAuthState.profile?.email);
+    const signedIn = hasAllowedSignedInHubAccount();
     const canTeacherView = signedIn && hubAccessState.canTeacherView;
     const canAdmin = signedIn && hubAccessState.canAdmin;
 
@@ -788,6 +790,17 @@ function renderHubAuthUi() {
         hubAccessBadge.hidden = !signedIn || canAdmin || !badgeLabel;
         hubAccessBadge.textContent = badgeLabel;
         hubAccessBadge.className = badgeClass ? `hub-access-badge ${badgeClass}` : "hub-access-badge";
+    }
+    if (hubBrowseMenu) {
+        hubBrowseMenu.hidden = !signedIn;
+        if (!signedIn) {
+            hubBrowseMenu.open = false;
+        }
+    }
+    if (hubBrowseButtons.length) {
+        hubBrowseButtons.forEach((element) => {
+            element.hidden = !signedIn;
+        });
     }
 
     if (!signedIn) {
