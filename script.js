@@ -434,6 +434,7 @@ function renderGlobalNavbar() {
     }
 
     const browseMenu = `<a id="hub-browse-practicals-link" data-auth-browse href="/browse-practicals.html" hidden>Browse Practicals</a>`;
+    const profileMenu = `<a href="/user-profile.html">User Profile</a>`;
 
     const uploadMenu = `
         <details class="nav-dropdown" id="hub-upload-menu" data-nav-dropdown hidden>
@@ -445,7 +446,7 @@ function renderGlobalNavbar() {
             </div>
         </details>
     `;
-    const topbarMenu = `${browseMenu}${uploadMenu}`;
+    const topbarMenu = `${browseMenu}${profileMenu}${uploadMenu}`;
 
     topbar.dataset.globalNavbar = "true";
     topbar.setAttribute("aria-label", "Primary");
@@ -970,6 +971,11 @@ function bindHubAuthControls() {
 
     if (hubUserBadge) {
         hubUserBadge.addEventListener("click", () => {
+            if (!hubProfilePanel) {
+                window.location.href = "/user-profile.html";
+                return;
+            }
+
             const currentlyOpen = hubProfilePanel ? !hubProfilePanel.hidden : false;
             setHubProfileOpen(!currentlyOpen);
             if (!currentlyOpen) {
