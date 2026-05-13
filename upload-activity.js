@@ -135,7 +135,7 @@ if (fileInput) {
 
 if (cancelButton) {
     cancelButton.addEventListener("click", () => {
-        window.location.href = "teacher-view.html";
+        window.location.href = "upload-menu.html";
     });
 }
 

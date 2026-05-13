@@ -21,12 +21,7 @@
                 <a class="brand" href="index.html">Computer Lab</a>
                 <div class="topbar-right">
                     <div class="topbar-links">
-                        <a href="index.html#current-week">This Week</a>
-                        <a href="index.html#project-library">Activity Library</a>
-                        <a href="index.html#browse-lab-projects">Lab Projects</a>
-                        <a href="browse-practicals.html">Browse Practicals</a>
-                        <a href="https://sites.google.com/westlandhigh.school.nz/dtec/home" target="_blank" rel="noreferrer">Learning Site</a>
-                        <a href="index.html#global-footer">Lab Notes</a>
+                        <a href="upload-menu.html">Upload Menu</a>
                     </div>
                     <div class="utility-actions" aria-label="Utility actions">
                         <a id="hub-staff-link" href="teacher-view.html" hidden>Teacher View</a>
@@ -55,8 +50,8 @@
                         Teacher view mirrors the student hub while adding management controls, draft visibility, and upload workflows.
                     </p>
                     <div class="hero-actions">
-                        <a class="button button-primary" href="#teacher-tools">Open Teacher Tools</a>
-                        <a class="button button-secondary" href="#upload-menu">Open Upload Menu</a>
+                        <a class="button button-primary" href="#browse-lab-projects">Browse Projects</a>
+                        <a class="button button-secondary" href="#project-library">Browse Activities</a>
                     </div>
                 </div>
 
@@ -79,39 +74,6 @@
         </header>
 
         <main>
-            <section id="teacher-tools" class="panel-section teacher-panel">
-                <div class="section-heading">
-                    <div>
-                        <p class="section-kicker">Teacher Controls</p>
-                        <h2>Manage teacher-only activity content</h2>
-                    </div>
-                    <p class="section-copy">
-                        These tools are only visible in teacher view. Use them to create activities and manage shared hub data.
-                    </p>
-                </div>
-                <div class="teacher-actions">
-                    <a class="button button-primary" href="upload-activity.html">Upload Activity</a>
-                    <button class="button button-secondary" id="teacher-export" type="button">Export Shared Activities</button>
-                    <button class="button button-secondary" id="teacher-clear" type="button">Clear Shared Activities</button>
-                </div>
-                <p id="teacher-status" class="upload-status" aria-live="polite"></p>
-
-                <section id="upload-menu" class="teacher-upload-menu" aria-label="Upload menu">
-                    <p class="section-kicker">Upload Menu</p>
-                    <h3>Choose what you want to upload</h3>
-                    <div class="upload-menu-grid">
-                        <a class="upload-menu-card" href="upload-project.html">
-                            <h4>Upload a Project</h4>
-                            <p>Create or publish a new project card and details for the lab projects experience.</p>
-                        </a>
-                        <a class="upload-menu-card" href="upload-activity.html">
-                            <h4>Upload an Activity</h4>
-                            <p>Create a new activity with resources, equipment, instructions, and teacher notes.</p>
-                        </a>
-                    </div>
-                </section>
-            </section>
-
             <div class="home-grid">
                 <div class="hub-column activities-column">
                     <section id="current-projects" class="panel-section current-work">
