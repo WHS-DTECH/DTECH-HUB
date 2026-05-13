@@ -5,7 +5,7 @@ const baseProjects = [
         className: "Year 11 Computer Lab",
         area: "Programming",
         activityCategory: "Practice",
-        showThisWeek: false,
+        showThisWeek: true,
         status: "active",
         term: "Term 2",
         updated: "2026-05-06",
@@ -148,7 +148,7 @@ const baseLabProjects = [
         className: "Year 13 Computer Lab",
         projectPhase: "Build",
         status: "active",
-        showThisWeek: false,
+        showThisWeek: true,
         term: "Term 2",
         updated: "2026-05-09",
         href: "ProjectPages/maker-lab-builds.html",
@@ -433,14 +433,6 @@ function renderGlobalNavbar() {
         return;
     }
 
-    const path = window.location.pathname.toLowerCase();
-    const teacherNavPage = [
-        "/teacher-view.html",
-        "/upload-activity.html",
-        "/upload-project.html",
-        "/upload-menu.html"
-    ].some((suffix) => path.endsWith(suffix));
-
     const browseMenu = `
         <details class="nav-dropdown" id="hub-browse-menu" data-nav-dropdown hidden>
             <summary>Browse</summary>
@@ -456,7 +448,7 @@ function renderGlobalNavbar() {
     `;
 
     const uploadMenu = `
-        <details class="nav-dropdown" data-nav-dropdown>
+        <details class="nav-dropdown" id="hub-upload-menu" data-nav-dropdown hidden>
             <summary>Upload</summary>
             <div class="nav-drawer" role="menu">
                 <a role="menuitem" href="/upload-project.html">Upload Project</a>
@@ -465,10 +457,7 @@ function renderGlobalNavbar() {
             </div>
         </details>
     `;
-
-    const topbarMenu = teacherNavPage
-        ? `${browseMenu}${uploadMenu}`
-        : `${browseMenu}`;
+    const topbarMenu = `${browseMenu}${uploadMenu}`;
 
     topbar.dataset.globalNavbar = "true";
     topbar.setAttribute("aria-label", "Primary");
@@ -594,11 +583,49 @@ const hubProfileDisplayEmail = document.querySelector("#hub-profile-display-emai
 const hubProfileDomain = document.querySelector("#hub-profile-domain");
 const hubProfileClose = document.querySelector("#hub-profile-close");
 const hubBrowseMenu = document.querySelector("#hub-browse-menu");
+const hubUploadMenu = document.querySelector("#hub-upload-menu");
 const hubBrowseButtons = Array.from(document.querySelectorAll("[data-auth-browse]"));
+const HUB_VIEW_MODE_STORAGE_KEY = "hub_view_mode_v1";
+
+function readStoredHubViewMode() {
+    try {
+        const value = localStorage.getItem(HUB_VIEW_MODE_STORAGE_KEY);
+        return value === "teacher" || value === "student" ? value : "";
+    } catch (_error) {
+        return "";
+    }
+}
+
+function writeStoredHubViewMode(mode) {
+    try {
+        const normalized = mode === "teacher" ? "teacher" : "student";
+        localStorage.setItem(HUB_VIEW_MODE_STORAGE_KEY, normalized);
+    } catch (_error) {
+        // Ignore storage errors in private or restricted browsing modes.
+    }
+}
+
+function getEffectiveHubViewMode() {
+    if (isTeacherWorkspacePath()) {
+        return "teacher";
+    }
+
+    const storedMode = readStoredHubViewMode();
+    if (storedMode) {
+        return storedMode;
+    }
+
+    return hubAccessState.defaultView === "teacher" ? "teacher" : "student";
+}
 
 function isHomepagePath() {
     const path = String(window.location.pathname || "").toLowerCase();
     return path === "/" || path.endsWith("/index.html");
+}
+
+function isTeacherWorkspacePath() {
+    const path = String(window.location.pathname || "").toLowerCase();
+    return path.endsWith("/teacher-view.html") || path.endsWith("/upload-activity.html") || path.endsWith("/upload-project.html") || path.endsWith("/upload-menu.html");
 }
 
 function setPublicHomepageUiState(signedIn) {
@@ -608,6 +635,13 @@ function setPublicHomepageUiState(signedIn) {
 
     document.body.classList.toggle("public-home-access", !signedIn);
 }
+
+// Ensure public-home-access is set on page load
+document.addEventListener("DOMContentLoaded", function() {
+    // If hubAuthState is not available yet, fallback to not signed in
+    var signedIn = (typeof hubAuthState !== 'undefined' && hubAuthState.profile && hubAuthState.profile.email);
+    setPublicHomepageUiState(!!signedIn);
+});
 
 function normalizeEmail(value) {
     return String(value || "").trim().toLowerCase();
@@ -793,6 +827,8 @@ function renderHubAuthUi() {
     const signedIn = hasAllowedSignedInHubAccount();
     const canTeacherView = signedIn && hubAccessState.canTeacherView;
     const canAdmin = signedIn && hubAccessState.canAdmin;
+    const canToggleView = canTeacherView || canAdmin;
+    const inTeacherMode = canToggleView && getEffectiveHubViewMode() === "teacher";
 
     let badgeLabel = "";
     let badgeClass = "";
@@ -818,10 +854,20 @@ function renderHubAuthUi() {
         hubUserBadge.title = signedIn ? getHubDisplayName(hubAuthState.profile) : "";
     }
     if (hubStaffLink) {
-        hubStaffLink.hidden = !canTeacherView;
+        hubStaffLink.hidden = !canToggleView;
+        if (canToggleView) {
+            hubStaffLink.textContent = inTeacherMode ? "Student View" : "Teacher View";
+            hubStaffLink.href = inTeacherMode ? "/index.html" : "/teacher-view.html";
+        }
     }
     if (hubAdminLink) {
         hubAdminLink.hidden = !canAdmin;
+    }
+    if (hubUploadMenu) {
+        hubUploadMenu.hidden = !(canAdmin || (canTeacherView && inTeacherMode));
+        if (hubUploadMenu.hidden) {
+            hubUploadMenu.open = false;
+        }
     }
     if (hubAccessBadge) {
         hubAccessBadge.hidden = !signedIn || canAdmin || !badgeLabel;
@@ -907,6 +953,26 @@ function bindHubAuthControls() {
 
     if (hubSignOutButton) {
         hubSignOutButton.addEventListener("click", signOutHubGoogle);
+    }
+
+    if (hubStaffLink) {
+        hubStaffLink.addEventListener("click", (event) => {
+            const signedIn = hasAllowedSignedInHubAccount();
+            const canToggleView = signedIn && (hubAccessState.canTeacherView || hubAccessState.canAdmin);
+            if (!canToggleView) {
+                return;
+            }
+
+            const currentMode = getEffectiveHubViewMode();
+            const nextMode = currentMode === "teacher" ? "student" : "teacher";
+            writeStoredHubViewMode(nextMode);
+
+            const targetHref = nextMode === "teacher" ? "/teacher-view.html" : "/index.html";
+            if (isTeacherWorkspacePath()) {
+                event.preventDefault();
+                window.location.href = targetHref;
+            }
+        });
     }
 
     if (hubUserBadge) {
