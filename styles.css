@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@400;600;700;800&display=swap');
+
 :root {
     --canvas: #d9dce2;
     --panel-bg: #f4f6fa;
@@ -30,7 +32,7 @@ html {
 body {
     margin: 0;
     min-height: 100vh;
-    font-family: "Manrope", sans-serif;
+    font-family: 'Lexend', sans-serif !important;
     color: var(--ink-strong);
     background: var(--canvas);
 }
@@ -60,8 +62,8 @@ a {
     padding: 6px clamp(14px, 4vw, 24px);
 }
 
-.brand {
-    font-family: "Manrope", sans-serif;
+ .brand {
+    font-family: 'Lexend', sans-serif;
     font-size: 0.8rem;
     font-weight: 700;
     letter-spacing: 0.09em;
@@ -571,10 +573,10 @@ a {
     margin: 0 0 6px;
 }
 
-.section-heading h2,
-.about-card h2 {
+ .section-heading h2,
+ .about-card h2 {
     margin: 0;
-    font-family: "Manrope", sans-serif;
+    font-family: 'Lexend', sans-serif;
     font-size: clamp(1.25rem, 2vw, 1.6rem);
     line-height: 1.2;
     font-weight: 800;
@@ -800,9 +802,9 @@ body.public-home-access .project-tags {
     color: #51576a;
 }
 
-.project-card h3 {
+ .project-card h3 {
     margin: 0 0 6px;
-    font-family: "Manrope", sans-serif;
+    font-family: 'Lexend', sans-serif;
     font-size: 0.93rem;
     line-height: 1.25;
     font-weight: 800;
@@ -869,9 +871,9 @@ body.public-home-access .project-tags {
     flex-wrap: wrap;
 }
 
-.footer-title {
+ .footer-title {
     margin: 0;
-    font-family: "Manrope", sans-serif;
+    font-family: 'Lexend', sans-serif;
     font-size: 0.92rem;
     font-weight: 800;
     color: var(--ink-strong);
