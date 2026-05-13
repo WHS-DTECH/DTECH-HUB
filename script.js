@@ -971,16 +971,7 @@ function bindHubAuthControls() {
 
     if (hubUserBadge) {
         hubUserBadge.addEventListener("click", () => {
-            if (!hubProfilePanel) {
-                window.location.href = "/user-profile.html";
-                return;
-            }
-
-            const currentlyOpen = hubProfilePanel ? !hubProfilePanel.hidden : false;
-            setHubProfileOpen(!currentlyOpen);
-            if (!currentlyOpen) {
-                populateHubProfilePanel();
-            }
+            window.location.href = "/user-profile.html";
         });
     }
 
