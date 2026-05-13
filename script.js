@@ -409,18 +409,50 @@ function renderGlobalNavbar() {
         return;
     }
 
+    const path = window.location.pathname.toLowerCase();
+    const teacherNavPage = [
+        "/teacher-view.html",
+        "/upload-activity.html",
+        "/upload-project.html",
+        "/upload-menu.html"
+    ].some((suffix) => path.endsWith(suffix));
+
+    const browseMenu = `
+        <details class="nav-dropdown" data-nav-dropdown>
+            <summary>Browse</summary>
+            <div class="nav-drawer" role="menu">
+                <a role="menuitem" href="/index.html#current-week">This Week</a>
+                <a role="menuitem" href="/index.html#project-library">Activity Library</a>
+                <a role="menuitem" href="/index.html#browse-lab-projects">Lab Projects</a>
+                <a role="menuitem" href="/browse-practicals.html">Browse Practicals</a>
+                <a role="menuitem" href="https://sites.google.com/westlandhigh.school.nz/dtec/home" target="_blank" rel="noreferrer">Learning Site</a>
+                <a role="menuitem" href="/index.html#global-footer">Lab Notes</a>
+            </div>
+        </details>
+    `;
+
+    const uploadMenu = `
+        <details class="nav-dropdown" data-nav-dropdown>
+            <summary>Upload</summary>
+            <div class="nav-drawer" role="menu">
+                <a role="menuitem" href="/upload-project.html">Upload Project</a>
+                <a role="menuitem" href="/upload-activity.html">Upload Activity</a>
+                <a role="menuitem" href="/upload-menu.html">Upload Menu</a>
+            </div>
+        </details>
+    `;
+
+    const topbarMenu = teacherNavPage
+        ? `${browseMenu}${uploadMenu}`
+        : `${browseMenu}`;
+
     topbar.dataset.globalNavbar = "true";
     topbar.setAttribute("aria-label", "Primary");
     topbar.innerHTML = `
         <a class="brand" href="/index.html">Computer Lab</a>
         <div class="topbar-right">
             <div class="topbar-links">
-                <a href="/index.html#current-week">This Week</a>
-                <a href="/index.html#project-library">Activity Library</a>
-                <a href="/index.html#browse-lab-projects">Lab Projects</a>
-                <a href="/browse-practicals.html">Browse Practicals</a>
-                <a href="https://sites.google.com/westlandhigh.school.nz/dtec/home" target="_blank" rel="noreferrer">Learning Site</a>
-                <a href="/index.html#global-footer">Lab Notes</a>
+                ${topbarMenu}
             </div>
             <div class="utility-actions" aria-label="Utility actions">
                 <a id="hub-staff-link" href="/teacher-view.html" hidden>Teacher View</a>
@@ -440,6 +472,26 @@ function renderGlobalNavbar() {
             </div>
         </div>
     `;
+
+    const dropdowns = Array.from(topbar.querySelectorAll("[data-nav-dropdown]"));
+    dropdowns.forEach((dropdown) => {
+        dropdown.addEventListener("toggle", () => {
+            if (!dropdown.open) return;
+            dropdowns.forEach((other) => {
+                if (other !== dropdown) {
+                    other.open = false;
+                }
+            });
+        });
+    });
+
+    document.addEventListener("click", (event) => {
+        if (!topbar.contains(event.target)) {
+            dropdowns.forEach((dropdown) => {
+                dropdown.open = false;
+            });
+        }
+    });
 }
 
 renderGlobalNavbar();

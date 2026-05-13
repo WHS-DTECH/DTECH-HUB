@@ -1,20 +1,20 @@
 const exportButton = document.querySelector("#teacher-export");
 const clearButton = document.querySelector("#teacher-clear");
 const teacherStatus = document.querySelector("#teacher-status");
-const HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
+const TEACHER_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 
 function getHubStoredAuthRaw() {
     let localValue = null;
     let sessionValue = null;
 
     try {
-        localValue = localStorage.getItem(HUB_AUTH_STORAGE_KEY);
+        localValue = localStorage.getItem(TEACHER_HUB_AUTH_STORAGE_KEY);
     } catch (_error) {
         localValue = null;
     }
 
     try {
-        sessionValue = sessionStorage.getItem(HUB_AUTH_STORAGE_KEY);
+        sessionValue = sessionStorage.getItem(TEACHER_HUB_AUTH_STORAGE_KEY);
     } catch (_error) {
         sessionValue = null;
     }

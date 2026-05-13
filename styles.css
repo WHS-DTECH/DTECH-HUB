@@ -75,6 +75,60 @@ a {
     gap: 8px;
 }
 
+.nav-dropdown {
+    position: relative;
+}
+
+.nav-dropdown summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 7px 12px;
+    border-radius: 6px;
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 0.72rem;
+    font-weight: 700;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.08);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.nav-dropdown summary::-webkit-details-marker {
+    display: none;
+}
+
+.nav-dropdown[open] summary {
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.nav-drawer {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 210px;
+    display: grid;
+    gap: 4px;
+    padding: 8px;
+    border-radius: 10px;
+    border: 1px solid #4f2f6f;
+    background: #2f1a43;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+    z-index: 50;
+}
+
+.nav-drawer a {
+    display: block;
+    padding: 7px 9px;
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: 0.74rem;
+    font-weight: 600;
+}
+
+.nav-drawer a:hover {
+    background: rgba(255, 255, 255, 0.14);
+}
+
 .topbar-right {
     display: flex;
     align-items: center;
