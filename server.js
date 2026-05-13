@@ -312,12 +312,17 @@ function pickExistingColumn(availableColumns, candidates) {
 
 async function resolveUserRolesColumns() {
   const availableColumns = await getAllTableColumns("user_additional_roles");
+  const preferredAdditionalRole = pickExistingColumn(availableColumns, ["additional_role", "role", "extra_role"]);
+  const legacyRoleName = pickExistingColumn(availableColumns, ["role_name"]);
+
   return {
     availableColumns,
     email: pickExistingColumn(availableColumns, ["user_email", "email", "staff_email"]),
     userType: pickExistingColumn(availableColumns, ["user_type", "type", "staff_type"]),
     displayName: pickExistingColumn(availableColumns, ["display_name", "name", "full_name"]),
-    additionalRole: pickExistingColumn(availableColumns, ["additional_role", "role", "extra_role"]),
+    additionalRole: preferredAdditionalRole || legacyRoleName,
+    legacyRoleName,
+    hubAccess: pickExistingColumn(availableColumns, ["hub_access", "hubs_access", "website_hubs", "hub"]),
     updatedAt: pickExistingColumn(availableColumns, ["updated_at", "modified_at", "last_updated"])
   };
 }
@@ -447,7 +452,31 @@ async function ensureSchema() {
   await pool.query(`ALTER TABLE user_additional_roles ADD COLUMN IF NOT EXISTS user_type TEXT`);
   await pool.query(`ALTER TABLE user_additional_roles ADD COLUMN IF NOT EXISTS display_name TEXT`);
   await pool.query(`ALTER TABLE user_additional_roles ADD COLUMN IF NOT EXISTS additional_role TEXT`);
+  await pool.query(`ALTER TABLE user_additional_roles ADD COLUMN IF NOT EXISTS hub_access TEXT[] NOT NULL DEFAULT ARRAY['DTECH-HUB']::text[]`);
   await pool.query(`ALTER TABLE user_additional_roles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+
+  try {
+    const roleColumns = await getAllTableColumns("user_additional_roles");
+
+    if (roleColumns.includes("additional_role") && roleColumns.includes("role_name")) {
+      await pool.query(`
+        UPDATE user_additional_roles
+        SET additional_role = role_name
+        WHERE (additional_role IS NULL OR BTRIM(additional_role) = '')
+          AND role_name IS NOT NULL
+          AND BTRIM(role_name) <> ''
+      `);
+    }
+
+    if (roleColumns.includes("hub_access")) {
+      await pool.query(`
+        UPDATE user_additional_roles
+        SET hub_access = ARRAY['DTECH-HUB']::text[]
+        WHERE hub_access IS NULL
+      `);
+    }
+  } catch (_error) {
+  }
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS staff_upload (
@@ -899,7 +928,14 @@ app.get("/api/admin/user-roles", async (_req, res) => {
       columns.userType ? `${quoteIdentifier(columns.userType)} AS user_type` : `'Staff' AS user_type`,
       `${quoteIdentifier(columns.email)} AS user_email`,
       columns.displayName ? `${quoteIdentifier(columns.displayName)} AS display_name` : `'' AS display_name`,
-      columns.additionalRole ? `${quoteIdentifier(columns.additionalRole)} AS additional_role` : `'' AS additional_role`
+      columns.additionalRole && columns.legacyRoleName && columns.additionalRole !== columns.legacyRoleName
+        ? `COALESCE(NULLIF(${quoteIdentifier(columns.additionalRole)}, ''), ${quoteIdentifier(columns.legacyRoleName)}) AS additional_role`
+        : columns.additionalRole
+          ? `${quoteIdentifier(columns.additionalRole)} AS additional_role`
+          : `'' AS additional_role`,
+      columns.hubAccess
+        ? `${quoteIdentifier(columns.hubAccess)} AS hub_access`
+        : `ARRAY['DTECH-HUB']::text[] AS hub_access`
     ];
 
     const orderByColumn = columns.updatedAt || columns.email;
@@ -931,6 +967,13 @@ app.post("/api/admin/user-roles", async (req, res) => {
   const userEmail = normalizeEmail(body.user_email);
   const additionalRole = String(body.additional_role || "").trim();
   const displayName = String(body.display_name || "").trim();
+  const hubAccessInput = Array.isArray(body.hub_access)
+    ? body.hub_access
+    : String(body.hub_access || "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+  const hubAccess = Array.from(new Set(hubAccessInput.length ? hubAccessInput : ["DTECH-HUB"]));
 
   if (!userType || !userEmail || !additionalRole) {
     res.status(400).send("user_type, user_email and additional_role are required");
@@ -941,7 +984,8 @@ app.post("/api/admin/user-roles", async (req, res) => {
     user_type: userType,
     user_email: userEmail,
     display_name: displayName,
-    additional_role: additionalRole
+    additional_role: additionalRole,
+    hub_access: hubAccess
   };
 
   if (!hasDatabase) {
@@ -974,6 +1018,14 @@ app.post("/api/admin/user-roles", async (req, res) => {
       updateAssignments.push(`additional_role = $${updateValues.length + 1}`);
       updateValues.push(additionalRole);
     }
+    if (columns.legacyRoleName && columns.legacyRoleName !== columns.additionalRole) {
+      updateAssignments.push(`role_name = $${updateValues.length + 1}`);
+      updateValues.push(additionalRole);
+    }
+    if (columns.hubAccess) {
+      updateAssignments.push(`hub_access = $${updateValues.length + 1}`);
+      updateValues.push(hubAccess);
+    }
     if (columns.updatedAt) {
       updateAssignments.push("updated_at = NOW()");
     }
@@ -982,7 +1034,14 @@ app.post("/api/admin/user-roles", async (req, res) => {
       columns.userType ? `${quoteIdentifier(columns.userType)} AS user_type` : `'Staff' AS user_type`,
       `${quoteIdentifier(columns.email)} AS user_email`,
       columns.displayName ? `${quoteIdentifier(columns.displayName)} AS display_name` : `'' AS display_name`,
-      columns.additionalRole ? `${quoteIdentifier(columns.additionalRole)} AS additional_role` : `'' AS additional_role`
+      columns.additionalRole && columns.legacyRoleName && columns.additionalRole !== columns.legacyRoleName
+        ? `COALESCE(NULLIF(${quoteIdentifier(columns.additionalRole)}, ''), ${quoteIdentifier(columns.legacyRoleName)}) AS additional_role`
+        : columns.additionalRole
+          ? `${quoteIdentifier(columns.additionalRole)} AS additional_role`
+          : `'' AS additional_role`,
+      columns.hubAccess
+        ? `${quoteIdentifier(columns.hubAccess)} AS hub_access`
+        : `ARRAY['DTECH-HUB']::text[] AS hub_access`
     ];
 
     const updateSqlAssignments = updateAssignments
@@ -990,6 +1049,8 @@ app.post("/api/admin/user-roles", async (req, res) => {
         .replace("user_type", columns.userType ? quoteIdentifier(columns.userType) : "user_type")
         .replace("display_name", columns.displayName ? quoteIdentifier(columns.displayName) : "display_name")
         .replace("additional_role", columns.additionalRole ? quoteIdentifier(columns.additionalRole) : "additional_role")
+        .replace("role_name", columns.legacyRoleName ? quoteIdentifier(columns.legacyRoleName) : "role_name")
+        .replace("hub_access", columns.hubAccess ? quoteIdentifier(columns.hubAccess) : "hub_access")
         .replace("updated_at", columns.updatedAt ? quoteIdentifier(columns.updatedAt) : "updated_at"));
 
     const updateResult = updateSqlAssignments.length
@@ -1021,6 +1082,14 @@ app.post("/api/admin/user-roles", async (req, res) => {
       if (columns.additionalRole) {
         insertColumns.push(quoteIdentifier(columns.additionalRole));
         insertValues.push(additionalRole);
+      }
+      if (columns.legacyRoleName && columns.legacyRoleName !== columns.additionalRole) {
+        insertColumns.push(quoteIdentifier(columns.legacyRoleName));
+        insertValues.push(additionalRole);
+      }
+      if (columns.hubAccess) {
+        insertColumns.push(quoteIdentifier(columns.hubAccess));
+        insertValues.push(hubAccess);
       }
 
       const valuePlaceholders = insertValues.map((_, index) => `$${index + 1}`);
