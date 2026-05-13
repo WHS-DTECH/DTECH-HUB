@@ -2,7 +2,6 @@ const form = document.querySelector("#upload-activity-form");
 const fileInput = document.querySelector("#outcome-image-file");
 const imageUrlInput = document.querySelector("#outcome-image-url");
 const uploadStatus = document.querySelector("#upload-status");
-const preview = document.querySelector("#export-preview");
 const cancelButton = document.querySelector("#cancel-upload");
 
 function slugify(value) {
@@ -110,26 +109,6 @@ async function saveActivityShared(payload) {
     }
 }
 
-function downloadPayload(payload) {
-    const safeName = (payload.name || "activity")
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "")
-        .slice(0, 60) || "activity";
-
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-
-    anchor.href = url;
-    anchor.download = `${safeName}.json`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-
-    URL.revokeObjectURL(url);
-}
-
 if (fileInput) {
     fileInput.addEventListener("change", async (event) => {
         const file = event.target.files?.[0];
@@ -164,10 +143,7 @@ if (form) {
         try {
             await saveActivityShared(payload);
             localStorage.setItem("dtechHub:lastActivityDraft", JSON.stringify(payload));
-            preview.hidden = false;
-            preview.textContent = JSON.stringify(payload, null, 2);
-            downloadPayload(payload);
-            setStatus("Activity saved to shared database and JSON exported.");
+            setStatus("Activity saved to Activities Library.");
         } catch (error) {
             setStatus(`Save failed: ${error.message}`, true);
         }
