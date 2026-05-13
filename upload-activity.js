@@ -1,6 +1,3 @@
-const CLOUDINARY_CLOUD_NAME = "dq1ndhl3t";
-const CLOUDINARY_UPLOAD_PRESET = "dtech_hub_unsigned";
-
 const form = document.querySelector("#upload-activity-form");
 const fileInput = document.querySelector("#outcome-image-file");
 const imageUrlInput = document.querySelector("#outcome-image-url");
@@ -28,29 +25,37 @@ function setStatus(message, isError = false) {
     uploadStatus.style.color = isError ? "#bb3f3f" : "#2f4e73";
 }
 
-async function uploadToCloudinary(file) {
+async function fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error("Failed to read image file."));
+        reader.readAsDataURL(file);
+    });
+}
+
+async function uploadActivityImage(file, activityName) {
     if (!file) return;
+    if (!activityName) throw new Error("Activity name is required before uploading images.");
 
-    const endpoint = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
-    const body = new FormData();
-    body.append("file", file);
-    body.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+    const imageData = await fileToDataUrl(file);
+    const activityId = slugify(activityName);
 
-    setStatus("Uploading image to Cloudinary...");
+    setStatus("Uploading image...");
 
-    const response = await fetch(endpoint, {
+    const response = await fetch(`/api/activities/${activityId}/upload-image`, {
         method: "POST",
-        body
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image_data: imageData, file_name: file.name })
     });
 
     const payload = await response.json();
 
-    if (!response.ok || !payload.secure_url) {
-        const details = payload?.error?.message || "Upload failed";
-        throw new Error(details);
+    if (!response.ok || !payload.image_url) {
+        throw new Error(payload.error || "Upload failed");
     }
 
-    imageUrlInput.value = payload.secure_url;
+    imageUrlInput.value = payload.image_url;
     setStatus("Image uploaded successfully. URL has been filled in.");
 }
 
@@ -122,13 +127,12 @@ if (fileInput) {
         const file = event.target.files?.[0];
         if (!file) return;
 
+        const activityName = String(form?.activityName?.value || "").trim();
+
         try {
-            await uploadToCloudinary(file);
+            await uploadActivityImage(file, activityName);
         } catch (error) {
-            setStatus(
-                `Cloudinary upload failed: ${error.message}. Check that unsigned preset '${CLOUDINARY_UPLOAD_PRESET}' exists in your Cloudinary settings.`,
-                true
-            );
+            setStatus(`Image upload failed: ${error.message}`, true);
         }
     });
 }

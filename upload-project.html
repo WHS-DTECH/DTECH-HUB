@@ -133,13 +133,13 @@
 
                         <div class="field field-wide">
                             <label for="outcome-image-url">Outcome Image URL</label>
-                            <input id="outcome-image-url" name="outcomeImageUrl" type="url" placeholder="https://... or /images/uploads/your-file.jpg">
+                            <input id="outcome-image-url" name="outcomeImageUrl" type="url" placeholder="https://... or auto-filled after upload">
                         </div>
 
                         <div class="field field-wide">
                             <label for="outcome-image-file">Upload Outcome Image (PNG or JPG)</label>
                             <input id="outcome-image-file" name="outcomeImageFile" type="file" accept="image/png,image/jpeg,image/jpg">
-                            <p class="help-text">Upload an image and the URL above will be filled automatically from Cloudinary.</p>
+                            <p class="help-text" id="upload-status"></p>
                         </div>
 
                         <div class="field field-wide">

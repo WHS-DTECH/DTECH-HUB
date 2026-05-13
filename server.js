@@ -1,4 +1,5 @@
 const path = require("path");
+const fs = require("fs");
 const express = require("express");
 const multer = require("multer");
 const nodemailer = require("nodemailer");
@@ -1287,6 +1288,51 @@ app.delete("/api/activities", async (_req, res) => {
     res.status(204).send();
   } catch (error) {
     res.status(500).send("Could not clear activities");
+  }
+});
+
+app.post("/api/activities/:id/upload-image", async (req, res) => {
+  const activityId = String(req.params.id || "").trim();
+  const body = req.body || {};
+  const imageData = String(body.image_data || "").trim();
+  const fileName = String(body.file_name || "image.png").trim();
+
+  if (!activityId) {
+    res.status(400).json({ error: "Activity ID is required" });
+    return;
+  }
+
+  if (!imageData || !imageData.startsWith("data:image/")) {
+    res.status(400).json({ error: "Invalid image data" });
+    return;
+  }
+
+  try {
+    const uploadsDir = path.join(__dirname, "public", "images", "activities");
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    const matches = imageData.match(/^data:image\/([a-z]+);base64,(.+)$/i);
+    if (!matches) {
+      res.status(400).json({ error: "Invalid base64 image format" });
+      return;
+    }
+
+    const mimeType = matches[1];
+    const base64Data = matches[2];
+    const ext = mimeType === "jpeg" ? "jpg" : mimeType;
+    const fileNameNoExt = path.basename(fileName, path.extname(fileName));
+    const safeFileName = slugify(fileNameNoExt) + "-" + Date.now() + "." + ext;
+    const filePath = path.join(uploadsDir, safeFileName);
+    const imageUrl = "/images/activities/" + safeFileName;
+
+    fs.writeFileSync(filePath, Buffer.from(base64Data, "base64"));
+
+    res.status(200).json({ image_url: imageUrl, file_name: safeFileName });
+  } catch (error) {
+    console.error("Image upload error:", error);
+    res.status(500).json({ error: "Failed to upload image" });
   }
 });
 
