@@ -55,6 +55,7 @@
             <section class="upload-panel" aria-label="Upload project form">
 
                 <form id="upload-activity-form" class="upload-form">
+                       <div id="upload-form-alert" class="upload-form-alert" hidden></div>
                     <div class="form-grid">
                         <div class="field">
                             <label for="activity-name">Project Name</label>
@@ -139,7 +140,6 @@
                         <div class="field field-wide">
                             <label for="outcome-image-file">Upload Outcome Image (PNG or JPG)</label>
                             <input id="outcome-image-file" name="outcomeImageFile" type="file" accept="image/png,image/jpeg,image/jpg">
-                            <p class="help-text" id="upload-status"></p>
                         </div>
 
                         <div class="field field-wide">
