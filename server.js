@@ -14,6 +14,8 @@ const memoryUserRoles = new Map();
 const memoryStaffDirectory = new Map();
 const memorySuggestions = [];
 let memorySuggestionId = 1;
+const memoryPracticalEvents = [];
+let memoryPracticalEventId = 1;
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -110,6 +112,78 @@ function parseCsvEmails(raw) {
     .split(",")
     .map((item) => normalizeEmail(item))
     .filter(Boolean);
+}
+
+function normalizeDateOnly(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return "";
+
+  const year = parsed.getUTCFullYear();
+  const month = String(parsed.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function addDaysToIsoDate(isoDate, daysToAdd) {
+  const parsed = new Date(`${isoDate}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime())) return isoDate;
+  parsed.setUTCDate(parsed.getUTCDate() + daysToAdd);
+  const year = parsed.getUTCFullYear();
+  const month = String(parsed.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function toIcsDate(isoDate) {
+  return String(isoDate || "").replace(/-/g, "");
+}
+
+function escapeIcsText(value) {
+  return String(value || "")
+    .replace(/\\/g, "\\\\")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,")
+    .replace(/\r?\n/g, "\\n");
+}
+
+function buildIcsCalendar(events) {
+  const now = new Date();
+  const timestamp = `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, "0")}${String(now.getUTCDate()).padStart(2, "0")}T${String(now.getUTCHours()).padStart(2, "0")}${String(now.getUTCMinutes()).padStart(2, "0")}${String(now.getUTCSeconds()).padStart(2, "0")}Z`;
+
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//WHS DTECH HUB//Browse Practicals//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "X-WR-CALNAME:Browse Practicals",
+    "X-WR-TIMEZONE:Pacific/Auckland"
+  ];
+
+  events.forEach((event) => {
+    const startDate = normalizeDateOnly(event.start_date);
+    const endDate = normalizeDateOnly(event.end_date || event.start_date) || startDate;
+    if (!startDate || !endDate) return;
+
+    const endExclusive = addDaysToIsoDate(endDate, 1);
+    const uid = `${escapeIcsText(event.id)}@dtech-hub2.onrender.com`;
+    const title = `${escapeIcsText(event.event_type || "Activity")}: ${escapeIcsText(event.title)}`;
+    const description = escapeIcsText(event.notes || "Scheduled in Browse Practicals");
+
+    lines.push("BEGIN:VEVENT");
+    lines.push(`UID:${uid}`);
+    lines.push(`DTSTAMP:${timestamp}`);
+    lines.push(`DTSTART;VALUE=DATE:${toIcsDate(startDate)}`);
+    lines.push(`DTEND;VALUE=DATE:${toIcsDate(endExclusive)}`);
+    lines.push(`SUMMARY:${title}`);
+    lines.push(`DESCRIPTION:${description}`);
+    lines.push("END:VEVENT");
+  });
+
+  lines.push("END:VCALENDAR");
+  return `${lines.join("\r\n")}\r\n`;
 }
 
 function buildSchoolEmail(value) {
@@ -718,10 +792,84 @@ async function ensureSchema() {
   await pool.query(`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS attachment_size INTEGER`);
   await pool.query(`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS attachment_data BYTEA`);
   await pool.query(`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS practical_schedule (
+      id BIGSERIAL PRIMARY KEY,
+      title TEXT NOT NULL,
+      event_type TEXT NOT NULL DEFAULT 'Activity',
+      start_date DATE NOT NULL,
+      end_date DATE NOT NULL,
+      notes TEXT,
+      linked_activity_id TEXT,
+      linked_url TEXT,
+      created_by_email TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS title TEXT`);
+  await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS event_type TEXT NOT NULL DEFAULT 'Activity'`);
+  await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS start_date DATE`);
+  await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS end_date DATE`);
+  await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS notes TEXT`);
+  await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS linked_activity_id TEXT`);
+  await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS linked_url TEXT`);
+  await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS created_by_email TEXT`);
+  await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 }
 
 app.use(express.json({ limit: "2mb" }));
 app.use(express.static(__dirname));
+
+async function canManagePracticalSchedule(email) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) return false;
+
+  const staffEmailSet = new Set();
+  try {
+    const staffRows = await getStaffDirectoryRows();
+    staffRows.forEach((row) => {
+      collectDirectoryEmails(row, ["email_school", "email", "user_email", "staff_email", "google_email"]).forEach((value) => {
+        staffEmailSet.add(value);
+      });
+    });
+  } catch (_error) {
+  }
+
+  const userRole = await getUserRoleByEmail(normalizedEmail);
+  const assignedRole = canonicalizeRoleName(userRole?.additional_role || userRole?.role_name || "");
+  const allPermissions = await getMergedRolePermissions();
+  const rolePermission = allPermissions.find(
+    (row) => canonicalizeRoleName(row.role_name) === assignedRole
+  ) || null;
+
+  const roleGrantsTeacherView = ["Admin", "Lead Teacher", "Teacher", "Technician"].includes(assignedRole);
+  const canAdmin = Boolean(rolePermission?.admin);
+  return Boolean(staffEmailSet.has(normalizedEmail) || roleGrantsTeacherView || canAdmin);
+}
+
+async function listPracticalEvents() {
+  if (!hasDatabase) {
+    return memoryPracticalEvents
+      .slice()
+      .sort((left, right) => {
+        const leftDate = normalizeDateOnly(left.start_date);
+        const rightDate = normalizeDateOnly(right.start_date);
+        if (leftDate !== rightDate) return leftDate.localeCompare(rightDate);
+        return String(left.title || "").localeCompare(String(right.title || ""));
+      });
+  }
+
+  const result = await pool.query(`
+    SELECT id, title, event_type, start_date, end_date, notes, linked_activity_id, linked_url, created_by_email, created_at, updated_at
+    FROM practical_schedule
+    ORDER BY start_date ASC, title ASC
+  `);
+  return result.rows;
+}
 
 async function getSuggestionRecipients() {
   const recipients = new Set(parseCsvEmails(suggestionNotificationFallback));
@@ -1196,6 +1344,123 @@ app.get("/api/student_timetable/all", async (_req, res) => {
     res.json({ students: rows });
   } catch (_error) {
     res.json({ students: [] });
+  }
+});
+
+app.get("/api/practicals/events", async (_req, res) => {
+  try {
+    const rows = await listPracticalEvents();
+    res.json(rows);
+  } catch (_error) {
+    res.status(500).json({ error: "Could not load practical events" });
+  }
+});
+
+app.post("/api/practicals/events", async (req, res) => {
+  const title = String(req.body?.title || "").trim();
+  const eventTypeRaw = String(req.body?.event_type || "Activity").trim();
+  const eventType = eventTypeRaw.toLowerCase().includes("project") ? "Project" : "Activity";
+  const startDate = normalizeDateOnly(req.body?.start_date);
+  const endDateInput = normalizeDateOnly(req.body?.end_date);
+  const endDate = endDateInput || startDate;
+  const notes = String(req.body?.notes || "").trim();
+  const linkedActivityId = String(req.body?.linked_activity_id || "").trim();
+  const linkedUrl = String(req.body?.linked_url || "").trim();
+  const createdByEmail = normalizeEmail(req.body?.user_email);
+
+  if (!title || !startDate) {
+    res.status(400).json({ error: "title and start_date are required" });
+    return;
+  }
+
+  if (!createdByEmail || !(await canManagePracticalSchedule(createdByEmail))) {
+    res.status(403).json({ error: "Only Teacher/Admin users can add calendar events" });
+    return;
+  }
+
+  if (!hasDatabase) {
+    const row = {
+      id: memoryPracticalEventId++,
+      title,
+      event_type: eventType,
+      start_date: startDate,
+      end_date: endDate,
+      notes,
+      linked_activity_id: linkedActivityId || null,
+      linked_url: linkedUrl || null,
+      created_by_email: createdByEmail,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    memoryPracticalEvents.push(row);
+    res.status(201).json(row);
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        INSERT INTO practical_schedule (
+          title, event_type, start_date, end_date, notes, linked_activity_id, linked_url, created_by_email, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3::date, $4::date, $5, $6, $7, $8, NOW(), NOW()
+        )
+        RETURNING id, title, event_type, start_date, end_date, notes, linked_activity_id, linked_url, created_by_email, created_at, updated_at
+      `,
+      [title, eventType, startDate, endDate, notes, linkedActivityId || null, linkedUrl || null, createdByEmail]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (_error) {
+    res.status(500).json({ error: "Could not save practical event" });
+  }
+});
+
+app.delete("/api/practicals/events/:id", async (req, res) => {
+  const eventId = Number.parseInt(req.params.id, 10);
+  const userEmail = normalizeEmail(req.query.user_email || req.body?.user_email);
+
+  if (!Number.isInteger(eventId) || eventId <= 0) {
+    res.status(400).json({ error: "invalid event id" });
+    return;
+  }
+
+  if (!userEmail || !(await canManagePracticalSchedule(userEmail))) {
+    res.status(403).json({ error: "Only Teacher/Admin users can delete calendar events" });
+    return;
+  }
+
+  if (!hasDatabase) {
+    const index = memoryPracticalEvents.findIndex((row) => Number(row.id) === eventId);
+    if (index < 0) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    memoryPracticalEvents.splice(index, 1);
+    res.status(204).send();
+    return;
+  }
+
+  try {
+    const result = await pool.query("DELETE FROM practical_schedule WHERE id = $1", [eventId]);
+    if (!result.rowCount) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    res.status(204).send();
+  } catch (_error) {
+    res.status(500).json({ error: "Could not delete practical event" });
+  }
+});
+
+app.get("/api/practicals/calendar.ics", async (_req, res) => {
+  try {
+    const rows = await listPracticalEvents();
+    const ics = buildIcsCalendar(rows);
+    res.setHeader("Content-Type", "text/calendar; charset=utf-8");
+    res.setHeader("Content-Disposition", "inline; filename=Browse-Practicals.ics");
+    res.send(ics);
+  } catch (_error) {
+    res.status(500).send("Could not generate calendar feed");
   }
 });
 

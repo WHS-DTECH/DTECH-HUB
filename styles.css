@@ -1314,6 +1314,177 @@ a {
     gap: 10px;
 }
 
+.practicals-page {
+    width: min(1200px, calc(100% - 28px));
+    margin: 18px auto 28px;
+    display: grid;
+    gap: 12px;
+}
+
+.practicals-header h1 {
+    margin: 4px 0 8px;
+}
+
+.practicals-sync-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.practicals-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+    gap: 12px;
+}
+
+.practicals-calendar-wrap {
+    padding: 12px;
+}
+
+.practicals-monthbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.practicals-monthbar h2 {
+    margin: 0;
+    color: #163f66;
+    font-size: 1.2rem;
+}
+
+.practicals-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #4c6788;
+    margin-bottom: 6px;
+    padding: 0 3px;
+}
+
+.practicals-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.practicals-day {
+    min-height: 108px;
+    background: #ffffff;
+    border: 1px solid #d1dced;
+    border-radius: 8px;
+    padding: 6px;
+}
+
+.practicals-day.is-other-month {
+    background: #f2f5f9;
+    opacity: 0.8;
+}
+
+.practicals-day-number {
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: #2e4f72;
+    margin-bottom: 5px;
+}
+
+.practicals-day-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 4px;
+}
+
+.practicals-day-list li {
+    font-size: 0.66rem;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: #eaf2ff;
+    color: #245d8d;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.practicals-day-list li.is-project {
+    background: #efe7fb;
+    color: #5c3a87;
+}
+
+.practicals-timeline {
+    padding: 12px;
+}
+
+.practicals-timeline h2 {
+    margin: 0;
+    color: #163f66;
+}
+
+.practicals-list {
+    display: grid;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.practical-item {
+    border: 1px solid #d0dbeb;
+    border-radius: 10px;
+    background: #f8faff;
+    padding: 10px;
+}
+
+.practical-item h3 {
+    margin: 0;
+    font-size: 0.95rem;
+    color: #18436b;
+}
+
+.practical-date {
+    margin: 4px 0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #2f5f8c;
+}
+
+.practical-notes {
+    margin: 0;
+    font-size: 0.78rem;
+    color: #4a5f7b;
+}
+
+.practical-actions {
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.practicals-manage {
+    border-color: #bfcbe0;
+    background: #f1f5fb;
+}
+
+@media (max-width: 980px) {
+    .practicals-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 760px) {
+    .practicals-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .practicals-weekdays {
+        display: none;
+    }
+}
+
 .admin-side-panel {
     align-self: start;
     display: grid;
