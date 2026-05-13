@@ -1214,59 +1214,90 @@ app.post("/api/activities", async (req, res) => {
 
   try {
     const activityColumns = await getAllTableColumns("activities");
+    const idColumn = pickExistingColumn(activityColumns, ["id"]);
+    const nameColumn = pickExistingColumn(activityColumns, ["name", "activity_name", "title"]);
+    const yearLevelColumn = pickExistingColumn(activityColumns, ["year_level", "year", "yeargroup"]);
+    const typeColumn = pickExistingColumn(activityColumns, ["type", "activity_type"]);
+
+    if (!idColumn || !nameColumn || !yearLevelColumn || !typeColumn) {
+      res.status(500).send("Could not save activity: activities table is missing one or more required columns (id, name, year_level, type).");
+      return;
+    }
+
+    const activityCategoryColumn = pickExistingColumn(activityColumns, ["activity_category", "category"]);
+    const durationColumn = pickExistingColumn(activityColumns, ["duration_hours", "duration_minutes", "duration"]);
+    const difficultyColumn = pickExistingColumn(activityColumns, ["difficulty", "level"]);
     const cardColorColumn = pickExistingColumn(activityColumns, ["card_color", "card_colour", "color"]);
     const cardUrlColumn = pickExistingColumn(activityColumns, ["card_url", "activity_url", "url"]);
+    const outcomeImageColumn = pickExistingColumn(activityColumns, ["outcome_image_url", "image_url", "thumbnail_url"]);
+    const descriptionColumn = pickExistingColumn(activityColumns, ["description", "summary"]);
+    const resourcesColumn = pickExistingColumn(activityColumns, ["resources"]);
+    const equipmentColumn = pickExistingColumn(activityColumns, ["equipment"]);
+    const instructionsColumn = pickExistingColumn(activityColumns, ["instructions", "steps"]);
+    const classManagementColumn = pickExistingColumn(activityColumns, ["class_management_notes"]);
+    const classPreparationColumn = pickExistingColumn(activityColumns, ["class_preparation"]);
+    const assessmentFocusColumn = pickExistingColumn(activityColumns, ["assessment_focus"]);
+    const showInWeekColumn = pickExistingColumn(activityColumns, ["show_in_this_week", "show_this_week", "is_pinned"]);
+    const termColumn = pickExistingColumn(activityColumns, ["term"]);
+    const updatedAtColumn = pickExistingColumn(activityColumns, ["updated_at", "updatedon", "modified_at"]);
 
     const sqlColumns = [
-      { name: "id", value: payload.id },
-      { name: "name", value: payload.name },
-      { name: "year_level", value: payload.year_level },
-      { name: "type", value: payload.type },
-      { name: "activity_category", value: payload.activity_category },
-      { name: "duration_hours", value: payload.duration_hours },
-      { name: "difficulty", value: payload.difficulty },
-      { name: "outcome_image_url", value: payload.outcome_image_url },
-      { name: "description", value: payload.description },
-      { name: "resources", value: JSON.stringify(payload.resources), cast: "jsonb" },
-      { name: "equipment", value: JSON.stringify(payload.equipment), cast: "jsonb" },
-      { name: "instructions", value: JSON.stringify(payload.instructions), cast: "jsonb" },
-      { name: "class_management_notes", value: JSON.stringify(payload.class_management_notes), cast: "jsonb" },
-      { name: "class_preparation", value: JSON.stringify(payload.class_preparation), cast: "jsonb" },
-      { name: "assessment_focus", value: JSON.stringify(payload.assessment_focus), cast: "jsonb" },
-      { name: "show_in_this_week", value: payload.show_in_this_week },
-      { name: "term", value: payload.term }
+      { name: idColumn, value: payload.id },
+      { name: nameColumn, value: payload.name },
+      { name: yearLevelColumn, value: payload.year_level },
+      { name: typeColumn, value: payload.type }
     ];
 
-    if (cardColorColumn) {
-      sqlColumns.splice(7, 0, { name: cardColorColumn, value: payload.card_color });
-    }
-
-    if (cardUrlColumn) {
-      const insertIndex = cardColorColumn ? 8 : 7;
-      sqlColumns.splice(insertIndex, 0, { name: cardUrlColumn, value: payload.card_url });
-    }
+    if (activityCategoryColumn) sqlColumns.push({ name: activityCategoryColumn, value: payload.activity_category });
+    if (durationColumn) sqlColumns.push({ name: durationColumn, value: payload.duration_hours });
+    if (difficultyColumn) sqlColumns.push({ name: difficultyColumn, value: payload.difficulty });
+    if (cardColorColumn) sqlColumns.push({ name: cardColorColumn, value: payload.card_color });
+    if (cardUrlColumn) sqlColumns.push({ name: cardUrlColumn, value: payload.card_url });
+    if (outcomeImageColumn) sqlColumns.push({ name: outcomeImageColumn, value: payload.outcome_image_url });
+    if (descriptionColumn) sqlColumns.push({ name: descriptionColumn, value: payload.description });
+    if (resourcesColumn) sqlColumns.push({ name: resourcesColumn, value: JSON.stringify(payload.resources), cast: "jsonb" });
+    if (equipmentColumn) sqlColumns.push({ name: equipmentColumn, value: JSON.stringify(payload.equipment), cast: "jsonb" });
+    if (instructionsColumn) sqlColumns.push({ name: instructionsColumn, value: JSON.stringify(payload.instructions), cast: "jsonb" });
+    if (classManagementColumn) sqlColumns.push({ name: classManagementColumn, value: JSON.stringify(payload.class_management_notes), cast: "jsonb" });
+    if (classPreparationColumn) sqlColumns.push({ name: classPreparationColumn, value: JSON.stringify(payload.class_preparation), cast: "jsonb" });
+    if (assessmentFocusColumn) sqlColumns.push({ name: assessmentFocusColumn, value: JSON.stringify(payload.assessment_focus), cast: "jsonb" });
+    if (showInWeekColumn) sqlColumns.push({ name: showInWeekColumn, value: payload.show_in_this_week });
+    if (termColumn) sqlColumns.push({ name: termColumn, value: payload.term });
 
     const insertColumnsSql = sqlColumns.map((column) => quoteIdentifier(column.name)).join(", ");
     const insertValuesSql = sqlColumns
       .map((column, index) => `$${index + 1}${column.cast ? `::${column.cast}` : ""}`)
       .join(", ");
-    const updateSql = sqlColumns
+    const updateAssignments = sqlColumns
       .filter((column) => column.name !== "id")
-      .map((column) => `${quoteIdentifier(column.name)} = EXCLUDED.${quoteIdentifier(column.name)}`)
-      .join(",\n              ");
+      .map((column) => `${quoteIdentifier(column.name)} = EXCLUDED.${quoteIdentifier(column.name)}`);
+
+    if (updatedAtColumn) {
+      updateAssignments.push(`${quoteIdentifier(updatedAtColumn)} = NOW()`);
+    }
+
+    const updateSql = updateAssignments.length
+      ? updateAssignments.join(",\n              ")
+      : `${quoteIdentifier(idColumn)} = EXCLUDED.${quoteIdentifier(idColumn)}`;
+
+    const insertColumnsWithAudit = updatedAtColumn
+      ? `${insertColumnsSql},\n          ${quoteIdentifier(updatedAtColumn)}`
+      : insertColumnsSql;
+
+    const insertValuesWithAudit = updatedAtColumn
+      ? `${insertValuesSql},\n          NOW()`
+      : insertValuesSql;
 
     const result = await pool.query(
       `
         INSERT INTO activities (
-          ${insertColumnsSql},
-          updated_at
+          ${insertColumnsWithAudit}
         ) VALUES (
-          ${insertValuesSql},
-          NOW()
+          ${insertValuesWithAudit}
         )
-        ON CONFLICT (id) DO UPDATE SET
+        ON CONFLICT (${quoteIdentifier(idColumn)}) DO UPDATE SET
           ${updateSql},
-          updated_at = NOW()
+          ${quoteIdentifier(idColumn)} = EXCLUDED.${quoteIdentifier(idColumn)}
         RETURNING *
       `,
       sqlColumns.map((column) => column.value)
