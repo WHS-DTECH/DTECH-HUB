@@ -53,7 +53,6 @@
             <p class="intro-text">Create a new activity with an outcome image, resources, equipment, and instructions.</p>
 
             <section class="upload-panel" aria-label="Upload activity form">
-                <h2>New Activity Details</h2>
 
                 <form id="upload-activity-form" class="upload-form">
                     <div class="form-grid">
@@ -66,6 +65,11 @@
                             <label for="year-level">Year Level</label>
                             <select id="year-level" name="yearLevel" required>
                                 <option value="">Select year</option>
+                                <option>Junior</option>
+                                <option>Middle</option>
+                                <option>Senior</option>
+                                <option>Year 7</option>
+                                <option>Year 8</option>
                                 <option>Year 9</option>
                                 <option>Year 10</option>
                                 <option>Year 11</option>
@@ -76,7 +80,13 @@
 
                         <div class="field">
                             <label for="type">Type</label>
-                            <input id="type" name="type" type="text" placeholder="Machine Sewing, Embroidery..." required>
+                            <select id="type" name="type" required>
+                                <option value="">Select type</option>
+                                <option>Office Suite</option>
+                                <option>Programming</option>
+                                <option>Electronics</option>
+                                <option>Digital Media</option>
+                            </select>
                         </div>
 
                         <div class="field">
