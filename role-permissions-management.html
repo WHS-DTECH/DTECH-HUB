@@ -11,7 +11,19 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="admin-page-wrap">
+  <div class="page-shell">
+    <nav class="topbar" aria-label="Primary">
+      <a class="brand" href="index.html">Computer Lab</a>
+      <div class="topbar-right">
+        <div class="topbar-links">
+          <a href="index.html">Home</a>
+          <a href="teacher-view.html">Teacher View</a>
+          <a href="admin-menu.html">Admin Menu</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="admin-page-wrap">
     <header class="admin-page-header">
       <h1>Role Permissions Management</h1>
       <p>Control which pages each role can access. Check a box to grant access, uncheck to remove access.</p>
@@ -61,6 +73,7 @@
         <li>When connected to Google login, changes should apply on the user's next token refresh.</li>
       </ul>
     </section>
+    </div>
   </div>
 
   <script src="role-permissions-management.js"></script>

@@ -31,6 +31,18 @@ const DEFAULT_ROLE_PERMISSIONS = [
 
 let memoryRolePermissions = DEFAULT_ROLE_PERMISSIONS.map((row) => ({ ...row }));
 
+const ROLE_NAME_ALIASES = new Map([
+  ["admin", "Admin"],
+  ["leadteacher", "Lead Teacher"],
+  ["publicaccess", "Public Access"],
+  ["staff", "Staff"],
+  ["student", "Student"],
+  ["teacher", "Teacher"],
+  ["technician", "Technician"]
+]);
+
+const DEFAULT_ROLE_ORDER = DEFAULT_ROLE_PERMISSIONS.map((row) => String(row.role_name || "").trim());
+
 function slugify(value) {
   return String(value || "")
     .toLowerCase()
@@ -55,6 +67,71 @@ function normalizeArray(value) {
 
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+function normalizeRoleKey(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function toTitleCaseWords(value) {
+  return String(value || "")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function canonicalizeRoleName(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  const aliasMatch = ROLE_NAME_ALIASES.get(normalizeRoleKey(raw));
+  if (aliasMatch) {
+    return aliasMatch;
+  }
+
+  return toTitleCaseWords(raw.replace(/[_-]+/g, " "));
+}
+
+function mergeRolePermissionRows(rows) {
+  const mergedByRole = new Map();
+
+  for (const row of rows || []) {
+    const roleName = canonicalizeRoleName(row.role_name);
+    if (!roleName) continue;
+
+    const existing = mergedByRole.get(roleName) || {
+      role_name: roleName,
+      home_page: false,
+      upload_activity: false,
+      browse_activities: false,
+      planning: false,
+      admin: false
+    };
+
+    existing.home_page = existing.home_page || Boolean(row.home_page);
+    existing.upload_activity = existing.upload_activity || Boolean(row.upload_activity);
+    existing.browse_activities = existing.browse_activities || Boolean(row.browse_activities);
+    existing.planning = existing.planning || Boolean(row.planning);
+    existing.admin = existing.admin || Boolean(row.admin);
+
+    mergedByRole.set(roleName, existing);
+  }
+
+  const orderLookup = new Map(DEFAULT_ROLE_ORDER.map((name, index) => [name, index]));
+  return Array.from(mergedByRole.values()).sort((left, right) => {
+    const leftOrder = orderLookup.has(left.role_name) ? orderLookup.get(left.role_name) : Number.MAX_SAFE_INTEGER;
+    const rightOrder = orderLookup.has(right.role_name) ? orderLookup.get(right.role_name) : Number.MAX_SAFE_INTEGER;
+
+    if (leftOrder !== rightOrder) {
+      return leftOrder - rightOrder;
+    }
+
+    return left.role_name.localeCompare(right.role_name);
+  });
 }
 
 function normalizeHeader(value) {
@@ -1014,7 +1091,7 @@ app.delete("/api/admin/user-roles/:email", async (req, res) => {
 
 app.get("/api/admin/role-permissions", async (_req, res) => {
   if (!hasDatabase) {
-    res.json(memoryRolePermissions);
+    res.json(mergeRolePermissionRows(memoryRolePermissions));
     return;
   }
 
@@ -1026,7 +1103,7 @@ app.get("/api/admin/role-permissions", async (_req, res) => {
         ORDER BY role_name ASC
       `
     );
-    res.json(result.rows);
+    res.json(mergeRolePermissionRows(result.rows));
   } catch (_error) {
     res.status(500).json({ error: "Could not load role permissions" });
   }
@@ -1040,7 +1117,7 @@ app.put("/api/admin/role-permissions", async (req, res) => {
   }
 
   const normalized = rows.map((row) => ({
-    role_name: String(row.role_name || "").trim(),
+    role_name: canonicalizeRoleName(row.role_name),
     home_page: Boolean(row.home_page),
     upload_activity: Boolean(row.upload_activity),
     browse_activities: Boolean(row.browse_activities),
@@ -1048,13 +1125,15 @@ app.put("/api/admin/role-permissions", async (req, res) => {
     admin: Boolean(row.admin)
   })).filter((row) => row.role_name);
 
-  if (!normalized.length) {
+  const merged = mergeRolePermissionRows(normalized);
+
+  if (!merged.length) {
     res.status(400).send("at least one valid role permission row is required");
     return;
   }
 
   if (!hasDatabase) {
-    memoryRolePermissions = normalized;
+    memoryRolePermissions = merged;
     res.json({ ok: true });
     return;
   }
@@ -1064,7 +1143,7 @@ app.put("/api/admin/role-permissions", async (req, res) => {
     await client.query("BEGIN");
     await client.query("DELETE FROM role_permissions");
 
-    for (const row of normalized) {
+    for (const row of merged) {
       await client.query(
         `
           INSERT INTO role_permissions (
