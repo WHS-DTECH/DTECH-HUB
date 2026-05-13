@@ -634,13 +634,10 @@ function renderHubAuthUi() {
     let badgeLabel = "";
     let badgeClass = "";
     if (signedIn) {
-        if (canAdmin) {
-            badgeLabel = "Admin";
-            badgeClass = "badge-admin";
-        } else if (canTeacherView) {
+        if (canTeacherView && !canAdmin) {
             badgeLabel = "Staff";
             badgeClass = "badge-staff";
-        } else {
+        } else if (!canAdmin) {
             badgeLabel = "Student";
             badgeClass = "badge-student";
         }
@@ -664,7 +661,7 @@ function renderHubAuthUi() {
         hubAdminLink.hidden = !canAdmin;
     }
     if (hubAccessBadge) {
-        hubAccessBadge.hidden = !signedIn;
+        hubAccessBadge.hidden = !signedIn || canAdmin || !badgeLabel;
         hubAccessBadge.textContent = badgeLabel;
         hubAccessBadge.className = badgeClass ? `hub-access-badge ${badgeClass}` : "hub-access-badge";
     }
