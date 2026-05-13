@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>User Role Management | Computer Lab</title>
+  <meta name="hub-google-allowed-domain" content="westlandhigh.school.nz">
   <link rel="icon" type="image/x-icon" href="images/favicon.ico">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,6 +20,11 @@
           <a href="index.html">Home</a>
           <a href="teacher-view.html">Teacher View</a>
           <a href="admin-menu.html">Admin Menu</a>
+        </div>
+        <div class="utility-actions" aria-label="Utility actions">
+          <span id="hub-auth-summary" class="admin-inline-note">Not signed in</span>
+          <button id="hub-google-signout" type="button" hidden>Sign out</button>
+          <button id="hub-user-badge" class="user-badge" type="button" hidden aria-label="Signed-in user"></button>
         </div>
       </div>
     </nav>
@@ -51,6 +57,7 @@
       <div class="admin-main-stack">
         <section id="add-role" class="admin-panel">
           <h2>Add Role to User</h2>
+          <p id="hub-role-auth-note" class="admin-inline-note">Sign in on the Home page to load your Google account into this admin tool.</p>
           <form id="add-role-form" class="admin-form-row">
             <label>
               User Type

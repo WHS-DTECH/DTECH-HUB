@@ -3,9 +3,140 @@ const roleStatus = document.querySelector("#user-role-status");
 const roleTableBody = document.querySelector("#user-role-table tbody");
 const staffList = document.querySelector("#staff-list");
 const staffSearch = document.querySelector("#staff-search");
+const hubAuthSummary = document.querySelector("#hub-auth-summary");
+const hubRoleAuthNote = document.querySelector("#hub-role-auth-note");
+const hubSignOutButton = document.querySelector("#hub-google-signout");
+const hubUserBadge = document.querySelector("#hub-user-badge");
+
+const HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
+const hubAllowedDomain = String(document.querySelector('meta[name="hub-google-allowed-domain"]')?.content || "")
+  .trim()
+  .toLowerCase();
 
 let cachedStaffRows = [];
 let selectedStaffEmail = "";
+let activeHubProfile = null;
+
+function getHubDisplayName(profile) {
+  if (!profile) return "";
+  return String(profile.name || profile.given_name || profile.email || "").trim();
+}
+
+function getHubUserInitials(profile) {
+  const name = getHubDisplayName(profile);
+  if (!name) return "--";
+
+  const parts = name.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0][0] || ""}${parts[1][0] || ""}`.toUpperCase();
+  }
+
+  return name.slice(0, 2).toUpperCase();
+}
+
+function normalizeHubAuthProfile(rawProfile) {
+  if (!rawProfile || typeof rawProfile !== "object") {
+    return null;
+  }
+
+  const email = String(rawProfile.email || "").trim().toLowerCase();
+  if (!email) {
+    return null;
+  }
+
+  if (hubAllowedDomain && !email.endsWith(`@${hubAllowedDomain}`)) {
+    return null;
+  }
+
+  return {
+    email,
+    name: getHubDisplayName(rawProfile),
+    given_name: String(rawProfile.given_name || "").trim(),
+    family_name: String(rawProfile.family_name || "").trim()
+  };
+}
+
+function loadHubProfile() {
+  const raw = sessionStorage.getItem(HUB_AUTH_STORAGE_KEY);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed?.expiresAt || parsed.expiresAt <= Date.now()) {
+      sessionStorage.removeItem(HUB_AUTH_STORAGE_KEY);
+      return null;
+    }
+    return normalizeHubAuthProfile(parsed.profile);
+  } catch (_error) {
+    sessionStorage.removeItem(HUB_AUTH_STORAGE_KEY);
+    return null;
+  }
+}
+
+function renderHubAuthState() {
+  activeHubProfile = loadHubProfile();
+  const isSignedIn = Boolean(activeHubProfile?.email);
+  const displayName = getHubDisplayName(activeHubProfile);
+
+  if (hubAuthSummary) {
+    hubAuthSummary.textContent = isSignedIn
+      ? `Signed in as ${displayName || activeHubProfile.email}`
+      : "Not signed in";
+  }
+
+  if (hubRoleAuthNote) {
+    hubRoleAuthNote.textContent = isSignedIn
+      ? `Google account loaded: ${activeHubProfile.email}. You can use it directly in the form or staff picker.`
+      : "Sign in on the Home page to load your Google account into this admin tool.";
+  }
+
+  if (hubSignOutButton) {
+    hubSignOutButton.hidden = !isSignedIn;
+  }
+
+  if (hubUserBadge) {
+    hubUserBadge.hidden = !isSignedIn;
+    hubUserBadge.textContent = isSignedIn ? getHubUserInitials(activeHubProfile) : "";
+    hubUserBadge.title = isSignedIn ? (displayName || activeHubProfile.email) : "";
+  }
+}
+
+function buildSignedInStaffRow() {
+  if (!activeHubProfile?.email) {
+    return null;
+  }
+
+  return {
+    first_name: activeHubProfile.given_name,
+    last_name: activeHubProfile.family_name,
+    display_name: activeHubProfile.name,
+    email_school: activeHubProfile.email,
+    primary_role: "Staff",
+    source: "google-session"
+  };
+}
+
+function mergeSignedInStaffRow(rows) {
+  const normalizedRows = Array.isArray(rows) ? [...rows] : [];
+  const signedInRow = buildSignedInStaffRow();
+
+  if (!signedInRow) {
+    return normalizedRows;
+  }
+
+  const existingIndex = normalizedRows.findIndex((row) => getStaffEmail(row) === signedInRow.email_school);
+  if (existingIndex >= 0) {
+    normalizedRows[existingIndex] = {
+      ...signedInRow,
+      ...normalizedRows[existingIndex]
+    };
+    return normalizedRows;
+  }
+
+  return [signedInRow, ...normalizedRows];
+}
 
 function getStaffDisplayName(row) {
   const firstName = String(row.first_name || row.firstname || row.first || "").trim();
@@ -74,6 +205,7 @@ function renderStaffList(rows) {
     const name = getStaffDisplayName(row);
     const email = getStaffEmail(row);
     const code = getStaffCode(row);
+    const isSignedInUser = Boolean(activeHubProfile?.email) && email === activeHubProfile.email;
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "staff-chip";
@@ -81,7 +213,7 @@ function renderStaffList(rows) {
     chip.innerHTML = `
       <strong>${name}</strong>
       <span>${email}</span>
-      ${code ? `<small>${code}</small>` : ""}
+      ${code ? `<small>${code}</small>` : isSignedInUser ? `<small>Signed-in account</small>` : ""}
     `;
     chip.addEventListener("click", () => populateRoleFormFromStaff(row));
     staffList.appendChild(chip);
@@ -167,11 +299,28 @@ async function refresh() {
 }
 
 async function refreshStaff() {
-  cachedStaffRows = await loadStaffRows();
+  cachedStaffRows = mergeSignedInStaffRow(await loadStaffRows());
   renderStaffList(cachedStaffRows);
 }
 
+function attachAuthActions() {
+  if (!hubSignOutButton) {
+    return;
+  }
+
+  hubSignOutButton.addEventListener("click", () => {
+    sessionStorage.removeItem(HUB_AUTH_STORAGE_KEY);
+    activeHubProfile = null;
+    selectedStaffEmail = "";
+    cachedStaffRows = [];
+    renderHubAuthState();
+    renderStaffList(cachedStaffRows);
+  });
+}
+
 function bootAdminData() {
+  renderHubAuthState();
+  attachAuthActions();
   Promise.allSettled([refresh(), refreshStaff()]);
 }
 
