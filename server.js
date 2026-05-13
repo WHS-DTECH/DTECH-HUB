@@ -205,6 +205,46 @@ async function getExistingTableColumns(tableName, candidateColumns) {
   return candidateColumns.filter((columnName) => available.has(String(columnName).toLowerCase()));
 }
 
+async function getAllTableColumns(tableName) {
+  const result = await pool.query(
+    `
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = $1
+    `,
+    [tableName]
+  );
+
+  return result.rows
+    .map((row) => String(row.column_name || "").trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function quoteIdentifier(identifier) {
+  const value = String(identifier || "").trim();
+  if (!/^[a-z_][a-z0-9_]*$/i.test(value)) {
+    throw new Error(`Invalid SQL identifier: ${identifier}`);
+  }
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+function pickExistingColumn(availableColumns, candidates) {
+  return candidates.find((columnName) => availableColumns.includes(columnName)) || null;
+}
+
+async function resolveUserRolesColumns() {
+  const availableColumns = await getAllTableColumns("user_additional_roles");
+  return {
+    availableColumns,
+    email: pickExistingColumn(availableColumns, ["user_email", "email", "staff_email"]),
+    userType: pickExistingColumn(availableColumns, ["user_type", "type", "staff_type"]),
+    displayName: pickExistingColumn(availableColumns, ["display_name", "name", "full_name"]),
+    additionalRole: pickExistingColumn(availableColumns, ["additional_role", "role", "extra_role"]),
+    updatedAt: pickExistingColumn(availableColumns, ["updated_at", "modified_at", "last_updated"])
+  };
+}
+
 async function resolveStaffTableName() {
   const result = await pool.query(
     `
@@ -760,30 +800,27 @@ app.get("/api/admin/user-roles", async (_req, res) => {
   }
 
   try {
-    const availableColumns = await getExistingTableColumns("user_additional_roles", [
-      "user_type",
-      "user_email",
-      "display_name",
-      "additional_role"
-    ]);
-
-    if (!availableColumns.includes("user_email")) {
+    const columns = await resolveUserRolesColumns();
+    if (!columns.email) {
       res.json([]);
       return;
     }
 
     const selectColumns = [
-      availableColumns.includes("user_type") ? "user_type" : `'Staff' AS user_type`,
-      "user_email",
-      availableColumns.includes("display_name") ? "display_name" : `'' AS display_name`,
-      availableColumns.includes("additional_role") ? "additional_role" : `'' AS additional_role`
+      columns.userType ? `${quoteIdentifier(columns.userType)} AS user_type` : `'Staff' AS user_type`,
+      `${quoteIdentifier(columns.email)} AS user_email`,
+      columns.displayName ? `${quoteIdentifier(columns.displayName)} AS display_name` : `'' AS display_name`,
+      columns.additionalRole ? `${quoteIdentifier(columns.additionalRole)} AS additional_role` : `'' AS additional_role`
     ];
 
+    const orderByColumn = columns.updatedAt || columns.email;
+
     const result = await pool.query(
-      `SELECT ${selectColumns.join(", ")} FROM user_additional_roles${buildOrderByClause(availableColumns)}`
+      `SELECT ${selectColumns.join(", ")} FROM user_additional_roles ORDER BY ${quoteIdentifier(orderByColumn)} DESC`
     );
     res.json(result.rows);
-  } catch (_error) {
+  } catch (error) {
+    console.error("Could not load user roles", error);
     res.json([]);
   }
 });
@@ -817,50 +854,50 @@ app.post("/api/admin/user-roles", async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    const availableColumns = await getExistingTableColumns("user_additional_roles", [
-      "user_email",
-      "user_type",
-      "display_name",
-      "additional_role",
-      "updated_at"
-    ]);
-
-    if (!availableColumns.includes("user_email")) {
+    const columns = await resolveUserRolesColumns();
+    if (!columns.email) {
       throw new Error("Missing user_email column");
     }
 
     const updateAssignments = [];
     const updateValues = [userEmail];
 
-    if (availableColumns.includes("user_type")) {
+    if (columns.userType) {
       updateAssignments.push(`user_type = $${updateValues.length + 1}`);
       updateValues.push(userType);
     }
-    if (availableColumns.includes("display_name")) {
+    if (columns.displayName) {
       updateAssignments.push(`display_name = $${updateValues.length + 1}`);
       updateValues.push(displayName);
     }
-    if (availableColumns.includes("additional_role")) {
+    if (columns.additionalRole) {
       updateAssignments.push(`additional_role = $${updateValues.length + 1}`);
       updateValues.push(additionalRole);
     }
-    if (availableColumns.includes("updated_at")) {
+    if (columns.updatedAt) {
       updateAssignments.push("updated_at = NOW()");
     }
 
     const returnColumns = [
-      availableColumns.includes("user_type") ? "user_type" : `'Staff' AS user_type`,
-      "user_email",
-      availableColumns.includes("display_name") ? "display_name" : `'' AS display_name`,
-      availableColumns.includes("additional_role") ? "additional_role" : `'' AS additional_role`
+      columns.userType ? `${quoteIdentifier(columns.userType)} AS user_type` : `'Staff' AS user_type`,
+      `${quoteIdentifier(columns.email)} AS user_email`,
+      columns.displayName ? `${quoteIdentifier(columns.displayName)} AS display_name` : `'' AS display_name`,
+      columns.additionalRole ? `${quoteIdentifier(columns.additionalRole)} AS additional_role` : `'' AS additional_role`
     ];
 
-    const updateResult = updateAssignments.length
+    const updateSqlAssignments = updateAssignments
+      .map((assignment) => assignment
+        .replace("user_type", columns.userType ? quoteIdentifier(columns.userType) : "user_type")
+        .replace("display_name", columns.displayName ? quoteIdentifier(columns.displayName) : "display_name")
+        .replace("additional_role", columns.additionalRole ? quoteIdentifier(columns.additionalRole) : "additional_role")
+        .replace("updated_at", columns.updatedAt ? quoteIdentifier(columns.updatedAt) : "updated_at"));
+
+    const updateResult = updateSqlAssignments.length
       ? await client.query(
           `
             UPDATE user_additional_roles
-            SET ${updateAssignments.join(", ")}
-            WHERE LOWER(user_email) = LOWER($1)
+            SET ${updateSqlAssignments.join(", ")}
+            WHERE LOWER(${quoteIdentifier(columns.email)}) = LOWER($1)
             RETURNING ${returnColumns.join(", ")}
           `,
           updateValues
@@ -870,25 +907,25 @@ app.post("/api/admin/user-roles", async (req, res) => {
     let savedRow = updateResult.rows[0];
 
     if (!savedRow) {
-      const insertColumns = ["user_email"];
+      const insertColumns = [quoteIdentifier(columns.email)];
       const insertValues = [userEmail];
 
-      if (availableColumns.includes("user_type")) {
-        insertColumns.push("user_type");
+      if (columns.userType) {
+        insertColumns.push(quoteIdentifier(columns.userType));
         insertValues.push(userType);
       }
-      if (availableColumns.includes("display_name")) {
-        insertColumns.push("display_name");
+      if (columns.displayName) {
+        insertColumns.push(quoteIdentifier(columns.displayName));
         insertValues.push(displayName);
       }
-      if (availableColumns.includes("additional_role")) {
-        insertColumns.push("additional_role");
+      if (columns.additionalRole) {
+        insertColumns.push(quoteIdentifier(columns.additionalRole));
         insertValues.push(additionalRole);
       }
 
       const valuePlaceholders = insertValues.map((_, index) => `$${index + 1}`);
-      if (availableColumns.includes("updated_at")) {
-        insertColumns.push("updated_at");
+      if (columns.updatedAt) {
+        insertColumns.push(quoteIdentifier(columns.updatedAt));
         valuePlaceholders.push("NOW()");
       }
 
@@ -910,8 +947,9 @@ app.post("/api/admin/user-roles", async (req, res) => {
     await client.query("COMMIT");
 
     res.status(201).json(savedRow);
-  } catch (_error) {
+  } catch (error) {
     await client.query("ROLLBACK");
+    console.error("Could not save user role", error);
     res.status(500).send("Could not save user role");
   } finally {
     client.release();
@@ -932,9 +970,19 @@ app.delete("/api/admin/user-roles/:email", async (req, res) => {
   }
 
   try {
-    await pool.query("DELETE FROM user_additional_roles WHERE user_email = $1", [email]);
+    const columns = await resolveUserRolesColumns();
+    if (!columns.email) {
+      res.status(204).send();
+      return;
+    }
+
+    await pool.query(
+      `DELETE FROM user_additional_roles WHERE LOWER(${quoteIdentifier(columns.email)}) = LOWER($1)`,
+      [email]
+    );
     res.status(204).send();
-  } catch (_error) {
+  } catch (error) {
+    console.error("Could not remove user role", error);
     res.status(500).send("Could not remove user role");
   }
 });
