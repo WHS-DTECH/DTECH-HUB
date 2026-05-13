@@ -6,8 +6,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const hasDatabase = Boolean(process.env.DATABASE_URL);
 const memoryActivities = new Map();
-const memoryStaffRows = new Map();
 const memoryUserRoles = new Map();
+const memoryStaffDirectory = new Map();
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -53,71 +53,52 @@ function normalizeEmail(value) {
 }
 
 function normalizeHeader(value) {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "");
-}
-
-function sortStaffRows(rows) {
-  return [...rows].sort((left, right) => {
-    const leftKey = `${String(left.last_name || "")} ${String(left.first_name || "")} ${String(left.email_school || "")}`.toLowerCase();
-    const rightKey = `${String(right.last_name || "")} ${String(right.first_name || "")} ${String(right.email_school || "")}`.toLowerCase();
-    return leftKey.localeCompare(rightKey);
-  });
+  return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 function findHeaderIndex(headers, aliases) {
-  const normalizedHeaders = headers.map((header) => normalizeHeader(header));
-  return aliases.reduce((foundIndex, alias) => {
-    if (foundIndex >= 0) {
-      return foundIndex;
-    }
-    return normalizedHeaders.indexOf(normalizeHeader(alias));
-  }, -1);
+  const normalizedHeaders = Array.isArray(headers) ? headers.map(normalizeHeader) : [];
+  return aliases
+    .map((alias) => normalizedHeaders.indexOf(normalizeHeader(alias)))
+    .find((index) => index >= 0) ?? -1;
 }
 
-function buildStaffUploadRows(headers, rawRows, metadata) {
+function getUploadCell(row, index) {
+  if (!Array.isArray(row) || index < 0 || index >= row.length) {
+    return "";
+  }
+
+  return String(row[index] || "").trim();
+}
+
+function buildStaffUploadRecord(headers, row, metadata = {}) {
   const codeIndex = findHeaderIndex(headers, ["code", "staff_code", "staff code"]);
   const lastNameIndex = findHeaderIndex(headers, ["last_name", "last name", "surname", "family_name"]);
   const firstNameIndex = findHeaderIndex(headers, ["first_name", "first name", "given_name", "forename"]);
   const titleIndex = findHeaderIndex(headers, ["title"]);
   const emailIndex = findHeaderIndex(headers, ["email_school", "email school", "email", "school_email", "email_address", "email address"]);
 
-  let skippedNoEmail = 0;
-  let duplicateEmailsInUpload = 0;
-  const seenEmails = new Set();
-  const rows = [];
+  const email = normalizeEmail(getUploadCell(row, emailIndex));
+  return {
+    code: getUploadCell(row, codeIndex),
+    last_name: getUploadCell(row, lastNameIndex),
+    first_name: getUploadCell(row, firstNameIndex),
+    title: getUploadCell(row, titleIndex),
+    email_school: email,
+    status: "Current",
+    primary_role: String(metadata.primary_role || "Staff").trim() || "Staff",
+    upload_year: Number.parseInt(metadata.upload_year, 10) || null,
+    upload_term: String(metadata.upload_term || "").trim(),
+    upload_date: String(metadata.upload_date || "").trim()
+  };
+}
 
-  rawRows.forEach((rawRow) => {
-    const values = Array.isArray(rawRow) ? rawRow : [];
-    const email = normalizeEmail(values[emailIndex]);
-    if (!email) {
-      skippedNoEmail += 1;
-      return;
+function upsertMemoryStaffRows(rows) {
+  rows.forEach((row) => {
+    if (row.email_school) {
+      memoryStaffDirectory.set(row.email_school, { ...row });
     }
-
-    if (seenEmails.has(email)) {
-      duplicateEmailsInUpload += 1;
-      return;
-    }
-    seenEmails.add(email);
-
-    rows.push({
-      code: String(values[codeIndex] || "").trim(),
-      last_name: String(values[lastNameIndex] || "").trim(),
-      first_name: String(values[firstNameIndex] || "").trim(),
-      title: String(values[titleIndex] || "").trim(),
-      email_school: email,
-      status: "Current",
-      primary_role: "Staff",
-      upload_year: metadata.uploadYear,
-      upload_term: metadata.uploadTerm,
-      upload_date: metadata.uploadDate
-    });
   });
-
-  return { rows, skippedNoEmail, duplicateEmailsInUpload };
 }
 
 async function getExistingTableColumns(tableName, candidateColumns) {
@@ -195,12 +176,12 @@ async function ensureSchema() {
       last_name TEXT,
       first_name TEXT,
       title TEXT,
-      email_school TEXT NOT NULL,
+      email_school TEXT,
       status TEXT NOT NULL DEFAULT 'Current',
       primary_role TEXT NOT NULL DEFAULT 'Staff',
       upload_year INTEGER,
       upload_term TEXT,
-      upload_date DATE,
+      upload_date TEXT,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
@@ -214,9 +195,8 @@ async function ensureSchema() {
   await pool.query(`ALTER TABLE upload_staff ADD COLUMN IF NOT EXISTS primary_role TEXT NOT NULL DEFAULT 'Staff'`);
   await pool.query(`ALTER TABLE upload_staff ADD COLUMN IF NOT EXISTS upload_year INTEGER`);
   await pool.query(`ALTER TABLE upload_staff ADD COLUMN IF NOT EXISTS upload_term TEXT`);
-  await pool.query(`ALTER TABLE upload_staff ADD COLUMN IF NOT EXISTS upload_date DATE`);
+  await pool.query(`ALTER TABLE upload_staff ADD COLUMN IF NOT EXISTS upload_date TEXT`);
   await pool.query(`ALTER TABLE upload_staff ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
-  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS upload_staff_email_school_idx ON upload_staff (email_school)`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS role_permissions (
@@ -420,9 +400,183 @@ app.delete("/api/activities", async (_req, res) => {
   }
 });
 
+app.post("/api/staff_upload", async (req, res) => {
+  const headers = Array.isArray(req.body?.headers) ? req.body.headers : [];
+  const staffRows = Array.isArray(req.body?.staff) ? req.body.staff : [];
+  const uploadYear = Number.parseInt(req.body?.uploadYear ?? req.body?.upload_year, 10) || null;
+  const uploadTerm = String(req.body?.uploadTerm ?? req.body?.upload_term ?? "").trim();
+  const uploadDate = String(req.body?.uploadDate ?? req.body?.upload_date ?? "").trim();
+
+  if (!headers.length || !staffRows.length) {
+    res.status(400).json({ error: "headers and staff rows are required" });
+    return;
+  }
+
+  const dedupedRows = new Map();
+  let skippedNoEmail = 0;
+  let duplicateEmailsInUpload = 0;
+
+  staffRows.forEach((row) => {
+    const record = buildStaffUploadRecord(headers, row, {
+      upload_year: uploadYear,
+      upload_term: uploadTerm,
+      upload_date: uploadDate
+    });
+
+    if (!record.email_school) {
+      skippedNoEmail += 1;
+      return;
+    }
+
+    if (dedupedRows.has(record.email_school)) {
+      duplicateEmailsInUpload += 1;
+    }
+
+    dedupedRows.set(record.email_school, record);
+  });
+
+  const normalizedRows = Array.from(dedupedRows.values());
+
+  if (!normalizedRows.length) {
+    res.json({
+      success: true,
+      processed: staffRows.length,
+      inserted: 0,
+      updated: 0,
+      marked_not_current: 0,
+      skipped_no_email: skippedNoEmail,
+      duplicate_emails_in_upload: duplicateEmailsInUpload,
+      upload_year: uploadYear,
+      upload_term: uploadTerm,
+      upload_date: uploadDate
+    });
+    return;
+  }
+
+  if (!hasDatabase) {
+    upsertMemoryStaffRows(normalizedRows);
+    res.json({
+      success: true,
+      processed: staffRows.length,
+      inserted: normalizedRows.length,
+      updated: 0,
+      marked_not_current: 0,
+      skipped_no_email: skippedNoEmail,
+      duplicate_emails_in_upload: duplicateEmailsInUpload,
+      upload_year: uploadYear,
+      upload_term: uploadTerm,
+      upload_date: uploadDate
+    });
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    let inserted = 0;
+    let updated = 0;
+
+    for (const row of normalizedRows) {
+      const existing = await client.query(
+        `SELECT id FROM upload_staff WHERE LOWER(email_school) = LOWER($1) LIMIT 1`,
+        [row.email_school]
+      );
+
+      if (existing.rows.length) {
+        await client.query(
+          `
+            UPDATE upload_staff
+            SET code = $2,
+                last_name = $3,
+                first_name = $4,
+                title = $5,
+                status = $6,
+                primary_role = $7,
+                upload_year = $8,
+                upload_term = $9,
+                upload_date = $10,
+                updated_at = NOW()
+            WHERE id = $1
+          `,
+          [
+            existing.rows[0].id,
+            row.code,
+            row.last_name,
+            row.first_name,
+            row.title,
+            row.status,
+            row.primary_role,
+            row.upload_year,
+            row.upload_term,
+            row.upload_date
+          ]
+        );
+        updated += 1;
+      } else {
+        await client.query(
+          `
+            INSERT INTO upload_staff (
+              code, last_name, first_name, title, email_school, status,
+              primary_role, upload_year, upload_term, upload_date, updated_at
+            ) VALUES (
+              $1, $2, $3, $4, $5, $6,
+              $7, $8, $9, $10, NOW()
+            )
+          `,
+          [
+            row.code,
+            row.last_name,
+            row.first_name,
+            row.title,
+            row.email_school,
+            row.status,
+            row.primary_role,
+            row.upload_year,
+            row.upload_term,
+            row.upload_date
+          ]
+        );
+        inserted += 1;
+      }
+    }
+
+    const currentEmails = normalizedRows.map((row) => row.email_school);
+    const markNotCurrentResult = await client.query(
+      `
+        UPDATE upload_staff
+        SET status = 'Not Current', updated_at = NOW()
+        WHERE COALESCE(email_school, '') <> ''
+          AND LOWER(email_school) <> ALL($1::text[])
+          AND COALESCE(status, 'Current') <> 'Not Current'
+      `,
+      [currentEmails]
+    );
+
+    await client.query("COMMIT");
+    res.json({
+      success: true,
+      processed: staffRows.length,
+      inserted,
+      updated,
+      marked_not_current: markNotCurrentResult.rowCount || 0,
+      skipped_no_email: skippedNoEmail,
+      duplicate_emails_in_upload: duplicateEmailsInUpload,
+      upload_year: uploadYear,
+      upload_term: uploadTerm,
+      upload_date: uploadDate
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    res.status(500).json({ error: "Could not import staff upload data" });
+  } finally {
+    client.release();
+  }
+});
+
 app.get("/api/admin/staff-list", async (_req, res) => {
   if (!hasDatabase) {
-    res.json(sortStaffRows(Array.from(memoryStaffRows.values())));
+    res.json(Array.from(memoryStaffDirectory.values()));
     return;
   }
 
@@ -457,7 +611,7 @@ app.get("/api/admin/staff-list", async (_req, res) => {
 
 app.get("/api/staff_upload/all", async (_req, res) => {
   if (!hasDatabase) {
-    res.json({ staff: sortStaffRows(Array.from(memoryStaffRows.values())) });
+    res.json({ staff: Array.from(memoryStaffDirectory.values()) });
     return;
   }
 
@@ -487,181 +641,6 @@ app.get("/api/staff_upload/all", async (_req, res) => {
     res.json({ staff: result.rows });
   } catch (_error) {
     res.json({ staff: [] });
-  }
-});
-
-app.post("/api/staff_upload", async (req, res) => {
-  const headers = Array.isArray(req.body?.headers) ? req.body.headers : [];
-  const rawRows = Array.isArray(req.body?.staff) ? req.body.staff : [];
-  const uploadYear = Number.parseInt(req.body?.uploadYear, 10);
-  const uploadTerm = String(req.body?.uploadTerm || "").trim();
-  const uploadDate = String(req.body?.uploadDate || "").trim();
-
-  if (!headers.length) {
-    res.status(400).json({ error: "headers are required" });
-    return;
-  }
-
-  if (!rawRows.length) {
-    res.status(400).json({ error: "staff rows are required" });
-    return;
-  }
-
-  if (!Number.isInteger(uploadYear) || uploadYear < 2000 || uploadYear > 2100) {
-    res.status(400).json({ error: "uploadYear must be a valid year" });
-    return;
-  }
-
-  if (!uploadTerm || !uploadDate) {
-    res.status(400).json({ error: "uploadTerm and uploadDate are required" });
-    return;
-  }
-
-  const normalized = buildStaffUploadRows(headers, rawRows, { uploadYear, uploadTerm, uploadDate });
-  const incomingEmails = normalized.rows.map((row) => row.email_school);
-
-  if (!normalized.rows.length) {
-    res.json({
-      success: true,
-      processed: 0,
-      inserted: 0,
-      updated: 0,
-      marked_not_current: 0,
-      skipped_no_email: normalized.skippedNoEmail,
-      duplicate_emails_in_upload: normalized.duplicateEmailsInUpload,
-      upload_year: uploadYear,
-      upload_term: uploadTerm,
-      upload_date: uploadDate
-    });
-    return;
-  }
-
-  if (!hasDatabase) {
-    const existingEmails = new Set(memoryStaffRows.keys());
-    let inserted = 0;
-    let updated = 0;
-    let markedNotCurrent = 0;
-
-    normalized.rows.forEach((row) => {
-      const existing = memoryStaffRows.get(row.email_school);
-      if (existing) {
-        updated += 1;
-      } else {
-        inserted += 1;
-      }
-
-      memoryStaffRows.set(row.email_school, {
-        id: existing?.id || row.email_school,
-        ...row,
-        primary_role: existing?.primary_role || row.primary_role
-      });
-    });
-
-    Array.from(memoryStaffRows.values()).forEach((row) => {
-      if (!incomingEmails.includes(row.email_school) && row.status !== "Not Current") {
-        row.status = "Not Current";
-        markedNotCurrent += 1;
-      }
-    });
-
-    res.json({
-      success: true,
-      processed: normalized.rows.length,
-      inserted,
-      updated,
-      marked_not_current: markedNotCurrent,
-      skipped_no_email: normalized.skippedNoEmail,
-      duplicate_emails_in_upload: normalized.duplicateEmailsInUpload,
-      upload_year: uploadYear,
-      upload_term: uploadTerm,
-      upload_date: uploadDate
-    });
-    return;
-  }
-
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-
-    const existingResult = await client.query(
-      "SELECT email_school FROM upload_staff WHERE email_school = ANY($1::text[])",
-      [incomingEmails]
-    );
-    const existingEmails = new Set(existingResult.rows.map((row) => row.email_school));
-    let inserted = 0;
-    let updated = 0;
-
-    for (const row of normalized.rows) {
-      if (existingEmails.has(row.email_school)) {
-        updated += 1;
-      } else {
-        inserted += 1;
-      }
-
-      await client.query(
-        `
-          INSERT INTO upload_staff (
-            code, last_name, first_name, title, email_school, status,
-            primary_role, upload_year, upload_term, upload_date, updated_at
-          ) VALUES (
-            $1, $2, $3, $4, $5, $6,
-            $7, $8, $9, $10, NOW()
-          )
-          ON CONFLICT (email_school) DO UPDATE SET
-            code = EXCLUDED.code,
-            last_name = EXCLUDED.last_name,
-            first_name = EXCLUDED.first_name,
-            title = EXCLUDED.title,
-            status = EXCLUDED.status,
-            primary_role = COALESCE(NULLIF(upload_staff.primary_role, ''), EXCLUDED.primary_role),
-            upload_year = EXCLUDED.upload_year,
-            upload_term = EXCLUDED.upload_term,
-            upload_date = EXCLUDED.upload_date,
-            updated_at = NOW()
-        `,
-        [
-          row.code,
-          row.last_name,
-          row.first_name,
-          row.title,
-          row.email_school,
-          row.status,
-          row.primary_role,
-          row.upload_year,
-          row.upload_term,
-          row.upload_date
-        ]
-      );
-    }
-
-    const markNotCurrentResult = await client.query(
-      `
-        UPDATE upload_staff
-        SET status = 'Not Current', updated_at = NOW()
-        WHERE status IS DISTINCT FROM 'Not Current'
-          AND NOT (email_school = ANY($1::text[]))
-      `,
-      [incomingEmails]
-    );
-
-    await client.query("COMMIT");
-    res.json({
-      success: true,
-      processed: normalized.rows.length,
-      inserted,
-      updated,
-      marked_not_current: Number(markNotCurrentResult.rowCount || 0),
-      skipped_no_email: normalized.skippedNoEmail,
-      duplicate_emails_in_upload: normalized.duplicateEmailsInUpload,
-      upload_year: uploadYear,
-      upload_term: uploadTerm,
-      upload_date: uploadDate
-    });
-  } catch (_error) {
-    await client.query("ROLLBACK");
-    res.status(500).json({ error: "Could not import staff upload" });
-  } finally {
-    client.release();
   }
 });
 
