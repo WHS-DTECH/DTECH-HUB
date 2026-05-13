@@ -275,13 +275,22 @@ function renderStaffList(rows) {
   if (!staffList) return;
 
   const query = String(staffSearch?.value || "").trim().toLowerCase();
+  const hasQuery = Boolean(query);
   const filtered = rows.filter((row) => {
     const name = getStaffDisplayName(row).toLowerCase();
     const email = getStaffEmail(row);
-    return !query || name.includes(query) || email.includes(query);
+    return hasQuery && (name.includes(query) || email.includes(query));
   });
 
   staffList.innerHTML = "";
+
+  if (!hasQuery) {
+    const empty = document.createElement("div");
+    empty.className = "admin-empty-state";
+    empty.textContent = "Start typing to search staff.";
+    staffList.appendChild(empty);
+    return;
+  }
 
   if (!filtered.length) {
     const empty = document.createElement("div");
@@ -314,14 +323,23 @@ function renderStudentList(rows) {
   if (!studentList) return;
 
   const query = String(studentSearch?.value || "").trim().toLowerCase();
+  const hasQuery = Boolean(query);
   const filtered = rows.filter((row) => {
     const name = getStudentDisplayName(row).toLowerCase();
     const idNumber = getStudentIdNumber(row).toLowerCase();
     const formClass = getStudentFormClass(row).toLowerCase();
-    return !query || name.includes(query) || idNumber.includes(query) || formClass.includes(query);
+    return hasQuery && (name.includes(query) || idNumber.includes(query) || formClass.includes(query));
   });
 
   studentList.innerHTML = "";
+
+  if (!hasQuery) {
+    const empty = document.createElement("div");
+    empty.className = "admin-empty-state";
+    empty.textContent = "Start typing to search students.";
+    studentList.appendChild(empty);
+    return;
+  }
 
   if (!filtered.length) {
     const empty = document.createElement("div");
