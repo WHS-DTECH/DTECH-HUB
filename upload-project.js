@@ -69,6 +69,7 @@ function createProjectPayload() {
         duration_hours: Number(formData.get("durationHours") || 0),
         difficulty: String(formData.get("difficulty") || "").trim(),
         card_color: String(formData.get("cardColor") || "").trim(),
+        card_url: String(formData.get("cardUrl") || "").trim(),
         outcome_image_url: String(formData.get("outcomeImageUrl") || "").trim(),
         description: String(formData.get("shortDescription") || "").trim(),
         resources: linesToArray(formData.get("resources")),
