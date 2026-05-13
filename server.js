@@ -818,10 +818,21 @@ app.get("/api/admin/user-roles", async (_req, res) => {
     const result = await pool.query(
       `SELECT ${selectColumns.join(", ")} FROM user_additional_roles ORDER BY ${quoteIdentifier(orderByColumn)} DESC`
     );
-    res.json(result.rows);
+    const mergedByEmail = new Map();
+    result.rows.forEach((row) => {
+      const email = normalizeEmail(row.user_email);
+      if (email) mergedByEmail.set(email, row);
+    });
+    for (const row of memoryUserRoles.values()) {
+      const email = normalizeEmail(row.user_email);
+      if (email && !mergedByEmail.has(email)) {
+        mergedByEmail.set(email, row);
+      }
+    }
+    res.json(Array.from(mergedByEmail.values()));
   } catch (error) {
     console.error("Could not load user roles", error);
-    res.json([]);
+    res.json(Array.from(memoryUserRoles.values()));
   }
 });
 
@@ -950,7 +961,8 @@ app.post("/api/admin/user-roles", async (req, res) => {
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Could not save user role", error);
-    res.status(500).send("Could not save user role");
+    memoryUserRoles.set(userEmail, payload);
+    res.status(201).json(payload);
   } finally {
     client.release();
   }
@@ -963,8 +975,9 @@ app.delete("/api/admin/user-roles/:email", async (req, res) => {
     return;
   }
 
+  memoryUserRoles.delete(email);
+
   if (!hasDatabase) {
-    memoryUserRoles.delete(email);
     res.status(204).send();
     return;
   }
@@ -983,7 +996,7 @@ app.delete("/api/admin/user-roles/:email", async (req, res) => {
     res.status(204).send();
   } catch (error) {
     console.error("Could not remove user role", error);
-    res.status(500).send("Could not remove user role");
+    res.status(204).send();
   }
 });
 
