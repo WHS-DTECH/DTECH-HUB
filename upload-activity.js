@@ -84,7 +84,7 @@ function createActivityPayload() {
         year_level: String(formData.get("yearLevel") || "").trim(),
         type: String(formData.get("type") || "").trim(),
         activity_category: String(formData.get("activityCategory") || "").trim(),
-        duration_hours: Number(formData.get("durationHours") || 0),
+        duration_hours: Number(formData.get("durationMinutes") || 0),
         difficulty: String(formData.get("difficulty") || "").trim(),
         card_color: String(formData.get("cardColor") || "").trim(),
         card_url: String(formData.get("cardUrl") || "").trim(),
