@@ -834,6 +834,42 @@ a {
     text-align: center;
 }
 
+.suggest-page {
+    width: min(920px, calc(100% - 24px));
+    margin: 20px auto;
+}
+
+.suggest-card {
+    padding: 18px;
+    border-radius: var(--radius-lg);
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    box-shadow: var(--shadow-soft);
+}
+
+.suggest-card h1 {
+    margin: 4px 0 10px;
+    font-size: clamp(1.7rem, 3.2vw, 2.2rem);
+    color: #144f8f;
+}
+
+.suggest-form {
+    display: grid;
+    gap: 10px;
+    margin-top: 12px;
+}
+
+.suggest-form textarea,
+.suggest-form input,
+.suggest-form select {
+    width: 100%;
+}
+
+#suggestions-table td {
+    vertical-align: top;
+    white-space: normal;
+}
+
 .noscript-note {
     width: min(920px, calc(100% - 28px));
     margin: 16px auto 0;

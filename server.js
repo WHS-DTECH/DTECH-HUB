@@ -1,5 +1,7 @@
 const path = require("path");
 const express = require("express");
+const multer = require("multer");
+const nodemailer = require("nodemailer");
 const { Pool } = require("pg");
 
 const app = express();
@@ -10,6 +12,8 @@ const staffDirectoryApiKey = String(process.env.STAFF_DIRECTORY_API_KEY || "").t
 const memoryActivities = new Map();
 const memoryUserRoles = new Map();
 const memoryStaffDirectory = new Map();
+const memorySuggestions = [];
+let memorySuggestionId = 1;
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -19,6 +23,35 @@ const pool = new Pool({
 const STAFF_TABLE_CANDIDATES = ["staff_upload", "upload_staff"];
 const STUDENT_TABLE_CANDIDATES = ["student_timetable"];
 const SCHOOL_EMAIL_DOMAIN = "westlandhigh.school.nz";
+const suggestionNotificationFallback = String(process.env.SUGGESTION_NOTIFY_EMAILS || "");
+const SMTP_HOST = String(process.env.SMTP_HOST || "").trim();
+const SMTP_PORT = Number.parseInt(process.env.SMTP_PORT || "", 10) || 587;
+const SMTP_SECURE = String(process.env.SMTP_SECURE || "false").trim().toLowerCase() === "true";
+const SMTP_USER = String(process.env.SMTP_USER || "").trim();
+const SMTP_PASS = String(process.env.SMTP_PASS || "").trim();
+const SMTP_FROM = String(process.env.SMTP_FROM || SMTP_USER || "").trim();
+const suggestionUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, callback) => {
+    const isPdfMime = String(file.mimetype || "").toLowerCase() === "application/pdf";
+    const isPdfName = String(file.originalname || "").toLowerCase().endsWith(".pdf");
+    callback(null, isPdfMime || isPdfName);
+  }
+});
+
+let smtpTransporter = null;
+if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
+  smtpTransporter = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_SECURE,
+    auth: {
+      user: SMTP_USER,
+      pass: SMTP_PASS
+    }
+  });
+}
 
 const DEFAULT_ROLE_PERMISSIONS = [
   { role_name: "Admin", home_page: true, upload_activity: true, browse_activities: true, planning: true, admin: true },
@@ -70,6 +103,13 @@ function normalizeArray(value) {
 
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+function parseCsvEmails(raw) {
+  return String(raw || "")
+    .split(",")
+    .map((item) => normalizeEmail(item))
+    .filter(Boolean);
 }
 
 function buildSchoolEmail(value) {
@@ -649,10 +689,148 @@ async function ensureSchema() {
       [row.role_name, row.home_page, row.upload_activity, row.browse_activities, row.planning, row.admin]
     );
   }
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS suggestions (
+      id BIGSERIAL PRIMARY KEY,
+      submitted_by_name TEXT NOT NULL,
+      submitted_by_email TEXT NOT NULL,
+      suggestion_type TEXT NOT NULL DEFAULT 'Activity',
+      suggestion_title TEXT NOT NULL,
+      reference_url TEXT,
+      reason TEXT NOT NULL,
+      attachment_filename TEXT,
+      attachment_mime TEXT,
+      attachment_size INTEGER,
+      attachment_data BYTEA,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS submitted_by_name TEXT`);
+  await pool.query(`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS submitted_by_email TEXT`);
+  await pool.query(`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS suggestion_type TEXT NOT NULL DEFAULT 'Activity'`);
+  await pool.query(`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS suggestion_title TEXT`);
+  await pool.query(`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS reference_url TEXT`);
+  await pool.query(`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS reason TEXT`);
+  await pool.query(`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS attachment_filename TEXT`);
+  await pool.query(`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS attachment_mime TEXT`);
+  await pool.query(`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS attachment_size INTEGER`);
+  await pool.query(`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS attachment_data BYTEA`);
+  await pool.query(`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 }
 
 app.use(express.json({ limit: "2mb" }));
 app.use(express.static(__dirname));
+
+async function getSuggestionRecipients() {
+  const recipients = new Set(parseCsvEmails(suggestionNotificationFallback));
+
+  const includeRole = (value) => {
+    const role = canonicalizeRoleName(value);
+    return ["Admin", "Lead Teacher", "Teacher"].includes(role);
+  };
+
+  for (const row of memoryUserRoles.values()) {
+    if (includeRole(row.additional_role) || includeRole(row.user_type)) {
+      const email = normalizeEmail(row.user_email);
+      if (email) recipients.add(email);
+    }
+  }
+
+  if (!hasDatabase) {
+    return Array.from(recipients);
+  }
+
+  try {
+    const columns = await resolveUserRolesColumns();
+    if (!columns.email) {
+      return Array.from(recipients);
+    }
+
+    const selectColumns = [
+      `${quoteIdentifier(columns.email)} AS user_email`,
+      columns.userType ? `${quoteIdentifier(columns.userType)} AS user_type` : `'' AS user_type`,
+      columns.additionalRole && columns.legacyRoleName && columns.additionalRole !== columns.legacyRoleName
+        ? `COALESCE(NULLIF(${quoteIdentifier(columns.additionalRole)}, ''), ${quoteIdentifier(columns.legacyRoleName)}) AS additional_role`
+        : columns.additionalRole
+          ? `${quoteIdentifier(columns.additionalRole)} AS additional_role`
+          : `'' AS additional_role`
+    ];
+
+    const result = await pool.query(`SELECT ${selectColumns.join(", ")} FROM user_additional_roles`);
+    result.rows.forEach((row) => {
+      if (includeRole(row.additional_role) || includeRole(row.user_type)) {
+        const email = normalizeEmail(row.user_email);
+        if (email) recipients.add(email);
+      }
+    });
+  } catch (_error) {
+  }
+
+  return Array.from(recipients);
+}
+
+function buildSuggestionEmailHtml(record) {
+  const safe = (value) => String(value || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const referenceCell = record.reference_url
+    ? `<a href="${safe(record.reference_url)}">${safe(record.reference_url)}</a>`
+    : "N/A";
+
+  return `
+    <div style="font-family:Arial,sans-serif;max-width:760px;margin:0 auto;border:1px solid #d4dbe5;border-radius:12px;overflow:hidden;">
+      <div style="background:#2f74b9;color:#fff;padding:16px 20px;">
+        <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;opacity:0.9;">DTECH HUB</div>
+        <h2 style="margin:6px 0 0;font-size:32px;">New ${safe(record.suggestion_type)} Suggestion</h2>
+      </div>
+      <div style="padding:16px 20px;background:#f8fbff;">
+        <table style="width:100%;border-collapse:collapse;">
+          <tr><td style="padding:8px;border:1px solid #d4dbe5;font-weight:700;">Date</td><td style="padding:8px;border:1px solid #d4dbe5;">${safe(new Date(record.created_at).toISOString().slice(0, 10))}</td></tr>
+          <tr><td style="padding:8px;border:1px solid #d4dbe5;font-weight:700;">Type</td><td style="padding:8px;border:1px solid #d4dbe5;">${safe(record.suggestion_type)}</td></tr>
+          <tr><td style="padding:8px;border:1px solid #d4dbe5;font-weight:700;">Title</td><td style="padding:8px;border:1px solid #d4dbe5;">${safe(record.suggestion_title)}</td></tr>
+          <tr><td style="padding:8px;border:1px solid #d4dbe5;font-weight:700;">Suggested By</td><td style="padding:8px;border:1px solid #d4dbe5;">${safe(record.submitted_by_name)}</td></tr>
+          <tr><td style="padding:8px;border:1px solid #d4dbe5;font-weight:700;">Email</td><td style="padding:8px;border:1px solid #d4dbe5;">${safe(record.submitted_by_email)}</td></tr>
+          <tr><td style="padding:8px;border:1px solid #d4dbe5;font-weight:700;">URL</td><td style="padding:8px;border:1px solid #d4dbe5;">${referenceCell}</td></tr>
+        </table>
+        <div style="margin-top:14px;">
+          <div style="font-weight:700;margin-bottom:6px;">Reason</div>
+          <div style="padding:10px;border:1px solid #d4dbe5;border-radius:8px;background:#fff;">${safe(record.reason)}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function notifySuggestionByEmail(record, attachment) {
+  if (!smtpTransporter || !SMTP_FROM) {
+    return { status: "not_configured", recipients: [] };
+  }
+
+  const recipients = await getSuggestionRecipients();
+  if (!recipients.length) {
+    return { status: "no_recipients", recipients: [] };
+  }
+
+  const mailOptions = {
+    from: SMTP_FROM,
+    to: recipients.join(","),
+    subject: `[Hub Suggestion] ${record.suggestion_type}: ${record.suggestion_title}`,
+    html: buildSuggestionEmailHtml(record)
+  };
+
+  if (attachment?.buffer?.length) {
+    mailOptions.attachments = [
+      {
+        filename: attachment.originalname || "suggestion.pdf",
+        content: attachment.buffer,
+        contentType: attachment.mimetype || "application/pdf"
+      }
+    ];
+  }
+
+  await smtpTransporter.sendMail(mailOptions);
+  return { status: "sent", recipients };
+}
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
@@ -1018,6 +1196,186 @@ app.get("/api/student_timetable/all", async (_req, res) => {
     res.json({ students: rows });
   } catch (_error) {
     res.json({ students: [] });
+  }
+});
+
+app.post("/api/suggestions", suggestionUpload.single("attachment"), async (req, res) => {
+  const submittedByName = String(req.body?.submitted_by_name || "").trim();
+  const submittedByEmail = normalizeEmail(req.body?.submitted_by_email);
+  const suggestionTypeRaw = String(req.body?.suggestion_type || "Activity").trim();
+  const suggestionType = suggestionTypeRaw.toLowerCase().includes("project") ? "Project" : "Activity";
+  const suggestionTitle = String(req.body?.suggestion_title || "").trim();
+  const referenceUrl = String(req.body?.reference_url || "").trim();
+  const reason = String(req.body?.reason || "").trim();
+  const attachment = req.file || null;
+
+  if (!submittedByName || !submittedByEmail || !suggestionTitle || !reason) {
+    res.status(400).json({ error: "name, email, title and reason are required" });
+    return;
+  }
+
+  const suggestionRecord = {
+    submitted_by_name: submittedByName,
+    submitted_by_email: submittedByEmail,
+    suggestion_type: suggestionType,
+    suggestion_title: suggestionTitle,
+    reference_url: referenceUrl,
+    reason,
+    attachment_filename: attachment?.originalname || null,
+    attachment_mime: attachment?.mimetype || null,
+    attachment_size: attachment?.size || null,
+    created_at: new Date().toISOString()
+  };
+
+  if (!hasDatabase) {
+    const memoryRow = {
+      id: memorySuggestionId++,
+      ...suggestionRecord,
+      attachment_data: attachment?.buffer || null
+    };
+    memorySuggestions.unshift(memoryRow);
+
+    try {
+      const emailResult = await notifySuggestionByEmail(memoryRow, attachment);
+      res.status(201).json({ ok: true, id: memoryRow.id, email_status: emailResult.status, recipients: emailResult.recipients.length });
+    } catch (_error) {
+      res.status(201).json({ ok: true, id: memoryRow.id, email_status: "failed", recipients: 0 });
+    }
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        INSERT INTO suggestions (
+          submitted_by_name,
+          submitted_by_email,
+          suggestion_type,
+          suggestion_title,
+          reference_url,
+          reason,
+          attachment_filename,
+          attachment_mime,
+          attachment_size,
+          attachment_data,
+          created_at
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW()
+        )
+        RETURNING id, submitted_by_name, submitted_by_email, suggestion_type, suggestion_title, reference_url, reason,
+                  attachment_filename, attachment_mime, attachment_size, created_at
+      `,
+      [
+        submittedByName,
+        submittedByEmail,
+        suggestionType,
+        suggestionTitle,
+        referenceUrl,
+        reason,
+        attachment?.originalname || null,
+        attachment?.mimetype || null,
+        attachment?.size || null,
+        attachment?.buffer || null
+      ]
+    );
+
+    const savedRow = result.rows[0];
+
+    try {
+      const emailResult = await notifySuggestionByEmail(savedRow, attachment);
+      res.status(201).json({ ok: true, id: savedRow.id, email_status: emailResult.status, recipients: emailResult.recipients.length });
+    } catch (_error) {
+      res.status(201).json({ ok: true, id: savedRow.id, email_status: "failed", recipients: 0 });
+    }
+  } catch (error) {
+    res.status(500).json({ error: "Could not save suggestion" });
+  }
+});
+
+app.get("/api/admin/suggestions", async (_req, res) => {
+  if (!hasDatabase) {
+    res.json(memorySuggestions.map((row) => ({
+      id: row.id,
+      created_at: row.created_at,
+      suggestion_type: row.suggestion_type,
+      suggestion_title: row.suggestion_title,
+      submitted_by_name: row.submitted_by_name,
+      submitted_by_email: row.submitted_by_email,
+      reference_url: row.reference_url,
+      reason: row.reason,
+      has_attachment: Boolean(row.attachment_data),
+      attachment_filename: row.attachment_filename
+    })));
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT
+          id,
+          created_at,
+          suggestion_type,
+          suggestion_title,
+          submitted_by_name,
+          submitted_by_email,
+          reference_url,
+          reason,
+          attachment_filename,
+          COALESCE(OCTET_LENGTH(attachment_data), 0) > 0 AS has_attachment
+        FROM suggestions
+        ORDER BY created_at DESC, id DESC
+      `
+    );
+
+    res.json(result.rows);
+  } catch (_error) {
+    res.status(500).json({ error: "Could not load suggestions" });
+  }
+});
+
+app.get("/api/admin/suggestions/:id/attachment", async (req, res) => {
+  const id = Number.parseInt(req.params.id, 10);
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).send("invalid id");
+    return;
+  }
+
+  if (!hasDatabase) {
+    const row = memorySuggestions.find((item) => Number(item.id) === id);
+    if (!row?.attachment_data) {
+      res.status(404).send("attachment not found");
+      return;
+    }
+
+    res.setHeader("Content-Type", row.attachment_mime || "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${row.attachment_filename || `suggestion-${id}.pdf`}"`);
+    res.send(row.attachment_data);
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT attachment_data, attachment_filename, attachment_mime
+        FROM suggestions
+        WHERE id = $1
+        LIMIT 1
+      `,
+      [id]
+    );
+
+    if (!result.rows.length || !result.rows[0].attachment_data) {
+      res.status(404).send("attachment not found");
+      return;
+    }
+
+    const row = result.rows[0];
+    res.setHeader("Content-Type", row.attachment_mime || "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${row.attachment_filename || `suggestion-${id}.pdf`}"`);
+    res.send(row.attachment_data);
+  } catch (_error) {
+    res.status(500).send("Could not download attachment");
   }
 });
 
