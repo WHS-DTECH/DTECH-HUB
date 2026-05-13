@@ -85,7 +85,7 @@ const DETAIL_DATA = {
     }
 };
 
-const HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
+const DETAIL_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 
 function escapeHtml(value) {
     return String(value || "")
@@ -115,7 +115,7 @@ function parseLines(value) {
 }
 
 function readStoredHubEmail() {
-    const raw = localStorage.getItem(HUB_AUTH_STORAGE_KEY) || sessionStorage.getItem(HUB_AUTH_STORAGE_KEY);
+    const raw = localStorage.getItem(DETAIL_HUB_AUTH_STORAGE_KEY) || sessionStorage.getItem(DETAIL_HUB_AUTH_STORAGE_KEY);
     if (!raw) return "";
 
     try {
