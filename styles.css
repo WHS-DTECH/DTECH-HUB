@@ -679,8 +679,10 @@ body.public-home-access .controls-panel {
     border-radius: var(--radius-md);
     background: #ffffff;
     border: 1px solid #d1d8e4;
-    box-shadow: 0 2px 8px rgba(23, 30, 46, 0.05);
+    box-shadow: 0 2px 8px rgba(23, 30, 46, 0.08);
     transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+    margin-bottom: 18px;
+    box-sizing: border-box;
 }
 
 .project-card:hover {
@@ -760,6 +762,10 @@ body.public-home-access .controls-panel {
     flex-wrap: wrap;
     gap: 5px;
     margin-bottom: 8px;
+}
+body.public-home-access .project-tags {
+    display: none !important;
+}
 }
 body.public-home-access .project-tags {
     display: none;
@@ -904,9 +910,12 @@ body.public-home-access .project-tags {
     background: var(--panel-bg);
     border: 1px solid var(--panel-border);
     box-shadow: var(--shadow-soft);
-    display: grid;
-    justify-items: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     gap: 10px;
+    text-align: center;
 }
 
 .global-suggest-button {
@@ -914,10 +923,14 @@ body.public-home-access .project-tags {
     padding: 8px 16px;
     border-radius: 8px;
     font-size: 0.82rem;
+    display: block;
+    margin: 0 auto;
 }
 
 .global-footer-copy {
     margin: 0;
+    width: 100%;
+    display: block;
     color: var(--ink-soft);
     font-size: 0.8rem;
     text-align: center;
