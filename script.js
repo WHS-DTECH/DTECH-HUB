@@ -263,6 +263,15 @@ function colorToPalette(colorName) {
     return palettes[String(colorName || "").toLowerCase()] || palettes.rose;
 }
 
+function escapeHtml(value) {
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 function textToIcon(text) {
     return String(text || "CL")
         .split(/\s+/)
@@ -298,6 +307,7 @@ async function loadSharedProjects() {
                 const category = String(item.activity_category || "Practice").trim();
                 const summary = String(item.description || "Teacher-uploaded activity").trim();
                 const created = String(item.created_at || new Date().toISOString()).slice(0, 10);
+                const imageUrl = String(item.outcome_image_url || "").trim();
 
                 return {
                     id,
@@ -313,6 +323,7 @@ async function loadSharedProjects() {
                     external: false,
                     summary,
                     keywords: [type, category, String(item.difficulty || ""), "teacher upload"].filter(Boolean),
+                    imageUrl: imageUrl || null,
                     visual: {
                         icon: textToIcon(type),
                         label: "Teacher Upload",
@@ -328,7 +339,17 @@ async function loadSharedProjects() {
 
 function mergeProjects(sharedProjects) {
     const byId = new Map();
+    const byTitle = new Map();
+    
     [...baseProjects, ...sharedProjects].forEach((project) => {
+        // First dedup by title - if we've already seen this title, skip it
+        const titleKey = project.title.toLowerCase().trim();
+        if (byTitle.has(titleKey)) {
+            return; // Skip this duplicate title
+        }
+        byTitle.set(titleKey, true);
+        
+        // Then add/update by ID
         byId.set(project.id, project);
     });
 
@@ -1137,21 +1158,32 @@ function createProjectCard(project) {
         enforceDetailAccess(event);
     });
 
-    card.innerHTML = `
-        <div class="project-visual" style="background: ${project.visual.palette};">
-            <span class="visual-label">
+    // Extract year level from className
+    const yearMatch = project.className.match(/Year\s+\d+|Junior|Middle|Senior/i);
+    const yearLevel = yearMatch ? yearMatch[0] : project.className.split(" ")[0];
+    
+    // Use image if available, otherwise use gradient background
+    const hasImage = project.imageUrl && project.imageUrl.trim().length > 0;
+    const visualContent = hasImage
+        ? `<img src="${escapeHtml(project.imageUrl)}" alt="${escapeHtml(project.title)}" class="project-image" loading="lazy">`
+        : `<span class="visual-label">
                 <span class="visual-mark">${project.visual.icon}</span>
                 ${project.visual.label}
-            </span>
+            </span>`;
+
+    const visualStyle = hasImage ? "" : `style="background: ${project.visual.palette};"`;
+
+    card.innerHTML = `
+        <div class="project-visual" ${visualStyle}>
+            ${visualContent}
         </div>
         <div class="project-body">
+            <h3>${escapeHtml(project.title)}</h3>
             <div class="project-tags">
-                <span class="status-tag status-${project.status}">${formatStatus(project.status)}</span>
-                <span class="project-tag">${project.activityCategory}</span>
-                <span class="project-tag">${project.term}</span>
+                <span class="project-tag">${escapeHtml(yearLevel)}</span>
+                <span class="project-tag">${escapeHtml(project.area)}</span>
+                <span class="project-tag">${escapeHtml(project.activityCategory)}</span>
             </div>
-            <h3>${project.title}</h3>
-            <p class="project-description">${project.summary}</p>
         </div>
     `;
 
