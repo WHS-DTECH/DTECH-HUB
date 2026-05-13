@@ -57,6 +57,7 @@ async function uploadToCloudinary(file) {
 function createProjectPayload() {
     const formData = new FormData(form);
     const name = String(formData.get("activityName") || "").trim();
+    const resourcesAndEquipment = linesToArray(formData.get("resources"));
 
     return {
         id: slugify(name),
@@ -70,8 +71,8 @@ function createProjectPayload() {
         card_url: String(formData.get("cardUrl") || "").trim(),
         outcome_image_url: String(formData.get("outcomeImageUrl") || "").trim(),
         description: String(formData.get("shortDescription") || "").trim(),
-        resources: linesToArray(formData.get("resources")),
-        equipment: linesToArray(formData.get("equipment")),
+        resources: resourcesAndEquipment,
+        equipment: resourcesAndEquipment,
         instructions: linesToArray(formData.get("instructions")),
         class_management_notes: linesToArray(formData.get("classManagementNotes")),
         class_preparation: linesToArray(formData.get("classPreparation")),
