@@ -445,6 +445,7 @@ const statusOrder = {
 };
 
 const currentProjectGrid = document.querySelector("#current-project-grid");
+const currentWeekGrid = document.querySelector("#current-week-grid");
 const libraryGrid = document.querySelector("#project-library-grid");
 const currentLabProjectGrid = document.querySelector("#current-lab-project-grid");
 const labProjectLibraryGrid = document.querySelector("#lab-project-library-grid");
@@ -956,6 +957,10 @@ function populateFilters() {
 }
 
 function renderCurrentProjects() {
+    if (!currentProjectGrid) {
+        return;
+    }
+
     currentProjectGrid.innerHTML = "";
     const activeProjects = sortProjects(projects.filter((project) => project.showThisWeek));
 
@@ -973,6 +978,44 @@ function renderCurrentProjects() {
 
     activeProjects.forEach((project) => {
         currentProjectGrid.appendChild(createProjectCard(project));
+    });
+}
+
+function renderCurrentWeek() {
+    if (!currentWeekGrid) {
+        return;
+    }
+
+    currentWeekGrid.innerHTML = "";
+
+    const activeActivities = sortProjects(projects.filter((project) => project.showThisWeek));
+    const activeLabProjects = sortLabProjects(labProjects.filter((project) => project.showThisWeek));
+
+    const combinedCards = [
+        ...activeActivities.map((project) => ({
+            title: String(project.title || "").toLowerCase(),
+            element: createProjectCard(project)
+        })),
+        ...activeLabProjects.map((project) => ({
+            title: String(project.title || "").toLowerCase(),
+            element: createLabProjectCard(project)
+        }))
+    ].sort((left, right) => left.title.localeCompare(right.title));
+
+    if (!combinedCards.length) {
+        const emptyState = document.createElement("div");
+        emptyState.className = "about-card";
+        emptyState.innerHTML = `
+            <p class="section-kicker">No Items Scheduled</p>
+            <h2>Nothing is pinned for this week yet.</h2>
+            <p>Use Teacher View to pin activities or projects that students should work on this week.</p>
+        `;
+        currentWeekGrid.appendChild(emptyState);
+        return;
+    }
+
+    combinedCards.forEach((item) => {
+        currentWeekGrid.appendChild(item.element);
     });
 }
 
@@ -1158,6 +1201,7 @@ async function init() {
     labProjects = [...baseLabProjects];
     renderStats();
     populateFilters();
+    renderCurrentWeek();
     renderCurrentProjects();
     renderLibrary();
     renderCurrentLabProjects();
