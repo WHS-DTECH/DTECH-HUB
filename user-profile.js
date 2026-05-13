@@ -42,6 +42,43 @@
         return String(value || "").trim().toLowerCase();
     }
 
+    function pickFirstNonEmpty(values) {
+        for (let i = 0; i < values.length; i += 1) {
+            const value = String(values[i] || "").trim();
+            if (value) {
+                return value;
+            }
+        }
+        return "";
+    }
+
+    function getRowDisplayName(row) {
+        if (!row || typeof row !== "object") {
+            return "";
+        }
+
+        const directName = pickFirstNonEmpty([
+            row.display_name,
+            row.name,
+            row.student_name,
+            row.full_name
+        ]);
+
+        if (directName) {
+            return directName;
+        }
+
+        const firstName = pickFirstNonEmpty([row.first_name, row.firstname, row.first]);
+        const lastName = pickFirstNonEmpty([row.last_name, row.lastname, row.surname]);
+        const combined = `${firstName} ${lastName}`.trim();
+        if (combined) {
+            return combined;
+        }
+
+        const email = pickFirstNonEmpty([row.email_school, row.email, row.user_email, row.staff_email]);
+        return email.includes("@") ? email.split("@")[0] : "";
+    }
+
     function getInitials(name, email) {
         const base = String(name || "").trim() || normalizeEmail(email).split("@")[0] || "UP";
         const parts = base.split(/\s+/).filter(Boolean);
@@ -65,7 +102,7 @@
 
         lines.forEach((line) => {
             const row = document.createElement("div");
-            row.className = `info-line${line.variant ? ` is-${line.variant}` : ""}`;
+            row.className = "info-line" + (line.variant ? ` is-${line.variant}` : "");
             row.textContent = line.text;
             element.appendChild(row);
         });
@@ -81,26 +118,26 @@
 
     function collectCandidateEmails(row) {
         const values = [
-            row?.email_school,
-            row?.email,
-            row?.user_email,
-            row?.staff_email,
-            row?.google_email,
-            row?.student_email,
-            row?.email_address,
-            row?.school_email,
-            row?.student_google_email,
-            row?.student_mail,
-            row?.mail,
-            row?.upn
+            row && row.email_school,
+            row && row.email,
+            row && row.user_email,
+            row && row.staff_email,
+            row && row.google_email,
+            row && row.student_email,
+            row && row.email_address,
+            row && row.school_email,
+            row && row.student_google_email,
+            row && row.student_mail,
+            row && row.mail,
+            row && row.upn
         ];
 
         const usernames = [
-            row?.username,
-            row?.user_name,
-            row?.student_username,
-            row?.login,
-            row?.student_login
+            row && row.username,
+            row && row.user_name,
+            row && row.student_username,
+            row && row.login,
+            row && row.student_login
         ];
 
         const normalized = new Set();
@@ -199,14 +236,11 @@
     async function loadProfile() {
         const auth = getStoredAuth();
         const profile = auth && auth.profile ? auth.profile : null;
-        const displayName = String(profile?.name || profile?.given_name || "").trim() || "Not signed in";
-        const email = normalizeEmail(profile?.email);
+        const loginName = String((profile && (profile.name || profile.given_name)) || "").trim();
+        const email = normalizeEmail(profile && profile.email);
         const domain = email.includes("@") ? email.split("@")[1] : "-";
 
-        if (avatarEl) {
-            avatarEl.textContent = getInitials(displayName, email || "user");
-        }
-        if (nameEl) nameEl.textContent = displayName;
+        if (nameEl) nameEl.textContent = loginName || "Not signed in";
         if (emailEl) emailEl.textContent = email || "Not signed in";
         if (domainEl) domainEl.textContent = domain || "-";
 
@@ -229,23 +263,21 @@
             return;
         }
 
+        let accessData = null;
         try {
-            const access = await fetchJson(`/api/auth/user-access?email=${encodeURIComponent(email)}`);
-            const role = access.additional_role || (access.can_admin ? "Admin" : access.can_teacher_view ? "Teacher/Staff" : "Student");
-            if (roleEl) roleEl.textContent = role;
+            accessData = await fetchJson(`/api/auth/user-access?email=${encodeURIComponent(email)}`);
             if (authStatusEl) authStatusEl.textContent = "Connected";
-            if (teacherViewEl) teacherViewEl.textContent = access.can_teacher_view ? "Enabled" : "Disabled";
+            if (teacherViewEl) teacherViewEl.textContent = accessData.can_teacher_view ? "Enabled" : "Disabled";
             if (topStatusEl) topStatusEl.textContent = "Profile ready";
             if (readyPillEl) readyPillEl.textContent = "Profile page ready";
             if (loginPillEl) loginPillEl.textContent = "Google Login preparation";
 
             setConnectionMessage(
                 "Google session active",
-                `Signed in as ${email}. Domain access is ${access.is_staff || access.is_student ? "linked" : "not yet linked"} to CSV records.",
+                `Signed in as ${email}. Domain access is ${accessData.is_staff || accessData.is_student ? "linked" : "not yet linked"} to CSV records.",
                 ""
             );
         } catch (_error) {
-            if (roleEl) roleEl.textContent = "Could not resolve";
             if (authStatusEl) authStatusEl.textContent = "Partial";
             if (teacherViewEl) teacherViewEl.textContent = "Unknown";
             setConnectionMessage(
@@ -255,16 +287,46 @@
             );
         }
 
-        const [staffRows, studentRows] = await Promise.all([
+        const [staffRows, studentRows, userRoleRows] = await Promise.all([
             fetchJson("/api/staff_upload/all").catch(() => []),
-            fetchJson("/api/student_timetable/all").catch(() => [])
+            fetchJson("/api/student_timetable/all").catch(() => []),
+            fetchJson("/api/admin/user-roles").catch(() => [])
         ]);
 
         const safeStaffRows = Array.isArray(staffRows) ? staffRows : Array.isArray(staffRows.staff) ? staffRows.staff : [];
         const safeStudentRows = Array.isArray(studentRows) ? studentRows : Array.isArray(studentRows.students) ? studentRows.students : [];
+        const safeRoleRows = Array.isArray(userRoleRows) ? userRoleRows : [];
 
-        const matchedStaffCount = safeStaffRows.filter((row) => collectCandidateEmails(row).has(email)).length;
-        const matchedStudentCount = safeStudentRows.filter((row) => collectCandidateEmails(row).has(email)).length;
+        const matchedStaffRows = safeStaffRows.filter((row) => collectCandidateEmails(row).has(email));
+        const matchedStudentRows = safeStudentRows.filter((row) => collectCandidateEmails(row).has(email));
+
+        const resolvedName = pickFirstNonEmpty([
+            getRowDisplayName(matchedStaffRows[0]),
+            getRowDisplayName(matchedStudentRows[0]),
+            loginName,
+            email
+        ]);
+
+        if (nameEl) {
+            nameEl.textContent = resolvedName || "Not signed in";
+        }
+        if (avatarEl) {
+            avatarEl.textContent = getInitials(resolvedName, email || "user");
+        }
+
+        const roleFromRolePage = safeRoleRows.find((row) => normalizeEmail(row && row.user_email) === email);
+        const resolvedRole = pickFirstNonEmpty([
+            roleFromRolePage && roleFromRolePage.additional_role,
+            accessData && accessData.additional_role,
+            accessData && (accessData.can_admin ? "Admin" : accessData.can_teacher_view ? "Teacher/Staff" : "Student")
+        ]) || "Student";
+
+        if (roleEl) {
+            roleEl.textContent = resolvedRole;
+        }
+
+        const matchedStaffCount = matchedStaffRows.length;
+        const matchedStudentCount = matchedStudentRows.length;
 
         setInfoStack(csvLinksEl, [
             { text: `Staff CSV links: ${matchedStaffCount}` },

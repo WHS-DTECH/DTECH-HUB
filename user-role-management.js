@@ -610,6 +610,12 @@ async function refreshStudents() {
 }
 
 function attachAuthActions() {
+  if (hubUserBadge) {
+    hubUserBadge.addEventListener("click", () => {
+      window.location.href = "/user-profile.html";
+    });
+  }
+
   if (!hubSignOutButton) {
     return;
   }
