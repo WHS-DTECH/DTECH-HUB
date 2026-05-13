@@ -1,6 +1,68 @@
 const exportButton = document.querySelector("#teacher-export");
 const clearButton = document.querySelector("#teacher-clear");
 const teacherStatus = document.querySelector("#teacher-status");
+const HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
+
+function getHubStoredAuthRaw() {
+    let localValue = null;
+    let sessionValue = null;
+
+    try {
+        localValue = localStorage.getItem(HUB_AUTH_STORAGE_KEY);
+    } catch (_error) {
+        localValue = null;
+    }
+
+    try {
+        sessionValue = sessionStorage.getItem(HUB_AUTH_STORAGE_KEY);
+    } catch (_error) {
+        sessionValue = null;
+    }
+
+    return localValue || sessionValue;
+}
+
+function getSignedInEmail() {
+    const raw = getHubStoredAuthRaw();
+    if (!raw) {
+        return "";
+    }
+
+    try {
+        const parsed = JSON.parse(raw);
+        if (!parsed?.expiresAt || Number(parsed.expiresAt) <= Date.now()) {
+            return "";
+        }
+        return String(parsed?.profile?.email || "").trim().toLowerCase();
+    } catch (_error) {
+        return "";
+    }
+}
+
+async function enforceTeacherViewAccess() {
+    const signedInEmail = getSignedInEmail();
+    if (!signedInEmail) {
+        window.location.replace("index.html");
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/auth/user-access?email=${encodeURIComponent(signedInEmail)}`);
+        if (!response.ok) {
+            window.location.replace("index.html");
+            return;
+        }
+
+        const access = await response.json();
+        if (!access?.can_teacher_view) {
+            window.location.replace("index.html");
+        }
+    } catch (_error) {
+        window.location.replace("index.html");
+    }
+}
+
+enforceTeacherViewAccess();
 
 function setTeacherStatus(message, isError = false) {
     if (!teacherStatus) return;

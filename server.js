@@ -18,6 +18,7 @@ const pool = new Pool({
 
 const STAFF_TABLE_CANDIDATES = ["staff_upload", "upload_staff"];
 const STUDENT_TABLE_CANDIDATES = ["student_timetable"];
+const SCHOOL_EMAIL_DOMAIN = "westlandhigh.school.nz";
 
 const DEFAULT_ROLE_PERMISSIONS = [
   { role_name: "Admin", home_page: true, upload_activity: true, browse_activities: true, planning: true, admin: true },
@@ -69,6 +70,19 @@ function normalizeArray(value) {
 
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+function buildSchoolEmail(value) {
+  const localPart = String(value || "").trim().toLowerCase();
+  if (!localPart || localPart.includes("@")) {
+    return "";
+  }
+
+  if (!/^[a-z0-9._%+-]+$/i.test(localPart)) {
+    return "";
+  }
+
+  return `${localPart}@${SCHOOL_EMAIL_DOMAIN}`;
 }
 
 function normalizeRoleKey(value) {
@@ -401,6 +415,100 @@ async function getStudentDirectoryRows() {
     `SELECT ${availableColumns.join(", ")} FROM ${studentTableName}${buildOrderByClause(availableColumns)}`
   );
   return result.rows;
+}
+
+function collectDirectoryEmails(row, exactEmailColumns, usernameColumns = []) {
+  const emails = new Set();
+  if (!row || typeof row !== "object") {
+    return emails;
+  }
+
+  exactEmailColumns.forEach((columnName) => {
+    const normalized = normalizeEmail(row[columnName]);
+    if (normalized.includes("@")) {
+      emails.add(normalized);
+    }
+  });
+
+  usernameColumns.forEach((columnName) => {
+    const candidate = buildSchoolEmail(row[columnName]);
+    if (candidate) {
+      emails.add(candidate);
+    }
+  });
+
+  return emails;
+}
+
+async function getMergedRolePermissions() {
+  if (!hasDatabase) {
+    return mergeRolePermissionRows(memoryRolePermissions);
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT role_name, home_page, upload_activity, browse_activities, planning, admin
+        FROM role_permissions
+        ORDER BY role_name ASC
+      `
+    );
+    return mergeRolePermissionRows(result.rows);
+  } catch (_error) {
+    return mergeRolePermissionRows(memoryRolePermissions);
+  }
+}
+
+async function getUserRoleByEmail(email) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) {
+    return null;
+  }
+
+  const memoryMatch = memoryUserRoles.get(normalizedEmail) || null;
+
+  if (!hasDatabase) {
+    return memoryMatch;
+  }
+
+  try {
+    const columns = await resolveUserRolesColumns();
+    if (!columns.email) {
+      return memoryMatch;
+    }
+
+    const selectColumns = [
+      columns.userType ? `${quoteIdentifier(columns.userType)} AS user_type` : `'Staff' AS user_type`,
+      `${quoteIdentifier(columns.email)} AS user_email`,
+      columns.displayName ? `${quoteIdentifier(columns.displayName)} AS display_name` : `'' AS display_name`,
+      columns.additionalRole && columns.legacyRoleName && columns.additionalRole !== columns.legacyRoleName
+        ? `COALESCE(NULLIF(${quoteIdentifier(columns.additionalRole)}, ''), ${quoteIdentifier(columns.legacyRoleName)}) AS additional_role`
+        : columns.additionalRole
+          ? `${quoteIdentifier(columns.additionalRole)} AS additional_role`
+          : `'' AS additional_role`,
+      columns.hubAccess
+        ? `${quoteIdentifier(columns.hubAccess)} AS hub_access`
+        : `ARRAY['DTECH-HUB']::text[] AS hub_access`
+    ];
+
+    const result = await pool.query(
+      `
+        SELECT ${selectColumns.join(", ")}
+        FROM user_additional_roles
+        WHERE LOWER(${quoteIdentifier(columns.email)}) = LOWER($1)
+        ORDER BY ${quoteIdentifier(columns.updatedAt || columns.email)} DESC
+        LIMIT 1
+      `,
+      [normalizedEmail]
+    );
+
+    if (result.rows.length) {
+      return result.rows[0];
+    }
+  } catch (_error) {
+  }
+
+  return memoryMatch;
 }
 
 function buildOrderByClause(availableColumns) {
@@ -913,6 +1021,79 @@ app.get("/api/student_timetable/all", async (_req, res) => {
   }
 });
 
+app.get("/api/auth/user-access", async (req, res) => {
+  const email = normalizeEmail(req.query.email);
+  if (!email) {
+    res.status(400).json({ error: "email is required" });
+    return;
+  }
+
+  const staffEmailSet = new Set();
+  const studentEmailSet = new Set();
+
+  try {
+    const staffRows = await getStaffDirectoryRows();
+    staffRows.forEach((row) => {
+      collectDirectoryEmails(row, ["email_school", "email", "user_email", "staff_email", "google_email"]).forEach((value) => {
+        staffEmailSet.add(value);
+      });
+    });
+  } catch (_error) {
+  }
+
+  try {
+    const studentRows = await getStudentDirectoryRows();
+    studentRows.forEach((row) => {
+      collectDirectoryEmails(
+        row,
+        [
+          "email_school",
+          "student_email",
+          "email",
+          "email_address",
+          "school_email",
+          "google_email",
+          "student_google_email",
+          "student_mail",
+          "mail",
+          "upn"
+        ],
+        ["username", "user_name", "student_username", "login", "student_login"]
+      ).forEach((value) => {
+        studentEmailSet.add(value);
+      });
+    });
+  } catch (_error) {
+  }
+
+  const userRole = await getUserRoleByEmail(email);
+  const assignedRole = canonicalizeRoleName(userRole?.additional_role || userRole?.role_name || "");
+  const allPermissions = await getMergedRolePermissions();
+  const rolePermission = allPermissions.find(
+    (row) => canonicalizeRoleName(row.role_name) === assignedRole
+  ) || null;
+
+  const isStaff = staffEmailSet.has(email);
+  const isStudent = studentEmailSet.has(email);
+  const roleGrantsTeacherView = ["Admin", "Lead Teacher", "Teacher", "Technician"].includes(assignedRole);
+  const canAdmin = Boolean(rolePermission?.admin);
+
+  let canTeacherView = Boolean(isStaff || roleGrantsTeacherView || canAdmin);
+  if (isStudent && !isStaff && !roleGrantsTeacherView && !canAdmin) {
+    canTeacherView = false;
+  }
+
+  res.json({
+    email,
+    is_staff: isStaff,
+    is_student: isStudent,
+    additional_role: assignedRole || null,
+    can_teacher_view: canTeacherView,
+    can_admin: canAdmin,
+    default_view: canTeacherView ? "teacher" : "student"
+  });
+});
+
 app.get("/api/admin/user-roles", async (_req, res) => {
   if (!hasDatabase) {
     res.json(Array.from(memoryUserRoles.values()));
@@ -1161,20 +1342,9 @@ app.delete("/api/admin/user-roles/:email", async (req, res) => {
 });
 
 app.get("/api/admin/role-permissions", async (_req, res) => {
-  if (!hasDatabase) {
-    res.json(mergeRolePermissionRows(memoryRolePermissions));
-    return;
-  }
-
   try {
-    const result = await pool.query(
-      `
-        SELECT role_name, home_page, upload_activity, browse_activities, planning, admin
-        FROM role_permissions
-        ORDER BY role_name ASC
-      `
-    );
-    res.json(mergeRolePermissionRows(result.rows));
+    const permissions = await getMergedRolePermissions();
+    res.json(permissions);
   } catch (_error) {
     res.status(500).json({ error: "Could not load role permissions" });
   }

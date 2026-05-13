@@ -415,6 +415,16 @@ const hubAuthState = {
     tokenClient: null
 };
 
+const hubAccessState = {
+    resolved: false,
+    isStaff: false,
+    isStudent: false,
+    canTeacherView: false,
+    canAdmin: false,
+    defaultView: "student",
+    additionalRole: ""
+};
+
 const state = {
     search: "",
     sort: "name-asc",
@@ -528,8 +538,54 @@ function clearHubAuthState() {
     hubAuthState.accessToken = null;
     hubAuthState.expiresAt = 0;
     hubAuthState.profile = null;
+    hubAccessState.resolved = false;
+    hubAccessState.isStaff = false;
+    hubAccessState.isStudent = false;
+    hubAccessState.canTeacherView = false;
+    hubAccessState.canAdmin = false;
+    hubAccessState.defaultView = "student";
+    hubAccessState.additionalRole = "";
     clearHubStoredAuthRaw();
     setHubProfileOpen(false);
+}
+
+async function resolveHubAccessState() {
+    const email = normalizeEmail(hubAuthState.profile?.email || "");
+    if (!email) {
+        hubAccessState.resolved = false;
+        hubAccessState.isStaff = false;
+        hubAccessState.isStudent = false;
+        hubAccessState.canTeacherView = false;
+        hubAccessState.canAdmin = false;
+        hubAccessState.defaultView = "student";
+        hubAccessState.additionalRole = "";
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/auth/user-access?email=${encodeURIComponent(email)}`);
+        if (!response.ok) {
+            throw new Error("Could not resolve user access.");
+        }
+
+        const data = await response.json();
+        hubAccessState.resolved = true;
+        hubAccessState.isStaff = Boolean(data.is_staff);
+        hubAccessState.isStudent = Boolean(data.is_student);
+        hubAccessState.canTeacherView = Boolean(data.can_teacher_view);
+        hubAccessState.canAdmin = Boolean(data.can_admin);
+        hubAccessState.defaultView = String(data.default_view || "student").toLowerCase() === "teacher" ? "teacher" : "student";
+        hubAccessState.additionalRole = String(data.additional_role || "").trim();
+    } catch (_error) {
+        // Safe fallback: do not expose teacher/admin links when access cannot be resolved.
+        hubAccessState.resolved = false;
+        hubAccessState.isStaff = false;
+        hubAccessState.isStudent = false;
+        hubAccessState.canTeacherView = false;
+        hubAccessState.canAdmin = false;
+        hubAccessState.defaultView = "student";
+        hubAccessState.additionalRole = "";
+    }
 }
 
 function loadHubAuthState() {
@@ -566,6 +622,8 @@ function isAllowedHubAccount(profile) {
 
 function renderHubAuthUi() {
     const signedIn = Boolean(hubAuthState.profile?.email);
+    const canTeacherView = signedIn && hubAccessState.canTeacherView;
+    const canAdmin = signedIn && hubAccessState.canAdmin;
 
     if (hubSignInButton) {
         hubSignInButton.hidden = signedIn;
@@ -579,10 +637,10 @@ function renderHubAuthUi() {
         hubUserBadge.title = signedIn ? getHubDisplayName(hubAuthState.profile) : "";
     }
     if (hubStaffLink) {
-        hubStaffLink.hidden = !signedIn;
+        hubStaffLink.hidden = !canTeacherView;
     }
     if (hubAdminLink) {
-        hubAdminLink.hidden = !signedIn;
+        hubAdminLink.hidden = !canAdmin;
     }
 
     if (!signedIn) {
@@ -620,6 +678,7 @@ async function handleHubGoogleToken(tokenResponse) {
     hubAuthState.expiresAt = Date.now() + (Number(tokenResponse.expires_in) || 3600) * 1000;
     hubAuthState.profile = profile;
     saveHubAuthState();
+    await resolveHubAccessState();
     renderHubAuthUi();
 }
 
@@ -670,6 +729,10 @@ function initHubGoogleAuth() {
     loadHubAuthState();
     renderHubAuthUi();
     bindHubAuthControls();
+
+    if (hubAuthState.profile?.email) {
+        resolveHubAccessState().finally(renderHubAuthUi);
+    }
 
     if (!hubGoogleClientId) {
         return;
