@@ -191,7 +191,21 @@ async function readSharedActivity(activityId) {
         resources: toArray(found.resources),
         equipment: toArray(found.equipment),
         instructions: toArray(found.instructions),
-        image: found.outcome_image_url || "https://placehold.co/900x560/3f89cf/ffffff?text=Uploaded+Activity"
+        image: found.outcome_image_url || "https://placehold.co/900x560/3f89cf/ffffff?text=Uploaded+Activity",
+        
+        // Project Proposal Fields
+        startDate: found.start_date || "",
+        contactName: found.contact_name || "",
+        contactPhone: found.contact_phone || "",
+        contactEmail: found.contact_email || "",
+        company: found.company || "",
+        address: found.address || "",
+        overview: toArray(found.overview),
+        services: toArray(found.services),
+        costs: toArray(found.costs),
+        outcomes: toArray(found.outcomes),
+        withdrawalDate: found.withdrawal_date || "",
+        clientId: found.client_id || ""
     };
 }
 
@@ -213,14 +227,28 @@ function defaultDetailShape(id, data) {
         resources: Array.isArray(data?.resources) ? data.resources : [],
         equipment: Array.isArray(data?.equipment) ? data.equipment : [],
         instructions: Array.isArray(data?.instructions) ? data.instructions : [],
-        image: String(data?.image || "").trim() || "https://placehold.co/900x560/3f89cf/ffffff?text=Uploaded+Activity"
+        image: String(data?.image || "").trim() || "https://placehold.co/900x560/3f89cf/ffffff?text=Uploaded+Activity",
+        
+        // Project Proposal Fields
+        startDate: String(data?.startDate || "").trim(),
+        contactName: String(data?.contactName || "").trim(),
+        contactPhone: String(data?.contactPhone || "").trim(),
+        contactEmail: String(data?.contactEmail || "").trim(),
+        company: String(data?.company || "").trim(),
+        address: String(data?.address || "").trim(),
+        overview: Array.isArray(data?.overview) ? data.overview : [],
+        services: Array.isArray(data?.services) ? data.services : [],
+        costs: Array.isArray(data?.costs) ? data.costs : [],
+        outcomes: Array.isArray(data?.outcomes) ? data.outcomes : [],
+        withdrawalDate: String(data?.withdrawalDate || "").trim(),
+        clientId: String(data?.clientId || "").trim()
     };
 }
 
 function renderDetailView(host, id, data, canEdit) {
     host.innerHTML = `
         <header class="toolbar">
-            <span class="toolbar-label">Teacher View</span>
+            <span class="toolbar-label">Project Details</span>
             <div class="toolbar-actions">
                 ${canEdit ? '<button type="button" class="detail-action" id="detail-edit-button">Edit Details</button>' : ""}
                 <a href="../index.html">Back to Hub</a>
@@ -229,43 +257,114 @@ function renderDetailView(host, id, data, canEdit) {
 
         <section class="hero">
             <div class="hero-copy">
-                <p class="kicker">Student Activity</p>
+                <p class="kicker">Project Proposal</p>
                 <h1>${escapeHtml(data.title)}</h1>
                 <div class="pills">
                     <span class="pill">${escapeHtml(data.yearLevel)}</span>
                     <span class="pill">${escapeHtml(data.type)}</span>
                     <span class="pill">${escapeHtml(data.duration)}</span>
-                    <span class="pill">${escapeHtml(data.activityCategory || "Practice")}</span>
                 </div>
                 <p>${escapeHtml(data.summary)}</p>
-                <div class="meta-row">
-                    <span class="meta-chip">Activity Category: ${escapeHtml(data.activityCategory || "Practice")}</span>
-                    <span class="meta-chip">Show in This Week: ${data.showInThisWeek ? "Yes" : "No"}</span>
-                    <span class="meta-chip">${escapeHtml(data.term)}</span>
-                </div>
             </div>
             <div class="hero-image">
-                <img src="${escapeHtml(data.image)}" alt="${escapeHtml(data.title)} activity image" loading="lazy">
+                <img src="${escapeHtml(data.image)}" alt="${escapeHtml(data.title)} project image" loading="lazy">
             </div>
         </section>
 
-        <section class="grid">
-            <article class="card">
-                <h2>Resources</h2>
-                <p class="sub">Materials students need.</p>
-                <ul class="list">${renderList(data.resources)}</ul>
-            </article>
-            <article class="card">
-                <h2>Equipment</h2>
-                <p class="sub">Tools and systems used.</p>
-                <ul class="list">${renderList(data.equipment)}</ul>
-            </article>
-            <article class="card">
-                <h2>Instructions</h2>
-                <p class="sub">Step-by-step method.</p>
-                <ol class="list">${renderList(data.instructions)}</ol>
-            </article>
+        <section class="proposal-details">
+            ${data.startDate ? `<div class="detail-row"><strong>EST. Start Date:</strong> <span>${escapeHtml(data.startDate)}</span></div>` : ""}
         </section>
+
+        ${
+            data.contactName || data.company || data.address ? `
+            <section class="proposal-section">
+                <h2>Contact Information</h2>
+                <div class="detail-grid">
+                    ${data.contactName ? `<div class="detail-field"><strong>Contact Name:</strong> ${escapeHtml(data.contactName)}</div>` : ""}
+                    ${data.contactPhone ? `<div class="detail-field"><strong>Phone:</strong> ${escapeHtml(data.contactPhone)}</div>` : ""}
+                    ${data.contactEmail ? `<div class="detail-field"><strong>Email:</strong> <a href="mailto:${escapeHtml(data.contactEmail)}">${escapeHtml(data.contactEmail)}</a></div>` : ""}
+                    ${data.company ? `<div class="detail-field"><strong>Company:</strong> ${escapeHtml(data.company)}</div>` : ""}
+                    ${data.address ? `<div class="detail-field detail-field-full"><strong>Address:</strong> ${escapeHtml(data.address)}</div>` : ""}
+                </div>
+            </section>
+            ` : ""
+        }
+
+        ${
+            data.overview.length ? `
+            <section class="proposal-section">
+                <h2>${escapeHtml(data.company ? data.company : "Project")} Overview and Needs</h2>
+                <ul class="list">${renderList(data.overview)}</ul>
+            </section>
+            ` : ""
+        }
+
+        ${
+            data.services.length ? `
+            <section class="proposal-section">
+                <h2>Services Provided</h2>
+                <ul class="list">${renderList(data.services)}</ul>
+            </section>
+            ` : ""
+        }
+
+        ${
+            data.costs.length ? `
+            <section class="proposal-section">
+                <h2>Estimated Service Cost to be Incurred by Client</h2>
+                <ul class="list">${renderList(data.costs)}</ul>
+            </section>
+            ` : ""
+        }
+
+        ${
+            data.outcomes.length ? `
+            <section class="proposal-section">
+                <h2>Positive Outcomes of the Services Provided</h2>
+                <ul class="list">${renderList(data.outcomes)}</ul>
+            </section>
+            ` : ""
+        }
+
+        ${
+            data.withdrawalDate ? `
+            <section class="proposal-section">
+                <h2>All-or-Nothing Terms</h2>
+                <p class="detail-field"><strong>Withdrawal if not Accepted by Date of:</strong> <span>${escapeHtml(data.withdrawalDate)}</span></p>
+            </section>
+            ` : ""
+        }
+
+        ${
+            data.clientId ? `
+            <section class="proposal-section">
+                <h2>Project Client Details</h2>
+                <p class="detail-field"><strong>Client ID / Details:</strong> <span>${escapeHtml(data.clientId)}</span></p>
+            </section>
+            ` : ""
+        }
+
+        ${
+            data.resources.length || data.equipment.length || data.instructions.length ? `
+            <section class="grid">
+                ${data.resources.length ? `<article class="card">
+                    <h2>Resources</h2>
+                    <p class="sub">Materials needed.</p>
+                    <ul class="list">${renderList(data.resources)}</ul>
+                </article>` : ""}
+                ${data.equipment.length ? `<article class="card">
+                    <h2>Equipment</h2>
+                    <p class="sub">Tools and systems used.</p>
+                    <ul class="list">${renderList(data.equipment)}</ul>
+                </article>` : ""}
+                ${data.instructions.length ? `<article class="card">
+                    <h2>Instructions</h2>
+                    <p class="sub">Step-by-step method.</p>
+                    <ol class="list">${renderList(data.instructions)}</ol>
+                </article>` : ""}
+            </section>
+            ` : ""
+        }
     `;
 
     const editButton = host.querySelector("#detail-edit-button");
@@ -288,7 +387,21 @@ async function saveDetails(id, draft) {
         equipment: draft.equipment,
         instructions: draft.instructions,
         show_in_this_week: draft.showInThisWeek,
-        term: draft.term
+        term: draft.term,
+        
+        // Project Proposal Fields
+        start_date: draft.startDate,
+        contact_name: draft.contactName,
+        contact_phone: draft.contactPhone,
+        contact_email: draft.contactEmail,
+        company: draft.company,
+        address: draft.address,
+        overview: draft.overview,
+        services: draft.services,
+        costs: draft.costs,
+        outcomes: draft.outcomes,
+        withdrawal_date: draft.withdrawalDate,
+        client_id: draft.clientId
     };
 
     const response = await fetch("/api/activities", {
@@ -315,7 +428,21 @@ async function saveDetails(id, draft) {
         resources: Array.isArray(result.resources) ? result.resources : draft.resources,
         equipment: Array.isArray(result.equipment) ? result.equipment : draft.equipment,
         instructions: Array.isArray(result.instructions) ? result.instructions : draft.instructions,
-        image: result.outcome_image_url || draft.image
+        image: result.outcome_image_url || draft.image,
+        
+        // Project Proposal Fields
+        startDate: result.start_date || draft.startDate,
+        contactName: result.contact_name || draft.contactName,
+        contactPhone: result.contact_phone || draft.contactPhone,
+        contactEmail: result.contact_email || draft.contactEmail,
+        company: result.company || draft.company,
+        address: result.address || draft.address,
+        overview: Array.isArray(result.overview) ? result.overview : draft.overview,
+        services: Array.isArray(result.services) ? result.services : draft.services,
+        costs: Array.isArray(result.costs) ? result.costs : draft.costs,
+        outcomes: Array.isArray(result.outcomes) ? result.outcomes : draft.outcomes,
+        withdrawalDate: result.withdrawal_date || draft.withdrawalDate,
+        clientId: result.client_id || draft.clientId
     };
 }
 
@@ -324,44 +451,105 @@ function renderEditForm(host, id, data) {
 
     host.innerHTML = `
         <header class="toolbar">
-            <span class="toolbar-label">Edit Activity</span>
+            <span class="toolbar-label">Edit Project</span>
             <div class="toolbar-actions">
                 <a href="../index.html">Back to Hub</a>
             </div>
         </header>
 
         <form id="${formId}" class="detail-form" novalidate>
-            <div class="detail-form-grid">
-                <label class="detail-field">
-                    <span>Title</span>
-                    <input name="title" type="text" required value="${escapeHtml(data.title)}">
-                </label>
-                <label class="detail-field">
-                    <span>Year Level</span>
-                    <input name="yearLevel" type="text" required value="${escapeHtml(data.yearLevel)}">
-                </label>
-                <label class="detail-field">
-                    <span>Type</span>
-                    <input name="type" type="text" required value="${escapeHtml(data.type)}">
-                </label>
-                <label class="detail-field">
-                    <span>Duration (hours)</span>
-                    <input name="durationHours" type="number" min="1" step="1" required value="${parseDurationHours(data.duration)}">
-                </label>
-                <label class="detail-field">
-                    <span>Term</span>
-                    <input name="term" type="text" value="${escapeHtml(data.term)}">
-                </label>
-                <label class="detail-field">
-                    <span>Activity Category</span>
-                    <input name="activityCategory" type="text" value="${escapeHtml(data.activityCategory || "Practice")}">
-                </label>
-            </div>
+            <fieldset class="detail-form-section">
+                <legend>Project Basics</legend>
+                <div class="detail-form-grid">
+                    <label class="detail-field">
+                        <span>Title</span>
+                        <input name="title" type="text" required value="${escapeHtml(data.title)}">
+                    </label>
+                    <label class="detail-field">
+                        <span>Start Date</span>
+                        <input name="startDate" type="date" value="${escapeHtml(data.startDate)}">
+                    </label>
+                    <label class="detail-field">
+                        <span>Year Level</span>
+                        <input name="yearLevel" type="text" required value="${escapeHtml(data.yearLevel)}">
+                    </label>
+                    <label class="detail-field">
+                        <span>Type</span>
+                        <input name="type" type="text" required value="${escapeHtml(data.type)}">
+                    </label>
+                    <label class="detail-field">
+                        <span>Duration (hours)</span>
+                        <input name="durationHours" type="number" min="1" step="1" required value="${parseDurationHours(data.duration)}">
+                    </label>
+                    <label class="detail-field">
+                        <span>Activity Category</span>
+                        <input name="activityCategory" type="text" value="${escapeHtml(data.activityCategory || "Practice")}">
+                    </label>
+                </div>
+            </fieldset>
+
+            <fieldset class="detail-form-section">
+                <legend>Contact Information</legend>
+                <div class="detail-form-grid">
+                    <label class="detail-field">
+                        <span>Contact Name</span>
+                        <input name="contactName" type="text" value="${escapeHtml(data.contactName)}">
+                    </label>
+                    <label class="detail-field">
+                        <span>Phone</span>
+                        <input name="contactPhone" type="tel" value="${escapeHtml(data.contactPhone)}">
+                    </label>
+                    <label class="detail-field">
+                        <span>Email</span>
+                        <input name="contactEmail" type="email" value="${escapeHtml(data.contactEmail)}">
+                    </label>
+                    <label class="detail-field">
+                        <span>Company</span>
+                        <input name="company" type="text" value="${escapeHtml(data.company)}">
+                    </label>
+                    <label class="detail-field detail-field-full">
+                        <span>Address</span>
+                        <input name="address" type="text" value="${escapeHtml(data.address)}">
+                    </label>
+                </div>
+            </fieldset>
 
             <label class="detail-field detail-field-full">
                 <span>Summary</span>
                 <textarea name="summary" rows="4">${escapeHtml(data.summary)}</textarea>
             </label>
+
+            <fieldset class="detail-form-section">
+                <legend>Proposal Content</legend>
+                <label class="detail-field detail-field-full">
+                    <span>Overview and Needs (one per line)</span>
+                    <textarea name="overview" rows="6">${escapeHtml(asLines(data.overview))}</textarea>
+                </label>
+                <label class="detail-field detail-field-full">
+                    <span>Services Provided (one per line)</span>
+                    <textarea name="services" rows="6">${escapeHtml(asLines(data.services))}</textarea>
+                </label>
+                <label class="detail-field detail-field-full">
+                    <span>Estimated Costs (one per line)</span>
+                    <textarea name="costs" rows="6">${escapeHtml(asLines(data.costs))}</textarea>
+                </label>
+                <label class="detail-field detail-field-full">
+                    <span>Positive Outcomes (one per line)</span>
+                    <textarea name="outcomes" rows="6">${escapeHtml(asLines(data.outcomes))}</textarea>
+                </label>
+            </fieldset>
+
+            <fieldset class="detail-form-section">
+                <legend>Proposal Terms</legend>
+                <label class="detail-field">
+                    <span>Withdrawal Date</span>
+                    <input name="withdrawalDate" type="date" value="${escapeHtml(data.withdrawalDate)}">
+                </label>
+                <label class="detail-field detail-field-full">
+                    <span>Client ID / Details</span>
+                    <input name="clientId" type="text" value="${escapeHtml(data.clientId)}">
+                </label>
+            </fieldset>
 
             <label class="detail-field detail-field-full">
                 <span>Image URL</span>
@@ -371,15 +559,15 @@ function renderEditForm(host, id, data) {
             <div class="detail-form-grid">
                 <label class="detail-field detail-field-full">
                     <span>Resources (one per line)</span>
-                    <textarea name="resources" rows="6">${escapeHtml(asLines(data.resources))}</textarea>
+                    <textarea name="resources" rows="4">${escapeHtml(asLines(data.resources))}</textarea>
                 </label>
                 <label class="detail-field detail-field-full">
                     <span>Equipment (one per line)</span>
-                    <textarea name="equipment" rows="6">${escapeHtml(asLines(data.equipment))}</textarea>
+                    <textarea name="equipment" rows="4">${escapeHtml(asLines(data.equipment))}</textarea>
                 </label>
                 <label class="detail-field detail-field-full">
                     <span>Instructions (one per line)</span>
-                    <textarea name="instructions" rows="6">${escapeHtml(asLines(data.instructions))}</textarea>
+                    <textarea name="instructions" rows="4">${escapeHtml(asLines(data.instructions))}</textarea>
                 </label>
             </div>
 
@@ -432,7 +620,21 @@ function renderEditForm(host, id, data) {
             resources: parseLines(formData.get("resources")),
             equipment: parseLines(formData.get("equipment")),
             instructions: parseLines(formData.get("instructions")),
-            showInThisWeek: formData.get("showInThisWeek") === "on"
+            showInThisWeek: formData.get("showInThisWeek") === "on",
+            
+            // Project Proposal Fields
+            startDate: String(formData.get("startDate") || "").trim(),
+            contactName: String(formData.get("contactName") || "").trim(),
+            contactPhone: String(formData.get("contactPhone") || "").trim(),
+            contactEmail: String(formData.get("contactEmail") || "").trim(),
+            company: String(formData.get("company") || "").trim(),
+            address: String(formData.get("address") || "").trim(),
+            overview: parseLines(formData.get("overview")),
+            services: parseLines(formData.get("services")),
+            costs: parseLines(formData.get("costs")),
+            outcomes: parseLines(formData.get("outcomes")),
+            withdrawalDate: String(formData.get("withdrawalDate") || "").trim(),
+            clientId: String(formData.get("clientId") || "").trim()
         };
 
         if (!draft.title || !draft.yearLevel || !draft.type) {

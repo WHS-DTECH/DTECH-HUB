@@ -36,10 +36,30 @@
     gap: 12px;
 }
 
+.form-section {
+    border: 1px solid #d4dfe9;
+    border-radius: 6px;
+    padding: 12px;
+    margin: 12px 0;
+    background: #f9fbfd;
+}
+
+.form-section legend {
+    color: #17395d;
+    font-size: 0.95rem;
+    font-weight: 700;
+    padding: 0 6px;
+    margin: -6px 0 8px -6px;
+}
+
 .form-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
+}
+
+.form-section .form-grid {
+    margin-top: 8px;
 }
 
 .field {

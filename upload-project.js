@@ -69,7 +69,6 @@ async function uploadActivityImage(file, activityName) {
 function createProjectPayload() {
     const formData = new FormData(form);
     const name = String(formData.get("activityName") || "").trim();
-    const resourcesAndEquipment = linesToArray(formData.get("resources"));
 
     return {
         id: slugify(name),
@@ -82,15 +81,22 @@ function createProjectPayload() {
         card_color: String(formData.get("cardColor") || "").trim(),
         card_url: String(formData.get("cardUrl") || "").trim(),
         outcome_image_url: String(formData.get("outcomeImageUrl") || "").trim(),
-        description: String(formData.get("shortDescription") || "").trim(),
-        resources: resourcesAndEquipment,
-        equipment: resourcesAndEquipment,
-        instructions: linesToArray(formData.get("instructions")),
-        class_management_notes: linesToArray(formData.get("classManagementNotes")),
-        class_preparation: linesToArray(formData.get("classPreparation")),
-        assessment_focus: linesToArray(formData.get("assessmentFocus")),
         show_in_this_week: Boolean(formData.get("showThisWeek")),
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        
+        // Project Proposal Fields
+        start_date: String(formData.get("startDate") || "").trim(),
+        contact_name: String(formData.get("contactName") || "").trim(),
+        contact_phone: String(formData.get("contactPhone") || "").trim(),
+        contact_email: String(formData.get("contactEmail") || "").trim(),
+        company: String(formData.get("company") || "").trim(),
+        address: String(formData.get("address") || "").trim(),
+        overview: linesToArray(formData.get("overview")),
+        services: linesToArray(formData.get("services")),
+        costs: linesToArray(formData.get("costs")),
+        outcomes: linesToArray(formData.get("outcomes")),
+        withdrawal_date: String(formData.get("withdrawalDate") || "").trim(),
+        client_id: String(formData.get("clientId") || "").trim()
     };
 }
 

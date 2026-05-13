@@ -49,133 +49,195 @@
         </header>
 
         <main class="upload-page">
-            <h1>Upload Project</h1>
-            <p class="intro-text">Create a new project with an outcome image, resources, equipment, and instructions.</p>
+            <h1>Upload Project Proposal</h1>
+            <p class="intro-text">Create a new project proposal with contact info, services, costs, outcomes, and deliverables.</p>
 
-            <section class="upload-panel" aria-label="Upload project form">
+            <section class="upload-panel" aria-label="Upload project proposal form">
 
-                     <form id="upload-activity-form" class="upload-form">
-                    <div class="form-grid">
-                        <div class="field">
-                            <label for="activity-name">Project Name</label>
-                            <input id="activity-name" name="activityName" type="text" required>
+                <form id="upload-activity-form" class="upload-form">
+                    
+                    <!-- Project Basics -->
+                    <fieldset class="form-section">
+                        <legend>Project Basics</legend>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="activity-name">Project Name</label>
+                                <input id="activity-name" name="activityName" type="text" required>
+                            </div>
+                            <div class="field">
+                                <label for="start-date">EST. Start Date</label>
+                                <input id="start-date" name="startDate" type="date">
+                            </div>
+                            <div class="field">
+                                <label for="year-level">Year Level</label>
+                                <select id="year-level" name="yearLevel" required>
+                                    <option value="">Select year</option>
+                                    <option>Junior</option>
+                                    <option>Middle</option>
+                                    <option>Senior</option>
+                                    <option>Year 7</option>
+                                    <option>Year 8</option>
+                                    <option>Year 9</option>
+                                    <option>Year 10</option>
+                                    <option>Year 11</option>
+                                    <option>Year 12</option>
+                                    <option>Year 13</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="type">Project Type</label>
+                                <select id="type" name="type" required>
+                                    <option value="">Select type</option>
+                                    <option>Office Suite</option>
+                                    <option>Programming</option>
+                                    <option>Electronics</option>
+                                    <option>Digital Media</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="activity-category">Project Category</label>
+                                <select id="activity-category" name="activityCategory" required>
+                                    <option>Project Activity</option>
+                                    <option>Practice</option>
+                                    <option>Skill Activity</option>
+                                    <option>Assessment Activity</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="difficulty">Difficulty</label>
+                                <select id="difficulty" name="difficulty" required>
+                                    <option value="">Select difficulty</option>
+                                    <option>Beginner</option>
+                                    <option>Intermediate</option>
+                                    <option>Advanced</option>
+                                </select>
+                            </div>
                         </div>
+                    </fieldset>
 
-                        <div class="field">
-                            <label for="year-level">Year Level</label>
-                            <select id="year-level" name="yearLevel" required>
-                                <option value="">Select year</option>
-                                <option>Junior</option>
-                                <option>Middle</option>
-                                <option>Senior</option>
-                                <option>Year 7</option>
-                                <option>Year 8</option>
-                                <option>Year 9</option>
-                                <option>Year 10</option>
-                                <option>Year 11</option>
-                                <option>Year 12</option>
-                                <option>Year 13</option>
-                            </select>
+                    <!-- Contact Information -->
+                    <fieldset class="form-section">
+                        <legend>Contact Information</legend>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="contact-name">Contact Name</label>
+                                <input id="contact-name" name="contactName" type="text">
+                            </div>
+                            <div class="field">
+                                <label for="contact-phone">Phone</label>
+                                <input id="contact-phone" name="contactPhone" type="tel">
+                            </div>
+                            <div class="field">
+                                <label for="contact-email">Email</label>
+                                <input id="contact-email" name="contactEmail" type="email">
+                            </div>
+                            <div class="field">
+                                <label for="company">Company</label>
+                                <input id="company" name="company" type="text">
+                            </div>
+                            <div class="field field-wide">
+                                <label for="address">Address</label>
+                                <input id="address" name="address" type="text">
+                            </div>
                         </div>
+                    </fieldset>
 
-                        <div class="field">
-                            <label for="type">Project Type</label>
-                            <select id="type" name="type" required>
-                                <option value="">Select type</option>
-                                <option>Office Suite</option>
-                                <option>Programming</option>
-                                <option>Electronics</option>
-                                <option>Digital Media</option>
-                            </select>
+                    <!-- Project Overview & Needs -->
+                    <fieldset class="form-section">
+                        <legend>Project Overview and Needs</legend>
+                        <div class="field field-wide">
+                            <label for="overview">Overview and Needs (one point per line)</label>
+                            <textarea id="overview" name="overview" placeholder="Enter key overview points and needs, one per line..."></textarea>
                         </div>
+                    </fieldset>
 
-                        <div class="field">
-                            <label for="activity-category">Project Category</label>
-                            <select id="activity-category" name="activityCategory" required>
-                                <option>Project Activity</option>
-                                <option>Practice</option>
-                                <option>Skill Activity</option>
-                                <option>Assessment Activity</option>
-                            </select>
+                    <!-- Services Provided -->
+                    <fieldset class="form-section">
+                        <legend>Services Provided</legend>
+                        <div class="field field-wide">
+                            <label for="services">Services (one per line)</label>
+                            <textarea id="services" name="services" placeholder="List all services to be provided, one per line..."></textarea>
                         </div>
+                    </fieldset>
 
-                        <div class="field">
-                            <label for="duration-minutes">Duration Minutes</label>
-                            <input id="duration-minutes" name="durationMinutes" type="number" min="1" step="1" required>
+                    <!-- Estimated Costs -->
+                    <fieldset class="form-section">
+                        <legend>Estimated Service Costs</legend>
+                        <div class="field field-wide">
+                            <label for="costs">Cost Breakdown (one per line, e.g., &quot;Service Name - $X.XX&quot;)</label>
+                            <textarea id="costs" name="costs" placeholder="Enter cost items, one per line..."></textarea>
                         </div>
+                    </fieldset>
 
-                        <div class="field">
-                            <label for="difficulty">Difficulty</label>
-                            <select id="difficulty" name="difficulty" required>
-                                <option value="">Select difficulty</option>
-                                <option>Beginner</option>
-                                <option>Intermediate</option>
-                                <option>Advanced</option>
-                            </select>
+                    <!-- Positive Outcomes -->
+                    <fieldset class="form-section">
+                        <legend>Positive Outcomes of the Services Provided</legend>
+                        <div class="field field-wide">
+                            <label for="outcomes">Outcomes (one per line)</label>
+                            <textarea id="outcomes" name="outcomes" placeholder="Enter positive outcomes, one per line..."></textarea>
                         </div>
+                    </fieldset>
 
-                        <div class="field">
-                            <label for="card-color">Card Color</label>
-                            <select id="card-color" name="cardColor" required>
-                                <option selected>Violet</option>
-                                <option>Rose</option>
-                                <option>Azure</option>
-                                <option>Amber</option>
-                                <option>Teal</option>
-                                <option>Slate</option>
-                            </select>
-                        </div>
-
-                        <div class="field">
-                            <label for="card-url">Card URL</label>
-                            <input id="card-url" name="cardUrl" type="url" placeholder="What URL should this card open?">
-                        </div>
-
+                    <!-- Project Image -->
+                    <fieldset class="form-section">
+                        <legend>Project Image</legend>
                         <div class="field field-wide">
                             <label for="outcome-image-url">Outcome Image URL</label>
                             <input id="outcome-image-url" name="outcomeImageUrl" type="text" placeholder="https://... or /images/...">
                         </div>
-
                         <div class="field field-wide">
                             <label for="outcome-image-file">Upload Outcome Image (PNG or JPG)</label>
                             <input id="outcome-image-file" name="outcomeImageFile" type="file" accept="image/png,image/jpeg,image/jpg">
                         </div>
+                    </fieldset>
 
-                        <div class="field field-wide">
-                            <label for="short-description">Short Description</label>
-                            <textarea id="short-description" name="shortDescription"></textarea>
+                    <!-- All-or-Nothing Terms -->
+                    <fieldset class="form-section">
+                        <legend>All-or-Nothing Terms</legend>
+                        <div class="field">
+                            <label for="withdrawal-date">Withdrawal if not Accepted by Date of</label>
+                            <input id="withdrawal-date" name="withdrawalDate" type="date">
                         </div>
+                    </fieldset>
 
-                        <div class="field field-wide">
-                            <label for="resources">Resources & Equipment (one per line)</label>
-                            <textarea id="resources" name="resources" placeholder="What resources and equipment are needed?"></textarea>
+                    <!-- Client Details -->
+                    <fieldset class="form-section">
+                        <legend>Project Client Details</legend>
+                        <div class="field">
+                            <label for="client-id">Project Client Details / ID</label>
+                            <input id="client-id" name="clientId" type="text" placeholder="Enter client identifier or details...">
                         </div>
+                    </fieldset>
 
-                        <div class="field field-wide">
-                            <label for="instructions">Instructions (one step per line)</label>
-                            <textarea id="instructions" name="instructions" placeholder="What are the steps students should follow?"></textarea>
+                    <!-- Display Options -->
+                    <fieldset class="form-section">
+                        <legend>Display Options</legend>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="card-color">Card Color</label>
+                                <select id="card-color" name="cardColor" required>
+                                    <option selected>Violet</option>
+                                    <option>Rose</option>
+                                    <option>Azure</option>
+                                    <option>Amber</option>
+                                    <option>Teal</option>
+                                    <option>Slate</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="duration-minutes">Duration Minutes</label>
+                                <input id="duration-minutes" name="durationMinutes" type="number" min="1" step="1" required>
+                            </div>
                         </div>
-
                         <div class="field field-wide">
-                            <label for="class-management">Teacher Card: Class Management Notes</label>
-                            <textarea id="class-management" name="classManagementNotes" placeholder="What class management notes should teachers know?"></textarea>
+                            <label for="card-url">Card URL</label>
+                            <input id="card-url" name="cardUrl" type="url" placeholder="What URL should this card open?">
                         </div>
-
-                        <div class="field field-wide">
-                            <label for="class-preparation">Teacher Card: Class Preparation</label>
-                            <textarea id="class-preparation" name="classPreparation" placeholder="What preparation should be done before class?"></textarea>
-                        </div>
-
-                        <div class="field field-wide">
-                            <label for="assessment-focus">Teacher Card: Assessment Focus</label>
-                            <textarea id="assessment-focus" name="assessmentFocus" placeholder="What evidence to observe or collect..."></textarea>
-                        </div>
-                    </div>
-
-                    <label class="checkbox-field" for="show-this-week">
-                        <input id="show-this-week" name="showThisWeek" type="checkbox">
-                        Show in This Week section
-                    </label>
+                        <label class="checkbox-field" for="show-this-week">
+                            <input id="show-this-week" name="showThisWeek" type="checkbox">
+                            Show in This Week section
+                        </label>
+                    </fieldset>
 
                     <div class="form-actions">
                         <button class="button-save" type="submit">Save Project</button>
