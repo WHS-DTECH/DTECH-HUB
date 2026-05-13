@@ -599,6 +599,14 @@ a {
     background: #ffffff;
     border: 1px solid var(--panel-border);
 }
+body.public-home-access #year-filter {
+    display: none;
+}
+body.public-home-access label.control-field[for="year-filter"] {
+    display: none;
+}
+body.public-home-access .controls-panel {
+    grid-template-columns: minmax(230px, 2fr) repeat(3, minmax(130px, 1fr));
 
 .control-field {
     display: grid;
@@ -752,6 +760,9 @@ a {
     flex-wrap: wrap;
     gap: 5px;
     margin-bottom: 8px;
+}
+body.public-home-access .project-tags {
+    display: none;
 }
 
 .project-tag,

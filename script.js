@@ -596,6 +596,19 @@ const hubProfileClose = document.querySelector("#hub-profile-close");
 const hubBrowseMenu = document.querySelector("#hub-browse-menu");
 const hubBrowseButtons = Array.from(document.querySelectorAll("[data-auth-browse]"));
 
+function isHomepagePath() {
+    const path = String(window.location.pathname || "").toLowerCase();
+    return path === "/" || path.endsWith("/index.html");
+}
+
+function setPublicHomepageUiState(signedIn) {
+    if (!document.body || !isHomepagePath()) {
+        return;
+    }
+
+    document.body.classList.toggle("public-home-access", !signedIn);
+}
+
 function normalizeEmail(value) {
     return String(value || "").trim().toLowerCase();
 }
@@ -827,6 +840,8 @@ function renderHubAuthUi() {
         });
     }
 
+    setPublicHomepageUiState(signedIn);
+
     if (!signedIn) {
         setHubProfileOpen(false);
         return;
@@ -1055,13 +1070,6 @@ function createProjectCard(project) {
             </div>
             <h3>${project.title}</h3>
             <p class="project-description">${project.summary}</p>
-            <div class="project-footer">
-                <div>
-                    <div class="project-meta">${project.className}</div>
-                    <div class="project-path">${project.external ? "External activity link" : project.href}</div>
-                </div>
-                <span class="project-link">${project.linkLabel || "Open activity"}</span>
-            </div>
         </div>
     `;
 
@@ -1095,13 +1103,6 @@ function createLabProjectCard(project) {
             </div>
             <h3>${project.title}</h3>
             <p class="project-description">${project.summary}</p>
-            <div class="project-footer">
-                <div>
-                    <div class="project-meta">${project.className}</div>
-                    <div class="project-path">${project.href}</div>
-                </div>
-                <span class="project-link">Open project</span>
-            </div>
         </div>
     `;
 
