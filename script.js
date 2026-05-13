@@ -239,8 +239,16 @@ const baseLabProjects = [
     }
 ];
 
+
 let projects = [...baseProjects];
 let labProjects = [...baseLabProjects];
+
+// Dynamically load backend activities and refresh library
+async function refreshActivitiesLibrary() {
+    const sharedProjects = await loadSharedProjects();
+    projects = mergeProjects(sharedProjects);
+    renderLibrary();
+}
 
 function colorToPalette(colorName) {
     const palettes = {
@@ -624,11 +632,17 @@ function setPublicHomepageUiState(signedIn) {
     document.body.classList.toggle("public-home-access", !signedIn);
 }
 
-// Ensure public-home-access is set on page load
+
+// Ensure public-home-access and refresh library on page load
 document.addEventListener("DOMContentLoaded", function() {
     // If hubAuthState is not available yet, fallback to not signed in
     var signedIn = (typeof hubAuthState !== 'undefined' && hubAuthState.profile && hubAuthState.profile.email);
     setPublicHomepageUiState(!!signedIn);
+
+    // If on homepage and library grid exists, refresh activities from backend
+    if (isHomepagePath() && document.querySelector("#project-library-grid")) {
+        refreshActivitiesLibrary();
+    }
 });
 
 function normalizeEmail(value) {
