@@ -1308,13 +1308,8 @@ function renderStats() {
     const runningActivities = projects.filter((project) => project.showThisWeek).length;
     const runningLabProjects = labProjects.filter((project) => project.showThisWeek).length;
 
-    activeCount.textContent = runningActivities + runningLabProjects;
-    if (runningDetail) {
-        runningDetail.textContent = `Activities: ${runningActivities} | Projects: ${runningLabProjects}`;
-    }
-
-    totalCount.textContent = projects.length;
-    categoryCount.textContent = labProjects.length;
+    totalCount.textContent = runningActivities;
+    categoryCount.textContent = runningLabProjects;
 }
 
 function bindControls() {
