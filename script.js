@@ -463,6 +463,7 @@ const totalCount = document.querySelector("#stat-total-count");
 const categoryCount = document.querySelector("#stat-category-count");
 const hubStaffLink = document.querySelector("#hub-staff-link");
 const hubAdminLink = document.querySelector("#hub-admin-link");
+const hubAccessBadge = document.querySelector("#hub-access-badge");
 const hubSignInButton = document.querySelector("#hub-google-signin");
 const hubSignOutButton = document.querySelector("#hub-google-signout");
 const hubUserBadge = document.querySelector("#hub-user-badge");
@@ -474,6 +475,10 @@ const hubProfileDisplayName = document.querySelector("#hub-profile-display-name"
 const hubProfileDisplayEmail = document.querySelector("#hub-profile-display-email");
 const hubProfileDomain = document.querySelector("#hub-profile-domain");
 const hubProfileClose = document.querySelector("#hub-profile-close");
+
+function normalizeEmail(value) {
+    return String(value || "").trim().toLowerCase();
+}
 
 function getHubDisplayName(profile) {
     if (!profile) return "";
@@ -625,6 +630,21 @@ function renderHubAuthUi() {
     const canTeacherView = signedIn && hubAccessState.canTeacherView;
     const canAdmin = signedIn && hubAccessState.canAdmin;
 
+    let badgeLabel = "";
+    let badgeClass = "";
+    if (signedIn) {
+        if (canAdmin) {
+            badgeLabel = "Admin";
+            badgeClass = "badge-admin";
+        } else if (canTeacherView) {
+            badgeLabel = "Staff";
+            badgeClass = "badge-staff";
+        } else {
+            badgeLabel = "Student";
+            badgeClass = "badge-student";
+        }
+    }
+
     if (hubSignInButton) {
         hubSignInButton.hidden = signedIn;
     }
@@ -641,6 +661,11 @@ function renderHubAuthUi() {
     }
     if (hubAdminLink) {
         hubAdminLink.hidden = !canAdmin;
+    }
+    if (hubAccessBadge) {
+        hubAccessBadge.hidden = !signedIn;
+        hubAccessBadge.textContent = badgeLabel;
+        hubAccessBadge.className = badgeClass ? `hub-access-badge ${badgeClass}` : "hub-access-badge";
     }
 
     if (!signedIn) {

@@ -97,6 +97,36 @@ a {
     gap: 6px;
 }
 
+.hub-access-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.hub-access-badge.badge-student {
+    background: rgba(40, 146, 72, 0.28);
+    border-color: rgba(148, 255, 180, 0.65);
+}
+
+.hub-access-badge.badge-staff {
+    background: rgba(51, 94, 197, 0.28);
+    border-color: rgba(157, 186, 255, 0.65);
+}
+
+.hub-access-badge.badge-admin {
+    background: rgba(164, 95, 18, 0.35);
+    border-color: rgba(255, 223, 151, 0.75);
+}
+
 .utility-actions [hidden] {
     display: none !important;
 }
