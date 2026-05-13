@@ -202,8 +202,100 @@ function getStudentFormClass(row) {
   return String(row.form_class || row.formclass || "").trim();
 }
 
+function normalizeEmailValue(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function sanitizeLocalPart(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9._-]+/g, ".")
+    .replace(/\.{2,}/g, ".")
+    .replace(/^\.|\.$/g, "");
+}
+
+function getStudentDomain() {
+  return hubAllowedDomain || "westlandhigh.school.nz";
+}
+
+function splitStudentName(row) {
+  const raw = getStudentDisplayName(row);
+  if (!raw) {
+    return { firstName: "", lastName: "" };
+  }
+
+  if (raw.includes(",")) {
+    const [last, first] = raw.split(",", 2).map((part) => String(part || "").trim());
+    return { firstName: first || "", lastName: last || "" };
+  }
+
+  const parts = raw.split(/\s+/).filter(Boolean);
+  if (!parts.length) {
+    return { firstName: "", lastName: "" };
+  }
+
+  return {
+    firstName: parts[0],
+    lastName: parts.length > 1 ? parts[parts.length - 1] : ""
+  };
+}
+
+function getStudentEmailInfo(row) {
+  const directCandidates = [
+    row.email_school,
+    row.student_email,
+    row.email,
+    row.user_email,
+    row.email_address,
+    row.school_email,
+    row.google_email,
+    row.student_google_email,
+    row.student_mail,
+    row.mail
+  ];
+
+  for (const candidate of directCandidates) {
+    const value = normalizeEmailValue(candidate);
+    if (value && value.includes("@")) {
+      return { email: value, source: "exact" };
+    }
+  }
+
+  const usernameCandidates = [
+    row.username,
+    row.user_name,
+    row.student_username,
+    row.login,
+    row.student_login,
+    row.upn
+  ];
+
+  for (const candidate of usernameCandidates) {
+    const value = normalizeEmailValue(candidate);
+    if (!value) continue;
+    if (value.includes("@")) {
+      return { email: value, source: "exact" };
+    }
+    const localPart = sanitizeLocalPart(value);
+    if (localPart) {
+      return { email: `${localPart}@${getStudentDomain()}`, source: "guess" };
+    }
+  }
+
+  const { firstName, lastName } = splitStudentName(row);
+  const localPart = sanitizeLocalPart([firstName, lastName].filter(Boolean).join("."));
+  if (localPart) {
+    return { email: `${localPart}@${getStudentDomain()}`, source: "guess" };
+  }
+
+  return { email: "", source: "none" };
+}
+
 function getStudentEmail(row) {
-  return String(row.email_school || row.student_email || row.email || row.user_email || "").trim().toLowerCase();
+  return getStudentEmailInfo(row).email;
 }
 
 function getStudentKey(row) {
@@ -244,7 +336,8 @@ function populateRoleFormFromStudent(row) {
   const displayName = getStudentDisplayName(row);
   const idNumber = getStudentIdNumber(row);
   const formClass = getStudentFormClass(row);
-  const email = getStudentEmail(row);
+  const emailInfo = getStudentEmailInfo(row);
+  const email = emailInfo.email;
 
   if (userEmailField) userEmailField.value = email || "";
   if (userTypeField) userTypeField.value = "Student";
@@ -261,8 +354,15 @@ function populateRoleFormFromStudent(row) {
     staffList.querySelectorAll(".staff-chip").forEach((chip) => chip.classList.remove("is-selected"));
   }
 
-  if (email) {
+  if (emailInfo.source === "exact") {
     setStatus(`Selected ${displayName}${idNumber ? ` (${idNumber})` : ""}. Choose an additional role to add.`);
+    return;
+  }
+
+  if (emailInfo.source === "guess") {
+    setStatus(
+      `Selected ${displayName}${idNumber ? ` (${idNumber})` : ""}. Suggested email loaded; please confirm it before adding a role.`
+    );
     return;
   }
 

@@ -294,7 +294,19 @@ async function getStudentDirectoryRows() {
     "upload_date",
     "email_school",
     "student_email",
-    "email"
+    "email",
+    "email_address",
+    "school_email",
+    "google_email",
+    "student_google_email",
+    "student_mail",
+    "mail",
+    "username",
+    "user_name",
+    "student_username",
+    "login",
+    "student_login",
+    "upn"
   ]);
 
   if (!availableColumns.length) {
