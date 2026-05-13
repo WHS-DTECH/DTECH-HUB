@@ -54,8 +54,7 @@
 
             <section class="upload-panel" aria-label="Upload activity form">
 
-                <form id="upload-activity-form" class="upload-form">
-                       <div id="upload-form-alert" class="upload-form-alert" hidden></div>
+                     <form id="upload-activity-form" class="upload-form">
                     <div class="form-grid">
                         <div class="field">
                             <label for="activity-name">Activity Name</label>
@@ -182,9 +181,8 @@
                     <div class="form-actions">
                         <button class="button-save" type="submit">Save Activity</button>
                         <button class="button-cancel" type="button" id="cancel-upload">Cancel</button>
+                        <p id="upload-status" class="upload-status" aria-live="polite" hidden></p>
                     </div>
-
-                    <p id="upload-status" class="upload-status" aria-live="polite"></p>
                     <pre id="export-preview" class="export-preview" hidden></pre>
                 </form>
             </section>

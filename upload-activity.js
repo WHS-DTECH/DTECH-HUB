@@ -1,7 +1,7 @@
 const form = document.querySelector("#upload-activity-form");
 const fileInput = document.querySelector("#outcome-image-file");
 const imageUrlInput = document.querySelector("#outcome-image-url");
-const formAlert = document.querySelector("#upload-form-alert");
+const uploadStatus = document.querySelector("#upload-status");
 const preview = document.querySelector("#export-preview");
 const cancelButton = document.querySelector("#cancel-upload");
 
@@ -20,23 +20,17 @@ function linesToArray(value) {
 }
 
 function setStatus(message, isError = false) {
-    if (!formAlert) return;
+    if (!uploadStatus) return;
     if (!message) {
-        formAlert.hidden = true;
-        formAlert.textContent = "";
+        uploadStatus.hidden = true;
+        uploadStatus.textContent = "";
+        uploadStatus.classList.remove("is-success", "is-error");
         return;
     }
-    formAlert.textContent = message;
-    formAlert.hidden = false;
-    if (isError) {
-        formAlert.style.backgroundColor = "#fee8e8";
-        formAlert.style.color = "#8b2323";
-        formAlert.style.borderColor = "#f5b9b9";
-    } else {
-        formAlert.style.backgroundColor = "#e8f5e9";
-        formAlert.style.color = "#2e7d32";
-        formAlert.style.borderColor = "#a5d6a7";
-    }
+    uploadStatus.textContent = message;
+    uploadStatus.hidden = false;
+    uploadStatus.classList.remove("is-success", "is-error");
+    uploadStatus.classList.add(isError ? "is-error" : "is-success");
 }
 
 async function fileToDataUrl(file) {
