@@ -451,7 +451,7 @@ a {
     width: min(1500px, calc(100% - 28px));
     margin: 0 auto;
     display: grid;
-    grid-template-columns: minmax(0, 1.38fr) minmax(360px, 1fr);
+    grid-template-columns: minmax(0, 1.35fr) minmax(340px, 1fr);
     gap: 18px;
     align-items: start;
 }
@@ -476,6 +476,8 @@ a {
 .home-grid .panel-section {
     width: auto;
     margin: 0;
+    position: relative;
+    overflow: hidden;
 }
 
 .section-heading {
@@ -563,14 +565,14 @@ a {
 
 .project-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 10px;
     margin-top: 10px;
     min-width: 0;
 }
 
 .projects-column .project-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 }
 
 .project-controls {
@@ -1411,5 +1413,15 @@ a {
 
     .admin-main-stack {
         order: 3;
+    }
+}
+
+@media (max-width: 1280px) {
+    .home-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .projects-column .project-grid {
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     }
 }
