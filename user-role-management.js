@@ -25,7 +25,7 @@ function getStaffCode(row) {
 }
 
 function getStaffType(row) {
-  return String(row.title || row.user_type || row.staff_type || "Staff").trim() || "Staff";
+  return String(row.primary_role || row.user_type || row.staff_type || row.title || "Staff").trim() || "Staff";
 }
 
 function populateRoleFormFromStaff(row) {

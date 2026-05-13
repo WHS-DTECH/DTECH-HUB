@@ -89,6 +89,11 @@ async function ensureSchema() {
     );
   `);
 
+  await pool.query(`ALTER TABLE user_additional_roles ADD COLUMN IF NOT EXISTS user_type TEXT`);
+  await pool.query(`ALTER TABLE user_additional_roles ADD COLUMN IF NOT EXISTS display_name TEXT`);
+  await pool.query(`ALTER TABLE user_additional_roles ADD COLUMN IF NOT EXISTS additional_role TEXT`);
+  await pool.query(`ALTER TABLE user_additional_roles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS role_permissions (
       role_name TEXT PRIMARY KEY,
@@ -100,6 +105,13 @@ async function ensureSchema() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
+
+  await pool.query(`ALTER TABLE role_permissions ADD COLUMN IF NOT EXISTS home_page BOOLEAN NOT NULL DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE role_permissions ADD COLUMN IF NOT EXISTS upload_activity BOOLEAN NOT NULL DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE role_permissions ADD COLUMN IF NOT EXISTS browse_activities BOOLEAN NOT NULL DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE role_permissions ADD COLUMN IF NOT EXISTS planning BOOLEAN NOT NULL DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE role_permissions ADD COLUMN IF NOT EXISTS admin BOOLEAN NOT NULL DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE role_permissions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 
   for (const row of DEFAULT_ROLE_PERMISSIONS) {
     await pool.query(
