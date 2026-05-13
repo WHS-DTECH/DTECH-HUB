@@ -121,9 +121,27 @@ const EXCLUDED_NON_DTECH_KEYWORDS = [
   "needlework"
 ];
 
+const EXCLUDED_NON_DTECH_ACTIVITY_IDS = new Set(["5", "12", "14"]);
+
+const EXCLUDED_NON_DTECH_ACTIVITY_TITLES = new Set([
+  "flat-felled seam practice",
+  "french seam cushion",
+  "invisible zip insertion"
+]);
+
 function isExcludedNonDtechActivity(record) {
   if (!record || typeof record !== "object") {
     return false;
+  }
+
+  const recordId = String(record.id || "").trim();
+  if (recordId && EXCLUDED_NON_DTECH_ACTIVITY_IDS.has(recordId)) {
+    return true;
+  }
+
+  const recordTitle = String(record.name || record.title || "").trim().toLowerCase();
+  if (recordTitle && EXCLUDED_NON_DTECH_ACTIVITY_TITLES.has(recordTitle)) {
+    return true;
   }
 
   const joined = [
