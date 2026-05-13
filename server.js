@@ -752,7 +752,7 @@ async function ensureSchema() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS activity_hub_visibility (
-      activity_id TEXT NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
+      activity_id TEXT NOT NULL,
       hub_name TEXT NOT NULL,
       is_visible BOOLEAN NOT NULL DEFAULT TRUE,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -1096,7 +1096,7 @@ app.get("/api/activities", async (_req, res) => {
         SELECT a.*
         FROM activities a
         LEFT JOIN activity_hub_visibility v
-          ON v.activity_id = a.id
+          ON v.activity_id = a.id::text
          AND v.hub_name = $1
         WHERE COALESCE(v.is_visible, TRUE) = TRUE
         ORDER BY a.created_at DESC
@@ -1127,7 +1127,7 @@ app.get("/api/activities/:id", async (req, res) => {
         SELECT a.*
         FROM activities a
         LEFT JOIN activity_hub_visibility v
-          ON v.activity_id = a.id
+          ON v.activity_id = a.id::text
          AND v.hub_name = $1
         WHERE a.id = $2
           AND COALESCE(v.is_visible, TRUE) = TRUE
