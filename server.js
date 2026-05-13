@@ -25,6 +25,7 @@ const pool = new Pool({
 const STAFF_TABLE_CANDIDATES = ["staff_upload", "upload_staff"];
 const STUDENT_TABLE_CANDIDATES = ["student_timetable"];
 const SCHOOL_EMAIL_DOMAIN = "westlandhigh.school.nz";
+const DTECH_HUB_NAME = "DTECH-HUB";
 const suggestionNotificationFallback = String(process.env.SUGGESTION_NOTIFY_EMAILS || "");
 const SMTP_HOST = String(process.env.SMTP_HOST || "").trim();
 const SMTP_PORT = Number.parseInt(process.env.SMTP_PORT || "", 10) || 587;
@@ -101,6 +102,92 @@ function normalizeArray(value) {
   }
 
   return [];
+}
+
+const EXCLUDED_NON_DTECH_KEYWORDS = [
+  "sewing",
+  "sew",
+  "stitch",
+  "cross stitch",
+  "embroidery",
+  "apron",
+  "buttonhole",
+  "bias binding",
+  "aida cloth",
+  "fabric",
+  "textiles",
+  "tassel",
+  "seam allowance",
+  "needlework"
+];
+
+function isExcludedNonDtechActivity(record) {
+  if (!record || typeof record !== "object") {
+    return false;
+  }
+
+  const joined = [
+    record.name,
+    record.title,
+    record.type,
+    record.activity_category,
+    record.description,
+    ...(Array.isArray(record.resources) ? record.resources : []),
+    ...(Array.isArray(record.equipment) ? record.equipment : []),
+    ...(Array.isArray(record.instructions) ? record.instructions : [])
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return EXCLUDED_NON_DTECH_KEYWORDS.some((keyword) => joined.includes(keyword));
+}
+
+function filterDtechActivities(rows) {
+  return (Array.isArray(rows) ? rows : []).filter((row) => !isExcludedNonDtechActivity(row));
+}
+
+async function upsertHubVisibility(activityIds, hubName, isVisible) {
+  if (!hasDatabase || !Array.isArray(activityIds) || !activityIds.length) {
+    return;
+  }
+
+  const ids = Array.from(new Set(activityIds.map((id) => String(id || "").trim()).filter(Boolean)));
+  if (!ids.length) {
+    return;
+  }
+
+  await pool.query(
+    `
+      INSERT INTO activity_hub_visibility (activity_id, hub_name, is_visible, updated_at)
+      SELECT id_value, $2, $3, NOW()
+      FROM UNNEST($1::text[]) AS ids(id_value)
+      ON CONFLICT (activity_id, hub_name) DO UPDATE
+      SET is_visible = EXCLUDED.is_visible,
+          updated_at = NOW()
+    `,
+    [ids, hubName, Boolean(isVisible)]
+  );
+}
+
+async function syncDtechExcludedActivitiesVisibility() {
+  if (!hasDatabase) {
+    return;
+  }
+
+  const result = await pool.query(`
+    SELECT id, name, year_level, type, activity_category, description, resources, equipment, instructions
+    FROM activities
+  `);
+
+  const excludedIds = result.rows
+    .filter((row) => isExcludedNonDtechActivity(row))
+    .map((row) => row.id);
+
+  if (!excludedIds.length) {
+    return;
+  }
+
+  await upsertHubVisibility(excludedIds, DTECH_HUB_NAME, false);
 }
 
 function normalizeEmail(value) {
@@ -664,6 +751,16 @@ async function ensureSchema() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS activity_hub_visibility (
+      activity_id TEXT NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
+      hub_name TEXT NOT NULL,
+      is_visible BOOLEAN NOT NULL DEFAULT TRUE,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (activity_id, hub_name)
+    );
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS user_additional_roles (
       user_email TEXT PRIMARY KEY,
       user_type TEXT NOT NULL,
@@ -986,7 +1083,7 @@ app.get("/api/health", (_req, res) => {
 
 app.get("/api/activities", async (_req, res) => {
   if (!hasDatabase) {
-    const rows = Array.from(memoryActivities.values()).sort((left, right) => {
+    const rows = filterDtechActivities(Array.from(memoryActivities.values())).sort((left, right) => {
       return new Date(right.created_at) - new Date(left.created_at);
     });
     res.json(rows);
@@ -994,8 +1091,19 @@ app.get("/api/activities", async (_req, res) => {
   }
 
   try {
-    const result = await pool.query("SELECT * FROM activities ORDER BY created_at DESC");
-    res.json(result.rows);
+    const result = await pool.query(
+      `
+        SELECT a.*
+        FROM activities a
+        LEFT JOIN activity_hub_visibility v
+          ON v.activity_id = a.id
+         AND v.hub_name = $1
+        WHERE COALESCE(v.is_visible, TRUE) = TRUE
+        ORDER BY a.created_at DESC
+      `,
+      [DTECH_HUB_NAME]
+    );
+    res.json(filterDtechActivities(result.rows));
   } catch (error) {
     res.status(500).json({ error: "Could not load activities" });
   }
@@ -1004,7 +1112,7 @@ app.get("/api/activities", async (_req, res) => {
 app.get("/api/activities/:id", async (req, res) => {
   if (!hasDatabase) {
     const found = memoryActivities.get(req.params.id);
-    if (!found) {
+    if (!found || isExcludedNonDtechActivity(found)) {
       res.status(404).json({ error: "Not found" });
       return;
     }
@@ -1014,8 +1122,20 @@ app.get("/api/activities/:id", async (req, res) => {
   }
 
   try {
-    const result = await pool.query("SELECT * FROM activities WHERE id = $1 LIMIT 1", [req.params.id]);
-    if (!result.rows.length) {
+    const result = await pool.query(
+      `
+        SELECT a.*
+        FROM activities a
+        LEFT JOIN activity_hub_visibility v
+          ON v.activity_id = a.id
+         AND v.hub_name = $1
+        WHERE a.id = $2
+          AND COALESCE(v.is_visible, TRUE) = TRUE
+        LIMIT 1
+      `,
+      [DTECH_HUB_NAME, req.params.id]
+    );
+    if (!result.rows.length || isExcludedNonDtechActivity(result.rows[0])) {
       res.status(404).json({ error: "Not found" });
       return;
     }
@@ -1060,6 +1180,11 @@ app.post("/api/activities", async (req, res) => {
     created_at: String(body.created_at || new Date().toISOString()),
     updated_at: new Date().toISOString()
   };
+
+  if (isExcludedNonDtechActivity(payload)) {
+    res.status(400).send("This app only accepts DTECH activities/projects. Sewing Hub content is blocked.");
+    return;
+  }
 
   if (!hasDatabase) {
     memoryActivities.set(payload.id, payload);
@@ -1123,6 +1248,8 @@ app.post("/api/activities", async (req, res) => {
         payload.term
       ]
     );
+
+    await upsertHubVisibility([result.rows[0].id], DTECH_HUB_NAME, true);
 
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -2066,6 +2193,7 @@ app.get("*", (_req, res) => {
 });
 
 ensureSchema()
+  .then(() => syncDtechExcludedActivitiesVisibility())
   .then(() => {
     app.listen(PORT, () => {
       console.log(`DTECH-HUB running on port ${PORT}`);
