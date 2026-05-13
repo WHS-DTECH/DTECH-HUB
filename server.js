@@ -813,27 +813,49 @@ app.post("/api/admin/user-roles", async (req, res) => {
     return;
   }
 
+  const client = await pool.connect();
   try {
-    const result = await pool.query(
+    await client.query("BEGIN");
+
+    const updateResult = await client.query(
       `
-        INSERT INTO user_additional_roles (
-          user_type, user_email, display_name, additional_role, updated_at
-        ) VALUES (
-          $1, $2, $3, $4, NOW()
-        )
-        ON CONFLICT (user_email) DO UPDATE SET
-          user_type = EXCLUDED.user_type,
-          display_name = EXCLUDED.display_name,
-          additional_role = EXCLUDED.additional_role,
-          updated_at = NOW()
+        UPDATE user_additional_roles
+        SET user_type = $2,
+            display_name = $3,
+            additional_role = $4,
+            updated_at = NOW()
+        WHERE LOWER(user_email) = LOWER($1)
         RETURNING user_type, user_email, display_name, additional_role
       `,
-      [userType, userEmail, displayName, additionalRole]
+      [userEmail, userType, displayName, additionalRole]
     );
 
-    res.status(201).json(result.rows[0]);
+    let savedRow = updateResult.rows[0];
+
+    if (!savedRow) {
+      const insertResult = await client.query(
+        `
+          INSERT INTO user_additional_roles (
+            user_type, user_email, display_name, additional_role, updated_at
+          ) VALUES (
+            $1, $2, $3, $4, NOW()
+          )
+          RETURNING user_type, user_email, display_name, additional_role
+        `,
+        [userType, userEmail, displayName, additionalRole]
+      );
+
+      savedRow = insertResult.rows[0];
+    }
+
+    await client.query("COMMIT");
+
+    res.status(201).json(savedRow);
   } catch (_error) {
+    await client.query("ROLLBACK");
     res.status(500).send("Could not save user role");
+  } finally {
+    client.release();
   }
 });
 
