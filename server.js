@@ -16,6 +16,8 @@ const pool = new Pool({
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
+const STAFF_TABLE_CANDIDATES = ["staff_upload", "upload_staff"];
+
 const DEFAULT_ROLE_PERMISSIONS = [
   { role_name: "Admin", home_page: true, upload_activity: true, browse_activities: true, planning: true, admin: true },
   { role_name: "Lead Teacher", home_page: true, upload_activity: true, browse_activities: true, planning: true, admin: false },
@@ -157,7 +159,8 @@ async function getStaffDirectoryRows() {
   }
 
   try {
-    const availableColumns = await getExistingTableColumns("upload_staff", [
+    const staffTableName = await resolveStaffTableName();
+    const availableColumns = await getExistingTableColumns(staffTableName, [
       "id",
       "code",
       "last_name",
@@ -173,7 +176,7 @@ async function getStaffDirectoryRows() {
 
     if (availableColumns.length) {
       const result = await pool.query(
-        `SELECT ${availableColumns.join(", ")} FROM upload_staff${buildOrderByClause(availableColumns)}`
+        `SELECT ${availableColumns.join(", ")} FROM ${staffTableName}${buildOrderByClause(availableColumns)}`
       );
 
       if (result.rows.length) {
@@ -199,6 +202,21 @@ async function getExistingTableColumns(tableName, candidateColumns) {
 
   const available = new Set(result.rows.map((row) => String(row.column_name || "").toLowerCase()));
   return candidateColumns.filter((columnName) => available.has(String(columnName).toLowerCase()));
+}
+
+async function resolveStaffTableName() {
+  const result = await pool.query(
+    `
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+        AND table_name = ANY($1::text[])
+    `,
+    [STAFF_TABLE_CANDIDATES]
+  );
+
+  const availableTables = new Set(result.rows.map((row) => String(row.table_name || "").toLowerCase()));
+  return STAFF_TABLE_CANDIDATES.find((tableName) => availableTables.has(tableName)) || "staff_upload";
 }
 
 function buildOrderByClause(availableColumns) {
@@ -255,7 +273,7 @@ async function ensureSchema() {
   await pool.query(`ALTER TABLE user_additional_roles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS upload_staff (
+    CREATE TABLE IF NOT EXISTS staff_upload (
       id BIGSERIAL PRIMARY KEY,
       code TEXT,
       last_name TEXT,
@@ -271,17 +289,17 @@ async function ensureSchema() {
     );
   `);
 
-  await pool.query(`ALTER TABLE upload_staff ADD COLUMN IF NOT EXISTS code TEXT`);
-  await pool.query(`ALTER TABLE upload_staff ADD COLUMN IF NOT EXISTS last_name TEXT`);
-  await pool.query(`ALTER TABLE upload_staff ADD COLUMN IF NOT EXISTS first_name TEXT`);
-  await pool.query(`ALTER TABLE upload_staff ADD COLUMN IF NOT EXISTS title TEXT`);
-  await pool.query(`ALTER TABLE upload_staff ADD COLUMN IF NOT EXISTS email_school TEXT`);
-  await pool.query(`ALTER TABLE upload_staff ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'Current'`);
-  await pool.query(`ALTER TABLE upload_staff ADD COLUMN IF NOT EXISTS primary_role TEXT NOT NULL DEFAULT 'Staff'`);
-  await pool.query(`ALTER TABLE upload_staff ADD COLUMN IF NOT EXISTS upload_year INTEGER`);
-  await pool.query(`ALTER TABLE upload_staff ADD COLUMN IF NOT EXISTS upload_term TEXT`);
-  await pool.query(`ALTER TABLE upload_staff ADD COLUMN IF NOT EXISTS upload_date TEXT`);
-  await pool.query(`ALTER TABLE upload_staff ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await pool.query(`ALTER TABLE staff_upload ADD COLUMN IF NOT EXISTS code TEXT`);
+  await pool.query(`ALTER TABLE staff_upload ADD COLUMN IF NOT EXISTS last_name TEXT`);
+  await pool.query(`ALTER TABLE staff_upload ADD COLUMN IF NOT EXISTS first_name TEXT`);
+  await pool.query(`ALTER TABLE staff_upload ADD COLUMN IF NOT EXISTS title TEXT`);
+  await pool.query(`ALTER TABLE staff_upload ADD COLUMN IF NOT EXISTS email_school TEXT`);
+  await pool.query(`ALTER TABLE staff_upload ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'Current'`);
+  await pool.query(`ALTER TABLE staff_upload ADD COLUMN IF NOT EXISTS primary_role TEXT NOT NULL DEFAULT 'Staff'`);
+  await pool.query(`ALTER TABLE staff_upload ADD COLUMN IF NOT EXISTS upload_year INTEGER`);
+  await pool.query(`ALTER TABLE staff_upload ADD COLUMN IF NOT EXISTS upload_term TEXT`);
+  await pool.query(`ALTER TABLE staff_upload ADD COLUMN IF NOT EXISTS upload_date TEXT`);
+  await pool.query(`ALTER TABLE staff_upload ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS role_permissions (
@@ -558,20 +576,21 @@ app.post("/api/staff_upload", async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    const staffTableName = await resolveStaffTableName();
 
     let inserted = 0;
     let updated = 0;
 
     for (const row of normalizedRows) {
       const existing = await client.query(
-        `SELECT id FROM upload_staff WHERE LOWER(email_school) = LOWER($1) LIMIT 1`,
+        `SELECT id FROM ${staffTableName} WHERE LOWER(email_school) = LOWER($1) LIMIT 1`,
         [row.email_school]
       );
 
       if (existing.rows.length) {
         await client.query(
           `
-            UPDATE upload_staff
+            UPDATE ${staffTableName}
             SET code = $2,
                 last_name = $3,
                 first_name = $4,
@@ -601,7 +620,7 @@ app.post("/api/staff_upload", async (req, res) => {
       } else {
         await client.query(
           `
-            INSERT INTO upload_staff (
+            INSERT INTO ${staffTableName} (
               code, last_name, first_name, title, email_school, status,
               primary_role, upload_year, upload_term, upload_date, updated_at
             ) VALUES (
@@ -629,7 +648,7 @@ app.post("/api/staff_upload", async (req, res) => {
     const currentEmails = normalizedRows.map((row) => row.email_school);
     const markNotCurrentResult = await client.query(
       `
-        UPDATE upload_staff
+        UPDATE ${staffTableName}
         SET status = 'Not Current', updated_at = NOW()
         WHERE COALESCE(email_school, '') <> ''
           AND LOWER(email_school) <> ALL($1::text[])
