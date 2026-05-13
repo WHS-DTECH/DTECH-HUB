@@ -25,6 +25,7 @@ const DEFAULT_ROLE_PERMISSIONS = [
   { role_name: "Public Access", home_page: true, upload_activity: false, browse_activities: false, planning: false, admin: false },
   { role_name: "Staff", home_page: true, upload_activity: false, browse_activities: true, planning: false, admin: false },
   { role_name: "Student", home_page: true, upload_activity: false, browse_activities: true, planning: false, admin: false },
+  { role_name: "Student Admin", home_page: true, upload_activity: false, browse_activities: true, planning: true, admin: true },
   { role_name: "Teacher", home_page: true, upload_activity: false, browse_activities: true, planning: false, admin: false },
   { role_name: "Technician", home_page: true, upload_activity: false, browse_activities: true, planning: false, admin: false }
 ];
@@ -37,6 +38,7 @@ const ROLE_NAME_ALIASES = new Map([
   ["publicaccess", "Public Access"],
   ["staff", "Staff"],
   ["student", "Student"],
+  ["studentadmin", "Student Admin"],
   ["teacher", "Teacher"],
   ["technician", "Technician"]
 ]);
