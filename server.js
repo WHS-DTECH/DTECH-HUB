@@ -817,32 +817,91 @@ app.post("/api/admin/user-roles", async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    const updateResult = await client.query(
-      `
-        UPDATE user_additional_roles
-        SET user_type = $2,
-            display_name = $3,
-            additional_role = $4,
-            updated_at = NOW()
-        WHERE LOWER(user_email) = LOWER($1)
-        RETURNING user_type, user_email, display_name, additional_role
-      `,
-      [userEmail, userType, displayName, additionalRole]
-    );
+    const availableColumns = await getExistingTableColumns("user_additional_roles", [
+      "user_email",
+      "user_type",
+      "display_name",
+      "additional_role",
+      "updated_at"
+    ]);
+
+    if (!availableColumns.includes("user_email")) {
+      throw new Error("Missing user_email column");
+    }
+
+    const updateAssignments = [];
+    const updateValues = [userEmail];
+
+    if (availableColumns.includes("user_type")) {
+      updateAssignments.push(`user_type = $${updateValues.length + 1}`);
+      updateValues.push(userType);
+    }
+    if (availableColumns.includes("display_name")) {
+      updateAssignments.push(`display_name = $${updateValues.length + 1}`);
+      updateValues.push(displayName);
+    }
+    if (availableColumns.includes("additional_role")) {
+      updateAssignments.push(`additional_role = $${updateValues.length + 1}`);
+      updateValues.push(additionalRole);
+    }
+    if (availableColumns.includes("updated_at")) {
+      updateAssignments.push("updated_at = NOW()");
+    }
+
+    const returnColumns = [
+      availableColumns.includes("user_type") ? "user_type" : `'Staff' AS user_type`,
+      "user_email",
+      availableColumns.includes("display_name") ? "display_name" : `'' AS display_name`,
+      availableColumns.includes("additional_role") ? "additional_role" : `'' AS additional_role`
+    ];
+
+    const updateResult = updateAssignments.length
+      ? await client.query(
+          `
+            UPDATE user_additional_roles
+            SET ${updateAssignments.join(", ")}
+            WHERE LOWER(user_email) = LOWER($1)
+            RETURNING ${returnColumns.join(", ")}
+          `,
+          updateValues
+        )
+      : { rows: [] };
 
     let savedRow = updateResult.rows[0];
 
     if (!savedRow) {
+      const insertColumns = ["user_email"];
+      const insertValues = [userEmail];
+
+      if (availableColumns.includes("user_type")) {
+        insertColumns.push("user_type");
+        insertValues.push(userType);
+      }
+      if (availableColumns.includes("display_name")) {
+        insertColumns.push("display_name");
+        insertValues.push(displayName);
+      }
+      if (availableColumns.includes("additional_role")) {
+        insertColumns.push("additional_role");
+        insertValues.push(additionalRole);
+      }
+
+      const valuePlaceholders = insertValues.map((_, index) => `$${index + 1}`);
+      if (availableColumns.includes("updated_at")) {
+        insertColumns.push("updated_at");
+        valuePlaceholders.push("NOW()");
+      }
+
       const insertResult = await client.query(
         `
           INSERT INTO user_additional_roles (
-            user_type, user_email, display_name, additional_role, updated_at
+            ${insertColumns.join(", ")}
           ) VALUES (
-            $1, $2, $3, $4, NOW()
+            ${valuePlaceholders.join(", ")}
           )
-          RETURNING user_type, user_email, display_name, additional_role
+          RETURNING ${returnColumns.join(", ")}
         `,
-        [userType, userEmail, displayName, additionalRole]
+        insertValues
       );
 
       savedRow = insertResult.rows[0];
