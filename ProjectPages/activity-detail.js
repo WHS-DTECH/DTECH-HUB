@@ -86,6 +86,10 @@ const DETAIL_DATA = {
 };
 
 const DETAIL_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
+const detailAllowedDomain =
+    (document.querySelector('meta[name="hub-google-allowed-domain"]')?.content || "")
+        .trim()
+        .toLowerCase();
 
 function escapeHtml(value) {
     return String(value || "")
@@ -123,6 +127,25 @@ function readStoredHubEmail() {
         return String(parsed?.profile?.email || "").trim().toLowerCase();
     } catch (_error) {
         return "";
+    }
+}
+
+function hasDetailPageAccess() {
+    const raw = localStorage.getItem(DETAIL_HUB_AUTH_STORAGE_KEY) || sessionStorage.getItem(DETAIL_HUB_AUTH_STORAGE_KEY);
+    if (!raw) return false;
+
+    try {
+        const parsed = JSON.parse(raw);
+        if (!parsed?.accessToken || !parsed?.expiresAt || Number(parsed.expiresAt) <= Date.now()) {
+            return false;
+        }
+
+        const email = String(parsed?.profile?.email || "").trim().toLowerCase();
+        if (!email) return false;
+        if (!detailAllowedDomain) return true;
+        return email.endsWith(`@${detailAllowedDomain}`);
+    } catch (_error) {
+        return false;
     }
 }
 
@@ -430,6 +453,11 @@ function renderEditForm(host, id, data) {
 }
 
 async function initDetail() {
+    if (!hasDetailPageAccess()) {
+        window.location.replace("../index.html");
+        return;
+    }
+
     const root = document.querySelector("[data-activity-id]");
     const queryRoot = document.querySelector(".page");
     const host = root || queryRoot;

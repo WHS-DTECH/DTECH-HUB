@@ -579,6 +579,37 @@ function getHubDisplayName(profile) {
     return String(profile.name || profile.given_name || profile.email || "").trim();
 }
 
+function hasAllowedSignedInHubAccount() {
+    const email = normalizeEmail(hubAuthState.profile?.email || "");
+    if (!email) {
+        return false;
+    }
+
+    if (!hubAllowedDomain) {
+        return true;
+    }
+
+    return email.endsWith(`@${hubAllowedDomain}`);
+}
+
+function enforceDetailAccess(event) {
+    if (hasAllowedSignedInHubAccount()) {
+        return false;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (hubAuthState.tokenClient) {
+        alert("Please sign in with your Westland High account to open details.");
+        hubAuthState.tokenClient.requestAccessToken({ prompt: "consent" });
+    } else {
+        alert("Please sign in with your Westland High account to open details.");
+    }
+
+    return true;
+}
+
 function getHubUserInitials(profile) {
     const name = getHubDisplayName(profile);
     if (!name) return "--";
@@ -968,6 +999,10 @@ function createProjectCard(project) {
     card.rel = project.external ? "noreferrer" : "";
     card.setAttribute("aria-label", `Open ${project.title}`);
 
+    card.addEventListener("click", (event) => {
+        enforceDetailAccess(event);
+    });
+
     card.innerHTML = `
         <div class="project-visual" style="background: ${project.visual.palette};">
             <span class="visual-label">
@@ -1003,6 +1038,10 @@ function createLabProjectCard(project) {
     card.target = project.external ? "_blank" : "_self";
     card.rel = project.external ? "noreferrer" : "";
     card.setAttribute("aria-label", `Open ${project.title}`);
+
+    card.addEventListener("click", (event) => {
+        enforceDetailAccess(event);
+    });
 
     card.innerHTML = `
         <div class="project-visual" style="background: ${project.visual.palette};">
