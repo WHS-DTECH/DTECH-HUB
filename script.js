@@ -1193,6 +1193,27 @@ function bindLabProjectControls() {
 }
 
 async function init() {
+    const hasDashboardLayout = Boolean(
+        (currentWeekGrid || currentProjectGrid || currentLabProjectGrid) &&
+        libraryGrid &&
+        labProjectLibraryGrid &&
+        searchInput &&
+        sortSelect &&
+        yearSelect &&
+        typeSelect &&
+        categorySelect &&
+        labProjectSearchInput &&
+        labProjectSortSelect &&
+        activeCount &&
+        totalCount &&
+        categoryCount
+    );
+
+    if (!hasDashboardLayout) {
+        initHubGoogleAuth();
+        return;
+    }
+
     const sharedProjects = await loadSharedProjects();
     projects = mergeProjects(sharedProjects);
     labProjects = [...baseLabProjects];

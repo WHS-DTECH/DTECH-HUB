@@ -131,7 +131,7 @@ function renderHubAuthState() {
   if (hubRoleAuthNote) {
     hubRoleAuthNote.textContent = isSignedIn
       ? `Google account loaded: ${activeHubProfile.email}. You can use it directly in the form or staff picker.`
-      : "Sign in on the Home page to load your Google account into this admin tool.";
+      : "Sign in with Google to load your account into this admin tool.";
   }
 
   if (hubSignOutButton) {
