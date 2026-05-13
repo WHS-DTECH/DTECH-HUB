@@ -801,13 +801,26 @@ function loadHubAuthState() {
 
     try {
         const parsed = JSON.parse(raw);
-        if (!parsed.accessToken || !parsed.expiresAt || parsed.expiresAt <= Date.now()) {
-            clearHubStoredAuthRaw();
+        const hasProfile = Boolean(parsed.profile?.email);
+        const tokenIsValid = Boolean(parsed.accessToken && parsed.expiresAt && parsed.expiresAt > Date.now());
+
+        if (tokenIsValid) {
+            hubAuthState.accessToken = parsed.accessToken;
+            hubAuthState.expiresAt = parsed.expiresAt;
+            hubAuthState.profile = parsed.profile || null;
             return;
         }
-        hubAuthState.accessToken = parsed.accessToken;
-        hubAuthState.expiresAt = parsed.expiresAt;
-        hubAuthState.profile = parsed.profile || null;
+
+        if (hasProfile) {
+            // Keep profile state across pages even when the Google token has expired.
+            hubAuthState.accessToken = null;
+            hubAuthState.expiresAt = 0;
+            hubAuthState.profile = parsed.profile;
+            saveHubAuthState();
+            return;
+        }
+
+        clearHubStoredAuthRaw();
     } catch (_error) {
         clearHubStoredAuthRaw();
     }
