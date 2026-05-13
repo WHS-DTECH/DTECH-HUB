@@ -105,6 +105,36 @@
 
         <main class="home-grid single-column">
             <div class="hub-column activities-column">
+                <!-- Featured Showcase Section for Public Visitors -->
+                <section id="featured-showcase" class="panel-section featured-showcase">
+                    <div class="section-heading featured-heading">
+                        <div>
+                            <p class="section-kicker">Featured This Week</p>
+                            <h2>Spotlight on our top activities</h2>
+                        </div>
+                        <p class="section-copy">
+                            Discover engaging practical activities across programming, design, robotics, and more.
+                        </p>
+                    </div>
+
+                    <div class="featured-carousel-container">
+                        <div id="featured-carousel" class="featured-carousel" aria-live="polite" role="region" aria-label="Featured activities carousel"></div>
+                        <div class="carousel-controls">
+                            <button id="carousel-prev" class="carousel-btn carousel-prev" aria-label="Previous featured activity">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="15 18 9 12 15 6"></polyline>
+                                </svg>
+                            </button>
+                            <button id="carousel-next" class="carousel-btn carousel-next" aria-label="Next featured activity">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                            </button>
+                        </div>
+                        <div id="carousel-indicators" class="carousel-indicators" role="tablist"></div>
+                    </div>
+                </section>
+
                 <section id="current-week" class="panel-section current-work">
                     <div class="section-heading">
                         <div>
@@ -132,41 +162,37 @@
                     </div>
 
                     <div class="controls-panel" role="search">
-                        <label class="control-field search-field" for="project-search">
-                            <span>Search</span>
-                            <input id="project-search" type="search" placeholder="Search activities or projects (e.g., zip, app, robotics)">
-                        </label>
+                        <div class="search-field-large">
+                            <label for="project-search" class="search-label">Search by title or keyword</label>
+                            <input id="project-search" type="search" placeholder="e.g., Python, robotics, web design, AI...">
+                        </div>
 
-                        <label class="control-field" for="year-filter">
-                            <span>Year Level</span>
-                            <select id="year-filter">
-                                <option value="All">All levels</option>
-                            </select>
-                        </label>
+                        <div class="filters-section">
+                            <div class="filter-group">
+                                <span class="filter-group-label">Year Level</span>
+                                <div id="year-filter-pills" class="filter-pills" role="group" aria-label="Filter by year level"></div>
+                            </div>
 
-                        <label class="control-field" for="type-filter">
-                            <span>Type</span>
-                            <select id="type-filter">
-                                <option value="All">All types</option>
-                            </select>
-                        </label>
+                            <div class="filter-group">
+                                <span class="filter-group-label">Type</span>
+                                <div id="type-filter-pills" class="filter-pills" role="group" aria-label="Filter by type"></div>
+                            </div>
 
-                        <label class="control-field" for="category-filter">
-                            <span>Activity Category</span>
-                            <select id="category-filter">
-                                <option value="All">All items</option>
-                            </select>
-                        </label>
+                            <div class="filter-group">
+                                <span class="filter-group-label">Category</span>
+                                <div id="category-filter-pills" class="filter-pills" role="group" aria-label="Filter by category"></div>
+                            </div>
 
-                        <label class="control-field sort-field" for="sort-order">
-                            <span>Sort</span>
-                            <select id="sort-order">
-                                <option value="name-asc">Name (A-Z)</option>
-                                <option value="name-desc">Name (Z-A)</option>
-                                <option value="status">Session Status</option>
-                                <option value="recent">Most recent</option>
-                            </select>
-                        </label>
+                            <div class="filter-group sort-group">
+                                <span class="filter-group-label">Sort by</span>
+                                <select id="sort-order" aria-label="Sort results">
+                                    <option value="name-asc">Name (A-Z)</option>
+                                    <option value="name-desc">Name (Z-A)</option>
+                                    <option value="status">Session Status</option>
+                                    <option value="recent">Most recent</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                     <div id="project-library-grid" class="project-grid" aria-live="polite"></div>
                 </section>

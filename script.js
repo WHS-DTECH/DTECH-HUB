@@ -1164,25 +1164,31 @@ function createProjectCard(project) {
     
     // Use image if available, otherwise use gradient background
     const hasImage = project.imageUrl && project.imageUrl.trim().length > 0;
+    const visualStyle = hasImage ? "" : `style="background: ${project.visual.palette};"`;
     const visualContent = hasImage
         ? `<img src="${escapeHtml(project.imageUrl)}" alt="${escapeHtml(project.title)}" class="project-image" loading="lazy">`
-        : `<span class="visual-label">
-                <span class="visual-mark">${project.visual.icon}</span>
-                ${project.visual.label}
-            </span>`;
+        : `<span class="visual-mark">${project.visual.icon}</span>`;
 
-    const visualStyle = hasImage ? "" : `style="background: ${project.visual.palette};"`;
+    const statusBadge = project.status 
+        ? `<span class="project-tag status-tag status-${project.status}">${formatStatus(project.status)}</span>` 
+        : '';
 
     card.innerHTML = `
         <div class="project-visual" ${visualStyle}>
             ${visualContent}
         </div>
         <div class="project-body">
-            <h3>${escapeHtml(project.title)}</h3>
+            <div class="project-header">
+                <h3>${escapeHtml(project.title)}</h3>
+            </div>
+            <p class="project-description">${escapeHtml(project.summary)}</p>
             <div class="project-tags">
+                ${statusBadge}
                 <span class="project-tag">${escapeHtml(yearLevel)}</span>
                 <span class="project-tag">${escapeHtml(project.area)}</span>
-                <span class="project-tag">${escapeHtml(project.activityCategory)}</span>
+            </div>
+            <div class="project-footer">
+                <span class="project-meta">${escapeHtml(project.activityCategory)}</span>
             </div>
         </div>
     `;
@@ -1204,19 +1210,21 @@ function createLabProjectCard(project) {
 
     card.innerHTML = `
         <div class="project-visual" style="background: ${project.visual.palette};">
-            <span class="visual-label">
-                <span class="visual-mark">${project.visual.icon}</span>
-                ${project.visual.label}
-            </span>
+            <span class="visual-mark">${project.visual.icon}</span>
         </div>
         <div class="project-body">
+            <div class="project-header">
+                <h3>${escapeHtml(project.title)}</h3>
+            </div>
+            <p class="project-description">${escapeHtml(project.summary)}</p>
             <div class="project-tags">
                 <span class="status-tag status-${project.status}">${formatStatus(project.status)}</span>
-                <span class="project-tag">${project.projectPhase}</span>
-                <span class="project-tag">${project.term}</span>
+                <span class="project-tag">${escapeHtml(project.projectPhase)}</span>
+                <span class="project-tag">${escapeHtml(project.term)}</span>
             </div>
-            <h3>${project.title}</h3>
-            <p class="project-description">${project.summary}</p>
+            <div class="project-footer">
+                <span class="project-meta">${escapeHtml(project.className)}</span>
+            </div>
         </div>
     `;
 
@@ -1228,13 +1236,77 @@ function formatStatus(status) {
 }
 
 function populateFilters() {
-    buildSelectOptions(yearSelect, ["All", ...getYearLevels()], "All levels");
-    buildSelectOptions(typeSelect, getTypes(), "All types", (value) => formatStatus(value));
-    buildSelectOptions(categorySelect, getCategories(), "All activities");
+    // Create filter pills for year levels
+    const yearLevelPills = document.getElementById("year-filter-pills");
+    if (yearLevelPills) {
+        yearLevelPills.innerHTML = "";
+        const years = ["All", ...getYearLevels()];
+        years.forEach(year => {
+            const pill = document.createElement("button");
+            pill.className = `filter-chip ${state.year === year ? 'active' : ''}`;
+            pill.type = "button";
+            pill.textContent = year === "All" ? "All levels" : year;
+            pill.addEventListener("click", () => {
+                state.year = year;
+                updateFilterPills("year-filter-pills", year);
+                renderLibrary();
+            });
+            yearLevelPills.appendChild(pill);
+        });
+    }
 
-    yearSelect.value = state.year;
-    typeSelect.value = state.type;
-    categorySelect.value = state.category;
+    // Create filter pills for type
+    const typePills = document.getElementById("type-filter-pills");
+    if (typePills) {
+        typePills.innerHTML = "";
+        const types = getTypes();
+        types.forEach(type => {
+            const pill = document.createElement("button");
+            pill.className = `filter-chip ${state.type === type ? 'active' : ''}`;
+            pill.type = "button";
+            pill.textContent = type === "All" ? "All types" : formatStatus(type);
+            pill.addEventListener("click", () => {
+                state.type = type;
+                updateFilterPills("type-filter-pills", type);
+                renderLibrary();
+            });
+            typePills.appendChild(pill);
+        });
+    }
+
+    // Create filter pills for category
+    const categoryPills = document.getElementById("category-filter-pills");
+    if (categoryPills) {
+        categoryPills.innerHTML = "";
+        const categories = getCategories();
+        categories.forEach(cat => {
+            const pill = document.createElement("button");
+            pill.className = `filter-chip ${state.category === cat ? 'active' : ''}`;
+            pill.type = "button";
+            pill.textContent = cat === "All" ? "All categories" : cat;
+            pill.addEventListener("click", () => {
+                state.category = cat;
+                updateFilterPills("category-filter-pills", cat);
+                renderLibrary();
+            });
+            categoryPills.appendChild(pill);
+        });
+    }
+}
+
+function updateFilterPills(containerId, activeValue) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    const pills = container.querySelectorAll(".filter-chip");
+    pills.forEach(pill => {
+        if (pill.textContent.toLowerCase() === activeValue.toLowerCase() ||
+            (activeValue === "All" && pill.textContent.toLowerCase().includes("all"))) {
+            pill.classList.add("active");
+        } else {
+            pill.classList.remove("active");
+        }
+    });
 }
 
 function renderCurrentProjects() {
@@ -1426,26 +1498,139 @@ function renderStats() {
     categoryCount.textContent = runningLabProjects;
 }
 
+function createFeaturedCard(project) {
+    const card = document.createElement("a");
+    card.className = "featured-card";
+    card.href = project.href;
+    card.target = project.external ? "_blank" : "_self";
+    card.rel = project.external ? "noreferrer" : "";
+    card.setAttribute("aria-label", `Featured: ${project.title}`);
+
+    card.addEventListener("click", (event) => {
+        enforceDetailAccess(event);
+    });
+
+    const yearMatch = project.className.match(/Year\s+\d+|Junior|Middle|Senior/i);
+    const yearLevel = yearMatch ? yearMatch[0] : project.className.split(" ")[0];
+
+    card.innerHTML = `
+        <div class="featured-visual" style="background: ${project.visual.palette};">
+            <div class="featured-visual-text">${project.visual.icon}</div>
+        </div>
+        <div class="featured-content">
+            <span class="featured-category">${escapeHtml(project.area)}</span>
+            <h3 class="featured-title">${escapeHtml(project.title)}</h3>
+            <p class="featured-description">${escapeHtml(project.summary)}</p>
+            <div class="featured-meta">
+                <span class="featured-meta-item">${escapeHtml(yearLevel)}</span>
+                <span class="featured-meta-item">${escapeHtml(project.activityCategory)}</span>
+            </div>
+        </div>
+    `;
+
+    return card;
+}
+
+function renderFeaturedCarousel() {
+    const carousel = document.getElementById("featured-carousel");
+    const indicators = document.getElementById("carousel-indicators");
+    
+    if (!carousel) return;
+    
+    carousel.innerHTML = "";
+    if (indicators) indicators.innerHTML = "";
+    
+    // Get diverse featured items - mix of activities
+    const featured = getUnifiedLibraryItems()
+        .filter(p => p.status === 'active')
+        .sort(() => 0.5 - Math.random())
+        .slice(0, 6);
+    
+    if (!featured.length) {
+        const allProjects = getUnifiedLibraryItems().slice(0, 6);
+        featured.push(...allProjects);
+    }
+    
+    featured.slice(0, 6).forEach((project, index) => {
+        carousel.appendChild(createFeaturedCard(project));
+        
+        if (indicators) {
+            const indicator = document.createElement("button");
+            indicator.className = `carousel-indicator ${index === 0 ? 'active' : ''}`;
+            indicator.type = "button";
+            indicator.setAttribute("role", "tab");
+            indicator.setAttribute("aria-label", `Show slide ${index + 1}`);
+            indicator.setAttribute("aria-selected", index === 0);
+            indicator.addEventListener("click", () => {
+                scrollCarouselToIndex(index);
+                updateCarouselIndicators(index);
+            });
+            indicators.appendChild(indicator);
+        }
+    });
+    
+    setupCarouselNavigation();
+}
+
+function setupCarouselNavigation() {
+    const carousel = document.getElementById("featured-carousel");
+    const prevBtn = document.getElementById("carousel-prev");
+    const nextBtn = document.getElementById("carousel-next");
+    
+    if (!carousel || !prevBtn || !nextBtn) return;
+    
+    let currentIndex = 0;
+    const cards = carousel.querySelectorAll(".featured-card");
+    const itemsPerView = getItemsPerView();
+    const maxIndex = Math.max(0, cards.length - itemsPerView);
+    
+    prevBtn.addEventListener("click", () => {
+        currentIndex = Math.max(0, currentIndex - 1);
+        scrollCarouselToIndex(currentIndex);
+        updateCarouselIndicators(currentIndex);
+    });
+    
+    nextBtn.addEventListener("click", () => {
+        currentIndex = Math.min(maxIndex, currentIndex + 1);
+        scrollCarouselToIndex(currentIndex);
+        updateCarouselIndicators(currentIndex);
+    });
+}
+
+function getItemsPerView() {
+    const width = window.innerWidth;
+    if (width <= 768) return 1;
+    if (width <= 1024) return 2;
+    return 3;
+}
+
+function scrollCarouselToIndex(index) {
+    const carousel = document.getElementById("featured-carousel");
+    if (!carousel) return;
+    
+    const cards = carousel.querySelectorAll(".featured-card");
+    if (cards[index]) {
+        cards[index].scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+}
+
+function updateCarouselIndicators(activeIndex) {
+    const indicators = document.getElementById("carousel-indicators");
+    if (!indicators) return;
+    
+    const tabs = indicators.querySelectorAll(".carousel-indicator");
+    tabs.forEach((tab, index) => {
+        const isActive = index === activeIndex;
+        tab.classList.toggle("active", isActive);
+        tab.setAttribute("aria-selected", isActive);
+    });
+}
+
 function bindControls() {
-    if (!searchInput || !sortSelect || !yearSelect || !typeSelect || !categorySelect) return;
+    if (!searchInput || !sortSelect) return;
 
     searchInput.addEventListener("input", (event) => {
         state.search = event.target.value;
-        renderLibrary();
-    });
-
-    yearSelect.addEventListener("change", (event) => {
-        state.year = event.target.value;
-        renderLibrary();
-    });
-
-    typeSelect.addEventListener("change", (event) => {
-        state.type = event.target.value;
-        renderLibrary();
-    });
-
-    categorySelect.addEventListener("change", (event) => {
-        state.category = event.target.value;
         renderLibrary();
     });
 
@@ -1476,13 +1661,7 @@ async function init() {
         (currentWeekGrid || currentProjectGrid) &&
         libraryGrid &&
         searchInput &&
-        sortSelect &&
-        yearSelect &&
-        typeSelect &&
-        categorySelect &&
-        activeCount &&
-        totalCount &&
-        categoryCount
+        sortSelect
     );
 
     if (!hasDashboardLayout) {
@@ -1495,6 +1674,7 @@ async function init() {
     labProjects = [...baseLabProjects];
     renderStats();
     populateFilters();
+    renderFeaturedCarousel();
     renderCurrentWeek();
     renderCurrentProjects();
     renderLibrary();
