@@ -1585,7 +1585,16 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     costs: normalizeArray(body.costs),
     outcomes: normalizeArray(body.outcomes),
     withdrawal_date: String(body.withdrawal_date || "").trim(),
-    client_id: String(body.client_id || "").trim()
+    client_id: String(body.client_id || "").trim(),
+    standard_details: normalizeArray(body.standard_details),
+    tasks_list: normalizeArray(body.tasks_list),
+    achieved: Boolean(body.achieved),
+    merit: Boolean(body.merit),
+    excellence: Boolean(body.excellence),
+    submission_requirements: normalizeArray(body.submission_requirements),
+    relevant_implications: normalizeArray(body.relevant_implications),
+    progress_logging: Boolean(body.progress_logging),
+    feedback_trialling: Boolean(body.feedback_trialling)
   };
 
   if (isExcludedNonDtechActivity(payload)) {
