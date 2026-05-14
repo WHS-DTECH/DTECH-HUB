@@ -189,7 +189,36 @@ async function readSharedActivity(activityId) {
     }
     if (!found) return null;
 
-    const toArray = (value) => Array.isArray(value) ? value : [];
+    const toArray = (value) => {
+        if (Array.isArray(value)) {
+            return value.map((item) => String(item || "").trim()).filter(Boolean);
+        }
+
+        if (typeof value === "string") {
+            const trimmed = value.trim();
+            if (!trimmed) {
+                return [];
+            }
+
+            if ((trimmed.startsWith("[") && trimmed.endsWith("]")) || (trimmed.startsWith("\"") && trimmed.endsWith("\""))) {
+                try {
+                    const parsed = JSON.parse(trimmed);
+                    if (Array.isArray(parsed)) {
+                        return parsed.map((item) => String(item || "").trim()).filter(Boolean);
+                    }
+                } catch (_error) {
+                    // Fall through to newline parsing.
+                }
+            }
+
+            return trimmed
+                .split(/\r?\n/)
+                .map((item) => item.trim())
+                .filter(Boolean);
+        }
+
+        return [];
+    };
 
     return {
         id: found.id || activityId,
@@ -304,6 +333,8 @@ function defaultDetailShape(id, data) {
 }
 
 function renderDetailView(host, id, data, canEdit) {
+    const isAssessmentTask = String(data?.activityCategory || "").toLowerCase().includes("assessment");
+
     host.innerHTML = `
         <header class="toolbar">
             <span class="toolbar-label">Project Details</span>
@@ -335,9 +366,18 @@ function renderDetailView(host, id, data, canEdit) {
         </section>
 
         ${
-            data.tasksList && data.tasksList.length ? `
+            isAssessmentTask && data.summary ? `
             <section class="proposal-section">
-                <h2>Tasks List</h2>
+                <h2>Short Description</h2>
+                <p>${escapeHtml(data.summary)}</p>
+            </section>
+            ` : ""
+        }
+
+        ${
+            isAssessmentTask && data.tasksList && data.tasksList.length ? `
+            <section class="proposal-section">
+                <h2>Task List</h2>
                 <ol class="list">${renderList(data.tasksList)}</ol>
             </section>
             ` : ""
