@@ -305,7 +305,7 @@ function createProjectPayload() {
         name,
         year_level: String(formData.get("yearLevel") || "").trim(),
         type: String(formData.get("type") || "Project").trim(),
-        activity_category: String(formData.get("activityCategory") || "Project Activity").trim(),
+        activity_category: String(formData.get("activityCategory") || "Project").trim(),
         duration_minutes: 1,
         time_sensitive: Boolean(formData.get("timeSensitive")),
         difficulty: String(formData.get("difficulty") || "").trim(),
