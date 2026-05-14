@@ -315,7 +315,7 @@ function renderDetailView(host, id, data, canEdit) {
         ${
             data.contactName || data.company || data.address ? `
             <section class="proposal-section">
-                <h2>Contact Information</h2>
+                <h2>Client's Contact Information</h2>
                 <div class="detail-grid">
                     ${data.contactName ? `<div class="detail-field"><strong>Contact Name:</strong> ${escapeHtml(data.contactName)}</div>` : ""}
                     ${data.contactPhone ? `<div class="detail-field"><strong>Phone:</strong> ${escapeHtml(data.contactPhone)}</div>` : ""}
@@ -585,7 +585,7 @@ function renderEditForm(host, id, data) {
             </fieldset>
 
             <fieldset class="detail-form-section">
-                <legend>Contact Information</legend>
+                <legend>Client's Contact Information</legend>
                 <div class="detail-form-grid">
                     <label class="detail-field">
                         <span>Contact Name</span>
