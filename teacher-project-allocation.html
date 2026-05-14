@@ -34,12 +34,6 @@
       font-size: 0.9rem;
     }
 
-    .alloc-header-actions {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
     .alloc-status {
       font-size: 0.8rem;
       color: #3a5470;
@@ -96,6 +90,19 @@
 
     .alloc-project-link:hover {
       text-decoration: underline;
+    }
+
+    .alloc-project-details {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 6px;
+      font-size: 0.75rem;
+      color: #4a6077;
+    }
+
+    .alloc-project-details strong {
+      color: #1a3651;
     }
 
     .alloc-meta {
@@ -213,6 +220,11 @@
       gap: 6px;
     }
 
+    .alloc-empty-row {
+      color: #6b7e94;
+      font-style: italic;
+    }
+
     .alloc-date {
       color: #6b7e94;
       font-size: 0.75rem;
@@ -251,10 +263,6 @@
       <header class="alloc-header">
         <h1>Project Allocations</h1>
         <p>Overview of all projects with student interest. Confirm or remove student allocations here.</p>
-        <div class="alloc-header-actions">
-          <button type="button" class="button button-secondary" id="alloc-refresh-btn">Refresh</button>
-          <a class="button button-secondary" href="teacher-view.html">Back to Teacher View</a>
-        </div>
         <p class="alloc-status" id="alloc-status" aria-live="polite"></p>
       </header>
 

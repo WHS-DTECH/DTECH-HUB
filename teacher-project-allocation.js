@@ -65,6 +65,53 @@ function setAllocStatus(message, isError = false) {
     el.className = isError ? "alloc-status is-error" : "alloc-status";
 }
 
+function isProjectRecord(record) {
+    const title = String(record?.name || record?.title || "").trim().toLowerCase();
+    if (title.includes("tinkercad")) {
+        return false;
+    }
+
+    const category = String(record?.activity_category || record?.activityCategory || "").trim().toLowerCase();
+    const hasProposalFields = Boolean(
+        record?.start_date ||
+        record?.startDate ||
+        record?.contact_name ||
+        record?.contactName ||
+        record?.company ||
+        record?.address ||
+        record?.overview ||
+        record?.services ||
+        record?.costs ||
+        record?.outcomes ||
+        record?.client_id ||
+        record?.clientId
+    );
+
+    return hasProposalFields || category.includes("project");
+}
+
+function normalizeProjectRecord(record) {
+    return {
+        project_id: String(record?.id || "").trim(),
+        project_name: String(record?.name || record?.title || "Untitled Project").trim(),
+        client_name: String(record?.company || record?.contact_name || "").trim(),
+        start_date: String(record?.start_date || record?.startDate || "").trim(),
+        detail_url: `ProjectPages/custom-activity.html?id=${encodeURIComponent(String(record?.id || "").trim())}`
+    };
+}
+
+function buildStudentRows(project) {
+    if (!project.students.length) {
+        return `
+            <tr>
+                <td class="alloc-empty-row" colspan="4">No students are interested yet.</td>
+            </tr>
+        `;
+    }
+
+    return project.students.map((student) => buildStudentRow(student)).join("");
+}
+
 function buildProjectBlock(project, email) {
     const block = document.createElement("div");
     block.className = "alloc-project-block";
@@ -72,13 +119,18 @@ function buildProjectBlock(project, email) {
 
     const confirmedCount = project.confirmed_count || 0;
     const totalCount = project.interest_count || 0;
-    const detailUrl = `ProjectPages/custom-activity.html?id=${encodeURIComponent(project.project_id)}`;
+    const clientName = project.client_name || "Not specified";
+    const startDate = project.start_date ? formatDate(project.start_date) : "Not specified";
 
     block.innerHTML = `
         <header class="alloc-project-header">
             <div>
                 <h2 class="alloc-project-title">${escapeHtml(project.project_name)}</h2>
-                <a class="alloc-project-link" href="${escapeHtml(detailUrl)}">View Project &rarr;</a>
+                <a class="alloc-project-link" href="${escapeHtml(project.detail_url)}">View Project &rarr;</a>
+                <div class="alloc-project-details">
+                    <span><strong>Client:</strong> ${escapeHtml(clientName)}</span>
+                    <span><strong>EST Start Date:</strong> ${escapeHtml(startDate)}</span>
+                </div>
             </div>
             <div class="alloc-meta">
                 <span><strong>${totalCount}</strong> interested</span>
@@ -96,7 +148,7 @@ function buildProjectBlock(project, email) {
                     </tr>
                 </thead>
                 <tbody>
-                    ${project.students.map((s) => buildStudentRow(s)).join("")}
+                    ${buildStudentRows(project)}
                 </tbody>
             </table>
         </div>
@@ -206,19 +258,56 @@ async function loadAllocations() {
     content.innerHTML = `<p class="alloc-empty">Loading project allocations&hellip;</p>`;
 
     try {
-        const resp = await fetch("/api/project-interests", {
-            headers: { "x-user-email": email }
-        });
+        const [activitiesResponse, interestsResponse] = await Promise.all([
+            fetch("/api/activities"),
+            fetch("/api/project-interests", { headers: { "x-user-email": email } })
+        ]);
 
-        if (!resp.ok) {
+        if (!activitiesResponse.ok) {
+            throw new Error("Could not load activities");
+        }
+
+        if (!interestsResponse.ok) {
             throw new Error("Could not load project interests");
         }
 
-        const projects = await resp.json();
+        const activities = await activitiesResponse.json();
+        const interestProjects = await interestsResponse.json();
+        const interestByProjectId = new Map(
+            (Array.isArray(interestProjects) ? interestProjects : []).map((project) => [String(project.project_id || "").trim(), project])
+        );
+
+        const projects = (Array.isArray(activities) ? activities : [])
+            .filter((record) => isProjectRecord(record))
+            .map((record) => {
+                const normalized = normalizeProjectRecord(record);
+                const interest = interestByProjectId.get(normalized.project_id) || {};
+                return {
+                    ...normalized,
+                    interest_count: Number(interest.interest_count || 0),
+                    confirmed_count: Number(interest.confirmed_count || 0),
+                    students: Array.isArray(interest.students)
+                        ? interest.students.map((student) => ({
+                            email: String(student.email || student.student_email || "").trim(),
+                            confirmed: Boolean(student.confirmed),
+                            created_at: student.created_at || ""
+                        })).filter((student) => student.email)
+                        : []
+                };
+            })
+            .sort((left, right) => {
+                const leftDate = left.start_date || "9999-12-31";
+                const rightDate = right.start_date || "9999-12-31";
+                if (leftDate !== rightDate) {
+                    return leftDate.localeCompare(rightDate);
+                }
+                return left.project_name.localeCompare(right.project_name);
+            });
+
         setAllocStatus("");
 
         if (!Array.isArray(projects) || projects.length === 0) {
-            content.innerHTML = `<p class="alloc-empty">No student interest has been registered on any project yet.</p>`;
+            content.innerHTML = `<p class="alloc-empty">No project records were found.</p>`;
             return;
         }
 
@@ -236,11 +325,6 @@ async function init() {
     const allowed = await allocEnforceAccess();
     if (!allowed) return;
     await loadAllocations();
-
-    const refreshBtn = document.getElementById("alloc-refresh-btn");
-    if (refreshBtn) {
-        refreshBtn.addEventListener("click", loadAllocations);
-    }
 }
 
 init();
