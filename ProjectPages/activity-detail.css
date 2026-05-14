@@ -442,3 +442,49 @@ h1 {
     color: #6b7e94;
     font-style: italic;
 }
+
+.interest-assign-form {
+    margin-top: 2px;
+    margin-bottom: 4px;
+}
+
+.interest-assign-label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #163f66;
+}
+
+.interest-assign-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.interest-assign-input {
+    min-width: 280px;
+    flex: 1 1 320px;
+    border: 1px solid #b8cbe0;
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: 0.82rem;
+    color: #1a3651;
+    background: #fff;
+}
+
+.interest-assign-btn {
+    font-size: 0.78rem;
+    padding: 7px 14px;
+}
+
+.interest-assign-status {
+    margin: 6px 0 0;
+    font-size: 0.76rem;
+    color: #2f5f8f;
+}
+
+.interest-assign-status.is-error {
+    color: #b23a3a;
+}

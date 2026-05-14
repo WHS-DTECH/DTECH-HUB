@@ -122,6 +122,16 @@ function parseLines(value) {
         .filter(Boolean);
 }
 
+function normalizeStudentEmailInput(value) {
+    const trimmed = String(value || "").trim().toLowerCase();
+    if (!trimmed) return "";
+    if (trimmed.includes("@")) return trimmed;
+    if (detailAllowedDomain) {
+        return `${trimmed}@${detailAllowedDomain}`;
+    }
+    return trimmed;
+}
+
 function readStoredHubEmail() {
     const raw = localStorage.getItem(DETAIL_HUB_AUTH_STORAGE_KEY) || sessionStorage.getItem(DETAIL_HUB_AUTH_STORAGE_KEY);
     if (!raw) return "";
@@ -908,12 +918,13 @@ async function initDetail() {
 
     // Load interest section only for backend-stored items (numeric IDs)
     if (String(id).match(/^\d+$/)) {
-        await loadAndRenderInterestSection(host, id, isTeacher);
+        await loadAndRenderInterestSection(host, id, isTeacher, resolvedData);
     }
 }
 
-async function loadAndRenderInterestSection(host, projectId, isTeacher) {
+async function loadAndRenderInterestSection(host, projectId, isTeacher, detailData) {
     const email = readStoredHubEmail();
+    const isAssessmentTask = String(detailData?.activityCategory || "").toLowerCase().includes("assessment");
 
     const fetchHeaders = {};
     if (email) fetchHeaders["x-user-email"] = email;
@@ -931,10 +942,24 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher) {
     const countText = interestData.count === 0
         ? "No students have registered interest yet."
         : interestData.count === 1
-            ? "1 student is interested in this project."
-            : `${interestData.count} students are interested in this project.`;
+            ? `1 student is interested in this ${isAssessmentTask ? "task" : "project"}.`
+            : `${interestData.count} students are interested in this ${isAssessmentTask ? "task" : "project"}.`;
 
     let html = `<h2>Student Interest</h2><p class="interest-count" id="interest-count-text">${countText}</p>`;
+
+    if (isTeacher && isAssessmentTask) {
+        const domainHint = detailAllowedDomain ? ` (${escapeHtml(detailAllowedDomain)} domain)` : "";
+        html += `
+            <form class="interest-assign-form" id="interest-assign-form" novalidate>
+                <label for="interest-assign-email" class="interest-assign-label">Allocate student by email${domainHint}</label>
+                <div class="interest-assign-row">
+                    <input id="interest-assign-email" name="studentEmail" type="email" class="interest-assign-input" placeholder="student@westlandhigh.school.nz" required>
+                    <button type="submit" class="detail-action interest-assign-btn">Add Student</button>
+                </div>
+                <p class="interest-assign-status" id="interest-assign-status" aria-live="polite"></p>
+            </form>
+        `;
+    }
 
     // Signed-in non-teacher students see the toggle button
     if (email && !isTeacher) {
@@ -983,12 +1008,63 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher) {
                         countEl.textContent = c === 0
                             ? "No students have registered interest yet."
                             : c === 1
-                                ? "1 student is interested in this project."
-                                : `${c} students are interested in this project.`;
+                                ? `1 student is interested in this ${isAssessmentTask ? "task" : "project"}.`
+                                : `${c} students are interested in this ${isAssessmentTask ? "task" : "project"}.`;
                     }
                 }
             } catch (_err) {}
             toggleBtn.disabled = false;
+        });
+    }
+
+    const assignForm = section.querySelector("#interest-assign-form");
+    if (assignForm && email) {
+        const assignInput = section.querySelector("#interest-assign-email");
+        const assignStatus = section.querySelector("#interest-assign-status");
+
+        const setAssignStatus = (message, isError = false) => {
+            if (!assignStatus) return;
+            assignStatus.textContent = message;
+            assignStatus.classList.toggle("is-error", isError);
+        };
+
+        assignForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            const normalizedEmail = normalizeStudentEmailInput(assignInput?.value || "");
+            if (!normalizedEmail) {
+                setAssignStatus("Enter a student email.", true);
+                return;
+            }
+
+            if (detailAllowedDomain && !normalizedEmail.endsWith(`@${detailAllowedDomain}`)) {
+                setAssignStatus(`Email must end with @${detailAllowedDomain}.`, true);
+                return;
+            }
+
+            const assignBtn = assignForm.querySelector("button[type='submit']");
+            if (assignBtn) assignBtn.disabled = true;
+            setAssignStatus("Adding student...");
+
+            try {
+                const resp = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interests`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "x-user-email": email },
+                    body: JSON.stringify({ student_email: normalizedEmail })
+                });
+
+                if (!resp.ok) {
+                    const errorData = await resp.json().catch(() => ({}));
+                    throw new Error(errorData.error || "Could not add student.");
+                }
+
+                setAssignStatus("Student allocated.");
+                if (assignInput) assignInput.value = "";
+                await loadAndRenderInterestSection(host, projectId, isTeacher, detailData);
+            } catch (error) {
+                setAssignStatus(error.message || "Could not add student.", true);
+            } finally {
+                if (assignBtn && assignBtn.isConnected) assignBtn.disabled = false;
+            }
         });
     }
 

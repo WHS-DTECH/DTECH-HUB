@@ -1932,6 +1932,48 @@ app.post("/api/activities/:id/interest", async (req, res) => {
   }
 });
 
+// POST /api/activities/:id/interests — teacher assigns a student to this task/project
+app.post("/api/activities/:id/interests", requireActivityWriteAccess, async (req, res) => {
+  const projectId = String(req.params.id || "").trim();
+  const rawStudentEmail = String(req.body?.student_email || req.body?.studentEmail || "").trim();
+  const studentEmail = normalizeEmail(rawStudentEmail);
+
+  if (!projectId || !studentEmail) {
+    res.status(400).json({ error: "Project ID and student email are required" });
+    return;
+  }
+
+  if (!studentEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(400).json({ error: `Student email must end with @${SCHOOL_EMAIL_DOMAIN}` });
+    return;
+  }
+
+  if (!hasDatabase) {
+    res.status(201).json({ ok: true, student_email: studentEmail });
+    return;
+  }
+
+  try {
+    await pool.query(
+      "INSERT INTO project_interests (project_id, student_email) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+      [projectId, studentEmail]
+    );
+
+    const countResult = await pool.query(
+      "SELECT COUNT(*)::int AS count FROM project_interests WHERE project_id = $1",
+      [projectId]
+    );
+
+    res.status(201).json({
+      ok: true,
+      student_email: studentEmail,
+      count: Number(countResult.rows?.[0]?.count || 0)
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Could not add student interest" });
+  }
+});
+
 // GET /api/activities/:id/interests — get interest count/list for a project
 app.get("/api/activities/:id/interests", async (req, res) => {
   const projectId = String(req.params.id || "").trim();
