@@ -1,5 +1,4 @@
 const path = require("path");
-const fs = require("fs");
 const express = require("express");
 const multer = require("multer");
 const nodemailer = require("nodemailer");
@@ -1082,7 +1081,7 @@ async function ensureSchema() {
   await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 }
 
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: "8mb" }));
 app.use("/images/activities", express.static(path.join(__dirname, "images", "activities")));
 app.use("/images/activities", express.static(path.join(__dirname, "public", "images", "activities")));
 app.use(express.static(__dirname));
@@ -1606,7 +1605,6 @@ app.post("/api/activities/:id/upload-image", requireActivityWriteAccess, async (
   const activityId = String(req.params.id || "").trim();
   const body = req.body || {};
   const imageData = String(body.image_data || "").trim();
-  const fileName = String(body.file_name || "image.png").trim();
 
   if (!activityId) {
     res.status(400).json({ error: "Activity ID is required" });
@@ -1619,28 +1617,14 @@ app.post("/api/activities/:id/upload-image", requireActivityWriteAccess, async (
   }
 
   try {
-    const uploadsDir = path.join(__dirname, "images", "activities");
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
-
     const matches = imageData.match(/^data:image\/([a-z]+);base64,(.+)$/i);
     if (!matches) {
       res.status(400).json({ error: "Invalid base64 image format" });
       return;
     }
 
-    const mimeType = matches[1];
-    const base64Data = matches[2];
-    const ext = mimeType === "jpeg" ? "jpg" : mimeType;
-    const fileNameNoExt = path.basename(fileName, path.extname(fileName));
-    const safeFileName = slugify(fileNameNoExt) + "-" + Date.now() + "." + ext;
-    const filePath = path.join(uploadsDir, safeFileName);
-    const imageUrl = "/images/activities/" + safeFileName;
-
-    fs.writeFileSync(filePath, Buffer.from(base64Data, "base64"));
-
-    res.status(200).json({ image_url: imageUrl, file_name: safeFileName });
+    // Persist as a data URL so hosted deploys do not lose files on restart/redeploy.
+    res.status(200).json({ image_url: imageData });
   } catch (error) {
     console.error("Image upload error:", error);
     res.status(500).json({ error: "Failed to upload image" });

@@ -1209,6 +1209,18 @@ function createProjectCard(project) {
         </div>
     `;
 
+    if (hasImage) {
+        const imageElement = card.querySelector(".project-image");
+        const visualElement = card.querySelector(".project-visual");
+
+        if (imageElement && visualElement) {
+            imageElement.addEventListener("error", () => {
+                visualElement.style.background = project.visual.palette;
+                visualElement.innerHTML = `<span class="visual-mark">${escapeHtml(project.visual.icon)}</span>`;
+            }, { once: true });
+        }
+    }
+
     return card;
 }
 
