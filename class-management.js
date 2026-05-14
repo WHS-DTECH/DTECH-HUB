@@ -143,6 +143,31 @@ function formatSchoolGroupLabel(group) {
     return group;
 }
 
+function getStudentLastName(student) {
+    const fullName = String(student?.student_name || "").trim();
+    if (!fullName) {
+        return "";
+    }
+
+    if (fullName.includes(",")) {
+        return fullName.split(",")[0].trim();
+    }
+
+    const parts = fullName.split(/\s+/).filter(Boolean);
+    return parts.length ? parts[parts.length - 1] : fullName;
+}
+
+function compareStudentsByLastName(left, right) {
+    const leftLastName = getStudentLastName(left).toLowerCase();
+    const rightLastName = getStudentLastName(right).toLowerCase();
+    const lastNameDelta = leftLastName.localeCompare(rightLastName, undefined, { numeric: true });
+    if (lastNameDelta) {
+        return lastNameDelta;
+    }
+
+    return String(left?.student_name || "").localeCompare(String(right?.student_name || ""), undefined, { numeric: true });
+}
+
 function renderSummary(students, visibleStudents) {
     const total = students.length;
     const withPrograms = students.filter((student) => Array.isArray(student.programs) && student.programs.length).length;
@@ -207,10 +232,7 @@ function getFilterState() {
         years: getSelectedValues("class-year-filter"),
         schoolGroups: getSelectedValues("class-school-filter"),
         forms: getSelectedValues("class-form-filter"),
-        statuses: getSelectedValues("class-status-filter").map((value) => String(value || "").toLowerCase()),
-        sort: String(document.getElementById("class-sort-filter")?.value || "name"),
         programs: getSelectedValues("class-program-filter"),
-        currentOnly: Boolean(document.getElementById("class-current-only")?.checked),
         linkedOnly: Boolean(document.getElementById("class-linked-only")?.checked)
     };
 }
@@ -241,24 +263,12 @@ function applyFilters() {
             if (filters.years.length && !filters.years.includes(String(student.year_level || ""))) return false;
             if (filters.schoolGroups.length && !filters.schoolGroups.includes(getSchoolGroupForYearLevel(student.year_level))) return false;
             if (filters.forms.length && !filters.forms.includes(String(student.form_class || ""))) return false;
-            if (filters.statuses.length && !filters.statuses.includes(String(student.status || "").toLowerCase())) return false;
             if (filters.programs.length && !filters.programs.some((program) => Array.isArray(student.programs) && student.programs.includes(program))) return false;
-            if (filters.currentOnly && String(student.status || "").toLowerCase() === "not current") return false;
+            if (String(student.status || "").toLowerCase() !== "current") return false;
             if (filters.linkedOnly && !(Array.isArray(student.linked_emails) && student.linked_emails.length)) return false;
             return studentMatchesSearch(student, filters.search);
         })
-        .sort((left, right) => {
-            if (filters.sort === "year") {
-                return String(left.year_level || "").localeCompare(String(right.year_level || ""), undefined, { numeric: true }) || String(left.student_name || "").localeCompare(String(right.student_name || ""));
-            }
-            if (filters.sort === "form") {
-                return String(left.form_class || "").localeCompare(String(right.form_class || "")) || String(left.student_name || "").localeCompare(String(right.student_name || ""));
-            }
-            if (filters.sort === "dtech") {
-                return Number(right.dtech_period_count || 0) - Number(left.dtech_period_count || 0) || String(left.student_name || "").localeCompare(String(right.student_name || ""));
-            }
-            return String(left.student_name || "").localeCompare(String(right.student_name || ""));
-        });
+        .sort(compareStudentsByLastName);
 
     classState.visibleStudents = visibleStudents;
     renderSummary(classState.allStudents, visibleStudents);
@@ -294,11 +304,6 @@ async function loadClassManagement() {
             formatter: formatSchoolGroupLabel
         });
         buildSelectOptions("class-form-filter", students.map((student) => student.form_class), "All form classes", { multiple: true });
-        buildSelectOptions("class-status-filter", ["Current", "Not Current"], "All statuses", {
-            multiple: true,
-            sortValues: false,
-            formatter: (value) => value
-        });
         buildSelectOptions("class-program-filter", ["DTECH", "DTONLINE", "COMP", "TEXT", "MPROG", "MDTECH"], "All programs", {
             multiple: true,
             sortValues: false,
@@ -322,10 +327,7 @@ function bindFilters() {
         "class-year-filter",
         "class-school-filter",
         "class-form-filter",
-        "class-status-filter",
-        "class-sort-filter",
         "class-program-filter",
-        "class-current-only",
         "class-linked-only"
     ].forEach((id) => {
         const element = document.getElementById(id);

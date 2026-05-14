@@ -87,7 +87,7 @@
 
         .class-filter-grid {
             display: grid;
-            grid-template-columns: 2fr repeat(5, minmax(0, 1fr));
+            grid-template-columns: 2fr repeat(3, minmax(0, 1fr));
             gap: 12px;
             align-items: end;
         }
@@ -119,11 +119,6 @@
         .class-field select[multiple] {
             min-height: 118px;
             padding: 8px 10px;
-        }
-
-        .class-checkbox-row .class-field {
-            flex: 1 1 260px;
-            min-width: 240px;
         }
 
         .class-filter-hint {
@@ -390,23 +385,6 @@
                             <option value="all">All form classes</option>
                         </select>
                     </label>
-                    <label class="class-field">
-                        <span>Status</span>
-                        <select id="class-status-filter" multiple size="4">
-                            <option value="all">All statuses</option>
-                            <option value="current">Current</option>
-                            <option value="not current">Not Current</option>
-                        </select>
-                    </label>
-                    <label class="class-field">
-                        <span>Sort</span>
-                        <select id="class-sort-filter">
-                            <option value="name">Name</option>
-                            <option value="year">Year level</option>
-                            <option value="form">Form class</option>
-                            <option value="dtech">Most DTECH slots</option>
-                        </select>
-                    </label>
                 </div>
                 <p class="class-filter-hint">Hold Ctrl on Windows to select multiple values in a list.</p>
                 <div class="class-checkbox-row">
@@ -421,10 +399,6 @@
                             <option value="MPROG">MPROG</option>
                             <option value="MDTECH">MDTECH</option>
                         </select>
-                    </label>
-                    <label class="class-checkbox">
-                        <input id="class-current-only" type="checkbox" checked>
-                        <span>Show current students only</span>
                     </label>
                     <label class="class-checkbox">
                         <input id="class-linked-only" type="checkbox">
