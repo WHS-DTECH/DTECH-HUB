@@ -191,24 +191,6 @@
                         </div>
                     </fieldset>
 
-                    <!-- All-or-Nothing Terms -->
-                    <fieldset class="form-section">
-                        <legend>All-or-Nothing Terms</legend>
-                        <div class="field">
-                            <label for="withdrawal-date">Withdrawal if not Accepted by Date of</label>
-                            <input id="withdrawal-date" name="withdrawalDate" type="date">
-                        </div>
-                    </fieldset>
-
-                    <!-- Client Details -->
-                    <fieldset class="form-section">
-                        <legend>Project Client Details</legend>
-                        <div class="field">
-                            <label for="client-id">Project Client Details / ID</label>
-                            <input id="client-id" name="clientId" type="text" placeholder="Enter client identifier or details...">
-                        </div>
-                    </fieldset>
-
                     <!-- Display Options -->
                     <fieldset class="form-section">
                         <legend>Display Options</legend>
@@ -224,11 +206,11 @@
                                     <option>Slate</option>
                                 </select>
                             </div>
-                            <div class="field">
-                                <label for="duration-minutes">Duration Minutes</label>
-                                <input id="duration-minutes" name="durationMinutes" type="number" min="1" step="1" placeholder="Optional">
-                            </div>
                         </div>
+                        <label class="checkbox-field" for="time-sensitive">
+                            <input id="time-sensitive" name="timeSensitive" type="checkbox">
+                            Time Sensitive
+                        </label>
                         <div class="field field-wide">
                             <label for="card-url">Card URL</label>
                             <input id="card-url" name="cardUrl" type="url" placeholder="What URL should this card open?">

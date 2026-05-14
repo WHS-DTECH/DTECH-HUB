@@ -49,8 +49,8 @@ async function prefillProjectIfEditing() {
         if (data.type) form.type.value = data.type;
         if (data.activity_category) form.activityCategory.value = data.activity_category;
         if (data.difficulty) form.difficulty.value = data.difficulty;
-        if (data.duration_hours !== undefined && data.duration_hours !== null) {
-            form.durationMinutes.value = Number(data.duration_hours) > 12 ? Math.round(Number(data.duration_hours)) : Math.round(Number(data.duration_hours) * 60);
+        if (data.time_sensitive !== undefined || data.timeSensitive !== undefined) {
+            form.timeSensitive.checked = Boolean(data.time_sensitive ?? data.timeSensitive);
         }
         if (data.card_color || data.card_colour || data.color) form.cardColor.value = data.card_color || data.card_colour || data.color;
         if (data.card_url || data.activity_url || data.url) form.cardUrl.value = data.card_url || data.activity_url || data.url;
@@ -69,8 +69,6 @@ async function prefillProjectIfEditing() {
         if (data.services) form.services.value = parseMaybeArray(data.services).join("\n");
         if (data.costs) form.costs.value = parseMaybeArray(data.costs).join("\n");
         if (data.outcomes) form.outcomes.value = parseMaybeArray(data.outcomes).join("\n");
-        if (data.withdrawal_date) form.withdrawalDate.value = data.withdrawal_date;
-        if (data.client_id) form.clientId.value = data.client_id;
         saveProjectDraft();
     } catch (_error) {
         // Ignore prefill failures and allow the form to remain editable.
@@ -214,11 +212,6 @@ function createProjectPayload() {
     const formData = new FormData(form);
     const name = String(formData.get("activityName") || "").trim();
     const editingId = getEditingProjectId();
-    const durationRaw = String(formData.get("durationMinutes") || "").trim();
-    const parsedDurationMinutes = Number.parseInt(durationRaw, 10);
-    const durationMinutes = Number.isFinite(parsedDurationMinutes) && parsedDurationMinutes > 0
-        ? parsedDurationMinutes
-        : null;
 
     return {
         id: editingId || slugify(name),
@@ -226,7 +219,8 @@ function createProjectPayload() {
         year_level: String(formData.get("yearLevel") || "").trim(),
         type: String(formData.get("type") || "Project").trim(),
         activity_category: String(formData.get("activityCategory") || "Project Activity").trim(),
-        duration_minutes: durationMinutes,
+        duration_minutes: 1,
+        time_sensitive: Boolean(formData.get("timeSensitive")),
         difficulty: String(formData.get("difficulty") || "").trim(),
         card_color: String(formData.get("cardColor") || "").trim(),
         card_url: String(formData.get("cardUrl") || "").trim(),
@@ -244,9 +238,7 @@ function createProjectPayload() {
         overview: linesToArray(formData.get("overview")),
         services: linesToArray(formData.get("services")),
         costs: linesToArray(formData.get("costs")),
-        outcomes: linesToArray(formData.get("outcomes")),
-        withdrawal_date: String(formData.get("withdrawalDate") || "").trim(),
-        client_id: String(formData.get("clientId") || "").trim()
+        outcomes: linesToArray(formData.get("outcomes"))
     };
 }
 

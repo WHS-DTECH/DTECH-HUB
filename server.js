@@ -881,6 +881,7 @@ async function ensureSchema() {
       class_management_notes JSONB NOT NULL DEFAULT '[]'::jsonb,
       class_preparation JSONB NOT NULL DEFAULT '[]'::jsonb,
       assessment_focus JSONB NOT NULL DEFAULT '[]'::jsonb,
+      time_sensitive BOOLEAN NOT NULL DEFAULT FALSE,
       show_in_this_week BOOLEAN NOT NULL DEFAULT FALSE,
       term TEXT NOT NULL DEFAULT 'Term 2',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -898,6 +899,7 @@ async function ensureSchema() {
   // Add proposal fields if they don't exist
   await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS duration_minutes INTEGER`);
   await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS card_url TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS time_sensitive BOOLEAN NOT NULL DEFAULT FALSE`);
   await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS show_in_this_week BOOLEAN NOT NULL DEFAULT FALSE`);
   await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS start_date TEXT`);
   await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS contact_name TEXT`);
@@ -1344,6 +1346,7 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     class_management_notes: normalizeArray(body.class_management_notes),
     class_preparation: normalizeArray(body.class_preparation),
     assessment_focus: normalizeArray(body.assessment_focus),
+    time_sensitive: Boolean(body.time_sensitive ?? body.timeSensitive),
     show_in_this_week: Boolean(body.show_in_this_week),
     term: String(body.term || "Term 2").trim() || "Term 2",
     created_at: String(body.created_at || new Date().toISOString()),
@@ -1403,6 +1406,7 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     const classManagementColumn = pickExistingColumn(activityColumns, ["class_management_notes"]);
     const classPreparationColumn = pickExistingColumn(activityColumns, ["class_preparation"]);
     const assessmentFocusColumn = pickExistingColumn(activityColumns, ["assessment_focus"]);
+    const timeSensitiveColumn = pickExistingColumn(activityColumns, ["time_sensitive"]);
     const showInWeekColumn = pickExistingColumn(activityColumns, ["show_in_this_week", "show_this_week", "is_pinned", "is_this_week"]);
     const termColumn = pickExistingColumn(activityColumns, ["term"]);
     const updatedAtColumn = pickExistingColumn(activityColumns, ["updated_at", "updatedon", "modified_at"]);
@@ -1458,6 +1462,7 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     if (classManagementColumn) sqlColumns.push({ name: classManagementColumn, value: JSON.stringify(payload.class_management_notes), cast: "jsonb" });
     if (classPreparationColumn) sqlColumns.push({ name: classPreparationColumn, value: JSON.stringify(payload.class_preparation), cast: "jsonb" });
     if (assessmentFocusColumn) sqlColumns.push({ name: assessmentFocusColumn, value: JSON.stringify(payload.assessment_focus), cast: "jsonb" });
+    if (timeSensitiveColumn) sqlColumns.push({ name: timeSensitiveColumn, value: payload.time_sensitive });
     if (showInWeekColumn) sqlColumns.push({ name: showInWeekColumn, value: payload.show_in_this_week });
     if (termColumn) sqlColumns.push({ name: termColumn, value: payload.term });
     
