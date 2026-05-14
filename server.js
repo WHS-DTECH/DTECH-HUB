@@ -1389,7 +1389,9 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     }
 
     const activityCategoryColumn = pickExistingColumn(activityColumns, ["activity_category", "category"]);
-    const durationColumn = pickExistingColumn(activityColumns, ["duration_minutes", "duration_hours", "duration"]);
+    const durationMinutesColumn = pickExistingColumn(activityColumns, ["duration_minutes"]);
+    const durationHoursColumn = pickExistingColumn(activityColumns, ["duration_hours"]);
+    const durationColumn = pickExistingColumn(activityColumns, ["duration"]);
     const difficultyColumn = pickExistingColumn(activityColumns, ["difficulty", "level"]);
     const cardColorColumn = pickExistingColumn(activityColumns, ["card_color", "card_colour", "color"]);
     const cardUrlColumn = pickExistingColumn(activityColumns, ["card_url", "activity_url", "url"]);
@@ -1436,11 +1438,14 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     }
 
     if (activityCategoryColumn) sqlColumns.push({ name: activityCategoryColumn, value: payload.activity_category });
+    if (durationMinutesColumn) {
+      sqlColumns.push({ name: durationMinutesColumn, value: payload.duration_minutes });
+    }
+    if (durationHoursColumn) {
+      sqlColumns.push({ name: durationHoursColumn, value: payload.duration_minutes / 60 });
+    }
     if (durationColumn) {
-      const durationValue = String(durationColumn).toLowerCase().includes("hour")
-        ? payload.duration_minutes / 60
-        : payload.duration_minutes;
-      sqlColumns.push({ name: durationColumn, value: durationValue });
+      sqlColumns.push({ name: durationColumn, value: payload.duration_minutes });
     }
     if (difficultyColumn) sqlColumns.push({ name: difficultyColumn, value: payload.difficulty });
     if (cardColorColumn) sqlColumns.push({ name: cardColorColumn, value: payload.card_color });
