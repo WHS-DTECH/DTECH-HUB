@@ -1221,9 +1221,6 @@ function createProjectCard(project) {
         ? `<span class="project-tag status-tag status-${project.status}">${formatStatus(project.status)}</span>` 
         : '';
     const contentTypeLabel = inferSourceTypeFromRecord(project) === "project" ? "Project" : "Activity";
-    const footerMeta = project.activityCategory
-        ? `${contentTypeLabel} | ${project.activityCategory}`
-        : contentTypeLabel;
 
     card.innerHTML = `
         <div class="project-visual" ${visualStyle}>
@@ -1240,7 +1237,7 @@ function createProjectCard(project) {
                 <span class="project-tag">${escapeHtml(project.area)}</span>
             </div>
             <div class="project-footer">
-                <span class="project-meta">${escapeHtml(footerMeta)}</span>
+                <span class="project-meta">${escapeHtml(contentTypeLabel)}</span>
             </div>
         </div>
     `;
@@ -1287,7 +1284,7 @@ function createLabProjectCard(project) {
                 <span class="project-tag">${escapeHtml(project.term)}</span>
             </div>
             <div class="project-footer">
-                <span class="project-meta">${escapeHtml(project.className)}</span>
+                <span class="project-meta">Project</span>
             </div>
         </div>
     `;
@@ -1576,11 +1573,12 @@ function renderLabProjectLibrary() {
 }
 
 function renderStats() {
-    const runningActivities = projects.filter((project) => project.showThisWeek).length;
-    const runningLabProjects = labProjects.filter((project) => project.showThisWeek).length;
+    const runningItems = getUnifiedLibraryItems().filter((item) => item.showThisWeek);
+    const runningActivities = runningItems.filter((item) => inferSourceTypeFromRecord(item) === "activity").length;
+    const runningProjects = runningItems.filter((item) => inferSourceTypeFromRecord(item) === "project").length;
 
     totalCount.textContent = runningActivities;
-    categoryCount.textContent = runningLabProjects;
+    categoryCount.textContent = runningProjects;
 }
 
 function createFeaturedCard(project) {
