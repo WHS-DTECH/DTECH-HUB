@@ -288,6 +288,35 @@ function slugify(value) {
         .replace(/^-+|-+$/g, "");
 }
 
+function inferSourceTypeFromRecord(record) {
+    const explicitType = String(record?.sourceType || "").toLowerCase();
+    if (explicitType === "project" || explicitType === "activity") {
+        return explicitType;
+    }
+
+    const category = String(record?.activityCategory || record?.activity_category || "").toLowerCase();
+    if (category.includes("project")) {
+        return "project";
+    }
+
+    const hasProjectFields = Boolean(
+        record?.start_date ||
+        record?.startDate ||
+        record?.contact_name ||
+        record?.contactName ||
+        record?.contact_email ||
+        record?.contactEmail ||
+        record?.company ||
+        record?.address ||
+        record?.overview ||
+        record?.services ||
+        record?.costs ||
+        record?.outcomes
+    );
+
+    return hasProjectFields ? "project" : "activity";
+}
+
 async function loadSharedProjects() {
     try {
         const response = await fetch("/api/activities");
@@ -309,6 +338,7 @@ async function loadSharedProjects() {
                 const created = String(item.created_at || new Date().toISOString()).slice(0, 10);
                 const imageUrl = String(item.outcome_image_url || item.image_url || "").trim();
                 const showInThisWeek = Boolean(item.show_in_this_week ?? item.show_this_week ?? item.is_pinned ?? item.is_this_week);
+                const sourceType = inferSourceTypeFromRecord(item);
 
                 return {
                     id,
@@ -324,6 +354,7 @@ async function loadSharedProjects() {
                     external: false,
                     summary,
                     keywords: [type, category, String(item.difficulty || ""), "teacher upload"].filter(Boolean),
+                    sourceType,
                     imageUrl: imageUrl || null,
                     visual: {
                         icon: textToIcon(type),
@@ -363,6 +394,7 @@ function mapLabProjectToLibraryItem(project) {
         title: project.title,
         className: project.className,
         area: "Lab Project",
+        sourceType: "project",
         activityCategory: `Project ${project.projectPhase}`,
         showThisWeek: Boolean(project.showThisWeek),
         status: project.status,
@@ -381,7 +413,7 @@ function getUnifiedLibraryItems() {
     return [
         ...projects.map((project) => ({
             ...project,
-            sourceType: project.sourceType || "activity"
+            sourceType: inferSourceTypeFromRecord(project)
         })),
         ...labProjects.map(mapLabProjectToLibraryItem)
     ];
@@ -1188,6 +1220,10 @@ function createProjectCard(project) {
     const statusBadge = project.status 
         ? `<span class="project-tag status-tag status-${project.status}">${formatStatus(project.status)}</span>` 
         : '';
+    const contentTypeLabel = inferSourceTypeFromRecord(project) === "project" ? "Project" : "Activity";
+    const footerMeta = project.activityCategory
+        ? `${contentTypeLabel} | ${project.activityCategory}`
+        : contentTypeLabel;
 
     card.innerHTML = `
         <div class="project-visual" ${visualStyle}>
@@ -1204,7 +1240,7 @@ function createProjectCard(project) {
                 <span class="project-tag">${escapeHtml(project.area)}</span>
             </div>
             <div class="project-footer">
-                <span class="project-meta">${escapeHtml(project.activityCategory)}</span>
+                <span class="project-meta">${escapeHtml(footerMeta)}</span>
             </div>
         </div>
     `;
