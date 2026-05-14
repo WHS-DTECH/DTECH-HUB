@@ -584,7 +584,18 @@ async function saveDetails(id, draft) {
         costs: Array.isArray(result.costs) ? result.costs : draft.costs,
         outcomes: Array.isArray(result.outcomes) ? result.outcomes : draft.outcomes,
         withdrawalDate: result.withdrawal_date || draft.withdrawalDate,
-        clientId: result.client_id || draft.clientId
+        clientId: result.client_id || draft.clientId,
+
+        // Assessment Task Fields
+        standardDetails: Array.isArray(result.standard_details) ? result.standard_details : draft.standardDetails,
+        tasksList: Array.isArray(result.tasks_list) ? result.tasks_list : draft.tasksList,
+        achieved: Array.isArray(result.achieved) ? result.achieved : draft.achieved,
+        merit: Array.isArray(result.merit) ? result.merit : draft.merit,
+        excellence: Array.isArray(result.excellence) ? result.excellence : draft.excellence,
+        submissionRequirements: Array.isArray(result.submission_requirements) ? result.submission_requirements : draft.submissionRequirements,
+        relevantImplications: Array.isArray(result.relevant_implications) ? result.relevant_implications : draft.relevantImplications,
+        progressLogging: Array.isArray(result.progress_logging) ? result.progress_logging : draft.progressLogging,
+        feedbackTrialling: Array.isArray(result.feedback_trialling) ? result.feedback_trialling : draft.feedbackTrialling
     };
 }
 

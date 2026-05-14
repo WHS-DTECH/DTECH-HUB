@@ -1588,13 +1588,13 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     client_id: String(body.client_id || "").trim(),
     standard_details: normalizeArray(body.standard_details),
     tasks_list: normalizeArray(body.tasks_list),
-    achieved: Boolean(body.achieved),
-    merit: Boolean(body.merit),
-    excellence: Boolean(body.excellence),
+    achieved: normalizeArray(body.achieved),
+    merit: normalizeArray(body.merit),
+    excellence: normalizeArray(body.excellence),
     submission_requirements: normalizeArray(body.submission_requirements),
     relevant_implications: normalizeArray(body.relevant_implications),
-    progress_logging: Boolean(body.progress_logging),
-    feedback_trialling: Boolean(body.feedback_trialling)
+    progress_logging: normalizeArray(body.progress_logging),
+    feedback_trialling: normalizeArray(body.feedback_trialling)
   };
 
   if (isExcludedNonDtechActivity(payload)) {
@@ -1654,6 +1654,15 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     const outcomesColumn = pickExistingColumn(activityColumns, ["outcomes"]);
     const withdrawalDateColumn = pickExistingColumn(activityColumns, ["withdrawal_date"]);
     const clientIdColumn = pickExistingColumn(activityColumns, ["client_id"]);
+    const standardDetailsColumn = pickExistingColumn(activityColumns, ["standard_details"]);
+    const tasksListColumn = pickExistingColumn(activityColumns, ["tasks_list"]);
+    const achievedColumn = pickExistingColumn(activityColumns, ["achieved"]);
+    const meritColumn = pickExistingColumn(activityColumns, ["merit"]);
+    const excellenceColumn = pickExistingColumn(activityColumns, ["excellence"]);
+    const submissionRequirementsColumn = pickExistingColumn(activityColumns, ["submission_requirements"]);
+    const relevantImplicationsColumn = pickExistingColumn(activityColumns, ["relevant_implications"]);
+    const progressLoggingColumn = pickExistingColumn(activityColumns, ["progress_logging"]);
+    const feedbackTriallingColumn = pickExistingColumn(activityColumns, ["feedback_trialling"]);
 
     const idMetadata = idColumn ? activityColumnMetadata.get(String(idColumn).toLowerCase()) : null;
     const idIsInteger = isIntegerLikeColumn(idMetadata);
@@ -1709,6 +1718,15 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     if (outcomesColumn) sqlColumns.push({ name: outcomesColumn, value: JSON.stringify(payload.outcomes), cast: "jsonb" });
     if (withdrawalDateColumn) sqlColumns.push({ name: withdrawalDateColumn, value: payload.withdrawal_date });
     if (clientIdColumn) sqlColumns.push({ name: clientIdColumn, value: payload.client_id });
+    if (standardDetailsColumn) sqlColumns.push({ name: standardDetailsColumn, value: JSON.stringify(payload.standard_details), cast: "jsonb" });
+    if (tasksListColumn) sqlColumns.push({ name: tasksListColumn, value: JSON.stringify(payload.tasks_list), cast: "jsonb" });
+    if (achievedColumn) sqlColumns.push({ name: achievedColumn, value: JSON.stringify(payload.achieved), cast: "jsonb" });
+    if (meritColumn) sqlColumns.push({ name: meritColumn, value: JSON.stringify(payload.merit), cast: "jsonb" });
+    if (excellenceColumn) sqlColumns.push({ name: excellenceColumn, value: JSON.stringify(payload.excellence), cast: "jsonb" });
+    if (submissionRequirementsColumn) sqlColumns.push({ name: submissionRequirementsColumn, value: JSON.stringify(payload.submission_requirements), cast: "jsonb" });
+    if (relevantImplicationsColumn) sqlColumns.push({ name: relevantImplicationsColumn, value: JSON.stringify(payload.relevant_implications), cast: "jsonb" });
+    if (progressLoggingColumn) sqlColumns.push({ name: progressLoggingColumn, value: JSON.stringify(payload.progress_logging), cast: "jsonb" });
+    if (feedbackTriallingColumn) sqlColumns.push({ name: feedbackTriallingColumn, value: JSON.stringify(payload.feedback_trialling), cast: "jsonb" });
 
     const insertColumnsSql = sqlColumns.map((column) => quoteIdentifier(column.name)).join(", ");
     const insertValuesSql = sqlColumns
