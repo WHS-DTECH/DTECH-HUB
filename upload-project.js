@@ -1,13 +1,10 @@
 const form = document.querySelector("#upload-activity-form");
-const fileInput = document.querySelector("#outcome-image-file");
-const imageUrlInput = document.querySelector("#outcome-image-url");
 const costsInput = document.querySelector("#costs");
 const commonCostOptions = Array.from(document.querySelectorAll(".common-cost-option"));
 const uploadStatus = document.querySelector("#upload-status");
 const cancelButton = document.querySelector("#cancel-upload");
 const clearDraftButtons = Array.from(document.querySelectorAll("[data-clear-project-draft]"));
 const authStatusElement = document.querySelector("#project-auth-status");
-let currentEditingImageUrl = "";
 const PROJECT_DRAFT_STORAGE_KEY = "dtechHub:uploadProjectDraft:v1";
 const UPLOAD_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 
@@ -173,9 +170,6 @@ async function prefillProjectIfEditing() {
             form.timeSensitive.checked = Boolean(data.time_sensitive ?? data.timeSensitive);
         }
         if (data.card_color || data.card_colour || data.color) form.cardColor.value = data.card_color || data.card_colour || data.color;
-        if (data.card_url || data.activity_url || data.url) form.cardUrl.value = data.card_url || data.activity_url || data.url;
-        currentEditingImageUrl = String(data.outcome_image_url || data.image_url || "").trim();
-        if (currentEditingImageUrl) form.outcomeImageUrl.value = currentEditingImageUrl;
         if (data.show_in_this_week !== undefined || data.show_this_week !== undefined || data.is_this_week !== undefined) {
             form.showThisWeek.checked = Boolean(data.show_in_this_week ?? data.show_this_week ?? data.is_this_week);
         }
@@ -188,7 +182,6 @@ async function prefillProjectIfEditing() {
         if (data.overview) form.overview.value = parseMaybeArray(data.overview).join("\n");
         if (data.services) form.services.value = parseMaybeArray(data.services).join("\n");
         if (data.costs) form.costs.value = parseMaybeArray(data.costs).join("\n");
-        if (data.outcomes) form.outcomes.value = parseMaybeArray(data.outcomes).join("\n");
         syncCommonCostOptionsFromTextarea();
         saveProjectDraft();
     } catch (_error) {
@@ -302,41 +295,6 @@ function setStatus(message, isError = false) {
     uploadStatus.classList.add(isError ? "is-error" : "is-success");
 }
 
-async function fileToDataUrl(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error("Failed to read image file."));
-        reader.readAsDataURL(file);
-    });
-}
-
-async function uploadActivityImage(file, activityName) {
-    if (!file) return;
-    if (!activityName) throw new Error("Project name is required before uploading images.");
-
-    const imageData = await fileToDataUrl(file);
-    const activityId = getEditingProjectId() || slugify(activityName);
-
-    setStatus("Uploading image...");
-
-    const response = await fetch(`/api/activities/${activityId}/upload-image`, {
-        method: "POST",
-        headers: withUserEmailHeader({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ image_data: imageData, file_name: file.name })
-    });
-
-    const payload = await response.json();
-
-    if (!response.ok || !payload.image_url) {
-        throw new Error(payload.error || "Upload failed");
-    }
-
-    imageUrlInput.value = payload.image_url;
-    currentEditingImageUrl = payload.image_url || currentEditingImageUrl;
-    setStatus("Image uploaded successfully. URL has been filled in.");
-}
-
 function createProjectPayload() {
     const formData = new FormData(form);
     const name = String(formData.get("activityName") || "").trim();
@@ -352,8 +310,6 @@ function createProjectPayload() {
         time_sensitive: Boolean(formData.get("timeSensitive")),
         difficulty: String(formData.get("difficulty") || "").trim(),
         card_color: String(formData.get("cardColor") || "").trim(),
-        card_url: String(formData.get("cardUrl") || "").trim(),
-        outcome_image_url: String(formData.get("outcomeImageUrl") || "").trim() || currentEditingImageUrl,
         show_in_this_week: Boolean(formData.get("showThisWeek")),
         created_at: new Date().toISOString(),
         
@@ -367,7 +323,6 @@ function createProjectPayload() {
         overview: linesToArray(formData.get("overview")),
         services: linesToArray(formData.get("services")),
         costs: linesToArray(formData.get("costs")),
-        outcomes: linesToArray(formData.get("outcomes"))
     };
 }
 
@@ -392,21 +347,6 @@ async function saveProjectShared(payload) {
     return result;
 }
 
-if (fileInput) {
-    fileInput.addEventListener("change", async (event) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        const activityName = String(form?.activityName?.value || "").trim();
-
-        try {
-            await uploadActivityImage(file, activityName);
-        } catch (error) {
-            setStatus(`Image upload failed: ${error.message}`, true);
-        }
-    });
-}
-
 if (cancelButton) {
     cancelButton.addEventListener("click", () => {
         window.location.href = "upload-menu.html";
@@ -416,8 +356,6 @@ if (cancelButton) {
 async function handleClearDraftClick() {
         clearProjectDraftStorage();
         setStatus("");
-        currentEditingImageUrl = "";
-
         if (!form) return;
 
         form.reset();
