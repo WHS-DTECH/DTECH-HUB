@@ -184,6 +184,7 @@ async function prefillFormIfEditing() {
         
         // Assessment-specific fields
         if (data.standard_details) form.standardDetails.value = linesToArray(data.standard_details).join("\n");
+        if (data.description || data.summary) form.shortDescription.value = String(data.description || data.summary || "").trim();
         if (data.tasks_list) form.tasksList.value = linesToArray(data.tasks_list).join("\n");
         if (data.achieved) form.achieved.value = linesToArray(data.achieved).join("\n");
         if (data.merit) form.merit.value = linesToArray(data.merit).join("\n");
@@ -211,6 +212,8 @@ function createAssessmentPayload() {
     const name = String(formData.get("activityName") || "").trim();
     const editingId = getEditingAssessmentId();
 
+    const shortDescription = String(formData.get("shortDescription") || "").trim();
+
     return {
         id: editingId || slugify(name),
         name,
@@ -224,6 +227,8 @@ function createAssessmentPayload() {
         created_at: new Date().toISOString(),
         
         // Assessment-specific fields
+        description: shortDescription,
+        summary: shortDescription,
         standard_details: linesToArray(formData.get("standardDetails")),
         tasks_list: linesToArray(formData.get("tasksList")),
         achieved: linesToArray(formData.get("achieved")),
