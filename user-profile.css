@@ -195,6 +195,46 @@
     color: #7a2323;
 }
 
+.timetable-grid-wrapper {
+    overflow-x: auto;
+    border: 1px solid #cfd8e2;
+    border-radius: 10px;
+    background: #f7fafc;
+}
+
+.timetable-grid {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 560px;
+}
+
+.timetable-grid th,
+.timetable-grid td {
+    border: 1px solid #d3dde7;
+    padding: 8px;
+    text-align: left;
+    vertical-align: top;
+    color: #1f3f5b;
+    font-size: 0.92rem;
+}
+
+.timetable-grid thead th {
+    background: #e6eef6;
+    color: #143556;
+    font-weight: 700;
+}
+
+.timetable-grid th[scope="row"] {
+    background: #eef4fa;
+    color: #2d4a66;
+    font-weight: 700;
+    width: 68px;
+}
+
+.timetable-cell-empty {
+    color: #6e8091;
+}
+
 @media (max-width: 980px) {
     .profile-grid {
         grid-template-columns: 1fr;

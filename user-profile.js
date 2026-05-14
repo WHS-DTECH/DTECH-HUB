@@ -21,6 +21,8 @@
     const loginPillEl = document.querySelector("#profile-login-pill");
     const connectionEl = document.querySelector("#profile-connection");
     const timetableEl = document.querySelector("#profile-timetable");
+    const overviewSubtextEl = document.querySelector("#profile-overview-subtext");
+    const timetableSubtextEl = document.querySelector("#profile-timetable-subtext");
     const csvLinksEl = document.querySelector("#profile-csv-links");
     const uploadHistoryEl = document.querySelector("#profile-upload-history");
     const classesEl = document.querySelector("#profile-classes");
@@ -559,6 +561,116 @@
         return rows;
     }
 
+    function buildStudentTimetableMatrix(row) {
+        const dayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+        const periodConfig = [
+            { label: "P1", keySuffixes: ["p1_1", "p1_2"] },
+            { label: "P2", keySuffixes: ["p2"] },
+            { label: "P3", keySuffixes: ["p3"] },
+            { label: "P4", keySuffixes: ["p4"] },
+            { label: "P5", keySuffixes: ["p5"] }
+        ];
+
+        const lowerKeyMap = new Map(Object.keys(row || {}).map((key) => [String(key || "").toLowerCase(), key]));
+
+        function getRowValue(columnKey) {
+            const matchedKey = lowerKeyMap.get(String(columnKey || "").toLowerCase());
+            return String(matchedKey ? row[matchedKey] : "").trim();
+        }
+
+        return {
+            days: dayOrder,
+            periods: periodConfig.map((period) => ({
+                label: period.label,
+                cells: dayOrder.map((day) => {
+                    const dayPrefix = day.toLowerCase();
+                    const values = period.keySuffixes
+                        .map((suffix) => getRowValue(`${dayPrefix}_${suffix}`))
+                        .filter(Boolean);
+                    return Array.from(new Set(values)).join(" / ");
+                })
+            }))
+        };
+    }
+
+    function renderStudentTimetableGrid(element, matchingRows) {
+        if (!element) return;
+
+        if (!matchingRows.length) {
+            setInfoStack(element, [{ text: "No timetable row is linked to this profile yet.", variant: "warn" }]);
+            return;
+        }
+
+        const preferredRow = matchingRows.find((row) => String(row.status || "").toLowerCase() !== "not current") || matchingRows[0];
+        const classSet = new Set();
+        const yearSet = new Set();
+
+        matchingRows.forEach((row) => {
+            const formClass = String(row.form_class || row.formclass || row.class_code || row.class || "").trim();
+            const yearLevel = String(row.year_level || row.yearlevel || "").trim();
+            if (formClass) classSet.add(formClass);
+            if (yearLevel) yearSet.add(yearLevel);
+        });
+
+        const matrix = buildStudentTimetableMatrix(preferredRow);
+
+        element.innerHTML = "";
+        const meta = [
+            { text: `Linked timetable rows: ${matchingRows.length}` },
+            { text: `Form classes: ${classSet.size ? Array.from(classSet).join(", ") : "None listed"}` },
+            { text: `Year levels: ${yearSet.size ? Array.from(yearSet).join(", ") : "None listed"}` }
+        ];
+        setInfoStack(element, meta);
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "timetable-grid-wrapper";
+
+        const table = document.createElement("table");
+        table.className = "timetable-grid";
+
+        const thead = document.createElement("thead");
+        const headRow = document.createElement("tr");
+        const periodHead = document.createElement("th");
+        periodHead.scope = "col";
+        periodHead.textContent = "Period";
+        headRow.appendChild(periodHead);
+
+        matrix.days.forEach((day) => {
+            const th = document.createElement("th");
+            th.scope = "col";
+            th.textContent = day;
+            headRow.appendChild(th);
+        });
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement("tbody");
+        matrix.periods.forEach((periodRow) => {
+            const row = document.createElement("tr");
+            const labelCell = document.createElement("th");
+            labelCell.scope = "row";
+            labelCell.textContent = periodRow.label;
+            row.appendChild(labelCell);
+
+            periodRow.cells.forEach((value) => {
+                const td = document.createElement("td");
+                if (value) {
+                    td.textContent = value;
+                } else {
+                    td.textContent = "-";
+                    td.className = "timetable-cell-empty";
+                }
+                row.appendChild(td);
+            });
+
+            tbody.appendChild(row);
+        });
+
+        table.appendChild(tbody);
+        wrapper.appendChild(table);
+        element.appendChild(wrapper);
+    }
+
     function buildClassSummary(matching) {
         if (!matching.length) {
             return [{ text: "No classes currently linked to this profile.", variant: "warn" }];
@@ -711,6 +823,18 @@
             classesCardEl.hidden = isStudentOnly;
         }
 
+        if (overviewSubtextEl) {
+            overviewSubtextEl.textContent = isStudentOnly
+                ? "Profile details are linked from your Google session and uploaded student timetable data."
+                : "Profile details are linked from Google session identity and uploaded Staff/Department CSV data.";
+        }
+
+        if (timetableSubtextEl) {
+            timetableSubtextEl.textContent = isStudentOnly
+                ? "Pulled from timetable CSV upload for your student profile."
+                : "Pulled from timetable CSV upload for your teacher code/profile.";
+        }
+
         if (roleEl) {
             roleEl.textContent = resolvedRole;
         }
@@ -751,7 +875,7 @@
                 ]);
             }
         } else {
-            setInfoStack(timetableEl, studentTimetableSummary);
+            renderStudentTimetableGrid(timetableEl, matchedStudentRows);
         }
 
         setInfoStack(classesEl, buildClassSummary(matchedStudentRows));
