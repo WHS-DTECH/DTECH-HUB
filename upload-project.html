@@ -168,9 +168,19 @@
                     <!-- Estimated Costs -->
                     <fieldset class="form-section">
                         <legend>Estimated Service Costs</legend>
-                        <div class="field field-wide">
-                            <label for="costs">Cost Breakdown (one per line, e.g., &quot;Service Name - $X.XX&quot;)</label>
-                            <textarea id="costs" name="costs" placeholder="Enter cost items, one per line..."></textarea>
+                        <div class="project-costs-layout">
+                            <div class="field costs-input-field">
+                                <label for="costs">Cost Breakdown (one per line, e.g., &quot;Service Name - $X.XX&quot;)</label>
+                                <textarea id="costs" name="costs" placeholder="Enter cost items, one per line..."></textarea>
+                            </div>
+
+                            <fieldset class="common-cost-values-panel">
+                                <legend>Common Cost Values</legend>
+                                <label><input type="checkbox" class="common-cost-option" value="Free - student project"> Free - student project</label>
+                                <label><input type="checkbox" class="common-cost-option" value="Materials supplied by client"> Materials supplied by client</label>
+                                <label><input type="checkbox" class="common-cost-option" value="School-funded materials"> School-funded materials</label>
+                                <label><input type="checkbox" class="common-cost-option" value="Estimated consumables cost - $"> Estimated consumables cost - $</label>
+                            </fieldset>
                         </div>
                     </fieldset>
 

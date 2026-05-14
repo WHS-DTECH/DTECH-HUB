@@ -165,6 +165,48 @@
     height: 14px;
 }
 
+.project-costs-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+}
+
+.costs-input-field textarea {
+    min-height: 84px;
+}
+
+.common-cost-values-panel {
+    border: 1px solid #a9c3df;
+    border-radius: 6px;
+    background: #eef4fd;
+    padding: 8px 10px;
+    display: grid;
+    gap: 6px;
+}
+
+.common-cost-values-panel legend {
+    color: #17395d;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 0 4px;
+}
+
+.common-cost-values-panel label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: #2f4e73;
+    font-size: 0.77rem;
+}
+
+.common-cost-values-panel input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+}
+
 .help-text {
     color: #687f9c;
     font-size: 0.72rem;
@@ -261,6 +303,10 @@
     }
 
     .resources-equipment-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .project-costs-layout {
         grid-template-columns: 1fr;
     }
 }

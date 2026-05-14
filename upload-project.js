@@ -1,6 +1,8 @@
 const form = document.querySelector("#upload-activity-form");
 const fileInput = document.querySelector("#outcome-image-file");
 const imageUrlInput = document.querySelector("#outcome-image-url");
+const costsInput = document.querySelector("#costs");
+const commonCostOptions = Array.from(document.querySelectorAll(".common-cost-option"));
 const uploadStatus = document.querySelector("#upload-status");
 const cancelButton = document.querySelector("#cancel-upload");
 const clearDraftButtons = Array.from(document.querySelectorAll("[data-clear-project-draft]"));
@@ -14,6 +16,59 @@ function getEditingProjectId() {
     return String(params.get("id") || "").trim();
 }
 
+function getTextareaLinesSet(textarea) {
+    return new Set(
+        String(textarea?.value || "")
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean)
+    );
+}
+
+function setTextareaLines(textarea, values) {
+    if (!textarea) return;
+    textarea.value = Array.from(values).join("\n");
+}
+
+function syncCommonCostOptionsFromTextarea() {
+    if (!costsInput || !commonCostOptions.length) {
+        return;
+    }
+
+    const normalizedLines = new Set(
+        Array.from(getTextareaLinesSet(costsInput)).map((value) => value.toLowerCase())
+    );
+
+    commonCostOptions.forEach((option) => {
+        const value = String(option.value || "").trim().toLowerCase();
+        option.checked = normalizedLines.has(value);
+    });
+}
+
+function toggleCommonCost(value, isChecked) {
+    if (!costsInput) {
+        return;
+    }
+
+    const line = String(value || "").trim();
+    if (!line) {
+        return;
+    }
+
+    const lines = getTextareaLinesSet(costsInput);
+    if (isChecked) {
+        lines.add(line);
+    } else {
+        const lowered = line.toLowerCase();
+        for (const existing of Array.from(lines)) {
+            if (existing.toLowerCase() === lowered) {
+                lines.delete(existing);
+            }
+        }
+    }
+
+    setTextareaLines(costsInput, lines);
+}
 function parseMaybeArray(value) {
     if (Array.isArray(value)) {
         return value;
@@ -134,6 +189,7 @@ async function prefillProjectIfEditing() {
         if (data.services) form.services.value = parseMaybeArray(data.services).join("\n");
         if (data.costs) form.costs.value = parseMaybeArray(data.costs).join("\n");
         if (data.outcomes) form.outcomes.value = parseMaybeArray(data.outcomes).join("\n");
+        syncCommonCostOptionsFromTextarea();
         saveProjectDraft();
     } catch (_error) {
         // Ignore prefill failures and allow the form to remain editable.
@@ -213,6 +269,8 @@ function restoreProjectDraftIfAvailable() {
 
         field.value = String(draft[key] || "");
     });
+
+    syncCommonCostOptionsFromTextarea();
 }
 
 function bindProjectDraftAutosave() {
@@ -363,6 +421,7 @@ async function handleClearDraftClick() {
         if (!form) return;
 
         form.reset();
+        syncCommonCostOptionsFromTextarea();
 
         if (getEditingProjectId()) {
             await prefillProjectIfEditing();
@@ -378,6 +437,22 @@ if (clearDraftButtons.length) {
         button.addEventListener("click", handleClearDraftClick);
     });
 }
+
+if (costsInput) {
+    costsInput.addEventListener("input", () => {
+        syncCommonCostOptionsFromTextarea();
+    });
+}
+
+if (commonCostOptions.length) {
+    commonCostOptions.forEach((option) => {
+        option.addEventListener("change", () => {
+            toggleCommonCost(option.value, option.checked);
+        });
+    });
+}
+
+syncCommonCostOptionsFromTextarea();
 
 if (form) {
     form.addEventListener("submit", async (event) => {
