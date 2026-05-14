@@ -221,6 +221,161 @@
         });
     }
 
+    function normalizeCode(value) {
+        return String(value || "")
+            .toUpperCase()
+            .replace(/[^A-Z0-9]/g, "")
+            .trim();
+    }
+
+    function collectTeacherIdentifiers(email, candidateNames, staffRows) {
+        const emailSet = new Set();
+        const codeSet = new Set();
+        const nameSet = new Set();
+
+        const normalizedEmail = normalizeEmail(email);
+        if (normalizedEmail) {
+            emailSet.add(normalizedEmail);
+            const localPart = normalizedEmail.split("@")[0] || "";
+            const localCode = normalizeCode(localPart);
+            if (localCode) {
+                codeSet.add(localCode);
+            }
+        }
+
+        collectStudentNameCandidates(candidateNames).forEach((name) => {
+            nameSet.add(name);
+        });
+
+        (Array.isArray(staffRows) ? staffRows : []).forEach((row) => {
+            collectCandidateEmails(row).forEach((linkedEmail) => {
+                emailSet.add(linkedEmail);
+                const localPart = String(linkedEmail).split("@")[0] || "";
+                const localCode = normalizeCode(localPart);
+                if (localCode) {
+                    codeSet.add(localCode);
+                }
+            });
+
+            [row && row.code, row && row.staff_code, row && row.staffid].forEach((value) => {
+                const normalized = normalizeCode(value);
+                if (normalized) {
+                    codeSet.add(normalized);
+                }
+            });
+
+            const displayName = normalizePersonName(getRowDisplayName(row));
+            if (displayName) {
+                nameSet.add(displayName);
+            }
+        });
+
+        return { emailSet, codeSet, nameSet };
+    }
+
+    function collectLinkedTeacherTimetableRows(teacherRows, identifiers) {
+        const safeRows = Array.isArray(teacherRows) ? teacherRows : [];
+        const emailSet = identifiers && identifiers.emailSet ? identifiers.emailSet : new Set();
+        const codeSet = identifiers && identifiers.codeSet ? identifiers.codeSet : new Set();
+        const nameSet = identifiers && identifiers.nameSet ? identifiers.nameSet : new Set();
+
+        const teacherCodeColumns = ["Teacher", "teacher", "teacher_code", "Teacher_Code", "staff_code", "code", "teacherid", "Teacher_ID"];
+        const teacherNameColumns = ["Teacher_Name", "teacher_name", "teachername", "name", "display_name", "teacher"];
+        const teacherEmailColumns = ["teacher_email", "Teacher_Email", "email", "email_school", "staff_email", "google_email", "user_email"];
+
+        return safeRows.filter((row) => {
+            const rowEmail = pickFirstNonEmpty(teacherEmailColumns.map((columnName) => row && row[columnName]));
+            const normalizedEmail = normalizeEmail(rowEmail);
+            if (normalizedEmail && emailSet.has(normalizedEmail)) {
+                return true;
+            }
+
+            const rowCode = pickFirstNonEmpty(teacherCodeColumns.map((columnName) => row && row[columnName]));
+            const normalizedCode = normalizeCode(rowCode);
+            if (normalizedCode && codeSet.has(normalizedCode)) {
+                return true;
+            }
+
+            const rowName = normalizePersonName(pickFirstNonEmpty(teacherNameColumns.map((columnName) => row && row[columnName])));
+            if (!rowName || !nameSet.size) {
+                return false;
+            }
+
+            if (nameSet.has(rowName)) {
+                return true;
+            }
+
+            for (const candidate of nameSet) {
+                if (rowName.includes(candidate) || candidate.includes(rowName)) {
+                    return true;
+                }
+            }
+
+            return false;
+        });
+    }
+
+    function getTeacherTimetableEntries(row) {
+        const skipColumns = new Set([
+            "id", "teacher", "teacher_name", "teacher_code", "teacher_email", "email", "email_school", "staff_email",
+            "upload_year", "upload_term", "upload_date", "updated_at", "created_at"
+        ]);
+
+        return Object.entries(row || {})
+            .map(([key, value]) => ({ key: String(key || ""), value: String(value || "").trim() }))
+            .filter((entry) => entry.value && !skipColumns.has(entry.key.toLowerCase()))
+            .map((entry) => ({
+                key: entry.key,
+                label: buildTimetableLabel(entry.key),
+                value: entry.value
+            }));
+    }
+
+    function buildTeacherTimetableSummary(matching) {
+        if (!matching.length) {
+            return [{ text: "No teacher timetable row is linked to this profile yet.", variant: "warn" }];
+        }
+
+        const preferredRow = matching.find((row) => String(row.status || "").toLowerCase() !== "not current") || matching[0];
+        const teacherCode = pickFirstNonEmpty([
+            preferredRow && preferredRow.Teacher,
+            preferredRow && preferredRow.teacher,
+            preferredRow && preferredRow.teacher_code,
+            preferredRow && preferredRow.staff_code,
+            preferredRow && preferredRow.code
+        ]);
+        const teacherName = pickFirstNonEmpty([
+            preferredRow && preferredRow.Teacher_Name,
+            preferredRow && preferredRow.teacher_name,
+            preferredRow && preferredRow.teachername,
+            preferredRow && preferredRow.name
+        ]);
+
+        const rows = [{ text: `Linked teacher timetable rows: ${matching.length}` }];
+        if (teacherCode) {
+            rows.push({ text: `Teacher code: ${teacherCode}` });
+        }
+        if (teacherName) {
+            rows.push({ text: `Teacher name: ${teacherName}` });
+        }
+
+        const entries = getTeacherTimetableEntries(preferredRow);
+        if (!entries.length) {
+            rows.push({ text: "No teacher timetable periods were included in the current upload.", variant: "warn" });
+            return rows;
+        }
+
+        entries.slice(0, 50).forEach((entry) => {
+            rows.push({ text: `${entry.label}: ${entry.value}` });
+        });
+
+        if (entries.length > 50) {
+            rows.push({ text: `... plus ${entries.length - 50} more timetable fields`, variant: "warn" });
+        }
+
+        return rows;
+    }
+
     function buildUploadHistory(staffRows, email) {
         const matching = staffRows.filter((row) => collectCandidateEmails(row).has(email));
         if (!matching.length) {
@@ -363,15 +518,21 @@
             );
         }
 
-        const [staffRows, studentRows, userRoleRows] = await Promise.all([
+        const [staffRows, studentRows, userRoleRows, teacherTimetableRows] = await Promise.all([
             fetchJson("/api/staff_upload/all").catch(() => []),
             fetchJson("/api/student_timetable/all").catch(() => []),
-            fetchJson("/api/admin/user-roles").catch(() => [])
+            fetchJson("/api/admin/user-roles").catch(() => []),
+            fetchJson("/api/timetable/all").catch(() => [])
         ]);
 
         const safeStaffRows = Array.isArray(staffRows) ? staffRows : Array.isArray(staffRows.staff) ? staffRows.staff : [];
         const safeStudentRows = Array.isArray(studentRows) ? studentRows : Array.isArray(studentRows.students) ? studentRows.students : [];
         const safeRoleRows = Array.isArray(userRoleRows) ? userRoleRows : [];
+        const safeTeacherTimetableRows = Array.isArray(teacherTimetableRows)
+            ? teacherTimetableRows
+            : Array.isArray(teacherTimetableRows.timetable)
+                ? teacherTimetableRows.timetable
+                : [];
 
         const roleFromRolePage = safeRoleRows.find((row) => normalizeEmail(row && row.user_email) === email);
         const matchedStaffRows = safeStaffRows.filter((row) => collectCandidateEmails(row).has(email));
@@ -380,6 +541,12 @@
             email,
             [loginName, roleFromRolePage && roleFromRolePage.display_name, profile && profile.name, profile && profile.given_name]
         );
+        const teacherIdentifiers = collectTeacherIdentifiers(
+            email,
+            [loginName, roleFromRolePage && roleFromRolePage.display_name, profile && profile.name, profile && profile.given_name],
+            matchedStaffRows
+        );
+        const matchedTeacherTimetableRows = collectLinkedTeacherTimetableRows(safeTeacherTimetableRows, teacherIdentifiers);
 
         const resolvedName = pickFirstNonEmpty([
             getRowDisplayName(matchedStaffRows[0]),
@@ -407,20 +574,43 @@
 
         const matchedStaffCount = matchedStaffRows.length;
         const matchedStudentCount = matchedStudentRows.length;
+        const matchedTeacherTimetableCount = matchedTeacherTimetableRows.length;
 
         setInfoStack(csvLinksEl, [
             { text: `Staff CSV links: ${matchedStaffCount}` },
             { text: `Student timetable links: ${matchedStudentCount}` },
+            { text: `Teacher timetable links: ${matchedTeacherTimetableCount}` },
             {
-                text: matchedStaffCount || matchedStudentCount
+                text: matchedStaffCount || matchedStudentCount || matchedTeacherTimetableCount
                     ? "CSV links found for this account."
                     : "No direct email links found yet. Ask admin to include your school email in uploads.",
-                variant: matchedStaffCount || matchedStudentCount ? "" : "warn"
+                variant: matchedStaffCount || matchedStudentCount || matchedTeacherTimetableCount ? "" : "warn"
             }
         ]);
 
         setInfoStack(uploadHistoryEl, buildUploadHistory(safeStaffRows, email));
-        setInfoStack(timetableEl, buildTimetableSummary(matchedStudentRows, [loginName, roleFromRolePage && roleFromRolePage.display_name, profile && profile.name]));
+        const roleLooksStudent = /^student\b/i.test(String(resolvedRole || "").trim());
+        const showTeacherTimetable = Boolean(accessData && accessData.can_teacher_view) && !roleLooksStudent;
+        const studentTimetableSummary = buildTimetableSummary(
+            matchedStudentRows,
+            [loginName, roleFromRolePage && roleFromRolePage.display_name, profile && profile.name]
+        );
+
+        if (showTeacherTimetable) {
+            const teacherSummary = buildTeacherTimetableSummary(matchedTeacherTimetableRows);
+            if (matchedTeacherTimetableRows.length) {
+                setInfoStack(timetableEl, teacherSummary);
+            } else {
+                setInfoStack(timetableEl, [
+                    ...teacherSummary,
+                    { text: "Falling back to student timetable links where available.", variant: "warn" },
+                    ...studentTimetableSummary
+                ]);
+            }
+        } else {
+            setInfoStack(timetableEl, studentTimetableSummary);
+        }
+
         setInfoStack(classesEl, buildClassSummary(matchedStudentRows));
     }
 

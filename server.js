@@ -24,6 +24,7 @@ const pool = new Pool({
 
 const STAFF_TABLE_CANDIDATES = ["staff_upload", "upload_staff"];
 const STUDENT_TABLE_CANDIDATES = ["student_timetable"];
+const TEACHER_TIMETABLE_TABLE_CANDIDATES = ["upload_timetable", "timetable", "teacher_timetable"];
 const SCHOOL_EMAIL_DOMAIN = "westlandhigh.school.nz";
 const DTECH_HUB_NAME = "DTECH-HUB";
 const STUDENT_TIMETABLE_PERIOD_COLUMNS = [
@@ -723,6 +724,44 @@ async function resolveStudentTableName() {
 
   const availableTables = new Set(result.rows.map((row) => String(row.table_name || "").toLowerCase()));
   return STUDENT_TABLE_CANDIDATES.find((tableName) => availableTables.has(tableName)) || "student_timetable";
+}
+
+async function resolveTeacherTimetableTableName() {
+  const result = await pool.query(
+    `
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+        AND table_name = ANY($1::text[])
+    `,
+    [TEACHER_TIMETABLE_TABLE_CANDIDATES]
+  );
+
+  const availableTables = new Set(result.rows.map((row) => String(row.table_name || "").toLowerCase()));
+  return TEACHER_TIMETABLE_TABLE_CANDIDATES.find((tableName) => availableTables.has(tableName)) || "";
+}
+
+async function getTeacherTimetableRows() {
+  if (!hasDatabase) {
+    return [];
+  }
+
+  const tableName = await resolveTeacherTimetableTableName();
+  if (!tableName) {
+    return [];
+  }
+
+  const columns = await getAllTableColumns(tableName);
+  if (!columns.length) {
+    return [];
+  }
+
+  const quotedColumns = columns.map((columnName) => quoteIdentifier(columnName)).join(", ");
+  const result = await pool.query(
+    `SELECT ${quotedColumns} FROM ${tableName}${buildOrderByClause(columns)}`
+  );
+
+  return result.rows;
 }
 
 async function getStudentDirectoryRows() {
@@ -2183,6 +2222,15 @@ app.get("/api/student_timetable/all", async (_req, res) => {
     res.json({ students: rows });
   } catch (_error) {
     res.json({ students: [] });
+  }
+});
+
+app.get("/api/timetable/all", async (_req, res) => {
+  try {
+    const rows = await getTeacherTimetableRows();
+    res.json({ timetable: rows });
+  } catch (_error) {
+    res.json({ timetable: [] });
   }
 });
 
