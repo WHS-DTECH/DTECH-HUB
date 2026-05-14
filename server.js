@@ -768,6 +768,88 @@ async function getUserRoleByEmail(email) {
   return memoryMatch;
 }
 
+function getRequestUserEmail(req) {
+  const headerEmail = normalizeEmail(
+    req.headers["x-user-email"] ||
+    req.headers["x-hub-user-email"] ||
+    req.headers["x-forwarded-email"]
+  );
+
+  if (headerEmail) {
+    return headerEmail;
+  }
+
+  const queryEmail = normalizeEmail(req.query?.email);
+  if (queryEmail) {
+    return queryEmail;
+  }
+
+  return normalizeEmail(req.body?.user_email);
+}
+
+async function resolveActivityWriteAccess(email) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) {
+    return {
+      email: "",
+      isAdmin: false,
+      isStaff: false,
+      allowed: false
+    };
+  }
+
+  const userRole = await getUserRoleByEmail(normalizedEmail);
+  const assignedRole = canonicalizeRoleName(userRole?.additional_role || userRole?.role_name || "");
+  const allPermissions = await getMergedRolePermissions();
+  const rolePermission = allPermissions.find(
+    (row) => canonicalizeRoleName(row.role_name) === assignedRole
+  ) || null;
+
+  let isStaffFromDirectory = false;
+  try {
+    const staffRows = await getStaffDirectoryRows();
+    isStaffFromDirectory = staffRows.some((row) =>
+      collectDirectoryEmails(row, ["email_school", "email", "user_email", "staff_email", "google_email"]).has(normalizedEmail)
+    );
+  } catch (_error) {
+    isStaffFromDirectory = false;
+  }
+
+  const staffRoles = new Set(["Admin", "Lead Teacher", "Teacher", "Technician", "Staff"]);
+  const isStaffFromRole = staffRoles.has(assignedRole);
+  const isAdmin = Boolean(rolePermission?.admin) || assignedRole === "Admin" || assignedRole === "Student Admin";
+  const canUploadByRolePermission = Boolean(rolePermission?.upload_activity || rolePermission?.admin);
+  const isStaff = isStaffFromDirectory || isStaffFromRole;
+
+  return {
+    email: normalizedEmail,
+    isAdmin,
+    isStaff,
+    allowed: Boolean(isAdmin || isStaff || canUploadByRolePermission)
+  };
+}
+
+async function requireActivityWriteAccess(req, res, next) {
+  const requesterEmail = getRequestUserEmail(req);
+  if (!requesterEmail) {
+    res.status(401).json({ error: "Sign-in required. Missing user email." });
+    return;
+  }
+
+  try {
+    const access = await resolveActivityWriteAccess(requesterEmail);
+    if (!access.allowed) {
+      res.status(403).json({ error: "Staff or admin access is required for this action." });
+      return;
+    }
+
+    req.activityWriteAccess = access;
+    next();
+  } catch (_error) {
+    res.status(500).json({ error: "Could not verify write permissions." });
+  }
+}
+
 function buildOrderByClause(availableColumns) {
   const preferredOrder = ["last_name", "first_name", "user_type", "user_email", "id"];
   const orderColumns = preferredOrder.filter((columnName) => availableColumns.includes(columnName));
@@ -1223,11 +1305,15 @@ app.get("/api/activities/:id", async (req, res) => {
   }
 });
 
-app.post("/api/activities", async (req, res) => {
+app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
   const body = req.body || {};
   const name = String(body.name || "").trim();
   const yearLevel = String(body.year_level || "").trim();
   const type = String(body.type || "").trim();
+  const durationMinutesInput = Number.parseInt(
+    body.duration_minutes ?? body.durationMinutes ?? body.duration_hours,
+    10
+  );
 
   if (!name || !yearLevel || !type) {
     res.status(400).send("name, year_level, and type are required");
@@ -1241,7 +1327,7 @@ app.post("/api/activities", async (req, res) => {
     year_level: yearLevel,
     type,
     activity_category: String(body.activity_category || "Practice").trim() || "Practice",
-    duration_hours: Number.parseInt(body.duration_hours, 10) || 1,
+    duration_minutes: Number.isInteger(durationMinutesInput) && durationMinutesInput > 0 ? durationMinutesInput : 1,
     difficulty: String(body.difficulty || "Beginner").trim() || "Beginner",
     card_color: String(body.card_color || "Rose").trim() || "Rose",
     card_url: String(body.card_url || "").trim(),
@@ -1345,7 +1431,7 @@ app.post("/api/activities", async (req, res) => {
     }
 
     if (activityCategoryColumn) sqlColumns.push({ name: activityCategoryColumn, value: payload.activity_category });
-    if (durationColumn) sqlColumns.push({ name: durationColumn, value: payload.duration_hours });
+    if (durationColumn) sqlColumns.push({ name: durationColumn, value: payload.duration_minutes });
     if (difficultyColumn) sqlColumns.push({ name: difficultyColumn, value: payload.difficulty });
     if (cardColorColumn) sqlColumns.push({ name: cardColorColumn, value: payload.card_color });
     if (cardUrlColumn) sqlColumns.push({ name: cardUrlColumn, value: payload.card_url });
@@ -1434,7 +1520,7 @@ app.post("/api/activities", async (req, res) => {
   }
 });
 
-app.delete("/api/activities", async (_req, res) => {
+app.delete("/api/activities", requireActivityWriteAccess, async (_req, res) => {
   if (!hasDatabase) {
     memoryActivities.clear();
     res.status(204).send();
@@ -1449,7 +1535,7 @@ app.delete("/api/activities", async (_req, res) => {
   }
 });
 
-app.post("/api/activities/:id/upload-image", async (req, res) => {
+app.post("/api/activities/:id/upload-image", requireActivityWriteAccess, async (req, res) => {
   const activityId = String(req.params.id || "").trim();
   const body = req.body || {};
   const imageData = String(body.image_data || "").trim();
