@@ -158,10 +158,20 @@ async function saveActivityShared(payload) {
         body: JSON.stringify(payload)
     });
 
+    const data = await response.json().catch(() => null);
+
     if (!response.ok) {
-        const details = await response.text();
-        throw new Error(details || "Could not save activity");
+        const message =
+            (data && (data.error || data.message)) ||
+            `Could not save activity (HTTP ${response.status})`;
+        throw new Error(message);
     }
+
+    if (!data || (!data.id && !data.name)) {
+        throw new Error("Save response was incomplete. Please try again.");
+    }
+
+    return data;
 }
 
 if (fileInput) {
@@ -202,9 +212,10 @@ if (form) {
 
         setStatus("Saving activity...", false);
         try {
-            await saveActivityShared(payload);
+            const saved = await saveActivityShared(payload);
             localStorage.setItem("dtechHub:lastActivityDraft", JSON.stringify(payload));
-            setStatus("Activity saved! Redirecting to Activities Library...", false);
+            localStorage.setItem("dtechHub:lastSavedActivityId", String(saved.id || payload.id || ""));
+            setStatus(`Activity "${saved.name || payload.name}" saved. Redirecting to Activities Library...`, false);
             setTimeout(() => {
                 window.location.href = "/index.html#project-library";
             }, 1000);
