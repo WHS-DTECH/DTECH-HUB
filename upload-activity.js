@@ -48,6 +48,7 @@ const fileInput = document.querySelector("#outcome-image-file");
 const imageUrlInput = document.querySelector("#outcome-image-url");
 const uploadStatus = document.querySelector("#upload-status");
 const cancelButton = document.querySelector("#cancel-upload");
+const authStatusElement = document.querySelector("#activity-auth-status");
 const classPreparationInput = document.querySelector("#class-preparation");
 const classPreparationNoneCheckbox = document.querySelector("#class-preparation-none");
 const resourcesInput = document.querySelector("#resources");
@@ -255,6 +256,27 @@ function withUserEmailHeader(headers = {}) {
         "x-user-email": email
     };
 }
+
+function renderActivityAuthStatus() {
+    if (!authStatusElement) return;
+
+    const email = getSignedInEmail();
+    if (email) {
+        authStatusElement.classList.remove("is-missing");
+        authStatusElement.textContent = `Signed in as ${email}`;
+        return;
+    }
+
+    authStatusElement.classList.add("is-missing");
+    authStatusElement.textContent = "Not signed in. Sign in with your school Google account before saving.";
+}
+
+window.addEventListener("DOMContentLoaded", renderActivityAuthStatus);
+window.addEventListener("storage", (event) => {
+    if (event.key === UPLOAD_HUB_AUTH_STORAGE_KEY) {
+        renderActivityAuthStatus();
+    }
+});
 
 function setStatus(message, isError = false) {
     if (!uploadStatus) return;
