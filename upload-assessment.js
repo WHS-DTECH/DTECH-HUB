@@ -19,7 +19,27 @@ function slugify(value) {
 }
 
 function linesToArray(value) {
-    return String(value || "")
+    if (Array.isArray(value)) {
+        return value.map((line) => String(line || "").trim()).filter(Boolean);
+    }
+
+    const text = String(value || "").trim();
+    if (!text) {
+        return [];
+    }
+
+    if (text.startsWith("[") && text.endsWith("]")) {
+        try {
+            const parsed = JSON.parse(text);
+            if (Array.isArray(parsed)) {
+                return parsed.map((line) => String(line || "").trim()).filter(Boolean);
+            }
+        } catch (_error) {
+            // Fall through to newline parsing.
+        }
+    }
+
+    return text
         .split(/\r?\n/)
         .map((line) => line.trim())
         .filter(Boolean);
