@@ -2016,12 +2016,13 @@ app.get("/api/project-interests", requireActivityWriteAccess, async (_req, res) 
         json_agg(
           json_build_object(
             'email', pi.student_email,
+            'student_email', pi.student_email,
             'confirmed', pi.confirmed,
             'created_at', pi.created_at
-          ) ORDER BY pi.created_at ASC
-        ) AS students
+          )
+        ) FILTER (WHERE pi.student_email IS NOT NULL) AS students
       FROM project_interests pi
-      LEFT JOIN activities a ON a.id = pi.project_id
+      LEFT JOIN activities a ON a.id::text = pi.project_id
       GROUP BY pi.project_id
       ORDER BY interest_count DESC
     `);
@@ -2031,9 +2032,10 @@ app.get("/api/project-interests", requireActivityWriteAccess, async (_req, res) 
       project_name: row.project_name || row.project_id,
       interest_count: row.interest_count,
       confirmed_count: row.confirmed_count,
-      students: Array.isArray(row.students) ? row.students : []
+      students: Array.isArray(row.students) ? row.students.sort((a, b) => new Date(a.created_at) - new Date(b.created_at)) : []
     })));
   } catch (error) {
+    console.error("[project-interests] Query failed:", error.message);
     res.status(500).json({ error: "Could not load project interests" });
   }
 });
