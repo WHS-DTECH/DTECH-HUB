@@ -3,6 +3,78 @@ const fileInput = document.querySelector("#outcome-image-file");
 const imageUrlInput = document.querySelector("#outcome-image-url");
 const uploadStatus = document.querySelector("#upload-status");
 const cancelButton = document.querySelector("#cancel-upload");
+let currentEditingImageUrl = "";
+
+function getEditingProjectId() {
+    const params = new URLSearchParams(window.location.search);
+    return String(params.get("id") || "").trim();
+}
+
+function parseMaybeArray(value) {
+    if (Array.isArray(value)) {
+        return value;
+    }
+
+    const raw = String(value || "").trim();
+    if (!raw) {
+        return [];
+    }
+
+    try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [raw];
+    } catch (_error) {
+        return raw
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean);
+    }
+}
+
+async function prefillProjectIfEditing() {
+    const id = getEditingProjectId();
+    if (!id || !form) return;
+
+    try {
+        const response = await fetch(`/api/activities/${encodeURIComponent(id)}`);
+        if (!response.ok) return;
+
+        const data = await response.json();
+
+        if (data.name) form.activityName.value = data.name;
+        if (data.start_date) form.startDate.value = data.start_date;
+        if (data.year_level) form.yearLevel.value = data.year_level;
+        if (data.type) form.type.value = data.type;
+        if (data.activity_category) form.activityCategory.value = data.activity_category;
+        if (data.difficulty) form.difficulty.value = data.difficulty;
+        if (data.duration_hours !== undefined && data.duration_hours !== null) {
+            form.durationMinutes.value = Number(data.duration_hours) > 12 ? Math.round(Number(data.duration_hours)) : Math.round(Number(data.duration_hours) * 60);
+        }
+        if (data.card_color || data.card_colour || data.color) form.cardColor.value = data.card_color || data.card_colour || data.color;
+        if (data.card_url || data.activity_url || data.url) form.cardUrl.value = data.card_url || data.activity_url || data.url;
+        currentEditingImageUrl = String(data.outcome_image_url || data.image_url || "").trim();
+        if (currentEditingImageUrl) form.outcomeImageUrl.value = currentEditingImageUrl;
+        if (data.show_in_this_week !== undefined || data.show_this_week !== undefined || data.is_this_week !== undefined) {
+            form.showThisWeek.checked = Boolean(data.show_in_this_week ?? data.show_this_week ?? data.is_this_week);
+        }
+
+        if (data.contact_name) form.contactName.value = data.contact_name;
+        if (data.contact_phone) form.contactPhone.value = data.contact_phone;
+        if (data.contact_email) form.contactEmail.value = data.contact_email;
+        if (data.company) form.company.value = data.company;
+        if (data.address) form.address.value = data.address;
+        if (data.overview) form.overview.value = parseMaybeArray(data.overview).join("\n");
+        if (data.services) form.services.value = parseMaybeArray(data.services).join("\n");
+        if (data.costs) form.costs.value = parseMaybeArray(data.costs).join("\n");
+        if (data.outcomes) form.outcomes.value = parseMaybeArray(data.outcomes).join("\n");
+        if (data.withdrawal_date) form.withdrawalDate.value = data.withdrawal_date;
+        if (data.client_id) form.clientId.value = data.client_id;
+    } catch (_error) {
+        // Ignore prefill failures and allow the form to remain editable.
+    }
+}
+
+window.addEventListener("DOMContentLoaded", prefillProjectIfEditing);
 
 function slugify(value) {
     return String(value || "")
@@ -63,15 +135,17 @@ async function uploadActivityImage(file, activityName) {
     }
 
     imageUrlInput.value = payload.image_url;
+    currentEditingImageUrl = payload.image_url || currentEditingImageUrl;
     setStatus("Image uploaded successfully. URL has been filled in.");
 }
 
 function createProjectPayload() {
     const formData = new FormData(form);
     const name = String(formData.get("activityName") || "").trim();
+    const editingId = getEditingProjectId();
 
     return {
-        id: slugify(name),
+        id: editingId || slugify(name),
         name,
         year_level: String(formData.get("yearLevel") || "").trim(),
         type: String(formData.get("type") || "Project").trim(),
@@ -80,7 +154,7 @@ function createProjectPayload() {
         difficulty: String(formData.get("difficulty") || "").trim(),
         card_color: String(formData.get("cardColor") || "").trim(),
         card_url: String(formData.get("cardUrl") || "").trim(),
-        outcome_image_url: String(formData.get("outcomeImageUrl") || "").trim(),
+        outcome_image_url: String(formData.get("outcomeImageUrl") || "").trim() || currentEditingImageUrl,
         show_in_this_week: Boolean(formData.get("showThisWeek")),
         created_at: new Date().toISOString(),
         
@@ -109,10 +183,13 @@ async function saveProjectShared(payload) {
         body: JSON.stringify(payload)
     });
 
+    const result = await response.json().catch(() => ({}));
+
     if (!response.ok) {
-        const details = await response.text();
-        throw new Error(details || "Could not save project");
+        throw new Error(result.error || result.message || "Could not save project");
     }
+
+    return result;
 }
 
 if (fileInput) {
@@ -147,8 +224,9 @@ if (form) {
         }
 
         try {
-            await saveProjectShared(payload);
+            const saved = await saveProjectShared(payload);
             localStorage.setItem("dtechHub:lastProjectDraft", JSON.stringify(payload));
+            localStorage.setItem("dtechHub:lastSavedProjectId", String(saved.id || payload.id || ""));
             setStatus("Project saved to Activities Library.");
         } catch (error) {
             setStatus(`Save failed: ${error.message}`, true);
