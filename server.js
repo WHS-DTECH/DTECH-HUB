@@ -53,6 +53,16 @@ const DTECH_TIMETABLE_KEYWORDS = [
   "cyber",
   "tinkercad"
 ];
+
+// Program-specific keyword mappings
+const PROGRAM_KEYWORDS = {
+  "DTECH": ["dtech", "d-tec", "digital tech", "digital technologies", "digitech"],
+  "DTONLINE": ["dtonline", "dt online", "d-t online", "online tech"],
+  "COMP": ["comp", "computing", "computer", "programming", "python"],
+  "TEXT": ["text", "textile", "textiles", "sewing"],
+  "MPROG": ["mprog", "media prog", "media programming"],
+  "MDTECH": ["mdtech", "m-dtech", "media dtech"]
+};
 const TIMETABLE_LABELS = new Map(STUDENT_TIMETABLE_PERIOD_COLUMNS.map((columnName) => {
   const label = columnName
     .replace(/_/g, " ")
@@ -769,6 +779,7 @@ function buildStudentClassManagementRow(row) {
     has_dtech: dtechTimetable.length > 0,
     dtech_period_count: dtechTimetable.length,
     dtech_timetable: dtechTimetable,
+    programs: getStudentPrograms(row),
     timetable
   };
 }
@@ -1275,7 +1286,10 @@ async function getSuggestionRecipients() {
         ? `COALESCE(NULLIF(${quoteIdentifier(columns.additionalRole)}, ''), ${quoteIdentifier(columns.legacyRoleName)}) AS additional_role`
         : columns.additionalRole
           ? `${quoteIdentifier(columns.additionalRole)} AS additional_role`
-          : `'' AS additional_role`
+          : `'' AS additional_role`,
+      columns.hubAccess
+        ? `${quoteIdentifier(columns.hubAccess)} AS hub_access`
+        : `ARRAY['DTECH-HUB']::text[] AS hub_access`
     ];
 
     const result = await pool.query(`SELECT ${selectColumns.join(", ")} FROM user_additional_roles`);

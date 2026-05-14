@@ -91,12 +91,12 @@ function buildSelectOptions(elementId, values, defaultLabel) {
 
 function renderSummary(students, visibleStudents) {
     const total = students.length;
-    const dtech = students.filter((student) => student.has_dtech).length;
+    const withPrograms = students.filter((student) => Array.isArray(student.programs) && student.programs.length).length;
     const linked = students.filter((student) => Array.isArray(student.linked_emails) && student.linked_emails.length).length;
 
     const summaryMap = new Map([
         ["summary-total", total],
-        ["summary-dtech", dtech],
+        ["summary-dtech", withPrograms],
         ["summary-visible", visibleStudents.length],
         ["summary-linked", linked]
     ]);
@@ -108,7 +108,7 @@ function renderSummary(students, visibleStudents) {
 
     const meta = document.getElementById("class-results-meta");
     if (meta) {
-        meta.textContent = `Showing ${visibleStudents.length} of ${total} students. ${dtech} students currently match DTECH timetable keywords.`;
+        meta.textContent = `Showing ${visibleStudents.length} of ${total} students. ${withPrograms} students have program matches.`;
     }
 }
 
@@ -122,9 +122,9 @@ function formatTimetablePills(entries, emptyMessage) {
 
 function renderStudentRow(student) {
     const statusClass = String(student.status || "").toLowerCase() === "not current" ? "pill-not-current" : "pill-current";
-    const dtechClass = student.has_dtech ? "pill-dtech" : "pill-non-dtech";
     const yearForm = [student.year_level && `Year ${student.year_level}`, student.form_class].filter(Boolean).join(" | ") || "Not specified";
     const uploadMeta = [student.upload_term, student.upload_year && `Year ${student.upload_year}`, student.upload_date && `Uploaded ${formatDate(student.upload_date)}`].filter(Boolean).join(" | ");
+    const programs = Array.isArray(student.programs) && student.programs.length ? student.programs.join(", ") : "No programs matched";
 
     return `
         <tr>
@@ -137,7 +137,7 @@ function renderStudentRow(student) {
             <td>
                 <div class="badge-row">
                     <span class="pill ${statusClass}">${escapeHtml(student.status || "Current")}</span>
-                    <span class="pill ${dtechClass}">${student.has_dtech ? `DTECH (${student.dtech_period_count})` : "No DTECH match"}</span>
+                    <span class="pill ${student.programs?.length ? "pill-dtech" : "pill-non-dtech"}">${escapeHtml(programs)}</span>
                 </div>
             </td>
             <td>${Array.isArray(student.linked_emails) && student.linked_emails.length ? `<div class="email-list">${student.linked_emails.map((email) => `<span class="email-pill">${escapeHtml(email)}</span>`).join("")}</div>` : `<span class="empty-note">No email/user key found in upload.</span>`}</td>
@@ -154,7 +154,7 @@ function getFilterState() {
         form: String(document.getElementById("class-form-filter")?.value || "all"),
         status: String(document.getElementById("class-status-filter")?.value || "all").toLowerCase(),
         sort: String(document.getElementById("class-sort-filter")?.value || "name"),
-        dtechOnly: Boolean(document.getElementById("class-dtech-only")?.checked),
+        program: String(document.getElementById("class-program-filter")?.value || "all"),
         currentOnly: Boolean(document.getElementById("class-current-only")?.checked),
         linkedOnly: Boolean(document.getElementById("class-linked-only")?.checked)
     };
@@ -184,7 +184,7 @@ function applyFilters() {
             if (filters.year !== "all" && String(student.year_level || "") !== filters.year) return false;
             if (filters.form !== "all" && String(student.form_class || "") !== filters.form) return false;
             if (filters.status !== "all" && String(student.status || "").toLowerCase() !== filters.status) return false;
-            if (filters.dtechOnly && !student.has_dtech) return false;
+            if (filters.program !== "all" && !(Array.isArray(student.programs) && student.programs.includes(filters.program))) return false;
             if (filters.currentOnly && String(student.status || "").toLowerCase() === "not current") return false;
             if (filters.linkedOnly && !(Array.isArray(student.linked_emails) && student.linked_emails.length)) return false;
             return studentMatchesSearch(student, filters.search);
@@ -250,7 +250,7 @@ function bindFilters() {
         "class-form-filter",
         "class-status-filter",
         "class-sort-filter",
-        "class-dtech-only",
+        "class-program-filter",
         "class-current-only",
         "class-linked-only"
     ].forEach((id) => {
