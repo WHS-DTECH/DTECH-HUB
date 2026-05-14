@@ -1520,6 +1520,53 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
   }
 });
 
+app.delete("/api/activities/:id", requireActivityWriteAccess, async (req, res) => {
+  const requestedId = String(req.params.id || "").trim();
+  if (!requestedId) {
+    res.status(400).json({ error: "Activity ID is required" });
+    return;
+  }
+
+  if (!hasDatabase) {
+    const deleted = memoryActivities.delete(requestedId);
+    if (!deleted) {
+      res.status(404).json({ error: "Activity not found" });
+      return;
+    }
+
+    res.status(200).json({ ok: true, id: requestedId });
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        DELETE FROM activities
+        WHERE id::text = $1
+        RETURNING id
+      `,
+      [requestedId]
+    );
+
+    if (!result.rows.length) {
+      res.status(404).json({ error: "Activity not found" });
+      return;
+    }
+
+    try {
+      await pool.query(
+        `DELETE FROM activity_hub_visibility WHERE activity_id = $1`,
+        [requestedId]
+      );
+    } catch (_visibilityError) {
+    }
+
+    res.status(200).json({ ok: true, id: String(result.rows[0].id) });
+  } catch (error) {
+    res.status(500).json({ error: "Could not delete activity" });
+  }
+});
+
 app.delete("/api/activities", requireActivityWriteAccess, async (_req, res) => {
   if (!hasDatabase) {
     memoryActivities.clear();

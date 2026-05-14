@@ -66,6 +66,15 @@ body {
     border-color: #b8d2ea;
 }
 
+.detail-action-danger {
+    background: #c24747;
+    border-color: #973333;
+}
+
+.detail-action-danger:hover {
+    background: #a93c3c;
+}
+
 .detail-form {
     margin-top: 10px;
     background: #f4f7fb;

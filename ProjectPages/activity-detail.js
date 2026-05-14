@@ -100,9 +100,13 @@ function escapeHtml(value) {
         .replace(/'/g, "&#039;");
 }
 
-function parseDurationHours(raw) {
-    const parsed = Number.parseInt(String(raw || "").replace(/[^0-9]/g, ""), 10);
-    if (!Number.isInteger(parsed) || parsed <= 0) return 2;
+function parseDurationMinutes(raw) {
+    const source = String(raw || "").trim().toLowerCase();
+    const parsed = Number.parseInt(source.replace(/[^0-9]/g, ""), 10);
+    if (!Number.isInteger(parsed) || parsed <= 0) return 120;
+    if (source.includes("hr")) {
+        return parsed * 60;
+    }
     return parsed;
 }
 
@@ -128,6 +132,15 @@ function readStoredHubEmail() {
     } catch (_error) {
         return "";
     }
+}
+
+function buildWriteHeaders() {
+    const email = readStoredHubEmail();
+    const headers = { "Content-Type": "application/json" };
+    if (email) {
+        headers["x-user-email"] = email;
+    }
+    return headers;
 }
 
 function hasDetailPageAccess() {
@@ -183,7 +196,9 @@ async function readSharedActivity(activityId) {
         title: found.name || "Uploaded Activity",
         yearLevel: found.year_level || "Year level",
         type: found.type || "Digital Learning",
-        duration: found.duration_hours ? `${found.duration_hours} hrs` : "2 hrs",
+        duration: found.duration_minutes
+            ? `${found.duration_minutes} mins`
+            : (found.duration_hours ? `${Number(found.duration_hours) * 60} mins` : "120 mins"),
         term: found.term || "Term 2",
         activityCategory: found.activity_category || "Practice",
         showInThisWeek: Boolean(found.show_in_this_week),
@@ -219,7 +234,7 @@ function defaultDetailShape(id, data) {
         title: String(data?.title || "").trim() || "Activity",
         yearLevel: String(data?.yearLevel || "").trim() || "Year level",
         type: String(data?.type || "").trim() || "Digital Learning",
-        duration: String(data?.duration || "2 hrs").trim() || "2 hrs",
+        duration: String(data?.duration || "120 mins").trim() || "120 mins",
         term: String(data?.term || "Term 2").trim() || "Term 2",
         activityCategory: String(data?.activityCategory || "Practice").trim() || "Practice",
         showInThisWeek: Boolean(data?.showInThisWeek),
@@ -251,6 +266,7 @@ function renderDetailView(host, id, data, canEdit) {
             <span class="toolbar-label">Project Details</span>
             <div class="toolbar-actions">
                 ${canEdit ? '<button type="button" class="detail-action" id="detail-edit-button">Edit Details</button>' : ""}
+                ${canEdit ? '<button type="button" class="detail-action detail-action-danger" id="detail-delete-button">Delete</button>' : ""}
                 <a href="../index.html">Back to Hub</a>
             </div>
         </header>
@@ -368,8 +384,39 @@ function renderDetailView(host, id, data, canEdit) {
     `;
 
     const editButton = host.querySelector("#detail-edit-button");
+    const deleteButton = host.querySelector("#detail-delete-button");
     if (editButton) {
         editButton.addEventListener("click", () => renderEditForm(host, id, data));
+    }
+
+    if (deleteButton) {
+        deleteButton.addEventListener("click", async () => {
+            const confirmed = window.confirm(`Delete "${data.title}"? This cannot be undone.`);
+            if (!confirmed) {
+                return;
+            }
+
+            deleteButton.disabled = true;
+            try {
+                await deleteDetails(id);
+                window.location.href = "../index.html#project-library";
+            } catch (error) {
+                deleteButton.disabled = false;
+                window.alert(error.message || "Could not delete this activity/project.");
+            }
+        });
+    }
+}
+
+async function deleteDetails(id) {
+    const response = await fetch(`/api/activities/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        headers: buildWriteHeaders()
+    });
+
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        throw new Error(result.error || result.message || "Could not delete this activity/project.");
     }
 }
 
@@ -380,7 +427,7 @@ async function saveDetails(id, draft) {
         year_level: draft.yearLevel,
         type: draft.type,
         activity_category: draft.activityCategory,
-        duration_hours: parseDurationHours(draft.durationHours),
+        duration_minutes: parseDurationMinutes(draft.durationMinutes),
         outcome_image_url: draft.image,
         description: draft.summary,
         resources: draft.resources,
@@ -406,7 +453,7 @@ async function saveDetails(id, draft) {
 
     const response = await fetch("/api/activities", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: buildWriteHeaders(),
         body: JSON.stringify(payload)
     });
 
@@ -420,7 +467,9 @@ async function saveDetails(id, draft) {
         title: result.name || draft.title,
         yearLevel: result.year_level || draft.yearLevel,
         type: result.type || draft.type,
-        duration: result.duration_hours ? `${result.duration_hours} hrs` : `${parseDurationHours(draft.durationHours)} hrs`,
+        duration: result.duration_minutes
+            ? `${result.duration_minutes} mins`
+            : `${parseDurationMinutes(draft.durationMinutes)} mins`,
         term: result.term || draft.term,
         activityCategory: result.activity_category || draft.activityCategory,
         showInThisWeek: Boolean(result.show_in_this_week),
@@ -478,8 +527,8 @@ function renderEditForm(host, id, data) {
                         <input name="type" type="text" required value="${escapeHtml(data.type)}">
                     </label>
                     <label class="detail-field">
-                        <span>Duration (hours)</span>
-                        <input name="durationHours" type="number" min="1" step="1" required value="${parseDurationHours(data.duration)}">
+                        <span>Duration (minutes)</span>
+                        <input name="durationMinutes" type="number" min="1" step="1" required value="${parseDurationMinutes(data.duration)}">
                     </label>
                     <label class="detail-field">
                         <span>Activity Category</span>
@@ -612,7 +661,7 @@ function renderEditForm(host, id, data) {
             title: String(formData.get("title") || "").trim(),
             yearLevel: String(formData.get("yearLevel") || "").trim(),
             type: String(formData.get("type") || "").trim(),
-            durationHours: String(formData.get("durationHours") || "").trim(),
+            durationMinutes: String(formData.get("durationMinutes") || "").trim(),
             term: String(formData.get("term") || "").trim() || "Term 2",
             activityCategory: String(formData.get("activityCategory") || "").trim() || "Practice",
             summary: String(formData.get("summary") || "").trim(),
