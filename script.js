@@ -902,10 +902,12 @@ function loadHubAuthState() {
             hubAuthState.accessToken = null;
             hubAuthState.expiresAt = 0;
             hubAuthState.profile = parsed.profile;
+            // Do NOT clear storage, just update it to reflect token expiry.
             saveHubAuthState();
             return;
         }
 
+        // Only clear storage if there is no valid profile.
         clearHubStoredAuthRaw();
     } catch (_error) {
         clearHubStoredAuthRaw();
