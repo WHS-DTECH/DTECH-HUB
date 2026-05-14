@@ -17,7 +17,8 @@ async function prefillFormIfEditing() {
         if (data.difficulty) form.difficulty.value = data.difficulty;
         if (data.card_color || data.card_colour || data.color) form.cardColor.value = data.card_color || data.card_colour || data.color;
         if (data.card_url || data.activity_url || data.url) form.cardUrl.value = data.card_url || data.activity_url || data.url;
-        if (data.outcome_image_url) form.outcomeImageUrl.value = data.outcome_image_url;
+        currentEditingImageUrl = String(data.outcome_image_url || data.image_url || "").trim();
+        if (currentEditingImageUrl) form.outcomeImageUrl.value = currentEditingImageUrl;
         if (data.description) form.shortDescription.value = data.description;
         form.resources.value = normalizeTextareaLines(data.resources).join("\n");
         if (form.equipment) {
@@ -52,6 +53,7 @@ const classPreparationNoneCheckbox = document.querySelector("#class-preparation-
 const resourcesInput = document.querySelector("#resources");
 const equipmentInput = document.querySelector("#equipment");
 const commonResourceOptions = Array.from(document.querySelectorAll(".common-resource-option"));
+let currentEditingImageUrl = "";
 
 const UPLOAD_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 
@@ -315,6 +317,7 @@ async function uploadActivityImage(file, activityName) {
     if (imageUrlInput) {
         imageUrlInput.value = payload.image_url;
     }
+    currentEditingImageUrl = payload.image_url || currentEditingImageUrl;
     setStatus("Image uploaded successfully. URL has been filled in.");
 }
 
@@ -336,7 +339,7 @@ function createActivityPayload() {
         difficulty: String(formData.get("difficulty") || "").trim(),
         card_color: String(formData.get("cardColor") || "").trim(),
         card_url: String(formData.get("cardUrl") || "").trim(),
-        outcome_image_url: String(formData.get("outcomeImageUrl") || "").trim(),
+        outcome_image_url: String(formData.get("outcomeImageUrl") || "").trim() || currentEditingImageUrl,
         description: String(formData.get("shortDescription") || "").trim(),
         resources,
         equipment,
