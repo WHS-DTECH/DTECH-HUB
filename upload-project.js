@@ -3,6 +3,7 @@ const fileInput = document.querySelector("#outcome-image-file");
 const imageUrlInput = document.querySelector("#outcome-image-url");
 const uploadStatus = document.querySelector("#upload-status");
 const cancelButton = document.querySelector("#cancel-upload");
+const clearDraftButton = document.querySelector("#clear-project-draft");
 let currentEditingImageUrl = "";
 const PROJECT_DRAFT_STORAGE_KEY = "dtechHub:uploadProjectDraft:v1";
 
@@ -152,6 +153,14 @@ function bindProjectDraftAutosave() {
     form.addEventListener("change", handler);
 }
 
+function clearProjectDraftStorage() {
+    try {
+        localStorage.removeItem(PROJECT_DRAFT_STORAGE_KEY);
+    } catch (_error) {
+        // Ignore storage errors.
+    }
+}
+
 function setStatus(message, isError = false) {
     if (!uploadStatus) return;
     if (!message) {
@@ -277,6 +286,26 @@ if (fileInput) {
 if (cancelButton) {
     cancelButton.addEventListener("click", () => {
         window.location.href = "upload-menu.html";
+    });
+}
+
+if (clearDraftButton) {
+    clearDraftButton.addEventListener("click", async () => {
+        clearProjectDraftStorage();
+        setStatus("");
+        currentEditingImageUrl = "";
+
+        if (!form) return;
+
+        form.reset();
+
+        if (getEditingProjectId()) {
+            await prefillProjectIfEditing();
+            setStatus("Draft cleared. Restored saved project values.");
+            return;
+        }
+
+        setStatus("Draft cleared.");
     });
 }
 
