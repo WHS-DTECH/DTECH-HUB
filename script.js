@@ -290,7 +290,7 @@ function slugify(value) {
 
 function inferSourceTypeFromRecord(record) {
     const explicitType = String(record?.sourceType || "").toLowerCase();
-    if (explicitType === "project" || explicitType === "activity") {
+    if (explicitType === "project" || explicitType === "activity" || explicitType === "assessment") {
         return explicitType;
     }
 
@@ -300,8 +300,28 @@ function inferSourceTypeFromRecord(record) {
     }
 
     const category = String(record?.activityCategory || record?.activity_category || "").toLowerCase();
+    if (category.includes("assessment")) {
+        return "assessment";
+    }
     if (category.includes("project")) {
         return "project";
+    }
+
+    // Check for assessment-specific fields
+    const hasAssessmentFields = Boolean(
+        record?.standard_details ||
+        record?.tasks_list ||
+        record?.achieved ||
+        record?.merit ||
+        record?.excellence ||
+        record?.submission_requirements ||
+        record?.relevant_implications ||
+        record?.progress_logging ||
+        record?.feedback_trialling
+    );
+
+    if (hasAssessmentFields) {
+        return "assessment";
     }
 
     const hasProjectFields = Boolean(
@@ -1133,7 +1153,7 @@ function getTypes() {
 }
 
 function getContentTypes() {
-    return ["All", "Activities", "Projects"];
+    return ["All", "Activities", "Projects", "Assessments"];
 }
 
 function getCategories() {
@@ -1189,7 +1209,8 @@ function filterProjects(items) {
         const matchesContent =
             state.content === "All" ||
             (state.content === "Activities" && project.sourceType === "activity") ||
-            (state.content === "Projects" && project.sourceType === "project");
+            (state.content === "Projects" && project.sourceType === "project") ||
+            (state.content === "Assessments" && project.sourceType === "assessment");
         const haystack = [project.title, project.className, project.area, project.activityCategory, project.summary, ...project.keywords]
             .join(" ")
             .toLowerCase();
@@ -1225,7 +1246,8 @@ function createProjectCard(project) {
     const statusBadge = project.status 
         ? `<span class="project-tag status-tag status-${project.status}">${formatStatus(project.status)}</span>` 
         : '';
-    const contentTypeLabel = inferSourceTypeFromRecord(project) === "project" ? "Project" : "Activity";
+    const sourceType = inferSourceTypeFromRecord(project);
+    const contentTypeLabel = sourceType === "project" ? "Project" : sourceType === "assessment" ? "Assessment" : "Activity";
 
     card.innerHTML = `
         <div class="project-visual" ${visualStyle}>
