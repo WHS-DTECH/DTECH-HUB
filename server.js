@@ -63,6 +63,50 @@ const PROGRAM_KEYWORDS = {
   "MPROG": ["mprog", "media prog", "media programming"],
   "MDTECH": ["mdtech", "m-dtech", "media dtech"]
 };
+
+function getStudentPrograms(row) {
+  if (!row || typeof row !== "object") {
+    return [];
+  }
+
+  const sourceValues = [
+    row.program,
+    row.program_code,
+    row.program_name,
+    row.subject,
+    row.subjects,
+    row.course,
+    row.course_name,
+    row.class_name,
+    row.form_class,
+    row.year_level,
+    row.status,
+    row.id_number,
+    row.student_name,
+    ...STUDENT_TIMETABLE_PERIOD_COLUMNS.map((columnName) => row[columnName])
+  ];
+
+  const normalizedText = sourceValues
+    .flatMap((value) => Array.isArray(value) ? value : [value])
+    .map((value) => String(value || "").toLowerCase())
+    .filter(Boolean)
+    .join(" | ");
+
+  const detectedPrograms = [];
+
+  Object.entries(PROGRAM_KEYWORDS).forEach(([programCode, keywords]) => {
+    if (keywords.some((keyword) => normalizedText.includes(keyword))) {
+      detectedPrograms.push(programCode);
+    }
+  });
+
+  if (DTECH_TIMETABLE_KEYWORDS.some((keyword) => normalizedText.includes(keyword)) && !detectedPrograms.includes("DTECH")) {
+    detectedPrograms.push("DTECH");
+  }
+
+  return detectedPrograms;
+}
+
 const TIMETABLE_LABELS = new Map(STUDENT_TIMETABLE_PERIOD_COLUMNS.map((columnName) => {
   const label = columnName
     .replace(/_/g, " ")
