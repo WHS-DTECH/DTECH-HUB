@@ -4,6 +4,7 @@ const imageUrlInput = document.querySelector("#outcome-image-url");
 const uploadStatus = document.querySelector("#upload-status");
 const cancelButton = document.querySelector("#cancel-upload");
 let currentEditingImageUrl = "";
+const PROJECT_DRAFT_STORAGE_KEY = "dtechHub:uploadProjectDraft:v1";
 
 function getEditingProjectId() {
     const params = new URLSearchParams(window.location.search);
@@ -69,12 +70,15 @@ async function prefillProjectIfEditing() {
         if (data.outcomes) form.outcomes.value = parseMaybeArray(data.outcomes).join("\n");
         if (data.withdrawal_date) form.withdrawalDate.value = data.withdrawal_date;
         if (data.client_id) form.clientId.value = data.client_id;
+        saveProjectDraft();
     } catch (_error) {
         // Ignore prefill failures and allow the form to remain editable.
     }
 }
 
 window.addEventListener("DOMContentLoaded", prefillProjectIfEditing);
+window.addEventListener("DOMContentLoaded", restoreProjectDraftIfAvailable);
+window.addEventListener("DOMContentLoaded", bindProjectDraftAutosave);
 
 function slugify(value) {
     return String(value || "")
@@ -88,6 +92,64 @@ function linesToArray(value) {
         .split(/\r?\n/)
         .map((line) => line.trim())
         .filter(Boolean);
+}
+
+function saveProjectDraft() {
+    if (!form) return;
+
+    const draft = {};
+    const formData = new FormData(form);
+    formData.forEach((value, key) => {
+        if (key === "outcomeImageFile") return;
+        draft[key] = String(value || "");
+    });
+
+    draft.showThisWeek = form.showThisWeek?.checked ? "on" : "";
+    draft.__editingId = getEditingProjectId();
+
+    try {
+        localStorage.setItem(PROJECT_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+    } catch (_error) {
+        // Ignore storage write errors.
+    }
+}
+
+function restoreProjectDraftIfAvailable() {
+    if (!form) return;
+
+    let draft = null;
+    try {
+        draft = JSON.parse(localStorage.getItem(PROJECT_DRAFT_STORAGE_KEY) || "null");
+    } catch (_error) {
+        draft = null;
+    }
+    if (!draft || typeof draft !== "object") return;
+
+    const editingId = getEditingProjectId();
+    if (editingId && draft.__editingId && String(draft.__editingId) !== String(editingId)) {
+        return;
+    }
+
+    Object.keys(draft).forEach((key) => {
+        if (key === "__editingId") return;
+
+        const field = form.elements.namedItem(key);
+        if (!field || field instanceof RadioNodeList) return;
+
+        if (field.type === "checkbox") {
+            field.checked = draft[key] === "on" || draft[key] === true;
+            return;
+        }
+
+        field.value = String(draft[key] || "");
+    });
+}
+
+function bindProjectDraftAutosave() {
+    if (!form) return;
+    const handler = () => saveProjectDraft();
+    form.addEventListener("input", handler);
+    form.addEventListener("change", handler);
 }
 
 function setStatus(message, isError = false) {
@@ -118,7 +180,7 @@ async function uploadActivityImage(file, activityName) {
     if (!activityName) throw new Error("Project name is required before uploading images.");
 
     const imageData = await fileToDataUrl(file);
-    const activityId = slugify(activityName);
+    const activityId = getEditingProjectId() || slugify(activityName);
 
     setStatus("Uploading image...");
 
@@ -143,6 +205,11 @@ function createProjectPayload() {
     const formData = new FormData(form);
     const name = String(formData.get("activityName") || "").trim();
     const editingId = getEditingProjectId();
+    const durationRaw = String(formData.get("durationMinutes") || "").trim();
+    const parsedDurationMinutes = Number.parseInt(durationRaw, 10);
+    const durationMinutes = Number.isFinite(parsedDurationMinutes) && parsedDurationMinutes > 0
+        ? parsedDurationMinutes
+        : null;
 
     return {
         id: editingId || slugify(name),
@@ -150,7 +217,7 @@ function createProjectPayload() {
         year_level: String(formData.get("yearLevel") || "").trim(),
         type: String(formData.get("type") || "Project").trim(),
         activity_category: String(formData.get("activityCategory") || "Project Activity").trim(),
-        duration_hours: Number(formData.get("durationMinutes") || 0),
+        duration_minutes: durationMinutes,
         difficulty: String(formData.get("difficulty") || "").trim(),
         card_color: String(formData.get("cardColor") || "").trim(),
         card_url: String(formData.get("cardUrl") || "").trim(),
@@ -228,6 +295,7 @@ if (form) {
             localStorage.setItem("dtechHub:lastProjectDraft", JSON.stringify(payload));
             localStorage.setItem("dtechHub:lastSavedProjectId", String(saved.id || payload.id || ""));
             setStatus("Project saved to Activities Library.");
+            saveProjectDraft();
         } catch (error) {
             setStatus(`Save failed: ${error.message}`, true);
         }
