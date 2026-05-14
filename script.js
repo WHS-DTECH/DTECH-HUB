@@ -307,7 +307,8 @@ async function loadSharedProjects() {
                 const category = String(item.activity_category || "Practice").trim();
                 const summary = String(item.description || "Teacher-uploaded activity").trim();
                 const created = String(item.created_at || new Date().toISOString()).slice(0, 10);
-                const imageUrl = String(item.outcome_image_url || "").trim();
+                const imageUrl = String(item.outcome_image_url || item.image_url || "").trim();
+                const showInThisWeek = Boolean(item.show_in_this_week ?? item.show_this_week ?? item.is_pinned ?? item.is_this_week);
 
                 return {
                     id,
@@ -315,8 +316,8 @@ async function loadSharedProjects() {
                     className: `${yearLevel} Computer Lab`,
                     area: type,
                     activityCategory: category,
-                    showThisWeek: Boolean(item.show_in_this_week),
-                    status: item.show_in_this_week ? "active" : "planning",
+                    showThisWeek: showInThisWeek,
+                    status: showInThisWeek ? "active" : "planning",
                     term: String(item.term || "Term 2"),
                     updated: created,
                     href: `ProjectPages/custom-activity.html?id=${encodeURIComponent(id)}`,
@@ -327,7 +328,7 @@ async function loadSharedProjects() {
                     visual: {
                         icon: textToIcon(type),
                         label: "Teacher Upload",
-                        palette: colorToPalette(item.card_color)
+                        palette: colorToPalette(item.card_color || item.card_colour || item.color)
                     }
                 };
             })

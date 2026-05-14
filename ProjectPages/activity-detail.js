@@ -196,12 +196,10 @@ async function readSharedActivity(activityId) {
         title: found.name || "Uploaded Activity",
         yearLevel: found.year_level || "Year level",
         type: found.type || "Digital Learning",
-        duration: found.duration_minutes
-            ? `${found.duration_minutes} mins`
-            : (found.duration_hours ? `${Number(found.duration_hours) * 60} mins` : "120 mins"),
+            duration: `${normalizeDurationMinutes(found)} mins`,
         term: found.term || "Term 2",
         activityCategory: found.activity_category || "Practice",
-        showInThisWeek: Boolean(found.show_in_this_week),
+            showInThisWeek: Boolean(found.show_in_this_week ?? found.show_this_week ?? found.is_pinned ?? found.is_this_week),
         summary: found.description || "Teacher-uploaded activity.",
         resources: toArray(found.resources),
         equipment: toArray(found.equipment),
@@ -223,6 +221,29 @@ async function readSharedActivity(activityId) {
         clientId: found.client_id || ""
     };
 }
+
+    function normalizeDurationMinutes(record) {
+        const minutes = Number.parseInt(record?.duration_minutes, 10);
+        if (Number.isFinite(minutes) && minutes > 0) {
+            return minutes;
+        }
+
+        const rawHours = Number(record?.duration_hours);
+        if (Number.isFinite(rawHours) && rawHours > 0) {
+            // Backward compatibility: some rows were previously saved as minutes in duration_hours.
+            if (rawHours > 12) {
+                return Math.round(rawHours);
+            }
+            return Math.round(rawHours * 60);
+        }
+
+        const genericDuration = Number(record?.duration);
+        if (Number.isFinite(genericDuration) && genericDuration > 0) {
+            return Math.round(genericDuration);
+        }
+
+        return 120;
+    }
 
 function renderList(items) {
     return items.map((item) => `<li>${escapeHtml(item)}</li>`).join("");

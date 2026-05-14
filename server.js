@@ -1386,7 +1386,7 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     }
 
     const activityCategoryColumn = pickExistingColumn(activityColumns, ["activity_category", "category"]);
-    const durationColumn = pickExistingColumn(activityColumns, ["duration_hours", "duration_minutes", "duration"]);
+    const durationColumn = pickExistingColumn(activityColumns, ["duration_minutes", "duration_hours", "duration"]);
     const difficultyColumn = pickExistingColumn(activityColumns, ["difficulty", "level"]);
     const cardColorColumn = pickExistingColumn(activityColumns, ["card_color", "card_colour", "color"]);
     const cardUrlColumn = pickExistingColumn(activityColumns, ["card_url", "activity_url", "url"]);
@@ -1398,7 +1398,7 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     const classManagementColumn = pickExistingColumn(activityColumns, ["class_management_notes"]);
     const classPreparationColumn = pickExistingColumn(activityColumns, ["class_preparation"]);
     const assessmentFocusColumn = pickExistingColumn(activityColumns, ["assessment_focus"]);
-    const showInWeekColumn = pickExistingColumn(activityColumns, ["show_in_this_week", "show_this_week", "is_pinned"]);
+    const showInWeekColumn = pickExistingColumn(activityColumns, ["show_in_this_week", "show_this_week", "is_pinned", "is_this_week"]);
     const termColumn = pickExistingColumn(activityColumns, ["term"]);
     const updatedAtColumn = pickExistingColumn(activityColumns, ["updated_at", "updatedon", "modified_at"]);
     
@@ -1433,7 +1433,12 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     }
 
     if (activityCategoryColumn) sqlColumns.push({ name: activityCategoryColumn, value: payload.activity_category });
-    if (durationColumn) sqlColumns.push({ name: durationColumn, value: payload.duration_minutes });
+    if (durationColumn) {
+      const durationValue = String(durationColumn).toLowerCase().includes("hour")
+        ? payload.duration_minutes / 60
+        : payload.duration_minutes;
+      sqlColumns.push({ name: durationColumn, value: durationValue });
+    }
     if (difficultyColumn) sqlColumns.push({ name: difficultyColumn, value: payload.difficulty });
     if (cardColorColumn) sqlColumns.push({ name: cardColorColumn, value: payload.card_color });
     if (cardUrlColumn) sqlColumns.push({ name: cardUrlColumn, value: payload.card_url });

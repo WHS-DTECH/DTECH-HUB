@@ -12,18 +12,20 @@ async function prefillFormIfEditing() {
         if (data.year_level) form.yearLevel.value = data.year_level;
         if (data.type) form.type.value = data.type;
         if (data.activity_category) form.activityCategory.value = data.activity_category;
-        if (data.duration_minutes) form.durationMinutes.value = data.duration_minutes;
+        const normalizedMinutes = normalizeMinutesFromRecord(data);
+        if (normalizedMinutes !== "") form.durationMinutes.value = normalizedMinutes;
         if (data.difficulty) form.difficulty.value = data.difficulty;
-        if (data.card_color) form.cardColor.value = data.card_color;
-        if (data.card_url) form.cardUrl.value = data.card_url;
+        if (data.card_color || data.card_colour || data.color) form.cardColor.value = data.card_color || data.card_colour || data.color;
+        if (data.card_url || data.activity_url || data.url) form.cardUrl.value = data.card_url || data.activity_url || data.url;
         if (data.outcome_image_url) form.outcomeImageUrl.value = data.outcome_image_url;
         if (data.description) form.shortDescription.value = data.description;
-        form.resources.value = parseMaybeArray(data.resources).join("\n");
-        form.instructions.value = parseMaybeArray(data.instructions).join("\n");
-        form.classManagementNotes.value = parseMaybeArray(data.class_management_notes).join("\n");
-        form.classPreparation.value = parseMaybeArray(data.class_preparation).join("\n");
-        form.assessmentFocus.value = parseMaybeArray(data.assessment_focus).join("\n");
-        if (typeof data.show_in_this_week !== "undefined") form.showThisWeek.checked = !!data.show_in_this_week;
+        form.resources.value = normalizeTextareaLines(data.resources).join("\n");
+        form.instructions.value = normalizeTextareaLines(data.instructions).join("\n");
+        form.classManagementNotes.value = normalizeTextareaLines(data.class_management_notes).join("\n");
+        form.classPreparation.value = normalizeTextareaLines(data.class_preparation).join("\n");
+        form.assessmentFocus.value = normalizeTextareaLines(data.assessment_focus).join("\n");
+        const showInThisWeek = data.show_in_this_week ?? data.show_this_week ?? data.is_pinned ?? data.is_this_week;
+        if (typeof showInThisWeek !== "undefined") form.showThisWeek.checked = !!showInThisWeek;
     } catch (e) {
         // Ignore errors, just don't prefill
     }
@@ -62,6 +64,50 @@ function parseMaybeArray(value) {
             .split(/\r?\n/)
             .map((line) => line.trim())
             .filter(Boolean);
+    }
+}
+
+function normalizeMinutesFromRecord(record) {
+    const minutes = Number.parseInt(record?.duration_minutes, 10);
+    if (Number.isFinite(minutes) && minutes > 0) {
+        return minutes;
+    }
+
+    const rawHours = Number(record?.duration_hours);
+    if (Number.isFinite(rawHours) && rawHours > 0) {
+        // Backward compatibility: older saves may have written minutes into duration_hours.
+        if (rawHours > 12) {
+            return Math.round(rawHours);
+        }
+        return Math.round(rawHours * 60);
+    }
+
+    const genericDuration = Number(record?.duration);
+    if (Number.isFinite(genericDuration) && genericDuration > 0) {
+        return Math.round(genericDuration);
+    }
+
+    return "";
+}
+
+function normalizeTextareaLines(value) {
+    const firstPass = parseMaybeArray(value);
+    if (firstPass.length !== 1) {
+        return firstPass;
+    }
+
+    const inner = String(firstPass[0] || "").trim();
+    if (!inner.startsWith("[") || !inner.endsWith("]")) {
+        return firstPass;
+    }
+
+    try {
+        const secondPass = JSON.parse(inner);
+        return Array.isArray(secondPass)
+            ? secondPass.map((item) => String(item || "").trim()).filter(Boolean)
+            : firstPass;
+    } catch (_error) {
+        return firstPass;
     }
 }
 
