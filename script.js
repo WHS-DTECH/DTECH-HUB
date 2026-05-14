@@ -687,7 +687,7 @@ function isHomepagePath() {
 
 function isTeacherWorkspacePath() {
     const path = String(window.location.pathname || "").toLowerCase();
-    return path.endsWith("/teacher-view.html") || path.endsWith("/upload-activity.html") || path.endsWith("/upload-project.html") || path.endsWith("/upload-menu.html");
+    return path.endsWith("/teacher-view.html") || path.endsWith("/upload-activity.html") || path.endsWith("/upload-project.html") || path.endsWith("/upload-menu.html") || path.endsWith("/teacher-project-allocation.html") || path.endsWith("/class-management.html");
 }
 
 function setPublicHomepageUiState(signedIn) {

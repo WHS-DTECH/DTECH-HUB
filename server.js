@@ -26,6 +26,48 @@ const STAFF_TABLE_CANDIDATES = ["staff_upload", "upload_staff"];
 const STUDENT_TABLE_CANDIDATES = ["student_timetable"];
 const SCHOOL_EMAIL_DOMAIN = "westlandhigh.school.nz";
 const DTECH_HUB_NAME = "DTECH-HUB";
+const STUDENT_TIMETABLE_PERIOD_COLUMNS = [
+  "mon_p1_1", "mon_p1_2", "mon_p2", "mon_i", "mon_p3", "mon_p4", "mon_l", "mon_p5",
+  "tue_p1_1", "tue_p1_2", "tue_p2", "tue_i", "tue_p3", "tue_p4", "tue_l", "tue_p5",
+  "wed_p1_1", "wed_p1_2", "wed_p2", "wed_i", "wed_p3", "wed_p4", "wed_l", "wed_p5",
+  "thu_p1_1", "thu_p1_2", "thu_p2", "thu_i", "thu_p3", "thu_p4", "thu_l", "thu_p5",
+  "fri_p1_1", "fri_p1_2", "fri_p2", "fri_i", "fri_p3", "fri_p4", "fri_l", "fri_p5"
+];
+const DTECH_TIMETABLE_KEYWORDS = [
+  "dtech",
+  "d-tec",
+  "digital tech",
+  "digital technologies",
+  "digitech",
+  "computer",
+  "computing",
+  "programming",
+  "python",
+  "robotics",
+  "electronics",
+  "web design",
+  "office suite",
+  "network",
+  "networking",
+  "infrastructure",
+  "cyber",
+  "tinkercad"
+];
+const TIMETABLE_LABELS = new Map(STUDENT_TIMETABLE_PERIOD_COLUMNS.map((columnName) => {
+  const label = columnName
+    .replace(/_/g, " ")
+    .replace(/\bp\b/gi, "P")
+    .replace(/\bi\b/gi, "I")
+    .replace(/\bl\b/gi, "L")
+    .replace(/\bmon\b/i, "Mon")
+    .replace(/\btue\b/i, "Tue")
+    .replace(/\bwed\b/i, "Wed")
+    .replace(/\bthu\b/i, "Thu")
+    .replace(/\bfri\b/i, "Fri")
+    .replace(/\s+/g, " ")
+    .trim();
+  return [columnName, label];
+}));
 const suggestionNotificationFallback = String(process.env.SUGGESTION_NOTIFY_EMAILS || "");
 const SMTP_HOST = String(process.env.SMTP_HOST || "").trim();
 const SMTP_PORT = Number.parseInt(process.env.SMTP_PORT || "", 10) || 587;
@@ -661,6 +703,7 @@ async function getStudentDirectoryRows() {
     "login",
     "student_login",
     "upn"
+    , ...STUDENT_TIMETABLE_PERIOD_COLUMNS
   ]);
 
   if (!availableColumns.length) {
@@ -671,6 +714,63 @@ async function getStudentDirectoryRows() {
     `SELECT ${availableColumns.join(", ")} FROM ${studentTableName}${buildOrderByClause(availableColumns)}`
   );
   return result.rows;
+}
+
+function normalizePersonName(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function getStudentTimetableEntries(row) {
+  return STUDENT_TIMETABLE_PERIOD_COLUMNS
+    .map((columnName) => ({
+      key: columnName,
+      label: TIMETABLE_LABELS.get(columnName) || columnName,
+      value: String(row?.[columnName] || "").trim()
+    }))
+    .filter((entry) => entry.value);
+}
+
+function isDtechTimetableValue(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+
+  return DTECH_TIMETABLE_KEYWORDS.some((keyword) => normalized.includes(keyword));
+}
+
+function buildStudentClassManagementRow(row) {
+  const timetable = getStudentTimetableEntries(row);
+  const dtechTimetable = timetable.filter((entry) => isDtechTimetableValue(entry.value));
+  const linkedEmails = Array.from(
+    collectDirectoryEmails(
+      row,
+      ["email_school", "student_email", "email", "email_address", "school_email", "google_email", "student_google_email", "student_mail", "mail", "upn"],
+      ["username", "user_name", "student_username", "login", "student_login"]
+    )
+  );
+
+  return {
+    id: row?.id ?? null,
+    student_name: String(row?.student_name || "").trim(),
+    normalized_name: normalizePersonName(row?.student_name),
+    id_number: String(row?.id_number || "").trim(),
+    form_class: String(row?.form_class || row?.formclass || row?.class_code || row?.class || "").trim(),
+    year_level: String(row?.year_level || row?.yearlevel || "").trim(),
+    status: String(row?.status || "Current").trim() || "Current",
+    upload_year: row?.upload_year ?? null,
+    upload_term: String(row?.upload_term || "").trim(),
+    upload_date: String(row?.upload_date || "").trim(),
+    linked_emails: linkedEmails,
+    has_dtech: dtechTimetable.length > 0,
+    dtech_period_count: dtechTimetable.length,
+    dtech_timetable: dtechTimetable,
+    timetable
+  };
 }
 
 function collectDirectoryEmails(row, exactEmailColumns, usernameColumns = []) {
@@ -2025,6 +2125,43 @@ app.get("/api/student_timetable/all", async (_req, res) => {
     res.json({ students: rows });
   } catch (_error) {
     res.json({ students: [] });
+  }
+});
+
+app.get("/api/class-management/students", async (req, res) => {
+  const userEmail = getRequestUserEmail(req);
+  if (!userEmail || !(await canManagePracticalSchedule(userEmail))) {
+    res.status(403).json({ error: "Teacher/Admin access is required." });
+    return;
+  }
+
+  try {
+    const rows = await getStudentDirectoryRows();
+    const normalizedRows = rows.map(buildStudentClassManagementRow);
+    const currentOnly = String(req.query?.current_only || "true").toLowerCase() !== "false";
+    const dtechOnly = String(req.query?.dtech_only || "false").toLowerCase() === "true";
+
+    const filteredRows = normalizedRows.filter((row) => {
+      if (currentOnly && String(row.status || "").toLowerCase() === "not current") {
+        return false;
+      }
+      if (dtechOnly && !row.has_dtech) {
+        return false;
+      }
+      return true;
+    });
+
+    res.json({
+      students: filteredRows,
+      summary: {
+        total_students: filteredRows.length,
+        dtech_students: filteredRows.filter((row) => row.has_dtech).length,
+        current_only: currentOnly,
+        dtech_only: dtechOnly
+      }
+    });
+  } catch (_error) {
+    res.status(500).json({ error: "Could not load class management students" });
   }
 });
 

@@ -1,6 +1,13 @@
 (function () {
     const HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
     const SCHOOL_DOMAIN = "westlandhigh.school.nz";
+    const STUDENT_PERIOD_COLUMNS = [
+        "mon_p1_1", "mon_p1_2", "mon_p2", "mon_i", "mon_p3", "mon_p4", "mon_l", "mon_p5",
+        "tue_p1_1", "tue_p1_2", "tue_p2", "tue_i", "tue_p3", "tue_p4", "tue_l", "tue_p5",
+        "wed_p1_1", "wed_p1_2", "wed_p2", "wed_i", "wed_p3", "wed_p4", "wed_l", "wed_p5",
+        "thu_p1_1", "thu_p1_2", "thu_p2", "thu_i", "thu_p3", "thu_p4", "thu_l", "thu_p5",
+        "fri_p1_1", "fri_p1_2", "fri_p2", "fri_i", "fri_p3", "fri_p4", "fri_l", "fri_p5"
+    ];
 
     const avatarEl = document.querySelector("#profile-avatar");
     const nameEl = document.querySelector("#profile-name");
@@ -40,6 +47,14 @@
 
     function normalizeEmail(value) {
         return String(value || "").trim().toLowerCase();
+    }
+
+    function normalizePersonName(value) {
+        return String(value || "")
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, " ")
+            .trim()
+            .replace(/\s+/g, " ");
     }
 
     function pickFirstNonEmpty(values) {
@@ -161,6 +176,51 @@
         return normalized;
     }
 
+    function buildTimetableLabel(key) {
+        return String(key || "")
+            .replace(/_/g, " ")
+            .replace(/\bmon\b/i, "Mon")
+            .replace(/\btue\b/i, "Tue")
+            .replace(/\bwed\b/i, "Wed")
+            .replace(/\bthu\b/i, "Thu")
+            .replace(/\bfri\b/i, "Fri")
+            .replace(/\bp\b/gi, "P")
+            .replace(/\bi\b/gi, "I")
+            .replace(/\bl\b/gi, "L")
+            .replace(/\s+/g, " ")
+            .trim();
+    }
+
+    function getTimetableEntries(row) {
+        return STUDENT_PERIOD_COLUMNS
+            .map((columnName) => ({
+                key: columnName,
+                label: buildTimetableLabel(columnName),
+                value: String(row && row[columnName] || "").trim()
+            }))
+            .filter((entry) => entry.value);
+    }
+
+    function collectStudentNameCandidates(values) {
+        return Array.from(new Set(
+            (Array.isArray(values) ? values : [])
+                .map((value) => normalizePersonName(value))
+                .filter(Boolean)
+        ));
+    }
+
+    function collectLinkedStudentRows(studentRows, email, candidateNames) {
+        const nameSet = new Set(collectStudentNameCandidates(candidateNames));
+        return studentRows.filter((row) => {
+            if (collectCandidateEmails(row).has(email)) {
+                return true;
+            }
+
+            const rowName = normalizePersonName(getRowDisplayName(row) || row.student_name);
+            return Boolean(rowName && nameSet.has(rowName));
+        });
+    }
+
     function buildUploadHistory(staffRows, email) {
         const matching = staffRows.filter((row) => collectCandidateEmails(row).has(email));
         if (!matching.length) {
@@ -184,14 +244,15 @@
         return labels.slice(0, 8);
     }
 
-    function buildTimetableSummary(studentRows, email) {
-        const matching = studentRows.filter((row) => collectCandidateEmails(row).has(email));
+    function buildTimetableSummary(matching, candidateNames) {
         if (!matching.length) {
-            return [{ text: "No timetable row directly linked to this email yet.", variant: "warn" }];
+            return [{ text: "No timetable row is linked to this profile yet.", variant: "warn" }];
         }
 
+        const preferredRow = matching.find((row) => String(row.status || "").toLowerCase() !== "not current") || matching[0];
         const classSet = new Set();
         const yearSet = new Set();
+        const timetableEntries = getTimetableEntries(preferredRow);
 
         matching.forEach((row) => {
             const formClass = String(row.form_class || row.formclass || row.class_code || row.class || "").trim();
@@ -202,27 +263,42 @@
 
         const rows = [];
         rows.push({ text: `Linked timetable rows: ${matching.length}` });
+        if (candidateNames && candidateNames.length) {
+            rows.push({ text: `Matched profile names: ${collectStudentNameCandidates(candidateNames).join(" | ")}` });
+        }
         rows.push({ text: `Form classes: ${classSet.size ? Array.from(classSet).join(", ") : "None listed"}` });
         rows.push({ text: `Year levels: ${yearSet.size ? Array.from(yearSet).join(", ") : "None listed"}` });
+
+        if (!timetableEntries.length) {
+            rows.push({ text: "No weekly timetable periods were included in the current upload.", variant: "warn" });
+            return rows;
+        }
+
+        timetableEntries.forEach((entry) => {
+            rows.push({ text: `${entry.label}: ${entry.value}` });
+        });
 
         return rows;
     }
 
-    function buildClassSummary(studentRows, email) {
-        const matching = studentRows.filter((row) => collectCandidateEmails(row).has(email));
+    function buildClassSummary(matching) {
         if (!matching.length) {
             return [{ text: "No classes currently linked to this profile.", variant: "warn" }];
         }
 
         const uniqueClasses = new Set();
+        const uniqueYears = new Set();
         matching.forEach((row) => {
             const classCode = String(row.form_class || row.formclass || row.class_code || "").trim();
+            const yearLevel = String(row.year_level || row.yearlevel || "").trim();
             if (classCode) uniqueClasses.add(classCode);
+            if (yearLevel) uniqueYears.add(yearLevel);
         });
 
         return [
             { text: `Unique linked classes: ${uniqueClasses.size}` },
             { text: `Class list: ${uniqueClasses.size ? Array.from(uniqueClasses).join(", ") : "None listed"}` },
+            { text: `Year levels: ${uniqueYears.size ? Array.from(uniqueYears).join(", ") : "None listed"}` },
             { text: `Linked student rows: ${matching.length}` }
         ];
     }
@@ -274,7 +350,7 @@
 
             setConnectionMessage(
                 "Google session active",
-                `Signed in as ${email}. Domain access is ${accessData.is_staff || accessData.is_student ? "linked" : "not yet linked"} to CSV records.",
+                `Signed in as ${email}. Domain access is ${accessData.is_staff || accessData.is_student ? "linked" : "not yet linked"} to CSV records.`,
                 ""
             );
         } catch (_error) {
@@ -297,8 +373,13 @@
         const safeStudentRows = Array.isArray(studentRows) ? studentRows : Array.isArray(studentRows.students) ? studentRows.students : [];
         const safeRoleRows = Array.isArray(userRoleRows) ? userRoleRows : [];
 
+        const roleFromRolePage = safeRoleRows.find((row) => normalizeEmail(row && row.user_email) === email);
         const matchedStaffRows = safeStaffRows.filter((row) => collectCandidateEmails(row).has(email));
-        const matchedStudentRows = safeStudentRows.filter((row) => collectCandidateEmails(row).has(email));
+        const matchedStudentRows = collectLinkedStudentRows(
+            safeStudentRows,
+            email,
+            [loginName, roleFromRolePage && roleFromRolePage.display_name, profile && profile.name, profile && profile.given_name]
+        );
 
         const resolvedName = pickFirstNonEmpty([
             getRowDisplayName(matchedStaffRows[0]),
@@ -314,7 +395,6 @@
             avatarEl.textContent = getInitials(resolvedName, email || "user");
         }
 
-        const roleFromRolePage = safeRoleRows.find((row) => normalizeEmail(row && row.user_email) === email);
         const resolvedRole = pickFirstNonEmpty([
             roleFromRolePage && roleFromRolePage.additional_role,
             accessData && accessData.additional_role,
@@ -340,8 +420,8 @@
         ]);
 
         setInfoStack(uploadHistoryEl, buildUploadHistory(safeStaffRows, email));
-        setInfoStack(timetableEl, buildTimetableSummary(safeStudentRows, email));
-        setInfoStack(classesEl, buildClassSummary(safeStudentRows, email));
+        setInfoStack(timetableEl, buildTimetableSummary(matchedStudentRows, [loginName, roleFromRolePage && roleFromRolePage.display_name, profile && profile.name]));
+        setInfoStack(classesEl, buildClassSummary(matchedStudentRows));
     }
 
     document.addEventListener("DOMContentLoaded", () => {
