@@ -4,6 +4,7 @@ const imageUrlInput = document.querySelector("#outcome-image-url");
 const uploadStatus = document.querySelector("#upload-status");
 const cancelButton = document.querySelector("#cancel-upload");
 const clearDraftButton = document.querySelector("#clear-project-draft");
+const authStatusElement = document.querySelector("#project-auth-status");
 let currentEditingImageUrl = "";
 const PROJECT_DRAFT_STORAGE_KEY = "dtechHub:uploadProjectDraft:v1";
 const UPLOAD_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
@@ -83,6 +84,20 @@ function withUserEmailHeader(headers = {}) {
     };
 }
 
+function renderProjectAuthStatus() {
+    if (!authStatusElement) return;
+
+    const email = getSignedInEmail();
+    if (email) {
+        authStatusElement.classList.remove("is-missing");
+        authStatusElement.textContent = `Signed in as ${email}`;
+        return;
+    }
+
+    authStatusElement.classList.add("is-missing");
+    authStatusElement.textContent = "Not signed in. Sign in with your school Google account before saving.";
+}
+
 async function prefillProjectIfEditing() {
     const id = getEditingProjectId();
     if (!id || !form) return;
@@ -128,6 +143,12 @@ async function prefillProjectIfEditing() {
 window.addEventListener("DOMContentLoaded", prefillProjectIfEditing);
 window.addEventListener("DOMContentLoaded", restoreProjectDraftIfAvailable);
 window.addEventListener("DOMContentLoaded", bindProjectDraftAutosave);
+window.addEventListener("DOMContentLoaded", renderProjectAuthStatus);
+window.addEventListener("storage", (event) => {
+    if (event.key === UPLOAD_HUB_AUTH_STORAGE_KEY) {
+        renderProjectAuthStatus();
+    }
+});
 
 function slugify(value) {
     return String(value || "")

@@ -15,6 +15,23 @@
     font-size: 0.85rem;
 }
 
+.project-auth-status {
+    margin: -2px 0 10px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    border: 1px solid #c8d5e7;
+    background: #eef4fd;
+    color: #28486d;
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.project-auth-status.is-missing {
+    border-color: #e8a6a6;
+    background: #fff0f0;
+    color: #8b2323;
+}
+
 .upload-panel {
     background: #f4f6fa;
     border: 1px solid #ced6e2;
