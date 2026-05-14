@@ -386,7 +386,15 @@ function renderDetailView(host, id, data, canEdit) {
     const editButton = host.querySelector("#detail-edit-button");
     const deleteButton = host.querySelector("#detail-delete-button");
     if (editButton) {
-        editButton.addEventListener("click", () => renderEditForm(host, id, data));
+        // If this is a backend activity (custom upload), redirect to upload-activity.html for editing
+        if (String(id).match(/^\d+$/)) {
+            editButton.addEventListener("click", () => {
+                window.location.href = `../upload-activity.html?id=${encodeURIComponent(id)}`;
+            });
+        } else {
+            // For base activities, use the in-place edit form
+            editButton.addEventListener("click", () => renderEditForm(host, id, data));
+        }
     }
 
     if (deleteButton) {

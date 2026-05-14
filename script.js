@@ -5,7 +5,7 @@ const baseProjects = [
         className: "Year 11 Computer Lab",
         area: "Programming",
         activityCategory: "Practice",
-        showThisWeek: true,
+        showThisWeek: false, // was true, now false to remove from current activities
         status: "active",
         term: "Term 2",
         updated: "2026-05-06",
@@ -148,7 +148,7 @@ const baseLabProjects = [
         className: "Year 13 Computer Lab",
         projectPhase: "Build",
         status: "active",
-        showThisWeek: true,
+        showThisWeek: false, // was true, now false to remove from current activities
         term: "Term 2",
         updated: "2026-05-09",
         href: "ProjectPages/maker-lab-builds.html",
