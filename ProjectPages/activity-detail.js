@@ -218,7 +218,18 @@ async function readSharedActivity(activityId) {
         costs: toArray(found.costs),
         outcomes: toArray(found.outcomes),
         withdrawalDate: found.withdrawal_date || "",
-        clientId: found.client_id || ""
+        clientId: found.client_id || "",
+        
+        // Assessment Task Fields
+        standardDetails: toArray(found.standard_details),
+        tasksList: toArray(found.tasks_list),
+        achieved: toArray(found.achieved),
+        merit: toArray(found.merit),
+        excellence: toArray(found.excellence),
+        submissionRequirements: toArray(found.submission_requirements),
+        relevantImplications: toArray(found.relevant_implications),
+        progressLogging: toArray(found.progress_logging),
+        feedbackTrialling: toArray(found.feedback_trialling)
     };
 }
 
@@ -277,7 +288,18 @@ function defaultDetailShape(id, data) {
         costs: Array.isArray(data?.costs) ? data.costs : [],
         outcomes: Array.isArray(data?.outcomes) ? data.outcomes : [],
         withdrawalDate: String(data?.withdrawalDate || "").trim(),
-        clientId: String(data?.clientId || "").trim()
+        clientId: String(data?.clientId || "").trim(),
+        
+        // Assessment Task Fields
+        standardDetails: Array.isArray(data?.standardDetails) ? data.standardDetails : [],
+        tasksList: Array.isArray(data?.tasksList) ? data.tasksList : [],
+        achieved: Array.isArray(data?.achieved) ? data.achieved : [],
+        merit: Array.isArray(data?.merit) ? data.merit : [],
+        excellence: Array.isArray(data?.excellence) ? data.excellence : [],
+        submissionRequirements: Array.isArray(data?.submissionRequirements) ? data.submissionRequirements : [],
+        relevantImplications: Array.isArray(data?.relevantImplications) ? data.relevantImplications : [],
+        progressLogging: Array.isArray(data?.progressLogging) ? data.progressLogging : [],
+        feedbackTrialling: Array.isArray(data?.feedbackTrialling) ? data.feedbackTrialling : []
     };
 }
 
@@ -311,6 +333,15 @@ function renderDetailView(host, id, data, canEdit) {
         <section class="proposal-details">
             ${data.startDate ? `<div class="detail-row"><strong>EST. Start Date:</strong> <span>${escapeHtml(data.startDate)}</span></div>` : ""}
         </section>
+
+        ${
+            data.tasksList && data.tasksList.length ? `
+            <section class="proposal-section">
+                <h2>Tasks List</h2>
+                <ol class="list">${renderList(data.tasksList)}</ol>
+            </section>
+            ` : ""
+        }
 
         ${
             data.contactName || data.company || data.address ? `
@@ -499,7 +530,18 @@ async function saveDetails(id, draft) {
         costs: draft.costs,
         outcomes: draft.outcomes,
         withdrawal_date: draft.withdrawalDate,
-        client_id: draft.clientId
+        client_id: draft.clientId,
+        
+        // Assessment Task Fields
+        standard_details: draft.standardDetails,
+        tasks_list: draft.tasksList,
+        achieved: draft.achieved,
+        merit: draft.merit,
+        excellence: draft.excellence,
+        submission_requirements: draft.submissionRequirements,
+        relevant_implications: draft.relevantImplications,
+        progress_logging: draft.progressLogging,
+        feedback_trialling: draft.feedbackTrialling
     };
 
     const response = await fetch("/api/activities", {
@@ -620,6 +662,30 @@ function renderEditForm(host, id, data) {
             </label>
 
             <fieldset class="detail-form-section">
+                <legend>Tasks & Assessment</legend>
+                <label class="detail-field detail-field-full">
+                    <span>Standard Details (one per line)</span>
+                    <textarea name="standardDetails" rows="4">${escapeHtml(asLines(data.standardDetails))}</textarea>
+                </label>
+                <label class="detail-field detail-field-full">
+                    <span>Tasks List (one per line)</span>
+                    <textarea name="tasksList" rows="6">${escapeHtml(asLines(data.tasksList))}</textarea>
+                </label>
+                <label class="detail-field detail-field-full">
+                    <span>Achieved (one per line)</span>
+                    <textarea name="achieved" rows="4">${escapeHtml(asLines(data.achieved))}</textarea>
+                </label>
+                <label class="detail-field detail-field-full">
+                    <span>Merit (one per line)</span>
+                    <textarea name="merit" rows="4">${escapeHtml(asLines(data.merit))}</textarea>
+                </label>
+                <label class="detail-field detail-field-full">
+                    <span>Excellence (one per line)</span>
+                    <textarea name="excellence" rows="4">${escapeHtml(asLines(data.excellence))}</textarea>
+                </label>
+            </fieldset>
+
+            <fieldset class="detail-form-section">
                 <legend>Proposal Content</legend>
                 <label class="detail-field detail-field-full">
                     <span>Overview and Needs (one per line)</span>
@@ -734,7 +800,18 @@ function renderEditForm(host, id, data) {
             costs: parseLines(formData.get("costs")),
             outcomes: parseLines(formData.get("outcomes")),
             withdrawalDate: String(formData.get("withdrawalDate") || "").trim(),
-            clientId: String(formData.get("clientId") || "").trim()
+            clientId: String(formData.get("clientId") || "").trim(),
+            
+            // Assessment Task Fields
+            standardDetails: parseLines(formData.get("standardDetails")),
+            tasksList: parseLines(formData.get("tasksList")),
+            achieved: parseLines(formData.get("achieved")),
+            merit: parseLines(formData.get("merit")),
+            excellence: parseLines(formData.get("excellence")),
+            submissionRequirements: parseLines(formData.get("submissionRequirements")),
+            relevantImplications: parseLines(formData.get("relevantImplications")),
+            progressLogging: parseLines(formData.get("progressLogging")),
+            feedbackTrialling: parseLines(formData.get("feedbackTrialling"))
         };
 
         if (!draft.title || !draft.yearLevel || !draft.type) {
