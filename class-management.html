@@ -87,7 +87,7 @@
 
         .class-filter-grid {
             display: grid;
-            grid-template-columns: 2fr repeat(4, minmax(0, 1fr));
+            grid-template-columns: 2fr repeat(5, minmax(0, 1fr));
             gap: 12px;
             align-items: end;
         }
@@ -114,6 +114,22 @@
             font: inherit;
             background: #fff;
             color: #1f2f45;
+        }
+
+        .class-field select[multiple] {
+            min-height: 118px;
+            padding: 8px 10px;
+        }
+
+        .class-checkbox-row .class-field {
+            flex: 1 1 260px;
+            min-width: 240px;
+        }
+
+        .class-filter-hint {
+            margin: 10px 0 0;
+            color: #647a91;
+            font-size: 0.78rem;
         }
 
         .class-checkbox-row {
@@ -358,19 +374,25 @@
                     </label>
                     <label class="class-field">
                         <span>Year Level</span>
-                        <select id="class-year-filter">
+                        <select id="class-year-filter" multiple size="4">
                             <option value="all">All years</option>
                         </select>
                     </label>
                     <label class="class-field">
+                        <span>School Group</span>
+                        <select id="class-school-filter" multiple size="4">
+                            <option value="all">All school groups</option>
+                        </select>
+                    </label>
+                    <label class="class-field">
                         <span>Form Class</span>
-                        <select id="class-form-filter">
+                        <select id="class-form-filter" multiple size="4">
                             <option value="all">All form classes</option>
                         </select>
                     </label>
                     <label class="class-field">
                         <span>Status</span>
-                        <select id="class-status-filter">
+                        <select id="class-status-filter" multiple size="4">
                             <option value="all">All statuses</option>
                             <option value="current">Current</option>
                             <option value="not current">Not Current</option>
@@ -386,10 +408,11 @@
                         </select>
                     </label>
                 </div>
+                <p class="class-filter-hint">Hold Ctrl on Windows to select multiple values in a list.</p>
                 <div class="class-checkbox-row">
                     <label class="class-field">
                         <span>Program</span>
-                        <select id="class-program-filter">
+                        <select id="class-program-filter" multiple size="6">
                             <option value="all">All Programs</option>
                             <option value="DTECH">DTECH</option>
                             <option value="DTONLINE">DTONLINE</option>

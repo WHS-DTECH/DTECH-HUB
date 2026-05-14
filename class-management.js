@@ -9,7 +9,6 @@ function classGetStoredEmail() {
     if (!raw) return "";
     try {
         const parsed = JSON.parse(raw);
-        if (!parsed?.expiresAt || Number(parsed.expiresAt) <= Date.now()) return "";
         return String(parsed?.profile?.email || "").trim().toLowerCase();
     } catch (_error) {
         return "";
@@ -71,22 +70,77 @@ function setClassStatus(message, isError = false) {
     element.className = isError ? "class-status is-error" : "class-status";
 }
 
-function uniqueSorted(values) {
-    return Array.from(new Set((Array.isArray(values) ? values : []).filter(Boolean))).sort((left, right) => String(left).localeCompare(String(right), undefined, { numeric: true }));
+function uniqueValues(values, sortValues = true) {
+    const unique = Array.from(new Set((Array.isArray(values) ? values : []).filter(Boolean)));
+    if (!sortValues) {
+        return unique;
+    }
+
+    return unique.sort((left, right) => String(left).localeCompare(String(right), undefined, { numeric: true }));
 }
 
-function buildSelectOptions(elementId, values, defaultLabel) {
+function getSelectedValues(elementId) {
+    const element = document.getElementById(elementId);
+    if (!element) return [];
+
+    if (element.multiple) {
+        return Array.from(element.selectedOptions)
+            .map((option) => String(option.value || "").trim())
+            .filter((value) => value && value !== "all");
+    }
+
+    const value = String(element.value || "all").trim();
+    return value && value !== "all" ? [value] : [];
+}
+
+function buildSelectOptions(elementId, values, defaultLabel, { multiple = false, sortValues = true, formatter = (value) => String(value) } = {}) {
     const element = document.getElementById(elementId);
     if (!element) return;
-    const previous = element.value || "all";
-    element.innerHTML = `<option value="all">${escapeHtml(defaultLabel)}</option>`;
-    uniqueSorted(values).forEach((value) => {
+
+    const previousValues = getSelectedValues(elementId);
+    const optionValues = uniqueValues(values, sortValues).map((value) => String(value).trim()).filter(Boolean);
+
+    element.multiple = multiple;
+    element.innerHTML = "";
+
+    if (!multiple) {
+        const defaultOption = document.createElement("option");
+        defaultOption.value = "all";
+        defaultOption.textContent = defaultLabel;
+        element.appendChild(defaultOption);
+    }
+
+    const selectAllByDefault = multiple && !previousValues.length;
+
+    optionValues.forEach((value) => {
         const option = document.createElement("option");
-        option.value = String(value);
-        option.textContent = String(value);
+        option.value = value;
+        option.textContent = formatter(value);
+        if (multiple) {
+            option.selected = selectAllByDefault || previousValues.includes(value);
+        }
         element.appendChild(option);
     });
-    element.value = Array.from(element.options).some((option) => option.value === previous) ? previous : "all";
+
+    if (!multiple) {
+        const previous = previousValues[0] || "all";
+        element.value = Array.from(element.options).some((option) => option.value === previous) ? previous : "all";
+    }
+}
+
+function getSchoolGroupForYearLevel(yearLevel) {
+    const yearNumber = Number.parseInt(String(yearLevel || "").replace(/\D+/g, ""), 10);
+    if (yearNumber >= 7 && yearNumber <= 8) return "Junior";
+    if (yearNumber >= 9 && yearNumber <= 10) return "Middle";
+    if (yearNumber >= 11 && yearNumber <= 13) return "Senior";
+    return "";
+}
+
+function formatSchoolGroupLabel(group) {
+    if (group === "Junior") return "Junior (Years 7-8)";
+    if (group === "Middle") return "Middle (Years 9-10)";
+    if (group === "Senior") return "Senior (Years 11-13)";
+    return group;
 }
 
 function renderSummary(students, visibleStudents) {
@@ -150,11 +204,12 @@ function renderStudentRow(student) {
 function getFilterState() {
     return {
         search: String(document.getElementById("class-search")?.value || "").trim().toLowerCase(),
-        year: String(document.getElementById("class-year-filter")?.value || "all"),
-        form: String(document.getElementById("class-form-filter")?.value || "all"),
-        status: String(document.getElementById("class-status-filter")?.value || "all").toLowerCase(),
+        years: getSelectedValues("class-year-filter"),
+        schoolGroups: getSelectedValues("class-school-filter"),
+        forms: getSelectedValues("class-form-filter"),
+        statuses: getSelectedValues("class-status-filter").map((value) => String(value || "").toLowerCase()),
         sort: String(document.getElementById("class-sort-filter")?.value || "name"),
-        program: String(document.getElementById("class-program-filter")?.value || "all"),
+        programs: getSelectedValues("class-program-filter"),
         currentOnly: Boolean(document.getElementById("class-current-only")?.checked),
         linkedOnly: Boolean(document.getElementById("class-linked-only")?.checked)
     };
@@ -167,6 +222,8 @@ function studentMatchesSearch(student, search) {
         student.id_number,
         student.form_class,
         student.year_level,
+        getSchoolGroupForYearLevel(student.year_level),
+        ...(Array.isArray(student.programs) ? student.programs : []),
         ...(Array.isArray(student.linked_emails) ? student.linked_emails : []),
         ...(Array.isArray(student.timetable) ? student.timetable.map((entry) => entry.value) : [])
     ].map((value) => String(value || "").toLowerCase());
@@ -181,10 +238,11 @@ function applyFilters() {
     const filters = getFilterState();
     const visibleStudents = classState.allStudents
         .filter((student) => {
-            if (filters.year !== "all" && String(student.year_level || "") !== filters.year) return false;
-            if (filters.form !== "all" && String(student.form_class || "") !== filters.form) return false;
-            if (filters.status !== "all" && String(student.status || "").toLowerCase() !== filters.status) return false;
-            if (filters.program !== "all" && !(Array.isArray(student.programs) && student.programs.includes(filters.program))) return false;
+            if (filters.years.length && !filters.years.includes(String(student.year_level || ""))) return false;
+            if (filters.schoolGroups.length && !filters.schoolGroups.includes(getSchoolGroupForYearLevel(student.year_level))) return false;
+            if (filters.forms.length && !filters.forms.includes(String(student.form_class || ""))) return false;
+            if (filters.statuses.length && !filters.statuses.includes(String(student.status || "").toLowerCase())) return false;
+            if (filters.programs.length && !filters.programs.some((program) => Array.isArray(student.programs) && student.programs.includes(program))) return false;
             if (filters.currentOnly && String(student.status || "").toLowerCase() === "not current") return false;
             if (filters.linkedOnly && !(Array.isArray(student.linked_emails) && student.linked_emails.length)) return false;
             return studentMatchesSearch(student, filters.search);
@@ -229,8 +287,23 @@ async function loadClassManagement() {
         const students = Array.isArray(payload.students) ? payload.students : [];
         classState.allStudents = students;
 
-        buildSelectOptions("class-year-filter", students.map((student) => student.year_level), "All years");
-        buildSelectOptions("class-form-filter", students.map((student) => student.form_class), "All form classes");
+        buildSelectOptions("class-year-filter", students.map((student) => student.year_level), "All years", { multiple: true });
+        buildSelectOptions("class-school-filter", ["Junior", "Middle", "Senior"], "All school groups", {
+            multiple: true,
+            sortValues: false,
+            formatter: formatSchoolGroupLabel
+        });
+        buildSelectOptions("class-form-filter", students.map((student) => student.form_class), "All form classes", { multiple: true });
+        buildSelectOptions("class-status-filter", ["Current", "Not Current"], "All statuses", {
+            multiple: true,
+            sortValues: false,
+            formatter: (value) => value
+        });
+        buildSelectOptions("class-program-filter", ["DTECH", "DTONLINE", "COMP", "TEXT", "MPROG", "MDTECH"], "All programs", {
+            multiple: true,
+            sortValues: false,
+            formatter: (value) => value
+        });
 
         setClassStatus("");
         applyFilters();
@@ -247,6 +320,7 @@ function bindFilters() {
     [
         "class-search",
         "class-year-filter",
+        "class-school-filter",
         "class-form-filter",
         "class-status-filter",
         "class-sort-filter",
