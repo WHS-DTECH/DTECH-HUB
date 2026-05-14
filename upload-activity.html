@@ -149,9 +149,29 @@
                             <textarea id="short-description" name="shortDescription"></textarea>
                         </div>
 
-                        <div class="field field-wide">
-                            <label for="resources">Resources & Equipment (one per line)</label>
-                            <textarea id="resources" name="resources" placeholder="What resources and equipment are needed?"></textarea>
+                        <div class="field field-wide resources-equipment-section">
+                            <label>Resources & Equipment</label>
+                            <div class="resources-equipment-layout">
+                                <div class="resources-equipment-inputs">
+                                    <div class="field">
+                                        <label for="resources">Resources (one per line)</label>
+                                        <textarea id="resources" name="resources" placeholder="List classroom resources..."></textarea>
+                                    </div>
+
+                                    <div class="field">
+                                        <label for="equipment">Equipment (one per line)</label>
+                                        <textarea id="equipment" name="equipment" placeholder="List required equipment..."></textarea>
+                                    </div>
+                                </div>
+
+                                <fieldset class="common-resources-panel">
+                                    <legend>Common Resources</legend>
+                                    <label><input type="checkbox" class="common-resource-option" value="Internet"> Internet</label>
+                                    <label><input type="checkbox" class="common-resource-option" value="Web Browser"> Web Browser</label>
+                                    <label><input type="checkbox" class="common-resource-option" value="Windows-Compatible"> Windows-Compatible</label>
+                                    <label><input type="checkbox" class="common-resource-option" value="USB Pen Drive"> USB Pen Drive</label>
+                                </fieldset>
+                            </div>
                         </div>
 
                         <div class="field field-wide">

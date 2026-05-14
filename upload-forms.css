@@ -99,6 +99,49 @@
     grid-column: 1 / -1;
 }
 
+.resources-equipment-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(230px, 300px);
+    gap: 10px;
+    align-items: start;
+}
+
+.resources-equipment-inputs {
+    display: grid;
+    gap: 10px;
+}
+
+.common-resources-panel {
+    border: 1px solid #a9c3df;
+    border-radius: 6px;
+    background: #eef4fd;
+    padding: 8px 10px;
+    display: grid;
+    gap: 6px;
+}
+
+.common-resources-panel legend {
+    color: #17395d;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 0 4px;
+}
+
+.common-resources-panel label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: #2f4e73;
+    font-size: 0.77rem;
+}
+
+.common-resources-panel input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+}
+
 .help-text {
     color: #687f9c;
     font-size: 0.72rem;
@@ -191,6 +234,10 @@
 
 @media (max-width: 820px) {
     .form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .resources-equipment-layout {
         grid-template-columns: 1fr;
     }
 }

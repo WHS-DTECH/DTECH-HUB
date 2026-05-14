@@ -20,6 +20,10 @@ async function prefillFormIfEditing() {
         if (data.outcome_image_url) form.outcomeImageUrl.value = data.outcome_image_url;
         if (data.description) form.shortDescription.value = data.description;
         form.resources.value = normalizeTextareaLines(data.resources).join("\n");
+        if (form.equipment) {
+            form.equipment.value = normalizeTextareaLines(data.equipment).join("\n");
+        }
+        syncCommonResourceOptionsFromTextarea();
         form.instructions.value = normalizeTextareaLines(data.instructions).join("\n");
         form.classManagementNotes.value = normalizeTextareaLines(data.class_management_notes).join("\n");
         form.classPreparation.value = normalizeTextareaLines(data.class_preparation).join("\n");
@@ -45,6 +49,9 @@ const uploadStatus = document.querySelector("#upload-status");
 const cancelButton = document.querySelector("#cancel-upload");
 const classPreparationInput = document.querySelector("#class-preparation");
 const classPreparationNoneCheckbox = document.querySelector("#class-preparation-none");
+const resourcesInput = document.querySelector("#resources");
+const equipmentInput = document.querySelector("#equipment");
+const commonResourceOptions = Array.from(document.querySelectorAll(".common-resource-option"));
 
 const UPLOAD_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 
@@ -142,6 +149,60 @@ function syncClassPreparationNoneState(fromCheckbox = false) {
 
     classPreparationInput.readOnly = false;
     classPreparationInput.removeAttribute("aria-disabled");
+}
+
+function getTextareaLinesSet(textarea) {
+    return new Set(
+        String(textarea?.value || "")
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean)
+    );
+}
+
+function setTextareaLines(textarea, values) {
+    if (!textarea) return;
+    textarea.value = Array.from(values).join("\n");
+}
+
+function syncCommonResourceOptionsFromTextarea() {
+    if (!resourcesInput || !commonResourceOptions.length) {
+        return;
+    }
+
+    const normalizedLines = new Set(
+        Array.from(getTextareaLinesSet(resourcesInput)).map((value) => value.toLowerCase())
+    );
+
+    commonResourceOptions.forEach((option) => {
+        const value = String(option.value || "").trim().toLowerCase();
+        option.checked = normalizedLines.has(value);
+    });
+}
+
+function toggleCommonResource(value, isChecked) {
+    if (!resourcesInput) {
+        return;
+    }
+
+    const line = String(value || "").trim();
+    if (!line) {
+        return;
+    }
+
+    const lines = getTextareaLinesSet(resourcesInput);
+    if (isChecked) {
+        lines.add(line);
+    } else {
+        const lowered = line.toLowerCase();
+        for (const existing of Array.from(lines)) {
+            if (existing.toLowerCase() === lowered) {
+                lines.delete(existing);
+            }
+        }
+    }
+
+    setTextareaLines(resourcesInput, lines);
 }
 
 function normalizeEmail(value) {
@@ -260,7 +321,8 @@ async function uploadActivityImage(file, activityName) {
 function createActivityPayload() {
     const formData = new FormData(form);
     const name = String(formData.get("activityName") || "").trim();
-    const resourcesAndEquipment = linesToArray(formData.get("resources"));
+    const resources = linesToArray(formData.get("resources"));
+    const equipment = linesToArray(formData.get("equipment"));
     const durationMinutes = Number.parseInt(String(formData.get("durationMinutes") || "0"), 10) || 0;
     const editingId = getEditingActivityId();
 
@@ -276,8 +338,8 @@ function createActivityPayload() {
         card_url: String(formData.get("cardUrl") || "").trim(),
         outcome_image_url: String(formData.get("outcomeImageUrl") || "").trim(),
         description: String(formData.get("shortDescription") || "").trim(),
-        resources: resourcesAndEquipment,
-        equipment: resourcesAndEquipment,
+        resources,
+        equipment,
         instructions: linesToArray(formData.get("instructions")),
         class_management_notes: linesToArray(formData.get("classManagementNotes")),
         class_preparation: linesToArray(formData.get("classPreparation")),
@@ -369,4 +431,19 @@ if (classPreparationNoneCheckbox) {
     });
 }
 
+if (resourcesInput) {
+    resourcesInput.addEventListener("input", () => {
+        syncCommonResourceOptionsFromTextarea();
+    });
+}
+
+if (commonResourceOptions.length) {
+    commonResourceOptions.forEach((option) => {
+        option.addEventListener("change", () => {
+            toggleCommonResource(option.value, option.checked);
+        });
+    });
+}
+
 syncClassPreparationNoneState();
+syncCommonResourceOptionsFromTextarea();
