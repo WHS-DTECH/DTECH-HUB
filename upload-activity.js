@@ -23,6 +23,11 @@ async function prefillFormIfEditing() {
         form.instructions.value = normalizeTextareaLines(data.instructions).join("\n");
         form.classManagementNotes.value = normalizeTextareaLines(data.class_management_notes).join("\n");
         form.classPreparation.value = normalizeTextareaLines(data.class_preparation).join("\n");
+        if (classPreparationNoneCheckbox) {
+            const hasPreparation = form.classPreparation.value.trim().length > 0;
+            classPreparationNoneCheckbox.checked = !hasPreparation || isNoneClassPreparation(form.classPreparation.value);
+            syncClassPreparationNoneState();
+        }
         form.assessmentFocus.value = normalizeTextareaLines(data.assessment_focus).join("\n");
         const showInThisWeek = data.show_in_this_week ?? data.show_this_week ?? data.is_pinned ?? data.is_this_week;
         if (typeof showInThisWeek !== "undefined") form.showThisWeek.checked = !!showInThisWeek;
@@ -38,6 +43,8 @@ const fileInput = document.querySelector("#outcome-image-file");
 const imageUrlInput = document.querySelector("#outcome-image-url");
 const uploadStatus = document.querySelector("#upload-status");
 const cancelButton = document.querySelector("#cancel-upload");
+const classPreparationInput = document.querySelector("#class-preparation");
+const classPreparationNoneCheckbox = document.querySelector("#class-preparation-none");
 
 const UPLOAD_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 
@@ -109,6 +116,32 @@ function normalizeTextareaLines(value) {
     } catch (_error) {
         return firstPass;
     }
+}
+
+function isNoneClassPreparation(value) {
+    return String(value || "").trim().toUpperCase() === "NONE";
+}
+
+function syncClassPreparationNoneState(fromCheckbox = false) {
+    if (!classPreparationInput || !classPreparationNoneCheckbox) {
+        return;
+    }
+
+    if (classPreparationNoneCheckbox.checked) {
+        if (fromCheckbox || !classPreparationInput.value.trim() || isNoneClassPreparation(classPreparationInput.value)) {
+            classPreparationInput.value = "NONE";
+        }
+        classPreparationInput.readOnly = true;
+        classPreparationInput.setAttribute("aria-disabled", "true");
+        return;
+    }
+
+    if (isNoneClassPreparation(classPreparationInput.value)) {
+        classPreparationInput.value = "";
+    }
+
+    classPreparationInput.readOnly = false;
+    classPreparationInput.removeAttribute("aria-disabled");
 }
 
 function normalizeEmail(value) {
@@ -329,3 +362,11 @@ if (form) {
         }
     });
 }
+
+if (classPreparationNoneCheckbox) {
+    classPreparationNoneCheckbox.addEventListener("change", () => {
+        syncClassPreparationNoneState(true);
+    });
+}
+
+syncClassPreparationNoneState();

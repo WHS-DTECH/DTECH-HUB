@@ -121,6 +121,23 @@
     height: 14px;
 }
 
+.class-prep-none-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 2px 0 2px;
+    color: #2f4e73;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.class-prep-none-toggle input {
+    width: 14px;
+    height: 14px;
+}
+
 .form-actions {
     display: flex;
     gap: 8px;
