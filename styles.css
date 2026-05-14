@@ -609,6 +609,7 @@ body.public-home-access label.control-field[for="year-filter"] {
 }
 body.public-home-access .controls-panel {
     grid-template-columns: minmax(230px, 2fr) repeat(3, minmax(130px, 1fr));
+}
 
 .control-field {
     display: grid;

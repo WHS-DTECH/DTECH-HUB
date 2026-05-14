@@ -1709,7 +1709,7 @@ async function init() {
     renderCurrentProjects();
     renderLibrary();
     bindControls();
-    applyCompactCardLayout();
+    setTimeout(() => applyCompactCardLayout(), 100);
     initHubGoogleAuth();
 }
 
