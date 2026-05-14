@@ -72,6 +72,10 @@ function isProjectRecord(record) {
     }
 
     const category = String(record?.activity_category || record?.activityCategory || "").trim().toLowerCase();
+    if (category.includes("assessment")) {
+        return false;
+    }
+
     const hasProposalFields = Boolean(
         record?.start_date ||
         record?.startDate ||

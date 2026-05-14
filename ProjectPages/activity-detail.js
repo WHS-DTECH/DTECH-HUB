@@ -426,8 +426,12 @@ function renderDetailView(host, id, data, canEdit) {
                     (Array.isArray(data?.outcomes) && data.outcomes.length)
                 );
 
-                const isProject = category.includes("project") || hasProjectProposalFields;
-                const targetPage = isProject ? "../upload-project.html" : "../upload-activity.html";
+                let targetPage = "../upload-activity.html";
+                if (category.includes("assessment")) {
+                    targetPage = "../upload-assessment.html";
+                } else if (category.includes("project") || hasProjectProposalFields) {
+                    targetPage = "../upload-project.html";
+                }
                 window.location.href = `${targetPage}?id=${encodeURIComponent(id)}`;
             });
         } else {
