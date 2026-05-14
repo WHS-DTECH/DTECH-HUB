@@ -1,3 +1,36 @@
+// Prefill form fields if editing an existing activity
+async function prefillFormIfEditing() {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("id");
+    if (!id || !form) return;
+
+    try {
+        const response = await fetch(`/api/activities/${encodeURIComponent(id)}`);
+        if (!response.ok) return;
+        const data = await response.json();
+        // Prefill each field if present in data
+        if (data.name) form.activityName.value = data.name;
+        if (data.year_level) form.yearLevel.value = data.year_level;
+        if (data.type) form.type.value = data.type;
+        if (data.activity_category) form.activityCategory.value = data.activity_category;
+        if (data.duration_minutes) form.durationMinutes.value = data.duration_minutes;
+        if (data.difficulty) form.difficulty.value = data.difficulty;
+        if (data.card_color) form.cardColor.value = data.card_color;
+        if (data.card_url) form.cardUrl.value = data.card_url;
+        if (data.outcome_image_url) form.outcomeImageUrl.value = data.outcome_image_url;
+        if (data.description) form.shortDescription.value = data.description;
+        if (data.resources) form.resources.value = Array.isArray(data.resources) ? data.resources.join("\n") : data.resources;
+        if (data.instructions) form.instructions.value = Array.isArray(data.instructions) ? data.instructions.join("\n") : data.instructions;
+        if (data.class_management_notes) form.classManagementNotes.value = Array.isArray(data.class_management_notes) ? data.class_management_notes.join("\n") : data.class_management_notes;
+        if (data.class_preparation) form.classPreparation.value = Array.isArray(data.class_preparation) ? data.class_preparation.join("\n") : data.class_preparation;
+        if (data.assessment_focus) form.assessmentFocus.value = Array.isArray(data.assessment_focus) ? data.assessment_focus.join("\n") : data.assessment_focus;
+        if (typeof data.show_in_this_week !== "undefined") form.showThisWeek.checked = !!data.show_in_this_week;
+    } catch (e) {
+        // Ignore errors, just don't prefill
+    }
+}
+
+window.addEventListener("DOMContentLoaded", prefillFormIfEditing);
 
 const form = document.querySelector("#upload-activity-form");
 const fileInput = document.querySelector("#outcome-image-file");
