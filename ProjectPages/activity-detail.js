@@ -261,7 +261,7 @@ async function readSharedActivity(activityId) {
         
         // Assessment Task Fields
         standardDetails: toArray(found.standard_details),
-        tasksList: toArray(found.tasks_list),
+        tasksList: toArray(found.tasks_list || found.assessment_focus),
         achieved: toArray(found.achieved),
         merit: toArray(found.merit),
         excellence: toArray(found.excellence),
@@ -585,6 +585,7 @@ async function saveDetails(id, draft) {
         // Assessment Task Fields
         standard_details: draft.standardDetails,
         tasks_list: draft.tasksList,
+        assessment_focus: draft.tasksList,
         achieved: draft.achieved,
         merit: draft.merit,
         excellence: draft.excellence,
@@ -638,7 +639,9 @@ async function saveDetails(id, draft) {
 
         // Assessment Task Fields
         standardDetails: Array.isArray(result.standard_details) ? result.standard_details : draft.standardDetails,
-        tasksList: Array.isArray(result.tasks_list) ? result.tasks_list : draft.tasksList,
+        tasksList: Array.isArray(result.tasks_list)
+            ? result.tasks_list
+            : (Array.isArray(result.assessment_focus) ? result.assessment_focus : draft.tasksList),
         achieved: Array.isArray(result.achieved) ? result.achieved : draft.achieved,
         merit: Array.isArray(result.merit) ? result.merit : draft.merit,
         excellence: Array.isArray(result.excellence) ? result.excellence : draft.excellence,

@@ -1566,7 +1566,7 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     instructions: normalizeArray(body.instructions),
     class_management_notes: normalizeArray(body.class_management_notes),
     class_preparation: normalizeArray(body.class_preparation),
-    assessment_focus: normalizeArray(body.assessment_focus),
+    assessment_focus: normalizeArray(body.assessment_focus ?? body.tasks_list),
     time_sensitive: Boolean(body.time_sensitive ?? body.timeSensitive),
     show_in_this_week: Boolean(body.show_in_this_week),
     term: String(body.term || "Term 2").trim() || "Term 2",
