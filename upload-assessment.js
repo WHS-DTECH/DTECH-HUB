@@ -173,27 +173,27 @@ async function prefillFormIfEditing() {
         const response = await fetch(`/api/activities/${encodeURIComponent(id)}`);
         if (!response.ok) return;
         const data = await response.json();
-        
-        // Prefill each field if present in data
-        if (data.name) form.activityName.value = data.name;
-        if (data.year_level) form.yearLevel.value = data.year_level;
-        if (data.type) form.type.value = data.type;
-        if (data.activity_category) form.activityCategory.value = data.activity_category;
-        if (data.difficulty) form.difficulty.value = data.difficulty;
-        if (data.card_color || data.card_colour || data.color) form.cardColor.value = data.card_color || data.card_colour || data.color;
-        
+
+        // Prefill every field with explicit defaults to avoid stale draft values.
+        form.activityName.value = String(data.name || "").trim();
+        form.yearLevel.value = String(data.year_level || "").trim();
+        form.type.value = String(data.type || "").trim();
+        form.activityCategory.value = String(data.activity_category || "Assessment Task").trim() || "Assessment Task";
+        form.difficulty.value = String(data.difficulty || "").trim();
+        form.cardColor.value = String(data.card_color || data.card_colour || data.color || "Green").trim() || "Green";
+
         // Assessment-specific fields
-        if (data.standard_details) form.standardDetails.value = linesToArray(data.standard_details).join("\n");
-        if (data.description || data.summary) form.shortDescription.value = String(data.description || data.summary || "").trim();
-        if (data.tasks_list) form.tasksList.value = linesToArray(data.tasks_list).join("\n");
-        if (data.achieved) form.achieved.value = linesToArray(data.achieved).join("\n");
-        if (data.merit) form.merit.value = linesToArray(data.merit).join("\n");
-        if (data.excellence) form.excellence.value = linesToArray(data.excellence).join("\n");
-        if (data.submission_requirements) form.submissionRequirements.value = linesToArray(data.submission_requirements).join("\n");
-        if (data.relevant_implications) form.relevantImplications.value = linesToArray(data.relevant_implications).join("\n");
-        if (data.progress_logging) form.progressLogging.value = linesToArray(data.progress_logging).join("\n");
-        if (data.feedback_trialling) form.feedbackTrialling.value = linesToArray(data.feedback_trialling).join("\n");
-        
+        form.shortDescription.value = String(data.description || data.summary || "").trim();
+        form.standardDetails.value = linesToArray(data.standard_details).join("\n");
+        form.tasksList.value = linesToArray(data.tasks_list).join("\n");
+        form.achieved.value = linesToArray(data.achieved).join("\n");
+        form.merit.value = linesToArray(data.merit).join("\n");
+        form.excellence.value = linesToArray(data.excellence).join("\n");
+        form.submissionRequirements.value = linesToArray(data.submission_requirements).join("\n");
+        form.relevantImplications.value = linesToArray(data.relevant_implications).join("\n");
+        form.progressLogging.value = linesToArray(data.progress_logging).join("\n");
+        form.feedbackTrialling.value = linesToArray(data.feedback_trialling).join("\n");
+
         const showInThisWeek = data.show_in_this_week ?? data.show_this_week ?? data.is_pinned ?? data.is_this_week;
         if (typeof showInThisWeek !== "undefined") form.showThisWeek.checked = !!showInThisWeek;
     } catch (e) {
@@ -202,7 +202,9 @@ async function prefillFormIfEditing() {
 }
 
 window.addEventListener("DOMContentLoaded", async () => {
-    restoreAssessmentDraftIfAvailable();
+    if (!getEditingAssessmentId()) {
+        restoreAssessmentDraftIfAvailable();
+    }
     await prefillFormIfEditing();
     renderAuthStatus();
 });
