@@ -407,10 +407,28 @@ function renderDetailView(host, id, data, canEdit) {
     const editButton = host.querySelector("#detail-edit-button");
     const deleteButton = host.querySelector("#detail-delete-button");
     if (editButton) {
-        // If this is a backend activity (custom upload), redirect to upload-activity.html for editing
+        // If this is a backend upload, route to the matching uploader page for prefilled editing.
         if (String(id).match(/^\d+$/)) {
             editButton.addEventListener("click", () => {
-                window.location.href = `../upload-activity.html?id=${encodeURIComponent(id)}`;
+                const category = String(data?.activityCategory || "").toLowerCase();
+                const hasProjectProposalFields = Boolean(
+                    data?.startDate ||
+                    data?.contactName ||
+                    data?.contactPhone ||
+                    data?.contactEmail ||
+                    data?.company ||
+                    data?.address ||
+                    data?.withdrawalDate ||
+                    data?.clientId ||
+                    (Array.isArray(data?.overview) && data.overview.length) ||
+                    (Array.isArray(data?.services) && data.services.length) ||
+                    (Array.isArray(data?.costs) && data.costs.length) ||
+                    (Array.isArray(data?.outcomes) && data.outcomes.length)
+                );
+
+                const isProject = category.includes("project") || hasProjectProposalFields;
+                const targetPage = isProject ? "../upload-project.html" : "../upload-activity.html";
+                window.location.href = `${targetPage}?id=${encodeURIComponent(id)}`;
             });
         } else {
             // For base activities, use the in-place edit form
