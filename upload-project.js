@@ -3,7 +3,7 @@ const fileInput = document.querySelector("#outcome-image-file");
 const imageUrlInput = document.querySelector("#outcome-image-url");
 const uploadStatus = document.querySelector("#upload-status");
 const cancelButton = document.querySelector("#cancel-upload");
-const clearDraftButton = document.querySelector("#clear-project-draft");
+const clearDraftButtons = Array.from(document.querySelectorAll("[data-clear-project-draft]"));
 const authStatusElement = document.querySelector("#project-auth-status");
 let currentEditingImageUrl = "";
 const PROJECT_DRAFT_STORAGE_KEY = "dtechHub:uploadProjectDraft:v1";
@@ -355,8 +355,7 @@ if (cancelButton) {
     });
 }
 
-if (clearDraftButton) {
-    clearDraftButton.addEventListener("click", async () => {
+async function handleClearDraftClick() {
         clearProjectDraftStorage();
         setStatus("");
         currentEditingImageUrl = "";
@@ -372,6 +371,11 @@ if (clearDraftButton) {
         }
 
         setStatus("Draft cleared.");
+}
+
+if (clearDraftButtons.length) {
+    clearDraftButtons.forEach((button) => {
+        button.addEventListener("click", handleClearDraftClick);
     });
 }
 

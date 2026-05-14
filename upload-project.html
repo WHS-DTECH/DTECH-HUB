@@ -52,6 +52,9 @@
             <h1>Upload Project</h1>
             <p class="intro-text">Create a new project proposal with contact info, services, costs, outcomes, and deliverables.</p>
             <p id="project-auth-status" class="project-auth-status" aria-live="polite"></p>
+            <div class="upload-page-tools">
+                <button class="button-cancel" type="button" id="clear-project-draft-top" data-clear-project-draft>Clear Draft</button>
+            </div>
 
             <section class="upload-panel" aria-label="Upload project form">
 
@@ -224,7 +227,7 @@
 
                     <div class="form-actions">
                         <button class="button-save" type="submit">Save Project</button>
-                        <button class="button-cancel" type="button" id="clear-project-draft">Clear Draft</button>
+                        <button class="button-cancel" type="button" id="clear-project-draft" data-clear-project-draft>Clear Draft</button>
                         <button class="button-cancel" type="button" id="cancel-upload">Cancel</button>
                         <p id="upload-status" class="upload-status" aria-live="polite" hidden></p>
                     </div>

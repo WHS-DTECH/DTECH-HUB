@@ -32,6 +32,12 @@
     color: #8b2323;
 }
 
+.upload-page-tools {
+    display: flex;
+    justify-content: flex-end;
+    margin: 0 0 10px;
+}
+
 .upload-panel {
     background: #f4f6fa;
     border: 1px solid #ced6e2;
