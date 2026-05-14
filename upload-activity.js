@@ -1,7 +1,6 @@
 // Prefill form fields if editing an existing activity
 async function prefillFormIfEditing() {
-    const params = new URLSearchParams(window.location.search);
-    const id = params.get("id");
+    const id = getEditingActivityId();
     if (!id || !form) return;
 
     try {
@@ -19,11 +18,11 @@ async function prefillFormIfEditing() {
         if (data.card_url) form.cardUrl.value = data.card_url;
         if (data.outcome_image_url) form.outcomeImageUrl.value = data.outcome_image_url;
         if (data.description) form.shortDescription.value = data.description;
-        if (data.resources) form.resources.value = Array.isArray(data.resources) ? data.resources.join("\n") : data.resources;
-        if (data.instructions) form.instructions.value = Array.isArray(data.instructions) ? data.instructions.join("\n") : data.instructions;
-        if (data.class_management_notes) form.classManagementNotes.value = Array.isArray(data.class_management_notes) ? data.class_management_notes.join("\n") : data.class_management_notes;
-        if (data.class_preparation) form.classPreparation.value = Array.isArray(data.class_preparation) ? data.class_preparation.join("\n") : data.class_preparation;
-        if (data.assessment_focus) form.assessmentFocus.value = Array.isArray(data.assessment_focus) ? data.assessment_focus.join("\n") : data.assessment_focus;
+        form.resources.value = parseMaybeArray(data.resources).join("\n");
+        form.instructions.value = parseMaybeArray(data.instructions).join("\n");
+        form.classManagementNotes.value = parseMaybeArray(data.class_management_notes).join("\n");
+        form.classPreparation.value = parseMaybeArray(data.class_preparation).join("\n");
+        form.assessmentFocus.value = parseMaybeArray(data.assessment_focus).join("\n");
         if (typeof data.show_in_this_week !== "undefined") form.showThisWeek.checked = !!data.show_in_this_week;
     } catch (e) {
         // Ignore errors, just don't prefill
@@ -39,6 +38,32 @@ const uploadStatus = document.querySelector("#upload-status");
 const cancelButton = document.querySelector("#cancel-upload");
 
 const UPLOAD_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
+
+function getEditingActivityId() {
+    const params = new URLSearchParams(window.location.search);
+    return String(params.get("id") || "").trim();
+}
+
+function parseMaybeArray(value) {
+    if (Array.isArray(value)) {
+        return value;
+    }
+
+    const raw = String(value || "").trim();
+    if (!raw) {
+        return [];
+    }
+
+    try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [raw];
+    } catch (_error) {
+        return raw
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean);
+    }
+}
 
 function normalizeEmail(value) {
     return String(value || "").trim().toLowerCase();
@@ -131,7 +156,7 @@ async function uploadActivityImage(file, activityName) {
     if (!activityName) throw new Error("Activity name is required before uploading images.");
 
     const imageData = await fileToDataUrl(file);
-    const activityId = slugify(activityName);
+    const activityId = getEditingActivityId() || slugify(activityName);
 
     setStatus("Uploading image...");
 
@@ -158,9 +183,10 @@ function createActivityPayload() {
     const name = String(formData.get("activityName") || "").trim();
     const resourcesAndEquipment = linesToArray(formData.get("resources"));
     const durationMinutes = Number.parseInt(String(formData.get("durationMinutes") || "0"), 10) || 0;
+    const editingId = getEditingActivityId();
 
     return {
-        id: slugify(name),
+        id: editingId || slugify(name),
         name,
         year_level: String(formData.get("yearLevel") || "").trim(),
         type: String(formData.get("type") || "").trim(),
