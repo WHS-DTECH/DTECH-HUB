@@ -1078,6 +1078,8 @@ async function ensureSchema() {
 }
 
 app.use(express.json({ limit: "2mb" }));
+app.use("/images/activities", express.static(path.join(__dirname, "images", "activities")));
+app.use("/images/activities", express.static(path.join(__dirname, "public", "images", "activities")));
 app.use(express.static(__dirname));
 
 async function canManagePracticalSchedule(email) {
@@ -1599,7 +1601,7 @@ app.post("/api/activities/:id/upload-image", requireActivityWriteAccess, async (
   }
 
   try {
-    const uploadsDir = path.join(__dirname, "public", "images", "activities");
+    const uploadsDir = path.join(__dirname, "images", "activities");
     if (!fs.existsSync(uploadsDir)) {
       fs.mkdirSync(uploadsDir, { recursive: true });
     }
