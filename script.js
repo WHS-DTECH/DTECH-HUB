@@ -378,7 +378,13 @@ function mapLabProjectToLibraryItem(project) {
 }
 
 function getUnifiedLibraryItems() {
-    return [...projects, ...labProjects.map(mapLabProjectToLibraryItem)];
+    return [
+        ...projects.map((project) => ({
+            ...project,
+            sourceType: project.sourceType || "activity"
+        })),
+        ...labProjects.map(mapLabProjectToLibraryItem)
+    ];
 }
 
 const HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
@@ -554,7 +560,8 @@ const state = {
     sort: "name-asc",
     year: "All",
     type: "All",
-    category: "All"
+    category: "All",
+    content: "All"
 };
 
 const labProjectState = {
@@ -1088,6 +1095,10 @@ function getTypes() {
     return ["All", "active", "planning", "archive"];
 }
 
+function getContentTypes() {
+    return ["All", "Activities", "Projects"];
+}
+
 function getCategories() {
     return ["All", ...new Set(getUnifiedLibraryItems().map((project) => project.activityCategory)).values()];
 }
@@ -1138,12 +1149,16 @@ function filterProjects(items) {
         const matchesYear = state.year === "All" || projectYear === state.year;
         const matchesType = state.type === "All" || project.status === state.type;
         const matchesCategory = state.category === "All" || project.activityCategory === state.category;
+        const matchesContent =
+            state.content === "All" ||
+            (state.content === "Activities" && project.sourceType === "activity") ||
+            (state.content === "Projects" && project.sourceType === "project");
         const haystack = [project.title, project.className, project.area, project.activityCategory, project.summary, ...project.keywords]
             .join(" ")
             .toLowerCase();
         const matchesSearch = !query || haystack.includes(query);
 
-        return matchesYear && matchesType && matchesCategory && matchesSearch;
+        return matchesYear && matchesType && matchesCategory && matchesContent && matchesSearch;
     });
 }
 
@@ -1237,6 +1252,24 @@ function formatStatus(status) {
 }
 
 function populateFilters() {
+    const contentPills = document.getElementById("content-filter-pills");
+    if (contentPills) {
+        contentPills.innerHTML = "";
+        getContentTypes().forEach((contentType) => {
+            const pill = document.createElement("button");
+            pill.className = `filter-chip ${state.content === contentType ? 'active' : ''}`;
+            pill.type = "button";
+            pill.textContent = contentType === "All" ? "All items" : contentType;
+            pill.addEventListener("click", () => {
+                state.content = contentType;
+                updateFilterPills("content-filter-pills", contentType);
+                renderLibrary();
+                applyCompactCardLayout();
+            });
+            contentPills.appendChild(pill);
+        });
+    }
+
     // Create filter pills for year levels
     const yearLevelPills = document.getElementById("year-filter-pills");
     if (yearLevelPills) {
@@ -1705,7 +1738,6 @@ async function init() {
     labProjects = [...baseLabProjects];
     renderStats();
     populateFilters();
-    renderFeaturedCarousel();
     renderCurrentWeek();
     renderCurrentProjects();
     renderLibrary();
