@@ -30,9 +30,6 @@ function getSignedInEmail() {
 
     try {
         const parsed = JSON.parse(raw);
-        if (!parsed?.expiresAt || Number(parsed.expiresAt) <= Date.now()) {
-            return "";
-        }
         return String(parsed?.profile?.email || "").trim().toLowerCase();
     } catch (_error) {
         return "";

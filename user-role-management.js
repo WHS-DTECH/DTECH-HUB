@@ -106,11 +106,25 @@ function loadHubProfile() {
 
   try {
     const parsed = JSON.parse(raw);
-    if (!parsed?.expiresAt || parsed.expiresAt <= Date.now()) {
-      clearHubStoredAuthRaw();
-      return null;
+    const profile = normalizeHubAuthProfile(parsed?.profile);
+
+    if (profile) {
+      if (!parsed?.accessToken || !parsed?.expiresAt || parsed.expiresAt <= Date.now()) {
+        try {
+          localStorage.setItem(HUB_AUTH_STORAGE_KEY, JSON.stringify({
+            accessToken: null,
+            expiresAt: 0,
+            profile: parsed.profile
+          }));
+        } catch (_error) {
+        }
+      }
+
+      return profile;
     }
-    return normalizeHubAuthProfile(parsed.profile);
+
+    clearHubStoredAuthRaw();
+    return null;
   } catch (_error) {
     clearHubStoredAuthRaw();
     return null;
