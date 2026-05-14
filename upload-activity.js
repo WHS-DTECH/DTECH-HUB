@@ -5,7 +5,7 @@ const imageUrlInput = document.querySelector("#outcome-image-url");
 const uploadStatus = document.querySelector("#upload-status");
 const cancelButton = document.querySelector("#cancel-upload");
 
-const HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
+const UPLOAD_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 
 function normalizeEmail(value) {
     return String(value || "").trim().toLowerCase();
@@ -16,13 +16,13 @@ function getHubStoredAuthRaw() {
     let sessionValue = null;
 
     try {
-        localValue = localStorage.getItem(HUB_AUTH_STORAGE_KEY);
+        localValue = localStorage.getItem(UPLOAD_HUB_AUTH_STORAGE_KEY);
     } catch (_error) {
         localValue = null;
     }
 
     try {
-        sessionValue = sessionStorage.getItem(HUB_AUTH_STORAGE_KEY);
+        sessionValue = sessionStorage.getItem(UPLOAD_HUB_AUTH_STORAGE_KEY);
     } catch (_error) {
         sessionValue = null;
     }
