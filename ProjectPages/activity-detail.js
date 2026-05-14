@@ -347,7 +347,7 @@ function renderDetailView(host, id, data, canEdit) {
 
     host.innerHTML = `
         <header class="toolbar">
-            <span class="toolbar-label">Project Details</span>
+            <span class="toolbar-label">${isAssessmentTask ? "Assessment Task Details" : "Project Details"}</span>
             <div class="toolbar-actions">
                 ${canEdit ? '<button type="button" class="detail-action" id="detail-edit-button">Edit Details</button>' : ""}
                 ${canEdit ? '<button type="button" class="detail-action detail-action-danger" id="detail-delete-button">Delete</button>' : ""}
@@ -357,7 +357,7 @@ function renderDetailView(host, id, data, canEdit) {
 
         <section class="hero">
             <div class="hero-copy">
-                <p class="kicker">Project Proposal</p>
+                ${isAssessmentTask ? "" : '<p class="kicker">Project Proposal</p>'}
                 <h1>${escapeHtml(data.title)}</h1>
                 <div class="pills">
                     <span class="pill">${escapeHtml(data.yearLevel)}</span>
