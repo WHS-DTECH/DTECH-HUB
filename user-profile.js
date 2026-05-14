@@ -24,6 +24,9 @@
     const csvLinksEl = document.querySelector("#profile-csv-links");
     const uploadHistoryEl = document.querySelector("#profile-upload-history");
     const classesEl = document.querySelector("#profile-classes");
+    const csvLinksCardEl = csvLinksEl ? csvLinksEl.closest(".profile-card") : null;
+    const uploadHistoryCardEl = uploadHistoryEl ? uploadHistoryEl.closest(".profile-card") : null;
+    const classesCardEl = classesEl ? classesEl.closest(".profile-card") : null;
 
     function getStoredAuth() {
         try {
@@ -55,6 +58,37 @@
             .replace(/[^a-z0-9]+/g, " ")
             .trim()
             .replace(/\s+/g, " ");
+    }
+
+    function canonicalizeEmail(value) {
+        const normalized = normalizeEmail(value);
+        if (!normalized.includes("@")) {
+            return "";
+        }
+
+        const [localPart, domain] = normalized.split("@");
+        const canonicalLocalPart = String(localPart || "").replace(/[^a-z0-9]/g, "");
+        if (!canonicalLocalPart || !domain) {
+            return "";
+        }
+
+        return `${canonicalLocalPart}@${domain}`;
+    }
+
+    function buildEmailMatchKeys(value) {
+        const keys = new Set();
+        const normalized = normalizeEmail(value);
+        if (!normalized.includes("@")) {
+            return keys;
+        }
+
+        keys.add(normalized);
+        const canonical = canonicalizeEmail(normalized);
+        if (canonical) {
+            keys.add(canonical);
+        }
+
+        return keys;
     }
 
     function pickFirstNonEmpty(values) {
@@ -176,6 +210,30 @@
         return normalized;
     }
 
+    function collectCandidateEmailMatchKeys(row) {
+        const keys = new Set();
+        collectCandidateEmails(row).forEach((email) => {
+            buildEmailMatchKeys(email).forEach((key) => keys.add(key));
+        });
+        return keys;
+    }
+
+    function hasMatchingEmailKey(row, email) {
+        const targetKeys = buildEmailMatchKeys(email);
+        if (!targetKeys.size) {
+            return false;
+        }
+
+        const rowKeys = collectCandidateEmailMatchKeys(row);
+        for (const key of targetKeys) {
+            if (rowKeys.has(key)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     function buildTimetableLabel(key) {
         return String(key || "")
             .replace(/_/g, " ")
@@ -212,7 +270,7 @@
     function collectLinkedStudentRows(studentRows, email, candidateNames) {
         const nameSet = new Set(collectStudentNameCandidates(candidateNames));
         return studentRows.filter((row) => {
-            if (collectCandidateEmails(row).has(email)) {
+            if (hasMatchingEmailKey(row, email)) {
                 return true;
             }
 
@@ -377,7 +435,7 @@
     }
 
     function buildUploadHistory(staffRows, email) {
-        const matching = staffRows.filter((row) => collectCandidateEmails(row).has(email));
+        const matching = staffRows.filter((row) => hasMatchingEmailKey(row, email));
         if (!matching.length) {
             return [{ text: "No matching staff upload rows for this account yet.", variant: "warn" }];
         }
@@ -535,7 +593,7 @@
                 : [];
 
         const roleFromRolePage = safeRoleRows.find((row) => normalizeEmail(row && row.user_email) === email);
-        const matchedStaffRows = safeStaffRows.filter((row) => collectCandidateEmails(row).has(email));
+        const matchedStaffRows = safeStaffRows.filter((row) => hasMatchingEmailKey(row, email));
         const matchedStudentRows = collectLinkedStudentRows(
             safeStudentRows,
             email,
@@ -567,6 +625,23 @@
             accessData && accessData.additional_role,
             accessData && (accessData.can_admin ? "Admin" : accessData.can_teacher_view ? "Teacher/Staff" : "Student")
         ]) || "Student";
+
+        const isStudentOnly = Boolean(
+            accessData &&
+            accessData.is_student &&
+            !accessData.can_teacher_view &&
+            !accessData.can_admin
+        );
+
+        if (csvLinksCardEl) {
+            csvLinksCardEl.hidden = isStudentOnly;
+        }
+        if (uploadHistoryCardEl) {
+            uploadHistoryCardEl.hidden = isStudentOnly;
+        }
+        if (classesCardEl) {
+            classesCardEl.hidden = isStudentOnly;
+        }
 
         if (roleEl) {
             roleEl.textContent = resolvedRole;

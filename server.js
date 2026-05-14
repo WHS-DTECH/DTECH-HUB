@@ -309,6 +309,21 @@ function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function canonicalizeEmail(value) {
+  const normalized = normalizeEmail(value);
+  if (!normalized.includes("@")) {
+    return "";
+  }
+
+  const [localPart, domain] = normalized.split("@");
+  const canonicalLocalPart = String(localPart || "").replace(/[^a-z0-9]/g, "");
+  if (!canonicalLocalPart || !domain) {
+    return "";
+  }
+
+  return `${canonicalLocalPart}@${domain}`;
+}
+
 function parseCsvEmails(raw) {
   return String(raw || "")
     .split(",")
@@ -2620,8 +2635,11 @@ app.get("/api/auth/user-access", async (req, res) => {
     (row) => canonicalizeRoleName(row.role_name) === assignedRole
   ) || null;
 
-  const isStaff = staffEmailSet.has(email);
-  const isStudent = studentEmailSet.has(email);
+  const canonicalEmail = canonicalizeEmail(email);
+  const canonicalStaffEmailSet = new Set(Array.from(staffEmailSet).map((value) => canonicalizeEmail(value)).filter(Boolean));
+  const canonicalStudentEmailSet = new Set(Array.from(studentEmailSet).map((value) => canonicalizeEmail(value)).filter(Boolean));
+  const isStaff = staffEmailSet.has(email) || (canonicalEmail ? canonicalStaffEmailSet.has(canonicalEmail) : false);
+  const isStudent = studentEmailSet.has(email) || (canonicalEmail ? canonicalStudentEmailSet.has(canonicalEmail) : false);
   const roleGrantsTeacherView = ["Admin", "Lead Teacher", "Teacher", "Technician"].includes(assignedRole);
   const canAdmin = Boolean(rolePermission?.admin);
 
