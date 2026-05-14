@@ -294,6 +294,11 @@ function inferSourceTypeFromRecord(record) {
         return explicitType;
     }
 
+    const title = String(record?.title || record?.name || "").trim().toLowerCase();
+    if (title.includes("tinkercad")) {
+        return "activity";
+    }
+
     const category = String(record?.activityCategory || record?.activity_category || "").toLowerCase();
     if (category.includes("project")) {
         return "project";
