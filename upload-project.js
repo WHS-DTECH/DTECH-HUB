@@ -6,6 +6,7 @@ const cancelButton = document.querySelector("#cancel-upload");
 const clearDraftButton = document.querySelector("#clear-project-draft");
 let currentEditingImageUrl = "";
 const PROJECT_DRAFT_STORAGE_KEY = "dtechHub:uploadProjectDraft:v1";
+const UPLOAD_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 
 function getEditingProjectId() {
     const params = new URLSearchParams(window.location.search);
@@ -31,6 +32,55 @@ function parseMaybeArray(value) {
             .map((line) => line.trim())
             .filter(Boolean);
     }
+}
+
+function normalizeEmail(value) {
+    return String(value || "").trim().toLowerCase();
+}
+
+function getHubStoredAuthRaw() {
+    let localValue = null;
+    let sessionValue = null;
+
+    try {
+        localValue = localStorage.getItem(UPLOAD_HUB_AUTH_STORAGE_KEY);
+    } catch (_error) {
+        localValue = null;
+    }
+
+    try {
+        sessionValue = sessionStorage.getItem(UPLOAD_HUB_AUTH_STORAGE_KEY);
+    } catch (_error) {
+        sessionValue = null;
+    }
+
+    return localValue || sessionValue;
+}
+
+function getSignedInEmail() {
+    const raw = getHubStoredAuthRaw();
+    if (!raw) {
+        return "";
+    }
+
+    try {
+        const parsed = JSON.parse(raw);
+        return normalizeEmail(parsed?.profile?.email || "");
+    } catch (_error) {
+        return "";
+    }
+}
+
+function withUserEmailHeader(headers = {}) {
+    const email = getSignedInEmail();
+    if (!email) {
+        return headers;
+    }
+
+    return {
+        ...headers,
+        "x-user-email": email
+    };
 }
 
 async function prefillProjectIfEditing() {
@@ -193,7 +243,7 @@ async function uploadActivityImage(file, activityName) {
 
     const response = await fetch(`/api/activities/${activityId}/upload-image`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: withUserEmailHeader({ "Content-Type": "application/json" }),
         body: JSON.stringify({ image_data: imageData, file_name: file.name })
     });
 
@@ -245,16 +295,19 @@ function createProjectPayload() {
 async function saveProjectShared(payload) {
     const response = await fetch("/api/activities", {
         method: "POST",
-        headers: {
+        headers: withUserEmailHeader({
             "Content-Type": "application/json"
-        },
+        }),
         body: JSON.stringify(payload)
     });
 
     const result = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-        throw new Error(result.error || result.message || "Could not save project");
+        if (response.status === 401) {
+            throw new Error("Sign-in required. Please sign in with your school Google account and try again.");
+        }
+        throw new Error(result.error || result.message || `Could not save project (HTTP ${response.status})`);
     }
 
     return result;
