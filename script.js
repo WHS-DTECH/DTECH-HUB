@@ -1250,6 +1250,7 @@ function populateFilters() {
                 state.year = year;
                 updateFilterPills("year-filter-pills", year);
                 renderLibrary();
+                applyCompactCardLayout();
             });
             yearLevelPills.appendChild(pill);
         });
@@ -1269,6 +1270,7 @@ function populateFilters() {
                 state.type = type;
                 updateFilterPills("type-filter-pills", type);
                 renderLibrary();
+                applyCompactCardLayout();
             });
             typePills.appendChild(pill);
         });
@@ -1288,6 +1290,7 @@ function populateFilters() {
                 state.category = cat;
                 updateFilterPills("category-filter-pills", cat);
                 renderLibrary();
+                applyCompactCardLayout();
             });
             categoryPills.appendChild(pill);
         });
@@ -1632,12 +1635,14 @@ function bindControls() {
     searchInput.addEventListener("input", (event) => {
         state.search = event.target.value;
         renderLibrary();
+        applyCompactCardLayout();
     });
 
     sortSelect.addEventListener("change", (event) => {
         state.sort = event.target.value;
         renderLibrary();
         renderCurrentProjects();
+        applyCompactCardLayout();
     });
 }
 
@@ -1653,6 +1658,31 @@ function bindLabProjectControls() {
         labProjectState.sort = event.target.value;
         renderCurrentLabProjects();
         renderLabProjectLibrary();
+    });
+}
+
+function applyCompactCardLayout() {
+    // Apply flex layout to all project grids for compact 4-column layout
+    const grids = [
+        document.getElementById('project-library-grid'),
+        document.getElementById('current-week-grid'),
+        document.getElementById('current-project-grid')
+    ].filter(Boolean);
+    
+    grids.forEach(grid => {
+        grid.style.display = 'flex';
+        grid.style.flexWrap = 'wrap';
+        grid.style.gap = '12px';
+        grid.style.marginTop = '10px';
+        grid.style.minWidth = '0';
+        
+        // Set card widths for 4-column layout
+        const cards = grid.querySelectorAll('.project-card');
+        cards.forEach(card => {
+            card.style.width = 'calc(25% - 9px)';
+            card.style.minWidth = '180px';
+            card.style.flexShrink = '0';
+        });
     });
 }
 
@@ -1679,6 +1709,7 @@ async function init() {
     renderCurrentProjects();
     renderLibrary();
     bindControls();
+    applyCompactCardLayout();
     initHubGoogleAuth();
 }
 
