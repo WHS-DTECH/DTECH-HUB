@@ -2010,7 +2010,7 @@ app.get("/api/project-interests", requireActivityWriteAccess, async (_req, res) 
     const result = await pool.query(`
       SELECT
         pi.project_id,
-        a.name AS project_name,
+        MAX(a.name) AS project_name,
         COUNT(*)::int AS interest_count,
         COUNT(*) FILTER (WHERE pi.confirmed)::int AS confirmed_count,
         json_agg(
@@ -2022,7 +2022,7 @@ app.get("/api/project-interests", requireActivityWriteAccess, async (_req, res) 
         ) AS students
       FROM project_interests pi
       LEFT JOIN activities a ON a.id = pi.project_id
-      GROUP BY pi.project_id, a.name
+      GROUP BY pi.project_id
       ORDER BY interest_count DESC
     `);
 
