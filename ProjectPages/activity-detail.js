@@ -771,9 +771,8 @@ async function initDetail() {
 
     document.title = `${resolvedData.title} | Computer Lab`;
 
-    // Edit/Delete are not shown on the student-facing detail page.
-    // Teachers manage projects through the Teacher View and upload workflows.
-    renderDetailView(host, id, resolvedData, false);
+    // Show Edit/Delete buttons if user is a teacher or admin
+    renderDetailView(host, id, resolvedData, isTeacher);
 
     // Load interest section only for backend-stored items (numeric IDs)
     if (String(id).match(/^\d+$/)) {
