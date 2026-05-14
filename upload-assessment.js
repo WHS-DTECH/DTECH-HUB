@@ -134,7 +134,7 @@ function withUserEmailHeader(headers) {
 
     try {
         const data = JSON.parse(auth);
-        const email = normalizeEmail(data.email);
+        const email = normalizeEmail(data?.profile?.email || "");
         if (email) {
             return { ...headers, "x-user-email": email };
         }
@@ -157,7 +157,7 @@ function renderAuthStatus() {
 
     try {
         const data = JSON.parse(auth);
-        authStatusElement.textContent = `✓ Signed in as ${data.email || "staff member"}`;
+        authStatusElement.textContent = `✓ Signed in as ${data?.profile?.email || "staff member"}`;
         authStatusElement.hidden = false;
     } catch (_error) {
         authStatusElement.hidden = true;
