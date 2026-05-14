@@ -1079,6 +1079,16 @@ async function ensureSchema() {
   await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS created_by_email TEXT`);
   await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS project_interests (
+      project_id TEXT NOT NULL,
+      student_email TEXT NOT NULL,
+      confirmed BOOLEAN NOT NULL DEFAULT FALSE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (project_id, student_email)
+    );
+  `);
 }
 
 app.use(express.json({ limit: "8mb" }));
@@ -1628,6 +1638,191 @@ app.post("/api/activities/:id/upload-image", requireActivityWriteAccess, async (
   } catch (error) {
     console.error("Image upload error:", error);
     res.status(500).json({ error: "Failed to upload image" });
+  }
+});
+
+// POST /api/activities/:id/interest — toggle a student's interest in a project
+app.post("/api/activities/:id/interest", async (req, res) => {
+  const projectId = String(req.params.id || "").trim();
+  const email = normalizeEmail(req.headers["x-user-email"] || "");
+
+  if (!projectId) {
+    res.status(400).json({ error: "Project ID is required" });
+    return;
+  }
+
+  if (!email || !email.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required" });
+    return;
+  }
+
+  if (!hasDatabase) {
+    res.json({ interested: true, count: 1 });
+    return;
+  }
+
+  try {
+    const existing = await pool.query(
+      "SELECT 1 FROM project_interests WHERE project_id = $1 AND student_email = $2",
+      [projectId, email]
+    );
+
+    let interested;
+    if (existing.rows.length) {
+      await pool.query(
+        "DELETE FROM project_interests WHERE project_id = $1 AND student_email = $2",
+        [projectId, email]
+      );
+      interested = false;
+    } else {
+      await pool.query(
+        "INSERT INTO project_interests (project_id, student_email) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+        [projectId, email]
+      );
+      interested = true;
+    }
+
+    const countResult = await pool.query(
+      "SELECT COUNT(*)::int AS count FROM project_interests WHERE project_id = $1",
+      [projectId]
+    );
+    res.json({ interested, count: countResult.rows[0].count });
+  } catch (error) {
+    console.error("Interest toggle error:", error);
+    res.status(500).json({ error: "Could not update interest" });
+  }
+});
+
+// GET /api/activities/:id/interests — get interest count/list for a project
+app.get("/api/activities/:id/interests", async (req, res) => {
+  const projectId = String(req.params.id || "").trim();
+  const email = normalizeEmail(req.headers["x-user-email"] || "");
+
+  if (!projectId) {
+    res.status(400).json({ error: "Project ID is required" });
+    return;
+  }
+
+  if (!hasDatabase) {
+    res.json({ count: 0, my_interest: false, emails: [], confirmed: [] });
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      "SELECT student_email, confirmed FROM project_interests WHERE project_id = $1 ORDER BY created_at ASC",
+      [projectId]
+    );
+
+    let isTeacher = false;
+    if (email) {
+      try {
+        const access = await resolveActivityWriteAccess(email);
+        isTeacher = Boolean(access.allowed);
+      } catch (_err) {}
+    }
+
+    const myInterest = email ? result.rows.some((r) => r.student_email === email) : false;
+    res.json({
+      count: result.rows.length,
+      my_interest: myInterest,
+      emails: isTeacher ? result.rows.map((r) => r.student_email) : [],
+      confirmed: isTeacher ? result.rows.filter((r) => r.confirmed).map((r) => r.student_email) : []
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Could not load interests" });
+  }
+});
+
+// PATCH /api/activities/:id/interests/:studentEmail/confirm — teacher confirm/unconfirm allocation
+app.patch("/api/activities/:id/interests/:studentEmail/confirm", requireActivityWriteAccess, async (req, res) => {
+  const projectId = String(req.params.id || "").trim();
+  const studentEmail = normalizeEmail(req.params.studentEmail || "");
+  const confirmed = req.body?.confirmed !== false;
+
+  if (!projectId || !studentEmail) {
+    res.status(400).json({ error: "Project ID and student email are required" });
+    return;
+  }
+
+  if (!hasDatabase) {
+    res.json({ confirmed });
+    return;
+  }
+
+  try {
+    await pool.query(
+      "UPDATE project_interests SET confirmed = $1 WHERE project_id = $2 AND student_email = $3",
+      [confirmed, projectId, studentEmail]
+    );
+    res.json({ confirmed });
+  } catch (error) {
+    res.status(500).json({ error: "Could not update confirmation" });
+  }
+});
+
+// DELETE /api/activities/:id/interests/:studentEmail — teacher removes a student's interest
+app.delete("/api/activities/:id/interests/:studentEmail", requireActivityWriteAccess, async (req, res) => {
+  const projectId = String(req.params.id || "").trim();
+  const studentEmail = normalizeEmail(req.params.studentEmail || "");
+
+  if (!projectId || !studentEmail) {
+    res.status(400).json({ error: "Project ID and student email are required" });
+    return;
+  }
+
+  if (!hasDatabase) {
+    res.status(204).send();
+    return;
+  }
+
+  try {
+    await pool.query(
+      "DELETE FROM project_interests WHERE project_id = $1 AND student_email = $2",
+      [projectId, studentEmail]
+    );
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ error: "Could not remove interest" });
+  }
+});
+
+// GET /api/project-interests — all projects with interest summaries (teacher-only)
+app.get("/api/project-interests", requireActivityWriteAccess, async (_req, res) => {
+  if (!hasDatabase) {
+    res.json([]);
+    return;
+  }
+
+  try {
+    const result = await pool.query(`
+      SELECT
+        pi.project_id,
+        a.name AS project_name,
+        COUNT(*)::int AS interest_count,
+        COUNT(*) FILTER (WHERE pi.confirmed)::int AS confirmed_count,
+        json_agg(
+          json_build_object(
+            'email', pi.student_email,
+            'confirmed', pi.confirmed,
+            'created_at', pi.created_at
+          ) ORDER BY pi.created_at ASC
+        ) AS students
+      FROM project_interests pi
+      LEFT JOIN activities a ON a.id = pi.project_id
+      GROUP BY pi.project_id, a.name
+      ORDER BY interest_count DESC
+    `);
+
+    res.json(result.rows.map((row) => ({
+      project_id: row.project_id,
+      project_name: row.project_name || row.project_id,
+      interest_count: row.interest_count,
+      confirmed_count: row.confirmed_count,
+      students: Array.isArray(row.students) ? row.students : []
+    })));
+  } catch (error) {
+    res.status(500).json({ error: "Could not load project interests" });
   }
 });
 

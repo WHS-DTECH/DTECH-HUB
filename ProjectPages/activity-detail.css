@@ -352,3 +352,93 @@ h1 {
         grid-template-columns: 1fr;
     }
 }
+
+/* ── Interest section ─────────────────────────────── */
+.interest-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.interest-count {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #3a5470;
+}
+
+.interest-btn {
+    align-self: flex-start;
+    background: #2f74b9;
+    border-color: #245a8f;
+    font-size: 0.8rem;
+    padding: 7px 16px;
+}
+
+.interest-btn.is-interested {
+    background: #217a45;
+    border-color: #18613a;
+}
+
+.interest-btn.is-interested:hover {
+    background: #1a6339;
+}
+
+.interest-student-list {
+    margin-top: 4px;
+}
+
+.interest-student-list h3 {
+    margin: 0 0 6px;
+    font-size: 0.85rem;
+    color: #163f66;
+}
+
+.interest-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+}
+
+.interest-table th,
+.interest-table td {
+    text-align: left;
+    padding: 6px 10px;
+    border-bottom: 1px solid #d4dfe9;
+}
+
+.interest-table th {
+    font-weight: 700;
+    color: #163f66;
+    background: #eef3f9;
+}
+
+.interest-table tr:last-child td {
+    border-bottom: none;
+}
+
+.interest-status {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.interest-confirmed {
+    background: #d4f0e0;
+    color: #1a6339;
+    border: 1px solid #a8dfc0;
+}
+
+.interest-pending {
+    background: #fff3cd;
+    color: #7a5700;
+    border: 1px solid #f0d880;
+}
+
+.interest-no-students {
+    margin: 0;
+    font-size: 0.8rem;
+    color: #6b7e94;
+    font-style: italic;
+}

@@ -200,7 +200,7 @@ async function readSharedActivity(activityId) {
         term: found.term || "Term 2",
         activityCategory: found.activity_category || "Practice",
             showInThisWeek: Boolean(found.show_in_this_week ?? found.show_this_week ?? found.is_pinned ?? found.is_this_week),
-        summary: found.description || "Teacher-uploaded activity.",
+        summary: found.description || "",
         resources: toArray(found.resources),
         equipment: toArray(found.equipment),
         instructions: toArray(found.instructions),
@@ -767,11 +767,131 @@ async function initDetail() {
     if (!data) return;
 
     const resolvedData = defaultDetailShape(id, data);
-    const canEdit = await canEditDetails();
+    const isTeacher = await canEditDetails();
 
     document.title = `${resolvedData.title} | Computer Lab`;
 
-    renderDetailView(host, id, resolvedData, canEdit);
+    // Edit/Delete are not shown on the student-facing detail page.
+    // Teachers manage projects through the Teacher View and upload workflows.
+    renderDetailView(host, id, resolvedData, false);
+
+    // Load interest section only for backend-stored items (numeric IDs)
+    if (String(id).match(/^\d+$/)) {
+        await loadAndRenderInterestSection(host, id, isTeacher);
+    }
+}
+
+async function loadAndRenderInterestSection(host, projectId, isTeacher) {
+    const email = readStoredHubEmail();
+
+    const fetchHeaders = {};
+    if (email) fetchHeaders["x-user-email"] = email;
+
+    let interestData = { count: 0, my_interest: false, emails: [], confirmed: [] };
+    try {
+        const resp = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interests`, { headers: fetchHeaders });
+        if (resp.ok) interestData = await resp.json();
+    } catch (_err) {}
+
+    const section = document.createElement("section");
+    section.className = "proposal-section interest-section";
+    section.id = "interest-section";
+
+    const countText = interestData.count === 0
+        ? "No students have registered interest yet."
+        : interestData.count === 1
+            ? "1 student is interested in this project."
+            : `${interestData.count} students are interested in this project.`;
+
+    let html = `<h2>Student Interest</h2><p class="interest-count" id="interest-count-text">${countText}</p>`;
+
+    // Signed-in non-teacher students see the toggle button
+    if (email && !isTeacher) {
+        const btnClass = interestData.my_interest ? "detail-action interest-btn is-interested" : "detail-action interest-btn";
+        const btnText = interestData.my_interest ? "\u2713 I'm Interested" : "I'm Interested";
+        html += `<button type="button" class="${btnClass}" id="interest-toggle-btn">${btnText}</button>`;
+    }
+
+    // Teachers see the full list of interested students
+    if (isTeacher && interestData.emails.length > 0) {
+        html += `<div class="interest-student-list"><h3>Interested Students</h3>`;
+        html += `<table class="interest-table"><thead><tr><th>Student Email</th><th>Status</th><th>Action</th></tr></thead><tbody>`;
+        for (const studentEmail of interestData.emails) {
+            const isConfirmed = interestData.confirmed.includes(studentEmail);
+            const statusBadge = isConfirmed
+                ? `<span class="interest-status interest-confirmed">Confirmed</span>`
+                : `<span class="interest-status interest-pending">Pending</span>`;
+            const confirmBtnText = isConfirmed ? "Unconfirm" : "Confirm";
+            html += `<tr data-student="${escapeHtml(studentEmail)}"><td>${escapeHtml(studentEmail)}</td><td>${statusBadge}</td><td><button type="button" class="detail-action interest-confirm-btn" data-confirmed="${isConfirmed}">${confirmBtnText}</button></td></tr>`;
+        }
+        html += `</tbody></table></div>`;
+    } else if (isTeacher && interestData.count === 0) {
+        html += `<p class="interest-no-students">No students have registered interest yet.</p>`;
+    }
+
+    section.innerHTML = html;
+    host.appendChild(section);
+
+    // Toggle interest button handler
+    const toggleBtn = section.querySelector("#interest-toggle-btn");
+    if (toggleBtn && email) {
+        toggleBtn.addEventListener("click", async () => {
+            toggleBtn.disabled = true;
+            try {
+                const resp = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interest`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "x-user-email": email }
+                });
+                if (resp.ok) {
+                    const data = await resp.json();
+                    toggleBtn.textContent = data.interested ? "\u2713 I'm Interested" : "I'm Interested";
+                    toggleBtn.classList.toggle("is-interested", Boolean(data.interested));
+                    const countEl = section.querySelector("#interest-count-text");
+                    if (countEl) {
+                        const c = data.count;
+                        countEl.textContent = c === 0
+                            ? "No students have registered interest yet."
+                            : c === 1
+                                ? "1 student is interested in this project."
+                                : `${c} students are interested in this project.`;
+                    }
+                }
+            } catch (_err) {}
+            toggleBtn.disabled = false;
+        });
+    }
+
+    // Confirm/unconfirm allocation buttons (teacher only)
+    section.querySelectorAll(".interest-confirm-btn").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+            const row = btn.closest("tr[data-student]");
+            if (!row) return;
+            const studentEmail = row.getAttribute("data-student");
+            const currentlyConfirmed = btn.getAttribute("data-confirmed") === "true";
+            const newConfirmed = !currentlyConfirmed;
+            btn.disabled = true;
+            try {
+                const resp = await fetch(
+                    `/api/activities/${encodeURIComponent(projectId)}/interests/${encodeURIComponent(studentEmail)}/confirm`,
+                    {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json", "x-user-email": email },
+                        body: JSON.stringify({ confirmed: newConfirmed })
+                    }
+                );
+                if (resp.ok) {
+                    btn.setAttribute("data-confirmed", String(newConfirmed));
+                    btn.textContent = newConfirmed ? "Unconfirm" : "Confirm";
+                    const statusCell = row.querySelector(".interest-status");
+                    if (statusCell) {
+                        statusCell.textContent = newConfirmed ? "Confirmed" : "Pending";
+                        statusCell.className = newConfirmed ? "interest-status interest-confirmed" : "interest-status interest-pending";
+                    }
+                }
+            } catch (_err) {}
+            btn.disabled = false;
+        });
+    });
 }
 
 initDetail();
