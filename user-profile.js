@@ -110,6 +110,7 @@
             row.display_name,
             row.name,
             row.student_name,
+            row.Student_Name,
             row.full_name
         ]);
 
@@ -124,7 +125,16 @@
             return combined;
         }
 
-        const email = pickFirstNonEmpty([row.email_school, row.email, row.user_email, row.staff_email]);
+        const email = pickFirstNonEmpty([
+            row.email_school,
+            row.Email_School,
+            row.email,
+            row.Email,
+            row.user_email,
+            row.User_Email,
+            row.staff_email,
+            row.Staff_Email
+        ]);
         return email.includes("@") ? email.split("@")[0] : "";
     }
 
@@ -168,25 +178,42 @@
     function collectCandidateEmails(row) {
         const values = [
             row && row.email_school,
+            row && row.Email_School,
             row && row.email,
+            row && row.Email,
             row && row.user_email,
+            row && row.User_Email,
             row && row.staff_email,
+            row && row.Staff_Email,
             row && row.google_email,
+            row && row.Google_Email,
             row && row.student_email,
+            row && row.Student_Email,
             row && row.email_address,
+            row && row.Email_Address,
             row && row.school_email,
+            row && row.School_Email,
             row && row.student_google_email,
+            row && row.Student_Google_Email,
             row && row.student_mail,
+            row && row.Student_Mail,
             row && row.mail,
-            row && row.upn
+            row && row.Mail,
+            row && row.upn,
+            row && row.UPN
         ];
 
         const usernames = [
             row && row.username,
+            row && row.Username,
             row && row.user_name,
+            row && row.User_Name,
             row && row.student_username,
+            row && row.Student_Username,
             row && row.login,
-            row && row.student_login
+            row && row.Login,
+            row && row.student_login,
+            row && row.Student_Login
         ];
 
         const normalized = new Set();
@@ -250,12 +277,19 @@
     }
 
     function getTimetableEntries(row) {
+        const lowerKeyMap = new Map(
+            Object.keys(row || {}).map((key) => [String(key || "").toLowerCase(), key])
+        );
+
         return STUDENT_PERIOD_COLUMNS
-            .map((columnName) => ({
-                key: columnName,
-                label: buildTimetableLabel(columnName),
-                value: String(row && row[columnName] || "").trim()
-            }))
+            .map((columnName) => {
+                const matchedKey = lowerKeyMap.get(String(columnName).toLowerCase()) || columnName;
+                return {
+                    key: columnName,
+                    label: buildTimetableLabel(columnName),
+                    value: String(row && row[matchedKey] || "").trim()
+                };
+            })
             .filter((entry) => entry.value);
     }
 
@@ -269,13 +303,44 @@
 
     function collectLinkedStudentRows(studentRows, email, candidateNames) {
         const nameSet = new Set(collectStudentNameCandidates(candidateNames));
+
+        const normalizedNameTokens = Array.from(nameSet).map((name) =>
+            new Set(name.split(" ").filter(Boolean))
+        );
+
         return studentRows.filter((row) => {
             if (hasMatchingEmailKey(row, email)) {
                 return true;
             }
 
             const rowName = normalizePersonName(getRowDisplayName(row) || row.student_name);
-            return Boolean(rowName && nameSet.has(rowName));
+            if (!rowName) {
+                return false;
+            }
+
+            if (nameSet.has(rowName)) {
+                return true;
+            }
+
+            const rowTokens = new Set(rowName.split(" ").filter(Boolean));
+            if (!rowTokens.size) {
+                return false;
+            }
+
+            return normalizedNameTokens.some((candidateTokens) => {
+                if (!candidateTokens.size) {
+                    return false;
+                }
+
+                let overlap = 0;
+                candidateTokens.forEach((token) => {
+                    if (rowTokens.has(token)) {
+                        overlap += 1;
+                    }
+                });
+
+                return overlap >= 2;
+            });
         });
     }
 
@@ -626,11 +691,14 @@
             accessData && (accessData.can_admin ? "Admin" : accessData.can_teacher_view ? "Teacher/Staff" : "Student")
         ]) || "Student";
 
+        const roleLooksStudentOnly = /^student\b/i.test(String(resolvedRole || "").trim());
         const isStudentOnly = Boolean(
-            accessData &&
-            accessData.is_student &&
-            !accessData.can_teacher_view &&
-            !accessData.can_admin
+            roleLooksStudentOnly || (
+                accessData &&
+                accessData.is_student &&
+                !accessData.can_teacher_view &&
+                !accessData.can_admin
+            )
         );
 
         if (csvLinksCardEl) {
