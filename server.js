@@ -27,6 +27,9 @@ const STUDENT_TABLE_CANDIDATES = ["student_timetable"];
 const TEACHER_TIMETABLE_TABLE_CANDIDATES = ["upload_timetable", "timetable", "teacher_timetable"];
 const SCHOOL_EMAIL_DOMAIN = "westlandhigh.school.nz";
 const DTECH_HUB_NAME = "DTECH-HUB";
+const NZQA_BASE_URL = "https://www.nzqa.govt.nz";
+const NZQA_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const nzqaStandardsCache = new Map();
 const STUDENT_TIMETABLE_PERIOD_COLUMNS = [
   "mon_p1_1", "mon_p1_2", "mon_p2", "mon_i", "mon_p3", "mon_p4", "mon_l", "mon_p5",
   "tue_p1_1", "tue_p1_2", "tue_p2", "tue_i", "tue_p3", "tue_p4", "tue_l", "tue_p5",
@@ -199,6 +202,164 @@ function normalizeArray(value) {
   }
 
   return [];
+}
+
+function decodeHtmlEntities(value) {
+  return String(value || "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#(\d+);/g, (_match, dec) => String.fromCharCode(Number.parseInt(dec, 10)))
+    .replace(/&#x([0-9a-f]+);/gi, (_match, hex) => String.fromCharCode(Number.parseInt(hex, 16)));
+}
+
+function stripHtml(value) {
+  return decodeHtmlEntities(String(value || "").replace(/<[^>]*>/g, " "))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function resolveNzqaLink(href) {
+  const raw = String(href || "").trim();
+  if (!raw) return "";
+  try {
+    return new URL(raw, NZQA_BASE_URL).toString();
+  } catch (_error) {
+    return "";
+  }
+}
+
+function buildNzqaSearchUrl(streamCode, level) {
+  const queryTerm = streamCode === "computing" ? "Computing" : "Digital Technologies";
+  const params = new URLSearchParams({
+    query: queryTerm,
+    view: "all",
+    level: String(level).padStart(2, "0")
+  });
+  return `${NZQA_BASE_URL}/ncea/assessment/search.do?${params.toString()}`;
+}
+
+function parseNzqaStandardsFromHtml(html, level, streamCode) {
+  const source = String(html || "");
+  const highlightRegex = /<tr\s+class="dataHighlight">([\s\S]*?)<\/tr>/gi;
+  const highlights = Array.from(source.matchAll(highlightRegex));
+  const rows = [];
+
+  for (let index = 0; index < highlights.length; index += 1) {
+    const current = highlights[index];
+    const next = highlights[index + 1];
+    const headerHtml = String(current[1] || "");
+    const start = (current.index || 0) + current[0].length;
+    const end = next ? (next.index || source.length) : source.length;
+    const detailHtml = source.slice(start, end);
+
+    const standardMatch = headerHtml.match(/<td[^>]*>\s*<strong>\s*(\d{4,6})\s*<\/strong>/i);
+    if (!standardMatch) continue;
+
+    const strongValues = Array.from(headerHtml.matchAll(/<strong>([\s\S]*?)<\/strong>/gi))
+      .map((match) => stripHtml(match[1]))
+      .filter(Boolean);
+
+    const standardNumber = String(standardMatch[1] || "").trim();
+    const subjectName = strongValues[1] || "";
+    const standardName = strongValues[2] || "";
+    const creditsText = strongValues.find((value) => /\bcredits?\b/i.test(value)) || "";
+    const creditsMatch = creditsText.match(/(\d+)/);
+    const credits = creditsMatch ? Number.parseInt(creditsMatch[1], 10) : null;
+
+    const detailsMatch = detailHtml.match(/href="([^"]*view-detailed\.do\?standardNumber=[^"]+)"/i);
+    const detailsUrl = detailsMatch ? resolveNzqaLink(detailsMatch[1]) : "";
+
+    const zipMatch = detailHtml.match(/nzqa-ncea-files\.zip\?[^\"]*\bversion=([0-9]+)/i);
+    const version = zipMatch ? String(zipMatch[1]) : "";
+
+    const pdfCandidates = [];
+    const docCandidates = [];
+    const downloadRegex = /<a[^>]+href="([^"]+)"[^>]+class="download\s+([a-z0-9]+)[^"]*"[^>]*>/gi;
+    let linkMatch;
+    while ((linkMatch = downloadRegex.exec(detailHtml)) !== null) {
+      const href = String(linkMatch[1] || "");
+      const linkClass = String(linkMatch[2] || "").toLowerCase();
+      const url = resolveNzqaLink(href);
+      if (!url) continue;
+
+      const contextStart = Math.max(0, linkMatch.index - 220);
+      const contextEnd = Math.min(detailHtml.length, linkMatch.index + linkMatch[0].length + 220);
+      const context = detailHtml.slice(contextStart, contextEnd);
+      const contextYearMatch = context.match(/Achievement\s+standard\s+(\d{4})/i) || context.match(/specifications\/(\d{4})/i);
+      const urlYearMatch = url.match(/\/(20\d{2})\//);
+      const year = Number.parseInt((contextYearMatch?.[1] || urlYearMatch?.[1] || "0"), 10) || 0;
+
+      const candidate = { url, year, order: linkMatch.index };
+      if (linkClass === "pdf" || /\.pdf(?:\?|$)/i.test(url)) {
+        pdfCandidates.push(candidate);
+      }
+      if (linkClass === "doc" || /\.(?:docx?|rtf)(?:\?|$)/i.test(url)) {
+        docCandidates.push(candidate);
+      }
+    }
+
+    const pickNewest = (candidates) => {
+      if (!candidates.length) return "";
+      const sorted = candidates.slice().sort((left, right) => {
+        if (left.year !== right.year) {
+          return right.year - left.year;
+        }
+        return right.order - left.order;
+      });
+      return sorted[0].url;
+    };
+
+    rows.push({
+      standard_number: standardNumber,
+      standard_name: standardName,
+      subject_name: subjectName,
+      version,
+      level: Number(level),
+      credits,
+      pdf_url: pickNewest(pdfCandidates),
+      docx_url: pickNewest(docCandidates),
+      details_url: detailsUrl,
+      stream: streamCode === "computing" ? "Generic Computing" : "Digital Technologies"
+    });
+  }
+
+  return rows;
+}
+
+async function fetchNzqaStandards(streamCode, level) {
+  const key = `${streamCode}:${level}`;
+  const cached = nzqaStandardsCache.get(key);
+  if (cached && (Date.now() - cached.fetchedAt) < NZQA_CACHE_TTL_MS) {
+    return cached.rows;
+  }
+
+  const url = buildNzqaSearchUrl(streamCode, level);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 25000);
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "user-agent": "WHS-DTECH-HUB/1.0"
+      },
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      throw new Error(`NZQA responded with HTTP ${response.status}`);
+    }
+
+    const html = await response.text();
+    const rows = parseNzqaStandardsFromHtml(html, level, streamCode);
+    nzqaStandardsCache.set(key, { fetchedAt: Date.now(), rows });
+    return rows;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 const EXCLUDED_NON_DTECH_KEYWORDS = [
@@ -1055,6 +1216,27 @@ async function requireActivityWriteAccess(req, res, next) {
     next();
   } catch (_error) {
     res.status(500).json({ error: "Could not verify write permissions." });
+  }
+}
+
+async function requireAdminAccess(req, res, next) {
+  const requesterEmail = getRequestUserEmail(req);
+  if (!requesterEmail) {
+    res.status(401).json({ error: "Sign-in required. Missing user email." });
+    return;
+  }
+
+  try {
+    const access = await resolveActivityWriteAccess(requesterEmail);
+    if (!access.isAdmin) {
+      res.status(403).json({ error: "Admin access is required for this action." });
+      return;
+    }
+
+    req.adminAccess = access;
+    next();
+  } catch (_error) {
+    res.status(500).json({ error: "Could not verify admin permissions." });
   }
 }
 
@@ -2152,6 +2334,69 @@ app.get("/api/project-interests", requireActivityWriteAccess, async (_req, res) 
   } catch (error) {
     console.error("[project-interests] Query failed:", error.message);
     res.status(500).json({ error: "Could not load project interests" });
+  }
+});
+
+// GET /api/admin/nzqa-standards — admin standards index for assessment management
+app.get("/api/admin/nzqa-standards", requireAdminAccess, async (req, res) => {
+  const levelParam = String(req.query?.level || "all").trim().toLowerCase();
+  const streamParam = String(req.query?.stream || "digital").trim().toLowerCase();
+  const standardQuery = String(req.query?.standard || "").trim().toLowerCase();
+
+  const levels = levelParam === "all"
+    ? [1, 2, 3]
+    : [Number.parseInt(levelParam, 10)].filter((value) => [1, 2, 3].includes(value));
+
+  if (!levels.length) {
+    res.status(400).json({ error: "level must be one of all, 1, 2, or 3" });
+    return;
+  }
+
+  const streams = streamParam === "both"
+    ? ["digital", "computing"]
+    : [streamParam];
+
+  if (!streams.every((stream) => ["digital", "computing"].includes(stream))) {
+    res.status(400).json({ error: "stream must be one of digital, computing, or both" });
+    return;
+  }
+
+  try {
+    const jobs = [];
+    levels.forEach((level) => {
+      streams.forEach((stream) => {
+        jobs.push(fetchNzqaStandards(stream, level));
+      });
+    });
+
+    const results = await Promise.all(jobs);
+    let standards = results.flat();
+
+    if (standardQuery) {
+      standards = standards.filter((item) =>
+        String(item.standard_number || "").toLowerCase().includes(standardQuery)
+      );
+    }
+
+    standards.sort((left, right) => {
+      if (left.level !== right.level) {
+        return left.level - right.level;
+      }
+      return String(left.standard_number || "").localeCompare(String(right.standard_number || ""), undefined, { numeric: true });
+    });
+
+    res.json({
+      generated_at: new Date().toISOString(),
+      filters: {
+        level: levelParam,
+        stream: streamParam,
+        standard: standardQuery
+      },
+      count: standards.length,
+      standards
+    });
+  } catch (error) {
+    res.status(500).json({ error: `Could not load NZQA standards: ${String(error?.message || "unknown error")}` });
   }
 });
 
