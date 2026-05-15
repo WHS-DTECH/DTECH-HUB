@@ -1,5 +1,6 @@
 const ALLOC_AUTH_KEY = "hub_google_auth_v1";
 const STRAND_CODES = ["DTECH", "COMP", "TEXT", "DTONLINE"];
+let allocStandardsOptions = [];
 
 function allocGetStoredEmail() {
     const raw = localStorage.getItem(ALLOC_AUTH_KEY) || sessionStorage.getItem(ALLOC_AUTH_KEY);
@@ -91,6 +92,50 @@ function extractStudentYearGroup(row) {
 
 function normalizeStandardValue(value) {
     return String(value || "").trim().slice(0, 120);
+}
+
+function extractStandardNumber(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    const match = raw.match(/\b(\d{4,6})\b/);
+    return match ? match[1] : raw;
+}
+
+function buildStandardOptionLabel(option) {
+    const number = String(option?.standard_number || "").trim();
+    const shortName = String(option?.short_name || option?.standard_name || "").trim();
+    const level = String(option?.level || "").trim();
+    if (number && shortName && level) return `${number} - ${shortName} (L${level})`;
+    if (number && shortName) return `${number} - ${shortName}`;
+    return number || shortName || "Unknown standard";
+}
+
+function renderStandardSelect(slot, currentValue) {
+    const selectedValue = extractStandardNumber(currentValue);
+    const options = Array.isArray(allocStandardsOptions) ? allocStandardsOptions : [];
+    const hasSelectedValue = selectedValue && options.some((option) => String(option.standard_number) === selectedValue);
+
+    const customOption = (!hasSelectedValue && String(currentValue || "").trim())
+        ? `<option value="${escapeHtml(selectedValue)}" selected>${escapeHtml(String(currentValue).trim())} (custom)</option>`
+        : "";
+
+    const standardOptions = options
+        .map((option) => {
+            const value = String(option.standard_number || "").trim();
+            if (!value) return "";
+            const label = buildStandardOptionLabel(option);
+            const selected = value === selectedValue ? " selected" : "";
+            return `<option value="${escapeHtml(value)}"${selected}>${escapeHtml(label)}</option>`;
+        })
+        .join("");
+
+    return `
+        <select class="alloc-standard-select" data-standard-slot="${escapeHtml(slot)}" aria-label="Standard ${escapeHtml(slot)}">
+            <option value="">Select standard</option>
+            ${customOption}
+            ${standardOptions}
+        </select>
+    `;
 }
 
 function parseStudentName(studentName) {
@@ -272,8 +317,8 @@ function buildStudentRow(student) {
             <td class="alloc-date">${escapeHtml(dateStr)}</td>
             <td>
                 <div class="alloc-standards-cell">
-                    <input type="text" class="alloc-standard-input" data-standard-slot="1" value="${escapeHtml(standard1)}" placeholder="Standard 1 e.g. AS91883 L1">
-                    <input type="text" class="alloc-standard-input" data-standard-slot="2" value="${escapeHtml(standard2)}" placeholder="Standard 2 e.g. AS91903 L2">
+                    ${renderStandardSelect("1", standard1)}
+                    ${renderStandardSelect("2", standard2)}
                     <button type="button" class="alloc-btn alloc-btn-unconfirm" data-action="save-standards">Save</button>
                 </div>
             </td>
@@ -388,6 +433,23 @@ async function fetchStudentsForAllocation(email) {
     return Array.isArray(payload?.students) ? payload.students : [];
 }
 
+async function fetchStandardsOptionsForAllocation(email) {
+    const headers = email ? { "x-user-email": email } : {};
+
+    try {
+        const response = await fetch("/api/assessment-standards/options?stream=both&level=all", { headers });
+        if (!response.ok) {
+            return [];
+        }
+
+        const payload = await response.json().catch(() => ({}));
+        const options = Array.isArray(payload?.options) ? payload.options : [];
+        return options;
+    } catch (_error) {
+        return [];
+    }
+}
+
 async function loadAllocations() {
     const email = allocGetStoredEmail();
     const content = document.getElementById("alloc-content");
@@ -412,7 +474,11 @@ async function loadAllocations() {
 
         const activities = await activitiesResponse.json();
         const interestProjects = await interestsResponse.json();
-        const students = await fetchStudentsForAllocation(email);
+        const [students, standardsOptions] = await Promise.all([
+            fetchStudentsForAllocation(email),
+            fetchStandardsOptionsForAllocation(email)
+        ]);
+        allocStandardsOptions = standardsOptions;
         const studentYearByEmail = new Map();
         const studentYearByLocal = new Map();
         const studentStrandsByEmail = new Map();

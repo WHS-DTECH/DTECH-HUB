@@ -2400,6 +2400,83 @@ app.get("/api/admin/nzqa-standards", requireAdminAccess, async (req, res) => {
   }
 });
 
+// GET /api/assessment-standards/options — staff/admin standards options for allocation dropdowns
+app.get("/api/assessment-standards/options", requireActivityWriteAccess, async (req, res) => {
+  const levelParam = String(req.query?.level || "all").trim().toLowerCase();
+  const streamParam = String(req.query?.stream || "both").trim().toLowerCase();
+
+  const levels = levelParam === "all"
+    ? [1, 2, 3]
+    : [Number.parseInt(levelParam, 10)].filter((value) => [1, 2, 3].includes(value));
+
+  if (!levels.length) {
+    res.status(400).json({ error: "level must be one of all, 1, 2, or 3" });
+    return;
+  }
+
+  const streams = streamParam === "both"
+    ? ["digital", "computing"]
+    : [streamParam];
+
+  if (!streams.every((stream) => ["digital", "computing"].includes(stream))) {
+    res.status(400).json({ error: "stream must be one of digital, computing, or both" });
+    return;
+  }
+
+  try {
+    const jobs = [];
+    levels.forEach((level) => {
+      streams.forEach((stream) => {
+        jobs.push(fetchNzqaStandards(stream, level));
+      });
+    });
+
+    const results = await Promise.all(jobs);
+    const deduped = new Map();
+
+    results.flat().forEach((row) => {
+      const standardNumber = String(row.standard_number || "").trim();
+      const level = Number.parseInt(row.level, 10) || 0;
+      if (!standardNumber || !level) return;
+
+      const key = `${standardNumber}:${level}`;
+      const existing = deduped.get(key);
+      const existingVersion = Number.parseInt(existing?.version, 10) || 0;
+      const candidateVersion = Number.parseInt(row.version, 10) || 0;
+
+      if (!existing || candidateVersion >= existingVersion) {
+        deduped.set(key, row);
+      }
+    });
+
+    const options = Array.from(deduped.values())
+      .map((row) => ({
+        standard_number: String(row.standard_number || "").trim(),
+        standard_name: String(row.standard_name || "").trim(),
+        short_name: String(row.standard_name || "").trim().replace(/\s+/g, " ").slice(0, 88),
+        version: String(row.version || "").trim(),
+        level: Number.parseInt(row.level, 10) || null,
+        credits: Number.isFinite(Number(row.credits)) ? Number(row.credits) : null,
+        stream: String(row.stream || "").trim(),
+        details_url: String(row.details_url || "").trim()
+      }))
+      .sort((left, right) => {
+        if (left.level !== right.level) {
+          return Number(left.level || 0) - Number(right.level || 0);
+        }
+        return String(left.standard_number || "").localeCompare(String(right.standard_number || ""), undefined, { numeric: true });
+      });
+
+    res.json({
+      generated_at: new Date().toISOString(),
+      count: options.length,
+      options
+    });
+  } catch (error) {
+    res.status(500).json({ error: `Could not load standards options: ${String(error?.message || "unknown error")}` });
+  }
+});
+
 app.post("/api/staff_upload", async (req, res) => {
   const headers = Array.isArray(req.body?.headers) ? req.body.headers : [];
   const staffRows = Array.isArray(req.body?.staff) ? req.body.staff : [];
