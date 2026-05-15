@@ -100,6 +100,22 @@ function escapeHtml(value) {
         .replace(/'/g, "&#039;");
 }
 
+function toSafeExternalUrl(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+
+    try {
+        const parsed = new URL(raw);
+        if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+            return parsed.toString();
+        }
+    } catch (_error) {
+        return "";
+    }
+
+    return "";
+}
+
 function parseDurationMinutes(raw) {
     const source = String(raw || "").trim().toLowerCase();
     const parsed = Number.parseInt(source.replace(/[^0-9]/g, ""), 10);
@@ -273,6 +289,7 @@ async function readSharedActivity(activityId) {
         resources: toArray(found.resources),
         equipment: toArray(found.equipment),
         instructions: toArray(found.instructions),
+        cardUrl: String(found.card_url || found.activity_url || found.url || "").trim(),
         image: found.outcome_image_url || "https://placehold.co/900x560/3f89cf/ffffff?text=Uploaded+Activity",
         
         // Project Proposal Fields
@@ -351,6 +368,7 @@ function defaultDetailShape(id, data) {
         resources: Array.isArray(data?.resources) ? data.resources : [],
         equipment: Array.isArray(data?.equipment) ? data.equipment : [],
         instructions: Array.isArray(data?.instructions) ? data.instructions : [],
+        cardUrl: String(data?.cardUrl || data?.card_url || data?.activity_url || data?.url || "").trim(),
         image: String(data?.image || "").trim() || "https://placehold.co/900x560/3f89cf/ffffff?text=Uploaded+Activity",
         
         // Project Proposal Fields
@@ -394,7 +412,7 @@ function defaultDetailShape(id, data) {
 
 function renderDetailView(host, id, data, canEdit) {
     const isAssessmentTask = String(data?.activityCategory || "").toLowerCase().includes("assessment");
-    const detailPageUrl = String(window.location.href || "");
+    const cardUrl = toSafeExternalUrl(data?.cardUrl);
     const resolvedTasksList = (() => {
         const fromTasksList = coerceArray(data?.tasksList);
         if (fromTasksList.length) {
@@ -520,13 +538,16 @@ function renderDetailView(host, id, data, canEdit) {
         }
 
         ${
-            data.resources.length || data.equipment.length || data.instructions.length ? `
+            data.resources.length || data.equipment.length || data.instructions.length || cardUrl ? `
             <section class="grid">
-                ${data.resources.length ? `<article class="card">
+                ${data.resources.length || cardUrl ? `<article class="card">
                     <h2>Resources</h2>
                     <p class="sub">Materials needed.</p>
-                    <ul class="list">${renderList(data.resources)}</ul>
-                    <p class="sub"><strong>URL:</strong> <a href="${escapeHtml(detailPageUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(detailPageUrl)}</a></p>
+                    ${data.resources.length ? `<ul class="list">${renderList(data.resources)}</ul>` : ""}
+                    ${cardUrl ? `<div class="card-url-box">
+                        <p class="card-url-label">Card URL</p>
+                        <a class="card-url-link" href="${escapeHtml(cardUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(cardUrl)}</a>
+                    </div>` : ""}
                 </article>` : ""}
                 ${data.equipment.length ? `<article class="card">
                     <h2>Equipment</h2>
@@ -645,6 +666,7 @@ async function saveDetails(id, draft) {
         resources: draft.resources,
         equipment: draft.equipment,
         instructions: draft.instructions,
+        card_url: draft.cardUrl,
         show_in_this_week: draft.showInThisWeek,
         term: draft.term,
         
@@ -701,6 +723,7 @@ async function saveDetails(id, draft) {
         resources: Array.isArray(result.resources) ? result.resources : draft.resources,
         equipment: Array.isArray(result.equipment) ? result.equipment : draft.equipment,
         instructions: Array.isArray(result.instructions) ? result.instructions : draft.instructions,
+        cardUrl: String(result.card_url || result.activity_url || result.url || draft.cardUrl || "").trim(),
         image: result.outcome_image_url || draft.image,
         
         // Project Proposal Fields
