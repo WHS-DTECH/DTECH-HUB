@@ -122,6 +122,36 @@ function parseLines(value) {
         .filter(Boolean);
 }
 
+function coerceArray(value) {
+    if (Array.isArray(value)) {
+        return value.map((item) => String(item || "").trim()).filter(Boolean);
+    }
+
+    if (typeof value === "string") {
+        const trimmed = value.trim();
+        if (!trimmed) {
+            return [];
+        }
+
+        if ((trimmed.startsWith("[") && trimmed.endsWith("]")) || (trimmed.startsWith("\"") && trimmed.endsWith("\""))) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                if (Array.isArray(parsed)) {
+                    return parsed.map((item) => String(item || "").trim()).filter(Boolean);
+                }
+            } catch (_error) {
+            }
+        }
+
+        return trimmed
+            .split(/\r?\n/)
+            .map((item) => item.trim())
+            .filter(Boolean);
+    }
+
+    return [];
+}
+
 function normalizeStudentEmailInput(value) {
     const trimmed = String(value || "").trim().toLowerCase();
     if (!trimmed) return "";
@@ -268,6 +298,8 @@ async function readSharedActivity(activityId) {
             }
             return toArray(found.assessment_focus);
         })(),
+        assessmentFocus: toArray(found.assessment_focus),
+        assessmentFocusRaw: found.assessment_focus,
         achieved: toArray(found.achieved),
         merit: toArray(found.merit),
         excellence: toArray(found.excellence),
@@ -337,7 +369,19 @@ function defaultDetailShape(id, data) {
         
         // Assessment Task Fields
         standardDetails: Array.isArray(data?.standardDetails) ? data.standardDetails : [],
-        tasksList: Array.isArray(data?.tasksList) ? data.tasksList : [],
+        tasksList: (() => {
+            const fromTasksList = coerceArray(data?.tasksList);
+            if (fromTasksList.length) {
+                return fromTasksList;
+            }
+
+            const fromAssessmentFocus = coerceArray(data?.assessmentFocus ?? data?.assessment_focus ?? data?.assessmentFocusRaw);
+            if (fromAssessmentFocus.length) {
+                return fromAssessmentFocus;
+            }
+
+            return [];
+        })(),
         achieved: Array.isArray(data?.achieved) ? data.achieved : [],
         merit: Array.isArray(data?.merit) ? data.merit : [],
         excellence: Array.isArray(data?.excellence) ? data.excellence : [],
@@ -350,6 +394,13 @@ function defaultDetailShape(id, data) {
 
 function renderDetailView(host, id, data, canEdit) {
     const isAssessmentTask = String(data?.activityCategory || "").toLowerCase().includes("assessment");
+    const resolvedTasksList = (() => {
+        const fromTasksList = coerceArray(data?.tasksList);
+        if (fromTasksList.length) {
+            return fromTasksList;
+        }
+        return coerceArray(data?.assessmentFocus ?? data?.assessment_focus ?? data?.assessmentFocusRaw);
+    })();
 
     host.innerHTML = `
         <header class="toolbar">
@@ -391,10 +442,10 @@ function renderDetailView(host, id, data, canEdit) {
         }
 
         ${
-            isAssessmentTask && data.tasksList && data.tasksList.length ? `
+            isAssessmentTask && resolvedTasksList.length ? `
             <section class="proposal-section">
                 <h2>Task List</h2>
-                <ol class="list">${renderList(data.tasksList)}</ol>
+                <ol class="list">${renderList(resolvedTasksList)}</ol>
             </section>
             ` : ""
         }
