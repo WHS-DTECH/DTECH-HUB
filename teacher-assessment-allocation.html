@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="styles.css">
   <style>
     .alloc-page {
-      width: min(1080px, calc(100% - 32px));
+      width: min(1500px, calc(100% - 32px));
       margin: 24px auto 48px;
     }
 
@@ -222,19 +222,26 @@
 
     .alloc-standards-cell {
       display: grid;
-      grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto;
+      grid-template-columns: minmax(120px, 1fr) minmax(120px, 1fr) auto;
       gap: 6px;
       align-items: center;
     }
 
     .alloc-standard-input {
       width: 100%;
+      min-width: 0;
       border: 1px solid #bfd0e2;
       border-radius: 6px;
       font-size: 0.75rem;
       padding: 6px 8px;
       color: #1a3651;
       background: #fff;
+    }
+
+    @media (min-width: 1320px) {
+      .alloc-table-wrap {
+        overflow-x: visible;
+      }
     }
 
     .alloc-standard-input:focus {
