@@ -58,6 +58,40 @@ function formatDate(isoString) {
     }
 }
 
+function buildLowerKeyMap(row) {
+    const map = new Map();
+    Object.keys(row || {}).forEach((key) => map.set(String(key).toLowerCase(), row[key]));
+    return map;
+}
+
+function extractStudentEmail(row) {
+    const lower = buildLowerKeyMap(row);
+    const keys = ["student_email", "email_school", "email", "user_email", "studentemail", "emailschool"];
+    for (const key of keys) {
+        const value = lower.get(key);
+        if (String(value || "").trim()) {
+            return String(value || "").trim().toLowerCase();
+        }
+    }
+    return "";
+}
+
+function extractStudentYearGroup(row) {
+    const lower = buildLowerKeyMap(row);
+    const keys = ["year_level", "yearlevel", "year", "class_year", "year_group", "yeargroup"];
+    for (const key of keys) {
+        const value = lower.get(key);
+        if (String(value || "").trim()) {
+            return String(value || "").trim();
+        }
+    }
+    return "";
+}
+
+function normalizeStandardValue(value) {
+    return String(value || "").trim().slice(0, 120);
+}
+
 function setAllocStatus(message, isError = false) {
     const el = document.getElementById("alloc-status");
     if (!el) return;
@@ -84,7 +118,7 @@ function buildStudentRows(project) {
     if (!project.students.length) {
         return `
             <tr>
-                <td class="alloc-empty-row" colspan="4">No students are interested yet.</td>
+                <td class="alloc-empty-row" colspan="6">No students are interested yet.</td>
             </tr>
         `;
     }
@@ -122,7 +156,9 @@ function buildProjectBlock(project, email) {
                 <thead>
                     <tr>
                         <th>Student Email</th>
+                        <th>Year Group</th>
                         <th>Registered</th>
+                        <th>Standards</th>
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
@@ -149,11 +185,22 @@ function buildStudentRow(student) {
         : `<span class="alloc-status-badge badge-pending">Pending</span>`;
     const confirmBtnClass = isConfirmed ? "alloc-btn alloc-btn-unconfirm" : "alloc-btn alloc-btn-confirm";
     const confirmBtnText = isConfirmed ? "Unconfirm" : "Confirm";
+    const yearGroup = String(student.year_group || "").trim() || "Unspecified";
+    const standard1 = normalizeStandardValue(student.standard_1);
+    const standard2 = normalizeStandardValue(student.standard_2);
 
     return `
         <tr data-student="${escapeHtml(student.email)}">
             <td>${escapeHtml(student.email)}</td>
+            <td>${escapeHtml(yearGroup)}</td>
             <td class="alloc-date">${escapeHtml(dateStr)}</td>
+            <td>
+                <div class="alloc-standards-cell">
+                    <input type="text" class="alloc-standard-input" data-standard-slot="1" value="${escapeHtml(standard1)}" placeholder="Standard 1 e.g. AS91883 L1">
+                    <input type="text" class="alloc-standard-input" data-standard-slot="2" value="${escapeHtml(standard2)}" placeholder="Standard 2 e.g. AS91903 L2">
+                    <button type="button" class="alloc-btn alloc-btn-unconfirm" data-action="save-standards">Save</button>
+                </div>
+            </td>
             <td>${statusBadge}</td>
             <td>
                 <div class="alloc-btn-group">
@@ -192,6 +239,24 @@ async function handleAllocationAction(btn, projectId, email) {
                     statusCell.className = newConfirmed ? "alloc-status-badge badge-confirmed" : "alloc-status-badge badge-pending";
                 }
                 updateProjectBlockCounts(btn.closest(".alloc-project-block"));
+            }
+        } else if (action === "save-standards") {
+            const standard1 = normalizeStandardValue(row.querySelector('[data-standard-slot="1"]')?.value || "");
+            const standard2 = normalizeStandardValue(row.querySelector('[data-standard-slot="2"]')?.value || "");
+
+            const resp = await fetch(
+                `/api/activities/${encodeURIComponent(projectId)}/interests/${encodeURIComponent(studentEmail)}/standards`,
+                {
+                    method: "PATCH",
+                    headers,
+                    body: JSON.stringify({ standard_1: standard1, standard_2: standard2 })
+                }
+            );
+
+            if (resp.ok) {
+                setAllocStatus(`Saved standards for ${studentEmail}.`);
+            } else {
+                setAllocStatus(`Could not save standards for ${studentEmail}.`, true);
             }
         } else if (action === "remove") {
             if (!window.confirm(`Remove ${studentEmail} from this task's interest list?`)) {
@@ -236,9 +301,10 @@ async function loadAllocations() {
     content.innerHTML = `<p class="alloc-empty">Loading assessment task allocations&hellip;</p>`;
 
     try {
-        const [activitiesResponse, interestsResponse] = await Promise.all([
+        const [activitiesResponse, interestsResponse, studentsResponse] = await Promise.all([
             fetch("/api/activities"),
-            fetch("/api/project-interests", { headers: { "x-user-email": email } })
+            fetch("/api/project-interests", { headers: { "x-user-email": email } }),
+            fetch("/api/student_timetable/all")
         ]);
 
         if (!activitiesResponse.ok) {
@@ -251,6 +317,16 @@ async function loadAllocations() {
 
         const activities = await activitiesResponse.json();
         const interestProjects = await interestsResponse.json();
+        const studentsPayload = await studentsResponse.json().catch(() => ({}));
+        const students = Array.isArray(studentsPayload?.students) ? studentsPayload.students : [];
+        const studentYearByEmail = new Map();
+        students.forEach((student) => {
+            const studentEmail = extractStudentEmail(student);
+            const yearGroup = extractStudentYearGroup(student);
+            if (studentEmail && yearGroup) {
+                studentYearByEmail.set(studentEmail, yearGroup);
+            }
+        });
         const interestByProjectId = new Map(
             (Array.isArray(interestProjects) ? interestProjects : []).map((project) => [String(project.project_id || "").trim(), project])
         );
@@ -268,7 +344,10 @@ async function loadAllocations() {
                         ? interest.students.map((student) => ({
                             email: String(student.email || student.student_email || "").trim(),
                             confirmed: Boolean(student.confirmed),
-                            created_at: student.created_at || ""
+                            created_at: student.created_at || "",
+                            standard_1: normalizeStandardValue(student.standard_1),
+                            standard_2: normalizeStandardValue(student.standard_2),
+                            year_group: studentYearByEmail.get(String(student.email || student.student_email || "").trim().toLowerCase()) || ""
                         })).filter((student) => student.email)
                         : []
                 };

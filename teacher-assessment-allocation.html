@@ -220,6 +220,34 @@
       gap: 6px;
     }
 
+    .alloc-standards-cell {
+      display: grid;
+      grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .alloc-standard-input {
+      width: 100%;
+      border: 1px solid #bfd0e2;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      padding: 6px 8px;
+      color: #1a3651;
+      background: #fff;
+    }
+
+    .alloc-standard-input:focus {
+      outline: 2px solid #93b9dd;
+      outline-offset: 1px;
+    }
+
+    @media (max-width: 980px) {
+      .alloc-standards-cell {
+        grid-template-columns: 1fr;
+      }
+    }
+
     .alloc-empty-row {
       color: #6b7e94;
       font-style: italic;
@@ -263,7 +291,7 @@
     <main class="alloc-page">
       <header class="alloc-header">
         <h1>Assessment Task Allocations</h1>
-        <p>Overview of all assessment tasks with student interest. Confirm or remove student allocations here.</p>
+        <p>Overview of all assessment tasks with student interest. Confirm allocations and assign up to two standards per student (including mixed levels).</p>
         <p class="alloc-status" id="alloc-status" aria-live="polite"></p>
       </header>
 

@@ -1294,10 +1294,15 @@ async function ensureSchema() {
       project_id TEXT NOT NULL,
       student_email TEXT NOT NULL,
       confirmed BOOLEAN NOT NULL DEFAULT FALSE,
+      standard_1 TEXT,
+      standard_2 TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (project_id, student_email)
     );
   `);
+
+  await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS standard_1 TEXT`);
+  await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS standard_2 TEXT`);
 }
 
 app.use(express.json({ limit: "8mb" }));
@@ -1994,7 +1999,7 @@ app.get("/api/activities/:id/interests", async (req, res) => {
 
   try {
     const result = await pool.query(
-      "SELECT student_email, confirmed FROM project_interests WHERE project_id = $1 ORDER BY created_at ASC",
+      "SELECT student_email, confirmed, standard_1, standard_2 FROM project_interests WHERE project_id = $1 ORDER BY created_at ASC",
       [projectId]
     );
 
@@ -2011,7 +2016,15 @@ app.get("/api/activities/:id/interests", async (req, res) => {
       count: result.rows.length,
       my_interest: myInterest,
       emails: isTeacher ? result.rows.map((r) => r.student_email) : [],
-      confirmed: isTeacher ? result.rows.filter((r) => r.confirmed).map((r) => r.student_email) : []
+      confirmed: isTeacher ? result.rows.filter((r) => r.confirmed).map((r) => r.student_email) : [],
+      students: isTeacher
+        ? result.rows.map((r) => ({
+          email: r.student_email,
+          confirmed: Boolean(r.confirmed),
+          standard_1: String(r.standard_1 || "").trim(),
+          standard_2: String(r.standard_2 || "").trim()
+        }))
+        : []
     });
   } catch (error) {
     res.status(500).json({ error: "Could not load interests" });
@@ -2042,6 +2055,34 @@ app.patch("/api/activities/:id/interests/:studentEmail/confirm", requireActivity
     res.json({ confirmed });
   } catch (error) {
     res.status(500).json({ error: "Could not update confirmation" });
+  }
+});
+
+// PATCH /api/activities/:id/interests/:studentEmail/standards — teacher assigns up to 2 standards
+app.patch("/api/activities/:id/interests/:studentEmail/standards", requireActivityWriteAccess, async (req, res) => {
+  const projectId = String(req.params.id || "").trim();
+  const studentEmail = normalizeEmail(req.params.studentEmail || "");
+  const standard1 = String(req.body?.standard_1 || req.body?.standard1 || "").trim();
+  const standard2 = String(req.body?.standard_2 || req.body?.standard2 || "").trim();
+
+  if (!projectId || !studentEmail) {
+    res.status(400).json({ error: "Project ID and student email are required" });
+    return;
+  }
+
+  if (!hasDatabase) {
+    res.json({ standard_1: standard1, standard_2: standard2 });
+    return;
+  }
+
+  try {
+    await pool.query(
+      "UPDATE project_interests SET standard_1 = $1, standard_2 = $2 WHERE project_id = $3 AND student_email = $4",
+      [standard1 || null, standard2 || null, projectId, studentEmail]
+    );
+    res.json({ standard_1: standard1, standard_2: standard2 });
+  } catch (error) {
+    res.status(500).json({ error: "Could not update standards" });
   }
 });
 
@@ -2090,6 +2131,8 @@ app.get("/api/project-interests", requireActivityWriteAccess, async (_req, res) 
             'email', pi.student_email,
             'student_email', pi.student_email,
             'confirmed', pi.confirmed,
+            'standard_1', pi.standard_1,
+            'standard_2', pi.standard_2,
             'created_at', pi.created_at
           )
         ) FILTER (WHERE pi.student_email IS NOT NULL) AS students

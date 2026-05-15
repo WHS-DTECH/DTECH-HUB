@@ -307,11 +307,18 @@ async function renderNzqaStandardsSnapshot() {
 
             const studentsInTask = Array.isArray(interestRow?.students) ? interestRow.students : [];
             const standardDetailLines = toArray(activity?.standard_details || activity?.assessment_focus);
-            const standardSummary = standardDetailLines.length ? standardDetailLines[0] : "";
 
             studentsInTask.forEach((student) => {
                 const studentEmail = String(student?.email || student?.student_email || "").trim().toLowerCase();
                 if (!studentEmail) return;
+
+                const assignedStandards = [
+                    String(student?.standard_1 || "").trim(),
+                    String(student?.standard_2 || "").trim()
+                ].filter(Boolean);
+                const standardSummary = assignedStandards.length
+                    ? assignedStandards.join("; ")
+                    : (standardDetailLines.length ? standardDetailLines[0] : "");
 
                 assignments.push({
                     activityId,
