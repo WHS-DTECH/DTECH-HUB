@@ -1,4 +1,5 @@
 const ALLOC_AUTH_KEY = "hub_google_auth_v1";
+const STRAND_CODES = ["DTECH", "COMP", "TEXT", "DTONLINE"];
 
 function allocGetStoredEmail() {
     const raw = localStorage.getItem(ALLOC_AUTH_KEY) || sessionStorage.getItem(ALLOC_AUTH_KEY);
@@ -92,6 +93,22 @@ function normalizeStandardValue(value) {
     return String(value || "").trim().slice(0, 120);
 }
 
+function extractStudentStrands(row) {
+    const programs = Array.isArray(row?.programs)
+        ? row.programs.map((program) => String(program || "").trim().toUpperCase()).filter(Boolean)
+        : [];
+
+    const matched = STRAND_CODES.filter((code) => programs.includes(code));
+    return matched;
+}
+
+function formatStudentStrand(strands) {
+    if (!Array.isArray(strands) || !strands.length) {
+        return "Unspecified";
+    }
+    return strands.join(", ");
+}
+
 function setAllocStatus(message, isError = false) {
     const el = document.getElementById("alloc-status");
     if (!el) return;
@@ -118,7 +135,7 @@ function buildStudentRows(project) {
     if (!project.students.length) {
         return `
             <tr>
-                <td class="alloc-empty-row" colspan="6">No students are interested yet.</td>
+                <td class="alloc-empty-row" colspan="7">No students are interested yet.</td>
             </tr>
         `;
     }
@@ -157,6 +174,7 @@ function buildProjectBlock(project, email) {
                     <tr>
                         <th>Student Email</th>
                         <th>Year Group</th>
+                        <th>Subject Strand</th>
                         <th>Registered</th>
                         <th>Standards</th>
                         <th>Status</th>
@@ -186,6 +204,7 @@ function buildStudentRow(student) {
     const confirmBtnClass = isConfirmed ? "alloc-btn alloc-btn-unconfirm" : "alloc-btn alloc-btn-confirm";
     const confirmBtnText = isConfirmed ? "Unconfirm" : "Confirm";
     const yearGroup = String(student.year_group || "").trim() || "Unspecified";
+    const subjectStrand = formatStudentStrand(student.subject_strands);
     const standard1 = normalizeStandardValue(student.standard_1);
     const standard2 = normalizeStandardValue(student.standard_2);
 
@@ -193,6 +212,7 @@ function buildStudentRow(student) {
         <tr data-student="${escapeHtml(student.email)}">
             <td>${escapeHtml(student.email)}</td>
             <td>${escapeHtml(yearGroup)}</td>
+            <td>${escapeHtml(subjectStrand)}</td>
             <td class="alloc-date">${escapeHtml(dateStr)}</td>
             <td>
                 <div class="alloc-standards-cell">
@@ -292,6 +312,26 @@ function updateProjectBlockCounts(block) {
     }
 }
 
+async function fetchStudentsForAllocation(email) {
+    const headers = email ? { "x-user-email": email } : {};
+
+    try {
+        const classResponse = await fetch("/api/class-management/students?current_only=false&dtech_only=false", { headers });
+        if (classResponse.ok) {
+            const payload = await classResponse.json().catch(() => ({}));
+            const students = Array.isArray(payload?.students) ? payload.students : [];
+            if (students.length) {
+                return students;
+            }
+        }
+    } catch (_error) {
+    }
+
+    const timetableResponse = await fetch("/api/student_timetable/all");
+    const payload = await timetableResponse.json().catch(() => ({}));
+    return Array.isArray(payload?.students) ? payload.students : [];
+}
+
 async function loadAllocations() {
     const email = allocGetStoredEmail();
     const content = document.getElementById("alloc-content");
@@ -301,10 +341,9 @@ async function loadAllocations() {
     content.innerHTML = `<p class="alloc-empty">Loading assessment task allocations&hellip;</p>`;
 
     try {
-        const [activitiesResponse, interestsResponse, studentsResponse] = await Promise.all([
+        const [activitiesResponse, interestsResponse] = await Promise.all([
             fetch("/api/activities"),
-            fetch("/api/project-interests", { headers: { "x-user-email": email } }),
-            fetch("/api/student_timetable/all")
+            fetch("/api/project-interests", { headers: { "x-user-email": email } })
         ]);
 
         if (!activitiesResponse.ok) {
@@ -317,14 +356,35 @@ async function loadAllocations() {
 
         const activities = await activitiesResponse.json();
         const interestProjects = await interestsResponse.json();
-        const studentsPayload = await studentsResponse.json().catch(() => ({}));
-        const students = Array.isArray(studentsPayload?.students) ? studentsPayload.students : [];
+        const students = await fetchStudentsForAllocation(email);
         const studentYearByEmail = new Map();
+        const studentStrandsByEmail = new Map();
         students.forEach((student) => {
-            const studentEmail = extractStudentEmail(student);
             const yearGroup = extractStudentYearGroup(student);
-            if (studentEmail && yearGroup) {
-                studentYearByEmail.set(studentEmail, yearGroup);
+            const strands = extractStudentStrands(student);
+
+            const directEmail = extractStudentEmail(student);
+            if (directEmail) {
+                if (yearGroup) {
+                    studentYearByEmail.set(directEmail, yearGroup);
+                }
+                if (strands.length) {
+                    studentStrandsByEmail.set(directEmail, strands);
+                }
+            }
+
+            if (Array.isArray(student?.linked_emails)) {
+                student.linked_emails
+                    .map((value) => String(value || "").trim().toLowerCase())
+                    .filter(Boolean)
+                    .forEach((linkedEmail) => {
+                        if (yearGroup) {
+                            studentYearByEmail.set(linkedEmail, yearGroup);
+                        }
+                        if (strands.length) {
+                            studentStrandsByEmail.set(linkedEmail, strands);
+                        }
+                    });
             }
         });
         const interestByProjectId = new Map(
@@ -347,7 +407,8 @@ async function loadAllocations() {
                             created_at: student.created_at || "",
                             standard_1: normalizeStandardValue(student.standard_1),
                             standard_2: normalizeStandardValue(student.standard_2),
-                            year_group: studentYearByEmail.get(String(student.email || student.student_email || "").trim().toLowerCase()) || ""
+                            year_group: studentYearByEmail.get(String(student.email || student.student_email || "").trim().toLowerCase()) || "",
+                            subject_strands: studentStrandsByEmail.get(String(student.email || student.student_email || "").trim().toLowerCase()) || []
                         })).filter((student) => student.email)
                         : []
                 };
