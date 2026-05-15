@@ -324,20 +324,27 @@ function inferSourceTypeFromRecord(record) {
         return "assessment";
     }
 
-    const hasProjectFields = Boolean(
-        record?.start_date ||
-        record?.startDate ||
-        record?.contact_name ||
-        record?.contactName ||
-        record?.contact_email ||
-        record?.contactEmail ||
-        record?.company ||
-        record?.address ||
-        record?.overview ||
-        record?.services ||
-        record?.costs ||
+    const hasMeaningfulValue = (value) => {
+        if (Array.isArray(value)) {
+            return value.map((item) => String(item || "").trim()).filter(Boolean).length > 0;
+        }
+        return String(value || "").trim().length > 0;
+    };
+
+    const hasProjectFields = [
+        record?.start_date,
+        record?.startDate,
+        record?.contact_name,
+        record?.contactName,
+        record?.contact_email,
+        record?.contactEmail,
+        record?.company,
+        record?.address,
+        record?.overview,
+        record?.services,
+        record?.costs,
         record?.outcomes
-    );
+    ].some((value) => hasMeaningfulValue(value));
 
     return hasProjectFields ? "project" : "activity";
 }
