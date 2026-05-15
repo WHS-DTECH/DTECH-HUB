@@ -7,6 +7,7 @@ const clearDraftButtons = Array.from(document.querySelectorAll("[data-clear-proj
 const authStatusElement = document.querySelector("#project-auth-status");
 const PROJECT_DRAFT_STORAGE_KEY = "dtechHub:uploadProjectDraft:v1";
 const UPLOAD_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
+const SUBJECT_STREAM_PREFIX = "subject_stream:";
 
 function getEditingProjectId() {
     const params = new URLSearchParams(window.location.search);
@@ -85,6 +86,36 @@ function parseMaybeArray(value) {
             .map((line) => line.trim())
             .filter(Boolean);
     }
+}
+
+function normalizeSubjectStream(value) {
+    const upper = String(value || "").trim().toUpperCase();
+    if (["DTECH", "COMP", "TEXT", "DTONLINE"].includes(upper)) {
+        return upper;
+    }
+    return "";
+}
+
+function extractSubjectStreamFromClassPreparation(value) {
+    const lines = parseMaybeArray(value);
+    for (const line of lines) {
+        const lower = String(line || "").trim().toLowerCase();
+        if (lower.startsWith(SUBJECT_STREAM_PREFIX)) {
+            return normalizeSubjectStream(lower.slice(SUBJECT_STREAM_PREFIX.length));
+        }
+    }
+    return "";
+}
+
+function mergeClassPreparationWithSubject(existingValue, subjectStream) {
+    const lines = parseMaybeArray(existingValue).filter(
+        (line) => !String(line || "").trim().toLowerCase().startsWith(SUBJECT_STREAM_PREFIX)
+    );
+    const normalized = normalizeSubjectStream(subjectStream);
+    if (normalized) {
+        lines.unshift(`${SUBJECT_STREAM_PREFIX}${normalized}`);
+    }
+    return lines;
 }
 
 function normalizeEmail(value) {
@@ -170,6 +201,10 @@ async function prefillProjectIfEditing() {
             form.timeSensitive.checked = Boolean(data.time_sensitive ?? data.timeSensitive);
         }
         if (data.card_color || data.card_colour || data.color) form.cardColor.value = data.card_color || data.card_colour || data.color;
+        if (form.subjectStream) {
+            form.subjectStream.value =
+                normalizeSubjectStream(data.subject_stream) || extractSubjectStreamFromClassPreparation(data.class_preparation);
+        }
         if (data.show_in_this_week !== undefined || data.show_this_week !== undefined || data.is_this_week !== undefined) {
             form.showThisWeek.checked = Boolean(data.show_in_this_week ?? data.show_this_week ?? data.is_this_week);
         }
@@ -299,6 +334,7 @@ function createProjectPayload() {
     const formData = new FormData(form);
     const name = String(formData.get("activityName") || "").trim();
     const editingId = getEditingProjectId();
+    const subjectStream = normalizeSubjectStream(formData.get("subjectStream"));
 
     return {
         id: editingId || slugify(name),
@@ -309,8 +345,10 @@ function createProjectPayload() {
         duration_minutes: 1,
         time_sensitive: Boolean(formData.get("timeSensitive")),
         difficulty: String(formData.get("difficulty") || "").trim(),
+        subject_stream: subjectStream,
         card_color: String(formData.get("cardColor") || "").trim(),
         show_in_this_week: Boolean(formData.get("showThisWeek")),
+        class_preparation: mergeClassPreparationWithSubject([], subjectStream),
         created_at: new Date().toISOString(),
         
         // Project Proposal Fields

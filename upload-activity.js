@@ -16,6 +16,10 @@ async function prefillFormIfEditing() {
         if (normalizedMinutes !== "") form.durationMinutes.value = normalizedMinutes;
         if (data.difficulty) form.difficulty.value = data.difficulty;
         if (data.card_color || data.card_colour || data.color) form.cardColor.value = data.card_color || data.card_colour || data.color;
+        if (form.subjectStream) {
+            form.subjectStream.value =
+                normalizeSubjectStream(data.subject_stream) || extractSubjectStreamFromClassPreparation(data.class_preparation);
+        }
         if (data.card_url || data.activity_url || data.url) form.cardUrl.value = data.card_url || data.activity_url || data.url;
         currentEditingImageUrl = String(data.outcome_image_url || data.image_url || "").trim();
         if (currentEditingImageUrl) form.outcomeImageUrl.value = currentEditingImageUrl;
@@ -27,7 +31,7 @@ async function prefillFormIfEditing() {
         syncCommonResourceOptionsFromTextarea();
         form.instructions.value = normalizeTextareaLines(data.instructions).join("\n");
         form.classManagementNotes.value = normalizeTextareaLines(data.class_management_notes).join("\n");
-        form.classPreparation.value = normalizeTextareaLines(data.class_preparation).join("\n");
+        form.classPreparation.value = stripSubjectStreamMarkers(normalizeTextareaLines(data.class_preparation)).join("\n");
         if (classPreparationNoneCheckbox) {
             const hasPreparation = form.classPreparation.value.trim().length > 0;
             classPreparationNoneCheckbox.checked = !hasPreparation || isNoneClassPreparation(form.classPreparation.value);
@@ -57,6 +61,7 @@ const commonResourceOptions = Array.from(document.querySelectorAll(".common-reso
 let currentEditingImageUrl = "";
 
 const UPLOAD_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
+const SUBJECT_STREAM_PREFIX = "subject_stream:";
 
 function getEditingActivityId() {
     const params = new URLSearchParams(window.location.search);
@@ -126,6 +131,38 @@ function normalizeTextareaLines(value) {
     } catch (_error) {
         return firstPass;
     }
+}
+
+function normalizeSubjectStream(value) {
+    const upper = String(value || "").trim().toUpperCase();
+    if (["DTECH", "COMP", "TEXT", "DTONLINE"].includes(upper)) {
+        return upper;
+    }
+    return "";
+}
+
+function extractSubjectStreamFromClassPreparation(value) {
+    const lines = normalizeTextareaLines(value);
+    for (const line of lines) {
+        const lower = String(line || "").trim().toLowerCase();
+        if (lower.startsWith(SUBJECT_STREAM_PREFIX)) {
+            return normalizeSubjectStream(lower.slice(SUBJECT_STREAM_PREFIX.length));
+        }
+    }
+    return "";
+}
+
+function stripSubjectStreamMarkers(lines) {
+    return lines.filter((line) => !String(line || "").trim().toLowerCase().startsWith(SUBJECT_STREAM_PREFIX));
+}
+
+function mergeClassPreparationWithSubject(existingValue, subjectStream) {
+    const existing = stripSubjectStreamMarkers(normalizeTextareaLines(existingValue));
+    const normalized = normalizeSubjectStream(subjectStream);
+    if (normalized) {
+        existing.unshift(`${SUBJECT_STREAM_PREFIX}${normalized}`);
+    }
+    return existing;
 }
 
 function isNoneClassPreparation(value) {
@@ -306,6 +343,20 @@ function linesToArray(value) {
         .filter(Boolean);
 }
 
+function parseSubjectStreamAndClassPreparation(formData) {
+    const subjectStream = normalizeSubjectStream(formData.get("subjectStream"));
+    let classPreparation = linesToArray(formData.get("classPreparation"));
+
+    if (classPreparationNoneCheckbox?.checked) {
+        classPreparation = ["NONE"];
+    }
+
+    return {
+        subjectStream,
+        classPreparation: mergeClassPreparationWithSubject(classPreparation, subjectStream)
+    };
+}
+
 async function fileToDataUrl(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -348,6 +399,7 @@ function createActivityPayload() {
     const name = String(formData.get("activityName") || "").trim();
     const resources = linesToArray(formData.get("resources"));
     const equipment = linesToArray(formData.get("equipment"));
+    const subjectData = parseSubjectStreamAndClassPreparation(formData);
     const durationMinutes = Number.parseInt(String(formData.get("durationMinutes") || "0"), 10) || 0;
     const editingId = getEditingActivityId();
 
@@ -359,6 +411,7 @@ function createActivityPayload() {
         activity_category: String(formData.get("activityCategory") || "").trim(),
         duration_minutes: durationMinutes,
         difficulty: String(formData.get("difficulty") || "").trim(),
+        subject_stream: subjectData.subjectStream,
         card_color: String(formData.get("cardColor") || "").trim(),
         card_url: String(formData.get("cardUrl") || "").trim(),
         outcome_image_url: String(formData.get("outcomeImageUrl") || "").trim() || currentEditingImageUrl,
@@ -367,7 +420,7 @@ function createActivityPayload() {
         equipment,
         instructions: linesToArray(formData.get("instructions")),
         class_management_notes: linesToArray(formData.get("classManagementNotes")),
-        class_preparation: linesToArray(formData.get("classPreparation")),
+        class_preparation: subjectData.classPreparation,
         assessment_focus: linesToArray(formData.get("assessmentFocus")),
         show_in_this_week: Boolean(formData.get("showThisWeek")),
         created_at: new Date().toISOString()
