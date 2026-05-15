@@ -261,7 +261,13 @@ async function readSharedActivity(activityId) {
         
         // Assessment Task Fields
         standardDetails: toArray(found.standard_details),
-        tasksList: toArray(found.tasks_list || found.assessment_focus),
+        tasksList: (() => {
+            const fromTasksList = toArray(found.tasks_list);
+            if (fromTasksList.length) {
+                return fromTasksList;
+            }
+            return toArray(found.assessment_focus);
+        })(),
         achieved: toArray(found.achieved),
         merit: toArray(found.merit),
         excellence: toArray(found.excellence),
@@ -553,6 +559,28 @@ async function deleteDetails(id) {
 }
 
 async function saveDetails(id, draft) {
+    const toArraySafe = (value) => {
+        if (Array.isArray(value)) {
+            return value.map((item) => String(item || "").trim()).filter(Boolean);
+        }
+        if (typeof value === "string") {
+            const trimmed = value.trim();
+            if (!trimmed) return [];
+            try {
+                const parsed = JSON.parse(trimmed);
+                if (Array.isArray(parsed)) {
+                    return parsed.map((item) => String(item || "").trim()).filter(Boolean);
+                }
+            } catch (_error) {
+            }
+            return trimmed
+                .split(/\r?\n/)
+                .map((item) => item.trim())
+                .filter(Boolean);
+        }
+        return [];
+    };
+
     const payload = {
         id,
         name: draft.title,
@@ -616,7 +644,7 @@ async function saveDetails(id, draft) {
             : `${parseDurationMinutes(draft.durationMinutes)} mins`,
         term: result.term || draft.term,
         activityCategory: result.activity_category || draft.activityCategory,
-        showInThisWeek: Boolean(result.show_in_this_week),
+        showInThisWeek: Boolean(result.show_in_this_week ?? result.show_this_week ?? result.is_pinned ?? result.is_this_week ?? draft.showInThisWeek),
         summary: String(result.description || result.summary || draft.summary || "").trim(),
         resources: Array.isArray(result.resources) ? result.resources : draft.resources,
         equipment: Array.isArray(result.equipment) ? result.equipment : draft.equipment,
@@ -639,9 +667,17 @@ async function saveDetails(id, draft) {
 
         // Assessment Task Fields
         standardDetails: Array.isArray(result.standard_details) ? result.standard_details : draft.standardDetails,
-        tasksList: Array.isArray(result.tasks_list)
-            ? result.tasks_list
-            : (Array.isArray(result.assessment_focus) ? result.assessment_focus : draft.tasksList),
+        tasksList: (() => {
+            const fromTasksList = toArraySafe(result.tasks_list);
+            if (fromTasksList.length) {
+                return fromTasksList;
+            }
+            const fromAssessmentFocus = toArraySafe(result.assessment_focus);
+            if (fromAssessmentFocus.length) {
+                return fromAssessmentFocus;
+            }
+            return draft.tasksList;
+        })(),
         achieved: Array.isArray(result.achieved) ? result.achieved : draft.achieved,
         merit: Array.isArray(result.merit) ? result.merit : draft.merit,
         excellence: Array.isArray(result.excellence) ? result.excellence : draft.excellence,
