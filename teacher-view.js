@@ -1,6 +1,9 @@
 const exportButton = document.querySelector("#teacher-export");
 const clearButton = document.querySelector("#teacher-clear");
 const teacherStatus = document.querySelector("#teacher-status");
+const standardsLinksHost = document.querySelector("#standards-links");
+const standardsSummaryHost = document.querySelector("#standards-summary");
+const standardsMeta = document.querySelector("#standards-results-meta");
 const TEACHER_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 
 function getHubStoredAuthRaw() {
@@ -40,26 +43,28 @@ async function enforceTeacherViewAccess() {
     const signedInEmail = getSignedInEmail();
     if (!signedInEmail) {
         window.location.replace("index.html");
-        return;
+        return false;
     }
 
     try {
         const response = await fetch(`/api/auth/user-access?email=${encodeURIComponent(signedInEmail)}`);
         if (!response.ok) {
             window.location.replace("index.html");
-            return;
+            return false;
         }
 
         const access = await response.json();
         if (!access?.can_teacher_view) {
             window.location.replace("index.html");
+            return false;
         }
+
+        return true;
     } catch (_error) {
         window.location.replace("index.html");
+        return false;
     }
 }
-
-enforceTeacherViewAccess();
 
 function setTeacherStatus(message, isError = false) {
     if (!teacherStatus) return;
@@ -75,6 +80,242 @@ async function fetchSharedActivities() {
 
     const data = await response.json();
     return Array.isArray(data) ? data : [];
+}
+
+function toArray(value) {
+    if (Array.isArray(value)) {
+        return value.map((item) => String(item || "").trim()).filter(Boolean);
+    }
+
+    const raw = String(value || "").trim();
+    if (!raw) {
+        return [];
+    }
+
+    if (raw.startsWith("[") && raw.endsWith("]")) {
+        try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+                return parsed.map((item) => String(item || "").trim()).filter(Boolean);
+            }
+        } catch (_error) {
+            // Fallback to newline parsing.
+        }
+    }
+
+    return raw.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+}
+
+function detectSubject(activity) {
+    const probe = [
+        activity?.name,
+        activity?.type,
+        activity?.description,
+        ...(toArray(activity?.standard_details)),
+        ...(toArray(activity?.assessment_focus)),
+        ...(toArray(activity?.tasks_list))
+    ]
+        .join(" ")
+        .toLowerCase();
+
+    if (/(textile|textiles|fabric|sewing|garment)/.test(probe)) return "TEXT";
+    if (/(dtonline|online|remote learning|distance)/.test(probe)) return "DTONLINE";
+    if (/(computer|computing|programming|python|software|coding|app dev)/.test(probe)) return "COMP";
+    if (/(digital technolog|dtech)/.test(probe)) return "DTECH";
+    return "DTECH";
+}
+
+function detectNceaLevel(activity) {
+    const probe = [
+        activity?.name,
+        activity?.description,
+        ...(toArray(activity?.standard_details)),
+        ...(toArray(activity?.assessment_focus))
+    ]
+        .join(" ")
+        .toLowerCase();
+
+    if (/level\s*1|\bl1\b/.test(probe)) return "1";
+    if (/level\s*2|\bl2\b/.test(probe)) return "2";
+    if (/level\s*3|\bl3\b/.test(probe)) return "3";
+
+    const yearText = String(activity?.year_level || "").toLowerCase();
+    const yearMatch = yearText.match(/(11|12|13)/);
+    if (yearMatch?.[1] === "11") return "1";
+    if (yearMatch?.[1] === "12") return "2";
+    if (yearMatch?.[1] === "13") return "3";
+    return "?";
+}
+
+function buildLowerKeyMap(row) {
+    const map = new Map();
+    Object.keys(row || {}).forEach((key) => map.set(String(key).toLowerCase(), row[key]));
+    return map;
+}
+
+function extractStudentEmail(row) {
+    const lower = buildLowerKeyMap(row);
+    const keys = ["student_email", "email_school", "email", "user_email", "studentemail", "emailschool"];
+    for (const key of keys) {
+        const value = lower.get(key);
+        if (String(value || "").trim()) {
+            return String(value || "").trim().toLowerCase();
+        }
+    }
+    return "";
+}
+
+function extractStudentYearGroup(row) {
+    const lower = buildLowerKeyMap(row);
+    const keys = ["year_level", "yearlevel", "year", "class_year", "year_group", "yeargroup"];
+    for (const key of keys) {
+        const value = lower.get(key);
+        if (String(value || "").trim()) {
+            return String(value || "").trim();
+        }
+    }
+    return "";
+}
+
+async function fetchProjectInterestSummary() {
+    const email = getSignedInEmail();
+    const headers = email ? { "x-user-email": email } : {};
+    const response = await fetch("/api/project-interests", { headers });
+    if (!response.ok) {
+        throw new Error("Could not load project interests");
+    }
+
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+}
+
+async function fetchStudentDirectory() {
+    const response = await fetch("/api/student_timetable/all");
+    if (!response.ok) {
+        return [];
+    }
+
+    const payload = await response.json().catch(() => ({}));
+    return Array.isArray(payload?.students) ? payload.students : [];
+}
+
+function renderStandardsLinks() {
+    if (!standardsLinksHost) return;
+
+    standardsLinksHost.className = "standards-link-grid";
+    standardsLinksHost.innerHTML = `
+        <article class="standards-link-card">
+            <h3>Digital Technologies</h3>
+            <a href="https://www.nzqa.govt.nz/ncea/assessment/search.do?query=Digital+Technologies&view=all&level=01" target="_blank" rel="noreferrer">Level 1</a>
+            <a href="https://www.nzqa.govt.nz/ncea/assessment/search.do?query=Digital+Technologies&view=all&level=02" target="_blank" rel="noreferrer">Level 2</a>
+            <a href="https://www.nzqa.govt.nz/ncea/assessment/search.do?query=Digital+Technologies&view=all&level=03" target="_blank" rel="noreferrer">Level 3</a>
+        </article>
+        <article class="standards-link-card">
+            <h3>Generic Computing</h3>
+            <a href="https://www.nzqa.govt.nz/ncea/assessment/search.do?query=Computing&view=all&level=01" target="_blank" rel="noreferrer">Level 1</a>
+            <a href="https://www.nzqa.govt.nz/ncea/assessment/search.do?query=Computing&view=all&level=02" target="_blank" rel="noreferrer">Level 2</a>
+            <a href="https://www.nzqa.govt.nz/ncea/assessment/search.do?query=Computing&view=all&level=03" target="_blank" rel="noreferrer">Level 3</a>
+        </article>
+    `;
+}
+
+function renderStandardsSummary(assignments) {
+    if (!standardsSummaryHost) return;
+
+    if (!assignments.length) {
+        standardsSummaryHost.innerHTML = `<article class="standards-group"><h3>No assessment allocations found</h3><p class="section-copy">Allocate students to assessment tasks to populate this snapshot.</p></article>`;
+        if (standardsMeta) standardsMeta.textContent = "0 students tracked";
+        return;
+    }
+
+    const groups = new Map();
+    for (const row of assignments) {
+        const key = `${row.subject} | ${row.yearGroup} | L${row.level}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(row);
+    }
+
+    const groupEntries = Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+    standardsSummaryHost.innerHTML = groupEntries.map(([groupName, rows]) => {
+        const lines = rows
+            .sort((left, right) => left.studentEmail.localeCompare(right.studentEmail))
+            .map((row) => {
+                const standardText = row.standardSummary ? ` — ${row.standardSummary}` : "";
+                return `<li><strong>${row.studentEmail}</strong><span class="standards-subject-chip">${row.subject}</span> · <a class="standards-task-link" href="ProjectPages/custom-activity.html?id=${encodeURIComponent(row.activityId)}">${row.activityName}</a>${standardText}</li>`;
+            })
+            .join("");
+
+        return `
+            <article class="standards-group">
+                <h3>${groupName}</h3>
+                <ol class="standards-list">${lines}</ol>
+            </article>
+        `;
+    }).join("");
+
+    if (standardsMeta) {
+        const studentCount = new Set(assignments.map((row) => row.studentEmail)).size;
+        standardsMeta.textContent = `${studentCount} student${studentCount === 1 ? "" : "s"} across ${groupEntries.length} stream${groupEntries.length === 1 ? "" : "s"}`;
+    }
+}
+
+async function renderNzqaStandardsSnapshot() {
+    renderStandardsLinks();
+
+    if (!standardsSummaryHost) return;
+    standardsSummaryHost.innerHTML = `<article class="standards-group"><h3>Loading standards snapshot...</h3></article>`;
+
+    try {
+        const [activities, interests, students] = await Promise.all([
+            fetchSharedActivities(),
+            fetchProjectInterestSummary(),
+            fetchStudentDirectory()
+        ]);
+
+        const activityById = new Map((activities || []).map((activity) => [String(activity?.id || "").trim(), activity]));
+        const studentYearByEmail = new Map();
+        (students || []).forEach((row) => {
+            const email = extractStudentEmail(row);
+            const year = extractStudentYearGroup(row);
+            if (email && year) {
+                studentYearByEmail.set(email, year);
+            }
+        });
+
+        const assignments = [];
+        (interests || []).forEach((interestRow) => {
+            const activityId = String(interestRow?.project_id || "").trim();
+            const activity = activityById.get(activityId);
+            if (!activity) return;
+
+            const category = String(activity?.activity_category || "").toLowerCase();
+            if (!category.includes("assessment")) return;
+
+            const studentsInTask = Array.isArray(interestRow?.students) ? interestRow.students : [];
+            const standardDetailLines = toArray(activity?.standard_details || activity?.assessment_focus);
+            const standardSummary = standardDetailLines.length ? standardDetailLines[0] : "";
+
+            studentsInTask.forEach((student) => {
+                const studentEmail = String(student?.email || student?.student_email || "").trim().toLowerCase();
+                if (!studentEmail) return;
+
+                assignments.push({
+                    activityId,
+                    activityName: String(activity?.name || "Assessment Task").trim(),
+                    studentEmail,
+                    subject: detectSubject(activity),
+                    level: detectNceaLevel(activity),
+                    yearGroup: studentYearByEmail.get(studentEmail) || String(activity?.year_level || "Unspecified").trim() || "Unspecified",
+                    standardSummary
+                });
+            });
+        });
+
+        renderStandardsSummary(assignments);
+    } catch (error) {
+        standardsSummaryHost.innerHTML = `<article class="standards-group"><h3>Could not load standards snapshot</h3><p class="section-copy">${String(error?.message || "Please refresh and try again.")}</p></article>`;
+        if (standardsMeta) standardsMeta.textContent = "Error";
+    }
 }
 
 function downloadJson(filename, payload) {
@@ -125,3 +366,11 @@ if (clearButton) {
         }
     });
 }
+
+async function initTeacherView() {
+    const allowed = await enforceTeacherViewAccess();
+    if (!allowed) return;
+    await renderNzqaStandardsSnapshot();
+}
+
+initTeacherView();

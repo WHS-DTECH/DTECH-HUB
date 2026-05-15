@@ -13,6 +13,87 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+    <style>
+        .standards-link-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .standards-link-card {
+            border: 1px solid #c9d7e8;
+            background: #f8fbff;
+            border-radius: 10px;
+            padding: 10px 12px;
+        }
+
+        .standards-link-card h3 {
+            margin: 0 0 4px;
+            font-size: 0.95rem;
+            color: #173f63;
+        }
+
+        .standards-link-card a {
+            display: inline-block;
+            margin-right: 8px;
+            margin-top: 4px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #2f74b9;
+            text-decoration: none;
+        }
+
+        .standards-link-card a:hover {
+            text-decoration: underline;
+        }
+
+        .standards-group {
+            border: 1px solid #d7e3f1;
+            border-radius: 10px;
+            background: #f8fbff;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+
+        .standards-group h3 {
+            margin: 0 0 8px;
+            color: #173f63;
+            font-size: 1rem;
+            font-family: "Fraunces", serif;
+        }
+
+        .standards-list {
+            margin: 0;
+            padding-left: 18px;
+            color: #2f4e73;
+            font-size: 0.84rem;
+            line-height: 1.45;
+        }
+
+        .standards-subject-chip {
+            display: inline-block;
+            margin-left: 8px;
+            padding: 2px 8px;
+            border: 1px solid #b8d1ea;
+            border-radius: 999px;
+            background: #e9f2fb;
+            color: #17466e;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+        }
+
+        .standards-task-link {
+            color: #2f74b9;
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .standards-task-link:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
     <div class="page-shell">
@@ -73,6 +154,22 @@
         <main>
             <div class="home-grid single-column">
                 <div class="hub-column activities-column">
+                    <section id="nzqa-standards" class="panel-section library-section">
+                        <div class="section-heading library-heading">
+                            <div>
+                                <p class="section-kicker">NZQA Tracking</p>
+                                <h2>Student standards snapshot</h2>
+                            </div>
+                            <p id="standards-results-meta" class="results-meta" aria-live="polite"></p>
+                            <p class="section-copy">
+                                Track which standards each student is currently working on, including subject stream and year group.
+                            </p>
+                        </div>
+
+                        <div id="standards-links" class="controls-panel" aria-label="NZQA standards quick links"></div>
+                        <div id="standards-summary" class="project-grid" aria-live="polite"></div>
+                    </section>
+
                     <section id="current-week" class="panel-section current-work">
                         <div class="section-heading">
                             <div>
