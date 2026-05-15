@@ -1462,18 +1462,20 @@ function renderCurrentWeek() {
     const activeActivities = sortProjects(projects.filter((project) => project.showThisWeek));
     const activeLabProjects = sortLabProjects(labProjects.filter((project) => project.showThisWeek));
 
-    const combinedCards = [
+    const allCards = [
         ...activeActivities.map((project) => ({
             title: String(project.title || "").toLowerCase(),
-            element: createProjectCard(project)
+            element: createProjectCard(project),
+            record: project
         })),
         ...activeLabProjects.map((project) => ({
             title: String(project.title || "").toLowerCase(),
-            element: createLabProjectCard(project)
+            element: createLabProjectCard(project),
+            record: project
         }))
     ].sort((left, right) => left.title.localeCompare(right.title));
 
-    if (!combinedCards.length) {
+    if (!allCards.length) {
         const emptyState = document.createElement("div");
         emptyState.className = "about-card";
         emptyState.innerHTML = `
@@ -1485,8 +1487,63 @@ function renderCurrentWeek() {
         return;
     }
 
-    combinedCards.forEach((item) => {
-        currentWeekGrid.appendChild(item.element);
+    // Group cards by sourceType
+    const grouped = {
+        activity: [],
+        assessment: [],
+        project: []
+    };
+
+    allCards.forEach((card) => {
+        const sourceType = inferSourceTypeFromRecord(card.record);
+        if (sourceType === "assessment") {
+            grouped.assessment.push(card);
+        } else if (sourceType === "project") {
+            grouped.project.push(card);
+        } else {
+            grouped.activity.push(card);
+        }
+    });
+
+    // Render each group with heading and count
+    const sectionOrder = [
+        { key: "activity", label: "Activities" },
+        { key: "assessment", label: "Assessment Tasks" },
+        { key: "project", label: "Projects" }
+    ];
+
+    sectionOrder.forEach(({ key, label }) => {
+        const cards = grouped[key];
+        if (cards.length === 0) {
+            return; // Skip empty sections
+        }
+
+        // Create section heading with count
+        const sectionHeading = document.createElement("div");
+        sectionHeading.className = "week-section-heading";
+        sectionHeading.innerHTML = `
+            <h3>${label} <span class="item-count">(${cards.length})</span></h3>
+        `;
+        currentWeekGrid.appendChild(sectionHeading);
+
+        // Create sub-grid for this section
+        const sectionGrid = document.createElement("div");
+        sectionGrid.className = "week-section-grid project-grid";
+        sectionGrid.style.display = "flex";
+        sectionGrid.style.flexWrap = "wrap";
+        sectionGrid.style.gap = "12px";
+        sectionGrid.style.marginBottom = "30px";
+        sectionGrid.style.minWidth = "0";
+
+        cards.forEach((card) => {
+            const cardElement = card.element.cloneNode(true);
+            cardElement.style.width = "calc(25% - 9px)";
+            cardElement.style.minWidth = "180px";
+            cardElement.style.flexShrink = "0";
+            sectionGrid.appendChild(cardElement);
+        });
+
+        currentWeekGrid.appendChild(sectionGrid);
     });
 }
 

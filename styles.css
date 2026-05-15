@@ -664,6 +664,34 @@ body.public-home-access .controls-panel {
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 
+.week-section-heading {
+    width: 100%;
+    margin-top: 25px;
+    margin-bottom: 15px;
+    border-bottom: 2px solid #e8dff7;
+    padding-bottom: 10px;
+}
+
+.week-section-heading h3 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #2a1e4a;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.week-section-heading .item-count {
+    font-size: 14px;
+    font-weight: 500;
+    color: #6b5b8f;
+}
+
+.week-section-grid {
+    width: 100%;
+}
+
 .project-controls {
     grid-template-columns: minmax(220px, 2fr) minmax(150px, 1fr);
 }
