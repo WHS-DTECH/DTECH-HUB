@@ -93,6 +93,62 @@ function normalizeStandardValue(value) {
     return String(value || "").trim().slice(0, 120);
 }
 
+function parseStudentName(studentName) {
+    const raw = String(studentName || "").trim();
+    if (!raw) {
+        return { firstName: "", lastName: "" };
+    }
+
+    if (raw.includes(",")) {
+        const [last, first] = raw.split(",");
+        return {
+            firstName: String(first || "").trim().split(/\s+/)[0] || "",
+            lastName: String(last || "").trim().split(/\s+/)[0] || ""
+        };
+    }
+
+    const parts = raw.split(/\s+/).filter(Boolean);
+    if (parts.length < 2) {
+        return { firstName: parts[0] || "", lastName: "" };
+    }
+
+    return {
+        firstName: parts[0],
+        lastName: parts[parts.length - 1]
+    };
+}
+
+function normalizeNameToken(value) {
+    return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "");
+}
+
+function buildStudentEmailAliases(student) {
+    const aliases = new Set();
+    const { firstName, lastName } = parseStudentName(student?.student_name);
+    const first = normalizeNameToken(firstName);
+    const last = normalizeNameToken(lastName);
+
+    if (first && last) {
+        aliases.add(`${first.charAt(0)}_${last}`);
+        aliases.add(`${first.charAt(0)}.${last}`);
+        aliases.add(`${first}${last}`);
+        aliases.add(`${last}${first.charAt(0)}`);
+    }
+
+    return Array.from(aliases).filter(Boolean);
+}
+
+function getEmailLocalPart(value) {
+    const email = String(value || "").trim().toLowerCase();
+    if (!email) return "";
+    const at = email.indexOf("@");
+    if (at <= 0) return "";
+    return email.slice(0, at);
+}
+
 function extractStudentStrands(row) {
     const programs = Array.isArray(row?.programs)
         ? row.programs.map((program) => String(program || "").trim().toUpperCase()).filter(Boolean)
@@ -358,7 +414,9 @@ async function loadAllocations() {
         const interestProjects = await interestsResponse.json();
         const students = await fetchStudentsForAllocation(email);
         const studentYearByEmail = new Map();
+        const studentYearByLocal = new Map();
         const studentStrandsByEmail = new Map();
+        const studentStrandsByLocal = new Map();
         students.forEach((student) => {
             const yearGroup = extractStudentYearGroup(student);
             const strands = extractStudentStrands(student);
@@ -367,9 +425,17 @@ async function loadAllocations() {
             if (directEmail) {
                 if (yearGroup) {
                     studentYearByEmail.set(directEmail, yearGroup);
+                    const local = getEmailLocalPart(directEmail);
+                    if (local) {
+                        studentYearByLocal.set(local, yearGroup);
+                    }
                 }
                 if (strands.length) {
                     studentStrandsByEmail.set(directEmail, strands);
+                    const local = getEmailLocalPart(directEmail);
+                    if (local) {
+                        studentStrandsByLocal.set(local, strands);
+                    }
                 }
             }
 
@@ -380,12 +446,30 @@ async function loadAllocations() {
                     .forEach((linkedEmail) => {
                         if (yearGroup) {
                             studentYearByEmail.set(linkedEmail, yearGroup);
+                            const local = getEmailLocalPart(linkedEmail);
+                            if (local) {
+                                studentYearByLocal.set(local, yearGroup);
+                            }
                         }
                         if (strands.length) {
                             studentStrandsByEmail.set(linkedEmail, strands);
+                            const local = getEmailLocalPart(linkedEmail);
+                            if (local) {
+                                studentStrandsByLocal.set(local, strands);
+                            }
                         }
                     });
             }
+
+            const aliases = buildStudentEmailAliases(student);
+            aliases.forEach((alias) => {
+                if (yearGroup) {
+                    studentYearByLocal.set(alias, yearGroup);
+                }
+                if (strands.length) {
+                    studentStrandsByLocal.set(alias, strands);
+                }
+            });
         });
         const interestByProjectId = new Map(
             (Array.isArray(interestProjects) ? interestProjects : []).map((project) => [String(project.project_id || "").trim(), project])
@@ -407,8 +491,16 @@ async function loadAllocations() {
                             created_at: student.created_at || "",
                             standard_1: normalizeStandardValue(student.standard_1),
                             standard_2: normalizeStandardValue(student.standard_2),
-                            year_group: studentYearByEmail.get(String(student.email || student.student_email || "").trim().toLowerCase()) || "",
-                            subject_strands: studentStrandsByEmail.get(String(student.email || student.student_email || "").trim().toLowerCase()) || []
+                            year_group: (() => {
+                                const studentEmail = String(student.email || student.student_email || "").trim().toLowerCase();
+                                const local = getEmailLocalPart(studentEmail);
+                                return studentYearByEmail.get(studentEmail) || studentYearByLocal.get(local) || "";
+                            })(),
+                            subject_strands: (() => {
+                                const studentEmail = String(student.email || student.student_email || "").trim().toLowerCase();
+                                const local = getEmailLocalPart(studentEmail);
+                                return studentStrandsByEmail.get(studentEmail) || studentStrandsByLocal.get(local) || [];
+                            })()
                         })).filter((student) => student.email)
                         : []
                 };
