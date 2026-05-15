@@ -1557,6 +1557,7 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     activity_category: String(body.activity_category || "Practice").trim() || "Practice",
     duration_minutes: Number.isInteger(durationMinutesInput) && durationMinutesInput > 0 ? durationMinutesInput : 1,
     difficulty: String(body.difficulty || "Beginner").trim() || "Beginner",
+    subject_stream: String(body.subject_stream || body.subject || "").trim().toUpperCase(),
     card_color: String(body.card_color || "Rose").trim() || "Rose",
     card_url: String(body.card_url || "").trim(),
     outcome_image_url: String(body.outcome_image_url || "").trim(),
@@ -1626,6 +1627,7 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     const durationHoursColumn = pickExistingColumn(activityColumns, ["duration_hours"]);
     const durationColumn = pickExistingColumn(activityColumns, ["duration"]);
     const difficultyColumn = pickExistingColumn(activityColumns, ["difficulty", "level"]);
+    const subjectStreamColumn = pickExistingColumn(activityColumns, ["subject_stream", "subject", "teaching_subject", "stream"]);
     const cardColorColumn = pickExistingColumn(activityColumns, ["card_color", "card_colour", "color"]);
     const cardUrlColumn = pickExistingColumn(activityColumns, ["card_url", "activity_url", "url"]);
     const outcomeImageColumn = pickExistingColumn(activityColumns, ["outcome_image_url", "image_url", "thumbnail_url"]);
@@ -1691,6 +1693,7 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
       sqlColumns.push({ name: durationColumn, value: payload.duration_minutes });
     }
     if (difficultyColumn) sqlColumns.push({ name: difficultyColumn, value: payload.difficulty });
+    if (subjectStreamColumn) sqlColumns.push({ name: subjectStreamColumn, value: payload.subject_stream });
     if (cardColorColumn) sqlColumns.push({ name: cardColorColumn, value: payload.card_color });
     if (cardUrlColumn) sqlColumns.push({ name: cardUrlColumn, value: payload.card_url });
     if (outcomeImageColumn) sqlColumns.push({ name: outcomeImageColumn, value: payload.outcome_image_url });

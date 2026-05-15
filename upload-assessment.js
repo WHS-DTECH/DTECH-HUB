@@ -5,6 +5,7 @@ const clearDraftButtons = Array.from(document.querySelectorAll("[data-clear-asse
 const authStatusElement = document.querySelector("#assessment-auth-status");
 const ASSESSMENT_DRAFT_STORAGE_KEY = "dtechHub:uploadAssessmentDraft:v1";
 const UPLOAD_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
+const SUBJECT_STREAM_PREFIX = "subject_stream:";
 
 function getEditingAssessmentId() {
     const params = new URLSearchParams(window.location.search);
@@ -43,6 +44,38 @@ function linesToArray(value) {
         .split(/\r?\n/)
         .map((line) => line.trim())
         .filter(Boolean);
+}
+
+function normalizeSubjectStream(value) {
+    const upper = String(value || "").trim().toUpperCase();
+    if (["DTECH", "COMP", "TEXT", "DTONLINE"].includes(upper)) {
+        return upper;
+    }
+    return "";
+}
+
+function extractSubjectStreamFromClassPreparation(value) {
+    const lines = linesToArray(value);
+    for (const line of lines) {
+        const lower = String(line || "").trim().toLowerCase();
+        if (lower.startsWith(SUBJECT_STREAM_PREFIX)) {
+            return normalizeSubjectStream(lower.slice(SUBJECT_STREAM_PREFIX.length));
+        }
+    }
+    return "";
+}
+
+function mergeClassPreparationWithSubject(existingValue, subjectStream) {
+    const existing = linesToArray(existingValue).filter((line) => {
+        return !String(line || "").trim().toLowerCase().startsWith(SUBJECT_STREAM_PREFIX);
+    });
+
+    const normalized = normalizeSubjectStream(subjectStream);
+    if (normalized) {
+        existing.unshift(`${SUBJECT_STREAM_PREFIX}${normalized}`);
+    }
+
+    return existing;
 }
 
 function saveAssessmentDraft() {
@@ -201,6 +234,7 @@ async function prefillFormIfEditing() {
         form.activityCategory.value = String(data.activity_category || "Assessment Task").trim() || "Assessment Task";
         form.difficulty.value = String(data.difficulty || "").trim();
         form.cardColor.value = String(data.card_color || data.card_colour || data.color || "Green").trim() || "Green";
+        form.subjectStream.value = normalizeSubjectStream(data.subject_stream) || extractSubjectStreamFromClassPreparation(data.class_preparation);
 
         // Assessment-specific fields
         form.shortDescription.value = String(data.description || data.summary || "").trim();
@@ -237,6 +271,8 @@ function createAssessmentPayload() {
     const shortDescription = String(formData.get("shortDescription") || "").trim();
 
     const tasksList = linesToArray(formData.get("tasksList"));
+    const subjectStream = normalizeSubjectStream(formData.get("subjectStream"));
+    const classPreparation = mergeClassPreparationWithSubject(formData.get("classPreparation"), subjectStream);
 
     return {
         id: editingId || slugify(name),
@@ -247,6 +283,7 @@ function createAssessmentPayload() {
         duration_minutes: 1,
         difficulty: String(formData.get("difficulty") || "").trim(),
         card_color: String(formData.get("cardColor") || "Green").trim(),
+        subject_stream: subjectStream,
         show_in_this_week: Boolean(formData.get("showThisWeek")),
         created_at: new Date().toISOString(),
         
@@ -256,6 +293,7 @@ function createAssessmentPayload() {
         standard_details: linesToArray(formData.get("standardDetails")),
         tasks_list: tasksList,
         assessment_focus: tasksList,
+        class_preparation: classPreparation,
         achieved: linesToArray(formData.get("achieved")),
         merit: linesToArray(formData.get("merit")),
         excellence: linesToArray(formData.get("excellence")),

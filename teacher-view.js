@@ -107,6 +107,20 @@ function toArray(value) {
 }
 
 function detectSubject(activity) {
+    const explicitSubject = String(activity?.subject_stream || activity?.subject || "").trim().toUpperCase();
+    if (["DTECH", "COMP", "TEXT", "DTONLINE"].includes(explicitSubject)) {
+        return explicitSubject;
+    }
+
+    const classPreparationLines = toArray(activity?.class_preparation);
+    const subjectMarker = classPreparationLines.find((line) => String(line || "").toLowerCase().startsWith("subject_stream:"));
+    if (subjectMarker) {
+        const fromMarker = String(subjectMarker).slice("subject_stream:".length).trim().toUpperCase();
+        if (["DTECH", "COMP", "TEXT", "DTONLINE"].includes(fromMarker)) {
+            return fromMarker;
+        }
+    }
+
     const probe = [
         activity?.name,
         activity?.type,
