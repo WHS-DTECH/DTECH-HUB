@@ -1256,7 +1256,7 @@ function createProjectCard(project) {
         ? `<span class="project-tag status-tag status-${project.status}">${formatStatus(project.status)}</span>` 
         : '';
     const sourceType = inferSourceTypeFromRecord(project);
-    const contentTypeLabel = sourceType === "project" ? "Project" : sourceType === "assessment" ? "Assessment" : "Activity";
+    const contentTypeLabel = sourceType === "project" ? "PROJECT" : sourceType === "assessment" ? "ASSESSMENT" : "ACTIVITY";
 
     card.innerHTML = `
         <div class="project-visual" ${visualStyle}>
