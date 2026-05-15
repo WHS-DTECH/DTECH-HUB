@@ -394,6 +394,7 @@ function defaultDetailShape(id, data) {
 
 function renderDetailView(host, id, data, canEdit) {
     const isAssessmentTask = String(data?.activityCategory || "").toLowerCase().includes("assessment");
+    const detailPageUrl = String(window.location.href || "");
     const resolvedTasksList = (() => {
         const fromTasksList = coerceArray(data?.tasksList);
         if (fromTasksList.length) {
@@ -404,7 +405,7 @@ function renderDetailView(host, id, data, canEdit) {
 
     host.innerHTML = `
         <header class="toolbar">
-            <span class="toolbar-label">${isAssessmentTask ? "Assessment Task Details" : "Project Details"}</span>
+            <span class="toolbar-label">${isAssessmentTask ? "Assessment Task Details" : "Activity"}</span>
             <div class="toolbar-actions">
                 ${canEdit ? '<button type="button" class="detail-action" id="detail-edit-button">Edit Details</button>' : ""}
                 ${canEdit ? '<button type="button" class="detail-action detail-action-danger" id="detail-delete-button">Delete</button>' : ""}
@@ -414,7 +415,6 @@ function renderDetailView(host, id, data, canEdit) {
 
         <section class="hero">
             <div class="hero-copy">
-                ${isAssessmentTask ? "" : '<p class="kicker">Project Proposal</p>'}
                 <h1>${escapeHtml(data.title)}</h1>
                 <div class="pills">
                     <span class="pill">${escapeHtml(data.yearLevel)}</span>
@@ -526,6 +526,7 @@ function renderDetailView(host, id, data, canEdit) {
                     <h2>Resources</h2>
                     <p class="sub">Materials needed.</p>
                     <ul class="list">${renderList(data.resources)}</ul>
+                    <p class="sub"><strong>URL:</strong> <a href="${escapeHtml(detailPageUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(detailPageUrl)}</a></p>
                 </article>` : ""}
                 ${data.equipment.length ? `<article class="card">
                     <h2>Equipment</h2>
