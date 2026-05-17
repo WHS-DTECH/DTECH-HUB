@@ -10,6 +10,7 @@ const hasDatabase = Boolean(process.env.DATABASE_URL);
 const staffDirectoryApiUrl = String(process.env.STAFF_DIRECTORY_API_URL || "").trim();
 const staffDirectoryApiKey = String(process.env.STAFF_DIRECTORY_API_KEY || "").trim();
 const memoryActivities = new Map();
+const memoryUnitPlans = new Map();
 const memoryUserRoles = new Map();
 const memoryStaffDirectory = new Map();
 const memorySuggestions = [];
@@ -202,6 +203,32 @@ function normalizeArray(value) {
   }
 
   return [];
+}
+
+function normalizeUnitLessons(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.map((lesson, index) => {
+    const lessonIndex = Number.parseInt(lesson?.lesson_index ?? lesson?.lessonIndex ?? index + 1, 10);
+
+    return {
+      lesson_index: Number.isInteger(lessonIndex) && lessonIndex > 0 ? lessonIndex : index + 1,
+      week_label: String(lesson?.week_label ?? lesson?.weekLabel ?? lesson?.week ?? "").trim(),
+      title: String(lesson?.title ?? lesson?.lesson_title ?? lesson?.lessonTitle ?? "").trim(),
+      focus: String(lesson?.focus ?? lesson?.lesson_focus ?? lesson?.lessonFocus ?? "").trim(),
+      calendar_date: String(lesson?.calendar_date ?? lesson?.calendarDate ?? "").trim(),
+      duration_minutes: Number.parseInt(lesson?.duration_minutes ?? lesson?.durationMinutes ?? 1, 10) || 1,
+      activity_name: String(lesson?.activity_name ?? lesson?.activityName ?? "").trim(),
+      activity_type: String(lesson?.activity_type ?? lesson?.activityType ?? "").trim(),
+      card_color: String(lesson?.card_color ?? lesson?.cardColor ?? "").trim(),
+      subject_stream: String(lesson?.subject_stream ?? lesson?.subjectStream ?? "").trim().toUpperCase(),
+      publish_activity: Boolean(lesson?.publish_activity ?? lesson?.publishActivity),
+      add_to_calendar: Boolean(lesson?.add_to_calendar ?? lesson?.addToCalendar),
+      notes: String(lesson?.notes ?? lesson?.lessonNotes ?? "").trim()
+    };
+  });
 }
 
 function decodeHtmlEntities(value) {
@@ -1292,6 +1319,8 @@ async function ensureSchema() {
   await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS time_sensitive BOOLEAN NOT NULL DEFAULT FALSE`);
   await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS show_in_this_week BOOLEAN NOT NULL DEFAULT FALSE`);
   await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS start_date TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS unit_plan_id TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS unit_lesson_index INTEGER`);
   await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS contact_name TEXT`);
   await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS contact_phone TEXT`);
   await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS contact_email TEXT`);
@@ -1454,6 +1483,8 @@ async function ensureSchema() {
       notes TEXT,
       linked_activity_id TEXT,
       linked_url TEXT,
+      unit_plan_id TEXT,
+      lesson_index INTEGER,
       created_by_email TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -1467,9 +1498,55 @@ async function ensureSchema() {
   await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS notes TEXT`);
   await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS linked_activity_id TEXT`);
   await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS linked_url TEXT`);
+  await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS unit_plan_id TEXT`);
+  await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS lesson_index INTEGER`);
   await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS created_by_email TEXT`);
   await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS practical_schedule_unit_plan_lesson_idx ON practical_schedule (unit_plan_id, lesson_index)`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS unit_plans (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      topic TEXT NOT NULL,
+      strand TEXT,
+      year_level TEXT NOT NULL,
+      term TEXT,
+      subject_stream TEXT,
+      duration_weeks INTEGER NOT NULL DEFAULT 1,
+      overview TEXT,
+      unit_aims JSONB NOT NULL DEFAULT '[]'::jsonb,
+      unit_values JSONB NOT NULL DEFAULT '[]'::jsonb,
+      contexts JSONB NOT NULL DEFAULT '[]'::jsonb,
+      curriculum_links JSONB NOT NULL DEFAULT '[]'::jsonb,
+      assessment_link TEXT,
+      notes TEXT,
+      lessons JSONB NOT NULL DEFAULT '[]'::jsonb,
+      created_by_email TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS title TEXT`);
+  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS topic TEXT`);
+  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS strand TEXT`);
+  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS year_level TEXT`);
+  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS term TEXT`);
+  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS subject_stream TEXT`);
+  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS duration_weeks INTEGER NOT NULL DEFAULT 1`);
+  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS overview TEXT`);
+  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS unit_aims JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS unit_values JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS contexts JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS curriculum_links JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS assessment_link TEXT`);
+  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS notes TEXT`);
+  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS lessons JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS created_by_email TEXT`);
+  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS project_interests (
@@ -1819,6 +1896,8 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     const cardUrlColumn = pickExistingColumn(activityColumns, ["card_url", "activity_url", "url"]);
     const outcomeImageColumn = pickExistingColumn(activityColumns, ["outcome_image_url", "image_url", "thumbnail_url"]);
     const descriptionColumn = pickExistingColumn(activityColumns, ["description", "summary"]);
+    const unitPlanIdColumn = pickExistingColumn(activityColumns, ["unit_plan_id", "unit_plan"]);
+    const unitLessonIndexColumn = pickExistingColumn(activityColumns, ["unit_lesson_index", "lesson_index"]);
     const resourcesColumn = pickExistingColumn(activityColumns, ["resources"]);
     const equipmentColumn = pickExistingColumn(activityColumns, ["equipment"]);
     const instructionsColumn = pickExistingColumn(activityColumns, ["instructions", "steps"]);
@@ -1885,6 +1964,8 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     if (cardUrlColumn) sqlColumns.push({ name: cardUrlColumn, value: payload.card_url });
     if (outcomeImageColumn) sqlColumns.push({ name: outcomeImageColumn, value: payload.outcome_image_url });
     if (descriptionColumn) sqlColumns.push({ name: descriptionColumn, value: payload.description });
+    if (unitPlanIdColumn) sqlColumns.push({ name: unitPlanIdColumn, value: String(body.unit_plan_id || body.unitPlanId || "").trim() });
+    if (unitLessonIndexColumn) sqlColumns.push({ name: unitLessonIndexColumn, value: Number.parseInt(body.unit_lesson_index ?? body.unitLessonIndex, 10) || null });
     if (resourcesColumn) sqlColumns.push({ name: resourcesColumn, value: JSON.stringify(payload.resources), cast: "jsonb" });
     if (equipmentColumn) sqlColumns.push({ name: equipmentColumn, value: JSON.stringify(payload.equipment), cast: "jsonb" });
     if (instructionsColumn) sqlColumns.push({ name: instructionsColumn, value: JSON.stringify(payload.instructions), cast: "jsonb" });
@@ -2744,6 +2825,8 @@ app.post("/api/practicals/events", async (req, res) => {
   const notes = String(req.body?.notes || "").trim();
   const linkedActivityId = String(req.body?.linked_activity_id || "").trim();
   const linkedUrl = String(req.body?.linked_url || "").trim();
+  const unitPlanId = String(req.body?.unit_plan_id || req.body?.unitPlanId || "").trim();
+  const lessonIndex = Number.parseInt(req.body?.lesson_index ?? req.body?.lessonIndex, 10);
   const createdByEmail = normalizeEmail(req.body?.user_email);
 
   if (!title || !startDate) {
@@ -2757,6 +2840,10 @@ app.post("/api/practicals/events", async (req, res) => {
   }
 
   if (!hasDatabase) {
+    const existingIndex = unitPlanId && Number.isInteger(lessonIndex) && lessonIndex > 0
+      ? memoryPracticalEvents.findIndex((row) => String(row.unit_plan_id || "") === unitPlanId && Number(row.lesson_index) === lessonIndex)
+      : -1;
+
     const row = {
       id: memoryPracticalEventId++,
       title,
@@ -2766,10 +2853,18 @@ app.post("/api/practicals/events", async (req, res) => {
       notes,
       linked_activity_id: linkedActivityId || null,
       linked_url: linkedUrl || null,
+      unit_plan_id: unitPlanId || null,
+      lesson_index: Number.isInteger(lessonIndex) && lessonIndex > 0 ? lessonIndex : null,
       created_by_email: createdByEmail,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
+    if (existingIndex >= 0) {
+      memoryPracticalEvents[existingIndex] = { ...memoryPracticalEvents[existingIndex], ...row };
+      res.status(200).json(memoryPracticalEvents[existingIndex]);
+      return;
+    }
+
     memoryPracticalEvents.push(row);
     res.status(201).json(row);
     return;
@@ -2779,17 +2874,171 @@ app.post("/api/practicals/events", async (req, res) => {
     const result = await pool.query(
       `
         INSERT INTO practical_schedule (
-          title, event_type, start_date, end_date, notes, linked_activity_id, linked_url, created_by_email, created_at, updated_at
+          title, event_type, start_date, end_date, notes, linked_activity_id, linked_url, unit_plan_id, lesson_index, created_by_email, created_at, updated_at
         ) VALUES (
-          $1, $2, $3::date, $4::date, $5, $6, $7, $8, NOW(), NOW()
+          $1, $2, $3::date, $4::date, $5, $6, $7, $8, $9, $10, NOW(), NOW()
         )
-        RETURNING id, title, event_type, start_date, end_date, notes, linked_activity_id, linked_url, created_by_email, created_at, updated_at
+        ON CONFLICT (unit_plan_id, lesson_index) DO UPDATE SET
+          title = EXCLUDED.title,
+          event_type = EXCLUDED.event_type,
+          start_date = EXCLUDED.start_date,
+          end_date = EXCLUDED.end_date,
+          notes = EXCLUDED.notes,
+          linked_activity_id = EXCLUDED.linked_activity_id,
+          linked_url = EXCLUDED.linked_url,
+          created_by_email = EXCLUDED.created_by_email,
+          updated_at = NOW()
+        RETURNING id, title, event_type, start_date, end_date, notes, linked_activity_id, linked_url, unit_plan_id, lesson_index, created_by_email, created_at, updated_at
       `,
-      [title, eventType, startDate, endDate, notes, linkedActivityId || null, linkedUrl || null, createdByEmail]
+      [title, eventType, startDate, endDate, notes, linkedActivityId || null, linkedUrl || null, unitPlanId || null, Number.isInteger(lessonIndex) && lessonIndex > 0 ? lessonIndex : null, createdByEmail]
     );
     res.status(201).json(result.rows[0]);
   } catch (_error) {
     res.status(500).json({ error: "Could not save practical event" });
+  }
+});
+
+app.get("/api/unit-plans", async (_req, res) => {
+  if (!hasDatabase) {
+    res.json(Array.from(memoryUnitPlans.values()).sort((left, right) => String(right.updated_at || "").localeCompare(String(left.updated_at || ""))));
+    return;
+  }
+
+  try {
+    const result = await pool.query("SELECT * FROM unit_plans ORDER BY updated_at DESC, created_at DESC");
+    res.json(result.rows);
+  } catch (_error) {
+    res.status(500).json({ error: "Could not load unit plans" });
+  }
+});
+
+app.get("/api/unit-plans/:id", async (req, res) => {
+  const requestedId = String(req.params.id || "").trim();
+  if (!requestedId) {
+    res.status(400).json({ error: "Unit plan ID is required" });
+    return;
+  }
+
+  if (!hasDatabase) {
+    const found = memoryUnitPlans.get(requestedId);
+    if (!found) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    res.json(found);
+    return;
+  }
+
+  try {
+    const result = await pool.query("SELECT * FROM unit_plans WHERE id = $1", [requestedId]);
+    if (!result.rowCount) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    res.json(result.rows[0]);
+  } catch (_error) {
+    res.status(500).json({ error: "Could not load unit plan" });
+  }
+});
+
+app.post("/api/unit-plans", async (req, res) => {
+  const userEmail = normalizeEmail(req.body?.created_by_email || req.body?.user_email || getRequestUserEmail(req));
+  if (!userEmail || !(await canManagePracticalSchedule(userEmail))) {
+    res.status(403).json({ error: "Teacher/Admin access is required." });
+    return;
+  }
+
+  const title = String(req.body?.title || req.body?.unit_title || "").trim();
+  const topic = String(req.body?.topic || req.body?.unit_topic || "").trim();
+  const yearLevel = String(req.body?.year_level || req.body?.yearLevel || "").trim();
+  const id = String(req.body?.id || slugify(title)).trim();
+
+  if (!title || !topic || !yearLevel) {
+    res.status(400).json({ error: "title, topic and year_level are required" });
+    return;
+  }
+
+  const payload = {
+    id,
+    title,
+    topic,
+    strand: String(req.body?.strand || "").trim(),
+    year_level: yearLevel,
+    term: String(req.body?.term || "").trim(),
+    subject_stream: String(req.body?.subject_stream || req.body?.subjectStream || "").trim().toUpperCase(),
+    duration_weeks: Number.parseInt(req.body?.duration_weeks ?? req.body?.durationWeeks, 10) || 1,
+    overview: String(req.body?.overview || "").trim(),
+    unit_aims: normalizeArray(req.body?.unit_aims ?? req.body?.unitAims),
+    unit_values: normalizeArray(req.body?.unit_values ?? req.body?.unitValues),
+    contexts: normalizeArray(req.body?.contexts ?? req.body?.unitContexts),
+    curriculum_links: normalizeArray(req.body?.curriculum_links ?? req.body?.curriculumLinks),
+    assessment_link: String(req.body?.assessment_link || req.body?.assessmentLink || "").trim(),
+    notes: String(req.body?.notes || req.body?.unitNotes || "").trim(),
+    lessons: normalizeUnitLessons(req.body?.lessons),
+    created_by_email: userEmail,
+    created_at: String(req.body?.created_at || new Date().toISOString()),
+    updated_at: new Date().toISOString()
+  };
+
+  if (!hasDatabase) {
+    memoryUnitPlans.set(payload.id, payload);
+    res.status(201).json(payload);
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        INSERT INTO unit_plans (
+          id, title, topic, strand, year_level, term, subject_stream, duration_weeks, overview, unit_aims, unit_values, contexts, curriculum_links, assessment_link, notes, lessons, created_by_email, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12::jsonb, $13::jsonb, $14, $15, $16::jsonb, $17, $18::timestamptz, $19::timestamptz
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          title = EXCLUDED.title,
+          topic = EXCLUDED.topic,
+          strand = EXCLUDED.strand,
+          year_level = EXCLUDED.year_level,
+          term = EXCLUDED.term,
+          subject_stream = EXCLUDED.subject_stream,
+          duration_weeks = EXCLUDED.duration_weeks,
+          overview = EXCLUDED.overview,
+          unit_aims = EXCLUDED.unit_aims,
+          unit_values = EXCLUDED.unit_values,
+          contexts = EXCLUDED.contexts,
+          curriculum_links = EXCLUDED.curriculum_links,
+          assessment_link = EXCLUDED.assessment_link,
+          notes = EXCLUDED.notes,
+          lessons = EXCLUDED.lessons,
+          created_by_email = EXCLUDED.created_by_email,
+          updated_at = EXCLUDED.updated_at
+        RETURNING *
+      `,
+      [
+        payload.id,
+        payload.title,
+        payload.topic,
+        payload.strand || null,
+        payload.year_level,
+        payload.term || null,
+        payload.subject_stream || null,
+        payload.duration_weeks,
+        payload.overview || null,
+        JSON.stringify(payload.unit_aims),
+        JSON.stringify(payload.unit_values),
+        JSON.stringify(payload.contexts),
+        JSON.stringify(payload.curriculum_links),
+        payload.assessment_link || null,
+        payload.notes || null,
+        JSON.stringify(payload.lessons),
+        payload.created_by_email,
+        payload.created_at,
+        payload.updated_at
+      ]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (_error) {
+    res.status(500).json({ error: "Could not save unit plan" });
   }
 });
 
