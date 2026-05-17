@@ -77,6 +77,77 @@
                 </form>
             </section>
 
+            <section class="upload-panel" aria-label="Manual unit planner entry">
+                <form id="manual-unit-form" class="upload-form">
+                    <fieldset class="form-section">
+                        <legend>Manual Unit Planner</legend>
+                        <p class="help-text">Use this original manual planner to create a unit plan without uploading a DOCX file.</p>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="manual-title">Unit Title</label>
+                                <input id="manual-title" name="title" type="text" required>
+                            </div>
+                            <div class="field">
+                                <label for="manual-topic">Topic</label>
+                                <input id="manual-topic" name="topic" type="text" required>
+                            </div>
+                            <div class="field">
+                                <label for="manual-year-level">Year Level</label>
+                                <input id="manual-year-level" name="year_level" type="text" required>
+                            </div>
+                            <div class="field">
+                                <label for="manual-subject-stream">Subject Stream</label>
+                                <input id="manual-subject-stream" name="subject_stream" type="text" placeholder="DTECH">
+                            </div>
+                            <div class="field">
+                                <label for="manual-duration-weeks">Duration Weeks</label>
+                                <input id="manual-duration-weeks" name="duration_weeks" type="number" min="1" step="1" value="1">
+                            </div>
+                            <div class="field">
+                                <label for="manual-term">Term</label>
+                                <input id="manual-term" name="term" type="text">
+                            </div>
+                            <div class="field field-wide">
+                                <label for="manual-overview">Unit Overview</label>
+                                <textarea id="manual-overview" name="overview" rows="3"></textarea>
+                            </div>
+                            <div class="field field-wide">
+                                <label for="manual-aims">Aims (one per line)</label>
+                                <textarea id="manual-aims" name="unit_aims" rows="4"></textarea>
+                            </div>
+                            <div class="field field-wide">
+                                <label for="manual-values">School Values (one per line)</label>
+                                <textarea id="manual-values" name="unit_values" rows="4"></textarea>
+                            </div>
+                            <div class="field field-wide">
+                                <label for="manual-contexts">Contexts of Learning (one per line)</label>
+                                <textarea id="manual-contexts" name="contexts" rows="4"></textarea>
+                            </div>
+                            <div class="field field-wide">
+                                <label for="manual-curriculum-links">Curriculum Links (one per line)</label>
+                                <textarea id="manual-curriculum-links" name="curriculum_links" rows="4"></textarea>
+                            </div>
+                            <div class="field field-wide">
+                                <label for="manual-assessment-link">Assessment / End Point</label>
+                                <textarea id="manual-assessment-link" name="assessment_link" rows="3"></textarea>
+                            </div>
+                            <div class="field field-wide">
+                                <label for="manual-notes">Planning Notes</label>
+                                <textarea id="manual-notes" name="notes" rows="3"></textarea>
+                            </div>
+                            <div class="field field-wide">
+                                <label for="manual-lessons-json">Lessons JSON (optional)</label>
+                                <textarea id="manual-lessons-json" name="lessons" rows="8" placeholder="[]"></textarea>
+                                <p class="help-text">Optional: provide a JSON array of lessons. Leave blank to save a unit with no lesson sequence.</p>
+                            </div>
+                        </div>
+                    </fieldset>
+                    <div class="form-actions">
+                        <button id="save-manual-unit-button" class="button-save" type="submit">Save Manual Unit Plan</button>
+                    </div>
+                </form>
+            </section>
+
             <section id="unit-preview-panel" class="upload-panel" aria-label="Preview imported unit plan" hidden>
                 <form id="unit-preview-form" class="upload-form">
                     <fieldset class="form-section">

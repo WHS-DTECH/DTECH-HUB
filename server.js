@@ -197,6 +197,213 @@ const ROLE_NAME_ALIASES = new Map([
 
 const DEFAULT_ROLE_ORDER = DEFAULT_ROLE_PERMISSIONS.map((row) => String(row.role_name || "").trim());
 
+function quoteIdentifier(value) {
+  return `"${String(value || "").replace(/"/g, '""')}"`;
+}
+
+function canonicalizeEmail(value) {
+  const email = normalizeEmail(value);
+  const atIndex = email.indexOf("@");
+  if (atIndex <= 0) {
+    return email;
+  }
+
+  const localPart = email.slice(0, atIndex).replace(/\+.*/, "");
+  const domain = email.slice(atIndex + 1);
+  return `${localPart}@${domain}`;
+}
+
+function canonicalizeRoleName(value) {
+  const raw = String(value || "").trim();
+  if (!raw) {
+    return "";
+  }
+
+  const aliasKey = raw.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (ROLE_NAME_ALIASES.has(aliasKey)) {
+    return ROLE_NAME_ALIASES.get(aliasKey);
+  }
+
+  const words = raw
+    .split(/\s+/)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+
+  return words;
+}
+
+function mergeRolePermissionRows(rows) {
+  const mergedByRole = new Map();
+
+  const seedRows = Array.isArray(DEFAULT_ROLE_PERMISSIONS) ? DEFAULT_ROLE_PERMISSIONS : [];
+  seedRows.forEach((row) => {
+    const roleName = canonicalizeRoleName(row?.role_name);
+    if (!roleName) {
+      return;
+    }
+
+    mergedByRole.set(roleName, {
+      role_name: roleName,
+      home_page: Boolean(row?.home_page),
+      upload_activity: Boolean(row?.upload_activity),
+      browse_activities: Boolean(row?.browse_activities),
+      planning: Boolean(row?.planning),
+      admin: Boolean(row?.admin)
+    });
+  });
+
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const roleName = canonicalizeRoleName(row?.role_name);
+    if (!roleName) {
+      return;
+    }
+
+    mergedByRole.set(roleName, {
+      role_name: roleName,
+      home_page: Boolean(row?.home_page),
+      upload_activity: Boolean(row?.upload_activity),
+      browse_activities: Boolean(row?.browse_activities),
+      planning: Boolean(row?.planning),
+      admin: Boolean(row?.admin)
+    });
+  });
+
+  return Array.from(mergedByRole.values()).sort((left, right) => {
+    const leftIndex = DEFAULT_ROLE_ORDER.findIndex((value) => value === left.role_name);
+    const rightIndex = DEFAULT_ROLE_ORDER.findIndex((value) => value === right.role_name);
+    const safeLeft = leftIndex >= 0 ? leftIndex : Number.MAX_SAFE_INTEGER;
+    const safeRight = rightIndex >= 0 ? rightIndex : Number.MAX_SAFE_INTEGER;
+    if (safeLeft !== safeRight) {
+      return safeLeft - safeRight;
+    }
+    return String(left.role_name || "").localeCompare(String(right.role_name || ""));
+  });
+}
+
+async function resolveUserRolesColumns() {
+  const fallbackColumns = {
+    email: "user_email",
+    userType: "user_type",
+    displayName: "display_name",
+    additionalRole: "additional_role",
+    legacyRoleName: "role_name",
+    hubAccess: "hub_access",
+    updatedAt: "updated_at"
+  };
+
+  if (!hasDatabase) {
+    return fallbackColumns;
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'user_additional_roles'
+      `
+    );
+
+    const available = new Set(result.rows.map((row) => String(row.column_name || "")));
+    const pick = (candidates) => candidates.find((name) => available.has(name)) || null;
+
+    return {
+      email: pick(["user_email", "email", "staff_email", "google_email"]),
+      userType: pick(["user_type", "type"]),
+      displayName: pick(["display_name", "name", "full_name"]),
+      additionalRole: pick(["additional_role", "role", "role_name"]),
+      legacyRoleName: pick(["role_name"]),
+      hubAccess: pick(["hub_access"]),
+      updatedAt: pick(["updated_at", "modified_at", "created_at"])
+    };
+  } catch (_error) {
+    return fallbackColumns;
+  }
+}
+
+async function getMergedRolePermissions() {
+  if (!hasDatabase) {
+    return mergeRolePermissionRows(memoryRolePermissions);
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT role_name, home_page, upload_activity, browse_activities, planning, admin
+        FROM role_permissions
+      `
+    );
+
+    return mergeRolePermissionRows(result.rows);
+  } catch (_error) {
+    return mergeRolePermissionRows(memoryRolePermissions);
+  }
+}
+
+async function getUserRoleByEmail(email) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) {
+    return null;
+  }
+
+  const exactMemory = memoryUserRoles.get(normalizedEmail);
+  if (exactMemory) {
+    return exactMemory;
+  }
+
+  const canonicalEmail = canonicalizeEmail(normalizedEmail);
+
+  for (const row of memoryUserRoles.values()) {
+    const rowEmail = normalizeEmail(row?.user_email || row?.email || "");
+    if (rowEmail && canonicalizeEmail(rowEmail) === canonicalEmail) {
+      return row;
+    }
+  }
+
+  if (!hasDatabase) {
+    return null;
+  }
+
+  try {
+    const columns = await resolveUserRolesColumns();
+    if (!columns.email) {
+      return null;
+    }
+
+    const selectColumns = [
+      `${quoteIdentifier(columns.email)} AS user_email`,
+      columns.userType ? `${quoteIdentifier(columns.userType)} AS user_type` : `'' AS user_type`,
+      columns.displayName ? `${quoteIdentifier(columns.displayName)} AS display_name` : `'' AS display_name`,
+      columns.additionalRole && columns.legacyRoleName && columns.additionalRole !== columns.legacyRoleName
+        ? `COALESCE(NULLIF(${quoteIdentifier(columns.additionalRole)}, ''), ${quoteIdentifier(columns.legacyRoleName)}) AS additional_role`
+        : columns.additionalRole
+          ? `${quoteIdentifier(columns.additionalRole)} AS additional_role`
+          : `'' AS additional_role`,
+      columns.legacyRoleName ? `${quoteIdentifier(columns.legacyRoleName)} AS role_name` : `'' AS role_name`,
+      columns.hubAccess ? `${quoteIdentifier(columns.hubAccess)} AS hub_access` : `ARRAY['DTECH-HUB']::text[] AS hub_access`
+    ];
+
+    const result = await pool.query(
+      `
+        SELECT ${selectColumns.join(", ")}
+        FROM user_additional_roles
+        WHERE LOWER(${quoteIdentifier(columns.email)}) = LOWER($1)
+        LIMIT 1
+      `,
+      [normalizedEmail]
+    );
+
+    const row = result.rows[0] || null;
+    if (row) {
+      memoryUserRoles.set(normalizedEmail, row);
+    }
+    return row;
+  } catch (_error) {
+    return null;
+  }
+}
+
 function slugify(value) {
   return String(value || "")
     .toLowerCase()
@@ -705,7 +912,7 @@ async function canManagePracticalSchedule(email) {
   const assignedRole = canonicalizeRoleName(userRole?.additional_role || userRole?.role_name || "");
   const allPermissions = await getMergedRolePermissions();
   const rolePermission = allPermissions.find(
-    (row) => canonicalizeRoleName
+    (row) => canonicalizeRoleName(row?.role_name) === assignedRole
   ) || null;
 
   const roleGrantsTeacherView = ["Admin", "Lead Teacher", "Teacher", "Technician"].includes(assignedRole);

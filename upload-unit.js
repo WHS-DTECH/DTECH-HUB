@@ -11,6 +11,8 @@ const previewPanel = document.querySelector("#unit-preview-panel");
 const previewForm = document.querySelector("#unit-preview-form");
 const previewSource = document.querySelector("#preview-source");
 const savePreviewButton = document.querySelector("#save-preview-button");
+const manualForm = document.querySelector("#manual-unit-form");
+const saveManualUnitButton = document.querySelector("#save-manual-unit-button");
 
 const previewFields = {
     title: document.querySelector("#preview-title"),
@@ -27,6 +29,23 @@ const previewFields = {
     assessmentLink: document.querySelector("#preview-assessment-link"),
     notes: document.querySelector("#preview-notes"),
     lessonsJson: document.querySelector("#preview-lessons-json")
+};
+
+const manualFields = {
+    title: document.querySelector("#manual-title"),
+    topic: document.querySelector("#manual-topic"),
+    yearLevel: document.querySelector("#manual-year-level"),
+    subjectStream: document.querySelector("#manual-subject-stream"),
+    durationWeeks: document.querySelector("#manual-duration-weeks"),
+    term: document.querySelector("#manual-term"),
+    overview: document.querySelector("#manual-overview"),
+    unitAims: document.querySelector("#manual-aims"),
+    unitValues: document.querySelector("#manual-values"),
+    contexts: document.querySelector("#manual-contexts"),
+    curriculumLinks: document.querySelector("#manual-curriculum-links"),
+    assessmentLink: document.querySelector("#manual-assessment-link"),
+    notes: document.querySelector("#manual-notes"),
+    lessonsJson: document.querySelector("#manual-lessons-json")
 };
 
 const UPLOAD_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
@@ -88,7 +107,7 @@ function setStatus(message, isError = false) {
 }
 
 function setActionButtonsDisabled(disabled) {
-    const buttons = [uploadButton, importTemplateButton, previewFileButton, previewTemplateButton, savePreviewButton];
+    const buttons = [uploadButton, importTemplateButton, previewFileButton, previewTemplateButton, savePreviewButton, saveManualUnitButton];
     buttons.forEach((button) => {
         if (button) {
             button.disabled = Boolean(disabled);
@@ -172,6 +191,25 @@ function collectPreviewPayload() {
         assessment_link: String(previewFields.assessmentLink?.value || "").trim(),
         notes: String(previewFields.notes?.value || "").trim(),
         lessons: parseLessonsJson(previewFields.lessonsJson?.value || "[]")
+    };
+}
+
+function collectManualPayload() {
+    return {
+        title: String(manualFields.title?.value || "").trim(),
+        topic: String(manualFields.topic?.value || "").trim(),
+        year_level: String(manualFields.yearLevel?.value || "").trim(),
+        subject_stream: String(manualFields.subjectStream?.value || "").trim().toUpperCase(),
+        duration_weeks: Number.parseInt(manualFields.durationWeeks?.value || "1", 10) || 1,
+        term: String(manualFields.term?.value || "").trim(),
+        overview: String(manualFields.overview?.value || "").trim(),
+        unit_aims: normalizeLines(manualFields.unitAims?.value || ""),
+        unit_values: normalizeLines(manualFields.unitValues?.value || ""),
+        contexts: normalizeLines(manualFields.contexts?.value || ""),
+        curriculum_links: normalizeLines(manualFields.curriculumLinks?.value || ""),
+        assessment_link: String(manualFields.assessmentLink?.value || "").trim(),
+        notes: String(manualFields.notes?.value || "").trim(),
+        lessons: parseLessonsJson(manualFields.lessonsJson?.value || "[]")
     };
 }
 
@@ -343,6 +381,49 @@ async function saveFromPreview(event) {
     }
 }
 
+async function saveManualUnitPlan(event) {
+    event.preventDefault();
+
+    let payload = null;
+    try {
+        payload = collectManualPayload();
+    } catch (error) {
+        setStatus(`Cannot save manual unit plan: ${error.message}`, true);
+        return;
+    }
+
+    if (!payload.title || !payload.topic || !payload.year_level) {
+        setStatus("Manual planner requires title, topic, and year level.", true);
+        return;
+    }
+
+    try {
+        setActionButtonsDisabled(true);
+        setStatus("Saving manual unit plan...");
+
+        const response = await fetch("/api/unit-plans", {
+            method: "POST",
+            headers: withUserEmailHeader({
+                "Content-Type": "application/json"
+            }),
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(result.error || `Could not save manual unit plan (HTTP ${response.status})`);
+        }
+
+        const lessonCount = Array.isArray(result?.lessons) ? result.lessons.length : 0;
+        setStatus(`Saved manual unit plan ${result.title || "unit plan"} with ${lessonCount} lesson${lessonCount === 1 ? "" : "s"}.`);
+        manualForm?.reset();
+    } catch (error) {
+        setStatus(`Manual save failed: ${error.message}`, true);
+    } finally {
+        setActionButtonsDisabled(false);
+    }
+}
+
 if (importTemplateButton) {
     importTemplateButton.addEventListener("click", () => {
         importTeacherTemplateDocx();
@@ -363,6 +444,10 @@ if (previewTemplateButton) {
 
 if (previewForm) {
     previewForm.addEventListener("submit", saveFromPreview);
+}
+
+if (manualForm) {
+    manualForm.addEventListener("submit", saveManualUnitPlan);
 }
 
 if (form) {
