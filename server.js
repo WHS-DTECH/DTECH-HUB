@@ -424,6 +424,163 @@ function parseUnitPlanFromDocxText(rawText, originalName = "") {
   };
 }
 
+function buildUnitPlanPayload(body, userEmail) {
+  const title = String(body?.title || body?.unit_title || "").trim();
+  const topic = String(body?.topic || body?.unit_topic || "").trim();
+  const yearLevel = String(body?.year_level || body?.yearLevel || "").trim();
+  const fallbackIdSource = title || topic || `unit-plan-${Date.now()}`;
+  const id = String(body?.id || slugify(fallbackIdSource)).trim();
+
+  return {
+    id,
+    title,
+    topic,
+    strand: String(body?.strand || "").trim(),
+    year_level: yearLevel,
+    term: String(body?.term || "").trim(),
+    subject_stream: String(body?.subject_stream || body?.subjectStream || "").trim().toUpperCase(),
+    duration_weeks: Number.parseInt(body?.duration_weeks ?? body?.durationWeeks, 10) || 1,
+    overview: String(body?.overview || "").trim(),
+    unit_aims: normalizeArray(body?.unit_aims ?? body?.unitAims),
+    unit_values: normalizeArray(body?.unit_values ?? body?.unitValues),
+    contexts: normalizeArray(body?.contexts ?? body?.unitContexts),
+    curriculum_links: normalizeArray(body?.curriculum_links ?? body?.curriculumLinks),
+    assessment_link: String(body?.assessment_link || body?.assessmentLink || "").trim(),
+    notes: String(body?.notes || body?.unitNotes || "").trim(),
+    lessons: normalizeUnitLessons(body?.lessons),
+    created_by_email: userEmail,
+    created_at: String(body?.created_at || new Date().toISOString()),
+    updated_at: new Date().toISOString()
+  };
+}
+
+async function saveUnitPlanPayload(payload) {
+  if (!hasDatabase) {
+    memoryUnitPlans.set(payload.id, payload);
+    return payload;
+  }
+
+  await ensureUnitPlanSchema();
+  const result = await pool.query(
+    `
+      INSERT INTO unit_plans (
+        id, title, topic, strand, year_level, term, subject_stream, duration_weeks, overview, unit_aims, unit_values, contexts, curriculum_links, assessment_link, notes, lessons, created_by_email, created_at, updated_at
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12::jsonb, $13::jsonb, $14, $15, $16::jsonb, $17, $18::timestamptz, $19::timestamptz
+      )
+      ON CONFLICT (id) DO UPDATE SET
+        title = EXCLUDED.title,
+        topic = EXCLUDED.topic,
+        strand = EXCLUDED.strand,
+        year_level = EXCLUDED.year_level,
+        term = EXCLUDED.term,
+        subject_stream = EXCLUDED.subject_stream,
+        duration_weeks = EXCLUDED.duration_weeks,
+        overview = EXCLUDED.overview,
+        unit_aims = EXCLUDED.unit_aims,
+        unit_values = EXCLUDED.unit_values,
+        contexts = EXCLUDED.contexts,
+        curriculum_links = EXCLUDED.curriculum_links,
+        assessment_link = EXCLUDED.assessment_link,
+        notes = EXCLUDED.notes,
+        lessons = EXCLUDED.lessons,
+        created_by_email = EXCLUDED.created_by_email,
+        updated_at = EXCLUDED.updated_at
+      RETURNING *
+    `,
+    [
+      payload.id,
+      payload.title,
+      payload.topic,
+      payload.strand || null,
+      payload.year_level,
+      payload.term || null,
+      payload.subject_stream || null,
+      payload.duration_weeks,
+      payload.overview || null,
+      JSON.stringify(payload.unit_aims || []),
+      JSON.stringify(payload.unit_values || []),
+      JSON.stringify(payload.contexts || []),
+      JSON.stringify(payload.curriculum_links || []),
+      payload.assessment_link || null,
+      payload.notes || null,
+      JSON.stringify(payload.lessons || []),
+      payload.created_by_email,
+      payload.created_at,
+      payload.updated_at
+    ]
+  );
+
+  return result.rows[0];
+}
+
+async function parseDocxBufferToUnitPlanPayload(buffer, originalName, userEmail) {
+  const extraction = await mammoth.extractRawText({ buffer });
+  const parsed = parseUnitPlanFromDocxText(extraction.value || "", originalName || "");
+  const payload = buildUnitPlanPayload(parsed, userEmail);
+
+  if (!payload.title || !payload.topic || !payload.year_level) {
+    throw new Error("Could not detect unit title, topic, or year level from document");
+  }
+
+  return payload;
+}
+
+app.post("/api/unit-plans/import-docx", unitPlanUpload.single("unitPlanFile"), async (req, res) => {
+  const userEmail = normalizeEmail(req.body?.created_by_email || req.body?.user_email || getRequestUserEmail(req));
+  if (!userEmail || !(await canManagePracticalSchedule(userEmail))) {
+    res.status(403).json({ error: "Teacher/Admin access is required." });
+    return;
+  }
+
+  const file = req.file;
+  if (!file?.buffer) {
+    res.status(400).json({ error: "A .docx file is required." });
+    return;
+  }
+
+  try {
+    const payload = await parseDocxBufferToUnitPlanPayload(file.buffer, file.originalname, userEmail);
+    const savedPlan = await saveUnitPlanPayload(payload);
+    res.status(201).json({
+      ok: true,
+      unitPlan: savedPlan,
+      lessonCount: Array.isArray(savedPlan?.lessons) ? savedPlan.lessons.length : 0,
+      createdActivities: 0,
+      createdCalendarEvents: 0
+    });
+  } catch (error) {
+    res.status(400).json({ error: error?.message || "Could not import unit plan document" });
+  }
+});
+
+app.post("/api/unit-plans/import-docx-template", async (req, res) => {
+  const userEmail = normalizeEmail(req.body?.created_by_email || req.body?.user_email || getRequestUserEmail(req));
+  if (!userEmail || !(await canManagePracticalSchedule(userEmail))) {
+    res.status(403).json({ error: "Teacher/Admin access is required." });
+    return;
+  }
+
+  const templateRelativePath = path.join("TeacherFiles", "Programming - TECHNOLOGY Unit Plan - DT (1).docx");
+  const templateAbsolutePath = path.join(__dirname, templateRelativePath);
+
+  try {
+    const templateBuffer = await require("fs").promises.readFile(templateAbsolutePath);
+    const payload = await parseDocxBufferToUnitPlanPayload(templateBuffer, "Programming - TECHNOLOGY Unit Plan - DT (1).docx", userEmail);
+    const savedPlan = await saveUnitPlanPayload(payload);
+    res.status(201).json({
+      ok: true,
+      source: templateRelativePath.replace(/\\/g, "/"),
+      unitPlan: savedPlan,
+      lessonCount: Array.isArray(savedPlan?.lessons) ? savedPlan.lessons.length : 0,
+      createdActivities: 0,
+      createdCalendarEvents: 0
+    });
+  } catch (error) {
+    res.status(400).json({ error: error?.message || "Could not import TeacherFiles template document" });
+  }
+});
+
 async function ensureUnitPlanSchema() {
   if (!hasDatabase) {
     return;
@@ -1851,96 +2008,16 @@ app.post("/api/unit-plans", async (req, res) => {
     return;
   }
 
-  const title = String(req.body?.title || req.body?.unit_title || "").trim();
-  const topic = String(req.body?.topic || req.body?.unit_topic || "").trim();
-  const yearLevel = String(req.body?.year_level || req.body?.yearLevel || "").trim();
-  const id = String(req.body?.id || slugify(title)).trim();
+  const payload = buildUnitPlanPayload(req.body, userEmail);
 
-  if (!title || !topic || !yearLevel) {
+  if (!payload.title || !payload.topic || !payload.year_level) {
     res.status(400).json({ error: "title, topic and year_level are required" });
     return;
   }
 
-  const payload = {
-    id,
-    title,
-    topic,
-    strand: String(req.body?.strand || "").trim(),
-    year_level: yearLevel,
-    term: String(req.body?.term || "").trim(),
-    subject_stream: String(req.body?.subject_stream || req.body?.subjectStream || "").trim().toUpperCase(),
-    duration_weeks: Number.parseInt(req.body?.duration_weeks ?? req.body?.durationWeeks, 10) || 1,
-    overview: String(req.body?.overview || "").trim(),
-    unit_aims: normalizeArray(req.body?.unit_aims ?? req.body?.unitAims),
-    unit_values: normalizeArray(req.body?.unit_values ?? req.body?.unitValues),
-    contexts: normalizeArray(req.body?.contexts ?? req.body?.unitContexts),
-    curriculum_links: normalizeArray(req.body?.curriculum_links ?? req.body?.curriculumLinks),
-    assessment_link: String(req.body?.assessment_link || req.body?.assessmentLink || "").trim(),
-    notes: String(req.body?.notes || req.body?.unitNotes || "").trim(),
-    lessons: normalizeUnitLessons(req.body?.lessons),
-    created_by_email: userEmail,
-    created_at: String(req.body?.created_at || new Date().toISOString()),
-    updated_at: new Date().toISOString()
-  };
-
-  if (!hasDatabase) {
-    memoryUnitPlans.set(payload.id, payload);
-    res.status(201).json(payload);
-    return;
-  }
-
   try {
-    await ensureUnitPlanSchema();
-    const result = await pool.query(
-      `
-        INSERT INTO unit_plans (
-          id, title, topic, strand, year_level, term, subject_stream, duration_weeks, overview, unit_aims, unit_values, contexts, curriculum_links, assessment_link, notes, lessons, created_by_email, created_at, updated_at
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12::jsonb, $13::jsonb, $14, $15, $16::jsonb, $17, $18::timestamptz, $19::timestamptz
-        )
-        ON CONFLICT (id) DO UPDATE SET
-          title = EXCLUDED.title,
-          topic = EXCLUDED.topic,
-          strand = EXCLUDED.strand,
-          year_level = EXCLUDED.year_level,
-          term = EXCLUDED.term,
-          subject_stream = EXCLUDED.subject_stream,
-          duration_weeks = EXCLUDED.duration_weeks,
-          overview = EXCLUDED.overview,
-          unit_aims = EXCLUDED.unit_aims,
-          unit_values = EXCLUDED.unit_values,
-          contexts = EXCLUDED.contexts,
-          curriculum_links = EXCLUDED.curriculum_links,
-          assessment_link = EXCLUDED.assessment_link,
-          notes = EXCLUDED.notes,
-          lessons = EXCLUDED.lessons,
-          created_by_email = EXCLUDED.created_by_email,
-          updated_at = EXCLUDED.updated_at
-        RETURNING *
-      `,
-      [
-        payload.id,
-        payload.title,
-        payload.topic,
-        payload.strand || null,
-        payload.year_level,
-        payload.term || null,
-        payload.subject_stream || null,
-        payload.duration_weeks,
-        payload.overview || null,
-        JSON.stringify(payload.unit_aims || []),
-        JSON.stringify(payload.unit_values || []),
-        JSON.stringify(payload.contexts || []),
-        JSON.stringify(payload.curriculum_links || []),
-        payload.assessment_link || null,
-        payload.notes || null,
-        JSON.stringify(payload.lessons || []),
-        payload.created_by_email,
-        payload.created_at,
-        payload.updated_at
-      ]
-    );
-    res.status(201).json(result.rows[0]);
+    const savedPlan = await saveUnitPlanPayload(payload);
+    res.status(201).json(savedPlan);
   } catch (_error) {
     res.status(500).json({ error: "Could not save unit plan" });
   }

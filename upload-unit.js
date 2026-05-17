@@ -4,6 +4,7 @@ const uploadStatus = document.querySelector("#upload-status");
 const authStatusElement = document.querySelector("#unit-auth-status");
 const uploadButton = document.querySelector("#upload-unit-button");
 const clearButton = document.querySelector("#clear-unit-file");
+const importTemplateButton = document.querySelector("#import-template-button");
 
 const UPLOAD_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 
@@ -90,6 +91,55 @@ if (clearButton) {
 
 renderAuthStatus();
 
+async function importTeacherTemplateDocx() {
+    try {
+        if (uploadButton) {
+            uploadButton.disabled = true;
+        }
+        if (importTemplateButton) {
+            importTemplateButton.disabled = true;
+        }
+
+        setStatus("Importing unit plan from TeacherFiles template...");
+        const response = await fetch("/api/unit-plans/import-docx-template", {
+            method: "POST",
+            headers: withUserEmailHeader({
+                "Content-Type": "application/json"
+            }),
+            body: JSON.stringify({})
+        });
+
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(result.error || `Could not import template (HTTP ${response.status})`);
+        }
+
+        const lessonCount = Number(result.lessonCount || 0);
+        const activityCount = Number(result.createdActivities || 0);
+        const calendarCount = Number(result.createdCalendarEvents || 0);
+
+        setStatus(`Imported ${result.unitPlan?.title || "unit plan"} from ${result.source || "TeacherFiles template"}. Saved ${lessonCount} lesson${lessonCount === 1 ? "" : "s"}, created ${activityCount} activity card${activityCount === 1 ? "" : "s"}${calendarCount ? `, and ${calendarCount} calendar event${calendarCount === 1 ? "" : "s"}` : ""}.`);
+        if (uploadInput) {
+            uploadInput.value = "";
+        }
+    } catch (error) {
+        setStatus(`Template import failed: ${error.message}`, true);
+    } finally {
+        if (uploadButton) {
+            uploadButton.disabled = false;
+        }
+        if (importTemplateButton) {
+            importTemplateButton.disabled = false;
+        }
+    }
+}
+
+if (importTemplateButton) {
+    importTemplateButton.addEventListener("click", () => {
+        importTeacherTemplateDocx();
+    });
+}
+
 if (form) {
     form.addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -111,6 +161,9 @@ if (form) {
         try {
             if (uploadButton) {
                 uploadButton.disabled = true;
+            }
+            if (importTemplateButton) {
+                importTemplateButton.disabled = true;
             }
             setStatus("Importing unit plan from document...");
 
@@ -136,6 +189,9 @@ if (form) {
         } finally {
             if (uploadButton) {
                 uploadButton.disabled = false;
+            }
+            if (importTemplateButton) {
+                importTemplateButton.disabled = false;
             }
         }
     });
