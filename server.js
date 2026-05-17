@@ -7,6 +7,7 @@ const { Pool } = require("pg");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const SERVER_STARTED_AT = new Date().toISOString();
 const hasDatabase = Boolean(process.env.DATABASE_URL);
 const staffDirectoryApiUrl = String(process.env.STAFF_DIRECTORY_API_URL || "").trim();
 const staffDirectoryApiKey = String(process.env.STAFF_DIRECTORY_API_KEY || "").trim();
@@ -672,6 +673,14 @@ async function ensureUnitPlanSchema() {
   await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS lesson_index INTEGER`);
 }
 
+async function ensureSchema() {
+  await ensureUnitPlanSchema();
+}
+
+async function syncDtechExcludedActivitiesVisibility() {
+  return;
+}
+
 app.use(express.json({ limit: "8mb" }));
 app.use("/images/activities", express.static(path.join(__dirname, "images", "activities")));
 app.use("/images/activities", express.static(path.join(__dirname, "public", "images", "activities")));
@@ -834,6 +843,99 @@ async function notifySuggestionByEmail(record, attachment) {
 
   await smtpTransporter.sendMail(mailOptions);
   return { status: "sent", recipients };
+}
+
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function getRequestUserEmail(req) {
+  return normalizeEmail(
+    req?.headers?.["x-user-email"] ||
+    req?.headers?.["x-ms-client-principal-name"] ||
+    req?.query?.user_email ||
+    req?.query?.email ||
+    req?.body?.user_email ||
+    req?.body?.created_by_email ||
+    ""
+  );
+}
+
+async function resolveActivityWriteAccess(email) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) {
+    return { allowed: false, email: "", reason: "missing_email" };
+  }
+
+  try {
+    const allowed = await canManagePracticalSchedule(normalizedEmail);
+    return {
+      allowed: Boolean(allowed),
+      email: normalizedEmail,
+      reason: allowed ? "allowed" : "forbidden"
+    };
+  } catch (_error) {
+    return { allowed: false, email: normalizedEmail, reason: "lookup_failed" };
+  }
+}
+
+async function requireActivityWriteAccess(req, res, next) {
+  const email = getRequestUserEmail(req);
+  if (!email) {
+    res.status(401).json({ error: "User email is required" });
+    return;
+  }
+
+  const access = await resolveActivityWriteAccess(email);
+  if (!access.allowed) {
+    res.status(403).json({ error: "Teacher/Admin access is required." });
+    return;
+  }
+
+  req.user_email = access.email;
+  next();
+}
+
+async function requireAdminAccess(req, res, next) {
+  const email = getRequestUserEmail(req);
+  if (!email) {
+    res.status(401).json({ error: "User email is required" });
+    return;
+  }
+
+  const roleHint = String(
+    req?.headers?.["x-user-role"] ||
+    req?.query?.role ||
+    req?.body?.role ||
+    req?.body?.user_role ||
+    ""
+  ).trim().toLowerCase();
+
+  if (roleHint === "admin" || roleHint === "student admin" || roleHint === "student_admin") {
+    req.user_email = email;
+    next();
+    return;
+  }
+
+  try {
+    if (typeof getUserRoleByEmail === "function" && typeof getMergedRolePermissions === "function") {
+      const userRole = await getUserRoleByEmail(email);
+      const assignedRole = String(userRole?.additional_role || userRole?.role_name || "").trim();
+      const mergedPermissions = await getMergedRolePermissions();
+      const matchedRole = mergedPermissions.find(
+        (row) => String(row?.role_name || "").trim().toLowerCase() === assignedRole.toLowerCase()
+      );
+
+      if (Boolean(matchedRole?.admin) || /\badmin\b/i.test(assignedRole)) {
+        req.user_email = email;
+        next();
+        return;
+      }
+    }
+  } catch (_error) {
+  }
+
+  res.status(403).json({ error: "Admin access is required." });
 }
 
 app.get("/api/health", (_req, res) => {
@@ -2722,6 +2824,15 @@ app.post("/api/admin/role-permissions/reset", async (_req, res) => {
   }
 });
 
+app.get("/health", (_req, res) => {
+  res.status(200).json({
+    ok: true,
+    service: "DTECH-HUB",
+    startedAt: SERVER_STARTED_AT,
+    hasDatabase
+  });
+});
+
 app.get("*", (_req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
@@ -2730,7 +2841,8 @@ ensureSchema()
   .then(() => syncDtechExcludedActivitiesVisibility())
   .then(() => {
     app.listen(PORT, () => {
-      console.log(`DTECH-HUB running on port ${PORT}`);
+      console.log(`DTECH-HUB is running on port ${PORT} and waiting for requests`);
+      console.log(`Health check available at /health`);
     });
   })
   .catch((error) => {
