@@ -533,7 +533,10 @@ function renderGlobalNavbar() {
         return;
     }
 
-    const browseMenu = `<a id="hub-browse-practicals-link" data-auth-browse href="/browse-practicals.html" hidden>Browse Practicals</a>`;
+    const browseMenu = `
+        <a id="hub-browse-practicals-link" data-auth-browse href="/browse-practicals.html" hidden>Browse Practicals</a>
+        <a id="hub-browse-unit-plans-link" data-auth-unit-plans href="/browse-unit-plans.html" hidden>Browse Unit Plans</a>
+    `;
 
     const uploadMenu = `
         <details class="nav-dropdown" id="hub-upload-menu" data-nav-dropdown hidden>
@@ -675,6 +678,7 @@ const hubProfileClose = document.querySelector("#hub-profile-close");
 const hubBrowseMenu = document.querySelector("#hub-browse-menu");
 const hubUploadMenu = document.querySelector("#hub-upload-menu");
 const hubBrowseButtons = Array.from(document.querySelectorAll("[data-auth-browse]"));
+const hubUnitPlansButtons = Array.from(document.querySelectorAll("[data-auth-unit-plans]"));
 const HUB_VIEW_MODE_STORAGE_KEY = "hub_view_mode_v1";
 
 function readStoredHubViewMode() {
@@ -938,6 +942,8 @@ function renderHubAuthUi() {
     const signedIn = hasAllowedSignedInHubAccount();
     const canTeacherView = signedIn && hubAccessState.canTeacherView;
     const canAdmin = signedIn && hubAccessState.canAdmin;
+    const normalizedRole = String(hubAccessState.additionalRole || "").trim().toLowerCase().replace(/\s+/g, " ");
+    const canBrowseUnitPlans = signedIn && (canAdmin || normalizedRole === "teacher" || normalizedRole === "lead teacher");
     const canToggleView = canTeacherView || canAdmin;
 
     if (canToggleView && isTeacherWorkspacePath()) {
@@ -999,6 +1005,11 @@ function renderHubAuthUi() {
     if (hubBrowseButtons.length) {
         hubBrowseButtons.forEach((element) => {
             element.hidden = !signedIn;
+        });
+    }
+    if (hubUnitPlansButtons.length) {
+        hubUnitPlansButtons.forEach((element) => {
+            element.hidden = !canBrowseUnitPlans;
         });
     }
 
