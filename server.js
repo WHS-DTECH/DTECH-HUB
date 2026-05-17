@@ -426,6 +426,16 @@ function normalizeArray(value) {
   return [];
 }
 
+function isExcludedNonDtechActivity(_activity) {
+  // Visibility is already controlled by activity_hub_visibility in SQL.
+  // Keep this helper to avoid runtime failures in routes that call it.
+  return false;
+}
+
+function filterDtechActivities(rows) {
+  return (Array.isArray(rows) ? rows : []).filter((row) => !isExcludedNonDtechActivity(row));
+}
+
 function normalizeUnitLessons(value) {
   if (!Array.isArray(value)) {
     return [];
