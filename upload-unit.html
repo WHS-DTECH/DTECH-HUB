@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Upload Unit Plan | Computer Lab</title>
-    <meta name="description" content="Create a unit plan and generate lesson activities and calendar events for the DTECH HUB.">
+    <meta name="description" content="Import a unit plan from a DOCX file and generate lesson activities for the DTECH HUB.">
     <meta name="theme-color" content="#4a1b6f">
     <meta name="hub-google-client-id" content="239433605438-ur2omagmkluhhn7i319g0i82l4l5l1j8.apps.googleusercontent.com">
     <meta name="hub-google-allowed-domain" content="westlandhigh.school.nz">
@@ -50,127 +50,25 @@
 
         <main class="upload-page">
             <h1>Upload Unit Plan</h1>
-            <p class="intro-text">Plan the unit first, then turn each lesson into an activity card and a calendar event when required.</p>
+            <p class="intro-text">Upload a .docx unit plan and the system will create the unit record plus lesson activities from the document structure.</p>
             <p id="unit-auth-status" class="project-auth-status" aria-live="polite"></p>
 
-            <div class="upload-page-tools">
-                <a class="button button-secondary" href="upload-menu.html">Back to Upload Menu</a>
-            </div>
-
-            <section class="upload-panel" aria-label="Upload unit form">
+            <section class="upload-panel" aria-label="Upload unit plan from document">
                 <form id="upload-unit-form" class="upload-form">
                     <fieldset class="form-section">
-                        <legend>Unit Details</legend>
+                        <legend>Unit Plan Document</legend>
                         <div class="form-grid">
-                            <div class="field">
-                                <label for="unit-title">Unit Title</label>
-                                <input id="unit-title" name="unitTitle" type="text" required>
-                            </div>
-
-                            <div class="field">
-                                <label for="unit-topic">Topic or Learning Area</label>
-                                <input id="unit-topic" name="topic" type="text" placeholder="Robotics, design, coding, media, ..." required>
-                            </div>
-
-                            <div class="field">
-                                <label for="unit-strand">Strand</label>
-                                <input id="unit-strand" name="strand" type="text" placeholder="Programming, systems, communication...">
-                            </div>
-
-                            <div class="field">
-                                <label for="unit-year-level">Year Level</label>
-                                <select id="unit-year-level" name="yearLevel" required>
-                                    <option value="">Select year level</option>
-                                    <option>Junior</option>
-                                    <option>Middle</option>
-                                    <option>Senior</option>
-                                    <option>Year 7</option>
-                                    <option>Year 8</option>
-                                    <option>Year 9</option>
-                                    <option>Year 10</option>
-                                    <option>Year 11</option>
-                                    <option>Year 12</option>
-                                    <option>Year 13</option>
-                                </select>
-                            </div>
-
-                            <div class="field">
-                                <label for="unit-term">Term</label>
-                                <select id="unit-term" name="term">
-                                    <option value="">Select term</option>
-                                    <option>Term 1</option>
-                                    <option>Term 2</option>
-                                    <option>Term 3</option>
-                                    <option>Term 4</option>
-                                </select>
-                            </div>
-
-                            <div class="field">
-                                <label for="duration-weeks">Duration Weeks</label>
-                                <input id="duration-weeks" name="durationWeeks" type="number" min="1" step="1" value="1" required>
-                            </div>
-
-                            <div class="field">
-                                <label for="subject-stream">Subject Stream</label>
-                                <select id="subject-stream" name="subjectStream">
-                                    <option value="">Select stream</option>
-                                    <option value="DTECH">DTECH</option>
-                                    <option value="COMP">COMP</option>
-                                    <option value="TEXT">TEXT</option>
-                                    <option value="DTONLINE">DTONLINE</option>
-                                </select>
-                            </div>
-
                             <div class="field field-wide">
-                                <label for="unit-overview">Unit Overview</label>
-                                <textarea id="unit-overview" name="unitOverview" placeholder="What is the unit about and where is it heading?"></textarea>
-                            </div>
-
-                            <div class="field field-wide">
-                                <label for="unit-aims">Aims</label>
-                                <textarea id="unit-aims" name="unitAims" placeholder="One aim per line"></textarea>
-                            </div>
-
-                            <div class="field field-wide">
-                                <label for="unit-values">School Values</label>
-                                <textarea id="unit-values" name="unitValues" placeholder="One value or note per line"></textarea>
-                            </div>
-
-                            <div class="field field-wide">
-                                <label for="unit-contexts">Contexts of Learning</label>
-                                <textarea id="unit-contexts" name="unitContexts" placeholder="Environment, culture, social, technology..."></textarea>
-                            </div>
-
-                            <div class="field field-wide">
-                                <label for="curriculum-links">Curriculum Links</label>
-                                <textarea id="curriculum-links" name="curriculumLinks" placeholder="Achievement objectives, standards, or links"></textarea>
-                            </div>
-
-                            <div class="field field-wide">
-                                <label for="assessment-link">Assessment / End Point</label>
-                                <textarea id="assessment-link" name="assessmentLink" placeholder="How will this unit lead into an assessment or final outcome?"></textarea>
-                            </div>
-
-                            <div class="field field-wide">
-                                <label for="unit-notes">Planning Notes</label>
-                                <textarea id="unit-notes" name="unitNotes" placeholder="General unit notes, resourcing, differentiation, or reminders"></textarea>
+                                <label for="unit-plan-file">DOCX Unit Plan File</label>
+                                <input id="unit-plan-file" name="unitPlanFile" type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" required>
+                                <p class="help-text">The import reads the Word document, saves the unit plan, and creates lesson activity cards from the lesson sequence it finds.</p>
                             </div>
                         </div>
-                    </fieldset>
-
-                    <fieldset class="form-section">
-                        <legend>Lesson Planner</legend>
-                        <p class="help-text">Add one row per lesson. Mark each lesson to publish it to the Activity Library or place it on the shared calendar.</p>
-                        <div class="unit-plan-toolbar">
-                            <button id="add-lesson" class="button button-secondary" type="button">Add Lesson</button>
-                        </div>
-                        <div id="lesson-list" class="lesson-list"></div>
                     </fieldset>
 
                     <div class="form-actions">
-                        <button class="button-save" type="submit">Save Unit Plan</button>
-                        <button class="button-cancel" type="button" id="cancel-upload">Cancel</button>
-                        <button class="button button-secondary" type="button" id="clear-draft">Clear Form</button>
+                        <button id="upload-unit-button" class="button-save" type="submit">Import Unit Plan</button>
+                        <button class="button-cancel" type="button" id="clear-unit-file">Clear File</button>
                         <p id="upload-status" class="project-auth-status" aria-live="polite" hidden></p>
                     </div>
                 </form>

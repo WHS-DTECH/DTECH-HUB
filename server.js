@@ -1,6 +1,7 @@
 const path = require("path");
 const express = require("express");
 const multer = require("multer");
+const mammoth = require("mammoth");
 const nodemailer = require("nodemailer");
 const { Pool } = require("pg");
 
@@ -144,6 +145,18 @@ const suggestionUpload = multer({
   }
 });
 
+const unitPlanUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (_req, file, callback) => {
+    const mime = String(file.mimetype || "").toLowerCase();
+    const name = String(file.originalname || "").toLowerCase();
+    const isDocxMime = mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    const isDocxName = name.endsWith(".docx");
+    callback(null, isDocxMime || isDocxName);
+  }
+});
+
 let smtpTransporter = null;
 if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
   smtpTransporter = nodemailer.createTransport({
@@ -231,1279 +244,190 @@ function normalizeUnitLessons(value) {
   });
 }
 
-function decodeHtmlEntities(value) {
+function splitDocxLines(value) {
   return String(value || "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&#(\d+);/g, (_match, dec) => String.fromCharCode(Number.parseInt(dec, 10)))
-    .replace(/&#x([0-9a-f]+);/gi, (_match, hex) => String.fromCharCode(Number.parseInt(hex, 16)));
+    .replace(/\r/g, "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
 }
 
-function stripHtml(value) {
-  return decodeHtmlEntities(String(value || "").replace(/<[^>]*>/g, " "))
-    .replace(/\s+/g, " ")
-    .trim();
+function findLineIndex(lines, matcher) {
+  return lines.findIndex((line) => matcher(String(line || "").trim().toLowerCase()));
 }
 
-function resolveNzqaLink(href) {
-  const raw = String(href || "").trim();
-  if (!raw) return "";
-  try {
-    return new URL(raw, NZQA_BASE_URL).toString();
-  } catch (_error) {
-    return "";
+function extractLinesBetween(lines, startIndex, endIndex) {
+  if (!Number.isInteger(startIndex) || startIndex < 0) {
+    return [];
   }
+
+  const safeEndIndex = Number.isInteger(endIndex) && endIndex > startIndex ? endIndex : lines.length;
+  return lines.slice(startIndex, safeEndIndex).map((line) => String(line || "").trim()).filter(Boolean);
 }
 
-function buildNzqaSearchUrl(streamCode, level) {
-  const queryTerm = streamCode === "computing" ? "Computing" : "Digital Technologies";
-  const params = new URLSearchParams({
-    query: queryTerm,
-    view: "all",
-    level: String(level).padStart(2, "0")
-  });
-  return `${NZQA_BASE_URL}/ncea/assessment/search.do?${params.toString()}`;
+function isLessonHeadingLine(line) {
+  const text = String(line || "").trim();
+  if (!text) {
+    return false;
+  }
+
+  return /^\d+(?:\/\d+)?(?:\s+.+)?$/.test(text);
 }
 
-function parseNzqaStandardsFromHtml(html, level, streamCode) {
-  const source = String(html || "");
-  const highlightRegex = /<tr\s+class="dataHighlight">([\s\S]*?)<\/tr>/gi;
-  const highlights = Array.from(source.matchAll(highlightRegex));
-  const rows = [];
+function parseLessonRowsFromSlideshow(lines) {
+  const lessons = [];
+  let currentLesson = null;
+  let waitingForTitle = false;
 
-  for (let index = 0; index < highlights.length; index += 1) {
-    const current = highlights[index];
-    const next = highlights[index + 1];
-    const headerHtml = String(current[1] || "");
-    const start = (current.index || 0) + current[0].length;
-    const end = next ? (next.index || source.length) : source.length;
-    const detailHtml = source.slice(start, end);
-
-    const standardMatch = headerHtml.match(/<td[^>]*>\s*<strong>\s*(\d{4,6})\s*<\/strong>/i);
-    if (!standardMatch) continue;
-
-    const strongValues = Array.from(headerHtml.matchAll(/<strong>([\s\S]*?)<\/strong>/gi))
-      .map((match) => stripHtml(match[1]))
-      .filter(Boolean);
-
-    const standardNumber = String(standardMatch[1] || "").trim();
-    const subjectName = strongValues[1] || "";
-    const standardName = strongValues[2] || "";
-    const creditsText = strongValues.find((value) => /\bcredits?\b/i.test(value)) || "";
-    const creditsMatch = creditsText.match(/(\d+)/);
-    const credits = creditsMatch ? Number.parseInt(creditsMatch[1], 10) : null;
-
-    const detailsMatch = detailHtml.match(/href="([^"]*view-detailed\.do\?standardNumber=[^"]+)"/i);
-    const detailsUrl = detailsMatch ? resolveNzqaLink(detailsMatch[1]) : "";
-
-    const zipMatch = detailHtml.match(/nzqa-ncea-files\.zip\?[^\"]*\bversion=([0-9]+)/i);
-    const version = zipMatch ? String(zipMatch[1]) : "";
-
-    const pdfCandidates = [];
-    const docCandidates = [];
-    const downloadRegex = /<a[^>]+href="([^"]+)"[^>]+class="download\s+([a-z0-9]+)[^"]*"[^>]*>/gi;
-    let linkMatch;
-    while ((linkMatch = downloadRegex.exec(detailHtml)) !== null) {
-      const href = String(linkMatch[1] || "");
-      const linkClass = String(linkMatch[2] || "").toLowerCase();
-      const url = resolveNzqaLink(href);
-      if (!url) continue;
-
-      const contextStart = Math.max(0, linkMatch.index - 220);
-      const contextEnd = Math.min(detailHtml.length, linkMatch.index + linkMatch[0].length + 220);
-      const context = detailHtml.slice(contextStart, contextEnd);
-      const contextYearMatch = context.match(/Achievement\s+standard\s+(\d{4})/i) || context.match(/specifications\/(\d{4})/i);
-      const urlYearMatch = url.match(/\/(20\d{2})\//);
-      const year = Number.parseInt((contextYearMatch?.[1] || urlYearMatch?.[1] || "0"), 10) || 0;
-
-      const candidate = { url, year, order: linkMatch.index };
-      if (linkClass === "pdf" || /\.pdf(?:\?|$)/i.test(url)) {
-        pdfCandidates.push(candidate);
-      }
-      if (linkClass === "doc" || /\.(?:docx?|rtf)(?:\?|$)/i.test(url)) {
-        docCandidates.push(candidate);
-      }
+  const flushLesson = () => {
+    if (!currentLesson) {
+      return;
     }
 
-    const pickNewest = (candidates) => {
-      if (!candidates.length) return "";
-      const sorted = candidates.slice().sort((left, right) => {
-        if (left.year !== right.year) {
-          return right.year - left.year;
-        }
-        return right.order - left.order;
+    const lessonTitle = String(currentLesson.lessonTitle || currentLesson.title || "").trim();
+    const lessonFocus = currentLesson.notes.join(" ").trim();
+
+    if (lessonTitle || lessonFocus) {
+      lessons.push({
+        lesson_index: lessons.length + 1,
+        title: lessonTitle || `Lesson ${lessons.length + 1}`,
+        focus: lessonFocus,
+        notes: lessonFocus,
+        duration_minutes: 1,
+        activity_name: lessonTitle || `Lesson ${lessons.length + 1}`,
+        publish_activity: true,
+        add_to_calendar: false
       });
-      return sorted[0].url;
-    };
-
-    rows.push({
-      standard_number: standardNumber,
-      standard_name: standardName,
-      subject_name: subjectName,
-      version,
-      level: Number(level),
-      credits,
-      pdf_url: pickNewest(pdfCandidates),
-      docx_url: pickNewest(docCandidates),
-      details_url: detailsUrl,
-      stream: streamCode === "computing" ? "Generic Computing" : "Digital Technologies"
-    });
-  }
-
-  return rows;
-}
-
-async function fetchNzqaStandards(streamCode, level) {
-  const key = `${streamCode}:${level}`;
-  const cached = nzqaStandardsCache.get(key);
-  if (cached && (Date.now() - cached.fetchedAt) < NZQA_CACHE_TTL_MS) {
-    return cached.rows;
-  }
-
-  const url = buildNzqaSearchUrl(streamCode, level);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25000);
-
-  try {
-    const response = await fetch(url, {
-      headers: {
-        "user-agent": "WHS-DTECH-HUB/1.0"
-      },
-      signal: controller.signal
-    });
-
-    if (!response.ok) {
-      throw new Error(`NZQA responded with HTTP ${response.status}`);
     }
 
-    const html = await response.text();
-    const rows = parseNzqaStandardsFromHtml(html, level, streamCode);
-    nzqaStandardsCache.set(key, { fetchedAt: Date.now(), rows });
-    return rows;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-const EXCLUDED_NON_DTECH_KEYWORDS = [
-  "sewing",
-  "sew",
-  "stitch",
-  "cross stitch",
-  "embroidery",
-  "apron",
-  "buttonhole",
-  "bias binding",
-  "aida cloth",
-  "fabric",
-  "textiles",
-  "tassel",
-  "seam allowance",
-  "needlework"
-];
-
-const EXCLUDED_NON_DTECH_ACTIVITY_IDS = new Set(["5", "12", "14"]);
-
-const EXCLUDED_NON_DTECH_ACTIVITY_TITLES = new Set([
-  "flat-felled seam practice",
-  "french seam cushion",
-  "invisible zip insertion"
-]);
-
-function isExcludedNonDtechActivity(record) {
-  if (!record || typeof record !== "object") {
-    return false;
-  }
-
-  const recordId = String(record.id || "").trim();
-  if (recordId && EXCLUDED_NON_DTECH_ACTIVITY_IDS.has(recordId)) {
-    return true;
-  }
-
-  const recordTitle = String(record.name || record.title || "").trim().toLowerCase();
-  if (recordTitle && EXCLUDED_NON_DTECH_ACTIVITY_TITLES.has(recordTitle)) {
-    return true;
-  }
-
-  const joined = [
-    record.name,
-    record.title,
-    record.type,
-    record.activity_category,
-    record.description,
-    ...(Array.isArray(record.resources) ? record.resources : []),
-    ...(Array.isArray(record.equipment) ? record.equipment : []),
-    ...(Array.isArray(record.instructions) ? record.instructions : [])
-  ]
-    .join(" ")
-    .toLowerCase();
-
-  return EXCLUDED_NON_DTECH_KEYWORDS.some((keyword) => joined.includes(keyword));
-}
-
-function filterDtechActivities(rows) {
-  return (Array.isArray(rows) ? rows : []).filter((row) => !isExcludedNonDtechActivity(row));
-}
-
-async function upsertHubVisibility(activityIds, hubName, isVisible) {
-  if (!hasDatabase || !Array.isArray(activityIds) || !activityIds.length) {
-    return;
-  }
-
-  const ids = Array.from(new Set(activityIds.map((id) => String(id || "").trim()).filter(Boolean)));
-  if (!ids.length) {
-    return;
-  }
-
-  await pool.query(
-    `
-      INSERT INTO activity_hub_visibility (activity_id, hub_name, is_visible, updated_at)
-      SELECT id_value, $2, $3, NOW()
-      FROM UNNEST($1::text[]) AS ids(id_value)
-      ON CONFLICT (activity_id, hub_name) DO UPDATE
-      SET is_visible = EXCLUDED.is_visible,
-          updated_at = NOW()
-    `,
-    [ids, hubName, Boolean(isVisible)]
-  );
-}
-
-async function syncDtechExcludedActivitiesVisibility() {
-  if (!hasDatabase) {
-    return;
-  }
-
-  const result = await pool.query(`
-    SELECT id, name, year_level, type, activity_category, description, resources, equipment, instructions
-    FROM activities
-  `);
-
-  const excludedIds = result.rows
-    .filter((row) => isExcludedNonDtechActivity(row))
-    .map((row) => row.id);
-
-  if (!excludedIds.length) {
-    return;
-  }
-
-  await upsertHubVisibility(excludedIds, DTECH_HUB_NAME, false);
-}
-
-function normalizeEmail(value) {
-  return String(value || "").trim().toLowerCase();
-}
-
-function canonicalizeEmail(value) {
-  const normalized = normalizeEmail(value);
-  if (!normalized.includes("@")) {
-    return "";
-  }
-
-  const [localPart, domain] = normalized.split("@");
-  const canonicalLocalPart = String(localPart || "").replace(/[^a-z0-9]/g, "");
-  if (!canonicalLocalPart || !domain) {
-    return "";
-  }
-
-  return `${canonicalLocalPart}@${domain}`;
-}
-
-function parseCsvEmails(raw) {
-  return String(raw || "")
-    .split(",")
-    .map((item) => normalizeEmail(item))
-    .filter(Boolean);
-}
-
-function normalizeDateOnly(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) return "";
-
-  const year = parsed.getUTCFullYear();
-  const month = String(parsed.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(parsed.getUTCDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function addDaysToIsoDate(isoDate, daysToAdd) {
-  const parsed = new Date(`${isoDate}T00:00:00.000Z`);
-  if (Number.isNaN(parsed.getTime())) return isoDate;
-  parsed.setUTCDate(parsed.getUTCDate() + daysToAdd);
-  const year = parsed.getUTCFullYear();
-  const month = String(parsed.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(parsed.getUTCDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function toIcsDate(isoDate) {
-  return String(isoDate || "").replace(/-/g, "");
-}
-
-function escapeIcsText(value) {
-  return String(value || "")
-    .replace(/\\/g, "\\\\")
-    .replace(/;/g, "\\;")
-    .replace(/,/g, "\\,")
-    .replace(/\r?\n/g, "\\n");
-}
-
-function buildIcsCalendar(events) {
-  const now = new Date();
-  const timestamp = `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, "0")}${String(now.getUTCDate()).padStart(2, "0")}T${String(now.getUTCHours()).padStart(2, "0")}${String(now.getUTCMinutes()).padStart(2, "0")}${String(now.getUTCSeconds()).padStart(2, "0")}Z`;
-
-  const lines = [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//WHS DTECH HUB//Browse Practicals//EN",
-    "CALSCALE:GREGORIAN",
-    "METHOD:PUBLISH",
-    "X-WR-CALNAME:Browse Practicals",
-    "X-WR-TIMEZONE:Pacific/Auckland"
-  ];
-
-  events.forEach((event) => {
-    const startDate = normalizeDateOnly(event.start_date);
-    const endDate = normalizeDateOnly(event.end_date || event.start_date) || startDate;
-    if (!startDate || !endDate) return;
-
-    const endExclusive = addDaysToIsoDate(endDate, 1);
-    const uid = `${escapeIcsText(event.id)}@dtech-hub2.onrender.com`;
-    const title = `${escapeIcsText(event.event_type || "Activity")}: ${escapeIcsText(event.title)}`;
-    const description = escapeIcsText(event.notes || "Scheduled in Browse Practicals");
-
-    lines.push("BEGIN:VEVENT");
-    lines.push(`UID:${uid}`);
-    lines.push(`DTSTAMP:${timestamp}`);
-    lines.push(`DTSTART;VALUE=DATE:${toIcsDate(startDate)}`);
-    lines.push(`DTEND;VALUE=DATE:${toIcsDate(endExclusive)}`);
-    lines.push(`SUMMARY:${title}`);
-    lines.push(`DESCRIPTION:${description}`);
-    lines.push("END:VEVENT");
-  });
-
-  lines.push("END:VCALENDAR");
-  return `${lines.join("\r\n")}\r\n`;
-}
-
-function buildSchoolEmail(value) {
-  const localPart = String(value || "").trim().toLowerCase();
-  if (!localPart || localPart.includes("@")) {
-    return "";
-  }
-
-  if (!/^[a-z0-9._%+-]+$/i.test(localPart)) {
-    return "";
-  }
-
-  return `${localPart}@${SCHOOL_EMAIL_DOMAIN}`;
-}
-
-function normalizeRoleKey(value) {
-  return String(value || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "");
-}
-
-function toTitleCaseWords(value) {
-  return String(value || "")
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-}
-
-function canonicalizeRoleName(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-
-  const aliasMatch = ROLE_NAME_ALIASES.get(normalizeRoleKey(raw));
-  if (aliasMatch) {
-    return aliasMatch;
-  }
-
-  return toTitleCaseWords(raw.replace(/[_-]+/g, " "));
-}
-
-function mergeRolePermissionRows(rows) {
-  const mergedByRole = new Map();
-
-  for (const row of rows || []) {
-    const roleName = canonicalizeRoleName(row.role_name);
-    if (!roleName) continue;
-
-    const existing = mergedByRole.get(roleName) || {
-      role_name: roleName,
-      home_page: false,
-      upload_activity: false,
-      browse_activities: false,
-      planning: false,
-      admin: false
-    };
-
-    existing.home_page = existing.home_page || Boolean(row.home_page);
-    existing.upload_activity = existing.upload_activity || Boolean(row.upload_activity);
-    existing.browse_activities = existing.browse_activities || Boolean(row.browse_activities);
-    existing.planning = existing.planning || Boolean(row.planning);
-    existing.admin = existing.admin || Boolean(row.admin);
-
-    mergedByRole.set(roleName, existing);
-  }
-
-  const orderLookup = new Map(DEFAULT_ROLE_ORDER.map((name, index) => [name, index]));
-  return Array.from(mergedByRole.values()).sort((left, right) => {
-    const leftOrder = orderLookup.has(left.role_name) ? orderLookup.get(left.role_name) : Number.MAX_SAFE_INTEGER;
-    const rightOrder = orderLookup.has(right.role_name) ? orderLookup.get(right.role_name) : Number.MAX_SAFE_INTEGER;
-
-    if (leftOrder !== rightOrder) {
-      return leftOrder - rightOrder;
-    }
-
-    return left.role_name.localeCompare(right.role_name);
-  });
-}
-
-function normalizeHeader(value) {
-  return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
-function findHeaderIndex(headers, aliases) {
-  const normalizedHeaders = Array.isArray(headers) ? headers.map(normalizeHeader) : [];
-  return aliases
-    .map((alias) => normalizedHeaders.indexOf(normalizeHeader(alias)))
-    .find((index) => index >= 0) ?? -1;
-}
-
-function getUploadCell(row, index) {
-  if (!Array.isArray(row) || index < 0 || index >= row.length) {
-    return "";
-  }
-
-  return String(row[index] || "").trim();
-}
-
-function buildStaffUploadRecord(headers, row, metadata = {}) {
-  const codeIndex = findHeaderIndex(headers, ["code", "staff_code", "staff code"]);
-  const lastNameIndex = findHeaderIndex(headers, ["last_name", "last name", "surname", "family_name"]);
-  const firstNameIndex = findHeaderIndex(headers, ["first_name", "first name", "given_name", "forename"]);
-  const titleIndex = findHeaderIndex(headers, ["title"]);
-  const emailIndex = findHeaderIndex(headers, ["email_school", "email school", "email", "school_email", "email_address", "email address"]);
-
-  const email = normalizeEmail(getUploadCell(row, emailIndex));
-  return {
-    code: getUploadCell(row, codeIndex),
-    last_name: getUploadCell(row, lastNameIndex),
-    first_name: getUploadCell(row, firstNameIndex),
-    title: getUploadCell(row, titleIndex),
-    email_school: email,
-    status: "Current",
-    primary_role: String(metadata.primary_role || "Staff").trim() || "Staff",
-    upload_year: Number.parseInt(metadata.upload_year, 10) || null,
-    upload_term: String(metadata.upload_term || "").trim(),
-    upload_date: String(metadata.upload_date || "").trim()
+    currentLesson = null;
+    waitingForTitle = false;
   };
-}
 
-function upsertMemoryStaffRows(rows) {
-  rows.forEach((row) => {
-    if (row.email_school) {
-      memoryStaffDirectory.set(row.email_school, { ...row });
+  lines.forEach((line) => {
+    const text = String(line || "").trim();
+    if (!text) {
+      return;
     }
+
+    if (/^reporting\s*&\s*assessment\s*link$/i.test(text) || /^unit evaluation$/i.test(text)) {
+      flushLesson();
+      return;
+    }
+
+    if (/^(juniors?|middle\/seniors?|middle|seniors?)$/i.test(text)) {
+      return;
+    }
+
+    const headingMatch = text.match(/^(\d+(?:\/\d+)?)(?:\s+(.*))?$/);
+    if (headingMatch) {
+      flushLesson();
+      currentLesson = {
+        title: String(headingMatch[2] || "").trim(),
+        notes: []
+      };
+      waitingForTitle = !headingMatch[2];
+      return;
+    }
+
+    if (!currentLesson) {
+      return;
+    }
+
+    if (waitingForTitle) {
+      currentLesson.title = text;
+      waitingForTitle = false;
+      return;
+    }
+
+    currentLesson.notes.push(text);
   });
+
+  flushLesson();
+  return lessons;
 }
 
-function normalizeStaffDirectoryRows(payload) {
-  const rows = Array.isArray(payload)
-    ? payload
-    : Array.isArray(payload?.staff)
-      ? payload.staff
-      : [];
-
-  return rows
-    .map((row) => ({
-      id: row.id ?? null,
-      code: String(row.code || row.staff_code || "").trim(),
-      last_name: String(row.last_name || row.lastname || row.surname || "").trim(),
-      first_name: String(row.first_name || row.firstname || row.first || "").trim(),
-      title: String(row.title || "").trim(),
-      email_school: normalizeEmail(row.email_school || row.email || row.user_email || row.staff_email),
-      status: String(row.status || "Current").trim() || "Current",
-      primary_role: String(row.primary_role || row.user_type || "Staff").trim() || "Staff",
-      upload_year: row.upload_year ?? null,
-      upload_term: String(row.upload_term || "").trim(),
-      upload_date: String(row.upload_date || "").trim()
-    }))
-    .filter((row) => row.email_school);
+function detectSubjectStreamFromText(text) {
+  const lower = String(text || "").toLowerCase();
+  if (lower.includes("dtech") || lower.includes("digital technology")) return "DTECH";
+  if (lower.includes("computing") || lower.includes("python") || lower.includes("programming") || lower.includes("computer")) return "COMP";
+  if (lower.includes("textile") || lower.includes("sewing")) return "TEXT";
+  return "";
 }
 
-async function loadRemoteStaffDirectory() {
-  if (!staffDirectoryApiUrl) {
-    return [];
-  }
-
-  try {
-    const headers = {};
-    if (staffDirectoryApiKey) {
-      headers["x-api-key"] = staffDirectoryApiKey;
+function parseUnitPlanFromDocxText(rawText, originalName = "") {
+  const lines = splitDocxLines(rawText);
+  const normalizedName = String(originalName || "").replace(/\.docx$/i, "").trim();
+  const unitPlanHeadingIndex = findLineIndex(lines, (line) => line.includes("unit plan"));
+  const topicIndex = (() => {
+    if (unitPlanHeadingIndex < 0) {
+      return lines.findIndex((line) => line.length > 0);
     }
 
-    const response = await fetch(staffDirectoryApiUrl, { headers });
-    if (!response.ok) {
-      return [];
-    }
-
-    const payload = await response.json();
-    return normalizeStaffDirectoryRows(payload);
-  } catch (_error) {
-    return [];
-  }
-}
-
-async function getStaffDirectoryRows() {
-  if (!hasDatabase) {
-    const memoryRows = Array.from(memoryStaffDirectory.values());
-    return memoryRows.length ? memoryRows : loadRemoteStaffDirectory();
-  }
-
-  try {
-    const staffTableName = await resolveStaffTableName();
-    const availableColumns = await getExistingTableColumns(staffTableName, [
-      "id",
-      "code",
-      "last_name",
-      "first_name",
-      "title",
-      "email_school",
-      "status",
-      "primary_role",
-      "upload_year",
-      "upload_term",
-      "upload_date"
-    ]);
-
-    if (availableColumns.length) {
-      const result = await pool.query(
-        `SELECT ${availableColumns.join(", ")} FROM ${staffTableName}${buildOrderByClause(availableColumns)}`
-      );
-
-      if (result.rows.length) {
-        return result.rows;
+    for (let index = unitPlanHeadingIndex + 1; index < Math.min(lines.length, unitPlanHeadingIndex + 8); index += 1) {
+      const candidate = lines[index];
+      const lower = candidate.toLowerCase();
+      if (!candidate || lower.includes("westland high school") || lower.includes("digital technology") || lower.includes("unit plan")) {
+        continue;
       }
+      return index;
     }
-  } catch (_error) {
-  }
 
-  return loadRemoteStaffDirectory();
-}
+    return -1;
+  })();
 
-async function getExistingTableColumns(tableName, candidateColumns) {
-  const result = await pool.query(
-    `
-      SELECT column_name
-      FROM information_schema.columns
-      WHERE table_schema = 'public'
-        AND table_name = $1
-    `,
-    [tableName]
-  );
+  const topic = topicIndex >= 0 ? lines[topicIndex] : normalizedName || "Imported Unit Plan";
+  const yearLevelLine = lines.find((line) => /year\s*\d|junior|middle|senior/i.test(line) || /main focus:/i.test(line)) || "";
+  const yearLevel = (() => {
+    const match = yearLevelLine.match(/main focus:\s*(.*)$/i) || yearLevelLine.match(/year\s*groups?:\s*(.*)$/i);
+    if (match && String(match[1] || "").trim()) {
+      return String(match[1] || "").trim();
+    }
+    return yearLevelLine || "";
+  })();
 
-  const available = new Set(result.rows.map((row) => String(row.column_name || "").toLowerCase()));
-  return candidateColumns.filter((columnName) => available.has(String(columnName).toLowerCase()));
-}
+  const aimIndex = findLineIndex(lines, (line) => line.startsWith("aim(s) of unit"));
+  const yearGroupsIndex = findLineIndex(lines, (line) => line.startsWith("year groups"));
+  const schoolValuesIndex = findLineIndex(lines, (line) => line.startsWith("school values"));
+  const contextsIndex = findLineIndex(lines, (line) => line.startsWith("contexts of learning"));
+  const localCurriculumIndex = findLineIndex(lines, (line) => line.startsWith("local curriculum links"));
+  const slideshowIndex = findLineIndex(lines, (line) => line.startsWith("slideshow"));
+  const reportingIndex = findLineIndex(lines, (line) => line.startsWith("reporting & assessment link"));
+  const evaluationIndex = findLineIndex(lines, (line) => line.startsWith("unit evaluation"));
 
-async function getAllTableColumns(tableName) {
-  const result = await pool.query(
-    `
-      SELECT column_name
-      FROM information_schema.columns
-      WHERE table_schema = 'public'
-        AND table_name = $1
-    `,
-    [tableName]
-  );
-
-  return result.rows
-    .map((row) => String(row.column_name || "").trim().toLowerCase())
-    .filter(Boolean);
-}
-
-async function getTableColumnMetadata(tableName) {
-  const result = await pool.query(
-    `
-      SELECT column_name, data_type, udt_name
-      FROM information_schema.columns
-      WHERE table_schema = 'public'
-        AND table_name = $1
-    `,
-    [tableName]
-  );
-
-  const metadata = new Map();
-  result.rows.forEach((row) => {
-    const name = String(row.column_name || "").trim().toLowerCase();
-    if (!name) return;
-    metadata.set(name, {
-      dataType: String(row.data_type || "").trim().toLowerCase(),
-      udtName: String(row.udt_name || "").trim().toLowerCase()
-    });
-  });
-
-  return metadata;
-}
-
-function isIntegerLikeColumn(metadataRow) {
-  if (!metadataRow) return false;
-  const dataType = String(metadataRow.dataType || "").toLowerCase();
-  const udtName = String(metadataRow.udtName || "").toLowerCase();
-
-  return dataType === "integer" ||
-    dataType === "smallint" ||
-    dataType === "bigint" ||
-    udtName === "int2" ||
-    udtName === "int4" ||
-    udtName === "int8";
-}
-
-function quoteIdentifier(identifier) {
-  const value = String(identifier || "").trim();
-  if (!/^[a-z_][a-z0-9_]*$/i.test(value)) {
-    throw new Error(`Invalid SQL identifier: ${identifier}`);
-  }
-  return `"${value.replace(/"/g, '""')}"`;
-}
-
-function pickExistingColumn(availableColumns, candidates) {
-  return candidates.find((columnName) => availableColumns.includes(columnName)) || null;
-}
-
-async function resolveUserRolesColumns() {
-  const availableColumns = await getAllTableColumns("user_additional_roles");
-  const preferredAdditionalRole = pickExistingColumn(availableColumns, ["additional_role", "role", "extra_role"]);
-  const legacyRoleName = pickExistingColumn(availableColumns, ["role_name"]);
+  const unitAims = extractLinesBetween(lines, aimIndex + 1, yearGroupsIndex);
+  const unitValues = extractLinesBetween(lines, schoolValuesIndex + 1, contextsIndex);
+  const contexts = extractLinesBetween(lines, contextsIndex + 1, localCurriculumIndex);
+  const curriculumLinks = extractLinesBetween(lines, localCurriculumIndex + 1, slideshowIndex);
+  const overview = extractLinesBetween(lines, topicIndex + 1, aimIndex).slice(0, 5).join(" ");
+  const assessmentLink = extractLinesBetween(lines, reportingIndex + 1, evaluationIndex).slice(0, 4).join(" ");
+  const notes = extractLinesBetween(lines, evaluationIndex + 1, lines.length).join(" ");
+  const lessonLines = extractLinesBetween(lines, slideshowIndex + 1, reportingIndex);
+  const lessons = parseLessonRowsFromSlideshow(lessonLines);
 
   return {
-    availableColumns,
-    email: pickExistingColumn(availableColumns, ["user_email", "email", "staff_email"]),
-    userType: pickExistingColumn(availableColumns, ["user_type", "type", "staff_type"]),
-    displayName: pickExistingColumn(availableColumns, ["display_name", "name", "full_name"]),
-    additionalRole: preferredAdditionalRole || legacyRoleName,
-    legacyRoleName,
-    hubAccess: pickExistingColumn(availableColumns, ["hub_access", "hubs_access", "website_hubs", "hub"]),
-    updatedAt: pickExistingColumn(availableColumns, ["updated_at", "modified_at", "last_updated"])
+    title: topic,
+    topic,
+    strand: "",
+    year_level: yearLevel || "Middle",
+    term: "",
+    subject_stream: detectSubjectStreamFromText(rawText),
+    duration_weeks: Math.max(1, lessons.length ? Math.ceil(lessons.length / 5) : 1),
+    overview,
+    unit_aims: unitAims,
+    unit_values: unitValues,
+    contexts,
+    curriculum_links: curriculumLinks,
+    assessment_link: assessmentLink,
+    notes,
+    lessons
   };
 }
 
-async function resolveStaffTableName() {
-  const result = await pool.query(
-    `
-      SELECT table_name
-      FROM information_schema.tables
-      WHERE table_schema = 'public'
-        AND table_name = ANY($1::text[])
-    `,
-    [STAFF_TABLE_CANDIDATES]
-  );
-
-  const availableTables = new Set(result.rows.map((row) => String(row.table_name || "").toLowerCase()));
-  return STAFF_TABLE_CANDIDATES.find((tableName) => availableTables.has(tableName)) || "staff_upload";
-}
-
-async function resolveStudentTableName() {
-  const result = await pool.query(
-    `
-      SELECT table_name
-      FROM information_schema.tables
-      WHERE table_schema = 'public'
-        AND table_name = ANY($1::text[])
-    `,
-    [STUDENT_TABLE_CANDIDATES]
-  );
-
-  const availableTables = new Set(result.rows.map((row) => String(row.table_name || "").toLowerCase()));
-  return STUDENT_TABLE_CANDIDATES.find((tableName) => availableTables.has(tableName)) || "student_timetable";
-}
-
-async function resolveTeacherTimetableTableName() {
-  const result = await pool.query(
-    `
-      SELECT table_name
-      FROM information_schema.tables
-      WHERE table_schema = 'public'
-        AND table_name = ANY($1::text[])
-    `,
-    [TEACHER_TIMETABLE_TABLE_CANDIDATES]
-  );
-
-  const availableTables = new Set(result.rows.map((row) => String(row.table_name || "").toLowerCase()));
-  return TEACHER_TIMETABLE_TABLE_CANDIDATES.find((tableName) => availableTables.has(tableName)) || "";
-}
-
-async function getTeacherTimetableRows() {
+async function ensureUnitPlanSchema() {
   if (!hasDatabase) {
-    return [];
-  }
-
-  const tableName = await resolveTeacherTimetableTableName();
-  if (!tableName) {
-    return [];
-  }
-
-  const columns = await getAllTableColumns(tableName);
-  if (!columns.length) {
-    return [];
-  }
-
-  const quotedColumns = columns.map((columnName) => quoteIdentifier(columnName)).join(", ");
-  const result = await pool.query(
-    `SELECT ${quotedColumns} FROM ${tableName}${buildOrderByClause(columns)}`
-  );
-
-  return result.rows;
-}
-
-async function getStudentDirectoryRows() {
-  if (!hasDatabase) {
-    return [];
-  }
-
-  const studentTableName = await resolveStudentTableName();
-  const availableColumns = await getExistingTableColumns(studentTableName, [
-    "id",
-    "student_name",
-    "id_number",
-    "form_class",
-    "year_level",
-    "status",
-    "primary_role",
-    "upload_year",
-    "upload_term",
-    "upload_date",
-    "email_school",
-    "student_email",
-    "email",
-    "email_address",
-    "school_email",
-    "google_email",
-    "student_google_email",
-    "student_mail",
-    "mail",
-    "username",
-    "user_name",
-    "student_username",
-    "login",
-    "student_login",
-    "upn"
-    , ...STUDENT_TIMETABLE_PERIOD_COLUMNS
-  ]);
-
-  if (!availableColumns.length) {
-    return [];
-  }
-
-  const result = await pool.query(
-    `SELECT ${availableColumns.join(", ")} FROM ${studentTableName}${buildOrderByClause(availableColumns)}`
-  );
-  return result.rows;
-}
-
-function normalizePersonName(value) {
-  return String(value || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim()
-    .replace(/\s+/g, " ");
-}
-
-function getStudentTimetableEntries(row) {
-  return STUDENT_TIMETABLE_PERIOD_COLUMNS
-    .map((columnName) => ({
-      key: columnName,
-      label: TIMETABLE_LABELS.get(columnName) || columnName,
-      value: String(row?.[columnName] || "").trim()
-    }))
-    .filter((entry) => entry.value);
-}
-
-function isDtechTimetableValue(value) {
-  const normalized = String(value || "").trim().toLowerCase();
-  if (!normalized) {
-    return false;
-  }
-
-  return DTECH_TIMETABLE_KEYWORDS.some((keyword) => normalized.includes(keyword));
-}
-
-function buildStudentClassManagementRow(row) {
-  const timetable = getStudentTimetableEntries(row);
-  const dtechTimetable = timetable.filter((entry) => isDtechTimetableValue(entry.value));
-  const linkedEmails = Array.from(
-    collectDirectoryEmails(
-      row,
-      ["email_school", "student_email", "email", "email_address", "school_email", "google_email", "student_google_email", "student_mail", "mail", "upn"],
-      ["username", "user_name", "student_username", "login", "student_login"]
-    )
-  );
-
-  return {
-    id: row?.id ?? null,
-    student_name: String(row?.student_name || "").trim(),
-    normalized_name: normalizePersonName(row?.student_name),
-    id_number: String(row?.id_number || "").trim(),
-    form_class: String(row?.form_class || row?.formclass || row?.class_code || row?.class || "").trim(),
-    year_level: String(row?.year_level || row?.yearlevel || "").trim(),
-    status: String(row?.status || "Current").trim() || "Current",
-    upload_year: row?.upload_year ?? null,
-    upload_term: String(row?.upload_term || "").trim(),
-    upload_date: String(row?.upload_date || "").trim(),
-    linked_emails: linkedEmails,
-    has_dtech: dtechTimetable.length > 0,
-    dtech_period_count: dtechTimetable.length,
-    dtech_timetable: dtechTimetable,
-    programs: getStudentPrograms(row),
-    timetable
-  };
-}
-
-function collectDirectoryEmails(row, exactEmailColumns, usernameColumns = []) {
-  const emails = new Set();
-  if (!row || typeof row !== "object") {
-    return emails;
-  }
-
-  exactEmailColumns.forEach((columnName) => {
-    const normalized = normalizeEmail(row[columnName]);
-    if (normalized.includes("@")) {
-      emails.add(normalized);
-    }
-  });
-
-  usernameColumns.forEach((columnName) => {
-    const candidate = buildSchoolEmail(row[columnName]);
-    if (candidate) {
-      emails.add(candidate);
-    }
-  });
-
-  return emails;
-}
-
-async function getMergedRolePermissions() {
-  if (!hasDatabase) {
-    return mergeRolePermissionRows(memoryRolePermissions);
-  }
-
-  try {
-    const result = await pool.query(
-      `
-        SELECT role_name, home_page, upload_activity, browse_activities, planning, admin
-        FROM role_permissions
-        ORDER BY role_name ASC
-      `
-    );
-    return mergeRolePermissionRows(result.rows);
-  } catch (_error) {
-    return mergeRolePermissionRows(memoryRolePermissions);
-  }
-}
-
-async function getUserRoleByEmail(email) {
-  const normalizedEmail = normalizeEmail(email);
-  if (!normalizedEmail) {
-    return null;
-  }
-
-  const memoryMatch = memoryUserRoles.get(normalizedEmail) || null;
-
-  if (!hasDatabase) {
-    return memoryMatch;
-  }
-
-  try {
-    const columns = await resolveUserRolesColumns();
-    if (!columns.email) {
-      return memoryMatch;
-    }
-
-    const selectColumns = [
-      columns.userType ? `${quoteIdentifier(columns.userType)} AS user_type` : `'Staff' AS user_type`,
-      `${quoteIdentifier(columns.email)} AS user_email`,
-      columns.displayName ? `${quoteIdentifier(columns.displayName)} AS display_name` : `'' AS display_name`,
-      columns.additionalRole && columns.legacyRoleName && columns.additionalRole !== columns.legacyRoleName
-        ? `COALESCE(NULLIF(${quoteIdentifier(columns.additionalRole)}, ''), ${quoteIdentifier(columns.legacyRoleName)}) AS additional_role`
-        : columns.additionalRole
-          ? `${quoteIdentifier(columns.additionalRole)} AS additional_role`
-          : `'' AS additional_role`,
-      columns.hubAccess
-        ? `${quoteIdentifier(columns.hubAccess)} AS hub_access`
-        : `ARRAY['DTECH-HUB']::text[] AS hub_access`
-    ];
-
-    const result = await pool.query(
-      `
-        SELECT ${selectColumns.join(", ")}
-        FROM user_additional_roles
-        WHERE LOWER(${quoteIdentifier(columns.email)}) = LOWER($1)
-        ORDER BY ${quoteIdentifier(columns.updatedAt || columns.email)} DESC
-        LIMIT 1
-      `,
-      [normalizedEmail]
-    );
-
-    if (result.rows.length) {
-      return result.rows[0];
-    }
-  } catch (_error) {
-  }
-
-  return memoryMatch;
-}
-
-function getRequestUserEmail(req) {
-  const headerEmail = normalizeEmail(
-    req.headers["x-user-email"] ||
-    req.headers["x-hub-user-email"] ||
-    req.headers["x-forwarded-email"]
-  );
-
-  if (headerEmail) {
-    return headerEmail;
-  }
-
-  const queryEmail = normalizeEmail(req.query?.email);
-  if (queryEmail) {
-    return queryEmail;
-  }
-
-  return normalizeEmail(req.body?.user_email);
-}
-
-async function resolveActivityWriteAccess(email) {
-  const normalizedEmail = normalizeEmail(email);
-  if (!normalizedEmail) {
-    return {
-      email: "",
-      isAdmin: false,
-      isStaff: false,
-      allowed: false
-    };
-  }
-
-  const userRole = await getUserRoleByEmail(normalizedEmail);
-  const assignedRole = canonicalizeRoleName(userRole?.additional_role || userRole?.role_name || "");
-  const allPermissions = await getMergedRolePermissions();
-  const rolePermission = allPermissions.find(
-    (row) => canonicalizeRoleName(row.role_name) === assignedRole
-  ) || null;
-
-  let isStaffFromDirectory = false;
-  try {
-    const staffRows = await getStaffDirectoryRows();
-    isStaffFromDirectory = staffRows.some((row) =>
-      collectDirectoryEmails(row, ["email_school", "email", "user_email", "staff_email", "google_email"]).has(normalizedEmail)
-    );
-  } catch (_error) {
-    isStaffFromDirectory = false;
-  }
-
-  const staffRoles = new Set(["Admin", "Lead Teacher", "Teacher", "Technician", "Staff"]);
-  const isStaffFromRole = staffRoles.has(assignedRole);
-  const isAdmin = Boolean(rolePermission?.admin) || assignedRole === "Admin" || assignedRole === "Student Admin";
-  const canUploadByRolePermission = Boolean(rolePermission?.upload_activity || rolePermission?.admin);
-  const isStaff = isStaffFromDirectory || isStaffFromRole;
-
-  return {
-    email: normalizedEmail,
-    isAdmin,
-    isStaff,
-    allowed: Boolean(isAdmin || isStaff || canUploadByRolePermission)
-  };
-}
-
-async function requireActivityWriteAccess(req, res, next) {
-  const requesterEmail = getRequestUserEmail(req);
-  if (!requesterEmail) {
-    res.status(401).json({ error: "Sign-in required. Missing user email." });
     return;
   }
-
-  try {
-    const access = await resolveActivityWriteAccess(requesterEmail);
-    if (!access.allowed) {
-      res.status(403).json({ error: "Staff or admin access is required for this action." });
-      return;
-    }
-
-    req.activityWriteAccess = access;
-    next();
-  } catch (_error) {
-    res.status(500).json({ error: "Could not verify write permissions." });
-  }
-}
-
-async function requireAdminAccess(req, res, next) {
-  const requesterEmail = getRequestUserEmail(req);
-  if (!requesterEmail) {
-    res.status(401).json({ error: "Sign-in required. Missing user email." });
-    return;
-  }
-
-  try {
-    const access = await resolveActivityWriteAccess(requesterEmail);
-    if (!access.isAdmin) {
-      res.status(403).json({ error: "Admin access is required for this action." });
-      return;
-    }
-
-    req.adminAccess = access;
-    next();
-  } catch (_error) {
-    res.status(500).json({ error: "Could not verify admin permissions." });
-  }
-}
-
-function buildOrderByClause(availableColumns) {
-  const preferredOrder = ["last_name", "first_name", "user_type", "user_email", "id"];
-  const orderColumns = preferredOrder.filter((columnName) => availableColumns.includes(columnName));
-  if (!orderColumns.length) {
-    return "";
-  }
-
-  return ` ORDER BY ${orderColumns.map((columnName) => `${columnName} ASC`).join(", ")}`;
-}
-
-async function ensureSchema() {
-  if (!hasDatabase) return;
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS activities (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      year_level TEXT NOT NULL,
-      type TEXT NOT NULL,
-      activity_category TEXT NOT NULL DEFAULT 'Practice',
-      duration_hours INTEGER NOT NULL DEFAULT 1,
-      difficulty TEXT NOT NULL DEFAULT 'Beginner',
-      card_color TEXT NOT NULL DEFAULT 'Rose',
-      outcome_image_url TEXT,
-      description TEXT,
-      resources JSONB NOT NULL DEFAULT '[]'::jsonb,
-      equipment JSONB NOT NULL DEFAULT '[]'::jsonb,
-      instructions JSONB NOT NULL DEFAULT '[]'::jsonb,
-      class_management_notes JSONB NOT NULL DEFAULT '[]'::jsonb,
-      class_preparation JSONB NOT NULL DEFAULT '[]'::jsonb,
-      assessment_focus JSONB NOT NULL DEFAULT '[]'::jsonb,
-      time_sensitive BOOLEAN NOT NULL DEFAULT FALSE,
-      show_in_this_week BOOLEAN NOT NULL DEFAULT FALSE,
-      term TEXT NOT NULL DEFAULT 'Term 2',
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
-
-  // Remove any check constraints on activity_category that may block proposal submissions
-  try {
-    await pool.query(`ALTER TABLE activities DROP CONSTRAINT IF EXISTS activities_activity_category_check`);
-  } catch (e) {
-    // Constraint may not exist, that's fine
-  }
-
-  // Add proposal fields if they don't exist
-  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS duration_minutes INTEGER`);
-  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS card_url TEXT`);
-  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS time_sensitive BOOLEAN NOT NULL DEFAULT FALSE`);
-  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS show_in_this_week BOOLEAN NOT NULL DEFAULT FALSE`);
-  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS start_date TEXT`);
-  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS unit_plan_id TEXT`);
-  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS unit_lesson_index INTEGER`);
-  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS contact_name TEXT`);
-  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS contact_phone TEXT`);
-  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS contact_email TEXT`);
-  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS company TEXT`);
-  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS address TEXT`);
-  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS overview JSONB NOT NULL DEFAULT '[]'::jsonb`);
-  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS services JSONB NOT NULL DEFAULT '[]'::jsonb`);
-  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS costs JSONB NOT NULL DEFAULT '[]'::jsonb`);
-  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS outcomes JSONB NOT NULL DEFAULT '[]'::jsonb`);
-  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS withdrawal_date TEXT`);
-  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS client_id TEXT`);
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS activity_hub_visibility (
-      activity_id TEXT NOT NULL,
-      hub_name TEXT NOT NULL,
-      is_visible BOOLEAN NOT NULL DEFAULT TRUE,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      PRIMARY KEY (activity_id, hub_name)
-    );
-  `);
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS user_additional_roles (
-      user_email TEXT PRIMARY KEY,
-      user_type TEXT NOT NULL,
-      display_name TEXT,
-      additional_role TEXT NOT NULL,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
-
-  await pool.query(`ALTER TABLE user_additional_roles ADD COLUMN IF NOT EXISTS user_type TEXT`);
-  await pool.query(`ALTER TABLE user_additional_roles ADD COLUMN IF NOT EXISTS display_name TEXT`);
-  await pool.query(`ALTER TABLE user_additional_roles ADD COLUMN IF NOT EXISTS additional_role TEXT`);
-  await pool.query(`ALTER TABLE user_additional_roles ADD COLUMN IF NOT EXISTS hub_access TEXT[] NOT NULL DEFAULT ARRAY['DTECH-HUB']::text[]`);
-  await pool.query(`ALTER TABLE user_additional_roles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
-
-  try {
-    const roleColumns = await getAllTableColumns("user_additional_roles");
-
-    if (roleColumns.includes("additional_role") && roleColumns.includes("role_name")) {
-      await pool.query(`
-        UPDATE user_additional_roles
-        SET additional_role = role_name
-        WHERE (additional_role IS NULL OR BTRIM(additional_role) = '')
-          AND role_name IS NOT NULL
-          AND BTRIM(role_name) <> ''
-      `);
-    }
-
-    if (roleColumns.includes("hub_access")) {
-      await pool.query(`
-        UPDATE user_additional_roles
-        SET hub_access = ARRAY['DTECH-HUB']::text[]
-        WHERE hub_access IS NULL
-      `);
-    }
-  } catch (_error) {
-  }
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS staff_upload (
-      id BIGSERIAL PRIMARY KEY,
-      code TEXT,
-      last_name TEXT,
-      first_name TEXT,
-      title TEXT,
-      email_school TEXT,
-      status TEXT NOT NULL DEFAULT 'Current',
-      primary_role TEXT NOT NULL DEFAULT 'Staff',
-      upload_year INTEGER,
-      upload_term TEXT,
-      upload_date TEXT,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
-
-  await pool.query(`ALTER TABLE staff_upload ADD COLUMN IF NOT EXISTS code TEXT`);
-  await pool.query(`ALTER TABLE staff_upload ADD COLUMN IF NOT EXISTS last_name TEXT`);
-  await pool.query(`ALTER TABLE staff_upload ADD COLUMN IF NOT EXISTS first_name TEXT`);
-  await pool.query(`ALTER TABLE staff_upload ADD COLUMN IF NOT EXISTS title TEXT`);
-  await pool.query(`ALTER TABLE staff_upload ADD COLUMN IF NOT EXISTS email_school TEXT`);
-  await pool.query(`ALTER TABLE staff_upload ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'Current'`);
-  await pool.query(`ALTER TABLE staff_upload ADD COLUMN IF NOT EXISTS primary_role TEXT NOT NULL DEFAULT 'Staff'`);
-  await pool.query(`ALTER TABLE staff_upload ADD COLUMN IF NOT EXISTS upload_year INTEGER`);
-  await pool.query(`ALTER TABLE staff_upload ADD COLUMN IF NOT EXISTS upload_term TEXT`);
-  await pool.query(`ALTER TABLE staff_upload ADD COLUMN IF NOT EXISTS upload_date TEXT`);
-  await pool.query(`ALTER TABLE staff_upload ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS role_permissions (
-      role_name TEXT PRIMARY KEY,
-      home_page BOOLEAN NOT NULL DEFAULT FALSE,
-      upload_activity BOOLEAN NOT NULL DEFAULT FALSE,
-      browse_activities BOOLEAN NOT NULL DEFAULT FALSE,
-      planning BOOLEAN NOT NULL DEFAULT FALSE,
-      admin BOOLEAN NOT NULL DEFAULT FALSE,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
-
-  await pool.query(`ALTER TABLE role_permissions ADD COLUMN IF NOT EXISTS home_page BOOLEAN NOT NULL DEFAULT FALSE`);
-  await pool.query(`ALTER TABLE role_permissions ADD COLUMN IF NOT EXISTS upload_activity BOOLEAN NOT NULL DEFAULT FALSE`);
-  await pool.query(`ALTER TABLE role_permissions ADD COLUMN IF NOT EXISTS browse_activities BOOLEAN NOT NULL DEFAULT FALSE`);
-  await pool.query(`ALTER TABLE role_permissions ADD COLUMN IF NOT EXISTS planning BOOLEAN NOT NULL DEFAULT FALSE`);
-  await pool.query(`ALTER TABLE role_permissions ADD COLUMN IF NOT EXISTS admin BOOLEAN NOT NULL DEFAULT FALSE`);
-  await pool.query(`ALTER TABLE role_permissions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
-
-  for (const row of DEFAULT_ROLE_PERMISSIONS) {
-    await pool.query(
-      `
-        INSERT INTO role_permissions (
-          role_name, home_page, upload_activity, browse_activities, planning, admin, updated_at
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, NOW()
-        )
-        ON CONFLICT (role_name) DO NOTHING
-      `,
-      [row.role_name, row.home_page, row.upload_activity, row.browse_activities, row.planning, row.admin]
-    );
-  }
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS suggestions (
-      id BIGSERIAL PRIMARY KEY,
-      submitted_by_name TEXT NOT NULL,
-      submitted_by_email TEXT NOT NULL,
-      suggestion_type TEXT NOT NULL DEFAULT 'Activity',
-      suggestion_title TEXT NOT NULL,
-      reference_url TEXT,
-      reason TEXT NOT NULL,
-      attachment_filename TEXT,
-      attachment_mime TEXT,
-      attachment_size INTEGER,
-      attachment_data BYTEA,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
-
-  await pool.query(`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS submitted_by_name TEXT`);
-  await pool.query(`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS submitted_by_email TEXT`);
-  await pool.query(`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS suggestion_type TEXT NOT NULL DEFAULT 'Activity'`);
-  await pool.query(`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS suggestion_title TEXT`);
-  await pool.query(`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS reference_url TEXT`);
-  await pool.query(`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS reason TEXT`);
-  await pool.query(`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS attachment_filename TEXT`);
-  await pool.query(`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS attachment_mime TEXT`);
-  await pool.query(`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS attachment_size INTEGER`);
-  await pool.query(`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS attachment_data BYTEA`);
-  await pool.query(`ALTER TABLE suggestions ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS practical_schedule (
-      id BIGSERIAL PRIMARY KEY,
-      title TEXT NOT NULL,
-      event_type TEXT NOT NULL DEFAULT 'Activity',
-      start_date DATE NOT NULL,
-      end_date DATE NOT NULL,
-      notes TEXT,
-      linked_activity_id TEXT,
-      linked_url TEXT,
-      unit_plan_id TEXT,
-      lesson_index INTEGER,
-      created_by_email TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
-
-  await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS title TEXT`);
-  await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS event_type TEXT NOT NULL DEFAULT 'Activity'`);
-  await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS start_date DATE`);
-  await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS end_date DATE`);
-  await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS notes TEXT`);
-  await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS linked_activity_id TEXT`);
-  await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS linked_url TEXT`);
-  await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS unit_plan_id TEXT`);
-  await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS lesson_index INTEGER`);
-  await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS created_by_email TEXT`);
-  await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
-  await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
-  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS practical_schedule_unit_plan_lesson_idx ON practical_schedule (unit_plan_id, lesson_index)`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS unit_plans (
@@ -1529,39 +453,16 @@ async function ensureSchema() {
     );
   `);
 
-  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS title TEXT`);
-  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS topic TEXT`);
-  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS strand TEXT`);
-  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS year_level TEXT`);
-  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS term TEXT`);
-  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS subject_stream TEXT`);
-  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS duration_weeks INTEGER NOT NULL DEFAULT 1`);
-  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS overview TEXT`);
   await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS unit_aims JSONB NOT NULL DEFAULT '[]'::jsonb`);
   await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS unit_values JSONB NOT NULL DEFAULT '[]'::jsonb`);
   await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS contexts JSONB NOT NULL DEFAULT '[]'::jsonb`);
   await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS curriculum_links JSONB NOT NULL DEFAULT '[]'::jsonb`);
-  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS assessment_link TEXT`);
-  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS notes TEXT`);
   await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS lessons JSONB NOT NULL DEFAULT '[]'::jsonb`);
-  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS created_by_email TEXT`);
-  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
-
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS project_interests (
-      project_id TEXT NOT NULL,
-      student_email TEXT NOT NULL,
-      confirmed BOOLEAN NOT NULL DEFAULT FALSE,
-      standard_1 TEXT,
-      standard_2 TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      PRIMARY KEY (project_id, student_email)
-    );
-  `);
-
-  await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS standard_1 TEXT`);
-  await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS standard_2 TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS unit_plan_id TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS unit_lesson_index INTEGER`);
+  await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS unit_plan_id TEXT`);
+  await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS lesson_index INTEGER`);
 }
 
 app.use(express.json({ limit: "8mb" }));
@@ -1588,7 +489,7 @@ async function canManagePracticalSchedule(email) {
   const assignedRole = canonicalizeRoleName(userRole?.additional_role || userRole?.role_name || "");
   const allPermissions = await getMergedRolePermissions();
   const rolePermission = allPermissions.find(
-    (row) => canonicalizeRoleName(row.role_name) === assignedRole
+    (row) => canonicalizeRoleName
   ) || null;
 
   const roleGrantsTeacherView = ["Admin", "Lead Teacher", "Teacher", "Technician"].includes(assignedRole);
@@ -1907,7 +808,7 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     const timeSensitiveColumn = pickExistingColumn(activityColumns, ["time_sensitive"]);
     const showInWeekColumn = pickExistingColumn(activityColumns, ["show_in_this_week", "show_this_week", "is_pinned", "is_this_week"]);
     const termColumn = pickExistingColumn(activityColumns, ["term"]);
-    const updatedAtColumn = pickExistingColumn(activityColumns, ["updated_at", "updatedon", "modified_at"]);
+    const updatedAtColumn = pickExistingColumn(activityColumns, ["updated_at", "updatedon", "last_updated"])
     
     // Proposal fields
     const startDateColumn = pickExistingColumn(activityColumns, ["start_date"]);
@@ -2905,6 +1806,7 @@ app.get("/api/unit-plans", async (_req, res) => {
   }
 
   try {
+    await ensureUnitPlanSchema();
     const result = await pool.query("SELECT * FROM unit_plans ORDER BY updated_at DESC, created_at DESC");
     res.json(result.rows);
   } catch (_error) {
@@ -2930,6 +1832,7 @@ app.get("/api/unit-plans/:id", async (req, res) => {
   }
 
   try {
+    await ensureUnitPlanSchema();
     const result = await pool.query("SELECT * FROM unit_plans WHERE id = $1", [requestedId]);
     if (!result.rowCount) {
       res.status(404).json({ error: "Not found" });
@@ -2987,6 +1890,7 @@ app.post("/api/unit-plans", async (req, res) => {
   }
 
   try {
+    await ensureUnitPlanSchema();
     const result = await pool.query(
       `
         INSERT INTO unit_plans (
@@ -3024,13 +1928,13 @@ app.post("/api/unit-plans", async (req, res) => {
         payload.subject_stream || null,
         payload.duration_weeks,
         payload.overview || null,
-        JSON.stringify(payload.unit_aims),
-        JSON.stringify(payload.unit_values),
-        JSON.stringify(payload.contexts),
-        JSON.stringify(payload.curriculum_links),
+        JSON.stringify(payload.unit_aims || []),
+        JSON.stringify(payload.unit_values || []),
+        JSON.stringify(payload.contexts || []),
+        JSON.stringify(payload.curriculum_links || []),
         payload.assessment_link || null,
         payload.notes || null,
-        JSON.stringify(payload.lessons),
+        JSON.stringify(payload.lessons || []),
         payload.created_by_email,
         payload.created_at,
         payload.updated_at
