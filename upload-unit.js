@@ -5,6 +5,29 @@ const authStatusElement = document.querySelector("#unit-auth-status");
 const uploadButton = document.querySelector("#upload-unit-button");
 const clearButton = document.querySelector("#clear-unit-file");
 const importTemplateButton = document.querySelector("#import-template-button");
+const previewFileButton = document.querySelector("#preview-file-button");
+const previewTemplateButton = document.querySelector("#preview-template-button");
+const previewPanel = document.querySelector("#unit-preview-panel");
+const previewForm = document.querySelector("#unit-preview-form");
+const previewSource = document.querySelector("#preview-source");
+const savePreviewButton = document.querySelector("#save-preview-button");
+
+const previewFields = {
+    title: document.querySelector("#preview-title"),
+    topic: document.querySelector("#preview-topic"),
+    yearLevel: document.querySelector("#preview-year-level"),
+    subjectStream: document.querySelector("#preview-subject-stream"),
+    durationWeeks: document.querySelector("#preview-duration-weeks"),
+    term: document.querySelector("#preview-term"),
+    overview: document.querySelector("#preview-overview"),
+    unitAims: document.querySelector("#preview-aims"),
+    unitValues: document.querySelector("#preview-values"),
+    contexts: document.querySelector("#preview-contexts"),
+    curriculumLinks: document.querySelector("#preview-curriculum-links"),
+    assessmentLink: document.querySelector("#preview-assessment-link"),
+    notes: document.querySelector("#preview-notes"),
+    lessonsJson: document.querySelector("#preview-lessons-json")
+};
 
 const UPLOAD_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 
@@ -64,6 +87,94 @@ function setStatus(message, isError = false) {
     uploadStatus.classList.add(isError ? "is-error" : "is-success");
 }
 
+function setActionButtonsDisabled(disabled) {
+    const buttons = [uploadButton, importTemplateButton, previewFileButton, previewTemplateButton, savePreviewButton];
+    buttons.forEach((button) => {
+        if (button) {
+            button.disabled = Boolean(disabled);
+        }
+    });
+}
+
+function joinLines(value) {
+    if (!Array.isArray(value)) {
+        return "";
+    }
+
+    return value
+        .map((item) => String(item || "").trim())
+        .filter(Boolean)
+        .join("\n");
+}
+
+function normalizeLines(value) {
+    return String(value || "")
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+}
+
+function parseLessonsJson(value) {
+    const source = String(value || "").trim();
+    if (!source) {
+        return [];
+    }
+
+    const parsed = JSON.parse(source);
+    if (!Array.isArray(parsed)) {
+        throw new Error("Lessons JSON must be an array.");
+    }
+
+    return parsed;
+}
+
+function showPreviewPanel(unitPlan, sourceLabel) {
+    if (!previewPanel) {
+        return;
+    }
+
+    const lessonCount = Array.isArray(unitPlan?.lessons) ? unitPlan.lessons.length : 0;
+    if (previewSource) {
+        previewSource.textContent = `Preview source: ${sourceLabel || "DOCX"} (${lessonCount} lesson${lessonCount === 1 ? "" : "s"} parsed)`;
+    }
+
+    if (previewFields.title) previewFields.title.value = String(unitPlan?.title || "");
+    if (previewFields.topic) previewFields.topic.value = String(unitPlan?.topic || "");
+    if (previewFields.yearLevel) previewFields.yearLevel.value = String(unitPlan?.year_level || "");
+    if (previewFields.subjectStream) previewFields.subjectStream.value = String(unitPlan?.subject_stream || "");
+    if (previewFields.durationWeeks) previewFields.durationWeeks.value = Number.parseInt(unitPlan?.duration_weeks, 10) || 1;
+    if (previewFields.term) previewFields.term.value = String(unitPlan?.term || "");
+    if (previewFields.overview) previewFields.overview.value = String(unitPlan?.overview || "");
+    if (previewFields.unitAims) previewFields.unitAims.value = joinLines(unitPlan?.unit_aims);
+    if (previewFields.unitValues) previewFields.unitValues.value = joinLines(unitPlan?.unit_values);
+    if (previewFields.contexts) previewFields.contexts.value = joinLines(unitPlan?.contexts);
+    if (previewFields.curriculumLinks) previewFields.curriculumLinks.value = joinLines(unitPlan?.curriculum_links);
+    if (previewFields.assessmentLink) previewFields.assessmentLink.value = String(unitPlan?.assessment_link || "");
+    if (previewFields.notes) previewFields.notes.value = String(unitPlan?.notes || "");
+    if (previewFields.lessonsJson) previewFields.lessonsJson.value = JSON.stringify(Array.isArray(unitPlan?.lessons) ? unitPlan.lessons : [], null, 2);
+
+    previewPanel.hidden = false;
+}
+
+function collectPreviewPayload() {
+    return {
+        title: String(previewFields.title?.value || "").trim(),
+        topic: String(previewFields.topic?.value || "").trim(),
+        year_level: String(previewFields.yearLevel?.value || "").trim(),
+        subject_stream: String(previewFields.subjectStream?.value || "").trim().toUpperCase(),
+        duration_weeks: Number.parseInt(previewFields.durationWeeks?.value || "1", 10) || 1,
+        term: String(previewFields.term?.value || "").trim(),
+        overview: String(previewFields.overview?.value || "").trim(),
+        unit_aims: normalizeLines(previewFields.unitAims?.value || ""),
+        unit_values: normalizeLines(previewFields.unitValues?.value || ""),
+        contexts: normalizeLines(previewFields.contexts?.value || ""),
+        curriculum_links: normalizeLines(previewFields.curriculumLinks?.value || ""),
+        assessment_link: String(previewFields.assessmentLink?.value || "").trim(),
+        notes: String(previewFields.notes?.value || "").trim(),
+        lessons: parseLessonsJson(previewFields.lessonsJson?.value || "[]")
+    };
+}
+
 function renderAuthStatus() {
     if (!authStatusElement) {
         return;
@@ -91,14 +202,75 @@ if (clearButton) {
 
 renderAuthStatus();
 
+async function previewFromFile() {
+    if (!uploadInput?.files?.length) {
+        setStatus("Choose a .docx file before previewing.", true);
+        return;
+    }
+
+    const file = uploadInput.files[0];
+    if (!file) {
+        setStatus("Choose a .docx file before previewing.", true);
+        return;
+    }
+
+    const payload = new FormData();
+    payload.append("unitPlanFile", file);
+
+    try {
+        setActionButtonsDisabled(true);
+        setStatus("Parsing DOCX for preview...");
+
+        const response = await fetch("/api/unit-plans/preview-docx", {
+            method: "POST",
+            headers: withUserEmailHeader(),
+            body: payload
+        });
+
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(result.error || `Could not preview document (HTTP ${response.status})`);
+        }
+
+        showPreviewPanel(result.unitPlan || {}, result.source || file.name);
+        setStatus("Preview loaded. Review fields and click Save Previewed Unit Plan when ready.");
+    } catch (error) {
+        setStatus(`Preview failed: ${error.message}`, true);
+    } finally {
+        setActionButtonsDisabled(false);
+    }
+}
+
+async function previewFromTemplate() {
+    try {
+        setActionButtonsDisabled(true);
+        setStatus("Parsing TeacherFiles template for preview...");
+
+        const response = await fetch("/api/unit-plans/preview-docx-template", {
+            method: "POST",
+            headers: withUserEmailHeader({
+                "Content-Type": "application/json"
+            }),
+            body: JSON.stringify({})
+        });
+
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(result.error || `Could not preview template (HTTP ${response.status})`);
+        }
+
+        showPreviewPanel(result.unitPlan || {}, result.source || "TeacherFiles template");
+        setStatus("Template preview loaded. Review fields and click Save Previewed Unit Plan when ready.");
+    } catch (error) {
+        setStatus(`Template preview failed: ${error.message}`, true);
+    } finally {
+        setActionButtonsDisabled(false);
+    }
+}
+
 async function importTeacherTemplateDocx() {
     try {
-        if (uploadButton) {
-            uploadButton.disabled = true;
-        }
-        if (importTemplateButton) {
-            importTemplateButton.disabled = true;
-        }
+        setActionButtonsDisabled(true);
 
         setStatus("Importing unit plan from TeacherFiles template...");
         const response = await fetch("/api/unit-plans/import-docx-template", {
@@ -125,12 +297,49 @@ async function importTeacherTemplateDocx() {
     } catch (error) {
         setStatus(`Template import failed: ${error.message}`, true);
     } finally {
-        if (uploadButton) {
-            uploadButton.disabled = false;
+        setActionButtonsDisabled(false);
+    }
+}
+
+async function saveFromPreview(event) {
+    event.preventDefault();
+
+    let payload = null;
+    try {
+        payload = collectPreviewPayload();
+    } catch (error) {
+        setStatus(`Cannot save preview: ${error.message}`, true);
+        return;
+    }
+
+    if (!payload.title || !payload.topic || !payload.year_level) {
+        setStatus("Preview must include title, topic, and year level before saving.", true);
+        return;
+    }
+
+    try {
+        setActionButtonsDisabled(true);
+        setStatus("Saving previewed unit plan...");
+
+        const response = await fetch("/api/unit-plans", {
+            method: "POST",
+            headers: withUserEmailHeader({
+                "Content-Type": "application/json"
+            }),
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(result.error || `Could not save unit plan (HTTP ${response.status})`);
         }
-        if (importTemplateButton) {
-            importTemplateButton.disabled = false;
-        }
+
+        const lessonCount = Array.isArray(result?.lessons) ? result.lessons.length : 0;
+        setStatus(`Saved ${result.title || "unit plan"} from preview with ${lessonCount} lesson${lessonCount === 1 ? "" : "s"}.`);
+    } catch (error) {
+        setStatus(`Save from preview failed: ${error.message}`, true);
+    } finally {
+        setActionButtonsDisabled(false);
     }
 }
 
@@ -138,6 +347,22 @@ if (importTemplateButton) {
     importTemplateButton.addEventListener("click", () => {
         importTeacherTemplateDocx();
     });
+}
+
+if (previewFileButton) {
+    previewFileButton.addEventListener("click", () => {
+        previewFromFile();
+    });
+}
+
+if (previewTemplateButton) {
+    previewTemplateButton.addEventListener("click", () => {
+        previewFromTemplate();
+    });
+}
+
+if (previewForm) {
+    previewForm.addEventListener("submit", saveFromPreview);
 }
 
 if (form) {
@@ -159,12 +384,7 @@ if (form) {
         payload.append("unitPlanFile", file);
 
         try {
-            if (uploadButton) {
-                uploadButton.disabled = true;
-            }
-            if (importTemplateButton) {
-                importTemplateButton.disabled = true;
-            }
+            setActionButtonsDisabled(true);
             setStatus("Importing unit plan from document...");
 
             const response = await fetch("/api/unit-plans/import-docx", {
@@ -187,12 +407,7 @@ if (form) {
         } catch (error) {
             setStatus(`Import failed: ${error.message}`, true);
         } finally {
-            if (uploadButton) {
-                uploadButton.disabled = false;
-            }
-            if (importTemplateButton) {
-                importTemplateButton.disabled = false;
-            }
+            setActionButtonsDisabled(false);
         }
     });
 }

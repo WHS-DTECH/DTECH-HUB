@@ -554,6 +554,32 @@ app.post("/api/unit-plans/import-docx", unitPlanUpload.single("unitPlanFile"), a
   }
 });
 
+app.post("/api/unit-plans/preview-docx", unitPlanUpload.single("unitPlanFile"), async (req, res) => {
+  const userEmail = normalizeEmail(req.body?.created_by_email || req.body?.user_email || getRequestUserEmail(req));
+  if (!userEmail || !(await canManagePracticalSchedule(userEmail))) {
+    res.status(403).json({ error: "Teacher/Admin access is required." });
+    return;
+  }
+
+  const file = req.file;
+  if (!file?.buffer) {
+    res.status(400).json({ error: "A .docx file is required." });
+    return;
+  }
+
+  try {
+    const payload = await parseDocxBufferToUnitPlanPayload(file.buffer, file.originalname, userEmail);
+    res.status(200).json({
+      ok: true,
+      source: file.originalname,
+      unitPlan: payload,
+      lessonCount: Array.isArray(payload?.lessons) ? payload.lessons.length : 0
+    });
+  } catch (error) {
+    res.status(400).json({ error: error?.message || "Could not preview unit plan document" });
+  }
+});
+
 app.post("/api/unit-plans/import-docx-template", async (req, res) => {
   const userEmail = normalizeEmail(req.body?.created_by_email || req.body?.user_email || getRequestUserEmail(req));
   if (!userEmail || !(await canManagePracticalSchedule(userEmail))) {
@@ -578,6 +604,30 @@ app.post("/api/unit-plans/import-docx-template", async (req, res) => {
     });
   } catch (error) {
     res.status(400).json({ error: error?.message || "Could not import TeacherFiles template document" });
+  }
+});
+
+app.post("/api/unit-plans/preview-docx-template", async (req, res) => {
+  const userEmail = normalizeEmail(req.body?.created_by_email || req.body?.user_email || getRequestUserEmail(req));
+  if (!userEmail || !(await canManagePracticalSchedule(userEmail))) {
+    res.status(403).json({ error: "Teacher/Admin access is required." });
+    return;
+  }
+
+  const templateRelativePath = path.join("TeacherFiles", "Programming - TECHNOLOGY Unit Plan - DT (1).docx");
+  const templateAbsolutePath = path.join(__dirname, templateRelativePath);
+
+  try {
+    const templateBuffer = await require("fs").promises.readFile(templateAbsolutePath);
+    const payload = await parseDocxBufferToUnitPlanPayload(templateBuffer, "Programming - TECHNOLOGY Unit Plan - DT (1).docx", userEmail);
+    res.status(200).json({
+      ok: true,
+      source: templateRelativePath.replace(/\\/g, "/"),
+      unitPlan: payload,
+      lessonCount: Array.isArray(payload?.lessons) ? payload.lessons.length : 0
+    });
+  } catch (error) {
+    res.status(400).json({ error: error?.message || "Could not preview TeacherFiles template document" });
   }
 });
 
