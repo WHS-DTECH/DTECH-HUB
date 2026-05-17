@@ -1536,7 +1536,7 @@ function renderCurrentWeek() {
         sectionGrid.style.minWidth = "0";
 
         cards.forEach((card) => {
-            const cardElement = card.element.cloneNode(true);
+            const cardElement = card.element;
             cardElement.style.width = "calc(25% - 9px)";
             cardElement.style.minWidth = "180px";
             cardElement.style.flexShrink = "0";
