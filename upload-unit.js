@@ -361,6 +361,20 @@ function autoResizeSchoolValueTextareas() {
     });
 }
 
+function autoResizeContextTextareas() {
+    const contextTextareas = document.querySelectorAll(".contexts-row textarea");
+    contextTextareas.forEach((textarea) => {
+        autoResizeTextarea(textarea);
+
+        if (!textarea.dataset.autoResizeBound) {
+            textarea.addEventListener("input", () => {
+                autoResizeTextarea(textarea);
+            });
+            textarea.dataset.autoResizeBound = "true";
+        }
+    });
+}
+
 function getSchoolValueResponses(group) {
     const responses = {};
     SCHOOL_VALUE_KEYS.forEach((key) => {
@@ -440,6 +454,7 @@ function setContextResponses(group, responses = {}) {
     CONTEXT_KEYS.forEach((key) => {
         if (group?.[key]) {
             group[key].value = String(responses[key] || "").trim();
+            autoResizeTextarea(group[key]);
         }
     });
 }
@@ -1120,6 +1135,7 @@ if (clearManualFormButton) {
     clearManualFormButton.addEventListener("click", () => {
         manualForm?.reset();
         autoResizeSchoolValueTextareas();
+        autoResizeContextTextareas();
         resetManualLessons();
         setStatus("Manual unit planner cleared.");
     });
@@ -1213,3 +1229,4 @@ if (uploadForm) {
 renderAuthStatus();
 resetManualLessons();
 autoResizeSchoolValueTextareas();
+autoResizeContextTextareas();
