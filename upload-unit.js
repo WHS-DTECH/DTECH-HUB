@@ -41,7 +41,10 @@ const previewFields = {
         social: document.querySelector("#preview-context-social"),
         technology: document.querySelector("#preview-context-technology")
     },
-    curriculumLinks: document.querySelector("#preview-curriculum-links"),
+    curriculumLinks: {
+        localCurriculumLinks: document.querySelector("#preview-local-curriculum-links"),
+        mataurangaMaori: document.querySelector("#preview-matauranga-maori")
+    },
     assessmentLink: document.querySelector("#preview-assessment-link"),
     notes: document.querySelector("#preview-notes"),
     lessonsJson: document.querySelector("#preview-lessons-json")
@@ -70,7 +73,10 @@ const manualFields = {
         social: document.querySelector("#manual-context-social"),
         technology: document.querySelector("#manual-context-technology")
     },
-    curriculumLinks: document.querySelector("#manual-curriculum-links"),
+    curriculumLinks: {
+        localCurriculumLinks: document.querySelector("#manual-local-curriculum-links"),
+        mataurangaMaori: document.querySelector("#manual-matauranga-maori")
+    },
     assessmentLink: document.querySelector("#manual-assessment-link"),
     notes: document.querySelector("#manual-notes")
 };
@@ -93,6 +99,11 @@ const CONTEXT_LABELS = {
     culture: "Culture",
     social: "Social",
     technology: "Technology"
+};
+const CURRICULUM_LINK_KEYS = ["localCurriculumLinks", "mataurangaMaori"];
+const CURRICULUM_LINK_LABELS = {
+    localCurriculumLinks: "Local Curriculum Links",
+    mataurangaMaori: "Matauranga Maori"
 };
 
 function normalizeEmail(value) {
@@ -454,6 +465,92 @@ function parseContextsToResponses(contexts) {
     return responseMap;
 }
 
+function getCurriculumLinkResponses(group) {
+    const responses = {};
+    CURRICULUM_LINK_KEYS.forEach((key) => {
+        responses[key] = String(group?.[key]?.value || "").trim();
+    });
+    return responses;
+}
+
+function setCurriculumLinkResponses(group, responses = {}) {
+    CURRICULUM_LINK_KEYS.forEach((key) => {
+        if (group?.[key]) {
+            group[key].value = String(responses[key] || "").trim();
+        }
+    });
+}
+
+function curriculumResponsesToLines(responses) {
+    const lines = [];
+
+    CURRICULUM_LINK_KEYS.forEach((key) => {
+        const responseLines = normalizeLines(responses[key] || "");
+        if (!responseLines.length) {
+            return;
+        }
+
+        lines.push(`${CURRICULUM_LINK_LABELS[key]}: ${responseLines[0]}`);
+        responseLines.slice(1).forEach((line) => {
+            lines.push(line);
+        });
+    });
+
+    return lines;
+}
+
+function parseCurriculumLinksToResponses(curriculumLinks) {
+    const responseMap = {
+        localCurriculumLinks: "",
+        mataurangaMaori: ""
+    };
+
+    const lines = Array.isArray(curriculumLinks)
+        ? curriculumLinks.map((line) => String(line || "").trim()).filter(Boolean)
+        : String(curriculumLinks || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+
+    let currentKey = "";
+    lines.forEach((line) => {
+        const lower = line.toLowerCase();
+        const localPrefix = /^local\s*curriculum\s*links?/i;
+        const mataurangaPrefix = /^(m[aā]tauranga\s*m[aā]ori|matauranga\s*maori)/i;
+
+        if (localPrefix.test(lower)) {
+            currentKey = "localCurriculumLinks";
+            const remainder = line.replace(localPrefix, "").replace(/^\s*:?\s*/, "").trim();
+            if (remainder) {
+                responseMap.localCurriculumLinks = responseMap.localCurriculumLinks
+                    ? `${responseMap.localCurriculumLinks}\n${remainder}`
+                    : remainder;
+            }
+            return;
+        }
+
+        if (mataurangaPrefix.test(lower)) {
+            currentKey = "mataurangaMaori";
+            const remainder = line.replace(mataurangaPrefix, "").replace(/^\s*:?\s*/, "").trim();
+            if (remainder) {
+                responseMap.mataurangaMaori = responseMap.mataurangaMaori
+                    ? `${responseMap.mataurangaMaori}\n${remainder}`
+                    : remainder;
+            }
+            return;
+        }
+
+        if (!currentKey && !responseMap.localCurriculumLinks) {
+            currentKey = "localCurriculumLinks";
+        }
+
+        if (currentKey) {
+            responseMap[currentKey] = responseMap[currentKey]
+                ? `${responseMap[currentKey]}\n${line}`
+                : line;
+        }
+    });
+
+    return responseMap;
+}
+
 function parseLessonsJson(value) {
     const source = String(value || "").trim();
     if (!source) {
@@ -636,7 +733,7 @@ function populateManualPlannerFromUnitPlan(unitPlan) {
     if (manualFields.unitAims) manualFields.unitAims.value = joinLines(unitPlan.unit_aims);
     setSchoolValueResponses(manualFields.unitValues, parseUnitValuesToResponses(unitPlan.unit_values));
     setContextResponses(manualFields.contexts, parseContextsToResponses(unitPlan.contexts));
-    if (manualFields.curriculumLinks) manualFields.curriculumLinks.value = joinLines(unitPlan.curriculum_links);
+    setCurriculumLinkResponses(manualFields.curriculumLinks, parseCurriculumLinksToResponses(unitPlan.curriculum_links));
     if (manualFields.assessmentLink) manualFields.assessmentLink.value = String(unitPlan.assessment_link || "");
     if (manualFields.notes) manualFields.notes.value = String(unitPlan.notes || "");
 
@@ -684,7 +781,7 @@ function showPreviewPanel(unitPlan, sourceLabel) {
     if (previewFields.unitAims) previewFields.unitAims.value = joinLines(unitPlan?.unit_aims);
     setSchoolValueResponses(previewFields.unitValues, parseUnitValuesToResponses(unitPlan?.unit_values));
     setContextResponses(previewFields.contexts, parseContextsToResponses(unitPlan?.contexts));
-    if (previewFields.curriculumLinks) previewFields.curriculumLinks.value = joinLines(unitPlan?.curriculum_links);
+    setCurriculumLinkResponses(previewFields.curriculumLinks, parseCurriculumLinksToResponses(unitPlan?.curriculum_links));
     if (previewFields.assessmentLink) previewFields.assessmentLink.value = String(unitPlan?.assessment_link || "");
     if (previewFields.notes) previewFields.notes.value = String(unitPlan?.notes || "");
     if (previewFields.lessonsJson) previewFields.lessonsJson.value = JSON.stringify(Array.isArray(unitPlan?.lessons) ? unitPlan.lessons : [], null, 2);
@@ -705,7 +802,7 @@ function collectPreviewPayload() {
         unit_aims: normalizeLines(previewFields.unitAims?.value || ""),
         unit_values: schoolValueResponsesToUnitValues(getSchoolValueResponses(previewFields.unitValues)),
         contexts: contextResponsesToArray(getContextResponses(previewFields.contexts)),
-        curriculum_links: normalizeLines(previewFields.curriculumLinks?.value || ""),
+        curriculum_links: curriculumResponsesToLines(getCurriculumLinkResponses(previewFields.curriculumLinks)),
         assessment_link: String(previewFields.assessmentLink?.value || "").trim(),
         notes: String(previewFields.notes?.value || "").trim(),
         lessons: parseLessonsJson(previewFields.lessonsJson?.value || "[]")
@@ -725,7 +822,7 @@ function collectManualPayload() {
         unit_aims: normalizeLines(manualFields.unitAims?.value || ""),
         unit_values: schoolValueResponsesToUnitValues(getSchoolValueResponses(manualFields.unitValues)),
         contexts: contextResponsesToArray(getContextResponses(manualFields.contexts)),
-        curriculum_links: normalizeLines(manualFields.curriculumLinks?.value || ""),
+        curriculum_links: curriculumResponsesToLines(getCurriculumLinkResponses(manualFields.curriculumLinks)),
         assessment_link: String(manualFields.assessmentLink?.value || "").trim(),
         notes: String(manualFields.notes?.value || "").trim(),
         lessons: collectLessons(),
