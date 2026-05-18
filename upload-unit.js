@@ -1170,7 +1170,7 @@ async function previewFromFile() {
 
         hasReadyFilePreview = true;
         showPreviewPanel(result.unitPlan || {}, result.source || file.name);
-        setStatus("Preview loaded. Review it, then click Import Unit Plan.");
+        setStatus("Preview loaded. Review it, then click Save Unit Plan.");
     } catch (error) {
         hasReadyFilePreview = false;
         setStatus(`Preview failed: ${error.message}`, true);
@@ -1400,18 +1400,18 @@ if (uploadForm) {
         event.preventDefault();
 
         if (!hasReadyFilePreview) {
-            setStatus("Preview the selected file first, then import.", true);
+            setStatus("Preview the selected file first, then save.", true);
             return;
         }
 
         if (!uploadInput?.files?.length) {
-            setStatus("Choose a .docx file before importing.", true);
+            setStatus("Choose a .docx file before saving.", true);
             return;
         }
 
         const file = uploadInput.files[0];
         if (!file) {
-            setStatus("Choose a .docx file before importing.", true);
+            setStatus("Choose a .docx file before saving.", true);
             return;
         }
 
@@ -1420,7 +1420,7 @@ if (uploadForm) {
 
         try {
             setActionButtonsDisabled(true);
-            setStatus("Importing unit plan from document...");
+            setStatus("Saving unit plan from document...");
 
             const response = await fetch("/api/unit-plans/import-docx", {
                 method: "POST",
@@ -1437,11 +1437,11 @@ if (uploadForm) {
             const activityCount = Number(result.createdActivities || 0);
             const calendarCount = Number(result.createdCalendarEvents || 0);
 
-            setStatus(`Imported ${result.unitPlan?.title || "unit plan"}. Saved ${lessonCount} lesson${lessonCount === 1 ? "" : "s"}, created ${activityCount} activity card${activityCount === 1 ? "" : "s"}${calendarCount ? `, and ${calendarCount} calendar event${calendarCount === 1 ? "" : "s"}` : ""}.`);
+            setStatus(`Saved ${result.unitPlan?.title || "unit plan"}. Created ${activityCount} activity card${activityCount === 1 ? "" : "s"}, saved ${lessonCount} lesson${lessonCount === 1 ? "" : "s"}${calendarCount ? `, and created ${calendarCount} calendar event${calendarCount === 1 ? "" : "s"}` : ""}.`);
             uploadInput.value = "";
             resetFilePreviewState();
         } catch (error) {
-            setStatus(`Import failed: ${error.message}`, true);
+            setStatus(`Save failed: ${error.message}`, true);
         } finally {
             setActionButtonsDisabled(false);
         }
