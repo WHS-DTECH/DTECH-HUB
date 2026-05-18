@@ -292,6 +292,64 @@
     border-right: 0;
 }
 
+.skills-field {
+    gap: 8px;
+}
+
+.skills-table-shell {
+    border: 1px solid #a9c3df;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f6f9ff;
+}
+
+.skills-table-title {
+    background: #8e1b08;
+    color: #ffffff;
+    text-align: center;
+    font-size: 1.06rem;
+    font-weight: 700;
+    padding: 8px 10px;
+    border-bottom: 1px solid #7a1402;
+    text-transform: none;
+}
+
+.skills-table {
+    display: grid;
+}
+
+.skills-row {
+    display: grid;
+    grid-template-columns: minmax(95px, 120px) 1fr;
+    border-top: 1px solid #c8d5e7;
+}
+
+.skills-row:first-child {
+    border-top: 0;
+}
+
+.skills-heading {
+    padding: 10px;
+    font-size: 0.82rem;
+    font-weight: 800;
+    color: #1f2f46;
+    border-right: 1px solid #c8d5e7;
+    background: #ece7e7;
+}
+
+.skills-row textarea {
+    border: 0;
+    border-radius: 0;
+    border-top: 0;
+    background: #f6f9ff;
+    min-height: 96px;
+    padding: 10px;
+    font: inherit;
+    color: #223653;
+    resize: vertical;
+    overflow-y: hidden;
+}
+
 .resources-equipment-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(230px, 300px);
@@ -551,6 +609,15 @@
 
     .local-curriculum-table textarea {
         border-right: 0;
+    }
+
+    .skills-row {
+        grid-template-columns: 1fr;
+    }
+
+    .skills-heading {
+        border-right: 0;
+        border-bottom: 1px solid #c8d5e7;
     }
 
     .resources-equipment-layout {
