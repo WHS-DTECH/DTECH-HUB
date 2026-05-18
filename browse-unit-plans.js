@@ -103,6 +103,8 @@ function renderLessons(lessons) {
                         </div>
                     </div>
                     <div class="lesson-row-grid">
+                        <div class="field"><label>Lesson Year Level</label><input type="text" value="${escapeHtml(lesson.lessonYearLevel || lesson.year_level || "-")}" disabled></div>
+                        <div class="field"><label>Lesson Link</label><input type="text" value="${escapeHtml(lesson.lessonLinkUrl || lesson.link_url || "-")}" disabled></div>
                         <div class="field"><label>Week / Session</label><input type="text" value="${escapeHtml(lesson.lessonWeek || lesson.week_label || lesson.week || "-")}" disabled></div>
                         <div class="field"><label>Duration Minutes</label><input type="text" value="${escapeHtml(lesson.lessonDurationMinutes || lesson.duration_minutes || "-")}" disabled></div>
                         <div class="field"><label>Calendar Date</label><input type="text" value="${escapeHtml(lesson.lessonDate || lesson.calendar_date || "-")}" disabled></div>
@@ -128,6 +130,10 @@ function filterRows(sourceRows) {
             ? row.lessons
                 .map((lesson) => [
                     lesson.lessonTitle,
+                    lesson.lessonYearLevel,
+                    lesson.year_level,
+                    lesson.lessonLinkUrl,
+                    lesson.link_url,
                     lesson.lessonWeek,
                     lesson.lessonDate,
                     lesson.lessonType,

@@ -454,6 +454,8 @@ function normalizeUnitLessons(value) {
       activity_name: String(lesson?.activity_name ?? lesson?.activityName ?? "").trim(),
       activity_type: String(lesson?.activity_type ?? lesson?.activityType ?? "").trim(),
       card_color: String(lesson?.card_color ?? lesson?.cardColor ?? "").trim(),
+      year_level: normalizeYearLevel(lesson?.year_level ?? lesson?.yearLevel ?? lesson?.lessonYearLevel ?? []),
+      link_url: String(lesson?.link_url ?? lesson?.linkUrl ?? lesson?.lessonLinkUrl ?? lesson?.resource_link ?? lesson?.resourceLink ?? "").trim(),
       subject_stream: String(lesson?.subject_stream ?? lesson?.subjectStream ?? "").trim().toUpperCase(),
       publish_activity: Boolean(lesson?.publish_activity ?? lesson?.publishActivity),
       add_to_calendar: Boolean(lesson?.add_to_calendar ?? lesson?.addToCalendar),
@@ -508,6 +510,7 @@ function parseLessonRowsFromSlideshow(lines) {
   const lessons = [];
   let currentLesson = null;
   let waitingForTitle = false;
+  const urlPattern = /(https?:\/\/[^\s)]+|www\.[^\s)]+)/i;
 
   const flushLesson = () => {
     if (!currentLesson) {
@@ -518,6 +521,7 @@ function parseLessonRowsFromSlideshow(lines) {
     const lessonFocus = currentLesson.notes.join(" ").trim();
 
     if (lessonTitle || lessonFocus) {
+      const detectedUrl = String(currentLesson.link_url || "").trim();
       lessons.push({
         lesson_index: lessons.length + 1,
         title: lessonTitle || `Lesson ${lessons.length + 1}`,
@@ -525,6 +529,8 @@ function parseLessonRowsFromSlideshow(lines) {
         notes: lessonFocus,
         duration_minutes: 1,
         activity_name: lessonTitle || `Lesson ${lessons.length + 1}`,
+        year_level: String(currentLesson.year_level || "").trim(),
+        link_url: detectedUrl,
         publish_activity: true,
         add_to_calendar: false
       });
@@ -545,17 +551,18 @@ function parseLessonRowsFromSlideshow(lines) {
       return;
     }
 
-    if (/^slideshow$/i.test(text)) {
+    if (/^(juniors?|middle(?:\/seniors?)?|seniors?|year\s*\d+(?:\s*(?:\/|and|&)\s*\d+)?)\b/i.test(text)) {
       flushLesson();
       currentLesson = {
-        title: "Slideshow",
+        year_level: text,
+        title: "",
         notes: []
       };
-      waitingForTitle = false;
+      waitingForTitle = true;
       return;
     }
 
-    if (/^(juniors?|middle\/seniors?|middle|seniors?)$/i.test(text)) {
+    if (/^slideshow$/i.test(text)) {
       return;
     }
 
@@ -578,6 +585,19 @@ function parseLessonRowsFromSlideshow(lines) {
       currentLesson.title = text;
       waitingForTitle = false;
       return;
+    }
+
+    if (!currentLesson.title && text.length <= 40 && !/[.!?]$/.test(text)) {
+      currentLesson.title = text;
+      return;
+    }
+
+    if (!currentLesson.link_url) {
+      const urlMatch = text.match(urlPattern);
+      if (urlMatch) {
+        const rawUrl = String(urlMatch[1] || "").trim();
+        currentLesson.link_url = rawUrl.startsWith("http") ? rawUrl : `https://${rawUrl}`;
+      }
     }
 
     currentLesson.notes.push(text);

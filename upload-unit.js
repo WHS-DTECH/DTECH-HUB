@@ -351,6 +351,14 @@ function createLessonRow(lesson = {}) {
                 <label>Activity Name</label>
                 <input name="activityName" type="text" placeholder="Card title for the Activity Library">
             </div>
+            <div class="field">
+                <label>Lesson Year Level</label>
+                <input name="lessonYearLevel" type="text" placeholder="e.g. Year 9, Year 10 or Junior">
+            </div>
+            <div class="field">
+                <label>Lesson Link</label>
+                <input name="lessonLinkUrl" type="url" placeholder="https://... (optional)">
+            </div>
             <div class="field field-wide">
                 <label>Lesson Focus</label>
                 <textarea name="lessonFocus" placeholder="What are students learning or doing?"></textarea>
@@ -371,6 +379,8 @@ function createLessonRow(lesson = {}) {
     const lessonType = row.querySelector('[name="lessonType"]');
     const lessonCardColor = row.querySelector('[name="lessonCardColor"]');
     const activityName = row.querySelector('[name="activityName"]');
+    const lessonYearLevel = row.querySelector('[name="lessonYearLevel"]');
+    const lessonLinkUrl = row.querySelector('[name="lessonLinkUrl"]');
     const lessonFocus = row.querySelector('[name="lessonFocus"]');
     const lessonNotes = row.querySelector('[name="lessonNotes"]');
     const publishActivity = row.querySelector('[name="publishActivity"]');
@@ -383,6 +393,8 @@ function createLessonRow(lesson = {}) {
     lessonType.value = String(lesson.lessonType || lesson.activity_type || "").trim();
     lessonCardColor.value = String(lesson.lessonCardColor || lesson.card_color || "Rose").trim() || "Rose";
     activityName.value = String(lesson.activityName || lesson.activity_name || "").trim();
+    lessonYearLevel.value = String(lesson.lessonYearLevel || lesson.year_level || "").trim();
+    lessonLinkUrl.value = String(lesson.lessonLinkUrl || lesson.link_url || lesson.resource_link || "").trim();
     lessonFocus.value = String(lesson.lessonFocus || lesson.focus || "").trim();
     lessonNotes.value = String(lesson.lessonNotes || lesson.notes || "").trim();
     publishActivity.checked = Boolean(lesson.publishActivity ?? lesson.publish_activity);
@@ -428,12 +440,14 @@ function collectLessons() {
             lessonType: String(row.querySelector('[name="lessonType"]')?.value || "").trim(),
             lessonCardColor: String(row.querySelector('[name="lessonCardColor"]')?.value || "Rose").trim() || "Rose",
             activityName: String(row.querySelector('[name="activityName"]')?.value || "").trim(),
+            lessonYearLevel: String(row.querySelector('[name="lessonYearLevel"]')?.value || "").trim(),
+            lessonLinkUrl: String(row.querySelector('[name="lessonLinkUrl"]')?.value || "").trim(),
             lessonFocus: String(row.querySelector('[name="lessonFocus"]')?.value || "").trim(),
             lessonNotes: String(row.querySelector('[name="lessonNotes"]')?.value || "").trim(),
             publishActivity: Boolean(row.querySelector('[name="publishActivity"]')?.checked),
             addToCalendar: Boolean(row.querySelector('[name="addToCalendar"]')?.checked)
         }))
-        .filter((lesson) => Boolean(lesson.lessonTitle || lesson.activityName || lesson.lessonFocus || lesson.lessonWeek || lesson.lessonDate));
+        .filter((lesson) => Boolean(lesson.lessonTitle || lesson.activityName || lesson.lessonFocus || lesson.lessonWeek || lesson.lessonDate || lesson.lessonYearLevel || lesson.lessonLinkUrl));
 }
 
 function populateManualPlannerFromUnitPlan(unitPlan) {
