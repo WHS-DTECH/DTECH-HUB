@@ -338,6 +338,29 @@ function normalizeLines(value) {
         .filter(Boolean);
 }
 
+function autoResizeTextarea(textarea) {
+    if (!textarea) {
+        return;
+    }
+
+    textarea.style.height = "auto";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+}
+
+function autoResizeSchoolValueTextareas() {
+    const schoolValueTextareas = document.querySelectorAll(".school-value-card textarea");
+    schoolValueTextareas.forEach((textarea) => {
+        autoResizeTextarea(textarea);
+
+        if (!textarea.dataset.autoResizeBound) {
+            textarea.addEventListener("input", () => {
+                autoResizeTextarea(textarea);
+            });
+            textarea.dataset.autoResizeBound = "true";
+        }
+    });
+}
+
 function getSchoolValueResponses(group) {
     const responses = {};
     SCHOOL_VALUE_KEYS.forEach((key) => {
@@ -350,6 +373,7 @@ function setSchoolValueResponses(group, responses = {}) {
     SCHOOL_VALUE_KEYS.forEach((key) => {
         if (group?.[key]) {
             group[key].value = String(responses[key] || "").trim();
+            autoResizeTextarea(group[key]);
         }
     });
 }
@@ -1095,6 +1119,7 @@ if (addLessonButton) {
 if (clearManualFormButton) {
     clearManualFormButton.addEventListener("click", () => {
         manualForm?.reset();
+        autoResizeSchoolValueTextareas();
         resetManualLessons();
         setStatus("Manual unit planner cleared.");
     });
@@ -1187,3 +1212,4 @@ if (uploadForm) {
 
 renderAuthStatus();
 resetManualLessons();
+autoResizeSchoolValueTextareas();

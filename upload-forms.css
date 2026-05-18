@@ -158,12 +158,13 @@
 }
 
 .school-value-card textarea {
-    min-height: 78px;
+    min-height: 150px;
     border: 1px solid #90b5dd;
     background: #f6f9ff;
     border-radius: 6px;
     padding: 8px 10px;
     resize: vertical;
+    overflow-y: hidden;
     font: inherit;
     color: #223653;
     font-size: 0.8rem;
