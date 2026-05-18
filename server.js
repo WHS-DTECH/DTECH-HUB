@@ -533,6 +533,16 @@ function parseLessonRowsFromSlideshow(lines) {
       return;
     }
 
+    if (/^slideshow$/i.test(text)) {
+      flushLesson();
+      currentLesson = {
+        title: "Slideshow",
+        notes: []
+      };
+      waitingForTitle = false;
+      return;
+    }
+
     if (/^(juniors?|middle\/seniors?|middle|seniors?)$/i.test(text)) {
       return;
     }
