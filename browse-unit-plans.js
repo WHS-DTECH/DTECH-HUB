@@ -18,9 +18,11 @@ function normalizeRole(value) {
 
 function setStatus(message, isError = false) {
     if (!statusElement) return;
-    statusElement.textContent = String(message || "");
+    const text = String(message || "");
+    statusElement.textContent = text;
     statusElement.classList.remove("is-error", "is-success");
     statusElement.classList.add(isError ? "is-error" : "is-success");
+    statusElement.hidden = !text;
 }
 
 function setAccess(message, isError = false) {
@@ -122,13 +124,34 @@ function filterRows(sourceRows) {
     if (!term) return sourceRows;
 
     return sourceRows.filter((row) => {
+        const lessonBlob = Array.isArray(row.lessons)
+            ? row.lessons
+                .map((lesson) => [
+                    lesson.lessonTitle,
+                    lesson.lessonWeek,
+                    lesson.lessonDate,
+                    lesson.lessonType,
+                    lesson.activityName,
+                    lesson.lessonFocus,
+                    lesson.lessonNotes
+                ].map((item) => String(item || "").toLowerCase()).join(" | "))
+                .join(" || ")
+            : "";
         const blob = [
             row.title,
             row.topic,
+            row.strand,
             row.year_level,
             row.subject_stream,
             row.term,
-            row.overview
+            row.overview,
+            row.unit_aims,
+            row.unit_values,
+            row.contexts,
+            row.curriculum_links,
+            row.assessment_link,
+            row.notes,
+            lessonBlob
         ]
             .map((item) => String(item || "").toLowerCase())
             .join(" | ");

@@ -316,6 +316,40 @@ function collectLessons() {
         .filter((lesson) => Boolean(lesson.lessonTitle || lesson.activityName || lesson.lessonFocus || lesson.lessonWeek || lesson.lessonDate));
 }
 
+function populateManualPlannerFromUnitPlan(unitPlan) {
+    if (!manualForm || !unitPlan) {
+        return;
+    }
+
+    if (manualFields.title) manualFields.title.value = String(unitPlan.title || "");
+    if (manualFields.topic) manualFields.topic.value = String(unitPlan.topic || "");
+    if (manualFields.strand) manualFields.strand.value = String(unitPlan.strand || unitPlan.subject_stream || "");
+    if (manualFields.yearLevel) manualFields.yearLevel.value = String(unitPlan.year_level || "");
+    if (manualFields.subjectStream) manualFields.subjectStream.value = String(unitPlan.subject_stream || "");
+    if (manualFields.durationWeeks) manualFields.durationWeeks.value = Number.parseInt(unitPlan.duration_weeks, 10) || 1;
+    if (manualFields.term) manualFields.term.value = String(unitPlan.term || "");
+    if (manualFields.overview) manualFields.overview.value = String(unitPlan.overview || "");
+    if (manualFields.unitAims) manualFields.unitAims.value = joinLines(unitPlan.unit_aims);
+    if (manualFields.unitValues) manualFields.unitValues.value = joinLines(unitPlan.unit_values);
+    if (manualFields.contexts) manualFields.contexts.value = joinLines(unitPlan.contexts);
+    if (manualFields.curriculumLinks) manualFields.curriculumLinks.value = joinLines(unitPlan.curriculum_links);
+    if (manualFields.assessmentLink) manualFields.assessmentLink.value = String(unitPlan.assessment_link || "");
+    if (manualFields.notes) manualFields.notes.value = String(unitPlan.notes || "");
+
+    if (lessonList) {
+        lessonList.innerHTML = "";
+        const lessons = Array.isArray(unitPlan.lessons) ? unitPlan.lessons : [];
+        if (!lessons.length) {
+            lessonList.appendChild(createLessonRow());
+        } else {
+            lessons.forEach((lesson) => {
+                lessonList.appendChild(createLessonRow(lesson));
+            });
+        }
+        renumberLessons();
+    }
+}
+
 function resetManualLessons() {
     if (!lessonList) {
         return;
@@ -351,6 +385,7 @@ function showPreviewPanel(unitPlan, sourceLabel) {
     if (previewFields.notes) previewFields.notes.value = String(unitPlan?.notes || "");
     if (previewFields.lessonsJson) previewFields.lessonsJson.value = JSON.stringify(Array.isArray(unitPlan?.lessons) ? unitPlan.lessons : [], null, 2);
 
+    populateManualPlannerFromUnitPlan(unitPlan);
     previewPanel.hidden = false;
 }
 
@@ -472,7 +507,7 @@ async function previewFromTemplate() {
         }
 
         showPreviewPanel(result.unitPlan || {}, result.source || "TeacherFiles template");
-        setStatus("Template preview loaded. Review fields and click Save Previewed Unit Plan when ready.");
+        setStatus("Template preview loaded. Review it, then click Import Unit Plan.");
     } catch (error) {
         setStatus(`Template preview failed: ${error.message}`, true);
     } finally {
@@ -599,6 +634,8 @@ if (clearButton) {
             uploadInput.value = "";
         }
         resetFilePreviewState();
+        manualForm?.reset();
+        resetManualLessons();
         setStatus("File cleared.");
     });
 }
