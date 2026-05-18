@@ -497,6 +497,39 @@ function extractLinesBetween(lines, startIndex, endIndex) {
   return lines.slice(startIndex, safeEndIndex).map((line) => String(line || "").trim()).filter(Boolean);
 }
 
+function sanitizeUnitAims(lines) {
+  const sourceLines = Array.isArray(lines)
+    ? lines.map((line) => String(line || "").trim()).filter(Boolean)
+    : [];
+
+  const sectionStartPattern = /\b(year\s*groups?|main\s*focus|school\s*values|whanaungatanga|rangatiratanga|manaakitanga|kaitiakitanga|contexts\s*of\s*learning|local\s*curriculum\s*links?|m[aā]tauranga\s*m[aā]ori|skills|health\s*(?:&|and)\s*safety|safety\s*issues?|slideshow|reporting\s*&\s*assessment\s*link|unit\s*evaluation)\b/i;
+  const cleaned = [];
+
+  for (const rawLine of sourceLines) {
+    const line = String(rawLine || "").trim();
+    if (!line) {
+      continue;
+    }
+
+    const matchIndex = line.search(sectionStartPattern);
+    if (matchIndex === 0) {
+      break;
+    }
+
+    if (matchIndex > 0) {
+      const trimmed = line.slice(0, matchIndex).trim();
+      if (trimmed) {
+        cleaned.push(trimmed);
+      }
+      break;
+    }
+
+    cleaned.push(line);
+  }
+
+  return cleaned;
+}
+
 function isLessonHeadingLine(line) {
   const text = String(line || "").trim();
   if (!text) {
@@ -722,7 +755,8 @@ function parseUnitPlanFromDocxText(rawText, originalName = "") {
     ]);
   })();
 
-  const unitAims = aimIndex >= 0 ? extractLinesBetween(lines, aimIndex + 1, aimsEndIndex) : [];
+  const extractedAims = aimIndex >= 0 ? extractLinesBetween(lines, aimIndex + 1, aimsEndIndex) : [];
+  const unitAims = sanitizeUnitAims(extractedAims);
   const unitValues = extractLinesBetween(lines, schoolValuesIndex + 1, contextsIndex);
   const contexts = extractLinesBetween(lines, contextsIndex + 1, localCurriculumIndex);
   const curriculumLinks = extractLinesBetween(lines, localCurriculumIndex + 1, slideshowIndex);
