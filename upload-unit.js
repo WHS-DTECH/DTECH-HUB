@@ -56,6 +56,8 @@ const manualFields = {
 const UPLOAD_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 let hasReadyFilePreview = false;
 
+const YEAR_LEVEL_OPTIONS = ["Junior", "Year 7", "Year 8", "Middle", "Year 9", "Year 10", "Senior", "Year 11", "Year 12", "Year 13"];
+
 function normalizeEmail(value) {
     return String(value || "").trim().toLowerCase();
 }
@@ -155,6 +157,124 @@ function joinLines(value) {
         .map((item) => String(item || "").trim())
         .filter(Boolean)
         .join("\n");
+}
+
+function getSelectValues(selectElement) {
+    if (!selectElement) {
+        return [];
+    }
+
+    return Array.from(selectElement.selectedOptions || [])
+        .map((option) => String(option.value || option.textContent || "").trim())
+        .filter(Boolean);
+}
+
+function setSelectValues(selectElement, values) {
+    if (!selectElement) {
+        return;
+    }
+
+    const selectedValues = Array.isArray(values)
+        ? values.map((value) => String(value || "").trim()).filter(Boolean)
+        : String(values || "").split(/\s*,\s*/).map((value) => value.trim()).filter(Boolean);
+
+    Array.from(selectElement.options || []).forEach((option) => {
+        const optionValue = String(option.value || option.textContent || "").trim();
+        option.selected = selectedValues.includes(optionValue);
+    });
+}
+
+function normalizeYearLevelText(value) {
+    if (Array.isArray(value)) {
+        return value.map((item) => String(item || "").trim()).filter(Boolean).join(", ");
+    }
+
+    return String(value || "")
+        .split(/\s*,\s*/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .join(", ");
+}
+
+function inferYearLevelSelections(value) {
+    const text = Array.isArray(value)
+        ? value.map((item) => String(item || "").trim()).filter(Boolean).join(" ")
+        : String(value || "");
+    const lower = text.toLowerCase();
+    const selected = new Set();
+
+    if (/\bjunior\b/.test(lower)) selected.add("Junior");
+    if (/\bmiddle\b/.test(lower)) selected.add("Middle");
+    if (/\bsenior\b/.test(lower)) selected.add("Senior");
+
+    for (let year = 7; year <= 13; year += 1) {
+        const yearPattern = new RegExp(`\\byear\\s*${year}\\b`);
+        if (yearPattern.test(lower) || new RegExp(`\\b${year}\\b`).test(lower)) {
+            selected.add(`Year ${year}`);
+        }
+    }
+
+    if (/\b7\s*(?:and|&)\s*8\b/.test(lower) || /\byear\s*7\s*(?:and|&)\s*8\b/.test(lower)) {
+        selected.add("Year 7");
+        selected.add("Year 8");
+    }
+
+    if (/\b8\s*(?:and|&)\s*9\b/.test(lower) || /\byear\s*8\s*(?:and|&)\s*9\b/.test(lower)) {
+        selected.add("Year 8");
+        selected.add("Year 9");
+    }
+
+    if (/\b9\s*(?:and|&)\s*10\b/.test(lower) || /\byear\s*9\s*(?:and|&)\s*10\b/.test(lower)) {
+        selected.add("Year 9");
+        selected.add("Year 10");
+    }
+
+    if (/\b10\s*(?:and|&)\s*11\b/.test(lower) || /\byear\s*10\s*(?:and|&)\s*11\b/.test(lower)) {
+        selected.add("Year 10");
+        selected.add("Year 11");
+    }
+
+    if (/\b11\s*(?:and|&)\s*12\b/.test(lower) || /\byear\s*11\s*(?:and|&)\s*12\b/.test(lower)) {
+        selected.add("Year 11");
+        selected.add("Year 12");
+    }
+
+    if (/\b12\s*(?:and|&)\s*13\b/.test(lower) || /\byear\s*12\s*(?:and|&)\s*13\b/.test(lower)) {
+        selected.add("Year 12");
+        selected.add("Year 13");
+    }
+
+    if (/\b7\s*[-–]\s*8\b/.test(lower) || /\byear\s*7\s*[-–]\s*8\b/.test(lower)) {
+        selected.add("Year 7");
+        selected.add("Year 8");
+    }
+
+    if (/\b8\s*[-–]\s*9\b/.test(lower) || /\byear\s*8\s*[-–]\s*9\b/.test(lower)) {
+        selected.add("Year 8");
+        selected.add("Year 9");
+    }
+
+    if (/\b9\s*[-–]\s*10\b/.test(lower) || /\byear\s*9\s*[-–]\s*10\b/.test(lower)) {
+        selected.add("Year 9");
+        selected.add("Year 10");
+    }
+
+    if (/\b10\s*[-–]\s*11\b/.test(lower) || /\byear\s*10\s*[-–]\s*11\b/.test(lower)) {
+        selected.add("Year 10");
+        selected.add("Year 11");
+    }
+
+    if (/\b11\s*[-–]\s*12\b/.test(lower) || /\byear\s*11\s*[-–]\s*12\b/.test(lower)) {
+        selected.add("Year 11");
+        selected.add("Year 12");
+    }
+
+    if (/\b12\s*[-–]\s*13\b/.test(lower) || /\byear\s*12\s*[-–]\s*13\b/.test(lower)) {
+        selected.add("Year 12");
+        selected.add("Year 13");
+    }
+
+    return YEAR_LEVEL_OPTIONS.filter((option) => selected.has(option));
 }
 
 function normalizeLines(value) {
@@ -324,7 +444,7 @@ function populateManualPlannerFromUnitPlan(unitPlan) {
     if (manualFields.title) manualFields.title.value = String(unitPlan.title || "");
     if (manualFields.topic) manualFields.topic.value = String(unitPlan.topic || "");
     if (manualFields.strand) manualFields.strand.value = String(unitPlan.strand || unitPlan.subject_stream || "");
-    if (manualFields.yearLevel) manualFields.yearLevel.value = String(unitPlan.year_level || "");
+    setSelectValues(manualFields.yearLevel, inferYearLevelSelections(unitPlan.year_level));
     if (manualFields.subjectStream) manualFields.subjectStream.value = String(unitPlan.subject_stream || "");
     if (manualFields.durationWeeks) manualFields.durationWeeks.value = Number.parseInt(unitPlan.duration_weeks, 10) || 1;
     if (manualFields.term) manualFields.term.value = String(unitPlan.term || "");
@@ -372,7 +492,7 @@ function showPreviewPanel(unitPlan, sourceLabel) {
 
     if (previewFields.title) previewFields.title.value = String(unitPlan?.title || "");
     if (previewFields.topic) previewFields.topic.value = String(unitPlan?.topic || "");
-    if (previewFields.yearLevel) previewFields.yearLevel.value = String(unitPlan?.year_level || "");
+    setSelectValues(previewFields.yearLevel, inferYearLevelSelections(unitPlan?.year_level));
     if (previewFields.subjectStream) previewFields.subjectStream.value = String(unitPlan?.subject_stream || "");
     if (previewFields.durationWeeks) previewFields.durationWeeks.value = Number.parseInt(unitPlan?.duration_weeks, 10) || 1;
     if (previewFields.term) previewFields.term.value = String(unitPlan?.term || "");
@@ -393,7 +513,7 @@ function collectPreviewPayload() {
     return {
         title: String(previewFields.title?.value || "").trim(),
         topic: String(previewFields.topic?.value || "").trim(),
-        year_level: String(previewFields.yearLevel?.value || "").trim(),
+        year_level: normalizeYearLevelText(getSelectValues(previewFields.yearLevel)),
         subject_stream: String(previewFields.subjectStream?.value || "").trim().toUpperCase(),
         duration_weeks: Number.parseInt(previewFields.durationWeeks?.value || "1", 10) || 1,
         term: String(previewFields.term?.value || "").trim(),
@@ -413,7 +533,7 @@ function collectManualPayload() {
         title: String(manualFields.title?.value || "").trim(),
         topic: String(manualFields.topic?.value || "").trim(),
         strand: String(manualFields.strand?.value || "").trim(),
-        year_level: String(manualFields.yearLevel?.value || "").trim(),
+        year_level: normalizeYearLevelText(getSelectValues(manualFields.yearLevel)),
         subject_stream: String(manualFields.subjectStream?.value || "").trim().toUpperCase(),
         duration_weeks: Number.parseInt(manualFields.durationWeeks?.value || "1", 10) || 1,
         term: String(manualFields.term?.value || "").trim(),

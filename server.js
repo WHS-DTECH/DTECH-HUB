@@ -462,6 +462,18 @@ function normalizeUnitLessons(value) {
   });
 }
 
+function normalizeYearLevel(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || "").trim()).filter(Boolean).join(", ");
+  }
+
+  return String(value || "")
+    .split(/\s*,\s*/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
 function splitDocxLines(value) {
   return String(value || "")
     .replace(/\r/g, "")
@@ -655,7 +667,7 @@ function parseUnitPlanFromDocxText(rawText, originalName = "") {
 function buildUnitPlanPayload(body, userEmail) {
   const title = String(body?.title || body?.unit_title || "").trim();
   const topic = String(body?.topic || body?.unit_topic || "").trim();
-  const yearLevel = String(body?.year_level || body?.yearLevel || "").trim();
+  const yearLevel = normalizeYearLevel(body?.year_level ?? body?.yearLevel);
   const fallbackIdSource = title || topic || `unit-plan-${Date.now()}`;
   const id = String(body?.id || slugify(fallbackIdSource)).trim();
 
