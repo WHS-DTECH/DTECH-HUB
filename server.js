@@ -742,6 +742,8 @@ function parseUnitPlanFromDocxText(rawText, originalName = "") {
   const reportingIndex = findLineIndex(lines, (line) => line.startsWith("reporting & assessment link"));
   const evaluationIndex = findLineIndex(lines, (line) => line.startsWith("unit evaluation"));
 
+  console.log("DEBUG PARSER: aimIndex =", aimIndex, "yearGroupsIndex =", yearGroupsIndex, "schoolValuesIndex =", schoolValuesIndex);
+
   const aimsEndIndex = (() => {
     if (aimIndex < 0) {
       return -1;
@@ -756,8 +758,12 @@ function parseUnitPlanFromDocxText(rawText, originalName = "") {
     ]);
   })();
 
+  console.log("DEBUG PARSER: aimsEndIndex =", aimsEndIndex);
+
   const extractedAims = aimIndex >= 0 ? extractLinesBetween(lines, aimIndex + 1, aimsEndIndex) : [];
+  console.log("DEBUG PARSER: extractedAims =", extractedAims);
   const unitAims = sanitizeUnitAims(extractedAims);
+  console.log("DEBUG PARSER: unitAims after sanitize =", unitAims);
   const unitValues = extractLinesBetween(lines, schoolValuesIndex + 1, contextsIndex);
   const contexts = extractLinesBetween(lines, contextsIndex + 1, localCurriculumIndex);
   const curriculumLinks = extractLinesBetween(lines, localCurriculumIndex + 1, slideshowIndex);
