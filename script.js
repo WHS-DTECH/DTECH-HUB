@@ -242,11 +242,13 @@ const baseLabProjects = [
 
 let projects = [...baseProjects];
 let labProjects = [...baseLabProjects];
+let lessons = [];
 
 // Dynamically load backend activities and refresh library
 async function refreshActivitiesLibrary() {
-    const sharedProjects = await loadSharedProjects();
+    const [sharedProjects, sharedLessons] = await Promise.all([loadSharedProjects(), loadSharedLessons()]);
     projects = mergeProjects(sharedProjects);
+    lessons = sharedLessons;
     renderLibrary();
 }
 
@@ -290,7 +292,7 @@ function slugify(value) {
 
 function inferSourceTypeFromRecord(record) {
     const explicitType = String(record?.sourceType || "").toLowerCase();
-    if (explicitType === "project" || explicitType === "activity" || explicitType === "assessment") {
+    if (explicitType === "project" || explicitType === "activity" || explicitType === "assessment" || explicitType === "lesson") {
         return explicitType;
     }
 
@@ -303,8 +305,23 @@ function inferSourceTypeFromRecord(record) {
     if (category.includes("assessment")) {
         return "assessment";
     }
+    if (category.includes("lesson")) {
+        return "lesson";
+    }
     if (category.includes("project")) {
         return "project";
+    }
+
+    const hasLessonFields = Boolean(
+        record?.lesson_title ||
+        record?.lesson_type ||
+        record?.lesson_focus ||
+        record?.lesson_year_level ||
+        record?.activity_name
+    );
+
+    if (hasLessonFields) {
+        return "lesson";
     }
 
     // Check for assessment-specific fields
@@ -401,6 +418,57 @@ async function loadSharedProjects() {
     }
 }
 
+async function loadSharedLessons() {
+    try {
+        const response = await fetch("/api/lessons");
+        if (!response.ok) return [];
+
+        const parsed = await response.json();
+        if (!Array.isArray(parsed)) return [];
+
+        return parsed
+            .filter((lesson) => Boolean(lesson?.publish_activity))
+            .map((lesson) => {
+                const lessonTitle = String(lesson.lesson_title || lesson.activity_name || "").trim();
+                if (!lessonTitle) return null;
+
+                const id = String(lesson.id || slugify(lessonTitle) || `lesson-${Date.now()}`);
+                const yearLevel = String(lesson.lesson_year_level || "Other").trim();
+                const lessonType = String(lesson.lesson_type || "Lesson").trim();
+                const summary = String(lesson.lesson_focus || lesson.lesson_notes || "Lesson details available.").trim();
+                const created = String(lesson.created_at || new Date().toISOString()).slice(0, 10);
+                const lessonLink = String(lesson.lesson_link_url || "").trim();
+                const isExternalLink = /^https?:\/\//i.test(lessonLink);
+
+                return {
+                    id,
+                    title: lessonTitle,
+                    className: `${yearLevel} Computer Lab`,
+                    area: lessonType,
+                    activityCategory: "Lesson",
+                    showThisWeek: false,
+                    status: "active",
+                    term: String(lesson.term || "Term 2"),
+                    updated: created,
+                    href: lessonLink || "browse-lessons.html",
+                    external: isExternalLink,
+                    summary,
+                    keywords: [lessonType, String(lesson.activity_name || ""), String(lesson.lesson_week || ""), "lesson"].filter(Boolean),
+                    sourceType: "lesson",
+                    imageUrl: null,
+                    visual: {
+                        icon: textToIcon(lessonType),
+                        label: "Lesson",
+                        palette: colorToPalette(lesson.lesson_card_color || lesson.lesson_card_colour || "rose")
+                    }
+                };
+            })
+            .filter(Boolean);
+    } catch (_error) {
+        return [];
+    }
+}
+
 function mergeProjects(sharedProjects) {
     const byId = new Map();
     const byTitle = new Map();
@@ -446,6 +514,10 @@ function getUnifiedLibraryItems() {
         ...projects.map((project) => ({
             ...project,
             sourceType: inferSourceTypeFromRecord(project)
+        })),
+        ...lessons.map((lesson) => ({
+            ...lesson,
+            sourceType: "lesson"
         })),
         ...labProjects.map(mapLabProjectToLibraryItem)
     ];
@@ -1174,7 +1246,7 @@ function getTypes() {
 }
 
 function getContentTypes() {
-    return ["All", "Activities", "Projects", "Assessments"];
+    return ["All", "Activities", "Projects", "Assessments", "Lessons"];
 }
 
 function getCategories() {
@@ -1231,7 +1303,8 @@ function filterProjects(items) {
             state.content === "All" ||
             (state.content === "Activities" && project.sourceType === "activity") ||
             (state.content === "Projects" && project.sourceType === "project") ||
-            (state.content === "Assessments" && project.sourceType === "assessment");
+            (state.content === "Assessments" && project.sourceType === "assessment") ||
+            (state.content === "Lessons" && project.sourceType === "lesson");
         const haystack = [project.title, project.className, project.area, project.activityCategory, project.summary, ...project.keywords]
             .join(" ")
             .toLowerCase();
@@ -1268,7 +1341,7 @@ function createProjectCard(project) {
         ? `<span class="project-tag status-tag status-${project.status}">${formatStatus(project.status)}</span>` 
         : '';
     const sourceType = inferSourceTypeFromRecord(project);
-    const contentTypeLabel = sourceType === "project" ? "PROJECT" : sourceType === "assessment" ? "ASSESSMENT" : "ACTIVITY";
+    const contentTypeLabel = sourceType === "project" ? "PROJECT" : sourceType === "assessment" ? "ASSESSMENT" : sourceType === "lesson" ? "LESSON" : "ACTIVITY";
 
     card.innerHTML = `
         <div class="project-visual" ${visualStyle}>
