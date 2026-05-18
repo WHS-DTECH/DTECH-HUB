@@ -34,7 +34,13 @@ const previewFields = {
         manaakitanga: document.querySelector("#preview-value-manaakitanga"),
         kaitiakitanga: document.querySelector("#preview-value-kaitiakitanga")
     },
-    contexts: document.querySelector("#preview-contexts"),
+    contexts: {
+        environment: document.querySelector("#preview-context-environment"),
+        mentalEmotional: document.querySelector("#preview-context-mental-emotional"),
+        culture: document.querySelector("#preview-context-culture"),
+        social: document.querySelector("#preview-context-social"),
+        technology: document.querySelector("#preview-context-technology")
+    },
     curriculumLinks: document.querySelector("#preview-curriculum-links"),
     assessmentLink: document.querySelector("#preview-assessment-link"),
     notes: document.querySelector("#preview-notes"),
@@ -57,7 +63,13 @@ const manualFields = {
         manaakitanga: document.querySelector("#manual-value-manaakitanga"),
         kaitiakitanga: document.querySelector("#manual-value-kaitiakitanga")
     },
-    contexts: document.querySelector("#manual-contexts"),
+    contexts: {
+        environment: document.querySelector("#manual-context-environment"),
+        mentalEmotional: document.querySelector("#manual-context-mental-emotional"),
+        culture: document.querySelector("#manual-context-culture"),
+        social: document.querySelector("#manual-context-social"),
+        technology: document.querySelector("#manual-context-technology")
+    },
     curriculumLinks: document.querySelector("#manual-curriculum-links"),
     assessmentLink: document.querySelector("#manual-assessment-link"),
     notes: document.querySelector("#manual-notes")
@@ -68,11 +80,19 @@ let hasReadyFilePreview = false;
 
 const YEAR_LEVEL_OPTIONS = ["Junior", "Year 7", "Year 8", "Middle", "Year 9", "Year 10", "Senior", "Year 11", "Year 12", "Year 13"];
 const SCHOOL_VALUE_KEYS = ["whanaungatanga", "rangatiratanga", "manaakitanga", "kaitiakitanga"];
+const CONTEXT_KEYS = ["environment", "mentalEmotional", "culture", "social", "technology"];
 const SCHOOL_VALUE_LABELS = {
     whanaungatanga: "Whanaungatanga",
     rangatiratanga: "Rangatiratanga",
     manaakitanga: "Manaakitanga",
     kaitiakitanga: "Kaitiakitanga"
+};
+const CONTEXT_LABELS = {
+    environment: "Environment",
+    mentalEmotional: "Mental-Emotional",
+    culture: "Culture",
+    social: "Social",
+    technology: "Technology"
 };
 
 function normalizeEmail(value) {
@@ -367,6 +387,73 @@ function parseUnitValuesToResponses(unitValues) {
     return responseMap;
 }
 
+function getContextResponses(group) {
+    const responses = {};
+    CONTEXT_KEYS.forEach((key) => {
+        responses[key] = String(group?.[key]?.value || "").trim();
+    });
+    return responses;
+}
+
+function setContextResponses(group, responses = {}) {
+    CONTEXT_KEYS.forEach((key) => {
+        if (group?.[key]) {
+            group[key].value = String(responses[key] || "").trim();
+        }
+    });
+}
+
+function contextResponsesToArray(responses) {
+    return CONTEXT_KEYS
+        .map((key) => {
+            const response = String(responses[key] || "").trim();
+            if (!response) {
+                return "";
+            }
+            return `${CONTEXT_LABELS[key]}: ${response}`;
+        })
+        .filter(Boolean);
+}
+
+function parseContextsToResponses(contexts) {
+    const responseMap = {
+        environment: "",
+        mentalEmotional: "",
+        culture: "",
+        social: "",
+        technology: ""
+    };
+
+    const lines = Array.isArray(contexts)
+        ? contexts.map((line) => String(line || "").trim()).filter(Boolean)
+        : String(contexts || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+
+    let currentKey = "";
+    lines.forEach((line) => {
+        const lower = line.toLowerCase();
+        const matchedKey = CONTEXT_KEYS.find((key) => lower.startsWith(CONTEXT_LABELS[key].toLowerCase()));
+
+        if (matchedKey) {
+            currentKey = matchedKey;
+            const remainder = line.replace(new RegExp(`^${CONTEXT_LABELS[matchedKey]}\s*:?\s*`, "i"), "").trim();
+            if (remainder) {
+                responseMap[matchedKey] = responseMap[matchedKey]
+                    ? `${responseMap[matchedKey]}\n${remainder}`
+                    : remainder;
+            }
+            return;
+        }
+
+        if (currentKey) {
+            responseMap[currentKey] = responseMap[currentKey]
+                ? `${responseMap[currentKey]}\n${line}`
+                : line;
+        }
+    });
+
+    return responseMap;
+}
+
 function parseLessonsJson(value) {
     const source = String(value || "").trim();
     if (!source) {
@@ -548,7 +635,7 @@ function populateManualPlannerFromUnitPlan(unitPlan) {
     if (manualFields.overview) manualFields.overview.value = String(unitPlan.overview || "");
     if (manualFields.unitAims) manualFields.unitAims.value = joinLines(unitPlan.unit_aims);
     setSchoolValueResponses(manualFields.unitValues, parseUnitValuesToResponses(unitPlan.unit_values));
-    if (manualFields.contexts) manualFields.contexts.value = joinLines(unitPlan.contexts);
+    setContextResponses(manualFields.contexts, parseContextsToResponses(unitPlan.contexts));
     if (manualFields.curriculumLinks) manualFields.curriculumLinks.value = joinLines(unitPlan.curriculum_links);
     if (manualFields.assessmentLink) manualFields.assessmentLink.value = String(unitPlan.assessment_link || "");
     if (manualFields.notes) manualFields.notes.value = String(unitPlan.notes || "");
@@ -596,7 +683,7 @@ function showPreviewPanel(unitPlan, sourceLabel) {
     if (previewFields.overview) previewFields.overview.value = String(unitPlan?.overview || "");
     if (previewFields.unitAims) previewFields.unitAims.value = joinLines(unitPlan?.unit_aims);
     setSchoolValueResponses(previewFields.unitValues, parseUnitValuesToResponses(unitPlan?.unit_values));
-    if (previewFields.contexts) previewFields.contexts.value = joinLines(unitPlan?.contexts);
+    setContextResponses(previewFields.contexts, parseContextsToResponses(unitPlan?.contexts));
     if (previewFields.curriculumLinks) previewFields.curriculumLinks.value = joinLines(unitPlan?.curriculum_links);
     if (previewFields.assessmentLink) previewFields.assessmentLink.value = String(unitPlan?.assessment_link || "");
     if (previewFields.notes) previewFields.notes.value = String(unitPlan?.notes || "");
@@ -617,7 +704,7 @@ function collectPreviewPayload() {
         overview: String(previewFields.overview?.value || "").trim(),
         unit_aims: normalizeLines(previewFields.unitAims?.value || ""),
         unit_values: schoolValueResponsesToUnitValues(getSchoolValueResponses(previewFields.unitValues)),
-        contexts: normalizeLines(previewFields.contexts?.value || ""),
+        contexts: contextResponsesToArray(getContextResponses(previewFields.contexts)),
         curriculum_links: normalizeLines(previewFields.curriculumLinks?.value || ""),
         assessment_link: String(previewFields.assessmentLink?.value || "").trim(),
         notes: String(previewFields.notes?.value || "").trim(),
@@ -637,7 +724,7 @@ function collectManualPayload() {
         overview: String(manualFields.overview?.value || "").trim(),
         unit_aims: normalizeLines(manualFields.unitAims?.value || ""),
         unit_values: schoolValueResponsesToUnitValues(getSchoolValueResponses(manualFields.unitValues)),
-        contexts: normalizeLines(manualFields.contexts?.value || ""),
+        contexts: contextResponsesToArray(getContextResponses(manualFields.contexts)),
         curriculum_links: normalizeLines(manualFields.curriculumLinks?.value || ""),
         assessment_link: String(manualFields.assessmentLink?.value || "").trim(),
         notes: String(manualFields.notes?.value || "").trim(),

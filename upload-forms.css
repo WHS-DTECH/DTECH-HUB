@@ -169,6 +169,80 @@
     font-size: 0.8rem;
 }
 
+.context-field {
+    gap: 8px;
+}
+
+.contexts-table-shell {
+    border: 1px solid #a9c3df;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f6f9ff;
+}
+
+.contexts-symbol-link {
+    display: grid;
+    justify-items: center;
+    gap: 4px;
+    text-decoration: none;
+    padding: 10px 10px 8px;
+    background: #8e1b08;
+    color: #ffffff;
+    border-bottom: 1px solid #7a1402;
+}
+
+.contexts-symbol-link:hover {
+    background: #7a1402;
+}
+
+.contexts-symbol-title {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+}
+
+.contexts-symbol {
+    width: 60px;
+    height: 60px;
+}
+
+.contexts-link-copy {
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.contexts-table {
+    display: grid;
+}
+
+.contexts-row {
+    display: grid;
+    grid-template-columns: minmax(120px, 180px) 1fr;
+    border-top: 1px solid #c8d5e7;
+}
+
+.contexts-heading {
+    padding: 10px;
+    font-size: 0.84rem;
+    font-weight: 800;
+    color: #17395d;
+    border-right: 1px solid #c8d5e7;
+    background: #edf3fb;
+}
+
+.contexts-row textarea {
+    border: 0;
+    border-radius: 0;
+    background: #f6f9ff;
+    min-height: 78px;
+    padding: 10px;
+    font: inherit;
+    color: #223653;
+    resize: vertical;
+}
+
 .resources-equipment-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(230px, 300px);
@@ -402,6 +476,15 @@
 
     .school-values-grid {
         grid-template-columns: 1fr;
+    }
+
+    .contexts-row {
+        grid-template-columns: 1fr;
+    }
+
+    .contexts-heading {
+        border-right: 0;
+        border-bottom: 1px solid #c8d5e7;
     }
 
     .resources-equipment-layout {
