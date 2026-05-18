@@ -617,6 +617,40 @@ function detectSubjectStreamFromText(text) {
 
 function parseUnitPlanFromDocxText(rawText, originalName = "") {
   const lines = splitDocxLines(rawText);
+  const lineHas = (line, text) => String(line || "").toLowerCase().includes(String(text || "").toLowerCase());
+  const isAimsHeading = (line) => {
+    const value = String(line || "").trim().toLowerCase();
+    return (
+      value === "aims" ||
+      value === "aims:" ||
+      value === "aim(s)" ||
+      value === "aim(s):" ||
+      value.startsWith("aims of unit") ||
+      value.startsWith("aim(s) of unit") ||
+      value.startsWith("aim(s) of unit:") ||
+      value.startsWith("aim(s) of unit")
+    );
+  };
+  const isAimsStopHeading = (line) => {
+    const value = String(line || "").trim().toLowerCase();
+    return (
+      value.startsWith("year groups") ||
+      value.startsWith("year group") ||
+      value.startsWith("main focus") ||
+      value.startsWith("school values") ||
+      lineHas(value, "contexts of learning") ||
+      lineHas(value, "local curriculum links") ||
+      lineHas(value, "maturanga maori") ||
+      lineHas(value, "matauranga maori") ||
+      value.startsWith("skills") ||
+      value.startsWith("health & safety") ||
+      value.startsWith("health and safety") ||
+      value.startsWith("safety issues") ||
+      value.startsWith("slideshow") ||
+      value.startsWith("reporting & assessment link") ||
+      value.startsWith("unit evaluation")
+    );
+  };
   const findNextSectionIndex = (startIndex, matchers = []) => {
     if (!Number.isInteger(startIndex) || startIndex < 0) {
       return -1;
@@ -665,7 +699,7 @@ function parseUnitPlanFromDocxText(rawText, originalName = "") {
     return yearLevelLine || "";
   })();
 
-  const aimIndex = findLineIndex(lines, (line) => line.startsWith("aim(s) of unit"));
+  const aimIndex = findLineIndex(lines, isAimsHeading);
   const yearGroupsIndex = findLineIndex(lines, (line) => line.startsWith("year groups"));
   const schoolValuesIndex = findLineIndex(lines, (line) => line.startsWith("school values"));
   const contextsIndex = findLineIndex(lines, (line) => line.startsWith("contexts of learning"));
@@ -675,28 +709,25 @@ function parseUnitPlanFromDocxText(rawText, originalName = "") {
   const evaluationIndex = findLineIndex(lines, (line) => line.startsWith("unit evaluation"));
 
   const aimsEndIndex = (() => {
+    if (aimIndex < 0) {
+      return -1;
+    }
+
     if (yearGroupsIndex > aimIndex) {
       return yearGroupsIndex;
     }
 
     return findNextSectionIndex(aimIndex, [
-      (line) => line.startsWith("school values"),
-      (line) => line.startsWith("contexts of learning"),
-      (line) => line.startsWith("local curriculum links"),
-      (line) => line.startsWith("maturanga maori") || line.startsWith("matauranga maori"),
-      (line) => line.startsWith("skills"),
-      (line) => line.startsWith("health & safety") || line.startsWith("health and safety") || line.startsWith("safety issues"),
-      (line) => line.startsWith("slideshow"),
-      (line) => line.startsWith("reporting & assessment link"),
-      (line) => line.startsWith("unit evaluation")
+      isAimsStopHeading
     ]);
   })();
 
-  const unitAims = extractLinesBetween(lines, aimIndex + 1, aimsEndIndex);
+  const unitAims = aimIndex >= 0 ? extractLinesBetween(lines, aimIndex + 1, aimsEndIndex) : [];
   const unitValues = extractLinesBetween(lines, schoolValuesIndex + 1, contextsIndex);
   const contexts = extractLinesBetween(lines, contextsIndex + 1, localCurriculumIndex);
   const curriculumLinks = extractLinesBetween(lines, localCurriculumIndex + 1, slideshowIndex);
-  const overview = extractLinesBetween(lines, topicIndex + 1, aimIndex).slice(0, 5).join(" ");
+  const overviewEndIndex = aimIndex > topicIndex ? aimIndex : yearGroupsIndex;
+  const overview = extractLinesBetween(lines, topicIndex + 1, overviewEndIndex).slice(0, 5).join(" ");
   const assessmentLink = extractLinesBetween(lines, reportingIndex + 1, evaluationIndex).slice(0, 4).join(" ");
   const notes = extractLinesBetween(lines, evaluationIndex + 1, lines.length).join(" ");
   const lessonLines = extractLinesBetween(lines, slideshowIndex + 1, reportingIndex);
