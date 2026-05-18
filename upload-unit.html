@@ -50,8 +50,12 @@
 
         <main class="upload-page">
             <h1>Upload Unit Plan</h1>
-            <p class="intro-text">Upload a .docx unit plan and the system will create the unit record plus lesson activities from the document structure.</p>
+            <p class="intro-text">Plan the unit first, then turn each lesson into an activity card and a calendar event when required.</p>
             <p id="unit-auth-status" class="project-auth-status" aria-live="polite"></p>
+            <div class="upload-page-tools">
+                <a class="button button-secondary" href="upload-menu.html">Back to Upload Menu</a>
+            </div>
+            <p id="upload-status" class="project-auth-status" aria-live="polite" hidden></p>
 
             <section class="upload-panel" aria-label="Upload unit plan from document">
                 <form id="upload-unit-form" class="upload-form">
@@ -67,12 +71,11 @@
                     </fieldset>
 
                     <div class="form-actions">
-                        <button id="upload-unit-button" class="button-save" type="submit">Import Unit Plan</button>
                         <button id="preview-file-button" class="button-save" type="button">Preview Selected File</button>
+                        <button id="upload-unit-button" class="button-save" type="submit" disabled>Import Unit Plan</button>
                         <button id="import-template-button" class="button-save" type="button">Load TeacherFiles Template</button>
                         <button id="preview-template-button" class="button-save" type="button">Preview TeacherFiles Template</button>
                         <button class="button-cancel" type="button" id="clear-unit-file">Clear File</button>
-                        <p id="upload-status" class="project-auth-status" aria-live="polite" hidden></p>
                     </div>
                 </form>
             </section>
@@ -85,65 +88,113 @@
                         <div class="form-grid">
                             <div class="field">
                                 <label for="manual-title">Unit Title</label>
-                                <input id="manual-title" name="title" type="text" required>
+                                <input id="manual-title" name="unitTitle" type="text" required>
                             </div>
+
                             <div class="field">
-                                <label for="manual-topic">Topic</label>
-                                <input id="manual-topic" name="topic" type="text" required>
+                                <label for="manual-topic">Topic or Learning Area</label>
+                                <input id="manual-topic" name="topic" type="text" placeholder="Robotics, design, coding, media, ..." required>
                             </div>
+
+                            <div class="field">
+                                <label for="manual-strand">Strand</label>
+                                <input id="manual-strand" name="strand" type="text" placeholder="Programming, systems, communication...">
+                            </div>
+
                             <div class="field">
                                 <label for="manual-year-level">Year Level</label>
-                                <input id="manual-year-level" name="year_level" type="text" required>
+                                <select id="manual-year-level" name="yearLevel" required>
+                                    <option value="">Select year level</option>
+                                    <option>Junior</option>
+                                    <option>Middle</option>
+                                    <option>Senior</option>
+                                    <option>Year 7</option>
+                                    <option>Year 8</option>
+                                    <option>Year 9</option>
+                                    <option>Year 10</option>
+                                    <option>Year 11</option>
+                                    <option>Year 12</option>
+                                    <option>Year 13</option>
+                                </select>
                             </div>
-                            <div class="field">
-                                <label for="manual-subject-stream">Subject Stream</label>
-                                <input id="manual-subject-stream" name="subject_stream" type="text" placeholder="DTECH">
-                            </div>
+
                             <div class="field">
                                 <label for="manual-duration-weeks">Duration Weeks</label>
-                                <input id="manual-duration-weeks" name="duration_weeks" type="number" min="1" step="1" value="1">
+                                <input id="manual-duration-weeks" name="durationWeeks" type="number" min="1" step="1" value="1" required>
                             </div>
+
                             <div class="field">
                                 <label for="manual-term">Term</label>
-                                <input id="manual-term" name="term" type="text">
+                                <select id="manual-term" name="term">
+                                    <option value="">Select term</option>
+                                    <option>Term 1</option>
+                                    <option>Term 2</option>
+                                    <option>Term 3</option>
+                                    <option>Term 4</option>
+                                </select>
                             </div>
+
+                            <div class="field">
+                                <label for="manual-subject-stream">Subject Stream</label>
+                                <select id="manual-subject-stream" name="subjectStream">
+                                    <option value="">Select stream</option>
+                                    <option value="DTECH">DTECH</option>
+                                    <option value="COMP">COMP</option>
+                                    <option value="TEXT">TEXT</option>
+                                    <option value="DTONLINE">DTONLINE</option>
+                                </select>
+                            </div>
+
                             <div class="field field-wide">
                                 <label for="manual-overview">Unit Overview</label>
-                                <textarea id="manual-overview" name="overview" rows="3"></textarea>
+                                <textarea id="manual-overview" name="unitOverview" rows="3" placeholder="What is the unit about and where is it heading?"></textarea>
                             </div>
+
                             <div class="field field-wide">
-                                <label for="manual-aims">Aims (one per line)</label>
-                                <textarea id="manual-aims" name="unit_aims" rows="4"></textarea>
+                                <label for="manual-aims">Aims</label>
+                                <textarea id="manual-aims" name="unitAims" rows="4" placeholder="One aim per line"></textarea>
                             </div>
+
                             <div class="field field-wide">
-                                <label for="manual-values">School Values (one per line)</label>
-                                <textarea id="manual-values" name="unit_values" rows="4"></textarea>
+                                <label for="manual-values">School Values</label>
+                                <textarea id="manual-values" name="unitValues" rows="4" placeholder="One value or note per line"></textarea>
                             </div>
+
                             <div class="field field-wide">
-                                <label for="manual-contexts">Contexts of Learning (one per line)</label>
-                                <textarea id="manual-contexts" name="contexts" rows="4"></textarea>
+                                <label for="manual-contexts">Contexts of Learning</label>
+                                <textarea id="manual-contexts" name="unitContexts" rows="4" placeholder="Environment, culture, social, technology..."></textarea>
                             </div>
+
                             <div class="field field-wide">
-                                <label for="manual-curriculum-links">Curriculum Links (one per line)</label>
-                                <textarea id="manual-curriculum-links" name="curriculum_links" rows="4"></textarea>
+                                <label for="manual-curriculum-links">Curriculum Links</label>
+                                <textarea id="manual-curriculum-links" name="curriculumLinks" rows="4" placeholder="Achievement objectives, standards, or links"></textarea>
                             </div>
+
                             <div class="field field-wide">
                                 <label for="manual-assessment-link">Assessment / End Point</label>
-                                <textarea id="manual-assessment-link" name="assessment_link" rows="3"></textarea>
+                                <textarea id="manual-assessment-link" name="assessmentLink" rows="3" placeholder="How will this unit lead into an assessment or final outcome?"></textarea>
                             </div>
+
                             <div class="field field-wide">
                                 <label for="manual-notes">Planning Notes</label>
-                                <textarea id="manual-notes" name="notes" rows="3"></textarea>
-                            </div>
-                            <div class="field field-wide">
-                                <label for="manual-lessons-json">Lessons JSON (optional)</label>
-                                <textarea id="manual-lessons-json" name="lessons" rows="8" placeholder="[]"></textarea>
-                                <p class="help-text">Optional: provide a JSON array of lessons. Leave blank to save a unit with no lesson sequence.</p>
+                                <textarea id="manual-notes" name="unitNotes" rows="3" placeholder="General unit notes, resourcing, differentiation, or reminders"></textarea>
                             </div>
                         </div>
                     </fieldset>
+
+                    <fieldset class="form-section">
+                        <legend>Lesson Planner</legend>
+                        <p class="help-text">Add one row per lesson. Mark each lesson to publish it to the Activity Library or place it on the shared calendar.</p>
+                        <div class="unit-plan-toolbar">
+                            <button id="add-lesson" class="button button-secondary" type="button">Add Lesson</button>
+                        </div>
+                        <div id="lesson-list" class="lesson-list"></div>
+                    </fieldset>
+
                     <div class="form-actions">
                         <button id="save-manual-unit-button" class="button-save" type="submit">Save Manual Unit Plan</button>
+                        <button id="cancel-manual-upload" class="button-cancel" type="button">Cancel</button>
+                        <button id="clear-manual-form" class="button button-secondary" type="button">Clear Form</button>
                     </div>
                 </form>
             </section>

@@ -1,4 +1,4 @@
-const form = document.querySelector("#upload-unit-form");
+const uploadForm = document.querySelector("#upload-unit-form");
 const uploadInput = document.querySelector("#unit-plan-file");
 const uploadStatus = document.querySelector("#upload-status");
 const authStatusElement = document.querySelector("#unit-auth-status");
@@ -11,8 +11,13 @@ const previewPanel = document.querySelector("#unit-preview-panel");
 const previewForm = document.querySelector("#unit-preview-form");
 const previewSource = document.querySelector("#preview-source");
 const savePreviewButton = document.querySelector("#save-preview-button");
+
 const manualForm = document.querySelector("#manual-unit-form");
 const saveManualUnitButton = document.querySelector("#save-manual-unit-button");
+const cancelManualUploadButton = document.querySelector("#cancel-manual-upload");
+const clearManualFormButton = document.querySelector("#clear-manual-form");
+const lessonList = document.querySelector("#lesson-list");
+const addLessonButton = document.querySelector("#add-lesson");
 
 const previewFields = {
     title: document.querySelector("#preview-title"),
@@ -34,6 +39,7 @@ const previewFields = {
 const manualFields = {
     title: document.querySelector("#manual-title"),
     topic: document.querySelector("#manual-topic"),
+    strand: document.querySelector("#manual-strand"),
     yearLevel: document.querySelector("#manual-year-level"),
     subjectStream: document.querySelector("#manual-subject-stream"),
     durationWeeks: document.querySelector("#manual-duration-weeks"),
@@ -44,11 +50,11 @@ const manualFields = {
     contexts: document.querySelector("#manual-contexts"),
     curriculumLinks: document.querySelector("#manual-curriculum-links"),
     assessmentLink: document.querySelector("#manual-assessment-link"),
-    notes: document.querySelector("#manual-notes"),
-    lessonsJson: document.querySelector("#manual-lessons-json")
+    notes: document.querySelector("#manual-notes")
 };
 
 const UPLOAD_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
+let hasReadyFilePreview = false;
 
 function normalizeEmail(value) {
     return String(value || "").trim().toLowerCase();
@@ -107,12 +113,37 @@ function setStatus(message, isError = false) {
 }
 
 function setActionButtonsDisabled(disabled) {
-    const buttons = [uploadButton, importTemplateButton, previewFileButton, previewTemplateButton, savePreviewButton, saveManualUnitButton];
+    const buttons = [
+        uploadButton,
+        importTemplateButton,
+        previewFileButton,
+        previewTemplateButton,
+        savePreviewButton,
+        saveManualUnitButton,
+        addLessonButton,
+        clearManualFormButton,
+        cancelManualUploadButton
+    ];
+
     buttons.forEach((button) => {
         if (button) {
             button.disabled = Boolean(disabled);
         }
     });
+
+    if (!disabled && uploadButton) {
+        uploadButton.disabled = !hasReadyFilePreview;
+    }
+}
+
+function resetFilePreviewState() {
+    hasReadyFilePreview = false;
+    if (previewPanel) {
+        previewPanel.hidden = true;
+    }
+    if (uploadButton) {
+        uploadButton.disabled = true;
+    }
 }
 
 function joinLines(value) {
@@ -145,6 +176,154 @@ function parseLessonsJson(value) {
     }
 
     return parsed;
+}
+
+function createLessonRow(lesson = {}) {
+    if (!lessonList) {
+        return null;
+    }
+
+    const row = document.createElement("div");
+    row.className = "lesson-row";
+    row.dataset.lessonRow = "true";
+
+    row.innerHTML = `
+        <div class="lesson-row-header">
+            <div>
+                <p class="section-kicker">Lesson <span data-lesson-number></span></p>
+                <h3>Lesson details</h3>
+            </div>
+            <button type="button" class="button button-secondary lesson-remove">Remove</button>
+        </div>
+        <div class="lesson-row-grid">
+            <div class="field">
+                <label>Lesson Title</label>
+                <input name="lessonTitle" type="text" placeholder="Lesson title" required>
+            </div>
+            <div class="field">
+                <label>Week / Session</label>
+                <input name="lessonWeek" type="text" placeholder="Week 1, Session 2">
+            </div>
+            <div class="field">
+                <label>Calendar Date</label>
+                <input name="lessonDate" type="date">
+            </div>
+            <div class="field">
+                <label>Duration Minutes</label>
+                <input name="lessonDurationMinutes" type="number" min="1" step="1" value="60">
+            </div>
+            <div class="field">
+                <label>Activity Type</label>
+                <input name="lessonType" type="text" placeholder="Programming, Digital Media, ...">
+            </div>
+            <div class="field">
+                <label>Card Colour</label>
+                <select name="lessonCardColor">
+                    <option>Rose</option>
+                    <option>Violet</option>
+                    <option>Azure</option>
+                    <option>Amber</option>
+                    <option>Teal</option>
+                    <option>Slate</option>
+                </select>
+            </div>
+            <div class="field field-wide">
+                <label>Activity Name</label>
+                <input name="activityName" type="text" placeholder="Card title for the Activity Library">
+            </div>
+            <div class="field field-wide">
+                <label>Lesson Focus</label>
+                <textarea name="lessonFocus" placeholder="What are students learning or doing?"></textarea>
+            </div>
+            <div class="field field-wide">
+                <label>Lesson Notes</label>
+                <textarea name="lessonNotes" placeholder="Teacher notes, resources, or setup reminders"></textarea>
+            </div>
+            <label class="checkbox-field lesson-toggle"><input name="publishActivity" type="checkbox"> Publish to Activity Library</label>
+            <label class="checkbox-field lesson-toggle"><input name="addToCalendar" type="checkbox"> Add to Calendar</label>
+        </div>
+    `;
+
+    const lessonTitle = row.querySelector('[name="lessonTitle"]');
+    const lessonWeek = row.querySelector('[name="lessonWeek"]');
+    const lessonDate = row.querySelector('[name="lessonDate"]');
+    const lessonDurationMinutes = row.querySelector('[name="lessonDurationMinutes"]');
+    const lessonType = row.querySelector('[name="lessonType"]');
+    const lessonCardColor = row.querySelector('[name="lessonCardColor"]');
+    const activityName = row.querySelector('[name="activityName"]');
+    const lessonFocus = row.querySelector('[name="lessonFocus"]');
+    const lessonNotes = row.querySelector('[name="lessonNotes"]');
+    const publishActivity = row.querySelector('[name="publishActivity"]');
+    const addToCalendar = row.querySelector('[name="addToCalendar"]');
+
+    lessonTitle.value = String(lesson.lessonTitle || lesson.title || "").trim();
+    lessonWeek.value = String(lesson.lessonWeek || lesson.week_label || lesson.week || "").trim();
+    lessonDate.value = String(lesson.lessonDate || lesson.calendar_date || "").trim();
+    lessonDurationMinutes.value = String(lesson.lessonDurationMinutes || lesson.duration_minutes || 60).trim();
+    lessonType.value = String(lesson.lessonType || lesson.activity_type || "").trim();
+    lessonCardColor.value = String(lesson.lessonCardColor || lesson.card_color || "Rose").trim() || "Rose";
+    activityName.value = String(lesson.activityName || lesson.activity_name || "").trim();
+    lessonFocus.value = String(lesson.lessonFocus || lesson.focus || "").trim();
+    lessonNotes.value = String(lesson.lessonNotes || lesson.notes || "").trim();
+    publishActivity.checked = Boolean(lesson.publishActivity ?? lesson.publish_activity);
+    addToCalendar.checked = Boolean(lesson.addToCalendar ?? lesson.add_to_calendar);
+
+    row.querySelector(".lesson-remove").addEventListener("click", () => {
+        row.remove();
+        if (!lessonList.querySelector("[data-lesson-row]")) {
+            lessonList.appendChild(createLessonRow());
+        }
+        renumberLessons();
+    });
+
+    return row;
+}
+
+function renumberLessons() {
+    if (!lessonList) {
+        return;
+    }
+
+    const rows = Array.from(lessonList.querySelectorAll("[data-lesson-row]"));
+    rows.forEach((row, index) => {
+        const number = row.querySelector("[data-lesson-number]");
+        if (number) {
+            number.textContent = String(index + 1);
+        }
+    });
+}
+
+function collectLessons() {
+    if (!lessonList) {
+        return [];
+    }
+
+    return Array.from(lessonList.querySelectorAll("[data-lesson-row]"))
+        .map((row, index) => ({
+            lesson_index: index + 1,
+            lessonTitle: String(row.querySelector('[name="lessonTitle"]')?.value || "").trim(),
+            lessonWeek: String(row.querySelector('[name="lessonWeek"]')?.value || "").trim(),
+            lessonDate: String(row.querySelector('[name="lessonDate"]')?.value || "").trim(),
+            lessonDurationMinutes: Number.parseInt(row.querySelector('[name="lessonDurationMinutes"]')?.value || "60", 10) || 60,
+            lessonType: String(row.querySelector('[name="lessonType"]')?.value || "").trim(),
+            lessonCardColor: String(row.querySelector('[name="lessonCardColor"]')?.value || "Rose").trim() || "Rose",
+            activityName: String(row.querySelector('[name="activityName"]')?.value || "").trim(),
+            lessonFocus: String(row.querySelector('[name="lessonFocus"]')?.value || "").trim(),
+            lessonNotes: String(row.querySelector('[name="lessonNotes"]')?.value || "").trim(),
+            publishActivity: Boolean(row.querySelector('[name="publishActivity"]')?.checked),
+            addToCalendar: Boolean(row.querySelector('[name="addToCalendar"]')?.checked)
+        }))
+        .filter((lesson) => Boolean(lesson.lessonTitle || lesson.activityName || lesson.lessonFocus || lesson.lessonWeek || lesson.lessonDate));
+}
+
+function resetManualLessons() {
+    if (!lessonList) {
+        return;
+    }
+
+    lessonList.innerHTML = "";
+    lessonList.appendChild(createLessonRow());
+    renumberLessons();
 }
 
 function showPreviewPanel(unitPlan, sourceLabel) {
@@ -198,6 +377,7 @@ function collectManualPayload() {
     return {
         title: String(manualFields.title?.value || "").trim(),
         topic: String(manualFields.topic?.value || "").trim(),
+        strand: String(manualFields.strand?.value || "").trim(),
         year_level: String(manualFields.yearLevel?.value || "").trim(),
         subject_stream: String(manualFields.subjectStream?.value || "").trim().toUpperCase(),
         duration_weeks: Number.parseInt(manualFields.durationWeeks?.value || "1", 10) || 1,
@@ -209,7 +389,9 @@ function collectManualPayload() {
         curriculum_links: normalizeLines(manualFields.curriculumLinks?.value || ""),
         assessment_link: String(manualFields.assessmentLink?.value || "").trim(),
         notes: String(manualFields.notes?.value || "").trim(),
-        lessons: parseLessonsJson(manualFields.lessonsJson?.value || "[]")
+        lessons: collectLessons(),
+        created_by_email: getSignedInEmail(),
+        created_at: new Date().toISOString()
     };
 }
 
@@ -228,17 +410,6 @@ function renderAuthStatus() {
     authStatusElement.classList.add("is-missing");
     authStatusElement.textContent = "Not signed in. Sign in with your school Google account before importing a unit plan.";
 }
-
-if (clearButton) {
-    clearButton.addEventListener("click", () => {
-        if (uploadInput) {
-            uploadInput.value = "";
-        }
-        setStatus("File cleared.");
-    });
-}
-
-renderAuthStatus();
 
 async function previewFromFile() {
     if (!uploadInput?.files?.length) {
@@ -267,12 +438,15 @@ async function previewFromFile() {
 
         const result = await response.json().catch(() => ({}));
         if (!response.ok) {
+            hasReadyFilePreview = false;
             throw new Error(result.error || `Could not preview document (HTTP ${response.status})`);
         }
 
+        hasReadyFilePreview = true;
         showPreviewPanel(result.unitPlan || {}, result.source || file.name);
-        setStatus("Preview loaded. Review fields and click Save Previewed Unit Plan when ready.");
+        setStatus("Preview loaded. Review it, then click Import Unit Plan.");
     } catch (error) {
+        hasReadyFilePreview = false;
         setStatus(`Preview failed: ${error.message}`, true);
     } finally {
         setActionButtonsDisabled(false);
@@ -309,8 +483,8 @@ async function previewFromTemplate() {
 async function importTeacherTemplateDocx() {
     try {
         setActionButtonsDisabled(true);
-
         setStatus("Importing unit plan from TeacherFiles template...");
+
         const response = await fetch("/api/unit-plans/import-docx-template", {
             method: "POST",
             headers: withUserEmailHeader({
@@ -384,14 +558,7 @@ async function saveFromPreview(event) {
 async function saveManualUnitPlan(event) {
     event.preventDefault();
 
-    let payload = null;
-    try {
-        payload = collectManualPayload();
-    } catch (error) {
-        setStatus(`Cannot save manual unit plan: ${error.message}`, true);
-        return;
-    }
-
+    const payload = collectManualPayload();
     if (!payload.title || !payload.topic || !payload.year_level) {
         setStatus("Manual planner requires title, topic, and year level.", true);
         return;
@@ -414,14 +581,59 @@ async function saveManualUnitPlan(event) {
             throw new Error(result.error || `Could not save manual unit plan (HTTP ${response.status})`);
         }
 
-        const lessonCount = Array.isArray(result?.lessons) ? result.lessons.length : 0;
-        setStatus(`Saved manual unit plan ${result.title || "unit plan"} with ${lessonCount} lesson${lessonCount === 1 ? "" : "s"}.`);
+        const lessonCount = Array.isArray(result?.lessons) ? result.lessons.length : payload.lessons.length;
+        setStatus(`Saved manual unit plan ${result.title || payload.title} with ${lessonCount} lesson${lessonCount === 1 ? "" : "s"}.`);
+
         manualForm?.reset();
+        resetManualLessons();
     } catch (error) {
         setStatus(`Manual save failed: ${error.message}`, true);
     } finally {
         setActionButtonsDisabled(false);
     }
+}
+
+if (clearButton) {
+    clearButton.addEventListener("click", () => {
+        if (uploadInput) {
+            uploadInput.value = "";
+        }
+        resetFilePreviewState();
+        setStatus("File cleared.");
+    });
+}
+
+if (uploadInput) {
+    uploadInput.addEventListener("change", () => {
+        resetFilePreviewState();
+        if (uploadInput.files?.length) {
+            previewFromFile();
+        }
+    });
+}
+
+if (addLessonButton) {
+    addLessonButton.addEventListener("click", () => {
+        if (!lessonList) {
+            return;
+        }
+        lessonList.appendChild(createLessonRow());
+        renumberLessons();
+    });
+}
+
+if (clearManualFormButton) {
+    clearManualFormButton.addEventListener("click", () => {
+        manualForm?.reset();
+        resetManualLessons();
+        setStatus("Manual unit planner cleared.");
+    });
+}
+
+if (cancelManualUploadButton) {
+    cancelManualUploadButton.addEventListener("click", () => {
+        window.location.href = "upload-menu.html";
+    });
 }
 
 if (importTemplateButton) {
@@ -450,9 +662,14 @@ if (manualForm) {
     manualForm.addEventListener("submit", saveManualUnitPlan);
 }
 
-if (form) {
-    form.addEventListener("submit", async (event) => {
+if (uploadForm) {
+    uploadForm.addEventListener("submit", async (event) => {
         event.preventDefault();
+
+        if (!hasReadyFilePreview) {
+            setStatus("Preview the selected file first, then import.", true);
+            return;
+        }
 
         if (!uploadInput?.files?.length) {
             setStatus("Choose a .docx file before importing.", true);
@@ -489,6 +706,7 @@ if (form) {
 
             setStatus(`Imported ${result.unitPlan?.title || "unit plan"}. Saved ${lessonCount} lesson${lessonCount === 1 ? "" : "s"}, created ${activityCount} activity card${activityCount === 1 ? "" : "s"}${calendarCount ? `, and ${calendarCount} calendar event${calendarCount === 1 ? "" : "s"}` : ""}.`);
             uploadInput.value = "";
+            resetFilePreviewState();
         } catch (error) {
             setStatus(`Import failed: ${error.message}`, true);
         } finally {
@@ -496,3 +714,6 @@ if (form) {
         }
     });
 }
+
+renderAuthStatus();
+resetManualLessons();

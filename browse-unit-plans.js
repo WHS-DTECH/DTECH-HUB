@@ -64,6 +64,59 @@ function getSearchTerm() {
     return String(searchElement?.value || "").trim().toLowerCase();
 }
 
+function escapeHtml(value) {
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function renderLineBlock(value, placeholder = "-") {
+    if (Array.isArray(value)) {
+        const lines = value.map((item) => String(item || "").trim()).filter(Boolean);
+        return escapeHtml(lines.length ? lines.join("\n") : placeholder);
+    }
+
+    const text = String(value || "").trim();
+    return escapeHtml(text || placeholder);
+}
+
+function renderLessons(lessons) {
+    if (!Array.isArray(lessons) || !lessons.length) {
+        return "<p class='help-text'>No lessons saved for this unit plan yet.</p>";
+    }
+
+    return lessons
+        .map((lesson, index) => {
+            const publishText = lesson.publish_activity || lesson.publishActivity ? "Yes" : "No";
+            const calendarText = lesson.add_to_calendar || lesson.addToCalendar ? "Yes" : "No";
+            return `
+                <article class="lesson-row" style="margin-top: 8px;">
+                    <div class="lesson-row-header">
+                        <div>
+                            <p class="help-text" style="margin:0; text-transform:uppercase; font-weight:700;">Lesson ${index + 1}</p>
+                            <h3 style="margin:2px 0 0;">${escapeHtml(lesson.lessonTitle || lesson.title || "Lesson")}</h3>
+                        </div>
+                    </div>
+                    <div class="lesson-row-grid">
+                        <div class="field"><label>Week / Session</label><input type="text" value="${escapeHtml(lesson.lessonWeek || lesson.week_label || lesson.week || "-")}" disabled></div>
+                        <div class="field"><label>Duration Minutes</label><input type="text" value="${escapeHtml(lesson.lessonDurationMinutes || lesson.duration_minutes || "-")}" disabled></div>
+                        <div class="field"><label>Calendar Date</label><input type="text" value="${escapeHtml(lesson.lessonDate || lesson.calendar_date || "-")}" disabled></div>
+                        <div class="field"><label>Card Colour</label><input type="text" value="${escapeHtml(lesson.lessonCardColor || lesson.card_color || "Rose")}" disabled></div>
+                        <div class="field field-wide"><label>Activity Name</label><input type="text" value="${escapeHtml(lesson.activityName || lesson.activity_name || "-")}" disabled></div>
+                        <div class="field field-wide"><label>Lesson Focus</label><textarea rows="3" disabled>${escapeHtml(lesson.lessonFocus || lesson.focus || "-")}</textarea></div>
+                        <div class="field field-wide"><label>Lesson Notes</label><textarea rows="3" disabled>${escapeHtml(lesson.lessonNotes || lesson.notes || "-")}</textarea></div>
+                        <div class="field"><label>Publish to Activity Library</label><input type="text" value="${publishText}" disabled></div>
+                        <div class="field"><label>Add to Calendar</label><input type="text" value="${calendarText}" disabled></div>
+                    </div>
+                </article>
+            `;
+        })
+        .join("");
+}
+
 function filterRows(sourceRows) {
     const term = getSearchTerm();
     if (!term) return sourceRows;
@@ -102,15 +155,31 @@ function renderRows() {
             const lessonCount = Array.isArray(row.lessons) ? row.lessons.length : 0;
             return `
                 <article class="upload-panel" style="margin-top: 1rem;">
-                    <h2 style="margin:0 0 .5rem; font-size:1.15rem;">${String(row.title || "Untitled Unit Plan")}</h2>
-                    <p class="help-text" style="margin:0 0 .5rem;">${String(row.topic || "No topic")}</p>
-                    <div class="form-grid">
-                        <div class="field"><label>Year</label><input type="text" value="${String(row.year_level || "-")}" disabled></div>
-                        <div class="field"><label>Stream</label><input type="text" value="${String(row.subject_stream || "-")}" disabled></div>
-                        <div class="field"><label>Term</label><input type="text" value="${String(row.term || "-")}" disabled></div>
-                        <div class="field"><label>Lessons</label><input type="text" value="${String(lessonCount)}" disabled></div>
-                        <div class="field field-wide"><label>Last Updated</label><input type="text" value="${formatDateTime(row.updated_at || row.created_at)}" disabled></div>
-                    </div>
+                    <fieldset class="form-section">
+                        <legend>Unit Details</legend>
+                        <div class="form-grid">
+                            <div class="field"><label>Unit Title</label><input type="text" value="${escapeHtml(row.title || "Untitled Unit Plan")}" disabled></div>
+                            <div class="field"><label>Topic or Learning Area</label><input type="text" value="${escapeHtml(row.topic || "-")}" disabled></div>
+                            <div class="field"><label>Strand</label><input type="text" value="${escapeHtml(row.strand || "-")}" disabled></div>
+                            <div class="field"><label>Year Level</label><input type="text" value="${escapeHtml(row.year_level || "-")}" disabled></div>
+                            <div class="field"><label>Term</label><input type="text" value="${escapeHtml(row.term || "-")}" disabled></div>
+                            <div class="field"><label>Duration Weeks</label><input type="text" value="${escapeHtml(row.duration_weeks || 1)}" disabled></div>
+                            <div class="field"><label>Subject Stream</label><input type="text" value="${escapeHtml(row.subject_stream || "-")}" disabled></div>
+                            <div class="field"><label>Lesson Count</label><input type="text" value="${escapeHtml(lessonCount)}" disabled></div>
+                            <div class="field field-wide"><label>Unit Overview</label><textarea rows="3" disabled>${renderLineBlock(row.overview)}</textarea></div>
+                            <div class="field field-wide"><label>Aims</label><textarea rows="4" disabled>${renderLineBlock(row.unit_aims)}</textarea></div>
+                            <div class="field field-wide"><label>School Values</label><textarea rows="4" disabled>${renderLineBlock(row.unit_values)}</textarea></div>
+                            <div class="field field-wide"><label>Contexts of Learning</label><textarea rows="4" disabled>${renderLineBlock(row.contexts)}</textarea></div>
+                            <div class="field field-wide"><label>Curriculum Links</label><textarea rows="4" disabled>${renderLineBlock(row.curriculum_links)}</textarea></div>
+                            <div class="field field-wide"><label>Assessment / End Point</label><textarea rows="3" disabled>${renderLineBlock(row.assessment_link)}</textarea></div>
+                            <div class="field field-wide"><label>Planning Notes</label><textarea rows="3" disabled>${renderLineBlock(row.notes)}</textarea></div>
+                            <div class="field field-wide"><label>Last Updated</label><input type="text" value="${escapeHtml(formatDateTime(row.updated_at || row.created_at))}" disabled></div>
+                        </div>
+                    </fieldset>
+                    <fieldset class="form-section" style="margin-top: 10px;">
+                        <legend>Lesson Planner</legend>
+                        ${renderLessons(row.lessons)}
+                    </fieldset>
                 </article>
             `;
         })
