@@ -15,6 +15,7 @@ const memoryActivities = new Map();
 const memoryUnitPlans = new Map();
 const memoryUserRoles = new Map();
 const memoryStaffDirectory = new Map();
+const memoryLessons = new Map();
 const memorySuggestions = [];
 let memorySuggestionId = 1;
 const memoryPracticalEvents = [];
@@ -3182,6 +3183,131 @@ app.post("/api/admin/role-permissions/reset", async (_req, res) => {
     res.status(500).send("Could not reset role permissions");
   } finally {
     client.release();
+  }
+});
+
+// GET /api/lessons — List all lessons
+app.get("/api/lessons", async (_req, res) => {
+  if (!hasDatabase) {
+    const lessonsArray = Array.from(memoryLessons.values()).sort((left, right) => {
+      const leftTime = new Date(left.created_at || 0);
+      const rightTime = new Date(right.created_at || 0);
+      return rightTime - leftTime;
+    });
+    res.json(lessonsArray);
+    return;
+  }
+
+  try {
+    const result = await pool.query("SELECT * FROM lessons ORDER BY created_at DESC");
+    res.json(result.rows || []);
+  } catch (_error) {
+    res.json([]);
+  }
+});
+
+// GET /api/lessons/:id — Get a specific lesson
+app.get("/api/lessons/:id", async (req, res) => {
+  const found = memoryLessons.get(req.params.id);
+  if (found) {
+    res.json(found);
+    return;
+  }
+
+  if (!hasDatabase) {
+    res.status(404).send("Lesson not found");
+    return;
+  }
+
+  try {
+    const result = await pool.query("SELECT * FROM lessons WHERE id = $1", [req.params.id]);
+    if (result.rows && result.rows.length > 0) {
+      res.json(result.rows[0]);
+    } else {
+      res.status(404).send("Lesson not found");
+    }
+  } catch (_error) {
+    res.status(404).send("Lesson not found");
+  }
+});
+
+// POST /api/lessons — Create a new lesson
+app.post("/api/lessons", async (req, res) => {
+  const body = req.body || {};
+  const lessonTitle = String(body.lesson_title || body.lessonTitle || "").trim();
+  const lessonType = String(body.lesson_type || body.lessonType || "").trim();
+  const activityName = String(body.activity_name || body.activityName || "").trim();
+  const lessonYearLevel = String(body.lesson_year_level || body.lessonYearLevel || "").trim();
+  const lessonFocus = String(body.lesson_focus || body.lessonFocus || "").trim();
+
+  if (!lessonTitle || !lessonType || !activityName || !lessonYearLevel || !lessonFocus) {
+    res.status(400).send("lesson_title, lesson_type, activity_name, lesson_year_level, and lesson_focus are required");
+    return;
+  }
+
+  const lessonId = String(body.id || `lesson-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
+  const payload = {
+    id: lessonId,
+    lesson_title: lessonTitle,
+    lesson_week: String(body.lesson_week || body.lessonWeek || "").trim(),
+    lesson_date: String(body.lesson_date || body.lessonDate || "").trim(),
+    lesson_duration_minutes: Number.parseInt(body.lesson_duration_minutes ?? body.lessonDurationMinutes ?? "60", 10) || 60,
+    lesson_type: lessonType,
+    lesson_card_color: String(body.lesson_card_color || body.lessonCardColor || "Rose").trim(),
+    activity_name: activityName,
+    lesson_year_level: lessonYearLevel,
+    lesson_link_url: String(body.lesson_link_url || body.lessonLinkUrl || "").trim(),
+    lesson_focus: lessonFocus,
+    lesson_notes: String(body.lesson_notes || body.lessonNotes || "").trim(),
+    publish_activity: Boolean(body.publish_activity ?? body.publishActivity),
+    add_to_calendar: Boolean(body.add_to_calendar ?? body.addToCalendar),
+    created_by_email: String(body.created_by_email || req.headers["x-user-email"] || "").trim(),
+    created_at: String(body.created_at || new Date().toISOString()),
+    updated_at: new Date().toISOString()
+  };
+
+  if (!hasDatabase) {
+    memoryLessons.set(payload.id, payload);
+    res.status(201).json(payload);
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO lessons 
+       (id, lesson_title, lesson_week, lesson_date, lesson_duration_minutes, lesson_type, lesson_card_color, 
+        activity_name, lesson_year_level, lesson_link_url, lesson_focus, lesson_notes, publish_activity, 
+        add_to_calendar, created_by_email, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+       ON CONFLICT(id) DO UPDATE SET
+       lesson_title = EXCLUDED.lesson_title,
+       lesson_week = EXCLUDED.lesson_week,
+       lesson_date = EXCLUDED.lesson_date,
+       lesson_duration_minutes = EXCLUDED.lesson_duration_minutes,
+       lesson_type = EXCLUDED.lesson_type,
+       lesson_card_color = EXCLUDED.lesson_card_color,
+       activity_name = EXCLUDED.activity_name,
+       lesson_year_level = EXCLUDED.lesson_year_level,
+       lesson_link_url = EXCLUDED.lesson_link_url,
+       lesson_focus = EXCLUDED.lesson_focus,
+       lesson_notes = EXCLUDED.lesson_notes,
+       publish_activity = EXCLUDED.publish_activity,
+       add_to_calendar = EXCLUDED.add_to_calendar,
+       updated_at = EXCLUDED.updated_at
+       RETURNING *`,
+      [
+        payload.id, payload.lesson_title, payload.lesson_week, payload.lesson_date,
+        payload.lesson_duration_minutes, payload.lesson_type, payload.lesson_card_color,
+        payload.activity_name, payload.lesson_year_level, payload.lesson_link_url,
+        payload.lesson_focus, payload.lesson_notes, payload.publish_activity,
+        payload.add_to_calendar, payload.created_by_email, payload.created_at, payload.updated_at
+      ]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error("Lesson save error:", error);
+    res.status(500).send(`Could not save lesson: ${String(error?.message || "Unknown error")}`);
   }
 });
 
