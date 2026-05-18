@@ -1455,3 +1455,127 @@ autoResizeContextTextareas();
 autoResizeLocalCurriculumTextareas();
 autoResizeSkillsTextareas();
 autoResizeHealthSafetyTextarea();
+
+// Achievement Objectives Data
+const ACHIEVEMENT_OBJECTIVES = {
+    4: [
+        {
+            title: "Planning for practice",
+            content: "Undertake planning that includes reviewing the effectiveness of past actions and resourcing, exploring implications for future actions and resource allocation, and considering stakeholder feedback to enable the development of an outcome."
+        },
+        {
+            title: "Outcome development and evaluation",
+            content: "Investigate a context to develop ideas for feasible outcomes. Undertake functional modelling that takes account of stakeholder feedback to select and create the outcome that best addresses the key attributes. Incorporating stakeholder feedback, evaluate the outcome's fitness for purpose in terms of how well it addresses the need or opportunity."
+        }
+    ],
+    5: [
+        {
+            title: "Planning for practice",
+            content: "Analyse their own and others' planning practices to inform the selection and use of planning tools. Use these to support and justify planning decisions (including those related to resource management) that will lead to the development of an outcome through to completion."
+        },
+        {
+            title: "Outcome development and evaluation",
+            content: "Analyse their own and others' outcomes to inform the development of ideas for feasible outcomes. Undertake ongoing functional modelling and evaluation that takes account of key stakeholder feedback and trialling in the physical and social environments. Use the information gained to select and develop the outcome that best addresses the specifications."
+        }
+    ],
+    6: [
+        {
+            title: "Planning for practice",
+            content: "Critically analyse their own and other's past and current planning practices to make an informed selection and effective use of planning tools. Use these to support and justify ongoing planning that will lead to the development of an outcome through to its completion."
+        },
+        {
+            title: "Outcome development and evaluation",
+            content: "Critically analyse their own and others' outcomes to inform the development of ideas for feasible outcomes. Undertake ongoing experimentation and functional modelling, taking account of stakeholder feedback and trialling in the physical and social environments. Use the information gained to select, justify, and develop an outcome."
+        }
+    ],
+    7: [
+        {
+            title: "Advanced technological practice",
+            content: "Apply advanced technological knowledge and practices in complex contexts. Analyse design challenges and develop sophisticated solutions that demonstrate sustained engagement with technological systems and processes."
+        },
+        {
+            title: "Strategic outcome development",
+            content: "Develop strategic outcomes that integrate complex technological knowledge. Critically evaluate processes and solutions against sophisticated criteria, demonstrating sustained evidence-based decision making."
+        }
+    ],
+    8: [
+        {
+            title: "Expert technological application",
+            content: "Demonstrate expert-level technological knowledge and sophisticated design practices. Synthesise complex information and develop innovative solutions to multifaceted technological challenges within professional contexts."
+        },
+        {
+            title: "Professional evaluation and innovation",
+            content: "Develop outcomes of professional quality that demonstrate comprehensive technological understanding. Conduct rigorous evaluation using advanced criteria, contributing innovative solutions that advance the field."
+        }
+    ]
+};
+
+// Initialize achievement objectives sliders
+function initializeAchievementSliders() {
+    // Manual form slider
+    const manualSlider = document.querySelector("#manual-achievement-slider");
+    const manualDisplay = document.querySelector("#manual-achievement-level-display");
+    const manualObjectives = document.querySelector("#manual-achievement-objectives");
+    const manualLevelInput = document.querySelector("#manual-selected-achievement-level");
+
+    if (manualSlider) {
+        manualSlider.addEventListener("input", function() {
+            const level = parseInt(this.value);
+            manualDisplay.textContent = `Level ${level}`;
+            manualLevelInput.value = level;
+            renderAchievementObjectives(manualObjectives, level);
+        });
+        // Initialize display
+        renderAchievementObjectives(manualObjectives, 4);
+    }
+
+    // Preview form slider
+    const previewSlider = document.querySelector("#preview-achievement-slider");
+    const previewDisplay = document.querySelector("#preview-achievement-level-display");
+    const previewObjectives = document.querySelector("#preview-achievement-objectives");
+    const previewLevelInput = document.querySelector("#preview-selected-achievement-level");
+
+    if (previewSlider) {
+        previewSlider.addEventListener("input", function() {
+            const level = parseInt(this.value);
+            previewDisplay.textContent = `Level ${level}`;
+            previewLevelInput.value = level;
+            renderAchievementObjectives(previewObjectives, level);
+        });
+        // Initialize display
+        renderAchievementObjectives(previewObjectives, 4);
+    }
+}
+
+function renderAchievementObjectives(container, level) {
+    if (!container || !ACHIEVEMENT_OBJECTIVES[level]) {
+        return;
+    }
+
+    container.innerHTML = "";
+    const objectives = ACHIEVEMENT_OBJECTIVES[level];
+
+    objectives.forEach((objective) => {
+        const objectiveDiv = document.createElement("div");
+        objectiveDiv.className = "achievement-objective";
+
+        const titleP = document.createElement("p");
+        titleP.className = "achievement-objective-title";
+        titleP.textContent = objective.title;
+
+        const contentP = document.createElement("p");
+        contentP.className = "achievement-objective-content";
+        contentP.textContent = objective.content;
+
+        objectiveDiv.appendChild(titleP);
+        objectiveDiv.appendChild(contentP);
+        container.appendChild(objectiveDiv);
+    });
+}
+
+// Initialize on DOM ready
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initializeAchievementSliders);
+} else {
+    initializeAchievementSliders();
+}

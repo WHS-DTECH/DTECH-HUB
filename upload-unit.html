@@ -279,6 +279,26 @@
                                 <textarea id="manual-health-safety" name="manualHealthSafety" rows="4" placeholder="Health and safety context, room/setup, and specific safety issues for this unit"></textarea>
                             </div>
 
+                            <div class="field field-wide achievement-objectives-field">
+                                <label>Achievement Objectives (NZ Curriculum - Technology)</label>
+                                <div class="achievement-slider-container">
+                                    <div class="slider-header">
+                                        <span class="slider-label">Student Working Level:</span>
+                                        <span id="manual-achievement-level-display" class="level-display">Level 4</span>
+                                    </div>
+                                    <input type="range" id="manual-achievement-slider" class="achievement-slider" min="4" max="8" value="4" step="1" aria-label="Achievement objectives level">
+                                    <div class="slider-levels">
+                                        <span>Level 4</span>
+                                        <span>Level 5</span>
+                                        <span>Level 6</span>
+                                        <span>Level 7</span>
+                                        <span>Level 8</span>
+                                    </div>
+                                    <div id="manual-achievement-objectives" class="achievement-objectives-display"></div>
+                                    <input type="hidden" id="manual-selected-achievement-level" name="achievementLevel" value="4">
+                                </div>
+                            </div>
+
                             <div class="field field-wide">
                                 <label for="manual-assessment-link">Assessment / End Point</label>
                                 <textarea id="manual-assessment-link" name="assessmentLink" rows="3" placeholder="How will this unit lead into an assessment or final outcome?"></textarea>
@@ -482,6 +502,24 @@
                             <div class="field field-wide">
                                 <label for="preview-health-safety">Health &amp; Safety</label>
                                 <textarea id="preview-health-safety" name="previewHealthSafety" rows="4" placeholder="Health and safety context, room/setup, and specific safety issues for this unit"></textarea>
+                            </div>
+                            <div class="field field-wide achievement-objectives-field">
+                                <label>Achievement Objectives (NZ Curriculum - Technology)</label>
+                                <div class="achievement-slider-container">
+                                    <div class="slider-header">
+                                        <span class="slider-label">Student Working Level:</span>
+                                        <span id="preview-achievement-level-display" class="level-display">Level 4</span>
+                                    </div>
+                                    <input type="range" id="preview-achievement-slider" class="achievement-slider" min="4" max="8" value="4" step="1" aria-label="Achievement objectives level">
+                                    <div class="slider-levels">
+                                        <span>Level 4</span>
+                                        <span>Level 5</span>
+                                        <span>Level 6</span>
+                                        <span>Level 7</span>\n                                        <span>Level 8</span>
+                                    </div>
+                                    <div id="preview-achievement-objectives" class="achievement-objectives-display"></div>
+                                    <input type="hidden" id="preview-selected-achievement-level" name="achievementLevel" value="4">
+                                </div>
                             </div>
                             <div class="field field-wide">
                                 <label for="preview-assessment-link">Assessment / End Point</label>

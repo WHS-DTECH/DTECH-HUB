@@ -628,3 +628,131 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* Achievement Objectives Slider */
+.achievement-objectives-field .achievement-slider-container {
+    display: grid;
+    gap: 12px;
+    padding: 12px;
+    background: #ffffff;
+    border: 1px solid #d4dfe9;
+    border-radius: 6px;
+}
+
+.slider-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.slider-label {
+    color: #577090;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.level-display {
+    color: #2f7bca;
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+.achievement-slider {
+    width: 100%;
+    height: 8px;
+    border-radius: 5px;
+    background: linear-gradient(to right, #a8d5ff, #2f7bca);
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    cursor: pointer;
+    margin: 8px 0;
+}
+
+.achievement-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #2f7bca;
+    cursor: pointer;
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 6px rgba(47, 123, 202, 0.3);
+    transition: all 0.2s ease;
+}
+
+.achievement-slider::-webkit-slider-thumb:hover {
+    width: 24px;
+    height: 24px;
+    box-shadow: 0 4px 12px rgba(47, 123, 202, 0.5);
+}
+
+.achievement-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #2f7bca;
+    cursor: pointer;
+    border: 2px solid #ffffff;
+    box-shadow: 0 2px 6px rgba(47, 123, 202, 0.3);
+    transition: all 0.2s ease;
+}
+
+.achievement-slider::-moz-range-thumb:hover {
+    width: 24px;
+    height: 24px;
+    box-shadow: 0 4px 12px rgba(47, 123, 202, 0.5);
+}
+
+.slider-levels {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
+    margin: 6px 0;
+}
+
+.slider-levels span {
+    text-align: center;
+    color: #687f9c;
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 2px 0;
+}
+
+.achievement-objectives-display {
+    display: grid;
+    gap: 10px;
+    margin-top: 8px;
+    padding-top: 12px;
+    border-top: 1px solid #e4ecf4;
+    min-height: 60px;
+}
+
+.achievement-objective {
+    display: grid;
+    gap: 6px;
+    padding: 10px;
+    background: #f6f9ff;
+    border-left: 3px solid #2f7bca;
+    border-radius: 4px;
+}
+
+.achievement-objective-title {
+    color: #1a4d7a;
+    font-size: 0.76rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin: 0;
+}
+
+.achievement-objective-content {
+    color: #3a5a7d;
+    font-size: 0.76rem;
+    line-height: 1.4;
+    margin: 0;
+}
