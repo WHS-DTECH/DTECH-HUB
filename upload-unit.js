@@ -375,6 +375,20 @@ function autoResizeContextTextareas() {
     });
 }
 
+function autoResizeLocalCurriculumTextareas() {
+    const localCurriculumTextareas = document.querySelectorAll(".local-curriculum-table textarea");
+    localCurriculumTextareas.forEach((textarea) => {
+        autoResizeTextarea(textarea);
+
+        if (!textarea.dataset.autoResizeBound) {
+            textarea.addEventListener("input", () => {
+                autoResizeTextarea(textarea);
+            });
+            textarea.dataset.autoResizeBound = "true";
+        }
+    });
+}
+
 function getSchoolValueResponses(group) {
     const responses = {};
     SCHOOL_VALUE_KEYS.forEach((key) => {
@@ -522,6 +536,7 @@ function setCurriculumLinkResponses(group, responses = {}) {
     CURRICULUM_LINK_KEYS.forEach((key) => {
         if (group?.[key]) {
             group[key].value = String(responses[key] || "").trim();
+            autoResizeTextarea(group[key]);
         }
     });
 }
@@ -1136,6 +1151,7 @@ if (clearManualFormButton) {
         manualForm?.reset();
         autoResizeSchoolValueTextareas();
         autoResizeContextTextareas();
+        autoResizeLocalCurriculumTextareas();
         resetManualLessons();
         setStatus("Manual unit planner cleared.");
     });
@@ -1230,3 +1246,4 @@ renderAuthStatus();
 resetManualLessons();
 autoResizeSchoolValueTextareas();
 autoResizeContextTextareas();
+autoResizeLocalCurriculumTextareas();

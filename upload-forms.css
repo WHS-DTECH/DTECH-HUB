@@ -280,11 +280,12 @@
     border-right: 1px solid #c8d5e7;
     border-radius: 0;
     background: #f6f9ff;
-    min-height: 92px;
+    min-height: 150px;
     padding: 10px;
     font: inherit;
     color: #223653;
     resize: vertical;
+    overflow-y: hidden;
 }
 
 .local-curriculum-table textarea:last-child {
