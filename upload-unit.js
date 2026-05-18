@@ -420,6 +420,20 @@ function autoResizeSkillsTextareas() {
     });
 }
 
+function autoResizeHealthSafetyTextarea() {
+    const healthSafetyTextarea = document.querySelector("#manual-health-safety, #preview-health-safety");
+    if (healthSafetyTextarea) {
+        autoResizeTextarea(healthSafetyTextarea);
+
+        if (!healthSafetyTextarea.dataset.autoResizeBound) {
+            healthSafetyTextarea.addEventListener("input", () => {
+                autoResizeTextarea(healthSafetyTextarea);
+            });
+            healthSafetyTextarea.dataset.autoResizeBound = "true";
+        }
+    }
+}
+
 function getSchoolValueResponses(group) {
     const responses = {};
     SCHOOL_VALUE_KEYS.forEach((key) => {
@@ -635,6 +649,40 @@ function curriculumResponsesToLines(responses) {
     return lines;
 }
 
+function sanitizeHealthSafetyContent(content) {
+    const text = String(content || "").trim();
+    if (!text) {
+        return "";
+    }
+
+    const lines = text.split(/\r?\n/).map((line) => line.trim());
+    const sectionStarts = /\b(slideshow|reporting|assessment|lesson|curriculum\s*achievement|new\s*zealand|level\s*\d|technological|learning\s*outcomes|LEVEL\s*\d)\b/i;
+    const result = [];
+
+    for (const line of lines) {
+        if (!line) {
+            continue;
+        }
+
+        const idx = line.search(sectionStarts);
+        if (idx === 0) {
+            break;
+        }
+
+        if (idx > 0) {
+            const trimmed = line.slice(0, idx).trim();
+            if (trimmed) {
+                result.push(trimmed);
+            }
+            break;
+        }
+
+        result.push(line);
+    }
+
+    return result.join("\n").trim();
+}
+
 function parseCurriculumLinksToResponses(curriculumLinks) {
     const responseMap = {
         localCurriculumLinks: "",
@@ -777,6 +825,8 @@ function parseCurriculumLinksToResponses(curriculumLinks) {
                 : line;
         }
     });
+
+    responseMap.healthSafety = sanitizeHealthSafetyContent(responseMap.healthSafety);
 
     return responseMap;
 }
@@ -1018,6 +1068,11 @@ function showPreviewPanel(unitPlan, sourceLabel) {
 
     populateManualPlannerFromUnitPlan(unitPlan);
     previewPanel.hidden = false;
+    autoResizeSchoolValueTextareas();
+    autoResizeContextTextareas();
+    autoResizeLocalCurriculumTextareas();
+    autoResizeSkillsTextareas();
+    autoResizeHealthSafetyTextarea();
 }
 
 function collectPreviewPayload() {
@@ -1297,6 +1352,7 @@ if (clearManualFormButton) {
         autoResizeContextTextareas();
         autoResizeLocalCurriculumTextareas();
         autoResizeSkillsTextareas();
+        autoResizeHealthSafetyTextarea();
         resetManualLessons();
         setStatus("Manual unit planner cleared.");
     });
@@ -1393,3 +1449,4 @@ autoResizeSchoolValueTextareas();
 autoResizeContextTextareas();
 autoResizeLocalCurriculumTextareas();
 autoResizeSkillsTextareas();
+autoResizeHealthSafetyTextarea();
