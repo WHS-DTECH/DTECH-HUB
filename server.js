@@ -617,6 +617,25 @@ function detectSubjectStreamFromText(text) {
 
 function parseUnitPlanFromDocxText(rawText, originalName = "") {
   const lines = splitDocxLines(rawText);
+  const findNextSectionIndex = (startIndex, matchers = []) => {
+    if (!Number.isInteger(startIndex) || startIndex < 0) {
+      return -1;
+    }
+
+    for (let index = startIndex + 1; index < lines.length; index += 1) {
+      const candidate = String(lines[index] || "").trim().toLowerCase();
+      if (!candidate) {
+        continue;
+      }
+
+      if (matchers.some((matcher) => matcher(candidate))) {
+        return index;
+      }
+    }
+
+    return -1;
+  };
+
   const normalizedName = String(originalName || "").replace(/\.docx$/i, "").trim();
   const unitPlanHeadingIndex = findLineIndex(lines, (line) => line.includes("unit plan"));
   const topicIndex = (() => {
@@ -655,7 +674,25 @@ function parseUnitPlanFromDocxText(rawText, originalName = "") {
   const reportingIndex = findLineIndex(lines, (line) => line.startsWith("reporting & assessment link"));
   const evaluationIndex = findLineIndex(lines, (line) => line.startsWith("unit evaluation"));
 
-  const unitAims = extractLinesBetween(lines, aimIndex + 1, yearGroupsIndex);
+  const aimsEndIndex = (() => {
+    if (yearGroupsIndex > aimIndex) {
+      return yearGroupsIndex;
+    }
+
+    return findNextSectionIndex(aimIndex, [
+      (line) => line.startsWith("school values"),
+      (line) => line.startsWith("contexts of learning"),
+      (line) => line.startsWith("local curriculum links"),
+      (line) => line.startsWith("maturanga maori") || line.startsWith("matauranga maori"),
+      (line) => line.startsWith("skills"),
+      (line) => line.startsWith("health & safety") || line.startsWith("health and safety") || line.startsWith("safety issues"),
+      (line) => line.startsWith("slideshow"),
+      (line) => line.startsWith("reporting & assessment link"),
+      (line) => line.startsWith("unit evaluation")
+    ]);
+  })();
+
+  const unitAims = extractLinesBetween(lines, aimIndex + 1, aimsEndIndex);
   const unitValues = extractLinesBetween(lines, schoolValuesIndex + 1, contextsIndex);
   const contexts = extractLinesBetween(lines, contextsIndex + 1, localCurriculumIndex);
   const curriculumLinks = extractLinesBetween(lines, localCurriculumIndex + 1, slideshowIndex);
