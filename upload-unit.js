@@ -1046,8 +1046,6 @@ function showPreviewPanel(unitPlan, sourceLabel) {
         return;
     }
 
-    console.log("DEBUG: showPreviewPanel received unitPlan.unit_aims =", unitPlan?.unit_aims);
-
     const lessonCount = Array.isArray(unitPlan?.lessons) ? unitPlan.lessons.length : 0;
     if (previewSource) {
         previewSource.textContent = `Preview source: ${sourceLabel || "DOCX"} (${lessonCount} lesson${lessonCount === 1 ? "" : "s"} parsed)`;
@@ -1061,10 +1059,8 @@ function showPreviewPanel(unitPlan, sourceLabel) {
     if (previewFields.term) previewFields.term.value = String(unitPlan?.term || "");
     if (previewFields.overview) previewFields.overview.value = String(unitPlan?.overview || "");
     
-    console.log("DEBUG: About to set unitAims, field exists?", !!previewFields.unitAims);
     if (previewFields.unitAims) {
         const aimsValue = joinLines(unitPlan?.unit_aims);
-        console.log("DEBUG: joinLines result =", aimsValue);
         previewFields.unitAims.value = aimsValue;
     }
     

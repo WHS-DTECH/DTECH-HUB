@@ -503,8 +503,10 @@ function sanitizeUnitAims(lines) {
     ? lines.map((line) => String(line || "").trim()).filter(Boolean)
     : [];
 
-  const sectionStartPattern = /\b(year\s*groups?|main\s*focus|school\s*values|whanaungatanga|rangatiratanga|manaakitanga|kaitiakitanga|contexts\s*of\s*learning|local\s*curriculum\s*links?|m[aā]tauranga\s*m[aā]ori|skills|health\s*(?:&|and)\s*safety|safety\s*issues?|slideshow|reporting\s*&\s*assessment\s*link|unit\s*evaluation)\b/i;
+  // Remove leading lines that are clearly section headers or not aims content
+  const mainSectionPattern = /^(year\s*groups?|main\s*focus|school\s*values|contexts\s*of\s*learning|local\s*curriculum\s*links|skills|slideshow|reporting|assessment|evaluation)\s*(?:[-:]|$)/i;
   const cleaned = [];
+  let foundContent = false;
 
   for (const rawLine of sourceLines) {
     const line = String(rawLine || "").trim();
@@ -512,19 +514,17 @@ function sanitizeUnitAims(lines) {
       continue;
     }
 
-    const matchIndex = line.search(sectionStartPattern);
-    if (matchIndex === 0) {
-      break;
-    }
-
-    if (matchIndex > 0) {
-      const trimmed = line.slice(0, matchIndex).trim();
-      if (trimmed) {
-        cleaned.push(trimmed);
+    // Skip lines that are clearly main section headers
+    if (mainSectionPattern.test(line)) {
+      if (foundContent) {
+        // If we already have content, stop at main sections
+        break;
       }
-      break;
+      // Otherwise skip this header and continue looking for aims
+      continue;
     }
 
+    foundContent = true;
     cleaned.push(line);
   }
 
@@ -734,36 +734,30 @@ function parseUnitPlanFromDocxText(rawText, originalName = "") {
   })();
 
   const aimIndex = findLineIndex(lines, isAimsHeading);
-  const yearGroupsIndex = findLineIndex(lines, (line) => line.startsWith("year groups"));
-  const schoolValuesIndex = findLineIndex(lines, (line) => line.startsWith("school values"));
-  const contextsIndex = findLineIndex(lines, (line) => line.startsWith("contexts of learning"));
-  const localCurriculumIndex = findLineIndex(lines, (line) => line.startsWith("local curriculum links"));
-  const slideshowIndex = findLineIndex(lines, (line) => line.startsWith("slideshow"));
-  const reportingIndex = findLineIndex(lines, (line) => line.startsWith("reporting & assessment link"));
-  const evaluationIndex = findLineIndex(lines, (line) => line.startsWith("unit evaluation"));
-
-  console.log("DEBUG PARSER: aimIndex =", aimIndex, "yearGroupsIndex =", yearGroupsIndex, "schoolValuesIndex =", schoolValuesIndex);
+  const yearGroupsIndex = findLineIndex(lines, (line) => line.toLowerCase().startsWith("year groups"));
+  const schoolValuesIndex = findLineIndex(lines, (line) => line.toLowerCase().startsWith("school values"));
+  const contextsIndex = findLineIndex(lines, (line) => line.toLowerCase().startsWith("contexts of learning"));
+  const localCurriculumIndex = findLineIndex(lines, (line) => line.toLowerCase().startsWith("local curriculum links"));
+  const slideshowIndex = findLineIndex(lines, (line) => line.toLowerCase().startsWith("slideshow"));
+  const reportingIndex = findLineIndex(lines, (line) => line.toLowerCase().startsWith("reporting & assessment link"));
+  const evaluationIndex = findLineIndex(lines, (line) => line.toLowerCase().startsWith("unit evaluation"));
 
   const aimsEndIndex = (() => {
     if (aimIndex < 0) {
       return -1;
     }
 
-    if (yearGroupsIndex > aimIndex) {
-      return yearGroupsIndex;
-    }
+    // Find the next main section header after aims
+    const nextSectionIndex = Math.min(
+      ...[yearGroupsIndex, schoolValuesIndex, contextsIndex, localCurriculumIndex, slideshowIndex, reportingIndex, evaluationIndex]
+        .filter((idx) => idx > aimIndex)
+    );
 
-    return findNextSectionIndex(aimIndex, [
-      isAimsStopHeading
-    ]);
+    return Number.isFinite(nextSectionIndex) ? nextSectionIndex : lines.length;
   })();
 
-  console.log("DEBUG PARSER: aimsEndIndex =", aimsEndIndex);
-
   const extractedAims = aimIndex >= 0 ? extractLinesBetween(lines, aimIndex + 1, aimsEndIndex) : [];
-  console.log("DEBUG PARSER: extractedAims =", extractedAims);
   const unitAims = sanitizeUnitAims(extractedAims);
-  console.log("DEBUG PARSER: unitAims after sanitize =", unitAims);
   const unitValues = extractLinesBetween(lines, schoolValuesIndex + 1, contextsIndex);
   const contexts = extractLinesBetween(lines, contextsIndex + 1, localCurriculumIndex);
   const curriculumLinks = extractLinesBetween(lines, localCurriculumIndex + 1, slideshowIndex);
