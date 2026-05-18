@@ -43,7 +43,9 @@ const previewFields = {
     },
     curriculumLinks: {
         localCurriculumLinks: document.querySelector("#preview-local-curriculum-links"),
-        mataurangaMaori: document.querySelector("#preview-matauranga-maori")
+        mataurangaMaori: document.querySelector("#preview-matauranga-maori"),
+        skills: document.querySelector("#preview-skills"),
+        healthSafety: document.querySelector("#preview-health-safety")
     },
     assessmentLink: document.querySelector("#preview-assessment-link"),
     notes: document.querySelector("#preview-notes"),
@@ -75,7 +77,9 @@ const manualFields = {
     },
     curriculumLinks: {
         localCurriculumLinks: document.querySelector("#manual-local-curriculum-links"),
-        mataurangaMaori: document.querySelector("#manual-matauranga-maori")
+        mataurangaMaori: document.querySelector("#manual-matauranga-maori"),
+        skills: document.querySelector("#manual-skills"),
+        healthSafety: document.querySelector("#manual-health-safety")
     },
     assessmentLink: document.querySelector("#manual-assessment-link"),
     notes: document.querySelector("#manual-notes")
@@ -100,10 +104,12 @@ const CONTEXT_LABELS = {
     social: "Social",
     technology: "Technology"
 };
-const CURRICULUM_LINK_KEYS = ["localCurriculumLinks", "mataurangaMaori"];
+const CURRICULUM_LINK_KEYS = ["localCurriculumLinks", "mataurangaMaori", "skills", "healthSafety"];
 const CURRICULUM_LINK_LABELS = {
     localCurriculumLinks: "Local Curriculum Links",
-    mataurangaMaori: "Matauranga Maori"
+    mataurangaMaori: "Matauranga Maori",
+    skills: "Skills",
+    healthSafety: "Health & Safety"
 };
 
 function normalizeEmail(value) {
@@ -502,7 +508,9 @@ function curriculumResponsesToLines(responses) {
 function parseCurriculumLinksToResponses(curriculumLinks) {
     const responseMap = {
         localCurriculumLinks: "",
-        mataurangaMaori: ""
+        mataurangaMaori: "",
+        skills: "",
+        healthSafety: ""
     };
 
     const lines = Array.isArray(curriculumLinks)
@@ -514,6 +522,8 @@ function parseCurriculumLinksToResponses(curriculumLinks) {
         const lower = line.toLowerCase();
         const localPrefix = /^local\s*curriculum\s*links?/i;
         const mataurangaPrefix = /^(m[aā]tauranga\s*m[aā]ori|matauranga\s*maori)/i;
+        const skillsPrefix = /^skills?\b/i;
+        const healthSafetyPrefix = /^(health\s*(?:&|and)\s*safety|safety\s*issues?)\b/i;
 
         if (localPrefix.test(lower)) {
             currentKey = "localCurriculumLinks";
@@ -532,6 +542,28 @@ function parseCurriculumLinksToResponses(curriculumLinks) {
             if (remainder) {
                 responseMap.mataurangaMaori = responseMap.mataurangaMaori
                     ? `${responseMap.mataurangaMaori}\n${remainder}`
+                    : remainder;
+            }
+            return;
+        }
+
+        if (skillsPrefix.test(lower)) {
+            currentKey = "skills";
+            const remainder = line.replace(skillsPrefix, "").replace(/^\s*:?\s*/, "").trim();
+            if (remainder) {
+                responseMap.skills = responseMap.skills
+                    ? `${responseMap.skills}\n${remainder}`
+                    : remainder;
+            }
+            return;
+        }
+
+        if (healthSafetyPrefix.test(lower)) {
+            currentKey = "healthSafety";
+            const remainder = line.replace(healthSafetyPrefix, "").replace(/^\s*:?\s*/, "").trim();
+            if (remainder) {
+                responseMap.healthSafety = responseMap.healthSafety
+                    ? `${responseMap.healthSafety}\n${remainder}`
                     : remainder;
             }
             return;
