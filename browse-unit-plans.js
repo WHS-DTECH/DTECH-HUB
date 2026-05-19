@@ -12,6 +12,29 @@ let selectedTopicType = "All topics";
 let selectedUnitPlanId = "";
 let pendingDeleteId = "";
 
+const SCHOOL_VALUE_KEYS = ["whanaungatanga", "rangatiratanga", "manaakitanga", "kaitiakitanga"];
+const SCHOOL_VALUE_LABELS = {
+    whanaungatanga: "Whanaungatanga",
+    rangatiratanga: "Rangatiratanga",
+    manaakitanga: "Manaakitanga",
+    kaitiakitanga: "Kaitiakitanga"
+};
+const CONTEXT_KEYS = ["environment", "mentalEmotional", "culture", "social", "technology"];
+const CONTEXT_LABELS = {
+    environment: "Environment",
+    mentalEmotional: "Mental-Emotional",
+    culture: "Culture",
+    social: "Social",
+    technology: "Technology"
+};
+const SKILL_KEYS = ["literacy", "numeracy", "digitalTech", "practical"];
+const SKILL_LABELS = {
+    literacy: "Literacy",
+    numeracy: "Numeracy",
+    digitalTech: "Digital Tech",
+    practical: "Practical"
+};
+
 function normalizeEmail(value) {
     return String(value || "").trim().toLowerCase();
 }
@@ -132,6 +155,234 @@ function renderLineBlock(value, placeholder = "-") {
     return escapeHtml(text || placeholder);
 }
 
+function toNormalizedLines(value) {
+    if (Array.isArray(value)) {
+        return value.map((line) => String(line || "").trim()).filter(Boolean);
+    }
+
+    return String(value || "")
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+}
+
+function parseUnitValuesToResponses(unitValues) {
+    const responseMap = {
+        whanaungatanga: "",
+        rangatiratanga: "",
+        manaakitanga: "",
+        kaitiakitanga: ""
+    };
+
+    const lines = toNormalizedLines(unitValues);
+    let currentKey = "";
+
+    lines.forEach((line) => {
+        const lower = line.toLowerCase();
+        const matchedKey = SCHOOL_VALUE_KEYS.find((key) => lower.startsWith(SCHOOL_VALUE_LABELS[key].toLowerCase()));
+
+        if (matchedKey) {
+            currentKey = matchedKey;
+            const remainder = line.replace(new RegExp(`^${SCHOOL_VALUE_LABELS[matchedKey]}\\s*:?\\s*`, "i"), "").trim();
+            if (remainder) {
+                responseMap[matchedKey] = responseMap[matchedKey]
+                    ? `${responseMap[matchedKey]}\n${remainder}`
+                    : remainder;
+            }
+            return;
+        }
+
+        if (currentKey) {
+            responseMap[currentKey] = responseMap[currentKey]
+                ? `${responseMap[currentKey]}\n${line}`
+                : line;
+        }
+    });
+
+    return responseMap;
+}
+
+function parseContextsToResponses(contexts) {
+    const responseMap = {
+        environment: "",
+        mentalEmotional: "",
+        culture: "",
+        social: "",
+        technology: ""
+    };
+
+    const lines = toNormalizedLines(contexts);
+    let currentKey = "";
+
+    lines.forEach((line) => {
+        const lower = line.toLowerCase();
+        const matchedKey = CONTEXT_KEYS.find((key) => lower.startsWith(CONTEXT_LABELS[key].toLowerCase()));
+
+        if (matchedKey) {
+            currentKey = matchedKey;
+            const remainder = line.replace(new RegExp(`^${CONTEXT_LABELS[matchedKey]}\\s*:?\\s*`, "i"), "").trim();
+            if (remainder) {
+                responseMap[matchedKey] = responseMap[matchedKey]
+                    ? `${responseMap[matchedKey]}\n${remainder}`
+                    : remainder;
+            }
+            return;
+        }
+
+        if (currentKey) {
+            responseMap[currentKey] = responseMap[currentKey]
+                ? `${responseMap[currentKey]}\n${line}`
+                : line;
+        }
+    });
+
+    return responseMap;
+}
+
+function parseCurriculumLinksToResponses(curriculumLinks) {
+    const responseMap = {
+        localCurriculumLinks: "",
+        mataurangaMaori: "",
+        skills: {
+            literacy: "",
+            numeracy: "",
+            digitalTech: "",
+            practical: ""
+        },
+        healthSafety: ""
+    };
+
+    const lines = toNormalizedLines(curriculumLinks);
+    let currentKey = "";
+    let currentSkillKey = "";
+
+    lines.forEach((line) => {
+        const lower = line.toLowerCase();
+        const localPrefix = /^local\s*curriculum\s*links?/i;
+        const mataurangaPrefix = /^(m[aā]tauranga\s*m[aā]ori|matauranga\s*maori)/i;
+        const skillsPrefix = /^skills?\b/i;
+        const healthSafetyPrefix = /^(health\s*(?:&|and)\s*safety|safety\s*issues?)\b/i;
+        const literacyPrefix = /^literacy\b/i;
+        const numeracyPrefix = /^numeracy\b/i;
+        const digitalTechPrefix = /^(digital\s*tech|digital\s*technology)\b/i;
+        const practicalPrefix = /^practical\b/i;
+
+        if (localPrefix.test(lower)) {
+            currentKey = "localCurriculumLinks";
+            currentSkillKey = "";
+            const remainder = line.replace(localPrefix, "").replace(/^\s*:?\s*/, "").trim();
+            if (remainder) {
+                responseMap.localCurriculumLinks = responseMap.localCurriculumLinks
+                    ? `${responseMap.localCurriculumLinks}\n${remainder}`
+                    : remainder;
+            }
+            return;
+        }
+
+        if (mataurangaPrefix.test(lower)) {
+            currentKey = "mataurangaMaori";
+            currentSkillKey = "";
+            const remainder = line.replace(mataurangaPrefix, "").replace(/^\s*:?\s*/, "").trim();
+            if (remainder) {
+                responseMap.mataurangaMaori = responseMap.mataurangaMaori
+                    ? `${responseMap.mataurangaMaori}\n${remainder}`
+                    : remainder;
+            }
+            return;
+        }
+
+        if (skillsPrefix.test(lower)) {
+            currentKey = "skills";
+            currentSkillKey = currentSkillKey || "literacy";
+            const remainder = line.replace(skillsPrefix, "").replace(/^\s*:?\s*/, "").trim();
+            if (remainder) {
+                responseMap.skills[currentSkillKey] = responseMap.skills[currentSkillKey]
+                    ? `${responseMap.skills[currentSkillKey]}\n${remainder}`
+                    : remainder;
+            }
+            return;
+        }
+
+        if (healthSafetyPrefix.test(lower)) {
+            currentKey = "healthSafety";
+            currentSkillKey = "";
+            const remainder = line.replace(healthSafetyPrefix, "").replace(/^\s*:?\s*/, "").trim();
+            if (remainder) {
+                responseMap.healthSafety = responseMap.healthSafety
+                    ? `${responseMap.healthSafety}\n${remainder}`
+                    : remainder;
+            }
+            return;
+        }
+
+        if (currentKey === "skills") {
+            if (literacyPrefix.test(lower)) {
+                currentSkillKey = "literacy";
+                const remainder = line.replace(literacyPrefix, "").replace(/^\s*:?\s*/, "").trim();
+                if (remainder) {
+                    responseMap.skills.literacy = responseMap.skills.literacy
+                        ? `${responseMap.skills.literacy}\n${remainder}`
+                        : remainder;
+                }
+                return;
+            }
+
+            if (numeracyPrefix.test(lower)) {
+                currentSkillKey = "numeracy";
+                const remainder = line.replace(numeracyPrefix, "").replace(/^\s*:?\s*/, "").trim();
+                if (remainder) {
+                    responseMap.skills.numeracy = responseMap.skills.numeracy
+                        ? `${responseMap.skills.numeracy}\n${remainder}`
+                        : remainder;
+                }
+                return;
+            }
+
+            if (digitalTechPrefix.test(lower)) {
+                currentSkillKey = "digitalTech";
+                const remainder = line.replace(digitalTechPrefix, "").replace(/^\s*:?\s*/, "").trim();
+                if (remainder) {
+                    responseMap.skills.digitalTech = responseMap.skills.digitalTech
+                        ? `${responseMap.skills.digitalTech}\n${remainder}`
+                        : remainder;
+                }
+                return;
+            }
+
+            if (practicalPrefix.test(lower)) {
+                currentSkillKey = "practical";
+                const remainder = line.replace(practicalPrefix, "").replace(/^\s*:?\s*/, "").trim();
+                if (remainder) {
+                    responseMap.skills.practical = responseMap.skills.practical
+                        ? `${responseMap.skills.practical}\n${remainder}`
+                        : remainder;
+                }
+                return;
+            }
+        }
+
+        if (!currentKey && !responseMap.localCurriculumLinks) {
+            currentKey = "localCurriculumLinks";
+        }
+
+        if (currentKey) {
+            if (currentKey === "skills") {
+                currentSkillKey = currentSkillKey || "literacy";
+                responseMap.skills[currentSkillKey] = responseMap.skills[currentSkillKey]
+                    ? `${responseMap.skills[currentSkillKey]}\n${line}`
+                    : line;
+                return;
+            }
+
+            responseMap[currentKey] = responseMap[currentKey]
+                ? `${responseMap[currentKey]}\n${line}`
+                : line;
+        }
+    });
+
+    return responseMap;
+}
+
 function renderLessons(lessons) {
     if (!Array.isArray(lessons) || !lessons.length) {
         return "<p class='help-text'>No lessons saved for this unit plan yet.</p>";
@@ -236,6 +487,9 @@ function renderUnitPlanCard(row) {
     const topicType = getUnitPlanTopicType(row);
     const isSelected = String(row.id || "") === selectedUnitPlanId;
     const cardId = getUnitPlanDomId(row);
+    const schoolValues = parseUnitValuesToResponses(row.unit_values);
+    const contexts = parseContextsToResponses(row.contexts);
+    const curriculum = parseCurriculumLinksToResponses(row.curriculum_links);
 
     return `
         <article id="${cardId}" class="upload-panel unit-plan-card ${isSelected ? "is-selected" : ""}" data-unit-plan-id="${escapeHtml(String(row.id || ""))}" style="margin-top: 1rem;">
@@ -251,21 +505,123 @@ function renderUnitPlanCard(row) {
                 </div>
             </div>
             <fieldset class="form-section">
-                <legend>Unit Details</legend>
+                <legend>Manual Unit Planner</legend>
                 <div class="form-grid">
                     <div class="field"><label>Unit Title</label><input type="text" value="${escapeHtml(row.title || "Untitled Unit Plan")}" disabled></div>
                     <div class="field"><label>Topic Type</label><input type="text" value="${escapeHtml(topicType)}" disabled></div>
                     <div class="field"><label>Strand</label><input type="text" value="${escapeHtml(row.strand || "-")}" disabled></div>
                     <div class="field"><label>Year Level</label><input type="text" value="${escapeHtml(row.year_level || "-")}" disabled></div>
-                    <div class="field"><label>Term</label><input type="text" value="${escapeHtml(row.term || "-")}" disabled></div>
                     <div class="field"><label>Duration Weeks</label><input type="text" value="${escapeHtml(row.duration_weeks || 1)}" disabled></div>
+                    <div class="field"><label>Term</label><input type="text" value="${escapeHtml(row.term || "-")}" disabled></div>
                     <div class="field"><label>Subject Stream</label><input type="text" value="${escapeHtml(row.subject_stream || "-")}" disabled></div>
                     <div class="field"><label>Lesson Count</label><input type="text" value="${escapeHtml(lessonCount)}" disabled></div>
                     <div class="field field-wide"><label>Unit Overview</label><textarea rows="3" disabled>${renderLineBlock(row.overview)}</textarea></div>
-                    <div class="field field-wide"><label>Aims</label><textarea rows="4" disabled>${renderLineBlock(row.unit_aims)}</textarea></div>
-                    <div class="field field-wide"><label>School Values</label><textarea rows="4" disabled>${renderLineBlock(row.unit_values)}</textarea></div>
-                    <div class="field field-wide"><label>Contexts of Learning</label><textarea rows="4" disabled>${renderLineBlock(row.contexts)}</textarea></div>
-                    <div class="field field-wide"><label>Curriculum Links</label><textarea rows="4" disabled>${renderLineBlock(row.curriculum_links)}</textarea></div>
+                    <div class="field field-wide"><label>Aims</label><textarea rows="10" disabled>${renderLineBlock(row.unit_aims)}</textarea></div>
+
+                    <div class="field field-wide school-values-field">
+                        <label>School Values</label>
+                        <div class="school-values-grid">
+                            <article class="school-value-card">
+                                <h4>Whanaungatanga</h4>
+                                <textarea rows="3" disabled>${renderLineBlock(schoolValues.whanaungatanga)}</textarea>
+                            </article>
+                            <article class="school-value-card">
+                                <h4>Rangatiratanga</h4>
+                                <textarea rows="3" disabled>${renderLineBlock(schoolValues.rangatiratanga)}</textarea>
+                            </article>
+                            <article class="school-value-card">
+                                <h4>Manaakitanga</h4>
+                                <textarea rows="3" disabled>${renderLineBlock(schoolValues.manaakitanga)}</textarea>
+                            </article>
+                            <article class="school-value-card">
+                                <h4>Kaitiakitanga</h4>
+                                <textarea rows="3" disabled>${renderLineBlock(schoolValues.kaitiakitanga)}</textarea>
+                            </article>
+                        </div>
+                    </div>
+
+                    <div class="field field-wide context-field">
+                        <label>Contexts of Learning</label>
+                        <div class="contexts-table-shell">
+                            <a class="contexts-symbol-link" href="https://theelearningcoach.com/elearning_design/context-in-learning-design/" target="_blank" rel="noreferrer" aria-label="Open pedagogical explanation for contexts of learning">
+                                <span class="contexts-symbol-title">Contexts of Learning</span>
+                                <svg class="contexts-symbol" viewBox="0 0 120 120" role="img" aria-label="Contexts symbol">
+                                    <circle cx="60" cy="60" r="56" fill="#ffffff" stroke="#90b5dd" stroke-width="4"></circle>
+                                    <path d="M60 60 L60 8 A52 52 0 0 1 105 37 Z" fill="#9fd0ff"></path>
+                                    <path d="M60 60 L105 37 A52 52 0 0 1 96 92 Z" fill="#ffd38d"></path>
+                                    <path d="M60 60 L96 92 A52 52 0 0 1 38 108 Z" fill="#a8ddb5"></path>
+                                    <path d="M60 60 L38 108 A52 52 0 0 1 14 55 Z" fill="#f3b0b0"></path>
+                                    <path d="M60 60 L14 55 A52 52 0 0 1 60 8 Z" fill="#cab8ff"></path>
+                                    <circle cx="60" cy="60" r="10" fill="#17395d"></circle>
+                                </svg>
+                                <span class="contexts-link-copy">Read pedagogy guide</span>
+                            </a>
+                            <div class="contexts-table">
+                                <div class="contexts-row">
+                                    <div class="contexts-heading">Environment</div>
+                                    <textarea rows="3" disabled>${renderLineBlock(contexts.environment)}</textarea>
+                                </div>
+                                <div class="contexts-row">
+                                    <div class="contexts-heading">Mental-Emotional</div>
+                                    <textarea rows="3" disabled>${renderLineBlock(contexts.mentalEmotional)}</textarea>
+                                </div>
+                                <div class="contexts-row">
+                                    <div class="contexts-heading">Culture</div>
+                                    <textarea rows="3" disabled>${renderLineBlock(contexts.culture)}</textarea>
+                                </div>
+                                <div class="contexts-row">
+                                    <div class="contexts-heading">Social</div>
+                                    <textarea rows="3" disabled>${renderLineBlock(contexts.social)}</textarea>
+                                </div>
+                                <div class="contexts-row">
+                                    <div class="contexts-heading">Technology</div>
+                                    <textarea rows="3" disabled>${renderLineBlock(contexts.technology)}</textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field field-wide local-curriculum-field">
+                        <label>Local Curriculum and Matauranga Maori</label>
+                        <div class="local-curriculum-shell">
+                            <div class="local-curriculum-table">
+                                <div class="local-curriculum-header">Local Curriculum Links</div>
+                                <div class="local-curriculum-header">Matauranga Maori</div>
+                                <textarea rows="4" disabled>${renderLineBlock(curriculum.localCurriculumLinks)}</textarea>
+                                <textarea rows="4" disabled>${renderLineBlock(curriculum.mataurangaMaori)}</textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field field-wide skills-field">
+                        <label>Skills</label>
+                        <div class="skills-table-shell">
+                            <div class="skills-table-title">Skills</div>
+                            <div class="skills-table">
+                                <div class="skills-row">
+                                    <div class="skills-heading">Literacy</div>
+                                    <textarea rows="4" disabled>${renderLineBlock(curriculum.skills.literacy)}</textarea>
+                                </div>
+                                <div class="skills-row">
+                                    <div class="skills-heading">Numeracy</div>
+                                    <textarea rows="3" disabled>${renderLineBlock(curriculum.skills.numeracy)}</textarea>
+                                </div>
+                                <div class="skills-row">
+                                    <div class="skills-heading">Digital Tech</div>
+                                    <textarea rows="4" disabled>${renderLineBlock(curriculum.skills.digitalTech)}</textarea>
+                                </div>
+                                <div class="skills-row">
+                                    <div class="skills-heading">Practical</div>
+                                    <textarea rows="4" disabled>${renderLineBlock(curriculum.skills.practical)}</textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field field-wide">
+                        <label>Health &amp; Safety</label>
+                        <textarea rows="10" disabled>${renderLineBlock(curriculum.healthSafety)}</textarea>
+                    </div>
                     <div class="field field-wide"><label>Assessment / End Point</label><textarea rows="3" disabled>${renderLineBlock(row.assessment_link)}</textarea></div>
                     <div class="field field-wide"><label>Planning Notes</label><textarea rows="3" disabled>${renderLineBlock(row.notes)}</textarea></div>
                     <div class="field field-wide"><label>Last Updated</label><input type="text" value="${escapeHtml(formatDateTime(row.updated_at || row.created_at))}" disabled></div>
