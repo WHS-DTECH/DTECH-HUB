@@ -2,11 +2,14 @@ const accessElement = document.querySelector("#unit-plan-access");
 const statusElement = document.querySelector("#unit-plan-status");
 const resultsElement = document.querySelector("#unit-plan-results");
 const searchElement = document.querySelector("#unit-plan-search");
+const topicPillsElement = document.querySelector("#topic-type-pills");
 
 const BROWSE_UNIT_AUTH_KEY = "hub_google_auth_v1";
 
 let rows = [];
 let hasAccess = false;
+let selectedTopicType = "All topics";
+let selectedUnitPlanId = "";
 
 function normalizeEmail(value) {
     return String(value || "").trim().toLowerCase();
@@ -73,6 +76,49 @@ function escapeHtml(value) {
         .replace(/>/g, "&gt;")
         .replace(/\"/g, "&quot;")
         .replace(/'/g, "&#39;");
+}
+
+function slugify(value) {
+    return String(value || "")
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+}
+
+function getUnitPlanTopicType(row) {
+    return String(row?.topic || "").trim() || "Unspecified";
+}
+
+function getUnitPlanDomId(row) {
+    return `unit-plan-${slugify(row?.id || row?.title || "plan")}`;
+}
+
+function getTopicTypes() {
+    const topicTypes = Array.from(new Set(rows.map((row) => getUnitPlanTopicType(row)))).filter(Boolean);
+    topicTypes.sort((left, right) => left.localeCompare(right));
+    return ["All topics", ...topicTypes];
+}
+
+function renderTopicTabs() {
+    if (!topicPillsElement) return;
+
+    const topicTypes = getTopicTypes();
+    topicPillsElement.innerHTML = "";
+
+    topicTypes.forEach((topicType) => {
+        const pill = document.createElement("button");
+        pill.type = "button";
+        pill.className = `filter-chip ${selectedTopicType === topicType ? "active" : ""}`;
+        pill.textContent = topicType;
+        pill.setAttribute("aria-pressed", String(selectedTopicType === topicType));
+        pill.addEventListener("click", () => {
+            selectedTopicType = topicType;
+            selectedUnitPlanId = "";
+            renderRows();
+        });
+        topicPillsElement.appendChild(pill);
+    });
 }
 
 function renderLineBlock(value, placeholder = "-") {
@@ -146,6 +192,7 @@ function filterRows(sourceRows) {
         const blob = [
             row.title,
             row.topic,
+            getUnitPlanTopicType(row),
             row.strand,
             row.year_level,
             row.subject_stream,
@@ -165,6 +212,68 @@ function filterRows(sourceRows) {
     });
 }
 
+function filterBySelectedTopicType(sourceRows) {
+    if (selectedTopicType === "All topics") {
+        return sourceRows;
+    }
+
+    return sourceRows.filter((row) => getUnitPlanTopicType(row) === selectedTopicType);
+}
+
+function openUnitPlan(rowId) {
+    selectedUnitPlanId = String(rowId || "");
+    renderRows();
+
+    const selectedElement = selectedUnitPlanId ? document.getElementById(getUnitPlanDomId(rows.find((row) => String(row.id) === selectedUnitPlanId))) : null;
+    if (selectedElement) {
+        selectedElement.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+}
+
+function renderUnitPlanCard(row) {
+    const lessonCount = Array.isArray(row.lessons) ? row.lessons.length : 0;
+    const topicType = getUnitPlanTopicType(row);
+    const isSelected = String(row.id || "") === selectedUnitPlanId;
+    const cardId = getUnitPlanDomId(row);
+
+    return `
+        <article id="${cardId}" class="upload-panel unit-plan-card ${isSelected ? "is-selected" : ""}" data-unit-plan-id="${escapeHtml(String(row.id || ""))}" style="margin-top: 1rem;">
+            <div class="unit-plan-card-header">
+                <div>
+                    <p class="help-text" style="margin:0; text-transform:uppercase; font-weight:700;">Topic Type</p>
+                    <h2 style="margin:2px 0 0;">${escapeHtml(row.title || "Untitled Unit Plan")}</h2>
+                </div>
+                <a href="#${cardId}" class="button button-secondary unit-plan-open-link" data-open-unit-plan="${escapeHtml(String(row.id || ""))}">Open Plan</a>
+            </div>
+            <fieldset class="form-section">
+                <legend>Unit Details</legend>
+                <div class="form-grid">
+                    <div class="field"><label>Unit Title</label><input type="text" value="${escapeHtml(row.title || "Untitled Unit Plan")}" disabled></div>
+                    <div class="field"><label>Topic Type</label><input type="text" value="${escapeHtml(topicType)}" disabled></div>
+                    <div class="field"><label>Strand</label><input type="text" value="${escapeHtml(row.strand || "-")}" disabled></div>
+                    <div class="field"><label>Year Level</label><input type="text" value="${escapeHtml(row.year_level || "-")}" disabled></div>
+                    <div class="field"><label>Term</label><input type="text" value="${escapeHtml(row.term || "-")}" disabled></div>
+                    <div class="field"><label>Duration Weeks</label><input type="text" value="${escapeHtml(row.duration_weeks || 1)}" disabled></div>
+                    <div class="field"><label>Subject Stream</label><input type="text" value="${escapeHtml(row.subject_stream || "-")}" disabled></div>
+                    <div class="field"><label>Lesson Count</label><input type="text" value="${escapeHtml(lessonCount)}" disabled></div>
+                    <div class="field field-wide"><label>Unit Overview</label><textarea rows="3" disabled>${renderLineBlock(row.overview)}</textarea></div>
+                    <div class="field field-wide"><label>Aims</label><textarea rows="4" disabled>${renderLineBlock(row.unit_aims)}</textarea></div>
+                    <div class="field field-wide"><label>School Values</label><textarea rows="4" disabled>${renderLineBlock(row.unit_values)}</textarea></div>
+                    <div class="field field-wide"><label>Contexts of Learning</label><textarea rows="4" disabled>${renderLineBlock(row.contexts)}</textarea></div>
+                    <div class="field field-wide"><label>Curriculum Links</label><textarea rows="4" disabled>${renderLineBlock(row.curriculum_links)}</textarea></div>
+                    <div class="field field-wide"><label>Assessment / End Point</label><textarea rows="3" disabled>${renderLineBlock(row.assessment_link)}</textarea></div>
+                    <div class="field field-wide"><label>Planning Notes</label><textarea rows="3" disabled>${renderLineBlock(row.notes)}</textarea></div>
+                    <div class="field field-wide"><label>Last Updated</label><input type="text" value="${escapeHtml(formatDateTime(row.updated_at || row.created_at))}" disabled></div>
+                </div>
+            </fieldset>
+            <fieldset class="form-section" style="margin-top: 10px;">
+                <legend>Lesson Planner</legend>
+                ${renderLessons(row.lessons)}
+            </fieldset>
+        </article>
+    `;
+}
+
 function renderRows() {
     if (!resultsElement) return;
 
@@ -173,48 +282,28 @@ function renderRows() {
         return;
     }
 
-    const filtered = filterRows(rows);
+    const filtered = filterBySelectedTopicType(filterRows(rows));
     if (!filtered.length) {
         resultsElement.innerHTML = "<p class='help-text'>No unit plans match your search.</p>";
         return;
     }
 
-    const cards = filtered
-        .map((row) => {
-            const lessonCount = Array.isArray(row.lessons) ? row.lessons.length : 0;
-            return `
-                <article class="upload-panel" style="margin-top: 1rem;">
-                    <fieldset class="form-section">
-                        <legend>Unit Details</legend>
-                        <div class="form-grid">
-                            <div class="field"><label>Unit Title</label><input type="text" value="${escapeHtml(row.title || "Untitled Unit Plan")}" disabled></div>
-                            <div class="field"><label>Topic or Learning Area</label><input type="text" value="${escapeHtml(row.topic || "-")}" disabled></div>
-                            <div class="field"><label>Strand</label><input type="text" value="${escapeHtml(row.strand || "-")}" disabled></div>
-                            <div class="field"><label>Year Level</label><input type="text" value="${escapeHtml(row.year_level || "-")}" disabled></div>
-                            <div class="field"><label>Term</label><input type="text" value="${escapeHtml(row.term || "-")}" disabled></div>
-                            <div class="field"><label>Duration Weeks</label><input type="text" value="${escapeHtml(row.duration_weeks || 1)}" disabled></div>
-                            <div class="field"><label>Subject Stream</label><input type="text" value="${escapeHtml(row.subject_stream || "-")}" disabled></div>
-                            <div class="field"><label>Lesson Count</label><input type="text" value="${escapeHtml(lessonCount)}" disabled></div>
-                            <div class="field field-wide"><label>Unit Overview</label><textarea rows="3" disabled>${renderLineBlock(row.overview)}</textarea></div>
-                            <div class="field field-wide"><label>Aims</label><textarea rows="4" disabled>${renderLineBlock(row.unit_aims)}</textarea></div>
-                            <div class="field field-wide"><label>School Values</label><textarea rows="4" disabled>${renderLineBlock(row.unit_values)}</textarea></div>
-                            <div class="field field-wide"><label>Contexts of Learning</label><textarea rows="4" disabled>${renderLineBlock(row.contexts)}</textarea></div>
-                            <div class="field field-wide"><label>Curriculum Links</label><textarea rows="4" disabled>${renderLineBlock(row.curriculum_links)}</textarea></div>
-                            <div class="field field-wide"><label>Assessment / End Point</label><textarea rows="3" disabled>${renderLineBlock(row.assessment_link)}</textarea></div>
-                            <div class="field field-wide"><label>Planning Notes</label><textarea rows="3" disabled>${renderLineBlock(row.notes)}</textarea></div>
-                            <div class="field field-wide"><label>Last Updated</label><input type="text" value="${escapeHtml(formatDateTime(row.updated_at || row.created_at))}" disabled></div>
-                        </div>
-                    </fieldset>
-                    <fieldset class="form-section" style="margin-top: 10px;">
-                        <legend>Lesson Planner</legend>
-                        ${renderLessons(row.lessons)}
-                    </fieldset>
-                </article>
-            `;
-        })
-        .join("");
+    const selectedFirst = [...filtered].sort((left, right) => {
+        const leftSelected = String(left.id || "") === selectedUnitPlanId ? 0 : 1;
+        const rightSelected = String(right.id || "") === selectedUnitPlanId ? 0 : 1;
+        return leftSelected - rightSelected || String(left.title || "").localeCompare(String(right.title || ""));
+    });
+
+    const cards = selectedFirst.map((row) => renderUnitPlanCard(row)).join("");
 
     resultsElement.innerHTML = cards;
+
+    resultsElement.querySelectorAll("[data-open-unit-plan]").forEach((link) => {
+        link.addEventListener("click", (event) => {
+            event.preventDefault();
+            openUnitPlan(link.getAttribute("data-open-unit-plan"));
+        });
+    });
 }
 
 async function loadUnitPlans() {
@@ -230,6 +319,10 @@ async function loadUnitPlans() {
         const data = await response.json();
         rows = Array.isArray(data) ? data : [];
         rows.sort((left, right) => String(right.updated_at || right.created_at || "").localeCompare(String(left.updated_at || left.created_at || "")));
+        if (!getTopicTypes().includes(selectedTopicType)) {
+            selectedTopicType = "All topics";
+        }
+        renderTopicTabs();
         renderRows();
         setStatus(`Loaded ${rows.length} unit plan${rows.length === 1 ? "" : "s"}.`);
     } catch (error) {
