@@ -81,8 +81,14 @@
                                 <input id="lesson-duration" name="lessonDurationMinutes" type="number" min="1" step="1" value="60" required>
                             </div>
                             <div class="field">
-                                <label for="lesson-type">Activity Type</label>
-                                <input id="lesson-type" name="lessonType" type="text" placeholder="e.g. Programming, Digital Media, Design" required>
+                                <label for="lesson-type">Topic Type</label>
+                                <select id="lesson-type" name="lessonType" required>
+                                    <option value="">Select topic type</option>
+                                    <option>Office Suite</option>
+                                    <option>Programming</option>
+                                    <option>Electronics</option>
+                                    <option>Digital Media</option>
+                                </select>
                             </div>
                             <div class="field">
                                 <label for="lesson-card-color">Card Colour</label>
