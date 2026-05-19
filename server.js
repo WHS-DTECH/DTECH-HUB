@@ -877,6 +877,116 @@ async function saveUnitPlanPayload(payload) {
   return result.rows[0];
 }
 
+function getUnitPlanLessonCardId(unitPlanId, lessonIndex) {
+  const safePlanId = slugify(unitPlanId || "unit-plan");
+  return `unitplan-${safePlanId}-lesson-${lessonIndex}`;
+}
+
+function buildLessonCardFromUnitLesson(unitPlan, lesson, fallbackIndex = 1) {
+  const lessonIndex = Number.parseInt(lesson?.lesson_index ?? fallbackIndex, 10);
+  const safeLessonIndex = Number.isInteger(lessonIndex) && lessonIndex > 0 ? lessonIndex : fallbackIndex;
+  const lessonTitle = String(lesson?.title || lesson?.activity_name || `Lesson ${safeLessonIndex}`).trim() || `Lesson ${safeLessonIndex}`;
+  const lessonFocus = String(lesson?.focus || lesson?.notes || "").trim() || `Lesson ${safeLessonIndex} from ${String(unitPlan?.title || "Unit Plan").trim()}`;
+  const explicitPublish = lesson?.publish_activity;
+  const publishActivity = typeof explicitPublish === "boolean" ? explicitPublish : true;
+
+  return {
+    id: getUnitPlanLessonCardId(unitPlan?.id, safeLessonIndex),
+    lesson_title: lessonTitle,
+    lesson_week: String(lesson?.week_label || "").trim(),
+    lesson_date: String(lesson?.calendar_date || "").trim(),
+    lesson_duration_minutes: Number.parseInt(lesson?.duration_minutes ?? 1, 10) || 1,
+    lesson_type: String(lesson?.activity_type || unitPlan?.topic || "Lesson").trim() || "Lesson",
+    lesson_card_color: String(lesson?.card_color || "Rose").trim() || "Rose",
+    activity_name: String(lesson?.activity_name || lessonTitle).trim() || lessonTitle,
+    lesson_year_level: String(lesson?.year_level || unitPlan?.year_level || "").trim(),
+    lesson_link_url: String(lesson?.link_url || "").trim(),
+    lesson_focus: lessonFocus,
+    lesson_notes: String(lesson?.notes || lessonFocus).trim(),
+    publish_activity: publishActivity,
+    add_to_calendar: Boolean(lesson?.add_to_calendar),
+    created_by_email: String(unitPlan?.created_by_email || "").trim(),
+    created_at: String(unitPlan?.created_at || new Date().toISOString()),
+    updated_at: new Date().toISOString()
+  };
+}
+
+async function syncUnitPlanLessonsToLibrary(unitPlan) {
+  const unitPlanId = String(unitPlan?.id || "").trim();
+  if (!unitPlanId) {
+    return 0;
+  }
+
+  const lessons = normalizeUnitLessons(unitPlan?.lessons);
+  const cardPrefix = `unitplan-${slugify(unitPlanId)}-lesson-`;
+
+  if (!hasDatabase) {
+    Array.from(memoryLessons.keys())
+      .filter((lessonId) => String(lessonId || "").startsWith(cardPrefix))
+      .forEach((lessonId) => {
+        memoryLessons.delete(lessonId);
+      });
+
+    lessons.forEach((lesson, index) => {
+      const card = buildLessonCardFromUnitLesson(unitPlan, lesson, index + 1);
+      memoryLessons.set(card.id, card);
+    });
+
+    return lessons.length;
+  }
+
+  await pool.query("DELETE FROM lessons WHERE id LIKE $1", [`${cardPrefix}%`]);
+
+  for (let index = 0; index < lessons.length; index += 1) {
+    const lesson = lessons[index];
+    const card = buildLessonCardFromUnitLesson(unitPlan, lesson, index + 1);
+
+    await pool.query(
+      `INSERT INTO lessons
+       (id, lesson_title, lesson_week, lesson_date, lesson_duration_minutes, lesson_type, lesson_card_color,
+        activity_name, lesson_year_level, lesson_link_url, lesson_focus, lesson_notes, publish_activity,
+        add_to_calendar, created_by_email, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+       ON CONFLICT(id) DO UPDATE SET
+       lesson_title = EXCLUDED.lesson_title,
+       lesson_week = EXCLUDED.lesson_week,
+       lesson_date = EXCLUDED.lesson_date,
+       lesson_duration_minutes = EXCLUDED.lesson_duration_minutes,
+       lesson_type = EXCLUDED.lesson_type,
+       lesson_card_color = EXCLUDED.lesson_card_color,
+       activity_name = EXCLUDED.activity_name,
+       lesson_year_level = EXCLUDED.lesson_year_level,
+       lesson_link_url = EXCLUDED.lesson_link_url,
+       lesson_focus = EXCLUDED.lesson_focus,
+       lesson_notes = EXCLUDED.lesson_notes,
+       publish_activity = EXCLUDED.publish_activity,
+       add_to_calendar = EXCLUDED.add_to_calendar,
+       updated_at = EXCLUDED.updated_at`,
+      [
+        card.id,
+        card.lesson_title,
+        card.lesson_week,
+        card.lesson_date,
+        card.lesson_duration_minutes,
+        card.lesson_type,
+        card.lesson_card_color,
+        card.activity_name,
+        card.lesson_year_level,
+        card.lesson_link_url,
+        card.lesson_focus,
+        card.lesson_notes,
+        card.publish_activity,
+        card.add_to_calendar,
+        card.created_by_email,
+        card.created_at,
+        card.updated_at
+      ]
+    );
+  }
+
+  return lessons.length;
+}
+
 async function parseDocxBufferToUnitPlanPayload(buffer, originalName, userEmail) {
   const extraction = await mammoth.extractRawText({ buffer });
   const parsed = parseUnitPlanFromDocxText(extraction.value || "", originalName || "");
@@ -905,11 +1015,13 @@ app.post("/api/unit-plans/import-docx", unitPlanUpload.single("unitPlanFile"), a
   try {
     const payload = await parseDocxBufferToUnitPlanPayload(file.buffer, file.originalname, userEmail);
     const savedPlan = await saveUnitPlanPayload(payload);
+    const createdLessonCards = await syncUnitPlanLessonsToLibrary(savedPlan);
     res.status(201).json({
       ok: true,
       unitPlan: savedPlan,
       lessonCount: Array.isArray(savedPlan?.lessons) ? savedPlan.lessons.length : 0,
-      createdActivities: 0,
+      createdLessonCards,
+      createdActivities: createdLessonCards,
       createdCalendarEvents: 0
     });
   } catch (error) {
@@ -957,12 +1069,14 @@ app.post("/api/unit-plans/import-docx-template", async (req, res) => {
     const templateBuffer = await require("fs").promises.readFile(templateAbsolutePath);
     const payload = await parseDocxBufferToUnitPlanPayload(templateBuffer, "Programming - TECHNOLOGY Unit Plan - DT (1).docx", userEmail);
     const savedPlan = await saveUnitPlanPayload(payload);
+    const createdLessonCards = await syncUnitPlanLessonsToLibrary(savedPlan);
     res.status(201).json({
       ok: true,
       source: templateRelativePath.replace(/\\/g, "/"),
       unitPlan: savedPlan,
       lessonCount: Array.isArray(savedPlan?.lessons) ? savedPlan.lessons.length : 0,
-      createdActivities: 0,
+      createdLessonCards,
+      createdActivities: createdLessonCards,
       createdCalendarEvents: 0
     });
   } catch (error) {
@@ -1029,6 +1143,38 @@ async function ensureUnitPlanSchema() {
   await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS curriculum_links JSONB NOT NULL DEFAULT '[]'::jsonb`);
   await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS lessons JSONB NOT NULL DEFAULT '[]'::jsonb`);
   await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS lessons (
+      id TEXT PRIMARY KEY,
+      lesson_title TEXT NOT NULL,
+      lesson_week TEXT,
+      lesson_date TEXT,
+      lesson_duration_minutes INTEGER NOT NULL DEFAULT 60,
+      lesson_type TEXT NOT NULL,
+      lesson_card_color TEXT,
+      activity_name TEXT NOT NULL,
+      lesson_year_level TEXT NOT NULL,
+      lesson_link_url TEXT,
+      lesson_focus TEXT NOT NULL,
+      lesson_notes TEXT,
+      publish_activity BOOLEAN NOT NULL DEFAULT FALSE,
+      add_to_calendar BOOLEAN NOT NULL DEFAULT FALSE,
+      created_by_email TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  await pool.query(`ALTER TABLE lessons ADD COLUMN IF NOT EXISTS lesson_week TEXT`);
+  await pool.query(`ALTER TABLE lessons ADD COLUMN IF NOT EXISTS lesson_date TEXT`);
+  await pool.query(`ALTER TABLE lessons ADD COLUMN IF NOT EXISTS lesson_duration_minutes INTEGER NOT NULL DEFAULT 60`);
+  await pool.query(`ALTER TABLE lessons ADD COLUMN IF NOT EXISTS lesson_card_color TEXT`);
+  await pool.query(`ALTER TABLE lessons ADD COLUMN IF NOT EXISTS lesson_link_url TEXT`);
+  await pool.query(`ALTER TABLE lessons ADD COLUMN IF NOT EXISTS lesson_notes TEXT`);
+  await pool.query(`ALTER TABLE lessons ADD COLUMN IF NOT EXISTS publish_activity BOOLEAN NOT NULL DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE lessons ADD COLUMN IF NOT EXISTS add_to_calendar BOOLEAN NOT NULL DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE lessons ADD COLUMN IF NOT EXISTS created_by_email TEXT`);
+  await pool.query(`ALTER TABLE lessons ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await pool.query(`ALTER TABLE lessons ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS unit_plan_id TEXT`);
   await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS unit_lesson_index INTEGER`);
   await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS unit_plan_id TEXT`);
@@ -2531,9 +2677,83 @@ app.post("/api/unit-plans", async (req, res) => {
 
   try {
     const savedPlan = await saveUnitPlanPayload(payload);
-    res.status(201).json(savedPlan);
+    const createdLessonCards = await syncUnitPlanLessonsToLibrary(savedPlan);
+    res.status(201).json({
+      ...savedPlan,
+      lesson_cards_created: createdLessonCards
+    });
   } catch (_error) {
     res.status(500).json({ error: "Could not save unit plan" });
+  }
+});
+
+app.put("/api/unit-plans/:id", async (req, res) => {
+  const unitPlanId = String(req.params.id || "").trim();
+  const userEmail = normalizeEmail(req.body?.created_by_email || req.body?.user_email || getRequestUserEmail(req));
+
+  if (!unitPlanId) {
+    res.status(400).json({ error: "Unit plan ID is required" });
+    return;
+  }
+
+  if (!userEmail || !(await canManagePracticalSchedule(userEmail))) {
+    res.status(403).json({ error: "Teacher/Admin access is required." });
+    return;
+  }
+
+  const payload = buildUnitPlanPayload(req.body, userEmail);
+  payload.id = unitPlanId;
+
+  if (!payload.title || !payload.topic || !payload.year_level) {
+    res.status(400).json({ error: "title, topic and year_level are required" });
+    return;
+  }
+
+  try {
+    const savedPlan = await saveUnitPlanPayload(payload);
+    const createdLessonCards = await syncUnitPlanLessonsToLibrary(savedPlan);
+    res.status(200).json({
+      ...savedPlan,
+      lesson_cards_created: createdLessonCards
+    });
+  } catch (_error) {
+    res.status(500).json({ error: "Could not update unit plan" });
+  }
+});
+
+app.delete("/api/unit-plans/:id", async (req, res) => {
+  const unitPlanId = String(req.params.id || "").trim();
+  const userEmail = getRequestUserEmail(req);
+
+  if (!unitPlanId) {
+    res.status(400).json({ error: "Unit plan ID is required" });
+    return;
+  }
+
+  if (!userEmail || !(await canManagePracticalSchedule(userEmail))) {
+    res.status(403).json({ error: "Only Teacher/Admin users can delete unit plans" });
+    return;
+  }
+
+  if (!hasDatabase) {
+    if (!memoryUnitPlans.has(unitPlanId)) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    memoryUnitPlans.delete(unitPlanId);
+    res.status(204).send();
+    return;
+  }
+
+  try {
+    const result = await pool.query("DELETE FROM unit_plans WHERE id = $1", [unitPlanId]);
+    if (!result.rowCount) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+    res.status(204).send();
+  } catch (_error) {
+    res.status(500).json({ error: "Could not delete unit plan" });
   }
 });
 

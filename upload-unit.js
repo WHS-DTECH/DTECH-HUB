@@ -18,6 +18,8 @@ const cancelManualUploadButton = document.querySelector("#cancel-manual-upload")
 const clearManualFormButton = document.querySelector("#clear-manual-form");
 const lessonList = document.querySelector("#lesson-list");
 const addLessonButton = document.querySelector("#add-lesson");
+const pageTitleElement = document.querySelector(".upload-page > h1");
+const introTextElement = document.querySelector(".upload-page > .intro-text");
 
 const previewFields = {
     title: document.querySelector("#preview-title"),
@@ -97,6 +99,7 @@ const manualFields = {
 
 const UPLOAD_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 let hasReadyFilePreview = false;
+let editUnitPlanId = "";
 
 const YEAR_LEVEL_OPTIONS = ["Junior", "Year 7", "Year 8", "Middle", "Year 9", "Year 10", "Senior", "Year 11", "Year 12", "Year 13"];
 const SCHOOL_VALUE_KEYS = ["whanaungatanga", "rangatiratanga", "manaakitanga", "kaitiakitanga"];
@@ -1121,6 +1124,54 @@ function collectManualPayload() {
     };
 }
 
+function getEditUnitPlanIdFromUrl() {
+    try {
+        const url = new URL(window.location.href);
+        return String(url.searchParams.get("edit") || "").trim();
+    } catch (_error) {
+        return "";
+    }
+}
+
+async function loadUnitPlanForEdit() {
+    editUnitPlanId = getEditUnitPlanIdFromUrl();
+    if (!editUnitPlanId) {
+        return;
+    }
+
+    try {
+        setStatus("Loading unit plan for editing...");
+        setActionButtonsDisabled(true);
+
+        const response = await fetch(`/api/unit-plans/${encodeURIComponent(editUnitPlanId)}`, {
+            headers: withUserEmailHeader()
+        });
+        if (!response.ok) {
+            throw new Error(`Could not load unit plan for edit (HTTP ${response.status})`);
+        }
+
+        const unitPlan = await response.json();
+        populateManualPlannerFromUnitPlan(unitPlan || {});
+
+        if (pageTitleElement) {
+            pageTitleElement.textContent = "Edit Unit Plan";
+        }
+        if (introTextElement) {
+            introTextElement.textContent = "Update the unit plan details and save your changes.";
+        }
+        if (saveManualUnitButton) {
+            saveManualUnitButton.textContent = "Update Unit Plan";
+        }
+
+        setStatus(`Editing ${unitPlan?.title || "unit plan"}.`);
+    } catch (error) {
+        editUnitPlanId = "";
+        setStatus(error.message || "Could not load unit plan for editing.", true);
+    } finally {
+        setActionButtonsDisabled(false);
+    }
+}
+
 function renderAuthStatus() {
     if (!authStatusElement) {
         return;
@@ -1225,10 +1276,10 @@ async function importTeacherTemplateDocx() {
         }
 
         const lessonCount = Number(result.lessonCount || 0);
-        const activityCount = Number(result.createdActivities || 0);
+        const lessonCardCount = Number(result.createdLessonCards ?? result.createdActivities ?? 0);
         const calendarCount = Number(result.createdCalendarEvents || 0);
 
-        setStatus(`Imported ${result.unitPlan?.title || "unit plan"} from ${result.source || "TeacherFiles template"}. Saved ${lessonCount} lesson${lessonCount === 1 ? "" : "s"}, created ${activityCount} activity card${activityCount === 1 ? "" : "s"}${calendarCount ? `, and ${calendarCount} calendar event${calendarCount === 1 ? "" : "s"}` : ""}.`);
+        setStatus(`Imported ${result.unitPlan?.title || "unit plan"} from ${result.source || "TeacherFiles template"}. Saved ${lessonCount} lesson${lessonCount === 1 ? "" : "s"}, created ${lessonCardCount} lesson card${lessonCardCount === 1 ? "" : "s"}${calendarCount ? `, and ${calendarCount} calendar event${calendarCount === 1 ? "" : "s"}` : ""}.`);
         if (uploadInput) {
             uploadInput.value = "";
         }
@@ -1292,10 +1343,15 @@ async function saveManualUnitPlan(event) {
 
     try {
         setActionButtonsDisabled(true);
-        setStatus("Saving manual unit plan...");
+        setStatus(editUnitPlanId ? "Updating unit plan..." : "Saving manual unit plan...");
 
-        const response = await fetch("/api/unit-plans", {
-            method: "POST",
+        const requestPath = editUnitPlanId
+            ? `/api/unit-plans/${encodeURIComponent(editUnitPlanId)}`
+            : "/api/unit-plans";
+        const requestMethod = editUnitPlanId ? "PUT" : "POST";
+
+        const response = await fetch(requestPath, {
+            method: requestMethod,
             headers: withUserEmailHeader({
                 "Content-Type": "application/json"
             }),
@@ -1308,12 +1364,19 @@ async function saveManualUnitPlan(event) {
         }
 
         const lessonCount = Array.isArray(result?.lessons) ? result.lessons.length : payload.lessons.length;
-        setStatus(`Saved manual unit plan ${result.title || payload.title} with ${lessonCount} lesson${lessonCount === 1 ? "" : "s"}.`);
+        const lessonCardCount = Number(result.lesson_cards_created || 0);
+        const actionWord = editUnitPlanId ? "Updated" : "Saved";
+        setStatus(`${actionWord} unit plan ${result.title || payload.title} with ${lessonCount} lesson${lessonCount === 1 ? "" : "s"} and ${lessonCardCount} lesson card${lessonCardCount === 1 ? "" : "s"} in the Library.`);
 
-        manualForm?.reset();
-        resetManualLessons();
+        if (editUnitPlanId) {
+            populateManualPlannerFromUnitPlan(result || payload);
+        } else {
+            manualForm?.reset();
+            resetManualLessons();
+        }
     } catch (error) {
-        setStatus(`Manual save failed: ${error.message}`, true);
+        const actionNoun = editUnitPlanId ? "Update" : "Manual save";
+        setStatus(`${actionNoun} failed: ${error.message}`, true);
     } finally {
         setActionButtonsDisabled(false);
     }
@@ -1434,10 +1497,10 @@ if (uploadForm) {
             }
 
             const lessonCount = Number(result.lessonCount || 0);
-            const activityCount = Number(result.createdActivities || 0);
+            const lessonCardCount = Number(result.createdLessonCards ?? result.createdActivities ?? 0);
             const calendarCount = Number(result.createdCalendarEvents || 0);
 
-            setStatus(`Saved ${result.unitPlan?.title || "unit plan"}. Created ${activityCount} activity card${activityCount === 1 ? "" : "s"}, saved ${lessonCount} lesson${lessonCount === 1 ? "" : "s"}${calendarCount ? `, and created ${calendarCount} calendar event${calendarCount === 1 ? "" : "s"}` : ""}.`);
+            setStatus(`Saved ${result.unitPlan?.title || "unit plan"}. Created ${lessonCardCount} lesson card${lessonCardCount === 1 ? "" : "s"}, saved ${lessonCount} lesson${lessonCount === 1 ? "" : "s"}${calendarCount ? `, and created ${calendarCount} calendar event${calendarCount === 1 ? "" : "s"}` : ""}.`);
             uploadInput.value = "";
             resetFilePreviewState();
         } catch (error) {
@@ -1448,13 +1511,18 @@ if (uploadForm) {
     });
 }
 
-renderAuthStatus();
-resetManualLessons();
-autoResizeSchoolValueTextareas();
-autoResizeContextTextareas();
-autoResizeLocalCurriculumTextareas();
-autoResizeSkillsTextareas();
-autoResizeHealthSafetyTextarea();
+async function initUploadUnitPage() {
+    renderAuthStatus();
+    resetManualLessons();
+    autoResizeSchoolValueTextareas();
+    autoResizeContextTextareas();
+    autoResizeLocalCurriculumTextareas();
+    autoResizeSkillsTextareas();
+    autoResizeHealthSafetyTextarea();
+    await loadUnitPlanForEdit();
+}
+
+initUploadUnitPage();
 
 // Achievement Objectives Data
 const ACHIEVEMENT_OBJECTIVES = {

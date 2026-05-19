@@ -10,6 +10,7 @@ let rows = [];
 let hasAccess = false;
 let selectedTopicType = "All topics";
 let selectedUnitPlanId = "";
+let pendingDeleteId = "";
 
 function normalizeEmail(value) {
     return String(value || "").trim().toLowerCase();
@@ -243,7 +244,11 @@ function renderUnitPlanCard(row) {
                     <p class="help-text" style="margin:0; text-transform:uppercase; font-weight:700;">Topic Type</p>
                     <h2 style="margin:2px 0 0;">${escapeHtml(row.title || "Untitled Unit Plan")}</h2>
                 </div>
-                <a href="#${cardId}" class="button button-secondary unit-plan-open-link" data-open-unit-plan="${escapeHtml(String(row.id || ""))}">Open Plan</a>
+                <div class="unit-plan-card-actions" style="display: flex; gap: 8px;">
+                    <a href="#${cardId}" class="button button-secondary unit-plan-open-link" data-open-unit-plan="${escapeHtml(String(row.id || ""))}">Open Plan</a>
+                    <button type="button" class="button button-secondary" data-edit-unit-plan="${escapeHtml(String(row.id || ""))}">Edit</button>
+                    <button type="button" class="button button-danger" data-delete-unit-plan="${escapeHtml(String(row.id || ""))}">Delete</button>
+                </div>
             </div>
             <fieldset class="form-section">
                 <legend>Unit Details</legend>
@@ -302,6 +307,24 @@ function renderRows() {
         link.addEventListener("click", (event) => {
             event.preventDefault();
             openUnitPlan(link.getAttribute("data-open-unit-plan"));
+        });
+    });
+
+    resultsElement.querySelectorAll("[data-edit-unit-plan]").forEach((button) => {
+        button.addEventListener("click", (event) => {
+            event.preventDefault();
+            const unitPlanId = button.getAttribute("data-edit-unit-plan");
+            window.location.href = `upload-unit.html?edit=${encodeURIComponent(unitPlanId)}`;
+        });
+    });
+
+    resultsElement.querySelectorAll("[data-delete-unit-plan]").forEach((button) => {
+        button.addEventListener("click", (event) => {
+            event.preventDefault();
+            const unitPlanId = button.getAttribute("data-delete-unit-plan");
+            const unitPlan = rows.find((row) => String(row.id) === unitPlanId);
+            const unitTitle = unitPlan ? unitPlan.title : "Unit Plan";
+            showDeleteConfirmation(unitPlanId, unitTitle);
         });
     });
 }
@@ -370,6 +393,72 @@ async function resolveAccess() {
 if (searchElement) {
     searchElement.addEventListener("input", () => {
         renderRows();
+    });
+}
+
+function showDeleteConfirmation(unitPlanId, unitTitle) {
+    const modal = document.querySelector("#delete-confirmation-modal");
+    const message = document.querySelector("#delete-confirmation-message");
+    if (modal && message) {
+        message.textContent = `Are you sure you want to delete "${String(unitTitle || "Unit Plan")}"? This action cannot be undone.`;
+        pendingDeleteId = unitPlanId;
+        modal.showModal();
+    }
+}
+
+async function deleteUnitPlan(unitPlanId) {
+    const email = readSignedInEmail();
+    if (!email) {
+        setStatus("Not signed in.", true);
+        return;
+    }
+
+    try {
+        setStatus("Deleting unit plan...");
+        const response = await fetch(`/api/unit-plans/${encodeURIComponent(unitPlanId)}`, {
+            method: "DELETE",
+            headers: {
+                "x-user-email": email
+            }
+        });
+
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.error || `Could not delete unit plan (HTTP ${response.status})`);
+        }
+
+        rows = rows.filter((row) => String(row.id) !== unitPlanId);
+        selectedUnitPlanId = "";
+        renderTopicTabs();
+        renderRows();
+        setStatus("Unit plan deleted successfully.");
+    } catch (error) {
+        setStatus(`Delete failed: ${error.message}`, true);
+    }
+}
+
+const deleteModal = document.querySelector("#delete-confirmation-modal");
+const deleteConfirmButton = document.querySelector("#delete-confirm-button");
+const deleteCancelButton = document.querySelector("#delete-cancel-button");
+
+if (deleteConfirmButton) {
+    deleteConfirmButton.addEventListener("click", () => {
+        if (pendingDeleteId) {
+            deleteUnitPlan(pendingDeleteId);
+        }
+        pendingDeleteId = "";
+        if (deleteModal) {
+            deleteModal.close();
+        }
+    });
+}
+
+if (deleteCancelButton) {
+    deleteCancelButton.addEventListener("click", () => {
+        pendingDeleteId = "";
+        if (deleteModal) {
+            deleteModal.close();
+        }
     });
 }
 

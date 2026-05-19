@@ -480,6 +480,46 @@ a {
     outline-color: #ff9f9f;
 }
 
+.unit-plan-card-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.confirmation-modal {
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius-lg);
+    padding: 0;
+    width: min(480px, calc(100vw - 32px));
+    background: var(--panel-bg);
+    color: var(--ink-strong);
+}
+
+.confirmation-modal::backdrop {
+    background: rgba(20, 20, 30, 0.4);
+}
+
+.confirmation-modal .modal-content {
+    padding: 20px;
+}
+
+.confirmation-modal .modal-content h2 {
+    margin: 0 0 8px;
+}
+
+.confirmation-modal .modal-content p {
+    margin: 0;
+    color: var(--ink-mid);
+}
+
+.confirmation-modal .modal-actions {
+    margin-top: 16px;
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
 .hero-stats {
     display: grid;
     gap: 10px;

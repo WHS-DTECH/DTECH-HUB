@@ -72,6 +72,17 @@
                     <p id="unit-plan-status" class="project-auth-status" aria-live="polite"></p>
                 </div>
 
+                <dialog id="delete-confirmation-modal" class="confirmation-modal" aria-label="Confirm deletion">
+                    <div class="modal-content">
+                        <h2>Delete Unit Plan?</h2>
+                        <p id="delete-confirmation-message">Are you sure you want to delete this unit plan? This action cannot be undone.</p>
+                        <div class="modal-actions">
+                            <button type="button" id="delete-cancel-button" class="button button-secondary">Cancel</button>
+                            <button type="button" id="delete-confirm-button" class="button button-danger">Delete</button>
+                        </div>
+                    </div>
+                </dialog>
+
                 <div id="unit-plan-results" class="unit-plan-results"></div>
             </section>
 
