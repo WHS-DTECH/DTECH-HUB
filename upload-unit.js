@@ -917,7 +917,7 @@ function createLessonRow(lesson = {}) {
                 <label>Lesson Notes</label>
                 <textarea name="lessonNotes" placeholder="Teacher notes, resources, or setup reminders"></textarea>
             </div>
-            <label class="checkbox-field lesson-toggle"><input name="publishActivity" type="checkbox"> Publish to Activity Library</label>
+            <label class="checkbox-field lesson-toggle"><input name="publishActivity" type="checkbox" checked> Publish to Activity Library</label>
             <label class="checkbox-field lesson-toggle"><input name="addToCalendar" type="checkbox"> Add to Calendar</label>
         </div>
     `;
