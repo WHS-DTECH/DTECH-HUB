@@ -458,7 +458,7 @@ function normalizeUnitLessons(value) {
       year_level: normalizeYearLevel(lesson?.year_level ?? lesson?.yearLevel ?? lesson?.lessonYearLevel ?? []),
       link_url: String(lesson?.link_url ?? lesson?.linkUrl ?? lesson?.lessonLinkUrl ?? lesson?.resource_link ?? lesson?.resourceLink ?? "").trim(),
       subject_stream: String(lesson?.subject_stream ?? lesson?.subjectStream ?? "").trim().toUpperCase(),
-      publish_activity: Boolean(lesson?.publish_activity ?? lesson?.publishActivity),
+      publish_activity: lesson?.publish_activity ?? lesson?.publishActivity ?? true,
       add_to_calendar: Boolean(lesson?.add_to_calendar ?? lesson?.addToCalendar),
       notes: String(lesson?.notes ?? lesson?.lessonNotes ?? "").trim()
     };
