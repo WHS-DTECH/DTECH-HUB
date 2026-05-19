@@ -498,9 +498,9 @@ function renderUnitPlanCard(row) {
                     <p class="help-text" style="margin:0; text-transform:uppercase; font-weight:700;">Topic Type</p>
                     <h2 style="margin:2px 0 0;">${escapeHtml(row.title || "Untitled Unit Plan")}</h2>
                 </div>
-                <div class="unit-plan-card-actions" style="display: flex; gap: 8px;">
-                    <a href="#${cardId}" class="button button-secondary unit-plan-open-link" data-open-unit-plan="${escapeHtml(String(row.id || ""))}">Open Plan</a>
-                    <button type="button" class="button button-secondary" data-edit-unit-plan="${escapeHtml(String(row.id || ""))}">Edit</button>
+                <div class="unit-plan-card-actions">
+                    <a href="#${cardId}" class="button-save unit-plan-open-link" data-open-unit-plan="${escapeHtml(String(row.id || ""))}">Open Plan</a>
+                    <button type="button" class="button-save" data-edit-unit-plan="${escapeHtml(String(row.id || ""))}">Edit</button>
                     <button type="button" class="button button-danger" data-delete-unit-plan="${escapeHtml(String(row.id || ""))}">Delete</button>
                 </div>
             </div>

@@ -50,27 +50,30 @@
         </header>
 
         <main class="upload-page">
+            <h1>Browse Unit Plans</h1>
+            <p class="intro-text">View all saved unit plans. Access is limited to Teacher, Lead Teacher, and Admin roles.</p>
+            <p id="unit-plan-access" class="project-auth-status" aria-live="polite"></p>
+            <div class="upload-page-tools" style="display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+                <a class="button button-secondary" href="upload-menu.html">Back to Upload Menu</a>
+                <a class="button-save" href="upload-unit.html">Open Upload Unit Plan</a>
+            </div>
+            <p id="unit-plan-status" class="project-auth-status" aria-live="polite" hidden></p>
+
             <section class="upload-panel" aria-label="Browse unit plans">
-                <h1>Browse Unit Plans</h1>
-                <p class="intro-text">View all saved unit plans. Access is limited to Teacher, Lead Teacher, and Admin roles.</p>
-                <p id="unit-plan-access" class="project-auth-status" aria-live="polite"></p>
+                <fieldset class="form-section">
+                    <legend>Browse Filters</legend>
+                    <div class="form-grid">
+                        <div class="field field-wide">
+                            <label for="unit-plan-search">Search Unit Plans</label>
+                            <input id="unit-plan-search" type="search" placeholder="Search title, topic type, year level, or stream">
+                        </div>
 
-                <div class="form-grid">
-                    <div class="field field-wide">
-                        <label for="unit-plan-search">Search Unit Plans</label>
-                        <input id="unit-plan-search" type="search" placeholder="Search title, topic type, year level, or stream">
+                        <div class="field field-wide">
+                            <label>Topic Type</label>
+                            <div id="topic-type-pills" class="filter-pills" role="tablist" aria-label="Filter unit plans by topic type"></div>
+                        </div>
                     </div>
-
-                    <div class="field field-wide">
-                        <label>Topic Type</label>
-                        <div id="topic-type-pills" class="filter-pills" role="tablist" aria-label="Filter unit plans by topic type"></div>
-                    </div>
-                </div>
-
-                <div class="form-actions">
-                    <a class="button-save" href="upload-unit.html">Open Upload Unit Plan</a>
-                    <p id="unit-plan-status" class="project-auth-status" aria-live="polite"></p>
-                </div>
+                </fieldset>
 
                 <dialog id="delete-confirmation-modal" class="confirmation-modal" aria-label="Confirm deletion">
                     <div class="modal-content">
