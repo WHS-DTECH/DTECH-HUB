@@ -442,6 +442,33 @@ function normalizeUnitLessons(value) {
     return [];
   }
 
+  const coerceBoolean = (rawValue, defaultValue = false) => {
+    if (typeof rawValue === "boolean") {
+      return rawValue;
+    }
+
+    if (typeof rawValue === "string") {
+      const normalized = rawValue.trim().toLowerCase();
+      if (["true", "yes", "y", "1", "on"].includes(normalized)) {
+        return true;
+      }
+      if (["false", "no", "n", "0", "off", ""].includes(normalized)) {
+        return false;
+      }
+      return defaultValue;
+    }
+
+    if (typeof rawValue === "number") {
+      return rawValue !== 0;
+    }
+
+    if (rawValue === null || rawValue === undefined) {
+      return defaultValue;
+    }
+
+    return Boolean(rawValue);
+  };
+
   return value.map((lesson, index) => {
     const lessonIndex = Number.parseInt(lesson?.lesson_index ?? lesson?.lessonIndex ?? index + 1, 10);
 
@@ -458,7 +485,7 @@ function normalizeUnitLessons(value) {
       year_level: normalizeYearLevel(lesson?.year_level ?? lesson?.yearLevel ?? lesson?.lessonYearLevel ?? []),
       link_url: String(lesson?.link_url ?? lesson?.linkUrl ?? lesson?.lessonLinkUrl ?? lesson?.resource_link ?? lesson?.resourceLink ?? "").trim(),
       subject_stream: String(lesson?.subject_stream ?? lesson?.subjectStream ?? "").trim().toUpperCase(),
-      publish_activity: lesson?.publish_activity ?? lesson?.publishActivity ?? true,
+      publish_activity: coerceBoolean(lesson?.publish_activity ?? lesson?.publishActivity, true),
       add_to_calendar: Boolean(lesson?.add_to_calendar ?? lesson?.addToCalendar),
       notes: String(lesson?.notes ?? lesson?.lessonNotes ?? "").trim()
     };
@@ -887,8 +914,13 @@ function buildLessonCardFromUnitLesson(unitPlan, lesson, fallbackIndex = 1) {
   const safeLessonIndex = Number.isInteger(lessonIndex) && lessonIndex > 0 ? lessonIndex : fallbackIndex;
   const lessonTitle = String(lesson?.title || lesson?.activity_name || `Lesson ${safeLessonIndex}`).trim() || `Lesson ${safeLessonIndex}`;
   const lessonFocus = String(lesson?.focus || lesson?.notes || "").trim() || `Lesson ${safeLessonIndex} from ${String(unitPlan?.title || "Unit Plan").trim()}`;
-  const explicitPublish = lesson?.publish_activity;
-  const publishActivity = typeof explicitPublish === "boolean" ? explicitPublish : true;
+  const explicitPublish = lesson?.publish_activity ?? lesson?.publishActivity;
+  const publishActivity =
+    typeof explicitPublish === "boolean"
+      ? explicitPublish
+      : ["false", "no", "0", "off"].includes(String(explicitPublish || "").trim().toLowerCase())
+        ? false
+        : true;
 
   return {
     id: getUnitPlanLessonCardId(unitPlan?.id, safeLessonIndex),

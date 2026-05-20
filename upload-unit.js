@@ -848,6 +848,39 @@ function parseLessonsJson(value) {
     return parsed;
 }
 
+function coerceToggleValue(rawValue, defaultValue = false) {
+    if (typeof rawValue === "boolean") {
+        return rawValue;
+    }
+
+    if (rawValue === null || rawValue === undefined) {
+        return defaultValue;
+    }
+
+    const normalizedValue = String(rawValue).trim().toLowerCase();
+    if (["true", "yes", "y", "1", "on"].includes(normalizedValue)) {
+        return true;
+    }
+
+    if (["false", "no", "n", "0", "off", ""].includes(normalizedValue)) {
+        return false;
+    }
+
+    return defaultValue;
+}
+
+function readToggleFieldValue(field, defaultValue = false) {
+    if (!field) {
+        return defaultValue;
+    }
+
+    if (field instanceof HTMLInputElement && field.type === "checkbox") {
+        return Boolean(field.checked);
+    }
+
+    return coerceToggleValue(field.value, defaultValue);
+}
+
 function createLessonRow(lesson = {}) {
     if (!lessonList) {
         return null;
@@ -947,7 +980,7 @@ function createLessonRow(lesson = {}) {
     lessonLinkUrl.value = String(lesson.lessonLinkUrl || lesson.link_url || lesson.resource_link || "").trim();
     lessonFocus.value = String(lesson.lessonFocus || lesson.focus || "").trim();
     lessonNotes.value = String(lesson.lessonNotes || lesson.notes || "").trim();
-    publishActivity.checked = Boolean(lesson.publishActivity ?? lesson.publish_activity);
+    publishActivity.checked = coerceToggleValue(lesson.publishActivity ?? lesson.publish_activity, true);
     addToCalendar.checked = Boolean(lesson.addToCalendar ?? lesson.add_to_calendar);
 
     row.querySelector(".lesson-remove").addEventListener("click", () => {
@@ -994,8 +1027,8 @@ function collectLessons() {
             lessonLinkUrl: String(row.querySelector('[name="lessonLinkUrl"]')?.value || "").trim(),
             lessonFocus: String(row.querySelector('[name="lessonFocus"]')?.value || "").trim(),
             lessonNotes: String(row.querySelector('[name="lessonNotes"]')?.value || "").trim(),
-            publishActivity: Boolean(row.querySelector('[name="publishActivity"]')?.checked),
-            addToCalendar: Boolean(row.querySelector('[name="addToCalendar"]')?.checked)
+            publishActivity: readToggleFieldValue(row.querySelector('[name="publishActivity"]'), true),
+            addToCalendar: readToggleFieldValue(row.querySelector('[name="addToCalendar"]'), false)
         }))
         .filter((lesson) => Boolean(lesson.lessonTitle || lesson.activityName || lesson.lessonFocus || lesson.lessonWeek || lesson.lessonDate || lesson.lessonYearLevel || lesson.lessonLinkUrl));
 }
