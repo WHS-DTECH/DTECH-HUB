@@ -3,6 +3,7 @@ const statusElement = document.querySelector("#unit-plan-status");
 const resultsElement = document.querySelector("#unit-plan-results");
 const searchElement = document.querySelector("#unit-plan-search");
 const topicPillsElement = document.querySelector("#topic-type-pills");
+const resyncLessonsButton = document.querySelector("#resync-unit-lessons-button");
 
 const BROWSE_UNIT_AUTH_KEY = "hub_google_auth_v1";
 
@@ -61,6 +62,15 @@ function setAccess(message, isError = false) {
     } else {
         accessElement.classList.add("is-success");
     }
+}
+
+function setResyncButtonState(isBusy, isAllowed = hasAccess) {
+    if (!resyncLessonsButton) {
+        return;
+    }
+
+    resyncLessonsButton.disabled = Boolean(isBusy) || !isAllowed;
+    resyncLessonsButton.textContent = isBusy ? "Resyncing..." : "Resync Unit Lessons";
 }
 
 function readSignedInEmail() {
@@ -709,10 +719,51 @@ async function loadUnitPlans() {
     }
 }
 
+async function resyncAllUnitPlanLessons() {
+    if (!hasAccess) {
+        setStatus("Teacher/Admin access is required.", true);
+        return;
+    }
+
+    const email = readSignedInEmail();
+    if (!email) {
+        setStatus("Sign in with your school account first.", true);
+        return;
+    }
+
+    try {
+        setResyncButtonState(true, true);
+        setStatus("Resyncing all unit lessons to the Activity Library...");
+
+        const response = await fetch("/api/unit-plans/resync-lessons", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "x-user-email": email
+            },
+            body: JSON.stringify({ user_email: email })
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(data.error || `Could not resync lessons (HTTP ${response.status})`);
+        }
+
+        const processed = Number(data.unit_plans_processed || 0);
+        const synced = Number(data.lesson_cards_synced || 0);
+        setStatus(`Resync complete. Processed ${processed} unit plan${processed === 1 ? "" : "s"}; synced ${synced} lesson card${synced === 1 ? "" : "s"}.`);
+    } catch (error) {
+        setStatus(`Resync failed: ${error.message}`, true);
+    } finally {
+        setResyncButtonState(false, hasAccess);
+    }
+}
+
 async function resolveAccess() {
     const email = readSignedInEmail();
     if (!email) {
         hasAccess = false;
+        setResyncButtonState(false, false);
         setAccess("Sign in with your school account to browse unit plans.", true);
         setStatus("", false);
         renderRows();
@@ -731,15 +782,18 @@ async function resolveAccess() {
         hasAccess = Boolean(data.can_admin) || roleAllowed;
 
         if (!hasAccess) {
+            setResyncButtonState(false, false);
             setAccess("Your account can sign in, but Browse Unit Plans is limited to Teacher, Lead Teacher, and Admin.", true);
             setStatus("", false);
             renderRows();
             return;
         }
 
+        setResyncButtonState(false, true);
         setAccess(`Signed in as ${email}`);
     } catch (error) {
         hasAccess = false;
+        setResyncButtonState(false, false);
         setAccess(error.message || "Could not resolve access.", true);
         setStatus("", false);
         renderRows();
@@ -749,6 +803,12 @@ async function resolveAccess() {
 if (searchElement) {
     searchElement.addEventListener("input", () => {
         renderRows();
+    });
+}
+
+if (resyncLessonsButton) {
+    resyncLessonsButton.addEventListener("click", () => {
+        resyncAllUnitPlanLessons();
     });
 }
 
@@ -819,6 +879,7 @@ if (deleteCancelButton) {
 }
 
 async function init() {
+    setResyncButtonState(false, false);
     await resolveAccess();
     await loadUnitPlans();
 }

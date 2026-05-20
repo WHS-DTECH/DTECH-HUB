@@ -44,6 +44,12 @@
     justify-content: space-between;
 }
 
+.browse-unit-plan-primary-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
 .unit-plan-card-actions .button-danger {
     min-height: 34px;
     padding: 6px 12px;
@@ -592,6 +598,11 @@
 @media (max-width: 820px) {
     .browse-unit-plan-tools {
         justify-content: flex-end;
+    }
+
+    .browse-unit-plan-primary-actions {
+        justify-content: flex-end;
+        width: 100%;
     }
 
     .form-grid {

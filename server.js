@@ -2670,6 +2670,39 @@ app.get("/api/unit-plans", async (_req, res) => {
   }
 });
 
+app.post("/api/unit-plans/resync-lessons", async (req, res) => {
+  const userEmail = normalizeEmail(req.body?.created_by_email || req.body?.user_email || req.query?.user_email || getRequestUserEmail(req));
+  if (!userEmail || !(await canManagePracticalSchedule(userEmail))) {
+    res.status(403).json({ error: "Teacher/Admin access is required." });
+    return;
+  }
+
+  try {
+    let unitPlans = [];
+
+    if (!hasDatabase) {
+      unitPlans = Array.from(memoryUnitPlans.values());
+    } else {
+      await ensureUnitPlanSchema();
+      const result = await pool.query("SELECT * FROM unit_plans ORDER BY updated_at DESC, created_at DESC");
+      unitPlans = result.rows || [];
+    }
+
+    let lessonCardsSynced = 0;
+    for (const unitPlan of unitPlans) {
+      lessonCardsSynced += await syncUnitPlanLessonsToLibrary(unitPlan);
+    }
+
+    res.status(200).json({
+      ok: true,
+      unit_plans_processed: unitPlans.length,
+      lesson_cards_synced: lessonCardsSynced
+    });
+  } catch (_error) {
+    res.status(500).json({ error: "Could not resync unit lessons" });
+  }
+});
+
 app.get("/api/unit-plans/:id", async (req, res) => {
   const requestedId = String(req.params.id || "").trim();
   if (!requestedId) {
