@@ -1207,6 +1207,13 @@ async function ensureUnitPlanSchema() {
   await pool.query(`ALTER TABLE lessons ADD COLUMN IF NOT EXISTS created_by_email TEXT`);
   await pool.query(`ALTER TABLE lessons ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`ALTER TABLE lessons ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  // Backfill older unit-plan lesson cards that were unintentionally saved as unpublished.
+  await pool.query(`
+    UPDATE lessons
+    SET publish_activity = TRUE
+    WHERE publish_activity = FALSE
+      AND id LIKE 'unitplan-%'
+  `);
   await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS unit_plan_id TEXT`);
   await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS unit_lesson_index INTEGER`);
   await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS unit_plan_id TEXT`);
