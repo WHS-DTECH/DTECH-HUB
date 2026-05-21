@@ -323,6 +323,114 @@ async function resolveUserRolesColumns() {
   }
 }
 
+async function getAllTableColumns(tableName) {
+  if (!hasDatabase) {
+    return [];
+  }
+
+  const safeTableName = String(tableName || "").trim().toLowerCase();
+  if (!safeTableName) {
+    return [];
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = $1
+      `,
+      [safeTableName]
+    );
+
+    return result.rows
+      .map((row) => String(row?.column_name || "").trim())
+      .filter(Boolean);
+  } catch (_error) {
+    return [];
+  }
+}
+
+async function getTableColumnMetadata(tableName) {
+  const metadataByColumn = new Map();
+  if (!hasDatabase) {
+    return metadataByColumn;
+  }
+
+  const safeTableName = String(tableName || "").trim().toLowerCase();
+  if (!safeTableName) {
+    return metadataByColumn;
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT column_name, data_type, udt_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = $1
+      `,
+      [safeTableName]
+    );
+
+    result.rows.forEach((row) => {
+      const columnName = String(row?.column_name || "").trim().toLowerCase();
+      if (!columnName) {
+        return;
+      }
+
+      metadataByColumn.set(columnName, {
+        columnName,
+        dataType: String(row?.data_type || "").trim().toLowerCase(),
+        udtName: String(row?.udt_name || "").trim().toLowerCase()
+      });
+    });
+  } catch (_error) {
+    return metadataByColumn;
+  }
+
+  return metadataByColumn;
+}
+
+function pickExistingColumn(availableColumns, candidates) {
+  const available = new Set(
+    (Array.isArray(availableColumns) ? availableColumns : [])
+      .map((value) => String(value || "").trim().toLowerCase())
+      .filter(Boolean)
+  );
+
+  for (const candidate of Array.isArray(candidates) ? candidates : []) {
+    const normalized = String(candidate || "").trim().toLowerCase();
+    if (normalized && available.has(normalized)) {
+      return normalized;
+    }
+  }
+
+  return null;
+}
+
+function isIntegerLikeColumn(metadata) {
+  if (!metadata) {
+    return false;
+  }
+
+  const dataType = String(metadata?.dataType || "").toLowerCase();
+  const udtName = String(metadata?.udtName || "").toLowerCase();
+  return ["smallint", "integer", "bigint"].includes(dataType)
+    || ["int2", "int4", "int8"].includes(udtName);
+}
+
+function isJsonLikeColumn(metadata) {
+  if (!metadata) {
+    return false;
+  }
+
+  const dataType = String(metadata?.dataType || "").toLowerCase();
+  const udtName = String(metadata?.udtName || "").toLowerCase();
+  return dataType === "json" || dataType === "jsonb" || udtName === "json" || udtName === "jsonb";
+}
+
 async function getMergedRolePermissions() {
   if (!hasDatabase) {
     return mergeRolePermissionRows(memoryRolePermissions);
@@ -1754,6 +1862,25 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
       { name: typeColumn, value: payload.type }
     ];
 
+    const pushArrayField = (columnName, values) => {
+      if (!columnName) {
+        return;
+      }
+
+      const columnMeta = activityColumnMetadata.get(String(columnName).toLowerCase());
+      const arrayValues = Array.isArray(values)
+        ? values.map((item) => String(item || "").trim()).filter(Boolean)
+        : [];
+
+      if (isJsonLikeColumn(columnMeta)) {
+        const cast = String(columnMeta?.dataType || "").toLowerCase() === "json" ? "json" : "jsonb";
+        sqlColumns.push({ name: columnName, value: JSON.stringify(arrayValues), cast });
+        return;
+      }
+
+      sqlColumns.push({ name: columnName, value: arrayValues.join("\n") });
+    };
+
     if (canUseExplicitId) {
       sqlColumns.unshift({ name: idColumn, value: idValueToSave });
     }
@@ -1776,12 +1903,12 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     if (descriptionColumn) sqlColumns.push({ name: descriptionColumn, value: payload.description });
     if (unitPlanIdColumn) sqlColumns.push({ name: unitPlanIdColumn, value: String(body.unit_plan_id || body.unitPlanId || "").trim() });
     if (unitLessonIndexColumn) sqlColumns.push({ name: unitLessonIndexColumn, value: Number.parseInt(body.unit_lesson_index ?? body.unitLessonIndex, 10) || null });
-    if (resourcesColumn) sqlColumns.push({ name: resourcesColumn, value: JSON.stringify(payload.resources), cast: "jsonb" });
-    if (equipmentColumn) sqlColumns.push({ name: equipmentColumn, value: JSON.stringify(payload.equipment), cast: "jsonb" });
-    if (instructionsColumn) sqlColumns.push({ name: instructionsColumn, value: JSON.stringify(payload.instructions), cast: "jsonb" });
-    if (classManagementColumn) sqlColumns.push({ name: classManagementColumn, value: JSON.stringify(payload.class_management_notes), cast: "jsonb" });
-    if (classPreparationColumn) sqlColumns.push({ name: classPreparationColumn, value: JSON.stringify(payload.class_preparation), cast: "jsonb" });
-    if (assessmentFocusColumn) sqlColumns.push({ name: assessmentFocusColumn, value: JSON.stringify(payload.assessment_focus), cast: "jsonb" });
+    pushArrayField(resourcesColumn, payload.resources);
+    pushArrayField(equipmentColumn, payload.equipment);
+    pushArrayField(instructionsColumn, payload.instructions);
+    pushArrayField(classManagementColumn, payload.class_management_notes);
+    pushArrayField(classPreparationColumn, payload.class_preparation);
+    pushArrayField(assessmentFocusColumn, payload.assessment_focus);
     if (timeSensitiveColumn) sqlColumns.push({ name: timeSensitiveColumn, value: payload.time_sensitive });
     if (showInWeekColumn) sqlColumns.push({ name: showInWeekColumn, value: payload.show_in_this_week });
     if (termColumn) sqlColumns.push({ name: termColumn, value: payload.term });
@@ -1793,21 +1920,21 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     if (contactEmailColumn) sqlColumns.push({ name: contactEmailColumn, value: payload.contact_email });
     if (companyColumn) sqlColumns.push({ name: companyColumn, value: payload.company });
     if (addressColumn) sqlColumns.push({ name: addressColumn, value: payload.address });
-    if (overviewColumn) sqlColumns.push({ name: overviewColumn, value: JSON.stringify(payload.overview), cast: "jsonb" });
-    if (servicesColumn) sqlColumns.push({ name: servicesColumn, value: JSON.stringify(payload.services), cast: "jsonb" });
-    if (costsColumn) sqlColumns.push({ name: costsColumn, value: JSON.stringify(payload.costs), cast: "jsonb" });
-    if (outcomesColumn) sqlColumns.push({ name: outcomesColumn, value: JSON.stringify(payload.outcomes), cast: "jsonb" });
+    pushArrayField(overviewColumn, payload.overview);
+    pushArrayField(servicesColumn, payload.services);
+    pushArrayField(costsColumn, payload.costs);
+    pushArrayField(outcomesColumn, payload.outcomes);
     if (withdrawalDateColumn) sqlColumns.push({ name: withdrawalDateColumn, value: payload.withdrawal_date });
     if (clientIdColumn) sqlColumns.push({ name: clientIdColumn, value: payload.client_id });
-    if (standardDetailsColumn) sqlColumns.push({ name: standardDetailsColumn, value: JSON.stringify(payload.standard_details), cast: "jsonb" });
-    if (tasksListColumn) sqlColumns.push({ name: tasksListColumn, value: JSON.stringify(payload.tasks_list), cast: "jsonb" });
-    if (achievedColumn) sqlColumns.push({ name: achievedColumn, value: JSON.stringify(payload.achieved), cast: "jsonb" });
-    if (meritColumn) sqlColumns.push({ name: meritColumn, value: JSON.stringify(payload.merit), cast: "jsonb" });
-    if (excellenceColumn) sqlColumns.push({ name: excellenceColumn, value: JSON.stringify(payload.excellence), cast: "jsonb" });
-    if (submissionRequirementsColumn) sqlColumns.push({ name: submissionRequirementsColumn, value: JSON.stringify(payload.submission_requirements), cast: "jsonb" });
-    if (relevantImplicationsColumn) sqlColumns.push({ name: relevantImplicationsColumn, value: JSON.stringify(payload.relevant_implications), cast: "jsonb" });
-    if (progressLoggingColumn) sqlColumns.push({ name: progressLoggingColumn, value: JSON.stringify(payload.progress_logging), cast: "jsonb" });
-    if (feedbackTriallingColumn) sqlColumns.push({ name: feedbackTriallingColumn, value: JSON.stringify(payload.feedback_trialling), cast: "jsonb" });
+    pushArrayField(standardDetailsColumn, payload.standard_details);
+    pushArrayField(tasksListColumn, payload.tasks_list);
+    pushArrayField(achievedColumn, payload.achieved);
+    pushArrayField(meritColumn, payload.merit);
+    pushArrayField(excellenceColumn, payload.excellence);
+    pushArrayField(submissionRequirementsColumn, payload.submission_requirements);
+    pushArrayField(relevantImplicationsColumn, payload.relevant_implications);
+    pushArrayField(progressLoggingColumn, payload.progress_logging);
+    pushArrayField(feedbackTriallingColumn, payload.feedback_trialling);
 
     const insertColumnsSql = sqlColumns.map((column) => quoteIdentifier(column.name)).join(", ");
     const insertValuesSql = sqlColumns
@@ -1864,6 +1991,7 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
 
     res.status(201).json(result.rows[0]);
   } catch (error) {
+    console.error("Activity save error:", error);
     const detail = String(error?.message || "Could not save activity");
     res.status(500).send(`Could not save activity: ${detail}`);
   }
