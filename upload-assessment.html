@@ -85,16 +85,6 @@
                                 </select>
                             </div>
                             <div class="field">
-                                <label for="type">Topic Type</label>
-                                <select id="type" name="type" required>
-                                    <option value="">Select topic type</option>
-                                    <option>Office Suite</option>
-                                    <option>Programming</option>
-                                    <option>Electronics</option>
-                                    <option>Digital Media</option>
-                                </select>
-                            </div>
-                            <div class="field">
                                 <label for="activity-category">Card Category</label>
                                 <select id="activity-category" name="activityCategory" required>
                                     <option>Assessment Task</option>
@@ -166,6 +156,16 @@
                             <input id="show-this-week" name="showThisWeek" type="checkbox">
                             Show in This Week section
                         </label>
+                    </fieldset>
+
+                    <fieldset class="form-section">
+                        <legend>Teacher Notes</legend>
+                        <div class="form-grid">
+                            <div class="field field-wide">
+                                <label for="class-preparation">Teacher Card: Class Preparation</label>
+                                <textarea id="class-preparation" name="classPreparation" placeholder="What preparation should be done before class?"></textarea>
+                            </div>
+                        </div>
                     </fieldset>
 
                     <!-- Tasks List -->

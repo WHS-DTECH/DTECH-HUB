@@ -244,6 +244,9 @@ async function prefillFormIfEditing() {
 
         // Assessment-specific fields
         form.shortDescription.value = String(data.description || data.summary || "").trim();
+        if (form.classPreparation) {
+            form.classPreparation.value = linesToArray(data.class_preparation).join("\n");
+        }
         form.standardDetails.value = linesToArray(data.standard_details).join("\n");
         form.tasksList.value = linesToArray(data.tasks_list || data.assessment_focus).join("\n");
         form.achieved.value = linesToArray(data.achieved).join("\n");
