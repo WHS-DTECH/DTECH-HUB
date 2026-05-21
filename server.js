@@ -473,6 +473,63 @@ async function getCheckConstraintAllowedValues(tableName, constraintName) {
   }
 }
 
+async function resolveActivityCategoryForInsert(activityCategory, activityType) {
+  const rawCategory = String(activityCategory || "").trim();
+  if (!hasDatabase) {
+    return rawCategory || "Practice";
+  }
+
+  const allowedActivityCategories = await getCheckConstraintAllowedValues(
+    "activities",
+    "activities_activity_category_check"
+  );
+
+  if (!allowedActivityCategories.length) {
+    return rawCategory || "Practice";
+  }
+
+  const allowedByLower = new Map(
+    allowedActivityCategories.map((value) => [String(value).toLowerCase(), value])
+  );
+
+  const candidateValues = [
+    rawCategory,
+    rawCategory.replace(/\s*activity\s*$/i, "").trim(),
+    String(activityType || "").trim(),
+    "Project",
+    "Practice",
+    "Activity",
+    "Assessment"
+  ].filter(Boolean);
+
+  const matched = candidateValues.find((candidate) => allowedByLower.has(String(candidate).toLowerCase()));
+  return matched
+    ? allowedByLower.get(String(matched).toLowerCase())
+    : allowedActivityCategories[0];
+}
+
+async function resolveActivityIdForInsert(idColumn, idMetadata, requestId, fallbackId) {
+  const idIsInteger = isIntegerLikeColumn(idMetadata);
+  const numericBodyId = Number.parseInt(requestId, 10);
+  let resolvedNumericId = Number.isInteger(numericBodyId) ? numericBodyId : null;
+
+  if (idIsInteger && !Number.isInteger(resolvedNumericId) && idColumn) {
+    const nextIdResult = await pool.query(
+      `SELECT COALESCE(MAX(${quoteIdentifier(idColumn)}), 0) + 1 AS next_id FROM activities`
+    );
+    const nextId = Number.parseInt(nextIdResult.rows?.[0]?.next_id, 10);
+    if (Number.isInteger(nextId) && nextId > 0) {
+      resolvedNumericId = nextId;
+    }
+  }
+
+  const canUseExplicitId = Boolean(idColumn) && (!idIsInteger || Number.isInteger(resolvedNumericId));
+  return {
+    canUseExplicitId,
+    idValueToSave: idIsInteger ? resolvedNumericId : fallbackId
+  };
+}
+
 async function getMergedRolePermissions() {
   if (!hasDatabase) {
     return mergeRolePermissionRows(memoryRolePermissions);
@@ -1925,7 +1982,7 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     const timeSensitiveColumn = pickExistingColumn(activityColumns, ["time_sensitive"]);
     const showInWeekColumn = pickExistingColumn(activityColumns, ["show_in_this_week", "show_this_week", "is_pinned", "is_this_week"]);
     const termColumn = pickExistingColumn(activityColumns, ["term"]);
-    const updatedAtColumn = pickExistingColumn(activityColumns, ["updated_at", "updatedon", "last_updated"])
+    const updatedAtColumn = pickExistingColumn(activityColumns, ["updated_at", "updatedon", "last_updated"]);
     
     // Proposal fields
     const startDateColumn = pickExistingColumn(activityColumns, ["start_date"]);
@@ -1950,53 +2007,17 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     const progressLoggingColumn = pickExistingColumn(activityColumns, ["progress_logging"]);
     const feedbackTriallingColumn = pickExistingColumn(activityColumns, ["feedback_trialling"]);
 
-    let resolvedActivityCategory = payload.activity_category;
-    if (activityCategoryColumn) {
-      const allowedActivityCategories = await getCheckConstraintAllowedValues(
-        "activities",
-        "activities_activity_category_check"
-      );
-
-      if (allowedActivityCategories.length) {
-        const allowedByLower = new Map(
-          allowedActivityCategories.map((value) => [String(value).toLowerCase(), value])
-        );
-
-        const rawCategory = String(payload.activity_category || "").trim();
-        const candidateValues = [
-          rawCategory,
-          rawCategory.replace(/\s*activity\s*$/i, "").trim(),
-          String(payload.type || "").trim(),
-          "Project",
-          "Practice",
-          "Activity",
-          "Assessment"
-        ].filter(Boolean);
-
-        const matched = candidateValues.find((candidate) => allowedByLower.has(String(candidate).toLowerCase()));
-        resolvedActivityCategory = matched
-          ? allowedByLower.get(String(matched).toLowerCase())
-          : allowedActivityCategories[0];
-      }
-    }
+    const resolvedActivityCategory = activityCategoryColumn
+      ? await resolveActivityCategoryForInsert(payload.activity_category, payload.type)
+      : payload.activity_category;
 
     const idMetadata = idColumn ? activityColumnMetadata.get(String(idColumn).toLowerCase()) : null;
-    const idIsInteger = isIntegerLikeColumn(idMetadata);
-    const numericBodyId = Number.parseInt(body.id, 10);
-    let resolvedNumericId = Number.isInteger(numericBodyId) ? numericBodyId : null;
-
-    if (idIsInteger && !Number.isInteger(resolvedNumericId) && idColumn) {
-      const nextIdResult = await pool.query(
-        `SELECT COALESCE(MAX(${quoteIdentifier(idColumn)}), 0) + 1 AS next_id FROM activities`
-      );
-      const nextId = Number.parseInt(nextIdResult.rows?.[0]?.next_id, 10);
-      if (Number.isInteger(nextId) && nextId > 0) {
-        resolvedNumericId = nextId;
-      }
-    }
-
-    const canUseExplicitId = Boolean(idColumn) && (!idIsInteger || Number.isInteger(resolvedNumericId));
-    const idValueToSave = idIsInteger ? resolvedNumericId : payload.id;
+    const { canUseExplicitId, idValueToSave } = await resolveActivityIdForInsert(
+      idColumn,
+      idMetadata,
+      body.id,
+      payload.id
+    );
 
     const sqlColumns = [
       { name: nameColumn, value: payload.name },
