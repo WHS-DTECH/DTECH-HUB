@@ -324,18 +324,25 @@ function inferSourceTypeFromRecord(record) {
         return "lesson";
     }
 
-    // Check for assessment-specific fields
-    const hasAssessmentFields = Boolean(
-        record?.standard_details ||
-        record?.tasks_list ||
-        record?.achieved ||
-        record?.merit ||
-        record?.excellence ||
-        record?.submission_requirements ||
-        record?.relevant_implications ||
-        record?.progress_logging ||
-        record?.feedback_trialling
-    );
+    // Detect assessment uploads even when assessment fields are intentionally left blank.
+    const assessmentSchemaKeys = [
+        "standard_details",
+        "tasks_list",
+        "achieved",
+        "merit",
+        "excellence",
+        "submission_requirements",
+        "relevant_implications",
+        "progress_logging",
+        "feedback_trialling"
+    ];
+
+    const hasAssessmentFields = assessmentSchemaKeys.some((key) => {
+        if (!Object.prototype.hasOwnProperty.call(record || {}, key)) {
+            return false;
+        }
+        return record?.[key] !== null && typeof record?.[key] !== "undefined";
+    });
 
     if (hasAssessmentFields) {
         return "assessment";
@@ -1341,7 +1348,7 @@ function createProjectCard(project) {
         ? `<span class="project-tag status-tag status-${project.status}">${formatStatus(project.status)}</span>` 
         : '';
     const sourceType = inferSourceTypeFromRecord(project);
-    const contentTypeLabel = sourceType === "project" ? "PROJECT" : sourceType === "assessment" ? "ASSESSMENT" : sourceType === "lesson" ? "LESSON" : "ACTIVITY";
+    const contentTypeLabel = sourceType === "project" ? "PROJECT" : sourceType === "assessment" ? "ASSESSMENT TASK" : sourceType === "lesson" ? "LESSON" : "ACTIVITY";
 
     card.innerHTML = `
         <div class="project-visual" ${visualStyle}>
