@@ -14,6 +14,7 @@ const savePreviewButton = document.querySelector("#save-preview-button");
 
 const manualForm = document.querySelector("#manual-unit-form");
 const saveManualUnitButton = document.querySelector("#save-manual-unit-button");
+const manualSaveStatus = document.querySelector("#manual-save-status");
 const cancelManualUploadButton = document.querySelector("#cancel-manual-upload");
 const clearManualFormButton = document.querySelector("#clear-manual-form");
 const lessonList = document.querySelector("#lesson-list");
@@ -186,6 +187,24 @@ function setStatus(message, isError = false) {
     uploadStatus.textContent = message;
     uploadStatus.classList.remove("is-success", "is-error");
     uploadStatus.classList.add(isError ? "is-error" : "is-success");
+}
+
+function setManualSaveStatus(message, isError = false) {
+    if (!manualSaveStatus) {
+        return;
+    }
+
+    if (!message) {
+        manualSaveStatus.hidden = true;
+        manualSaveStatus.textContent = "";
+        manualSaveStatus.classList.remove("is-success", "is-error");
+        return;
+    }
+
+    manualSaveStatus.hidden = false;
+    manualSaveStatus.textContent = message;
+    manualSaveStatus.classList.remove("is-success", "is-error");
+    manualSaveStatus.classList.add(isError ? "is-error" : "is-success");
 }
 
 function setActionButtonsDisabled(disabled) {
@@ -1370,13 +1389,13 @@ async function saveManualUnitPlan(event) {
 
     const payload = collectManualPayload();
     if (!payload.title || !payload.topic || !payload.year_level) {
-        setStatus("Manual planner requires title, topic, and year level.", true);
+        setManualSaveStatus("Manual planner requires title, topic, and year level.", true);
         return;
     }
 
     try {
         setActionButtonsDisabled(true);
-        setStatus(editUnitPlanId ? "Updating unit plan..." : "Saving manual unit plan...");
+        setManualSaveStatus(editUnitPlanId ? "Updating unit plan..." : "Saving manual unit plan...");
 
         const requestPath = editUnitPlanId
             ? `/api/unit-plans/${encodeURIComponent(editUnitPlanId)}`
@@ -1399,7 +1418,7 @@ async function saveManualUnitPlan(event) {
         const lessonCount = Array.isArray(result?.lessons) ? result.lessons.length : payload.lessons.length;
         const lessonCardCount = Number(result.lesson_cards_created || 0);
         const actionWord = editUnitPlanId ? "Updated" : "Saved";
-        setStatus(`${actionWord} unit plan ${result.title || payload.title} with ${lessonCount} lesson${lessonCount === 1 ? "" : "s"} and ${lessonCardCount} lesson card${lessonCardCount === 1 ? "" : "s"} in the Library.`);
+        setManualSaveStatus(`${actionWord} unit plan ${result.title || payload.title} with ${lessonCount} lesson${lessonCount === 1 ? "" : "s"} and ${lessonCardCount} lesson card${lessonCardCount === 1 ? "" : "s"} in the Library.`);
 
         if (editUnitPlanId) {
             populateManualPlannerFromUnitPlan(result || payload);
@@ -1409,7 +1428,7 @@ async function saveManualUnitPlan(event) {
         }
     } catch (error) {
         const actionNoun = editUnitPlanId ? "Update" : "Manual save";
-        setStatus(`${actionNoun} failed: ${error.message}`, true);
+        setManualSaveStatus(`${actionNoun} failed: ${error.message}`, true);
     } finally {
         setActionButtonsDisabled(false);
     }
@@ -1455,6 +1474,7 @@ if (clearManualFormButton) {
         autoResizeSkillsTextareas();
         autoResizeHealthSafetyTextarea();
         resetManualLessons();
+        setManualSaveStatus("");
         setStatus("Manual unit planner cleared.");
     });
 }
@@ -1547,6 +1567,7 @@ if (uploadForm) {
 async function initUploadUnitPage() {
     renderAuthStatus();
     resetManualLessons();
+    setManualSaveStatus("");
     autoResizeSchoolValueTextareas();
     autoResizeContextTextareas();
     autoResizeLocalCurriculumTextareas();

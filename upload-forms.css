@@ -595,6 +595,12 @@
     border-color: #f5b9b9;
 }
 
+.manual-save-status {
+    margin: 0;
+    flex: 1 1 260px;
+    min-width: 220px;
+}
+
 @media (max-width: 820px) {
     .browse-unit-plan-tools {
         justify-content: flex-end;
@@ -654,6 +660,11 @@
 
     .project-costs-layout {
         grid-template-columns: 1fr;
+    }
+
+    .manual-save-status {
+        min-width: 100%;
+        order: 3;
     }
 }
 

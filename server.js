@@ -763,6 +763,26 @@ function normalizeYearLevel(value) {
     .join(", ");
 }
 
+function normalizeTimestamp(value, fallback = new Date()) {
+  const fallbackDate = fallback instanceof Date ? fallback : new Date(fallback || Date.now());
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString();
+  }
+
+  const rawValue = String(value || "").trim();
+  if (!rawValue) {
+    return fallbackDate.toISOString();
+  }
+
+  const parsed = new Date(rawValue);
+  if (Number.isNaN(parsed.getTime())) {
+    return fallbackDate.toISOString();
+  }
+
+  return parsed.toISOString();
+}
+
 function splitDocxLines(value) {
   return String(value || "")
     .replace(/\r/g, "")
@@ -1098,8 +1118,8 @@ function buildUnitPlanPayload(body, userEmail) {
     notes: String(body?.notes || body?.unitNotes || "").trim(),
     lessons: normalizeUnitLessons(body?.lessons),
     created_by_email: userEmail,
-    created_at: String(body?.created_at || new Date().toISOString()),
-    updated_at: new Date().toISOString()
+    created_at: normalizeTimestamp(body?.created_at),
+    updated_at: normalizeTimestamp(new Date())
   };
 }
 
@@ -1110,6 +1130,8 @@ async function saveUnitPlanPayload(payload) {
   }
 
   await ensureUnitPlanSchema();
+  const createdAt = normalizeTimestamp(payload.created_at);
+  const updatedAt = normalizeTimestamp(payload.updated_at);
   const result = await pool.query(
     `
       INSERT INTO unit_plans (
@@ -1155,8 +1177,8 @@ async function saveUnitPlanPayload(payload) {
       payload.notes || null,
       JSON.stringify(payload.lessons || []),
       payload.created_by_email,
-      payload.created_at,
-      payload.updated_at
+      createdAt,
+      updatedAt
     ]
   );
 
@@ -1197,8 +1219,8 @@ function buildLessonCardFromUnitLesson(unitPlan, lesson, fallbackIndex = 1) {
     publish_activity: publishActivity,
     add_to_calendar: Boolean(lesson?.add_to_calendar),
     created_by_email: String(unitPlan?.created_by_email || "").trim(),
-    created_at: String(unitPlan?.created_at || new Date().toISOString()),
-    updated_at: new Date().toISOString()
+    created_at: normalizeTimestamp(unitPlan?.created_at),
+    updated_at: normalizeTimestamp(new Date())
   };
 }
 
