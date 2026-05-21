@@ -1381,7 +1381,65 @@ async function ensureUnitPlanSchema() {
   await ensureActivityHubVisibilitySchema();
 }
 
+async function ensureActivitiesSchema() {
+  if (!hasDatabase) {
+    return;
+  }
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS activities (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      year_level TEXT NOT NULL,
+      type TEXT NOT NULL,
+      activity_category TEXT,
+      duration_minutes INTEGER,
+      difficulty TEXT,
+      subject_stream TEXT,
+      card_color TEXT,
+      card_url TEXT,
+      outcome_image_url TEXT,
+      description TEXT,
+      resources JSONB NOT NULL DEFAULT '[]'::jsonb,
+      equipment JSONB NOT NULL DEFAULT '[]'::jsonb,
+      instructions JSONB NOT NULL DEFAULT '[]'::jsonb,
+      class_management_notes JSONB NOT NULL DEFAULT '[]'::jsonb,
+      class_preparation JSONB NOT NULL DEFAULT '[]'::jsonb,
+      assessment_focus JSONB NOT NULL DEFAULT '[]'::jsonb,
+      time_sensitive BOOLEAN NOT NULL DEFAULT FALSE,
+      show_in_this_week BOOLEAN NOT NULL DEFAULT FALSE,
+      term TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS name TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS year_level TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS type TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS activity_category TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS duration_minutes INTEGER`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS difficulty TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS subject_stream TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS card_color TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS card_url TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS outcome_image_url TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS description TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS resources JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS equipment JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS instructions JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS class_management_notes JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS class_preparation JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS assessment_focus JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS time_sensitive BOOLEAN NOT NULL DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS show_in_this_week BOOLEAN NOT NULL DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS term TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+}
+
 async function ensureSchema() {
+  await ensureActivitiesSchema();
   await ensureUnitPlanSchema();
 }
 
@@ -1853,8 +1911,20 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     const idMetadata = idColumn ? activityColumnMetadata.get(String(idColumn).toLowerCase()) : null;
     const idIsInteger = isIntegerLikeColumn(idMetadata);
     const numericBodyId = Number.parseInt(body.id, 10);
-    const canUseExplicitId = Boolean(idColumn) && (!idIsInteger || Number.isInteger(numericBodyId));
-    const idValueToSave = idIsInteger ? numericBodyId : payload.id;
+    let resolvedNumericId = Number.isInteger(numericBodyId) ? numericBodyId : null;
+
+    if (idIsInteger && !Number.isInteger(resolvedNumericId) && idColumn) {
+      const nextIdResult = await pool.query(
+        `SELECT COALESCE(MAX(${quoteIdentifier(idColumn)}), 0) + 1 AS next_id FROM activities`
+      );
+      const nextId = Number.parseInt(nextIdResult.rows?.[0]?.next_id, 10);
+      if (Number.isInteger(nextId) && nextId > 0) {
+        resolvedNumericId = nextId;
+      }
+    }
+
+    const canUseExplicitId = Boolean(idColumn) && (!idIsInteger || Number.isInteger(resolvedNumericId));
+    const idValueToSave = idIsInteger ? resolvedNumericId : payload.id;
 
     const sqlColumns = [
       { name: nameColumn, value: payload.name },
