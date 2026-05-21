@@ -1404,6 +1404,10 @@ async function ensureUnitPlanSchema() {
     return;
   }
 
+  // Unit-plan flows can run before activity/calendar routes on fresh deployments.
+  // Ensure dependent tables exist before ALTER statements below.
+  await ensureActivitiesSchema();
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS unit_plans (
       id TEXT PRIMARY KEY,
@@ -1466,6 +1470,23 @@ async function ensureUnitPlanSchema() {
   await pool.query(`ALTER TABLE lessons ADD COLUMN IF NOT EXISTS created_by_email TEXT`);
   await pool.query(`ALTER TABLE lessons ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`ALTER TABLE lessons ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS practical_schedule (
+      id SERIAL PRIMARY KEY,
+      title TEXT NOT NULL,
+      event_type TEXT NOT NULL,
+      start_date DATE NOT NULL,
+      end_date DATE,
+      notes TEXT,
+      linked_activity_id TEXT,
+      linked_url TEXT,
+      unit_plan_id TEXT,
+      lesson_index INTEGER,
+      created_by_email TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
   // Backfill older unit-plan lesson cards that were unintentionally saved as unpublished.
   await pool.query(`
     UPDATE lessons
@@ -3098,7 +3119,8 @@ app.post("/api/unit-plans", async (req, res) => {
       ...savedPlan,
       lesson_cards_created: createdLessonCards
     });
-  } catch (_error) {
+  } catch (error) {
+    console.error("Unit plan save error:", error);
     res.status(500).json({ error: "Could not save unit plan" });
   }
 });
@@ -3132,7 +3154,8 @@ app.put("/api/unit-plans/:id", async (req, res) => {
       ...savedPlan,
       lesson_cards_created: createdLessonCards
     });
-  } catch (_error) {
+  } catch (error) {
+    console.error("Unit plan update error:", error);
     res.status(500).json({ error: "Could not update unit plan" });
   }
 });
