@@ -5,7 +5,7 @@ function setStatus(message, isError = false) {
     }
 
     statusDiv.textContent = message;
-    statusDiv.className = `status-message ${isError ? "error" : "success"}`;
+    statusDiv.className = `upload-status ${isError ? "is-error" : "is-success"}`;
     statusDiv.hidden = false;
 
     if (!isError) {
