@@ -373,7 +373,16 @@ async function saveProjectShared(payload) {
         body: JSON.stringify(payload)
     });
 
-    const result = await response.json().catch(() => ({}));
+    const responseText = await response.text();
+    let result = {};
+
+    if (responseText) {
+        try {
+            result = JSON.parse(responseText);
+        } catch (_error) {
+            result = { error: responseText };
+        }
+    }
 
     if (!response.ok) {
         if (response.status === 401) {

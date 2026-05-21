@@ -427,6 +427,58 @@ function normalizeArray(value) {
   return [];
 }
 
+async function ensureActivityHubVisibilitySchema() {
+  if (!hasDatabase) {
+    return;
+  }
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS activity_hub_visibility (
+      activity_id TEXT NOT NULL,
+      hub_name TEXT NOT NULL,
+      is_visible BOOLEAN NOT NULL DEFAULT TRUE,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (activity_id, hub_name)
+    );
+  `);
+
+  await pool.query(`ALTER TABLE activity_hub_visibility ADD COLUMN IF NOT EXISTS is_visible BOOLEAN NOT NULL DEFAULT TRUE`);
+  await pool.query(`ALTER TABLE activity_hub_visibility ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+}
+
+async function upsertHubVisibility(activityIds, hubName, isVisible) {
+  if (!hasDatabase) {
+    return 0;
+  }
+
+  const ids = Array.isArray(activityIds)
+    ? activityIds.map((value) => String(value || "").trim()).filter(Boolean)
+    : [];
+
+  if (!ids.length || !String(hubName || "").trim()) {
+    return 0;
+  }
+
+  await ensureActivityHubVisibilitySchema();
+
+  let affected = 0;
+  for (const activityId of ids) {
+    await pool.query(
+      `
+        INSERT INTO activity_hub_visibility (activity_id, hub_name, is_visible, updated_at)
+        VALUES ($1, $2, $3, NOW())
+        ON CONFLICT (activity_id, hub_name) DO UPDATE SET
+          is_visible = EXCLUDED.is_visible,
+          updated_at = NOW()
+      `,
+      [activityId, String(hubName).trim(), Boolean(isVisible)]
+    );
+    affected += 1;
+  }
+
+  return affected;
+}
+
 function isExcludedNonDtechActivity(_activity) {
   // Visibility is already controlled by activity_hub_visibility in SQL.
   // Keep this helper to avoid runtime failures in routes that call it.
@@ -1218,6 +1270,7 @@ async function ensureUnitPlanSchema() {
   await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS unit_lesson_index INTEGER`);
   await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS unit_plan_id TEXT`);
   await pool.query(`ALTER TABLE practical_schedule ADD COLUMN IF NOT EXISTS lesson_index INTEGER`);
+  await ensureActivityHubVisibilitySchema();
 }
 
 async function ensureSchema() {
