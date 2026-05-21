@@ -815,14 +815,18 @@ if (resyncLessonsButton) {
 function showDeleteConfirmation(unitPlanId, unitTitle) {
     const modal = document.querySelector("#delete-confirmation-modal");
     const message = document.querySelector("#delete-confirmation-message");
+    const deleteLessonsCheckbox = document.querySelector("#delete-lessons-checkbox");
     if (modal && message) {
-        message.textContent = `Are you sure you want to delete "${String(unitTitle || "Unit Plan")}"? This action cannot be undone.`;
+        message.textContent = `Delete "${String(unitTitle || "Unit Plan")}". You can choose whether to delete its lesson cards too.`;
         pendingDeleteId = unitPlanId;
+        if (deleteLessonsCheckbox) {
+            deleteLessonsCheckbox.checked = true;
+        }
         modal.showModal();
     }
 }
 
-async function deleteUnitPlan(unitPlanId) {
+async function deleteUnitPlan(unitPlanId, deleteLessons) {
     const email = readSignedInEmail();
     if (!email) {
         setStatus("Not signed in.", true);
@@ -830,16 +834,19 @@ async function deleteUnitPlan(unitPlanId) {
     }
 
     try {
-        setStatus("Deleting unit plan...");
-        const response = await fetch(`/api/unit-plans/${encodeURIComponent(unitPlanId)}`, {
+        setStatus(deleteLessons ? "Deleting unit plan and lesson cards..." : "Deleting unit plan and keeping lesson cards...");
+        const query = new URLSearchParams({
+            delete_lessons: deleteLessons ? "1" : "0"
+        });
+        const response = await fetch(`/api/unit-plans/${encodeURIComponent(unitPlanId)}?${query.toString()}`, {
             method: "DELETE",
             headers: {
                 "x-user-email": email
             }
         });
 
+        const data = await response.json().catch(() => ({}));
         if (!response.ok) {
-            const data = await response.json().catch(() => ({}));
             throw new Error(data.error || `Could not delete unit plan (HTTP ${response.status})`);
         }
 
@@ -847,7 +854,13 @@ async function deleteUnitPlan(unitPlanId) {
         selectedUnitPlanId = "";
         renderTopicTabs();
         renderRows();
-        setStatus("Unit plan deleted successfully.");
+
+        const removedLessonCards = Number(data?.deleted_lesson_cards || 0);
+        if (deleteLessons) {
+            setStatus(`Unit plan deleted. Removed ${removedLessonCards} lesson card${removedLessonCards === 1 ? "" : "s"}.`);
+        } else {
+            setStatus("Unit plan deleted. Existing lesson cards were kept.");
+        }
     } catch (error) {
         setStatus(`Delete failed: ${error.message}`, true);
     }
@@ -856,11 +869,13 @@ async function deleteUnitPlan(unitPlanId) {
 const deleteModal = document.querySelector("#delete-confirmation-modal");
 const deleteConfirmButton = document.querySelector("#delete-confirm-button");
 const deleteCancelButton = document.querySelector("#delete-cancel-button");
+const deleteLessonsCheckbox = document.querySelector("#delete-lessons-checkbox");
 
 if (deleteConfirmButton) {
     deleteConfirmButton.addEventListener("click", () => {
+        const shouldDeleteLessons = Boolean(deleteLessonsCheckbox?.checked);
         if (pendingDeleteId) {
-            deleteUnitPlan(pendingDeleteId);
+            deleteUnitPlan(pendingDeleteId, shouldDeleteLessons);
         }
         pendingDeleteId = "";
         if (deleteModal) {

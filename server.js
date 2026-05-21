@@ -1224,6 +1224,16 @@ function buildLessonCardFromUnitLesson(unitPlan, lesson, fallbackIndex = 1) {
   };
 }
 
+function getUnitPlanLessonCardFingerprint(card) {
+  const normalize = (value) => String(value || "").trim().toLowerCase();
+  return [
+    normalize(card?.lesson_title),
+    normalize(card?.lesson_type),
+    normalize(card?.lesson_year_level),
+    normalize(card?.lesson_focus)
+  ].join("|");
+}
+
 async function syncUnitPlanLessonsToLibrary(unitPlan) {
   const unitPlanId = String(unitPlan?.id || "").trim();
   if (!unitPlanId) {
@@ -1232,6 +1242,7 @@ async function syncUnitPlanLessonsToLibrary(unitPlan) {
 
   const lessons = normalizeUnitLessons(unitPlan?.lessons);
   const cardPrefix = `unitplan-${slugify(unitPlanId)}-lesson-`;
+  let syncedCount = 0;
 
   if (!hasDatabase) {
     Array.from(memoryLessons.keys())
@@ -1240,12 +1251,25 @@ async function syncUnitPlanLessonsToLibrary(unitPlan) {
         memoryLessons.delete(lessonId);
       });
 
-    lessons.forEach((lesson, index) => {
+    for (let index = 0; index < lessons.length; index += 1) {
+      const lesson = lessons[index];
       const card = buildLessonCardFromUnitLesson(unitPlan, lesson, index + 1);
-      memoryLessons.set(card.id, card);
-    });
+      const fingerprint = getUnitPlanLessonCardFingerprint(card);
+      const duplicateExists = Array.from(memoryLessons.values()).some((existing) => (
+        String(existing?.id || "").startsWith("unitplan-") &&
+        String(existing?.id || "") !== card.id &&
+        getUnitPlanLessonCardFingerprint(existing) === fingerprint
+      ));
 
-    return lessons.length;
+      if (duplicateExists) {
+        continue;
+      }
+
+      memoryLessons.set(card.id, card);
+      syncedCount += 1;
+    }
+
+    return syncedCount;
   }
 
   await pool.query("DELETE FROM lessons WHERE id LIKE $1", [`${cardPrefix}%`]);
@@ -1253,6 +1277,22 @@ async function syncUnitPlanLessonsToLibrary(unitPlan) {
   for (let index = 0; index < lessons.length; index += 1) {
     const lesson = lessons[index];
     const card = buildLessonCardFromUnitLesson(unitPlan, lesson, index + 1);
+
+    const duplicateResult = await pool.query(
+      `SELECT id FROM lessons
+       WHERE id LIKE 'unitplan-%'
+         AND id <> $1
+         AND lower(trim(COALESCE(lesson_title, ''))) = lower(trim($2))
+         AND lower(trim(COALESCE(lesson_type, ''))) = lower(trim($3))
+         AND lower(trim(COALESCE(lesson_year_level, ''))) = lower(trim($4))
+         AND lower(trim(COALESCE(lesson_focus, ''))) = lower(trim($5))
+       LIMIT 1`,
+      [card.id, card.lesson_title, card.lesson_type, card.lesson_year_level, card.lesson_focus]
+    );
+
+    if (duplicateResult.rowCount) {
+      continue;
+    }
 
     await pool.query(
       `INSERT INTO lessons
@@ -1295,9 +1335,11 @@ async function syncUnitPlanLessonsToLibrary(unitPlan) {
         card.updated_at
       ]
     );
+
+    syncedCount += 1;
   }
 
-  return lessons.length;
+  return syncedCount;
 }
 
 async function parseDocxBufferToUnitPlanPayload(buffer, originalName, userEmail) {
@@ -3185,6 +3227,9 @@ app.put("/api/unit-plans/:id", async (req, res) => {
 app.delete("/api/unit-plans/:id", async (req, res) => {
   const unitPlanId = String(req.params.id || "").trim();
   const userEmail = getRequestUserEmail(req);
+  const deleteLessonsRaw = String(req.query?.delete_lessons || req.body?.delete_lessons || "").trim().toLowerCase();
+  const shouldDeleteLessons = ["1", "true", "yes", "on"].includes(deleteLessonsRaw);
+  const lessonCardPrefix = `unitplan-${slugify(unitPlanId)}-lesson-`;
 
   if (!unitPlanId) {
     res.status(400).json({ error: "Unit plan ID is required" });
@@ -3201,20 +3246,56 @@ app.delete("/api/unit-plans/:id", async (req, res) => {
       res.status(404).json({ error: "Not found" });
       return;
     }
+
+    let deletedLessonCards = 0;
+    if (shouldDeleteLessons) {
+      Array.from(memoryLessons.keys())
+        .filter((lessonId) => String(lessonId || "").startsWith(lessonCardPrefix))
+        .forEach((lessonId) => {
+          memoryLessons.delete(lessonId);
+          deletedLessonCards += 1;
+        });
+    }
+
     memoryUnitPlans.delete(unitPlanId);
-    res.status(204).send();
+    res.status(200).json({
+      ok: true,
+      deleted_unit_plan_id: unitPlanId,
+      deleted_lesson_cards: deletedLessonCards,
+      kept_lesson_cards: !shouldDeleteLessons
+    });
     return;
   }
 
+  const client = await pool.connect();
   try {
-    const result = await pool.query("DELETE FROM unit_plans WHERE id = $1", [unitPlanId]);
-    if (!result.rowCount) {
+    await client.query("BEGIN");
+
+    let deletedLessonCards = 0;
+    if (shouldDeleteLessons) {
+      const deletedLessonsResult = await client.query("DELETE FROM lessons WHERE id LIKE $1", [`${lessonCardPrefix}%`]);
+      deletedLessonCards = Number(deletedLessonsResult.rowCount || 0);
+    }
+
+    const deletedPlanResult = await client.query("DELETE FROM unit_plans WHERE id = $1", [unitPlanId]);
+    if (!deletedPlanResult.rowCount) {
+      await client.query("ROLLBACK");
       res.status(404).json({ error: "Not found" });
       return;
     }
-    res.status(204).send();
+
+    await client.query("COMMIT");
+    res.status(200).json({
+      ok: true,
+      deleted_unit_plan_id: unitPlanId,
+      deleted_lesson_cards: deletedLessonCards,
+      kept_lesson_cards: !shouldDeleteLessons
+    });
   } catch (_error) {
+    await client.query("ROLLBACK");
     res.status(500).json({ error: "Could not delete unit plan" });
+  } finally {
+    client.release();
   }
 });
 
