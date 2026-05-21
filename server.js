@@ -431,6 +431,48 @@ function isJsonLikeColumn(metadata) {
   return dataType === "json" || dataType === "jsonb" || udtName === "json" || udtName === "jsonb";
 }
 
+async function getCheckConstraintAllowedValues(tableName, constraintName) {
+  if (!hasDatabase) {
+    return [];
+  }
+
+  const safeTableName = String(tableName || "").trim();
+  const safeConstraintName = String(constraintName || "").trim();
+  if (!safeTableName || !safeConstraintName) {
+    return [];
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT pg_get_constraintdef(c.oid) AS definition
+        FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        WHERE n.nspname = 'public'
+          AND t.relname = $1
+          AND c.conname = $2
+        LIMIT 1
+      `,
+      [safeTableName, safeConstraintName]
+    );
+
+    const definition = String(result.rows?.[0]?.definition || "");
+    if (!definition) {
+      return [];
+    }
+
+    const matches = definition.match(/'([^']+)'/g) || [];
+    const values = matches
+      .map((value) => String(value || "").replace(/^'/, "").replace(/'$/, "").trim())
+      .filter(Boolean);
+
+    return Array.from(new Set(values));
+  } catch (_error) {
+    return [];
+  }
+}
+
 async function getMergedRolePermissions() {
   if (!hasDatabase) {
     return mergeRolePermissionRows(memoryRolePermissions);
@@ -1908,6 +1950,36 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     const progressLoggingColumn = pickExistingColumn(activityColumns, ["progress_logging"]);
     const feedbackTriallingColumn = pickExistingColumn(activityColumns, ["feedback_trialling"]);
 
+    let resolvedActivityCategory = payload.activity_category;
+    if (activityCategoryColumn) {
+      const allowedActivityCategories = await getCheckConstraintAllowedValues(
+        "activities",
+        "activities_activity_category_check"
+      );
+
+      if (allowedActivityCategories.length) {
+        const allowedByLower = new Map(
+          allowedActivityCategories.map((value) => [String(value).toLowerCase(), value])
+        );
+
+        const rawCategory = String(payload.activity_category || "").trim();
+        const candidateValues = [
+          rawCategory,
+          rawCategory.replace(/\s*activity\s*$/i, "").trim(),
+          String(payload.type || "").trim(),
+          "Project",
+          "Practice",
+          "Activity",
+          "Assessment"
+        ].filter(Boolean);
+
+        const matched = candidateValues.find((candidate) => allowedByLower.has(String(candidate).toLowerCase()));
+        resolvedActivityCategory = matched
+          ? allowedByLower.get(String(matched).toLowerCase())
+          : allowedActivityCategories[0];
+      }
+    }
+
     const idMetadata = idColumn ? activityColumnMetadata.get(String(idColumn).toLowerCase()) : null;
     const idIsInteger = isIntegerLikeColumn(idMetadata);
     const numericBodyId = Number.parseInt(body.id, 10);
@@ -1955,7 +2027,7 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
       sqlColumns.unshift({ name: idColumn, value: idValueToSave });
     }
 
-    if (activityCategoryColumn) sqlColumns.push({ name: activityCategoryColumn, value: payload.activity_category });
+    if (activityCategoryColumn) sqlColumns.push({ name: activityCategoryColumn, value: resolvedActivityCategory });
     if (durationMinutesColumn) {
       sqlColumns.push({ name: durationMinutesColumn, value: payload.duration_minutes });
     }
