@@ -395,6 +395,7 @@ async function loadSharedProjects() {
                 const imageUrl = String(item.outcome_image_url || item.image_url || "").trim();
                 const showInThisWeek = Boolean(item.show_in_this_week ?? item.show_this_week ?? item.is_pinned ?? item.is_this_week);
                 const sourceType = inferSourceTypeFromRecord(item);
+                const defaultCardColor = sourceType === "assessment" ? "Slate" : "Rose";
 
                 return {
                     id,
@@ -415,7 +416,7 @@ async function loadSharedProjects() {
                     visual: {
                         icon: textToIcon(type),
                         label: "Teacher Upload",
-                        palette: colorToPalette(item.card_color || item.card_colour || item.color)
+                        palette: colorToPalette(item.card_color || item.card_colour || item.color || defaultCardColor)
                     }
                 };
             })

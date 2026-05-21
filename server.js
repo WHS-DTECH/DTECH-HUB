@@ -1982,7 +1982,11 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     duration_minutes: Number.isInteger(durationMinutesInput) && durationMinutesInput > 0 ? durationMinutesInput : 1,
     difficulty: String(body.difficulty || "Beginner").trim() || "Beginner",
     subject_stream: String(body.subject_stream || body.subject || "").trim().toUpperCase(),
-    card_color: String(body.card_color || "Rose").trim() || "Rose",
+    card_color: (() => {
+      const normalizedCategory = String(body.activity_category || "").toLowerCase();
+      const fallbackColor = normalizedCategory.includes("assessment") ? "Slate" : "Rose";
+      return String(body.card_color || fallbackColor).trim() || fallbackColor;
+    })(),
     card_url: String(body.card_url || "").trim(),
     outcome_image_url: String(body.outcome_image_url || "").trim(),
     description: String(body.description || "").trim(),
