@@ -56,171 +56,170 @@
             <section class="upload-panel" aria-label="Upload activity form">
 
                 <form id="upload-activity-form" class="upload-form">
-                <fieldset class="field-group">
-                    <legend>Card Basics</legend>
-                    <div class="form-grid">
-                        <div class="field">
-                            <label for="activity-name">Card Name</label>
-                            <input id="activity-name" name="activityName" type="text" required>
-                        </div>
-
-                        <div class="field">
-                            <label for="year-level">Year Level</label>
-                            <select id="year-level" name="yearLevel" required>
-                                <option value="">Select year</option>
-                                <option>Junior</option>
-                                <option>Middle</option>
-                                <option>Senior</option>
-                                <option>Year 7</option>
-                                <option>Year 8</option>
-                                <option>Year 9</option>
-                                <option>Year 10</option>
-                                <option>Year 11</option>
-                                <option>Year 12</option>
-                                <option>Year 13</option>
-                            </select>
-                        </div>
-
-                        <div class="field">
-                            <label for="type">Topic Type</label>
-                            <select id="type" name="type" required>
-                                <option value="">Select topic type</option>
-                                <option>Office Suite</option>
-                                <option>Programming</option>
-                                <option>Electronics</option>
-                                <option>Digital Media</option>
-                            </select>
-                        </div>
-
-                        <div class="field">
-                            <label for="activity-category">Card Category</label>
-                            <select id="activity-category" name="activityCategory" required>
-                                <option>Activity</option>
-                                <option>Skill Activity</option>
-                                <option>Project</option>
-                                <option>Assessment Activity</option>
-                                <option>Practice Activity</option>
-                            </select>
-                        </div>
-
-                        <div class="field">
-                            <label for="difficulty">Difficulty</label>
-                            <select id="difficulty" name="difficulty" required>
-                                <option value="">Select difficulty</option>
-                                <option>Beginner</option>
-                                <option>Intermediate</option>
-                                <option>Advanced</option>
-                            </select>
-                        </div>
-
-                        <div class="field">
-                            <label for="card-color">Card Color</label>
-                            <select id="card-color" name="cardColor" required>
-                                <option selected>Violet</option>
-                                <option>Rose</option>
-                                <option>Azure</option>
-                                <option>Amber</option>
-                                <option>Teal</option>
-                                <option>Slate</option>
-                            </select>
-                        </div>
-
-                        <div class="field">
-                            <label for="subject-stream">Subject Stream</label>
-                            <select id="subject-stream" name="subjectStream" required>
-                                <option value="">Select subject</option>
-                                <option value="DTECH">DTECH</option>
-                                <option value="COMP">COMP</option>
-                                <option value="TEXT">TEXT</option>
-                                <option value="DTONLINE">DTONLINE</option>
-                            </select>
+                    <fieldset class="form-section">
+                        <legend>Card Basics</legend>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="activity-name">Card Name</label>
+                                <input id="activity-name" name="activityName" type="text" required>
                             </div>
-                        </fieldset>
 
-                        <fieldset class="form-section">
-                            <legend>Activity Timing and Display</legend>
-                            <div class="form-grid">
-                        </div>
+                            <div class="field">
+                                <label for="year-level">Year Level</label>
+                                <select id="year-level" name="yearLevel" required>
+                                    <option value="">Select year</option>
+                                    <option>Junior</option>
+                                    <option>Middle</option>
+                                    <option>Senior</option>
+                                    <option>Year 7</option>
+                                    <option>Year 8</option>
+                                    <option>Year 9</option>
+                                    <option>Year 10</option>
+                                    <option>Year 11</option>
+                                    <option>Year 12</option>
+                                    <option>Year 13</option>
+                                </select>
+                            </div>
 
-                        <div class="field">
-                            <label for="card-url">Card URL</label>
-                            <label class="checkbox-field" for="show-this-week">
-                                <input id="show-this-week" name="showThisWeek" type="checkbox">
-                                Show in This Week section
-                            </label>
-                        </fieldset>
+                            <div class="field">
+                                <label for="activity-category">Card Category</label>
+                                <select id="activity-category" name="activityCategory" required>
+                                    <option>Activity</option>
+                                    <option>Skill Activity</option>
+                                    <option>Project</option>
+                                    <option>Assessment Activity</option>
+                                    <option>Practice Activity</option>
+                                </select>
+                            </div>
 
-                        <div class="field field-wide resources-equipment-section">
-                            <label>Resources & Equipment</label>
-                            <div class="resources-equipment-layout">
-                                <div class="resources-equipment-inputs">
-                                    <div class="field">
-                                        <label for="resources">Resources (one per line)</label>
-                                        <textarea id="resources" name="resources" placeholder="List classroom resources..."></textarea>
-                                    </div>
-                            <label>Resources & Equipment</label>
-                            <div class="resources-equipment-layout">
-                                <div class="resources-equipment-inputs">
-                                    <div class="field">
-                                        <label for="resources">Resources (one per line)</label>
-                                </div>
-                                        <textarea id="resources" name="resources" placeholder="List classroom resources..."></textarea>
-                                <fieldset class="common-resources-panel">
-                                    <legend>Common Resources</legend>
-                                    <label><input type="checkbox" class="common-resource-option" value="Internet"> Internet</label>
-                                    <label><input type="checkbox" class="common-resource-option" value="Web Browser"> Web Browser</label>
-                                    <label><input type="checkbox" class="common-resource-option" value="Windows-Compatible"> Windows-Compatible</label>
-                                    <label><input type="checkbox" class="common-resource-option" value="USB Pen Drive"> USB Pen Drive</label>
-                                </fieldset>
+                            <div class="field">
+                                <label for="subject-stream">Subject Stream</label>
+                                <select id="subject-stream" name="subjectStream" required>
+                                    <option value="">Select subject</option>
+                                    <option value="DTECH">DTECH</option>
+                                    <option value="COMP">COMP</option>
+                                    <option value="TEXT">TEXT</option>
+                                    <option value="DTONLINE">DTONLINE</option>
+                                </select>
+                            </div>
+
+                            <div class="field">
+                                <label for="type">Topic Type</label>
+                                <select id="type" name="type" required>
+                                    <option value="">Select topic type</option>
+                                    <option>Office Suite</option>
+                                    <option>Programming</option>
+                                    <option>Electronics</option>
+                                    <option>Digital Media</option>
+                                </select>
+                            </div>
+
+                            <div class="field">
+                                <label for="difficulty">Difficulty</label>
+                                <select id="difficulty" name="difficulty" required>
+                                    <option value="">Select difficulty</option>
+                                    <option>Beginner</option>
+                                    <option>Intermediate</option>
+                                    <option>Advanced</option>
+                                </select>
+                            </div>
+
+                            <div class="field">
+                                <label for="card-url">Card URL</label>
+                                <input id="card-url" name="cardUrl" type="url" placeholder="What URL should this card open?">
+                            </div>
+
+                            <div class="field field-wide">
+                                <label for="outcome-image-url">Card Image</label>
+                                <input id="outcome-image-url" name="outcomeImageUrl" type="text" placeholder="https://... or /images/...">
+                            </div>
+
+                            <div class="field field-wide">
+                                <label for="short-description">Short Description</label>
+                                <textarea id="short-description" name="shortDescription" placeholder="Brief overview of the activity..."></textarea>
                             </div>
                         </div>
-                                    </div>
+                    </fieldset>
 
-                                    <div class="field">
-                                        <label for="equipment">Equipment (one per line)</label>
-                                        <textarea id="equipment" name="equipment" placeholder="List required equipment..."></textarea>
-                                    </div>
+                    <fieldset class="form-section">
+                        <legend>Activity Details</legend>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="duration-minutes">Duration Minutes</label>
+                                <input id="duration-minutes" name="durationMinutes" type="number" min="1" step="1" required>
+                            </div>
+
+                            <div class="field">
+                                <label for="card-color">Card Color</label>
+                                <select id="card-color" name="cardColor" required>
+                                    <option selected>Violet</option>
+                                    <option>Rose</option>
+                                    <option>Azure</option>
+                                    <option>Amber</option>
+                                    <option>Teal</option>
+                                    <option>Slate</option>
+                                </select>
+                            </div>
+                        </div>
+                        <label class="checkbox-field" for="show-this-week">
+                            <input id="show-this-week" name="showThisWeek" type="checkbox">
+                            Show in This Week section
+                        </label>
+                    </fieldset>
+
+                    <fieldset class="form-section">
+                        <legend>Resources</legend>
+                        <div class="resources-equipment-layout">
+                            <div class="resources-equipment-inputs">
+                                <div class="field">
+                                    <label for="resources">Resources (one per line)</label>
+                                    <textarea id="resources" name="resources" placeholder="List classroom resources..."></textarea>
                                 </div>
 
-                                <fieldset class="common-resources-panel">
-                                    <legend>Common Resources</legend>
-                                    <label><input type="checkbox" class="common-resource-option" value="Internet"> Internet</label>
-                                    <label><input type="checkbox" class="common-resource-option" value="Web Browser"> Web Browser</label>
-                                    <label><input type="checkbox" class="common-resource-option" value="Windows-Compatible"> Windows-Compatible</label>
-                                    <label><input type="checkbox" class="common-resource-option" value="USB Pen Drive"> USB Pen Drive</label>
-                                </fieldset>
+                                <div class="field">
+                                    <label for="equipment">Equipment (one per line)</label>
+                                    <textarea id="equipment" name="equipment" placeholder="List required equipment..."></textarea>
+                                </div>
+                            </div>
+
+                            <fieldset class="common-resources-panel">
+                                <legend>Common Resources</legend>
+                                <label><input type="checkbox" class="common-resource-option" value="Internet"> Internet</label>
+                                <label><input type="checkbox" class="common-resource-option" value="Web Browser"> Web Browser</label>
+                                <label><input type="checkbox" class="common-resource-option" value="Windows-Compatible"> Windows-Compatible</label>
+                                <label><input type="checkbox" class="common-resource-option" value="USB Pen Drive"> USB Pen Drive</label>
+                            </fieldset>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="form-section">
+                        <legend>Instructions and Teacher Notes</legend>
+                        <div class="form-grid">
+                            <div class="field field-wide">
+                                <label for="instructions">Instructions (one step per line)</label>
+                                <textarea id="instructions" name="instructions" placeholder="What are the steps students should follow?"></textarea>
+                            </div>
+
+                            <div class="field field-wide">
+                                <label for="class-management">Teacher Card: Class Management Notes</label>
+                                <textarea id="class-management" name="classManagementNotes" placeholder="What class management notes should teachers know?"></textarea>
+                            </div>
+
+                            <div class="field field-wide">
+                                <label for="class-preparation">Teacher Card: Class Preparation</label>
+                                <label class="class-prep-none-toggle" for="class-preparation-none">
+                                    <input id="class-preparation-none" name="classPreparationNone" type="checkbox" checked>
+                                    None
+                                </label>
+                                <textarea id="class-preparation" name="classPreparation" placeholder="What preparation should be done before class?"></textarea>
+                            </div>
+
+                            <div class="field field-wide">
+                                <label for="assessment-focus">Teacher Card: Assessment Focus</label>
+                                <textarea id="assessment-focus" name="assessmentFocus" placeholder="What evidence to observe or collect..."></textarea>
                             </div>
                         </div>
-
-                        <div class="field field-wide">
-                            <label for="instructions">Instructions (one step per line)</label>
-                            <textarea id="instructions" name="instructions" placeholder="What are the steps students should follow?"></textarea>
-                        </div>
-
-                        <div class="field field-wide">
-                            <label for="class-management">Teacher Card: Class Management Notes</label>
-                            <textarea id="class-management" name="classManagementNotes" placeholder="What class management notes should teachers know?"></textarea>
-                        </div>
-
-                        <div class="field field-wide">
-                            <label for="class-preparation">Teacher Card: Class Preparation</label>
-                            <label class="class-prep-none-toggle" for="class-preparation-none">
-                                <input id="class-preparation-none" name="classPreparationNone" type="checkbox" checked>
-                                None
-                            </label>
-                            <textarea id="class-preparation" name="classPreparation" placeholder="What preparation should be done before class?"></textarea>
-                        </div>
-
-                        <div class="field field-wide">
-                            <label for="assessment-focus">Teacher Card: Assessment Focus</label>
-                            <textarea id="assessment-focus" name="assessmentFocus" placeholder="What evidence to observe or collect..."></textarea>
-                        </div>
-                    </div>
-
-                    <label class="checkbox-field" for="show-this-week">
-                        <input id="show-this-week" name="showThisWeek" type="checkbox">
-                        Show in This Week section
-                    </label>
+                    </fieldset>
 
                     <div class="form-actions">
                         <button class="button-save" type="submit">Save Activity</button>
