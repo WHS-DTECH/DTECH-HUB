@@ -60,12 +60,12 @@
 
                 <form id="upload-activity-form" class="upload-form">
                     
-                    <!-- Assessment Basics -->
+                    <!-- Card Basics -->
                     <fieldset class="form-section">
-                        <legend>Assessment Basics</legend>
+                        <legend>Card Basics</legend>
                         <div class="form-grid">
                             <div class="field">
-                                <label for="activity-name">Assessment Task Name</label>
+                                <label for="activity-name">Card Name</label>
                                 <input id="activity-name" name="activityName" type="text" required>
                             </div>
                             <div class="field">
@@ -95,32 +95,11 @@
                                 </select>
                             </div>
                             <div class="field">
-                                <label for="activity-category">Assessment Category</label>
+                                <label for="activity-category">Card Category</label>
                                 <select id="activity-category" name="activityCategory" required>
                                     <option>Assessment Task</option>
                                     <option>Assessment Activity</option>
                                     <option>Practice</option>
-                                </select>
-                            </div>
-                            <div class="field">
-                                <label for="difficulty">Difficulty</label>
-                                <select id="difficulty" name="difficulty" required>
-                                    <option value="">Select difficulty</option>
-                                    <option>Beginner</option>
-                                    <option>Intermediate</option>
-                                    <option>Advanced</option>
-                                </select>
-                            </div>
-                            <div class="field">
-                                <label for="card-color">Card Color</label>
-                                <select id="card-color" name="cardColor" required>
-                                    <option>Green</option>
-                                    <option>Violet</option>
-                                    <option>Rose</option>
-                                    <option>Azure</option>
-                                    <option>Amber</option>
-                                    <option>Teal</option>
-                                    <option selected>Slate</option>
                                 </select>
                             </div>
                             <div class="field">
@@ -133,11 +112,60 @@
                                     <option value="DTONLINE">DTONLINE</option>
                                 </select>
                             </div>
+                            <div class="field">
+                                <label for="type">Topic Type</label>
+                                <select id="type" name="type" required>
+                                    <option value="">Select topic type</option>
+                                    <option>Office Suite</option>
+                                    <option>Programming</option>
+                                    <option>Electronics</option>
+                                    <option>Digital Media</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="difficulty">Difficulty</label>
+                                <select id="difficulty" name="difficulty" required>
+                                    <option value="">Select difficulty</option>
+                                    <option>Beginner</option>
+                                    <option>Intermediate</option>
+                                    <option>Advanced</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="card-url">Card URL</label>
+                                <input id="card-url" name="cardUrl" type="url" placeholder="What URL should this card open?">
+                            </div>
+                            <div class="field field-wide">
+                                <label for="outcome-image-url">Card Image</label>
+                                <input id="outcome-image-url" name="outcomeImageUrl" type="text" placeholder="https://... or /images/...">
+                            </div>
                             <div class="field field-wide">
                                 <label for="short-description">Short Description</label>
                                 <textarea id="short-description" name="shortDescription" placeholder="Brief overview of the assessment task..."></textarea>
                             </div>
                         </div>
+                    </fieldset>
+
+                    <fieldset class="form-section">
+                        <legend>Display Options</legend>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="card-color">Card Color</label>
+                                <select id="card-color" name="cardColor" required>
+                                    <option>Green</option>
+                                    <option>Violet</option>
+                                    <option>Rose</option>
+                                    <option>Azure</option>
+                                    <option>Amber</option>
+                                    <option>Teal</option>
+                                    <option selected>Slate</option>
+                                </select>
+                            </div>
+                        </div>
+                        <label class="checkbox-field" for="show-this-week">
+                            <input id="show-this-week" name="showThisWeek" type="checkbox">
+                            Show in This Week section
+                        </label>
                     </fieldset>
 
                     <!-- Tasks List -->
@@ -251,12 +279,6 @@
                             </div>
                         </div>
                     </fieldset>
-
-                    <!-- Display Options -->
-                    <label class="checkbox-field" for="show-this-week">
-                        <input id="show-this-week" name="showThisWeek" type="checkbox">
-                        Show in This Week section
-                    </label>
 
                     <div class="form-actions">
                         <button class="button-save" type="submit">Save Assessment Task</button>

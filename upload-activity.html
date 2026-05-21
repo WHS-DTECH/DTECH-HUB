@@ -57,10 +57,10 @@
 
                 <form id="upload-activity-form" class="upload-form">
                 <fieldset class="field-group">
-                    <legend>Activity Details</legend>
+                    <legend>Card Basics</legend>
                     <div class="form-grid">
                         <div class="field">
-                            <label for="activity-name">Activity Name</label>
+                            <label for="activity-name">Card Name</label>
                             <input id="activity-name" name="activityName" type="text" required>
                         </div>
 
@@ -93,7 +93,7 @@
                         </div>
 
                         <div class="field">
-                            <label for="activity-category">Activity Category</label>
+                            <label for="activity-category">Card Category</label>
                             <select id="activity-category" name="activityCategory" required>
                                 <option>Activity</option>
                                 <option>Skill Activity</option>
@@ -101,11 +101,6 @@
                                 <option>Assessment Activity</option>
                                 <option>Practice Activity</option>
                             </select>
-                        </div>
-
-                        <div class="field">
-                            <label for="duration-minutes">Duration Minutes</label>
-                            <input id="duration-minutes" name="durationMinutes" type="number" min="1" step="1" required>
                         </div>
 
                         <div class="field">
@@ -147,18 +142,23 @@
                         </div>
 
                         <div class="field field-wide">
-                            <label for="outcome-image-url">Outcome Image URL</label>
+                            <label for="outcome-image-url">Card Image</label>
                             <input id="outcome-image-url" name="outcomeImageUrl" type="text" placeholder="https://... or /images/...">
                         </div>
 
                         <div class="field field-wide">
-                            <label for="outcome-image-file">Upload Outcome Image (PNG or JPG)</label>
+                            <label for="outcome-image-file">Upload Card Image (PNG or JPG)</label>
                             <input id="outcome-image-file" name="outcomeImageFile" type="file" accept="image/png,image/jpeg,image/jpg">
                         </div>
 
                         <div class="field field-wide">
                             <label for="short-description">Short Description</label>
                             <textarea id="short-description" name="shortDescription"></textarea>
+                        </div>
+
+                        <div class="field">
+                            <label for="duration-minutes">Duration Minutes</label>
+                            <input id="duration-minutes" name="durationMinutes" type="number" min="1" step="1" required>
                         </div>
 
                         <div class="field field-wide resources-equipment-section">

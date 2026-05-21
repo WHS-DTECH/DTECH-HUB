@@ -234,6 +234,12 @@ async function prefillFormIfEditing() {
         form.activityCategory.value = String(data.activity_category || "Assessment Task").trim() || "Assessment Task";
         form.difficulty.value = String(data.difficulty || "").trim();
         form.cardColor.value = String(data.card_color || data.card_colour || data.color || "Slate").trim() || "Slate";
+        if (form.cardUrl) {
+            form.cardUrl.value = String(data.card_url || data.activity_url || data.url || "").trim();
+        }
+        if (form.outcomeImageUrl) {
+            form.outcomeImageUrl.value = String(data.outcome_image_url || data.image_url || "").trim();
+        }
         form.subjectStream.value = normalizeSubjectStream(data.subject_stream) || extractSubjectStreamFromClassPreparation(data.class_preparation);
 
         // Assessment-specific fields
@@ -283,6 +289,8 @@ function createAssessmentPayload() {
         duration_minutes: 1,
         difficulty: String(formData.get("difficulty") || "").trim(),
         card_color: String(formData.get("cardColor") || "Slate").trim(),
+        card_url: String(formData.get("cardUrl") || "").trim(),
+        outcome_image_url: String(formData.get("outcomeImageUrl") || "").trim(),
         subject_stream: subjectStream,
         show_in_this_week: Boolean(formData.get("showThisWeek")),
         created_at: new Date().toISOString(),

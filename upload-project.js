@@ -201,6 +201,8 @@ async function prefillProjectIfEditing() {
             form.timeSensitive.checked = Boolean(data.time_sensitive ?? data.timeSensitive);
         }
         if (data.card_color || data.card_colour || data.color) form.cardColor.value = data.card_color || data.card_colour || data.color;
+            if (data.card_url || data.activity_url || data.url) form.cardUrl.value = data.card_url || data.activity_url || data.url;
+            if (data.outcome_image_url || data.image_url) form.outcomeImageUrl.value = data.outcome_image_url || data.image_url;
         if (form.subjectStream) {
             form.subjectStream.value =
                 normalizeSubjectStream(data.subject_stream) || extractSubjectStreamFromClassPreparation(data.class_preparation);
@@ -214,6 +216,7 @@ async function prefillProjectIfEditing() {
         if (data.contact_email) form.contactEmail.value = data.contact_email;
         if (data.company) form.company.value = data.company;
         if (data.address) form.address.value = data.address;
+        if (data.description) form.shortDescription.value = data.description;
         if (data.overview) form.overview.value = parseMaybeArray(data.overview).join("\n");
         if (data.services) form.services.value = parseMaybeArray(data.services).join("\n");
         if (data.costs) form.costs.value = parseMaybeArray(data.costs).join("\n");
@@ -347,12 +350,15 @@ function createProjectPayload() {
         difficulty: String(formData.get("difficulty") || "").trim(),
         subject_stream: subjectStream,
         card_color: String(formData.get("cardColor") || "").trim(),
+            card_url: String(formData.get("cardUrl") || "").trim(),
+            outcome_image_url: String(formData.get("outcomeImageUrl") || "").trim(),
         show_in_this_week: Boolean(formData.get("showThisWeek")),
         class_preparation: mergeClassPreparationWithSubject([], subjectStream),
         created_at: new Date().toISOString(),
         
         // Project Proposal Fields
         start_date: String(formData.get("startDate") || "").trim(),
+            description: String(formData.get("shortDescription") || "").trim(),
         contact_name: String(formData.get("contactName") || "").trim(),
         contact_phone: String(formData.get("contactPhone") || "").trim(),
         contact_email: String(formData.get("contactEmail") || "").trim(),

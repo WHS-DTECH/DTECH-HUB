@@ -60,17 +60,13 @@
 
                 <form id="upload-activity-form" class="upload-form">
                     
-                    <!-- Project Basics -->
+                    <!-- Card Basics -->
                     <fieldset class="form-section">
-                        <legend>Project Basics</legend>
+                        <legend>Card Basics</legend>
                         <div class="form-grid">
                             <div class="field">
-                                <label for="activity-name">Project Name</label>
+                                <label for="activity-name">Card Name</label>
                                 <input id="activity-name" name="activityName" type="text" required>
-                            </div>
-                            <div class="field">
-                                <label for="start-date">EST. Start Date</label>
-                                <input id="start-date" name="startDate" type="date">
                             </div>
                             <div class="field">
                                 <label for="year-level">Year Level</label>
@@ -89,6 +85,25 @@
                                 </select>
                             </div>
                             <div class="field">
+                                <label for="activity-category">Card Category</label>
+                                <select id="activity-category" name="activityCategory" required>
+                                    <option>Project</option>
+                                    <option>Practice</option>
+                                    <option>Skill Activity</option>
+                                    <option>Assessment Activity</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="subject-stream">Subject Stream</label>
+                                <select id="subject-stream" name="subjectStream" required>
+                                    <option value="">Select subject</option>
+                                    <option value="DTECH">DTECH</option>
+                                    <option value="COMP">COMP</option>
+                                    <option value="TEXT">TEXT</option>
+                                    <option value="DTONLINE">DTONLINE</option>
+                                </select>
+                            </div>
+                            <div class="field">
                                 <label for="type">Topic Type</label>
                                 <select id="type" name="type" required>
                                     <option value="">Select topic type</option>
@@ -96,15 +111,6 @@
                                     <option>Programming</option>
                                     <option>Electronics</option>
                                     <option>Digital Media</option>
-                                </select>
-                            </div>
-                            <div class="field">
-                                <label for="activity-category">Project Category</label>
-                                <select id="activity-category" name="activityCategory" required>
-                                    <option>Project</option>
-                                    <option>Practice</option>
-                                    <option>Skill Activity</option>
-                                    <option>Assessment Activity</option>
                                 </select>
                             </div>
                             <div class="field">
@@ -117,14 +123,26 @@
                                 </select>
                             </div>
                             <div class="field">
-                                <label for="subject-stream">Subject Stream</label>
-                                <select id="subject-stream" name="subjectStream" required>
-                                    <option value="">Select subject</option>
-                                    <option value="DTECH">DTECH</option>
-                                    <option value="COMP">COMP</option>
-                                    <option value="TEXT">TEXT</option>
-                                    <option value="DTONLINE">DTONLINE</option>
-                                </select>
+                                <label for="card-url">Card URL</label>
+                                <input id="card-url" name="cardUrl" type="url" placeholder="What URL should this card open?">
+                            </div>
+                            <div class="field field-wide">
+                                <label for="outcome-image-url">Card Image</label>
+                                <input id="outcome-image-url" name="outcomeImageUrl" type="text" placeholder="https://... or /images/...">
+                            </div>
+                            <div class="field field-wide">
+                                <label for="short-description">Short Description</label>
+                                <textarea id="short-description" name="shortDescription" placeholder="Brief summary of the project..."></textarea>
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="form-section">
+                        <legend>Project Timeline</legend>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="start-date">EST. Start Date</label>
+                                <input id="start-date" name="startDate" type="date">
                             </div>
                         </div>
                     </fieldset>
