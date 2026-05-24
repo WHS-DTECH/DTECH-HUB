@@ -1757,7 +1757,13 @@ function createLessonRow(lesson = {}) {
                 </div>
                 <div class="field">
                     <label>Card Category</label>
-                    <input name="lessonType" type="text" placeholder="Activity, Skill Activity, Project...">
+                    <select name="lessonType">
+                        <option>Activity</option>
+                        <option>Skill Activity</option>
+                        <option>Project</option>
+                        <option>Assessment Activity</option>
+                        <option>Practice Activity</option>
+                    </select>
                 </div>
                 <div class="field">
                     <label>Subject Stream</label>
@@ -1771,6 +1777,16 @@ function createLessonRow(lesson = {}) {
                 </div>
                 <div class="field">
                     <label>Topic Type</label>
+                    <select name="lessonTopicType">
+                        <option value="">Select topic type</option>
+                        <option>Office Suite</option>
+                        <option>Programming</option>
+                        <option>Electronics</option>
+                        <option>Digital Media</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Unit Topic</label>
                     <select name="lessonUnitTopic">
                         <option value="">Select unit topic</option>
                     </select>
@@ -1837,6 +1853,7 @@ function createLessonRow(lesson = {}) {
     const lessonDurationMinutes = row.querySelector('[name="lessonDurationMinutes"]');
     const lessonType = row.querySelector('[name="lessonType"]');
     const lessonSubjectStream = row.querySelector('[name="lessonSubjectStream"]');
+    const lessonTopicType = row.querySelector('[name="lessonTopicType"]');
     const lessonCardColor = row.querySelector('[name="lessonCardColor"]');
     const activityName = row.querySelector('[name="activityName"]');
     const lessonYearLevel = row.querySelector('[name="lessonYearLevel"]');
@@ -1857,8 +1874,9 @@ function createLessonRow(lesson = {}) {
     lessonWeek.value = String(lesson.lessonWeek || lesson.week_label || lesson.week || "").trim();
     lessonDate.value = String(lesson.lessonDate || lesson.calendar_date || "").trim();
     lessonDurationMinutes.value = String(lesson.lessonDurationMinutes || lesson.duration_minutes || 60).trim();
-    lessonType.value = String(lesson.lessonType || lesson.activity_type || "").trim();
+    lessonType.value = String(lesson.lessonType || lesson.activity_type || "Activity").trim() || "Activity";
     lessonSubjectStream.value = String(lesson.lessonSubjectStream || lesson.subject_stream || manualFields?.subjectStream?.value || "").trim().toUpperCase();
+    lessonTopicType.value = String(lesson.lessonTopicType || lesson.type || manualFields?.topic?.value || "").trim();
     lessonCardColor.value = String(lesson.lessonCardColor || lesson.card_color || "Rose").trim() || "Rose";
     activityName.value = String(lesson.activityName || lesson.activity_name || "").trim();
     lessonYearLevel.value = String(lesson.lessonYearLevel || lesson.year_level || "").trim();
@@ -1918,6 +1936,7 @@ function collectLessons() {
             lessonDate: String(row.querySelector('[name="lessonDate"]')?.value || "").trim(),
             lessonDurationMinutes: Number.parseInt(row.querySelector('[name="lessonDurationMinutes"]')?.value || "60", 10) || 60,
             lessonType: String(row.querySelector('[name="lessonType"]')?.value || "").trim(),
+            type: String(row.querySelector('[name="lessonTopicType"]')?.value || "").trim(),
             subject_stream: String(row.querySelector('[name="lessonSubjectStream"]')?.value || "").trim().toUpperCase(),
             lessonCardColor: String(row.querySelector('[name="lessonCardColor"]')?.value || "Rose").trim() || "Rose",
             activityName: String(row.querySelector('[name="activityName"]')?.value || "").trim(),
