@@ -483,13 +483,12 @@ function filterBySelectedTopicType(sourceRows) {
 }
 
 function openUnitPlan(rowId) {
-    selectedUnitPlanId = String(rowId || "");
-    renderRows();
-
-    const selectedElement = selectedUnitPlanId ? document.getElementById(getUnitPlanDomId(rows.find((row) => String(row.id) === selectedUnitPlanId))) : null;
-    if (selectedElement) {
-        selectedElement.scrollIntoView({ behavior: "smooth", block: "start" });
+    const unitPlanId = String(rowId || "").trim();
+    if (!unitPlanId) {
+        return;
     }
+
+    window.location.href = `upload-unit.html?edit=${encodeURIComponent(unitPlanId)}`;
 }
 
 function renderUnitPlanCard(row) {
@@ -509,7 +508,7 @@ function renderUnitPlanCard(row) {
                     <h2 style="margin:2px 0 0;">${escapeHtml(row.title || "Untitled Unit Plan")}</h2>
                 </div>
                 <div class="unit-plan-card-actions">
-                    <a href="#${cardId}" class="button-save unit-plan-open-link" data-open-unit-plan="${escapeHtml(String(row.id || ""))}">Open Plan</a>
+                    <a href="upload-unit.html?edit=${encodeURIComponent(String(row.id || ""))}" class="button-save unit-plan-open-link" data-open-unit-plan="${escapeHtml(String(row.id || ""))}">Open in Upload Unit Plan</a>
                     <button type="button" class="button-save" data-edit-unit-plan="${escapeHtml(String(row.id || ""))}">Edit</button>
                     <button type="button" class="button button-danger" data-delete-unit-plan="${escapeHtml(String(row.id || ""))}">Delete</button>
                 </div>
