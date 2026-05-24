@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WHS Class Change Workflow</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <h1>WHS Class Change Workflow</h1>
+        <p>Track every student class move from request to completion with approvals, notifications, and audit evidence.</p>
+      </section>
+
+      <section class="grid">
+        <article class="panel">
+          <h2>Create Request</h2>
+          <form id="request-form">
+            <label>
+              Student
+              <select id="studentId" required></select>
+            </label>
+            <label>
+              New Class
+              <input id="toClass" placeholder="10B Mathematics" required />
+            </label>
+            <label>
+              Reason
+              <textarea id="reason" required></textarea>
+            </label>
+            <label>
+              Requested By
+              <input id="requestedBy" placeholder="Learning Support" required />
+            </label>
+            <button type="submit">Submit Request</button>
+          </form>
+        </article>
+
+        <article class="panel">
+          <h2>Workflow Actions</h2>
+          <form id="action-form">
+            <label>
+              Request
+              <select id="requestId" required></select>
+            </label>
+            <label>
+              Action
+              <select id="action" required>
+                <option value="approve">Approve</option>
+                <option value="reject">Reject</option>
+                <option value="complete">Complete</option>
+              </select>
+            </label>
+            <label>
+              Role
+              <select id="role" required>
+                <option value="Dean">Dean</option>
+                <option value="Timetabler">Timetabler</option>
+                <option value="Admin">Admin</option>
+              </select>
+            </label>
+            <label>
+              Actor Name
+              <input id="actorName" required />
+            </label>
+            <label>
+              Notes
+              <textarea id="notes"></textarea>
+            </label>
+            <button type="submit">Run Action</button>
+          </form>
+        </article>
+      </section>
+
+      <section class="panel wide">
+        <h2>Requests</h2>
+        <div id="request-list"></div>
+      </section>
+
+      <section class="panel wide">
+        <h2>Process Confirmation Timeline</h2>
+        <pre id="timeline">Select a request to view approvals, notifications, and audit events.</pre>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
