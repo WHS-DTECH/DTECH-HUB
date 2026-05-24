@@ -324,7 +324,21 @@ function inferSourceTypeFromRecord(record) {
         return "lesson";
     }
 
-    // Detect assessment uploads even when assessment fields are intentionally left blank.
+    const hasMeaningfulValue = (value) => {
+        if (Array.isArray(value)) {
+            return value.map((item) => String(item || "").trim()).filter(Boolean).length > 0;
+        }
+
+        const text = String(value || "").trim();
+        if (!text) return false;
+        if (text === "[]" || text === "{}") return false;
+
+        const lowered = text.toLowerCase();
+        if (lowered === "null" || lowered === "undefined" || lowered === "none" || lowered === "n/a") return false;
+
+        return true;
+    };
+
     const assessmentSchemaKeys = [
         "assessment_focus",
         "standard_details",
@@ -338,23 +352,10 @@ function inferSourceTypeFromRecord(record) {
         "feedback_trialling"
     ];
 
-    const hasAssessmentFields = assessmentSchemaKeys.some((key) => {
-        if (!Object.prototype.hasOwnProperty.call(record || {}, key)) {
-            return false;
-        }
-        return record?.[key] !== null && typeof record?.[key] !== "undefined";
-    });
-
-    if (hasAssessmentFields) {
+    const hasAssessmentContent = assessmentSchemaKeys.some((key) => hasMeaningfulValue(record?.[key]));
+    if (hasAssessmentContent) {
         return "assessment";
     }
-
-    const hasMeaningfulValue = (value) => {
-        if (Array.isArray(value)) {
-            return value.map((item) => String(item || "").trim()).filter(Boolean).length > 0;
-        }
-        return String(value || "").trim().length > 0;
-    };
 
     const hasProjectFields = [
         record?.start_date,
