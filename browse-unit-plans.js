@@ -671,8 +671,10 @@ function renderAllTopicsTree(sourceRows) {
                                 .join("");
                             return `
                                 <li class="tree-node is-branch">
-                                    <span class="tree-label">${escapeHtml(year)}</span>
-                                    <ul class="tree-children">${topicLeaves}</ul>
+                                    <details class="tree-details" open>
+                                        <summary class="tree-summary"><span class="tree-label">${escapeHtml(year)}</span></summary>
+                                        <ul class="tree-children">${topicLeaves}</ul>
+                                    </details>
                                 </li>
                             `;
                         })
@@ -688,11 +690,15 @@ function renderAllTopicsTree(sourceRows) {
 
                     return `
                         <li class="tree-node is-branch">
-                            <div class="tree-plan-row">
-                                <span class="tree-label">${escapeHtml(planTitle)}${yearLevel ? ` (${escapeHtml(yearLevel)})` : ""}</span>
-                                <a class="button-save tree-open-button" href="upload-unit.html?edit=${encodeURIComponent(planId)}">Open in Upload Unit Plan</a>
-                            </div>
-                            ${topicTree}
+                            <details class="tree-details" open>
+                                <summary class="tree-summary">
+                                    <div class="tree-plan-row">
+                                        <span class="tree-label">${escapeHtml(planTitle)}${yearLevel ? ` (${escapeHtml(yearLevel)})` : ""}</span>
+                                        <a class="button-save tree-open-button" href="upload-unit.html?edit=${encodeURIComponent(planId)}">Open in Upload Unit Plan</a>
+                                    </div>
+                                </summary>
+                                ${topicTree}
+                            </details>
                         </li>
                     `;
                 })
@@ -700,8 +706,10 @@ function renderAllTopicsTree(sourceRows) {
 
             return `
                 <section class="upload-panel unit-plan-tree-group" style="margin-top: 1rem;">
-                    <h2 style="margin:0 0 8px;">${escapeHtml(mainUnit)}</h2>
-                    <ul class="unit-plan-tree">${plansHtml}</ul>
+                    <details class="tree-details" open>
+                        <summary class="tree-summary"><h2 style="margin:0;">${escapeHtml(mainUnit)}</h2></summary>
+                        <ul class="unit-plan-tree">${plansHtml}</ul>
+                    </details>
                 </section>
             `;
         })

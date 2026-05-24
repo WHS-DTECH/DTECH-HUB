@@ -849,6 +849,37 @@
     padding: 0;
 }
 
+.tree-details {
+    margin: 0;
+    padding: 0;
+}
+
+.tree-summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 0;
+}
+
+.tree-summary::-webkit-details-marker {
+    display: none;
+}
+
+.tree-summary::before {
+    content: "\25B8";
+    color: #3d5f88;
+    font-size: 0.8rem;
+    width: 10px;
+    flex: 0 0 10px;
+    transform: translateY(-1px);
+}
+
+.tree-details[open] > .tree-summary::before {
+    content: "\25BE";
+}
+
 .tree-node {
     list-style: none;
     margin: 0;
@@ -871,6 +902,18 @@
     font-size: 0.92rem;
 }
 
+.tree-summary > h2 {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #17395d;
+}
+
+.tree-summary > h2::before {
+    content: "\1F4C1";
+    font-size: 0.96rem;
+}
+
 .tree-node.is-leaf > .tree-label::before {
     content: "\1F4C4";
     font-size: 0.86rem;
@@ -888,6 +931,7 @@
     justify-content: space-between;
     align-items: center;
     gap: 10px;
+    width: 100%;
 }
 
 .tree-open-button {
