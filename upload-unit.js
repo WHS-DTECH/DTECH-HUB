@@ -157,8 +157,39 @@ function normalizeEmail(value) {
 }
 
 function getHubStoredAuthRaw() {
+    let localValue = null;
+    let sessionValue = null;
+
     try {
-        return localStorage.getItem(UPLOAD_HUB_AUTH_STORAGE_KEY) || sessionStorage.getItem(UPLOAD_HUB_AUTH_STORAGE_KEY) || "";
+        localValue = localStorage.getItem(UPLOAD_HUB_AUTH_STORAGE_KEY);
+    } catch (_error) {
+        localValue = null;
+    }
+
+    try {
+        sessionValue = sessionStorage.getItem(UPLOAD_HUB_AUTH_STORAGE_KEY);
+    } catch (_error) {
+        sessionValue = null;
+    }
+
+    if (!localValue && sessionValue) {
+        try {
+            localStorage.setItem(UPLOAD_HUB_AUTH_STORAGE_KEY, sessionValue);
+        } catch (_error) {
+        }
+    }
+
+    return localValue || sessionValue || "";
+}
+
+function getSignedInEmailFromRaw(raw) {
+    if (!raw) {
+        return "";
+    }
+
+    try {
+        const data = JSON.parse(raw);
+        return normalizeEmail(data?.profile?.email || data?.email || "");
     } catch (_error) {
         return "";
     }
@@ -166,13 +197,16 @@ function getHubStoredAuthRaw() {
 
 function getSignedInEmail() {
     const raw = getHubStoredAuthRaw();
-    if (!raw) {
-        return "";
+    const emailFromStorage = getSignedInEmailFromRaw(raw);
+    if (emailFromStorage) {
+        return emailFromStorage;
     }
 
     try {
-        const data = JSON.parse(raw);
-        return normalizeEmail(data?.profile?.email || "");
+        if (typeof hubAuthState !== "undefined") {
+            return normalizeEmail(hubAuthState?.profile?.email || "");
+        }
+        return "";
     } catch (_error) {
         return "";
     }
@@ -2145,6 +2179,31 @@ function renderAuthStatus() {
     authStatusElement.textContent = "Not signed in. Sign in with your school Google account before importing a unit plan.";
 }
 
+let authStatusListenersBound = false;
+function bindAuthStatusListeners() {
+    if (authStatusListenersBound) {
+        return;
+    }
+
+    window.addEventListener("storage", (event) => {
+        if (!event.key || event.key === UPLOAD_HUB_AUTH_STORAGE_KEY) {
+            renderAuthStatus();
+        }
+    });
+
+    window.addEventListener("focus", () => {
+        renderAuthStatus();
+    });
+
+    document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) {
+            renderAuthStatus();
+        }
+    });
+
+    authStatusListenersBound = true;
+}
+
 async function previewFromFile() {
     if (!uploadInput?.files?.length) {
         setStatus("Choose a .docx file before previewing.", true);
@@ -2508,6 +2567,7 @@ if (uploadForm) {
 }
 
 async function initUploadUnitPage() {
+    bindAuthStatusListeners();
     renderAuthStatus();
     setManualUnitTopics([]);
     resetManualLessons();
