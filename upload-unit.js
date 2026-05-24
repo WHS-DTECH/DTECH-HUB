@@ -757,7 +757,7 @@ function applyTopicOptionsToSelect(select, selectedValue = "") {
     }
 
     const normalizedSelected = normalizeUnitTopicDisplayLabel(selectedValue);
-    const optionList = normalizeUnitTopicList([...manualUnitTopics, ...getLessonTopicSelections(), normalizedSelected]);
+    const optionList = normalizeUnitTopicList([...manualUnitTopics, normalizedSelected]);
     select.innerHTML = `<option value="">Select unit topic</option>${optionList
         .map((topic) => `<option value="${topic}">${topic}</option>`)
         .join("")}`;
@@ -774,7 +774,7 @@ function updateLessonTopicOptions() {
         applyTopicOptionsToSelect(select, selectedValue);
     });
 
-    const optionList = normalizeUnitTopicList([...manualUnitTopics, ...getLessonTopicSelections()]);
+    const optionList = normalizeUnitTopicList([...manualUnitTopics]);
 
     if (manualUnitTopicsHidden) {
         manualUnitTopicsHidden.value = optionList.join("\n");
@@ -816,8 +816,8 @@ function renderUnitTopicsList() {
 }
 
 function setManualUnitTopics(topics = []) {
-    const fromLessons = getLessonTopicSelections();
-    manualUnitTopics = normalizeUnitTopicList([...topics, ...fromLessons]);
+    const providedTopics = Array.isArray(topics) ? topics : [];
+    manualUnitTopics = normalizeUnitTopicList(providedTopics);
     renderUnitTopicsList();
 }
 
@@ -1908,9 +1908,6 @@ function createLessonRow(lesson = {}) {
 
     const explicitUnitTopic = getExplicitUnitTopicFromLesson(lesson);
     const selectedUnitTopic = normalizeUnitTopicDisplayLabel(explicitUnitTopic || (manualUnitTopics.length ? "" : inferUnitTopicFromLessonLike(lesson)));
-    if (explicitUnitTopic) {
-        addManualUnitTopic(explicitUnitTopic);
-    }
     applyTopicOptionsToSelect(lessonUnitTopic, selectedUnitTopic);
 
     lessonTitle.value = String(lesson.lessonTitle || lesson.title || "").trim();
