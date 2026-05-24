@@ -646,6 +646,43 @@ function getUnitTopicsForTree(row) {
     return normalized;
 }
 
+function normalizeYearLevelForTree(value) {
+    const text = String(value || "").trim();
+    const lower = text.toLowerCase();
+    if (!lower) {
+        return "";
+    }
+
+    if (/\bjunior/.test(lower)) return "Juniors";
+    if (/\bmiddle/.test(lower)) return "Middle";
+    if (/\bsenior/.test(lower)) return "Senior";
+
+    const yearMatch = lower.match(/year\s*(\d{1,2})/);
+    if (yearMatch?.[1]) {
+        return `Year ${yearMatch[1]}`;
+    }
+
+    return "";
+}
+
+function getTreePlanLabel(row) {
+    const topicType = getUnitPlanTopicType(row);
+    const rawTitle = String(row?.title || "").trim();
+    const looksLikeSentence = rawTitle.length > 90 || /[.!?]/.test(rawTitle);
+    const baseLabel = !rawTitle || looksLikeSentence ? topicType : rawTitle;
+    const yearLabel = normalizeYearLevelForTree(row?.year_level);
+
+    if (!yearLabel) {
+        return baseLabel;
+    }
+
+    if (baseLabel.toLowerCase().includes(yearLabel.toLowerCase())) {
+        return baseLabel;
+    }
+
+    return `${baseLabel} (${yearLabel})`;
+}
+
 function renderAllTopicsTree(sourceRows) {
     if (!Array.isArray(sourceRows) || !sourceRows.length) {
         return "<p class='help-text'>No unit plans match your search.</p>";
@@ -668,8 +705,7 @@ function renderAllTopicsTree(sourceRows) {
             const plansHtml = sortedPlans
                 .map((row) => {
                     const planId = String(row?.id || "");
-                    const planTitle = String(row?.title || "Untitled Unit Plan");
-                    const yearLevel = String(row?.year_level || "").trim();
+                    const planTitle = getTreePlanLabel(row);
                     const topics = getUnitTopicsForTree(row);
 
                     const byYear = new Map();
@@ -718,7 +754,7 @@ function renderAllTopicsTree(sourceRows) {
                             <details class="tree-details" open>
                                 <summary class="tree-summary">
                                     <div class="tree-plan-row">
-                                        <a class="tree-label tree-plan-link" href="${planLink}">${escapeHtml(planTitle)}${yearLevel ? ` (${escapeHtml(yearLevel)})` : ""}</a>
+                                        <a class="tree-label tree-plan-link" href="${planLink}">${escapeHtml(planTitle)}</a>
                                     </div>
                                 </summary>
                                 ${topicTree}
