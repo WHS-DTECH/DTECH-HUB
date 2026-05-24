@@ -701,39 +701,6 @@ function normalizeUnitLessons(value) {
     return [];
   }
 
-  const inferUnitTopic = (lesson) => {
-    const explicit = String(lesson?.unit_topic ?? lesson?.unitTopic ?? lesson?.lessonUnitTopic ?? "").trim();
-    if (explicit) {
-      return explicit;
-    }
-
-    const candidates = [
-      lesson?.title,
-      lesson?.lesson_title,
-      lesson?.lessonTitle,
-      lesson?.activity_name,
-      lesson?.activityName,
-      lesson?.activity_type,
-      lesson?.activityType
-    ]
-      .map((item) => String(item || "").trim())
-      .filter(Boolean);
-
-    for (const valueText of candidates) {
-      const cleaned = String(valueText)
-        .replace(/activities?\s*:?$/i, "")
-        .replace(/:\s*$/, "")
-        .replace(/^l\d+\s*[-:]\s*/i, "")
-        .trim();
-
-      if (cleaned && cleaned.length <= 64) {
-        return cleaned;
-      }
-    }
-
-    return "";
-  };
-
   const coerceBoolean = (rawValue, defaultValue = false) => {
     if (typeof rawValue === "boolean") {
       return rawValue;
@@ -763,11 +730,11 @@ function normalizeUnitLessons(value) {
 
   return value.map((lesson, index) => {
     const lessonIndex = Number.parseInt(lesson?.lesson_index ?? lesson?.lessonIndex ?? index + 1, 10);
-    const inferredUnitTopic = inferUnitTopic(lesson);
+    const explicitUnitTopic = String(lesson?.unit_topic ?? lesson?.unitTopic ?? lesson?.lessonUnitTopic ?? "").trim();
 
     return {
       lesson_index: Number.isInteger(lessonIndex) && lessonIndex > 0 ? lessonIndex : index + 1,
-      unit_topic: inferredUnitTopic,
+      unit_topic: explicitUnitTopic,
       week_label: String(lesson?.week_label ?? lesson?.weekLabel ?? lesson?.week ?? "").trim(),
       title: String(lesson?.title ?? lesson?.lesson_title ?? lesson?.lessonTitle ?? "").trim(),
       focus: String(lesson?.focus ?? lesson?.lesson_focus ?? lesson?.lessonFocus ?? "").trim(),
@@ -885,7 +852,20 @@ function parseLessonRowsFromSlideshow(lines) {
   const lessons = [];
   let currentLesson = null;
   let waitingForTitle = false;
+  let currentYearLevel = "";
+  let currentUnitTopic = "";
   const urlPattern = /(https?:\/\/[^\s)]+|www\.[^\s)]+)/i;
+  const activityHeadingPattern = /^(.+?)\s+activities?\s*:?$/i;
+  const yearLevelPattern = /^(juniors?|middle(?:\/seniors?)?|seniors?|year\s*\d+(?:\s*(?:\/|and|&)\s*\d+)?)\b/i;
+
+  const formatContextUnitTopic = () => {
+    const year = String(currentYearLevel || "").trim();
+    const topic = String(currentUnitTopic || "").trim();
+    if (!topic) {
+      return "";
+    }
+    return year ? `${year} | ${topic}` : topic;
+  };
 
   const flushLesson = () => {
     if (!currentLesson) {
@@ -904,7 +884,8 @@ function parseLessonRowsFromSlideshow(lines) {
         notes: lessonFocus,
         duration_minutes: 1,
         activity_name: lessonTitle || `Lesson ${lessons.length + 1}`,
-        year_level: String(currentLesson.year_level || "").trim(),
+        year_level: String(currentLesson.year_level || currentYearLevel || "").trim(),
+        unit_topic: formatContextUnitTopic(),
         link_url: detectedUrl,
         publish_activity: true,
         add_to_calendar: false
@@ -926,14 +907,16 @@ function parseLessonRowsFromSlideshow(lines) {
       return;
     }
 
-    if (/^(juniors?|middle(?:\/seniors?)?|seniors?|year\s*\d+(?:\s*(?:\/|and|&)\s*\d+)?)\b/i.test(text)) {
+    if (yearLevelPattern.test(text)) {
       flushLesson();
-      currentLesson = {
-        year_level: text,
-        title: "",
-        notes: []
-      };
-      waitingForTitle = true;
+      currentYearLevel = text;
+      return;
+    }
+
+    const activityHeadingMatch = text.match(activityHeadingPattern);
+    if (activityHeadingMatch) {
+      flushLesson();
+      currentUnitTopic = String(activityHeadingMatch[1] || "").replace(/:\s*$/, "").trim();
       return;
     }
 

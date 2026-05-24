@@ -673,6 +673,76 @@
     background: #f4f7fc;
 }
 
+.unit-topics-pill-table {
+    border: 1px solid #b8cadf;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f4f7fc;
+}
+
+.unit-topics-pill-table-row {
+    display: grid;
+    grid-template-columns: minmax(130px, 170px) minmax(180px, 240px) 1fr;
+}
+
+.unit-topics-pill-table-row + .unit-topics-pill-table-row {
+    border-top: 1px solid #cfdae9;
+}
+
+.unit-topics-pill-table-row.is-header {
+    background: #8e1b08;
+    color: #ffffff;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.unit-topics-pill-table-cell {
+    padding: 7px 8px;
+    border-right: 1px solid #cfdae9;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    min-height: 38px;
+}
+
+.unit-topics-pill-table-row .unit-topics-pill-table-cell:last-child {
+    border-right: 0;
+}
+
+.unit-topics-pill-table-row.is-header .unit-topics-pill-table-cell {
+    border-right: 1px solid #7a1402;
+}
+
+.unit-topics-pill-table-row.is-header .unit-topics-pill-table-cell:last-child {
+    border-right: 0;
+}
+
+.unit-topic-table-pill {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid #c8d5e7;
+    border-radius: 999px;
+    padding: 3px 8px;
+    background: #eef4fd;
+    color: #1f2f46;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.unit-topic-table-pill.is-lesson {
+    background: #f8fbff;
+    font-weight: 600;
+}
+
+.unit-topic-table-empty {
+    color: #738ba7;
+    font-size: 0.73rem;
+    font-weight: 600;
+}
+
 .unit-topics-item {
     display: inline-flex;
     align-items: center;
@@ -873,6 +943,19 @@
 
     .unit-topics-add-row {
         grid-template-columns: 1fr;
+    }
+
+    .unit-topics-pill-table-row {
+        grid-template-columns: 1fr;
+    }
+
+    .unit-topics-pill-table-cell {
+        border-right: 0;
+        border-bottom: 1px solid #cfdae9;
+    }
+
+    .unit-topics-pill-table-row .unit-topics-pill-table-cell:last-child {
+        border-bottom: 0;
     }
 
     .project-costs-layout {

@@ -22,6 +22,7 @@ const addLessonButton = document.querySelector("#add-lesson");
 const manualUnitTopicInput = document.querySelector("#manual-unit-topic-input");
 const manualAddUnitTopicButton = document.querySelector("#manual-add-unit-topic");
 const manualUnitTopicsList = document.querySelector("#manual-unit-topics-list");
+const manualUnitTopicsTable = document.querySelector("#manual-unit-topics-table");
 const manualUnitTopicsHidden = document.querySelector("#manual-unit-topics");
 const pageTitleElement = document.querySelector(".upload-page > h1");
 const introTextElement = document.querySelector(".upload-page > .intro-text");
@@ -472,6 +473,103 @@ function getLessonTopicSelections() {
         .filter(Boolean);
 }
 
+function parseUnitTopicLabel(topicLabel) {
+    const source = normalizeTopicText(topicLabel);
+    if (!source) {
+        return { yearLevel: "", topicName: "" };
+    }
+
+    const parts = source.split("|").map((part) => normalizeTopicText(part));
+    if (parts.length >= 2) {
+        return {
+            yearLevel: parts[0],
+            topicName: parts.slice(1).join(" | ")
+        };
+    }
+
+    return {
+        yearLevel: "",
+        topicName: source
+    };
+}
+
+function escapeHtml(value) {
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function collectLessonAssignmentsByTopic() {
+    const assignments = new Map();
+
+    getLessonRows().forEach((row) => {
+        const topic = normalizeTopicText(row.querySelector('[name="lessonUnitTopic"]')?.value || "");
+        const title = normalizeTopicText(row.querySelector('[name="lessonTitle"]')?.value || "");
+        if (!topic || !title) {
+            return;
+        }
+
+        const current = assignments.get(topic) || [];
+        if (!current.includes(title)) {
+            current.push(title);
+            assignments.set(topic, current);
+        }
+    });
+
+    return assignments;
+}
+
+function renderUnitTopicsPillTable() {
+    if (!manualUnitTopicsTable) {
+        return;
+    }
+
+    if (!manualUnitTopics.length) {
+        manualUnitTopicsTable.hidden = true;
+        manualUnitTopicsTable.innerHTML = "";
+        return;
+    }
+
+    const assignments = collectLessonAssignmentsByTopic();
+    const rowsHtml = manualUnitTopics
+        .map((topicLabel) => {
+            const parsed = parseUnitTopicLabel(topicLabel);
+            const lessonPills = (assignments.get(topicLabel) || [])
+                .map((lesson) => `<span class="unit-topic-table-pill is-lesson">${escapeHtml(lesson)}</span>`)
+                .join("");
+
+            const yearCell = parsed.yearLevel
+                ? `<span class="unit-topic-table-pill">${escapeHtml(parsed.yearLevel)}</span>`
+                : `<span class="unit-topic-table-empty">-</span>`;
+            const topicCell = parsed.topicName
+                ? `<span class="unit-topic-table-pill">${escapeHtml(parsed.topicName)}</span>`
+                : `<span class="unit-topic-table-empty">-</span>`;
+            const lessonsCell = lessonPills || `<span class="unit-topic-table-empty">No lessons allocated yet.</span>`;
+
+            return `
+                <div class="unit-topics-pill-table-row">
+                    <div class="unit-topics-pill-table-cell">${yearCell}</div>
+                    <div class="unit-topics-pill-table-cell">${topicCell}</div>
+                    <div class="unit-topics-pill-table-cell">${lessonsCell}</div>
+                </div>
+            `;
+        })
+        .join("");
+
+    manualUnitTopicsTable.innerHTML = `
+        <div class="unit-topics-pill-table-row is-header">
+            <div class="unit-topics-pill-table-cell">Year Level</div>
+            <div class="unit-topics-pill-table-cell">Unit Topic</div>
+            <div class="unit-topics-pill-table-cell">Lessons</div>
+        </div>
+        ${rowsHtml}
+    `;
+    manualUnitTopicsTable.hidden = false;
+}
+
 function applyTopicOptionsToSelect(select, selectedValue = "") {
     if (!select) {
         return;
@@ -500,6 +598,8 @@ function updateLessonTopicOptions() {
     if (manualUnitTopicsHidden) {
         manualUnitTopicsHidden.value = optionList.join("\n");
     }
+
+    renderUnitTopicsPillTable();
 }
 
 function renderUnitTopicsList() {
