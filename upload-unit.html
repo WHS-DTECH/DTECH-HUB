@@ -273,9 +273,47 @@
                                 </div>
                             </div>
 
-                            <div class="field field-wide">
-                                <label for="manual-health-safety">Health &amp; Safety</label>
-                                <textarea id="manual-health-safety" name="manualHealthSafety" rows="10" placeholder="Health and safety context, room/setup, and specific safety issues for this unit"></textarea>
+                            <div class="field field-wide health-safety-field">
+                                <label for="manual-health-safety-link">Health &amp; Safety</label>
+                                <div class="health-safety-shell" data-health-safety-editor="manual">
+                                    <div class="health-safety-title-row">
+                                        <span>Health &amp; Safety</span>
+                                        <input id="manual-health-safety-link" type="text" placeholder="Link or document reference">
+                                    </div>
+                                    <div class="health-safety-room-row">
+                                        <label for="manual-health-safety-room">Room / Space</label>
+                                        <input id="manual-health-safety-room" type="text" placeholder="Computing Room, Maker Lab, Workshop...">
+                                    </div>
+                                    <div class="health-safety-grid" aria-label="Health and safety issues and considerations table">
+                                        <div class="health-safety-column-header">Safety Issue</div>
+                                        <div class="health-safety-column-header">Health &amp; Safety Considerations</div>
+
+                                        <input data-health-safety-group="manual" data-health-safety-role="issue" type="text" placeholder="Soldering Equipment">
+                                        <textarea data-health-safety-group="manual" data-health-safety-role="consideration" rows="3" placeholder="Risk controls and expected safe practice"></textarea>
+
+                                        <input data-health-safety-group="manual" data-health-safety-role="issue" type="text" placeholder="Electrical Safety">
+                                        <textarea data-health-safety-group="manual" data-health-safety-role="consideration" rows="3" placeholder="Risk controls and expected safe practice"></textarea>
+
+                                        <input data-health-safety-group="manual" data-health-safety-role="issue" type="text" placeholder="Sharp Components &amp; Tools">
+                                        <textarea data-health-safety-group="manual" data-health-safety-role="consideration" rows="3" placeholder="Risk controls and expected safe practice"></textarea>
+
+                                        <input data-health-safety-group="manual" data-health-safety-role="issue" type="text" placeholder="Heat &amp; Fire Hazards">
+                                        <textarea data-health-safety-group="manual" data-health-safety-role="consideration" rows="3" placeholder="Risk controls and expected safe practice"></textarea>
+
+                                        <input data-health-safety-group="manual" data-health-safety-role="issue" type="text" placeholder="Fumes &amp; Ventilation">
+                                        <textarea data-health-safety-group="manual" data-health-safety-role="consideration" rows="3" placeholder="Risk controls and expected safe practice"></textarea>
+
+                                        <input data-health-safety-group="manual" data-health-safety-role="issue" type="text" placeholder="Trip &amp; Workspace Hazards">
+                                        <textarea data-health-safety-group="manual" data-health-safety-role="consideration" rows="3" placeholder="Risk controls and expected safe practice"></textarea>
+
+                                        <input data-health-safety-group="manual" data-health-safety-role="issue" type="text" placeholder="Tool Misuse">
+                                        <textarea data-health-safety-group="manual" data-health-safety-role="consideration" rows="3" placeholder="Risk controls and expected safe practice"></textarea>
+
+                                        <input data-health-safety-group="manual" data-health-safety-role="issue" type="text" placeholder="Other Hazard">
+                                        <textarea data-health-safety-group="manual" data-health-safety-role="consideration" rows="3" placeholder="Risk controls and expected safe practice"></textarea>
+                                    </div>
+                                    <textarea id="manual-health-safety" name="manualHealthSafety" hidden></textarea>
+                                </div>
                             </div>
 
                             <div class="field field-wide achievement-objectives-field">
@@ -501,9 +539,47 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="field field-wide">
-                                <label for="preview-health-safety">Health &amp; Safety</label>
-                                <textarea id="preview-health-safety" name="previewHealthSafety" rows="10" placeholder="Health and safety context, room/setup, and specific safety issues for this unit"></textarea>
+                            <div class="field field-wide health-safety-field">
+                                <label for="preview-health-safety-link">Health &amp; Safety</label>
+                                <div class="health-safety-shell" data-health-safety-editor="preview">
+                                    <div class="health-safety-title-row">
+                                        <span>Health &amp; Safety</span>
+                                        <input id="preview-health-safety-link" type="text" placeholder="Link or document reference">
+                                    </div>
+                                    <div class="health-safety-room-row">
+                                        <label for="preview-health-safety-room">Room / Space</label>
+                                        <input id="preview-health-safety-room" type="text" placeholder="Computing Room, Maker Lab, Workshop...">
+                                    </div>
+                                    <div class="health-safety-grid" aria-label="Health and safety issues and considerations table">
+                                        <div class="health-safety-column-header">Safety Issue</div>
+                                        <div class="health-safety-column-header">Health &amp; Safety Considerations</div>
+
+                                        <input data-health-safety-group="preview" data-health-safety-role="issue" type="text" placeholder="Soldering Equipment">
+                                        <textarea data-health-safety-group="preview" data-health-safety-role="consideration" rows="3" placeholder="Risk controls and expected safe practice"></textarea>
+
+                                        <input data-health-safety-group="preview" data-health-safety-role="issue" type="text" placeholder="Electrical Safety">
+                                        <textarea data-health-safety-group="preview" data-health-safety-role="consideration" rows="3" placeholder="Risk controls and expected safe practice"></textarea>
+
+                                        <input data-health-safety-group="preview" data-health-safety-role="issue" type="text" placeholder="Sharp Components &amp; Tools">
+                                        <textarea data-health-safety-group="preview" data-health-safety-role="consideration" rows="3" placeholder="Risk controls and expected safe practice"></textarea>
+
+                                        <input data-health-safety-group="preview" data-health-safety-role="issue" type="text" placeholder="Heat &amp; Fire Hazards">
+                                        <textarea data-health-safety-group="preview" data-health-safety-role="consideration" rows="3" placeholder="Risk controls and expected safe practice"></textarea>
+
+                                        <input data-health-safety-group="preview" data-health-safety-role="issue" type="text" placeholder="Fumes &amp; Ventilation">
+                                        <textarea data-health-safety-group="preview" data-health-safety-role="consideration" rows="3" placeholder="Risk controls and expected safe practice"></textarea>
+
+                                        <input data-health-safety-group="preview" data-health-safety-role="issue" type="text" placeholder="Trip &amp; Workspace Hazards">
+                                        <textarea data-health-safety-group="preview" data-health-safety-role="consideration" rows="3" placeholder="Risk controls and expected safe practice"></textarea>
+
+                                        <input data-health-safety-group="preview" data-health-safety-role="issue" type="text" placeholder="Tool Misuse">
+                                        <textarea data-health-safety-group="preview" data-health-safety-role="consideration" rows="3" placeholder="Risk controls and expected safe practice"></textarea>
+
+                                        <input data-health-safety-group="preview" data-health-safety-role="issue" type="text" placeholder="Other Hazard">
+                                        <textarea data-health-safety-group="preview" data-health-safety-role="consideration" rows="3" placeholder="Risk controls and expected safe practice"></textarea>
+                                    </div>
+                                    <textarea id="preview-health-safety" name="previewHealthSafety" hidden></textarea>
+                                </div>
                             </div>
                             <div class="field field-wide achievement-objectives-field">
                                 <label>Achievement Objectives (NZ Curriculum - Technology)</label>

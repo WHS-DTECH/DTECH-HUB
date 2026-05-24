@@ -369,6 +369,110 @@
     overflow-y: hidden;
 }
 
+.health-safety-field {
+    gap: 8px;
+}
+
+.health-safety-shell {
+    border: 1px solid #a9c3df;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f6f9ff;
+}
+
+.health-safety-title-row {
+    display: grid;
+    grid-template-columns: minmax(150px, 220px) 1fr;
+    background: #8e1b08;
+    border-bottom: 1px solid #7a1402;
+}
+
+.health-safety-title-row span {
+    color: #ffffff;
+    font-size: 0.92rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 10px;
+    border-right: 1px solid #7a1402;
+}
+
+.health-safety-title-row input {
+    border: 0;
+    border-radius: 0;
+    background: #ffffff;
+    min-height: 40px;
+}
+
+.health-safety-room-row {
+    display: grid;
+    grid-template-columns: minmax(150px, 220px) 1fr;
+    border-bottom: 1px solid #c8d5e7;
+}
+
+.health-safety-room-row label {
+    margin: 0;
+    padding: 10px;
+    background: #ece7e7;
+    color: #1f2f46;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    text-transform: none;
+    border-right: 1px solid #c8d5e7;
+}
+
+.health-safety-room-row input {
+    border: 0;
+    border-radius: 0;
+    min-height: 40px;
+    background: #f6f9ff;
+}
+
+.health-safety-grid {
+    display: grid;
+    grid-template-columns: minmax(170px, 250px) 1fr;
+}
+
+.health-safety-column-header {
+    background: #dedede;
+    color: #1f2f46;
+    font-size: 0.8rem;
+    font-weight: 800;
+    text-transform: none;
+    padding: 9px 10px;
+    border-bottom: 1px solid #c8d5e7;
+}
+
+.health-safety-column-header:first-child {
+    border-right: 1px solid #c8d5e7;
+}
+
+.health-safety-grid input,
+.health-safety-grid textarea {
+    border: 0;
+    border-radius: 0;
+    border-bottom: 1px solid #c8d5e7;
+    background: #f6f9ff;
+}
+
+.health-safety-grid input {
+    border-right: 1px solid #c8d5e7;
+    min-height: 44px;
+    font-weight: 700;
+}
+
+.health-safety-grid textarea {
+    min-height: 68px;
+    resize: vertical;
+    overflow-y: hidden;
+}
+
+.health-safety-grid input:nth-last-of-type(1),
+.health-safety-grid textarea:nth-last-of-type(1) {
+    border-bottom: 0;
+}
+
 .resources-equipment-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(230px, 300px);
@@ -652,6 +756,19 @@
     .skills-heading {
         border-right: 0;
         border-bottom: 1px solid #c8d5e7;
+    }
+
+    .health-safety-title-row,
+    .health-safety-room-row,
+    .health-safety-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .health-safety-title-row span,
+    .health-safety-room-row label,
+    .health-safety-column-header,
+    .health-safety-grid input {
+        border-right: 0;
     }
 
     .resources-equipment-layout {

@@ -130,6 +130,7 @@ const SKILL_LABELS = {
     digitalTech: "Digital Tech",
     practical: "Practical"
 };
+const HEALTH_SAFETY_ROW_LIMIT = 8;
 
 function normalizeEmail(value) {
     return String(value || "").trim().toLowerCase();
@@ -441,17 +442,244 @@ function autoResizeSkillsTextareas() {
 }
 
 function autoResizeHealthSafetyTextarea() {
-    const healthSafetyTextarea = document.querySelector("#manual-health-safety, #preview-health-safety");
-    if (healthSafetyTextarea) {
-        autoResizeTextarea(healthSafetyTextarea);
+    const healthSafetyTextareas = document.querySelectorAll(".health-safety-grid textarea, #manual-health-safety, #preview-health-safety");
+    healthSafetyTextareas.forEach((textarea) => {
+        if (textarea.hidden) {
+            return;
+        }
 
-        if (!healthSafetyTextarea.dataset.autoResizeBound) {
-            healthSafetyTextarea.addEventListener("input", () => {
-                autoResizeTextarea(healthSafetyTextarea);
+        autoResizeTextarea(textarea);
+
+        if (!textarea.dataset.autoResizeBound) {
+            textarea.addEventListener("input", () => {
+                autoResizeTextarea(textarea);
             });
-            healthSafetyTextarea.dataset.autoResizeBound = "true";
+            textarea.dataset.autoResizeBound = "true";
+        }
+    });
+}
+
+function inferHealthSafetyEditorKeyFromField(field) {
+    const id = String(field?.id || "");
+    if (id.startsWith("preview-")) {
+        return "preview";
+    }
+    return "manual";
+}
+
+function getHealthSafetyEditor(editorKey) {
+    const key = editorKey === "preview" ? "preview" : "manual";
+    const hidden = document.querySelector(`#${key}-health-safety`);
+    if (!hidden) {
+        return null;
+    }
+
+    return {
+        key,
+        hidden,
+        link: document.querySelector(`#${key}-health-safety-link`),
+        room: document.querySelector(`#${key}-health-safety-room`),
+        issueFields: Array.from(document.querySelectorAll(`[data-health-safety-group="${key}"][data-health-safety-role="issue"]`)),
+        considerationFields: Array.from(document.querySelectorAll(`[data-health-safety-group="${key}"][data-health-safety-role="consideration"]`))
+    };
+}
+
+function looksLikeHealthSafetyIssueHeading(line) {
+    const cleaned = String(line || "").trim();
+    if (!cleaned) {
+        return false;
+    }
+
+    if (/^health\s*(?:&|and)\s*safety/i.test(cleaned) || /^safety\s*issues?/i.test(cleaned)) {
+        return false;
+    }
+
+    const wordCount = cleaned.split(/\s+/).filter(Boolean).length;
+    if (wordCount > 8) {
+        return false;
+    }
+
+    if (/[.!?]$/.test(cleaned)) {
+        return false;
+    }
+
+    return true;
+}
+
+function parseHealthSafetyTableContent(content) {
+    const rawLines = String(content || "")
+        .split(/\r?\n/)
+        .map((line) => line.replace(/^[-*\u2022\s]+/, "").trim())
+        .filter(Boolean);
+
+    const parsed = {
+        link: "",
+        room: "",
+        rows: []
+    };
+
+    let currentRow = null;
+
+    const pushRow = (issue = "") => {
+        if (parsed.rows.length >= HEALTH_SAFETY_ROW_LIMIT) {
+            currentRow = parsed.rows[parsed.rows.length - 1] || null;
+            return currentRow;
+        }
+
+        const row = { issue: String(issue || "").trim(), consideration: "" };
+        parsed.rows.push(row);
+        currentRow = row;
+        return row;
+    };
+
+    rawLines.forEach((line) => {
+        if (!line) {
+            return;
+        }
+
+        if (!parsed.link && /^link\b/i.test(line) && line.length <= 64) {
+            parsed.link = line;
+            return;
+        }
+
+        if (!parsed.room && /(room|lab|laboratory|workshop|studio)/i.test(line) && line.length <= 72) {
+            parsed.room = line;
+            return;
+        }
+
+        if (/^safety\s*issues?$/i.test(line) || /^health\s*(?:&|and)\s*safety\s*considerations?/i.test(line)) {
+            return;
+        }
+
+        const explicitIssueMatch = line.match(/^safety\s*issues?\s*:\s*(.+)$/i);
+        if (explicitIssueMatch && explicitIssueMatch[1]) {
+            pushRow(explicitIssueMatch[1]);
+            return;
+        }
+
+        const explicitConsiderationMatch = line.match(/^health\s*(?:&|and)\s*safety\s*considerations?\s*:?\s*(.+)$/i);
+        if (explicitConsiderationMatch && explicitConsiderationMatch[1]) {
+            const row = currentRow || pushRow("");
+            row.consideration = row.consideration
+                ? `${row.consideration}\n${explicitConsiderationMatch[1].trim()}`
+                : explicitConsiderationMatch[1].trim();
+            return;
+        }
+
+        if (looksLikeHealthSafetyIssueHeading(line)) {
+            pushRow(line);
+            return;
+        }
+
+        const row = currentRow || pushRow("");
+        row.consideration = row.consideration
+            ? `${row.consideration}\n${line}`
+            : line;
+    });
+
+    return parsed;
+}
+
+function serializeHealthSafetyEditor(editor) {
+    if (!editor) {
+        return "";
+    }
+
+    const lines = [];
+    const link = String(editor.link?.value || "").trim();
+    const room = String(editor.room?.value || "").trim();
+
+    if (link) {
+        lines.push(link);
+    }
+    if (room) {
+        lines.push(room);
+    }
+
+    for (let index = 0; index < HEALTH_SAFETY_ROW_LIMIT; index += 1) {
+        const issue = String(editor.issueFields?.[index]?.value || "").trim();
+        const considerationLines = normalizeLines(editor.considerationFields?.[index]?.value || "");
+
+        if (!issue && !considerationLines.length) {
+            continue;
+        }
+
+        if (issue) {
+            lines.push(issue);
+        }
+        if (considerationLines.length) {
+            lines.push(...considerationLines);
         }
     }
+
+    return sanitizeHealthSafetyContent(lines.join("\n"));
+}
+
+function applyHealthSafetyContentToEditor(editor, content) {
+    if (!editor || !editor.hidden) {
+        return;
+    }
+
+    const parsed = parseHealthSafetyTableContent(content);
+
+    if (editor.link) {
+        editor.link.value = parsed.link;
+    }
+    if (editor.room) {
+        editor.room.value = parsed.room;
+    }
+
+    for (let index = 0; index < HEALTH_SAFETY_ROW_LIMIT; index += 1) {
+        const row = parsed.rows[index] || { issue: "", consideration: "" };
+        if (editor.issueFields?.[index]) {
+            editor.issueFields[index].value = String(row.issue || "").trim();
+        }
+        if (editor.considerationFields?.[index]) {
+            editor.considerationFields[index].value = String(row.consideration || "").trim();
+            autoResizeTextarea(editor.considerationFields[index]);
+        }
+    }
+
+    editor.hidden.value = serializeHealthSafetyEditor(editor);
+}
+
+function syncHealthSafetyEditorValue(editorKey) {
+    const editor = getHealthSafetyEditor(editorKey);
+    if (!editor?.hidden) {
+        return;
+    }
+    editor.hidden.value = serializeHealthSafetyEditor(editor);
+}
+
+function initializeHealthSafetyEditors() {
+    ["manual", "preview"].forEach((editorKey) => {
+        const editor = getHealthSafetyEditor(editorKey);
+        if (!editor?.hidden) {
+            return;
+        }
+
+        if (!editor.hidden.dataset.healthSafetyBound) {
+            const inputFields = [
+                editor.link,
+                editor.room,
+                ...(editor.issueFields || []),
+                ...(editor.considerationFields || [])
+            ].filter(Boolean);
+
+            inputFields.forEach((field) => {
+                field.addEventListener("input", () => {
+                    if (field.tagName === "TEXTAREA") {
+                        autoResizeTextarea(field);
+                    }
+                    syncHealthSafetyEditorValue(editorKey);
+                });
+            });
+
+            editor.hidden.dataset.healthSafetyBound = "true";
+        }
+
+        applyHealthSafetyContentToEditor(editor, editor.hidden.value);
+    });
 }
 
 function getSchoolValueResponses(group) {
@@ -601,6 +829,11 @@ function getCurriculumLinkResponses(group) {
             return;
         }
 
+        if (key === "healthSafety") {
+            const editorKey = inferHealthSafetyEditorKeyFromField(group?.[key]);
+            syncHealthSafetyEditorValue(editorKey);
+        }
+
         responses[key] = String(group?.[key]?.value || "").trim();
     });
     return responses;
@@ -624,6 +857,12 @@ function setCurriculumLinkResponses(group, responses = {}) {
         if (group?.[key]) {
             group[key].value = String(responses[key] || "").trim();
             autoResizeTextarea(group[key]);
+
+            if (key === "healthSafety") {
+                const editorKey = inferHealthSafetyEditorKeyFromField(group[key]);
+                const editor = getHealthSafetyEditor(editorKey);
+                applyHealthSafetyContentToEditor(editor, group[key].value);
+            }
         }
     });
 }
@@ -1462,6 +1701,7 @@ if (addLessonButton) {
 if (clearManualFormButton) {
     clearManualFormButton.addEventListener("click", () => {
         manualForm?.reset();
+        initializeHealthSafetyEditors();
         autoResizeSchoolValueTextareas();
         autoResizeContextTextareas();
         autoResizeLocalCurriculumTextareas();
@@ -1562,6 +1802,7 @@ async function initUploadUnitPage() {
     renderAuthStatus();
     resetManualLessons();
     setManualSaveStatus("");
+    initializeHealthSafetyEditors();
     autoResizeSchoolValueTextareas();
     autoResizeContextTextareas();
     autoResizeLocalCurriculumTextareas();
