@@ -476,7 +476,7 @@ async function getCheckConstraintAllowedValues(tableName, constraintName) {
 async function resolveActivityCategoryForInsert(activityCategory, activityType) {
   const rawCategory = String(activityCategory || "").trim();
   if (!hasDatabase) {
-    return rawCategory || "Practice";
+    return rawCategory || "Activity";
   }
 
   const allowedActivityCategories = await getCheckConstraintAllowedValues(
@@ -485,7 +485,7 @@ async function resolveActivityCategoryForInsert(activityCategory, activityType) 
   );
 
   if (!allowedActivityCategories.length) {
-    return rawCategory || "Practice";
+    return rawCategory || "Activity";
   }
 
   const allowedByLower = new Map(
@@ -2432,7 +2432,7 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     name,
     year_level: yearLevel,
     type,
-    activity_category: String(body.activity_category || "Practice").trim() || "Practice",
+    activity_category: String(body.activity_category || "Activity").trim() || "Activity",
     duration_minutes: Number.isInteger(durationMinutesInput) && durationMinutesInput > 0 ? durationMinutesInput : 1,
     difficulty: String(body.difficulty || "Beginner").trim() || "Beginner",
     subject_stream: String(body.subject_stream || body.subject || "").trim().toUpperCase(),

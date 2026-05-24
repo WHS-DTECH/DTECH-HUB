@@ -4,7 +4,7 @@ const baseProjects = [
         title: "Python Debug Lab",
         className: "Year 11 Computer Lab",
         area: "Programming",
-        activityCategory: "Practice",
+        activityCategory: "Activity",
         showThisWeek: false, // was true, now false to remove from current activities
         status: "active",
         term: "Term 2",
@@ -24,7 +24,7 @@ const baseProjects = [
         title: "Web UI Remix",
         className: "Year 10 Computer Lab",
         area: "Web Design",
-        activityCategory: "Practice",
+        activityCategory: "Activity",
         showThisWeek: false,
         status: "active",
         term: "Term 2",
@@ -44,7 +44,7 @@ const baseProjects = [
         title: "Robotics Control Board",
         className: "Year 12 Computer Lab",
         area: "Physical Computing",
-        activityCategory: "Practice",
+        activityCategory: "Activity",
         showThisWeek: false,
         status: "active",
         term: "Term 2",
@@ -64,7 +64,7 @@ const baseProjects = [
         title: "Data Visual Story",
         className: "Year 12 Computer Lab",
         area: "Data Skills",
-        activityCategory: "Practice",
+        activityCategory: "Activity",
         showThisWeek: false,
         status: "planning",
         term: "Term 2",
@@ -84,7 +84,7 @@ const baseProjects = [
         title: "Cyber Safety Lab",
         className: "Year 9 Computer Lab",
         area: "Cyber Security",
-        activityCategory: "Practice",
+        activityCategory: "Activity",
         showThisWeek: false,
         status: "planning",
         term: "Term 2",
@@ -104,7 +104,7 @@ const baseProjects = [
         title: "Digital Portfolio Studio",
         className: "Year 11 Computer Lab",
         area: "Digital Learning",
-        activityCategory: "Practice",
+        activityCategory: "Activity",
         showThisWeek: false,
         status: "archive",
         term: "Term 1",
@@ -124,7 +124,7 @@ const baseProjects = [
         title: "Maker Lab Builds",
         className: "Year 13 Computer Lab",
         area: "STEM Projects",
-        activityCategory: "Practice",
+        activityCategory: "Activity",
         showThisWeek: false,
         status: "archive",
         term: "Term 1",
@@ -391,7 +391,7 @@ async function loadSharedProjects() {
                 const id = String(item.id || slugify(title) || `activity-${Date.now()}`);
                 const yearLevel = String(item.year_level || "Year 9").trim();
                 const type = String(item.type || "Digital Learning").trim();
-                const category = String(item.activity_category || "Practice").trim();
+                const category = String(item.activity_category || "Activity").trim();
                 const summary = String(item.description || "").trim();
                 const created = String(item.created_at || new Date().toISOString()).slice(0, 10);
                 const imageUrl = String(item.outcome_image_url || item.image_url || "").trim();
