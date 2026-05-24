@@ -455,6 +455,9 @@ function normalizeUnitTopicList(values) {
 
     source.forEach((value) => {
         const topic = normalizeUnitTopicDisplayLabel(value);
+        if (isLikelyNoiseTopicLabel(topic)) {
+            return;
+        }
         const key = canonicalizeUnitTopicLabel(topic);
         if (!topic || seen.has(key)) {
             return;
@@ -570,6 +573,30 @@ function normalizeUnitTopicDisplayLabel(topicLabel) {
         return topic;
     }
     return normalizeTopicText(topicLabel);
+}
+
+function isLikelyNoiseTopicLabel(topicLabel) {
+    const parsed = parseUnitTopicLabel(topicLabel);
+    const yearKey = canonicalizeYearLevel(parsed.yearLevel);
+    const topicText = normalizeTopicText(parsed.topicName || topicLabel).toLowerCase();
+
+    if (!topicText) {
+        return true;
+    }
+
+    if (/^school\s*values?$/.test(topicText)) {
+        return true;
+    }
+
+    if (/^level\s*\d+$/i.test(topicText)) {
+        return true;
+    }
+
+    if (yearKey.startsWith("year") && /^level\s*\d+$/i.test(topicText)) {
+        return true;
+    }
+
+    return false;
 }
 
 function canonicalizeUnitTopicLabel(topicLabel) {

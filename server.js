@@ -859,11 +859,13 @@ function parseLessonRowsFromSlideshow(lines) {
   const activityHeadingPattern = /^(.+?)\s+activities?\s*:?$/i;
   const yearLevelPattern = /^(juniors?|middle(?:\/seniors?)?|seniors?|year\s*\d+(?:\s*(?:\/|and|&)\s*\d+)?)\b/i;
   const likelyLessonObjectivePattern = /^l\d+\s*[-:]|^\d+\s*[-:]/i;
+  const blockedTopicLabelPattern = /^(school\s*values?|level\s*\d+|year\s*\d+)$/i;
 
   const looksLikeUnitTopicLabel = (value) => {
     const text = String(value || "").trim();
     if (!text) return false;
     if (likelyLessonObjectivePattern.test(text)) return false;
+    if (blockedTopicLabelPattern.test(text)) return false;
     if (/[.;!?]$/.test(text) || text.includes(". ")) return false;
     if (text.length > 70) return false;
     return true;
@@ -994,6 +996,7 @@ function extractOrderedUnitTopicsFromSlideshow(lines) {
   const activityHeadingPattern = /^(.+?)\s+activities?\s*:?$/i;
   const ignoredHeadingPattern = /^(slideshow|reporting\s*&\s*assessment\s*link|unit\s*evaluation|assessment\s*link)$/i;
   const likelyLessonObjectivePattern = /^l\d+\s*[-:]|^\d+\s*[-:]/i;
+  const blockedTopicLabelPattern = /^(school\s*values?|level\s*\d+|year\s*\d+)$/i;
 
   const looksLikeUnitTopicLabel = (value) => {
     const text = String(value || "").trim();
@@ -1001,6 +1004,7 @@ function extractOrderedUnitTopicsFromSlideshow(lines) {
     if (ignoredHeadingPattern.test(text)) return false;
     if (yearLevelPattern.test(text)) return false;
     if (likelyLessonObjectivePattern.test(text)) return false;
+    if (blockedTopicLabelPattern.test(text)) return false;
     if (/[.;!?]$/.test(text) || text.includes(". ")) return false;
     if (text.length > 70) return false;
     return true;
