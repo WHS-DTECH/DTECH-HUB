@@ -717,6 +717,10 @@ const labProjectState = {
     sort: "name-asc"
 };
 
+const projectAssignmentCounts = new Map();
+let projectAssignmentsAttemptedForEmail = "";
+let projectAssignmentsLoading = false;
+
 const statusOrder = {
     active: 0,
     planning: 1,
@@ -825,6 +829,108 @@ document.addEventListener("DOMContentLoaded", function() {
 
 function normalizeEmail(value) {
     return String(value || "").trim().toLowerCase();
+}
+
+function getHubStoredSignedInEmail() {
+    const raw = getHubStoredAuthRaw();
+    if (!raw) {
+        return "";
+    }
+
+    try {
+        const parsed = JSON.parse(raw);
+        return normalizeEmail(parsed?.profile?.email || "");
+    } catch (_error) {
+        return "";
+    }
+}
+
+function getActiveHubEmail() {
+    return normalizeEmail(hubAuthState.profile?.email || getHubStoredSignedInEmail());
+}
+
+function rerenderAssignmentIndicators() {
+    if (!libraryGrid) {
+        return;
+    }
+
+    renderCurrentWeek();
+    renderCurrentProjects();
+    renderLibrary();
+    applyCompactCardLayout();
+}
+
+function clearProjectAssignmentSummaries() {
+    const hadData = projectAssignmentCounts.size > 0;
+    projectAssignmentCounts.clear();
+    projectAssignmentsAttemptedForEmail = "";
+    projectAssignmentsLoading = false;
+
+    if (hadData) {
+        rerenderAssignmentIndicators();
+    }
+}
+
+async function loadProjectAssignmentSummaries(force = false) {
+    const email = getActiveHubEmail();
+    const canViewAssignments = hubAccessState.canTeacherView || hubAccessState.canAdmin;
+
+    if (!email || !canViewAssignments || !isHomepagePath() || !libraryGrid) {
+        return;
+    }
+
+    if (!force && (projectAssignmentsAttemptedForEmail === email || projectAssignmentsLoading)) {
+        return;
+    }
+
+    projectAssignmentsLoading = true;
+    projectAssignmentsAttemptedForEmail = email;
+
+    try {
+        const response = await fetch("/api/project-interests", {
+            headers: {
+                "x-user-email": email
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error("Could not load project assignment summaries.");
+        }
+
+        const rows = await response.json();
+        projectAssignmentCounts.clear();
+
+        if (Array.isArray(rows)) {
+            rows.forEach((row) => {
+                const projectId = String(row?.project_id || "").trim();
+                const assignedCount = Number(row?.confirmed_count ?? row?.interest_count ?? 0);
+                if (!projectId || assignedCount <= 0) {
+                    return;
+                }
+                projectAssignmentCounts.set(projectId, assignedCount);
+            });
+        }
+
+        rerenderAssignmentIndicators();
+    } catch (_error) {
+        projectAssignmentCounts.clear();
+        rerenderAssignmentIndicators();
+    } finally {
+        projectAssignmentsLoading = false;
+    }
+}
+
+function getAssignedStudentCount(project, sourceType) {
+    if (sourceType !== "project") {
+        return 0;
+    }
+
+    const projectId = String(project?.id || "").trim();
+    if (!projectId) {
+        return 0;
+    }
+
+    return Number(projectAssignmentCounts.get(projectId) || 0);
 }
 
 function getHubDisplayName(profile) {
@@ -1095,6 +1201,14 @@ function renderHubAuthUi() {
 
     setPublicHomepageUiState(signedIn);
 
+    if (isHomepagePath() && libraryGrid) {
+        if (signedIn && (hubAccessState.canTeacherView || hubAccessState.canAdmin)) {
+            loadProjectAssignmentSummaries();
+        } else {
+            clearProjectAssignmentSummaries();
+        }
+    }
+
     if (!signedIn) {
         setHubProfileOpen(false);
         return;
@@ -1350,6 +1464,10 @@ function createProjectCard(project) {
         : '';
     const sourceType = inferSourceTypeFromRecord(project);
     const contentTypeLabel = sourceType === "project" ? "PROJECT" : sourceType === "assessment" ? "ASSESSMENT TASK" : sourceType === "lesson" ? "LESSON" : "ACTIVITY";
+    const assignedStudentCount = getAssignedStudentCount(project, sourceType);
+    const assignmentBadge = assignedStudentCount > 0
+        ? `<span class="project-meta project-meta-assigned" title="Assigned to ${assignedStudentCount} student${assignedStudentCount === 1 ? "" : "s"}">Assigned (${assignedStudentCount})</span>`
+        : "";
 
     card.innerHTML = `
         <div class="project-visual" ${visualStyle}>
@@ -1367,6 +1485,7 @@ function createProjectCard(project) {
             </div>
             <div class="project-footer">
                 <span class="project-meta">${escapeHtml(contentTypeLabel)}</span>
+                ${assignmentBadge}
             </div>
         </div>
     `;

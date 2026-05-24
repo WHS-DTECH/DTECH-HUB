@@ -2413,6 +2413,17 @@ body.public-home-access .controls-panel {
     font-weight: 600;
 }
 
+.project-meta-assigned {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(46, 122, 86, 0.36);
+    background: rgba(46, 122, 86, 0.12);
+    color: #205c43;
+    font-weight: 700;
+}
+
 /* Responsive Carousel */
 @media (max-width: 1024px) {
     .featured-carousel {
