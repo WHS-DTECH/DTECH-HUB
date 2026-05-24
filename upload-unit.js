@@ -51,6 +51,9 @@ const previewFields = {
         localCurriculumLinks: document.querySelector("#preview-local-curriculum-links"),
         mataurangaMaori: document.querySelector("#preview-matauranga-maori"),
         skills: {
+            generalSkills: document.querySelector("#preview-skill-general"),
+            careerFutureSkills: document.querySelector("#preview-skill-career-future"),
+            considerationsWithinElectronics: document.querySelector("#preview-skill-electronics-considerations"),
             literacy: document.querySelector("#preview-skill-literacy"),
             numeracy: document.querySelector("#preview-skill-numeracy"),
             digitalTech: document.querySelector("#preview-skill-digital-tech"),
@@ -89,6 +92,9 @@ const manualFields = {
         localCurriculumLinks: document.querySelector("#manual-local-curriculum-links"),
         mataurangaMaori: document.querySelector("#manual-matauranga-maori"),
         skills: {
+            generalSkills: document.querySelector("#manual-skill-general"),
+            careerFutureSkills: document.querySelector("#manual-skill-career-future"),
+            considerationsWithinElectronics: document.querySelector("#manual-skill-electronics-considerations"),
             literacy: document.querySelector("#manual-skill-literacy"),
             numeracy: document.querySelector("#manual-skill-numeracy"),
             digitalTech: document.querySelector("#manual-skill-digital-tech"),
@@ -122,7 +128,7 @@ const CONTEXT_LABELS = {
     technology: "Technology"
 };
 const CURRICULUM_LINK_KEYS = ["localCurriculumLinks", "mataurangaMaori", "skills", "healthSafety"];
-const SKILL_KEYS = ["literacy", "numeracy", "digitalTech", "practical"];
+const SKILL_KEYS = ["generalSkills", "careerFutureSkills", "considerationsWithinElectronics", "literacy", "numeracy", "digitalTech", "practical"];
 const CURRICULUM_LINK_LABELS = {
     localCurriculumLinks: "Local Curriculum Links",
     mataurangaMaori: "Matauranga Maori",
@@ -130,6 +136,9 @@ const CURRICULUM_LINK_LABELS = {
     healthSafety: "Health & Safety"
 };
 const SKILL_LABELS = {
+    generalSkills: "Skills",
+    careerFutureSkills: "Career & Future-Focused Skills",
+    considerationsWithinElectronics: "Considerations within Electronics",
     literacy: "Literacy",
     numeracy: "Numeracy",
     digitalTech: "Digital Tech",
@@ -1086,6 +1095,9 @@ function parseCurriculumLinksToResponses(curriculumLinks) {
         localCurriculumLinks: "",
         mataurangaMaori: "",
         skills: {
+            generalSkills: "",
+            careerFutureSkills: "",
+            considerationsWithinElectronics: "",
             literacy: "",
             numeracy: "",
             digitalTech: "",
@@ -1105,11 +1117,38 @@ function parseCurriculumLinksToResponses(curriculumLinks) {
         const localPrefix = /^local\s*curriculum\s*links?/i;
         const mataurangaPrefix = /^(m[aā]tauranga\s*m[aā]ori|matauranga\s*maori)/i;
         const skillsPrefix = /^skills?\b/i;
+        const generalSkillsPrefix = /^(general\s*skills|skills)\b/i;
+        const careerFutureSkillsPrefix = /^career\s*(?:&|and)?\s*future(?:-focused)?\s*skills\b/i;
+        const electronicsConsiderationsPrefix = /^considerations\s*within\s*electronics\b/i;
         const healthSafetyPrefix = /^(health\s*(?:&|and)\s*safety|safety\s*issues?)\b/i;
         const literacyPrefix = /^literacy\b/i;
         const numeracyPrefix = /^numeracy\b/i;
         const digitalTechPrefix = /^(digital\s*tech|digital\s*technology)\b/i;
         const practicalPrefix = /^practical\b/i;
+
+        if (careerFutureSkillsPrefix.test(lower)) {
+            currentKey = "skills";
+            currentSkillKey = "careerFutureSkills";
+            const remainder = line.replace(careerFutureSkillsPrefix, "").replace(/^\s*:?\s*/, "").trim();
+            if (remainder) {
+                responseMap.skills.careerFutureSkills = responseMap.skills.careerFutureSkills
+                    ? `${responseMap.skills.careerFutureSkills}\n${remainder}`
+                    : remainder;
+            }
+            return;
+        }
+
+        if (electronicsConsiderationsPrefix.test(lower)) {
+            currentKey = "skills";
+            currentSkillKey = "considerationsWithinElectronics";
+            const remainder = line.replace(electronicsConsiderationsPrefix, "").replace(/^\s*:?\s*/, "").trim();
+            if (remainder) {
+                responseMap.skills.considerationsWithinElectronics = responseMap.skills.considerationsWithinElectronics
+                    ? `${responseMap.skills.considerationsWithinElectronics}\n${remainder}`
+                    : remainder;
+            }
+            return;
+        }
 
         if (localPrefix.test(lower)) {
             currentKey = "localCurriculumLinks";
@@ -1137,7 +1176,7 @@ function parseCurriculumLinksToResponses(curriculumLinks) {
 
         if (skillsPrefix.test(lower)) {
             currentKey = "skills";
-            currentSkillKey = currentSkillKey || "literacy";
+            currentSkillKey = currentSkillKey || "generalSkills";
             const remainder = line.replace(skillsPrefix, "").replace(/^\s*:?\s*/, "").trim();
             if (remainder) {
                 responseMap.skills[currentSkillKey] = responseMap.skills[currentSkillKey]
@@ -1160,6 +1199,39 @@ function parseCurriculumLinksToResponses(curriculumLinks) {
         }
 
         if (currentKey === "skills") {
+            if (generalSkillsPrefix.test(lower)) {
+                currentSkillKey = "generalSkills";
+                const remainder = line.replace(generalSkillsPrefix, "").replace(/^\s*:?\s*/, "").trim();
+                if (remainder) {
+                    responseMap.skills.generalSkills = responseMap.skills.generalSkills
+                        ? `${responseMap.skills.generalSkills}\n${remainder}`
+                        : remainder;
+                }
+                return;
+            }
+
+            if (careerFutureSkillsPrefix.test(lower)) {
+                currentSkillKey = "careerFutureSkills";
+                const remainder = line.replace(careerFutureSkillsPrefix, "").replace(/^\s*:?\s*/, "").trim();
+                if (remainder) {
+                    responseMap.skills.careerFutureSkills = responseMap.skills.careerFutureSkills
+                        ? `${responseMap.skills.careerFutureSkills}\n${remainder}`
+                        : remainder;
+                }
+                return;
+            }
+
+            if (electronicsConsiderationsPrefix.test(lower)) {
+                currentSkillKey = "considerationsWithinElectronics";
+                const remainder = line.replace(electronicsConsiderationsPrefix, "").replace(/^\s*:?\s*/, "").trim();
+                if (remainder) {
+                    responseMap.skills.considerationsWithinElectronics = responseMap.skills.considerationsWithinElectronics
+                        ? `${responseMap.skills.considerationsWithinElectronics}\n${remainder}`
+                        : remainder;
+                }
+                return;
+            }
+
             if (literacyPrefix.test(lower)) {
                 currentSkillKey = "literacy";
                 const remainder = line.replace(literacyPrefix, "").replace(/^\s*:?\s*/, "").trim();
@@ -1205,13 +1277,49 @@ function parseCurriculumLinksToResponses(curriculumLinks) {
             }
         }
 
+        if (currentKey === "healthSafety") {
+            if (generalSkillsPrefix.test(lower) || careerFutureSkillsPrefix.test(lower) || electronicsConsiderationsPrefix.test(lower)) {
+                currentKey = "skills";
+                if (careerFutureSkillsPrefix.test(lower)) {
+                    currentSkillKey = "careerFutureSkills";
+                    const remainder = line.replace(careerFutureSkillsPrefix, "").replace(/^\s*:?\s*/, "").trim();
+                    if (remainder) {
+                        responseMap.skills.careerFutureSkills = responseMap.skills.careerFutureSkills
+                            ? `${responseMap.skills.careerFutureSkills}\n${remainder}`
+                            : remainder;
+                    }
+                    return;
+                }
+
+                if (electronicsConsiderationsPrefix.test(lower)) {
+                    currentSkillKey = "considerationsWithinElectronics";
+                    const remainder = line.replace(electronicsConsiderationsPrefix, "").replace(/^\s*:?\s*/, "").trim();
+                    if (remainder) {
+                        responseMap.skills.considerationsWithinElectronics = responseMap.skills.considerationsWithinElectronics
+                            ? `${responseMap.skills.considerationsWithinElectronics}\n${remainder}`
+                            : remainder;
+                    }
+                    return;
+                }
+
+                currentSkillKey = "generalSkills";
+                const remainder = line.replace(generalSkillsPrefix, "").replace(/^\s*:?\s*/, "").trim();
+                if (remainder) {
+                    responseMap.skills.generalSkills = responseMap.skills.generalSkills
+                        ? `${responseMap.skills.generalSkills}\n${remainder}`
+                        : remainder;
+                }
+                return;
+            }
+        }
+
         if (!currentKey && !responseMap.localCurriculumLinks) {
             currentKey = "localCurriculumLinks";
         }
 
         if (currentKey) {
             if (currentKey === "skills") {
-                currentSkillKey = currentSkillKey || "literacy";
+                currentSkillKey = currentSkillKey || "generalSkills";
                 responseMap.skills[currentSkillKey] = responseMap.skills[currentSkillKey]
                     ? `${responseMap.skills[currentSkillKey]}\n${line}`
                     : line;
