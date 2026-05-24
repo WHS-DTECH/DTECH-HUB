@@ -113,6 +113,7 @@ let manualUnitTopics = [];
 const YEAR_LEVEL_OPTIONS = ["Junior", "Year 7", "Year 8", "Middle", "Year 9", "Year 10", "Senior", "Year 11", "Year 12", "Year 13"];
 const SCHOOL_VALUE_KEYS = ["whanaungatanga", "rangatiratanga", "manaakitanga", "kaitiakitanga"];
 const CONTEXT_KEYS = ["environment", "mentalEmotional", "culture", "social", "technology"];
+const LESSON_CARD_CATEGORY_OPTIONS = ["Activity", "Project", "Assessment Task", "Lesson"];
 const SCHOOL_VALUE_LABELS = {
     whanaungatanga: "Whanaungatanga",
     rangatiratanga: "Rangatiratanga",
@@ -1800,12 +1801,10 @@ function createLessonRow(lesson = {}) {
                 <div class="field">
                     <label>Card Category</label>
                     <select name="lessonType">
-                        <option>Lesson</option>
-                        <option>Activity</option>
-                        <option>Skill Activity</option>
-                        <option>Project</option>
-                        <option>Assessment Activity</option>
-                        <option>Practice Activity</option>
+                        ${LESSON_CARD_CATEGORY_OPTIONS.map((option) => {
+                            const selectedAttr = option === "Lesson" ? " selected" : "";
+                            return `<option${selectedAttr}>${escapeHtml(option)}</option>`;
+                        }).join("")}
                     </select>
                 </div>
                 <div class="field">
@@ -1914,7 +1913,7 @@ function createLessonRow(lesson = {}) {
     lessonWeek.value = String(lesson.lessonWeek || lesson.week_label || lesson.week || "").trim();
     lessonDate.value = String(lesson.lessonDate || lesson.calendar_date || "").trim();
     lessonDurationMinutes.value = String(lesson.lessonDurationMinutes || lesson.duration_minutes || 60).trim();
-    lessonType.value = String(lesson.lessonType || lesson.activity_type || "Lesson").trim() || "Lesson";
+    lessonType.value = normalizeLessonCardCategory(lesson.lessonType || lesson.activity_type, "Lesson");
     lessonSubjectStream.value = String(lesson.lessonSubjectStream || lesson.subject_stream || manualFields?.subjectStream?.value || "").trim().toUpperCase();
     lessonTopicType.value = String(lesson.lessonTopicType || lesson.type || manualFields?.topic?.value || "").trim();
     lessonCardColor.value = String(lesson.lessonCardColor || lesson.card_color || "Rose").trim() || "Rose";
@@ -1975,7 +1974,7 @@ function collectLessons() {
             lessonWeek: String(row.querySelector('[name="lessonWeek"]')?.value || "").trim(),
             lessonDate: String(row.querySelector('[name="lessonDate"]')?.value || "").trim(),
             lessonDurationMinutes: Number.parseInt(row.querySelector('[name="lessonDurationMinutes"]')?.value || "60", 10) || 60,
-            lessonType: String(row.querySelector('[name="lessonType"]')?.value || "").trim(),
+            lessonType: normalizeLessonCardCategory(row.querySelector('[name="lessonType"]')?.value || "", "Lesson"),
             type: String(row.querySelector('[name="lessonTopicType"]')?.value || "").trim(),
             subject_stream: String(row.querySelector('[name="lessonSubjectStream"]')?.value || "").trim().toUpperCase(),
             lessonCardColor: String(row.querySelector('[name="lessonCardColor"]')?.value || "Rose").trim() || "Rose",
@@ -2711,4 +2710,16 @@ if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", initializeAchievementSliders);
 } else {
     initializeAchievementSliders();
+}
+
+function normalizeLessonCardCategory(value, fallback = "Lesson") {
+    const raw = String(value || "").trim().toLowerCase();
+    if (!raw) return fallback;
+
+    if (raw === "project") return "Project";
+    if (raw === "lesson") return "Lesson";
+    if (raw === "assessment task" || raw === "assessment activity" || raw === "assessment") return "Assessment Task";
+    if (raw === "activity" || raw === "skill activity" || raw === "practice" || raw === "practice activity") return "Activity";
+
+    return fallback;
 }

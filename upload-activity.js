@@ -1,4 +1,16 @@
 // Prefill form fields if editing an existing activity
+function normalizeCardCategory(value, fallback = "Activity") {
+    const raw = String(value || "").trim().toLowerCase();
+    if (!raw) return fallback;
+
+    if (raw === "project") return "Project";
+    if (raw === "lesson") return "Lesson";
+    if (raw === "assessment task" || raw === "assessment activity" || raw === "assessment") return "Assessment Task";
+    if (raw === "activity" || raw === "skill activity" || raw === "practice" || raw === "practice activity") return "Activity";
+
+    return fallback;
+}
+
 async function prefillFormIfEditing() {
     const id = getEditingActivityId();
     if (!id || !form) return;
@@ -11,7 +23,7 @@ async function prefillFormIfEditing() {
         if (data.name) form.activityName.value = data.name;
         if (data.year_level) form.yearLevel.value = data.year_level;
         if (data.type) form.type.value = data.type;
-        if (data.activity_category) form.activityCategory.value = data.activity_category;
+        form.activityCategory.value = normalizeCardCategory(data.activity_category, "Activity");
         const normalizedMinutes = normalizeMinutesFromRecord(data);
         if (normalizedMinutes !== "") form.durationMinutes.value = normalizedMinutes;
         if (data.difficulty) form.difficulty.value = data.difficulty;
@@ -408,7 +420,7 @@ function createActivityPayload() {
         name,
         year_level: String(formData.get("yearLevel") || "").trim(),
         type: String(formData.get("type") || "").trim(),
-        activity_category: String(formData.get("activityCategory") || "").trim(),
+        activity_category: normalizeCardCategory(formData.get("activityCategory"), "Activity"),
         duration_minutes: durationMinutes,
         difficulty: String(formData.get("difficulty") || "").trim(),
         subject_stream: subjectData.subjectStream,

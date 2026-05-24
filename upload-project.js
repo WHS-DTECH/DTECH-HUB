@@ -14,6 +14,18 @@ function getEditingProjectId() {
     return String(params.get("id") || "").trim();
 }
 
+function normalizeCardCategory(value, fallback = "Project") {
+    const raw = String(value || "").trim().toLowerCase();
+    if (!raw) return fallback;
+
+    if (raw === "project") return "Project";
+    if (raw === "lesson") return "Lesson";
+    if (raw === "assessment task" || raw === "assessment activity" || raw === "assessment") return "Assessment Task";
+    if (raw === "activity" || raw === "skill activity" || raw === "practice" || raw === "practice activity") return "Activity";
+
+    return fallback;
+}
+
 function getTextareaLinesSet(textarea) {
     return new Set(
         String(textarea?.value || "")
@@ -195,7 +207,7 @@ async function prefillProjectIfEditing() {
         if (data.start_date) form.startDate.value = data.start_date;
         if (data.year_level) form.yearLevel.value = data.year_level;
         if (data.type) form.type.value = data.type;
-        if (data.activity_category) form.activityCategory.value = data.activity_category;
+        form.activityCategory.value = normalizeCardCategory(data.activity_category, "Project");
         if (data.difficulty) form.difficulty.value = data.difficulty;
         if (data.time_sensitive !== undefined || data.timeSensitive !== undefined) {
             form.timeSensitive.checked = Boolean(data.time_sensitive ?? data.timeSensitive);
@@ -298,6 +310,11 @@ function restoreProjectDraftIfAvailable() {
             return;
         }
 
+        if (key === "activityCategory") {
+            field.value = normalizeCardCategory(draft[key], "Project");
+            return;
+        }
+
         field.value = String(draft[key] || "");
     });
 
@@ -344,7 +361,7 @@ function createProjectPayload() {
         name,
         year_level: String(formData.get("yearLevel") || "").trim(),
         type: String(formData.get("type") || "Project").trim(),
-        activity_category: String(formData.get("activityCategory") || "Project").trim(),
+        activity_category: normalizeCardCategory(formData.get("activityCategory"), "Project"),
         duration_minutes: 1,
         time_sensitive: Boolean(formData.get("timeSensitive")),
         difficulty: String(formData.get("difficulty") || "").trim(),
