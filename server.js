@@ -860,6 +860,7 @@ function parseLessonRowsFromSlideshow(lines) {
   const yearLevelPattern = /^(juniors?|middle(?:\/seniors?)?|seniors?|year\s*\d+(?:\s*(?:\/|and|&)\s*\d+)?)\b/i;
   const likelyLessonObjectivePattern = /^l\d+\s*[-:]|^\d+\s*[-:]/i;
   const blockedTopicLabelPattern = /^(school\s*values?|level\s*\d+|year\s*\d+|technology\s*strand|whanaungatanga|manaakitanga|rangatiratanga|kotahitanga|kaitiakitanga|\d+|\d+\s*\/\s*\d+)$/i;
+  const standaloneTopicPattern = /(\bblock\s+programming\b|\btutorial\s+programming\b|\bproject\s+programming\b|^binary\b|^assessment\b|\bbreadboard\b|\bmicro(?:\s*::?\s*|\s*:\s*|\s+)?bit\b|\bmicrobit\b|\bsolder(?:ing)?\b|\bpcb\b|\bprinted\s*circuit\s*boards?\b|\barduino\b)/i;
 
   const looksLikeUnitTopicLabel = (value) => {
     const text = String(value || "").trim();
@@ -936,6 +937,13 @@ function parseLessonRowsFromSlideshow(lines) {
       return;
     }
 
+    if (!currentLesson && looksLikeUnitTopicLabel(text) && standaloneTopicPattern.test(text)) {
+      flushLesson();
+      currentUnitTopic = String(text || "").replace(/:\s*$/, "").trim();
+      waitingForTopicAfterYear = false;
+      return;
+    }
+
     if (waitingForTopicAfterYear && blockedTopicLabelPattern.test(text)) {
       waitingForTopicAfterYear = false;
       return;
@@ -1003,6 +1011,7 @@ function extractOrderedUnitTopicsFromSlideshow(lines) {
   const ignoredHeadingPattern = /^(slideshow|reporting\s*&\s*assessment\s*link|unit\s*evaluation|assessment\s*link)$/i;
   const likelyLessonObjectivePattern = /^l\d+\s*[-:]|^\d+\s*[-:]/i;
   const blockedTopicLabelPattern = /^(school\s*values?|level\s*\d+|year\s*\d+|technology\s*strand|whanaungatanga|manaakitanga|rangatiratanga|kotahitanga|kaitiakitanga|\d+|\d+\s*\/\s*\d+)$/i;
+  const standaloneTopicPattern = /(\bblock\s+programming\b|\btutorial\s+programming\b|\bproject\s+programming\b|^binary\b|^assessment\b|\bbreadboard\b|\bmicro(?:\s*::?\s*|\s*:\s*|\s+)?bit\b|\bmicrobit\b|\bsolder(?:ing)?\b|\bpcb\b|\bprinted\s*circuit\s*boards?\b|\barduino\b)/i;
 
   const looksLikeUnitTopicLabel = (value) => {
     const text = String(value || "").trim();
@@ -1074,6 +1083,12 @@ function extractOrderedUnitTopicsFromSlideshow(lines) {
     if (activityMatch) {
       const topic = String(activityMatch[1] || "").replace(/:\s*$/, "").trim();
       addTopic(topic);
+      waitingForTopicAfterYear = false;
+      return;
+    }
+
+    if (looksLikeUnitTopicLabel(text) && standaloneTopicPattern.test(text)) {
+      addTopic(String(text || "").replace(/:\s*$/, "").trim());
       waitingForTopicAfterYear = false;
       return;
     }
@@ -1225,7 +1240,24 @@ function parseUnitPlanFromDocxText(rawText, originalName = "") {
       .map((lesson) => String(lesson?.unit_topic || "").trim())
       .filter(Boolean)
   ));
-  const unitTopics = orderedTopicsFromTable.length ? orderedTopicsFromTable : topicsFromLessons;
+  const unitTopics = (() => {
+    const ordered = Array.isArray(orderedTopicsFromTable) ? orderedTopicsFromTable : [];
+    const fromLessons = Array.isArray(topicsFromLessons) ? topicsFromLessons : [];
+    const source = ordered.length ? [...ordered, ...fromLessons] : fromLessons;
+    const seen = new Set();
+    const result = [];
+
+    source.forEach((topic) => {
+      const label = String(topic || "").trim();
+      if (!label) return;
+      const key = label.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      result.push(label);
+    });
+
+    return result;
+  })();
 
   return {
     title: topic,
