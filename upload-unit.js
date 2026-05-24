@@ -402,6 +402,14 @@ function normalizeTopicText(value) {
         .trim();
 }
 
+function toTitleCase(value) {
+    return String(value || "")
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(" ");
+}
+
 function inferUnitTopicFromLessonLike(lesson) {
     const explicit = normalizeTopicText(lesson?.unit_topic ?? lesson?.unitTopic ?? lesson?.lessonUnitTopic ?? "");
     if (explicit) {
@@ -446,7 +454,7 @@ function normalizeUnitTopicList(values) {
     const result = [];
 
     source.forEach((value) => {
-        const topic = normalizeTopicText(value);
+        const topic = normalizeUnitTopicDisplayLabel(value);
         const key = canonicalizeUnitTopicLabel(topic);
         if (!topic || seen.has(key)) {
             return;
@@ -467,7 +475,7 @@ function getLessonRows() {
 
 function getLessonTopicSelections() {
     return getLessonRows()
-        .map((row) => normalizeTopicText(row.querySelector('[name="lessonUnitTopic"]')?.value || ""))
+    .map((row) => normalizeUnitTopicDisplayLabel(row.querySelector('[name="lessonUnitTopic"]')?.value || ""))
         .filter(Boolean);
 }
 
@@ -525,8 +533,47 @@ function canonicalizeTopicName(value) {
     return text.replace(/[^a-z0-9]+/g, " ").trim();
 }
 
-function canonicalizeUnitTopicLabel(topicLabel) {
+function normalizeYearLevelDisplay(value) {
+    const canonical = canonicalizeYearLevel(value);
+    if (canonical === "juniors") return "Juniors";
+    if (canonical === "middle") return "Middle";
+    if (canonical === "senior") return "Senior";
+
+    if (/^year\d{1,2}$/.test(canonical)) {
+        return `Year ${canonical.replace("year", "")}`;
+    }
+
+    const cleaned = String(value || "")
+        .replace(/\(.*?\)/g, "")
+        .replace(/-\s*.*$/g, "")
+        .trim();
+    return toTitleCase(cleaned);
+}
+
+function normalizeTopicNameDisplay(value) {
+    const canonical = canonicalizeTopicName(value);
+    if (canonical === "pcb") return "Printed Circuit Boards (PCB)";
+    if (canonical === "microbit") return "Micro::bit";
+    if (!canonical) return "";
+    return toTitleCase(String(value || "").trim());
+}
+
+function normalizeUnitTopicDisplayLabel(topicLabel) {
     const parsed = parseUnitTopicLabel(topicLabel);
+    const year = normalizeYearLevelDisplay(parsed.yearLevel);
+    const topic = normalizeTopicNameDisplay(parsed.topicName || topicLabel);
+
+    if (year && topic) {
+        return `${year} | ${topic}`;
+    }
+    if (topic) {
+        return topic;
+    }
+    return normalizeTopicText(topicLabel);
+}
+
+function canonicalizeUnitTopicLabel(topicLabel) {
+    const parsed = parseUnitTopicLabel(normalizeUnitTopicDisplayLabel(topicLabel));
     const yearKey = canonicalizeYearLevel(parsed.yearLevel);
     const topicKey = canonicalizeTopicName(parsed.topicName || topicLabel);
 
@@ -550,7 +597,7 @@ function collectLessonAssignmentsByTopic() {
     const assignments = new Map();
 
     getLessonRows().forEach((row) => {
-        const topic = normalizeTopicText(row.querySelector('[name="lessonUnitTopic"]')?.value || "");
+        const topic = normalizeUnitTopicDisplayLabel(row.querySelector('[name="lessonUnitTopic"]')?.value || "");
         const title = normalizeTopicText(row.querySelector('[name="lessonTitle"]')?.value || "");
         if (!topic || !title) {
             return;
@@ -621,7 +668,7 @@ function applyTopicOptionsToSelect(select, selectedValue = "") {
         return;
     }
 
-    const normalizedSelected = normalizeTopicText(selectedValue);
+    const normalizedSelected = normalizeUnitTopicDisplayLabel(selectedValue);
     const optionList = normalizeUnitTopicList([...manualUnitTopics, ...getLessonTopicSelections(), normalizedSelected]);
     select.innerHTML = `<option value="">Select unit topic</option>${optionList
         .map((topic) => `<option value="${topic}">${topic}</option>`)
@@ -635,7 +682,7 @@ function applyTopicOptionsToSelect(select, selectedValue = "") {
 function updateLessonTopicOptions() {
     getLessonRows().forEach((row) => {
         const select = row.querySelector('[name="lessonUnitTopic"]');
-        const selectedValue = normalizeTopicText(select?.value || "");
+        const selectedValue = normalizeUnitTopicDisplayLabel(select?.value || "");
         applyTopicOptionsToSelect(select, selectedValue);
     });
 
@@ -687,7 +734,7 @@ function setManualUnitTopics(topics = []) {
 }
 
 function addManualUnitTopic(rawTopic) {
-    const topic = normalizeTopicText(rawTopic);
+    const topic = normalizeUnitTopicDisplayLabel(rawTopic);
     if (!topic) {
         return;
     }
@@ -1730,7 +1777,7 @@ function createLessonRow(lesson = {}) {
     const addToCalendar = row.querySelector('[name="addToCalendar"]');
 
     const explicitUnitTopic = getExplicitUnitTopicFromLesson(lesson);
-    const selectedUnitTopic = explicitUnitTopic || (manualUnitTopics.length ? "" : inferUnitTopicFromLessonLike(lesson));
+    const selectedUnitTopic = normalizeUnitTopicDisplayLabel(explicitUnitTopic || (manualUnitTopics.length ? "" : inferUnitTopicFromLessonLike(lesson)));
     if (explicitUnitTopic) {
         addManualUnitTopic(explicitUnitTopic);
     }
