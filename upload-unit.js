@@ -447,7 +447,7 @@ function normalizeUnitTopicList(values) {
 
     source.forEach((value) => {
         const topic = normalizeTopicText(value);
-        const key = topic.toLowerCase();
+        const key = canonicalizeUnitTopicLabel(topic);
         if (!topic || seen.has(key)) {
             return;
         }
@@ -491,6 +491,52 @@ function parseUnitTopicLabel(topicLabel) {
     };
 }
 
+function canonicalizeYearLevel(value) {
+    const text = normalizeTopicText(value).toLowerCase();
+    if (!text) {
+        return "";
+    }
+
+    if (/\bjunior/.test(text)) return "juniors";
+    if (/\bmiddle/.test(text)) return "middle";
+    if (/\bsenior/.test(text)) return "senior";
+
+    const yearMatch = text.match(/year\s*(\d{1,2})/);
+    if (yearMatch?.[1]) {
+        return `year${yearMatch[1]}`;
+    }
+
+    return text.replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function canonicalizeTopicName(value) {
+    const text = normalizeTopicText(value).toLowerCase();
+    if (!text) {
+        return "";
+    }
+
+    if (/\bpcb\b/.test(text) || /printed\s*circuit\s*boards?/.test(text)) {
+        return "pcb";
+    }
+    if (/micro\s*:?\s*:?-?\s*bit/.test(text) || /microbit/.test(text)) {
+        return "microbit";
+    }
+
+    return text.replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function canonicalizeUnitTopicLabel(topicLabel) {
+    const parsed = parseUnitTopicLabel(topicLabel);
+    const yearKey = canonicalizeYearLevel(parsed.yearLevel);
+    const topicKey = canonicalizeTopicName(parsed.topicName || topicLabel);
+
+    if (yearKey || topicKey) {
+        return `${yearKey}|${topicKey}`;
+    }
+
+    return normalizeTopicText(topicLabel).toLowerCase();
+}
+
 function escapeHtml(value) {
     return String(value || "")
         .replace(/&/g, "&amp;")
@@ -510,10 +556,11 @@ function collectLessonAssignmentsByTopic() {
             return;
         }
 
-        const current = assignments.get(topic) || [];
+        const topicKey = canonicalizeUnitTopicLabel(topic);
+        const current = assignments.get(topicKey) || [];
         if (!current.includes(title)) {
             current.push(title);
-            assignments.set(topic, current);
+            assignments.set(topicKey, current);
         }
     });
 
@@ -535,7 +582,8 @@ function renderUnitTopicsPillTable() {
     const rowsHtml = manualUnitTopics
         .map((topicLabel) => {
             const parsed = parseUnitTopicLabel(topicLabel);
-            const lessonPills = (assignments.get(topicLabel) || [])
+            const topicKey = canonicalizeUnitTopicLabel(topicLabel);
+            const lessonPills = (assignments.get(topicKey) || [])
                 .map((lesson) => `<span class="unit-topic-table-pill is-lesson">${escapeHtml(lesson)}</span>`)
                 .join("");
 

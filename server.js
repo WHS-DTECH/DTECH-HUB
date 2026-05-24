@@ -974,6 +974,25 @@ function extractOrderedUnitTopicsFromSlideshow(lines) {
   const activityHeadingPattern = /^(.+?)\s+activities?\s*:?$/i;
   const ignoredHeadingPattern = /^(slideshow|reporting\s*&\s*assessment\s*link|unit\s*evaluation|assessment\s*link)$/i;
 
+  const canonicalizeYearLevel = (value) => {
+    const text = String(value || "").trim().toLowerCase();
+    if (!text) return "";
+    if (/\bjunior/.test(text)) return "juniors";
+    if (/\bmiddle/.test(text)) return "middle";
+    if (/\bsenior/.test(text)) return "senior";
+    const yearMatch = text.match(/year\s*(\d{1,2})/);
+    if (yearMatch?.[1]) return `year${yearMatch[1]}`;
+    return text.replace(/[^a-z0-9]+/g, " ").trim();
+  };
+
+  const canonicalizeTopicName = (value) => {
+    const text = String(value || "").trim().toLowerCase();
+    if (!text) return "";
+    if (/\bpcb\b/.test(text) || /printed\s*circuit\s*boards?/.test(text)) return "pcb";
+    if (/micro\s*:?\s*:?-?\s*bit/.test(text) || /microbit/.test(text)) return "microbit";
+    return text.replace(/[^a-z0-9]+/g, " ").trim();
+  };
+
   const addTopic = (topicValue) => {
     const topic = String(topicValue || "").trim();
     if (!topic) {
@@ -981,7 +1000,7 @@ function extractOrderedUnitTopicsFromSlideshow(lines) {
     }
 
     const label = currentYearLevel ? `${currentYearLevel} | ${topic}` : topic;
-    const key = label.toLowerCase();
+    const key = `${canonicalizeYearLevel(currentYearLevel)}|${canonicalizeTopicName(topic)}`;
     if (seen.has(key)) {
       return;
     }
