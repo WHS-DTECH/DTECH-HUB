@@ -145,6 +145,13 @@ const SKILL_LABELS = {
     practical: "Practical"
 };
 const HEALTH_SAFETY_ROW_LIMIT = 8;
+const HEALTH_SAFETY_SKILLS_CARRYOVER_LABELS = [
+    "skills",
+    "career & future-focused skills",
+    "career and future-focused skills",
+    "career future-focused skills",
+    "considerations within electronics"
+];
 
 function normalizeEmail(value) {
     return String(value || "").trim().toLowerCase();
@@ -690,6 +697,19 @@ function looksLikeHealthSafetyIssueHeading(line) {
     return true;
 }
 
+function isSkillsCarryoverHealthSafetyLabel(line) {
+    const normalized = String(line || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, " ");
+
+    if (!normalized) {
+        return false;
+    }
+
+    return HEALTH_SAFETY_SKILLS_CARRYOVER_LABELS.includes(normalized);
+}
+
 function parseHealthSafetyTableContent(content) {
     const rawLines = String(content || "")
         .split(/\r?\n/)
@@ -703,6 +723,7 @@ function parseHealthSafetyTableContent(content) {
     };
 
     let currentRow = null;
+    let suppressSkillsCarryoverBlock = false;
 
     const pushRow = (issue = "") => {
         if (parsed.rows.length >= HEALTH_SAFETY_ROW_LIMIT) {
@@ -731,22 +752,45 @@ function parseHealthSafetyTableContent(content) {
             return;
         }
 
+        if (isSkillsCarryoverHealthSafetyLabel(line)) {
+            suppressSkillsCarryoverBlock = true;
+            currentRow = null;
+            return;
+        }
+
         if (/^safety\s*issues?$/i.test(line) || /^health\s*(?:&|and)\s*safety\s*considerations?/i.test(line)) {
             return;
         }
 
         const explicitIssueMatch = line.match(/^safety\s*issues?\s*:\s*(.+)$/i);
         if (explicitIssueMatch && explicitIssueMatch[1]) {
+            if (isSkillsCarryoverHealthSafetyLabel(explicitIssueMatch[1])) {
+                suppressSkillsCarryoverBlock = true;
+                currentRow = null;
+                return;
+            }
+            suppressSkillsCarryoverBlock = false;
             pushRow(explicitIssueMatch[1]);
             return;
         }
 
         const explicitConsiderationMatch = line.match(/^health\s*(?:&|and)\s*safety\s*considerations?\s*:?\s*(.+)$/i);
         if (explicitConsiderationMatch && explicitConsiderationMatch[1]) {
+            if (suppressSkillsCarryoverBlock) {
+                return;
+            }
             const row = currentRow || pushRow("");
             row.consideration = row.consideration
                 ? `${row.consideration}\n${explicitConsiderationMatch[1].trim()}`
                 : explicitConsiderationMatch[1].trim();
+            return;
+        }
+
+        if (suppressSkillsCarryoverBlock) {
+            if (looksLikeHealthSafetyIssueHeading(line) && !isSkillsCarryoverHealthSafetyLabel(line)) {
+                suppressSkillsCarryoverBlock = false;
+                pushRow(line);
+            }
             return;
         }
 
@@ -783,6 +827,10 @@ function serializeHealthSafetyEditor(editor) {
     for (let index = 0; index < HEALTH_SAFETY_ROW_LIMIT; index += 1) {
         const issue = String(editor.issueFields?.[index]?.value || "").trim();
         const considerationLines = normalizeLines(editor.considerationFields?.[index]?.value || "");
+
+        if (isSkillsCarryoverHealthSafetyLabel(issue)) {
+            continue;
+        }
 
         if (!issue && !considerationLines.length) {
             continue;
