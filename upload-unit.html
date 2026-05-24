@@ -349,6 +349,19 @@
                     </fieldset>
 
                     <fieldset class="form-section">
+                        <legend>Unit Topics and Lesson Allocation</legend>
+                        <p class="help-text">Add your Unit Topics here, then choose one for each lesson in the Lesson Planner below.</p>
+                        <div class="unit-topics-manager">
+                            <div class="unit-topics-add-row">
+                                <input id="manual-unit-topic-input" type="text" placeholder="Type a Unit Topic, then click Add Topic">
+                                <button id="manual-add-unit-topic" class="button button-secondary" type="button">Add Topic</button>
+                            </div>
+                            <div id="manual-unit-topics-list" class="unit-topics-list" aria-live="polite"></div>
+                            <textarea id="manual-unit-topics" name="unitTopics" hidden></textarea>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="form-section">
                         <legend>Lesson Planner</legend>
                         <p class="help-text">Add one row per lesson. Mark each lesson to publish it to the Activity Library or place it on the shared calendar.</p>
                         <div class="unit-plan-toolbar">

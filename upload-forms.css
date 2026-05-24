@@ -610,6 +610,60 @@
     margin: 0 0 10px;
 }
 
+.unit-topics-manager {
+    display: grid;
+    gap: 10px;
+}
+
+.unit-topics-add-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+}
+
+.unit-topics-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-height: 40px;
+    padding: 8px;
+    border: 1px dashed #a9c3df;
+    border-radius: 8px;
+    background: #f6f9ff;
+}
+
+.unit-topics-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #eef4fd;
+    border: 1px solid #c8d5e7;
+    border-radius: 999px;
+    padding: 4px 8px 4px 10px;
+    color: #1f2f46;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.unit-topics-remove {
+    border: 0;
+    background: #8e1b08;
+    color: #ffffff;
+    border-radius: 999px;
+    min-width: 20px;
+    min-height: 20px;
+    line-height: 1;
+    cursor: pointer;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.unit-topics-empty {
+    color: #687f9c;
+    font-size: 0.74rem;
+    font-weight: 600;
+}
+
 .lesson-list {
     display: grid;
     gap: 12px;
@@ -772,6 +826,10 @@
     }
 
     .resources-equipment-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .unit-topics-add-row {
         grid-template-columns: 1fr;
     }
 

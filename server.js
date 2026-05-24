@@ -733,6 +733,7 @@ function normalizeUnitLessons(value) {
 
     return {
       lesson_index: Number.isInteger(lessonIndex) && lessonIndex > 0 ? lessonIndex : index + 1,
+      unit_topic: String(lesson?.unit_topic ?? lesson?.unitTopic ?? lesson?.lessonUnitTopic ?? "").trim(),
       week_label: String(lesson?.week_label ?? lesson?.weekLabel ?? lesson?.week ?? "").trim(),
       title: String(lesson?.title ?? lesson?.lesson_title ?? lesson?.lessonTitle ?? "").trim(),
       focus: String(lesson?.focus ?? lesson?.lesson_focus ?? lesson?.lessonFocus ?? "").trim(),
@@ -1110,6 +1111,7 @@ function buildUnitPlanPayload(body, userEmail) {
     subject_stream: String(body?.subject_stream || body?.subjectStream || "").trim().toUpperCase(),
     duration_weeks: Number.parseInt(body?.duration_weeks ?? body?.durationWeeks, 10) || 1,
     overview: String(body?.overview || "").trim(),
+    unit_topics: normalizeArray(body?.unit_topics ?? body?.unitTopics),
     unit_aims: normalizeArray(body?.unit_aims ?? body?.unitAims),
     unit_values: normalizeArray(body?.unit_values ?? body?.unitValues),
     contexts: normalizeArray(body?.contexts ?? body?.unitContexts),
@@ -1135,9 +1137,9 @@ async function saveUnitPlanPayload(payload) {
   const result = await pool.query(
     `
       INSERT INTO unit_plans (
-        id, title, topic, strand, year_level, term, subject_stream, duration_weeks, overview, unit_aims, unit_values, contexts, curriculum_links, assessment_link, notes, lessons, created_by_email, created_at, updated_at
+        id, title, topic, strand, year_level, term, subject_stream, duration_weeks, overview, unit_topics, unit_aims, unit_values, contexts, curriculum_links, assessment_link, notes, lessons, created_by_email, created_at, updated_at
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12::jsonb, $13::jsonb, $14, $15, $16::jsonb, $17, $18::timestamptz, $19::timestamptz
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12::jsonb, $13::jsonb, $14::jsonb, $15, $16, $17::jsonb, $18, $19::timestamptz, $20::timestamptz
       )
       ON CONFLICT (id) DO UPDATE SET
         title = EXCLUDED.title,
@@ -1148,6 +1150,7 @@ async function saveUnitPlanPayload(payload) {
         subject_stream = EXCLUDED.subject_stream,
         duration_weeks = EXCLUDED.duration_weeks,
         overview = EXCLUDED.overview,
+        unit_topics = EXCLUDED.unit_topics,
         unit_aims = EXCLUDED.unit_aims,
         unit_values = EXCLUDED.unit_values,
         contexts = EXCLUDED.contexts,
@@ -1169,6 +1172,7 @@ async function saveUnitPlanPayload(payload) {
       payload.subject_stream || null,
       payload.duration_weeks,
       payload.overview || null,
+      JSON.stringify(payload.unit_topics || []),
       JSON.stringify(payload.unit_aims || []),
       JSON.stringify(payload.unit_values || []),
       JSON.stringify(payload.contexts || []),
@@ -1483,6 +1487,7 @@ async function ensureUnitPlanSchema() {
       subject_stream TEXT,
       duration_weeks INTEGER NOT NULL DEFAULT 1,
       overview TEXT,
+      unit_topics JSONB NOT NULL DEFAULT '[]'::jsonb,
       unit_aims JSONB NOT NULL DEFAULT '[]'::jsonb,
       unit_values JSONB NOT NULL DEFAULT '[]'::jsonb,
       contexts JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -1497,6 +1502,7 @@ async function ensureUnitPlanSchema() {
   `);
 
   await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS unit_aims JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS unit_topics JSONB NOT NULL DEFAULT '[]'::jsonb`);
   await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS unit_values JSONB NOT NULL DEFAULT '[]'::jsonb`);
   await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS contexts JSONB NOT NULL DEFAULT '[]'::jsonb`);
   await pool.query(`ALTER TABLE unit_plans ADD COLUMN IF NOT EXISTS curriculum_links JSONB NOT NULL DEFAULT '[]'::jsonb`);

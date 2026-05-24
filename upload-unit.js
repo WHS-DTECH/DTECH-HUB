@@ -19,6 +19,10 @@ const cancelManualUploadButton = document.querySelector("#cancel-manual-upload")
 const clearManualFormButton = document.querySelector("#clear-manual-form");
 const lessonList = document.querySelector("#lesson-list");
 const addLessonButton = document.querySelector("#add-lesson");
+const manualUnitTopicInput = document.querySelector("#manual-unit-topic-input");
+const manualAddUnitTopicButton = document.querySelector("#manual-add-unit-topic");
+const manualUnitTopicsList = document.querySelector("#manual-unit-topics-list");
+const manualUnitTopicsHidden = document.querySelector("#manual-unit-topics");
 const pageTitleElement = document.querySelector(".upload-page > h1");
 const introTextElement = document.querySelector(".upload-page > .intro-text");
 
@@ -99,6 +103,7 @@ const manualFields = {
 const UPLOAD_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 let hasReadyFilePreview = false;
 let editUnitPlanId = "";
+let manualUnitTopics = [];
 
 const YEAR_LEVEL_OPTIONS = ["Junior", "Year 7", "Year 8", "Middle", "Year 9", "Year 10", "Senior", "Year 11", "Year 12", "Year 13"];
 const SCHOOL_VALUE_KEYS = ["whanaungatanga", "rangatiratanga", "manaakitanga", "kaitiakitanga"];
@@ -374,6 +379,140 @@ function normalizeLines(value) {
         .split(/\r?\n/)
         .map((line) => line.trim())
         .filter(Boolean);
+}
+
+function normalizeTopicText(value) {
+    return String(value || "")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+function normalizeUnitTopicList(values) {
+    const source = Array.isArray(values)
+        ? values
+        : String(values || "").split(/\r?\n|\s*,\s*/);
+    const seen = new Set();
+    const result = [];
+
+    source.forEach((value) => {
+        const topic = normalizeTopicText(value);
+        const key = topic.toLowerCase();
+        if (!topic || seen.has(key)) {
+            return;
+        }
+        seen.add(key);
+        result.push(topic);
+    });
+
+    return result;
+}
+
+function getLessonRows() {
+    if (!lessonList) {
+        return [];
+    }
+    return Array.from(lessonList.querySelectorAll("[data-lesson-row]"));
+}
+
+function getLessonTopicSelections() {
+    return getLessonRows()
+        .map((row) => normalizeTopicText(row.querySelector('[name="lessonUnitTopic"]')?.value || ""))
+        .filter(Boolean);
+}
+
+function applyTopicOptionsToSelect(select, selectedValue = "") {
+    if (!select) {
+        return;
+    }
+
+    const normalizedSelected = normalizeTopicText(selectedValue);
+    const optionList = normalizeUnitTopicList([...manualUnitTopics, ...getLessonTopicSelections(), normalizedSelected]);
+    select.innerHTML = `<option value="">Select unit topic</option>${optionList
+        .map((topic) => `<option value="${topic}">${topic}</option>`)
+        .join("")}`;
+
+    if (normalizedSelected && optionList.includes(normalizedSelected)) {
+        select.value = normalizedSelected;
+    }
+}
+
+function updateLessonTopicOptions() {
+    getLessonRows().forEach((row) => {
+        const select = row.querySelector('[name="lessonUnitTopic"]');
+        const selectedValue = normalizeTopicText(select?.value || "");
+        applyTopicOptionsToSelect(select, selectedValue);
+    });
+
+    const optionList = normalizeUnitTopicList([...manualUnitTopics, ...getLessonTopicSelections()]);
+
+    if (manualUnitTopicsHidden) {
+        manualUnitTopicsHidden.value = optionList.join("\n");
+    }
+}
+
+function renderUnitTopicsList() {
+    if (!manualUnitTopicsList) {
+        return;
+    }
+
+    manualUnitTopicsList.innerHTML = "";
+    if (!manualUnitTopics.length) {
+        const empty = document.createElement("p");
+        empty.className = "unit-topics-empty";
+        empty.textContent = "No Unit Topics added yet.";
+        manualUnitTopicsList.appendChild(empty);
+        if (manualUnitTopicsHidden) {
+            manualUnitTopicsHidden.value = "";
+        }
+        updateLessonTopicOptions();
+        return;
+    }
+
+    manualUnitTopics.forEach((topic, index) => {
+        const tag = document.createElement("div");
+        tag.className = "unit-topics-item";
+        tag.innerHTML = `<span>${topic}</span><button type="button" class="unit-topics-remove" data-remove-unit-topic="${index}" aria-label="Remove ${topic}">x</button>`;
+        manualUnitTopicsList.appendChild(tag);
+    });
+
+    if (manualUnitTopicsHidden) {
+        manualUnitTopicsHidden.value = manualUnitTopics.join("\n");
+    }
+
+    updateLessonTopicOptions();
+}
+
+function setManualUnitTopics(topics = []) {
+    const fromLessons = getLessonTopicSelections();
+    manualUnitTopics = normalizeUnitTopicList([...topics, ...fromLessons]);
+    renderUnitTopicsList();
+}
+
+function addManualUnitTopic(rawTopic) {
+    const topic = normalizeTopicText(rawTopic);
+    if (!topic) {
+        return;
+    }
+    manualUnitTopics = normalizeUnitTopicList([...manualUnitTopics, topic]);
+    renderUnitTopicsList();
+}
+
+function removeManualUnitTopic(indexToRemove) {
+    const index = Number.parseInt(indexToRemove, 10);
+    if (!Number.isInteger(index) || index < 0 || index >= manualUnitTopics.length) {
+        return;
+    }
+
+    const removedTopic = manualUnitTopics[index];
+    manualUnitTopics = manualUnitTopics.filter((_topic, indexValue) => indexValue !== index);
+    renderUnitTopicsList();
+
+    getLessonRows().forEach((row) => {
+        const select = row.querySelector('[name="lessonUnitTopic"]');
+        if (select && normalizeTopicText(select.value) === removedTopic) {
+            select.value = "";
+        }
+    });
 }
 
 function autoResizeTextarea(textarea) {
@@ -1160,6 +1299,12 @@ function createLessonRow(lesson = {}) {
                 <input name="lessonTitle" type="text" placeholder="Lesson title" required>
             </div>
             <div class="field">
+                <label>Unit Topic</label>
+                <select name="lessonUnitTopic">
+                    <option value="">Select unit topic</option>
+                </select>
+            </div>
+            <div class="field">
                 <label>Week / Session</label>
                 <input name="lessonWeek" type="text" placeholder="Week 1, Session 2">
             </div>
@@ -1212,6 +1357,7 @@ function createLessonRow(lesson = {}) {
     `;
 
     const lessonTitle = row.querySelector('[name="lessonTitle"]');
+    const lessonUnitTopic = row.querySelector('[name="lessonUnitTopic"]');
     const lessonWeek = row.querySelector('[name="lessonWeek"]');
     const lessonDate = row.querySelector('[name="lessonDate"]');
     const lessonDurationMinutes = row.querySelector('[name="lessonDurationMinutes"]');
@@ -1224,6 +1370,12 @@ function createLessonRow(lesson = {}) {
     const lessonNotes = row.querySelector('[name="lessonNotes"]');
     const publishActivity = row.querySelector('[name="publishActivity"]');
     const addToCalendar = row.querySelector('[name="addToCalendar"]');
+
+    const selectedUnitTopic = normalizeTopicText(lesson.lessonUnitTopic || lesson.unit_topic || lesson.unitTopic || "");
+    if (selectedUnitTopic) {
+        addManualUnitTopic(selectedUnitTopic);
+    }
+    applyTopicOptionsToSelect(lessonUnitTopic, selectedUnitTopic);
 
     lessonTitle.value = String(lesson.lessonTitle || lesson.title || "").trim();
     lessonWeek.value = String(lesson.lessonWeek || lesson.week_label || lesson.week || "").trim();
@@ -1239,12 +1391,23 @@ function createLessonRow(lesson = {}) {
     publishActivity.checked = coerceToggleValue(lesson.publishActivity ?? lesson.publish_activity, true);
     addToCalendar.checked = Boolean(lesson.addToCalendar ?? lesson.add_to_calendar);
 
+    if (lessonUnitTopic) {
+        lessonUnitTopic.addEventListener("change", () => {
+            const selected = normalizeTopicText(lessonUnitTopic.value);
+            if (selected) {
+                addManualUnitTopic(selected);
+            }
+            updateLessonTopicOptions();
+        });
+    }
+
     row.querySelector(".lesson-remove").addEventListener("click", () => {
         row.remove();
         if (!lessonList.querySelector("[data-lesson-row]")) {
             lessonList.appendChild(createLessonRow());
         }
         renumberLessons();
+        updateLessonTopicOptions();
     });
 
     return row;
@@ -1273,6 +1436,7 @@ function collectLessons() {
         .map((row, index) => ({
             lesson_index: index + 1,
             lessonTitle: String(row.querySelector('[name="lessonTitle"]')?.value || "").trim(),
+            unit_topic: normalizeTopicText(row.querySelector('[name="lessonUnitTopic"]')?.value || ""),
             lessonWeek: String(row.querySelector('[name="lessonWeek"]')?.value || "").trim(),
             lessonDate: String(row.querySelector('[name="lessonDate"]')?.value || "").trim(),
             lessonDurationMinutes: Number.parseInt(row.querySelector('[name="lessonDurationMinutes"]')?.value || "60", 10) || 60,
@@ -1308,6 +1472,11 @@ function populateManualPlannerFromUnitPlan(unitPlan) {
     if (manualFields.assessmentLink) manualFields.assessmentLink.value = String(unitPlan.assessment_link || "");
     if (manualFields.notes) manualFields.notes.value = String(unitPlan.notes || "");
 
+    const topicFromLessons = Array.isArray(unitPlan.lessons)
+        ? unitPlan.lessons.map((lesson) => lesson?.unit_topic ?? lesson?.unitTopic ?? lesson?.lessonUnitTopic)
+        : [];
+    setManualUnitTopics(unitPlan.unit_topics || topicFromLessons || []);
+
     if (lessonList) {
         lessonList.innerHTML = "";
         const lessons = Array.isArray(unitPlan.lessons) ? unitPlan.lessons : [];
@@ -1330,6 +1499,7 @@ function resetManualLessons() {
     lessonList.innerHTML = "";
     lessonList.appendChild(createLessonRow());
     renumberLessons();
+    updateLessonTopicOptions();
 }
 
 function showPreviewPanel(unitPlan, sourceLabel) {
@@ -1389,6 +1559,7 @@ function collectPreviewPayload() {
 }
 
 function collectManualPayload() {
+    const normalizedTopics = normalizeUnitTopicList([...manualUnitTopics, ...getLessonTopicSelections()]);
     return {
         title: String(manualFields.title?.value || "").trim(),
         topic: String(manualFields.topic?.value || "").trim(),
@@ -1401,6 +1572,7 @@ function collectManualPayload() {
         unit_values: schoolValueResponsesToUnitValues(getSchoolValueResponses(manualFields.unitValues)),
         contexts: contextResponsesToArray(getContextResponses(manualFields.contexts)),
         curriculum_links: curriculumResponsesToLines(getCurriculumLinkResponses(manualFields.curriculumLinks)),
+        unit_topics: normalizedTopics,
         assessment_link: String(manualFields.assessmentLink?.value || "").trim(),
         notes: String(manualFields.notes?.value || "").trim(),
         lessons: collectLessons(),
@@ -1695,12 +1867,48 @@ if (addLessonButton) {
         }
         lessonList.appendChild(createLessonRow());
         renumberLessons();
+        updateLessonTopicOptions();
+    });
+}
+
+if (manualAddUnitTopicButton) {
+    manualAddUnitTopicButton.addEventListener("click", () => {
+        addManualUnitTopic(manualUnitTopicInput?.value || "");
+        if (manualUnitTopicInput) {
+            manualUnitTopicInput.value = "";
+            manualUnitTopicInput.focus();
+        }
+    });
+}
+
+if (manualUnitTopicInput) {
+    manualUnitTopicInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            addManualUnitTopic(manualUnitTopicInput.value);
+            manualUnitTopicInput.value = "";
+        }
+    });
+}
+
+if (manualUnitTopicsList) {
+    manualUnitTopicsList.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) {
+            return;
+        }
+        const removeIndex = target.getAttribute("data-remove-unit-topic");
+        if (removeIndex === null) {
+            return;
+        }
+        removeManualUnitTopic(removeIndex);
     });
 }
 
 if (clearManualFormButton) {
     clearManualFormButton.addEventListener("click", () => {
         manualForm?.reset();
+        setManualUnitTopics([]);
         initializeHealthSafetyEditors();
         autoResizeSchoolValueTextareas();
         autoResizeContextTextareas();
@@ -1800,6 +2008,7 @@ if (uploadForm) {
 
 async function initUploadUnitPage() {
     renderAuthStatus();
+    setManualUnitTopics([]);
     resetManualLessons();
     setManualSaveStatus("");
     initializeHealthSafetyEditors();
