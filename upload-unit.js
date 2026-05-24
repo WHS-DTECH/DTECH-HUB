@@ -532,6 +532,9 @@ function canonicalizeTopicName(value) {
     if (/micro\s*:?\s*:?-?\s*bit/.test(text) || /microbit/.test(text)) {
         return "microbit";
     }
+    if (/^ardunio$/.test(text) || /^arduino$/.test(text)) {
+        return "arduino";
+    }
 
     return text.replace(/[^a-z0-9]+/g, " ").trim();
 }
@@ -557,6 +560,7 @@ function normalizeTopicNameDisplay(value) {
     const canonical = canonicalizeTopicName(value);
     if (canonical === "pcb") return "Printed Circuit Boards (PCB)";
     if (canonical === "microbit") return "Micro::bit";
+    if (canonical === "arduino") return "Arduino";
     if (!canonical) return "";
     return toTitleCase(String(value || "").trim());
 }
@@ -579,12 +583,27 @@ function isLikelyNoiseTopicLabel(topicLabel) {
     const parsed = parseUnitTopicLabel(topicLabel);
     const yearKey = canonicalizeYearLevel(parsed.yearLevel);
     const topicText = normalizeTopicText(parsed.topicName || topicLabel).toLowerCase();
+    const schoolValueLabels = new Set([
+        "whanaungatanga",
+        "manaakitanga",
+        "rangatiratanga",
+        "kotahitanga",
+        "kaitiakitanga"
+    ]);
 
     if (!topicText) {
         return true;
     }
 
     if (/^school\s*values?$/.test(topicText)) {
+        return true;
+    }
+
+    if (/^technology\s*strand$/.test(topicText)) {
+        return true;
+    }
+
+    if (schoolValueLabels.has(topicText)) {
         return true;
     }
 

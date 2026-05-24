@@ -859,7 +859,7 @@ function parseLessonRowsFromSlideshow(lines) {
   const activityHeadingPattern = /^(.+?)\s+activities?\s*:?$/i;
   const yearLevelPattern = /^(juniors?|middle(?:\/seniors?)?|seniors?|year\s*\d+(?:\s*(?:\/|and|&)\s*\d+)?)\b/i;
   const likelyLessonObjectivePattern = /^l\d+\s*[-:]|^\d+\s*[-:]/i;
-  const blockedTopicLabelPattern = /^(school\s*values?|level\s*\d+|year\s*\d+)$/i;
+  const blockedTopicLabelPattern = /^(school\s*values?|level\s*\d+|year\s*\d+|technology\s*strand|whanaungatanga|manaakitanga|rangatiratanga|kotahitanga|kaitiakitanga)$/i;
 
   const looksLikeUnitTopicLabel = (value) => {
     const text = String(value || "").trim();
@@ -935,6 +935,11 @@ function parseLessonRowsFromSlideshow(lines) {
       return;
     }
 
+    if (waitingForTopicAfterYear && blockedTopicLabelPattern.test(text)) {
+      waitingForTopicAfterYear = false;
+      return;
+    }
+
     if (waitingForTopicAfterYear && looksLikeUnitTopicLabel(text)) {
       currentUnitTopic = text;
       waitingForTopicAfterYear = false;
@@ -996,7 +1001,7 @@ function extractOrderedUnitTopicsFromSlideshow(lines) {
   const activityHeadingPattern = /^(.+?)\s+activities?\s*:?$/i;
   const ignoredHeadingPattern = /^(slideshow|reporting\s*&\s*assessment\s*link|unit\s*evaluation|assessment\s*link)$/i;
   const likelyLessonObjectivePattern = /^l\d+\s*[-:]|^\d+\s*[-:]/i;
-  const blockedTopicLabelPattern = /^(school\s*values?|level\s*\d+|year\s*\d+)$/i;
+  const blockedTopicLabelPattern = /^(school\s*values?|level\s*\d+|year\s*\d+|technology\s*strand|whanaungatanga|manaakitanga|rangatiratanga|kotahitanga|kaitiakitanga)$/i;
 
   const looksLikeUnitTopicLabel = (value) => {
     const text = String(value || "").trim();
@@ -1026,6 +1031,7 @@ function extractOrderedUnitTopicsFromSlideshow(lines) {
     if (!text) return "";
     if (/\bpcb\b/.test(text) || /printed\s*circuit\s*boards?/.test(text)) return "pcb";
     if (/micro\s*:?\s*:?-?\s*bit/.test(text) || /microbit/.test(text)) return "microbit";
+    if (/^ardunio$/.test(text) || /^arduino$/.test(text)) return "arduino";
     return text.replace(/[^a-z0-9]+/g, " ").trim();
   };
 
@@ -1058,6 +1064,7 @@ function extractOrderedUnitTopicsFromSlideshow(lines) {
     }
 
     if (ignoredHeadingPattern.test(text)) {
+      waitingForTopicAfterYear = false;
       return;
     }
 
@@ -1065,6 +1072,11 @@ function extractOrderedUnitTopicsFromSlideshow(lines) {
     if (activityMatch) {
       const topic = String(activityMatch[1] || "").replace(/:\s*$/, "").trim();
       addTopic(topic);
+      waitingForTopicAfterYear = false;
+      return;
+    }
+
+    if (waitingForTopicAfterYear && blockedTopicLabelPattern.test(text)) {
       waitingForTopicAfterYear = false;
       return;
     }
