@@ -612,7 +612,26 @@
 
 .unit-topics-manager {
     display: grid;
-    gap: 10px;
+    gap: 8px;
+}
+
+.unit-topics-section {
+    padding-top: 10px;
+}
+
+.unit-topics-section legend {
+    color: #0f3a69;
+    font-size: 1.05rem;
+    letter-spacing: 0.01em;
+    text-transform: none;
+}
+
+.unit-topics-help {
+    margin: 0;
+    color: #56789d;
+    font-size: 0.74rem;
+    text-decoration: underline;
+    text-underline-offset: 2px;
 }
 
 .unit-topics-add-row {
@@ -621,15 +640,37 @@
     gap: 8px;
 }
 
+.unit-topics-add-row input {
+    min-height: 32px;
+    background: #ffffff;
+}
+
+.unit-topics-add-button {
+    min-height: 32px;
+    padding: 5px 12px;
+    font-size: 0.71rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #8ea2ba;
+    background: #f2f5fa;
+    border: 1px solid #d2dbe7;
+}
+
+.unit-topics-add-button:hover {
+    color: #5f7894;
+    border-color: #b8c8da;
+    background: #ebf0f7;
+}
+
 .unit-topics-list {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    min-height: 40px;
-    padding: 8px;
+    min-height: 44px;
+    padding: 10px;
     border: 1px dashed #a9c3df;
     border-radius: 8px;
-    background: #f6f9ff;
+    background: #f4f7fc;
 }
 
 .unit-topics-item {
@@ -659,9 +700,10 @@
 }
 
 .unit-topics-empty {
-    color: #687f9c;
+    color: #617f9f;
     font-size: 0.74rem;
     font-weight: 600;
+    margin: 0;
 }
 
 .lesson-list {
