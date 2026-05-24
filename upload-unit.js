@@ -1758,6 +1758,7 @@ function createLessonRow(lesson = {}) {
                 <div class="field">
                     <label>Card Category</label>
                     <select name="lessonType">
+                        <option>Lesson</option>
                         <option>Activity</option>
                         <option>Skill Activity</option>
                         <option>Project</option>
@@ -1874,7 +1875,7 @@ function createLessonRow(lesson = {}) {
     lessonWeek.value = String(lesson.lessonWeek || lesson.week_label || lesson.week || "").trim();
     lessonDate.value = String(lesson.lessonDate || lesson.calendar_date || "").trim();
     lessonDurationMinutes.value = String(lesson.lessonDurationMinutes || lesson.duration_minutes || 60).trim();
-    lessonType.value = String(lesson.lessonType || lesson.activity_type || "Activity").trim() || "Activity";
+    lessonType.value = String(lesson.lessonType || lesson.activity_type || "Lesson").trim() || "Lesson";
     lessonSubjectStream.value = String(lesson.lessonSubjectStream || lesson.subject_stream || manualFields?.subjectStream?.value || "").trim().toUpperCase();
     lessonTopicType.value = String(lesson.lessonTopicType || lesson.type || manualFields?.topic?.value || "").trim();
     lessonCardColor.value = String(lesson.lessonCardColor || lesson.card_color || "Rose").trim() || "Rose";
