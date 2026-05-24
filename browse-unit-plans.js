@@ -149,6 +149,7 @@ function renderTopicTabs() {
         pill.addEventListener("click", () => {
             selectedTopicType = topicType;
             selectedUnitPlanId = "";
+            renderTopicTabs();
             renderRows();
         });
         topicPillsElement.appendChild(pill);
