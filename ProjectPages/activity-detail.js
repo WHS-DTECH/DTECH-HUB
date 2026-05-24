@@ -178,6 +178,18 @@ function normalizeStudentEmailInput(value) {
     return trimmed;
 }
 
+function normalizeCardCategory(value, fallback = "Activity") {
+    const raw = String(value || "").trim().toLowerCase();
+    if (!raw) return fallback;
+
+    if (raw === "project") return "Project";
+    if (raw === "lesson") return "Lesson";
+    if (raw === "assessment task" || raw === "assessment activity" || raw === "assessment") return "Assessment Task";
+    if (raw === "activity" || raw === "skill activity" || raw === "practice" || raw === "practice activity") return "Activity";
+
+    return fallback;
+}
+
 function readStoredHubEmail() {
     const raw = localStorage.getItem(DETAIL_HUB_AUTH_STORAGE_KEY) || sessionStorage.getItem(DETAIL_HUB_AUTH_STORAGE_KEY);
     if (!raw) return "";
@@ -283,7 +295,7 @@ async function readSharedActivity(activityId) {
         type: found.type || "Digital Learning",
             duration: `${normalizeDurationMinutes(found)} mins`,
         term: found.term || "Term 2",
-        activityCategory: found.activity_category || "Practice",
+        activityCategory: normalizeCardCategory(found.activity_category, "Activity"),
             showInThisWeek: Boolean(found.show_in_this_week ?? found.show_this_week ?? found.is_pinned ?? found.is_this_week),
         summary: String(found.description || found.summary || "").trim(),
         resources: toArray(found.resources),
@@ -362,7 +374,7 @@ function defaultDetailShape(id, data) {
         type: String(data?.type || "").trim() || "Digital Learning",
         duration: String(data?.duration || "120 mins").trim() || "120 mins",
         term: String(data?.term || "Term 2").trim() || "Term 2",
-        activityCategory: String(data?.activityCategory || "Practice").trim() || "Practice",
+        activityCategory: normalizeCardCategory(data?.activityCategory, "Activity"),
         showInThisWeek: Boolean(data?.showInThisWeek),
         summary: String(data?.summary || "").trim(),
         resources: Array.isArray(data?.resources) ? data.resources : [],
@@ -659,7 +671,7 @@ async function saveDetails(id, draft) {
         name: draft.title,
         year_level: draft.yearLevel,
         type: draft.type,
-        activity_category: draft.activityCategory,
+            activity_category: normalizeCardCategory(draft.activityCategory, "Activity"),
         duration_minutes: parseDurationMinutes(draft.durationMinutes),
         outcome_image_url: draft.image,
         description: draft.summary,
@@ -717,7 +729,7 @@ async function saveDetails(id, draft) {
             ? `${result.duration_minutes} mins`
             : `${parseDurationMinutes(draft.durationMinutes)} mins`,
         term: result.term || draft.term,
-        activityCategory: result.activity_category || draft.activityCategory,
+        activityCategory: normalizeCardCategory(result.activity_category || draft.activityCategory, "Activity"),
         showInThisWeek: Boolean(result.show_in_this_week ?? result.show_this_week ?? result.is_pinned ?? result.is_this_week ?? draft.showInThisWeek),
         summary: String(result.description || result.summary || draft.summary || "").trim(),
         resources: Array.isArray(result.resources) ? result.resources : draft.resources,
@@ -800,7 +812,12 @@ function renderEditForm(host, id, data) {
                     </label>
                     <label class="detail-field">
                         <span>Activity Category</span>
-                        <input name="activityCategory" type="text" value="${escapeHtml(data.activityCategory || "Practice")}">
+                        <select name="activityCategory">
+                            <option${normalizeCardCategory(data.activityCategory, "Activity") === "Activity" ? " selected" : ""}>Activity</option>
+                            <option${normalizeCardCategory(data.activityCategory, "Activity") === "Project" ? " selected" : ""}>Project</option>
+                            <option${normalizeCardCategory(data.activityCategory, "Activity") === "Assessment Task" ? " selected" : ""}>Assessment Task</option>
+                            <option${normalizeCardCategory(data.activityCategory, "Activity") === "Lesson" ? " selected" : ""}>Lesson</option>
+                        </select>
                     </label>
                 </div>
             </fieldset>
@@ -824,7 +841,7 @@ function renderEditForm(host, id, data) {
                         <span>Company</span>
                         <input name="company" type="text" value="${escapeHtml(data.company)}">
                     </label>
-                    <label class="detail-field detail-field-full">
+                                activityCategory: normalizeCardCategory(data?.activityCategory || "", "Activity"),
                         <span>Address</span>
                         <input name="address" type="text" value="${escapeHtml(data.address)}">
                     </label>
@@ -955,7 +972,7 @@ function renderEditForm(host, id, data) {
             type: String(formData.get("type") || "").trim(),
             durationMinutes: String(formData.get("durationMinutes") || "").trim(),
             term: String(formData.get("term") || "").trim() || "Term 2",
-            activityCategory: String(formData.get("activityCategory") || "").trim() || "Practice",
+            activityCategory: normalizeCardCategory(formData.get("activityCategory"), "Activity"),
             summary: String(formData.get("summary") || "").trim(),
             image: String(formData.get("image") || "").trim() || "https://placehold.co/900x560/3f89cf/ffffff?text=Uploaded+Activity",
             resources: parseLines(formData.get("resources")),

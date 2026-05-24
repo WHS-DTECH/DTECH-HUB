@@ -11,6 +11,18 @@ const params = new URLSearchParams(window.location.search);
 const editId = Number(params.get('id'));
 const isEditMode = Number.isInteger(editId) && editId > 0;
 
+function normalizeCardCategory(value, fallback = 'Activity') {
+  const raw = String(value || '').trim().toLowerCase();
+  if (!raw) return fallback;
+
+  if (raw === 'project') return 'Project';
+  if (raw === 'lesson') return 'Lesson';
+  if (raw === 'assessment task' || raw === 'assessment activity' || raw === 'assessment') return 'Assessment Task';
+  if (raw === 'activity' || raw === 'skill' || raw === 'skill activity' || raw === 'practice' || raw === 'practice activity') return 'Activity';
+
+  return fallback;
+}
+
 function setStatus(msg, isError) {
   if (!statusEl) return;
   statusEl.textContent = msg;
@@ -75,7 +87,7 @@ async function loadActivityForEdit() {
     setValue('activity-name', data.name);
     setValue('activity-year', data.year_level);
     setValue('activity-type', data.type);
-    setValue('activity-category', data.activity_category || 'Practice');
+    setValue('activity-category', normalizeCardCategory(data.activity_category, 'Activity'));
     setValue('activity-duration', data.duration_hours);
     setValue('activity-difficulty', data.difficulty);
     setValue('activity-color', data.color || 'color-rose');
@@ -110,7 +122,7 @@ if (form) {
       name: document.getElementById('activity-name')?.value?.trim(),
       year_level: document.getElementById('activity-year')?.value,
       type: document.getElementById('activity-type')?.value?.trim(),
-      activity_category: document.getElementById('activity-category')?.value,
+      activity_category: normalizeCardCategory(document.getElementById('activity-category')?.value, 'Activity'),
       duration_hours: Number(document.getElementById('activity-duration')?.value),
       difficulty: document.getElementById('activity-difficulty')?.value,
       description: document.getElementById('activity-description')?.value?.trim() || null,
