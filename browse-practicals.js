@@ -8,6 +8,12 @@ const practicalsForm = document.querySelector("#practicals-form");
 const practicalsFormStatus = document.querySelector("#practicals-form-status");
 const practicalsManage = document.querySelector("#practicals-manage");
 const icsUrlCopy = document.querySelector("#ics-url-copy");
+const studentManager = document.querySelector("#practicals-student-manager");
+const studentPracticalBody = document.querySelector("#student-practical-body");
+const studentPracticalStatus = document.querySelector("#student-practical-status");
+const studentPracticalMeta = document.querySelector("#student-practical-meta");
+const studentPracticalSearch = document.querySelector("#student-practical-search");
+const studentPracticalStrand = document.querySelector("#student-practical-strand");
 
 const BROWSE_PRACTICALS_AUTH_KEY = "hub_google_auth_v1";
 
@@ -15,11 +21,249 @@ let practicalEvents = [];
 let visibleMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let signedInEmail = "";
 let canManage = false;
+let studentPracticalRows = [];
+
+const SENIOR_MIN_YEAR = 11;
+const SENIOR_TARGET_STRANDS = new Set(["DTECH", "COMP", "DTONLINE"]);
+
+function escapeHtml(value) {
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
 
 function setStatus(target, message, isError = false) {
     if (!target) return;
     target.textContent = message;
     target.style.color = isError ? "#bb3f3f" : "#2f4e73";
+}
+
+function normalizeEmail(value) {
+    return String(value || "").trim().toLowerCase();
+}
+
+function yearIsSenior(yearLevel) {
+    const year = Number.parseInt(String(yearLevel || "").replace(/\D+/g, ""), 10);
+    return Number.isInteger(year) && year >= SENIOR_MIN_YEAR;
+}
+
+function getStudentStrands(student) {
+    const programs = Array.isArray(student?.programs) ? student.programs : [];
+    return programs
+        .map((value) => String(value || "").trim().toUpperCase())
+        .filter((value) => SENIOR_TARGET_STRANDS.has(value));
+}
+
+function formatStrandLabel(value) {
+    return value === "DTONLINE" ? "DT ONLINE" : value;
+}
+
+function inferPracticalType(record) {
+    const category = String(record?.activity_category || record?.activityCategory || "").trim().toLowerCase();
+    if (category.includes("assessment")) return "Assessment Task";
+    if (category.includes("project")) return "Project";
+    return "Practical";
+}
+
+function buildPracticalMap(activities, projectInterests) {
+    const activityMeta = new Map();
+
+    (Array.isArray(activities) ? activities : []).forEach((record) => {
+        const id = String(record?.id || "").trim();
+        if (!id) return;
+        activityMeta.set(id, {
+            title: String(record?.name || record?.title || id).trim() || id,
+            type: inferPracticalType(record)
+        });
+    });
+
+    const byStudentEmail = new Map();
+    (Array.isArray(projectInterests) ? projectInterests : []).forEach((entry) => {
+        const projectId = String(entry?.project_id || "").trim();
+        const students = Array.isArray(entry?.students) ? entry.students : [];
+        const projectName = String(entry?.project_name || "").trim();
+        const meta = activityMeta.get(projectId) || {
+            title: projectName || projectId,
+            type: "Practical"
+        };
+
+        students.forEach((student) => {
+            const email = normalizeEmail(student?.student_email || student?.email);
+            if (!email) return;
+
+            if (!byStudentEmail.has(email)) {
+                byStudentEmail.set(email, []);
+            }
+
+            byStudentEmail.get(email).push({
+                id: projectId,
+                title: meta.title,
+                type: meta.type,
+                confirmed: Boolean(student?.confirmed)
+            });
+        });
+    });
+
+    return byStudentEmail;
+}
+
+function sortStudentsByLastName(left, right) {
+    const leftName = String(left?.student_name || "").trim();
+    const rightName = String(right?.student_name || "").trim();
+
+    const getLast = (value) => {
+        if (!value) return "";
+        if (value.includes(",")) return value.split(",")[0].trim().toLowerCase();
+        const parts = value.split(/\s+/).filter(Boolean);
+        return (parts[parts.length - 1] || "").toLowerCase();
+    };
+
+    const byLast = getLast(leftName).localeCompare(getLast(rightName), undefined, { numeric: true });
+    if (byLast) return byLast;
+    return leftName.localeCompare(rightName, undefined, { numeric: true });
+}
+
+function buildStudentPracticalRows(students, byStudentEmail) {
+    return (Array.isArray(students) ? students : [])
+        .filter((student) => String(student?.status || "").toLowerCase() !== "not current")
+        .filter((student) => yearIsSenior(student?.year_level))
+        .map((student) => {
+            const strands = getStudentStrands(student);
+            const linkedEmails = Array.isArray(student?.linked_emails)
+                ? student.linked_emails.map((value) => normalizeEmail(value)).filter(Boolean)
+                : [];
+
+            const practicalsById = new Map();
+            linkedEmails.forEach((email) => {
+                const matches = byStudentEmail.get(email) || [];
+                matches.forEach((item) => {
+                    const key = `${item.id}::${item.title}`;
+                    if (!practicalsById.has(key)) {
+                        practicalsById.set(key, item);
+                    }
+                });
+            });
+
+            return {
+                student_name: String(student?.student_name || "Unnamed student").trim() || "Unnamed student",
+                year_level: String(student?.year_level || "").trim(),
+                form_class: String(student?.form_class || "").trim(),
+                linked_emails: linkedEmails,
+                strands,
+                practicals: Array.from(practicalsById.values()).sort((a, b) => a.title.localeCompare(b.title))
+            };
+        })
+        .filter((row) => row.strands.length)
+        .sort(sortStudentsByLastName);
+}
+
+function renderStudentPracticalTable() {
+    if (!studentPracticalBody) return;
+
+    const searchQuery = String(studentPracticalSearch?.value || "").trim().toLowerCase();
+    const strandFilter = String(studentPracticalStrand?.value || "all").trim().toUpperCase();
+
+    const visibleRows = studentPracticalRows.filter((row) => {
+        if (strandFilter !== "ALL" && !row.strands.includes(strandFilter)) {
+            return false;
+        }
+
+        if (!searchQuery) {
+            return true;
+        }
+
+        const haystack = [
+            row.student_name,
+            row.year_level,
+            row.form_class,
+            ...row.strands,
+            ...row.practicals.map((item) => item.title),
+            ...row.practicals.map((item) => item.type)
+        ]
+            .join(" ")
+            .toLowerCase();
+
+        return haystack.includes(searchQuery);
+    });
+
+    if (studentPracticalMeta) {
+        studentPracticalMeta.textContent = `Showing ${visibleRows.length} of ${studentPracticalRows.length} senior students in DTECH, COMP, or DT ONLINE.`;
+    }
+
+    if (!visibleRows.length) {
+        studentPracticalBody.innerHTML = `<tr><td colspan="4" class="empty-note">No students matched your current filter.</td></tr>`;
+        return;
+    }
+
+    studentPracticalBody.innerHTML = visibleRows.map((row) => {
+        const yearForm = [row.year_level && `Year ${row.year_level}`, row.form_class].filter(Boolean).join(" | ") || "Not specified";
+        const strandPills = row.strands.map((strand) => `<span class="strand-pill">${escapeHtml(formatStrandLabel(strand))}</span>`).join("");
+        const practicalPills = row.practicals.length
+            ? row.practicals.map((item) => {
+                const typeClass = item.type === "Assessment Task" ? "is-assessment" : (item.type === "Project" ? "is-project" : "");
+                const confirmedClass = item.confirmed ? "" : " is-unconfirmed";
+                return `<span class="practical-pill ${typeClass}${confirmedClass}">${escapeHtml(item.title)} (${escapeHtml(item.type)})</span>`;
+            }).join("")
+            : `<span class="empty-note">No practical allocations yet.</span>`;
+
+        return `
+            <tr>
+                <td>
+                    <div class="student-practical-name">${escapeHtml(row.student_name)}</div>
+                    <div class="student-practical-subline">${row.linked_emails.length ? escapeHtml(row.linked_emails.join(", ")) : "No linked email keys"}</div>
+                </td>
+                <td>${escapeHtml(yearForm)}</td>
+                <td><div class="strand-pill-row">${strandPills}</div></td>
+                <td><div class="practical-pill-row">${practicalPills}</div></td>
+            </tr>
+        `;
+    }).join("");
+}
+
+async function loadStudentPracticalTracker() {
+    if (!canManage || !signedInEmail || !studentManager) return;
+
+    try {
+        setStatus(studentPracticalStatus, "Loading student practical tracker...");
+        const [studentsResponse, activitiesResponse, interestsResponse] = await Promise.all([
+            fetch("/api/class-management/students?current_only=true&dtech_only=false", {
+                headers: { "x-user-email": signedInEmail }
+            }),
+            fetch("/api/activities"),
+            fetch("/api/project-interests", {
+                headers: { "x-user-email": signedInEmail }
+            })
+        ]);
+
+        if (!studentsResponse.ok) {
+            throw new Error("Could not load students from Class Management.");
+        }
+        if (!activitiesResponse.ok) {
+            throw new Error("Could not load practical records.");
+        }
+        if (!interestsResponse.ok) {
+            throw new Error("Could not load practical allocations.");
+        }
+
+        const studentsPayload = await studentsResponse.json().catch(() => ({}));
+        const activities = await activitiesResponse.json().catch(() => []);
+        const projectInterests = await interestsResponse.json().catch(() => []);
+        const studentRows = Array.isArray(studentsPayload?.students) ? studentsPayload.students : [];
+
+        const byStudentEmail = buildPracticalMap(activities, projectInterests);
+        studentPracticalRows = buildStudentPracticalRows(studentRows, byStudentEmail);
+
+        renderStudentPracticalTable();
+        setStatus(studentPracticalStatus, `Loaded ${studentPracticalRows.length} students into the practical tracker.`);
+    } catch (error) {
+        if (studentPracticalBody) {
+            studentPracticalBody.innerHTML = `<tr><td colspan="4" class="empty-note">Could not load student practical tracker.</td></tr>`;
+        }
+        setStatus(studentPracticalStatus, error.message || "Could not load student practical tracker.", true);
+    }
 }
 
 function toIsoDate(date) {
@@ -235,6 +479,7 @@ async function resolveManageAccess() {
 
     if (!signedInEmail) {
         if (practicalsManage) practicalsManage.hidden = true;
+        if (studentManager) studentManager.hidden = true;
         return;
     }
 
@@ -249,9 +494,21 @@ async function resolveManageAccess() {
         if (practicalsManage) {
             practicalsManage.hidden = !canManage;
         }
+        if (studentManager) {
+            studentManager.hidden = !canManage;
+        }
     } catch (_error) {
         if (practicalsManage) practicalsManage.hidden = true;
+        if (studentManager) studentManager.hidden = true;
     }
+}
+
+if (studentPracticalSearch) {
+    studentPracticalSearch.addEventListener("input", () => renderStudentPracticalTable());
+}
+
+if (studentPracticalStrand) {
+    studentPracticalStrand.addEventListener("change", () => renderStudentPracticalTable());
 }
 
 if (monthPrev) {
@@ -321,5 +578,8 @@ if (practicalsForm) {
 
     resolveManageAccess().then(() => {
         loadEvents();
+        if (canManage) {
+            loadStudentPracticalTracker();
+        }
     });
 })();

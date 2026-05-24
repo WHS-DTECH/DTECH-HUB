@@ -60,6 +60,56 @@
                 </div>
             </section>
 
+            <section id="practicals-student-manager" class="panel-section practicals-student-manager" hidden>
+                <div class="practicals-student-head">
+                    <div>
+                        <p class="section-kicker">Teacher/Admin Tools</p>
+                        <h2>Senior Student Practical Tracker</h2>
+                        <p class="section-copy">Students are pulled from Class Management and filtered to Senior classes with DTECH, COMP, or DT ONLINE strands.</p>
+                    </div>
+                    <div class="practicals-student-actions">
+                        <a class="button button-secondary" href="teacher-project-allocation.html">Manage Projects</a>
+                        <a class="button button-secondary" href="teacher-assessment-allocation.html">Manage Assessment Tasks</a>
+                    </div>
+                </div>
+
+                <div class="practicals-student-filters">
+                    <div class="field">
+                        <label for="student-practical-search">Search Student Or Practical</label>
+                        <input id="student-practical-search" type="search" placeholder="Search by student name, strand, or practical title">
+                    </div>
+                    <div class="field">
+                        <label for="student-practical-strand">Subject Strand</label>
+                        <select id="student-practical-strand">
+                            <option value="all">All strands</option>
+                            <option value="DTECH">DTECH</option>
+                            <option value="COMP">COMP</option>
+                            <option value="DTONLINE">DT ONLINE</option>
+                        </select>
+                    </div>
+                </div>
+
+                <p id="student-practical-meta" class="results-meta">Loading student practical tracker...</p>
+                <div class="practicals-student-table-wrap">
+                    <table class="practicals-student-table">
+                        <thead>
+                            <tr>
+                                <th>Student</th>
+                                <th>Year / Form</th>
+                                <th>Subject Strand</th>
+                                <th>Current Practicals / Assessment Tasks</th>
+                            </tr>
+                        </thead>
+                        <tbody id="student-practical-body">
+                            <tr>
+                                <td colspan="4" class="empty-note">Loading student practical tracker...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p id="student-practical-status" class="upload-status" aria-live="polite"></p>
+            </section>
+
             <section class="practicals-layout">
                 <section class="panel-section practicals-calendar-wrap">
                     <div class="practicals-monthbar">
