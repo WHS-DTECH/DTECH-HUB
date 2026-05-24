@@ -854,9 +854,20 @@ function parseLessonRowsFromSlideshow(lines) {
   let waitingForTitle = false;
   let currentYearLevel = "";
   let currentUnitTopic = "";
+  let waitingForTopicAfterYear = false;
   const urlPattern = /(https?:\/\/[^\s)]+|www\.[^\s)]+)/i;
   const activityHeadingPattern = /^(.+?)\s+activities?\s*:?$/i;
   const yearLevelPattern = /^(juniors?|middle(?:\/seniors?)?|seniors?|year\s*\d+(?:\s*(?:\/|and|&)\s*\d+)?)\b/i;
+  const likelyLessonObjectivePattern = /^l\d+\s*[-:]|^\d+\s*[-:]/i;
+
+  const looksLikeUnitTopicLabel = (value) => {
+    const text = String(value || "").trim();
+    if (!text) return false;
+    if (likelyLessonObjectivePattern.test(text)) return false;
+    if (/[.;!?]$/.test(text) || text.includes(". ")) return false;
+    if (text.length > 70) return false;
+    return true;
+  };
 
   const formatContextUnitTopic = () => {
     const year = String(currentYearLevel || "").trim();
@@ -910,6 +921,7 @@ function parseLessonRowsFromSlideshow(lines) {
     if (yearLevelPattern.test(text)) {
       flushLesson();
       currentYearLevel = text;
+      waitingForTopicAfterYear = true;
       return;
     }
 
@@ -917,6 +929,13 @@ function parseLessonRowsFromSlideshow(lines) {
     if (activityHeadingMatch) {
       flushLesson();
       currentUnitTopic = String(activityHeadingMatch[1] || "").replace(/:\s*$/, "").trim();
+      waitingForTopicAfterYear = false;
+      return;
+    }
+
+    if (waitingForTopicAfterYear && looksLikeUnitTopicLabel(text)) {
+      currentUnitTopic = text;
+      waitingForTopicAfterYear = false;
       return;
     }
 
@@ -969,10 +988,23 @@ function extractOrderedUnitTopicsFromSlideshow(lines) {
   const topics = [];
   const seen = new Set();
   let currentYearLevel = "";
+  let waitingForTopicAfterYear = false;
 
   const yearLevelPattern = /^(juniors?|middle(?:\/seniors?)?|seniors?|year\s*\d+(?:\s*(?:\/|and|&)\s*\d+)?)\b/i;
   const activityHeadingPattern = /^(.+?)\s+activities?\s*:?$/i;
   const ignoredHeadingPattern = /^(slideshow|reporting\s*&\s*assessment\s*link|unit\s*evaluation|assessment\s*link)$/i;
+  const likelyLessonObjectivePattern = /^l\d+\s*[-:]|^\d+\s*[-:]/i;
+
+  const looksLikeUnitTopicLabel = (value) => {
+    const text = String(value || "").trim();
+    if (!text) return false;
+    if (ignoredHeadingPattern.test(text)) return false;
+    if (yearLevelPattern.test(text)) return false;
+    if (likelyLessonObjectivePattern.test(text)) return false;
+    if (/[.;!?]$/.test(text) || text.includes(". ")) return false;
+    if (text.length > 70) return false;
+    return true;
+  };
 
   const canonicalizeYearLevel = (value) => {
     const text = String(value || "").trim().toLowerCase();
@@ -1017,6 +1049,7 @@ function extractOrderedUnitTopicsFromSlideshow(lines) {
 
     if (yearLevelPattern.test(text)) {
       currentYearLevel = text;
+      waitingForTopicAfterYear = true;
       return;
     }
 
@@ -1028,6 +1061,13 @@ function extractOrderedUnitTopicsFromSlideshow(lines) {
     if (activityMatch) {
       const topic = String(activityMatch[1] || "").replace(/:\s*$/, "").trim();
       addTopic(topic);
+      waitingForTopicAfterYear = false;
+      return;
+    }
+
+    if (waitingForTopicAfterYear && looksLikeUnitTopicLabel(text)) {
+      addTopic(text);
+      waitingForTopicAfterYear = false;
       return;
     }
   });
