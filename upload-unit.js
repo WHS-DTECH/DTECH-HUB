@@ -428,6 +428,10 @@ function inferUnitTopicFromLessonLike(lesson) {
     return "";
 }
 
+function getExplicitUnitTopicFromLesson(lesson) {
+    return normalizeTopicText(lesson?.unit_topic ?? lesson?.unitTopic ?? lesson?.lessonUnitTopic ?? "");
+}
+
 function normalizeUnitTopicList(values) {
     const source = Array.isArray(values)
         ? values
@@ -1511,9 +1515,10 @@ function createLessonRow(lesson = {}) {
     const publishActivity = row.querySelector('[name="publishActivity"]');
     const addToCalendar = row.querySelector('[name="addToCalendar"]');
 
-    const selectedUnitTopic = inferUnitTopicFromLessonLike(lesson);
-    if (selectedUnitTopic) {
-        addManualUnitTopic(selectedUnitTopic);
+    const explicitUnitTopic = getExplicitUnitTopicFromLesson(lesson);
+    const selectedUnitTopic = explicitUnitTopic || (manualUnitTopics.length ? "" : inferUnitTopicFromLessonLike(lesson));
+    if (explicitUnitTopic) {
+        addManualUnitTopic(explicitUnitTopic);
     }
     applyTopicOptionsToSelect(lessonUnitTopic, selectedUnitTopic);
 
@@ -1613,9 +1618,14 @@ function populateManualPlannerFromUnitPlan(unitPlan) {
     if (manualFields.notes) manualFields.notes.value = String(unitPlan.notes || "");
 
     const topicFromLessons = Array.isArray(unitPlan.lessons)
-        ? unitPlan.lessons.map((lesson) => inferUnitTopicFromLessonLike(lesson))
+        ? unitPlan.lessons.map((lesson) => getExplicitUnitTopicFromLesson(lesson))
         : [];
-    setManualUnitTopics(unitPlan.unit_topics || topicFromLessons || []);
+    const fallbackTopics = topicFromLessons.some(Boolean)
+        ? topicFromLessons
+        : (Array.isArray(unitPlan.lessons)
+            ? unitPlan.lessons.map((lesson) => inferUnitTopicFromLessonLike(lesson))
+            : []);
+    setManualUnitTopics(unitPlan.unit_topics || fallbackTopics || []);
 
     if (lessonList) {
         lessonList.innerHTML = "";

@@ -982,6 +982,57 @@ function parseLessonRowsFromSlideshow(lines) {
   return lessons;
 }
 
+function extractOrderedUnitTopicsFromSlideshow(lines) {
+  const topics = [];
+  const seen = new Set();
+  let currentYearLevel = "";
+
+  const yearLevelPattern = /^(juniors?|middle(?:\/seniors?)?|seniors?|year\s*\d+(?:\s*(?:\/|and|&)\s*\d+)?)\b/i;
+  const activityHeadingPattern = /^(.+?)\s+activities?\s*:?$/i;
+  const ignoredHeadingPattern = /^(slideshow|reporting\s*&\s*assessment\s*link|unit\s*evaluation|assessment\s*link)$/i;
+
+  const addTopic = (topicValue) => {
+    const topic = String(topicValue || "").trim();
+    if (!topic) {
+      return;
+    }
+
+    const label = currentYearLevel ? `${currentYearLevel} | ${topic}` : topic;
+    const key = label.toLowerCase();
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    topics.push(label);
+  };
+
+  (Array.isArray(lines) ? lines : []).forEach((line) => {
+    const text = String(line || "").trim();
+    if (!text) {
+      return;
+    }
+
+    if (yearLevelPattern.test(text)) {
+      currentYearLevel = text;
+      return;
+    }
+
+    if (ignoredHeadingPattern.test(text)) {
+      return;
+    }
+
+    const activityMatch = text.match(activityHeadingPattern);
+    if (activityMatch) {
+      const topic = String(activityMatch[1] || "").replace(/:\s*$/, "").trim();
+      addTopic(topic);
+      return;
+    }
+  });
+
+  return topics;
+}
+
 function detectSubjectStreamFromText(text) {
   const lower = String(text || "").toLowerCase();
   if (lower.includes("dtech") || lower.includes("digital technology")) return "DTECH";
@@ -1108,11 +1159,13 @@ function parseUnitPlanFromDocxText(rawText, originalName = "") {
   const notes = extractLinesBetween(lines, evaluationIndex + 1, lines.length).join(" ");
   const lessonLines = extractLinesBetween(lines, slideshowIndex + 1, reportingIndex);
   const lessons = normalizeUnitLessons(parseLessonRowsFromSlideshow(lessonLines));
-  const unitTopics = Array.from(new Set(
+  const orderedTopicsFromTable = extractOrderedUnitTopicsFromSlideshow(lessonLines);
+  const topicsFromLessons = Array.from(new Set(
     lessons
       .map((lesson) => String(lesson?.unit_topic || "").trim())
       .filter(Boolean)
   ));
+  const unitTopics = orderedTopicsFromTable.length ? orderedTopicsFromTable : topicsFromLessons;
 
   return {
     title: topic,
