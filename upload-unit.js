@@ -396,6 +396,38 @@ function normalizeTopicText(value) {
         .trim();
 }
 
+function inferUnitTopicFromLessonLike(lesson) {
+    const explicit = normalizeTopicText(lesson?.unit_topic ?? lesson?.unitTopic ?? lesson?.lessonUnitTopic ?? "");
+    if (explicit) {
+        return explicit;
+    }
+
+    const candidates = [
+        lesson?.title,
+        lesson?.lessonTitle,
+        lesson?.activity_name,
+        lesson?.activityName,
+        lesson?.lessonType,
+        lesson?.activity_type
+    ]
+        .map((value) => normalizeTopicText(value || ""))
+        .filter(Boolean);
+
+    for (const value of candidates) {
+        const cleaned = normalizeTopicText(
+            value
+                .replace(/activities?\s*:?$/i, "")
+                .replace(/:\s*$/, "")
+                .replace(/^l\d+\s*[-:]\s*/i, "")
+        );
+        if (cleaned && cleaned.length <= 64) {
+            return cleaned;
+        }
+    }
+
+    return "";
+}
+
 function normalizeUnitTopicList(values) {
     const source = Array.isArray(values)
         ? values
@@ -1479,7 +1511,7 @@ function createLessonRow(lesson = {}) {
     const publishActivity = row.querySelector('[name="publishActivity"]');
     const addToCalendar = row.querySelector('[name="addToCalendar"]');
 
-    const selectedUnitTopic = normalizeTopicText(lesson.lessonUnitTopic || lesson.unit_topic || lesson.unitTopic || "");
+    const selectedUnitTopic = inferUnitTopicFromLessonLike(lesson);
     if (selectedUnitTopic) {
         addManualUnitTopic(selectedUnitTopic);
     }
@@ -1581,7 +1613,7 @@ function populateManualPlannerFromUnitPlan(unitPlan) {
     if (manualFields.notes) manualFields.notes.value = String(unitPlan.notes || "");
 
     const topicFromLessons = Array.isArray(unitPlan.lessons)
-        ? unitPlan.lessons.map((lesson) => lesson?.unit_topic ?? lesson?.unitTopic ?? lesson?.lessonUnitTopic)
+        ? unitPlan.lessons.map((lesson) => inferUnitTopicFromLessonLike(lesson))
         : [];
     setManualUnitTopics(unitPlan.unit_topics || topicFromLessons || []);
 

@@ -701,6 +701,39 @@ function normalizeUnitLessons(value) {
     return [];
   }
 
+  const inferUnitTopic = (lesson) => {
+    const explicit = String(lesson?.unit_topic ?? lesson?.unitTopic ?? lesson?.lessonUnitTopic ?? "").trim();
+    if (explicit) {
+      return explicit;
+    }
+
+    const candidates = [
+      lesson?.title,
+      lesson?.lesson_title,
+      lesson?.lessonTitle,
+      lesson?.activity_name,
+      lesson?.activityName,
+      lesson?.activity_type,
+      lesson?.activityType
+    ]
+      .map((item) => String(item || "").trim())
+      .filter(Boolean);
+
+    for (const valueText of candidates) {
+      const cleaned = String(valueText)
+        .replace(/activities?\s*:?$/i, "")
+        .replace(/:\s*$/, "")
+        .replace(/^l\d+\s*[-:]\s*/i, "")
+        .trim();
+
+      if (cleaned && cleaned.length <= 64) {
+        return cleaned;
+      }
+    }
+
+    return "";
+  };
+
   const coerceBoolean = (rawValue, defaultValue = false) => {
     if (typeof rawValue === "boolean") {
       return rawValue;
@@ -730,10 +763,11 @@ function normalizeUnitLessons(value) {
 
   return value.map((lesson, index) => {
     const lessonIndex = Number.parseInt(lesson?.lesson_index ?? lesson?.lessonIndex ?? index + 1, 10);
+    const inferredUnitTopic = inferUnitTopic(lesson);
 
     return {
       lesson_index: Number.isInteger(lessonIndex) && lessonIndex > 0 ? lessonIndex : index + 1,
-      unit_topic: String(lesson?.unit_topic ?? lesson?.unitTopic ?? lesson?.lessonUnitTopic ?? "").trim(),
+      unit_topic: inferredUnitTopic,
       week_label: String(lesson?.week_label ?? lesson?.weekLabel ?? lesson?.week ?? "").trim(),
       title: String(lesson?.title ?? lesson?.lesson_title ?? lesson?.lessonTitle ?? "").trim(),
       focus: String(lesson?.focus ?? lesson?.lesson_focus ?? lesson?.lessonFocus ?? "").trim(),
@@ -1073,7 +1107,12 @@ function parseUnitPlanFromDocxText(rawText, originalName = "") {
   const assessmentLink = extractLinesBetween(lines, reportingIndex + 1, evaluationIndex).slice(0, 4).join(" ");
   const notes = extractLinesBetween(lines, evaluationIndex + 1, lines.length).join(" ");
   const lessonLines = extractLinesBetween(lines, slideshowIndex + 1, reportingIndex);
-  const lessons = parseLessonRowsFromSlideshow(lessonLines);
+  const lessons = normalizeUnitLessons(parseLessonRowsFromSlideshow(lessonLines));
+  const unitTopics = Array.from(new Set(
+    lessons
+      .map((lesson) => String(lesson?.unit_topic || "").trim())
+      .filter(Boolean)
+  ));
 
   return {
     title: topic,
@@ -1084,6 +1123,7 @@ function parseUnitPlanFromDocxText(rawText, originalName = "") {
     subject_stream: detectSubjectStreamFromText(rawText),
     duration_weeks: Math.max(1, lessons.length ? Math.ceil(lessons.length / 5) : 1),
     overview,
+    unit_topics: unitTopics,
     unit_aims: unitAims,
     unit_values: unitValues,
     contexts,
