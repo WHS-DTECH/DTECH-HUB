@@ -1531,10 +1531,121 @@ async function syncUnitPlanLessonsToLibrary(unitPlan) {
   return syncedCount;
 }
 
+function decodeHtmlEntities(value) {
+  return String(value || "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&#x27;/gi, "'");
+}
+
+function normalizeHtmlCellText(html) {
+  const withLineBreaks = String(html || "")
+    .replace(/<\s*br\s*\/?\s*>/gi, "\n")
+    .replace(/<\/?\s*(p|div|li|ul|ol)\b[^>]*>/gi, "\n");
+
+  const plain = withLineBreaks.replace(/<[^>]+>/g, " ");
+  return decodeHtmlEntities(plain)
+    .replace(/\r/g, "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isLikelyYearLabel(value) {
+  const text = String(value || "").trim().toLowerCase();
+  return /^(juniors?|middle(?:\/seniors?)?|seniors?|year\s*\d+)/i.test(text);
+}
+
+function isLikelyValidTopicText(value) {
+  const text = String(value || "").trim();
+  const lower = text.toLowerCase();
+  if (!text) return false;
+  if (text.length > 90) return false;
+  if (/^(school\s*values?|technology\s*strand|level\s*\d+|\d+|\d+\s*\/\s*\d+)$/i.test(lower)) return false;
+  if (/^(assessment\s*instructions?|assessment\s*schedule|assessment\s*clarity|assessment\s*due|assessment\s*time)$/i.test(lower)) return false;
+  return true;
+}
+
+function extractUnitTopicsFromDocxHtml(html) {
+  const source = String(html || "");
+  if (!source) {
+    return [];
+  }
+
+  const tableMatches = source.match(/<table[\s\S]*?<\/table>/gi) || [];
+  const targetTable = tableMatches.find((tableHtml) => /unit\s*topics?/i.test(tableHtml) && /lessons?/i.test(tableHtml)) || "";
+  if (!targetTable) {
+    return [];
+  }
+
+  const topics = [];
+  const seen = new Set();
+  let lastYear = "";
+
+  const rowMatches = targetTable.match(/<tr[\s\S]*?<\/tr>/gi) || [];
+  rowMatches.forEach((rowHtml) => {
+    const cellMatches = rowHtml.match(/<t[dh][^>]*>[\s\S]*?<\/t[dh]>/gi) || [];
+    const cells = cellMatches
+      .map((cellHtml) => normalizeHtmlCellText(cellHtml))
+      .filter(Boolean);
+
+    if (cells.length < 2) {
+      return;
+    }
+
+    if (/unit\s*topics?/i.test(cells[0]) || /lessons?/i.test(cells[0])) {
+      return;
+    }
+
+    let year = "";
+    let topic = "";
+
+    if (isLikelyYearLabel(cells[0])) {
+      year = cells[0];
+      topic = cells[1] || "";
+      lastYear = year;
+    } else {
+      year = lastYear;
+      topic = cells[0] || "";
+    }
+
+    if (!isLikelyValidTopicText(topic)) {
+      return;
+    }
+
+    const label = year ? `${year} | ${topic}` : topic;
+    const key = label.toLowerCase();
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    topics.push(label);
+  });
+
+  return topics;
+}
+
 async function parseDocxBufferToUnitPlanPayload(buffer, originalName, userEmail) {
-  const extraction = await mammoth.extractRawText({ buffer });
-  const parsed = parseUnitPlanFromDocxText(extraction.value || "", originalName || "");
+  const [rawExtraction, htmlExtraction] = await Promise.all([
+    mammoth.extractRawText({ buffer }),
+    mammoth.convertToHtml({ buffer })
+  ]);
+
+  const parsed = parseUnitPlanFromDocxText(rawExtraction.value || "", originalName || "");
   const payload = buildUnitPlanPayload(parsed, userEmail);
+  const htmlTopics = extractUnitTopicsFromDocxHtml(htmlExtraction?.value || "");
+
+  if (htmlTopics.length) {
+    payload.unit_topics = htmlTopics;
+  }
 
   if (!payload.title || !payload.topic || !payload.year_level) {
     throw new Error("Could not detect unit title, topic, or year level from document");
