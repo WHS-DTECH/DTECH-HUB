@@ -1580,57 +1580,90 @@ function extractUnitTopicsFromDocxHtml(html) {
   }
 
   const tableMatches = source.match(/<table[\s\S]*?<\/table>/gi) || [];
-  const targetTable = tableMatches.find((tableHtml) => /unit\s*topics?/i.test(tableHtml) && /lessons?/i.test(tableHtml)) || "";
-  if (!targetTable) {
-    return [];
-  }
 
-  const topics = [];
-  const seen = new Set();
-  let lastYear = "";
-
-  const rowMatches = targetTable.match(/<tr[\s\S]*?<\/tr>/gi) || [];
-  rowMatches.forEach((rowHtml) => {
-    const cellMatches = rowHtml.match(/<t[dh][^>]*>[\s\S]*?<\/t[dh]>/gi) || [];
-    const cells = cellMatches
-      .map((cellHtml) => normalizeHtmlCellText(cellHtml))
-      .filter(Boolean);
-
-    if (cells.length < 2) {
-      return;
+  const evaluateTable = (tableHtml) => {
+    const lowerTable = String(tableHtml || "").toLowerCase();
+    if (!tableHtml) {
+      return { score: -1, topics: [] };
     }
 
-    if (/unit\s*topics?/i.test(cells[0]) || /lessons?/i.test(cells[0])) {
-      return;
+    // Explicitly avoid slideshow/reporting/evaluation tables, which contain lesson flow not unit topic map.
+    if (/slideshow|reporting\s*&\s*assessment|unit\s*evaluation/.test(lowerTable)) {
+      return { score: -1, topics: [] };
     }
 
-    let year = "";
-    let topic = "";
+    const topics = [];
+    const seen = new Set();
+    let lastYear = "";
+    let validTopicRows = 0;
+    let yearTopicRows = 0;
 
-    if (isLikelyYearLabel(cells[0])) {
-      year = cells[0];
-      topic = cells[1] || "";
-      lastYear = year;
-    } else {
-      year = lastYear;
-      topic = cells[0] || "";
+    const rowMatches = tableHtml.match(/<tr[\s\S]*?<\/tr>/gi) || [];
+    rowMatches.forEach((rowHtml) => {
+      const cellMatches = rowHtml.match(/<t[dh][^>]*>[\s\S]*?<\/t[dh]>/gi) || [];
+      const cells = cellMatches
+        .map((cellHtml) => normalizeHtmlCellText(cellHtml))
+        .filter(Boolean);
+
+      if (cells.length < 2) {
+        return;
+      }
+
+      const first = cells[0] || "";
+      const second = cells[1] || "";
+      const rowText = cells.join(" | ").toLowerCase();
+
+      if (/unit\s*topics?|lessons?|learning\s*experience|intentions?/.test(rowText)) {
+        return;
+      }
+
+      let year = "";
+      let topic = "";
+
+      if (isLikelyYearLabel(first)) {
+        year = first;
+        topic = second;
+        lastYear = year;
+        yearTopicRows += 1;
+      } else if (isLikelyYearLabel(second) && cells.length >= 3) {
+        year = second;
+        topic = cells[2] || "";
+        lastYear = year;
+        yearTopicRows += 1;
+      } else {
+        year = lastYear;
+        topic = second || first;
+      }
+
+      if (!isLikelyValidTopicText(topic)) {
+        return;
+      }
+
+      const label = year ? `${year} | ${topic}` : topic;
+      const key = label.toLowerCase();
+      if (seen.has(key)) {
+        return;
+      }
+
+      seen.add(key);
+      topics.push(label);
+      validTopicRows += 1;
+    });
+
+    const hasUnitHeadingHint = /unit\s*topics?/.test(lowerTable) ? 4 : 0;
+    const score = validTopicRows + (yearTopicRows * 2) + hasUnitHeadingHint;
+    return { score, topics };
+  };
+
+  let best = { score: -1, topics: [] };
+  tableMatches.forEach((tableHtml) => {
+    const candidate = evaluateTable(tableHtml);
+    if (candidate.score > best.score && candidate.topics.length) {
+      best = candidate;
     }
-
-    if (!isLikelyValidTopicText(topic)) {
-      return;
-    }
-
-    const label = year ? `${year} | ${topic}` : topic;
-    const key = label.toLowerCase();
-    if (seen.has(key)) {
-      return;
-    }
-
-    seen.add(key);
-    topics.push(label);
   });
 
-  return topics;
+  return best.topics;
 }
 
 async function parseDocxBufferToUnitPlanPayload(buffer, originalName, userEmail) {
