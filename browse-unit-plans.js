@@ -594,6 +594,24 @@ function parseUnitTopicLabel(value) {
     return { yearLevel: "", topicName: source };
 }
 
+function isLikelyNoiseUnitTopicLabel(value) {
+    const text = String(value || "").trim();
+    if (!text) {
+        return true;
+    }
+
+    const lower = text.toLowerCase();
+    if (/^(school\s*values?|technology\s*strand|level\s*\d+|year\s*\d+)$/i.test(lower)) {
+        return true;
+    }
+
+    if (/\b(term\s*=|semester\s*=|periods|hours)\b/i.test(lower) && /^(juniors?|middle(?:\s*school)?|seniors?|year\s*\d+)/i.test(lower)) {
+        return true;
+    }
+
+    return false;
+}
+
 function getUnitTopicsForTree(row) {
     const fromUnitTopics = Array.isArray(row?.unit_topics)
         ? row.unit_topics
@@ -604,12 +622,17 @@ function getUnitTopicsForTree(row) {
             .filter(Boolean)
         : [];
 
+    const source = fromUnitTopics.length ? fromUnitTopics : fromLessons;
+
     const seen = new Set();
     const normalized = [];
 
-    [...fromUnitTopics, ...fromLessons].forEach((entry) => {
+    source.forEach((entry) => {
         const label = String(entry || "").trim();
         if (!label) {
+            return;
+        }
+        if (isLikelyNoiseUnitTopicLabel(label)) {
             return;
         }
         const key = label.toLowerCase();
@@ -688,13 +711,14 @@ function renderAllTopicsTree(sourceRows) {
                         ? `<ul class="tree-children">${yearBranches}${uncategorizedBranches}</ul>`
                         : `<p class="help-text" style="margin:4px 0 0;">No sub-unit topics saved yet.</p>`;
 
+                    const planLink = `upload-unit.html?edit=${encodeURIComponent(planId)}`;
+
                     return `
                         <li class="tree-node is-branch">
                             <details class="tree-details" open>
                                 <summary class="tree-summary">
                                     <div class="tree-plan-row">
-                                        <span class="tree-label">${escapeHtml(planTitle)}${yearLevel ? ` (${escapeHtml(yearLevel)})` : ""}</span>
-                                        <a class="button-save tree-open-button" href="upload-unit.html?edit=${encodeURIComponent(planId)}">Open in Upload Unit Plan</a>
+                                        <a class="tree-label tree-plan-link" href="${planLink}">${escapeHtml(planTitle)}${yearLevel ? ` (${escapeHtml(yearLevel)})` : ""}</a>
                                     </div>
                                 </summary>
                                 ${topicTree}
