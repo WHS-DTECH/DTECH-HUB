@@ -1558,6 +1558,19 @@ function normalizeHtmlCellText(html) {
     .trim();
 }
 
+function normalizeHtmlCellLines(html) {
+  const withLineBreaks = String(html || "")
+    .replace(/<\s*br\s*\/?\s*>/gi, "\n")
+    .replace(/<\/?\s*(p|div|li|ul|ol)\b[^>]*>/gi, "\n");
+
+  const plain = withLineBreaks.replace(/<[^>]+>/g, " ");
+  return decodeHtmlEntities(plain)
+    .replace(/\r/g, "")
+    .split("\n")
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+}
+
 function isLikelyYearLabel(value) {
   const text = String(value || "").trim().toLowerCase();
   return /^(juniors?|middle(?:\/seniors?)?|seniors?|year\s*\d+)/i.test(text);
@@ -1666,6 +1679,107 @@ function extractUnitTopicsFromDocxHtml(html) {
   return best.topics;
 }
 
+function extractLessonsFromDocxHtml(html) {
+  const source = String(html || "");
+  if (!source) {
+    return [];
+  }
+
+  const tableMatches = source.match(/<table[\s\S]*?<\/table>/gi) || [];
+  const lessonTable = tableMatches.find((tableHtml) => /slideshow/i.test(tableHtml) && /slides?/i.test(tableHtml)) || "";
+  if (!lessonTable) {
+    return [];
+  }
+
+  const lessons = [];
+  const seen = new Set();
+  let currentYear = "";
+  let sequence = 1;
+
+  const rowMatches = lessonTable.match(/<tr[\s\S]*?<\/tr>/gi) || [];
+  rowMatches.forEach((rowHtml) => {
+    const cellMatches = rowHtml.match(/<t[dh][^>]*>[\s\S]*?<\/t[dh]>/gi) || [];
+    if (cellMatches.length < 2) {
+      return;
+    }
+
+    const col1Lines = normalizeHtmlCellLines(cellMatches[0]);
+    const col2Lines = normalizeHtmlCellLines(cellMatches[1]);
+    const col3Lines = cellMatches[2] ? normalizeHtmlCellLines(cellMatches[2]) : [];
+
+    const col1Text = col1Lines.join(" ").trim();
+    const col2Text = col2Lines.join(" ").trim();
+    const rowText = `${col1Text} | ${col2Text} | ${col3Lines.join(" ")}`.toLowerCase();
+
+    if (!col2Lines.length) {
+      return;
+    }
+
+    if (/main\s*lesson\s*resource|lesson\s*topic|lesson\s*objectives|activity\s*details|slideshow/.test(rowText)) {
+      return;
+    }
+
+    if (isLikelyYearLabel(col1Text)) {
+      currentYear = col1Text;
+    }
+
+    const title = String(col2Lines[0] || "").replace(/:\s*$/, "").trim();
+    if (!title) {
+      return;
+    }
+
+    const notesLines = [...col2Lines.slice(1), ...col3Lines].filter(Boolean);
+    const focus = notesLines.join(" ").trim();
+    const yearLevel = currentYear || col1Text;
+    const unitTopic = yearLevel ? `${yearLevel} | ${title}` : title;
+
+    const dedupeKey = `${title.toLowerCase()}|${(yearLevel || "").toLowerCase()}`;
+    if (seen.has(dedupeKey)) {
+      return;
+    }
+    seen.add(dedupeKey);
+
+    lessons.push({
+      lesson_index: sequence,
+      title,
+      focus,
+      notes: focus,
+      duration_minutes: 1,
+      activity_name: title,
+      year_level: yearLevel,
+      unit_topic: unitTopic,
+      publish_activity: true,
+      add_to_calendar: false
+    });
+    sequence += 1;
+  });
+
+  return lessons;
+}
+
+function mergeLessonsPreferComplete(primaryLessons, secondaryLessons) {
+  const merged = [];
+  const seen = new Set();
+  const pushUnique = (lesson) => {
+    const title = String(lesson?.title || lesson?.lessonTitle || lesson?.activity_name || "").trim();
+    const year = String(lesson?.year_level || lesson?.lessonYearLevel || "").trim();
+    if (!title) {
+      return;
+    }
+    const key = `${title.toLowerCase()}|${year.toLowerCase()}`;
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    merged.push(lesson);
+  };
+
+  (Array.isArray(primaryLessons) ? primaryLessons : []).forEach(pushUnique);
+  (Array.isArray(secondaryLessons) ? secondaryLessons : []).forEach(pushUnique);
+
+  return normalizeUnitLessons(merged);
+}
+
 async function parseDocxBufferToUnitPlanPayload(buffer, originalName, userEmail) {
   const [rawExtraction, htmlExtraction] = await Promise.all([
     mammoth.extractRawText({ buffer }),
@@ -1675,9 +1789,14 @@ async function parseDocxBufferToUnitPlanPayload(buffer, originalName, userEmail)
   const parsed = parseUnitPlanFromDocxText(rawExtraction.value || "", originalName || "");
   const payload = buildUnitPlanPayload(parsed, userEmail);
   const htmlTopics = extractUnitTopicsFromDocxHtml(htmlExtraction?.value || "");
+  const htmlLessons = extractLessonsFromDocxHtml(htmlExtraction?.value || "");
 
   if (htmlTopics.length) {
     payload.unit_topics = htmlTopics;
+  }
+
+  if (htmlLessons.length) {
+    payload.lessons = mergeLessonsPreferComplete(htmlLessons, payload.lessons || []);
   }
 
   if (!payload.title || !payload.topic || !payload.year_level) {
