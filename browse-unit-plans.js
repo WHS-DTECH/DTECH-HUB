@@ -571,6 +571,151 @@ function filterBySelectedTopicType(sourceRows) {
     return sourceRows.filter((row) => getUnitPlanTopicType(row) === selectedTopicType);
 }
 
+function looksLikeYearLevelLabel(value) {
+    const text = String(value || "").trim().toLowerCase();
+    return /^(juniors?|middle(?:\/seniors?)?|seniors?|year\s*\d+)/i.test(text);
+}
+
+function parseUnitTopicLabel(value) {
+    const source = String(value || "").trim();
+    if (!source) {
+        return { yearLevel: "", topicName: "" };
+    }
+
+    const parts = source.split("|").map((part) => String(part || "").trim()).filter(Boolean);
+    if (parts.length >= 2) {
+        const first = parts[0];
+        const remainder = parts.slice(1).join(" | ");
+        if (looksLikeYearLevelLabel(first)) {
+            return { yearLevel: first, topicName: remainder };
+        }
+    }
+
+    return { yearLevel: "", topicName: source };
+}
+
+function getUnitTopicsForTree(row) {
+    const fromUnitTopics = Array.isArray(row?.unit_topics)
+        ? row.unit_topics
+        : toNormalizedLines(row?.unit_topics);
+    const fromLessons = Array.isArray(row?.lessons)
+        ? row.lessons
+            .map((lesson) => String(lesson?.unit_topic || lesson?.unitTopic || "").trim())
+            .filter(Boolean)
+        : [];
+
+    const seen = new Set();
+    const normalized = [];
+
+    [...fromUnitTopics, ...fromLessons].forEach((entry) => {
+        const label = String(entry || "").trim();
+        if (!label) {
+            return;
+        }
+        const key = label.toLowerCase();
+        if (seen.has(key)) {
+            return;
+        }
+        seen.add(key);
+        normalized.push(label);
+    });
+
+    return normalized;
+}
+
+function renderAllTopicsTree(sourceRows) {
+    if (!Array.isArray(sourceRows) || !sourceRows.length) {
+        return "<p class='help-text'>No unit plans match your search.</p>";
+    }
+
+    const grouped = new Map();
+
+    sourceRows.forEach((row) => {
+        const mainUnit = getUnitPlanTopicType(row);
+        if (!grouped.has(mainUnit)) {
+            grouped.set(mainUnit, []);
+        }
+        grouped.get(mainUnit).push(row);
+    });
+
+    const groups = Array.from(grouped.entries()).sort((left, right) => left[0].localeCompare(right[0]));
+    const treeHtml = groups
+        .map(([mainUnit, unitPlans]) => {
+            const sortedPlans = [...unitPlans].sort((left, right) => String(left.title || "").localeCompare(String(right.title || "")));
+            const plansHtml = sortedPlans
+                .map((row) => {
+                    const planId = String(row?.id || "");
+                    const planTitle = String(row?.title || "Untitled Unit Plan");
+                    const yearLevel = String(row?.year_level || "").trim();
+                    const topics = getUnitTopicsForTree(row);
+
+                    const byYear = new Map();
+                    const uncategorized = [];
+
+                    topics.forEach((topicLabel) => {
+                        const parsed = parseUnitTopicLabel(topicLabel);
+                        if (parsed.yearLevel) {
+                            if (!byYear.has(parsed.yearLevel)) {
+                                byYear.set(parsed.yearLevel, []);
+                            }
+                            byYear.get(parsed.yearLevel).push(parsed.topicName || parsed.yearLevel);
+                        } else {
+                            uncategorized.push(parsed.topicName || topicLabel);
+                        }
+                    });
+
+                    const yearBranches = Array.from(byYear.entries())
+                        .map(([year, yearTopics]) => {
+                            const topicLeaves = yearTopics
+                                .map((topicName) => `<li class="tree-node is-leaf"><span class="tree-label">${escapeHtml(topicName)}</span></li>`)
+                                .join("");
+                            return `
+                                <li class="tree-node is-branch">
+                                    <span class="tree-label">${escapeHtml(year)}</span>
+                                    <ul class="tree-children">${topicLeaves}</ul>
+                                </li>
+                            `;
+                        })
+                        .join("");
+
+                    const uncategorizedBranches = uncategorized
+                        .map((topicName) => `<li class="tree-node is-leaf"><span class="tree-label">${escapeHtml(topicName)}</span></li>`)
+                        .join("");
+
+                    const topicTree = yearBranches || uncategorizedBranches
+                        ? `<ul class="tree-children">${yearBranches}${uncategorizedBranches}</ul>`
+                        : `<p class="help-text" style="margin:4px 0 0;">No sub-unit topics saved yet.</p>`;
+
+                    return `
+                        <li class="tree-node is-branch">
+                            <div class="tree-plan-row">
+                                <span class="tree-label">${escapeHtml(planTitle)}${yearLevel ? ` (${escapeHtml(yearLevel)})` : ""}</span>
+                                <a class="button-save tree-open-button" href="upload-unit.html?edit=${encodeURIComponent(planId)}">Open in Upload Unit Plan</a>
+                            </div>
+                            ${topicTree}
+                        </li>
+                    `;
+                })
+                .join("");
+
+            return `
+                <section class="upload-panel unit-plan-tree-group" style="margin-top: 1rem;">
+                    <h2 style="margin:0 0 8px;">${escapeHtml(mainUnit)}</h2>
+                    <ul class="unit-plan-tree">${plansHtml}</ul>
+                </section>
+            `;
+        })
+        .join("");
+
+    return `
+        <section class="upload-panel" style="margin-top: 1rem;">
+            <h2 style="margin:0 0 8px;">All Topics Pathway</h2>
+            <p class="help-text" style="margin:0 0 10px;">Main Unit Plans are grouped by Topic Type, with sub-unit coverage listed beneath each plan.</p>
+            ${treeHtml}
+        </section>
+    `;
+}
+
 function openUnitPlan(rowId) {
     const unitPlanId = String(rowId || "").trim();
     if (!unitPlanId) {
@@ -751,7 +896,14 @@ function renderRows() {
         return;
     }
 
-    const filtered = filterBySelectedTopicType(filterRows(rows));
+    const baseFiltered = filterRows(rows);
+
+    if (selectedTopicType === "All topics") {
+        resultsElement.innerHTML = renderAllTopicsTree(baseFiltered);
+        return;
+    }
+
+    const filtered = filterBySelectedTopicType(baseFiltered);
     if (!filtered.length) {
         resultsElement.innerHTML = "<p class='help-text'>No unit plans match your search.</p>";
         return;
