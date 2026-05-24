@@ -676,6 +676,26 @@ function autoResizeTextarea(textarea) {
     textarea.style.height = `${textarea.scrollHeight}px`;
 }
 
+function autoResizeOverviewAndAimsTextareas() {
+    const coreTextareas = [
+        manualFields?.overview,
+        manualFields?.unitAims,
+        previewFields?.overview,
+        previewFields?.unitAims
+    ].filter(Boolean);
+
+    coreTextareas.forEach((textarea) => {
+        autoResizeTextarea(textarea);
+
+        if (!textarea.dataset.autoResizeBound) {
+            textarea.addEventListener("input", () => {
+                autoResizeTextarea(textarea);
+            });
+            textarea.dataset.autoResizeBound = "true";
+        }
+    });
+}
+
 function autoResizeSchoolValueTextareas() {
     const schoolValueTextareas = document.querySelectorAll(".school-value-card textarea");
     schoolValueTextareas.forEach((textarea) => {
@@ -1831,6 +1851,7 @@ function showPreviewPanel(unitPlan, sourceLabel) {
 
     populateManualPlannerFromUnitPlan(unitPlan);
     previewPanel.hidden = false;
+    autoResizeOverviewAndAimsTextareas();
     autoResizeSchoolValueTextareas();
     autoResizeContextTextareas();
     autoResizeLocalCurriculumTextareas();
@@ -2208,6 +2229,7 @@ if (clearManualFormButton) {
         manualForm?.reset();
         setManualUnitTopics([]);
         initializeHealthSafetyEditors();
+        autoResizeOverviewAndAimsTextareas();
         autoResizeSchoolValueTextareas();
         autoResizeContextTextareas();
         autoResizeLocalCurriculumTextareas();
@@ -2310,6 +2332,7 @@ async function initUploadUnitPage() {
     resetManualLessons();
     setManualSaveStatus("");
     initializeHealthSafetyEditors();
+    autoResizeOverviewAndAimsTextareas();
     autoResizeSchoolValueTextareas();
     autoResizeContextTextareas();
     autoResizeLocalCurriculumTextareas();

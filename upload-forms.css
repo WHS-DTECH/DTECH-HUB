@@ -137,6 +137,13 @@
     line-height: 1.45;
 }
 
+#manual-overview,
+#manual-aims,
+#preview-overview,
+#preview-aims {
+    overflow-y: hidden;
+}
+
 .field-wide {
     grid-column: 1 / -1;
 }
