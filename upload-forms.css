@@ -795,6 +795,21 @@
     background: #f9fbfd;
 }
 
+.lesson-row-section {
+    border: 1px solid #d4dfe9;
+    border-radius: 8px;
+    padding: 10px;
+    background: #f3f7fb;
+    margin-bottom: 10px;
+}
+
+.lesson-row-section-title {
+    margin: 0 0 8px;
+    color: #17395d;
+    font-size: 0.98rem;
+    font-weight: 700;
+}
+
 .lesson-row-header {
     display: flex;
     justify-content: space-between;

@@ -1744,66 +1744,89 @@ function createLessonRow(lesson = {}) {
             </div>
             <button type="button" class="button button-secondary lesson-remove">Remove</button>
         </div>
-        <div class="lesson-row-grid">
-            <div class="field">
-                <label>Lesson Title</label>
-                <input name="lessonTitle" type="text" placeholder="Lesson title" required>
+        <div class="lesson-row-section">
+            <p class="lesson-row-section-title">Card Basics</p>
+            <div class="lesson-row-grid">
+                <div class="field">
+                    <label>Card Name</label>
+                    <input name="lessonTitle" type="text" placeholder="Card title" required>
+                </div>
+                <div class="field">
+                    <label>Year Level</label>
+                    <input name="lessonYearLevel" type="text" placeholder="e.g. Junior, Middle, Year 9">
+                </div>
+                <div class="field">
+                    <label>Card Category</label>
+                    <input name="lessonType" type="text" placeholder="Activity, Skill Activity, Project...">
+                </div>
+                <div class="field">
+                    <label>Subject Stream</label>
+                    <select name="lessonSubjectStream">
+                        <option value="">Select subject</option>
+                        <option value="DTECH">DTECH</option>
+                        <option value="COMP">COMP</option>
+                        <option value="TEXT">TEXT</option>
+                        <option value="DTONLINE">DTONLINE</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Topic Type</label>
+                    <select name="lessonUnitTopic">
+                        <option value="">Select unit topic</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Card URL</label>
+                    <input name="lessonLinkUrl" type="url" placeholder="https://... (optional)">
+                </div>
+                <div class="field field-wide">
+                    <label>Short Description</label>
+                    <textarea name="lessonFocus" placeholder="Brief overview of this lesson card"></textarea>
+                </div>
             </div>
-            <div class="field">
-                <label>Unit Topic</label>
-                <select name="lessonUnitTopic">
-                    <option value="">Select unit topic</option>
-                </select>
+        </div>
+        <div class="lesson-row-section">
+            <p class="lesson-row-section-title">Activity Details</p>
+            <div class="lesson-row-grid">
+                <div class="field">
+                    <label>Duration Minutes</label>
+                    <input name="lessonDurationMinutes" type="number" min="1" step="1" value="60">
+                </div>
+                <div class="field">
+                    <label>Card Color</label>
+                    <select name="lessonCardColor">
+                        <option>Rose</option>
+                        <option>Violet</option>
+                        <option>Azure</option>
+                        <option>Amber</option>
+                        <option>Teal</option>
+                        <option>Slate</option>
+                    </select>
+                </div>
+                <label class="checkbox-field lesson-toggle field-wide"><input name="publishActivity" type="checkbox" checked> Show in This Week section</label>
             </div>
-            <div class="field">
-                <label>Week / Session</label>
-                <input name="lessonWeek" type="text" placeholder="Week 1, Session 2">
+        </div>
+        <div class="lesson-row-section">
+            <p class="lesson-row-section-title">Planner Details</p>
+            <div class="lesson-row-grid">
+                <div class="field">
+                    <label>Week / Session</label>
+                    <input name="lessonWeek" type="text" placeholder="Week 1, Session 2">
+                </div>
+                <div class="field">
+                    <label>Calendar Date</label>
+                    <input name="lessonDate" type="date">
+                </div>
+                <div class="field field-wide">
+                    <label>Activity Name</label>
+                    <input name="activityName" type="text" placeholder="Activity Library card name (optional override)">
+                </div>
+                <div class="field field-wide">
+                    <label>Lesson Notes</label>
+                    <textarea name="lessonNotes" placeholder="Teacher notes, resources, or setup reminders"></textarea>
+                </div>
+                <label class="checkbox-field lesson-toggle field-wide"><input name="addToCalendar" type="checkbox"> Add to Calendar</label>
             </div>
-            <div class="field">
-                <label>Calendar Date</label>
-                <input name="lessonDate" type="date">
-            </div>
-            <div class="field">
-                <label>Duration Minutes</label>
-                <input name="lessonDurationMinutes" type="number" min="1" step="1" value="60">
-            </div>
-            <div class="field">
-                <label>Activity Type</label>
-                <input name="lessonType" type="text" placeholder="Programming, Digital Media, ...">
-            </div>
-            <div class="field">
-                <label>Card Colour</label>
-                <select name="lessonCardColor">
-                    <option>Rose</option>
-                    <option>Violet</option>
-                    <option>Azure</option>
-                    <option>Amber</option>
-                    <option>Teal</option>
-                    <option>Slate</option>
-                </select>
-            </div>
-            <div class="field field-wide">
-                <label>Activity Name</label>
-                <input name="activityName" type="text" placeholder="Card title for the Activity Library">
-            </div>
-            <div class="field">
-                <label>Lesson Year Level</label>
-                <input name="lessonYearLevel" type="text" placeholder="e.g. Year 9, Year 10 or Junior">
-            </div>
-            <div class="field">
-                <label>Lesson Link</label>
-                <input name="lessonLinkUrl" type="url" placeholder="https://... (optional)">
-            </div>
-            <div class="field field-wide">
-                <label>Lesson Focus</label>
-                <textarea name="lessonFocus" placeholder="What are students learning or doing?"></textarea>
-            </div>
-            <div class="field field-wide">
-                <label>Lesson Notes</label>
-                <textarea name="lessonNotes" placeholder="Teacher notes, resources, or setup reminders"></textarea>
-            </div>
-            <label class="checkbox-field lesson-toggle"><input name="publishActivity" type="checkbox" checked> Publish to Activity Library</label>
-            <label class="checkbox-field lesson-toggle"><input name="addToCalendar" type="checkbox"> Add to Calendar</label>
         </div>
     `;
 
@@ -1813,6 +1836,7 @@ function createLessonRow(lesson = {}) {
     const lessonDate = row.querySelector('[name="lessonDate"]');
     const lessonDurationMinutes = row.querySelector('[name="lessonDurationMinutes"]');
     const lessonType = row.querySelector('[name="lessonType"]');
+    const lessonSubjectStream = row.querySelector('[name="lessonSubjectStream"]');
     const lessonCardColor = row.querySelector('[name="lessonCardColor"]');
     const activityName = row.querySelector('[name="activityName"]');
     const lessonYearLevel = row.querySelector('[name="lessonYearLevel"]');
@@ -1834,6 +1858,7 @@ function createLessonRow(lesson = {}) {
     lessonDate.value = String(lesson.lessonDate || lesson.calendar_date || "").trim();
     lessonDurationMinutes.value = String(lesson.lessonDurationMinutes || lesson.duration_minutes || 60).trim();
     lessonType.value = String(lesson.lessonType || lesson.activity_type || "").trim();
+    lessonSubjectStream.value = String(lesson.lessonSubjectStream || lesson.subject_stream || manualFields?.subjectStream?.value || "").trim().toUpperCase();
     lessonCardColor.value = String(lesson.lessonCardColor || lesson.card_color || "Rose").trim() || "Rose";
     activityName.value = String(lesson.activityName || lesson.activity_name || "").trim();
     lessonYearLevel.value = String(lesson.lessonYearLevel || lesson.year_level || "").trim();
@@ -1893,6 +1918,7 @@ function collectLessons() {
             lessonDate: String(row.querySelector('[name="lessonDate"]')?.value || "").trim(),
             lessonDurationMinutes: Number.parseInt(row.querySelector('[name="lessonDurationMinutes"]')?.value || "60", 10) || 60,
             lessonType: String(row.querySelector('[name="lessonType"]')?.value || "").trim(),
+            subject_stream: String(row.querySelector('[name="lessonSubjectStream"]')?.value || "").trim().toUpperCase(),
             lessonCardColor: String(row.querySelector('[name="lessonCardColor"]')?.value || "Rose").trim() || "Rose",
             activityName: String(row.querySelector('[name="activityName"]')?.value || "").trim(),
             lessonYearLevel: String(row.querySelector('[name="lessonYearLevel"]')?.value || "").trim(),
