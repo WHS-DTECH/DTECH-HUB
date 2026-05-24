@@ -326,6 +326,7 @@ function inferSourceTypeFromRecord(record) {
 
     // Detect assessment uploads even when assessment fields are intentionally left blank.
     const assessmentSchemaKeys = [
+        "assessment_focus",
         "standard_details",
         "tasks_list",
         "achieved",
