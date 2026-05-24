@@ -645,6 +645,14 @@ function isLikelyNoiseTopicLabel(topicLabel) {
         return true;
     }
 
+    if (/^\d+(?:\s*\/\s*\d+)?$/.test(topicText)) {
+        return true;
+    }
+
+    if (/^(?:year\s*\d+\s*\|\s*)?\d+(?:\s*\/\s*\d+)?$/.test(`${parsed.yearLevel ? `${parsed.yearLevel} | ` : ""}${parsed.topicName || topicText}`.toLowerCase())) {
+        return true;
+    }
+
     if (yearKey.startsWith("year") && /^level\s*\d+$/i.test(topicText)) {
         return true;
     }
