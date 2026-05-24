@@ -27,7 +27,6 @@ const previewFields = {
     topic: document.querySelector("#preview-topic"),
     yearLevel: document.querySelector("#preview-year-level"),
     subjectStream: document.querySelector("#preview-subject-stream"),
-    durationWeeks: document.querySelector("#preview-duration-weeks"),
     term: document.querySelector("#preview-term"),
     overview: document.querySelector("#preview-overview"),
     unitAims: document.querySelector("#preview-aims"),
@@ -66,7 +65,6 @@ const manualFields = {
     strand: document.querySelector("#manual-strand"),
     yearLevel: document.querySelector("#manual-year-level"),
     subjectStream: document.querySelector("#manual-subject-stream"),
-    durationWeeks: document.querySelector("#manual-duration-weeks"),
     term: document.querySelector("#manual-term"),
     overview: document.querySelector("#manual-overview"),
     unitAims: document.querySelector("#manual-aims"),
@@ -1062,7 +1060,6 @@ function populateManualPlannerFromUnitPlan(unitPlan) {
     if (manualFields.strand) manualFields.strand.value = String(unitPlan.strand || unitPlan.subject_stream || "");
     setSelectValues(manualFields.yearLevel, inferYearLevelSelections(unitPlan.year_level));
     if (manualFields.subjectStream) manualFields.subjectStream.value = String(unitPlan.subject_stream || "");
-    if (manualFields.durationWeeks) manualFields.durationWeeks.value = Number.parseInt(unitPlan.duration_weeks, 10) || 1;
     if (manualFields.term) manualFields.term.value = String(unitPlan.term || "");
     if (manualFields.overview) manualFields.overview.value = String(unitPlan.overview || "");
     if (manualFields.unitAims) manualFields.unitAims.value = joinLines(unitPlan.unit_aims);
@@ -1110,7 +1107,6 @@ function showPreviewPanel(unitPlan, sourceLabel) {
     if (previewFields.topic) previewFields.topic.value = String(unitPlan?.topic || "");
     setSelectValues(previewFields.yearLevel, inferYearLevelSelections(unitPlan?.year_level));
     if (previewFields.subjectStream) previewFields.subjectStream.value = String(unitPlan?.subject_stream || "");
-    if (previewFields.durationWeeks) previewFields.durationWeeks.value = Number.parseInt(unitPlan?.duration_weeks, 10) || 1;
     if (previewFields.term) previewFields.term.value = String(unitPlan?.term || "");
     if (previewFields.overview) previewFields.overview.value = String(unitPlan?.overview || "");
     
@@ -1141,7 +1137,6 @@ function collectPreviewPayload() {
         topic: String(previewFields.topic?.value || "").trim(),
         year_level: normalizeYearLevelText(getSelectValues(previewFields.yearLevel)),
         subject_stream: String(previewFields.subjectStream?.value || "").trim().toUpperCase(),
-        duration_weeks: Number.parseInt(previewFields.durationWeeks?.value || "1", 10) || 1,
         term: String(previewFields.term?.value || "").trim(),
         overview: String(previewFields.overview?.value || "").trim(),
         unit_aims: normalizeLines(previewFields.unitAims?.value || ""),
@@ -1161,7 +1156,6 @@ function collectManualPayload() {
         strand: String(manualFields.strand?.value || "").trim(),
         year_level: normalizeYearLevelText(getSelectValues(manualFields.yearLevel)),
         subject_stream: String(manualFields.subjectStream?.value || "").trim().toUpperCase(),
-        duration_weeks: Number.parseInt(manualFields.durationWeeks?.value || "1", 10) || 1,
         term: String(manualFields.term?.value || "").trim(),
         overview: String(manualFields.overview?.value || "").trim(),
         unit_aims: normalizeLines(manualFields.unitAims?.value || ""),
