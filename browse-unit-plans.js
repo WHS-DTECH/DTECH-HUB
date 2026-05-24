@@ -12,6 +12,7 @@ let hasAccess = false;
 let selectedTopicType = "All topics";
 let selectedUnitPlanId = "";
 let pendingDeleteId = "";
+let authRefreshInFlight = false;
 
 const SCHOOL_VALUE_KEYS = ["whanaungatanga", "rangatiratanga", "manaakitanga", "kaitiakitanga"];
 const SCHOOL_VALUE_LABELS = {
@@ -28,8 +29,11 @@ const CONTEXT_LABELS = {
     social: "Social",
     technology: "Technology"
 };
-const SKILL_KEYS = ["literacy", "numeracy", "digitalTech", "practical"];
+const SKILL_KEYS = ["generalSkills", "careerFutureSkills", "considerationsWithinElectronics", "literacy", "numeracy", "digitalTech", "practical"];
 const SKILL_LABELS = {
+    generalSkills: "Skills",
+    careerFutureSkills: "Career & Future-Focused Skills",
+    considerationsWithinElectronics: "Considerations within Electronics",
     literacy: "Literacy",
     numeracy: "Numeracy",
     digitalTech: "Digital Tech",
@@ -74,12 +78,34 @@ function setResyncButtonState(isBusy, isAllowed = hasAccess) {
 }
 
 function readSignedInEmail() {
-    const raw = localStorage.getItem(BROWSE_UNIT_AUTH_KEY) || sessionStorage.getItem(BROWSE_UNIT_AUTH_KEY);
+    let localValue = null;
+    let sessionValue = null;
+
+    try {
+        localValue = localStorage.getItem(BROWSE_UNIT_AUTH_KEY);
+    } catch (_error) {
+        localValue = null;
+    }
+
+    try {
+        sessionValue = sessionStorage.getItem(BROWSE_UNIT_AUTH_KEY);
+    } catch (_error) {
+        sessionValue = null;
+    }
+
+    if (!localValue && sessionValue) {
+        try {
+            localStorage.setItem(BROWSE_UNIT_AUTH_KEY, sessionValue);
+        } catch (_error) {
+        }
+    }
+
+    const raw = localValue || sessionValue || "";
     if (!raw) return "";
 
     try {
         const parsed = JSON.parse(raw);
-        return normalizeEmail(parsed?.profile?.email || "");
+        return normalizeEmail(parsed?.profile?.email || parsed?.email || "");
     } catch (_error) {
         return "";
     }
@@ -255,6 +281,9 @@ function parseCurriculumLinksToResponses(curriculumLinks) {
         localCurriculumLinks: "",
         mataurangaMaori: "",
         skills: {
+            generalSkills: "",
+            careerFutureSkills: "",
+            considerationsWithinElectronics: "",
             literacy: "",
             numeracy: "",
             digitalTech: "",
@@ -272,11 +301,38 @@ function parseCurriculumLinksToResponses(curriculumLinks) {
         const localPrefix = /^local\s*curriculum\s*links?/i;
         const mataurangaPrefix = /^(m[aā]tauranga\s*m[aā]ori|matauranga\s*maori)/i;
         const skillsPrefix = /^skills?\b/i;
+        const generalSkillsPrefix = /^(general\s*skills|skills)\b/i;
+        const careerFutureSkillsPrefix = /^career\s*(?:&|and)?\s*future(?:-focused)?\s*skills\b/i;
+        const electronicsConsiderationsPrefix = /^considerations\s*within\s*electronics\b/i;
         const healthSafetyPrefix = /^(health\s*(?:&|and)\s*safety|safety\s*issues?)\b/i;
         const literacyPrefix = /^literacy\b/i;
         const numeracyPrefix = /^numeracy\b/i;
         const digitalTechPrefix = /^(digital\s*tech|digital\s*technology)\b/i;
         const practicalPrefix = /^practical\b/i;
+
+        if (careerFutureSkillsPrefix.test(lower)) {
+            currentKey = "skills";
+            currentSkillKey = "careerFutureSkills";
+            const remainder = line.replace(careerFutureSkillsPrefix, "").replace(/^\s*:?\s*/, "").trim();
+            if (remainder) {
+                responseMap.skills.careerFutureSkills = responseMap.skills.careerFutureSkills
+                    ? `${responseMap.skills.careerFutureSkills}\n${remainder}`
+                    : remainder;
+            }
+            return;
+        }
+
+        if (electronicsConsiderationsPrefix.test(lower)) {
+            currentKey = "skills";
+            currentSkillKey = "considerationsWithinElectronics";
+            const remainder = line.replace(electronicsConsiderationsPrefix, "").replace(/^\s*:?\s*/, "").trim();
+            if (remainder) {
+                responseMap.skills.considerationsWithinElectronics = responseMap.skills.considerationsWithinElectronics
+                    ? `${responseMap.skills.considerationsWithinElectronics}\n${remainder}`
+                    : remainder;
+            }
+            return;
+        }
 
         if (localPrefix.test(lower)) {
             currentKey = "localCurriculumLinks";
@@ -304,7 +360,7 @@ function parseCurriculumLinksToResponses(curriculumLinks) {
 
         if (skillsPrefix.test(lower)) {
             currentKey = "skills";
-            currentSkillKey = currentSkillKey || "literacy";
+            currentSkillKey = currentSkillKey || "generalSkills";
             const remainder = line.replace(skillsPrefix, "").replace(/^\s*:?\s*/, "").trim();
             if (remainder) {
                 responseMap.skills[currentSkillKey] = responseMap.skills[currentSkillKey]
@@ -327,6 +383,39 @@ function parseCurriculumLinksToResponses(curriculumLinks) {
         }
 
         if (currentKey === "skills") {
+            if (generalSkillsPrefix.test(lower)) {
+                currentSkillKey = "generalSkills";
+                const remainder = line.replace(generalSkillsPrefix, "").replace(/^\s*:?\s*/, "").trim();
+                if (remainder) {
+                    responseMap.skills.generalSkills = responseMap.skills.generalSkills
+                        ? `${responseMap.skills.generalSkills}\n${remainder}`
+                        : remainder;
+                }
+                return;
+            }
+
+            if (careerFutureSkillsPrefix.test(lower)) {
+                currentSkillKey = "careerFutureSkills";
+                const remainder = line.replace(careerFutureSkillsPrefix, "").replace(/^\s*:?\s*/, "").trim();
+                if (remainder) {
+                    responseMap.skills.careerFutureSkills = responseMap.skills.careerFutureSkills
+                        ? `${responseMap.skills.careerFutureSkills}\n${remainder}`
+                        : remainder;
+                }
+                return;
+            }
+
+            if (electronicsConsiderationsPrefix.test(lower)) {
+                currentSkillKey = "considerationsWithinElectronics";
+                const remainder = line.replace(electronicsConsiderationsPrefix, "").replace(/^\s*:?\s*/, "").trim();
+                if (remainder) {
+                    responseMap.skills.considerationsWithinElectronics = responseMap.skills.considerationsWithinElectronics
+                        ? `${responseMap.skills.considerationsWithinElectronics}\n${remainder}`
+                        : remainder;
+                }
+                return;
+            }
+
             if (literacyPrefix.test(lower)) {
                 currentSkillKey = "literacy";
                 const remainder = line.replace(literacyPrefix, "").replace(/^\s*:?\s*/, "").trim();
@@ -378,7 +467,7 @@ function parseCurriculumLinksToResponses(curriculumLinks) {
 
         if (currentKey) {
             if (currentKey === "skills") {
-                currentSkillKey = currentSkillKey || "literacy";
+                currentSkillKey = currentSkillKey || "generalSkills";
                 responseMap.skills[currentSkillKey] = responseMap.skills[currentSkillKey]
                     ? `${responseMap.skills[currentSkillKey]}\n${line}`
                     : line;
@@ -459,7 +548,6 @@ function filterRows(sourceRows) {
             row.strand,
             row.year_level,
             row.subject_stream,
-            row.term,
             row.overview,
             row.unit_aims,
             row.unit_values,
@@ -521,7 +609,6 @@ function renderUnitPlanCard(row) {
                     <div class="field"><label>Topic Type</label><input type="text" value="${escapeHtml(topicType)}" disabled></div>
                     <div class="field"><label>Strand</label><input type="text" value="${escapeHtml(row.strand || "-")}" disabled></div>
                     <div class="field"><label>Year Level</label><input type="text" value="${escapeHtml(row.year_level || "-")}" disabled></div>
-                    <div class="field"><label>Term</label><input type="text" value="${escapeHtml(row.term || "-")}" disabled></div>
                     <div class="field"><label>Subject Stream</label><input type="text" value="${escapeHtml(row.subject_stream || "-")}" disabled></div>
                     <div class="field"><label>Lesson Count</label><input type="text" value="${escapeHtml(lessonCount)}" disabled></div>
                     <div class="field field-wide"><label>Unit Overview</label><textarea rows="3" disabled>${renderLineBlock(row.overview)}</textarea></div>
@@ -607,6 +694,18 @@ function renderUnitPlanCard(row) {
                         <div class="skills-table-shell">
                             <div class="skills-table-title">Skills</div>
                             <div class="skills-table">
+                                <div class="skills-row">
+                                    <div class="skills-heading">Skills</div>
+                                    <textarea rows="4" disabled>${renderLineBlock(curriculum.skills.generalSkills)}</textarea>
+                                </div>
+                                <div class="skills-row">
+                                    <div class="skills-heading">Career &amp; Future-Focused Skills</div>
+                                    <textarea rows="4" disabled>${renderLineBlock(curriculum.skills.careerFutureSkills)}</textarea>
+                                </div>
+                                <div class="skills-row">
+                                    <div class="skills-heading">Considerations within Electronics</div>
+                                    <textarea rows="4" disabled>${renderLineBlock(curriculum.skills.considerationsWithinElectronics)}</textarea>
+                                </div>
                                 <div class="skills-row">
                                     <div class="skills-heading">Literacy</div>
                                     <textarea rows="4" disabled>${renderLineBlock(curriculum.skills.literacy)}</textarea>
@@ -897,5 +996,35 @@ async function init() {
     await resolveAccess();
     await loadUnitPlans();
 }
+
+async function refreshAccessAndPlans() {
+    if (authRefreshInFlight) {
+        return;
+    }
+
+    authRefreshInFlight = true;
+    try {
+        await resolveAccess();
+        await loadUnitPlans();
+    } finally {
+        authRefreshInFlight = false;
+    }
+}
+
+window.addEventListener("storage", (event) => {
+    if (!event.key || event.key === BROWSE_UNIT_AUTH_KEY) {
+        refreshAccessAndPlans();
+    }
+});
+
+window.addEventListener("focus", () => {
+    refreshAccessAndPlans();
+});
+
+document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+        refreshAccessAndPlans();
+    }
+});
 
 init();
