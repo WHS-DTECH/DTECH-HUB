@@ -22,6 +22,8 @@ let visibleMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let signedInEmail = "";
 let canManage = false;
 let studentPracticalRows = [];
+let studentPracticalCatalog = [];
+let studentPracticalCatalogById = new Map();
 
 const SENIOR_MIN_YEAR = 11;
 const SENIOR_TARGET_STRANDS = new Set(["DTECH", "COMP", "DTONLINE"]);
@@ -63,22 +65,38 @@ function formatStrandLabel(value) {
 
 function inferPracticalType(record) {
     const category = String(record?.activity_category || record?.activityCategory || "").trim().toLowerCase();
+    if (category.includes("lesson")) return "Lesson";
     if (category.includes("assessment")) return "Assessment Task";
     if (category.includes("project")) return "Project";
     return "Practical";
 }
 
-function buildPracticalMap(activities, projectInterests) {
-    const activityMeta = new Map();
+function buildPracticalCatalog(activities) {
+    const map = new Map();
 
     (Array.isArray(activities) ? activities : []).forEach((record) => {
         const id = String(record?.id || "").trim();
         if (!id) return;
-        activityMeta.set(id, {
+
+        map.set(id, {
+            id,
             title: String(record?.name || record?.title || id).trim() || id,
             type: inferPracticalType(record)
         });
     });
+
+    studentPracticalCatalogById = map;
+    studentPracticalCatalog = Array.from(map.values())
+        .filter((item) => item.type !== "Lesson")
+        .sort((left, right) => {
+            if (left.type !== right.type) return left.type.localeCompare(right.type);
+            return left.title.localeCompare(right.title);
+        });
+}
+
+function buildPracticalMap(activities, projectInterests) {
+    buildPracticalCatalog(activities);
+    const activityMeta = studentPracticalCatalogById;
 
     const byStudentEmail = new Map();
     (Array.isArray(projectInterests) ? projectInterests : []).forEach((entry) => {
@@ -135,6 +153,7 @@ function buildStudentPracticalRows(students, byStudentEmail) {
             const linkedEmails = Array.isArray(student?.linked_emails)
                 ? student.linked_emails.map((value) => normalizeEmail(value)).filter(Boolean)
                 : [];
+            const primaryEmail = linkedEmails[0] || "";
 
             const practicalsById = new Map();
             linkedEmails.forEach((email) => {
@@ -152,6 +171,7 @@ function buildStudentPracticalRows(students, byStudentEmail) {
                 year_level: String(student?.year_level || "").trim(),
                 form_class: String(student?.form_class || "").trim(),
                 linked_emails: linkedEmails,
+                primary_email: primaryEmail,
                 strands,
                 practicals: Array.from(practicalsById.values()).sort((a, b) => a.title.localeCompare(b.title))
             };
@@ -201,26 +221,130 @@ function renderStudentPracticalTable() {
     studentPracticalBody.innerHTML = visibleRows.map((row) => {
         const yearForm = [row.year_level && `Year ${row.year_level}`, row.form_class].filter(Boolean).join(" | ") || "Not specified";
         const strandPills = row.strands.map((strand) => `<span class="strand-pill">${escapeHtml(formatStrandLabel(strand))}</span>`).join("");
+        const assignedIds = new Set(row.practicals.map((item) => item.id));
+
+        const assignOptions = studentPracticalCatalog
+            .filter((item) => !assignedIds.has(item.id))
+            .map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.title)} (${escapeHtml(item.type)})</option>`)
+            .join("");
+
         const practicalPills = row.practicals.length
             ? row.practicals.map((item) => {
                 const typeClass = item.type === "Assessment Task" ? "is-assessment" : (item.type === "Project" ? "is-project" : "");
                 const confirmedClass = item.confirmed ? "" : " is-unconfirmed";
-                return `<span class="practical-pill ${typeClass}${confirmedClass}">${escapeHtml(item.title)} (${escapeHtml(item.type)})</span>`;
+                const manageButtons = row.primary_email
+                    ? `
+                        <button type="button" class="practical-pill-btn" data-action="toggle-confirm" data-project-id="${escapeHtml(item.id)}" data-confirmed="${item.confirmed ? "true" : "false"}">${item.confirmed ? "Unconfirm" : "Confirm"}</button>
+                        <button type="button" class="practical-pill-btn practical-pill-btn-remove" data-action="remove-assignment" data-project-id="${escapeHtml(item.id)}">Remove</button>
+                    `
+                    : "";
+                return `<span class="practical-pill ${typeClass}${confirmedClass}"><span class="practical-pill-label">${escapeHtml(item.title)} (${escapeHtml(item.type)})</span>${manageButtons}</span>`;
             }).join("")
             : `<span class="empty-note">No practical allocations yet.</span>`;
 
+        const inlineManage = row.primary_email
+            ? `
+                <div class="practical-inline-manage">
+                    <select data-assign-select>
+                        <option value="">Assign practical...</option>
+                        ${assignOptions}
+                    </select>
+                    <button type="button" class="button button-secondary practical-inline-assign" data-action="assign-practical">Assign</button>
+                </div>
+            `
+            : `<div class="empty-note">Cannot manage allocations until this student has a linked email key in Class Management.</div>`;
+
         return `
-            <tr>
+            <tr data-student-email="${escapeHtml(row.primary_email)}">
                 <td>
                     <div class="student-practical-name">${escapeHtml(row.student_name)}</div>
                     <div class="student-practical-subline">${row.linked_emails.length ? escapeHtml(row.linked_emails.join(", ")) : "No linked email keys"}</div>
                 </td>
                 <td>${escapeHtml(yearForm)}</td>
                 <td><div class="strand-pill-row">${strandPills}</div></td>
-                <td><div class="practical-pill-row">${practicalPills}</div></td>
+                <td>
+                    <div class="practical-pill-row">${practicalPills}</div>
+                    ${inlineManage}
+                </td>
             </tr>
         `;
     }).join("");
+}
+
+async function handleStudentPracticalAction(button) {
+    if (!canManage || !signedInEmail || !button) return;
+
+    const action = String(button.getAttribute("data-action") || "").trim();
+    const row = button.closest("tr[data-student-email]");
+    const studentEmail = normalizeEmail(row?.getAttribute("data-student-email"));
+
+    if (!studentEmail) {
+        setStatus(studentPracticalStatus, "This student is missing a linked email key, so allocations cannot be managed.", true);
+        return;
+    }
+
+    let requestUrl = "";
+    let requestMethod = "POST";
+    let requestBody = null;
+
+    if (action === "assign-practical") {
+        const select = row.querySelector("select[data-assign-select]");
+        const projectId = String(select?.value || "").trim();
+        if (!projectId) {
+            setStatus(studentPracticalStatus, "Select a practical or assessment task first.", true);
+            return;
+        }
+        requestUrl = `/api/activities/${encodeURIComponent(projectId)}/interests`;
+        requestMethod = "POST";
+        requestBody = { student_email: studentEmail };
+    }
+
+    if (action === "toggle-confirm") {
+        const projectId = String(button.getAttribute("data-project-id") || "").trim();
+        if (!projectId) return;
+        const currentlyConfirmed = String(button.getAttribute("data-confirmed") || "false") === "true";
+        requestUrl = `/api/activities/${encodeURIComponent(projectId)}/interests/${encodeURIComponent(studentEmail)}/confirm`;
+        requestMethod = "PATCH";
+        requestBody = { confirmed: !currentlyConfirmed };
+    }
+
+    if (action === "remove-assignment") {
+        const projectId = String(button.getAttribute("data-project-id") || "").trim();
+        if (!projectId) return;
+        requestUrl = `/api/activities/${encodeURIComponent(projectId)}/interests/${encodeURIComponent(studentEmail)}`;
+        requestMethod = "DELETE";
+        requestBody = null;
+    }
+
+    if (!requestUrl) return;
+
+    try {
+        button.disabled = true;
+        setStatus(studentPracticalStatus, "Saving student allocation changes...");
+
+        const response = await fetch(requestUrl, {
+            method: requestMethod,
+            headers: {
+                "Content-Type": "application/json",
+                "x-user-email": signedInEmail
+            },
+            body: requestBody ? JSON.stringify(requestBody) : undefined
+        });
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(payload.error || "Could not update student allocation.");
+        }
+
+        setStatus(studentPracticalStatus, "Student allocations updated.");
+        await loadStudentPracticalTracker();
+    } catch (error) {
+        setStatus(studentPracticalStatus, error.message || "Could not update student allocation.", true);
+    } finally {
+        if (button && button.isConnected) {
+            button.disabled = false;
+        }
+    }
 }
 
 async function loadStudentPracticalTracker() {
@@ -509,6 +633,14 @@ if (studentPracticalSearch) {
 
 if (studentPracticalStrand) {
     studentPracticalStrand.addEventListener("change", () => renderStudentPracticalTable());
+}
+
+if (studentPracticalBody) {
+    studentPracticalBody.addEventListener("click", (event) => {
+        const button = event.target.closest("button[data-action]");
+        if (!button) return;
+        handleStudentPracticalAction(button);
+    });
 }
 
 if (monthPrev) {

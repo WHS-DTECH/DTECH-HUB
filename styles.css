@@ -1771,6 +1771,57 @@ body.public-home-access .controls-panel {
     border: 1px solid #cad8ea;
     background: #eef5ff;
     color: #27557f;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.practical-pill-label {
+    display: inline-flex;
+    align-items: center;
+}
+
+.practical-pill-btn {
+    border: 1px solid #b5c8df;
+    background: #ffffff;
+    color: #2f5f8d;
+    border-radius: 999px;
+    font-size: 0.66rem;
+    font-weight: 700;
+    padding: 2px 7px;
+    cursor: pointer;
+}
+
+.practical-pill-btn:hover {
+    border-color: #8fafcf;
+}
+
+.practical-pill-btn-remove {
+    color: #8a3c3c;
+    border-color: #d8b8b8;
+}
+
+.practical-inline-manage {
+    margin-top: 8px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.practical-inline-manage select {
+    min-width: 240px;
+    border: 1px solid #bfd0e6;
+    border-radius: 8px;
+    padding: 6px 8px;
+    font: inherit;
+    font-size: 0.76rem;
+    color: #24415f;
+    background: #fff;
+}
+
+.practical-inline-assign {
+    padding: 6px 10px;
+    font-size: 0.74rem;
 }
 
 .practical-pill.is-assessment {
