@@ -130,6 +130,143 @@ const TIMETABLE_LABELS = new Map(STUDENT_TIMETABLE_PERIOD_COLUMNS.map((columnNam
     .trim();
   return [columnName, label];
 }));
+
+async function resolveExistingTableName(candidates) {
+  const candidateList = Array.isArray(candidates) ? candidates.map((value) => String(value || "").trim()).filter(Boolean) : [];
+  if (!candidateList.length) {
+    return null;
+  }
+
+  if (!hasDatabase) {
+    return candidateList[0] || null;
+  }
+
+  for (const tableName of candidateList) {
+    try {
+      const result = await pool.query("SELECT to_regclass($1) AS table_ref", [`public.${tableName}`]);
+      if (String(result.rows?.[0]?.table_ref || "").trim()) {
+        return tableName;
+      }
+    } catch (_error) {
+    }
+  }
+
+  return null;
+}
+
+async function getStudentDirectoryRows() {
+  if (!hasDatabase) {
+    return [];
+  }
+
+  const tableName = await resolveExistingTableName(STUDENT_TABLE_CANDIDATES);
+  if (!tableName) {
+    return [];
+  }
+
+  try {
+    const result = await pool.query(`SELECT * FROM ${quoteIdentifier(tableName)}`);
+    return Array.isArray(result.rows) ? result.rows : [];
+  } catch (_error) {
+    return [];
+  }
+}
+
+function buildLowerKeyMap(row) {
+  const map = new Map();
+  Object.keys(row || {}).forEach((key) => {
+    map.set(String(key || "").toLowerCase(), row[key]);
+  });
+  return map;
+}
+
+function pickRowValue(lowerMap, keys) {
+  for (const key of Array.isArray(keys) ? keys : []) {
+    const value = lowerMap.get(String(key || "").toLowerCase());
+    if (typeof value === "undefined" || value === null) {
+      continue;
+    }
+    const text = String(value || "").trim();
+    if (text) {
+      return text;
+    }
+  }
+  return "";
+}
+
+function collectStudentLinkedEmails(row) {
+  const lower = buildLowerKeyMap(row);
+  const linked = new Set();
+
+  [
+    "email_school",
+    "student_email",
+    "email",
+    "email_address",
+    "school_email",
+    "google_email",
+    "student_google_email",
+    "student_mail",
+    "mail",
+    "upn"
+  ].forEach((key) => {
+    const raw = String(lower.get(key) || "").trim().toLowerCase();
+    if (!raw) {
+      return;
+    }
+    linked.add(raw.includes("@") ? raw : `${raw}@${SCHOOL_EMAIL_DOMAIN}`);
+  });
+
+  ["username", "user_name", "student_username", "login", "student_login"].forEach((key) => {
+    const raw = String(lower.get(key) || "").trim().toLowerCase();
+    if (!raw) {
+      return;
+    }
+    linked.add(raw.includes("@") ? raw : `${raw}@${SCHOOL_EMAIL_DOMAIN}`);
+  });
+
+  return Array.from(linked);
+}
+
+function buildStudentClassManagementRow(row) {
+  const lower = buildLowerKeyMap(row);
+  const status = pickRowValue(lower, ["status", "student_status"]) || "Current";
+  const timetable = STUDENT_TIMETABLE_PERIOD_COLUMNS
+    .map((columnName) => {
+      const value = String(row?.[columnName] || "").trim();
+      if (!value) {
+        return null;
+      }
+      return {
+        label: TIMETABLE_LABELS.get(columnName) || columnName,
+        value
+      };
+    })
+    .filter(Boolean);
+
+  const dtechTimetable = timetable.filter((entry) => {
+    const text = String(entry?.value || "").toLowerCase();
+    return DTECH_TIMETABLE_KEYWORDS.some((keyword) => text.includes(keyword));
+  });
+
+  const programs = getStudentPrograms(row);
+
+  return {
+    student_name: pickRowValue(lower, ["student_name", "full_name", "name", "student"]) || "Unnamed student",
+    id_number: pickRowValue(lower, ["id_number", "student_id", "id", "idnumber"]),
+    year_level: pickRowValue(lower, ["year_level", "year", "yeargroup", "year_group"]),
+    form_class: pickRowValue(lower, ["form_class", "form", "home_room", "homeroom", "class"]),
+    status,
+    upload_term: pickRowValue(lower, ["upload_term", "term"]),
+    upload_year: pickRowValue(lower, ["upload_year", "year_uploaded"]),
+    upload_date: pickRowValue(lower, ["upload_date", "updated_at", "created_at"]),
+    programs,
+    has_dtech: programs.includes("DTECH"),
+    linked_emails: collectStudentLinkedEmails(row),
+    dtech_timetable: dtechTimetable,
+    timetable
+  };
+}
 const suggestionNotificationFallback = String(process.env.SUGGESTION_NOTIFY_EMAILS || "");
 const SMTP_HOST = String(process.env.SMTP_HOST || "").trim();
 const SMTP_PORT = Number.parseInt(process.env.SMTP_PORT || "", 10) || 587;
