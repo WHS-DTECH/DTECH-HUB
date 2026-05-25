@@ -49,21 +49,10 @@
         </header>
 
         <main class="practicals-page">
-            <section class="panel-section practicals-header">
-                <p class="section-kicker">Shared Calendar</p>
-                <h1>Browse Practicals</h1>
-                <p class="section-copy">A Google Calendar-style monthly view of when projects and activities are happening.</p>
-                <div class="practicals-sync-row">
-                    <a class="button button-secondary" id="ics-download" href="/api/practicals/calendar.ics">Download ICS</a>
-                    <a class="button button-secondary" id="ics-open" href="/api/practicals/calendar.ics" target="_blank" rel="noreferrer">Open Calendar Feed</a>
-                    <p id="ics-url-copy" class="results-meta"></p>
-                </div>
-            </section>
-
             <section id="practicals-student-manager" class="panel-section practicals-student-manager" hidden>
                 <div class="practicals-student-head">
                     <div>
-                        <p class="section-kicker">Teacher/Admin Tools</p>
+                        <p class="section-kicker">Browse Practicals</p>
                         <h2>Senior Student Practical Tracker</h2>
                         <p class="section-copy">Students are pulled from Class Management and filtered to Senior classes with DTECH, COMP, or DT ONLINE strands.</p>
                     </div>
@@ -108,67 +97,6 @@
                     </table>
                 </div>
                 <p id="student-practical-status" class="upload-status" aria-live="polite"></p>
-            </section>
-
-            <section class="practicals-layout">
-                <section class="panel-section practicals-calendar-wrap">
-                    <div class="practicals-monthbar">
-                        <button type="button" class="button button-secondary" id="month-prev">Previous</button>
-                        <h2 id="month-label">Month Year</h2>
-                        <button type="button" class="button button-secondary" id="month-next">Next</button>
-                    </div>
-                    <div class="practicals-weekdays" aria-hidden="true">
-                        <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
-                    </div>
-                    <div id="practicals-grid" class="practicals-grid" aria-live="polite"></div>
-                </section>
-
-                <aside class="panel-section practicals-timeline">
-                    <h2>Timeline</h2>
-                    <p class="section-copy">Upcoming projects and activities.</p>
-                    <div id="practicals-list" class="practicals-list"></div>
-                    <p id="practicals-status" class="upload-status" aria-live="polite"></p>
-                </aside>
-            </section>
-
-            <section id="practicals-manage" class="panel-section practicals-manage" hidden>
-                <p class="section-kicker">Teacher/Admin Tools</p>
-                <h2>Add Event To Browse Practicals</h2>
-                <form id="practicals-form" class="upload-form">
-                    <div class="form-grid">
-                        <div class="field">
-                            <label for="event-title">Title</label>
-                            <input id="event-title" name="title" type="text" required>
-                        </div>
-                        <div class="field">
-                            <label for="event-type">Type</label>
-                            <select id="event-type" name="event_type">
-                                <option>Activity</option>
-                                <option>Project</option>
-                            </select>
-                        </div>
-                        <div class="field">
-                            <label for="event-start">Start Date</label>
-                            <input id="event-start" name="start_date" type="date" required>
-                        </div>
-                        <div class="field">
-                            <label for="event-end">End Date</label>
-                            <input id="event-end" name="end_date" type="date">
-                        </div>
-                        <div class="field field-wide">
-                            <label for="event-notes">Notes</label>
-                            <textarea id="event-notes" name="notes" rows="3" placeholder="Optional notes for students and teachers"></textarea>
-                        </div>
-                        <div class="field field-wide">
-                            <label for="event-link">Optional Link</label>
-                            <input id="event-link" name="linked_url" type="url" placeholder="https://...">
-                        </div>
-                    </div>
-                    <div class="form-actions">
-                        <button class="button-save" type="submit">Add To Calendar</button>
-                    </div>
-                    <p id="practicals-form-status" class="upload-status" aria-live="polite"></p>
-                </form>
             </section>
 
             <footer id="global-footer" class="global-hub-footer" aria-label="Hub suggestions and links">

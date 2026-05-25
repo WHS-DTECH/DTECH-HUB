@@ -703,13 +703,7 @@ if (practicalsForm) {
 }
 
 (function initPracticalsCalendar() {
-    const feedUrl = `${window.location.origin}/api/practicals/calendar.ics`;
-    if (icsUrlCopy) {
-        icsUrlCopy.textContent = `Feed URL for Google Calendar: ${feedUrl}`;
-    }
-
     resolveManageAccess().then(() => {
-        loadEvents();
         if (canManage) {
             loadStudentPracticalTracker();
         }
