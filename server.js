@@ -208,19 +208,38 @@ function pickRowValue(lowerMap, keys) {
   return "";
 }
 
+function mergeUniqueStrings(values) {
+  const seen = new Set();
+  (Array.isArray(values) ? values : []).forEach((value) => {
+    const text = String(value || "").trim();
+    if (text) {
+      seen.add(text);
+    }
+  });
+  return Array.from(seen);
+}
+
 function collectStudentLinkedEmails(row) {
   const lower = buildLowerKeyMap(row);
   const linked = new Set();
 
   [
     "email_school",
+    "email school",
     "student_email",
+    "student email",
+    "studentemail",
     "email",
     "email_address",
+    "email address",
     "school_email",
+    "school email",
     "google_email",
+    "google email",
     "student_google_email",
+    "student google email",
     "student_mail",
+    "student mail",
     "mail",
     "upn"
   ].forEach((key) => {
@@ -244,6 +263,9 @@ function collectStudentLinkedEmails(row) {
 
 function buildStudentClassManagementRow(row) {
   const lower = buildLowerKeyMap(row);
+  const firstName = pickRowValue(lower, ["first_name", "first name", "firstname", "given_name", "given name"]);
+  const lastName = pickRowValue(lower, ["last_name", "last name", "lastname", "surname", "family_name", "family name"]);
+  const fullNameFallback = [firstName, lastName].filter(Boolean).join(" ").trim();
   const status = pickRowValue(lower, ["status", "student_status"]) || "Current";
   const timetable = STUDENT_TIMETABLE_PERIOD_COLUMNS
     .map((columnName) => {
@@ -266,10 +288,10 @@ function buildStudentClassManagementRow(row) {
   const programs = getStudentPrograms(row);
 
   return {
-    student_name: pickRowValue(lower, ["student_name", "full_name", "name", "student"]) || "Unnamed student",
+    student_name: pickRowValue(lower, ["student_name", "student name", "full_name", "full name", "name", "student"]) || fullNameFallback || "Unnamed student",
     id_number: pickRowValue(lower, ["id_number", "student_id", "id", "idnumber"]),
-    year_level: pickRowValue(lower, ["year_level", "year", "yeargroup", "year_group"]),
-    form_class: pickRowValue(lower, ["form_class", "form", "home_room", "homeroom", "class"]),
+    year_level: pickRowValue(lower, ["year_level", "year level", "year", "level", "yeargroup", "year_group"]),
+    form_class: pickRowValue(lower, ["form_class", "form class", "form", "tutor", "tutor_class", "timetable_class", "home_room", "homeroom", "class"]),
     status,
     upload_term: pickRowValue(lower, ["upload_term", "term"]),
     upload_year: pickRowValue(lower, ["upload_year", "year_uploaded"]),
@@ -359,12 +381,32 @@ function dedupeToLatestStudentRows(rows) {
   (Array.isArray(rows) ? rows : []).forEach((row) => {
     const key = getStudentIdentityKey(row);
     const existing = latestByStudent.get(key);
-    if (!existing || shouldReplaceStudentSnapshot(existing, row)) {
+    if (!existing) {
       latestByStudent.set(key, row);
+      return;
     }
+
+    const replace = shouldReplaceStudentSnapshot(existing, row);
+    const preferred = replace ? row : existing;
+    const secondary = replace ? existing : row;
+
+    latestByStudent.set(key, {
+      ...preferred,
+      linked_emails: mergeUniqueStrings([
+        ...(Array.isArray(preferred?.linked_emails) ? preferred.linked_emails : []),
+        ...(Array.isArray(secondary?.linked_emails) ? secondary.linked_emails : [])
+      ]),
+      programs: mergeUniqueStrings([
+        ...(Array.isArray(preferred?.programs) ? preferred.programs : []),
+        ...(Array.isArray(secondary?.programs) ? secondary.programs : [])
+      ])
+    });
   });
 
-  return Array.from(latestByStudent.values());
+  return Array.from(latestByStudent.values()).map((row) => ({
+    ...row,
+    has_dtech: Array.isArray(row?.programs) && row.programs.includes("DTECH")
+  }));
 }
 const suggestionNotificationFallback = String(process.env.SUGGESTION_NOTIFY_EMAILS || "");
 const SMTP_HOST = String(process.env.SMTP_HOST || "").trim();
