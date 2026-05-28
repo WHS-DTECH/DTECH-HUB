@@ -192,4 +192,9 @@ async function initAssessmentStandardsPage() {
     await loadStandards();
 }
 
+// Backwards-compatibility hook for any legacy onclick handlers.
+window.fetchNzqaStandards = function fetchNzqaStandards(force = false) {
+    return loadStandards({ force: Boolean(force) });
+};
+
 initAssessmentStandardsPage();

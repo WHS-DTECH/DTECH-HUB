@@ -211,6 +211,89 @@ function buildWriteHeaders() {
     return headers;
 }
 
+let detailStandardsOptionsCache = null;
+
+function formatDetailStandardOption(row) {
+    const standardNumber = String(row?.standard_number || "").trim();
+    const standardName = String(row?.standard_name || "").trim();
+    const level = Number.parseInt(row?.level, 10);
+    const credits = Number.isFinite(Number(row?.credits)) ? Number(row.credits) : null;
+    return [
+        standardNumber || "Unknown",
+        standardName || "Unnamed standard",
+        Number.isInteger(level) ? `L${level}` : "",
+        Number.isFinite(credits) ? `${credits} credits` : ""
+    ].filter(Boolean).join(" | ");
+}
+
+async function getDetailStandardsOptions() {
+    if (Array.isArray(detailStandardsOptionsCache)) {
+        return detailStandardsOptionsCache;
+    }
+
+    try {
+        const response = await fetch("/api/assessment-standards/options?stream=both&level=all", {
+            headers: buildWriteHeaders()
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            return [];
+        }
+
+        detailStandardsOptionsCache = Array.isArray(payload?.options) ? payload.options : [];
+        return detailStandardsOptionsCache;
+    } catch (_error) {
+        return [];
+    }
+}
+
+async function setupDetailStandardsPicker(form, setStatus) {
+    const textarea = form?.querySelector('textarea[name="standardDetails"]');
+    const picker = form?.querySelector('select[name="standardLibraryOption"]');
+    const addButton = form?.querySelector('[data-add-standard-line]');
+    if (!textarea || !picker || !addButton) {
+        return;
+    }
+
+    picker.innerHTML = `<option value="">Loading standards...</option>`;
+    picker.disabled = true;
+    addButton.disabled = true;
+
+    const options = await getDetailStandardsOptions();
+    if (!options.length) {
+        picker.innerHTML = `<option value="">No standards available</option>`;
+        picker.disabled = false;
+        addButton.disabled = false;
+        return;
+    }
+
+    picker.innerHTML = [
+        `<option value="">Select a standard...</option>`,
+        ...options.map((row) => {
+            const text = formatDetailStandardOption(row);
+            const escapedText = escapeHtml(text);
+            return `<option value="${escapedText}">${escapedText}</option>`;
+        })
+    ].join("");
+    picker.disabled = false;
+    addButton.disabled = false;
+
+    addButton.addEventListener("click", () => {
+        const selected = String(picker.value || "").trim();
+        if (!selected) {
+            setStatus("Select a standard first.", true);
+            return;
+        }
+
+        const existing = parseLines(textarea.value);
+        if (!existing.includes(selected)) {
+            existing.push(selected);
+            textarea.value = existing.join("\n");
+        }
+        setStatus("Standard added.");
+    });
+}
+
 function hasDetailPageAccess() {
     const raw = localStorage.getItem(DETAIL_HUB_AUTH_STORAGE_KEY) || sessionStorage.getItem(DETAIL_HUB_AUTH_STORAGE_KEY);
     if (!raw) return false;
@@ -857,6 +940,12 @@ function renderEditForm(host, id, data) {
                 <legend>Tasks & Assessment</legend>
                 <label class="detail-field detail-field-full">
                     <span>Standard Details (one per line)</span>
+                    <div class="practical-inline-manage" style="margin-bottom: 8px;">
+                        <select name="standardLibraryOption" style="min-width: 260px;">
+                            <option value="">Loading standards...</option>
+                        </select>
+                        <button type="button" class="detail-action detail-action-secondary" data-add-standard-line>Add Standard</button>
+                    </div>
                     <textarea name="standardDetails" rows="4">${escapeHtml(asLines(data.standardDetails))}</textarea>
                 </label>
                 <label class="detail-field detail-field-full">
@@ -962,6 +1051,8 @@ function renderEditForm(host, id, data) {
     }
 
     if (!form) return;
+
+    setupDetailStandardsPicker(form, setStatus);
 
     form.addEventListener("submit", async (event) => {
         event.preventDefault();

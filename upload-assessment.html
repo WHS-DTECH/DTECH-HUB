@@ -186,6 +186,13 @@
                         <div class="form-grid">
                             <div class="field field-wide">
                                 <label for="standard-details">Standard Details</label>
+                                <div class="upload-page-tools" style="margin: 0 0 8px;">
+                                    <select id="standard-library-select" aria-label="Assessment standards picker" style="min-width: 300px;">
+                                        <option value="">Loading standards from Assessment Standards Manager...</option>
+                                    </select>
+                                    <button id="standard-library-add" class="button-save" type="button" style="min-height: 34px; padding: 6px 12px;">Add Standard</button>
+                                    <a class="button-cancel" href="admin-assessment-information.html" target="_blank" rel="noreferrer">Open Standards Manager</a>
+                                </div>
                                 <textarea id="standard-details" name="standardDetails" placeholder="Describe the standard or learning outcome..."></textarea>
                             </div>
                         </div>

@@ -3,6 +3,8 @@ const uploadStatus = document.querySelector("#upload-status");
 const cancelButton = document.querySelector("#cancel-upload");
 const clearDraftButtons = Array.from(document.querySelectorAll("[data-clear-assessment-draft]"));
 const authStatusElement = document.querySelector("#assessment-auth-status");
+const standardLibrarySelect = document.querySelector("#standard-library-select");
+const standardLibraryAdd = document.querySelector("#standard-library-add");
 const ASSESSMENT_DRAFT_STORAGE_KEY = "dtechHub:uploadAssessmentDraft:v1";
 const UPLOAD_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 const SUBJECT_STREAM_PREFIX = "subject_stream:";
@@ -215,6 +217,75 @@ function withUserEmailHeader(headers) {
     return headers;
 }
 
+function formatStandardOptionLabel(row) {
+    const standardNumber = String(row?.standard_number || "").trim();
+    const standardName = String(row?.standard_name || "").trim();
+    const level = Number.parseInt(row?.level, 10);
+    const credits = Number.isFinite(Number(row?.credits)) ? Number(row.credits) : null;
+    const bits = [
+        standardNumber || "Unknown",
+        standardName || "Unnamed standard",
+        Number.isInteger(level) ? `L${level}` : "",
+        Number.isFinite(credits) ? `${credits} credits` : ""
+    ].filter(Boolean);
+    return bits.join(" | ");
+}
+
+async function loadAssessmentStandardsOptions() {
+    if (!standardLibrarySelect) return;
+
+    standardLibrarySelect.innerHTML = `<option value="">Loading standards...</option>`;
+    standardLibrarySelect.disabled = true;
+    if (standardLibraryAdd) standardLibraryAdd.disabled = true;
+
+    try {
+        const response = await fetch("/api/assessment-standards/options?stream=both&level=all", {
+            headers: withUserEmailHeader({})
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(payload.error || "Could not load standards options.");
+        }
+
+        const options = Array.isArray(payload?.options) ? payload.options : [];
+        if (!options.length) {
+            standardLibrarySelect.innerHTML = `<option value="">No standards available</option>`;
+            return;
+        }
+
+        standardLibrarySelect.innerHTML = [
+            `<option value="">Select a standard...</option>`,
+            ...options.map((row) => {
+                const line = formatStandardOptionLabel(row);
+                return `<option value="${line.replace(/"/g, "&quot;")}">${line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</option>`;
+            })
+        ].join("");
+    } catch (_error) {
+        standardLibrarySelect.innerHTML = `<option value="">Could not load standards</option>`;
+    } finally {
+        standardLibrarySelect.disabled = false;
+        if (standardLibraryAdd) standardLibraryAdd.disabled = false;
+    }
+}
+
+function addSelectedStandardToTextarea() {
+    if (!form?.standardDetails || !standardLibrarySelect) return;
+    const selected = String(standardLibrarySelect.value || "").trim();
+    if (!selected) {
+        setStatus("Select a standard first.", true);
+        return;
+    }
+
+    const existing = linesToArray(form.standardDetails.value);
+    if (!existing.includes(selected)) {
+        existing.push(selected);
+        form.standardDetails.value = existing.join("\n");
+        saveAssessmentDraft();
+    }
+
+    setStatus("Standard added.");
+}
+
 function renderAuthStatus() {
     if (!authStatusElement) return;
 
@@ -286,8 +357,13 @@ window.addEventListener("DOMContentLoaded", async () => {
         restoreAssessmentDraftIfAvailable();
     }
     await prefillFormIfEditing();
+    await loadAssessmentStandardsOptions();
     renderAuthStatus();
 });
+
+if (standardLibraryAdd) {
+    standardLibraryAdd.addEventListener("click", addSelectedStandardToTextarea);
+}
 
 function createAssessmentPayload() {
     const formData = new FormData(form);
