@@ -34,12 +34,95 @@ const DTECH_HUB_NAME = "DTECH-HUB";
 const NZQA_BASE_URL = "https://www.nzqa.govt.nz";
 const NZQA_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const nzqaStandardsCache = new Map();
+const NZQA_STANDARDS_FALLBACK = [
+  { standard_number: "91883", standard_name: "Develop a digital technologies outcome", version: "4", level: 1, credits: 4, stream: "digital" },
+  { standard_number: "91884", standard_name: "Use design ideas to produce a conceptual design for an outcome", version: "4", level: 1, credits: 4, stream: "digital" },
+  { standard_number: "91885", standard_name: "Implement an outcome using basic tools and techniques", version: "4", level: 1, credits: 6, stream: "digital" },
+  { standard_number: "91886", standard_name: "Demonstrate understanding of how technological modelling supports decision-making", version: "4", level: 1, credits: 4, stream: "digital" },
+  { standard_number: "91900", standard_name: "Develop a digital media outcome", version: "2", level: 2, credits: 4, stream: "digital" },
+  { standard_number: "91901", standard_name: "Apply user experience methodologies in developing a digital outcome", version: "2", level: 2, credits: 4, stream: "digital" },
+  { standard_number: "91902", standard_name: "Use advanced techniques to develop a digital technologies outcome", version: "2", level: 2, credits: 6, stream: "digital" },
+  { standard_number: "91903", standard_name: "Use complex techniques to develop a digital media outcome", version: "2", level: 2, credits: 4, stream: "digital" },
+  { standard_number: "91908", standard_name: "Demonstrate understanding of material development and evaluation of digital outcomes", version: "1", level: 3, credits: 5, stream: "digital" },
+  { standard_number: "91909", standard_name: "Develop a conceptual design considering fitness for purpose in broad terms", version: "1", level: 3, credits: 6, stream: "digital" },
+  { standard_number: "91910", standard_name: "Develop a complex digital technologies outcome", version: "1", level: 3, credits: 6, stream: "digital" },
+  { standard_number: "91911", standard_name: "Develop a complex digital media outcome", version: "1", level: 3, credits: 4, stream: "digital" },
+  { standard_number: "91896", standard_name: "Use advanced programming techniques to develop a computer program", version: "3", level: 1, credits: 4, stream: "computing" },
+  { standard_number: "91897", standard_name: "Demonstrate understanding of how data is represented, accessed, and stored", version: "3", level: 1, credits: 4, stream: "computing" },
+  { standard_number: "91898", standard_name: "Demonstrate understanding of a computer science concept", version: "3", level: 1, credits: 3, stream: "computing" },
+  { standard_number: "91899", standard_name: "Present a summary of developing a computer program", version: "3", level: 1, credits: 3, stream: "computing" },
+  { standard_number: "91906", standard_name: "Use advanced programming techniques to develop a complex computer program", version: "2", level: 2, credits: 4, stream: "computing" },
+  { standard_number: "91907", standard_name: "Demonstrate understanding of advanced concepts from computer science", version: "2", level: 2, credits: 3, stream: "computing" },
+  { standard_number: "91912", standard_name: "Use complex programming techniques to develop a complex computer program", version: "1", level: 3, credits: 6, stream: "computing" },
+  { standard_number: "91913", standard_name: "Demonstrate understanding of complex concepts of computer science", version: "1", level: 3, credits: 3, stream: "computing" }
+];
 const DEFAULT_CLASS_DATA_AGING_DAYS = 3;
 const DEFAULT_CLASS_DATA_STALE_DAYS = 7;
 
 function parsePositiveInteger(value, fallback) {
   const parsed = Number.parseInt(String(value || "").trim(), 10);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function buildNzqaLinks(standardNumber) {
+  const number = String(standardNumber || "").trim();
+  if (!number) {
+    return { details_url: "", pdf_url: "", docx_url: "" };
+  }
+
+  const details_url = `${NZQA_BASE_URL}/ncea/assessment/search.do?query=${encodeURIComponent(number)}`;
+  return {
+    details_url,
+    pdf_url: "",
+    docx_url: ""
+  };
+}
+
+async function fetchNzqaStandards(stream, level) {
+  const normalizedStream = String(stream || "").trim().toLowerCase();
+  const normalizedLevel = Number.parseInt(level, 10);
+
+  if (!["digital", "computing"].includes(normalizedStream)) {
+    return [];
+  }
+
+  if (![1, 2, 3].includes(normalizedLevel)) {
+    return [];
+  }
+
+  const cacheKey = `${normalizedStream}:${normalizedLevel}`;
+  const now = Date.now();
+  const cached = nzqaStandardsCache.get(cacheKey);
+  if (cached && Number(cached.timestamp) + NZQA_CACHE_TTL_MS > now && Array.isArray(cached.rows)) {
+    return cached.rows;
+  }
+
+  const rows = NZQA_STANDARDS_FALLBACK
+    .filter((row) => String(row.stream || "").toLowerCase() === normalizedStream)
+    .filter((row) => Number.parseInt(row.level, 10) === normalizedLevel)
+    .map((row) => {
+      const standard_number = String(row.standard_number || "").trim();
+      const links = buildNzqaLinks(standard_number);
+      return {
+        standard_number,
+        standard_name: String(row.standard_name || "").trim(),
+        version: String(row.version || "").trim() || "1",
+        level: Number.parseInt(row.level, 10) || normalizedLevel,
+        credits: Number.isFinite(Number(row.credits)) ? Number(row.credits) : null,
+        stream: normalizedStream,
+        details_url: links.details_url,
+        pdf_url: links.pdf_url,
+        docx_url: links.docx_url
+      };
+    })
+    .sort((left, right) => String(left.standard_number || "").localeCompare(String(right.standard_number || ""), undefined, { numeric: true }));
+
+  nzqaStandardsCache.set(cacheKey, {
+    timestamp: now,
+    rows
+  });
+
+  return rows;
 }
 
 const CLASS_DATA_AGING_DAYS = parsePositiveInteger(process.env.CLASS_DATA_AGING_DAYS, DEFAULT_CLASS_DATA_AGING_DAYS);
