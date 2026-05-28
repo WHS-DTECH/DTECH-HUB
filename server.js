@@ -268,6 +268,91 @@ function buildStudentClassManagementRow(row) {
     timetable
   };
 }
+
+function getStudentIdentityKey(row) {
+  const idNumber = String(row?.id_number || "").trim().toLowerCase();
+  if (idNumber) {
+    return `id:${idNumber}`;
+  }
+
+  const name = String(row?.student_name || "").trim().toLowerCase();
+  if (name) {
+    return `name:${name}`;
+  }
+
+  const formClass = String(row?.form_class || "").trim().toLowerCase();
+  const yearLevel = String(row?.year_level || "").trim().toLowerCase();
+  return `fallback:${name}|${formClass}|${yearLevel}`;
+}
+
+function toEpochMillis(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return 0;
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+}
+
+function parseTermOrdinal(value) {
+  const text = String(value || "").trim().toLowerCase();
+  const matched = text.match(/term\s*(\d+)/i) || text.match(/\b(\d+)\b/);
+  const term = Number.parseInt(matched?.[1] || "", 10);
+  return Number.isInteger(term) ? term : 0;
+}
+
+function parseYearOrdinal(value) {
+  const year = Number.parseInt(String(value || "").replace(/[^0-9]/g, ""), 10);
+  return Number.isInteger(year) ? year : 0;
+}
+
+function getDtechSignalScore(row) {
+  const hasDtech = row?.has_dtech ? 1 : 0;
+  const dtechSlots = Array.isArray(row?.dtech_timetable) ? row.dtech_timetable.length : 0;
+  return hasDtech * 100 + dtechSlots;
+}
+
+function shouldReplaceStudentSnapshot(currentRow, candidateRow) {
+  const currentDate = toEpochMillis(currentRow?.upload_date);
+  const candidateDate = toEpochMillis(candidateRow?.upload_date);
+  if (candidateDate !== currentDate) {
+    return candidateDate > currentDate;
+  }
+
+  const currentYear = parseYearOrdinal(currentRow?.upload_year);
+  const candidateYear = parseYearOrdinal(candidateRow?.upload_year);
+  if (candidateYear !== currentYear) {
+    return candidateYear > currentYear;
+  }
+
+  const currentTerm = parseTermOrdinal(currentRow?.upload_term);
+  const candidateTerm = parseTermOrdinal(candidateRow?.upload_term);
+  if (candidateTerm !== currentTerm) {
+    return candidateTerm > currentTerm;
+  }
+
+  const currentDtechSignal = getDtechSignalScore(currentRow);
+  const candidateDtechSignal = getDtechSignalScore(candidateRow);
+  if (candidateDtechSignal !== currentDtechSignal) {
+    return candidateDtechSignal > currentDtechSignal;
+  }
+
+  const currentSlots = Array.isArray(currentRow?.timetable) ? currentRow.timetable.length : 0;
+  const candidateSlots = Array.isArray(candidateRow?.timetable) ? candidateRow.timetable.length : 0;
+  return candidateSlots > currentSlots;
+}
+
+function dedupeToLatestStudentRows(rows) {
+  const latestByStudent = new Map();
+
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const key = getStudentIdentityKey(row);
+    const existing = latestByStudent.get(key);
+    if (!existing || shouldReplaceStudentSnapshot(existing, row)) {
+      latestByStudent.set(key, row);
+    }
+  });
+
+  return Array.from(latestByStudent.values());
+}
 const suggestionNotificationFallback = String(process.env.SUGGESTION_NOTIFY_EMAILS || "");
 const SMTP_HOST = String(process.env.SMTP_HOST || "").trim();
 const SMTP_PORT = Number.parseInt(process.env.SMTP_PORT || "", 10) || 587;
@@ -3560,7 +3645,7 @@ app.get("/api/class-management/students", async (req, res) => {
 
   try {
     const rows = await getStudentDirectoryRows();
-    const normalizedRows = rows.map(buildStudentClassManagementRow);
+    const normalizedRows = dedupeToLatestStudentRows(rows.map(buildStudentClassManagementRow));
     const currentOnly = String(req.query?.current_only || "true").toLowerCase() !== "false";
     const dtechOnly = String(req.query?.dtech_only || "false").toLowerCase() === "true";
 
