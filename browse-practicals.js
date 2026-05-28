@@ -188,18 +188,8 @@ function renderStudentPracticalTable() {
     const strandFilter = String(studentPracticalStrand?.value || "all").trim().toUpperCase();
     const allocationFilter = String(studentPracticalAllocation?.value || "all").trim().toLowerCase();
 
-    const visibleRows = studentPracticalRows.filter((row) => {
-        const hasAnyAllocation = Array.isArray(row.practicals) && row.practicals.length > 0;
-
+    const baseRows = studentPracticalRows.filter((row) => {
         if (strandFilter !== "ALL" && !row.strands.includes(strandFilter)) {
-            return false;
-        }
-
-        if (allocationFilter === "with" && !hasAnyAllocation) {
-            return false;
-        }
-
-        if (allocationFilter === "without" && hasAnyAllocation) {
             return false;
         }
 
@@ -219,6 +209,31 @@ function renderStudentPracticalTable() {
             .toLowerCase();
 
         return haystack.includes(searchQuery);
+    });
+
+    if (studentPracticalAllocation) {
+        const withCount = baseRows.filter((row) => Array.isArray(row.practicals) && row.practicals.length > 0).length;
+        const withoutCount = Math.max(0, baseRows.length - withCount);
+        const allOption = studentPracticalAllocation.querySelector('option[value="all"]');
+        const withOption = studentPracticalAllocation.querySelector('option[value="with"]');
+        const withoutOption = studentPracticalAllocation.querySelector('option[value="without"]');
+
+        if (allOption) allOption.textContent = `All students (${baseRows.length})`;
+        if (withOption) withOption.textContent = `With allocation (${withCount})`;
+        if (withoutOption) withoutOption.textContent = `Without allocation (${withoutCount})`;
+    }
+
+    const visibleRows = baseRows.filter((row) => {
+        const hasAnyAllocation = Array.isArray(row.practicals) && row.practicals.length > 0;
+
+        if (allocationFilter === "with" && !hasAnyAllocation) {
+            return false;
+        }
+
+        if (allocationFilter === "without" && hasAnyAllocation) {
+            return false;
+        }
+        return true;
     });
 
     if (studentPracticalMeta) {
