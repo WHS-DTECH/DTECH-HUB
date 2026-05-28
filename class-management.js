@@ -1,4 +1,5 @@
 const CLASS_AUTH_KEY = "hub_google_auth_v1";
+const KNOWN_PROGRAMS = ["DTECH", "DTONLINE", "COMP", "TEXT", "MPROG", "MDTECH"];
 const classState = {
     allStudents: [],
     visibleStudents: []
@@ -227,12 +228,15 @@ function renderStudentRow(student) {
 }
 
 function getFilterState() {
+    const selectedPrograms = getSelectedValues("class-program-filter");
+    const shouldApplyProgramFilter = selectedPrograms.length > 0 && selectedPrograms.length < KNOWN_PROGRAMS.length;
+
     return {
         search: String(document.getElementById("class-search")?.value || "").trim().toLowerCase(),
         years: getSelectedValues("class-year-filter"),
         schoolGroups: getSelectedValues("class-school-filter"),
         forms: getSelectedValues("class-form-filter"),
-        programs: getSelectedValues("class-program-filter"),
+        programs: shouldApplyProgramFilter ? selectedPrograms : [],
         linkedOnly: Boolean(document.getElementById("class-linked-only")?.checked)
     };
 }
@@ -260,13 +264,16 @@ function applyFilters() {
     const filters = getFilterState();
     const visibleStudents = classState.allStudents
         .filter((student) => {
+            const matchesSearch = studentMatchesSearch(student, filters.search);
+            if (!matchesSearch) return false;
+
             if (filters.years.length && !filters.years.includes(String(student.year_level || ""))) return false;
             if (filters.schoolGroups.length && !filters.schoolGroups.includes(getSchoolGroupForYearLevel(student.year_level))) return false;
             if (filters.forms.length && !filters.forms.includes(String(student.form_class || ""))) return false;
-            if (filters.programs.length && !filters.programs.some((program) => Array.isArray(student.programs) && student.programs.includes(program))) return false;
+            if (!filters.search && filters.programs.length && !filters.programs.some((program) => Array.isArray(student.programs) && student.programs.includes(program))) return false;
             if (String(student.status || "").toLowerCase() !== "current") return false;
             if (filters.linkedOnly && !(Array.isArray(student.linked_emails) && student.linked_emails.length)) return false;
-            return studentMatchesSearch(student, filters.search);
+            return true;
         })
         .sort(compareStudentsByLastName);
 
@@ -304,7 +311,7 @@ async function loadClassManagement() {
             formatter: formatSchoolGroupLabel
         });
         buildSelectOptions("class-form-filter", students.map((student) => student.form_class), "All form classes", { multiple: true });
-        buildSelectOptions("class-program-filter", ["DTECH", "DTONLINE", "COMP", "TEXT", "MPROG", "MDTECH"], "All programs", {
+        buildSelectOptions("class-program-filter", KNOWN_PROGRAMS, "All programs", {
             multiple: true,
             sortValues: false,
             formatter: (value) => value

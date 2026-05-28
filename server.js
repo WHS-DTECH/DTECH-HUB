@@ -91,7 +91,8 @@ function getStudentPrograms(row) {
     row.status,
     row.id_number,
     row.student_name,
-    ...STUDENT_TIMETABLE_PERIOD_COLUMNS.map((columnName) => row[columnName])
+    ...STUDENT_TIMETABLE_PERIOD_COLUMNS.map((columnName) => row[columnName]),
+    ...Object.values(row || {})
   ];
 
   const normalizedText = sourceValues
