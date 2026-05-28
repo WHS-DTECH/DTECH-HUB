@@ -1825,6 +1825,7 @@ function createLessonRow(lesson = {}) {
                         <option>Programming</option>
                         <option>Electronics</option>
                         <option>Digital Media</option>
+                        <option>Project Management</option>
                     </select>
                 </div>
                 <div class="field">
