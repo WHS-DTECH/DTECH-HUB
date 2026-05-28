@@ -1,5 +1,13 @@
 const CLASS_AUTH_KEY = "hub_google_auth_v1";
 const KNOWN_PROGRAMS = ["DTECH", "DTONLINE", "COMP", "TEXT", "MPROG", "MDTECH"];
+const DEFAULT_FRESHNESS_THRESHOLDS = {
+    aging_days: 3,
+    stale_days: 7
+};
+const classFreshnessThresholds = {
+    aging_days: DEFAULT_FRESHNESS_THRESHOLDS.aging_days,
+    stale_days: DEFAULT_FRESHNESS_THRESHOLDS.stale_days
+};
 const classState = {
     allStudents: [],
     visibleStudents: []
@@ -64,11 +72,18 @@ function formatDate(value) {
     }
 }
 
-function setDataFreshness(message, isError = false) {
+function normalizePositiveInteger(value, fallback) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function setDataFreshness(message, { tone = "unknown", label = "Unknown" } = {}) {
     const element = document.getElementById("class-data-freshness");
     if (!element) return;
-    element.textContent = message;
-    element.className = isError ? "class-status is-error" : "class-status";
+    const safeMessage = String(message || "");
+    const normalizedTone = ["fresh", "aging", "stale", "unknown"].includes(tone) ? tone : "unknown";
+    element.className = `class-status class-data-freshness is-${normalizedTone}`;
+    element.innerHTML = `<span class="freshness-pill">${escapeHtml(label)}</span><span>${escapeHtml(safeMessage)}</span>`;
 }
 
 function updateDataFreshness(students) {
@@ -83,21 +98,67 @@ function updateDataFreshness(students) {
         .filter(Boolean);
 
     if (!timestamps.length) {
-        setDataFreshness("Student timetable upload date is unavailable in this dataset.", true);
+        setDataFreshness("Student timetable upload date is unavailable in this dataset.", {
+            tone: "unknown",
+            label: "Unknown"
+        });
         return;
     }
 
     const latest = timestamps.sort((a, b) => b.getTime() - a.getTime())[0];
     const now = new Date();
-    const ageDays = Math.floor((now.getTime() - latest.getTime()) / (1000 * 60 * 60 * 24));
+    const ageDays = Math.max(0, Math.floor((now.getTime() - latest.getTime()) / (1000 * 60 * 60 * 24)));
     const label = formatDate(latest.toISOString());
+    const agingDays = normalizePositiveInteger(classFreshnessThresholds.aging_days, DEFAULT_FRESHNESS_THRESHOLDS.aging_days);
+    const staleDays = Math.max(
+        agingDays + 1,
+        normalizePositiveInteger(classFreshnessThresholds.stale_days, DEFAULT_FRESHNESS_THRESHOLDS.stale_days)
+    );
 
-    if (ageDays >= 7) {
-        setDataFreshness(`Student timetable last upload in this DTECH-HUB dataset: ${label} (${ageDays} days old).`, true);
+    if (ageDays >= staleDays) {
+        setDataFreshness(
+            `Student timetable last upload in this DTECH-HUB dataset: ${label} (${ageDays} days old).`,
+            { tone: "stale", label: "Stale" }
+        );
         return;
     }
 
-    setDataFreshness(`Student timetable last upload in this DTECH-HUB dataset: ${label}.`);
+    if (ageDays >= agingDays) {
+        setDataFreshness(
+            `Student timetable last upload in this DTECH-HUB dataset: ${label} (${ageDays} days old).`,
+            { tone: "aging", label: "Aging" }
+        );
+        return;
+    }
+
+    setDataFreshness(
+        `Student timetable last upload in this DTECH-HUB dataset: ${label}.`,
+        { tone: "fresh", label: "Fresh" }
+    );
+}
+
+async function loadFreshnessThresholds(email) {
+    try {
+        const response = await fetch("/api/class-management/freshness-config", {
+            headers: { "x-user-email": email }
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            return;
+        }
+
+        const agingDays = normalizePositiveInteger(payload?.aging_days, DEFAULT_FRESHNESS_THRESHOLDS.aging_days);
+        const staleDays = Math.max(
+            agingDays + 1,
+            normalizePositiveInteger(payload?.stale_days, DEFAULT_FRESHNESS_THRESHOLDS.stale_days)
+        );
+
+        classFreshnessThresholds.aging_days = agingDays;
+        classFreshnessThresholds.stale_days = staleDays;
+    } catch (_error) {
+        classFreshnessThresholds.aging_days = DEFAULT_FRESHNESS_THRESHOLDS.aging_days;
+        classFreshnessThresholds.stale_days = DEFAULT_FRESHNESS_THRESHOLDS.stale_days;
+    }
 }
 
 function setClassStatus(message, isError = false) {
@@ -329,6 +390,7 @@ async function loadClassManagement() {
     setClassStatus("Loading student timetable rows…");
 
     try {
+        await loadFreshnessThresholds(email);
         const response = await fetch("/api/class-management/students?current_only=false&dtech_only=false", {
             headers: { "x-user-email": email }
         });
@@ -357,7 +419,10 @@ async function loadClassManagement() {
         setClassStatus("");
         applyFilters();
     } catch (error) {
-        setDataFreshness("Could not verify student timetable freshness.", true);
+        setDataFreshness("Could not verify student timetable freshness.", {
+            tone: "unknown",
+            label: "Unknown"
+        });
         setClassStatus(error.message || "Could not load class management data.", true);
         const body = document.getElementById("class-table-body");
         if (body) {

@@ -34,6 +34,19 @@ const DTECH_HUB_NAME = "DTECH-HUB";
 const NZQA_BASE_URL = "https://www.nzqa.govt.nz";
 const NZQA_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const nzqaStandardsCache = new Map();
+const DEFAULT_CLASS_DATA_AGING_DAYS = 3;
+const DEFAULT_CLASS_DATA_STALE_DAYS = 7;
+
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number.parseInt(String(value || "").trim(), 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const CLASS_DATA_AGING_DAYS = parsePositiveInteger(process.env.CLASS_DATA_AGING_DAYS, DEFAULT_CLASS_DATA_AGING_DAYS);
+const CLASS_DATA_STALE_DAYS = Math.max(
+  CLASS_DATA_AGING_DAYS + 1,
+  parsePositiveInteger(process.env.CLASS_DATA_STALE_DAYS, DEFAULT_CLASS_DATA_STALE_DAYS)
+);
 const STUDENT_TIMETABLE_PERIOD_COLUMNS = [
   "mon_p1_1", "mon_p1_2", "mon_p2", "mon_i", "mon_p3", "mon_p4", "mon_l", "mon_p5",
   "tue_p1_1", "tue_p1_2", "tue_p2", "tue_i", "tue_p3", "tue_p4", "tue_l", "tue_p5",
@@ -3671,6 +3684,19 @@ app.get("/api/class-management/students", async (req, res) => {
   } catch (_error) {
     res.status(500).json({ error: "Could not load class management students" });
   }
+});
+
+app.get("/api/class-management/freshness-config", async (req, res) => {
+  const userEmail = getRequestUserEmail(req);
+  if (!userEmail || !(await canManagePracticalSchedule(userEmail))) {
+    res.status(403).json({ error: "Teacher/Admin access is required." });
+    return;
+  }
+
+  res.json({
+    aging_days: CLASS_DATA_AGING_DAYS,
+    stale_days: CLASS_DATA_STALE_DAYS
+  });
 });
 
 app.get("/api/practicals/events", async (_req, res) => {
