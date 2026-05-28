@@ -1157,13 +1157,17 @@ function normalizeActivityCategoryForResponse(activity) {
   }
 
   const rawCategory = String(row.activity_category || "").trim().toLowerCase();
+  const assessmentText = [row.name, row.title, row.description, row.summary]
+    .map((value) => String(value || "").trim().toLowerCase())
+    .join(" ");
+  const hasAssessmentTextSignal = /\bassessment\b/.test(assessmentText);
 
   if (rawCategory === "assessment" || rawCategory === "assessment activity") {
     row.activity_category = "Assessment Task";
     return row;
   }
 
-  if ((rawCategory === "" || rawCategory === "activity") && hasAssessmentSignals(row)) {
+  if ((rawCategory === "" || rawCategory === "activity") && (hasAssessmentSignals(row) || hasAssessmentTextSignal)) {
     row.activity_category = "Assessment Task";
   }
 

@@ -357,6 +357,19 @@ function inferSourceTypeFromRecord(record) {
         return "assessment";
     }
 
+    const assessmentText = [
+        record?.title,
+        record?.name,
+        record?.summary,
+        record?.description
+    ]
+        .map((value) => String(value || "").trim().toLowerCase())
+        .join(" ");
+
+    if (/\bassessment\b/.test(assessmentText)) {
+        return "assessment";
+    }
+
     const hasProjectFields = [
         record?.start_date,
         record?.startDate,
