@@ -2563,6 +2563,27 @@ async function ensureActivitiesSchema() {
   await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS time_sensitive BOOLEAN NOT NULL DEFAULT FALSE`);
   await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS show_in_this_week BOOLEAN NOT NULL DEFAULT FALSE`);
   await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS term TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS start_date TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS contact_name TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS contact_phone TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS contact_email TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS company TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS address TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS overview JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS services JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS costs JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS outcomes JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS withdrawal_date TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS client_id TEXT`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS standard_details JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS tasks_list JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS achieved JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS merit JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS excellence JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS submission_requirements JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS relevant_implications JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS progress_logging JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS feedback_trialling JSONB NOT NULL DEFAULT '[]'::jsonb`);
   await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 }
