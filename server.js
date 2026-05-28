@@ -2813,6 +2813,66 @@ async function notifySuggestionByEmail(record, attachment) {
   return { status: "sent", recipients };
 }
 
+function buildAllocationApprovalEmailHtml({ studentEmail, activityName, activityCategory, teacherEmail, approvedAt }) {
+  const safe = (value) => String(value || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return `
+    <div style="font-family:Arial,sans-serif;max-width:760px;margin:0 auto;border:1px solid #d4dbe5;border-radius:12px;overflow:hidden;">
+      <div style="background:#2f74b9;color:#fff;padding:16px 20px;">
+        <div style="font-size:12px;letter-spacing:0.08em;text-transform:uppercase;opacity:0.9;">DTECH HUB</div>
+        <h2 style="margin:6px 0 0;font-size:28px;">Allocation Approved</h2>
+      </div>
+      <div style="padding:16px 20px;background:#f8fbff;">
+        <p style="margin:0 0 10px;">Kia ora ${safe(studentEmail)},</p>
+        <p style="margin:0 0 14px;">Your ${safe(activityCategory)} allocation has been approved.</p>
+        <table style="width:100%;border-collapse:collapse;">
+          <tr><td style="padding:8px;border:1px solid #d4dbe5;font-weight:700;">Task</td><td style="padding:8px;border:1px solid #d4dbe5;">${safe(activityName)}</td></tr>
+          <tr><td style="padding:8px;border:1px solid #d4dbe5;font-weight:700;">Category</td><td style="padding:8px;border:1px solid #d4dbe5;">${safe(activityCategory)}</td></tr>
+          <tr><td style="padding:8px;border:1px solid #d4dbe5;font-weight:700;">Approved At</td><td style="padding:8px;border:1px solid #d4dbe5;">${safe(approvedAt)}</td></tr>
+          <tr><td style="padding:8px;border:1px solid #d4dbe5;font-weight:700;">Teacher</td><td style="padding:8px;border:1px solid #d4dbe5;">${safe(teacherEmail || "Teacher")}</td></tr>
+        </table>
+        <p style="margin:14px 0 0;">Please check your task detail page for any standards and evidence checklist expectations.</p>
+      </div>
+    </div>
+  `;
+}
+
+async function notifyAllocationApprovedByEmail({ studentEmail, teacherEmail, activityName, activityCategory }) {
+  if (!smtpTransporter || !SMTP_FROM) {
+    return { status: "not_configured" };
+  }
+
+  const toEmail = normalizeEmail(studentEmail);
+  const ccEmail = normalizeEmail(teacherEmail);
+  if (!toEmail) {
+    return { status: "missing_student_email" };
+  }
+
+  const approvedAt = new Date().toISOString().slice(0, 10);
+  const categoryLabel = String(activityCategory || "Project").trim() || "Project";
+  const taskName = String(activityName || "Allocated task").trim() || "Allocated task";
+
+  const mailOptions = {
+    from: SMTP_FROM,
+    to: toEmail,
+    cc: ccEmail || undefined,
+    subject: `[DTECH HUB] ${categoryLabel} Approved: ${taskName}`,
+    html: buildAllocationApprovalEmailHtml({
+      studentEmail: toEmail,
+      activityName: taskName,
+      activityCategory: categoryLabel,
+      teacherEmail: ccEmail,
+      approvedAt
+    })
+  };
+
+  await smtpTransporter.sendMail(mailOptions);
+  return {
+    status: "sent",
+    to: toEmail,
+    cc: ccEmail || ""
+  };
+}
+
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -3531,6 +3591,7 @@ app.patch("/api/activities/:id/interests/:studentEmail/confirm", requireActivity
   const projectId = String(req.params.id || "").trim();
   const studentEmail = normalizeEmail(req.params.studentEmail || "");
   const confirmed = req.body?.confirmed !== false;
+  const teacherEmail = normalizeEmail(req.user_email || getRequestUserEmail(req));
 
   if (!projectId || !studentEmail) {
     res.status(400).json({ error: "Project ID and student email are required" });
@@ -3538,16 +3599,53 @@ app.patch("/api/activities/:id/interests/:studentEmail/confirm", requireActivity
   }
 
   if (!hasDatabase) {
-    res.json({ confirmed });
+    res.json({ confirmed, email_notification: "skipped_no_database" });
     return;
   }
 
   try {
+    const currentRowResult = await pool.query(
+      "SELECT confirmed FROM project_interests WHERE project_id = $1 AND student_email = $2 LIMIT 1",
+      [projectId, studentEmail]
+    );
+
+    if (!currentRowResult.rowCount) {
+      res.status(404).json({ error: "Student allocation not found" });
+      return;
+    }
+
+    const previousConfirmed = Boolean(currentRowResult.rows[0]?.confirmed);
+
     await pool.query(
       "UPDATE project_interests SET confirmed = $1 WHERE project_id = $2 AND student_email = $3",
       [confirmed, projectId, studentEmail]
     );
-    res.json({ confirmed });
+
+    let emailNotification = "not_sent";
+    if (confirmed && !previousConfirmed) {
+      try {
+        const activityResult = await pool.query(
+          "SELECT name, activity_category, category FROM activities WHERE id::text = $1 LIMIT 1",
+          [projectId]
+        );
+        const activityRow = activityResult.rows?.[0] || {};
+        const rawCategory = String(activityRow.activity_category || activityRow.category || "Project").toLowerCase();
+        const activityCategory = rawCategory.includes("assessment") ? "Assessment Task" : "Project";
+
+        const emailResult = await notifyAllocationApprovedByEmail({
+          studentEmail,
+          teacherEmail,
+          activityName: String(activityRow.name || projectId),
+          activityCategory
+        });
+
+        emailNotification = String(emailResult?.status || "not_sent");
+      } catch (_emailError) {
+        emailNotification = "failed";
+      }
+    }
+
+    res.json({ confirmed, email_notification: emailNotification });
   } catch (error) {
     res.status(500).json({ error: "Could not update confirmation" });
   }
