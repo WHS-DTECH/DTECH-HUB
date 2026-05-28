@@ -27,8 +27,8 @@ const pool = new Pool({
 });
 
 const STAFF_TABLE_CANDIDATES = ["staff_upload", "upload_staff"];
-const STUDENT_TABLE_CANDIDATES = ["student_timetable"];
-const TEACHER_TIMETABLE_TABLE_CANDIDATES = ["upload_timetable", "timetable", "teacher_timetable"];
+const STUDENT_TABLE_CANDIDATES = ["student_upload", "student_timetable", "upload_student"];
+const TEACHER_TIMETABLE_TABLE_CANDIDATES = ["kamar_timetable", "upload_timetable", "timetable", "teacher_timetable"];
 const SCHOOL_EMAIL_DOMAIN = "westlandhigh.school.nz";
 const DTECH_HUB_NAME = "DTECH-HUB";
 const NZQA_BASE_URL = "https://www.nzqa.govt.nz";
