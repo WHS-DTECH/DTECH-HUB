@@ -96,11 +96,16 @@ const EVIDENCE_STEPS_DEFAULTS = {
         "Evaluate the final outcome against requirements."
     ],
     "91897": [
-        "Identify problem requirements and success criteria.",
-        "Plan and implement advanced techniques for the outcome.",
-        "Capture evidence from iterative testing and debugging.",
-        "Refine the outcome based on trial results.",
-        "Explain how the outcome meets specifications."
+        "Achieved: Use appropriate project management tools and techniques to plan the development of a digital technologies outcome.",
+        "Achieved: Decompose the outcome into smaller components.",
+        "Achieved: Trial the components of the digital technologies outcome.",
+        "Achieved: Test that the digital technologies outcome functions as intended.",
+        "Achieved: Explain relevant implications.",
+        "Merit: Effectively use project management and version control tools and techniques to manage development of a digital technologies outcome.",
+        "Merit: Trial multiple components and/or techniques and select those that are most suitable.",
+        "Merit: Use information from testing and trialling to improve the functionality of the digital technologies outcome.",
+        "Merit: Address relevant implications.",
+        "Excellence: Discuss how planning, testing, and trialling information assisted the development of a high-quality outcome."
     ],
     "91907": [
         "Establish the project purpose and design requirements.",
