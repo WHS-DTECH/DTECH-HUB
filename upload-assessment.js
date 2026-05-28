@@ -350,7 +350,7 @@ async function prefillFormIfEditing() {
         form.activityName.value = String(data.name || "").trim();
         form.yearLevel.value = String(data.year_level || "").trim();
         form.type.value = String(data.type || "").trim();
-        form.activityCategory.value = normalizeCardCategory(data.activity_category, "Assessment Task");
+        form.activityCategory.value = "Assessment Task";
         form.difficulty.value = String(data.difficulty || "").trim();
         form.cardColor.value = String(data.card_color || data.card_colour || data.color || "Slate").trim() || "Slate";
         if (form.cardUrl) {

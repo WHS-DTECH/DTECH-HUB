@@ -879,9 +879,15 @@ async function getCheckConstraintAllowedValues(tableName, constraintName) {
   }
 }
 
-async function resolveActivityCategoryForInsert(activityCategory, activityType) {
+async function resolveActivityCategoryForInsert(activityCategory, activityType, options = {}) {
   const rawCategory = String(activityCategory || "").trim();
+  const rawCategoryLower = rawCategory.toLowerCase();
+  const preferAssessment = Boolean(options?.preferAssessment) || ["assessment", "assessment activity", "assessment task"].includes(rawCategoryLower);
+
   if (!hasDatabase) {
+    if (preferAssessment) {
+      return rawCategory || "Assessment Task";
+    }
     return rawCategory || "Activity";
   }
 
@@ -898,19 +904,41 @@ async function resolveActivityCategoryForInsert(activityCategory, activityType) 
     allowedActivityCategories.map((value) => [String(value).toLowerCase(), value])
   );
 
+  const findAllowed = (candidates) => {
+    const found = (Array.isArray(candidates) ? candidates : [])
+      .map((candidate) => String(candidate || "").trim())
+      .filter(Boolean)
+      .find((candidate) => allowedByLower.has(String(candidate).toLowerCase()));
+    return found ? allowedByLower.get(String(found).toLowerCase()) : "";
+  };
+
+  if (preferAssessment) {
+    const matchedAssessment = findAllowed([
+      rawCategory,
+      "Assessment Task",
+      "Assessment",
+      "Assessment Activity"
+    ]);
+    if (matchedAssessment) {
+      return matchedAssessment;
+    }
+  }
+
   const candidateValues = [
     rawCategory,
     rawCategory.replace(/\s*activity\s*$/i, "").trim(),
     String(activityType || "").trim(),
+    "Assessment",
+    "Assessment Task",
+    "Assessment Activity",
     "Project",
     "Practice",
-    "Activity",
-    "Assessment"
+    "Activity"
   ].filter(Boolean);
 
-  const matched = candidateValues.find((candidate) => allowedByLower.has(String(candidate).toLowerCase()));
+  const matched = findAllowed(candidateValues);
   return matched
-    ? allowedByLower.get(String(matched).toLowerCase())
+    ? matched
     : allowedActivityCategories[0];
 }
 
@@ -3051,7 +3079,7 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
   }
 
   const id = String(body.id || slugify(name));
-  const requestedActivityCategory = String(body.activity_category || "").trim();
+  const requestedActivityCategory = String(body.activity_category || body.activityCategory || "").trim();
   const hasAssessmentPayload = hasAssessmentSignals(body) || hasAssessmentPayloadShape(body);
   const resolvedRequestedCategory = (() => {
     const normalizedRequested = requestedActivityCategory.toLowerCase();
@@ -3074,7 +3102,7 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     difficulty: String(body.difficulty || "Beginner").trim() || "Beginner",
     subject_stream: String(body.subject_stream || body.subject || "").trim().toUpperCase(),
     card_color: (() => {
-      const normalizedCategory = String(body.activity_category || "").toLowerCase();
+      const normalizedCategory = String(resolvedRequestedCategory || requestedActivityCategory || "").toLowerCase();
       const fallbackColor = normalizedCategory.includes("assessment") ? "Slate" : "Rose";
       return String(body.card_color || fallbackColor).trim() || fallbackColor;
     })(),
@@ -3187,8 +3215,11 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     const progressLoggingColumn = pickExistingColumn(activityColumns, ["progress_logging"]);
     const feedbackTriallingColumn = pickExistingColumn(activityColumns, ["feedback_trialling"]);
 
+    const categoryRequestsAssessment = ["assessment", "assessment activity", "assessment task"].includes(String(payload.activity_category || "").toLowerCase());
     const resolvedActivityCategory = activityCategoryColumn
-      ? await resolveActivityCategoryForInsert(payload.activity_category, payload.type)
+      ? await resolveActivityCategoryForInsert(payload.activity_category, payload.type, {
+          preferAssessment: hasAssessmentPayload || categoryRequestsAssessment
+        })
       : payload.activity_category;
 
     const idMetadata = idColumn ? activityColumnMetadata.get(String(idColumn).toLowerCase()) : null;
@@ -3332,7 +3363,7 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
 
     await upsertHubVisibility([result.rows[0].id], DTECH_HUB_NAME, true);
 
-    res.status(201).json(result.rows[0]);
+    res.status(201).json(normalizeActivityCategoryForResponse(result.rows[0]));
   } catch (error) {
     console.error("Activity save error:", error);
     const detail = String(error?.message || "Could not save activity");
