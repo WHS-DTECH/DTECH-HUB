@@ -1098,8 +1098,42 @@ function isExcludedNonDtechActivity(_activity) {
   return false;
 }
 
+function hasAssessmentSignals(activity) {
+  const row = activity || {};
+  return [
+    row.standard_details,
+    row.tasks_list,
+    row.assessment_focus,
+    row.achieved,
+    row.merit,
+    row.excellence,
+    row.submission_requirements,
+    row.relevant_implications,
+    row.progress_logging,
+    row.feedback_trialling
+  ].some((value) => normalizeArray(value).length > 0);
+}
+
+function normalizeActivityCategoryForResponse(activity) {
+  const row = activity && typeof activity === "object" ? { ...activity } : {};
+  const rawCategory = String(row.activity_category || row.category || "").trim().toLowerCase();
+
+  if (rawCategory === "assessment" || rawCategory === "assessment activity") {
+    row.activity_category = "Assessment Task";
+    return row;
+  }
+
+  if ((rawCategory === "" || rawCategory === "activity") && hasAssessmentSignals(row)) {
+    row.activity_category = "Assessment Task";
+  }
+
+  return row;
+}
+
 function filterDtechActivities(rows) {
-  return (Array.isArray(rows) ? rows : []).filter((row) => !isExcludedNonDtechActivity(row));
+  return (Array.isArray(rows) ? rows : [])
+    .filter((row) => !isExcludedNonDtechActivity(row))
+    .map((row) => normalizeActivityCategoryForResponse(row));
 }
 
 function normalizeUnitLessons(value) {
@@ -2788,7 +2822,7 @@ app.get("/api/activities/:id", async (req, res) => {
       return;
     }
 
-    res.json(found);
+    res.json(normalizeActivityCategoryForResponse(found));
     return;
   }
 
@@ -2811,7 +2845,7 @@ app.get("/api/activities/:id", async (req, res) => {
       return;
     }
 
-    res.json(result.rows[0]);
+    res.json(normalizeActivityCategoryForResponse(result.rows[0]));
   } catch (error) {
     res.status(500).json({ error: "Could not load activity" });
   }
@@ -2833,12 +2867,25 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
   }
 
   const id = String(body.id || slugify(name));
+  const requestedActivityCategory = String(body.activity_category || "").trim();
+  const hasAssessmentPayload = hasAssessmentSignals(body);
+  const resolvedRequestedCategory = (() => {
+    const normalizedRequested = requestedActivityCategory.toLowerCase();
+    if (normalizedRequested === "assessment" || normalizedRequested === "assessment activity") {
+      return "Assessment Task";
+    }
+    if ((normalizedRequested === "" || normalizedRequested === "activity") && hasAssessmentPayload) {
+      return "Assessment Task";
+    }
+    return requestedActivityCategory || "Activity";
+  })();
+
   const payload = {
     id,
     name,
     year_level: yearLevel,
     type,
-    activity_category: String(body.activity_category || "Activity").trim() || "Activity",
+    activity_category: resolvedRequestedCategory,
     duration_minutes: Number.isInteger(durationMinutesInput) && durationMinutesInput > 0 ? durationMinutesInput : 1,
     difficulty: String(body.difficulty || "Beginner").trim() || "Beginner",
     subject_stream: String(body.subject_stream || body.subject || "").trim().toUpperCase(),
