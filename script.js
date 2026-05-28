@@ -301,7 +301,7 @@ function inferSourceTypeFromRecord(record) {
         return "activity";
     }
 
-    const category = String(record?.activityCategory || record?.activity_category || "").toLowerCase();
+    const category = String(record?.activityCategory || record?.activity_category || record?.category || "").toLowerCase();
     if (category.includes("assessment")) {
         return "assessment";
     }
@@ -391,7 +391,7 @@ async function loadSharedProjects() {
                 const id = String(item.id || slugify(title) || `activity-${Date.now()}`);
                 const yearLevel = String(item.year_level || "Year 9").trim();
                 const type = String(item.type || "Digital Learning").trim();
-                const category = String(item.activity_category || "Activity").trim();
+                const category = String(item.activity_category || item.category || "Activity").trim();
                 const summary = String(item.description || "").trim();
                 const created = String(item.created_at || new Date().toISOString()).slice(0, 10);
                 const imageUrl = String(item.outcome_image_url || item.image_url || "").trim();

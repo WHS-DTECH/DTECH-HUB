@@ -141,7 +141,7 @@ function restoreAssessmentDraftIfAvailable() {
         }
 
         if (key === "activityCategory") {
-            field.value = normalizeCardCategory(draft[key], "Assessment Task");
+            field.value = "Assessment Task";
             return;
         }
 
@@ -427,7 +427,7 @@ function createAssessmentPayload() {
         name,
         year_level: String(formData.get("yearLevel") || "").trim(),
         type: String(formData.get("type") || "").trim(),
-        activity_category: normalizeCardCategory(formData.get("activityCategory"), "Assessment Task"),
+        activity_category: "Assessment Task",
         duration_minutes: 1,
         difficulty: String(formData.get("difficulty") || "").trim(),
         card_color: String(formData.get("cardColor") || "Slate").trim(),

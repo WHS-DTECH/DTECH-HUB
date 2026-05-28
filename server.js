@@ -1100,6 +1100,23 @@ function isExcludedNonDtechActivity(_activity) {
 
 function hasAssessmentSignals(activity) {
   const row = activity || {};
+  const hasMeaningfulValue = (value) => {
+    if (Array.isArray(value)) {
+      return value.map((item) => String(item || "").trim()).filter(Boolean).length > 0;
+    }
+
+    const text = String(value || "").trim();
+    if (!text) return false;
+    if (text === "[]" || text === "{}") return false;
+
+    const lowered = text.toLowerCase();
+    if (lowered === "null" || lowered === "undefined" || lowered === "none" || lowered === "n/a") {
+      return false;
+    }
+
+    return true;
+  };
+
   return [
     row.standard_details,
     row.tasks_list,
@@ -1111,12 +1128,35 @@ function hasAssessmentSignals(activity) {
     row.relevant_implications,
     row.progress_logging,
     row.feedback_trialling
-  ].some((value) => normalizeArray(value).length > 0);
+  ].some((value) => hasMeaningfulValue(value));
+}
+
+function hasAssessmentPayloadShape(activity) {
+  const row = activity || {};
+  const keys = [
+    "standard_details",
+    "tasks_list",
+    "assessment_focus",
+    "achieved",
+    "merit",
+    "excellence",
+    "submission_requirements",
+    "relevant_implications",
+    "progress_logging",
+    "feedback_trialling"
+  ];
+
+  return keys.some((key) => Object.prototype.hasOwnProperty.call(row, key));
 }
 
 function normalizeActivityCategoryForResponse(activity) {
   const row = activity && typeof activity === "object" ? { ...activity } : {};
-  const rawCategory = String(row.activity_category || row.category || "").trim().toLowerCase();
+  const resolvedCategoryText = String(row.activity_category || row.category || "").trim();
+  if (resolvedCategoryText && !String(row.activity_category || "").trim()) {
+    row.activity_category = resolvedCategoryText;
+  }
+
+  const rawCategory = String(row.activity_category || "").trim().toLowerCase();
 
   if (rawCategory === "assessment" || rawCategory === "assessment activity") {
     row.activity_category = "Assessment Task";
@@ -2868,7 +2908,7 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
 
   const id = String(body.id || slugify(name));
   const requestedActivityCategory = String(body.activity_category || "").trim();
-  const hasAssessmentPayload = hasAssessmentSignals(body);
+  const hasAssessmentPayload = hasAssessmentSignals(body) || hasAssessmentPayloadShape(body);
   const resolvedRequestedCategory = (() => {
     const normalizedRequested = requestedActivityCategory.toLowerCase();
     if (normalizedRequested === "assessment" || normalizedRequested === "assessment activity") {
