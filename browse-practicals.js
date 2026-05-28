@@ -189,17 +189,17 @@ function renderStudentPracticalTable() {
     const allocationFilter = String(studentPracticalAllocation?.value || "all").trim().toLowerCase();
 
     const visibleRows = studentPracticalRows.filter((row) => {
-        const hasProjectAllocation = row.practicals.some((item) => item.type === "Project");
+        const hasAnyAllocation = Array.isArray(row.practicals) && row.practicals.length > 0;
 
         if (strandFilter !== "ALL" && !row.strands.includes(strandFilter)) {
             return false;
         }
 
-        if (allocationFilter === "with" && !hasProjectAllocation) {
+        if (allocationFilter === "with" && !hasAnyAllocation) {
             return false;
         }
 
-        if (allocationFilter === "without" && hasProjectAllocation) {
+        if (allocationFilter === "without" && hasAnyAllocation) {
             return false;
         }
 
