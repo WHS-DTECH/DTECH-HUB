@@ -408,6 +408,18 @@ async function readSharedActivity(activityId) {
         return [];
     };
 
+    const foundStandardDetails = toArray(found.standard_details);
+    const foundTasksList = toArray(found.tasks_list);
+    const foundAssessmentFocus = toArray(found.assessment_focus);
+    const inferredAssessmentCategory = (
+        foundStandardDetails.length
+        || foundTasksList.length
+        || foundAssessmentFocus.length
+        || toArray(found.achieved).length
+        || toArray(found.merit).length
+        || toArray(found.excellence).length
+    ) ? "Assessment Task" : "Activity";
+
     return {
         id: found.id || activityId,
         title: found.name || "Uploaded Activity",
@@ -415,7 +427,7 @@ async function readSharedActivity(activityId) {
         type: found.type || "Digital Learning",
             duration: `${normalizeDurationMinutes(found)} mins`,
         term: found.term || "Term 2",
-        activityCategory: normalizeCardCategory(found.activity_category, "Activity"),
+        activityCategory: normalizeCardCategory(found.activity_category || found.category, inferredAssessmentCategory),
             showInThisWeek: Boolean(found.show_in_this_week ?? found.show_this_week ?? found.is_pinned ?? found.is_this_week),
         summary: String(found.description || found.summary || "").trim(),
         resources: toArray(found.resources),
@@ -439,15 +451,15 @@ async function readSharedActivity(activityId) {
         clientId: found.client_id || "",
         
         // Assessment Task Fields
-        standardDetails: toArray(found.standard_details),
+        standardDetails: foundStandardDetails,
         tasksList: (() => {
-            const fromTasksList = toArray(found.tasks_list);
+            const fromTasksList = foundTasksList;
             if (fromTasksList.length) {
                 return fromTasksList;
             }
-            return toArray(found.assessment_focus);
+            return foundAssessmentFocus;
         })(),
-        assessmentFocus: toArray(found.assessment_focus),
+        assessmentFocus: foundAssessmentFocus,
         assessmentFocusRaw: found.assessment_focus,
         achieved: toArray(found.achieved),
         merit: toArray(found.merit),
@@ -487,6 +499,15 @@ function renderList(items) {
 }
 
 function defaultDetailShape(id, data) {
+    const inferredAssessmentCategory = (
+        coerceArray(data?.standardDetails).length
+        || coerceArray(data?.tasksList).length
+        || coerceArray(data?.assessmentFocus ?? data?.assessment_focus).length
+        || coerceArray(data?.achieved).length
+        || coerceArray(data?.merit).length
+        || coerceArray(data?.excellence).length
+    ) ? "Assessment Task" : "Activity";
+
     return {
         id,
         title: String(data?.title || "").trim() || "Activity",
@@ -494,7 +515,7 @@ function defaultDetailShape(id, data) {
         type: String(data?.type || "").trim() || "Digital Learning",
         duration: String(data?.duration || "120 mins").trim() || "120 mins",
         term: String(data?.term || "Term 2").trim() || "Term 2",
-        activityCategory: normalizeCardCategory(data?.activityCategory, "Activity"),
+        activityCategory: normalizeCardCategory(data?.activityCategory || data?.activity_category || data?.category, inferredAssessmentCategory),
         showInThisWeek: Boolean(data?.showInThisWeek),
         summary: String(data?.summary || "").trim(),
         resources: Array.isArray(data?.resources) ? data.resources : [],
@@ -961,7 +982,7 @@ function renderEditForm(host, id, data) {
                         <span>Company</span>
                         <input name="company" type="text" value="${escapeHtml(data.company)}">
                     </label>
-                                activityCategory: normalizeCardCategory(data?.activityCategory || "", "Activity"),
+                    <label class="detail-field">
                         <span>Address</span>
                         <input name="address" type="text" value="${escapeHtml(data.address)}">
                     </label>
@@ -1101,7 +1122,7 @@ function renderEditForm(host, id, data) {
             type: String(formData.get("type") || "").trim(),
             durationMinutes: String(formData.get("durationMinutes") || "").trim(),
             term: String(formData.get("term") || "").trim() || "Term 2",
-            activityCategory: normalizeCardCategory(formData.get("activityCategory"), "Activity"),
+            activityCategory: normalizeCardCategory(formData.get("activityCategory"), data?.activityCategory || "Assessment Task"),
             summary: String(formData.get("summary") || "").trim(),
             image: String(formData.get("image") || "").trim() || "https://placehold.co/900x560/3f89cf/ffffff?text=Uploaded+Activity",
             resources: parseLines(formData.get("resources")),
