@@ -1693,7 +1693,7 @@ body.public-home-access .controls-panel {
 .practicals-student-filters {
     margin-top: 10px;
     display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(180px, 1fr);
+    grid-template-columns: minmax(0, 2fr) minmax(180px, 1fr) minmax(220px, 1fr);
     gap: 10px;
 }
 

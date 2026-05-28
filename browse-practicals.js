@@ -14,6 +14,7 @@ const studentPracticalStatus = document.querySelector("#student-practical-status
 const studentPracticalMeta = document.querySelector("#student-practical-meta");
 const studentPracticalSearch = document.querySelector("#student-practical-search");
 const studentPracticalStrand = document.querySelector("#student-practical-strand");
+const studentPracticalAllocation = document.querySelector("#student-practical-allocation");
 
 const BROWSE_PRACTICALS_AUTH_KEY = "hub_google_auth_v1";
 
@@ -185,9 +186,20 @@ function renderStudentPracticalTable() {
 
     const searchQuery = String(studentPracticalSearch?.value || "").trim().toLowerCase();
     const strandFilter = String(studentPracticalStrand?.value || "all").trim().toUpperCase();
+    const allocationFilter = String(studentPracticalAllocation?.value || "all").trim().toLowerCase();
 
     const visibleRows = studentPracticalRows.filter((row) => {
+        const hasProjectAllocation = row.practicals.some((item) => item.type === "Project");
+
         if (strandFilter !== "ALL" && !row.strands.includes(strandFilter)) {
+            return false;
+        }
+
+        if (allocationFilter === "with" && !hasProjectAllocation) {
+            return false;
+        }
+
+        if (allocationFilter === "without" && hasProjectAllocation) {
             return false;
         }
 
@@ -633,6 +645,10 @@ if (studentPracticalSearch) {
 
 if (studentPracticalStrand) {
     studentPracticalStrand.addEventListener("change", () => renderStudentPracticalTable());
+}
+
+if (studentPracticalAllocation) {
+    studentPracticalAllocation.addEventListener("change", () => renderStudentPracticalTable());
 }
 
 if (studentPracticalBody) {
