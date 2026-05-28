@@ -5,7 +5,8 @@
   "description": "Computer Lab hub with shared activity uploads",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test:assessment-category-guard": "node scripts/regression-assessment-category.js"
   },
   "dependencies": {
     "express": "^4.19.2",

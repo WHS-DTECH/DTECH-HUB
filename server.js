@@ -1177,6 +1177,11 @@ function hasAssessmentPayloadShape(activity) {
   return keys.some((key) => Object.prototype.hasOwnProperty.call(row, key));
 }
 
+function isAssessmentCategoryLabel(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized.includes("assessment");
+}
+
 function normalizeActivityCategoryForResponse(activity) {
   const row = activity && typeof activity === "object" ? { ...activity } : {};
   const resolvedCategoryText = String(row.activity_category || row.category || "").trim();
@@ -3216,11 +3221,26 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     const feedbackTriallingColumn = pickExistingColumn(activityColumns, ["feedback_trialling"]);
 
     const categoryRequestsAssessment = ["assessment", "assessment activity", "assessment task"].includes(String(payload.activity_category || "").toLowerCase());
-    const resolvedActivityCategory = activityCategoryColumn
+    let resolvedActivityCategory = activityCategoryColumn
       ? await resolveActivityCategoryForInsert(payload.activity_category, payload.type, {
           preferAssessment: hasAssessmentPayload || categoryRequestsAssessment
         })
       : payload.activity_category;
+
+    if (hasAssessmentPayload && !isAssessmentCategoryLabel(resolvedActivityCategory)) {
+      console.warn(
+        `[assessment-category-guard] Non-assessment category resolved for assessment payload id=${payload.id} name="${payload.name}" category="${resolvedActivityCategory}"`
+      );
+
+      if (activityCategoryColumn) {
+        const forcedAssessmentCategory = await resolveActivityCategoryForInsert("Assessment Task", payload.type, {
+          preferAssessment: true
+        });
+        if (isAssessmentCategoryLabel(forcedAssessmentCategory)) {
+          resolvedActivityCategory = forcedAssessmentCategory;
+        }
+      }
+    }
 
     const idMetadata = idColumn ? activityColumnMetadata.get(String(idColumn).toLowerCase()) : null;
     const { canUseExplicitId, idValueToSave } = await resolveActivityIdForInsert(
