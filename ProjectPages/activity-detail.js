@@ -241,37 +241,97 @@ function toStandardCode(value) {
     return match ? match[0] : "";
 }
 
-function getEvidenceStepsStorageKey(email, projectId) {
-    return `dtech:evidence-steps:v1:${String(email || "").toLowerCase()}:${String(projectId || "")}`;
+function normalizeEvidenceSteps(rows) {
+    const source = Array.isArray(rows) ? rows : [];
+    return source
+        .map((row) => {
+            const standard = String(row?.standard || "").trim();
+            if (!standard) return null;
+
+            const steps = Array.isArray(row?.steps)
+                ? row.steps
+                    .map((step) => ({
+                        text: String(step?.text || "").trim(),
+                        done: Boolean(step?.done)
+                    }))
+                    .filter((step) => step.text)
+                : [];
+
+            return { standard, steps };
+        })
+        .filter(Boolean);
 }
 
-function readEvidenceStepsMap(email, projectId) {
-    const key = getEvidenceStepsStorageKey(email, projectId);
-    if (!key) return {};
+function evidenceRowsToMap(rows) {
+    const map = {};
+    normalizeEvidenceSteps(rows).forEach((row) => {
+        map[row.standard] = row.steps.map((step) => ({ text: step.text, done: Boolean(step.done) }));
+    });
+    return map;
+}
 
-    try {
-        const parsed = JSON.parse(localStorage.getItem(key) || "{}");
-        if (!parsed || typeof parsed !== "object") {
-            return {};
-        }
-        return parsed;
-    } catch (_error) {
-        return {};
+function evidenceMapToRows(state, standards) {
+    return normalizeEvidenceSteps(
+        (Array.isArray(standards) ? standards : []).map((standard) => ({
+            standard,
+            steps: Array.isArray(state?.[standard]) ? state[standard] : []
+        }))
+    );
+}
+
+function getEvidenceCompletionPercentFromRows(rows, standards) {
+    const map = evidenceRowsToMap(rows);
+    const targetStandards = Array.isArray(standards) ? standards : [];
+    let total = 0;
+    let done = 0;
+
+    targetStandards.forEach((standard) => {
+        const items = Array.isArray(map[standard]) ? map[standard] : [];
+        items.forEach((item) => {
+            if (!String(item?.text || "").trim()) {
+                return;
+            }
+            total += 1;
+            if (Boolean(item?.done)) {
+                done += 1;
+            }
+        });
+    });
+
+    if (!total) {
+        return 0;
+    }
+
+    return Math.round((done / total) * 100);
+}
+
+async function fetchEvidenceRows(projectId, studentEmail) {
+    const response = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interests/${encodeURIComponent(studentEmail)}/evidence`, {
+        headers: buildWriteHeaders()
+    });
+
+    if (!response.ok) {
+        throw new Error("Could not load evidence steps.");
+    }
+
+    const payload = await response.json().catch(() => ({}));
+    return normalizeEvidenceSteps(payload?.evidence_steps);
+}
+
+async function saveEvidenceRows(projectId, studentEmail, rows) {
+    const response = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interests/${encodeURIComponent(studentEmail)}/evidence`, {
+        method: "PATCH",
+        headers: buildWriteHeaders(),
+        body: JSON.stringify({ evidence_steps: normalizeEvidenceSteps(rows) })
+    });
+
+    if (!response.ok) {
+        throw new Error("Could not save evidence steps.");
     }
 }
 
-function writeEvidenceStepsMap(email, projectId, value) {
-    const key = getEvidenceStepsStorageKey(email, projectId);
-    if (!key) return;
-
-    try {
-        localStorage.setItem(key, JSON.stringify(value || {}));
-    } catch (_error) {
-    }
-}
-
-function renderEvidenceSidebar({ host, email, projectId, standards }) {
-    if (!host || !email || !projectId || !Array.isArray(standards) || !standards.length) {
+async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmail, standards, studentLabel = "Student" }) {
+    if (!host || !studentEmail || !projectId || !Array.isArray(standards) || !standards.length) {
         return;
     }
 
@@ -313,15 +373,36 @@ function renderEvidenceSidebar({ host, email, projectId, standards }) {
         backdrop.classList.add("is-open");
     };
 
-    const state = readEvidenceStepsMap(email, projectId);
+    const state = evidenceRowsToMap(await fetchEvidenceRows(projectId, studentEmail).catch(() => []));
     standards.forEach((code) => {
         if (!Array.isArray(state[code]) || !state[code].length) {
-            state[code] = Array.isArray(EVIDENCE_STEPS_DEFAULTS[code])
-                ? [...EVIDENCE_STEPS_DEFAULTS[code]]
-                : [""];
+            state[code] = (Array.isArray(EVIDENCE_STEPS_DEFAULTS[code]) ? EVIDENCE_STEPS_DEFAULTS[code] : [""])
+                .map((text) => ({ text: String(text || "").trim(), done: false }))
+                .filter((step) => step.text);
+            if (!state[code].length) {
+                state[code] = [{ text: "", done: false }];
+            }
         }
     });
-    writeEvidenceStepsMap(email, projectId, state);
+
+    const persistState = async (statusHost) => {
+        if (statusHost) {
+            statusHost.textContent = "Saving...";
+            statusHost.classList.remove("is-error");
+        }
+        try {
+            await saveEvidenceRows(projectId, studentEmail, evidenceMapToRows(state, standards));
+            if (statusHost) {
+                statusHost.textContent = "Saved.";
+                statusHost.classList.remove("is-error");
+            }
+        } catch (_error) {
+            if (statusHost) {
+                statusHost.textContent = "Could not save right now.";
+                statusHost.classList.add("is-error");
+            }
+        }
+    };
 
     const renderStepRows = (rowsHost, standardCode) => {
         const steps = Array.isArray(state[standardCode]) ? state[standardCode] : [];
@@ -334,16 +415,20 @@ function renderEvidenceSidebar({ host, email, projectId, standards }) {
             const check = document.createElement("input");
             check.type = "checkbox";
             check.className = "evidence-step-check";
-            check.disabled = true;
+            check.checked = Boolean(step?.done);
+            check.addEventListener("change", () => {
+                state[standardCode][index].done = check.checked;
+                void persistState(sidebar.querySelector("#evidence-sidebar-status"));
+            });
 
             const input = document.createElement("input");
             input.type = "text";
             input.className = "evidence-step-input";
-            input.value = String(step || "");
+            input.value = String(step?.text || "");
             input.placeholder = "Add an evidence step";
             input.addEventListener("input", () => {
-                state[standardCode][index] = input.value;
-                writeEvidenceStepsMap(email, projectId, state);
+                state[standardCode][index].text = input.value;
+                void persistState(sidebar.querySelector("#evidence-sidebar-status"));
             });
 
             const removeButton = document.createElement("button");
@@ -353,9 +438,9 @@ function renderEvidenceSidebar({ host, email, projectId, standards }) {
             removeButton.addEventListener("click", () => {
                 state[standardCode].splice(index, 1);
                 if (!state[standardCode].length) {
-                    state[standardCode].push("");
+                    state[standardCode].push({ text: "", done: false });
                 }
-                writeEvidenceStepsMap(email, projectId, state);
+                void persistState(sidebar.querySelector("#evidence-sidebar-status"));
                 renderStepRows(rowsHost, standardCode);
             });
 
@@ -369,7 +454,8 @@ function renderEvidenceSidebar({ host, email, projectId, standards }) {
             <h2>Evidence Steps</h2>
             <button type="button" class="detail-action detail-action-secondary" id="evidence-sidebar-close">Close</button>
         </header>
-        <p class="evidence-sidebar-copy">List the steps you will use as evidence for your allocated standard(s).</p>
+        <p class="evidence-sidebar-copy">Tracking for <strong>${escapeHtml(studentLabel)}</strong>. List the steps and tick each one when evidence is complete.</p>
+        <p class="evidence-sidebar-status" id="evidence-sidebar-status" aria-live="polite"></p>
         <div class="evidence-standard-list" id="evidence-standard-list"></div>
     `;
 
@@ -387,8 +473,8 @@ function renderEvidenceSidebar({ host, email, projectId, standards }) {
         const addButton = block.querySelector(".evidence-step-add");
         if (addButton) {
             addButton.addEventListener("click", () => {
-                state[code].push("");
-                writeEvidenceStepsMap(email, projectId, state);
+                state[code].push({ text: "", done: false });
+                void persistState(sidebar.querySelector("#evidence-sidebar-status"));
                 renderStepRows(rowsHost, code);
             });
         }
@@ -1450,6 +1536,9 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
 
     // Teachers see the full list of interested students
     if (isTeacher && interestData.emails.length > 0) {
+        const studentsByEmail = new Map((Array.isArray(interestData.students) ? interestData.students : [])
+            .map((student) => [String(student?.email || "").toLowerCase(), student]));
+
         html += `<div class="interest-student-list"><h3>Interested Students</h3>`;
         html += `<table class="interest-table"><thead><tr><th>Student Email</th><th>Status</th><th>Action</th></tr></thead><tbody>`;
         for (const studentEmail of interestData.emails) {
@@ -1458,7 +1547,18 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                 ? `<span class="interest-status interest-confirmed">Confirmed</span>`
                 : `<span class="interest-status interest-pending">Pending</span>`;
             const confirmBtnText = isConfirmed ? "Unconfirm" : "Confirm";
-            html += `<tr data-student="${escapeHtml(studentEmail)}"><td>${escapeHtml(studentEmail)}</td><td>${statusBadge}</td><td><button type="button" class="detail-action interest-confirm-btn" data-confirmed="${isConfirmed}">${confirmBtnText}</button></td></tr>`;
+
+            const studentRecord = studentsByEmail.get(String(studentEmail || "").toLowerCase()) || null;
+            const assignedStandards = [
+                toStandardCode(studentRecord?.standard_1),
+                toStandardCode(studentRecord?.standard_2)
+            ].filter((code) => EVIDENCE_STEPS_TARGET_STANDARDS.has(code));
+            const completionPercent = getEvidenceCompletionPercentFromRows(studentRecord?.evidence_steps, assignedStandards);
+            const progressButton = assignedStandards.length
+                ? `<button type="button" class="detail-action detail-action-secondary interest-progress-btn" data-student-email="${escapeHtml(studentEmail)}" data-standards="${escapeHtml(assignedStandards.join(","))}">Progress ${completionPercent}%</button>`
+                : "";
+
+            html += `<tr data-student="${escapeHtml(studentEmail)}"><td>${escapeHtml(studentEmail)}</td><td>${statusBadge}</td><td><div class="interest-action-group"><button type="button" class="detail-action interest-confirm-btn" data-confirmed="${isConfirmed}">${confirmBtnText}</button>${progressButton}</div></td></tr>`;
         }
         html += `</tbody></table></div>`;
     } else if (isTeacher && interestData.count === 0) {
@@ -1476,13 +1576,40 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         ].filter((code) => EVIDENCE_STEPS_TARGET_STANDARDS.has(code));
 
         if (assignedStandards.length) {
-            renderEvidenceSidebar({
+            await renderEvidenceSidebar({
                 host,
-                email,
                 projectId,
-                standards: Array.from(new Set(assignedStandards))
+                viewerEmail: email,
+                studentEmail: email,
+                standards: Array.from(new Set(assignedStandards)),
+                studentLabel: "My progress"
             });
         }
+    }
+
+    if (isTeacher && email) {
+        section.querySelectorAll(".interest-progress-btn").forEach((button) => {
+            button.addEventListener("click", async () => {
+                const studentEmail = String(button.getAttribute("data-student-email") || "").trim().toLowerCase();
+                const standards = String(button.getAttribute("data-standards") || "")
+                    .split(",")
+                    .map((item) => item.trim())
+                    .filter(Boolean);
+
+                if (!studentEmail || !standards.length) {
+                    return;
+                }
+
+                await renderEvidenceSidebar({
+                    host,
+                    projectId,
+                    viewerEmail: email,
+                    studentEmail,
+                    standards,
+                    studentLabel: studentEmail
+                });
+            });
+        });
     }
 
     // Toggle interest button handler

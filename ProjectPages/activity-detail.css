@@ -441,6 +441,12 @@ h1 {
     border-bottom: none;
 }
 
+.interest-action-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
 .interest-status {
     display: inline-block;
     padding: 2px 8px;
@@ -572,6 +578,17 @@ h1 {
     font-size: 0.82rem;
     color: #375b7f;
     line-height: 1.45;
+}
+
+.evidence-sidebar-status {
+    margin: -2px 0 10px;
+    min-height: 1em;
+    font-size: 0.74rem;
+    color: #2f5f8f;
+}
+
+.evidence-sidebar-status.is-error {
+    color: #b23a3a;
 }
 
 .evidence-standard-list {

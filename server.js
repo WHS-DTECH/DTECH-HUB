@@ -2588,8 +2588,36 @@ async function ensureActivitiesSchema() {
   await pool.query(`ALTER TABLE activities ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 }
 
+async function ensureProjectInterestsSchema() {
+  if (!hasDatabase) {
+    return;
+  }
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS project_interests (
+      project_id TEXT NOT NULL,
+      student_email TEXT NOT NULL,
+      confirmed BOOLEAN NOT NULL DEFAULT FALSE,
+      standard_1 TEXT,
+      standard_2 TEXT,
+      evidence_steps JSONB NOT NULL DEFAULT '[]'::jsonb,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (project_id, student_email)
+    );
+  `);
+
+  await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS confirmed BOOLEAN NOT NULL DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS standard_1 TEXT`);
+  await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS standard_2 TEXT`);
+  await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS evidence_steps JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+}
+
 async function ensureSchema() {
   await ensureActivitiesSchema();
+  await ensureProjectInterestsSchema();
   await ensureUnitPlanSchema();
 }
 
@@ -2601,6 +2629,30 @@ app.use(express.json({ limit: "8mb" }));
 app.use("/images/activities", express.static(path.join(__dirname, "images", "activities")));
 app.use("/images/activities", express.static(path.join(__dirname, "public", "images", "activities")));
 app.use(express.static(__dirname));
+
+function normalizeEvidenceStepsPayload(value) {
+  const rows = Array.isArray(value) ? value : [];
+
+  return rows
+    .map((row) => {
+      const standard = String(row?.standard || "").trim();
+      const steps = Array.isArray(row?.steps)
+        ? row.steps
+          .map((step) => ({
+            text: String(step?.text || "").trim(),
+            done: Boolean(step?.done)
+          }))
+          .filter((step) => step.text)
+        : [];
+
+      if (!standard) {
+        return null;
+      }
+
+      return { standard, steps };
+    })
+    .filter(Boolean);
+}
 
 async function canManagePracticalSchedule(email) {
   const normalizedEmail = normalizeEmail(email);
@@ -3431,7 +3483,7 @@ app.get("/api/activities/:id/interests", async (req, res) => {
 
   try {
     const result = await pool.query(
-      "SELECT student_email, confirmed, standard_1, standard_2 FROM project_interests WHERE project_id = $1 ORDER BY created_at ASC",
+      "SELECT student_email, confirmed, standard_1, standard_2, evidence_steps FROM project_interests WHERE project_id = $1 ORDER BY created_at ASC",
       [projectId]
     );
 
@@ -3453,7 +3505,8 @@ app.get("/api/activities/:id/interests", async (req, res) => {
           email,
           confirmed: Boolean(myAllocationRow.confirmed),
           standard_1: String(myAllocationRow.standard_1 || "").trim(),
-          standard_2: String(myAllocationRow.standard_2 || "").trim()
+          standard_2: String(myAllocationRow.standard_2 || "").trim(),
+          evidence_steps: normalizeEvidenceStepsPayload(myAllocationRow.evidence_steps)
         }
         : null,
       emails: isTeacher ? result.rows.map((r) => r.student_email) : [],
@@ -3463,7 +3516,8 @@ app.get("/api/activities/:id/interests", async (req, res) => {
           email: r.student_email,
           confirmed: Boolean(r.confirmed),
           standard_1: String(r.standard_1 || "").trim(),
-          standard_2: String(r.standard_2 || "").trim()
+          standard_2: String(r.standard_2 || "").trim(),
+          evidence_steps: normalizeEvidenceStepsPayload(r.evidence_steps)
         }))
         : []
     });
@@ -3524,6 +3578,131 @@ app.patch("/api/activities/:id/interests/:studentEmail/standards", requireActivi
     res.json({ standard_1: standard1, standard_2: standard2 });
   } catch (error) {
     res.status(500).json({ error: "Could not update standards" });
+  }
+});
+
+app.get("/api/activities/:id/interests/:studentEmail/evidence", async (req, res) => {
+  const projectId = String(req.params.id || "").trim();
+  const studentEmail = normalizeEmail(req.params.studentEmail || "");
+  const requesterEmail = normalizeEmail(req.headers["x-user-email"] || "");
+
+  if (!projectId || !studentEmail) {
+    res.status(400).json({ error: "Project ID and student email are required" });
+    return;
+  }
+
+  if (!requesterEmail || !requesterEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required" });
+    return;
+  }
+
+  let isTeacher = false;
+  try {
+    const access = await resolveActivityWriteAccess(requesterEmail);
+    isTeacher = Boolean(access.allowed);
+  } catch (_error) {
+    isTeacher = false;
+  }
+
+  if (!isTeacher && requesterEmail !== studentEmail) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
+
+  if (!hasDatabase) {
+    res.json({
+      student_email: studentEmail,
+      standard_1: "",
+      standard_2: "",
+      evidence_steps: []
+    });
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      "SELECT standard_1, standard_2, evidence_steps FROM project_interests WHERE project_id = $1 AND student_email = $2 LIMIT 1",
+      [projectId, studentEmail]
+    );
+
+    if (!result.rowCount) {
+      res.status(404).json({ error: "Student allocation not found" });
+      return;
+    }
+
+    const row = result.rows[0] || {};
+    res.json({
+      student_email: studentEmail,
+      standard_1: String(row.standard_1 || "").trim(),
+      standard_2: String(row.standard_2 || "").trim(),
+      evidence_steps: normalizeEvidenceStepsPayload(row.evidence_steps)
+    });
+  } catch (_error) {
+    res.status(500).json({ error: "Could not load evidence steps" });
+  }
+});
+
+app.patch("/api/activities/:id/interests/:studentEmail/evidence", async (req, res) => {
+  const projectId = String(req.params.id || "").trim();
+  const studentEmail = normalizeEmail(req.params.studentEmail || "");
+  const requesterEmail = normalizeEmail(req.headers["x-user-email"] || "");
+
+  if (!projectId || !studentEmail) {
+    res.status(400).json({ error: "Project ID and student email are required" });
+    return;
+  }
+
+  if (!requesterEmail || !requesterEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required" });
+    return;
+  }
+
+  let isTeacher = false;
+  try {
+    const access = await resolveActivityWriteAccess(requesterEmail);
+    isTeacher = Boolean(access.allowed);
+  } catch (_error) {
+    isTeacher = false;
+  }
+
+  if (!isTeacher && requesterEmail !== studentEmail) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
+
+  const evidenceSteps = normalizeEvidenceStepsPayload(req.body?.evidence_steps);
+
+  if (!hasDatabase) {
+    res.json({
+      student_email: studentEmail,
+      evidence_steps: evidenceSteps
+    });
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        UPDATE project_interests
+        SET evidence_steps = $1::jsonb,
+            updated_at = NOW()
+        WHERE project_id = $2 AND student_email = $3
+        RETURNING student_email
+      `,
+      [JSON.stringify(evidenceSteps), projectId, studentEmail]
+    );
+
+    if (!result.rowCount) {
+      res.status(404).json({ error: "Student allocation not found" });
+      return;
+    }
+
+    res.json({
+      student_email: studentEmail,
+      evidence_steps: evidenceSteps
+    });
+  } catch (_error) {
+    res.status(500).json({ error: "Could not save evidence steps" });
   }
 });
 
