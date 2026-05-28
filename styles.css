@@ -1840,6 +1840,41 @@ body.public-home-access .controls-panel {
     opacity: 0.75;
 }
 
+.standard-chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 6px 0 8px;
+}
+
+.standard-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: #ecf3fb;
+    border: 1px solid #c1d3e8;
+    color: #2e5d8a;
+    font-size: 0.74rem;
+    font-weight: 700;
+}
+
+.standard-chip-remove {
+    border: 1px solid #b5c8df;
+    background: #ffffff;
+    color: #2f5f8d;
+    border-radius: 999px;
+    font-size: 0.66rem;
+    font-weight: 700;
+    padding: 1px 7px;
+    cursor: pointer;
+}
+
+.standard-details-storage {
+    display: none !important;
+}
+
 @media (max-width: 760px) {
     .practicals-student-filters {
         grid-template-columns: 1fr;

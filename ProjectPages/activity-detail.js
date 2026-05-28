@@ -251,9 +251,29 @@ async function setupDetailStandardsPicker(form, setStatus) {
     const textarea = form?.querySelector('textarea[name="standardDetails"]');
     const picker = form?.querySelector('select[name="standardLibraryOption"]');
     const addButton = form?.querySelector('[data-add-standard-line]');
+    const chipList = form?.querySelector('[data-standard-chip-list]');
     if (!textarea || !picker || !addButton) {
         return;
     }
+
+    const renderChips = () => {
+        if (!chipList) {
+            return;
+        }
+
+        const lines = parseLines(textarea.value);
+        if (!lines.length) {
+            chipList.innerHTML = `<span class="empty-note">No standards selected yet.</span>`;
+            return;
+        }
+
+        chipList.innerHTML = lines.map((line) => {
+            const escaped = escapeHtml(line);
+            return `<span class="standard-chip"><span>${escaped}</span><button type="button" class="standard-chip-remove" data-standard-remove="${escaped}">Remove</button></span>`;
+        }).join("");
+    };
+
+    renderChips();
 
     picker.innerHTML = `<option value="">Loading standards...</option>`;
     picker.disabled = true;
@@ -264,6 +284,7 @@ async function setupDetailStandardsPicker(form, setStatus) {
         picker.innerHTML = `<option value="">No standards available</option>`;
         picker.disabled = false;
         addButton.disabled = false;
+        renderChips();
         return;
     }
 
@@ -277,6 +298,7 @@ async function setupDetailStandardsPicker(form, setStatus) {
     ].join("");
     picker.disabled = false;
     addButton.disabled = false;
+    renderChips();
 
     addButton.addEventListener("click", () => {
         const selected = String(picker.value || "").trim();
@@ -289,9 +311,24 @@ async function setupDetailStandardsPicker(form, setStatus) {
         if (!existing.includes(selected)) {
             existing.push(selected);
             textarea.value = existing.join("\n");
+            renderChips();
         }
         setStatus("Standard added.");
     });
+
+    if (chipList) {
+        chipList.addEventListener("click", (event) => {
+            const button = event.target.closest("button[data-standard-remove]");
+            if (!button) return;
+            const value = String(button.getAttribute("data-standard-remove") || "").trim();
+            if (!value) return;
+
+            const next = parseLines(textarea.value).filter((line) => line !== value);
+            textarea.value = next.join("\n");
+            renderChips();
+            setStatus("Standard removed.");
+        });
+    }
 }
 
 function hasDetailPageAccess() {
@@ -946,7 +983,8 @@ function renderEditForm(host, id, data) {
                         </select>
                         <button type="button" class="detail-action detail-action-secondary" data-add-standard-line>Add Standard</button>
                     </div>
-                    <textarea name="standardDetails" rows="4">${escapeHtml(asLines(data.standardDetails))}</textarea>
+                    <div class="standard-chip-list" data-standard-chip-list aria-live="polite"></div>
+                    <textarea name="standardDetails" class="standard-details-storage" aria-hidden="true" tabindex="-1" rows="4">${escapeHtml(asLines(data.standardDetails))}</textarea>
                 </label>
                 <label class="detail-field detail-field-full">
                     <span>Tasks List (one per line)</span>

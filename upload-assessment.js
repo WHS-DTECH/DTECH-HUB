@@ -5,6 +5,7 @@ const clearDraftButtons = Array.from(document.querySelectorAll("[data-clear-asse
 const authStatusElement = document.querySelector("#assessment-auth-status");
 const standardLibrarySelect = document.querySelector("#standard-library-select");
 const standardLibraryAdd = document.querySelector("#standard-library-add");
+const standardChipList = document.querySelector("#standard-chip-list");
 const ASSESSMENT_DRAFT_STORAGE_KEY = "dtechHub:uploadAssessmentDraft:v1";
 const UPLOAD_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 const SUBJECT_STREAM_PREFIX = "subject_stream:";
@@ -217,6 +218,36 @@ function withUserEmailHeader(headers) {
     return headers;
 }
 
+function getCurrentStandardLines() {
+    return linesToArray(form?.standardDetails?.value || "");
+}
+
+function renderStandardChips() {
+    if (!standardChipList) return;
+    const lines = getCurrentStandardLines();
+
+    if (!lines.length) {
+        standardChipList.innerHTML = `<span class="empty-note">No standards selected yet.</span>`;
+        return;
+    }
+
+    standardChipList.innerHTML = lines.map((line) => {
+        const escaped = line
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+        return `<span class="standard-chip"><span>${escaped}</span><button type="button" class="standard-chip-remove" data-standard-remove="${escaped}">Remove</button></span>`;
+    }).join("");
+}
+
+function setStandardLines(lines) {
+    if (!form?.standardDetails) return;
+    form.standardDetails.value = linesToArray(lines).join("\n");
+    renderStandardChips();
+}
+
 function formatStandardOptionLabel(row) {
     const standardNumber = String(row?.standard_number || "").trim();
     const standardName = String(row?.standard_name || "").trim();
@@ -276,10 +307,10 @@ function addSelectedStandardToTextarea() {
         return;
     }
 
-    const existing = linesToArray(form.standardDetails.value);
+    const existing = getCurrentStandardLines();
     if (!existing.includes(selected)) {
         existing.push(selected);
-        form.standardDetails.value = existing.join("\n");
+        setStandardLines(existing);
         saveAssessmentDraft();
     }
 
@@ -358,11 +389,26 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
     await prefillFormIfEditing();
     await loadAssessmentStandardsOptions();
+    renderStandardChips();
     renderAuthStatus();
 });
 
 if (standardLibraryAdd) {
     standardLibraryAdd.addEventListener("click", addSelectedStandardToTextarea);
+}
+
+if (standardChipList) {
+    standardChipList.addEventListener("click", (event) => {
+        const button = event.target.closest("button[data-standard-remove]");
+        if (!button) return;
+        const value = String(button.getAttribute("data-standard-remove") || "").trim();
+        if (!value) return;
+
+        const next = getCurrentStandardLines().filter((line) => line !== value);
+        setStandardLines(next);
+        saveAssessmentDraft();
+        setStatus("Standard removed.");
+    });
 }
 
 function createAssessmentPayload() {
@@ -503,9 +549,11 @@ async function handleClearDraftClick() {
     if (!form) return;
 
     form.reset();
+    setStandardLines([]);
 
     if (getEditingAssessmentId()) {
         await prefillFormIfEditing();
+        renderStandardChips();
         setStatus("Draft cleared. Restored saved assessment values.");
         return;
     }
