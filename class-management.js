@@ -64,6 +64,42 @@ function formatDate(value) {
     }
 }
 
+function setDataFreshness(message, isError = false) {
+    const element = document.getElementById("class-data-freshness");
+    if (!element) return;
+    element.textContent = message;
+    element.className = isError ? "class-status is-error" : "class-status";
+}
+
+function updateDataFreshness(students) {
+    const rows = Array.isArray(students) ? students : [];
+    const timestamps = rows
+        .map((student) => {
+            const raw = String(student?.upload_date || "").trim();
+            if (!raw) return null;
+            const parsed = new Date(raw);
+            return Number.isNaN(parsed.getTime()) ? null : parsed;
+        })
+        .filter(Boolean);
+
+    if (!timestamps.length) {
+        setDataFreshness("Student timetable upload date is unavailable in this dataset.", true);
+        return;
+    }
+
+    const latest = timestamps.sort((a, b) => b.getTime() - a.getTime())[0];
+    const now = new Date();
+    const ageDays = Math.floor((now.getTime() - latest.getTime()) / (1000 * 60 * 60 * 24));
+    const label = formatDate(latest.toISOString());
+
+    if (ageDays >= 7) {
+        setDataFreshness(`Student timetable last upload in this DTECH-HUB dataset: ${label} (${ageDays} days old).`, true);
+        return;
+    }
+
+    setDataFreshness(`Student timetable last upload in this DTECH-HUB dataset: ${label}.`);
+}
+
 function setClassStatus(message, isError = false) {
     const element = document.getElementById("class-status");
     if (!element) return;
@@ -303,6 +339,7 @@ async function loadClassManagement() {
 
         const students = Array.isArray(payload.students) ? payload.students : [];
         classState.allStudents = students;
+        updateDataFreshness(students);
 
         buildSelectOptions("class-year-filter", students.map((student) => student.year_level), "All years", { multiple: true });
         buildSelectOptions("class-school-filter", ["Junior", "Middle", "Senior"], "All school groups", {
@@ -320,6 +357,7 @@ async function loadClassManagement() {
         setClassStatus("");
         applyFilters();
     } catch (error) {
+        setDataFreshness("Could not verify student timetable freshness.", true);
         setClassStatus(error.message || "Could not load class management data.", true);
         const body = document.getElementById("class-table-body");
         if (body) {
