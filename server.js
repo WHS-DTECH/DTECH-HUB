@@ -27,7 +27,7 @@ const pool = new Pool({
 });
 
 const STAFF_TABLE_CANDIDATES = ["staff_upload", "upload_staff"];
-const STUDENT_TABLE_CANDIDATES = ["student_upload", "student_timetable", "upload_student"];
+const STUDENT_TABLE_CANDIDATES = ["student_details_upload", "student_upload", "student_timetable", "upload_student"];
 const TEACHER_TIMETABLE_TABLE_CANDIDATES = ["kamar_timetable", "upload_timetable", "timetable", "teacher_timetable"];
 const SCHOOL_EMAIL_DOMAIN = "westlandhigh.school.nz";
 const DTECH_HUB_NAME = "DTECH-HUB";
@@ -168,22 +168,52 @@ async function resolveExistingTableName(candidates) {
   return null;
 }
 
+async function resolveExistingTableNames(candidates) {
+  const candidateList = Array.isArray(candidates) ? candidates.map((value) => String(value || "").trim()).filter(Boolean) : [];
+  if (!candidateList.length) {
+    return [];
+  }
+
+  if (!hasDatabase) {
+    return candidateList;
+  }
+
+  const existing = [];
+  for (const tableName of candidateList) {
+    try {
+      const result = await pool.query("SELECT to_regclass($1) AS table_ref", [`public.${tableName}`]);
+      if (String(result.rows?.[0]?.table_ref || "").trim()) {
+        existing.push(tableName);
+      }
+    } catch (_error) {
+    }
+  }
+
+  return existing;
+}
+
 async function getStudentDirectoryRows() {
   if (!hasDatabase) {
     return [];
   }
 
-  const tableName = await resolveExistingTableName(STUDENT_TABLE_CANDIDATES);
-  if (!tableName) {
+  const tableNames = await resolveExistingTableNames(STUDENT_TABLE_CANDIDATES);
+  if (!tableNames.length) {
     return [];
   }
 
-  try {
-    const result = await pool.query(`SELECT * FROM ${quoteIdentifier(tableName)}`);
-    return Array.isArray(result.rows) ? result.rows : [];
-  } catch (_error) {
-    return [];
+  const mergedRows = [];
+  for (const tableName of tableNames) {
+    try {
+      const result = await pool.query(`SELECT * FROM ${quoteIdentifier(tableName)}`);
+      if (Array.isArray(result.rows) && result.rows.length) {
+        mergedRows.push(...result.rows);
+      }
+    } catch (_error) {
+    }
   }
+
+  return mergedRows;
 }
 
 function buildLowerKeyMap(row) {
