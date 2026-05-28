@@ -86,6 +86,31 @@ const DETAIL_DATA = {
 };
 
 const DETAIL_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
+const EVIDENCE_STEPS_TARGET_STANDARDS = new Set(["92005", "91897", "91907"]);
+const EVIDENCE_STEPS_DEFAULTS = {
+    "92005": [
+        "Define what the digital outcome needs to do.",
+        "Collect and review evidence of user or stakeholder needs.",
+        "Build and test versions of the outcome.",
+        "Record changes and justify decisions using evidence.",
+        "Evaluate the final outcome against requirements."
+    ],
+    "91897": [
+        "Identify problem requirements and success criteria.",
+        "Plan and implement advanced techniques for the outcome.",
+        "Capture evidence from iterative testing and debugging.",
+        "Refine the outcome based on trial results.",
+        "Explain how the outcome meets specifications."
+    ],
+    "91907": [
+        "Establish the project purpose and design requirements.",
+        "Develop and trial design options.",
+        "Document implementation decisions and technical evidence.",
+        "Test against requirements and refine.",
+        "Summarize final evidence for achieved, merit, or excellence."
+    ]
+};
+
 const detailAllowedDomain =
     (document.querySelector('meta[name="hub-google-allowed-domain"]')?.content || "")
         .trim()
@@ -209,6 +234,180 @@ function buildWriteHeaders() {
         headers["x-user-email"] = email;
     }
     return headers;
+}
+
+function toStandardCode(value) {
+    const match = String(value || "").match(/\b\d{5}\b/);
+    return match ? match[0] : "";
+}
+
+function getEvidenceStepsStorageKey(email, projectId) {
+    return `dtech:evidence-steps:v1:${String(email || "").toLowerCase()}:${String(projectId || "")}`;
+}
+
+function readEvidenceStepsMap(email, projectId) {
+    const key = getEvidenceStepsStorageKey(email, projectId);
+    if (!key) return {};
+
+    try {
+        const parsed = JSON.parse(localStorage.getItem(key) || "{}");
+        if (!parsed || typeof parsed !== "object") {
+            return {};
+        }
+        return parsed;
+    } catch (_error) {
+        return {};
+    }
+}
+
+function writeEvidenceStepsMap(email, projectId, value) {
+    const key = getEvidenceStepsStorageKey(email, projectId);
+    if (!key) return;
+
+    try {
+        localStorage.setItem(key, JSON.stringify(value || {}));
+    } catch (_error) {
+    }
+}
+
+function renderEvidenceSidebar({ host, email, projectId, standards }) {
+    if (!host || !email || !projectId || !Array.isArray(standards) || !standards.length) {
+        return;
+    }
+
+    const existing = document.querySelector("#evidence-steps-sidebar");
+    if (existing) {
+        existing.remove();
+    }
+    const existingBackdrop = document.querySelector("#evidence-steps-backdrop");
+    if (existingBackdrop) {
+        existingBackdrop.remove();
+    }
+
+    const section = host.querySelector("#interest-section");
+    if (section && !section.querySelector("#evidence-sidebar-open")) {
+        const triggerButton = document.createElement("button");
+        triggerButton.type = "button";
+        triggerButton.id = "evidence-sidebar-open";
+        triggerButton.className = "detail-action evidence-sidebar-open-btn";
+        triggerButton.textContent = "Open Evidence Steps";
+        section.appendChild(triggerButton);
+    }
+
+    const backdrop = document.createElement("div");
+    backdrop.id = "evidence-steps-backdrop";
+    backdrop.className = "evidence-sidebar-backdrop";
+
+    const sidebar = document.createElement("aside");
+    sidebar.id = "evidence-steps-sidebar";
+    sidebar.className = "evidence-sidebar";
+    sidebar.setAttribute("aria-label", "Evidence steps sidebar");
+
+    const closeSidebar = () => {
+        sidebar.classList.remove("is-open");
+        backdrop.classList.remove("is-open");
+    };
+
+    const openSidebar = () => {
+        sidebar.classList.add("is-open");
+        backdrop.classList.add("is-open");
+    };
+
+    const state = readEvidenceStepsMap(email, projectId);
+    standards.forEach((code) => {
+        if (!Array.isArray(state[code]) || !state[code].length) {
+            state[code] = Array.isArray(EVIDENCE_STEPS_DEFAULTS[code])
+                ? [...EVIDENCE_STEPS_DEFAULTS[code]]
+                : [""];
+        }
+    });
+    writeEvidenceStepsMap(email, projectId, state);
+
+    const renderStepRows = (rowsHost, standardCode) => {
+        const steps = Array.isArray(state[standardCode]) ? state[standardCode] : [];
+        rowsHost.innerHTML = "";
+
+        steps.forEach((step, index) => {
+            const row = document.createElement("div");
+            row.className = "evidence-step-row";
+
+            const check = document.createElement("input");
+            check.type = "checkbox";
+            check.className = "evidence-step-check";
+            check.disabled = true;
+
+            const input = document.createElement("input");
+            input.type = "text";
+            input.className = "evidence-step-input";
+            input.value = String(step || "");
+            input.placeholder = "Add an evidence step";
+            input.addEventListener("input", () => {
+                state[standardCode][index] = input.value;
+                writeEvidenceStepsMap(email, projectId, state);
+            });
+
+            const removeButton = document.createElement("button");
+            removeButton.type = "button";
+            removeButton.className = "evidence-step-remove";
+            removeButton.textContent = "Remove";
+            removeButton.addEventListener("click", () => {
+                state[standardCode].splice(index, 1);
+                if (!state[standardCode].length) {
+                    state[standardCode].push("");
+                }
+                writeEvidenceStepsMap(email, projectId, state);
+                renderStepRows(rowsHost, standardCode);
+            });
+
+            row.append(check, input, removeButton);
+            rowsHost.appendChild(row);
+        });
+    };
+
+    sidebar.innerHTML = `
+        <header class="evidence-sidebar-header">
+            <h2>Evidence Steps</h2>
+            <button type="button" class="detail-action detail-action-secondary" id="evidence-sidebar-close">Close</button>
+        </header>
+        <p class="evidence-sidebar-copy">List the steps you will use as evidence for your allocated standard(s).</p>
+        <div class="evidence-standard-list" id="evidence-standard-list"></div>
+    `;
+
+    const standardsHost = sidebar.querySelector("#evidence-standard-list");
+    standards.forEach((code) => {
+        const block = document.createElement("section");
+        block.className = "evidence-standard-block";
+        block.innerHTML = `
+            <h3>Standard ${escapeHtml(code)}</h3>
+            <div class="evidence-step-list" id="evidence-step-list-${escapeHtml(code)}"></div>
+            <button type="button" class="detail-action detail-action-secondary evidence-step-add">Add Step</button>
+        `;
+
+        const rowsHost = block.querySelector(`#evidence-step-list-${code}`);
+        const addButton = block.querySelector(".evidence-step-add");
+        if (addButton) {
+            addButton.addEventListener("click", () => {
+                state[code].push("");
+                writeEvidenceStepsMap(email, projectId, state);
+                renderStepRows(rowsHost, code);
+            });
+        }
+
+        renderStepRows(rowsHost, code);
+        standardsHost.appendChild(block);
+    });
+
+    const closeButton = sidebar.querySelector("#evidence-sidebar-close");
+    closeButton?.addEventListener("click", closeSidebar);
+    backdrop.addEventListener("click", closeSidebar);
+
+    document.body.appendChild(backdrop);
+    document.body.appendChild(sidebar);
+
+    const openButton = host.querySelector("#evidence-sidebar-open");
+    openButton?.addEventListener("click", openSidebar);
+
+    openSidebar();
 }
 
 let detailStandardsOptionsCache = null;
@@ -1210,7 +1409,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     const fetchHeaders = {};
     if (email) fetchHeaders["x-user-email"] = email;
 
-    let interestData = { count: 0, my_interest: false, emails: [], confirmed: [] };
+    let interestData = { count: 0, my_interest: false, emails: [], confirmed: [], my_allocation: null };
     try {
         const resp = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interests`, { headers: fetchHeaders });
         if (resp.ok) interestData = await resp.json();
@@ -1268,6 +1467,23 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
 
     section.innerHTML = html;
     host.appendChild(section);
+
+    if (!isTeacher && isAssessmentTask && email) {
+        const myAllocation = interestData?.my_allocation || null;
+        const assignedStandards = [
+            toStandardCode(myAllocation?.standard_1),
+            toStandardCode(myAllocation?.standard_2)
+        ].filter((code) => EVIDENCE_STEPS_TARGET_STANDARDS.has(code));
+
+        if (assignedStandards.length) {
+            renderEvidenceSidebar({
+                host,
+                email,
+                projectId,
+                standards: Array.from(new Set(assignedStandards))
+            });
+        }
+    }
 
     // Toggle interest button handler
     const toggleBtn = section.querySelector("#interest-toggle-btn");

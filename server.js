@@ -3422,10 +3422,19 @@ app.get("/api/activities/:id/interests", async (req, res) => {
       } catch (_err) {}
     }
 
-    const myInterest = email ? result.rows.some((r) => r.student_email === email) : false;
+    const myAllocationRow = email ? result.rows.find((r) => r.student_email === email) : null;
+    const myInterest = Boolean(myAllocationRow);
     res.json({
       count: result.rows.length,
       my_interest: myInterest,
+      my_allocation: myAllocationRow
+        ? {
+          email,
+          confirmed: Boolean(myAllocationRow.confirmed),
+          standard_1: String(myAllocationRow.standard_1 || "").trim(),
+          standard_2: String(myAllocationRow.standard_2 || "").trim()
+        }
+        : null,
       emails: isTeacher ? result.rows.map((r) => r.student_email) : [],
       confirmed: isTeacher ? result.rows.filter((r) => r.confirmed).map((r) => r.student_email) : [],
       students: isTeacher
