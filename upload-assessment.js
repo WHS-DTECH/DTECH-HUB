@@ -6,6 +6,8 @@ const authStatusElement = document.querySelector("#assessment-auth-status");
 const standardLibrarySelect = document.querySelector("#standard-library-select");
 const standardLibraryAdd = document.querySelector("#standard-library-add");
 const standardChipList = document.querySelector("#standard-chip-list");
+const achievedChecklistPreview = document.querySelector("#achieved-checklist-preview");
+const achievedChecklistPreviewList = document.querySelector("#achieved-checklist-preview-list");
 const ASSESSMENT_DRAFT_STORAGE_KEY = "dtechHub:uploadAssessmentDraft:v1";
 const UPLOAD_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 const SUBJECT_STREAM_PREFIX = "subject_stream:";
@@ -144,6 +146,25 @@ function bindRequirementTextareaAutosize() {
         autoResizeTextarea(field);
         field.addEventListener("input", () => autoResizeTextarea(field));
     });
+}
+
+function renderAchievedChecklistPreview(items) {
+    if (!achievedChecklistPreview || !achievedChecklistPreviewList) return;
+
+    const rows = Array.isArray(items)
+        ? items.map((item) => String(item || "").trim()).filter(Boolean)
+        : [];
+
+    if (!rows.length) {
+        achievedChecklistPreview.hidden = true;
+        achievedChecklistPreviewList.innerHTML = "";
+        return;
+    }
+
+    achievedChecklistPreviewList.innerHTML = rows
+        .map((item) => `<li>${item.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</li>`)
+        .join("");
+    achievedChecklistPreview.hidden = false;
 }
 
 function saveAssessmentDraft() {
@@ -424,6 +445,7 @@ async function prefillFormIfEditing() {
         form.achieved.value = linesToArray(data.achieved).join("\n");
         form.merit.value = linesToArray(data.merit).join("\n");
         form.excellence.value = linesToArray(data.excellence).join("\n");
+        renderAchievedChecklistPreview(linesToArray(data.achieved));
         form.submissionRequirements.value = linesToArray(data.submission_requirements).join("\n");
         form.relevantImplications.value = linesToArray(data.relevant_implications).join("\n");
         form.progressLogging.value = linesToArray(data.progress_logging).join("\n");
@@ -445,6 +467,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     await loadAssessmentStandardsOptions();
     renderStandardChips();
     renderAuthStatus();
+    renderAchievedChecklistPreview(parseRequirementChecklistItems(form?.achieved?.value || ""));
 });
 
 if (standardLibraryAdd) {
@@ -473,6 +496,9 @@ function createAssessmentPayload() {
     const shortDescription = String(formData.get("shortDescription") || "").trim();
 
     const tasksList = linesToArray(formData.get("tasksList"));
+    const achievedItems = parseRequirementChecklistItems(formData.get("achieved"));
+    const meritItems = parseRequirementChecklistItems(formData.get("merit"));
+    const excellenceItems = parseRequirementChecklistItems(formData.get("excellence"));
     const subjectStream = normalizeSubjectStream(formData.get("subjectStream"));
     const classPreparation = mergeClassPreparationWithSubject(formData.get("classPreparation"), subjectStream);
 
@@ -498,9 +524,9 @@ function createAssessmentPayload() {
         tasks_list: tasksList,
         assessment_focus: tasksList,
         class_preparation: classPreparation,
-        achieved: parseRequirementChecklistItems(formData.get("achieved")),
-        merit: parseRequirementChecklistItems(formData.get("merit")),
-        excellence: parseRequirementChecklistItems(formData.get("excellence")),
+        achieved: achievedItems,
+        merit: meritItems,
+        excellence: excellenceItems,
         submission_requirements: linesToArray(formData.get("submissionRequirements")),
         relevant_implications: linesToArray(formData.get("relevantImplications")),
         progress_logging: linesToArray(formData.get("progressLogging")),
@@ -604,6 +630,7 @@ async function handleClearDraftClick() {
 
     form.reset();
     setStandardLines([]);
+    renderAchievedChecklistPreview([]);
 
     if (getEditingAssessmentId()) {
         await prefillFormIfEditing();
@@ -635,6 +662,21 @@ if (form) {
 
         try {
             const saved = await saveAssessmentShared(payload);
+
+            // After save, normalize requirement textbox display into checklist-line format.
+            if (form.achieved) {
+                form.achieved.value = payload.achieved.join("\n");
+                autoResizeTextarea(form.achieved);
+                renderAchievedChecklistPreview(payload.achieved);
+            }
+            if (form.merit) {
+                form.merit.value = payload.merit.join("\n");
+                autoResizeTextarea(form.merit);
+            }
+            if (form.excellence) {
+                form.excellence.value = payload.excellence.join("\n");
+                autoResizeTextarea(form.excellence);
+            }
             
             // Upload images if any
             if (saved.id || saved.name) {

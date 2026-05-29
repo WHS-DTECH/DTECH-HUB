@@ -143,6 +143,35 @@
     overflow-y: hidden;
 }
 
+.requirement-checklist-preview {
+    margin-top: 8px;
+    border: 1px solid #c6d8ec;
+    border-radius: 8px;
+    background: #edf5ff;
+    padding: 8px 10px;
+}
+
+.requirement-checklist-preview-title {
+    margin: 0 0 4px;
+    color: #315b84;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.requirement-checklist-preview-list {
+    margin: 0;
+    padding-left: 18px;
+    color: #1f3550;
+    font-size: 0.78rem;
+    line-height: 1.4;
+}
+
+.requirement-checklist-preview-list li {
+    margin: 2px 0;
+}
+
 #manual-overview,
 #manual-aims,
 #preview-overview,
