@@ -249,6 +249,40 @@ function buildTaskDefaultsByStandard(standards, detailData) {
     return map;
 }
 
+function expandBulletChecklistRows(rows) {
+    const source = Array.isArray(rows) ? rows : [];
+    const expanded = [];
+
+    source.forEach((row) => {
+        const text = String(row?.text || "").trim();
+        const done = Boolean(row?.done);
+        if (!text) {
+            return;
+        }
+
+        const levelMatch = text.match(/^(Achieved|Merit|Excellence):\s*/i);
+        const levelPrefix = levelMatch ? `${levelMatch[1]}: ` : "";
+        const body = levelMatch ? text.replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim() : text;
+
+        const parts = body
+            .replace(/\u2022/g, "•")
+            .split("•")
+            .map((item) => item.trim())
+            .filter(Boolean);
+
+        if (parts.length > 1) {
+            parts.slice(1).forEach((item) => {
+                expanded.push({ text: `${levelPrefix}${item}`, done });
+            });
+            return;
+        }
+
+        expanded.push({ text, done });
+    });
+
+    return expanded;
+}
+
 function normalizeStudentEmailInput(value) {
     const trimmed = String(value || "").trim().toLowerCase();
     if (!trimmed) return "";
@@ -442,6 +476,10 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
             if (!state[code].length) {
                 state[code] = [{ text: "", done: false }];
             }
+        }
+
+        if (String(code) === "91897") {
+            state[code] = expandBulletChecklistRows(state[code]);
         }
     });
 
