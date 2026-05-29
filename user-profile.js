@@ -21,6 +21,7 @@
     const loginPillEl = document.querySelector("#profile-login-pill");
     const connectionEl = document.querySelector("#profile-connection");
     const timetableEl = document.querySelector("#profile-timetable");
+    const timetableCardEl = timetableEl ? timetableEl.closest(".profile-card") : null;
     const overviewSubtextEl = document.querySelector("#profile-overview-subtext");
     const timetableSubtextEl = document.querySelector("#profile-timetable-subtext");
     const csvLinksEl = document.querySelector("#profile-csv-links");
@@ -1117,6 +1118,12 @@
         );
         const matchedTeacherTimetableRows = collectLinkedTeacherTimetableRows(safeTeacherTimetableRows, teacherIdentifiers);
 
+        const hasStaffSyncData = matchedStaffRows.length > 0;
+        const hasStudentSyncData = matchedStudentRows.length > 0;
+        const hasTeacherTimetableSyncData = matchedTeacherTimetableRows.length > 0;
+        const hasAnyTimetableSyncData = hasStudentSyncData || hasTeacherTimetableSyncData;
+        const hasAnySyncData = hasStaffSyncData || hasAnyTimetableSyncData;
+
         const resolvedName = pickFirstNonEmpty([
             getRowDisplayName(matchedStaffRows[0]),
             getRowDisplayName(matchedStudentRows[0]),
@@ -1155,6 +1162,21 @@
         }
         if (classesCardEl) {
             classesCardEl.hidden = isStudentOnly;
+        }
+
+        if (!isStudentOnly) {
+            if (timetableCardEl) {
+                timetableCardEl.hidden = !hasAnyTimetableSyncData;
+            }
+            if (csvLinksCardEl) {
+                csvLinksCardEl.hidden = !hasAnySyncData;
+            }
+            if (uploadHistoryCardEl) {
+                uploadHistoryCardEl.hidden = !hasStaffSyncData;
+            }
+            if (classesCardEl) {
+                classesCardEl.hidden = !hasStudentSyncData;
+            }
         }
 
         if (overviewSubtextEl) {
