@@ -199,10 +199,24 @@ function coerceArray(value) {
 }
 
 function splitRequirementSegments(value) {
-    return String(value || "")
-        .split(/\s*[•·]\s*/)
+    const line = String(value || "").trim();
+    if (!line) {
+        return [];
+    }
+
+    const normalizedBullets = line.replace(/\u2022/g, "•");
+    const parts = normalizedBullets
+        .split("•")
         .map((item) => item.trim())
         .filter(Boolean);
+
+    // If the line contains lead-in text plus bullets, keep only the bullet items.
+    if (parts.length > 1 && normalizedBullets.includes("•")) {
+        return parts.slice(1).map((item) => item.replace(/^[\-*]\s*/, "").trim()).filter(Boolean);
+    }
+
+    const plain = normalizedBullets.replace(/^[\-*]\s*/, "").trim();
+    return plain ? [plain] : [];
 }
 
 function formatRequirementSteps(values, levelLabel) {
@@ -224,9 +238,13 @@ function buildTaskDefaultsByStandard(standards, detailData) {
     const requirementSteps = buildRequirementSidebarSteps(detailData);
     const map = {};
     (Array.isArray(standards) ? standards : []).forEach((code) => {
-        map[code] = requirementSteps.length
-            ? requirementSteps
-            : (Array.isArray(EVIDENCE_STEPS_DEFAULTS[code]) ? EVIDENCE_STEPS_DEFAULTS[code] : []);
+        const standardCode = String(code || "").trim();
+        if (standardCode === "91897" && requirementSteps.length) {
+            map[code] = requirementSteps;
+            return;
+        }
+
+        map[code] = Array.isArray(EVIDENCE_STEPS_DEFAULTS[standardCode]) ? EVIDENCE_STEPS_DEFAULTS[standardCode] : [];
     });
     return map;
 }
@@ -446,11 +464,40 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
         }
     };
 
-    const renderStepRows = (rowsHost, standardCode) => {
+    const getStepLevel = (text) => {
+        const normalized = String(text || "").trim().toLowerCase();
+        if (normalized.startsWith("achieved:")) return "Achieved";
+        if (normalized.startsWith("merit:")) return "Merit";
+        if (normalized.startsWith("excellence:")) return "Excellence";
+        return "";
+    };
+
+    const stripStepLevel = (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim();
+
+    const renderStepRows = (rowsHost, standardCode, levelFilter = "") => {
         const steps = Array.isArray(state[standardCode]) ? state[standardCode] : [];
         rowsHost.innerHTML = "";
 
-        steps.forEach((step, index) => {
+        const filtered = steps
+            .map((step, index) => ({ step, index }))
+            .filter(({ step }) => {
+                if (!levelFilter) {
+                    return true;
+                }
+
+                const level = getStepLevel(step?.text);
+                return level === levelFilter;
+            });
+
+        if (!filtered.length && levelFilter) {
+            const empty = document.createElement("p");
+            empty.className = "evidence-level-empty";
+            empty.textContent = `No ${levelFilter.toLowerCase()} tasks yet.`;
+            rowsHost.appendChild(empty);
+            return;
+        }
+
+        filtered.forEach(({ step, index }) => {
             const row = document.createElement("div");
             row.className = "evidence-step-row";
 
@@ -466,10 +513,11 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
             const input = document.createElement("input");
             input.type = "text";
             input.className = "evidence-step-input";
-            input.value = String(step?.text || "");
-            input.placeholder = "Add a task item";
+            input.value = levelFilter ? stripStepLevel(step?.text) : String(step?.text || "");
+            input.placeholder = levelFilter ? `Add ${levelFilter.toLowerCase()} task` : "Add a task item";
             input.addEventListener("input", () => {
-                state[standardCode][index].text = input.value;
+                const nextText = String(input.value || "").trim();
+                state[standardCode][index].text = levelFilter ? `${levelFilter}: ${nextText}` : nextText;
                 void persistState(sidebar.querySelector("#evidence-sidebar-status"));
             });
 
@@ -480,10 +528,11 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
             removeButton.addEventListener("click", () => {
                 state[standardCode].splice(index, 1);
                 if (!state[standardCode].length) {
-                    state[standardCode].push({ text: "", done: false });
+                    const fallbackText = levelFilter ? `${levelFilter}: ` : "";
+                    state[standardCode].push({ text: fallbackText, done: false });
                 }
                 void persistState(sidebar.querySelector("#evidence-sidebar-status"));
-                renderStepRows(rowsHost, standardCode);
+                renderStepRows(rowsHost, standardCode, levelFilter);
             });
 
             row.append(check, input, removeButton);
@@ -505,23 +554,59 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
     standards.forEach((code) => {
         const block = document.createElement("section");
         block.className = "evidence-standard-block";
-        block.innerHTML = `
-            <h3>Standard ${escapeHtml(code)}</h3>
-            <div class="evidence-step-list" id="evidence-step-list-${escapeHtml(code)}"></div>
-            <button type="button" class="detail-action detail-action-secondary evidence-step-add">Add Step</button>
-        `;
+        if (String(code) === "91897") {
+            const levels = ["Achieved", "Merit", "Excellence"];
+            block.innerHTML = `
+                <h3>Standard ${escapeHtml(code)}</h3>
+                ${levels.map((level) => `
+                    <div class="evidence-level-group" data-level="${escapeHtml(level)}">
+                        <h4>${escapeHtml(level)}</h4>
+                        <div class="evidence-step-list" id="evidence-step-list-${escapeHtml(code)}-${escapeHtml(level.toLowerCase())}"></div>
+                        <button type="button" class="detail-action detail-action-secondary evidence-step-add" data-add-level="${escapeHtml(level)}">Add ${escapeHtml(level)} Step</button>
+                    </div>
+                `).join("")}
+            `;
 
-        const rowsHost = block.querySelector(`#evidence-step-list-${code}`);
-        const addButton = block.querySelector(".evidence-step-add");
-        if (addButton) {
-            addButton.addEventListener("click", () => {
-                state[code].push({ text: "", done: false });
-                void persistState(sidebar.querySelector("#evidence-sidebar-status"));
-                renderStepRows(rowsHost, code);
+            const renderGrouped = () => {
+                levels.forEach((level) => {
+                    const rowsHost = block.querySelector(`#evidence-step-list-${code}-${level.toLowerCase()}`);
+                    if (rowsHost) {
+                        renderStepRows(rowsHost, code, level);
+                    }
+                });
+            };
+
+            block.querySelectorAll(".evidence-step-add").forEach((button) => {
+                button.addEventListener("click", () => {
+                    const level = String(button.getAttribute("data-add-level") || "").trim();
+                    const seedText = level ? `${level}: ` : "";
+                    state[code].push({ text: seedText, done: false });
+                    void persistState(sidebar.querySelector("#evidence-sidebar-status"));
+                    renderGrouped();
+                });
             });
+
+            renderGrouped();
+        } else {
+            block.innerHTML = `
+                <h3>Standard ${escapeHtml(code)}</h3>
+                <div class="evidence-step-list" id="evidence-step-list-${escapeHtml(code)}"></div>
+                <button type="button" class="detail-action detail-action-secondary evidence-step-add">Add Step</button>
+            `;
+
+            const rowsHost = block.querySelector(`#evidence-step-list-${code}`);
+            const addButton = block.querySelector(".evidence-step-add");
+            if (addButton) {
+                addButton.addEventListener("click", () => {
+                    state[code].push({ text: "", done: false });
+                    void persistState(sidebar.querySelector("#evidence-sidebar-status"));
+                    renderStepRows(rowsHost, code);
+                });
+            }
+
+            renderStepRows(rowsHost, code);
         }
 
-        renderStepRows(rowsHost, code);
         standardsHost.appendChild(block);
     });
 

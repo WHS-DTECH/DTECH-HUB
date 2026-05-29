@@ -609,6 +609,27 @@ h1 {
     font-size: 0.9rem;
 }
 
+.evidence-level-group {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed #d2deed;
+}
+
+.evidence-level-group h4 {
+    margin: 0 0 6px;
+    color: #244f78;
+    font-size: 0.8rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.evidence-level-empty {
+    margin: 0;
+    font-size: 0.74rem;
+    color: #6783a3;
+}
+
 .evidence-step-list {
     display: grid;
     gap: 8px;
