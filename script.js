@@ -779,6 +779,9 @@ const hubUploadMenu = document.querySelector("#hub-upload-menu");
 const hubBrowseButtons = Array.from(document.querySelectorAll("[data-auth-browse]"));
 const hubUnitPlansButtons = Array.from(document.querySelectorAll("[data-auth-unit-plans]"));
 const HUB_VIEW_MODE_STORAGE_KEY = "hub_view_mode_v1";
+const HUB_GLOBAL_SIDEBAR_SESSION_KEY = "hub_global_sidebar_seen_v1";
+
+let hubGlobalSidebarNodes = null;
 
 function readStoredHubViewMode() {
     try {
@@ -1024,6 +1027,138 @@ function setHubProfileOpen(isOpen) {
     hubUserBadge.setAttribute("aria-expanded", String(isOpen && canOpen));
 }
 
+function readGlobalSidebarSeenThisSession() {
+    try {
+        return sessionStorage.getItem(HUB_GLOBAL_SIDEBAR_SESSION_KEY) === "1";
+    } catch (_error) {
+        return false;
+    }
+}
+
+function markGlobalSidebarSeenThisSession() {
+    try {
+        sessionStorage.setItem(HUB_GLOBAL_SIDEBAR_SESSION_KEY, "1");
+    } catch (_error) {
+    }
+}
+
+function ensureGlobalHubSidebar() {
+    if (hubGlobalSidebarNodes) {
+        return hubGlobalSidebarNodes;
+    }
+
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.id = "hub-global-sidebar-toggle";
+    toggle.className = "hub-global-sidebar-toggle";
+    toggle.textContent = "Sidebar";
+    toggle.hidden = true;
+
+    const backdrop = document.createElement("div");
+    backdrop.id = "hub-global-sidebar-backdrop";
+    backdrop.className = "hub-global-sidebar-backdrop";
+
+    const panel = document.createElement("aside");
+    panel.id = "hub-global-sidebar";
+    panel.className = "hub-global-sidebar";
+    panel.setAttribute("aria-label", "DTECH sidebar");
+    panel.innerHTML = `
+        <header class="hub-global-sidebar-header">
+            <h2>DTECH Sidebar</h2>
+            <button type="button" class="hub-global-sidebar-close" id="hub-global-sidebar-close">Close</button>
+        </header>
+        <p class="hub-global-sidebar-copy" id="hub-global-sidebar-copy">Quick access while signed in.</p>
+        <nav class="hub-global-sidebar-links" aria-label="Sidebar links">
+            <a href="/index.html">Home</a>
+            <a href="/browse-practicals.html">Browse Practicals</a>
+            <a href="/user-profile.html">My Profile</a>
+            <a href="/teacher-view.html" id="hub-global-sidebar-teacher-link" hidden>Teacher View</a>
+            <a href="/admin-menu.html" id="hub-global-sidebar-admin-link" hidden>Admin Menu</a>
+            <button type="button" id="hub-global-sidebar-tasklist-link" hidden>Open Task List</button>
+        </nav>
+    `;
+
+    const setOpen = (isOpen) => {
+        panel.classList.toggle("is-open", Boolean(isOpen));
+        backdrop.classList.toggle("is-open", Boolean(isOpen));
+    };
+
+    toggle.addEventListener("click", () => setOpen(true));
+    backdrop.addEventListener("click", () => setOpen(false));
+    panel.querySelector("#hub-global-sidebar-close")?.addEventListener("click", () => setOpen(false));
+
+    const taskListButton = panel.querySelector("#hub-global-sidebar-tasklist-link");
+    taskListButton?.addEventListener("click", () => {
+        const trigger = document.querySelector("#evidence-sidebar-open");
+        if (trigger instanceof HTMLElement) {
+            trigger.click();
+            setOpen(false);
+        }
+    });
+
+    const teacherLink = panel.querySelector("#hub-global-sidebar-teacher-link");
+    teacherLink?.addEventListener("click", () => {
+        const href = String(teacherLink.getAttribute("href") || "");
+        if (href.includes("teacher-view")) {
+            writeStoredHubViewMode("teacher");
+        } else if (href.includes("index")) {
+            writeStoredHubViewMode("student");
+        }
+    });
+
+    document.body.append(toggle, backdrop, panel);
+    hubGlobalSidebarNodes = { toggle, backdrop, panel, setOpen };
+    return hubGlobalSidebarNodes;
+}
+
+function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {
+    const { toggle, panel, setOpen } = ensureGlobalHubSidebar();
+
+    if (!signedIn) {
+        toggle.hidden = true;
+        setOpen(false);
+        return;
+    }
+
+    toggle.hidden = false;
+
+    const teacherLink = panel.querySelector("#hub-global-sidebar-teacher-link");
+    const adminLink = panel.querySelector("#hub-global-sidebar-admin-link");
+    const taskListButton = panel.querySelector("#hub-global-sidebar-tasklist-link");
+    const copy = panel.querySelector("#hub-global-sidebar-copy");
+
+    const canToggleView = Boolean(canTeacherView || canAdmin);
+    if (teacherLink) {
+        teacherLink.hidden = !canToggleView;
+        if (canToggleView) {
+            const inTeacherMode = getEffectiveHubViewMode() === "teacher";
+            teacherLink.textContent = inTeacherMode ? "Switch to Student View" : "Switch to Teacher View";
+            teacherLink.href = inTeacherMode ? "/index.html" : "/teacher-view.html";
+        }
+    }
+
+    if (adminLink) {
+        adminLink.hidden = !canAdmin;
+    }
+
+    if (taskListButton) {
+        const hasTaskListTrigger = document.querySelector("#evidence-sidebar-open") instanceof HTMLElement;
+        taskListButton.hidden = !hasTaskListTrigger;
+    }
+
+    if (copy) {
+        const displayName = getHubDisplayName(hubAuthState.profile);
+        copy.textContent = displayName
+            ? `Welcome ${displayName}. Quick access is available on every page.`
+            : "Quick access is available on every page.";
+    }
+
+    if (!readGlobalSidebarSeenThisSession()) {
+        markGlobalSidebarSeenThisSession();
+        setTimeout(() => setOpen(true), 180);
+    }
+}
+
 function saveHubAuthState() {
     if (!hubAuthState.accessToken || !hubAuthState.profile) {
         clearHubStoredAuthRaw();
@@ -1213,6 +1348,8 @@ function renderHubAuthUi() {
             element.hidden = !canBrowseUnitPlans;
         });
     }
+
+    renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin });
 
     setPublicHomepageUiState(signedIn);
 

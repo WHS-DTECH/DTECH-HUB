@@ -258,6 +258,120 @@ a {
     height: 18px;
 }
 
+.hub-global-sidebar-toggle {
+    position: fixed;
+    right: 16px;
+    bottom: 18px;
+    z-index: 170;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    border-radius: 999px;
+    background: linear-gradient(135deg, #2c173d 0%, #4a1b6f 100%);
+    color: #ffffff;
+    min-height: 36px;
+    padding: 7px 14px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 0 10px 22px rgba(35, 40, 58, 0.26);
+}
+
+.hub-global-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(18, 16, 26, 0.45);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms ease;
+    z-index: 160;
+}
+
+.hub-global-sidebar-backdrop.is-open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.hub-global-sidebar {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: min(330px, 92vw);
+    height: 100vh;
+    padding: 16px 14px;
+    border-left: 1px solid #4f2f6f;
+    background: #251434;
+    color: #ffffff;
+    transform: translateX(100%);
+    transition: transform 200ms ease;
+    z-index: 165;
+    box-shadow: -14px 0 30px rgba(0, 0, 0, 0.32);
+}
+
+.hub-global-sidebar.is-open {
+    transform: translateX(0);
+}
+
+.hub-global-sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.hub-global-sidebar-header h2 {
+    margin: 0;
+    font-size: 1rem;
+    letter-spacing: 0.03em;
+}
+
+.hub-global-sidebar-close {
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    border-radius: 999px;
+    min-height: 28px;
+    padding: 5px 10px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    font-size: 0.66rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+}
+
+.hub-global-sidebar-copy {
+    margin: 12px 0 14px;
+    color: rgba(243, 240, 255, 0.88);
+    font-size: 0.78rem;
+    line-height: 1.45;
+}
+
+.hub-global-sidebar-links {
+    display: grid;
+    gap: 8px;
+}
+
+.hub-global-sidebar-links a,
+.hub-global-sidebar-links button {
+    display: block;
+    width: 100%;
+    padding: 9px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+    text-align: left;
+    font-family: inherit;
+    font-size: 0.76rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.hub-global-sidebar-links a:hover,
+.hub-global-sidebar-links button:hover {
+    background: rgba(255, 255, 255, 0.18);
+}
+
 .user-badge {
     display: inline-flex;
     align-items: center;
@@ -1082,6 +1196,10 @@ body.public-home-access .controls-panel {
 .topbar-links a:focus-visible,
 .utility-actions a:focus-visible,
 .utility-actions button:focus-visible,
+.hub-global-sidebar-toggle:focus-visible,
+.hub-global-sidebar-close:focus-visible,
+.hub-global-sidebar-links a:focus-visible,
+.hub-global-sidebar-links button:focus-visible,
 .button:focus-visible,
 .search-field input:focus-visible,
 .control-field select:focus-visible,
@@ -1212,6 +1330,11 @@ body.public-home-access .controls-panel {
 
     .search-field {
         grid-column: auto;
+    }
+
+    .hub-global-sidebar-toggle {
+        right: 10px;
+        bottom: 10px;
     }
 }
 
