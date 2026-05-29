@@ -780,18 +780,32 @@
         authorizeUrl.searchParams.set("key", String(config.api_key));
         authorizeUrl.searchParams.set("return_url", returnUrl);
 
-        const popup = window.open(authorizeUrl.toString(), "dtech_hub_trello_connect", "width=650,height=760");
-        if (!popup) {
-            throw new Error("Popup blocked. Please allow popups and try again.");
-        }
-
         return new Promise((resolve, reject) => {
-            let timedOut = false;
-            const timeout = setTimeout(() => {
-                timedOut = true;
+            let finished = false;
+            let popupRef = null;
+            let timeoutHandle = null;
+            let closePollHandle = null;
+
+            const finish = (error, token) => {
+                if (finished) {
+                    return;
+                }
+                finished = true;
                 window.removeEventListener("message", onMessage);
-                reject(new Error("Trello authorization timed out. Please try again."));
-            }, 120000);
+                if (timeoutHandle) {
+                    clearTimeout(timeoutHandle);
+                }
+                if (closePollHandle) {
+                    clearInterval(closePollHandle);
+                }
+
+                if (error) {
+                    reject(error);
+                    return;
+                }
+
+                resolve(String(token || ""));
+            };
 
             const onMessage = (event) => {
                 if (event.origin !== window.location.origin) {
@@ -803,16 +817,29 @@
                     return;
                 }
 
-                if (timedOut) {
-                    return;
-                }
-
-                clearTimeout(timeout);
-                window.removeEventListener("message", onMessage);
-                resolve(String(data.token));
+                finish(null, data.token);
             };
 
             window.addEventListener("message", onMessage);
+
+            popupRef = window.open(authorizeUrl.toString(), "dtech_hub_trello_connect", "width=650,height=760");
+            if (!popupRef) {
+                finish(new Error("Popup blocked. Please allow popups and try again."));
+                return;
+            }
+
+            timeoutHandle = setTimeout(() => {
+                finish(new Error("Trello authorization timed out. Please try again."));
+            }, 120000);
+
+            closePollHandle = setInterval(() => {
+                if (finished) {
+                    return;
+                }
+                if (popupRef && popupRef.closed) {
+                    finish(new Error("Trello authorization was cancelled."));
+                }
+            }, 350);
         });
     }
 
