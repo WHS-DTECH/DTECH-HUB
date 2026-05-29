@@ -290,9 +290,78 @@ function slugify(value) {
         .replace(/^-+|-+$/g, "");
 }
 
+function splitTaskTopicSegments(value) {
+    const text = String(value || "").trim();
+    if (!text) return [];
+
+    const bulletSplitRegex = /[\u2022\u25CF\u25E6\u25AA\u2023\u2043\u00B7\u2219]/;
+    if (!bulletSplitRegex.test(text)) {
+        return [text];
+    }
+
+    const parts = text
+        .split(bulletSplitRegex)
+        .map((segment) => String(segment || "").trim())
+        .filter(Boolean);
+
+    if (!parts.length) {
+        return [];
+    }
+
+    const startsWithBullet = /^[\s\u2022\u25CF\u25E6\u25AA\u2023\u2043\u00B7\u2219]/.test(text);
+    return startsWithBullet ? parts : parts.slice(1);
+}
+
+function normalizeTaskTopicRows(value) {
+    const rows = Array.isArray(value)
+        ? value
+        : String(value || "")
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean);
+
+    const expanded = rows
+        .flatMap((row) => splitTaskTopicSegments(row))
+        .map((row) => String(row || "").trim())
+        .map((row) => row.replace(/^(Achieved|Merit|Excellence)\s*:\s*/i, "").trim())
+        .map((row) => row.replace(/^[\-*]\s*/, "").trim())
+        .filter(Boolean);
+
+    const seen = new Set();
+    const unique = [];
+    expanded.forEach((row) => {
+        const key = row.toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        unique.push(row);
+    });
+
+    return unique;
+}
+
+function collectTaskTopicsFromActivityRecord(record) {
+    const grouped = [
+        ...normalizeTaskTopicRows(record?.tasks_list),
+        ...normalizeTaskTopicRows(record?.achieved),
+        ...normalizeTaskTopicRows(record?.merit),
+        ...normalizeTaskTopicRows(record?.excellence)
+    ];
+
+    const seen = new Set();
+    const unique = [];
+    grouped.forEach((row) => {
+        const key = String(row || "").toLowerCase();
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        unique.push(String(row || "").trim());
+    });
+
+    return unique;
+}
+
 function inferSourceTypeFromRecord(record) {
     const explicitType = String(record?.sourceType || "").toLowerCase();
-    if (explicitType === "project" || explicitType === "activity" || explicitType === "assessment" || explicitType === "lesson") {
+    if (explicitType === "project" || explicitType === "activity" || explicitType === "assessment" || explicitType === "lesson" || explicitType === "task-topic") {
         return explicitType;
     }
 
@@ -307,6 +376,9 @@ function inferSourceTypeFromRecord(record) {
     }
     if (category.includes("lesson")) {
         return "lesson";
+    }
+    if (category.includes("task topic")) {
+        return "task-topic";
     }
     if (category.includes("project")) {
         return "project";
@@ -411,6 +483,7 @@ async function loadSharedProjects() {
                 const showInThisWeek = Boolean(item.show_in_this_week ?? item.show_this_week ?? item.is_pinned ?? item.is_this_week);
                 const sourceType = inferSourceTypeFromRecord(item);
                 const defaultCardColor = sourceType === "assessment" ? "Slate" : "Rose";
+                const taskTopics = collectTaskTopicsFromActivityRecord(item);
 
                 return {
                     id,
@@ -428,6 +501,7 @@ async function loadSharedProjects() {
                     keywords: [type, category, String(item.difficulty || ""), "teacher upload"].filter(Boolean),
                     sourceType,
                     imageUrl: imageUrl || null,
+                    taskTopics,
                     visual: {
                         icon: textToIcon(type),
                         label: "Teacher Upload",
@@ -439,6 +513,45 @@ async function loadSharedProjects() {
     } catch (_error) {
         return [];
     }
+}
+
+function mapProjectTaskTopicsToLibraryItems(project) {
+    const taskTopics = Array.isArray(project?.taskTopics) ? project.taskTopics : [];
+    if (!taskTopics.length) {
+        return [];
+    }
+
+    return taskTopics.map((topic, index) => {
+        const topicText = String(topic || "").trim();
+        const topicNumber = index + 1;
+
+        return {
+            id: `task-topic-${String(project.id || "item")}-${topicNumber}`,
+            title: topicText,
+            className: project.className,
+            area: project.area,
+            sourceType: "task-topic",
+            activityCategory: "Task Topic",
+            showThisWeek: Boolean(project.showThisWeek),
+            status: project.status,
+            term: project.term,
+            updated: project.updated,
+            href: project.href,
+            external: project.external,
+            summary: `Task topic ${topicNumber} from ${project.title}`,
+            keywords: [
+                ...(Array.isArray(project.keywords) ? project.keywords : []),
+                "task topic",
+                String(project.title || "")
+            ].filter(Boolean),
+            imageUrl: project.imageUrl || null,
+            visual: {
+                icon: textToIcon(project.area || "Task"),
+                label: "Task Topic",
+                palette: project?.visual?.palette || colorToPalette("rose")
+            }
+        };
+    });
 }
 
 async function loadSharedLessons() {
@@ -533,15 +646,22 @@ function mapLabProjectToLibraryItem(project) {
 }
 
 function getUnifiedLibraryItems() {
+    const projectItems = projects.map((project) => ({
+        ...project,
+        sourceType: inferSourceTypeFromRecord(project)
+    }));
+
+    const taskTopicItems = projectItems
+        .filter((project) => project.sourceType === "assessment")
+        .flatMap((project) => mapProjectTaskTopicsToLibraryItems(project));
+
     return [
-        ...projects.map((project) => ({
-            ...project,
-            sourceType: inferSourceTypeFromRecord(project)
-        })),
+        ...projectItems,
         ...lessons.map((lesson) => ({
             ...lesson,
             sourceType: "lesson"
         })),
+        ...taskTopicItems,
         ...labProjects.map(mapLabProjectToLibraryItem)
     ];
 }
@@ -1535,7 +1655,7 @@ function getTypes() {
 }
 
 function getContentTypes() {
-    return ["All", "Activities", "Projects", "Assessments", "Lessons"];
+    return ["All", "Activities", "Projects", "Assessments", "Lessons", "Task Topics"];
 }
 
 function getCategories() {
@@ -1593,7 +1713,8 @@ function filterProjects(items) {
             (state.content === "Activities" && project.sourceType === "activity") ||
             (state.content === "Projects" && project.sourceType === "project") ||
             (state.content === "Assessments" && project.sourceType === "assessment") ||
-            (state.content === "Lessons" && project.sourceType === "lesson");
+            (state.content === "Lessons" && project.sourceType === "lesson") ||
+            (state.content === "Task Topics" && project.sourceType === "task-topic");
         const haystack = [project.title, project.className, project.area, project.activityCategory, project.summary, ...project.keywords]
             .join(" ")
             .toLowerCase();
@@ -1630,7 +1751,15 @@ function createProjectCard(project) {
         ? `<span class="project-tag status-tag status-${project.status}">${formatStatus(project.status)}</span>` 
         : '';
     const sourceType = inferSourceTypeFromRecord(project);
-    const contentTypeLabel = sourceType === "project" ? "PROJECT" : sourceType === "assessment" ? "ASSESSMENT TASK" : sourceType === "lesson" ? "LESSON" : "ACTIVITY";
+    const contentTypeLabel = sourceType === "project"
+        ? "PROJECT"
+        : sourceType === "assessment"
+            ? "ASSESSMENT TASK"
+            : sourceType === "lesson"
+                ? "LESSON"
+                : sourceType === "task-topic"
+                    ? "TASK TOPIC"
+                    : "ACTIVITY";
     const assignedStudentCount = getAssignedStudentCount(project, sourceType);
     const assignmentBadge = assignedStudentCount > 0
         ? `<span class="project-meta project-meta-assigned" title="Assigned to ${assignedStudentCount} student${assignedStudentCount === 1 ? "" : "s"}">Assigned (${assignedStudentCount})</span>`
