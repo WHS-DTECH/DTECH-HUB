@@ -26,6 +26,11 @@
     const csvLinksEl = document.querySelector("#profile-csv-links");
     const uploadHistoryEl = document.querySelector("#profile-upload-history");
     const classesEl = document.querySelector("#profile-classes");
+    const trelloConnectionEl = document.querySelector("#profile-trello-connection");
+    const trelloBoardsEl = document.querySelector("#trello-boards");
+    const trelloConnectBtn = document.querySelector("#trello-connect-btn");
+    const trelloDisconnectBtn = document.querySelector("#trello-disconnect-btn");
+    const trelloRefreshBoardsBtn = document.querySelector("#trello-refresh-boards-btn");
     const csvLinksCardEl = csvLinksEl ? csvLinksEl.closest(".profile-card") : null;
     const uploadHistoryCardEl = uploadHistoryEl ? uploadHistoryEl.closest(".profile-card") : null;
     const classesCardEl = classesEl ? classesEl.closest(".profile-card") : null;
@@ -699,6 +704,236 @@
         connectionEl.innerHTML = `<strong>${title}</strong><p>${description}</p>`;
     }
 
+    function setTrelloConnectionMessage(title, description, variant) {
+        if (!trelloConnectionEl) return;
+        trelloConnectionEl.className = `connection-box${variant ? ` is-${variant}` : ""}`;
+        trelloConnectionEl.innerHTML = `<strong>${title}</strong><p>${description}</p>`;
+    }
+
+    function setTrelloBoards(lines) {
+        if (!trelloBoardsEl) return;
+        if (!Array.isArray(lines) || !lines.length) {
+            trelloBoardsEl.hidden = true;
+            trelloBoardsEl.innerHTML = "";
+            return;
+        }
+
+        trelloBoardsEl.hidden = false;
+        trelloBoardsEl.innerHTML = "";
+        lines.forEach((line) => {
+            const row = document.createElement("div");
+            row.className = "info-line";
+
+            if (line.href) {
+                const anchor = document.createElement("a");
+                anchor.href = line.href;
+                anchor.target = "_blank";
+                anchor.rel = "noopener noreferrer";
+                anchor.textContent = line.text;
+                row.appendChild(anchor);
+            } else {
+                row.textContent = line.text;
+            }
+
+            trelloBoardsEl.appendChild(row);
+        });
+    }
+
+    async function fetchTrelloJson(path, options, email) {
+        const headers = { "Content-Type": "application/json" };
+        if (email) {
+            headers["x-user-email"] = email;
+        }
+
+        const response = await fetch(path, {
+            ...(options || {}),
+            headers: {
+                ...headers,
+                ...((options && options.headers) || {})
+            }
+        });
+
+        if (response.status === 204) {
+            return null;
+        }
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(String(payload?.error || `Request failed (${response.status})`));
+        }
+
+        return payload;
+    }
+
+    async function openTrelloConnectPopup() {
+        const config = await fetchTrelloJson("/api/integrations/trello/config");
+        if (!config?.enabled || !config?.api_key) {
+            throw new Error("Trello integration is not configured on the server yet.");
+        }
+
+        const returnUrl = `${window.location.origin}/trello-callback.html`;
+        const authorizeUrl = new URL("https://trello.com/1/authorize");
+        authorizeUrl.searchParams.set("expiration", "never");
+        authorizeUrl.searchParams.set("name", "DTECH-HUB");
+        authorizeUrl.searchParams.set("scope", "read,write");
+        authorizeUrl.searchParams.set("response_type", "token");
+        authorizeUrl.searchParams.set("key", String(config.api_key));
+        authorizeUrl.searchParams.set("return_url", returnUrl);
+
+        const popup = window.open(authorizeUrl.toString(), "dtech_hub_trello_connect", "width=650,height=760");
+        if (!popup) {
+            throw new Error("Popup blocked. Please allow popups and try again.");
+        }
+
+        return new Promise((resolve, reject) => {
+            let timedOut = false;
+            const timeout = setTimeout(() => {
+                timedOut = true;
+                window.removeEventListener("message", onMessage);
+                reject(new Error("Trello authorization timed out. Please try again."));
+            }, 120000);
+
+            const onMessage = (event) => {
+                if (event.origin !== window.location.origin) {
+                    return;
+                }
+
+                const data = event.data || {};
+                if (data.source !== "dtech-hub-trello" || !data.token) {
+                    return;
+                }
+
+                if (timedOut) {
+                    return;
+                }
+
+                clearTimeout(timeout);
+                window.removeEventListener("message", onMessage);
+                resolve(String(data.token));
+            };
+
+            window.addEventListener("message", onMessage);
+        });
+    }
+
+    async function loadTrelloBoards(email) {
+        const boards = await fetchTrelloJson("/api/integrations/trello/boards", { method: "GET" }, email);
+        const rows = (Array.isArray(boards) ? boards : []).slice(0, 6).map((board) => ({
+            text: board.name || "Untitled Board",
+            href: board.url || ""
+        }));
+
+        if (!rows.length) {
+            setTrelloBoards([{ text: "No open Trello boards found for this account." }]);
+            return;
+        }
+
+        setTrelloBoards(rows);
+    }
+
+    async function refreshTrelloStatus(email) {
+        if (!email) {
+            setTrelloConnectionMessage("Sign in first", "Connect with your school account, then link Trello.", "warn");
+            if (trelloConnectBtn) trelloConnectBtn.hidden = false;
+            if (trelloDisconnectBtn) trelloDisconnectBtn.hidden = true;
+            if (trelloRefreshBoardsBtn) trelloRefreshBoardsBtn.hidden = true;
+            setTrelloBoards([]);
+            return;
+        }
+
+        try {
+            const status = await fetchTrelloJson("/api/integrations/trello/status", { method: "GET" }, email);
+            if (!status?.connected) {
+                setTrelloConnectionMessage(
+                    "Trello not connected",
+                    "Click Connect Trello to link your account and enable work-log sync.",
+                    "warn"
+                );
+                if (trelloConnectBtn) trelloConnectBtn.hidden = false;
+                if (trelloDisconnectBtn) trelloDisconnectBtn.hidden = true;
+                if (trelloRefreshBoardsBtn) trelloRefreshBoardsBtn.hidden = true;
+                setTrelloBoards([]);
+                return;
+            }
+
+            const username = String(status?.trello?.username || "").trim();
+            const fullName = String(status?.trello?.full_name || "").trim();
+            setTrelloConnectionMessage(
+                "Trello connected",
+                `Linked as ${fullName || username || "Trello user"}. You can now send logs from task pages.`,
+                ""
+            );
+
+            if (trelloConnectBtn) trelloConnectBtn.hidden = true;
+            if (trelloDisconnectBtn) trelloDisconnectBtn.hidden = false;
+            if (trelloRefreshBoardsBtn) trelloRefreshBoardsBtn.hidden = false;
+
+            await loadTrelloBoards(email);
+        } catch (error) {
+            setTrelloConnectionMessage("Trello check failed", error.message || "Could not check Trello status.", "error");
+            if (trelloConnectBtn) trelloConnectBtn.hidden = false;
+            if (trelloDisconnectBtn) trelloDisconnectBtn.hidden = true;
+            if (trelloRefreshBoardsBtn) trelloRefreshBoardsBtn.hidden = true;
+            setTrelloBoards([]);
+        }
+    }
+
+    function wireTrelloActions(email) {
+        if (trelloConnectBtn) {
+            trelloConnectBtn.onclick = async () => {
+                trelloConnectBtn.disabled = true;
+                try {
+                    setTrelloConnectionMessage("Connecting Trello", "Authorize DTECH-HUB in the Trello popup window.", "");
+                    const token = await openTrelloConnectPopup();
+                    await fetchTrelloJson(
+                        "/api/integrations/trello/connect",
+                        {
+                            method: "POST",
+                            body: JSON.stringify({ token })
+                        },
+                        email
+                    );
+                    await refreshTrelloStatus(email);
+                } catch (error) {
+                    setTrelloConnectionMessage("Could not connect Trello", error.message || "Try again.", "error");
+                } finally {
+                    trelloConnectBtn.disabled = false;
+                }
+            };
+        }
+
+        if (trelloDisconnectBtn) {
+            trelloDisconnectBtn.onclick = async () => {
+                trelloDisconnectBtn.disabled = true;
+                try {
+                    await fetchTrelloJson(
+                        "/api/integrations/trello/connect",
+                        { method: "DELETE" },
+                        email
+                    );
+                    await refreshTrelloStatus(email);
+                } catch (error) {
+                    setTrelloConnectionMessage("Could not disconnect Trello", error.message || "Try again.", "error");
+                } finally {
+                    trelloDisconnectBtn.disabled = false;
+                }
+            };
+        }
+
+        if (trelloRefreshBoardsBtn) {
+            trelloRefreshBoardsBtn.onclick = async () => {
+                trelloRefreshBoardsBtn.disabled = true;
+                try {
+                    await loadTrelloBoards(email);
+                } catch (error) {
+                    setTrelloConnectionMessage("Could not load boards", error.message || "Try again.", "error");
+                } finally {
+                    trelloRefreshBoardsBtn.disabled = false;
+                }
+            };
+        }
+    }
+
     async function loadProfile() {
         const auth = getStoredAuth();
         const profile = auth && auth.profile ? auth.profile : null;
@@ -726,8 +961,13 @@
             setInfoStack(csvLinksEl, [{ text: "Sign in to check linked staff CSV records.", variant: "warn" }]);
             setInfoStack(uploadHistoryEl, [{ text: "Sign in to view your staff upload history.", variant: "warn" }]);
             setInfoStack(classesEl, [{ text: "Sign in to view linked classes and students.", variant: "warn" }]);
+            wireTrelloActions("");
+            await refreshTrelloStatus("");
             return;
         }
+
+        wireTrelloActions(email);
+        await refreshTrelloStatus(email);
 
         let accessData = null;
         try {

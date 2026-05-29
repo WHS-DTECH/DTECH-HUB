@@ -86,6 +86,7 @@ const DETAIL_DATA = {
 };
 
 const DETAIL_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
+const TRELLO_CARD_LINK_STORAGE_PREFIX = "hub_trello_card_link_v1";
 const EVIDENCE_STEPS_TARGET_STANDARDS = new Set(["92005", "91897", "91907"]);
 const EVIDENCE_STEPS_DEFAULTS = {
     "92005": [
@@ -396,6 +397,54 @@ function buildWriteHeaders() {
         headers["x-user-email"] = email;
     }
     return headers;
+}
+
+function getTrelloCardStorageKey(projectId, email) {
+    return `${TRELLO_CARD_LINK_STORAGE_PREFIX}:${String(projectId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
+}
+
+function readStoredTrelloCardLink(projectId, email) {
+    const storageKey = getTrelloCardStorageKey(projectId, email);
+    try {
+        return String(localStorage.getItem(storageKey) || "").trim();
+    } catch (_error) {
+        return "";
+    }
+}
+
+function writeStoredTrelloCardLink(projectId, email, value) {
+    const storageKey = getTrelloCardStorageKey(projectId, email);
+    const nextValue = String(value || "").trim();
+    try {
+        if (!nextValue) {
+            localStorage.removeItem(storageKey);
+            return;
+        }
+        localStorage.setItem(storageKey, nextValue);
+    } catch (_error) {
+    }
+}
+
+function toSafeTrelloCardUrl(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+
+    try {
+        const parsed = new URL(raw);
+        const host = String(parsed.hostname || "").toLowerCase();
+        if (!(host === "trello.com" || host.endsWith(".trello.com"))) {
+            return "";
+        }
+
+        const match = parsed.pathname.match(/\/c\/([a-zA-Z0-9]+)/i);
+        if (!match?.[1]) {
+            return "";
+        }
+
+        return `https://trello.com/c/${match[1]}`;
+    } catch (_error) {
+        return "";
+    }
 }
 
 function toStandardCode(value) {
@@ -1770,6 +1819,30 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         const btnClass = interestData.my_interest ? "detail-action interest-btn is-interested" : "detail-action interest-btn";
         const btnText = interestData.my_interest ? "\u2713 I'm Interested" : "I'm Interested";
         html += `<button type="button" class="${btnClass}" id="interest-toggle-btn">${btnText}</button>`;
+
+        const myAllocation = interestData?.my_allocation || null;
+        const assignedStandards = [
+            toStandardCode(myAllocation?.standard_1),
+            toStandardCode(myAllocation?.standard_2)
+        ].filter((code) => EVIDENCE_STEPS_TARGET_STANDARDS.has(code));
+        const completionPercent = getEvidenceCompletionPercentFromRows(myAllocation?.evidence_steps, assignedStandards);
+        const savedCardLink = escapeHtml(readStoredTrelloCardLink(projectId, email));
+
+        html += `
+            <div class="trello-sync-panel" id="trello-sync-panel">
+                <h3>Trello Sync</h3>
+                <p>Open your Trello card quickly or send this work update to Trello.</p>
+                <label for="trello-card-url" class="trello-sync-label">Trello card link</label>
+                <input id="trello-card-url" class="trello-sync-input" type="url" placeholder="https://trello.com/c/xxxx1234" value="${savedCardLink}">
+                <label for="trello-work-note" class="trello-sync-label">Work note</label>
+                <textarea id="trello-work-note" class="trello-sync-input trello-sync-note" placeholder="What did you complete today?"></textarea>
+                <div class="trello-sync-actions">
+                    <button type="button" class="detail-action detail-action-secondary" id="trello-open-card-btn">Open Trello Card</button>
+                    <button type="button" class="detail-action" id="trello-send-log-btn">Send Log to Trello (${completionPercent}%)</button>
+                </div>
+                <p class="trello-sync-status" id="trello-sync-status" aria-live="polite"></p>
+            </div>
+        `;
     }
 
     // Teachers see the full list of interested students
@@ -1854,6 +1927,104 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             });
         });
     }
+
+    const trelloCardInput = section.querySelector("#trello-card-url");
+    const trelloWorkNoteInput = section.querySelector("#trello-work-note");
+    const trelloOpenCardBtn = section.querySelector("#trello-open-card-btn");
+    const trelloSendLogBtn = section.querySelector("#trello-send-log-btn");
+    const trelloStatus = section.querySelector("#trello-sync-status");
+
+    const setTrelloStatus = (message, isError = false) => {
+        if (!trelloStatus) return;
+        trelloStatus.textContent = String(message || "");
+        trelloStatus.classList.toggle("is-error", Boolean(isError));
+    };
+
+    const readCardUrl = () => {
+        const safe = toSafeTrelloCardUrl(trelloCardInput?.value || "");
+        if (trelloCardInput && safe && trelloCardInput.value !== safe) {
+            trelloCardInput.value = safe;
+        }
+        writeStoredTrelloCardLink(projectId, email, safe);
+        return safe;
+    };
+
+    trelloCardInput?.addEventListener("change", () => {
+        const safe = readCardUrl();
+        if (!safe) {
+            setTrelloStatus("Enter a valid Trello card link (trello.com/c/...).", true);
+        } else {
+            setTrelloStatus("Card link saved.");
+        }
+    });
+
+    trelloOpenCardBtn?.addEventListener("click", () => {
+        const cardUrl = readCardUrl();
+        if (!cardUrl) {
+            setTrelloStatus("Enter a valid Trello card link first.", true);
+            return;
+        }
+
+        window.open(cardUrl, "_blank", "noopener,noreferrer");
+        setTrelloStatus("Opened Trello card.");
+    });
+
+    trelloSendLogBtn?.addEventListener("click", async () => {
+        const cardUrl = readCardUrl();
+        if (!cardUrl) {
+            setTrelloStatus("Enter a valid Trello card link first.", true);
+            return;
+        }
+
+        const myAllocation = interestData?.my_allocation || null;
+        const assignedStandards = [
+            toStandardCode(myAllocation?.standard_1),
+            toStandardCode(myAllocation?.standard_2)
+        ].filter((code) => EVIDENCE_STEPS_TARGET_STANDARDS.has(code));
+        const completionPercent = getEvidenceCompletionPercentFromRows(myAllocation?.evidence_steps, assignedStandards);
+
+        const note = String(trelloWorkNoteInput?.value || "").trim();
+        if (trelloSendLogBtn) trelloSendLogBtn.disabled = true;
+        setTrelloStatus("Sending log to Trello...");
+
+        try {
+            const response = await fetch("/api/integrations/trello/work-log", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-user-email": email
+                },
+                body: JSON.stringify({
+                    card_url: cardUrl,
+                    note,
+                    activity_title: String(detailData?.title || "").trim(),
+                    progress_percent: completionPercent
+                })
+            });
+
+            if (!response.ok) {
+                const payload = await response.json().catch(() => ({}));
+                throw new Error(payload?.error || "Could not send log to Trello.");
+            }
+
+            const payload = await response.json().catch(() => ({}));
+            if (trelloWorkNoteInput) {
+                trelloWorkNoteInput.value = "";
+            }
+
+            const cardUrlFromApi = toSafeTrelloCardUrl(payload?.card_url || cardUrl);
+            if (cardUrlFromApi && trelloCardInput) {
+                trelloCardInput.value = cardUrlFromApi;
+                writeStoredTrelloCardLink(projectId, email, cardUrlFromApi);
+            }
+
+            setTrelloStatus("Work log sent to Trello.");
+        } catch (error) {
+            setTrelloStatus(error.message || "Could not send log to Trello.", true);
+        } finally {
+            if (trelloSendLogBtn && trelloSendLogBtn.isConnected) trelloSendLogBtn.disabled = false;
+        }
+    });
 
     // Toggle interest button handler
     const toggleBtn = section.querySelector("#interest-toggle-btn");

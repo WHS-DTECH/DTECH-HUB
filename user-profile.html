@@ -104,6 +104,21 @@
                         </div>
                     </article>
 
+                    <article id="trello-integration-card" class="profile-card profile-card-connection">
+                        <h2>Trello Integration</h2>
+                        <p class="card-subtext">Connect once, then send work logs from DTECH-HUB into your Trello card.</p>
+                        <div id="profile-trello-connection" class="connection-box">
+                            <strong>Checking Trello connection...</strong>
+                            <p>Loading integration status.</p>
+                        </div>
+                        <div class="trello-actions-row">
+                            <button type="button" id="trello-connect-btn" class="detail-action">Connect Trello</button>
+                            <button type="button" id="trello-disconnect-btn" class="detail-action detail-action-secondary" hidden>Disconnect</button>
+                            <button type="button" id="trello-refresh-boards-btn" class="detail-action detail-action-secondary" hidden>Refresh Boards</button>
+                        </div>
+                        <div id="trello-boards" class="info-stack" hidden></div>
+                    </article>
+
                     <article class="profile-card">
                         <h2>CSV Data Links</h2>
                         <div id="profile-csv-links" class="info-stack">

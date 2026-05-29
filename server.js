@@ -9,6 +9,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const SERVER_STARTED_AT = new Date().toISOString();
 const hasDatabase = Boolean(process.env.DATABASE_URL);
+const TRELLO_API_KEY = String(process.env.TRELLO_API_KEY || "").trim();
 const staffDirectoryApiUrl = String(process.env.STAFF_DIRECTORY_API_URL || "").trim();
 const staffDirectoryApiKey = String(process.env.STAFF_DIRECTORY_API_KEY || "").trim();
 const memoryActivities = new Map();
@@ -20,6 +21,7 @@ const memorySuggestions = [];
 let memorySuggestionId = 1;
 const memoryPracticalEvents = [];
 let memoryPracticalEventId = 1;
+const memoryTrelloConnections = new Map();
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -2648,9 +2650,35 @@ async function ensureProjectInterestsSchema() {
   await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 }
 
+async function ensureTrelloConnectionsSchema() {
+  if (!hasDatabase) {
+    return;
+  }
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS student_trello_connections (
+      student_email TEXT PRIMARY KEY,
+      trello_token TEXT NOT NULL,
+      trello_member_id TEXT,
+      trello_username TEXT,
+      trello_full_name TEXT,
+      connected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`ALTER TABLE student_trello_connections ADD COLUMN IF NOT EXISTS trello_token TEXT`);
+  await pool.query(`ALTER TABLE student_trello_connections ADD COLUMN IF NOT EXISTS trello_member_id TEXT`);
+  await pool.query(`ALTER TABLE student_trello_connections ADD COLUMN IF NOT EXISTS trello_username TEXT`);
+  await pool.query(`ALTER TABLE student_trello_connections ADD COLUMN IF NOT EXISTS trello_full_name TEXT`);
+  await pool.query(`ALTER TABLE student_trello_connections ADD COLUMN IF NOT EXISTS connected_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await pool.query(`ALTER TABLE student_trello_connections ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+}
+
 async function ensureSchema() {
   await ensureActivitiesSchema();
   await ensureProjectInterestsSchema();
+  await ensureTrelloConnectionsSchema();
   await ensureUnitPlanSchema();
 }
 
@@ -2920,6 +2948,167 @@ function getRequestUserEmail(req) {
     req?.body?.created_by_email ||
     ""
   );
+}
+
+function isSchoolEmail(email) {
+  const normalized = normalizeEmail(email);
+  return Boolean(normalized && normalized.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`));
+}
+
+function parseTrelloCardIdentifier(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  const shortLinkFromRaw = raw.match(/^[a-zA-Z0-9]{8}$/);
+  if (shortLinkFromRaw) {
+    return shortLinkFromRaw[0];
+  }
+
+  try {
+    const parsed = new URL(raw);
+    const cardMatch = parsed.pathname.match(/\/c\/([a-zA-Z0-9]+)/i);
+    if (cardMatch?.[1]) {
+      return cardMatch[1];
+    }
+  } catch (_error) {
+  }
+
+  return "";
+}
+
+function formatTrelloCommentText({ activityTitle, progressPercent, note, createdByEmail }) {
+  const lines = [];
+  lines.push(`[DTECH-HUB] Work log update`);
+  if (activityTitle) {
+    lines.push(`Activity: ${activityTitle}`);
+  }
+  if (Number.isFinite(progressPercent)) {
+    lines.push(`Progress: ${Math.max(0, Math.min(100, Math.round(progressPercent)))}%`);
+  }
+  if (createdByEmail) {
+    lines.push(`Student: ${createdByEmail}`);
+  }
+  if (note) {
+    lines.push(`Note: ${note}`);
+  }
+  return lines.join("\n");
+}
+
+async function trelloApiRequest(pathname, { token = "", method = "GET", query = {}, body = null } = {}) {
+  if (!TRELLO_API_KEY) {
+    const error = new Error("Trello API key is not configured.");
+    error.status = 503;
+    throw error;
+  }
+
+  const params = new URLSearchParams({ key: TRELLO_API_KEY });
+  if (token) {
+    params.set("token", token);
+  }
+
+  Object.entries(query || {}).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") return;
+    params.set(key, String(value));
+  });
+
+  const response = await fetch(`https://api.trello.com/1${pathname}?${params.toString()}`, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = String(payload?.message || payload?.error || `Trello request failed (${response.status}).`);
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
+  }
+
+  return payload;
+}
+
+async function getStoredTrelloConnection(email) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) return null;
+
+  if (!hasDatabase) {
+    return memoryTrelloConnections.get(normalizedEmail) || null;
+  }
+
+  const result = await pool.query(
+    `
+      SELECT student_email, trello_token, trello_member_id, trello_username, trello_full_name, connected_at, updated_at
+      FROM student_trello_connections
+      WHERE student_email = $1
+      LIMIT 1
+    `,
+    [normalizedEmail]
+  );
+
+  return result.rows?.[0] || null;
+}
+
+async function saveTrelloConnection(email, token, member) {
+  const normalizedEmail = normalizeEmail(email);
+  const row = {
+    student_email: normalizedEmail,
+    trello_token: String(token || "").trim(),
+    trello_member_id: String(member?.id || "").trim(),
+    trello_username: String(member?.username || "").trim(),
+    trello_full_name: String(member?.fullName || "").trim(),
+    connected_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+
+  if (!hasDatabase) {
+    memoryTrelloConnections.set(normalizedEmail, row);
+    return row;
+  }
+
+  const result = await pool.query(
+    `
+      INSERT INTO student_trello_connections (
+        student_email,
+        trello_token,
+        trello_member_id,
+        trello_username,
+        trello_full_name,
+        connected_at,
+        updated_at
+      )
+      VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+      ON CONFLICT (student_email)
+      DO UPDATE SET
+        trello_token = EXCLUDED.trello_token,
+        trello_member_id = EXCLUDED.trello_member_id,
+        trello_username = EXCLUDED.trello_username,
+        trello_full_name = EXCLUDED.trello_full_name,
+        updated_at = NOW()
+      RETURNING student_email, trello_token, trello_member_id, trello_username, trello_full_name, connected_at, updated_at
+    `,
+    [
+      normalizedEmail,
+      row.trello_token,
+      row.trello_member_id || null,
+      row.trello_username || null,
+      row.trello_full_name || null
+    ]
+  );
+
+  return result.rows?.[0] || row;
+}
+
+async function deleteTrelloConnection(email) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) return;
+
+  if (!hasDatabase) {
+    memoryTrelloConnections.delete(normalizedEmail);
+    return;
+  }
+
+  await pool.query(`DELETE FROM student_trello_connections WHERE student_email = $1`, [normalizedEmail]);
 }
 
 async function resolveActivityWriteAccess(email) {
@@ -4935,6 +5124,201 @@ app.get("/api/auth/user-access", async (req, res) => {
     can_admin: canAdmin,
     default_view: canTeacherView ? "teacher" : "student"
   });
+});
+
+app.get("/api/integrations/trello/config", (_req, res) => {
+  res.json({
+    enabled: Boolean(TRELLO_API_KEY),
+    api_key: TRELLO_API_KEY || ""
+  });
+});
+
+app.get("/api/integrations/trello/status", async (req, res) => {
+  const email = getRequestUserEmail(req);
+  if (!isSchoolEmail(email)) {
+    res.status(401).json({ error: "School sign-in required" });
+    return;
+  }
+
+  try {
+    const existing = await getStoredTrelloConnection(email);
+    if (!existing?.trello_token) {
+      res.json({ connected: false, email: normalizeEmail(email) });
+      return;
+    }
+
+    let me = null;
+    try {
+      me = await trelloApiRequest("/members/me", {
+        token: existing.trello_token,
+        query: { fields: "id,username,fullName,url" }
+      });
+    } catch (_error) {
+      res.json({
+        connected: false,
+        email: normalizeEmail(email),
+        reason: "token_invalid"
+      });
+      return;
+    }
+
+    res.json({
+      connected: true,
+      email: normalizeEmail(email),
+      trello: {
+        id: String(me?.id || existing.trello_member_id || "").trim(),
+        username: String(me?.username || existing.trello_username || "").trim(),
+        full_name: String(me?.fullName || existing.trello_full_name || "").trim(),
+        url: String(me?.url || "").trim()
+      },
+      connected_at: existing.connected_at || null,
+      updated_at: existing.updated_at || null
+    });
+  } catch (_error) {
+    res.status(500).json({ error: "Could not load Trello connection status" });
+  }
+});
+
+app.post("/api/integrations/trello/connect", async (req, res) => {
+  const email = getRequestUserEmail(req);
+  if (!isSchoolEmail(email)) {
+    res.status(401).json({ error: "School sign-in required" });
+    return;
+  }
+
+  if (!TRELLO_API_KEY) {
+    res.status(503).json({ error: "Trello integration is not configured yet" });
+    return;
+  }
+
+  const token = String(req.body?.token || "").trim();
+  if (!token) {
+    res.status(400).json({ error: "Trello token is required" });
+    return;
+  }
+
+  try {
+    const me = await trelloApiRequest("/members/me", {
+      token,
+      query: { fields: "id,username,fullName,url" }
+    });
+
+    const saved = await saveTrelloConnection(email, token, me);
+
+    res.status(201).json({
+      connected: true,
+      email: normalizeEmail(email),
+      trello: {
+        id: String(me?.id || "").trim(),
+        username: String(me?.username || "").trim(),
+        full_name: String(me?.fullName || "").trim(),
+        url: String(me?.url || "").trim()
+      },
+      connected_at: saved.connected_at || null,
+      updated_at: saved.updated_at || null
+    });
+  } catch (error) {
+    const status = Number(error?.status) || 400;
+    res.status(status === 401 ? 400 : status).json({ error: error.message || "Could not connect Trello account" });
+  }
+});
+
+app.delete("/api/integrations/trello/connect", async (req, res) => {
+  const email = getRequestUserEmail(req);
+  if (!isSchoolEmail(email)) {
+    res.status(401).json({ error: "School sign-in required" });
+    return;
+  }
+
+  try {
+    await deleteTrelloConnection(email);
+    res.status(204).send();
+  } catch (_error) {
+    res.status(500).json({ error: "Could not disconnect Trello account" });
+  }
+});
+
+app.get("/api/integrations/trello/boards", async (req, res) => {
+  const email = getRequestUserEmail(req);
+  if (!isSchoolEmail(email)) {
+    res.status(401).json({ error: "School sign-in required" });
+    return;
+  }
+
+  try {
+    const existing = await getStoredTrelloConnection(email);
+    if (!existing?.trello_token) {
+      res.status(404).json({ error: "Connect Trello first" });
+      return;
+    }
+
+    const boards = await trelloApiRequest("/members/me/boards", {
+      token: existing.trello_token,
+      query: { fields: "id,name,url,closed", filter: "open" }
+    });
+
+    res.json((Array.isArray(boards) ? boards : []).map((board) => ({
+      id: String(board?.id || "").trim(),
+      name: String(board?.name || "").trim(),
+      url: String(board?.url || "").trim()
+    })).filter((board) => board.id));
+  } catch (error) {
+    const status = Number(error?.status) || 500;
+    res.status(status).json({ error: error.message || "Could not load Trello boards" });
+  }
+});
+
+app.post("/api/integrations/trello/work-log", async (req, res) => {
+  const email = getRequestUserEmail(req);
+  if (!isSchoolEmail(email)) {
+    res.status(401).json({ error: "School sign-in required" });
+    return;
+  }
+
+  try {
+    const existing = await getStoredTrelloConnection(email);
+    if (!existing?.trello_token) {
+      res.status(404).json({ error: "Connect Trello first" });
+      return;
+    }
+
+    const cardIdentifier = parseTrelloCardIdentifier(req.body?.card_id || req.body?.card_url);
+    if (!cardIdentifier) {
+      res.status(400).json({ error: "A Trello card link or card id is required" });
+      return;
+    }
+
+    const note = String(req.body?.note || "").trim();
+    const activityTitle = String(req.body?.activity_title || req.body?.activity_name || "").trim();
+    const progressRaw = Number(req.body?.progress_percent);
+    const progressPercent = Number.isFinite(progressRaw) ? Math.max(0, Math.min(100, Math.round(progressRaw))) : NaN;
+
+    const text = formatTrelloCommentText({
+      activityTitle,
+      progressPercent,
+      note,
+      createdByEmail: normalizeEmail(email)
+    });
+
+    const action = await trelloApiRequest(`/cards/${encodeURIComponent(cardIdentifier)}/actions/comments`, {
+      token: existing.trello_token,
+      method: "POST",
+      query: { text }
+    });
+
+    const shortLink = String(action?.data?.card?.shortLink || cardIdentifier).trim();
+    const cardUrl = shortLink ? `https://trello.com/c/${shortLink}` : "";
+
+    res.status(201).json({
+      ok: true,
+      card_id: cardIdentifier,
+      card_url: cardUrl,
+      action_id: String(action?.id || "").trim()
+    });
+  } catch (error) {
+    const status = Number(error?.status) || 500;
+    res.status(status).json({ error: error.message || "Could not send Trello work log" });
+  }
 });
 
 app.get("/api/admin/user-roles", async (_req, res) => {

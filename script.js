@@ -648,11 +648,12 @@ function renderGlobalNavbar() {
         <details class="nav-dropdown" id="hub-student-work-menu" data-nav-dropdown hidden>
             <summary>Student Work</summary>
             <div class="nav-drawer" role="menu">
-                <a role="menuitem" href="/index.html">Student Home</a>
+                <a role="menuitem" href="/index.html#current-week">This Week</a>
+                <a role="menuitem" href="/index.html#project-library">Activity Library</a>
                 <a role="menuitem" href="/browse-practicals.html">Browse Practicals</a>
                 <a role="menuitem" href="/browse-lessons.html">Browse Lessons</a>
                 <a role="menuitem" href="/suggest-activity.html">Suggest Activity</a>
-                <a role="menuitem" href="/user-profile.html">Student Profile</a>
+                <a role="menuitem" href="/user-profile.html#trello-integration-card">Profile & Trello</a>
             </div>
         </details>
     `;

@@ -520,6 +520,69 @@ h1 {
     color: #b23a3a;
 }
 
+.trello-sync-panel {
+    margin-top: 12px;
+    border: 1px solid #c5d5e6;
+    background: #f5f9fe;
+    border-radius: 10px;
+    padding: 10px;
+}
+
+.trello-sync-panel h3 {
+    margin: 0;
+    font-size: 0.92rem;
+    color: #1a4870;
+}
+
+.trello-sync-panel p {
+    margin: 4px 0 8px;
+    font-size: 0.78rem;
+    color: #395f81;
+}
+
+.trello-sync-label {
+    display: block;
+    margin: 7px 0 4px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #274a69;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.trello-sync-input {
+    width: 100%;
+    border: 1px solid #b8cbe0;
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: 0.8rem;
+    color: #1a3651;
+    background: #fff;
+}
+
+.trello-sync-note {
+    min-height: 72px;
+    resize: vertical;
+}
+
+.trello-sync-actions {
+    margin-top: 8px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.trello-sync-status {
+    margin: 8px 0 0;
+    min-height: 1em;
+    font-size: 0.74rem;
+    color: #2f5f8f;
+}
+
+.trello-sync-status.is-error {
+    color: #b23a3a;
+}
+
 .evidence-sidebar-open-btn {
     align-self: flex-start;
     margin-top: 4px;

@@ -170,6 +170,19 @@
     color: #445f74;
 }
 
+.trello-actions-row {
+    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.trello-actions-row .detail-action,
+.trello-actions-row .detail-action-secondary {
+    font-size: 0.78rem;
+    padding: 7px 11px;
+}
+
 .info-stack {
     display: grid;
     gap: 8px;
