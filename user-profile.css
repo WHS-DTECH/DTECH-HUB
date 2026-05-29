@@ -183,6 +183,23 @@
     padding: 7px 11px;
 }
 
+.trello-manual-box {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed #c8d6e5;
+    display: grid;
+    gap: 7px;
+}
+
+.trello-manual-token {
+    border: 1px solid #b8cbe0;
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: 0.8rem;
+    color: #1a3651;
+    background: #fff;
+}
+
 .info-stack {
     display: grid;
     gap: 8px;

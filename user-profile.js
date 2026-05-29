@@ -31,6 +31,8 @@
     const trelloConnectBtn = document.querySelector("#trello-connect-btn");
     const trelloDisconnectBtn = document.querySelector("#trello-disconnect-btn");
     const trelloRefreshBoardsBtn = document.querySelector("#trello-refresh-boards-btn");
+    const trelloManualTokenInput = document.querySelector("#trello-manual-token");
+    const trelloManualConnectBtn = document.querySelector("#trello-manual-connect-btn");
     const csvLinksCardEl = csvLinksEl ? csvLinksEl.closest(".profile-card") : null;
     const uploadHistoryCardEl = uploadHistoryEl ? uploadHistoryEl.closest(".profile-card") : null;
     const classesCardEl = classesEl ? classesEl.closest(".profile-card") : null;
@@ -858,6 +860,23 @@
         setTrelloBoards(rows);
     }
 
+    async function connectTrelloWithToken(email, token) {
+        await fetchTrelloJson(
+            "/api/integrations/trello/connect",
+            {
+                method: "POST",
+                body: JSON.stringify({ token: String(token || "").trim() })
+            },
+            email
+        );
+
+        if (trelloManualTokenInput) {
+            trelloManualTokenInput.value = "";
+        }
+
+        await refreshTrelloStatus(email);
+    }
+
     async function refreshTrelloStatus(email) {
         if (!email) {
             setTrelloConnectionMessage("Sign in first", "Connect with your school account, then link Trello.", "warn");
@@ -912,19 +931,31 @@
                 try {
                     setTrelloConnectionMessage("Connecting Trello", "Authorize DTECH-HUB in the Trello popup window.", "");
                     const token = await openTrelloConnectPopup();
-                    await fetchTrelloJson(
-                        "/api/integrations/trello/connect",
-                        {
-                            method: "POST",
-                            body: JSON.stringify({ token })
-                        },
-                        email
-                    );
-                    await refreshTrelloStatus(email);
+                    await connectTrelloWithToken(email, token);
                 } catch (error) {
                     setTrelloConnectionMessage("Could not connect Trello", error.message || "Try again.", "error");
                 } finally {
                     trelloConnectBtn.disabled = false;
+                }
+            };
+        }
+
+        if (trelloManualConnectBtn) {
+            trelloManualConnectBtn.onclick = async () => {
+                const token = String(trelloManualTokenInput?.value || "").trim();
+                if (!token) {
+                    setTrelloConnectionMessage("Token required", "Paste a Trello token first.", "warn");
+                    return;
+                }
+
+                trelloManualConnectBtn.disabled = true;
+                try {
+                    setTrelloConnectionMessage("Connecting Trello", "Validating and saving Trello token...", "");
+                    await connectTrelloWithToken(email, token);
+                } catch (error) {
+                    setTrelloConnectionMessage("Could not connect Trello", error.message || "Try again.", "error");
+                } finally {
+                    trelloManualConnectBtn.disabled = false;
                 }
             };
         }
