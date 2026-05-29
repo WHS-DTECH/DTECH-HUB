@@ -283,6 +283,63 @@ function expandBulletChecklistRows(rows) {
     return expanded;
 }
 
+function normalize91897RowsWithRequirementFallback(existingRows, defaultRows) {
+    const expandedExisting = expandBulletChecklistRows(existingRows);
+    const defaults = Array.isArray(defaultRows)
+        ? defaultRows.map((text) => ({ text: String(text || "").trim(), done: false })).filter((row) => row.text)
+        : [];
+
+    if (!defaults.length) {
+        return expandedExisting;
+    }
+
+    const getLevel = (text) => {
+        const raw = String(text || "").trim().toLowerCase();
+        if (raw.startsWith("achieved:")) return "achieved";
+        if (raw.startsWith("merit:")) return "merit";
+        if (raw.startsWith("excellence:")) return "excellence";
+        return "";
+    };
+
+    const existingCounts = { achieved: 0, merit: 0, excellence: 0 };
+    const defaultCounts = { achieved: 0, merit: 0, excellence: 0 };
+
+    expandedExisting.forEach((row) => {
+        const level = getLevel(row?.text);
+        if (level) existingCounts[level] += 1;
+    });
+    defaults.forEach((row) => {
+        const level = getLevel(row?.text);
+        if (level) defaultCounts[level] += 1;
+    });
+
+    // Legacy shape to migrate: one long line per level while defaults have multiple items.
+    const shouldRebuildFromRequirements =
+        expandedExisting.length <= 3 ||
+        existingCounts.achieved < defaultCounts.achieved ||
+        existingCounts.merit < defaultCounts.merit ||
+        existingCounts.excellence < defaultCounts.excellence;
+
+    if (!shouldRebuildFromRequirements) {
+        return expandedExisting;
+    }
+
+    const doneByText = new Map();
+    expandedExisting.forEach((row) => {
+        const key = String(row?.text || "").trim().toLowerCase();
+        if (!key) return;
+        doneByText.set(key, Boolean(row?.done));
+    });
+
+    return defaults.map((row) => {
+        const key = String(row.text || "").trim().toLowerCase();
+        return {
+            text: row.text,
+            done: doneByText.get(key) || false
+        };
+    });
+}
+
 function normalizeStudentEmailInput(value) {
     const trimmed = String(value || "").trim().toLowerCase();
     if (!trimmed) return "";
@@ -479,7 +536,8 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
         }
 
         if (String(code) === "91897") {
-            state[code] = expandBulletChecklistRows(state[code]);
+            const defaultsFor91897 = Array.isArray(taskDefaultsByStandard?.[code]) ? taskDefaultsByStandard[code] : [];
+            state[code] = normalize91897RowsWithRequirementFallback(state[code], defaultsFor91897);
         }
     });
 
