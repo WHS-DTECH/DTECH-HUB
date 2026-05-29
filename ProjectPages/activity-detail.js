@@ -198,6 +198,39 @@ function coerceArray(value) {
     return [];
 }
 
+function splitRequirementSegments(value) {
+    return String(value || "")
+        .split(/\s*[•·]\s*/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+}
+
+function formatRequirementSteps(values, levelLabel) {
+    const prefix = `${levelLabel}:`;
+    return coerceArray(values)
+        .flatMap((line) => splitRequirementSegments(line))
+        .map((line) => (line.toLowerCase().startsWith(prefix.toLowerCase()) ? line : `${prefix} ${line}`))
+        .filter(Boolean);
+}
+
+function buildRequirementSidebarSteps(detailData) {
+    const achievedSteps = formatRequirementSteps(detailData?.achieved, "Achieved");
+    const meritSteps = formatRequirementSteps(detailData?.merit, "Merit");
+    const excellenceSteps = formatRequirementSteps(detailData?.excellence, "Excellence");
+    return [...achievedSteps, ...meritSteps, ...excellenceSteps];
+}
+
+function buildTaskDefaultsByStandard(standards, detailData) {
+    const requirementSteps = buildRequirementSidebarSteps(detailData);
+    const map = {};
+    (Array.isArray(standards) ? standards : []).forEach((code) => {
+        map[code] = requirementSteps.length
+            ? requirementSteps
+            : (Array.isArray(EVIDENCE_STEPS_DEFAULTS[code]) ? EVIDENCE_STEPS_DEFAULTS[code] : []);
+    });
+    return map;
+}
+
 function normalizeStudentEmailInput(value) {
     const trimmed = String(value || "").trim().toLowerCase();
     if (!trimmed) return "";
@@ -335,7 +368,7 @@ async function saveEvidenceRows(projectId, studentEmail, rows) {
     }
 }
 
-async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmail, standards, studentLabel = "Student" }) {
+async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmail, standards, studentLabel = "Student", taskDefaultsByStandard = {} }) {
     if (!host || !studentEmail || !projectId || !Array.isArray(standards) || !standards.length) {
         return;
     }
@@ -355,7 +388,7 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
         triggerButton.type = "button";
         triggerButton.id = "evidence-sidebar-open";
         triggerButton.className = "detail-action evidence-sidebar-open-btn";
-        triggerButton.textContent = "Open Evidence Steps";
+        triggerButton.textContent = "Open Task List";
         section.appendChild(triggerButton);
     }
 
@@ -381,7 +414,11 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
     const state = evidenceRowsToMap(await fetchEvidenceRows(projectId, studentEmail).catch(() => []));
     standards.forEach((code) => {
         if (!Array.isArray(state[code]) || !state[code].length) {
-            state[code] = (Array.isArray(EVIDENCE_STEPS_DEFAULTS[code]) ? EVIDENCE_STEPS_DEFAULTS[code] : [""])
+            const defaultSteps = Array.isArray(taskDefaultsByStandard?.[code])
+                ? taskDefaultsByStandard[code]
+                : (Array.isArray(EVIDENCE_STEPS_DEFAULTS[code]) ? EVIDENCE_STEPS_DEFAULTS[code] : [""]);
+
+            state[code] = defaultSteps
                 .map((text) => ({ text: String(text || "").trim(), done: false }))
                 .filter((step) => step.text);
             if (!state[code].length) {
@@ -430,7 +467,7 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
             input.type = "text";
             input.className = "evidence-step-input";
             input.value = String(step?.text || "");
-            input.placeholder = "Add an evidence step";
+            input.placeholder = "Add a task item";
             input.addEventListener("input", () => {
                 state[standardCode][index].text = input.value;
                 void persistState(sidebar.querySelector("#evidence-sidebar-status"));
@@ -456,10 +493,10 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
 
     sidebar.innerHTML = `
         <header class="evidence-sidebar-header">
-            <h2>Evidence Steps</h2>
+            <h2>Task List</h2>
             <button type="button" class="detail-action detail-action-secondary" id="evidence-sidebar-close">Close</button>
         </header>
-        <p class="evidence-sidebar-copy">Tracking for <strong>${escapeHtml(studentLabel)}</strong>. List the steps and tick each one when evidence is complete.</p>
+        <p class="evidence-sidebar-copy">Tracking for <strong>${escapeHtml(studentLabel)}</strong>. Tick each requirement when evidence is complete.</p>
         <p class="evidence-sidebar-status" id="evidence-sidebar-status" aria-live="polite"></p>
         <div class="evidence-standard-list" id="evidence-standard-list"></div>
     `;
@@ -1579,6 +1616,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             toStandardCode(myAllocation?.standard_1),
             toStandardCode(myAllocation?.standard_2)
         ].filter((code) => EVIDENCE_STEPS_TARGET_STANDARDS.has(code));
+        const taskDefaultsByStandard = buildTaskDefaultsByStandard(assignedStandards, detailData);
 
         if (assignedStandards.length) {
             await renderEvidenceSidebar({
@@ -1587,7 +1625,8 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                 viewerEmail: email,
                 studentEmail: email,
                 standards: Array.from(new Set(assignedStandards)),
-                studentLabel: "My progress"
+                studentLabel: "My progress",
+                taskDefaultsByStandard
             });
         }
     }
@@ -1605,13 +1644,16 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                     return;
                 }
 
+                const taskDefaultsByStandard = buildTaskDefaultsByStandard(standards, detailData);
+
                 await renderEvidenceSidebar({
                     host,
                     projectId,
                     viewerEmail: email,
                     studentEmail,
                     standards,
-                    studentLabel: studentEmail
+                    studentLabel: studentEmail,
+                    taskDefaultsByStandard
                 });
             });
         });

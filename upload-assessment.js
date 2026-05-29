@@ -93,6 +93,22 @@ function mergeClassPreparationWithSubject(existingValue, subjectStream) {
     return existing;
 }
 
+function autoResizeTextarea(field) {
+    if (!field) return;
+    field.style.height = "auto";
+    field.style.height = `${Math.max(field.scrollHeight, 84)}px`;
+}
+
+function bindRequirementTextareaAutosize() {
+    if (!form) return;
+
+    const requirementFields = [form.achieved, form.merit, form.excellence].filter(Boolean);
+    requirementFields.forEach((field) => {
+        autoResizeTextarea(field);
+        field.addEventListener("input", () => autoResizeTextarea(field));
+    });
+}
+
 function saveAssessmentDraft() {
     if (!form) return;
 
@@ -388,6 +404,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         restoreAssessmentDraftIfAvailable();
     }
     await prefillFormIfEditing();
+    bindRequirementTextareaAutosize();
     await loadAssessmentStandardsOptions();
     renderStandardChips();
     renderAuthStatus();

@@ -137,6 +137,12 @@
     line-height: 1.45;
 }
 
+#achieved,
+#merit,
+#excellence {
+    overflow-y: hidden;
+}
+
 #manual-overview,
 #manual-aims,
 #preview-overview,
