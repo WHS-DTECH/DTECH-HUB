@@ -168,6 +168,38 @@ function parseLines(value) {
         .filter(Boolean);
 }
 
+function parseRequirementLines(value) {
+    const lines = parseLines(value);
+    const results = [];
+    const bulletSplitRegex = /[\u2022\u25CF\u25E6\u25AA\u2023\u2043\u00B7\u2219]/;
+    const bulletStartRegex = /^[\s\u2022\u25CF\u25E6\u25AA\u2023\u2043\u00B7\u2219]/;
+
+    lines.forEach((line) => {
+        const text = String(line || "").trim();
+        if (!text) return;
+
+        const withoutLevel = text.replace(/^(Achieved|Merit|Excellence)\s*:\s*/i, "").trim();
+        if (!bulletSplitRegex.test(withoutLevel)) {
+            results.push(withoutLevel.replace(/^[\-*]\s*/, "").trim());
+            return;
+        }
+
+        const segments = withoutLevel
+            .split(bulletSplitRegex)
+            .map((segment) => segment.replace(/^[\-*]\s*/, "").trim())
+            .filter(Boolean);
+
+        if (!segments.length) return;
+        const useAllSegments = bulletStartRegex.test(withoutLevel);
+        const selected = useAllSegments ? segments : segments.slice(1);
+        selected.forEach((segment) => {
+            if (segment) results.push(segment);
+        });
+    });
+
+    return results.filter(Boolean);
+}
+
 function coerceArray(value) {
     if (Array.isArray(value)) {
         return value.map((item) => String(item || "").trim()).filter(Boolean);
@@ -199,24 +231,7 @@ function coerceArray(value) {
 }
 
 function splitRequirementSegments(value) {
-    const line = String(value || "").trim();
-    if (!line) {
-        return [];
-    }
-
-    const normalizedBullets = line.replace(/\u2022/g, "•");
-    const parts = normalizedBullets
-        .split("•")
-        .map((item) => item.trim())
-        .filter(Boolean);
-
-    // If the line contains lead-in text plus bullets, keep only the bullet items.
-    if (parts.length > 1 && normalizedBullets.includes("•")) {
-        return parts.slice(1).map((item) => item.replace(/^[\-*]\s*/, "").trim()).filter(Boolean);
-    }
-
-    const plain = normalizedBullets.replace(/^[\-*]\s*/, "").trim();
-    return plain ? [plain] : [];
+    return parseRequirementLines(value);
 }
 
 function formatRequirementSteps(values, levelLabel) {
@@ -1655,9 +1670,9 @@ function renderEditForm(host, id, data) {
             // Assessment Task Fields
             standardDetails: parseLines(formData.get("standardDetails")),
             tasksList: parseLines(formData.get("tasksList")),
-            achieved: parseLines(formData.get("achieved")),
-            merit: parseLines(formData.get("merit")),
-            excellence: parseLines(formData.get("excellence")),
+            achieved: parseRequirementLines(formData.get("achieved")),
+            merit: parseRequirementLines(formData.get("merit")),
+            excellence: parseRequirementLines(formData.get("excellence")),
             submissionRequirements: parseLines(formData.get("submissionRequirements")),
             relevantImplications: parseLines(formData.get("relevantImplications")),
             progressLogging: parseLines(formData.get("progressLogging")),

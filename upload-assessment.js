@@ -9,6 +9,8 @@ const standardChipList = document.querySelector("#standard-chip-list");
 const ASSESSMENT_DRAFT_STORAGE_KEY = "dtechHub:uploadAssessmentDraft:v1";
 const UPLOAD_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 const SUBJECT_STREAM_PREFIX = "subject_stream:";
+const BULLET_SPLIT_REGEX = /[\u2022\u25CF\u25E6\u25AA\u2023\u2043\u00B7\u2219]/;
+const BULLET_START_REGEX = /^[\s\u2022\u25CF\u25E6\u25AA\u2023\u2043\u00B7\u2219]/;
 
 function getEditingAssessmentId() {
     const params = new URLSearchParams(window.location.search);
@@ -59,6 +61,41 @@ function linesToArray(value) {
         .split(/\r?\n/)
         .map((line) => line.trim())
         .filter(Boolean);
+}
+
+function parseRequirementChecklistItems(value) {
+    const lines = linesToArray(value);
+    const items = [];
+
+    lines.forEach((line) => {
+        const text = String(line || "").trim();
+        if (!text) return;
+
+        const withoutLevel = text.replace(/^(Achieved|Merit|Excellence)\s*:\s*/i, "").trim();
+        const hasBullets = BULLET_SPLIT_REGEX.test(withoutLevel);
+
+        if (!hasBullets) {
+            items.push(withoutLevel.replace(/^[\-*]\s*/, "").trim());
+            return;
+        }
+
+        const segments = withoutLevel
+            .split(BULLET_SPLIT_REGEX)
+            .map((segment) => segment.replace(/^[\-*]\s*/, "").trim())
+            .filter(Boolean);
+
+        if (!segments.length) {
+            return;
+        }
+
+        const useAllSegments = BULLET_START_REGEX.test(withoutLevel);
+        const pickedSegments = useAllSegments ? segments : segments.slice(1);
+        pickedSegments.forEach((segment) => {
+            if (segment) items.push(segment);
+        });
+    });
+
+    return items.filter(Boolean);
 }
 
 function normalizeSubjectStream(value) {
@@ -461,9 +498,9 @@ function createAssessmentPayload() {
         tasks_list: tasksList,
         assessment_focus: tasksList,
         class_preparation: classPreparation,
-        achieved: linesToArray(formData.get("achieved")),
-        merit: linesToArray(formData.get("merit")),
-        excellence: linesToArray(formData.get("excellence")),
+        achieved: parseRequirementChecklistItems(formData.get("achieved")),
+        merit: parseRequirementChecklistItems(formData.get("merit")),
+        excellence: parseRequirementChecklistItems(formData.get("excellence")),
         submission_requirements: linesToArray(formData.get("submissionRequirements")),
         relevant_implications: linesToArray(formData.get("relevantImplications")),
         progress_logging: linesToArray(formData.get("progressLogging")),
