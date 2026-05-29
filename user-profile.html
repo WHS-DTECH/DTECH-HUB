@@ -116,10 +116,10 @@
                             <button type="button" id="trello-disconnect-btn" class="detail-action detail-action-secondary" hidden>Disconnect</button>
                             <button type="button" id="trello-refresh-boards-btn" class="detail-action detail-action-secondary" hidden>Refresh Boards</button>
                         </div>
-                        <div class="trello-manual-box">
+                        <div id="trello-manual-box" class="trello-manual-box">
                             <p class="card-subtext">If popup auth fails, generate a token using the DTECH key, then paste it below:</p>
                             <button type="button" id="trello-manual-generate-btn" class="detail-action detail-action-secondary">Generate DTECH Token</button>
-                            <input type="password" id="trello-manual-token" class="trello-manual-token" placeholder="Paste Trello token">
+                            <input type="password" id="trello-manual-token" class="trello-manual-token" placeholder="Paste Trello token" autocomplete="new-password" name="trello_manual_token">
                             <button type="button" id="trello-manual-connect-btn" class="detail-action detail-action-secondary">Connect with Token</button>
                         </div>
                         <div id="trello-boards" class="info-stack" hidden></div>

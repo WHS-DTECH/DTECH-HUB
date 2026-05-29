@@ -28,6 +28,7 @@
     const classesEl = document.querySelector("#profile-classes");
     const trelloConnectionEl = document.querySelector("#profile-trello-connection");
     const trelloBoardsEl = document.querySelector("#trello-boards");
+    const trelloManualBox = document.querySelector("#trello-manual-box");
     const trelloConnectBtn = document.querySelector("#trello-connect-btn");
     const trelloDisconnectBtn = document.querySelector("#trello-disconnect-btn");
     const trelloRefreshBoardsBtn = document.querySelector("#trello-refresh-boards-btn");
@@ -884,6 +885,7 @@
             if (trelloConnectBtn) trelloConnectBtn.hidden = false;
             if (trelloDisconnectBtn) trelloDisconnectBtn.hidden = true;
             if (trelloRefreshBoardsBtn) trelloRefreshBoardsBtn.hidden = true;
+            if (trelloManualBox) trelloManualBox.hidden = false;
             setTrelloBoards([]);
             return;
         }
@@ -899,6 +901,7 @@
                 if (trelloConnectBtn) trelloConnectBtn.hidden = false;
                 if (trelloDisconnectBtn) trelloDisconnectBtn.hidden = true;
                 if (trelloRefreshBoardsBtn) trelloRefreshBoardsBtn.hidden = true;
+                if (trelloManualBox) trelloManualBox.hidden = false;
                 setTrelloBoards([]);
                 return;
             }
@@ -914,6 +917,7 @@
             if (trelloConnectBtn) trelloConnectBtn.hidden = true;
             if (trelloDisconnectBtn) trelloDisconnectBtn.hidden = false;
             if (trelloRefreshBoardsBtn) trelloRefreshBoardsBtn.hidden = false;
+            if (trelloManualBox) trelloManualBox.hidden = true;
 
             await loadTrelloBoards(email);
         } catch (error) {
@@ -921,6 +925,7 @@
             if (trelloConnectBtn) trelloConnectBtn.hidden = false;
             if (trelloDisconnectBtn) trelloDisconnectBtn.hidden = true;
             if (trelloRefreshBoardsBtn) trelloRefreshBoardsBtn.hidden = true;
+            if (trelloManualBox) trelloManualBox.hidden = false;
             setTrelloBoards([]);
         }
     }
