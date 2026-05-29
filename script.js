@@ -644,7 +644,19 @@ function renderGlobalNavbar() {
             </div>
         </details>
     `;
-    const topbarMenu = `${browseMenu}${uploadMenu}`;
+    const studentWorkMenu = `
+        <details class="nav-dropdown" id="hub-student-work-menu" data-nav-dropdown hidden>
+            <summary>Student Work</summary>
+            <div class="nav-drawer" role="menu">
+                <a role="menuitem" href="/index.html">Student Home</a>
+                <a role="menuitem" href="/browse-practicals.html">Browse Practicals</a>
+                <a role="menuitem" href="/browse-lessons.html">Browse Lessons</a>
+                <a role="menuitem" href="/suggest-activity.html">Suggest Activity</a>
+                <a role="menuitem" href="/user-profile.html">Student Profile</a>
+            </div>
+        </details>
+    `;
+    const topbarMenu = `${browseMenu}${uploadMenu}${studentWorkMenu}`;
 
     topbar.dataset.globalNavbar = "true";
     topbar.setAttribute("aria-label", "Primary");
@@ -776,6 +788,7 @@ const hubProfileDomain = document.querySelector("#hub-profile-domain");
 const hubProfileClose = document.querySelector("#hub-profile-close");
 const hubBrowseMenu = document.querySelector("#hub-browse-menu");
 const hubUploadMenu = document.querySelector("#hub-upload-menu");
+const hubStudentWorkMenu = document.querySelector("#hub-student-work-menu");
 const hubBrowseButtons = Array.from(document.querySelectorAll("[data-auth-browse]"));
 const hubUnitPlansButtons = Array.from(document.querySelectorAll("[data-auth-unit-plans]"));
 const HUB_VIEW_MODE_STORAGE_KEY = "hub_view_mode_v1";
@@ -1325,6 +1338,12 @@ function renderHubAuthUi() {
         hubUploadMenu.hidden = !(canAdmin || (canTeacherView && inTeacherMode));
         if (hubUploadMenu.hidden) {
             hubUploadMenu.open = false;
+        }
+    }
+    if (hubStudentWorkMenu) {
+        hubStudentWorkMenu.hidden = !(canToggleView && inTeacherMode);
+        if (hubStudentWorkMenu.hidden) {
+            hubStudentWorkMenu.open = false;
         }
     }
     if (hubAccessBadge) {
