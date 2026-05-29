@@ -6,8 +6,20 @@ const authStatusElement = document.querySelector("#assessment-auth-status");
 const standardLibrarySelect = document.querySelector("#standard-library-select");
 const standardLibraryAdd = document.querySelector("#standard-library-add");
 const standardChipList = document.querySelector("#standard-chip-list");
-const achievedChecklistPreview = document.querySelector("#achieved-checklist-preview");
-const achievedChecklistPreviewList = document.querySelector("#achieved-checklist-preview-list");
+const requirementChecklistPreviewMap = {
+    achieved: {
+        host: document.querySelector("#achieved-checklist-preview"),
+        list: document.querySelector("#achieved-checklist-preview-list")
+    },
+    merit: {
+        host: document.querySelector("#merit-checklist-preview"),
+        list: document.querySelector("#merit-checklist-preview-list")
+    },
+    excellence: {
+        host: document.querySelector("#excellence-checklist-preview"),
+        list: document.querySelector("#excellence-checklist-preview-list")
+    }
+};
 const ASSESSMENT_DRAFT_STORAGE_KEY = "dtechHub:uploadAssessmentDraft:v1";
 const UPLOAD_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 const SUBJECT_STREAM_PREFIX = "subject_stream:";
@@ -148,23 +160,25 @@ function bindRequirementTextareaAutosize() {
     });
 }
 
-function renderAchievedChecklistPreview(items) {
-    if (!achievedChecklistPreview || !achievedChecklistPreviewList) return;
+function renderRequirementChecklistPreview(kind, items) {
+    const key = String(kind || "").trim().toLowerCase();
+    const target = requirementChecklistPreviewMap[key];
+    if (!target?.host || !target?.list) return;
 
     const rows = Array.isArray(items)
         ? items.map((item) => String(item || "").trim()).filter(Boolean)
         : [];
 
     if (!rows.length) {
-        achievedChecklistPreview.hidden = true;
-        achievedChecklistPreviewList.innerHTML = "";
+        target.host.hidden = true;
+        target.list.innerHTML = "";
         return;
     }
 
-    achievedChecklistPreviewList.innerHTML = rows
+    target.list.innerHTML = rows
         .map((item) => `<li>${item.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</li>`)
         .join("");
-    achievedChecklistPreview.hidden = false;
+    target.host.hidden = false;
 }
 
 function saveAssessmentDraft() {
@@ -445,7 +459,9 @@ async function prefillFormIfEditing() {
         form.achieved.value = linesToArray(data.achieved).join("\n");
         form.merit.value = linesToArray(data.merit).join("\n");
         form.excellence.value = linesToArray(data.excellence).join("\n");
-        renderAchievedChecklistPreview(linesToArray(data.achieved));
+        renderRequirementChecklistPreview("achieved", linesToArray(data.achieved));
+        renderRequirementChecklistPreview("merit", linesToArray(data.merit));
+        renderRequirementChecklistPreview("excellence", linesToArray(data.excellence));
         form.submissionRequirements.value = linesToArray(data.submission_requirements).join("\n");
         form.relevantImplications.value = linesToArray(data.relevant_implications).join("\n");
         form.progressLogging.value = linesToArray(data.progress_logging).join("\n");
@@ -467,7 +483,9 @@ window.addEventListener("DOMContentLoaded", async () => {
     await loadAssessmentStandardsOptions();
     renderStandardChips();
     renderAuthStatus();
-    renderAchievedChecklistPreview(parseRequirementChecklistItems(form?.achieved?.value || ""));
+    renderRequirementChecklistPreview("achieved", parseRequirementChecklistItems(form?.achieved?.value || ""));
+    renderRequirementChecklistPreview("merit", parseRequirementChecklistItems(form?.merit?.value || ""));
+    renderRequirementChecklistPreview("excellence", parseRequirementChecklistItems(form?.excellence?.value || ""));
 });
 
 if (standardLibraryAdd) {
@@ -630,7 +648,9 @@ async function handleClearDraftClick() {
 
     form.reset();
     setStandardLines([]);
-    renderAchievedChecklistPreview([]);
+    renderRequirementChecklistPreview("achieved", []);
+    renderRequirementChecklistPreview("merit", []);
+    renderRequirementChecklistPreview("excellence", []);
 
     if (getEditingAssessmentId()) {
         await prefillFormIfEditing();
@@ -667,15 +687,17 @@ if (form) {
             if (form.achieved) {
                 form.achieved.value = payload.achieved.join("\n");
                 autoResizeTextarea(form.achieved);
-                renderAchievedChecklistPreview(payload.achieved);
+                renderRequirementChecklistPreview("achieved", payload.achieved);
             }
             if (form.merit) {
                 form.merit.value = payload.merit.join("\n");
                 autoResizeTextarea(form.merit);
+                renderRequirementChecklistPreview("merit", payload.merit);
             }
             if (form.excellence) {
                 form.excellence.value = payload.excellence.join("\n");
                 autoResizeTextarea(form.excellence);
+                renderRequirementChecklistPreview("excellence", payload.excellence);
             }
             
             // Upload images if any
