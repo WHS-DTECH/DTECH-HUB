@@ -5219,7 +5219,13 @@ app.post("/api/integrations/trello/connect", async (req, res) => {
     });
   } catch (error) {
     const status = Number(error?.status) || 400;
-    res.status(status === 401 ? 400 : status).json({ error: error.message || "Could not connect Trello account" });
+    const safeStatus = status === 401 ? 400 : status;
+    const baseMessage = String(error?.message || "Could not connect Trello account");
+    const errorMessage = status === 401
+      ? `${baseMessage} Generate a token using this app's key and try again.`
+      : baseMessage;
+
+    res.status(safeStatus).json({ error: errorMessage });
   }
 });
 

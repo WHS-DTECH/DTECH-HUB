@@ -31,6 +31,7 @@
     const trelloConnectBtn = document.querySelector("#trello-connect-btn");
     const trelloDisconnectBtn = document.querySelector("#trello-disconnect-btn");
     const trelloRefreshBoardsBtn = document.querySelector("#trello-refresh-boards-btn");
+    const trelloManualGenerateBtn = document.querySelector("#trello-manual-generate-btn");
     const trelloManualTokenInput = document.querySelector("#trello-manual-token");
     const trelloManualConnectBtn = document.querySelector("#trello-manual-connect-btn");
     const csvLinksCardEl = csvLinksEl ? csvLinksEl.closest(".profile-card") : null;
@@ -940,6 +941,32 @@
             };
         }
 
+        if (trelloManualGenerateBtn) {
+            trelloManualGenerateBtn.onclick = async () => {
+                trelloManualGenerateBtn.disabled = true;
+                try {
+                    const config = await fetchTrelloJson("/api/integrations/trello/config");
+                    if (!config?.enabled || !config?.api_key) {
+                        throw new Error("Trello integration is not configured on the server yet.");
+                    }
+
+                    const authorizeUrl = new URL("https://trello.com/1/authorize");
+                    authorizeUrl.searchParams.set("expiration", "never");
+                    authorizeUrl.searchParams.set("name", "DTECH-HUB");
+                    authorizeUrl.searchParams.set("scope", "read,write");
+                    authorizeUrl.searchParams.set("response_type", "token");
+                    authorizeUrl.searchParams.set("key", String(config.api_key));
+
+                    window.open(authorizeUrl.toString(), "_blank", "noopener,noreferrer");
+                    setTrelloConnectionMessage("Token page opened", "Approve access, copy token from Trello, then paste it here.", "");
+                } catch (error) {
+                    setTrelloConnectionMessage("Could not open token generator", error.message || "Try again.", "error");
+                } finally {
+                    trelloManualGenerateBtn.disabled = false;
+                }
+            };
+        }
+
         if (trelloManualConnectBtn) {
             trelloManualConnectBtn.onclick = async () => {
                 const token = String(trelloManualTokenInput?.value || "").trim();
@@ -953,7 +980,11 @@
                     setTrelloConnectionMessage("Connecting Trello", "Validating and saving Trello token...", "");
                     await connectTrelloWithToken(email, token);
                 } catch (error) {
-                    setTrelloConnectionMessage("Could not connect Trello", error.message || "Try again.", "error");
+                    const message = String(error?.message || "Try again.");
+                    const withHint = /401|unauthor|invalid token|token/i.test(message)
+                        ? `${message} Use Generate DTECH Token so the token matches this app key.`
+                        : message;
+                    setTrelloConnectionMessage("Could not connect Trello", withHint, "error");
                 } finally {
                     trelloManualConnectBtn.disabled = false;
                 }
