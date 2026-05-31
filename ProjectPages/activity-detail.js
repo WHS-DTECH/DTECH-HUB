@@ -635,6 +635,21 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
     const stripStepLevel = (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim();
 
     let showTaskDetail = () => {};
+    const openTaskTopicCard = ({ text, topicIndex }) => {
+        const safeText = String(text || "").trim();
+        if (!safeText) {
+            return;
+        }
+
+        const nextUrl = new URL(window.location.href);
+        nextUrl.searchParams.set("id", String(projectId || ""));
+        nextUrl.searchParams.set("taskTopic", safeText);
+        if (Number.isFinite(Number(topicIndex)) && Number(topicIndex) > 0) {
+            nextUrl.searchParams.set("taskTopicIndex", String(topicIndex));
+        }
+
+        window.location.href = `${nextUrl.pathname}${nextUrl.search}`;
+    };
 
     const renderStepRows = (rowsHost, standardCode, levelFilter = "") => {
         const steps = Array.isArray(state[standardCode]) ? state[standardCode] : [];
@@ -679,10 +694,9 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
             input.placeholder = levelFilter ? `Add ${levelFilter.toLowerCase()} task` : "Add a task item";
             input.title = levelFilter ? stripStepLevel(step?.text) : String(step?.text || "");
             input.addEventListener("click", () => {
-                showTaskDetail({
-                    standardCode,
-                    level: levelFilter || getStepLevel(step?.text),
-                    text: levelFilter ? stripStepLevel(step?.text) : String(step?.text || "")
+                openTaskTopicCard({
+                    text: levelFilter ? stripStepLevel(step?.text) : String(step?.text || ""),
+                    topicIndex: index + 1
                 });
             });
             input.addEventListener("input", () => {
