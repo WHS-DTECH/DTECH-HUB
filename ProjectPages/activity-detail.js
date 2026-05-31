@@ -1474,6 +1474,24 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         }
         return coerceArray(data?.assessmentFocus ?? data?.assessment_focus ?? data?.assessmentFocusRaw);
     })();
+    const submissionRequirements = coerceArray(data?.submissionRequirements)
+        .map((line) => String(line || "").trim())
+        .filter(Boolean);
+    const relevantImplicationNotes = coerceArray(data?.relevantImplications)
+        .map((line) => String(line || "").trim())
+        .filter(Boolean);
+    const isRelevantImplicationsTopic = taskTopicTitle.toLowerCase().includes("relevant implication");
+    const submissionTaskItems = Array.from(new Set([
+        ...(isRelevantImplicationsTopic
+            ? ["Written evidence that explains your relevant implications and justifies your design decisions."]
+            : []),
+        ...submissionRequirements
+    ]));
+    if (!submissionTaskItems.length) {
+        submissionTaskItems.push("Upload evidence that clearly demonstrates completion of this task topic.");
+    }
+
+    host.classList.toggle("task-topic-screen", isTaskTopicView);
 
     host.innerHTML = `
         <header class="toolbar">
@@ -1503,101 +1521,124 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
 
         ${
             isTaskTopicView ? `
-            <section class="proposal-section task-topic-card-basics">
-                <h2>Card Basics</h2>
-                <div class="task-topic-card-grid">
-                    <div class="task-topic-card-field">
-                        <span class="task-topic-card-label">Card Name</span>
-                        <p class="task-topic-card-value">${escapeHtml(displayTitle)}</p>
-                    </div>
-                    <div class="task-topic-card-field">
-                        <span class="task-topic-card-label">Year Level</span>
-                        <p class="task-topic-card-value">Senior</p>
-                    </div>
-                    <div class="task-topic-card-field">
-                        <span class="task-topic-card-label">Card Category</span>
-                        <p class="task-topic-card-value">Task Topic</p>
-                    </div>
-                    <div class="task-topic-card-field">
-                        <span class="task-topic-card-label">Subject Stream</span>
-                        <p class="task-topic-card-value">DTECH</p>
-                    </div>
-                    <div class="task-topic-card-field">
-                        <span class="task-topic-card-label">Topic Type</span>
-                        <p class="task-topic-card-value">Process</p>
-                    </div>
-                    <div class="task-topic-card-field">
-                        <span class="task-topic-card-label">Difficulty</span>
-                        <p class="task-topic-card-value">Intermediate</p>
-                    </div>
-                    <div class="task-topic-card-field task-topic-card-field-full">
-                        <span class="task-topic-card-label">Card URL</span>
-                        <p class="task-topic-card-value"><a href="${escapeHtml(standardTaskTopicUrl)}" target="_blank" rel="noreferrer">${escapeHtml(standardTaskTopicUrl)}</a></p>
-                    </div>
-                    <div class="task-topic-card-field task-topic-card-field-full">
-                        <span class="task-topic-card-label">Short Description</span>
-                        <p class="task-topic-card-value">${escapeHtml(taskTopicTitle)}</p>
-                    </div>
-                </div>
-            </section>
+            <div class="task-topic-detail-layout">
+                <div class="task-topic-detail-main">
+                    <section class="proposal-section task-topic-card-basics">
+                        <h2>Card Basics</h2>
+                        <div class="task-topic-card-grid">
+                            <div class="task-topic-card-field">
+                                <span class="task-topic-card-label">Card Name</span>
+                                <p class="task-topic-card-value">${escapeHtml(displayTitle)}</p>
+                            </div>
+                            <div class="task-topic-card-field">
+                                <span class="task-topic-card-label">Year Level</span>
+                                <p class="task-topic-card-value">Senior</p>
+                            </div>
+                            <div class="task-topic-card-field">
+                                <span class="task-topic-card-label">Card Category</span>
+                                <p class="task-topic-card-value">Task Topic</p>
+                            </div>
+                            <div class="task-topic-card-field">
+                                <span class="task-topic-card-label">Subject Stream</span>
+                                <p class="task-topic-card-value">DTECH</p>
+                            </div>
+                            <div class="task-topic-card-field">
+                                <span class="task-topic-card-label">Topic Type</span>
+                                <p class="task-topic-card-value">Process</p>
+                            </div>
+                            <div class="task-topic-card-field">
+                                <span class="task-topic-card-label">Difficulty</span>
+                                <p class="task-topic-card-value">Intermediate</p>
+                            </div>
+                            <div class="task-topic-card-field task-topic-card-field-full">
+                                <span class="task-topic-card-label">Card URL</span>
+                                <p class="task-topic-card-value"><a href="${escapeHtml(standardTaskTopicUrl)}" target="_blank" rel="noreferrer">${escapeHtml(standardTaskTopicUrl)}</a></p>
+                            </div>
+                            <div class="task-topic-card-field task-topic-card-field-full">
+                                <span class="task-topic-card-label">Short Description</span>
+                                <p class="task-topic-card-value">${escapeHtml(taskTopicTitle)}</p>
+                            </div>
+                        </div>
+                    </section>
 
-            ${showMergedTaskTopicLayout ? `
-            <section class="proposal-section task-topic-merged-overview">
-                <div class="task-topic-merged-grid">
-                    <article class="task-topic-merged-column task-topic-standards-panel">
+                    ${showMergedTaskTopicLayout ? `
+                    <section class="proposal-section task-topic-merged-overview">
+                        <div class="task-topic-merged-grid">
+                            <article class="task-topic-merged-column task-topic-standards-panel">
+                                <h2>Standard Details</h2>
+                                ${taskTopicStandardDetails.length
+                                    ? `<div class="task-topic-standard-list task-topic-standard-list-prominent">${taskTopicStandardDetails.map((line) => `<span class="task-topic-standard-chip task-topic-standard-chip-prominent">${escapeHtml(line)}</span>`).join("")}</div>`
+                                    : `<p class="task-topic-card-value">No standards linked.</p>`
+                                }
+                            </article>
+                            <article class="task-topic-merged-column task-topic-merged-links-panel">
+                                <h2>Merged Task Topic Cards</h2>
+                                <p class="task-topic-merged-links-subtitle">Open each merged card from its level.</p>
+                                <ul class="task-topic-merged-links-list">
+                                    ${mergedTaskTopicLinks.map((entry) => `
+                                        <li class="task-topic-merged-link-item">
+                                            ${entry.isCurrent
+                                                ? `<span class="task-topic-merged-link current">${escapeHtml(entry.topicText)}</span>`
+                                                : `<a class="task-topic-merged-link" href="${escapeHtml(entry.href)}">${escapeHtml(entry.topicText)}</a>`
+                                            }
+                                            <div class="task-topic-merged-pills">
+                                                <span class="task-topic-merged-level">${escapeHtml(entry.levelLabel)}</span>
+                                                ${mergedStandardNumber ? `<span class="task-topic-merged-standard">${escapeHtml(mergedStandardNumber)}</span>` : ""}
+                                            </div>
+                                        </li>
+                                    `).join("")}
+                                </ul>
+                            </article>
+                        </div>
+                    </section>
+                    ` : `
+                    <section class="proposal-section task-topic-standards-panel">
                         <h2>Standard Details</h2>
                         ${taskTopicStandardDetails.length
                             ? `<div class="task-topic-standard-list task-topic-standard-list-prominent">${taskTopicStandardDetails.map((line) => `<span class="task-topic-standard-chip task-topic-standard-chip-prominent">${escapeHtml(line)}</span>`).join("")}</div>`
                             : `<p class="task-topic-card-value">No standards linked.</p>`
                         }
-                    </article>
-                    <article class="task-topic-merged-column task-topic-merged-links-panel">
-                        <h2>Merged Task Topic Cards</h2>
-                        <p class="task-topic-merged-links-subtitle">Open each merged card from its level.</p>
-                        <ul class="task-topic-merged-links-list">
-                            ${mergedTaskTopicLinks.map((entry) => `
-                                <li class="task-topic-merged-link-item">
-                                    ${entry.isCurrent
-                                        ? `<span class="task-topic-merged-link current">${escapeHtml(entry.topicText)}</span>`
-                                        : `<a class="task-topic-merged-link" href="${escapeHtml(entry.href)}">${escapeHtml(entry.topicText)}</a>`
-                                    }
-                                    <div class="task-topic-merged-pills">
-                                        <span class="task-topic-merged-level">${escapeHtml(entry.levelLabel)}</span>
-                                        ${mergedStandardNumber ? `<span class="task-topic-merged-standard">${escapeHtml(mergedStandardNumber)}</span>` : ""}
-                                    </div>
-                                </li>
-                            `).join("")}
-                        </ul>
-                    </article>
-                </div>
-            </section>
-            ` : `
-            <section class="proposal-section task-topic-standards-panel">
-                <h2>Standard Details</h2>
-                ${taskTopicStandardDetails.length
-                    ? `<div class="task-topic-standard-list task-topic-standard-list-prominent">${taskTopicStandardDetails.map((line) => `<span class="task-topic-standard-chip task-topic-standard-chip-prominent">${escapeHtml(line)}</span>`).join("")}</div>`
-                    : `<p class="task-topic-card-value">No standards linked.</p>`
-                }
-            </section>
-            `}
+                    </section>
+                    `}
 
-            <section class="proposal-section task-topic-display-options">
-                <h2>Display Options</h2>
-                <div class="task-topic-display-grid">
-                    <div class="task-topic-card-field task-topic-card-field-full">
-                        <span class="task-topic-card-label">Card Colour</span>
-                        <p class="task-topic-card-value">Azure</p>
-                    </div>
-                    <div class="task-topic-display-check">
-                        <span class="task-topic-check-box" aria-hidden="true"></span>
-                        <span>Time Sensitive</span>
-                    </div>
-                    <div class="task-topic-display-check is-checked">
-                        <span class="task-topic-check-box" aria-hidden="true">✓</span>
-                        <span>Show In This Week Section</span>
-                    </div>
+                    <section class="proposal-section task-topic-display-options">
+                        <h2>Display Options</h2>
+                        <div class="task-topic-display-grid">
+                            <div class="task-topic-card-field task-topic-card-field-full">
+                                <span class="task-topic-card-label">Card Colour</span>
+                                <p class="task-topic-card-value">Azure</p>
+                            </div>
+                            <div class="task-topic-display-check">
+                                <span class="task-topic-check-box" aria-hidden="true"></span>
+                                <span>Time Sensitive</span>
+                            </div>
+                            <div class="task-topic-display-check is-checked">
+                                <span class="task-topic-check-box" aria-hidden="true">✓</span>
+                                <span>Show In This Week Section</span>
+                            </div>
+                        </div>
+                    </section>
                 </div>
-            </section>
+
+                <aside class="task-topic-submission-column">
+                    <section class="proposal-section task-topic-submission-panel">
+                        <h2>Submission Tasks</h2>
+                        <p class="task-topic-submission-intro">Students submit evidence here to show they have completed this task topic.</p>
+                        <div class="task-topic-submission-evidence-type">
+                            <span class="task-topic-card-label">Primary Evidence Type</span>
+                            <p class="task-topic-card-value">${isRelevantImplicationsTopic ? "Written Evidence" : "Evidence Upload"}</p>
+                        </div>
+                        <ul class="list task-topic-submission-list">${renderList(submissionTaskItems)}</ul>
+                    </section>
+
+                    ${relevantImplicationNotes.length ? `
+                    <section class="proposal-section task-topic-submission-panel">
+                        <h2>Relevant Implications Focus</h2>
+                        <ul class="list task-topic-submission-list">${renderList(relevantImplicationNotes)}</ul>
+                    </section>
+                    ` : ""}
+                </aside>
+            </div>
             ` : ""
         }
 
