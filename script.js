@@ -2346,7 +2346,7 @@ function createProjectCard(project, options = {}) {
         mergeToggle.type = "button";
         mergeToggle.className = `task-topic-merge-toggle${isSelected ? " is-selected" : ""}`;
         mergeToggle.setAttribute("aria-label", isSelected ? "Unselect Task Topic" : "Select Task Topic for merge");
-        mergeToggle.textContent = isSelected ? "✓" : "";
+        mergeToggle.textContent = isSelected ? "✓" : "□";
         mergeToggle.addEventListener("click", (event) => {
             event.preventDefault();
             event.stopPropagation();
