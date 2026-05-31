@@ -563,6 +563,47 @@ function setTaskTopicMergePreference(projectId, topics, shouldMerge) {
     writeTaskTopicMergePrefs(allPrefs);
 }
 
+function clearTaskTopicMergePreference(projectId, topics) {
+    const safeProjectId = String(projectId || "").trim();
+    const safeTopics = normalizeTaskTopicList(topics);
+    if (!safeProjectId || !safeTopics.length) {
+        return;
+    }
+
+    const selectedTopicKeys = new Set(safeTopics.map((topic) => topic.toLowerCase()));
+    const allPrefs = readTaskTopicMergePrefs();
+    const projectPrefs = allPrefs[safeProjectId] && typeof allPrefs[safeProjectId] === "object" ? allPrefs[safeProjectId] : {};
+    let changed = false;
+
+    Object.keys(projectPrefs).forEach((signature) => {
+        const signatureTopics = String(signature || "")
+            .split("||")
+            .map((value) => String(value || "").trim().toLowerCase())
+            .filter(Boolean);
+        if (!signatureTopics.length) {
+            return;
+        }
+
+        const containsAllSelected = Array.from(selectedTopicKeys.values()).every((key) => signatureTopics.includes(key));
+        if (containsAllSelected) {
+            delete projectPrefs[signature];
+            changed = true;
+        }
+    });
+
+    if (!changed) {
+        return;
+    }
+
+    if (Object.keys(projectPrefs).length) {
+        allPrefs[safeProjectId] = projectPrefs;
+    } else {
+        delete allPrefs[safeProjectId];
+    }
+
+    writeTaskTopicMergePrefs(allPrefs);
+}
+
 function extractTaskTopicQualifier(topicText) {
     const words = String(topicText || "")
         .trim()
@@ -2141,6 +2182,44 @@ function mergeSelectedTaskTopicCards(visibleTaskTopics) {
     applyCompactCardLayout();
 }
 
+function unmergeSelectedTaskTopicCards(visibleTaskTopics) {
+    const topics = getVisibleTaskTopicItems(visibleTaskTopics);
+    const selectedItems = topics.filter((item) => taskTopicMergeSelection.has(String(item.id || "")));
+
+    if (!selectedItems.length) {
+        window.alert("Select at least one Task Topic card to unmerge.");
+        return;
+    }
+
+    const assessmentIds = new Set(selectedItems.map((item) => String(item.parentAssessmentId || "").trim()).filter(Boolean));
+    if (assessmentIds.size !== 1) {
+        window.alert("Please select Task Topic cards from the same Assessment Task.");
+        return;
+    }
+
+    const parentAssessmentId = Array.from(assessmentIds.values())[0];
+    const uniqueTopics = normalizeTaskTopicList(selectedItems.map((item) => item.taskTopicText));
+    if (!uniqueTopics.length) {
+        return;
+    }
+
+    const confirmed = typeof window.confirm === "function"
+        ? window.confirm(`Unmerge ${uniqueTopics.length} selected Task Topic card${uniqueTopics.length === 1 ? "" : "s"}?`)
+        : true;
+    if (!confirmed) {
+        return;
+    }
+
+    uniqueTopics.forEach((topicText) => {
+        setStoredTaskTopicShortName(parentAssessmentId, topicText, "");
+    });
+
+    clearTaskTopicMergePreference(parentAssessmentId, uniqueTopics);
+    clearTaskTopicMergeSelection();
+    renderLibrary();
+    applyCompactCardLayout();
+}
+
 function renderTaskTopicMergeToolbar(visibleProjects) {
     if (!libraryGrid) {
         return;
@@ -2165,12 +2244,17 @@ function renderTaskTopicMergeToolbar(visibleProjects) {
         <div class="task-topic-merge-toolbar-actions">
             <span class="task-topic-merge-count">${selectedCount} selected</span>
             <button type="button" class="task-topic-merge-btn" ${selectedCount < 2 ? "disabled" : ""}>Merge Selected</button>
+            <button type="button" class="task-topic-unmerge-btn" ${selectedCount < 1 ? "disabled" : ""}>Unmerge Selected</button>
             <button type="button" class="task-topic-merge-clear">Clear</button>
         </div>
     `;
 
     toolbar.querySelector(".task-topic-merge-btn")?.addEventListener("click", () => {
         mergeSelectedTaskTopicCards(visibleTaskTopics);
+    });
+
+    toolbar.querySelector(".task-topic-unmerge-btn")?.addEventListener("click", () => {
+        unmergeSelectedTaskTopicCards(visibleTaskTopics);
     });
 
     toolbar.querySelector(".task-topic-merge-clear")?.addEventListener("click", () => {

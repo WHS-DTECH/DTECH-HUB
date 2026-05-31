@@ -1097,6 +1097,7 @@ body.public-home-access .controls-panel {
 }
 
 .task-topic-merge-btn,
+.task-topic-unmerge-btn,
 .task-topic-merge-clear {
     border: 1px solid #b6cbe2;
     border-radius: 8px;
@@ -1113,6 +1114,17 @@ body.public-home-access .controls-panel {
 }
 
 .task-topic-merge-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.task-topic-unmerge-btn {
+    background: #ffffff;
+    border-color: #d4bec0;
+    color: #8c3c43;
+}
+
+.task-topic-unmerge-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
