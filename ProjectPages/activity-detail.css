@@ -333,6 +333,11 @@ h1 {
     border-color: #c9d9ed;
 }
 
+.task-topic-standards-panel {
+    background: #f8fbff;
+    border-color: #c9d9ed;
+}
+
 .task-topic-card-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(180px, 1fr));
@@ -442,6 +447,18 @@ h1 {
     font-size: 0.74rem;
     color: #244a72;
     background: #eef5fc;
+}
+
+.task-topic-standard-list-prominent {
+    padding: 2px 0;
+}
+
+.task-topic-standard-chip-prominent {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    border-color: #a9c5e2;
+    background: #e8f2fc;
 }
 
 .task-topic-standard-remove {

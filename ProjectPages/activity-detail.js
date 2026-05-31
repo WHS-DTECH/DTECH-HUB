@@ -1316,13 +1316,6 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "") {
                         <p class="task-topic-card-value">Intermediate</p>
                     </div>
                     <div class="task-topic-card-field task-topic-card-field-full">
-                        <span class="task-topic-card-label">Standard Details</span>
-                        ${taskTopicStandardDetails.length
-                            ? `<div class="task-topic-standard-list">${taskTopicStandardDetails.map((line) => `<span class="task-topic-standard-chip">${escapeHtml(line)}</span>`).join("")}</div>`
-                            : `<p class="task-topic-card-value">No standards linked.</p>`
-                        }
-                    </div>
-                    <div class="task-topic-card-field task-topic-card-field-full">
                         <span class="task-topic-card-label">Card URL</span>
                         <p class="task-topic-card-value"><a href="${escapeHtml(standardTaskTopicUrl)}" target="_blank" rel="noreferrer">${escapeHtml(standardTaskTopicUrl)}</a></p>
                     </div>
@@ -1331,6 +1324,14 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "") {
                         <p class="task-topic-card-value">${escapeHtml(taskTopicTitle)}</p>
                     </div>
                 </div>
+            </section>
+
+            <section class="proposal-section task-topic-standards-panel">
+                <h2>Standard Details</h2>
+                ${taskTopicStandardDetails.length
+                    ? `<div class="task-topic-standard-list task-topic-standard-list-prominent">${taskTopicStandardDetails.map((line) => `<span class="task-topic-standard-chip task-topic-standard-chip-prominent">${escapeHtml(line)}</span>`).join("")}</div>`
+                    : `<p class="task-topic-card-value">No standards linked.</p>`
+                }
             </section>
 
             <section class="proposal-section task-topic-display-options">
