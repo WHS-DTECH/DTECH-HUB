@@ -2724,7 +2724,7 @@ async function syncDtechExcludedActivitiesVisibility() {
 
   await ensureActivityHubVisibilitySchema();
 
-  const result = await pool.query(`SELECT id, name, title, type, subject_stream, subject, description, summary, activity_category, category FROM activities`);
+  const result = await pool.query(`SELECT * FROM activities`);
   const excludedIds = (Array.isArray(result.rows) ? result.rows : [])
     .filter((row) => isExcludedNonDtechActivity(row))
     .map((row) => String(row?.id || "").trim())
