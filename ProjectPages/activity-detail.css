@@ -654,6 +654,36 @@ h1 {
     color: #b23a3a;
 }
 
+.evidence-task-detail {
+    margin: 0 0 12px;
+    padding: 10px;
+    border: 1px solid #cfdbeb;
+    border-radius: 10px;
+    background: #ffffff;
+}
+
+.evidence-task-detail h3 {
+    margin: 0 0 4px;
+    color: #1b4873;
+    font-size: 0.84rem;
+}
+
+.evidence-task-detail-meta {
+    margin: 0 0 6px;
+    font-size: 0.72rem;
+    color: #4a6a8a;
+    font-weight: 700;
+}
+
+.evidence-task-detail-text {
+    margin: 0;
+    font-size: 0.82rem;
+    color: #1f3550;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 .evidence-standard-list {
     display: grid;
     gap: 12px;
@@ -718,6 +748,7 @@ h1 {
     font-size: 0.8rem;
     color: #1f3550;
     background: #fff;
+    cursor: pointer;
 }
 
 .evidence-step-remove {

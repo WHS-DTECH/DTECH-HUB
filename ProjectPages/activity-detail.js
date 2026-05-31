@@ -634,6 +634,8 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
 
     const stripStepLevel = (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim();
 
+    let showTaskDetail = () => {};
+
     const renderStepRows = (rowsHost, standardCode, levelFilter = "") => {
         const steps = Array.isArray(state[standardCode]) ? state[standardCode] : [];
         rowsHost.innerHTML = "";
@@ -675,9 +677,23 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
             input.className = "evidence-step-input";
             input.value = levelFilter ? stripStepLevel(step?.text) : String(step?.text || "");
             input.placeholder = levelFilter ? `Add ${levelFilter.toLowerCase()} task` : "Add a task item";
+            input.title = levelFilter ? stripStepLevel(step?.text) : String(step?.text || "");
+            input.addEventListener("click", () => {
+                showTaskDetail({
+                    standardCode,
+                    level: levelFilter || getStepLevel(step?.text),
+                    text: levelFilter ? stripStepLevel(step?.text) : String(step?.text || "")
+                });
+            });
             input.addEventListener("input", () => {
                 const nextText = String(input.value || "").trim();
                 state[standardCode][index].text = levelFilter ? `${levelFilter}: ${nextText}` : nextText;
+                input.title = nextText;
+                showTaskDetail({
+                    standardCode,
+                    level: levelFilter || getStepLevel(state[standardCode][index].text),
+                    text: nextText
+                });
                 void persistState(sidebar.querySelector("#evidence-sidebar-status"));
             });
 
@@ -707,8 +723,31 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
         </header>
         <p class="evidence-sidebar-copy">Tracking for <strong>${escapeHtml(studentLabel)}</strong>. Tick each requirement when evidence is complete.</p>
         <p class="evidence-sidebar-status" id="evidence-sidebar-status" aria-live="polite"></p>
+        <section class="evidence-task-detail" id="evidence-task-detail" hidden>
+            <h3>Task Details</h3>
+            <p class="evidence-task-detail-meta" id="evidence-task-detail-meta"></p>
+            <p class="evidence-task-detail-text" id="evidence-task-detail-text"></p>
+        </section>
         <div class="evidence-standard-list" id="evidence-standard-list"></div>
     `;
+
+    const taskDetailHost = sidebar.querySelector("#evidence-task-detail");
+    const taskDetailMeta = sidebar.querySelector("#evidence-task-detail-meta");
+    const taskDetailText = sidebar.querySelector("#evidence-task-detail-text");
+
+    showTaskDetail = ({ standardCode, level, text }) => {
+        const safeText = String(text || "").trim();
+        if (!taskDetailHost || !taskDetailMeta || !taskDetailText || !safeText) {
+            return;
+        }
+
+        const levelText = String(level || "").trim();
+        taskDetailMeta.textContent = levelText
+            ? `Standard ${standardCode} • ${levelText}`
+            : `Standard ${standardCode}`;
+        taskDetailText.textContent = safeText;
+        taskDetailHost.hidden = false;
+    };
 
     const standardsHost = sidebar.querySelector("#evidence-standard-list");
     standards.forEach((code) => {
