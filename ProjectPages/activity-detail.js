@@ -1726,20 +1726,6 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         if (String(id).match(/^\d+$/)) {
             editButton.addEventListener("click", () => {
                 const category = String(data?.activityCategory || "").toLowerCase();
-                const hasProjectProposalFields = Boolean(
-                    data?.startDate ||
-                    data?.contactName ||
-                    data?.contactPhone ||
-                    data?.contactEmail ||
-                    data?.company ||
-                    data?.address ||
-                    data?.withdrawalDate ||
-                    data?.clientId ||
-                    (Array.isArray(data?.overview) && data.overview.length) ||
-                    (Array.isArray(data?.services) && data.services.length) ||
-                    (Array.isArray(data?.costs) && data.costs.length) ||
-                    (Array.isArray(data?.outcomes) && data.outcomes.length)
-                );
 
                 let targetPage = "../upload-activity.html";
                 if (isTaskTopicView) {
@@ -1748,7 +1734,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 }
                 if (category.includes("assessment")) {
                     targetPage = "../upload-assessment.html";
-                } else if (category.includes("project") || hasProjectProposalFields) {
+                } else if (category.includes("project")) {
                     targetPage = "../upload-project.html";
                 }
                 window.location.href = `${targetPage}?id=${encodeURIComponent(id)}`;

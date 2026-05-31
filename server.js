@@ -3352,7 +3352,7 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     subject_stream: String(body.subject_stream || body.subject || "").trim().toUpperCase(),
     card_color: (() => {
       const normalizedCategory = String(resolvedRequestedCategory || requestedActivityCategory || "").toLowerCase();
-      const fallbackColor = normalizedCategory.includes("assessment") ? "Slate" : "Rose";
+      const fallbackColor = normalizedCategory.includes("assessment") ? "Slate" : "Amber";
       return String(body.card_color || fallbackColor).trim() || fallbackColor;
     })(),
     card_url: String(body.card_url || "").trim(),

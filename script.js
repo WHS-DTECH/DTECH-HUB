@@ -803,7 +803,7 @@ async function loadSharedProjects() {
                 const imageUrl = isGeneratedUploadedActivityImageUrl(rawImageUrl) ? "" : rawImageUrl;
                 const showInThisWeek = Boolean(item.show_in_this_week ?? item.show_this_week ?? item.is_pinned ?? item.is_this_week);
                 const sourceType = inferSourceTypeFromRecord(item);
-                const defaultCardColor = sourceType === "assessment" ? "Slate" : "Rose";
+                const defaultCardColor = sourceType === "assessment" ? "Slate" : "Amber";
                 const taskTopics = collectTaskTopicsFromActivityRecord(item);
                 const standardDetails = normalizeStandardDetailsRows(item.standard_details);
 
@@ -2318,21 +2318,23 @@ function createProjectCard(project, options = {}) {
         enforceDetailAccess(event);
     });
 
+    const sourceType = inferSourceTypeFromRecord(project);
+    const visualPalette = sourceType === "activity" ? colorToPalette("amber") : project.visual.palette;
+
     // Extract year level from className
     const yearMatch = project.className.match(/Year\s+\d+|Junior|Middle|Senior/i);
     const yearLevel = yearMatch ? yearMatch[0] : project.className.split(" ")[0];
-    
+
     // Use image if available, otherwise use gradient background
     const hasImage = project.imageUrl && project.imageUrl.trim().length > 0;
-    const visualStyle = hasImage ? "" : `style="background: ${project.visual.palette};"`;
+    const visualStyle = hasImage ? "" : `style="background: ${visualPalette};"`;
     const visualContent = hasImage
         ? `<img src="${escapeHtml(project.imageUrl)}" alt="${escapeHtml(project.title)}" class="project-image" loading="lazy">`
         : `<span class="visual-mark">${project.visual.icon}</span>`;
 
-    const statusBadge = project.status 
-        ? `<span class="project-tag status-tag status-${project.status}">${formatStatus(project.status)}</span>` 
+    const statusBadge = project.status
+        ? `<span class="project-tag status-tag status-${project.status}">${formatStatus(project.status)}</span>`
         : '';
-    const sourceType = inferSourceTypeFromRecord(project);
     const showTaskTopicMergeToggle = options.context === "library"
         && sourceType === "task-topic"
         && isTaskTopicMergeModeEnabled()
@@ -2410,7 +2412,7 @@ function createProjectCard(project, options = {}) {
 
         if (imageElement && visualElement) {
             imageElement.addEventListener("error", () => {
-                visualElement.style.background = project.visual.palette;
+                visualElement.style.background = visualPalette;
                 visualElement.innerHTML = `<span class="visual-mark">${escapeHtml(project.visual.icon)}</span>`;
             }, { once: true });
         }
