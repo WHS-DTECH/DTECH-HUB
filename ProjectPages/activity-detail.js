@@ -1227,6 +1227,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "") {
     const cardUrl = toSafeExternalUrl(data?.cardUrl);
     const taskTopicTitle = String(selectedTaskTopic || "").trim();
     const isTaskTopicView = Boolean(taskTopicTitle);
+    const toolbarLabel = isTaskTopicView
+        ? "Task Topic Card"
+        : (isAssessmentTask ? "Assessment Task Details" : "Activity");
     const standardTaskTopicUrl = cardUrl || `${window.location.origin}/ProjectPages/custom-activity.html?id=${encodeURIComponent(String(id || ""))}`;
     const displayTitle = taskTopicTitle || data.title;
     const displaySummary = taskTopicTitle
@@ -1242,7 +1245,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "") {
 
     host.innerHTML = `
         <header class="toolbar">
-            <span class="toolbar-label">${isAssessmentTask ? "Assessment Task Details" : "Activity"}</span>
+            <span class="toolbar-label">${toolbarLabel}</span>
             <div class="toolbar-actions">
                 ${canEdit ? '<button type="button" class="detail-action" id="detail-edit-button">Edit Details</button>' : ""}
                 ${canEdit ? '<button type="button" class="detail-action detail-action-danger" id="detail-delete-button">Delete</button>' : ""}
