@@ -688,9 +688,6 @@ function inferSourceTypeFromRecord(record) {
     if (category.includes("project")) {
         return "project";
     }
-    if (category === "activity" || category.includes("skill activity") || category.includes("practice")) {
-        return "activity";
-    }
 
     const hasLessonFields = Boolean(
         record?.lesson_title ||
@@ -702,6 +699,26 @@ function inferSourceTypeFromRecord(record) {
 
     if (hasLessonFields) {
         return "lesson";
+    }
+
+    const hasProjectFields = [
+        record?.start_date,
+        record?.startDate,
+        record?.contact_name,
+        record?.contactName,
+        record?.contact_email,
+        record?.contactEmail,
+        record?.company,
+        record?.address,
+        record?.overview,
+        record?.services,
+        record?.costs,
+        record?.outcomes
+    ].some((value) => hasMeaningfulValue(value));
+
+    const hasExplicitActivityCategory = category === "activity" || category.includes("skill activity") || category.includes("practice");
+    if (hasExplicitActivityCategory) {
+        return hasProjectFields ? "project" : "activity";
     }
 
     const hasMeaningfulValue = (value) => {
@@ -749,21 +766,6 @@ function inferSourceTypeFromRecord(record) {
     if (/\bassessment\b/.test(assessmentText)) {
         return "assessment";
     }
-
-    const hasProjectFields = [
-        record?.start_date,
-        record?.startDate,
-        record?.contact_name,
-        record?.contactName,
-        record?.contact_email,
-        record?.contactEmail,
-        record?.company,
-        record?.address,
-        record?.overview,
-        record?.services,
-        record?.costs,
-        record?.outcomes
-    ].some((value) => hasMeaningfulValue(value));
 
     return hasProjectFields ? "project" : "activity";
 }
