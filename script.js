@@ -1013,8 +1013,8 @@ function mapLabProjectToLibraryItem(project) {
         title: project.title,
         className: project.className,
         area: "Lab Project",
-        sourceType: "project",
-        activityCategory: `Project ${project.projectPhase}`,
+        sourceType: "activity",
+        activityCategory: "Activity",
         showThisWeek: Boolean(project.showThisWeek),
         status: project.status,
         term: project.term,
@@ -1022,9 +1022,9 @@ function mapLabProjectToLibraryItem(project) {
         href: project.href,
         external: project.external,
         summary: project.summary,
-        keywords: [...(Array.isArray(project.keywords) ? project.keywords : []), "project", "lab project"],
+        keywords: [...(Array.isArray(project.keywords) ? project.keywords : []), "activity", "lab project"],
         visual: project.visual,
-        linkLabel: "Open project"
+        linkLabel: "Open activity"
     };
 }
 
@@ -2446,7 +2446,7 @@ function createLabProjectCard(project) {
                 <span class="project-tag">${escapeHtml(project.term)}</span>
             </div>
             <div class="project-footer">
-                <span class="project-meta">Project</span>
+                <span class="project-meta">Activity</span>
             </div>
         </div>
     `;
