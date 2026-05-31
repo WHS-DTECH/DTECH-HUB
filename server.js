@@ -33,6 +33,7 @@ const STUDENT_TABLE_CANDIDATES = ["student_details_upload", "student_upload", "s
 const TEACHER_TIMETABLE_TABLE_CANDIDATES = ["kamar_timetable", "upload_timetable", "timetable", "teacher_timetable"];
 const SCHOOL_EMAIL_DOMAIN = "westlandhigh.school.nz";
 const DTECH_HUB_NAME = "DTECH-HUB";
+const SEWING_ROOM_HUB_NAME = "SEWING-ROOM-HUB";
 const NZQA_BASE_URL = "https://www.nzqa.govt.nz";
 const NZQA_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const nzqaStandardsCache = new Map();
@@ -2717,7 +2718,26 @@ async function ensureSchema() {
 }
 
 async function syncDtechExcludedActivitiesVisibility() {
-  return;
+  if (!hasDatabase) {
+    return 0;
+  }
+
+  await ensureActivityHubVisibilitySchema();
+
+  const result = await pool.query(`SELECT id, name, title, type, subject_stream, subject, description, summary, activity_category, category FROM activities`);
+  const excludedIds = (Array.isArray(result.rows) ? result.rows : [])
+    .filter((row) => isExcludedNonDtechActivity(row))
+    .map((row) => String(row?.id || "").trim())
+    .filter(Boolean);
+
+  if (!excludedIds.length) {
+    return 0;
+  }
+
+  await upsertHubVisibility(excludedIds, DTECH_HUB_NAME, false);
+  await upsertHubVisibility(excludedIds, SEWING_ROOM_HUB_NAME, true);
+
+  return excludedIds.length;
 }
 
 app.use(express.json({ limit: "8mb" }));
