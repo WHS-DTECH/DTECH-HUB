@@ -385,6 +385,90 @@ h1 {
     margin: 0;
 }
 
+.task-topic-submission-live-panel {
+    margin-top: 10px;
+    display: grid;
+    gap: 10px;
+}
+
+.task-topic-submission-note {
+    margin: 0;
+    border: 1px dashed #d3b77f;
+    border-radius: 8px;
+    background: #fff5df;
+    color: #5b4420;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    padding: 10px;
+}
+
+.task-topic-submission-form {
+    display: grid;
+    gap: 8px;
+}
+
+.task-topic-submission-label {
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #6a5228;
+}
+
+.task-topic-submission-input {
+    width: 100%;
+    border: 1px solid #d9be88;
+    border-radius: 8px;
+    background: #fffdf9;
+    color: #2e2311;
+    font: inherit;
+    font-size: 0.82rem;
+    padding: 8px 10px;
+    box-sizing: border-box;
+}
+
+.task-topic-submission-textarea {
+    min-height: 110px;
+    resize: vertical;
+}
+
+.task-topic-submission-file-name {
+    margin: -2px 0 0;
+    font-size: 0.75rem;
+    color: #6b5735;
+}
+
+.task-topic-submission-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.task-topic-submission-status {
+    margin: 0;
+    min-height: 1em;
+    font-size: 0.76rem;
+    color: #4a6f22;
+}
+
+.task-topic-submission-status.is-error {
+    color: #9b2f2f;
+}
+
+.task-topic-submission-meta {
+    border: 1px solid #e1c790;
+    border-radius: 8px;
+    background: #fff6e5;
+    padding: 8px 10px;
+    display: grid;
+    gap: 4px;
+}
+
+.task-topic-submission-meta p {
+    margin: 0;
+    font-size: 0.78rem;
+    color: #5b4520;
+}
+
 .task-topic-standards-panel {
     background: #f8fbff;
     border-color: #c9d9ed;

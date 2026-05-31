@@ -551,6 +551,258 @@ async function saveEvidenceRows(projectId, studentEmail, rows) {
     }
 }
 
+function buildTaskTopicSubmissionStandardKey(taskTopicTitle, standardNumber = "") {
+    const topicSlug = normalizeTaskTopicText(taskTopicTitle)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+    const standardSlug = String(standardNumber || "task-topic")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+
+    return `task-topic:${standardSlug || "task-topic"}:${topicSlug || "topic"}`;
+}
+
+function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
+    const normalizedRows = normalizeEvidenceSteps(rows);
+    const source = normalizedRows.find((row) => String(row?.standard || "").trim() === standardKey);
+    const result = {
+        writtenEvidence: "",
+        evidenceLink: "",
+        fileName: "",
+        submittedAt: "",
+        reviewStatus: "pending"
+    };
+
+    if (!source || !Array.isArray(source.steps)) {
+        return result;
+    }
+
+    source.steps.forEach((step) => {
+        const text = String(step?.text || "").trim();
+        if (!text) {
+            return;
+        }
+
+        if (text.startsWith("WRITTEN|")) {
+            result.writtenEvidence = text.slice("WRITTEN|".length).trim();
+            return;
+        }
+
+        if (text.startsWith("LINK|")) {
+            result.evidenceLink = text.slice("LINK|".length).trim();
+            return;
+        }
+
+        if (text.startsWith("FILE|")) {
+            result.fileName = text.slice("FILE|".length).trim();
+            return;
+        }
+
+        if (text.startsWith("SUBMITTED_AT|")) {
+            result.submittedAt = text.slice("SUBMITTED_AT|".length).trim();
+            return;
+        }
+
+        if (text.startsWith("REVIEW|")) {
+            const status = text.slice("REVIEW|".length).trim().toLowerCase();
+            result.reviewStatus = status === "reviewed" ? "reviewed" : "pending";
+        }
+    });
+
+    return result;
+}
+
+function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
+    const sourceRows = normalizeEvidenceSteps(rows).filter(
+        (row) => String(row?.standard || "").trim() !== standardKey
+    );
+
+    const writtenEvidence = String(payload?.writtenEvidence || "").trim();
+    const evidenceLink = toSafeExternalUrl(payload?.evidenceLink);
+    const fileName = String(payload?.fileName || "").trim();
+    const submittedAt = String(payload?.submittedAt || "").trim();
+    const reviewStatus = String(payload?.reviewStatus || "").trim().toLowerCase() === "reviewed"
+        ? "reviewed"
+        : "pending";
+
+    const steps = [];
+    if (writtenEvidence) {
+        steps.push({ text: `WRITTEN|${writtenEvidence}`, done: true });
+    }
+    if (evidenceLink) {
+        steps.push({ text: `LINK|${evidenceLink}`, done: true });
+    }
+    if (fileName) {
+        steps.push({ text: `FILE|${fileName}`, done: true });
+    }
+    if (submittedAt) {
+        steps.push({ text: `SUBMITTED_AT|${submittedAt}`, done: true });
+    }
+    steps.push({ text: `REVIEW|${reviewStatus}`, done: reviewStatus === "reviewed" });
+
+    sourceRows.push({ standard: standardKey, steps });
+    return sourceRows;
+}
+
+function formatSubmissionTimestamp(value) {
+    const raw = String(value || "").trim();
+    if (!raw) {
+        return "Not submitted yet";
+    }
+
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) {
+        return raw;
+    }
+
+    return parsed.toLocaleString();
+}
+
+async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, email, isTeacher, interestData }) {
+    const panelHost = host?.querySelector("#task-topic-submission-live-panel");
+    if (!panelHost) {
+        return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const taskTopicTitle = String(params.get("taskTopic") || "").trim();
+    if (!taskTopicTitle) {
+        panelHost.innerHTML = "";
+        return;
+    }
+
+    if (!email) {
+        panelHost.innerHTML = `<p class="task-topic-submission-note">Sign in to submit your evidence for this task topic.</p>`;
+        return;
+    }
+
+    if (isTeacher) {
+        panelHost.innerHTML = `<p class="task-topic-submission-note">Teacher view: student evidence submissions appear here when students submit from their own account.</p>`;
+        return;
+    }
+
+    const hasAllocation = Boolean(interestData?.my_interest || interestData?.my_allocation);
+    if (!hasAllocation) {
+        panelHost.innerHTML = `<p class="task-topic-submission-note">Select <strong>I'm Interested</strong> first, then you can submit your evidence for this task topic.</p>`;
+        return;
+    }
+
+    const standardNumber = extractPrimaryStandardNumberFromRows(coerceArray(detailData?.standardDetails));
+    const standardKey = buildTaskTopicSubmissionStandardKey(taskTopicTitle, standardNumber);
+
+    let evidenceRows = [];
+    try {
+        evidenceRows = await fetchEvidenceRows(projectId, email);
+    } catch (_error) {
+        panelHost.innerHTML = `<p class="task-topic-submission-note">Could not load your submission right now. Try again shortly.</p>`;
+        return;
+    }
+
+    const submission = parseTaskTopicSubmissionFromEvidenceRows(evidenceRows, standardKey);
+    const reviewLabel = submission.reviewStatus === "reviewed" ? "Reviewed" : "Pending review";
+
+    panelHost.innerHTML = `
+        <form id="task-topic-submission-form" class="task-topic-submission-form" novalidate>
+            <label class="task-topic-submission-label" for="task-topic-written-evidence">Written Evidence</label>
+            <textarea id="task-topic-written-evidence" class="task-topic-submission-input task-topic-submission-textarea" placeholder="Write the evidence for how you completed this task topic..." required>${escapeHtml(submission.writtenEvidence)}</textarea>
+
+            <label class="task-topic-submission-label" for="task-topic-evidence-link">Evidence Link (optional)</label>
+            <input id="task-topic-evidence-link" class="task-topic-submission-input" type="url" placeholder="https://..." value="${escapeHtml(submission.evidenceLink)}">
+
+            <label class="task-topic-submission-label" for="task-topic-evidence-file">Attach File Name (optional)</label>
+            <input id="task-topic-evidence-file" class="task-topic-submission-input" type="file" accept=".pdf,.doc,.docx,.txt,.rtf,.pages">
+            <p class="task-topic-submission-file-name" id="task-topic-submission-file-name">${submission.fileName ? `Selected: ${escapeHtml(submission.fileName)}` : "No file selected"}</p>
+
+            <div class="task-topic-submission-actions">
+                <button type="submit" class="detail-action">Submit Evidence</button>
+            </div>
+            <p class="task-topic-submission-status" id="task-topic-submission-status" aria-live="polite"></p>
+        </form>
+        <div class="task-topic-submission-meta">
+            <p><strong>Last Submitted:</strong> <span id="task-topic-last-submitted">${escapeHtml(formatSubmissionTimestamp(submission.submittedAt))}</span></p>
+            <p><strong>Teacher Review:</strong> <span id="task-topic-review-status">${escapeHtml(reviewLabel)}</span></p>
+        </div>
+    `;
+
+    const form = panelHost.querySelector("#task-topic-submission-form");
+    const writtenInput = panelHost.querySelector("#task-topic-written-evidence");
+    const linkInput = panelHost.querySelector("#task-topic-evidence-link");
+    const fileInput = panelHost.querySelector("#task-topic-evidence-file");
+    const fileNameHost = panelHost.querySelector("#task-topic-submission-file-name");
+    const statusHost = panelHost.querySelector("#task-topic-submission-status");
+    const lastSubmittedHost = panelHost.querySelector("#task-topic-last-submitted");
+    const reviewStatusHost = panelHost.querySelector("#task-topic-review-status");
+    let selectedFileName = submission.fileName;
+
+    const setStatus = (message, isError = false) => {
+        if (!statusHost) {
+            return;
+        }
+        statusHost.textContent = String(message || "");
+        statusHost.classList.toggle("is-error", Boolean(isError));
+    };
+
+    fileInput?.addEventListener("change", () => {
+        const chosen = fileInput.files?.[0]?.name ? String(fileInput.files[0].name).trim() : "";
+        selectedFileName = chosen || submission.fileName;
+        if (fileNameHost) {
+            fileNameHost.textContent = selectedFileName ? `Selected: ${selectedFileName}` : "No file selected";
+        }
+    });
+
+    form?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const writtenEvidence = String(writtenInput?.value || "").trim();
+        const evidenceLink = String(linkInput?.value || "").trim();
+        if (!writtenEvidence) {
+            setStatus("Written evidence is required.", true);
+            return;
+        }
+
+        const submitButton = form.querySelector("button[type='submit']");
+        if (submitButton) {
+            submitButton.disabled = true;
+        }
+        setStatus("Saving submission...");
+
+        const submittedAt = new Date().toISOString();
+        const nextRows = upsertTaskTopicSubmissionEvidenceRows(evidenceRows, standardKey, {
+            writtenEvidence,
+            evidenceLink,
+            fileName: selectedFileName,
+            submittedAt,
+            reviewStatus: "pending"
+        });
+
+        try {
+            await saveEvidenceRows(projectId, email, nextRows);
+            evidenceRows = nextRows;
+            submission.writtenEvidence = writtenEvidence;
+            submission.evidenceLink = toSafeExternalUrl(evidenceLink);
+            submission.fileName = selectedFileName;
+            submission.submittedAt = submittedAt;
+            submission.reviewStatus = "pending";
+
+            if (lastSubmittedHost) {
+                lastSubmittedHost.textContent = formatSubmissionTimestamp(submittedAt);
+            }
+            if (reviewStatusHost) {
+                reviewStatusHost.textContent = "Pending review";
+            }
+            setStatus("Submission saved.");
+        } catch (_error) {
+            setStatus("Could not save submission right now.", true);
+        } finally {
+            if (submitButton && submitButton.isConnected) {
+                submitButton.disabled = false;
+            }
+        }
+    });
+}
+
 async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmail, standards, studentLabel = "Student", taskDefaultsByStandard = {} }) {
     if (!host || !studentEmail || !projectId || !Array.isArray(standards) || !standards.length) {
         return;
@@ -1629,6 +1881,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                             <p class="task-topic-card-value">${isRelevantImplicationsTopic ? "Written Evidence" : "Evidence Upload"}</p>
                         </div>
                         <ul class="list task-topic-submission-list">${renderList(submissionTaskItems)}</ul>
+                        <div id="task-topic-submission-live-panel" class="task-topic-submission-live-panel"></div>
                     </section>
 
                     ${relevantImplicationNotes.length ? `
@@ -2585,6 +2838,11 @@ async function initDetail() {
 }
 
 async function loadAndRenderInterestSection(host, projectId, isTeacher, detailData) {
+    const existingSection = host.querySelector("#interest-section");
+    if (existingSection) {
+        existingSection.remove();
+    }
+
     const email = readStoredHubEmail();
     const isAssessmentTask = String(detailData?.activityCategory || "").toLowerCase().includes("assessment");
 
@@ -2687,6 +2945,15 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
 
     section.innerHTML = html;
     host.appendChild(section);
+
+    await renderTaskTopicSubmissionPanel({
+        host,
+        projectId,
+        detailData,
+        email,
+        isTeacher,
+        interestData
+    });
 
     if (!isTeacher && isAssessmentTask && email) {
         const myAllocation = interestData?.my_allocation || null;
@@ -2858,6 +3125,8 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                                 ? `1 student is interested in this ${isAssessmentTask ? "task" : "project"}.`
                                 : `${c} students are interested in this ${isAssessmentTask ? "task" : "project"}.`;
                     }
+
+                    await loadAndRenderInterestSection(host, projectId, isTeacher, detailData);
                 }
             } catch (_err) {}
             toggleBtn.disabled = false;
