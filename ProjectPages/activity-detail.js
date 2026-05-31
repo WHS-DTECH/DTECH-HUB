@@ -1470,6 +1470,10 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "") {
                 );
 
                 let targetPage = "../upload-activity.html";
+                if (isTaskTopicView) {
+                    void renderTaskTopicEditForm(host, id, data, canEdit, taskTopicTitle);
+                    return;
+                }
                 if (category.includes("assessment")) {
                     targetPage = "../upload-assessment.html";
                 } else if (category.includes("project") || hasProjectProposalFields) {
@@ -1644,6 +1648,154 @@ async function saveDetails(id, draft) {
         progressLogging: Array.isArray(result.progress_logging) ? result.progress_logging : draft.progressLogging,
         feedbackTrialling: Array.isArray(result.feedback_trialling) ? result.feedback_trialling : draft.feedbackTrialling
     };
+}
+
+function replaceTaskTopicInLines(lines, previousTopic, nextTopic) {
+    const source = Array.isArray(lines) ? lines : [];
+    const previousNormalized = normalizeTaskTopicText(previousTopic).toLowerCase();
+    const nextValue = String(nextTopic || "").trim();
+
+    if (!previousNormalized || !nextValue) {
+        return source;
+    }
+
+    return source.map((line) => {
+        const text = String(line || "").trim();
+        if (!text) {
+            return text;
+        }
+
+        const levelMatch = text.match(/^(Achieved|Merit|Excellence)\s*:\s*(.*)$/i);
+        const rawValue = levelMatch ? String(levelMatch[2] || "").trim() : text;
+        const normalizedValue = normalizeTaskTopicText(rawValue).toLowerCase();
+        if (normalizedValue !== previousNormalized) {
+            return text;
+        }
+
+        if (levelMatch) {
+            return `${levelMatch[1]}: ${nextValue}`;
+        }
+
+        return nextValue;
+    });
+}
+
+function renderTaskTopicEditForm(host, id, data, canEdit, selectedTaskTopic) {
+    const currentTopic = String(selectedTaskTopic || "").trim();
+    if (!currentTopic) {
+        renderDetailView(host, id, data, canEdit, selectedTaskTopic);
+        return;
+    }
+
+    const formId = `task-topic-edit-form-${id}`;
+    host.innerHTML = `
+        <header class="toolbar">
+            <span class="toolbar-label">Edit Task Topic Card</span>
+            <div class="toolbar-actions">
+                <a href="../index.html">Back to Hub</a>
+            </div>
+        </header>
+
+        <form id="${formId}" class="detail-form" novalidate>
+            <fieldset class="detail-form-section">
+                <legend>Task Topic Basics</legend>
+                <div class="detail-form-grid">
+                    <label class="detail-field detail-field-full">
+                        <span>Task Topic Name</span>
+                        <input name="taskTopicTitle" type="text" required value="${escapeHtml(currentTopic)}">
+                    </label>
+                    <label class="detail-field detail-field-full">
+                        <span>Short Description</span>
+                        <textarea name="taskTopicSummary" rows="4" required>${escapeHtml(currentTopic)}</textarea>
+                    </label>
+                </div>
+            </fieldset>
+
+            <div class="detail-form-actions">
+                <button type="submit" class="detail-action">Save Task Topic</button>
+                <button type="button" class="detail-action detail-action-secondary" id="task-topic-edit-cancel">Cancel</button>
+                <p class="detail-form-status" id="task-topic-edit-status" aria-live="polite"></p>
+            </div>
+        </form>
+    `;
+
+    const form = host.querySelector(`#${formId}`);
+    const cancelButton = host.querySelector("#task-topic-edit-cancel");
+    const statusElement = host.querySelector("#task-topic-edit-status");
+
+    cancelButton?.addEventListener("click", () => {
+        renderDetailView(host, id, data, canEdit, selectedTaskTopic);
+    });
+
+    form?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const formData = new FormData(form);
+        const nextTopic = String(formData.get("taskTopicTitle") || "").trim();
+
+        if (!nextTopic) {
+            if (statusElement) {
+                statusElement.textContent = "Task topic name is required.";
+                statusElement.classList.add("is-error");
+            }
+            return;
+        }
+
+        if (statusElement) {
+            statusElement.textContent = "Saving...";
+            statusElement.classList.remove("is-error");
+        }
+
+        const draft = {
+            title: data.title,
+            yearLevel: data.yearLevel,
+            type: data.type,
+            durationMinutes: parseDurationMinutes(data.duration),
+            term: data.term,
+            activityCategory: data.activityCategory,
+            showInThisWeek: data.showInThisWeek,
+            summary: data.summary,
+            resources: coerceArray(data.resources),
+            equipment: coerceArray(data.equipment),
+            instructions: coerceArray(data.instructions),
+            cardUrl: data.cardUrl,
+            image: data.image,
+            startDate: data.startDate,
+            contactName: data.contactName,
+            contactPhone: data.contactPhone,
+            contactEmail: data.contactEmail,
+            company: data.company,
+            address: data.address,
+            overview: coerceArray(data.overview),
+            services: coerceArray(data.services),
+            costs: coerceArray(data.costs),
+            outcomes: coerceArray(data.outcomes),
+            withdrawalDate: data.withdrawalDate,
+            clientId: data.clientId,
+            standardDetails: coerceArray(data.standardDetails),
+            tasksList: replaceTaskTopicInLines(coerceArray(data.tasksList), currentTopic, nextTopic),
+            achieved: replaceTaskTopicInLines(coerceArray(data.achieved), currentTopic, nextTopic),
+            merit: replaceTaskTopicInLines(coerceArray(data.merit), currentTopic, nextTopic),
+            excellence: replaceTaskTopicInLines(coerceArray(data.excellence), currentTopic, nextTopic),
+            submissionRequirements: coerceArray(data.submissionRequirements),
+            relevantImplications: coerceArray(data.relevantImplications),
+            progressLogging: coerceArray(data.progressLogging),
+            feedbackTrialling: coerceArray(data.feedbackTrialling)
+        };
+
+        try {
+            const saved = await saveDetails(id, draft);
+            if (statusElement) {
+                statusElement.textContent = "Saved.";
+                statusElement.classList.remove("is-error");
+            }
+            renderDetailView(host, id, saved, canEdit, nextTopic);
+        } catch (error) {
+            if (statusElement) {
+                statusElement.textContent = error.message || "Could not save task topic.";
+                statusElement.classList.add("is-error");
+            }
+        }
+    });
 }
 
 function renderEditForm(host, id, data) {
