@@ -554,7 +554,7 @@ function mapProjectTaskTopicsToLibraryItems(project) {
             visual: {
                 icon: textToIcon(project.area || "Task"),
                 label: "Task Topic",
-                palette: project?.visual?.palette || colorToPalette("rose")
+                palette: colorToPalette("azure")
             }
         };
     });
