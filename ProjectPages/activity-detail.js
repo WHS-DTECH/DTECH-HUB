@@ -1249,6 +1249,17 @@ function collectDetailTaskTopicEntries(data) {
     return output;
 }
 
+function extractPrimaryStandardNumberFromRows(rows) {
+    const standardRows = Array.isArray(rows) ? rows : [];
+    for (const row of standardRows) {
+        const match = String(row || "").match(/\b\d{4,6}\b/);
+        if (match && match[0]) {
+            return match[0];
+        }
+    }
+    return "";
+}
+
 function buildTaskTopicDetailHref(activityId, topicText, taskShortName = "", topicIndex = 0) {
     const params = new URLSearchParams();
     params.set("id", String(activityId || ""));
@@ -1455,6 +1466,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     const taskTopicStandardDetails = coerceArray(data?.standardDetails)
         .map((line) => String(line || "").trim())
         .filter(Boolean);
+    const mergedStandardNumber = extractPrimaryStandardNumberFromRows(taskTopicStandardDetails);
     const resolvedTasksList = (() => {
         const fromTasksList = coerceArray(data?.tasksList);
         if (fromTasksList.length) {
@@ -1549,7 +1561,10 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                                         ? `<span class="task-topic-merged-link current">${escapeHtml(entry.topicText)}</span>`
                                         : `<a class="task-topic-merged-link" href="${escapeHtml(entry.href)}">${escapeHtml(entry.topicText)}</a>`
                                     }
-                                    <span class="task-topic-merged-level">${escapeHtml(entry.levelLabel)}</span>
+                                    <div class="task-topic-merged-pills">
+                                        <span class="task-topic-merged-level">${escapeHtml(entry.levelLabel)}</span>
+                                        ${mergedStandardNumber ? `<span class="task-topic-merged-standard">${escapeHtml(mergedStandardNumber)}</span>` : ""}
+                                    </div>
                                 </li>
                             `).join("")}
                         </ul>

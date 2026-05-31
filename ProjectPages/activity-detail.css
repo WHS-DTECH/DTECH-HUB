@@ -559,6 +559,24 @@ h1 {
     background: #ebf3fc;
 }
 
+.task-topic-merged-pills {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.task-topic-merged-standard {
+    align-self: start;
+    justify-self: start;
+    border: 1px solid #b5cce4;
+    border-radius: 999px;
+    padding: 3px 8px;
+    font-size: 0.72rem;
+    color: #2a4a6b;
+    background: #ebf3fc;
+    font-weight: 700;
+}
+
 @media (max-width: 640px) {
     .task-topic-card-grid {
         grid-template-columns: 1fr;
