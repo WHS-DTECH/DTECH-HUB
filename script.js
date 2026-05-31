@@ -688,6 +688,9 @@ function inferSourceTypeFromRecord(record) {
     if (category.includes("project")) {
         return "project";
     }
+    if (category === "activity" || category.includes("skill activity") || category.includes("practice")) {
+        return "activity";
+    }
 
     const hasLessonFields = Boolean(
         record?.lesson_title ||

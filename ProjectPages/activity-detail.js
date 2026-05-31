@@ -2265,10 +2265,14 @@ function renderTaskTopicEditForm(host, id, data, canEdit, selectedTaskTopic, sel
 
 function renderEditForm(host, id, data) {
     const formId = `detail-edit-form-${id}`;
+    const normalizedCategory = normalizeCardCategory(data.activityCategory, "Activity");
+    const isProjectCategory = normalizedCategory === "Project";
+    const editorLabel = isProjectCategory ? "Project" : (normalizedCategory || "Activity");
+    const basicsLegend = isProjectCategory ? "Project Basics" : "Activity Basics";
 
     host.innerHTML = `
         <header class="toolbar">
-            <span class="toolbar-label">Edit Project</span>
+            <span class="toolbar-label">Edit ${escapeHtml(editorLabel)}</span>
             <div class="toolbar-actions">
                 <a href="../index.html">Back to Hub</a>
             </div>
@@ -2276,7 +2280,7 @@ function renderEditForm(host, id, data) {
 
         <form id="${formId}" class="detail-form" novalidate>
             <fieldset class="detail-form-section">
-                <legend>Project Basics</legend>
+                <legend>${escapeHtml(basicsLegend)}</legend>
                 <div class="detail-form-grid">
                     <label class="detail-field">
                         <span>Title</span>

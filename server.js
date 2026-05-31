@@ -1184,6 +1184,11 @@ function isAssessmentCategoryLabel(value) {
   return normalized.includes("assessment");
 }
 
+function isExplicitActivityCategoryLabel(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "activity" || normalized === "skill activity" || normalized === "practice" || normalized === "practice activity";
+}
+
 function normalizeActivityCategoryForResponse(activity) {
   const row = activity && typeof activity === "object" ? { ...activity } : {};
   const resolvedCategoryText = String(row.activity_category || row.category || "").trim();
@@ -1209,7 +1214,7 @@ function normalizeActivityCategoryForResponse(activity) {
     return row;
   }
 
-  if ((rawCategory === "" || rawCategory === "activity") && (hasAssessmentSignals(row) || hasAssessmentTextSignal)) {
+  if (rawCategory === "" && (hasAssessmentSignals(row) || hasAssessmentTextSignal)) {
     row.activity_category = "Assessment Task";
   }
 
@@ -3274,13 +3279,14 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
 
   const id = String(body.id || slugify(name));
   const requestedActivityCategory = String(body.activity_category || body.activityCategory || "").trim();
+  const isExplicitActivityRequest = isExplicitActivityCategoryLabel(requestedActivityCategory);
   const hasAssessmentPayload = hasAssessmentSignals(body) || hasAssessmentPayloadShape(body);
   const resolvedRequestedCategory = (() => {
     const normalizedRequested = requestedActivityCategory.toLowerCase();
     if (normalizedRequested === "assessment" || normalizedRequested === "assessment activity") {
       return "Assessment Task";
     }
-    if ((normalizedRequested === "" || normalizedRequested === "activity") && hasAssessmentPayload) {
+    if (normalizedRequested === "" && hasAssessmentPayload) {
       return "Assessment Task";
     }
     return requestedActivityCategory || "Activity";
@@ -3416,7 +3422,7 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
         })
       : payload.activity_category;
 
-    if (hasAssessmentPayload && !isAssessmentCategoryLabel(resolvedActivityCategory)) {
+    if (hasAssessmentPayload && !isAssessmentCategoryLabel(resolvedActivityCategory) && !isExplicitActivityRequest) {
       console.warn(
         `[assessment-category-guard] Non-assessment category resolved for assessment payload id=${payload.id} name="${payload.name}" category="${resolvedActivityCategory}"`
       );
