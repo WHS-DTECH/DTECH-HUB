@@ -430,6 +430,72 @@ function generateTaskShortName(taskText) {
 }
 
 const TASK_TOPIC_MERGE_PREFS_KEY = "dtechHub:taskTopicMergePrefs:v1";
+const TASK_TOPIC_SHORT_NAME_OVERRIDES_KEY = "dtechHub:taskTopicShortNameOverrides:v1";
+
+function normalizeTaskTopicLookupKey(topicText) {
+    return String(topicText || "").trim().toLowerCase();
+}
+
+function readTaskTopicShortNameOverrides() {
+    try {
+        const raw = localStorage.getItem(TASK_TOPIC_SHORT_NAME_OVERRIDES_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (_error) {
+        return {};
+    }
+}
+
+function writeTaskTopicShortNameOverrides(value) {
+    try {
+        localStorage.setItem(TASK_TOPIC_SHORT_NAME_OVERRIDES_KEY, JSON.stringify(value));
+    } catch (_error) {
+        // Ignore storage errors.
+    }
+}
+
+function getStoredTaskTopicShortName(projectId, topicText) {
+    const safeProjectId = String(projectId || "").trim();
+    const topicKey = normalizeTaskTopicLookupKey(topicText);
+    if (!safeProjectId || !topicKey) {
+        return "";
+    }
+
+    const all = readTaskTopicShortNameOverrides();
+    const projectMap = all[safeProjectId] && typeof all[safeProjectId] === "object" ? all[safeProjectId] : {};
+    return String(projectMap[topicKey] || "").trim();
+}
+
+function setStoredTaskTopicShortName(projectId, topicText, shortName) {
+    const safeProjectId = String(projectId || "").trim();
+    const topicKey = normalizeTaskTopicLookupKey(topicText);
+    if (!safeProjectId || !topicKey) {
+        return;
+    }
+
+    const all = readTaskTopicShortNameOverrides();
+    const projectMap = all[safeProjectId] && typeof all[safeProjectId] === "object" ? all[safeProjectId] : {};
+    const nextShortName = String(shortName || "").trim();
+
+    if (nextShortName) {
+        projectMap[topicKey] = nextShortName;
+        all[safeProjectId] = projectMap;
+    } else {
+        delete projectMap[topicKey];
+        if (Object.keys(projectMap).length) {
+            all[safeProjectId] = projectMap;
+        } else {
+            delete all[safeProjectId];
+        }
+    }
+
+    writeTaskTopicShortNameOverrides(all);
+}
+
+if (typeof window !== "undefined") {
+    window.hubGetTaskTopicShortNameOverride = getStoredTaskTopicShortName;
+    window.hubSetTaskTopicShortNameOverride = setStoredTaskTopicShortName;
+}
 
 function readTaskTopicMergePrefs() {
     try {
@@ -681,10 +747,10 @@ function mapProjectTaskTopicsToLibraryItems(project) {
         return [];
     }
 
-    const buildTaskTopicHref = (baseHref, topicText, topicNumber) => {
+    const buildTaskTopicHref = (baseHref, topicText, topicNumber, taskShortName) => {
         const safeBase = String(baseHref || "").trim() || "ProjectPages/custom-activity.html";
         const joiner = safeBase.includes("?") ? "&" : "?";
-        const shortName = generateTaskShortName(topicText);
+        const shortName = String(taskShortName || "").trim() || generateTaskShortName(topicText);
         return `${safeBase}${joiner}taskTopic=${encodeURIComponent(String(topicText || "").trim())}&taskTopicIndex=${encodeURIComponent(String(topicNumber))}&taskShortName=${encodeURIComponent(shortName)}`;
     };
 
@@ -695,7 +761,7 @@ function mapProjectTaskTopicsToLibraryItems(project) {
             return;
         }
 
-        const shortName = generateTaskShortName(topicText) || "Task Topic";
+        const shortName = getStoredTaskTopicShortName(project?.id, topicText) || generateTaskShortName(topicText) || "Task Topic";
         const bucket = groupedByShortName.get(shortName) || [];
         if (!bucket.some((existing) => existing.toLowerCase() === topicText.toLowerCase())) {
             bucket.push(topicText);
@@ -752,7 +818,7 @@ function mapProjectTaskTopicsToLibraryItems(project) {
             status: project.status,
             term: project.term,
             updated: project.updated,
-            href: buildTaskTopicHref(project.href, topicText, topicNumber),
+            href: buildTaskTopicHref(project.href, topicText, topicNumber, shortTaskName),
             external: project.external,
             summary: topicText,
             keywords: [

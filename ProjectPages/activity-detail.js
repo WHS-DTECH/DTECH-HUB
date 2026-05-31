@@ -641,7 +641,7 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
             return;
         }
 
-        const taskShortName = deriveTaskShortName(safeText);
+        const taskShortName = getTaskTopicShortNameOverride(projectId, safeText) || deriveTaskShortName(safeText);
 
         const nextUrl = new URL(window.location.href);
         nextUrl.searchParams.set("id", String(projectId || ""));
@@ -1180,6 +1180,30 @@ function deriveTaskShortName(value) {
         .join(" ");
 }
 
+function getTaskTopicShortNameOverride(activityId, topicText) {
+    if (typeof window === "undefined" || typeof window.hubGetTaskTopicShortNameOverride !== "function") {
+        return "";
+    }
+
+    try {
+        return String(window.hubGetTaskTopicShortNameOverride(activityId, topicText) || "").trim();
+    } catch (_error) {
+        return "";
+    }
+}
+
+function setTaskTopicShortNameOverride(activityId, topicText, shortName) {
+    if (typeof window === "undefined" || typeof window.hubSetTaskTopicShortNameOverride !== "function") {
+        return;
+    }
+
+    try {
+        window.hubSetTaskTopicShortNameOverride(activityId, topicText, shortName);
+    } catch (_error) {
+        // Ignore storage helper failures.
+    }
+}
+
 function collectDetailTaskTopics(data) {
     return [
         ...coerceArray(data?.tasksList),
@@ -1297,7 +1321,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         : (isAssessmentTask ? "Assessment Task Details" : "Activity");
     const standardTaskTopicUrl = cardUrl || `${window.location.origin}/ProjectPages/custom-activity.html?id=${encodeURIComponent(String(id || ""))}`;
     const parentAssessmentUrl = `custom-activity.html?id=${encodeURIComponent(String(id || ""))}`;
-    const resolvedTaskShortName = String(selectedTaskShortName || "").trim() || (taskTopicTitle ? deriveTaskShortName(taskTopicTitle) : "");
+    const resolvedTaskShortName = String(selectedTaskShortName || "").trim()
+        || (taskTopicTitle ? getTaskTopicShortNameOverride(id, taskTopicTitle) : "")
+        || (taskTopicTitle ? deriveTaskShortName(taskTopicTitle) : "");
     const displayTitle = resolvedTaskShortName || taskTopicTitle || data.title;
     const displaySummaryHtml = taskTopicTitle
         ? `Task topic from <a class="task-topic-parent-link" href="${parentAssessmentUrl}">${escapeHtml(data.title)}</a>`
@@ -1549,7 +1575,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
 
                 let targetPage = "../upload-activity.html";
                 if (isTaskTopicView) {
-                    void renderTaskTopicEditForm(host, id, data, canEdit, taskTopicTitle);
+                    void renderTaskTopicEditForm(host, id, data, canEdit, taskTopicTitle, selectedTaskShortName);
                     return;
                 }
                 if (category.includes("assessment")) {
@@ -1758,8 +1784,11 @@ function replaceTaskTopicInLines(lines, previousTopic, nextTopic) {
     });
 }
 
-function renderTaskTopicEditForm(host, id, data, canEdit, selectedTaskTopic) {
+function renderTaskTopicEditForm(host, id, data, canEdit, selectedTaskTopic, selectedTaskShortName = "") {
     const currentTopic = String(selectedTaskTopic || "").trim();
+    const currentShortName = String(selectedTaskShortName || "").trim()
+        || getTaskTopicShortNameOverride(id, currentTopic)
+        || deriveTaskShortName(currentTopic);
     const standardTaskTopicUrl = toSafeExternalUrl(data?.cardUrl)
         || `${window.location.origin}/ProjectPages/custom-activity.html?id=${encodeURIComponent(String(id || ""))}`;
     const renderOptions = (options, selectedValue) => options
@@ -1802,7 +1831,7 @@ function renderTaskTopicEditForm(host, id, data, canEdit, selectedTaskTopic) {
                 <div class="detail-form-grid">
                     <label class="detail-field">
                         <span>Card Name</span>
-                        <input name="taskTopicTitle" type="text" required value="${escapeHtml(currentTopic)}">
+                        <input name="taskTopicShortName" type="text" required value="${escapeHtml(currentShortName)}">
                     </label>
                     <label class="detail-field">
                         <span>Year Level</span>
@@ -1954,7 +1983,7 @@ function renderTaskTopicEditForm(host, id, data, canEdit, selectedTaskTopic) {
     void loadStandardOptions();
 
     cancelButton?.addEventListener("click", () => {
-        renderDetailView(host, id, data, canEdit, selectedTaskTopic);
+        renderDetailView(host, id, data, canEdit, selectedTaskTopic, currentShortName);
     });
 
     standardAddButton?.addEventListener("click", () => {
@@ -1987,11 +2016,20 @@ function renderTaskTopicEditForm(host, id, data, canEdit, selectedTaskTopic) {
     form?.addEventListener("submit", async (event) => {
         event.preventDefault();
         const formData = new FormData(form);
-        const nextTopic = String(formData.get("taskTopicTitle") || "").trim();
+        const nextShortName = String(formData.get("taskTopicShortName") || "").trim();
+        const nextTopic = normalizeTaskTopicText(formData.get("taskTopicSummary") || "");
+
+        if (!nextShortName) {
+            if (statusElement) {
+                statusElement.textContent = "Task short name is required.";
+                statusElement.classList.add("is-error");
+            }
+            return;
+        }
 
         if (!nextTopic) {
             if (statusElement) {
-                statusElement.textContent = "Task topic name is required.";
+                statusElement.textContent = "Task long name (Short Description) is required.";
                 statusElement.classList.add("is-error");
             }
             return;
@@ -2041,11 +2079,13 @@ function renderTaskTopicEditForm(host, id, data, canEdit, selectedTaskTopic) {
 
         try {
             const saved = await saveDetails(id, draft);
+            setTaskTopicShortNameOverride(id, currentTopic, "");
+            setTaskTopicShortNameOverride(id, nextTopic, nextShortName);
             if (statusElement) {
                 statusElement.textContent = "Saved.";
                 statusElement.classList.remove("is-error");
             }
-            renderDetailView(host, id, saved, canEdit, nextTopic);
+            renderDetailView(host, id, saved, canEdit, nextTopic, nextShortName);
         } catch (error) {
             if (statusElement) {
                 statusElement.textContent = error.message || "Could not save task topic.";
@@ -2330,7 +2370,8 @@ async function initDetail() {
 
     const resolvedData = defaultDetailShape(id, data);
     const selectedTaskTopic = resolveRequestedTaskTopic(resolvedData, params);
-    const selectedTaskShortName = String(params.get("taskShortName") || "").trim();
+    const selectedTaskShortName = String(params.get("taskShortName") || "").trim()
+        || getTaskTopicShortNameOverride(id, selectedTaskTopic);
     const isTeacher = await canEditDetails();
 
     document.title = `${selectedTaskShortName || selectedTaskTopic || resolvedData.title} | Computer Lab`;
