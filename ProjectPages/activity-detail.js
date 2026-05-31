@@ -1216,6 +1216,116 @@ function collectDetailTaskTopics(data) {
         .filter(Boolean);
 }
 
+function collectDetailTaskTopicEntries(data) {
+    const output = [];
+
+    const pushEntries = (items, level) => {
+        coerceArray(items).forEach((item) => {
+            const text = normalizeTaskTopicText(item);
+            if (!text) {
+                return;
+            }
+
+            output.push({ text, level });
+        });
+    };
+
+    pushEntries(data?.tasksList, "General");
+    pushEntries(data?.assessmentFocus ?? data?.assessment_focus ?? data?.assessmentFocusRaw, "General");
+    pushEntries(data?.achieved, "Achieved");
+    pushEntries(data?.merit, "Merit");
+    pushEntries(data?.excellence, "Excellence");
+
+    return output;
+}
+
+function buildTaskTopicDetailHref(activityId, topicText, taskShortName = "", topicIndex = 0) {
+    const params = new URLSearchParams();
+    params.set("id", String(activityId || ""));
+    params.set("taskTopic", String(topicText || "").trim());
+
+    const resolvedShortName = String(taskShortName || "").trim() || deriveTaskShortName(topicText);
+    if (resolvedShortName) {
+        params.set("taskShortName", resolvedShortName);
+    }
+
+    if (Number.isFinite(Number(topicIndex)) && Number(topicIndex) > 0) {
+        params.set("taskTopicIndex", String(topicIndex));
+    }
+
+    return `custom-activity.html?${params.toString()}`;
+}
+
+function collectMergedTaskTopicLinks(data, activityId, selectedTopic, selectedShortName) {
+    const activeTopic = normalizeTaskTopicText(selectedTopic);
+    const activeShortName = String(selectedShortName || "").trim() || deriveTaskShortName(activeTopic);
+    if (!activeTopic || !activeShortName) {
+        return [];
+    }
+
+    const allTopics = collectDetailTaskTopics(data);
+    const topicEntries = collectDetailTaskTopicEntries(data);
+    if (!topicEntries.length) {
+        return [];
+    }
+
+    const levelRank = {
+        Achieved: 1,
+        Merit: 2,
+        Excellence: 3,
+        General: 4
+    };
+
+    const byTopic = new Map();
+    topicEntries.forEach((entry) => {
+        const topicText = String(entry.text || "").trim();
+        if (!topicText) {
+            return;
+        }
+
+        const resolvedShort = getTaskTopicShortNameOverride(activityId, topicText) || deriveTaskShortName(topicText);
+        if (resolvedShort !== activeShortName) {
+            return;
+        }
+
+        const key = topicText.toLowerCase();
+        const existing = byTopic.get(key) || {
+            topicText,
+            levels: new Set(),
+            shortName: resolvedShort
+        };
+
+        existing.levels.add(String(entry.level || "General"));
+        byTopic.set(key, existing);
+    });
+
+    const links = Array.from(byTopic.values()).map((entry) => {
+        const topicTextLower = entry.topicText.toLowerCase();
+        const topicIndex = allTopics.findIndex((topic) => String(topic || "").trim().toLowerCase() === topicTextLower) + 1;
+        const levels = Array.from(entry.levels);
+        const primaryLevel = levels
+            .slice()
+            .sort((a, b) => (levelRank[a] || 99) - (levelRank[b] || 99))[0] || "General";
+
+        return {
+            topicText: entry.topicText,
+            shortName: entry.shortName,
+            levelLabel: levels.join(" / "),
+            primaryLevel,
+            isCurrent: topicTextLower === activeTopic.toLowerCase(),
+            href: buildTaskTopicDetailHref(activityId, entry.topicText, entry.shortName, topicIndex)
+        };
+    });
+
+    return links.sort((a, b) => {
+        const levelDiff = (levelRank[a.primaryLevel] || 99) - (levelRank[b.primaryLevel] || 99);
+        if (levelDiff !== 0) {
+            return levelDiff;
+        }
+        return a.topicText.localeCompare(b.topicText);
+    });
+}
+
 function resolveRequestedTaskTopic(data, params) {
     const requestedTopicText = String(params.get("taskTopic") || "").trim();
     const requestedTopicIndex = Number.parseInt(params.get("taskTopicIndex"), 10);
@@ -1324,6 +1434,10 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     const resolvedTaskShortName = String(selectedTaskShortName || "").trim()
         || (taskTopicTitle ? getTaskTopicShortNameOverride(id, taskTopicTitle) : "")
         || (taskTopicTitle ? deriveTaskShortName(taskTopicTitle) : "");
+    const mergedTaskTopicLinks = isTaskTopicView
+        ? collectMergedTaskTopicLinks(data, id, taskTopicTitle, resolvedTaskShortName)
+        : [];
+    const showMergedTaskTopicLayout = mergedTaskTopicLinks.length > 1;
     const displayTitle = resolvedTaskShortName || taskTopicTitle || data.title;
     const displaySummaryHtml = taskTopicTitle
         ? `Task topic from <a class="task-topic-parent-link" href="${parentAssessmentUrl}">${escapeHtml(data.title)}</a>`
@@ -1372,7 +1486,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 <div class="task-topic-card-grid">
                     <div class="task-topic-card-field">
                         <span class="task-topic-card-label">Card Name</span>
-                        <p class="task-topic-card-value">${escapeHtml(taskTopicTitle)}</p>
+                        <p class="task-topic-card-value">${escapeHtml(displayTitle)}</p>
                     </div>
                     <div class="task-topic-card-field">
                         <span class="task-topic-card-label">Year Level</span>
@@ -1405,6 +1519,34 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 </div>
             </section>
 
+            ${showMergedTaskTopicLayout ? `
+            <section class="proposal-section task-topic-merged-overview">
+                <div class="task-topic-merged-grid">
+                    <article class="task-topic-merged-column task-topic-standards-panel">
+                        <h2>Standard Details</h2>
+                        ${taskTopicStandardDetails.length
+                            ? `<div class="task-topic-standard-list task-topic-standard-list-prominent">${taskTopicStandardDetails.map((line) => `<span class="task-topic-standard-chip task-topic-standard-chip-prominent">${escapeHtml(line)}</span>`).join("")}</div>`
+                            : `<p class="task-topic-card-value">No standards linked.</p>`
+                        }
+                    </article>
+                    <article class="task-topic-merged-column task-topic-merged-links-panel">
+                        <h2>Merged Task Topic Cards</h2>
+                        <p class="task-topic-merged-links-subtitle">Open each merged card from its level.</p>
+                        <ul class="task-topic-merged-links-list">
+                            ${mergedTaskTopicLinks.map((entry) => `
+                                <li class="task-topic-merged-link-item">
+                                    ${entry.isCurrent
+                                        ? `<span class="task-topic-merged-link current">${escapeHtml(entry.topicText)}</span>`
+                                        : `<a class="task-topic-merged-link" href="${escapeHtml(entry.href)}">${escapeHtml(entry.topicText)}</a>`
+                                    }
+                                    <span class="task-topic-merged-level">${escapeHtml(entry.levelLabel)}</span>
+                                </li>
+                            `).join("")}
+                        </ul>
+                    </article>
+                </div>
+            </section>
+            ` : `
             <section class="proposal-section task-topic-standards-panel">
                 <h2>Standard Details</h2>
                 ${taskTopicStandardDetails.length
@@ -1412,6 +1554,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                     : `<p class="task-topic-card-value">No standards linked.</p>`
                 }
             </section>
+            `}
 
             <section class="proposal-section task-topic-display-options">
                 <h2>Display Options</h2>
