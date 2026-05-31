@@ -1131,16 +1131,22 @@ function resolveRequestedTaskTopic(data, params) {
     const requestedTopicText = String(params.get("taskTopic") || "").trim();
     const requestedTopicIndex = Number.parseInt(params.get("taskTopicIndex"), 10);
     const allTopics = collectDetailTaskTopics(data);
+    const normalizedRequested = normalizeTaskTopicText(requestedTopicText);
 
     if (!allTopics.length) {
-        return "";
+        return normalizedRequested;
     }
 
     if (requestedTopicText) {
-        const normalizedRequested = normalizeTaskTopicText(requestedTopicText).toLowerCase();
-        const exactMatch = allTopics.find((topic) => topic.toLowerCase() === normalizedRequested);
+        const normalizedRequestedLower = normalizedRequested.toLowerCase();
+        const exactMatch = allTopics.find((topic) => topic.toLowerCase() === normalizedRequestedLower);
         if (exactMatch) {
             return exactMatch;
+        }
+
+        // Preserve clicked topic context even when backend topic parsing does not align.
+        if (normalizedRequested) {
+            return normalizedRequested;
         }
     }
 
