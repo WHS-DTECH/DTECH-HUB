@@ -378,6 +378,16 @@ function normalizeCardCategory(value, fallback = "Activity") {
     return fallback;
 }
 
+function isGeneratedUploadedActivityImageUrl(value) {
+    const raw = String(value || "").trim().toLowerCase();
+    if (!raw) {
+        return false;
+    }
+
+    return raw.includes("placehold.co/900x560/3f89cf/ffffff")
+        && raw.includes("uploaded+activity");
+}
+
 function readStoredHubEmail() {
     const raw = localStorage.getItem(DETAIL_HUB_AUTH_STORAGE_KEY) || sessionStorage.getItem(DETAIL_HUB_AUTH_STORAGE_KEY);
     if (!raw) return "";
@@ -1795,7 +1805,7 @@ async function saveDetails(id, draft) {
         type: draft.type,
             activity_category: normalizeCardCategory(draft.activityCategory, "Activity"),
         duration_minutes: parseDurationMinutes(draft.durationMinutes),
-        outcome_image_url: draft.image,
+        outcome_image_url: isGeneratedUploadedActivityImageUrl(draft.image) ? "" : draft.image,
         description: draft.summary,
         resources: draft.resources,
         equipment: draft.equipment,

@@ -684,6 +684,16 @@ function inferSourceTypeFromRecord(record) {
     return hasProjectFields ? "project" : "activity";
 }
 
+function isGeneratedUploadedActivityImageUrl(value) {
+    const raw = String(value || "").trim().toLowerCase();
+    if (!raw) {
+        return false;
+    }
+
+    return raw.includes("placehold.co/900x560/3f89cf/ffffff")
+        && raw.includes("uploaded+activity");
+}
+
 async function loadSharedProjects() {
     try {
         const response = await fetch("/api/activities");
@@ -703,7 +713,8 @@ async function loadSharedProjects() {
                 const category = String(item.activity_category || item.category || "Activity").trim();
                 const summary = String(item.description || "").trim();
                 const created = String(item.created_at || new Date().toISOString()).slice(0, 10);
-                const imageUrl = String(item.outcome_image_url || item.image_url || "").trim();
+                const rawImageUrl = String(item.outcome_image_url || item.image_url || "").trim();
+                const imageUrl = isGeneratedUploadedActivityImageUrl(rawImageUrl) ? "" : rawImageUrl;
                 const showInThisWeek = Boolean(item.show_in_this_week ?? item.show_this_week ?? item.is_pinned ?? item.is_this_week);
                 const sourceType = inferSourceTypeFromRecord(item);
                 const defaultCardColor = sourceType === "assessment" ? "Slate" : "Rose";
