@@ -1249,6 +1249,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "") {
     const displaySummary = taskTopicTitle
         ? `Task topic from ${data.title}`
         : data.summary;
+    const taskTopicStandardDetails = coerceArray(data?.standardDetails)
+        .map((line) => String(line || "").trim())
+        .filter(Boolean);
     const resolvedTasksList = (() => {
         const fromTasksList = coerceArray(data?.tasksList);
         if (fromTasksList.length) {
@@ -1311,6 +1314,13 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "") {
                     <div class="task-topic-card-field">
                         <span class="task-topic-card-label">Difficulty</span>
                         <p class="task-topic-card-value">Intermediate</p>
+                    </div>
+                    <div class="task-topic-card-field task-topic-card-field-full">
+                        <span class="task-topic-card-label">Standard Details</span>
+                        ${taskTopicStandardDetails.length
+                            ? `<div class="task-topic-standard-list">${taskTopicStandardDetails.map((line) => `<span class="task-topic-standard-chip">${escapeHtml(line)}</span>`).join("")}</div>`
+                            : `<p class="task-topic-card-value">No standards linked.</p>`
+                        }
                     </div>
                     <div class="task-topic-card-field task-topic-card-field-full">
                         <span class="task-topic-card-label">Card URL</span>
@@ -1741,6 +1751,18 @@ function renderTaskTopicEditForm(host, id, data, canEdit, selectedTaskTopic) {
                         <input name="taskTopicDifficulty" type="text" value="Intermediate" readonly>
                     </label>
                     <label class="detail-field detail-field-full">
+                        <span>Standard Details</span>
+                        <div class="task-topic-standard-controls">
+                            <select name="taskTopicStandardLibrary">
+                                <option value="">Loading standards...</option>
+                            </select>
+                            <button type="button" class="detail-action detail-action-secondary" id="task-topic-standard-add">Add Standard</button>
+                            <a class="detail-action detail-action-secondary" href="../admin-assessment-information.html" target="_blank" rel="noreferrer">Open Standards Manager</a>
+                        </div>
+                        <input name="taskTopicStandardDetails" type="hidden" value="">
+                        <div class="task-topic-standard-list task-topic-standard-edit-list" id="task-topic-standard-chip-list"></div>
+                    </label>
+                    <label class="detail-field detail-field-full">
                         <span>Card URL</span>
                         <input name="taskTopicUrl" type="url" value="${escapeHtml(standardTaskTopicUrl)}" readonly>
                     </label>
@@ -1780,9 +1802,102 @@ function renderTaskTopicEditForm(host, id, data, canEdit, selectedTaskTopic) {
     const form = host.querySelector(`#${formId}`);
     const cancelButton = host.querySelector("#task-topic-edit-cancel");
     const statusElement = host.querySelector("#task-topic-edit-status");
+    const standardSelect = host.querySelector("[name='taskTopicStandardLibrary']");
+    const standardAddButton = host.querySelector("#task-topic-standard-add");
+    const standardChipList = host.querySelector("#task-topic-standard-chip-list");
+    const standardHiddenInput = host.querySelector("[name='taskTopicStandardDetails']");
+    let standardLines = coerceArray(data?.standardDetails)
+        .map((line) => String(line || "").trim())
+        .filter(Boolean);
+
+    const renderStandardChips = () => {
+        if (!standardChipList || !standardHiddenInput) {
+            return;
+        }
+
+        standardHiddenInput.value = standardLines.join("\n");
+        if (!standardLines.length) {
+            standardChipList.innerHTML = '<span class="task-topic-standard-empty">No standards selected yet.</span>';
+            return;
+        }
+
+        standardChipList.innerHTML = standardLines
+            .map((line, index) => `
+                <span class="task-topic-standard-chip">
+                    ${escapeHtml(line)}
+                    <button type="button" class="task-topic-standard-remove" data-standard-remove-index="${index}">Remove</button>
+                </span>
+            `)
+            .join("");
+    };
+
+    const loadStandardOptions = async () => {
+        if (!standardSelect) {
+            return;
+        }
+
+        standardSelect.innerHTML = '<option value="">Loading standards...</option>';
+        standardSelect.disabled = true;
+        if (standardAddButton) {
+            standardAddButton.disabled = true;
+        }
+
+        try {
+            const options = await getDetailStandardsOptions();
+            if (!Array.isArray(options) || !options.length) {
+                standardSelect.innerHTML = '<option value="">No standards available</option>';
+                return;
+            }
+
+            standardSelect.innerHTML = [
+                '<option value="">Select a standard...</option>',
+                ...options.map((row) => {
+                    const label = formatDetailStandardOption(row);
+                    return `<option value="${escapeHtml(label)}">${escapeHtml(label)}</option>`;
+                })
+            ].join("");
+        } catch (_error) {
+            standardSelect.innerHTML = '<option value="">Could not load standards</option>';
+        } finally {
+            standardSelect.disabled = false;
+            if (standardAddButton) {
+                standardAddButton.disabled = false;
+            }
+        }
+    };
+
+    renderStandardChips();
+    void loadStandardOptions();
 
     cancelButton?.addEventListener("click", () => {
         renderDetailView(host, id, data, canEdit, selectedTaskTopic);
+    });
+
+    standardAddButton?.addEventListener("click", () => {
+        const selected = String(standardSelect?.value || "").trim();
+        if (!selected) {
+            return;
+        }
+
+        if (!standardLines.includes(selected)) {
+            standardLines.push(selected);
+            renderStandardChips();
+        }
+    });
+
+    standardChipList?.addEventListener("click", (event) => {
+        const target = event.target.closest("button[data-standard-remove-index]");
+        if (!target) {
+            return;
+        }
+
+        const index = Number.parseInt(target.getAttribute("data-standard-remove-index"), 10);
+        if (!Number.isInteger(index) || index < 0 || index >= standardLines.length) {
+            return;
+        }
+
+        standardLines.splice(index, 1);
+        renderStandardChips();
     });
 
     form?.addEventListener("submit", async (event) => {
@@ -1829,7 +1944,7 @@ function renderTaskTopicEditForm(host, id, data, canEdit, selectedTaskTopic) {
             outcomes: coerceArray(data.outcomes),
             withdrawalDate: data.withdrawalDate,
             clientId: data.clientId,
-            standardDetails: coerceArray(data.standardDetails),
+            standardDetails: standardLines,
             tasksList: replaceTaskTopicInLines(coerceArray(data.tasksList), currentTopic, nextTopic),
             achieved: replaceTaskTopicInLines(coerceArray(data.achieved), currentTopic, nextTopic),
             merit: replaceTaskTopicInLines(coerceArray(data.merit), currentTopic, nextTopic),

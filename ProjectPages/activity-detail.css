@@ -408,6 +408,57 @@ h1 {
     border-color: #6c95bf;
 }
 
+.task-topic-standard-controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.task-topic-standard-controls select {
+    min-width: 260px;
+    border: 1px solid #b8cce3;
+    border-radius: 8px;
+    background: #fff;
+    color: #14395f;
+    font-size: 0.82rem;
+    padding: 7px 9px;
+}
+
+.task-topic-standard-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.task-topic-standard-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid #b9d0e8;
+    border-radius: 999px;
+    padding: 4px 8px;
+    font-size: 0.74rem;
+    color: #244a72;
+    background: #eef5fc;
+}
+
+.task-topic-standard-remove {
+    border: 1px solid #c98787;
+    background: #fff6f6;
+    color: #8a2e2e;
+    border-radius: 999px;
+    padding: 1px 7px;
+    font-size: 0.68rem;
+    cursor: pointer;
+}
+
+.task-topic-standard-empty {
+    font-size: 0.76rem;
+    color: #5f7893;
+}
+
 @media (max-width: 640px) {
     .task-topic-card-grid {
         grid-template-columns: 1fr;
