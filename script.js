@@ -383,6 +383,52 @@ function extractPrimaryStandardNumber(standardDetails) {
     return "";
 }
 
+function generateTaskShortName(taskText) {
+    const raw = String(taskText || "").trim();
+    if (!raw) {
+        return "";
+    }
+
+    const normalized = raw.toLowerCase();
+    const phraseMap = [
+        { pattern: /project\s+management/, label: "Project Management" },
+        { pattern: /relevant\s+implications/, label: "Relevant Implications" },
+        { pattern: /version\s+control/, label: "Version Control" },
+        { pattern: /digital\s+technologies\s+outcome/, label: "Digital Outcome" },
+        { pattern: /decompos/, label: "Decomposition" },
+        { pattern: /triall?ing\s+multiple\s+components/, label: "Component Trialling" },
+        { pattern: /triall?ing\s+the\s+components/, label: "Component Trialling" },
+        { pattern: /testing\s+that/, label: "Functional Testing" },
+        { pattern: /using\s+information\s+appropriately/, label: "Testing Insights" },
+        { pattern: /discussing\s+how/, label: "Planning Insights" }
+    ];
+
+    for (const entry of phraseMap) {
+        if (entry.pattern.test(normalized)) {
+            return entry.label;
+        }
+    }
+
+    const stopwords = new Set([
+        "the", "and", "for", "with", "from", "that", "this", "into", "using", "use", "how",
+        "which", "are", "was", "were", "have", "has", "had", "its", "their", "these", "those",
+        "plan", "development", "digital", "technologies", "outcome", "components"
+    ]);
+
+    const keywords = normalized
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .map((word) => word.trim())
+        .filter((word) => word.length > 2 && !stopwords.has(word));
+
+    if (!keywords.length) {
+        return raw;
+    }
+
+    const shortWords = keywords.slice(0, 2).map((word) => word.charAt(0).toUpperCase() + word.slice(1));
+    return shortWords.join(" ");
+}
+
 function inferSourceTypeFromRecord(record) {
     const explicitType = String(record?.sourceType || "").toLowerCase();
     if (explicitType === "project" || explicitType === "activity" || explicitType === "assessment" || explicitType === "lesson" || explicitType === "task-topic") {
@@ -550,17 +596,19 @@ function mapProjectTaskTopicsToLibraryItems(project) {
     const buildTaskTopicHref = (baseHref, topicText, topicNumber) => {
         const safeBase = String(baseHref || "").trim() || "ProjectPages/custom-activity.html";
         const joiner = safeBase.includes("?") ? "&" : "?";
-        return `${safeBase}${joiner}taskTopic=${encodeURIComponent(String(topicText || "").trim())}&taskTopicIndex=${encodeURIComponent(String(topicNumber))}`;
+        const shortName = generateTaskShortName(topicText);
+        return `${safeBase}${joiner}taskTopic=${encodeURIComponent(String(topicText || "").trim())}&taskTopicIndex=${encodeURIComponent(String(topicNumber))}&taskShortName=${encodeURIComponent(shortName)}`;
     };
 
     return taskTopics.map((topic, index) => {
         const topicText = String(topic || "").trim();
         const topicNumber = index + 1;
         const standardNumber = extractPrimaryStandardNumber(project?.standardDetails);
+        const shortTaskName = generateTaskShortName(topicText) || `Task ${topicNumber}`;
 
         return {
             id: `task-topic-${String(project.id || "item")}-${topicNumber}`,
-            title: topicText,
+            title: shortTaskName,
             className: project.className,
             area: project.area,
             sourceType: "task-topic",
@@ -572,10 +620,11 @@ function mapProjectTaskTopicsToLibraryItems(project) {
             updated: project.updated,
             href: buildTaskTopicHref(project.href, topicText, topicNumber),
             external: project.external,
-            summary: `Task topic ${topicNumber} from ${project.title}`,
+            summary: topicText,
             keywords: [
                 ...(Array.isArray(project.keywords) ? project.keywords : []),
                 "task topic",
+                shortTaskName,
                 String(project.title || "")
             ].filter(Boolean),
             imageUrl: project.imageUrl || null,

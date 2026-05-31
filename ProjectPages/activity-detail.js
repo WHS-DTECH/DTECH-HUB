@@ -641,9 +641,12 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
             return;
         }
 
+        const taskShortName = deriveTaskShortName(safeText);
+
         const nextUrl = new URL(window.location.href);
         nextUrl.searchParams.set("id", String(projectId || ""));
         nextUrl.searchParams.set("taskTopic", safeText);
+        nextUrl.searchParams.set("taskShortName", taskShortName);
         if (Number.isFinite(Number(topicIndex)) && Number(topicIndex) > 0) {
             nextUrl.searchParams.set("taskTopicIndex", String(topicIndex));
         }
@@ -1129,6 +1132,54 @@ function normalizeTaskTopicText(value) {
         .trim();
 }
 
+function deriveTaskShortName(value) {
+    const raw = normalizeTaskTopicText(value);
+    if (!raw) {
+        return "";
+    }
+
+    const normalized = raw.toLowerCase();
+    const phraseMap = [
+        { pattern: /project\s+management/, label: "Project Management" },
+        { pattern: /relevant\s+implications/, label: "Relevant Implications" },
+        { pattern: /version\s+control/, label: "Version Control" },
+        { pattern: /digital\s+technologies\s+outcome/, label: "Digital Outcome" },
+        { pattern: /decompos/, label: "Decomposition" },
+        { pattern: /triall?ing\s+multiple\s+components/, label: "Component Trialling" },
+        { pattern: /triall?ing\s+the\s+components/, label: "Component Trialling" },
+        { pattern: /testing\s+that/, label: "Functional Testing" },
+        { pattern: /using\s+information\s+appropriately/, label: "Testing Insights" },
+        { pattern: /discussing\s+how/, label: "Planning Insights" }
+    ];
+
+    for (const entry of phraseMap) {
+        if (entry.pattern.test(normalized)) {
+            return entry.label;
+        }
+    }
+
+    const stopwords = new Set([
+        "the", "and", "for", "with", "from", "that", "this", "into", "using", "use", "how",
+        "which", "are", "was", "were", "have", "has", "had", "its", "their", "these", "those",
+        "plan", "development", "digital", "technologies", "outcome", "components"
+    ]);
+
+    const keywords = normalized
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .map((word) => word.trim())
+        .filter((word) => word.length > 2 && !stopwords.has(word));
+
+    if (!keywords.length) {
+        return raw;
+    }
+
+    return keywords
+        .slice(0, 2)
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+}
+
 function collectDetailTaskTopics(data) {
     return [
         ...coerceArray(data?.tasksList),
@@ -1236,7 +1287,7 @@ function defaultDetailShape(id, data) {
     };
 }
 
-function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "") {
+function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selectedTaskShortName = "") {
     const isAssessmentTask = String(data?.activityCategory || "").toLowerCase().includes("assessment");
     const cardUrl = toSafeExternalUrl(data?.cardUrl);
     const taskTopicTitle = String(selectedTaskTopic || "").trim();
@@ -1246,7 +1297,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "") {
         : (isAssessmentTask ? "Assessment Task Details" : "Activity");
     const standardTaskTopicUrl = cardUrl || `${window.location.origin}/ProjectPages/custom-activity.html?id=${encodeURIComponent(String(id || ""))}`;
     const parentAssessmentUrl = `custom-activity.html?id=${encodeURIComponent(String(id || ""))}`;
-    const displayTitle = taskTopicTitle || data.title;
+    const resolvedTaskShortName = String(selectedTaskShortName || "").trim() || (taskTopicTitle ? deriveTaskShortName(taskTopicTitle) : "");
+    const displayTitle = resolvedTaskShortName || taskTopicTitle || data.title;
     const displaySummaryHtml = taskTopicTitle
         ? `Task topic from <a class="task-topic-parent-link" href="${parentAssessmentUrl}">${escapeHtml(data.title)}</a>`
         : escapeHtml(data.summary);
@@ -2278,12 +2330,13 @@ async function initDetail() {
 
     const resolvedData = defaultDetailShape(id, data);
     const selectedTaskTopic = resolveRequestedTaskTopic(resolvedData, params);
+    const selectedTaskShortName = String(params.get("taskShortName") || "").trim();
     const isTeacher = await canEditDetails();
 
-    document.title = `${selectedTaskTopic || resolvedData.title} | Computer Lab`;
+    document.title = `${selectedTaskShortName || selectedTaskTopic || resolvedData.title} | Computer Lab`;
 
     // Show Edit/Delete buttons if user is a teacher or admin
-    renderDetailView(host, id, resolvedData, isTeacher, selectedTaskTopic);
+    renderDetailView(host, id, resolvedData, isTeacher, selectedTaskTopic, selectedTaskShortName);
 
     // Load interest section only for backend-stored items (numeric IDs)
     if (String(id).match(/^\d+$/)) {
