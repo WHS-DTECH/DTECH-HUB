@@ -1234,6 +1234,7 @@ const state = {
 };
 
 const taskTopicMergeSelection = new Set();
+let hubToastHideTimer = null;
 
 const labProjectState = {
     search: "",
@@ -2112,6 +2113,38 @@ function clearTaskTopicMergeSelection() {
     taskTopicMergeSelection.clear();
 }
 
+function showHubToast(message, tone = "success") {
+    if (typeof document === "undefined") {
+        return;
+    }
+
+    const safeMessage = String(message || "").trim();
+    if (!safeMessage) {
+        return;
+    }
+
+    let toast = document.querySelector("#hub-toast");
+    if (!toast) {
+        toast = document.createElement("div");
+        toast.id = "hub-toast";
+        toast.className = "hub-toast";
+        toast.setAttribute("role", "status");
+        toast.setAttribute("aria-live", "polite");
+        document.body.appendChild(toast);
+    }
+
+    toast.textContent = safeMessage;
+    toast.className = `hub-toast is-visible tone-${tone === "warning" ? "warning" : "success"}`;
+
+    if (hubToastHideTimer) {
+        clearTimeout(hubToastHideTimer);
+    }
+
+    hubToastHideTimer = window.setTimeout(() => {
+        toast.classList.remove("is-visible");
+    }, 2200);
+}
+
 function getVisibleTaskTopicItems(items) {
     return (Array.isArray(items) ? items : []).filter((item) => {
         return inferSourceTypeFromRecord(item) === "task-topic"
@@ -2180,6 +2213,7 @@ function mergeSelectedTaskTopicCards(visibleTaskTopics) {
     clearTaskTopicMergeSelection();
     renderLibrary();
     applyCompactCardLayout();
+    showHubToast(`Merged ${uniqueTopics.length} Task Topic${uniqueTopics.length === 1 ? "" : "s"}.`);
 }
 
 function unmergeSelectedTaskTopicCards(visibleTaskTopics) {
@@ -2218,6 +2252,7 @@ function unmergeSelectedTaskTopicCards(visibleTaskTopics) {
     clearTaskTopicMergeSelection();
     renderLibrary();
     applyCompactCardLayout();
+    showHubToast(`Unmerged ${uniqueTopics.length} Task Topic${uniqueTopics.length === 1 ? "" : "s"}.`);
 }
 
 function renderTaskTopicMergeToolbar(visibleProjects) {
