@@ -521,6 +521,12 @@ function mapProjectTaskTopicsToLibraryItems(project) {
         return [];
     }
 
+    const buildTaskTopicHref = (baseHref, topicText, topicNumber) => {
+        const safeBase = String(baseHref || "").trim() || "ProjectPages/custom-activity.html";
+        const joiner = safeBase.includes("?") ? "&" : "?";
+        return `${safeBase}${joiner}taskTopic=${encodeURIComponent(String(topicText || "").trim())}&taskTopicIndex=${encodeURIComponent(String(topicNumber))}`;
+    };
+
     return taskTopics.map((topic, index) => {
         const topicText = String(topic || "").trim();
         const topicNumber = index + 1;
@@ -536,7 +542,7 @@ function mapProjectTaskTopicsToLibraryItems(project) {
             status: project.status,
             term: project.term,
             updated: project.updated,
-            href: project.href,
+            href: buildTaskTopicHref(project.href, topicText, topicNumber),
             external: project.external,
             summary: `Task topic ${topicNumber} from ${project.title}`,
             keywords: [

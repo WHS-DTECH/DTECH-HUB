@@ -1109,6 +1109,48 @@ function renderList(items) {
     return items.map((item) => `<li>${escapeHtml(item)}</li>`).join("");
 }
 
+function normalizeTaskTopicText(value) {
+    return String(value || "")
+        .replace(/^(Achieved|Merit|Excellence)\s*:\s*/i, "")
+        .trim();
+}
+
+function collectDetailTaskTopics(data) {
+    return [
+        ...coerceArray(data?.tasksList),
+        ...coerceArray(data?.assessmentFocus ?? data?.assessment_focus ?? data?.assessmentFocusRaw),
+        ...coerceArray(data?.achieved),
+        ...coerceArray(data?.merit),
+        ...coerceArray(data?.excellence)
+    ]
+        .map((item) => normalizeTaskTopicText(item))
+        .filter(Boolean);
+}
+
+function resolveRequestedTaskTopic(data, params) {
+    const requestedTopicText = String(params.get("taskTopic") || "").trim();
+    const requestedTopicIndex = Number.parseInt(params.get("taskTopicIndex"), 10);
+    const allTopics = collectDetailTaskTopics(data);
+
+    if (!allTopics.length) {
+        return "";
+    }
+
+    if (requestedTopicText) {
+        const normalizedRequested = normalizeTaskTopicText(requestedTopicText).toLowerCase();
+        const exactMatch = allTopics.find((topic) => topic.toLowerCase() === normalizedRequested);
+        if (exactMatch) {
+            return exactMatch;
+        }
+    }
+
+    if (Number.isFinite(requestedTopicIndex) && requestedTopicIndex > 0) {
+        return allTopics[requestedTopicIndex - 1] || "";
+    }
+
+    return "";
+}
+
 function defaultDetailShape(id, data) {
     const inferredAssessmentCategory = (
         coerceArray(data?.standardDetails).length
@@ -1174,9 +1216,14 @@ function defaultDetailShape(id, data) {
     };
 }
 
-function renderDetailView(host, id, data, canEdit) {
+function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "") {
     const isAssessmentTask = String(data?.activityCategory || "").toLowerCase().includes("assessment");
     const cardUrl = toSafeExternalUrl(data?.cardUrl);
+    const taskTopicTitle = String(selectedTaskTopic || "").trim();
+    const displayTitle = taskTopicTitle || data.title;
+    const displaySummary = taskTopicTitle
+        ? `Task topic from ${data.title}`
+        : data.summary;
     const resolvedTasksList = (() => {
         const fromTasksList = coerceArray(data?.tasksList);
         if (fromTasksList.length) {
@@ -1197,18 +1244,28 @@ function renderDetailView(host, id, data, canEdit) {
 
         <section class="hero">
             <div class="hero-copy">
-                <h1>${escapeHtml(data.title)}</h1>
+                <h1>${escapeHtml(displayTitle)}</h1>
                 <div class="pills">
                     <span class="pill">${escapeHtml(data.yearLevel)}</span>
                     <span class="pill">${escapeHtml(data.type)}</span>
                     <span class="pill">${escapeHtml(data.duration)}</span>
+                    ${taskTopicTitle ? '<span class="pill">Task Topic</span>' : ""}
                 </div>
-                <p>${escapeHtml(data.summary)}</p>
+                <p>${escapeHtml(displaySummary)}</p>
             </div>
             <div class="hero-image">
-                <img src="${escapeHtml(data.image)}" alt="${escapeHtml(data.title)} project image" loading="lazy">
+                <img src="${escapeHtml(data.image)}" alt="${escapeHtml(displayTitle)} project image" loading="lazy">
             </div>
         </section>
+
+        ${
+            taskTopicTitle ? `
+            <section class="proposal-section selected-task-topic-section">
+                <h2>Selected Task Topic</h2>
+                <p class="selected-task-topic-text">${escapeHtml(taskTopicTitle)}</p>
+            </section>
+            ` : ""
+        }
 
         <section class="proposal-details">
             ${data.startDate ? `<div class="detail-row"><strong>EST. Start Date:</strong> <span>${escapeHtml(data.startDate)}</span></div>` : ""}
@@ -1801,12 +1858,13 @@ async function initDetail() {
     if (!data) return;
 
     const resolvedData = defaultDetailShape(id, data);
+    const selectedTaskTopic = resolveRequestedTaskTopic(resolvedData, params);
     const isTeacher = await canEditDetails();
 
-    document.title = `${resolvedData.title} | Computer Lab`;
+    document.title = `${selectedTaskTopic || resolvedData.title} | Computer Lab`;
 
     // Show Edit/Delete buttons if user is a teacher or admin
-    renderDetailView(host, id, resolvedData, isTeacher);
+    renderDetailView(host, id, resolvedData, isTeacher, selectedTaskTopic);
 
     // Load interest section only for backend-stored items (numeric IDs)
     if (String(id).match(/^\d+$/)) {

@@ -314,6 +314,19 @@ h1 {
     color: #163f66;
 }
 
+.selected-task-topic-section {
+    background: #eef6ff;
+    border-color: #bfd6f1;
+}
+
+.selected-task-topic-text {
+    margin: 0;
+    font-size: 0.88rem;
+    color: #173a5f;
+    line-height: 1.45;
+    font-weight: 700;
+}
+
 .detail-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
