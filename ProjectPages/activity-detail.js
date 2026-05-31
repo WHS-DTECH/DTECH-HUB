@@ -1710,6 +1710,26 @@ function renderTaskTopicEditForm(host, id, data, canEdit, selectedTaskTopic) {
     const currentTopic = String(selectedTaskTopic || "").trim();
     const standardTaskTopicUrl = toSafeExternalUrl(data?.cardUrl)
         || `${window.location.origin}/ProjectPages/custom-activity.html?id=${encodeURIComponent(String(id || ""))}`;
+    const renderOptions = (options, selectedValue) => options
+        .map((option) => {
+            const safeOption = String(option || "").trim();
+            const selected = safeOption === String(selectedValue || "").trim() ? " selected" : "";
+            return `<option${selected}>${escapeHtml(safeOption)}</option>`;
+        })
+        .join("");
+
+    const yearLevelOptions = ["Junior", "Middle", "Senior", "Year 7", "Year 8", "Year 9", "Year 10", "Year 11", "Year 12", "Year 13"];
+    const cardCategoryOptions = ["Activity", "Project", "Assessment Task", "Lesson", "Task Topic"];
+    const subjectStreamOptions = ["DTECH", "COMP", "TEXT", "DTONLINE"];
+    const topicTypeOptions = ["Office Suite", "Programming", "Electronics", "Digital Media", "Project Management", "Process"];
+    const difficultyOptions = ["Beginner", "Intermediate", "Advanced"];
+
+    const selectedYearLevel = "Senior";
+    const selectedCardCategory = "Task Topic";
+    const selectedSubjectStream = "DTECH";
+    const selectedTopicType = "Process";
+    const selectedDifficulty = "Intermediate";
+
     if (!currentTopic) {
         renderDetailView(host, id, data, canEdit, selectedTaskTopic);
         return;
@@ -1734,23 +1754,33 @@ function renderTaskTopicEditForm(host, id, data, canEdit, selectedTaskTopic) {
                     </label>
                     <label class="detail-field">
                         <span>Year Level</span>
-                        <input name="taskTopicYearLevel" type="text" value="Senior" readonly>
+                        <select name="taskTopicYearLevel">
+                            ${renderOptions(yearLevelOptions, selectedYearLevel)}
+                        </select>
                     </label>
                     <label class="detail-field">
                         <span>Card Category</span>
-                        <input name="taskTopicCategory" type="text" value="Task Topic" readonly>
+                        <select name="taskTopicCategory" disabled>
+                            ${renderOptions(cardCategoryOptions, selectedCardCategory)}
+                        </select>
                     </label>
                     <label class="detail-field">
                         <span>Subject Stream</span>
-                        <input name="taskTopicSubject" type="text" value="DTECH" readonly>
+                        <select name="taskTopicSubject">
+                            ${renderOptions(subjectStreamOptions, selectedSubjectStream)}
+                        </select>
                     </label>
                     <label class="detail-field">
                         <span>Topic Type</span>
-                        <input name="taskTopicType" type="text" value="Process" readonly>
+                        <select name="taskTopicType">
+                            ${renderOptions(topicTypeOptions, selectedTopicType)}
+                        </select>
                     </label>
                     <label class="detail-field">
                         <span>Difficulty</span>
-                        <input name="taskTopicDifficulty" type="text" value="Intermediate" readonly>
+                        <select name="taskTopicDifficulty">
+                            ${renderOptions(difficultyOptions, selectedDifficulty)}
+                        </select>
                     </label>
                     <label class="detail-field detail-field-full">
                         <span>Standard Details</span>
