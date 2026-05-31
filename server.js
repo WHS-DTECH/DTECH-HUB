@@ -1122,10 +1122,39 @@ async function upsertHubVisibility(activityIds, hubName, isVisible) {
   return affected;
 }
 
-function isExcludedNonDtechActivity(_activity) {
-  // Visibility is already controlled by activity_hub_visibility in SQL.
-  // Keep this helper to avoid runtime failures in routes that call it.
-  return false;
+function isExcludedNonDtechActivity(activity) {
+  const row = activity && typeof activity === "object" ? activity : {};
+  const fields = [
+    row.name,
+    row.title,
+    row.type,
+    row.subject_stream,
+    row.subject,
+    row.description,
+    row.summary,
+    row.activity_category,
+    row.category
+  ]
+    .map((value) => String(value || "").trim().toLowerCase())
+    .filter(Boolean);
+
+  const combined = fields.join(" | ");
+  const looksLikeSewingRoomContent = [
+    "sewing room",
+    "machine sewing",
+    "fabric",
+    "textile",
+    "textiles",
+    "garment",
+    "pattern making",
+    "sampler"
+  ].some((token) => combined.includes(token));
+
+  const explicitSewingStream = ["text", "textiles", "sewing", "fashion"].includes(
+    String(row.subject_stream || row.subject || "").trim().toLowerCase()
+  );
+
+  return looksLikeSewingRoomContent || explicitSewingStream;
 }
 
 function hasAssessmentSignals(activity) {
