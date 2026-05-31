@@ -1133,13 +1133,18 @@ function isExcludedNonDtechActivity(activity) {
     row.subject,
     row.description,
     row.summary,
+    row.short_description,
+    row.topic,
+    row.learning_area,
+    row.tags,
+    row.keywords,
     row.activity_category,
     row.category
   ]
     .map((value) => String(value || "").trim().toLowerCase())
     .filter(Boolean);
 
-  const combined = fields.join(" | ");
+  const combined = `${fields.join(" | ")} | ${JSON.stringify(row || {}).toLowerCase()}`;
   const looksLikeSewingRoomContent = [
     "sewing room",
     "machine sewing",
@@ -1148,7 +1153,22 @@ function isExcludedNonDtechActivity(activity) {
     "textiles",
     "garment",
     "pattern making",
-    "sampler"
+    "sampler",
+    "felt",
+    "felting",
+    "fixings",
+    "zip",
+    "zipper",
+    "zips",
+    "button",
+    "buttons",
+    "bow",
+    "bows",
+    "lacing",
+    "fastening",
+    "fastenings",
+    "needle",
+    "stitch"
   ].some((token) => combined.includes(token));
 
   const explicitSewingStream = ["text", "textiles", "sewing", "fashion"].includes(
