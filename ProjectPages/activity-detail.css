@@ -197,6 +197,17 @@ h1 {
     color: rgba(255, 255, 255, 0.94);
 }
 
+.hero-copy .task-topic-parent-link {
+    color: #ffffff;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.hero-copy .task-topic-parent-link:hover {
+    color: #e6f2ff;
+}
+
 .hero-image img {
     width: 100%;
     height: 100%;

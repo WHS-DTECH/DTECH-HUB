@@ -1245,10 +1245,11 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "") {
         ? "Task Topic Card"
         : (isAssessmentTask ? "Assessment Task Details" : "Activity");
     const standardTaskTopicUrl = cardUrl || `${window.location.origin}/ProjectPages/custom-activity.html?id=${encodeURIComponent(String(id || ""))}`;
+    const parentAssessmentUrl = `custom-activity.html?id=${encodeURIComponent(String(id || ""))}`;
     const displayTitle = taskTopicTitle || data.title;
-    const displaySummary = taskTopicTitle
-        ? `Task topic from ${data.title}`
-        : data.summary;
+    const displaySummaryHtml = taskTopicTitle
+        ? `Task topic from <a class="task-topic-parent-link" href="${parentAssessmentUrl}">${escapeHtml(data.title)}</a>`
+        : escapeHtml(data.summary);
     const taskTopicStandardDetails = coerceArray(data?.standardDetails)
         .map((line) => String(line || "").trim())
         .filter(Boolean);
@@ -1279,7 +1280,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "") {
                     <span class="pill">${escapeHtml(data.duration)}</span>
                     ${taskTopicTitle ? '<span class="pill">Task Topic</span>' : ""}
                 </div>
-                <p>${escapeHtml(displaySummary)}</p>
+                <p>${displaySummaryHtml}</p>
             </div>
             <div class="hero-image">
                 <img src="${escapeHtml(data.image)}" alt="${escapeHtml(displayTitle)} project image" loading="lazy">
