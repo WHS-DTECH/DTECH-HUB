@@ -429,6 +429,94 @@ function generateTaskShortName(taskText) {
     return shortWords.join(" ");
 }
 
+const TASK_TOPIC_MERGE_PREFS_KEY = "dtechHub:taskTopicMergePrefs:v1";
+
+function readTaskTopicMergePrefs() {
+    try {
+        const raw = localStorage.getItem(TASK_TOPIC_MERGE_PREFS_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (_error) {
+        return {};
+    }
+}
+
+function writeTaskTopicMergePrefs(value) {
+    try {
+        localStorage.setItem(TASK_TOPIC_MERGE_PREFS_KEY, JSON.stringify(value));
+    } catch (_error) {
+        // Ignore storage errors.
+    }
+}
+
+function getTaskTopicMergeSignature(topics) {
+    return (Array.isArray(topics) ? topics : [])
+        .map((topic) => String(topic || "").trim().toLowerCase())
+        .filter(Boolean)
+        .sort()
+        .join("||");
+}
+
+function extractTaskTopicQualifier(topicText) {
+    const words = String(topicText || "")
+        .trim()
+        .split(/\s+/)
+        .map((word) => String(word || "").trim())
+        .filter(Boolean);
+
+    if (!words.length) {
+        return "";
+    }
+
+    const firstWord = words[0].replace(/[^a-z]/gi, "");
+    if (!firstWord) {
+        return "";
+    }
+
+    return firstWord.charAt(0).toUpperCase() + firstWord.slice(1).toLowerCase();
+}
+
+function resolveTaskTopicMergeDecision(project, shortName, topics) {
+    const projectId = String(project?.id || "").trim();
+    const signature = getTaskTopicMergeSignature(topics);
+    if (!projectId || !signature) {
+        return false;
+    }
+
+    const allPrefs = readTaskTopicMergePrefs();
+    const projectPrefs = allPrefs[projectId] && typeof allPrefs[projectId] === "object" ? allPrefs[projectId] : {};
+    const existing = projectPrefs[signature];
+
+    if (existing && typeof existing.merge === "boolean") {
+        return existing.merge;
+    }
+
+    if (typeof window === "undefined" || typeof window.confirm !== "function") {
+        return false;
+    }
+
+    const promptMessage = [
+        `Possible duplicate Task Topics found for \"${project?.title || "this assessment"}\".`,
+        "",
+        ...topics.map((topic) => `- ${topic}`),
+        "",
+        `Merge into one topic called \"${shortName}\"?`,
+        "",
+        "OK = Merge",
+        "Cancel = Keep separate"
+    ].join("\n");
+
+    const shouldMerge = window.confirm(promptMessage);
+    projectPrefs[signature] = {
+        merge: shouldMerge,
+        updatedAt: new Date().toISOString()
+    };
+    allPrefs[projectId] = projectPrefs;
+    writeTaskTopicMergePrefs(allPrefs);
+
+    return shouldMerge;
+}
+
 function inferSourceTypeFromRecord(record) {
     const explicitType = String(record?.sourceType || "").toLowerCase();
     if (explicitType === "project" || explicitType === "activity" || explicitType === "assessment" || explicitType === "lesson" || explicitType === "task-topic") {
@@ -600,11 +688,57 @@ function mapProjectTaskTopicsToLibraryItems(project) {
         return `${safeBase}${joiner}taskTopic=${encodeURIComponent(String(topicText || "").trim())}&taskTopicIndex=${encodeURIComponent(String(topicNumber))}&taskShortName=${encodeURIComponent(shortName)}`;
     };
 
-    return taskTopics.map((topic, index) => {
+    const groupedByShortName = new Map();
+    taskTopics.forEach((topic) => {
         const topicText = String(topic || "").trim();
+        if (!topicText) {
+            return;
+        }
+
+        const shortName = generateTaskShortName(topicText) || "Task Topic";
+        const bucket = groupedByShortName.get(shortName) || [];
+        if (!bucket.some((existing) => existing.toLowerCase() === topicText.toLowerCase())) {
+            bucket.push(topicText);
+        }
+        groupedByShortName.set(shortName, bucket);
+    });
+
+    const outputTopics = [];
+    groupedByShortName.forEach((topics, shortName) => {
+        if (topics.length <= 1) {
+            outputTopics.push({
+                topicText: topics[0],
+                title: shortName,
+                merged: false
+            });
+            return;
+        }
+
+        const shouldMerge = resolveTaskTopicMergeDecision(project, shortName, topics);
+        if (shouldMerge) {
+            outputTopics.push({
+                topicText: topics[0],
+                title: shortName,
+                merged: true
+            });
+            return;
+        }
+
+        topics.forEach((topicText) => {
+            const qualifier = extractTaskTopicQualifier(topicText);
+            outputTopics.push({
+                topicText,
+                title: qualifier ? `${shortName} (${qualifier})` : shortName,
+                merged: false
+            });
+        });
+    });
+
+    return outputTopics.map((entry, index) => {
+        const topicText = String(entry.topicText || "").trim();
         const topicNumber = index + 1;
         const standardNumber = extractPrimaryStandardNumber(project?.standardDetails);
-        const shortTaskName = generateTaskShortName(topicText) || `Task ${topicNumber}`;
+        const shortTaskName = String(entry.title || "").trim() || `Task ${topicNumber}`;
 
         return {
             id: `task-topic-${String(project.id || "item")}-${topicNumber}`,
