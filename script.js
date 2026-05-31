@@ -359,6 +359,30 @@ function collectTaskTopicsFromActivityRecord(record) {
     return unique;
 }
 
+function normalizeStandardDetailsRows(value) {
+    const rows = Array.isArray(value)
+        ? value
+        : String(value || "")
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean);
+
+    return rows
+        .map((row) => String(row || "").trim())
+        .filter(Boolean);
+}
+
+function extractPrimaryStandardNumber(standardDetails) {
+    const rows = normalizeStandardDetailsRows(standardDetails);
+    for (const row of rows) {
+        const match = String(row).match(/\b\d{4,6}\b/);
+        if (match && match[0]) {
+            return match[0];
+        }
+    }
+    return "";
+}
+
 function inferSourceTypeFromRecord(record) {
     const explicitType = String(record?.sourceType || "").toLowerCase();
     if (explicitType === "project" || explicitType === "activity" || explicitType === "assessment" || explicitType === "lesson" || explicitType === "task-topic") {
@@ -484,6 +508,7 @@ async function loadSharedProjects() {
                 const sourceType = inferSourceTypeFromRecord(item);
                 const defaultCardColor = sourceType === "assessment" ? "Slate" : "Rose";
                 const taskTopics = collectTaskTopicsFromActivityRecord(item);
+                const standardDetails = normalizeStandardDetailsRows(item.standard_details);
 
                 return {
                     id,
@@ -502,6 +527,7 @@ async function loadSharedProjects() {
                     sourceType,
                     imageUrl: imageUrl || null,
                     taskTopics,
+                    standardDetails,
                     visual: {
                         icon: textToIcon(type),
                         label: "Teacher Upload",
@@ -530,6 +556,7 @@ function mapProjectTaskTopicsToLibraryItems(project) {
     return taskTopics.map((topic, index) => {
         const topicText = String(topic || "").trim();
         const topicNumber = index + 1;
+        const standardNumber = extractPrimaryStandardNumber(project?.standardDetails);
 
         return {
             id: `task-topic-${String(project.id || "item")}-${topicNumber}`,
@@ -537,6 +564,7 @@ function mapProjectTaskTopicsToLibraryItems(project) {
             className: project.className,
             area: project.area,
             sourceType: "task-topic",
+            standardNumber,
             activityCategory: "Task Topic",
             showThisWeek: Boolean(project.showThisWeek),
             status: project.status,
@@ -1770,6 +1798,9 @@ function createProjectCard(project) {
     const assignmentBadge = assignedStudentCount > 0
         ? `<span class="project-meta project-meta-assigned" title="Assigned to ${assignedStudentCount} student${assignedStudentCount === 1 ? "" : "s"}">Assigned (${assignedStudentCount})</span>`
         : "";
+    const standardPill = sourceType === "task-topic" && String(project?.standardNumber || "").trim()
+        ? `<span class="project-tag">${escapeHtml(String(project.standardNumber))}</span>`
+        : "";
 
     card.innerHTML = `
         <div class="project-visual" ${visualStyle}>
@@ -1784,6 +1815,7 @@ function createProjectCard(project) {
                 ${statusBadge}
                 <span class="project-tag">${escapeHtml(yearLevel)}</span>
                 <span class="project-tag">${escapeHtml(project.area)}</span>
+                ${standardPill}
             </div>
             <div class="project-footer">
                 <span class="project-meta">${escapeHtml(contentTypeLabel)}</span>
