@@ -1220,6 +1220,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "") {
     const isAssessmentTask = String(data?.activityCategory || "").toLowerCase().includes("assessment");
     const cardUrl = toSafeExternalUrl(data?.cardUrl);
     const taskTopicTitle = String(selectedTaskTopic || "").trim();
+    const isTaskTopicView = Boolean(taskTopicTitle);
+    const standardTaskTopicUrl = cardUrl || `${window.location.origin}/ProjectPages/custom-activity.html?id=${encodeURIComponent(String(id || ""))}`;
     const displayTitle = taskTopicTitle || data.title;
     const displaySummary = taskTopicTitle
         ? `Task topic from ${data.title}`
@@ -1259,20 +1261,71 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "") {
         </section>
 
         ${
-            taskTopicTitle ? `
-            <section class="proposal-section selected-task-topic-section">
-                <h2>Selected Task Topic</h2>
-                <p class="selected-task-topic-text">${escapeHtml(taskTopicTitle)}</p>
+            isTaskTopicView ? `
+            <section class="proposal-section task-topic-card-basics">
+                <h2>Card Basics</h2>
+                <div class="task-topic-card-grid">
+                    <div class="task-topic-card-field">
+                        <span class="task-topic-card-label">Card Name</span>
+                        <p class="task-topic-card-value">${escapeHtml(taskTopicTitle)}</p>
+                    </div>
+                    <div class="task-topic-card-field">
+                        <span class="task-topic-card-label">Year Level</span>
+                        <p class="task-topic-card-value">Senior</p>
+                    </div>
+                    <div class="task-topic-card-field">
+                        <span class="task-topic-card-label">Card Category</span>
+                        <p class="task-topic-card-value">Task Topic</p>
+                    </div>
+                    <div class="task-topic-card-field">
+                        <span class="task-topic-card-label">Subject Stream</span>
+                        <p class="task-topic-card-value">DTECH</p>
+                    </div>
+                    <div class="task-topic-card-field">
+                        <span class="task-topic-card-label">Topic Type</span>
+                        <p class="task-topic-card-value">Process</p>
+                    </div>
+                    <div class="task-topic-card-field">
+                        <span class="task-topic-card-label">Difficulty</span>
+                        <p class="task-topic-card-value">Intermediate</p>
+                    </div>
+                    <div class="task-topic-card-field task-topic-card-field-full">
+                        <span class="task-topic-card-label">Card URL</span>
+                        <p class="task-topic-card-value"><a href="${escapeHtml(standardTaskTopicUrl)}" target="_blank" rel="noreferrer">${escapeHtml(standardTaskTopicUrl)}</a></p>
+                    </div>
+                    <div class="task-topic-card-field task-topic-card-field-full">
+                        <span class="task-topic-card-label">Short Description</span>
+                        <p class="task-topic-card-value">${escapeHtml(taskTopicTitle)}</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="proposal-section task-topic-display-options">
+                <h2>Display Options</h2>
+                <div class="task-topic-display-grid">
+                    <div class="task-topic-card-field task-topic-card-field-full">
+                        <span class="task-topic-card-label">Card Colour</span>
+                        <p class="task-topic-card-value">Azure</p>
+                    </div>
+                    <div class="task-topic-display-check">
+                        <span class="task-topic-check-box" aria-hidden="true"></span>
+                        <span>Time Sensitive</span>
+                    </div>
+                    <div class="task-topic-display-check is-checked">
+                        <span class="task-topic-check-box" aria-hidden="true">✓</span>
+                        <span>Show In This Week Section</span>
+                    </div>
+                </div>
             </section>
             ` : ""
         }
 
-        <section class="proposal-details">
+        <section class="proposal-details" ${isTaskTopicView ? 'hidden' : ""}>
             ${data.startDate ? `<div class="detail-row"><strong>EST. Start Date:</strong> <span>${escapeHtml(data.startDate)}</span></div>` : ""}
         </section>
 
         ${
-            isAssessmentTask && data.summary ? `
+            !isTaskTopicView && isAssessmentTask && data.summary ? `
             <section class="proposal-section">
                 <h2>Short Description</h2>
                 <p>${escapeHtml(data.summary)}</p>
@@ -1281,7 +1334,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "") {
         }
 
         ${
-            isAssessmentTask && resolvedTasksList.length ? `
+            !isTaskTopicView && isAssessmentTask && resolvedTasksList.length ? `
             <section class="proposal-section">
                 <h2>Task List</h2>
                 <ol class="list">${renderList(resolvedTasksList)}</ol>

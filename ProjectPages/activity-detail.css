@@ -327,6 +327,93 @@ h1 {
     font-weight: 700;
 }
 
+.task-topic-card-basics,
+.task-topic-display-options {
+    background: #f8fbff;
+    border-color: #c9d9ed;
+}
+
+.task-topic-card-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+    gap: 10px;
+}
+
+.task-topic-card-field {
+    border: 1px solid #c7d8ec;
+    border-radius: 8px;
+    padding: 8px 10px;
+    background: #ffffff;
+}
+
+.task-topic-card-field-full {
+    grid-column: 1 / -1;
+}
+
+.task-topic-card-label {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #4a6485;
+}
+
+.task-topic-card-value {
+    margin: 0;
+    font-size: 0.86rem;
+    color: #14304e;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
+.task-topic-card-value a {
+    color: #1d5f9d;
+    text-decoration: none;
+}
+
+.task-topic-card-value a:hover {
+    text-decoration: underline;
+}
+
+.task-topic-display-grid {
+    display: grid;
+    gap: 8px;
+}
+
+.task-topic-display-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+    color: #1f3550;
+}
+
+.task-topic-check-box {
+    width: 16px;
+    height: 16px;
+    border: 1px solid #8ba9c7;
+    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    color: #184f83;
+    background: #ffffff;
+}
+
+.task-topic-display-check.is-checked .task-topic-check-box {
+    background: #e5f0fb;
+    border-color: #6c95bf;
+}
+
+@media (max-width: 640px) {
+    .task-topic-card-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 .detail-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
