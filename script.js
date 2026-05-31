@@ -701,6 +701,21 @@ function inferSourceTypeFromRecord(record) {
         return "lesson";
     }
 
+    const hasMeaningfulValue = (value) => {
+        if (Array.isArray(value)) {
+            return value.map((item) => String(item || "").trim()).filter(Boolean).length > 0;
+        }
+
+        const text = String(value || "").trim();
+        if (!text) return false;
+        if (text === "[]" || text === "{}") return false;
+
+        const lowered = text.toLowerCase();
+        if (lowered === "null" || lowered === "undefined" || lowered === "none" || lowered === "n/a") return false;
+
+        return true;
+    };
+
     const hasProjectFields = [
         record?.start_date,
         record?.startDate,
@@ -720,21 +735,6 @@ function inferSourceTypeFromRecord(record) {
     if (hasExplicitActivityCategory) {
         return hasProjectFields ? "project" : "activity";
     }
-
-    const hasMeaningfulValue = (value) => {
-        if (Array.isArray(value)) {
-            return value.map((item) => String(item || "").trim()).filter(Boolean).length > 0;
-        }
-
-        const text = String(value || "").trim();
-        if (!text) return false;
-        if (text === "[]" || text === "{}") return false;
-
-        const lowered = text.toLowerCase();
-        if (lowered === "null" || lowered === "undefined" || lowered === "none" || lowered === "n/a") return false;
-
-        return true;
-    };
 
     const assessmentSchemaKeys = [
         "assessment_focus",
