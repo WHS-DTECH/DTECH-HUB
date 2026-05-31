@@ -523,6 +523,46 @@ function getTaskTopicMergeSignature(topics) {
         .join("||");
 }
 
+function normalizeTaskTopicList(topics) {
+    const seen = new Set();
+    const output = [];
+
+    (Array.isArray(topics) ? topics : []).forEach((topic) => {
+        const safeTopic = String(topic || "").trim();
+        if (!safeTopic) {
+            return;
+        }
+
+        const key = safeTopic.toLowerCase();
+        if (seen.has(key)) {
+            return;
+        }
+
+        seen.add(key);
+        output.push(safeTopic);
+    });
+
+    return output;
+}
+
+function setTaskTopicMergePreference(projectId, topics, shouldMerge) {
+    const safeProjectId = String(projectId || "").trim();
+    const safeTopics = normalizeTaskTopicList(topics);
+    const signature = getTaskTopicMergeSignature(safeTopics);
+    if (!safeProjectId || !signature) {
+        return;
+    }
+
+    const allPrefs = readTaskTopicMergePrefs();
+    const projectPrefs = allPrefs[safeProjectId] && typeof allPrefs[safeProjectId] === "object" ? allPrefs[safeProjectId] : {};
+    projectPrefs[signature] = {
+        merge: Boolean(shouldMerge),
+        updatedAt: new Date().toISOString()
+    };
+    allPrefs[safeProjectId] = projectPrefs;
+    writeTaskTopicMergePrefs(allPrefs);
+}
+
 function extractTaskTopicQualifier(topicText) {
     const words = String(topicText || "")
         .trim()
@@ -823,6 +863,9 @@ function mapProjectTaskTopicsToLibraryItems(project) {
             className: project.className,
             area: project.area,
             sourceType: "task-topic",
+            parentAssessmentId: String(project.id || ""),
+            taskTopicText: topicText,
+            taskTopicIndex: topicNumber,
             standardNumber,
             activityCategory: "Task Topic",
             showThisWeek: Boolean(project.showThisWeek),
@@ -1148,6 +1191,8 @@ const state = {
     category: "All",
     content: "All"
 };
+
+const taskTopicMergeSelection = new Set();
 
 const labProjectState = {
     search: "",
@@ -2018,7 +2063,126 @@ function filterProjects(items) {
     });
 }
 
-function createProjectCard(project) {
+function isTaskTopicMergeModeEnabled() {
+    return state.content === "Task Topics";
+}
+
+function clearTaskTopicMergeSelection() {
+    taskTopicMergeSelection.clear();
+}
+
+function getVisibleTaskTopicItems(items) {
+    return (Array.isArray(items) ? items : []).filter((item) => {
+        return inferSourceTypeFromRecord(item) === "task-topic"
+            && String(item?.parentAssessmentId || "").trim()
+            && String(item?.taskTopicText || "").trim();
+    });
+}
+
+function pruneTaskTopicMergeSelection(visibleTaskTopics) {
+    const visibleIds = new Set(
+        getVisibleTaskTopicItems(visibleTaskTopics)
+            .map((item) => String(item?.id || "").trim())
+            .filter(Boolean)
+    );
+
+    Array.from(taskTopicMergeSelection.values()).forEach((selectedId) => {
+        if (!visibleIds.has(selectedId)) {
+            taskTopicMergeSelection.delete(selectedId);
+        }
+    });
+}
+
+function mergeSelectedTaskTopicCards(visibleTaskTopics) {
+    const topics = getVisibleTaskTopicItems(visibleTaskTopics);
+    const selectedItems = topics.filter((item) => taskTopicMergeSelection.has(String(item.id || "")));
+
+    if (selectedItems.length < 2) {
+        window.alert("Select at least two Task Topic cards to merge.");
+        return;
+    }
+
+    const assessmentIds = new Set(selectedItems.map((item) => String(item.parentAssessmentId || "").trim()).filter(Boolean));
+    if (assessmentIds.size !== 1) {
+        window.alert("Please select Task Topic cards from the same Assessment Task.");
+        return;
+    }
+
+    const parentAssessmentId = Array.from(assessmentIds.values())[0];
+    const uniqueTopics = normalizeTaskTopicList(selectedItems.map((item) => item.taskTopicText));
+    if (uniqueTopics.length < 2) {
+        window.alert("Please select two different Task Topic cards to merge.");
+        return;
+    }
+
+    const defaultName = String(selectedItems[0]?.title || "").trim() || generateTaskShortName(uniqueTopics[0]) || "Merged Task Topic";
+    const promptMessage = "Merged Task Card Name:";
+    const requestedName = typeof window.prompt === "function"
+        ? window.prompt(promptMessage, defaultName)
+        : defaultName;
+
+    if (requestedName === null) {
+        return;
+    }
+
+    const mergedName = String(requestedName || "").trim();
+    if (!mergedName) {
+        window.alert("Please enter a valid merged card name.");
+        return;
+    }
+
+    uniqueTopics.forEach((topicText) => {
+        setStoredTaskTopicShortName(parentAssessmentId, topicText, mergedName);
+    });
+
+    setTaskTopicMergePreference(parentAssessmentId, uniqueTopics, true);
+    clearTaskTopicMergeSelection();
+    renderLibrary();
+    applyCompactCardLayout();
+}
+
+function renderTaskTopicMergeToolbar(visibleProjects) {
+    if (!libraryGrid) {
+        return;
+    }
+
+    const visibleTaskTopics = getVisibleTaskTopicItems(visibleProjects);
+    if (!isTaskTopicMergeModeEnabled() || !visibleTaskTopics.length) {
+        clearTaskTopicMergeSelection();
+        return;
+    }
+
+    pruneTaskTopicMergeSelection(visibleTaskTopics);
+    const selectedCount = visibleTaskTopics.filter((item) => taskTopicMergeSelection.has(String(item.id || ""))).length;
+
+    const toolbar = document.createElement("div");
+    toolbar.className = "task-topic-merge-toolbar";
+    toolbar.innerHTML = `
+        <div class="task-topic-merge-toolbar-copy">
+            <strong>Merge Task Topics</strong>
+            <span>Tick card corners, then merge into one card name.</span>
+        </div>
+        <div class="task-topic-merge-toolbar-actions">
+            <span class="task-topic-merge-count">${selectedCount} selected</span>
+            <button type="button" class="task-topic-merge-btn" ${selectedCount < 2 ? "disabled" : ""}>Merge Selected</button>
+            <button type="button" class="task-topic-merge-clear">Clear</button>
+        </div>
+    `;
+
+    toolbar.querySelector(".task-topic-merge-btn")?.addEventListener("click", () => {
+        mergeSelectedTaskTopicCards(visibleTaskTopics);
+    });
+
+    toolbar.querySelector(".task-topic-merge-clear")?.addEventListener("click", () => {
+        clearTaskTopicMergeSelection();
+        renderLibrary();
+        applyCompactCardLayout();
+    });
+
+    libraryGrid.appendChild(toolbar);
+}
+
+function createProjectCard(project, options = {}) {
     const card = document.createElement("a");
     card.className = "project-card";
     card.href = project.href;
@@ -2045,6 +2209,11 @@ function createProjectCard(project) {
         ? `<span class="project-tag status-tag status-${project.status}">${formatStatus(project.status)}</span>` 
         : '';
     const sourceType = inferSourceTypeFromRecord(project);
+    const showTaskTopicMergeToggle = options.context === "library"
+        && sourceType === "task-topic"
+        && isTaskTopicMergeModeEnabled()
+        && String(project?.parentAssessmentId || "").trim()
+        && String(project?.taskTopicText || "").trim();
     const contentTypeLabel = sourceType === "project"
         ? "PROJECT"
         : sourceType === "assessment"
@@ -2083,6 +2252,33 @@ function createProjectCard(project) {
             </div>
         </div>
     `;
+
+    if (showTaskTopicMergeToggle) {
+        const projectId = String(project.id || "").trim();
+        const isSelected = taskTopicMergeSelection.has(projectId);
+        card.classList.toggle("is-task-topic-selected", isSelected);
+
+        const mergeToggle = document.createElement("button");
+        mergeToggle.type = "button";
+        mergeToggle.className = `task-topic-merge-toggle${isSelected ? " is-selected" : ""}`;
+        mergeToggle.setAttribute("aria-label", isSelected ? "Unselect Task Topic" : "Select Task Topic for merge");
+        mergeToggle.textContent = isSelected ? "✓" : "";
+        mergeToggle.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (taskTopicMergeSelection.has(projectId)) {
+                taskTopicMergeSelection.delete(projectId);
+            } else {
+                taskTopicMergeSelection.add(projectId);
+            }
+
+            renderLibrary();
+            applyCompactCardLayout();
+        });
+
+        card.appendChild(mergeToggle);
+    }
 
     if (hasImage) {
         const imageElement = card.querySelector(".project-image");
@@ -2360,6 +2556,7 @@ function renderLibrary() {
     libraryResultsMeta.textContent = `${visibleProjects.length} item${visibleProjects.length === 1 ? "" : "s"} shown`;
 
     if (!visibleProjects.length) {
+        clearTaskTopicMergeSelection();
         const emptyState = document.createElement("div");
         emptyState.className = "about-card";
         emptyState.innerHTML = `
@@ -2371,8 +2568,10 @@ function renderLibrary() {
         return;
     }
 
+    renderTaskTopicMergeToolbar(visibleProjects);
+
     visibleProjects.forEach((project) => {
-        libraryGrid.appendChild(createProjectCard(project));
+        libraryGrid.appendChild(createProjectCard(project, { context: "library" }));
     });
 }
 

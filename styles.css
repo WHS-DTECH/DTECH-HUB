@@ -866,6 +866,7 @@ body.public-home-access .controls-panel {
     overflow: hidden;
     transition: all 200ms ease;
     flex-shrink: 0;
+    position: relative;
 }
 
 .project-card:hover {
@@ -1020,6 +1021,117 @@ body.public-home-access .controls-panel {
     font-size: 0.65rem;
     color: var(--ink-soft);
     font-weight: 600;
+}
+
+.project-card.is-task-topic-selected {
+    border-color: #1f6aa7;
+    box-shadow: 0 0 0 2px rgba(31, 106, 167, 0.25);
+}
+
+.task-topic-merge-toggle {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.95);
+    background: rgba(255, 255, 255, 0.9);
+    color: #114b7e;
+    font-size: 0.78rem;
+    font-weight: 800;
+    line-height: 1;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    z-index: 3;
+}
+
+.task-topic-merge-toggle:hover {
+    background: #ffffff;
+}
+
+.task-topic-merge-toggle.is-selected {
+    background: #1f6aa7;
+    color: #ffffff;
+    border-color: #1f6aa7;
+}
+
+.task-topic-merge-toolbar {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border: 1px solid #cddcee;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #f8fbff 0%, #eef5fd 100%);
+    padding: 10px 12px;
+}
+
+.task-topic-merge-toolbar-copy {
+    display: grid;
+    gap: 4px;
+}
+
+.task-topic-merge-toolbar-copy strong {
+    color: #163f66;
+    font-size: 0.82rem;
+}
+
+.task-topic-merge-toolbar-copy span {
+    color: #30567c;
+    font-size: 0.74rem;
+}
+
+.task-topic-merge-toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.task-topic-merge-count {
+    font-size: 0.72rem;
+    color: #2a4e73;
+    font-weight: 700;
+}
+
+.task-topic-merge-btn,
+.task-topic-merge-clear {
+    border: 1px solid #b6cbe2;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.task-topic-merge-btn {
+    background: #1f6aa7;
+    border-color: #1f6aa7;
+    color: #ffffff;
+}
+
+.task-topic-merge-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.task-topic-merge-clear {
+    background: #ffffff;
+    color: #25486d;
+}
+
+@media (max-width: 760px) {
+    .task-topic-merge-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .task-topic-merge-toolbar-actions {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
 }
 
 /* Status and Tag Styles */
@@ -2638,6 +2750,7 @@ body.public-home-access .controls-panel {
     overflow: hidden;
     transition: all 200ms ease;
     flex-shrink: 0;
+    position: relative;
 }
 
 .project-card:hover {
