@@ -1682,6 +1682,8 @@ function replaceTaskTopicInLines(lines, previousTopic, nextTopic) {
 
 function renderTaskTopicEditForm(host, id, data, canEdit, selectedTaskTopic) {
     const currentTopic = String(selectedTaskTopic || "").trim();
+    const standardTaskTopicUrl = toSafeExternalUrl(data?.cardUrl)
+        || `${window.location.origin}/ProjectPages/custom-activity.html?id=${encodeURIComponent(String(id || ""))}`;
     if (!currentTopic) {
         renderDetailView(host, id, data, canEdit, selectedTaskTopic);
         return;
@@ -1698,15 +1700,57 @@ function renderTaskTopicEditForm(host, id, data, canEdit, selectedTaskTopic) {
 
         <form id="${formId}" class="detail-form" novalidate>
             <fieldset class="detail-form-section">
-                <legend>Task Topic Basics</legend>
+                <legend>Card Basics</legend>
                 <div class="detail-form-grid">
-                    <label class="detail-field detail-field-full">
-                        <span>Task Topic Name</span>
+                    <label class="detail-field">
+                        <span>Card Name</span>
                         <input name="taskTopicTitle" type="text" required value="${escapeHtml(currentTopic)}">
+                    </label>
+                    <label class="detail-field">
+                        <span>Year Level</span>
+                        <input name="taskTopicYearLevel" type="text" value="Senior" readonly>
+                    </label>
+                    <label class="detail-field">
+                        <span>Card Category</span>
+                        <input name="taskTopicCategory" type="text" value="Task Topic" readonly>
+                    </label>
+                    <label class="detail-field">
+                        <span>Subject Stream</span>
+                        <input name="taskTopicSubject" type="text" value="DTECH" readonly>
+                    </label>
+                    <label class="detail-field">
+                        <span>Topic Type</span>
+                        <input name="taskTopicType" type="text" value="Process" readonly>
+                    </label>
+                    <label class="detail-field">
+                        <span>Difficulty</span>
+                        <input name="taskTopicDifficulty" type="text" value="Intermediate" readonly>
+                    </label>
+                    <label class="detail-field detail-field-full">
+                        <span>Card URL</span>
+                        <input name="taskTopicUrl" type="url" value="${escapeHtml(standardTaskTopicUrl)}" readonly>
                     </label>
                     <label class="detail-field detail-field-full">
                         <span>Short Description</span>
                         <textarea name="taskTopicSummary" rows="4" required>${escapeHtml(currentTopic)}</textarea>
+                    </label>
+                </div>
+            </fieldset>
+
+            <fieldset class="detail-form-section">
+                <legend>Display Options</legend>
+                <div class="detail-form-grid">
+                    <label class="detail-field detail-field-full">
+                        <span>Card Colour</span>
+                        <input name="taskTopicColor" type="text" value="Azure" readonly>
+                    </label>
+                    <label class="detail-field detail-field-full" style="display:flex;align-items:center;gap:8px;">
+                        <input name="taskTopicTimeSensitive" type="checkbox" disabled>
+                        <span style="margin:0;">Time Sensitive</span>
+                    </label>
+                    <label class="detail-field detail-field-full" style="display:flex;align-items:center;gap:8px;">
+                        <input name="taskTopicShowThisWeek" type="checkbox" checked disabled>
+                        <span style="margin:0;">Show In This Week Section</span>
                     </label>
                 </div>
             </fieldset>
