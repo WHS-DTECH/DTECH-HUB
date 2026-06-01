@@ -1192,6 +1192,19 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 <label class="task-topic-submission-label" for="task-topic-media-review-url">Review Link (Optional)</label>
                 <input id="task-topic-media-review-url" class="task-topic-submission-input" type="url" placeholder="https://frame.io/... or review board" value="${escapeHtml(currentMediaReviewUrl)}">
 
+                <div class="task-topic-media-naming-panel" role="note" aria-label="Media naming convention guide">
+                    <p class="task-topic-media-naming-title">File Naming Convention</p>
+                    <p class="task-topic-media-naming-text">Use this format so assets sort cleanly and versions are easy to find:</p>
+                    <p class="task-topic-media-naming-format">client-project_asset-type_v##_YYYY-MM-DD_initials.ext</p>
+                    <ul class="task-topic-media-naming-list">
+                        <li>Use two digits for version numbers: v01, v02, v03.</li>
+                        <li>Use ISO date format: YYYY-MM-DD.</li>
+                        <li>Keep names lowercase and use hyphens instead of spaces.</li>
+                        <li>Store final exports in a final-exports folder inside your master asset folder.</li>
+                    </ul>
+                    <p class="task-topic-media-naming-example">Example: te-ao-fitness_social-cut_v03_2026-06-01_vm.mp4</p>
+                </div>
+
                 <div class="task-topic-trello-log-box">
                     <p class="task-topic-submission-note ${hasLoggedToday ? "task-topic-submission-note-success" : "task-topic-submission-note-warning"}">${hasLoggedToday ? "Version log complete for today." : "Daily prompt: add a version log entry for your media updates now."}</p>
                     <label class="task-topic-submission-label" for="task-topic-media-log-note">Today's Version Log</label>
