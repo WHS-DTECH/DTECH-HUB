@@ -3,8 +3,15 @@ const express = require("express");
 const multer = require("multer");
 const mammoth = require("mammoth");
 const nodemailer = require("nodemailer");
-const { PDFParse } = require("pdf-parse");
 const { Pool } = require("pg");
+
+let PDFParse = null;
+try {
+  ({ PDFParse } = require("pdf-parse"));
+} catch (_error) {
+  PDFParse = null;
+  console.warn("[startup] Optional dependency 'pdf-parse' is not available. PDF extraction features will use fallback behavior.");
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -282,11 +289,13 @@ async function fetchNzqaStandardDetails(standardNumber) {
           "accept": "application/pdf"
         }
       });
-      const bytes = Buffer.from(await response.arrayBuffer());
-      const parser = new PDFParse({ data: bytes, verbosity: 0 });
-      const extraction = await parser.getText();
-      result.source_type = "pdf";
-      result.extracted_text = String(extraction?.text || "").replace(/\r/g, "").trim();
+      if (PDFParse) {
+        const bytes = Buffer.from(await response.arrayBuffer());
+        const parser = new PDFParse({ data: bytes, verbosity: 0 });
+        const extraction = await parser.getText();
+        result.source_type = "pdf";
+        result.extracted_text = String(extraction?.text || "").replace(/\r/g, "").trim();
+      }
     } catch (_error) {
       // Fallback below.
     }
@@ -2900,6 +2909,11 @@ app.post("/api/course-outlines/parse-pdf", requireActivityWriteAccess, courseOut
   }
 
   try {
+    if (!PDFParse) {
+      res.status(503).json({ error: "PDF import is temporarily unavailable because pdf-parse is not installed on the server." });
+      return;
+    }
+
     const parser = new PDFParse({
       data: file.buffer,
       verbosity: 0
