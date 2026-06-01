@@ -875,6 +875,8 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             .filter(Boolean);
 
         const todayNz = getNzDateKey();
+        const missingTrelloRows = rows.filter((row) => !String(row.trelloCardUrl || "").trim());
+        const missingLogRows = rows.filter((row) => row.lastLogDate !== todayNz);
 
         if (!rows.length) {
             panelHost.innerHTML = `<p class="task-topic-submission-note">No student records are ready for acknowledgement tracking yet.</p>`;
@@ -893,6 +895,21 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                     <p><strong>Acknowledged:</strong> ${rows.filter((row) => row.acknowledged).length} of ${rows.length}</p>
                     ${isProjectManagementTopic ? `<p><strong>Logged today:</strong> ${rows.filter((row) => row.lastLogDate === todayNz).length} of ${rows.length}</p>` : ""}
                 </div>
+                ${isProjectManagementTopic ? `
+                    <div class="task-topic-teacher-summary-row">
+                        <div class="task-topic-teacher-summary-item">
+                            <span class="task-topic-teacher-summary-label">Missing Trello Link</span>
+                            <span class="task-topic-teacher-summary-value">${missingTrelloRows.length}</span>
+                        </div>
+                        <div class="task-topic-teacher-summary-item">
+                            <span class="task-topic-teacher-summary-label">Missing Today's Log</span>
+                            <span class="task-topic-teacher-summary-value">${missingLogRows.length}</span>
+                        </div>
+                        <div class="task-topic-teacher-summary-action">
+                            <button type="button" class="detail-action detail-action-secondary" id="task-topic-export-missing-log">Export Missing Today's Log</button>
+                        </div>
+                    </div>
+                ` : ""}
                 ${isProjectManagementTopic ? `
                     <div class="task-topic-submission-actions task-topic-teacher-filter-actions">
                         <button type="button" class="detail-action detail-action-secondary" id="task-topic-filter-missing-trello">Show Missing Trello Links</button>
@@ -925,6 +942,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             const missingFilterButton = panelHost.querySelector("#task-topic-filter-missing-trello");
             const missingLogFilterButton = panelHost.querySelector("#task-topic-filter-missing-log");
             const showAllButton = panelHost.querySelector("#task-topic-filter-show-all");
+            const exportMissingLogButton = panelHost.querySelector("#task-topic-export-missing-log");
             const items = Array.from(panelHost.querySelectorAll(".task-topic-teacher-status-item"));
 
             const applyFilter = (mode) => {
@@ -954,6 +972,32 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             missingFilterButton?.addEventListener("click", () => applyFilter("missing-trello"));
             missingLogFilterButton?.addEventListener("click", () => applyFilter("missing-log"));
             showAllButton?.addEventListener("click", () => applyFilter("all"));
+
+            exportMissingLogButton?.addEventListener("click", () => {
+                const rowsToExport = rows.filter((row) => row.lastLogDate !== todayNz);
+                const quoteCsv = (value) => `"${String(value || "").replace(/"/g, '""')}"`;
+                const csvLines = [
+                    ["student_email", "acknowledged", "trello_linked", "last_log_date", "last_log_at", "document_reference"].join(","),
+                    ...rowsToExport.map((row) => [
+                        quoteCsv(row.email),
+                        quoteCsv(row.acknowledged ? "yes" : "no"),
+                        quoteCsv(row.trelloCardUrl ? "yes" : "no"),
+                        quoteCsv(row.lastLogDate || ""),
+                        quoteCsv(row.lastLogAt || ""),
+                        quoteCsv(row.docRef || "")
+                    ].join(","))
+                ];
+
+                const blob = new Blob([csvLines.join("\n")], { type: "text/csv;charset=utf-8;" });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = `missing-todays-log-${todayNz}.csv`;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(url);
+            });
         }
         return;
     }
