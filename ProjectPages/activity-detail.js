@@ -758,6 +758,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
 
     const params = new URLSearchParams(window.location.search);
     const taskTopicTitle = String(params.get("taskTopic") || "").trim();
+    const taskTopicShortName = String(params.get("taskShortName") || "").trim();
     if (!taskTopicTitle) {
         panelHost.innerHTML = "";
         return;
@@ -771,7 +772,11 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const standardNumber = extractPrimaryStandardNumberFromRows(coerceArray(detailData?.standardDetails));
     const standardKey = buildTaskTopicSubmissionStandardKey(taskTopicTitle, standardNumber);
     const isRelevantImplicationsTopic = taskTopicTitle.toLowerCase().includes("relevant implication");
-    const isProjectManagementTopic = taskTopicTitle.toLowerCase().includes("project management");
+    const normalizedDerivedShortName = deriveTaskShortName(taskTopicTitle).toLowerCase();
+    const normalizedTaskTopicShortName = taskTopicShortName.toLowerCase();
+    const isProjectManagementTopic = taskTopicTitle.toLowerCase().includes("project management")
+        || normalizedTaskTopicShortName.includes("project management")
+        || normalizedDerivedShortName.includes("project management");
     const haparaWorkspacePublicUrl = "https://bit.ly/4uO74lI";
     const haparaWorkspaceEmbedUrl = "https://workspace.teacherdashboard.com/public/#/w/6a1cc0549131d4df96cb4f7f?embed=true";
     const haparaClassDriveUrl = "https://app.hapara.com/dashboard/drive/4-1-12comp-vp-2026@westlandhigh.school.nz/all";
