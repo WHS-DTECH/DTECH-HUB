@@ -411,10 +411,6 @@ function applyAssessmentStandardCardTemplate(card) {
         renderRequirementChecklistPreview("excellence", excellenceLines);
     }
 
-    if (form.cardColor) {
-        form.cardColor.value = "Teal";
-    }
-
     if (form.tasksList) {
         form.tasksList.value = nextTaskTopics.join("\n");
         autoResizeTextarea(form.tasksList);
