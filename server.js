@@ -1594,7 +1594,22 @@ function pickBestAssessmentStandardCardMatch(cards, { standardCode, yearLevel, c
   const scored = (Array.isArray(cards) ? cards : [])
     .map((row) => normalizeAssessmentStandardCardRow(row))
     .filter((row) => row.is_active)
-    .filter((row) => row.standard_codes.includes(normalizedCode))
+    .filter((row) => {
+      const rowCourseName = String(row.course_name || "").trim();
+      const rowCodeList = Array.isArray(row.standard_codes)
+        ? row.standard_codes.map((code) => String(code || "").trim())
+        : [];
+
+      if (rowCodeList.includes(normalizedCode)) {
+        return true;
+      }
+
+      if (rowCodeList.some((code) => code.includes(normalizedCode))) {
+        return true;
+      }
+
+      return rowCourseName.includes(normalizedCode);
+    })
     .map((row) => {
       let score = 0;
       const rowYearLevel = String(row.year_level || "").trim().toLowerCase();
@@ -5447,10 +5462,8 @@ app.get("/api/assessment-standard-cards/match", requireActivityWriteAccess, asyn
         SELECT *
         FROM assessment_standard_cards
         WHERE is_active = TRUE
-          AND standard_codes ? $1
         ORDER BY updated_at DESC
-      `,
-      [standardCode]
+      `
     );
 
     const match = pickBestAssessmentStandardCardMatch(result.rows, {
