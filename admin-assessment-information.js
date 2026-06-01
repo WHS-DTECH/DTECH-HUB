@@ -281,13 +281,13 @@ async function loadStandardDetail(standardNumber, { force = false } = {}) {
             ? String(details?.pdf_url || "").trim()
             : sourceType === "DOCX"
                 ? String(details?.docx_url || "").trim()
-                : String(details?.details_url || "").trim();
+                : "";
         const sourceHasNumber = normalizedNumber && sourceUrl
             ? sourceUrl.toLowerCase().includes(normalizedNumber.toLowerCase())
             : false;
         const matchLabel = sourceUrl
             ? `Matched source URL for ${normalizedNumber}: ${sourceHasNumber ? "Yes" : "Partial"} (${sourceUrl})`
-            : `Matched source URL for ${normalizedNumber}: Not available`;
+            : `Matched source URL for ${normalizedNumber}: Not available (DOCX/PDF only mode)`;
 
         setStandardDetailState({
             title: titleBits.join(" - ") || "Standard details",

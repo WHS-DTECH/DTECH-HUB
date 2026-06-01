@@ -389,7 +389,25 @@ async function fetchNzqaStandardDetails(standardNumber) {
     fetched_at: new Date().toISOString()
   };
 
-  if (result.pdf_url) {
+  // Prefer DOCX first because it tends to contain cleaner section text for parsing.
+  if (!result.extracted_text && result.docx_url && /\.docx(?:$|[?#])/i.test(result.docx_url)) {
+    try {
+      const response = await fetch(result.docx_url, {
+        headers: {
+          "user-agent": "Mozilla/5.0 (DTECH-HUB/1.0)",
+          "accept": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        }
+      });
+      const bytes = Buffer.from(await response.arrayBuffer());
+      const extraction = await mammoth.extractRawText({ buffer: bytes });
+      result.source_type = "docx";
+      result.extracted_text = String(extraction?.value || "").replace(/\r/g, "").trim();
+    } catch (_error) {
+      // Continue to PDF fallback.
+    }
+  }
+
+  if (!result.extracted_text && result.pdf_url) {
     try {
       const response = await fetch(result.pdf_url, {
         headers: {
@@ -405,74 +423,13 @@ async function fetchNzqaStandardDetails(standardNumber) {
         result.extracted_text = String(extraction?.text || "").replace(/\r/g, "").trim();
       }
     } catch (_error) {
-      // Fallback below.
+      // No further source fallback.
     }
   }
 
-  if (!result.extracted_text && result.docx_url && /\.docx(?:$|[?#])/i.test(result.docx_url)) {
-    try {
-      const response = await fetch(result.docx_url, {
-        headers: {
-          "user-agent": "Mozilla/5.0 (DTECH-HUB/1.0)",
-          "accept": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        }
-      });
-      const bytes = Buffer.from(await response.arrayBuffer());
-      const extraction = await mammoth.extractRawText({ buffer: bytes });
-      result.source_type = "docx";
-      result.extracted_text = String(extraction?.value || "").replace(/\r/g, "").trim();
-    } catch (_error) {
-      // Fallback below.
-    }
-  }
-
-  if (!result.extracted_text && result.details_url && !isDocumentAttachmentUrl(result.details_url)) {
-    try {
-      const response = await fetch(result.details_url, {
-        headers: {
-          "user-agent": "Mozilla/5.0 (DTECH-HUB/1.0)",
-          "accept": "text/html,application/xhtml+xml"
-        }
-      });
-      const contentType = String(response.headers.get("content-type") || "").toLowerCase();
-      if (!contentType.includes("text/html")) {
-        throw new Error("NZQA details URL did not return HTML");
-      }
-      const html = await response.text();
-      result.source_type = "html";
-      result.extracted_text = stripNzqaHtmlToText(html);
-    } catch (_error) {
-      // Keep empty result.
-    }
-  }
-
-  // Last-resort HTML fallback from search page in case prior detail URL was not usable.
   if (!result.extracted_text || looksLikeBinaryGarble(result.extracted_text)) {
-    try {
-      const fallbackDetailsUrl = buildNzqaLinks(number).details_url;
-      const response = await fetch(fallbackDetailsUrl, {
-        headers: {
-          "user-agent": "Mozilla/5.0 (DTECH-HUB/1.0)",
-          "accept": "text/html,application/xhtml+xml"
-        }
-      });
-      const contentType = String(response.headers.get("content-type") || "").toLowerCase();
-      if (contentType.includes("text/html")) {
-        const html = await response.text();
-        const cleaned = stripNzqaHtmlToText(html);
-        if (cleaned && !looksLikeBinaryGarble(cleaned)) {
-          result.source_type = "html";
-          result.extracted_text = cleaned;
-          result.details_url = fallbackDetailsUrl;
-        }
-      }
-    } catch (_error) {
-      // Keep existing extraction state.
-    }
-  }
-
-  if (!result.extracted_text) {
-    result.extracted_text = "No downloadable PDF/DOCX content could be extracted for this standard.";
+    result.source_type = "none";
+    result.extracted_text = "No usable DOCX/PDF content could be extracted for this standard. The source has been limited to standard documents only (no general website fallback).";
   }
 
   result.criteria = extractAssessmentCriteriaFromText(result.extracted_text);
