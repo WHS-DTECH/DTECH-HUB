@@ -5207,6 +5207,39 @@ app.get("/api/admin/assessment-standard-cards", requireAdminAccess, async (req, 
   }
 });
 
+app.get("/api/assessment-standard-cards", requireActivityWriteAccess, async (_req, res) => {
+  if (!hasDatabase) {
+    const cards = Array.from(memoryAssessmentStandardCards.values())
+      .map((row) => normalizeAssessmentStandardCardRow(row))
+      .filter((row) => row.is_active)
+      .sort((a, b) => {
+        const aTime = Number.isNaN(new Date(a.updated_at || 0).getTime()) ? 0 : new Date(a.updated_at || 0).getTime();
+        const bTime = Number.isNaN(new Date(b.updated_at || 0).getTime()) ? 0 : new Date(b.updated_at || 0).getTime();
+        return bTime - aTime;
+      });
+
+    res.json({ count: cards.length, cards });
+    return;
+  }
+
+  try {
+    await ensureAssessmentStandardCardsSchema();
+    const result = await pool.query(
+      `
+        SELECT *
+        FROM assessment_standard_cards
+        WHERE is_active = TRUE
+        ORDER BY updated_at DESC
+      `
+    );
+
+    const cards = result.rows.map((row) => normalizeAssessmentStandardCardRow(row));
+    res.json({ count: cards.length, cards });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not load Assessment Standard Cards" });
+  }
+});
+
 app.post("/api/admin/assessment-standard-cards", requireAdminAccess, async (req, res) => {
   const body = req.body && typeof req.body === "object" ? req.body : {};
   const requestEmail = normalizeEmail(getRequestUserEmail(req));

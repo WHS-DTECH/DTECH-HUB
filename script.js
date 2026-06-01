@@ -243,12 +243,18 @@ const baseLabProjects = [
 let projects = [...baseProjects];
 let labProjects = [...baseLabProjects];
 let lessons = [];
+let standardCards = [];
 
 // Dynamically load backend activities and refresh library
 async function refreshActivitiesLibrary() {
-    const [sharedProjects, sharedLessons] = await Promise.all([loadSharedProjects(), loadSharedLessons()]);
+    const [sharedProjects, sharedLessons, sharedStandardCards] = await Promise.all([
+        loadSharedProjects(),
+        loadSharedLessons(),
+        loadAssessmentStandardCardsForLibrary()
+    ]);
     projects = mergeProjects(sharedProjects);
     lessons = sharedLessons;
+    standardCards = sharedStandardCards;
     renderLibrary();
 }
 
@@ -988,6 +994,81 @@ async function loadSharedLessons() {
     }
 }
 
+async function loadAssessmentStandardCardsForLibrary() {
+    const email = getActiveHubEmail();
+    if (!email) {
+        return [];
+    }
+
+    try {
+        const response = await fetch("/api/assessment-standard-cards", {
+            headers: {
+                "x-user-email": email
+            }
+        });
+        if (!response.ok) return [];
+
+        const payload = await response.json().catch(() => ({}));
+        const cards = Array.isArray(payload?.cards) ? payload.cards : [];
+        return cards
+            .map((card) => {
+                const id = String(card?.id || "").trim();
+                const standardCodes = Array.isArray(card?.standard_codes)
+                    ? card.standard_codes.map((value) => String(value || "").trim()).filter(Boolean)
+                    : [];
+                const title = String(card?.course_name || standardCodes[0] || "").trim();
+                if (!id || !title) {
+                    return null;
+                }
+
+                const updated = String(card?.updated_at || card?.created_at || new Date().toISOString()).slice(0, 10);
+                const standardNumber = String(standardCodes[0] || "").trim();
+                const criteriaRows = [
+                    String(card?.achieved_text || "").trim(),
+                    String(card?.merit_text || "").trim(),
+                    String(card?.excellence_text || "").trim()
+                ].filter(Boolean);
+
+                return {
+                    id: `standard-card-${id}`,
+                    title: standardNumber ? `AS ${standardNumber}` : title,
+                    className: `${String(card?.year_level || "Other").trim() || "Other"} Computer Lab`,
+                    area: "Assessment Standard",
+                    activityCategory: "Standard",
+                    showThisWeek: false,
+                    status: "active",
+                    term: "Assessment",
+                    updated,
+                    href: `/admin-assessment-information.html?card=${encodeURIComponent(id)}`,
+                    external: false,
+                    summary: String(card?.excellence_text || card?.merit_text || card?.achieved_text || "Assessment standard card").trim(),
+                    keywords: [
+                        "standard",
+                        "assessment standard",
+                        String(card?.course_name || ""),
+                        String(card?.year_level || ""),
+                        ...standardCodes
+                    ].map((value) => String(value || "").trim()).filter(Boolean),
+                    sourceType: "assessment",
+                    standardNumber,
+                    standardDetails: [
+                        ...standardCodes,
+                        ...criteriaRows
+                    ],
+                    imageUrl: null,
+                    visual: {
+                        icon: standardNumber ? `AS${standardNumber.slice(-2)}` : "AS",
+                        label: "Standard",
+                        palette: colorToPalette("teal")
+                    }
+                };
+            })
+            .filter(Boolean);
+    } catch (_error) {
+        return [];
+    }
+}
+
 function mergeProjects(sharedProjects) {
     const byId = new Map();
     const byTitle = new Map();
@@ -1043,6 +1124,10 @@ function getUnifiedLibraryItems() {
         ...lessons.map((lesson) => ({
             ...lesson,
             sourceType: "lesson"
+        })),
+        ...standardCards.map((card) => ({
+            ...card,
+            sourceType: "assessment"
         })),
         ...taskTopicItems,
         ...labProjects.map(mapLabProjectToLibraryItem)
@@ -3024,8 +3109,14 @@ async function init() {
         return;
     }
 
-    const sharedProjects = await loadSharedProjects();
+    const [sharedProjects, sharedLessons, sharedStandardCards] = await Promise.all([
+        loadSharedProjects(),
+        loadSharedLessons(),
+        loadAssessmentStandardCardsForLibrary()
+    ]);
     projects = mergeProjects(sharedProjects);
+    lessons = sharedLessons;
+    standardCards = sharedStandardCards;
     labProjects = [...baseLabProjects];
     renderStats();
     populateFilters();
