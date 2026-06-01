@@ -2042,7 +2042,17 @@ function getTypes() {
 }
 
 function getContentTypes() {
-    return ["All", "Activities", "Projects", "Assessments", "Lessons", "Task Topics"];
+    return ["All", "Activities", "Projects", "Assessments", "Standards", "Lessons", "Task Topics"];
+}
+
+function hasStandardReference(project) {
+    const standardNumber = String(project?.standardNumber || "").trim();
+    if (standardNumber) {
+        return true;
+    }
+
+    const standardRows = Array.isArray(project?.standardDetails) ? project.standardDetails : [];
+    return standardRows.some((row) => String(row || "").trim().length > 0);
 }
 
 function getCategories() {
@@ -2100,9 +2110,19 @@ function filterProjects(items) {
             (state.content === "Activities" && project.sourceType === "activity") ||
             (state.content === "Projects" && project.sourceType === "project") ||
             (state.content === "Assessments" && project.sourceType === "assessment") ||
+            (state.content === "Standards" && hasStandardReference(project)) ||
             (state.content === "Lessons" && project.sourceType === "lesson") ||
             (state.content === "Task Topics" && project.sourceType === "task-topic");
-        const haystack = [project.title, project.className, project.area, project.activityCategory, project.summary, ...project.keywords]
+        const haystack = [
+            project.title,
+            project.className,
+            project.area,
+            project.activityCategory,
+            project.summary,
+            String(project?.standardNumber || ""),
+            ...(Array.isArray(project?.standardDetails) ? project.standardDetails : []),
+            ...project.keywords
+        ]
             .join(" ")
             .toLowerCase();
         const matchesSearch = !query || haystack.includes(query);
