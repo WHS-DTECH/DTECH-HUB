@@ -568,43 +568,6 @@ const unitPlanUpload = multer({
   }
 });
 
-const evidenceFileUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 8 * 1024 * 1024 },
-  fileFilter: (_req, file, callback) => {
-    const mime = String(file?.mimetype || "").toLowerCase();
-    const lowerName = String(file?.originalname || "").toLowerCase();
-    const allowedExtensions = [".pdf", ".doc", ".docx", ".txt", ".rtf", ".pages", ".odt", ".png", ".jpg", ".jpeg", ".webp"];
-    const allowedMimes = new Set([
-      "application/pdf",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "text/plain",
-      "application/rtf",
-      "text/rtf",
-      "application/vnd.oasis.opendocument.text",
-      "image/png",
-      "image/jpeg",
-      "image/webp",
-      "application/octet-stream"
-    ]);
-
-    const allowedByExtension = allowedExtensions.some((extension) => lowerName.endsWith(extension));
-    const allowedByMime = allowedMimes.has(mime);
-    callback(null, allowedByExtension || allowedByMime);
-  }
-});
-
-function sanitizeEvidenceFileName(value) {
-  const raw = String(value || "").trim();
-  if (!raw) {
-    return "evidence-file";
-  }
-
-  const withoutPath = raw.split(/[\\/]/).pop() || raw;
-  const cleaned = withoutPath.replace(/[^a-zA-Z0-9._-]/g, "_");
-  return cleaned.slice(0, 120) || "evidence-file";
-}
 
 let smtpTransporter = null;
 if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
@@ -3783,53 +3746,6 @@ app.post("/api/activities/:id/upload-image", requireActivityWriteAccess, async (
     console.error("Image upload error:", error);
     res.status(500).json({ error: "Failed to upload image" });
   }
-});
-
-app.post("/api/activities/:id/interests/:studentEmail/evidence-upload", evidenceFileUpload.single("evidenceFile"), async (req, res) => {
-  const projectId = String(req.params.id || "").trim();
-  const studentEmail = normalizeEmail(req.params.studentEmail || "");
-  const requesterEmail = normalizeEmail(req.headers["x-user-email"] || "");
-
-  if (!projectId || !studentEmail) {
-    res.status(400).json({ error: "Project ID and student email are required" });
-    return;
-  }
-
-  if (!requesterEmail || !requesterEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
-    res.status(401).json({ error: "School sign-in required" });
-    return;
-  }
-
-  let isTeacher = false;
-  try {
-    const access = await resolveActivityWriteAccess(requesterEmail);
-    isTeacher = Boolean(access.allowed);
-  } catch (_error) {
-    isTeacher = false;
-  }
-
-  if (!isTeacher && requesterEmail !== studentEmail) {
-    res.status(403).json({ error: "Access denied" });
-    return;
-  }
-
-  const uploadedFile = req.file;
-  if (!uploadedFile || !uploadedFile.buffer || !uploadedFile.buffer.length) {
-    res.status(400).json({ error: "No evidence file uploaded" });
-    return;
-  }
-
-  const safeName = sanitizeEvidenceFileName(uploadedFile.originalname || "evidence-file");
-  const safeMime = String(uploadedFile.mimetype || "application/octet-stream").trim() || "application/octet-stream";
-  const base64Data = uploadedFile.buffer.toString("base64");
-  const fileUrl = `data:${safeMime};base64,${base64Data}`;
-
-  res.json({
-    file_name: safeName,
-    file_url: fileUrl,
-    mime_type: safeMime,
-    size_bytes: Number(uploadedFile.size) || uploadedFile.buffer.length
-  });
 });
 
 // POST /api/activities/:id/interest — toggle a student's interest in a project

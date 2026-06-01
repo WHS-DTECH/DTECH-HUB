@@ -573,6 +573,9 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
         evidenceLink: "",
         fileName: "",
         fileUrl: "",
+        haparaAcknowledged: false,
+        haparaSubmittedAt: "",
+        haparaLocation: "",
         submittedAt: "",
         reviewStatus: "pending"
     };
@@ -607,6 +610,22 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
             return;
         }
 
+        if (text.startsWith("HAPARA_ACK|")) {
+            const value = text.slice("HAPARA_ACK|".length).trim().toLowerCase();
+            result.haparaAcknowledged = value === "true" || value === "1" || value === "yes";
+            return;
+        }
+
+        if (text.startsWith("HAPARA_SUBMITTED_AT|")) {
+            result.haparaSubmittedAt = text.slice("HAPARA_SUBMITTED_AT|".length).trim();
+            return;
+        }
+
+        if (text.startsWith("HAPARA_LOCATION|")) {
+            result.haparaLocation = text.slice("HAPARA_LOCATION|".length).trim();
+            return;
+        }
+
         if (text.startsWith("SUBMITTED_AT|")) {
             result.submittedAt = text.slice("SUBMITTED_AT|".length).trim();
             return;
@@ -637,6 +656,9 @@ function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     const fileName = String(payload?.fileName || "").trim();
     const fileUrl = String(payload?.fileUrl || "").trim();
     const submittedAt = String(payload?.submittedAt || "").trim();
+    const haparaAcknowledged = Boolean(payload?.haparaAcknowledged);
+    const haparaSubmittedAt = String(payload?.haparaSubmittedAt || "").trim();
+    const haparaLocation = String(payload?.haparaLocation || "").trim();
     const reviewStatusRaw = String(payload?.reviewStatus || "").trim().toLowerCase();
     const reviewStatus = reviewStatusRaw === "reviewed"
         ? "reviewed"
@@ -659,6 +681,13 @@ function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     }
     if (submittedAt) {
         steps.push({ text: `SUBMITTED_AT|${submittedAt}`, done: true });
+    }
+    steps.push({ text: `HAPARA_ACK|${haparaAcknowledged ? "true" : "false"}`, done: haparaAcknowledged });
+    if (haparaSubmittedAt) {
+        steps.push({ text: `HAPARA_SUBMITTED_AT|${haparaSubmittedAt}`, done: true });
+    }
+    if (haparaLocation) {
+        steps.push({ text: `HAPARA_LOCATION|${haparaLocation}`, done: true });
     }
     steps.push({ text: `REVIEW|${reviewStatus}`, done: reviewStatus === "reviewed" });
 
@@ -711,181 +740,56 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
 
     const standardNumber = extractPrimaryStandardNumberFromRows(coerceArray(detailData?.standardDetails));
     const standardKey = buildTaskTopicSubmissionStandardKey(taskTopicTitle, standardNumber);
+    const isRelevantImplicationsTopic = taskTopicTitle.toLowerCase().includes("relevant implication");
+    const haparaSpaceName = isRelevantImplicationsTopic
+        ? "Relevant Implication Documentation"
+        : "Workspace Evidence";
 
     if (isTeacher) {
-        const students = Array.from(new Set(
-            (Array.isArray(interestData?.emails) ? interestData.emails : [])
-                .map((value) => String(value || "").trim().toLowerCase())
-                .filter(Boolean)
-        ));
-
+        const students = Array.isArray(interestData?.students) ? interestData.students : [];
         if (!students.length) {
-            panelHost.innerHTML = `<p class="task-topic-submission-note">No allocated students yet. Add or confirm a student first, then review status controls will appear here.</p>`;
+            panelHost.innerHTML = `<p class="task-topic-submission-note">No allocated students yet. Add or confirm a student first, then Hapara acknowledgement statuses will appear here.</p>`;
+            return;
+        }
+
+        const rows = students
+            .map((student) => {
+                const studentEmail = String(student?.email || "").trim().toLowerCase();
+                if (!studentEmail) {
+                    return null;
+                }
+
+                const submission = parseTaskTopicSubmissionFromEvidenceRows(student?.evidence_steps, standardKey);
+                return {
+                    email: studentEmail,
+                    acknowledged: Boolean(submission.haparaAcknowledged),
+                    submittedAt: submission.haparaSubmittedAt || submission.submittedAt || ""
+                };
+            })
+            .filter(Boolean);
+
+        if (!rows.length) {
+            panelHost.innerHTML = `<p class="task-topic-submission-note">No student records are ready for acknowledgement tracking yet.</p>`;
             return;
         }
 
         panelHost.innerHTML = `
             <div class="task-topic-submission-teacher-panel">
-                <label class="task-topic-submission-label" for="task-topic-review-student">Student</label>
-                <select id="task-topic-review-student" class="task-topic-submission-input">
-                    ${students.map((student) => `<option value="${escapeHtml(student)}">${escapeHtml(student)}</option>`).join("")}
-                </select>
-
-                <label class="task-topic-submission-label" for="task-topic-teacher-review-status">Review Status</label>
-                <select id="task-topic-teacher-review-status" class="task-topic-submission-input">
-                    <option value="pending">Pending review</option>
-                    <option value="reviewed">Reviewed</option>
-                    <option value="needs_changes">Needs changes</option>
-                </select>
-
-                <div class="task-topic-submission-actions">
-                    <button type="button" class="detail-action" id="task-topic-save-review-status">Save Review Status</button>
-                </div>
-                <p class="task-topic-submission-status" id="task-topic-teacher-review-message" aria-live="polite"></p>
-
+                <p class="task-topic-submission-note">Students submit work in Hapara <strong>${escapeHtml(haparaSpaceName)}</strong>. This panel tracks who has acknowledged they submitted.</p>
                 <div class="task-topic-submission-meta">
-                    <p><strong>Last Submitted:</strong> <span id="task-topic-teacher-last-submitted">Not submitted yet</span></p>
-                    <p><strong>Evidence Link:</strong> <span id="task-topic-teacher-evidence-link">No link submitted</span></p>
-                    <p><strong>Submitted File:</strong> <span id="task-topic-teacher-file-link">No file submitted</span></p>
+                    <p><strong>Acknowledged:</strong> ${rows.filter((row) => row.acknowledged).length} of ${rows.length}</p>
                 </div>
-
-                <label class="task-topic-submission-label" for="task-topic-teacher-written-preview">Written Evidence (preview)</label>
-                <textarea id="task-topic-teacher-written-preview" class="task-topic-submission-input task-topic-submission-textarea task-topic-submission-preview" readonly></textarea>
+                <div class="task-topic-teacher-status-list">
+                    ${rows.map((row) => `
+                        <div class="task-topic-teacher-status-item">
+                            <span class="task-topic-teacher-status-email">${escapeHtml(row.email)}</span>
+                            <span class="task-topic-teacher-status-pill ${row.acknowledged ? "is-acknowledged" : "is-pending"}">${row.acknowledged ? "Submitted in Hapara" : "Not acknowledged"}</span>
+                            <span class="task-topic-teacher-status-time">${escapeHtml(formatSubmissionTimestamp(row.submittedAt))}</span>
+                        </div>
+                    `).join("")}
+                </div>
             </div>
         `;
-
-        const studentSelect = panelHost.querySelector("#task-topic-review-student");
-        const statusSelect = panelHost.querySelector("#task-topic-teacher-review-status");
-        const saveStatusButton = panelHost.querySelector("#task-topic-save-review-status");
-        const statusMessage = panelHost.querySelector("#task-topic-teacher-review-message");
-        const submittedHost = panelHost.querySelector("#task-topic-teacher-last-submitted");
-        const linkHost = panelHost.querySelector("#task-topic-teacher-evidence-link");
-        const fileHost = panelHost.querySelector("#task-topic-teacher-file-link");
-        const previewHost = panelHost.querySelector("#task-topic-teacher-written-preview");
-
-        let selectedStudent = students[0];
-        let selectedRows = [];
-        let selectedSubmission = {
-            writtenEvidence: "",
-            evidenceLink: "",
-            fileName: "",
-            fileUrl: "",
-            submittedAt: "",
-            reviewStatus: "pending"
-        };
-
-        const setTeacherStatusMessage = (message, isError = false) => {
-            if (!statusMessage) {
-                return;
-            }
-
-            statusMessage.textContent = String(message || "");
-            statusMessage.classList.toggle("is-error", Boolean(isError));
-        };
-
-        const loadStudentSubmission = async (studentEmail) => {
-            selectedStudent = String(studentEmail || "").trim().toLowerCase();
-            if (!selectedStudent) {
-                return;
-            }
-
-            setTeacherStatusMessage("Loading student submission...");
-            try {
-                selectedRows = await fetchEvidenceRows(projectId, selectedStudent);
-                selectedSubmission = parseTaskTopicSubmissionFromEvidenceRows(selectedRows, standardKey);
-
-                if (statusSelect) {
-                    statusSelect.value = selectedSubmission.reviewStatus;
-                }
-                if (submittedHost) {
-                    submittedHost.textContent = formatSubmissionTimestamp(selectedSubmission.submittedAt);
-                }
-                if (previewHost) {
-                    previewHost.value = selectedSubmission.writtenEvidence || "No written evidence submitted yet.";
-                }
-                if (linkHost) {
-                    const safeLink = toSafeExternalUrl(selectedSubmission.evidenceLink);
-                    if (safeLink) {
-                        linkHost.innerHTML = `<a href="${escapeHtml(safeLink)}" target="_blank" rel="noreferrer">${escapeHtml(safeLink)}</a>`;
-                    } else {
-                        linkHost.textContent = "No link submitted";
-                    }
-                }
-                if (fileHost) {
-                    const safeFileUrl = String(selectedSubmission.fileUrl || "").trim();
-                    const safeFileName = String(selectedSubmission.fileName || "").trim() || "Download evidence file";
-                    if (safeFileUrl) {
-                        fileHost.innerHTML = `<a href="${escapeHtml(safeFileUrl)}" download="${escapeHtml(safeFileName)}">${escapeHtml(safeFileName)}</a>`;
-                    } else {
-                        fileHost.textContent = "No file submitted";
-                    }
-                }
-
-                setTeacherStatusMessage(`Loaded submission for ${selectedStudent}.`);
-            } catch (_error) {
-                selectedRows = [];
-                selectedSubmission = {
-                    writtenEvidence: "",
-                    evidenceLink: "",
-                    fileName: "",
-                    fileUrl: "",
-                    submittedAt: "",
-                    reviewStatus: "pending"
-                };
-
-                if (statusSelect) {
-                    statusSelect.value = "pending";
-                }
-                if (submittedHost) {
-                    submittedHost.textContent = "Not submitted yet";
-                }
-                if (previewHost) {
-                    previewHost.value = "No submission found for this student yet.";
-                }
-                if (linkHost) {
-                    linkHost.textContent = "No link submitted";
-                }
-                if (fileHost) {
-                    fileHost.textContent = "No file submitted";
-                }
-
-                setTeacherStatusMessage("Could not load this student submission right now.", true);
-            }
-        };
-
-        studentSelect?.addEventListener("change", () => {
-            void loadStudentSubmission(studentSelect.value);
-        });
-
-        saveStatusButton?.addEventListener("click", async () => {
-            const nextStatus = String(statusSelect?.value || "pending").trim().toLowerCase() || "pending";
-            saveStatusButton.disabled = true;
-            setTeacherStatusMessage("Saving review status...");
-
-            const nextRows = upsertTaskTopicSubmissionEvidenceRows(selectedRows, standardKey, {
-                writtenEvidence: selectedSubmission.writtenEvidence,
-                evidenceLink: selectedSubmission.evidenceLink,
-                fileName: selectedSubmission.fileName,
-                fileUrl: selectedSubmission.fileUrl,
-                submittedAt: selectedSubmission.submittedAt,
-                reviewStatus: nextStatus
-            });
-
-            try {
-                await saveEvidenceRows(projectId, selectedStudent, nextRows);
-                selectedRows = nextRows;
-                selectedSubmission.reviewStatus = nextStatus;
-                setTeacherStatusMessage(`Review status saved: ${getReviewStatusLabel(nextStatus)}.`);
-            } catch (_error) {
-                setTeacherStatusMessage("Could not save review status right now.", true);
-            } finally {
-                if (saveStatusButton && saveStatusButton.isConnected) {
-                    saveStatusButton.disabled = false;
-                }
-            }
-        });
-
-        await loadStudentSubmission(selectedStudent);
         return;
     }
 
@@ -904,45 +808,40 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     }
 
     const submission = parseTaskTopicSubmissionFromEvidenceRows(evidenceRows, standardKey);
-    const reviewLabel = getReviewStatusLabel(submission.reviewStatus);
-    const submittedFileName = String(submission.fileName || "").trim();
-    const submittedFileUrl = String(submission.fileUrl || "").trim();
+    const acknowledged = Boolean(submission.haparaAcknowledged);
+    const acknowledgedAt = submission.haparaSubmittedAt || submission.submittedAt || "";
 
     panelHost.innerHTML = `
         <form id="task-topic-submission-form" class="task-topic-submission-form" novalidate>
-            <label class="task-topic-submission-label" for="task-topic-written-evidence">Written Evidence</label>
-            <textarea id="task-topic-written-evidence" class="task-topic-submission-input task-topic-submission-textarea" placeholder="Write the evidence for how you completed this task topic..." required>${escapeHtml(submission.writtenEvidence)}</textarea>
-
-            <label class="task-topic-submission-label" for="task-topic-evidence-link">Evidence Link (optional)</label>
-            <input id="task-topic-evidence-link" class="task-topic-submission-input" type="url" placeholder="https://..." value="${escapeHtml(submission.evidenceLink)}">
-
-            <label class="task-topic-submission-label" for="task-topic-evidence-file">Attach File Name (optional)</label>
-            <input id="task-topic-evidence-file" class="task-topic-submission-input" type="file" accept=".pdf,.doc,.docx,.txt,.rtf,.pages">
-            <p class="task-topic-submission-file-name" id="task-topic-submission-file-name">${submission.fileName ? `Selected: ${escapeHtml(submission.fileName)}` : "No file selected"}</p>
+            <p class="task-topic-submission-note">Upload your write-up to Hapara <strong>${escapeHtml(haparaSpaceName)}</strong>, then click acknowledge below so this system records completion.</p>
 
             <div class="task-topic-submission-actions">
-                <button type="submit" class="detail-action">Submit Evidence</button>
+                <button type="submit" class="detail-action">I Submitted In Hapara</button>
+                <button type="button" class="detail-action detail-action-secondary" id="task-topic-clear-acknowledgement">Clear Acknowledgement</button>
             </div>
             <p class="task-topic-submission-status" id="task-topic-submission-status" aria-live="polite"></p>
         </form>
         <div class="task-topic-submission-meta">
-            <p><strong>Last Submitted:</strong> <span id="task-topic-last-submitted">${escapeHtml(formatSubmissionTimestamp(submission.submittedAt))}</span></p>
-            <p><strong>Teacher Review:</strong> <span id="task-topic-review-status">${escapeHtml(reviewLabel)}</span></p>
-            <p><strong>Submitted File:</strong> <span id="task-topic-submitted-file">${submittedFileUrl ? `<a href="${escapeHtml(submittedFileUrl)}" download="${escapeHtml(submittedFileName || "evidence-file")}">${escapeHtml(submittedFileName || "Download evidence file")}</a>` : "No file submitted"}</span></p>
+            <p><strong>Status:</strong> <span id="task-topic-ack-status">${acknowledged ? "Submitted in Hapara" : "Waiting for acknowledgement"}</span></p>
+            <p><strong>Acknowledged At:</strong> <span id="task-topic-last-submitted">${escapeHtml(formatSubmissionTimestamp(acknowledgedAt))}</span></p>
+            <p><strong>Hapara Space:</strong> <span>${escapeHtml(haparaSpaceName)}</span></p>
         </div>
     `;
 
     const form = panelHost.querySelector("#task-topic-submission-form");
-    const writtenInput = panelHost.querySelector("#task-topic-written-evidence");
-    const linkInput = panelHost.querySelector("#task-topic-evidence-link");
-    const fileInput = panelHost.querySelector("#task-topic-evidence-file");
-    const fileNameHost = panelHost.querySelector("#task-topic-submission-file-name");
+    const clearAckButton = panelHost.querySelector("#task-topic-clear-acknowledgement");
     const statusHost = panelHost.querySelector("#task-topic-submission-status");
+    const ackStatusHost = panelHost.querySelector("#task-topic-ack-status");
     const lastSubmittedHost = panelHost.querySelector("#task-topic-last-submitted");
-    const reviewStatusHost = panelHost.querySelector("#task-topic-review-status");
-    const submittedFileHost = panelHost.querySelector("#task-topic-submitted-file");
-    let selectedFile = null;
-    let selectedFileName = submission.fileName;
+    const updateMeta = (isAcknowledged, timestamp) => {
+        if (ackStatusHost) {
+            ackStatusHost.textContent = isAcknowledged ? "Submitted in Hapara" : "Waiting for acknowledgement";
+        }
+
+        if (lastSubmittedHost) {
+            lastSubmittedHost.textContent = formatSubmissionTimestamp(timestamp);
+        }
+    };
 
     const setStatus = (message, isError = false) => {
         if (!statusHost) {
@@ -952,107 +851,77 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         statusHost.classList.toggle("is-error", Boolean(isError));
     };
 
-    fileInput?.addEventListener("change", () => {
-        selectedFile = fileInput.files?.[0] || null;
-        const chosen = fileInput.files?.[0]?.name ? String(fileInput.files[0].name).trim() : "";
-        selectedFileName = chosen || submission.fileName;
-        if (fileNameHost) {
-            fileNameHost.textContent = selectedFileName ? `Selected: ${selectedFileName}` : "No file selected";
-        }
-    });
-
     form?.addEventListener("submit", async (event) => {
         event.preventDefault();
-        const writtenEvidence = String(writtenInput?.value || "").trim();
-        const evidenceLink = String(linkInput?.value || "").trim();
-        if (!writtenEvidence) {
-            setStatus("Written evidence is required.", true);
-            return;
-        }
 
         const submitButton = form.querySelector("button[type='submit']");
         if (submitButton) {
             submitButton.disabled = true;
         }
-        setStatus("Saving submission...");
-
-        let uploadedFileUrl = String(submission.fileUrl || "").trim();
-        if (selectedFile) {
-            const uploadFormData = new FormData();
-            uploadFormData.append("evidenceFile", selectedFile);
-
-            try {
-                setStatus("Uploading file...");
-                const uploadResponse = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interests/${encodeURIComponent(email)}/evidence-upload`, {
-                    method: "POST",
-                    headers: email ? { "x-user-email": email } : {},
-                    body: uploadFormData
-                });
-
-                if (!uploadResponse.ok) {
-                    const uploadResult = await uploadResponse.json().catch(() => ({}));
-                    throw new Error(uploadResult.error || "Could not upload evidence file.");
-                }
-
-                const uploadResult = await uploadResponse.json().catch(() => ({}));
-                selectedFileName = String(uploadResult.file_name || selectedFileName || "").trim();
-                uploadedFileUrl = String(uploadResult.file_url || uploadedFileUrl || "").trim();
-            } catch (error) {
-                setStatus(error.message || "Could not upload evidence file.", true);
-                if (submitButton && submitButton.isConnected) {
-                    submitButton.disabled = false;
-                }
-                return;
-            }
-        }
+        setStatus("Saving acknowledgement...");
 
         const submittedAt = new Date().toISOString();
         const nextRows = upsertTaskTopicSubmissionEvidenceRows(evidenceRows, standardKey, {
-            writtenEvidence,
-            evidenceLink,
-            fileName: selectedFileName,
-            fileUrl: uploadedFileUrl,
+            writtenEvidence: submission.writtenEvidence,
+            evidenceLink: submission.evidenceLink,
+            fileName: submission.fileName,
+            fileUrl: submission.fileUrl,
             submittedAt,
+            haparaAcknowledged: true,
+            haparaSubmittedAt: submittedAt,
+            haparaLocation: haparaSpaceName,
             reviewStatus: "pending"
         });
 
         try {
             await saveEvidenceRows(projectId, email, nextRows);
             evidenceRows = nextRows;
-            submission.writtenEvidence = writtenEvidence;
-            submission.evidenceLink = toSafeExternalUrl(evidenceLink);
-            submission.fileName = selectedFileName;
-            submission.fileUrl = uploadedFileUrl;
+            submission.haparaAcknowledged = true;
+            submission.haparaSubmittedAt = submittedAt;
+            submission.haparaLocation = haparaSpaceName;
             submission.submittedAt = submittedAt;
             submission.reviewStatus = "pending";
-            selectedFile = null;
 
-            if (fileInput) {
-                fileInput.value = "";
-            }
-            if (fileNameHost) {
-                fileNameHost.textContent = selectedFileName ? `Selected: ${selectedFileName}` : "No file selected";
-            }
-
-            if (lastSubmittedHost) {
-                lastSubmittedHost.textContent = formatSubmissionTimestamp(submittedAt);
-            }
-            if (reviewStatusHost) {
-                reviewStatusHost.textContent = getReviewStatusLabel("pending");
-            }
-            if (submittedFileHost) {
-                if (uploadedFileUrl) {
-                    submittedFileHost.innerHTML = `<a href="${escapeHtml(uploadedFileUrl)}" download="${escapeHtml(selectedFileName || "evidence-file")}">${escapeHtml(selectedFileName || "Download evidence file")}</a>`;
-                } else {
-                    submittedFileHost.textContent = "No file submitted";
-                }
-            }
-            setStatus("Submission saved.");
+            updateMeta(true, submittedAt);
+            setStatus("Acknowledged. Your Hapara submission has been recorded.");
         } catch (_error) {
-            setStatus("Could not save submission right now.", true);
+            setStatus("Could not save acknowledgement right now.", true);
         } finally {
             if (submitButton && submitButton.isConnected) {
                 submitButton.disabled = false;
+            }
+        }
+    });
+
+    clearAckButton?.addEventListener("click", async () => {
+        clearAckButton.disabled = true;
+        setStatus("Clearing acknowledgement...");
+
+        const nextRows = upsertTaskTopicSubmissionEvidenceRows(evidenceRows, standardKey, {
+            writtenEvidence: submission.writtenEvidence,
+            evidenceLink: submission.evidenceLink,
+            fileName: submission.fileName,
+            fileUrl: submission.fileUrl,
+            submittedAt: "",
+            haparaAcknowledged: false,
+            haparaSubmittedAt: "",
+            haparaLocation: haparaSpaceName,
+            reviewStatus: submission.reviewStatus
+        });
+
+        try {
+            await saveEvidenceRows(projectId, email, nextRows);
+            evidenceRows = nextRows;
+            submission.haparaAcknowledged = false;
+            submission.haparaSubmittedAt = "";
+            submission.submittedAt = "";
+            updateMeta(false, "");
+            setStatus("Acknowledgement cleared.");
+        } catch (_error) {
+            setStatus("Could not clear acknowledgement right now.", true);
+        } finally {
+            if (clearAckButton && clearAckButton.isConnected) {
+                clearAckButton.disabled = false;
             }
         }
     });

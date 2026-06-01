@@ -474,6 +474,52 @@ h1 {
     color: #4b3a1a;
 }
 
+.task-topic-teacher-status-list {
+    display: grid;
+    gap: 8px;
+}
+
+.task-topic-teacher-status-item {
+    border: 1px solid #e2c88f;
+    border-radius: 8px;
+    background: #fff8ea;
+    padding: 8px 10px;
+    display: grid;
+    gap: 5px;
+}
+
+.task-topic-teacher-status-email {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #4f3b1a;
+}
+
+.task-topic-teacher-status-pill {
+    justify-self: start;
+    border: 1px solid #d3b16d;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.task-topic-teacher-status-pill.is-acknowledged {
+    color: #265b2c;
+    background: #e6f7ea;
+    border-color: #9dcca6;
+}
+
+.task-topic-teacher-status-pill.is-pending {
+    color: #6e5019;
+    background: #fff0d1;
+    border-color: #e5c27f;
+}
+
+.task-topic-teacher-status-time {
+    font-size: 0.74rem;
+    color: #6a5735;
+}
+
 .task-topic-standards-panel {
     background: #f8fbff;
     border-color: #c9d9ed;
