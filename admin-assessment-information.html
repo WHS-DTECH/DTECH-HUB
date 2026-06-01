@@ -215,6 +215,27 @@
       font-family: "Fraunces", serif;
     }
 
+    .standard-detail-refresh {
+      border: 1px solid #356a9d;
+      background: #2b5f90;
+      color: #fff;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 6px 10px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .standard-detail-refresh:hover {
+      background: #244f78;
+    }
+
+    .standard-detail-refresh:disabled {
+      opacity: 0.6;
+      cursor: wait;
+    }
+
     .standard-detail-meta {
       margin: 0 0 8px;
       font-size: 0.8rem;
@@ -512,6 +533,7 @@
       <section class="standard-detail-section" aria-label="Selected standard details">
         <div class="standard-detail-header">
           <h3 id="standard-detail-title">Standard details</h3>
+          <button type="button" id="standard-detail-force-refresh" class="standard-detail-refresh" disabled>Force Refresh Standard</button>
         </div>
         <p id="standard-detail-meta" class="standard-detail-meta">Click any standard number to load details from NZQA PDF/DOCX where available.</p>
         <div class="standard-detail-links" id="standard-detail-links"></div>

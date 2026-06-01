@@ -11,6 +11,7 @@ const standardDetailTitle = document.getElementById("standard-detail-title");
 const standardDetailMeta = document.getElementById("standard-detail-meta");
 const standardDetailLinks = document.getElementById("standard-detail-links");
 const standardDetailText = document.getElementById("standard-detail-text");
+const standardDetailForceRefreshButton = document.getElementById("standard-detail-force-refresh");
 const standardCardForm = document.getElementById("standard-card-form");
 const standardCardIdInput = document.getElementById("standard-card-id");
 const standardCardResetButton = document.getElementById("standard-card-reset");
@@ -18,6 +19,7 @@ const standardCardStatus = document.getElementById("standard-card-status");
 const standardCardTableBody = document.getElementById("standard-card-table-body");
 let loadedStandardCards = [];
 let loadedStandards = [];
+let selectedStandardForDetails = "";
 
 function standardsGetStoredEmail() {
     const raw = localStorage.getItem(STANDARDS_AUTH_KEY) || sessionStorage.getItem(STANDARDS_AUTH_KEY);
@@ -215,7 +217,7 @@ function autoFillCardFormFromStandardSelection(selected, details) {
     }
 }
 
-async function loadStandardDetail(standardNumber) {
+async function loadStandardDetail(standardNumber, { force = false } = {}) {
     const email = standardsGetStoredEmail();
     if (!email) {
         setStandardDetailState({
@@ -232,6 +234,12 @@ async function loadStandardDetail(standardNumber) {
         String(selected?.standard_name || "").trim()
     ].filter(Boolean);
 
+    const normalizedStandardNumber = String(standardNumber || "").trim();
+    selectedStandardForDetails = normalizedStandardNumber;
+    if (standardDetailForceRefreshButton) {
+        standardDetailForceRefreshButton.disabled = true;
+    }
+
     setStandardDetailState({
         title: titleBits.join(" - ") || "Standard details",
         meta: "Loading details from NZQA document sources...",
@@ -240,7 +248,13 @@ async function loadStandardDetail(standardNumber) {
     });
 
     try {
-        const response = await fetch(`/api/admin/nzqa-standards/details?standard=${encodeURIComponent(String(standardNumber || "").trim())}`, {
+        const params = new URLSearchParams();
+        params.set("standard", normalizedStandardNumber);
+        if (force) {
+            params.set("force", "true");
+        }
+
+        const response = await fetch(`/api/admin/nzqa-standards/details?${params.toString()}`, {
             headers: {
                 "x-user-email": email
             }
@@ -272,6 +286,10 @@ async function loadStandardDetail(standardNumber) {
             text: "",
             details: selected || null
         });
+    } finally {
+        if (standardDetailForceRefreshButton) {
+            standardDetailForceRefreshButton.disabled = !selectedStandardForDetails;
+        }
     }
 }
 
@@ -588,6 +606,16 @@ function bindEvents() {
                 return;
             }
             void loadStandardDetail(standardNumber);
+        });
+    }
+
+    if (standardDetailForceRefreshButton) {
+        standardDetailForceRefreshButton.addEventListener("click", () => {
+            const standardNumber = String(selectedStandardForDetails || "").trim();
+            if (!standardNumber) {
+                return;
+            }
+            void loadStandardDetail(standardNumber, { force: true });
         });
     }
 
