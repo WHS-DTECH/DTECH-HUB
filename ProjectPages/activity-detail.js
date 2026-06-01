@@ -608,7 +608,13 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
 
         if (text.startsWith("REVIEW|")) {
             const status = text.slice("REVIEW|".length).trim().toLowerCase();
-            result.reviewStatus = status === "reviewed" ? "reviewed" : "pending";
+            if (status === "reviewed") {
+                result.reviewStatus = "reviewed";
+            } else if (status === "needs_changes" || status === "needs-changes" || status === "needs changes") {
+                result.reviewStatus = "needs_changes";
+            } else {
+                result.reviewStatus = "pending";
+            }
         }
     });
 
@@ -624,9 +630,12 @@ function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     const evidenceLink = toSafeExternalUrl(payload?.evidenceLink);
     const fileName = String(payload?.fileName || "").trim();
     const submittedAt = String(payload?.submittedAt || "").trim();
-    const reviewStatus = String(payload?.reviewStatus || "").trim().toLowerCase() === "reviewed"
+    const reviewStatusRaw = String(payload?.reviewStatus || "").trim().toLowerCase();
+    const reviewStatus = reviewStatusRaw === "reviewed"
         ? "reviewed"
-        : "pending";
+        : (reviewStatusRaw === "needs_changes" || reviewStatusRaw === "needs-changes" || reviewStatusRaw === "needs changes")
+            ? "needs_changes"
+            : "pending";
 
     const steps = [];
     if (writtenEvidence) {
@@ -661,6 +670,17 @@ function formatSubmissionTimestamp(value) {
     return parsed.toLocaleString();
 }
 
+function getReviewStatusLabel(value) {
+    const status = String(value || "").trim().toLowerCase();
+    if (status === "reviewed") {
+        return "Reviewed";
+    }
+    if (status === "needs_changes" || status === "needs-changes" || status === "needs changes") {
+        return "Needs changes";
+    }
+    return "Pending review";
+}
+
 async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, email, isTeacher, interestData }) {
     const panelHost = host?.querySelector("#task-topic-submission-live-panel");
     if (!panelHost) {
@@ -679,8 +699,166 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         return;
     }
 
+    const standardNumber = extractPrimaryStandardNumberFromRows(coerceArray(detailData?.standardDetails));
+    const standardKey = buildTaskTopicSubmissionStandardKey(taskTopicTitle, standardNumber);
+
     if (isTeacher) {
-        panelHost.innerHTML = `<p class="task-topic-submission-note">Teacher view: student evidence submissions appear here when students submit from their own account.</p>`;
+        const students = Array.from(new Set(
+            (Array.isArray(interestData?.emails) ? interestData.emails : [])
+                .map((value) => String(value || "").trim().toLowerCase())
+                .filter(Boolean)
+        ));
+
+        if (!students.length) {
+            panelHost.innerHTML = `<p class="task-topic-submission-note">No allocated students yet. Add or confirm a student first, then review status controls will appear here.</p>`;
+            return;
+        }
+
+        panelHost.innerHTML = `
+            <div class="task-topic-submission-teacher-panel">
+                <label class="task-topic-submission-label" for="task-topic-review-student">Student</label>
+                <select id="task-topic-review-student" class="task-topic-submission-input">
+                    ${students.map((student) => `<option value="${escapeHtml(student)}">${escapeHtml(student)}</option>`).join("")}
+                </select>
+
+                <label class="task-topic-submission-label" for="task-topic-teacher-review-status">Review Status</label>
+                <select id="task-topic-teacher-review-status" class="task-topic-submission-input">
+                    <option value="pending">Pending review</option>
+                    <option value="reviewed">Reviewed</option>
+                    <option value="needs_changes">Needs changes</option>
+                </select>
+
+                <div class="task-topic-submission-actions">
+                    <button type="button" class="detail-action" id="task-topic-save-review-status">Save Review Status</button>
+                </div>
+                <p class="task-topic-submission-status" id="task-topic-teacher-review-message" aria-live="polite"></p>
+
+                <div class="task-topic-submission-meta">
+                    <p><strong>Last Submitted:</strong> <span id="task-topic-teacher-last-submitted">Not submitted yet</span></p>
+                    <p><strong>Evidence Link:</strong> <span id="task-topic-teacher-evidence-link">No link submitted</span></p>
+                </div>
+
+                <label class="task-topic-submission-label" for="task-topic-teacher-written-preview">Written Evidence (preview)</label>
+                <textarea id="task-topic-teacher-written-preview" class="task-topic-submission-input task-topic-submission-textarea task-topic-submission-preview" readonly></textarea>
+            </div>
+        `;
+
+        const studentSelect = panelHost.querySelector("#task-topic-review-student");
+        const statusSelect = panelHost.querySelector("#task-topic-teacher-review-status");
+        const saveStatusButton = panelHost.querySelector("#task-topic-save-review-status");
+        const statusMessage = panelHost.querySelector("#task-topic-teacher-review-message");
+        const submittedHost = panelHost.querySelector("#task-topic-teacher-last-submitted");
+        const linkHost = panelHost.querySelector("#task-topic-teacher-evidence-link");
+        const previewHost = panelHost.querySelector("#task-topic-teacher-written-preview");
+
+        let selectedStudent = students[0];
+        let selectedRows = [];
+        let selectedSubmission = {
+            writtenEvidence: "",
+            evidenceLink: "",
+            fileName: "",
+            submittedAt: "",
+            reviewStatus: "pending"
+        };
+
+        const setTeacherStatusMessage = (message, isError = false) => {
+            if (!statusMessage) {
+                return;
+            }
+
+            statusMessage.textContent = String(message || "");
+            statusMessage.classList.toggle("is-error", Boolean(isError));
+        };
+
+        const loadStudentSubmission = async (studentEmail) => {
+            selectedStudent = String(studentEmail || "").trim().toLowerCase();
+            if (!selectedStudent) {
+                return;
+            }
+
+            setTeacherStatusMessage("Loading student submission...");
+            try {
+                selectedRows = await fetchEvidenceRows(projectId, selectedStudent);
+                selectedSubmission = parseTaskTopicSubmissionFromEvidenceRows(selectedRows, standardKey);
+
+                if (statusSelect) {
+                    statusSelect.value = selectedSubmission.reviewStatus;
+                }
+                if (submittedHost) {
+                    submittedHost.textContent = formatSubmissionTimestamp(selectedSubmission.submittedAt);
+                }
+                if (previewHost) {
+                    previewHost.value = selectedSubmission.writtenEvidence || "No written evidence submitted yet.";
+                }
+                if (linkHost) {
+                    const safeLink = toSafeExternalUrl(selectedSubmission.evidenceLink);
+                    if (safeLink) {
+                        linkHost.innerHTML = `<a href="${escapeHtml(safeLink)}" target="_blank" rel="noreferrer">${escapeHtml(safeLink)}</a>`;
+                    } else {
+                        linkHost.textContent = "No link submitted";
+                    }
+                }
+
+                setTeacherStatusMessage(`Loaded submission for ${selectedStudent}.`);
+            } catch (_error) {
+                selectedRows = [];
+                selectedSubmission = {
+                    writtenEvidence: "",
+                    evidenceLink: "",
+                    fileName: "",
+                    submittedAt: "",
+                    reviewStatus: "pending"
+                };
+
+                if (statusSelect) {
+                    statusSelect.value = "pending";
+                }
+                if (submittedHost) {
+                    submittedHost.textContent = "Not submitted yet";
+                }
+                if (previewHost) {
+                    previewHost.value = "No submission found for this student yet.";
+                }
+                if (linkHost) {
+                    linkHost.textContent = "No link submitted";
+                }
+
+                setTeacherStatusMessage("Could not load this student submission right now.", true);
+            }
+        };
+
+        studentSelect?.addEventListener("change", () => {
+            void loadStudentSubmission(studentSelect.value);
+        });
+
+        saveStatusButton?.addEventListener("click", async () => {
+            const nextStatus = String(statusSelect?.value || "pending").trim().toLowerCase() || "pending";
+            saveStatusButton.disabled = true;
+            setTeacherStatusMessage("Saving review status...");
+
+            const nextRows = upsertTaskTopicSubmissionEvidenceRows(selectedRows, standardKey, {
+                writtenEvidence: selectedSubmission.writtenEvidence,
+                evidenceLink: selectedSubmission.evidenceLink,
+                fileName: selectedSubmission.fileName,
+                submittedAt: selectedSubmission.submittedAt,
+                reviewStatus: nextStatus
+            });
+
+            try {
+                await saveEvidenceRows(projectId, selectedStudent, nextRows);
+                selectedRows = nextRows;
+                selectedSubmission.reviewStatus = nextStatus;
+                setTeacherStatusMessage(`Review status saved: ${getReviewStatusLabel(nextStatus)}.`);
+            } catch (_error) {
+                setTeacherStatusMessage("Could not save review status right now.", true);
+            } finally {
+                if (saveStatusButton && saveStatusButton.isConnected) {
+                    saveStatusButton.disabled = false;
+                }
+            }
+        });
+
+        await loadStudentSubmission(selectedStudent);
         return;
     }
 
@@ -689,9 +867,6 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         panelHost.innerHTML = `<p class="task-topic-submission-note">Select <strong>I'm Interested</strong> first, then you can submit your evidence for this task topic.</p>`;
         return;
     }
-
-    const standardNumber = extractPrimaryStandardNumberFromRows(coerceArray(detailData?.standardDetails));
-    const standardKey = buildTaskTopicSubmissionStandardKey(taskTopicTitle, standardNumber);
 
     let evidenceRows = [];
     try {
@@ -702,7 +877,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     }
 
     const submission = parseTaskTopicSubmissionFromEvidenceRows(evidenceRows, standardKey);
-    const reviewLabel = submission.reviewStatus === "reviewed" ? "Reviewed" : "Pending review";
+    const reviewLabel = getReviewStatusLabel(submission.reviewStatus);
 
     panelHost.innerHTML = `
         <form id="task-topic-submission-form" class="task-topic-submission-form" novalidate>
@@ -790,7 +965,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 lastSubmittedHost.textContent = formatSubmissionTimestamp(submittedAt);
             }
             if (reviewStatusHost) {
-                reviewStatusHost.textContent = "Pending review";
+                reviewStatusHost.textContent = getReviewStatusLabel("pending");
             }
             setStatus("Submission saved.");
         } catch (_error) {

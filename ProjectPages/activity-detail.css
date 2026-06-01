@@ -469,6 +469,11 @@ h1 {
     color: #5b4520;
 }
 
+.task-topic-submission-preview {
+    background: #fff8ea;
+    color: #4b3a1a;
+}
+
 .task-topic-standards-panel {
     background: #f8fbff;
     border-color: #c9d9ed;
