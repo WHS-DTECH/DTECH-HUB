@@ -175,8 +175,178 @@
       font-style: italic;
     }
 
+    .template-section {
+      margin-top: 18px;
+      background: #eef8f4;
+      border: 1px solid #b7ddcf;
+      border-radius: 12px;
+      padding: 14px;
+    }
+
+    .template-section h2 {
+      margin: 0 0 8px;
+      font-family: "Fraunces", serif;
+      font-size: 1.25rem;
+      color: #124f39;
+    }
+
+    .template-section p {
+      margin: 0 0 10px;
+      color: #3a6654;
+      font-size: 0.84rem;
+    }
+
+    .template-form {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .template-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(140px, 1fr));
+      gap: 10px;
+    }
+
+    .template-grid .standards-field textarea,
+    .template-grid .standards-field input,
+    .template-grid .standards-field select {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #9ec8b8;
+      border-radius: 8px;
+      background: #fff;
+      color: #1a4f3b;
+      font-size: 0.84rem;
+      padding: 9px 10px;
+      font-family: "Manrope", sans-serif;
+    }
+
+    .template-grid .standards-field textarea {
+      min-height: 84px;
+      resize: vertical;
+    }
+
+    .template-grid .full {
+      grid-column: 1 / -1;
+    }
+
+    .template-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .template-save,
+    .template-reset,
+    .template-delete {
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 8px 12px;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+
+    .template-save {
+      border-color: #2f7a5a;
+      background: #2a6f53;
+      color: #fff;
+    }
+
+    .template-reset {
+      border-color: #7ea997;
+      background: #eff8f3;
+      color: #255743;
+    }
+
+    .template-delete {
+      border-color: #c78e8e;
+      background: #fff2f2;
+      color: #8d3333;
+    }
+
+    .template-status {
+      min-height: 1.2em;
+      margin: 0;
+      font-size: 0.8rem;
+      color: #255743;
+    }
+
+    .template-status.is-error {
+      color: #9d2f2f;
+    }
+
+    .template-card-color-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid #6fb493;
+      background: #dff4e9;
+      color: #1f6f4f;
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .template-cards-table-wrap {
+      overflow-x: auto;
+      border: 1px solid #b7ddcf;
+      border-radius: 12px;
+      background: #f5fbf8;
+    }
+
+    .template-cards-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 960px;
+      font-size: 0.81rem;
+      color: #164d39;
+    }
+
+    .template-cards-table th {
+      background: #d8f0e5;
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 2px solid #b5ddcc;
+      font-weight: 700;
+    }
+
+    .template-cards-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #d8ece3;
+      vertical-align: top;
+    }
+
+    .template-cards-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .template-row-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .template-row-button {
+      border: 1px solid #7ea997;
+      border-radius: 6px;
+      background: #ffffff;
+      color: #255743;
+      padding: 4px 8px;
+      font-size: 0.73rem;
+      cursor: pointer;
+    }
+
     @media (max-width: 980px) {
       .standards-controls {
+        grid-template-columns: 1fr;
+      }
+
+      .template-grid {
         grid-template-columns: 1fr;
       }
 
@@ -270,6 +440,92 @@
             </tr>
           </tbody>
         </table>
+      </section>
+
+      <section class="template-section" aria-label="Assessment Standard Cards">
+        <h2>Assessment Standard Cards (Teal)</h2>
+        <p>Create reusable course/year templates. When teachers assign a matching standard, criteria can auto-populate and still be edited locally.</p>
+
+        <form id="standard-card-form" class="template-form" novalidate>
+          <input id="standard-card-id" name="id" type="hidden">
+          <div class="template-grid">
+            <div class="standards-field">
+              <label for="standard-card-course-name">Course Name</label>
+              <input id="standard-card-course-name" name="courseName" type="text" placeholder="e.g. DTEC L2 Programming" required>
+            </div>
+            <div class="standards-field">
+              <label for="standard-card-year-level">Year Level</label>
+              <input id="standard-card-year-level" name="yearLevel" type="text" placeholder="e.g. Year 12" required>
+            </div>
+            <div class="standards-field">
+              <label for="standard-card-year-version">Year (Version)</label>
+              <input id="standard-card-year-version" name="yearVersion" type="number" min="2000" max="2100" required>
+            </div>
+            <div class="standards-field">
+              <label>Card Colour</label>
+              <span class="template-card-color-pill">Teal</span>
+            </div>
+
+            <div class="standards-field full">
+              <label for="standard-card-codes">Standard Code(s)</label>
+              <input id="standard-card-codes" name="standardCodes" type="text" placeholder="e.g. 91897, 91907" required>
+            </div>
+
+            <div class="standards-field full">
+              <label for="standard-card-achieved-text">Achieved Text</label>
+              <textarea id="standard-card-achieved-text" name="achievedText" placeholder="Achieved criteria text..."></textarea>
+            </div>
+            <div class="standards-field full">
+              <label for="standard-card-achieved-checklist">Achieved Checklist (optional, one per line)</label>
+              <textarea id="standard-card-achieved-checklist" name="achievedChecklist" placeholder="Checklist bullet 1"></textarea>
+            </div>
+
+            <div class="standards-field full">
+              <label for="standard-card-merit-text">Merit Text</label>
+              <textarea id="standard-card-merit-text" name="meritText" placeholder="Merit criteria text..."></textarea>
+            </div>
+            <div class="standards-field full">
+              <label for="standard-card-merit-checklist">Merit Checklist (optional, one per line)</label>
+              <textarea id="standard-card-merit-checklist" name="meritChecklist" placeholder="Checklist bullet 1"></textarea>
+            </div>
+
+            <div class="standards-field full">
+              <label for="standard-card-excellence-text">Excellence Text</label>
+              <textarea id="standard-card-excellence-text" name="excellenceText" placeholder="Excellence criteria text..."></textarea>
+            </div>
+            <div class="standards-field full">
+              <label for="standard-card-excellence-checklist">Excellence Checklist (optional, one per line)</label>
+              <textarea id="standard-card-excellence-checklist" name="excellenceChecklist" placeholder="Checklist bullet 1"></textarea>
+            </div>
+          </div>
+
+          <div class="template-actions">
+            <button type="submit" class="template-save">Save Assessment Standard Card</button>
+            <button type="button" class="template-reset" id="standard-card-reset">Clear Form</button>
+          </div>
+          <p id="standard-card-status" class="template-status" aria-live="polite"></p>
+        </form>
+
+        <div class="template-cards-table-wrap" aria-label="Assessment Standard Card library">
+          <table class="template-cards-table">
+            <thead>
+              <tr>
+                <th>Course</th>
+                <th>Year Level</th>
+                <th>Year</th>
+                <th>Standard Code(s)</th>
+                <th>Colour</th>
+                <th>Updated</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="standard-card-table-body">
+              <tr>
+                <td colspan="7" class="standards-empty">Loading Assessment Standard Cards...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
     </main>
 

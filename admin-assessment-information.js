@@ -7,6 +7,12 @@ const refreshButton = document.getElementById("nzqa-refresh");
 const statusElement = document.getElementById("standards-status");
 const metaElement = document.getElementById("standards-results-meta");
 const tableBody = document.getElementById("standards-table-body");
+const standardCardForm = document.getElementById("standard-card-form");
+const standardCardIdInput = document.getElementById("standard-card-id");
+const standardCardResetButton = document.getElementById("standard-card-reset");
+const standardCardStatus = document.getElementById("standard-card-status");
+const standardCardTableBody = document.getElementById("standard-card-table-body");
+let loadedStandardCards = [];
 
 function standardsGetStoredEmail() {
     const raw = localStorage.getItem(STANDARDS_AUTH_KEY) || sessionStorage.getItem(STANDARDS_AUTH_KEY);
@@ -62,6 +68,29 @@ function escapeHtml(value) {
         .replace(/'/g, "&#039;");
 }
 
+function linesToArray(value) {
+    return String(value || "")
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+}
+
+function parseCodesFromInput(value) {
+    const unique = new Set();
+    String(value || "")
+        .split(/[\r\n,;]+/)
+        .map((part) => part.trim())
+        .filter(Boolean)
+        .forEach((code) => unique.add(code));
+    return Array.from(unique);
+}
+
+function setCardStatus(message, isError = false) {
+    if (!standardCardStatus) return;
+    standardCardStatus.textContent = String(message || "");
+    standardCardStatus.className = isError ? "template-status is-error" : "template-status";
+}
+
 function renderRows(rows) {
     if (!tableBody) return;
 
@@ -93,6 +122,208 @@ function renderRows(rows) {
             </tr>
         `;
     }).join("");
+}
+
+function formatCardUpdatedAt(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "-";
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return raw;
+    return parsed.toLocaleString();
+}
+
+function renderStandardCards(rows) {
+    if (!standardCardTableBody) return;
+
+    const list = Array.isArray(rows) ? rows : [];
+    if (!list.length) {
+        standardCardTableBody.innerHTML = `<tr><td colspan="7" class="standards-empty">No Assessment Standard Cards yet.</td></tr>`;
+        return;
+    }
+
+    standardCardTableBody.innerHTML = list.map((row) => {
+        const id = String(row?.id || "").trim();
+        const codes = Array.isArray(row?.standard_codes) ? row.standard_codes : [];
+        return `
+            <tr>
+                <td>${escapeHtml(row?.course_name || "")}</td>
+                <td>${escapeHtml(row?.year_level || "")}</td>
+                <td>${escapeHtml(row?.year_version || "")}</td>
+                <td>${escapeHtml(codes.join(", ") || "-")}</td>
+                <td><span class="template-card-color-pill">${escapeHtml(row?.card_color || "Teal")}</span></td>
+                <td>${escapeHtml(formatCardUpdatedAt(row?.updated_at))}</td>
+                <td>
+                    <div class="template-row-actions">
+                        <button type="button" class="template-row-button" data-card-edit="${escapeHtml(id)}">Edit</button>
+                        <button type="button" class="template-row-button" data-card-delete="${escapeHtml(id)}">Delete</button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join("");
+}
+
+function resetCardForm() {
+    if (!standardCardForm) return;
+    standardCardForm.reset();
+    if (standardCardIdInput) {
+        standardCardIdInput.value = "";
+    }
+    setCardStatus("");
+}
+
+function fillCardForm(card) {
+    if (!standardCardForm || !card) return;
+
+    if (standardCardIdInput) {
+        standardCardIdInput.value = String(card.id || "").trim();
+    }
+
+    standardCardForm.courseName.value = String(card.course_name || "").trim();
+    standardCardForm.yearLevel.value = String(card.year_level || "").trim();
+    standardCardForm.yearVersion.value = String(card.year_version || "").trim();
+    standardCardForm.standardCodes.value = Array.isArray(card.standard_codes) ? card.standard_codes.join(", ") : "";
+    standardCardForm.achievedText.value = String(card.achieved_text || "").trim();
+    standardCardForm.meritText.value = String(card.merit_text || "").trim();
+    standardCardForm.excellenceText.value = String(card.excellence_text || "").trim();
+    standardCardForm.achievedChecklist.value = Array.isArray(card.achieved_checklist) ? card.achieved_checklist.join("\n") : "";
+    standardCardForm.meritChecklist.value = Array.isArray(card.merit_checklist) ? card.merit_checklist.join("\n") : "";
+    standardCardForm.excellenceChecklist.value = Array.isArray(card.excellence_checklist) ? card.excellence_checklist.join("\n") : "";
+
+    setCardStatus("Card loaded. You can now edit and save.");
+}
+
+async function loadAssessmentStandardCards() {
+    const email = standardsGetStoredEmail();
+    if (!email) return;
+
+    if (standardCardTableBody) {
+        standardCardTableBody.innerHTML = `<tr><td colspan="7" class="standards-empty">Loading Assessment Standard Cards...</td></tr>`;
+    }
+
+    try {
+        const response = await fetch("/api/admin/assessment-standard-cards", {
+            headers: {
+                "x-user-email": email
+            }
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(payload.error || "Could not load Assessment Standard Cards.");
+        }
+
+        loadedStandardCards = Array.isArray(payload?.cards) ? payload.cards : [];
+        renderStandardCards(loadedStandardCards);
+    } catch (error) {
+        loadedStandardCards = [];
+        renderStandardCards([]);
+        setCardStatus(String(error?.message || "Could not load Assessment Standard Cards."), true);
+    }
+}
+
+async function saveAssessmentStandardCard(event) {
+    event.preventDefault();
+    if (!standardCardForm) return;
+
+    const email = standardsGetStoredEmail();
+    if (!email) {
+        setCardStatus("Sign in as admin to save Assessment Standard Cards.", true);
+        return;
+    }
+
+    const yearVersion = Number.parseInt(standardCardForm.yearVersion.value, 10);
+    const standardCodes = parseCodesFromInput(standardCardForm.standardCodes.value);
+    const courseName = String(standardCardForm.courseName.value || "").trim();
+    const yearLevel = String(standardCardForm.yearLevel.value || "").trim();
+
+    if (!courseName) {
+        setCardStatus("Course name is required.", true);
+        return;
+    }
+    if (!yearLevel) {
+        setCardStatus("Year level is required.", true);
+        return;
+    }
+    if (!Number.isInteger(yearVersion)) {
+        setCardStatus("Year (version) must be a whole number.", true);
+        return;
+    }
+    if (!standardCodes.length) {
+        setCardStatus("At least one standard code is required.", true);
+        return;
+    }
+
+    const payload = {
+        id: String(standardCardIdInput?.value || "").trim(),
+        course_name: courseName,
+        year_level: yearLevel,
+        year_version: yearVersion,
+        standard_codes: standardCodes,
+        achieved_text: String(standardCardForm.achievedText.value || "").trim(),
+        merit_text: String(standardCardForm.meritText.value || "").trim(),
+        excellence_text: String(standardCardForm.excellenceText.value || "").trim(),
+        achieved_checklist: linesToArray(standardCardForm.achievedChecklist.value),
+        merit_checklist: linesToArray(standardCardForm.meritChecklist.value),
+        excellence_checklist: linesToArray(standardCardForm.excellenceChecklist.value),
+        is_active: true
+    };
+
+    setCardStatus("Saving Assessment Standard Card...");
+    try {
+        const response = await fetch("/api/admin/assessment-standard-cards", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "x-user-email": email
+            },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(result.error || "Could not save Assessment Standard Card.");
+        }
+
+        setCardStatus("Assessment Standard Card saved.");
+        await loadAssessmentStandardCards();
+        if (result?.card) {
+            fillCardForm(result.card);
+        }
+    } catch (error) {
+        setCardStatus(String(error?.message || "Could not save Assessment Standard Card."), true);
+    }
+}
+
+async function deleteAssessmentStandardCard(id) {
+    const email = standardsGetStoredEmail();
+    if (!email) {
+        setCardStatus("Sign in as admin to delete cards.", true);
+        return;
+    }
+
+    const confirmed = window.confirm("Delete this Assessment Standard Card?");
+    if (!confirmed) return;
+
+    setCardStatus("Deleting Assessment Standard Card...");
+    try {
+        const response = await fetch(`/api/admin/assessment-standard-cards/${encodeURIComponent(id)}`, {
+            method: "DELETE",
+            headers: {
+                "x-user-email": email
+            }
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(result.error || "Could not delete Assessment Standard Card.");
+        }
+
+        setCardStatus("Assessment Standard Card deleted.");
+        await loadAssessmentStandardCards();
+        if (String(standardCardIdInput?.value || "").trim() === String(id || "").trim()) {
+            resetCardForm();
+        }
+    } catch (error) {
+        setCardStatus(String(error?.message || "Could not delete Assessment Standard Card."), true);
+    }
 }
 
 function buildQuery() {
@@ -182,6 +413,36 @@ function bindEvents() {
     if (refreshButton) {
         refreshButton.addEventListener("click", () => loadStandards({ force: true }));
     }
+
+    if (standardCardForm) {
+        standardCardForm.addEventListener("submit", saveAssessmentStandardCard);
+    }
+
+    if (standardCardResetButton) {
+        standardCardResetButton.addEventListener("click", resetCardForm);
+    }
+
+    if (standardCardTableBody) {
+        standardCardTableBody.addEventListener("click", async (event) => {
+            const editButton = event.target.closest("button[data-card-edit]");
+            if (editButton) {
+                const id = String(editButton.getAttribute("data-card-edit") || "").trim();
+                const found = loadedStandardCards.find((row) => String(row?.id || "").trim() === id);
+                if (found) {
+                    fillCardForm(found);
+                }
+                return;
+            }
+
+            const deleteButton = event.target.closest("button[data-card-delete]");
+            if (deleteButton) {
+                const id = String(deleteButton.getAttribute("data-card-delete") || "").trim();
+                if (id) {
+                    await deleteAssessmentStandardCard(id);
+                }
+            }
+        });
+    }
 }
 
 async function initAssessmentStandardsPage() {
@@ -189,7 +450,10 @@ async function initAssessmentStandardsPage() {
     if (!email) return;
 
     bindEvents();
-    await loadStandards();
+    await Promise.all([
+        loadStandards(),
+        loadAssessmentStandardCards()
+    ]);
 }
 
 // Backwards-compatibility hook for any legacy onclick handlers.

@@ -22,6 +22,7 @@ let memorySuggestionId = 1;
 const memoryPracticalEvents = [];
 let memoryPracticalEventId = 1;
 const memoryTrelloConnections = new Map();
+const memoryAssessmentStandardCards = new Map();
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -1070,6 +1071,134 @@ function normalizeArray(value) {
   }
 
   return [];
+}
+
+function normalizeStandardCodeList(value) {
+  const raw = Array.isArray(value)
+    ? value
+    : String(value || "")
+      .split(/[\r\n,;]+/);
+
+  const unique = new Set();
+  raw.forEach((entry) => {
+    const code = String(entry || "").trim();
+    if (code) {
+      unique.add(code);
+    }
+  });
+
+  return Array.from(unique);
+}
+
+function normalizeAssessmentStandardCardRow(row) {
+  const source = row && typeof row === "object" ? row : {};
+  const yearVersionRaw = Number.parseInt(source.year_version ?? source.year ?? source.yearVersion, 10);
+  return {
+    id: String(source.id || "").trim(),
+    course_name: String(source.course_name || source.courseName || "").trim(),
+    year_level: String(source.year_level || source.yearLevel || "").trim(),
+    year_version: Number.isInteger(yearVersionRaw) ? yearVersionRaw : null,
+    standard_codes: normalizeStandardCodeList(source.standard_codes || source.standardCodes),
+    achieved_text: String(source.achieved_text || source.achievedText || "").trim(),
+    merit_text: String(source.merit_text || source.meritText || "").trim(),
+    excellence_text: String(source.excellence_text || source.excellenceText || "").trim(),
+    achieved_checklist: normalizeArray(source.achieved_checklist || source.achievedChecklist),
+    merit_checklist: normalizeArray(source.merit_checklist || source.meritChecklist),
+    excellence_checklist: normalizeArray(source.excellence_checklist || source.excellenceChecklist),
+    card_color: "Teal",
+    is_active: source.is_active === false ? false : source.isActive === false ? false : true,
+    created_by_email: String(source.created_by_email || "").trim().toLowerCase(),
+    updated_by_email: String(source.updated_by_email || "").trim().toLowerCase(),
+    created_at: source.created_at || source.createdAt || null,
+    updated_at: source.updated_at || source.updatedAt || null
+  };
+}
+
+function pickBestAssessmentStandardCardMatch(cards, { standardCode, yearLevel, courseName, yearVersion }) {
+  const normalizedCode = String(standardCode || "").trim();
+  if (!normalizedCode) {
+    return null;
+  }
+
+  const normalizedYearLevel = String(yearLevel || "").trim().toLowerCase();
+  const normalizedCourseName = String(courseName || "").trim().toLowerCase();
+  const normalizedYearVersion = Number.isInteger(Number.parseInt(yearVersion, 10))
+    ? Number.parseInt(yearVersion, 10)
+    : null;
+
+  const scored = (Array.isArray(cards) ? cards : [])
+    .map((row) => normalizeAssessmentStandardCardRow(row))
+    .filter((row) => row.is_active)
+    .filter((row) => row.standard_codes.includes(normalizedCode))
+    .map((row) => {
+      let score = 0;
+      const rowYearLevel = String(row.year_level || "").trim().toLowerCase();
+      const rowCourseName = String(row.course_name || "").trim().toLowerCase();
+      const rowYearVersion = Number.parseInt(row.year_version, 10);
+
+      if (normalizedYearLevel && rowYearLevel === normalizedYearLevel) score += 5;
+      if (normalizedCourseName && rowCourseName === normalizedCourseName) score += 3;
+      if (Number.isInteger(normalizedYearVersion) && Number.isInteger(rowYearVersion) && rowYearVersion === normalizedYearVersion) score += 4;
+      if (!normalizedYearLevel && rowYearLevel) score += 1;
+
+      const updatedAtTime = Number.isNaN(new Date(row.updated_at || 0).getTime()) ? 0 : new Date(row.updated_at || 0).getTime();
+      return { row, score, updatedAtTime };
+    })
+    .sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+      return right.updatedAtTime - left.updatedAtTime;
+    });
+
+  return scored.length ? scored[0].row : null;
+}
+
+async function ensureAssessmentStandardCardsSchema() {
+  if (!hasDatabase) {
+    return;
+  }
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS assessment_standard_cards (
+      id TEXT PRIMARY KEY,
+      course_name TEXT NOT NULL,
+      year_level TEXT NOT NULL,
+      year_version INTEGER NOT NULL,
+      standard_codes JSONB NOT NULL DEFAULT '[]'::jsonb,
+      achieved_text TEXT NOT NULL DEFAULT '',
+      merit_text TEXT NOT NULL DEFAULT '',
+      excellence_text TEXT NOT NULL DEFAULT '',
+      achieved_checklist JSONB NOT NULL DEFAULT '[]'::jsonb,
+      merit_checklist JSONB NOT NULL DEFAULT '[]'::jsonb,
+      excellence_checklist JSONB NOT NULL DEFAULT '[]'::jsonb,
+      card_color TEXT NOT NULL DEFAULT 'Teal',
+      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_by_email TEXT,
+      updated_by_email TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`ALTER TABLE assessment_standard_cards ADD COLUMN IF NOT EXISTS course_name TEXT`);
+  await pool.query(`ALTER TABLE assessment_standard_cards ADD COLUMN IF NOT EXISTS year_level TEXT`);
+  await pool.query(`ALTER TABLE assessment_standard_cards ADD COLUMN IF NOT EXISTS year_version INTEGER`);
+  await pool.query(`ALTER TABLE assessment_standard_cards ADD COLUMN IF NOT EXISTS standard_codes JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE assessment_standard_cards ADD COLUMN IF NOT EXISTS achieved_text TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE assessment_standard_cards ADD COLUMN IF NOT EXISTS merit_text TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE assessment_standard_cards ADD COLUMN IF NOT EXISTS excellence_text TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE assessment_standard_cards ADD COLUMN IF NOT EXISTS achieved_checklist JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE assessment_standard_cards ADD COLUMN IF NOT EXISTS merit_checklist JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE assessment_standard_cards ADD COLUMN IF NOT EXISTS excellence_checklist JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE assessment_standard_cards ADD COLUMN IF NOT EXISTS card_color TEXT NOT NULL DEFAULT 'Teal'`);
+  await pool.query(`ALTER TABLE assessment_standard_cards ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE`);
+  await pool.query(`ALTER TABLE assessment_standard_cards ADD COLUMN IF NOT EXISTS created_by_email TEXT`);
+  await pool.query(`ALTER TABLE assessment_standard_cards ADD COLUMN IF NOT EXISTS updated_by_email TEXT`);
+  await pool.query(`ALTER TABLE assessment_standard_cards ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await pool.query(`ALTER TABLE assessment_standard_cards ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS assessment_standard_cards_year_idx ON assessment_standard_cards (year_version)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS assessment_standard_cards_active_idx ON assessment_standard_cards (is_active)`);
 }
 
 async function ensureActivityHubVisibilitySchema() {
@@ -2736,6 +2865,7 @@ async function ensureSchema() {
   await ensureProjectInterestsSchema();
   await ensureTrelloConnectionsSchema();
   await ensureUnitPlanSchema();
+  await ensureAssessmentStandardCardsSchema();
 }
 
 async function syncDtechExcludedActivitiesVisibility() {
@@ -4326,6 +4456,301 @@ app.get("/api/assessment-standards/options", requireActivityWriteAccess, async (
     });
   } catch (error) {
     res.status(500).json({ error: `Could not load standards options: ${String(error?.message || "unknown error")}` });
+  }
+});
+
+app.get("/api/admin/assessment-standard-cards", requireAdminAccess, async (req, res) => {
+  const standardCode = String(req.query?.standard || "").trim();
+  const yearLevel = String(req.query?.year_level || req.query?.yearLevel || "").trim().toLowerCase();
+  const courseName = String(req.query?.course_name || req.query?.courseName || "").trim().toLowerCase();
+  const yearVersion = Number.parseInt(req.query?.year || req.query?.year_version || req.query?.yearVersion, 10);
+
+  if (!hasDatabase) {
+    let rows = Array.from(memoryAssessmentStandardCards.values()).map((row) => normalizeAssessmentStandardCardRow(row));
+    if (standardCode) {
+      rows = rows.filter((row) => row.standard_codes.includes(standardCode));
+    }
+    if (yearLevel) {
+      rows = rows.filter((row) => String(row.year_level || "").trim().toLowerCase() === yearLevel);
+    }
+    if (courseName) {
+      rows = rows.filter((row) => String(row.course_name || "").trim().toLowerCase() === courseName);
+    }
+    if (Number.isInteger(yearVersion)) {
+      rows = rows.filter((row) => Number.parseInt(row.year_version, 10) === yearVersion);
+    }
+
+    rows.sort((a, b) => {
+      const aTime = Number.isNaN(new Date(a.updated_at || 0).getTime()) ? 0 : new Date(a.updated_at || 0).getTime();
+      const bTime = Number.isNaN(new Date(b.updated_at || 0).getTime()) ? 0 : new Date(b.updated_at || 0).getTime();
+      return bTime - aTime;
+    });
+
+    res.json({ count: rows.length, cards: rows });
+    return;
+  }
+
+  try {
+    await ensureAssessmentStandardCardsSchema();
+    const conditions = [];
+    const values = [];
+    let paramIndex = 1;
+
+    if (standardCode) {
+      conditions.push(`standard_codes ? $${paramIndex}`);
+      values.push(standardCode);
+      paramIndex += 1;
+    }
+    if (yearLevel) {
+      conditions.push(`LOWER(year_level) = $${paramIndex}`);
+      values.push(yearLevel);
+      paramIndex += 1;
+    }
+    if (courseName) {
+      conditions.push(`LOWER(course_name) = $${paramIndex}`);
+      values.push(courseName);
+      paramIndex += 1;
+    }
+    if (Number.isInteger(yearVersion)) {
+      conditions.push(`year_version = $${paramIndex}`);
+      values.push(yearVersion);
+      paramIndex += 1;
+    }
+
+    const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+    const result = await pool.query(
+      `
+        SELECT *
+        FROM assessment_standard_cards
+        ${whereClause}
+        ORDER BY updated_at DESC
+      `,
+      values
+    );
+
+    const cards = result.rows.map((row) => normalizeAssessmentStandardCardRow(row));
+    res.json({ count: cards.length, cards });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not load Assessment Standard Cards" });
+  }
+});
+
+app.post("/api/admin/assessment-standard-cards", requireAdminAccess, async (req, res) => {
+  const body = req.body && typeof req.body === "object" ? req.body : {};
+  const requestEmail = normalizeEmail(getRequestUserEmail(req));
+  const courseName = String(body.course_name || body.courseName || "").trim();
+  const yearLevel = String(body.year_level || body.yearLevel || "").trim();
+  const yearVersion = Number.parseInt(body.year_version ?? body.yearVersion ?? body.year, 10);
+  const standardCodes = normalizeStandardCodeList(body.standard_codes || body.standardCodes);
+  const achievedText = String(body.achieved_text || body.achievedText || "").trim();
+  const meritText = String(body.merit_text || body.meritText || "").trim();
+  const excellenceText = String(body.excellence_text || body.excellenceText || "").trim();
+  const achievedChecklist = normalizeArray(body.achieved_checklist || body.achievedChecklist);
+  const meritChecklist = normalizeArray(body.merit_checklist || body.meritChecklist);
+  const excellenceChecklist = normalizeArray(body.excellence_checklist || body.excellenceChecklist);
+  const isActive = body.is_active === false || body.isActive === false ? false : true;
+
+  if (!courseName) {
+    res.status(400).json({ error: "course_name is required" });
+    return;
+  }
+  if (!yearLevel) {
+    res.status(400).json({ error: "year_level is required" });
+    return;
+  }
+  if (!Number.isInteger(yearVersion)) {
+    res.status(400).json({ error: "year_version must be an integer" });
+    return;
+  }
+  if (!standardCodes.length) {
+    res.status(400).json({ error: "At least one standard code is required" });
+    return;
+  }
+
+  const firstCode = String(standardCodes[0] || "").trim();
+  const generatedId = slugify(`${courseName}-${yearLevel}-${yearVersion}-${firstCode}`) || `standard-card-${Date.now()}`;
+  const id = String(body.id || generatedId).trim();
+
+  if (!hasDatabase) {
+    const nowIso = new Date().toISOString();
+    const existing = normalizeAssessmentStandardCardRow(memoryAssessmentStandardCards.get(id) || {});
+    const row = normalizeAssessmentStandardCardRow({
+      id,
+      course_name: courseName,
+      year_level: yearLevel,
+      year_version: yearVersion,
+      standard_codes: standardCodes,
+      achieved_text: achievedText,
+      merit_text: meritText,
+      excellence_text: excellenceText,
+      achieved_checklist: achievedChecklist,
+      merit_checklist: meritChecklist,
+      excellence_checklist: excellenceChecklist,
+      is_active: isActive,
+      created_by_email: existing.created_by_email || requestEmail,
+      updated_by_email: requestEmail,
+      created_at: existing.created_at || nowIso,
+      updated_at: nowIso
+    });
+    memoryAssessmentStandardCards.set(id, row);
+    res.status(201).json({ ok: true, card: row });
+    return;
+  }
+
+  try {
+    await ensureAssessmentStandardCardsSchema();
+    const result = await pool.query(
+      `
+        INSERT INTO assessment_standard_cards (
+          id,
+          course_name,
+          year_level,
+          year_version,
+          standard_codes,
+          achieved_text,
+          merit_text,
+          excellence_text,
+          achieved_checklist,
+          merit_checklist,
+          excellence_checklist,
+          card_color,
+          is_active,
+          created_by_email,
+          updated_by_email,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          $1,
+          $2,
+          $3,
+          $4,
+          $5::jsonb,
+          $6,
+          $7,
+          $8,
+          $9::jsonb,
+          $10::jsonb,
+          $11::jsonb,
+          'Teal',
+          $12,
+          $13,
+          $14,
+          NOW(),
+          NOW()
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          course_name = EXCLUDED.course_name,
+          year_level = EXCLUDED.year_level,
+          year_version = EXCLUDED.year_version,
+          standard_codes = EXCLUDED.standard_codes,
+          achieved_text = EXCLUDED.achieved_text,
+          merit_text = EXCLUDED.merit_text,
+          excellence_text = EXCLUDED.excellence_text,
+          achieved_checklist = EXCLUDED.achieved_checklist,
+          merit_checklist = EXCLUDED.merit_checklist,
+          excellence_checklist = EXCLUDED.excellence_checklist,
+          card_color = 'Teal',
+          is_active = EXCLUDED.is_active,
+          updated_by_email = EXCLUDED.updated_by_email,
+          updated_at = NOW()
+        RETURNING *
+      `,
+      [
+        id,
+        courseName,
+        yearLevel,
+        yearVersion,
+        JSON.stringify(standardCodes),
+        achievedText,
+        meritText,
+        excellenceText,
+        JSON.stringify(achievedChecklist),
+        JSON.stringify(meritChecklist),
+        JSON.stringify(excellenceChecklist),
+        isActive,
+        requestEmail,
+        requestEmail
+      ]
+    );
+
+    res.status(201).json({ ok: true, card: normalizeAssessmentStandardCardRow(result.rows[0] || {}) });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not save Assessment Standard Card" });
+  }
+});
+
+app.delete("/api/admin/assessment-standard-cards/:id", requireAdminAccess, async (req, res) => {
+  const id = String(req.params.id || "").trim();
+  if (!id) {
+    res.status(400).json({ error: "id is required" });
+    return;
+  }
+
+  if (!hasDatabase) {
+    const existed = memoryAssessmentStandardCards.delete(id);
+    res.json({ ok: true, deleted: existed ? 1 : 0 });
+    return;
+  }
+
+  try {
+    await ensureAssessmentStandardCardsSchema();
+    const result = await pool.query(`DELETE FROM assessment_standard_cards WHERE id = $1`, [id]);
+    res.json({ ok: true, deleted: Number(result.rowCount) || 0 });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not delete Assessment Standard Card" });
+  }
+});
+
+app.get("/api/assessment-standard-cards/match", requireActivityWriteAccess, async (req, res) => {
+  const standardCode = String(req.query?.standard || "").trim();
+  const yearLevel = String(req.query?.year_level || req.query?.yearLevel || "").trim();
+  const courseName = String(req.query?.course_name || req.query?.courseName || "").trim();
+  const yearVersionRaw = Number.parseInt(req.query?.year || req.query?.year_version || req.query?.yearVersion, 10);
+
+  if (!standardCode) {
+    res.status(400).json({ error: "standard is required" });
+    return;
+  }
+
+  if (!hasDatabase) {
+    const match = pickBestAssessmentStandardCardMatch(
+      Array.from(memoryAssessmentStandardCards.values()),
+      {
+        standardCode,
+        yearLevel,
+        courseName,
+        yearVersion: Number.isInteger(yearVersionRaw) ? yearVersionRaw : null
+      }
+    );
+
+    res.json({ matched: Boolean(match), card: match || null });
+    return;
+  }
+
+  try {
+    await ensureAssessmentStandardCardsSchema();
+    const result = await pool.query(
+      `
+        SELECT *
+        FROM assessment_standard_cards
+        WHERE is_active = TRUE
+          AND standard_codes ? $1
+        ORDER BY updated_at DESC
+      `,
+      [standardCode]
+    );
+
+    const match = pickBestAssessmentStandardCardMatch(result.rows, {
+      standardCode,
+      yearLevel,
+      courseName,
+      yearVersion: Number.isInteger(yearVersionRaw) ? yearVersionRaw : null
+    });
+
+    res.json({ matched: Boolean(match), card: match || null });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not match Assessment Standard Card" });
   }
 });
 

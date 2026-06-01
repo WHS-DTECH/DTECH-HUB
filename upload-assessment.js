@@ -350,6 +350,101 @@ function formatStandardOptionLabel(row) {
     return bits.join(" | ");
 }
 
+function extractStandardCode(value) {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    const match = text.match(/\b\d{5}\b/);
+    return match ? String(match[0] || "").trim() : "";
+}
+
+function applyAssessmentStandardCardTemplate(card) {
+    if (!form || !card || typeof card !== "object") return;
+
+    const pickLines = (textValue, checklistValue) => {
+        const checklist = Array.isArray(checklistValue)
+            ? checklistValue.map((line) => String(line || "").trim()).filter(Boolean)
+            : [];
+
+        if (checklist.length) {
+            return checklist;
+        }
+
+        const text = String(textValue || "").trim();
+        return text ? [text] : [];
+    };
+
+    const achievedLines = pickLines(card.achieved_text, card.achieved_checklist);
+    const meritLines = pickLines(card.merit_text, card.merit_checklist);
+    const excellenceLines = pickLines(card.excellence_text, card.excellence_checklist);
+
+    if (form.achieved) {
+        form.achieved.value = achievedLines.join("\n");
+        autoResizeTextarea(form.achieved);
+        renderRequirementChecklistPreview("achieved", achievedLines);
+    }
+
+    if (form.merit) {
+        form.merit.value = meritLines.join("\n");
+        autoResizeTextarea(form.merit);
+        renderRequirementChecklistPreview("merit", meritLines);
+    }
+
+    if (form.excellence) {
+        form.excellence.value = excellenceLines.join("\n");
+        autoResizeTextarea(form.excellence);
+        renderRequirementChecklistPreview("excellence", excellenceLines);
+    }
+
+    if (form.cardColor) {
+        form.cardColor.value = "Teal";
+    }
+}
+
+async function tryAutofillFromAssessmentStandardCard(standardLabel) {
+    const standardCode = extractStandardCode(standardLabel);
+    if (!standardCode) {
+        return;
+    }
+
+    const params = new URLSearchParams();
+    params.set("standard", standardCode);
+
+    const yearLevel = String(form?.yearLevel?.value || "").trim();
+    if (yearLevel) {
+        params.set("year_level", yearLevel);
+    }
+
+    const courseName = String(form?.activityName?.value || "").trim();
+    if (courseName) {
+        params.set("course_name", courseName);
+    }
+
+    const yearVersion = new Date().getFullYear();
+    params.set("year", String(yearVersion));
+
+    try {
+        const response = await fetch(`/api/assessment-standard-cards/match?${params.toString()}`, {
+            headers: withUserEmailHeader({})
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            return;
+        }
+
+        if (!payload?.matched || !payload?.card) {
+            setStatus("Standard added. No matching Assessment Standard Card template found.");
+            return;
+        }
+
+        applyAssessmentStandardCardTemplate(payload.card);
+        saveAssessmentDraft();
+        const templateLabel = String(payload.card?.course_name || "").trim();
+        setStatus(`Standard added. Loaded criteria from Assessment Standard Card${templateLabel ? ` (${templateLabel})` : ""}.`);
+    } catch (_error) {
+        // Keep the standard add flow resilient if template lookup fails.
+    }
+}
+
 async function loadAssessmentStandardsOptions() {
     if (!standardLibrarySelect) return;
 
@@ -387,7 +482,7 @@ async function loadAssessmentStandardsOptions() {
     }
 }
 
-function addSelectedStandardToTextarea() {
+async function addSelectedStandardToTextarea() {
     if (!form?.standardDetails || !standardLibrarySelect) return;
     const selected = String(standardLibrarySelect.value || "").trim();
     if (!selected) {
@@ -403,6 +498,7 @@ function addSelectedStandardToTextarea() {
     }
 
     setStatus("Standard added.");
+    await tryAutofillFromAssessmentStandardCard(selected);
 }
 
 function renderAuthStatus() {
@@ -489,7 +585,9 @@ window.addEventListener("DOMContentLoaded", async () => {
 });
 
 if (standardLibraryAdd) {
-    standardLibraryAdd.addEventListener("click", addSelectedStandardToTextarea);
+    standardLibraryAdd.addEventListener("click", () => {
+        addSelectedStandardToTextarea();
+    });
 }
 
 if (standardChipList) {
