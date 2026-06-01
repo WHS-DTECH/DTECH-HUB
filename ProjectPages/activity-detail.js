@@ -579,6 +579,9 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
         haparaDriveClassUrl: "",
         haparaDocumentRef: "",
         trelloCardUrl: "",
+        trelloLastLogDate: "",
+        trelloLastLogAt: "",
+        trelloLastLogNote: "",
         submittedAt: "",
         reviewStatus: "pending"
     };
@@ -644,6 +647,21 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
             return;
         }
 
+        if (text.startsWith("TRELLO_LAST_LOG_DATE|")) {
+            result.trelloLastLogDate = text.slice("TRELLO_LAST_LOG_DATE|".length).trim();
+            return;
+        }
+
+        if (text.startsWith("TRELLO_LAST_LOG_AT|")) {
+            result.trelloLastLogAt = text.slice("TRELLO_LAST_LOG_AT|".length).trim();
+            return;
+        }
+
+        if (text.startsWith("TRELLO_LAST_LOG_NOTE|")) {
+            result.trelloLastLogNote = text.slice("TRELLO_LAST_LOG_NOTE|".length).trim();
+            return;
+        }
+
         if (text.startsWith("SUBMITTED_AT|")) {
             result.submittedAt = text.slice("SUBMITTED_AT|".length).trim();
             return;
@@ -680,6 +698,9 @@ function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     const haparaDriveClassUrl = String(payload?.haparaDriveClassUrl || "").trim();
     const haparaDocumentRef = String(payload?.haparaDocumentRef || "").trim();
     const trelloCardUrl = toSafeTrelloCardUrl(payload?.trelloCardUrl);
+    const trelloLastLogDate = String(payload?.trelloLastLogDate || "").trim();
+    const trelloLastLogAt = String(payload?.trelloLastLogAt || "").trim();
+    const trelloLastLogNote = String(payload?.trelloLastLogNote || "").trim();
     const reviewStatusRaw = String(payload?.reviewStatus || "").trim().toLowerCase();
     const reviewStatus = reviewStatusRaw === "reviewed"
         ? "reviewed"
@@ -719,6 +740,15 @@ function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     if (trelloCardUrl) {
         steps.push({ text: `TRELLO_CARD_URL|${trelloCardUrl}`, done: true });
     }
+    if (trelloLastLogDate) {
+        steps.push({ text: `TRELLO_LAST_LOG_DATE|${trelloLastLogDate}`, done: true });
+    }
+    if (trelloLastLogAt) {
+        steps.push({ text: `TRELLO_LAST_LOG_AT|${trelloLastLogAt}`, done: true });
+    }
+    if (trelloLastLogNote) {
+        steps.push({ text: `TRELLO_LAST_LOG_NOTE|${trelloLastLogNote}`, done: true });
+    }
     steps.push({ text: `REVIEW|${reviewStatus}`, done: reviewStatus === "reviewed" });
 
     sourceRows.push({ standard: standardKey, steps });
@@ -748,6 +778,19 @@ function getReviewStatusLabel(value) {
         return "Needs changes";
     }
     return "Pending review";
+}
+
+function getNzDateKey(date = new Date()) {
+    try {
+        return new Intl.DateTimeFormat("en-CA", {
+            timeZone: "Pacific/Auckland",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit"
+        }).format(date);
+    } catch (_error) {
+        return new Date(date).toISOString().slice(0, 10);
+    }
 }
 
 async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, email, isTeacher, interestData }) {
@@ -824,10 +867,14 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                     acknowledged: Boolean(submission.haparaAcknowledged),
                     submittedAt: submission.haparaSubmittedAt || submission.submittedAt || "",
                     trelloCardUrl: submission.trelloCardUrl || "",
-                    docRef: submission.haparaDocumentRef || ""
+                    docRef: submission.haparaDocumentRef || "",
+                    lastLogDate: String(submission.trelloLastLogDate || "").trim(),
+                    lastLogAt: String(submission.trelloLastLogAt || "").trim()
                 };
             })
             .filter(Boolean);
+
+        const todayNz = getNzDateKey();
 
         if (!rows.length) {
             panelHost.innerHTML = `<p class="task-topic-submission-note">No student records are ready for acknowledgement tracking yet.</p>`;
@@ -844,10 +891,12 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 <p class="task-topic-submission-note">Students submit work in Hapara <strong>${escapeHtml(haparaSpaceName)}</strong>. This panel tracks who has acknowledged they submitted.</p>
                 <div class="task-topic-submission-meta">
                     <p><strong>Acknowledged:</strong> ${rows.filter((row) => row.acknowledged).length} of ${rows.length}</p>
+                    ${isProjectManagementTopic ? `<p><strong>Logged today:</strong> ${rows.filter((row) => row.lastLogDate === todayNz).length} of ${rows.length}</p>` : ""}
                 </div>
                 ${isProjectManagementTopic ? `
                     <div class="task-topic-submission-actions task-topic-teacher-filter-actions">
                         <button type="button" class="detail-action detail-action-secondary" id="task-topic-filter-missing-trello">Show Missing Trello Links</button>
+                        <button type="button" class="detail-action detail-action-secondary" id="task-topic-filter-missing-log">Show Missing Today's Log</button>
                         <button type="button" class="detail-action detail-action-secondary" id="task-topic-filter-show-all" hidden>Show All Students</button>
                     </div>
                 ` : ""}
@@ -861,6 +910,10 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                                 ? `<a class="task-topic-teacher-status-trello" href="${escapeHtml(row.trelloCardUrl)}" target="_blank" rel="noreferrer">Open Trello Card</a>`
                                 : `<span class="task-topic-teacher-status-trello task-topic-teacher-status-trello-missing">No Trello card linked</span>`
                             }
+                            ${isProjectManagementTopic
+                                ? `<span class="task-topic-teacher-status-log ${row.lastLogDate === todayNz ? "is-complete" : "is-missing"}">${row.lastLogDate === todayNz ? "Logged today" : "Missing today's log"}</span>`
+                                : ""
+                            }
                             <span class="task-topic-teacher-status-time">${escapeHtml(formatSubmissionTimestamp(row.submittedAt))}</span>
                         </div>
                     `).join("")}
@@ -870,25 +923,37 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
 
         if (isProjectManagementTopic) {
             const missingFilterButton = panelHost.querySelector("#task-topic-filter-missing-trello");
+            const missingLogFilterButton = panelHost.querySelector("#task-topic-filter-missing-log");
             const showAllButton = panelHost.querySelector("#task-topic-filter-show-all");
             const items = Array.from(panelHost.querySelectorAll(".task-topic-teacher-status-item"));
 
-            const applyFilter = (showMissingOnly) => {
+            const applyFilter = (mode) => {
                 items.forEach((item) => {
                     const hasMissingBadge = Boolean(item.querySelector(".task-topic-teacher-status-trello-missing"));
-                    item.hidden = showMissingOnly ? !hasMissingBadge : false;
+                    const hasMissingLog = Boolean(item.querySelector(".task-topic-teacher-status-log.is-missing"));
+                    if (mode === "missing-trello") {
+                        item.hidden = !hasMissingBadge;
+                    } else if (mode === "missing-log") {
+                        item.hidden = !hasMissingLog;
+                    } else {
+                        item.hidden = false;
+                    }
                 });
 
                 if (missingFilterButton) {
-                    missingFilterButton.hidden = showMissingOnly;
+                    missingFilterButton.hidden = mode === "missing-trello";
+                }
+                if (missingLogFilterButton) {
+                    missingLogFilterButton.hidden = mode === "missing-log";
                 }
                 if (showAllButton) {
-                    showAllButton.hidden = !showMissingOnly;
+                    showAllButton.hidden = mode === "all";
                 }
             };
 
-            missingFilterButton?.addEventListener("click", () => applyFilter(true));
-            showAllButton?.addEventListener("click", () => applyFilter(false));
+            missingFilterButton?.addEventListener("click", () => applyFilter("missing-trello"));
+            missingLogFilterButton?.addEventListener("click", () => applyFilter("missing-log"));
+            showAllButton?.addEventListener("click", () => applyFilter("all"));
         }
         return;
     }
@@ -912,6 +977,8 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const acknowledgedAt = submission.haparaSubmittedAt || submission.submittedAt || "";
     const currentDocRef = String(submission.haparaDocumentRef || "").trim();
     const currentTrelloCardUrl = toSafeTrelloCardUrl(submission.trelloCardUrl);
+    const todayNz = getNzDateKey();
+    const hasLoggedToday = String(submission.trelloLastLogDate || "").trim() === todayNz;
 
     panelHost.innerHTML = `
         <form id="task-topic-submission-form" class="task-topic-submission-form" novalidate>
@@ -929,6 +996,28 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 <label class="task-topic-submission-label" for="task-topic-trello-card-url">Trello Card Link</label>
                 <input id="task-topic-trello-card-url" class="task-topic-submission-input" type="url" placeholder="https://trello.com/c/xxxx1234" value="${escapeHtml(currentTrelloCardUrl)}" required>
                 <p class="task-topic-submission-note">Project Management evidence requires your Trello card link. This gives your teacher one-click access for marking.</p>
+
+                <div class="task-topic-trello-create-box">
+                    <p class="task-topic-submission-note">Create a Trello card automatically (optional):</p>
+                    <label class="task-topic-submission-label" for="task-topic-trello-board">Board</label>
+                    <select id="task-topic-trello-board" class="task-topic-submission-input">
+                        <option value="">Select board</option>
+                    </select>
+                    <label class="task-topic-submission-label" for="task-topic-trello-list">List</label>
+                    <select id="task-topic-trello-list" class="task-topic-submission-input">
+                        <option value="">Select list</option>
+                    </select>
+                    <button type="button" class="detail-action detail-action-secondary" id="task-topic-create-trello-card">Create Trello Card for This Task</button>
+                    <p class="task-topic-submission-status" id="task-topic-trello-create-status" aria-live="polite"></p>
+                </div>
+
+                <div class="task-topic-trello-log-box">
+                    <p class="task-topic-submission-note ${hasLoggedToday ? "task-topic-submission-note-success" : "task-topic-submission-note-warning"}">${hasLoggedToday ? "Trello work log complete for today." : "Daily prompt: log your project management progress in Trello now."}</p>
+                    <label class="task-topic-submission-label" for="task-topic-trello-log-note">Today's Trello Work Log</label>
+                    <textarea id="task-topic-trello-log-note" class="task-topic-submission-input task-topic-submission-textarea" placeholder="What did you complete today? What blocker did you hit? What is your next step before next lesson?"></textarea>
+                    <button type="button" class="detail-action" id="task-topic-send-trello-log">Send Today's Log to Trello</button>
+                    <p class="task-topic-submission-status" id="task-topic-trello-log-status" aria-live="polite"></p>
+                </div>
             ` : ""}
 
             <div class="task-topic-submission-actions">
@@ -946,6 +1035,10 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 ? `<p><strong>Trello Card:</strong> <span id="task-topic-trello-reference">${currentTrelloCardUrl ? `<a href="${escapeHtml(currentTrelloCardUrl)}" target="_blank" rel="noreferrer">${escapeHtml(currentTrelloCardUrl)}</a>` : "Not linked"}</span></p>`
                 : ""
             }
+            ${isProjectManagementTopic
+                ? `<p><strong>Last Trello Log:</strong> <span id="task-topic-trello-last-log">${escapeHtml(formatSubmissionTimestamp(submission.trelloLastLogAt || ""))}</span></p>`
+                : ""
+            }
         </div>
     `;
 
@@ -953,11 +1046,19 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const clearAckButton = panelHost.querySelector("#task-topic-clear-acknowledgement");
     const docRefInput = panelHost.querySelector("#task-topic-hapara-doc-ref");
     const trelloCardInput = panelHost.querySelector("#task-topic-trello-card-url");
+    const trelloBoardSelect = panelHost.querySelector("#task-topic-trello-board");
+    const trelloListSelect = panelHost.querySelector("#task-topic-trello-list");
+    const trelloCreateButton = panelHost.querySelector("#task-topic-create-trello-card");
+    const trelloCreateStatusHost = panelHost.querySelector("#task-topic-trello-create-status");
+    const trelloLogNoteInput = panelHost.querySelector("#task-topic-trello-log-note");
+    const trelloLogButton = panelHost.querySelector("#task-topic-send-trello-log");
+    const trelloLogStatusHost = panelHost.querySelector("#task-topic-trello-log-status");
     const statusHost = panelHost.querySelector("#task-topic-submission-status");
     const ackStatusHost = panelHost.querySelector("#task-topic-ack-status");
     const lastSubmittedHost = panelHost.querySelector("#task-topic-last-submitted");
     const docRefHost = panelHost.querySelector("#task-topic-doc-reference");
     const trelloRefHost = panelHost.querySelector("#task-topic-trello-reference");
+    const trelloLastLogHost = panelHost.querySelector("#task-topic-trello-last-log");
     const updateMeta = (isAcknowledged, timestamp) => {
         if (ackStatusHost) {
             ackStatusHost.textContent = isAcknowledged ? "Submitted in Hapara" : "Waiting for acknowledgement";
@@ -989,6 +1090,183 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         statusHost.textContent = String(message || "");
         statusHost.classList.toggle("is-error", Boolean(isError));
     };
+
+    const setTrelloCreateStatus = (message, isError = false) => {
+        if (!trelloCreateStatusHost) return;
+        trelloCreateStatusHost.textContent = String(message || "");
+        trelloCreateStatusHost.classList.toggle("is-error", Boolean(isError));
+    };
+
+    const setTrelloLogStatus = (message, isError = false) => {
+        if (!trelloLogStatusHost) return;
+        trelloLogStatusHost.textContent = String(message || "");
+        trelloLogStatusHost.classList.toggle("is-error", Boolean(isError));
+    };
+
+    if (isProjectManagementTopic && trelloBoardSelect && trelloListSelect) {
+        try {
+            const boardsResponse = await fetch("/api/integrations/trello/boards", { headers: buildWriteHeaders() });
+            if (boardsResponse.ok) {
+                const boards = await boardsResponse.json().catch(() => []);
+                const boardOptions = (Array.isArray(boards) ? boards : [])
+                    .map((board) => `<option value="${escapeHtml(board.id)}">${escapeHtml(board.name || board.id)}</option>`)
+                    .join("");
+                trelloBoardSelect.innerHTML = `<option value="">Select board</option>${boardOptions}`;
+            } else {
+                setTrelloCreateStatus("Connect Trello first (Student Work page), then reload.", true);
+            }
+        } catch (_error) {
+            setTrelloCreateStatus("Could not load Trello boards right now.", true);
+        }
+
+        trelloBoardSelect.addEventListener("change", async () => {
+            const boardId = String(trelloBoardSelect.value || "").trim();
+            trelloListSelect.innerHTML = `<option value="">Loading lists...</option>`;
+            if (!boardId) {
+                trelloListSelect.innerHTML = `<option value="">Select list</option>`;
+                return;
+            }
+
+            try {
+                const listsResponse = await fetch(`/api/integrations/trello/boards/${encodeURIComponent(boardId)}/lists`, { headers: buildWriteHeaders() });
+                if (!listsResponse.ok) {
+                    throw new Error("Could not load lists.");
+                }
+
+                const lists = await listsResponse.json().catch(() => []);
+                const listOptions = (Array.isArray(lists) ? lists : [])
+                    .map((list) => `<option value="${escapeHtml(list.id)}">${escapeHtml(list.name || list.id)}</option>`)
+                    .join("");
+                trelloListSelect.innerHTML = `<option value="">Select list</option>${listOptions}`;
+            } catch (_error) {
+                trelloListSelect.innerHTML = `<option value="">Select list</option>`;
+                setTrelloCreateStatus("Could not load Trello lists.", true);
+            }
+        });
+
+        trelloCreateButton?.addEventListener("click", async () => {
+            const listId = String(trelloListSelect.value || "").trim();
+            if (!listId) {
+                setTrelloCreateStatus("Select a Trello list first.", true);
+                return;
+            }
+
+            const cardName = `${detailData?.title || "Project"} - ${taskTopicShortName || deriveTaskShortName(taskTopicTitle) || "Project Management"}`;
+            const cardDesc = [
+                `Student: ${email}`,
+                `Task Topic: ${taskTopicTitle}`,
+                "",
+                "Daily log prompts:",
+                "1) What did I complete today?",
+                "2) What blocker did I hit?",
+                "3) What is my next step before next lesson?"
+            ].join("\n");
+
+            trelloCreateButton.disabled = true;
+            setTrelloCreateStatus("Creating Trello card...");
+            try {
+                const createResponse = await fetch("/api/integrations/trello/cards", {
+                    method: "POST",
+                    headers: buildWriteHeaders(),
+                    body: JSON.stringify({
+                        list_id: listId,
+                        name: cardName,
+                        desc: cardDesc,
+                        pos: "top"
+                    })
+                });
+
+                if (!createResponse.ok) {
+                    const createError = await createResponse.json().catch(() => ({}));
+                    throw new Error(createError.error || "Could not create Trello card.");
+                }
+
+                const created = await createResponse.json().catch(() => ({}));
+                const safeUrl = toSafeTrelloCardUrl(created.url || "");
+                if (safeUrl && trelloCardInput) {
+                    trelloCardInput.value = safeUrl;
+                }
+                setTrelloCreateStatus("Trello card created and linked.");
+                updateMeta(acknowledged, acknowledgedAt);
+            } catch (error) {
+                setTrelloCreateStatus(error.message || "Could not create Trello card.", true);
+            } finally {
+                if (trelloCreateButton && trelloCreateButton.isConnected) trelloCreateButton.disabled = false;
+            }
+        });
+
+        trelloLogButton?.addEventListener("click", async () => {
+            const safeCardUrl = toSafeTrelloCardUrl(trelloCardInput?.value || "");
+            const note = String(trelloLogNoteInput?.value || "").trim();
+            if (!safeCardUrl) {
+                setTrelloLogStatus("Add a valid Trello card link first.", true);
+                return;
+            }
+            if (!note) {
+                setTrelloLogStatus("Add your daily log note before sending.", true);
+                return;
+            }
+
+            if (trelloLogButton) trelloLogButton.disabled = true;
+            setTrelloLogStatus("Sending log to Trello...");
+
+            try {
+                const sendResponse = await fetch("/api/integrations/trello/work-log", {
+                    method: "POST",
+                    headers: buildWriteHeaders(),
+                    body: JSON.stringify({
+                        card_url: safeCardUrl,
+                        note,
+                        activity_title: `${detailData?.title || "Project"} - ${taskTopicTitle}`
+                    })
+                });
+
+                if (!sendResponse.ok) {
+                    const sendError = await sendResponse.json().catch(() => ({}));
+                    throw new Error(sendError.error || "Could not send Trello log.");
+                }
+
+                const nowIso = new Date().toISOString();
+                const logDate = getNzDateKey(new Date());
+                const nextRows = upsertTaskTopicSubmissionEvidenceRows(evidenceRows, standardKey, {
+                    writtenEvidence: submission.writtenEvidence,
+                    evidenceLink: submission.evidenceLink,
+                    fileName: submission.fileName,
+                    fileUrl: submission.fileUrl,
+                    submittedAt: submission.submittedAt,
+                    haparaAcknowledged: submission.haparaAcknowledged,
+                    haparaSubmittedAt: submission.haparaSubmittedAt,
+                    haparaLocation: submission.haparaLocation,
+                    haparaDriveClassUrl: submission.haparaDriveClassUrl,
+                    haparaDocumentRef: submission.haparaDocumentRef,
+                    trelloCardUrl: safeCardUrl,
+                    trelloLastLogDate: logDate,
+                    trelloLastLogAt: nowIso,
+                    trelloLastLogNote: note,
+                    reviewStatus: submission.reviewStatus
+                });
+
+                await saveEvidenceRows(projectId, email, nextRows);
+                evidenceRows = nextRows;
+                submission.trelloCardUrl = safeCardUrl;
+                submission.trelloLastLogDate = logDate;
+                submission.trelloLastLogAt = nowIso;
+                submission.trelloLastLogNote = note;
+
+                if (trelloLastLogHost) {
+                    trelloLastLogHost.textContent = formatSubmissionTimestamp(nowIso);
+                }
+                if (trelloLogNoteInput) {
+                    trelloLogNoteInput.value = "";
+                }
+                setTrelloLogStatus("Trello log sent. Daily prompt complete for today.");
+            } catch (error) {
+                setTrelloLogStatus(error.message || "Could not send Trello log.", true);
+            } finally {
+                if (trelloLogButton && trelloLogButton.isConnected) trelloLogButton.disabled = false;
+            }
+        });
+    }
 
     form?.addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -1023,6 +1301,9 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             haparaDriveClassUrl: haparaClassDriveUrl,
             haparaDocumentRef: docReference,
             trelloCardUrl,
+            trelloLastLogDate: submission.trelloLastLogDate,
+            trelloLastLogAt: submission.trelloLastLogAt,
+            trelloLastLogNote: submission.trelloLastLogNote,
             reviewStatus: "pending"
         });
 
@@ -1065,6 +1346,9 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             haparaDriveClassUrl: haparaClassDriveUrl,
             haparaDocumentRef: String(docRefInput?.value || "").trim(),
             trelloCardUrl: toSafeTrelloCardUrl(trelloCardInput?.value || ""),
+            trelloLastLogDate: submission.trelloLastLogDate,
+            trelloLastLogAt: submission.trelloLastLogAt,
+            trelloLastLogNote: submission.trelloLastLogNote,
             reviewStatus: submission.reviewStatus
         });
 

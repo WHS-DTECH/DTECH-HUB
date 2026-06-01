@@ -402,7 +402,29 @@ h1 {
     padding: 10px;
 }
 
+.task-topic-submission-note-warning {
+    border-color: #e2b367;
+    background: #fff1d6;
+    color: #674611;
+}
+
+.task-topic-submission-note-success {
+    border-color: #9fd3a6;
+    background: #eaf8ed;
+    color: #24552c;
+}
+
 .task-topic-submission-form {
+    display: grid;
+    gap: 8px;
+}
+
+.task-topic-trello-create-box,
+.task-topic-trello-log-box {
+    border: 1px solid #e1c790;
+    border-radius: 8px;
+    background: #fff8e9;
+    padding: 8px 10px;
     display: grid;
     gap: 8px;
 }
@@ -551,6 +573,27 @@ h1 {
 .task-topic-teacher-status-trello-missing {
     color: #7d6230;
     font-weight: 600;
+}
+
+.task-topic-teacher-status-log {
+    justify-self: start;
+    border: 1px solid #d2b884;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.task-topic-teacher-status-log.is-complete {
+    color: #255b2d;
+    background: #e6f7ea;
+    border-color: #9dcba5;
+}
+
+.task-topic-teacher-status-log.is-missing {
+    color: #6e5019;
+    background: #fff0d1;
+    border-color: #e5c27f;
 }
 
 .task-topic-hapara-embed-panel {

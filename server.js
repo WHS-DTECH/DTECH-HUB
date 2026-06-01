@@ -5350,6 +5350,87 @@ app.get("/api/integrations/trello/boards", async (req, res) => {
   }
 });
 
+app.get("/api/integrations/trello/boards/:boardId/lists", async (req, res) => {
+  const email = getRequestUserEmail(req);
+  if (!isSchoolEmail(email)) {
+    res.status(401).json({ error: "School sign-in required" });
+    return;
+  }
+
+  const boardId = String(req.params.boardId || "").trim();
+  if (!boardId) {
+    res.status(400).json({ error: "Board id is required" });
+    return;
+  }
+
+  try {
+    const existing = await getStoredTrelloConnection(email);
+    if (!existing?.trello_token) {
+      res.status(404).json({ error: "Connect Trello first" });
+      return;
+    }
+
+    const lists = await trelloApiRequest(`/boards/${encodeURIComponent(boardId)}/lists`, {
+      token: existing.trello_token,
+      query: { fields: "id,name,closed,pos", filter: "open" }
+    });
+
+    res.json((Array.isArray(lists) ? lists : []).map((list) => ({
+      id: String(list?.id || "").trim(),
+      name: String(list?.name || "").trim(),
+      pos: Number(list?.pos) || 0
+    })).filter((list) => list.id));
+  } catch (error) {
+    const status = Number(error?.status) || 500;
+    res.status(status).json({ error: error.message || "Could not load Trello lists" });
+  }
+});
+
+app.post("/api/integrations/trello/cards", async (req, res) => {
+  const email = getRequestUserEmail(req);
+  if (!isSchoolEmail(email)) {
+    res.status(401).json({ error: "School sign-in required" });
+    return;
+  }
+
+  const listId = String(req.body?.list_id || req.body?.idList || "").trim();
+  const cardName = String(req.body?.name || "").trim();
+  const cardDesc = String(req.body?.desc || "").trim();
+  if (!listId || !cardName) {
+    res.status(400).json({ error: "List and card name are required" });
+    return;
+  }
+
+  try {
+    const existing = await getStoredTrelloConnection(email);
+    if (!existing?.trello_token) {
+      res.status(404).json({ error: "Connect Trello first" });
+      return;
+    }
+
+    const created = await trelloApiRequest("/cards", {
+      token: existing.trello_token,
+      method: "POST",
+      query: {
+        idList: listId,
+        name: cardName,
+        desc: cardDesc,
+        pos: String(req.body?.pos || "top").trim() || "top"
+      }
+    });
+
+    res.status(201).json({
+      id: String(created?.id || "").trim(),
+      name: String(created?.name || cardName).trim(),
+      url: String(created?.url || "").trim(),
+      short_link: String(created?.shortLink || "").trim()
+    });
+  } catch (error) {
+    const status = Number(error?.status) || 500;
+    res.status(status).json({ error: error.message || "Could not create Trello card" });
+  }
+});
+
 app.post("/api/integrations/trello/work-log", async (req, res) => {
   const email = getRequestUserEmail(req);
   if (!isSchoolEmail(email)) {
