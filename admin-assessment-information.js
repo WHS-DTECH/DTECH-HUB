@@ -34,26 +34,26 @@ function standardsGetStoredEmail() {
 async function enforceAdminAccess() {
     const email = standardsGetStoredEmail();
     if (!email) {
-        window.location.replace("admin-menu.html");
+        setStatus("Sign in with Google (top-right) to open Assessment Standards Manager.", true);
         return "";
     }
 
     try {
         const response = await fetch(`/api/auth/user-access?email=${encodeURIComponent(email)}`);
         if (!response.ok) {
-            window.location.replace("admin-menu.html");
+            setStatus("Could not verify admin access right now. Please sign out and sign in again.", true);
             return "";
         }
 
         const access = await response.json();
         if (!access?.can_admin) {
-            window.location.replace("admin-menu.html");
+            setStatus("Your account does not currently have admin access for this page.", true);
             return "";
         }
 
         return email;
     } catch (_error) {
-        window.location.replace("admin-menu.html");
+        setStatus("Could not verify admin access. Check your connection and try again.", true);
         return "";
     }
 }
