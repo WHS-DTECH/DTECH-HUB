@@ -1016,13 +1016,20 @@ async function loadAssessmentStandardCardsForLibrary() {
                 const standardCodes = Array.isArray(card?.standard_codes)
                     ? card.standard_codes.map((value) => String(value || "").trim()).filter(Boolean)
                     : [];
-                const title = String(card?.course_name || standardCodes[0] || "").trim();
+                const courseName = String(card?.course_name || "").trim();
+                const sourceForNumber = [courseName, ...standardCodes].join(" ");
+                const codeMatch = sourceForNumber.match(/\b(\d{5})\b/);
+                const standardNumber = codeMatch ? codeMatch[1] : "";
+                const standardName = standardCodes.find((value) => !/\b\d{5}\b/.test(String(value || ""))) || "";
+                const title = standardNumber
+                    ? `AS ${standardNumber}${standardName ? ` ${standardName}` : ""}`
+                    : String(standardName || courseName || standardCodes[0] || "").trim();
+
                 if (!id || !title) {
                     return null;
                 }
 
                 const updated = String(card?.updated_at || card?.created_at || new Date().toISOString()).slice(0, 10);
-                const standardNumber = String(standardCodes[0] || "").trim();
                 const criteriaRows = [
                     String(card?.achieved_text || "").trim(),
                     String(card?.merit_text || "").trim(),
@@ -1039,7 +1046,7 @@ async function loadAssessmentStandardCardsForLibrary() {
                     status: "active",
                     term: "Assessment",
                     updated,
-                    href: `/admin-assessment-information.html?card=${encodeURIComponent(id)}`,
+                    href: `/assessment-standard-card.html?card=${encodeURIComponent(id)}`,
                     external: false,
                     summary: String(card?.excellence_text || card?.merit_text || card?.achieved_text || "Assessment standard card").trim(),
                     keywords: [
@@ -1052,6 +1059,7 @@ async function loadAssessmentStandardCardsForLibrary() {
                     sourceType: "assessment",
                     standardNumber,
                     standardDetails: [
+                        courseName,
                         ...standardCodes,
                         ...criteriaRows
                     ],
@@ -2448,7 +2456,9 @@ function createProjectCard(project, options = {}) {
         && String(project?.taskTopicText || "").trim();
     const contentTypeLabel = sourceType === "project"
         ? "PROJECT"
-        : sourceType === "assessment"
+        : sourceType === "assessment" && String(project?.activityCategory || "").toLowerCase().includes("standard")
+            ? "STANDARD"
+            : sourceType === "assessment"
             ? "ASSESSMENT TASK"
             : sourceType === "lesson"
                 ? "LESSON"
@@ -2459,7 +2469,7 @@ function createProjectCard(project, options = {}) {
     const assignmentBadge = assignedStudentCount > 0
         ? `<span class="project-meta project-meta-assigned" title="Assigned to ${assignedStudentCount} student${assignedStudentCount === 1 ? "" : "s"}">Assigned (${assignedStudentCount})</span>`
         : "";
-    const standardPill = sourceType === "task-topic" && String(project?.standardNumber || "").trim()
+    const standardPill = (sourceType === "task-topic" || String(project?.activityCategory || "").toLowerCase().includes("standard")) && String(project?.standardNumber || "").trim()
         ? `<span class="project-tag">${escapeHtml(String(project.standardNumber))}</span>`
         : "";
 
