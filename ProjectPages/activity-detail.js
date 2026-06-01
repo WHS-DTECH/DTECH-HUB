@@ -2017,6 +2017,68 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
 
 let detailStandardsOptionsCache = null;
 
+function extractStandardCodeFromLabel(value) {
+    const match = String(value || "").match(/\b(\d{5})\b/);
+    return match ? String(match[1] || "").trim() : "";
+}
+
+async function tryAutofillDetailStandardCard(standardLabel, { onApplied } = {}) {
+    const standardCode = extractStandardCodeFromLabel(standardLabel);
+    if (!standardCode) return;
+
+    const params = new URLSearchParams();
+    params.set("standard", standardCode);
+    params.set("year", String(new Date().getFullYear()));
+
+    try {
+        const response = await fetch(`/api/assessment-standard-cards/match?${params.toString()}`, {
+            headers: buildWriteHeaders()
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload?.matched || !payload?.card) return;
+
+        if (typeof onApplied === "function") {
+            onApplied(payload.card);
+        }
+    } catch (_error) {
+        // Keep the standard add flow resilient if template lookup fails.
+    }
+}
+
+function applyDetailStandardCardTemplate(card, fields) {
+    if (!card || typeof card !== "object") return;
+
+    const pickLines = (textValue, checklistValue) => {
+        const checklist = Array.isArray(checklistValue)
+            ? checklistValue.map((line) => String(line || "").trim()).filter(Boolean)
+            : [];
+        if (checklist.length) return checklist;
+        const text = String(textValue || "").trim();
+        return text ? [text] : [];
+    };
+
+    const achievedLines = pickLines(card.achieved_text, card.achieved_checklist);
+    const meritLines = pickLines(card.merit_text, card.merit_checklist);
+    const excellenceLines = pickLines(card.excellence_text, card.excellence_checklist);
+
+    const { achievedField, meritField, excellenceField, setStatusFn } = fields || {};
+
+    if (achievedField && achievedLines.length) {
+        achievedField.value = achievedLines.join("\n");
+    }
+    if (meritField && meritLines.length) {
+        meritField.value = meritLines.join("\n");
+    }
+    if (excellenceField && excellenceLines.length) {
+        excellenceField.value = excellenceLines.join("\n");
+    }
+
+    if (typeof setStatusFn === "function") {
+        const templateLabel = String(card?.course_name || "").trim();
+        setStatusFn(`Standard added. Loaded criteria from Assessment Standard Card${templateLabel ? ` (${templateLabel})` : ""}`);
+    }
+}
+
 function formatDetailStandardOption(row) {
     const standardNumber = String(row?.standard_number || "").trim();
     const standardName = String(row?.standard_name || "").trim();
@@ -2118,6 +2180,18 @@ async function setupDetailStandardsPicker(form, setStatus) {
             renderChips();
         }
         setStatus("Standard added.");
+
+        const achievedField = form?.querySelector('[name="achieved"]');
+        const meritField = form?.querySelector('[name="merit"]');
+        const excellenceField = form?.querySelector('[name="excellence"]');
+        void tryAutofillDetailStandardCard(selected, {
+            onApplied: (card) => applyDetailStandardCardTemplate(card, {
+                achievedField,
+                meritField,
+                excellenceField,
+                setStatusFn: setStatus
+            })
+        });
     });
 
     if (chipList) {
@@ -3358,6 +3432,24 @@ function renderTaskTopicEditForm(host, id, data, canEdit, selectedTaskTopic, sel
             standardLines.push(selected);
             renderStandardChips();
         }
+
+        const achievedField = form?.querySelector('[name="achieved"]');
+        const meritField = form?.querySelector('[name="merit"]');
+        const excellenceField = form?.querySelector('[name="excellence"]');
+        const statusEl = host.querySelector("#task-topic-edit-status");
+        const setStatus = (message, isError = false) => {
+            if (!statusEl) return;
+            statusEl.textContent = message;
+            statusEl.classList.toggle("is-error", Boolean(isError));
+        };
+        void tryAutofillDetailStandardCard(selected, {
+            onApplied: (card) => applyDetailStandardCardTemplate(card, {
+                achievedField,
+                meritField,
+                excellenceField,
+                setStatusFn: setStatus
+            })
+        });
     });
 
     standardChipList?.addEventListener("click", (event) => {
