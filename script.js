@@ -1143,6 +1143,7 @@ function renderGlobalNavbar() {
                 <a role="menuitem" href="/upload-project.html">Upload Project</a>
                 <a role="menuitem" href="/upload-activity.html">Upload Activity</a>
                 <a role="menuitem" href="/upload-assessment.html">Upload Assessment Task</a>
+                <a role="menuitem" href="/upload-course-outline.html">Upload Course Outline</a>
                 <a role="menuitem" href="/upload-unit.html">Upload Unit Plan</a>
             </div>
         </details>

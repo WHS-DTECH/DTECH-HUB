@@ -2860,12 +2860,52 @@ async function ensureTrelloConnectionsSchema() {
   await pool.query(`ALTER TABLE student_trello_connections ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 }
 
+async function ensureCourseOutlinesSchema() {
+  if (!hasDatabase) {
+    return;
+  }
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS course_outlines (
+      id TEXT PRIMARY KEY,
+      course_name TEXT NOT NULL,
+      year_level TEXT NOT NULL,
+      year_version INTEGER NOT NULL,
+      subject_stream TEXT NOT NULL DEFAULT '',
+      summary TEXT NOT NULL DEFAULT '',
+      card_color TEXT NOT NULL DEFAULT 'Teal',
+      standards JSONB NOT NULL DEFAULT '[]'::jsonb,
+      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_by_email TEXT,
+      updated_by_email TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`ALTER TABLE course_outlines ADD COLUMN IF NOT EXISTS course_name TEXT`);
+  await pool.query(`ALTER TABLE course_outlines ADD COLUMN IF NOT EXISTS year_level TEXT`);
+  await pool.query(`ALTER TABLE course_outlines ADD COLUMN IF NOT EXISTS year_version INTEGER`);
+  await pool.query(`ALTER TABLE course_outlines ADD COLUMN IF NOT EXISTS subject_stream TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE course_outlines ADD COLUMN IF NOT EXISTS summary TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE course_outlines ADD COLUMN IF NOT EXISTS card_color TEXT NOT NULL DEFAULT 'Teal'`);
+  await pool.query(`ALTER TABLE course_outlines ADD COLUMN IF NOT EXISTS standards JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE course_outlines ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE`);
+  await pool.query(`ALTER TABLE course_outlines ADD COLUMN IF NOT EXISTS created_by_email TEXT`);
+  await pool.query(`ALTER TABLE course_outlines ADD COLUMN IF NOT EXISTS updated_by_email TEXT`);
+  await pool.query(`ALTER TABLE course_outlines ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await pool.query(`ALTER TABLE course_outlines ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS course_outlines_year_idx ON course_outlines (year_version)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS course_outlines_active_idx ON course_outlines (is_active)`);
+}
+
 async function ensureSchema() {
   await ensureActivitiesSchema();
   await ensureProjectInterestsSchema();
   await ensureTrelloConnectionsSchema();
   await ensureUnitPlanSchema();
   await ensureAssessmentStandardCardsSchema();
+  await ensureCourseOutlinesSchema();
 }
 
 async function syncDtechExcludedActivitiesVisibility() {
@@ -4751,6 +4791,170 @@ app.get("/api/assessment-standard-cards/match", requireActivityWriteAccess, asyn
     res.json({ matched: Boolean(match), card: match || null });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not match Assessment Standard Card" });
+  }
+});
+
+// ─── Course Outlines ────────────────────────────────────────────────────────
+
+const memoryCourseOutlines = new Map();
+
+function normalizeCourseOutlineRow(row) {
+  if (!row || typeof row !== "object") return null;
+  const standards = Array.isArray(row.standards)
+    ? row.standards
+    : (() => { try { return JSON.parse(row.standards || "[]"); } catch (_) { return []; } })();
+  return {
+    id: String(row.id || ""),
+    course_name: String(row.course_name || ""),
+    year_level: String(row.year_level || ""),
+    year_version: Number.parseInt(row.year_version, 10) || 0,
+    subject_stream: String(row.subject_stream || ""),
+    summary: String(row.summary || ""),
+    card_color: String(row.card_color || "Teal"),
+    standards: standards.map((s) => ({
+      standardLabel: String(s?.standardLabel || ""),
+      achieved: String(s?.achieved || ""),
+      merit: String(s?.merit || ""),
+      excellence: String(s?.excellence || "")
+    })),
+    is_active: row.is_active !== false,
+    created_by_email: String(row.created_by_email || ""),
+    updated_by_email: String(row.updated_by_email || ""),
+    created_at: row.created_at ? new Date(row.created_at).toISOString() : null,
+    updated_at: row.updated_at ? new Date(row.updated_at).toISOString() : null
+  };
+}
+
+app.get("/api/course-outlines", requireActivityWriteAccess, async (req, res) => {
+  if (!hasDatabase) {
+    const rows = Array.from(memoryCourseOutlines.values())
+      .sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""));
+    res.json({ count: rows.length, outlines: rows });
+    return;
+  }
+
+  try {
+    await ensureCourseOutlinesSchema();
+    const result = await pool.query(
+      `SELECT * FROM course_outlines WHERE is_active = TRUE ORDER BY updated_at DESC`
+    );
+    const outlines = result.rows.map((row) => normalizeCourseOutlineRow(row));
+    res.json({ count: outlines.length, outlines });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not load Course Outlines" });
+  }
+});
+
+app.post("/api/course-outlines", requireActivityWriteAccess, async (req, res) => {
+  const body = req.body && typeof req.body === "object" ? req.body : {};
+  const requestEmail = normalizeEmail(getRequestUserEmail(req));
+  const courseName = String(body.course_name || body.courseName || "").trim();
+  const yearLevel = String(body.year_level || body.yearLevel || "").trim();
+  const yearVersion = Number.parseInt(body.year_version ?? body.yearVersion ?? body.year, 10);
+  const subjectStream = String(body.subject_stream || body.subjectStream || "").trim();
+  const summary = String(body.summary || "").trim();
+  const rawStandards = Array.isArray(body.standards) ? body.standards : [];
+  const standards = rawStandards.map((s) => ({
+    standardLabel: String(s?.standardLabel || "").trim(),
+    achieved: String(s?.achieved || "").trim(),
+    merit: String(s?.merit || "").trim(),
+    excellence: String(s?.excellence || "").trim()
+  })).filter((s) => s.standardLabel);
+
+  if (!courseName) { res.status(400).json({ error: "course_name is required" }); return; }
+  if (!yearLevel) { res.status(400).json({ error: "year_level is required" }); return; }
+  if (!Number.isInteger(yearVersion)) { res.status(400).json({ error: "year_version must be an integer" }); return; }
+
+  const generatedId = slugify(`${courseName}-${yearLevel}-${yearVersion}`) || `course-outline-${Date.now()}`;
+  const id = String(body.id || generatedId).trim();
+
+  if (!hasDatabase) {
+    const nowIso = new Date().toISOString();
+    const existing = memoryCourseOutlines.get(id) || {};
+    const row = normalizeCourseOutlineRow({
+      id,
+      course_name: courseName,
+      year_level: yearLevel,
+      year_version: yearVersion,
+      subject_stream: subjectStream,
+      summary,
+      card_color: "Teal",
+      standards,
+      is_active: true,
+      created_by_email: existing.created_by_email || requestEmail,
+      updated_by_email: requestEmail,
+      created_at: existing.created_at || nowIso,
+      updated_at: nowIso
+    });
+    memoryCourseOutlines.set(id, row);
+    res.status(201).json({ ok: true, outline: row });
+    return;
+  }
+
+  try {
+    await ensureCourseOutlinesSchema();
+    const result = await pool.query(
+      `
+        INSERT INTO course_outlines (
+          id, course_name, year_level, year_version, subject_stream,
+          summary, card_color, standards, is_active,
+          created_by_email, updated_by_email, created_at, updated_at
+        )
+        VALUES ($1,$2,$3,$4,$5,$6,'Teal',$7::jsonb,$8,$9,$10,NOW(),NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          course_name = EXCLUDED.course_name,
+          year_level = EXCLUDED.year_level,
+          year_version = EXCLUDED.year_version,
+          subject_stream = EXCLUDED.subject_stream,
+          summary = EXCLUDED.summary,
+          card_color = 'Teal',
+          standards = EXCLUDED.standards,
+          updated_by_email = EXCLUDED.updated_by_email,
+          updated_at = NOW()
+        RETURNING *
+      `,
+      [id, courseName, yearLevel, yearVersion, subjectStream, summary,
+       JSON.stringify(standards), true, requestEmail, requestEmail]
+    );
+
+    const savedOutline = normalizeCourseOutlineRow(result.rows[0] || {});
+
+    // Sync each standard entry to assessment_standard_cards for auto-populate.
+    await ensureAssessmentStandardCardsSchema();
+    for (const s of standards) {
+      const codeMatch = String(s.standardLabel || "").match(/\b(\d{5})\b/);
+      if (!codeMatch) continue;
+      const code = codeMatch[1];
+      const cardId = slugify(`${courseName}-${yearLevel}-${yearVersion}-${code}`) || `card-${code}-${Date.now()}`;
+      await pool.query(
+        `
+          INSERT INTO assessment_standard_cards (
+            id, course_name, year_level, year_version, standard_codes,
+            achieved_text, merit_text, excellence_text,
+            achieved_checklist, merit_checklist, excellence_checklist,
+            card_color, is_active, created_by_email, updated_by_email, created_at, updated_at
+          )
+          VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,'[]'::jsonb,'[]'::jsonb,'[]'::jsonb,'Teal',TRUE,$9,$10,NOW(),NOW())
+          ON CONFLICT (id) DO UPDATE SET
+            course_name = EXCLUDED.course_name,
+            year_level = EXCLUDED.year_level,
+            year_version = EXCLUDED.year_version,
+            standard_codes = EXCLUDED.standard_codes,
+            achieved_text = EXCLUDED.achieved_text,
+            merit_text = EXCLUDED.merit_text,
+            excellence_text = EXCLUDED.excellence_text,
+            card_color = 'Teal',
+            updated_by_email = EXCLUDED.updated_by_email,
+            updated_at = NOW()
+        `,
+        [cardId, courseName, yearLevel, yearVersion, JSON.stringify([code]),
+         s.achieved, s.merit, s.excellence, requestEmail, requestEmail]
+      );
+    }
+
+    res.status(201).json({ ok: true, outline: savedOutline });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not save Course Outline" });
   }
 });
 
