@@ -532,6 +532,23 @@ h1 {
     color: #5d4a28;
 }
 
+.task-topic-teacher-status-trello {
+    justify-self: start;
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: #1f5f93;
+    text-decoration: none;
+}
+
+.task-topic-teacher-status-trello:hover {
+    text-decoration: underline;
+}
+
+.task-topic-teacher-status-trello-missing {
+    color: #7d6230;
+    font-weight: 600;
+}
+
 .task-topic-hapara-embed-panel {
     margin-top: 0;
 }

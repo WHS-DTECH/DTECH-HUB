@@ -578,6 +578,7 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
         haparaLocation: "",
         haparaDriveClassUrl: "",
         haparaDocumentRef: "",
+        trelloCardUrl: "",
         submittedAt: "",
         reviewStatus: "pending"
     };
@@ -638,6 +639,11 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
             return;
         }
 
+        if (text.startsWith("TRELLO_CARD_URL|")) {
+            result.trelloCardUrl = toSafeTrelloCardUrl(text.slice("TRELLO_CARD_URL|".length).trim());
+            return;
+        }
+
         if (text.startsWith("SUBMITTED_AT|")) {
             result.submittedAt = text.slice("SUBMITTED_AT|".length).trim();
             return;
@@ -673,6 +679,7 @@ function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     const haparaLocation = String(payload?.haparaLocation || "").trim();
     const haparaDriveClassUrl = String(payload?.haparaDriveClassUrl || "").trim();
     const haparaDocumentRef = String(payload?.haparaDocumentRef || "").trim();
+    const trelloCardUrl = toSafeTrelloCardUrl(payload?.trelloCardUrl);
     const reviewStatusRaw = String(payload?.reviewStatus || "").trim().toLowerCase();
     const reviewStatus = reviewStatusRaw === "reviewed"
         ? "reviewed"
@@ -708,6 +715,9 @@ function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     }
     if (haparaDocumentRef) {
         steps.push({ text: `HAPARA_DOC_REF|${haparaDocumentRef}`, done: true });
+    }
+    if (trelloCardUrl) {
+        steps.push({ text: `TRELLO_CARD_URL|${trelloCardUrl}`, done: true });
     }
     steps.push({ text: `REVIEW|${reviewStatus}`, done: reviewStatus === "reviewed" });
 
@@ -761,6 +771,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const standardNumber = extractPrimaryStandardNumberFromRows(coerceArray(detailData?.standardDetails));
     const standardKey = buildTaskTopicSubmissionStandardKey(taskTopicTitle, standardNumber);
     const isRelevantImplicationsTopic = taskTopicTitle.toLowerCase().includes("relevant implication");
+    const isProjectManagementTopic = taskTopicTitle.toLowerCase().includes("project management");
     const haparaWorkspacePublicUrl = "https://bit.ly/4uO74lI";
     const haparaWorkspaceEmbedUrl = "https://workspace.teacherdashboard.com/public/#/w/6a1cc0549131d4df96cb4f7f?embed=true";
     const haparaClassDriveUrl = "https://app.hapara.com/dashboard/drive/4-1-12comp-vp-2026@westlandhigh.school.nz/all";
@@ -806,7 +817,9 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 return {
                     email: studentEmail,
                     acknowledged: Boolean(submission.haparaAcknowledged),
-                    submittedAt: submission.haparaSubmittedAt || submission.submittedAt || ""
+                    submittedAt: submission.haparaSubmittedAt || submission.submittedAt || "",
+                    trelloCardUrl: submission.trelloCardUrl || "",
+                    docRef: submission.haparaDocumentRef || ""
                 };
             })
             .filter(Boolean);
@@ -832,7 +845,11 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                         <div class="task-topic-teacher-status-item">
                             <span class="task-topic-teacher-status-email">${escapeHtml(row.email)}</span>
                             <span class="task-topic-teacher-status-pill ${row.acknowledged ? "is-acknowledged" : "is-pending"}">${row.acknowledged ? "Submitted in Hapara" : "Not acknowledged"}</span>
-                            <span class="task-topic-teacher-status-doc">${escapeHtml(parseTaskTopicSubmissionFromEvidenceRows((students.find((student) => String(student?.email || "").trim().toLowerCase() === row.email) || {}).evidence_steps, standardKey).haparaDocumentRef || "No document reference")}</span>
+                            <span class="task-topic-teacher-status-doc">${escapeHtml(row.docRef || "No document reference")}</span>
+                            ${row.trelloCardUrl
+                                ? `<a class="task-topic-teacher-status-trello" href="${escapeHtml(row.trelloCardUrl)}" target="_blank" rel="noreferrer">Open Trello Card</a>`
+                                : `<span class="task-topic-teacher-status-trello task-topic-teacher-status-trello-missing">No Trello card linked</span>`
+                            }
                             <span class="task-topic-teacher-status-time">${escapeHtml(formatSubmissionTimestamp(row.submittedAt))}</span>
                         </div>
                     `).join("")}
@@ -860,6 +877,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const acknowledged = Boolean(submission.haparaAcknowledged);
     const acknowledgedAt = submission.haparaSubmittedAt || submission.submittedAt || "";
     const currentDocRef = String(submission.haparaDocumentRef || "").trim();
+    const currentTrelloCardUrl = toSafeTrelloCardUrl(submission.trelloCardUrl);
 
     panelHost.innerHTML = `
         <form id="task-topic-submission-form" class="task-topic-submission-form" novalidate>
@@ -873,6 +891,12 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             <label class="task-topic-submission-label" for="task-topic-hapara-doc-ref">Document Name or Drive Reference</label>
             <input id="task-topic-hapara-doc-ref" class="task-topic-submission-input" type="text" placeholder="Example: Relevant Implications - Victor McKewen" value="${escapeHtml(currentDocRef)}" required>
 
+            ${isProjectManagementTopic ? `
+                <label class="task-topic-submission-label" for="task-topic-trello-card-url">Trello Card Link</label>
+                <input id="task-topic-trello-card-url" class="task-topic-submission-input" type="url" placeholder="https://trello.com/c/xxxx1234" value="${escapeHtml(currentTrelloCardUrl)}" required>
+                <p class="task-topic-submission-note">Project Management evidence requires your Trello card link. This gives your teacher one-click access for marking.</p>
+            ` : ""}
+
             <div class="task-topic-submission-actions">
                 <button type="submit" class="detail-action">I Submitted In Hapara</button>
                 <button type="button" class="detail-action detail-action-secondary" id="task-topic-clear-acknowledgement">Clear Acknowledgement</button>
@@ -884,16 +908,22 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             <p><strong>Acknowledged At:</strong> <span id="task-topic-last-submitted">${escapeHtml(formatSubmissionTimestamp(acknowledgedAt))}</span></p>
             <p><strong>Hapara Space:</strong> <span>${escapeHtml(haparaSpaceName)}</span></p>
             <p><strong>Document Reference:</strong> <span id="task-topic-doc-reference">${escapeHtml(currentDocRef || "Not provided")}</span></p>
+            ${isProjectManagementTopic
+                ? `<p><strong>Trello Card:</strong> <span id="task-topic-trello-reference">${currentTrelloCardUrl ? `<a href="${escapeHtml(currentTrelloCardUrl)}" target="_blank" rel="noreferrer">${escapeHtml(currentTrelloCardUrl)}</a>` : "Not linked"}</span></p>`
+                : ""
+            }
         </div>
     `;
 
     const form = panelHost.querySelector("#task-topic-submission-form");
     const clearAckButton = panelHost.querySelector("#task-topic-clear-acknowledgement");
     const docRefInput = panelHost.querySelector("#task-topic-hapara-doc-ref");
+    const trelloCardInput = panelHost.querySelector("#task-topic-trello-card-url");
     const statusHost = panelHost.querySelector("#task-topic-submission-status");
     const ackStatusHost = panelHost.querySelector("#task-topic-ack-status");
     const lastSubmittedHost = panelHost.querySelector("#task-topic-last-submitted");
     const docRefHost = panelHost.querySelector("#task-topic-doc-reference");
+    const trelloRefHost = panelHost.querySelector("#task-topic-trello-reference");
     const updateMeta = (isAcknowledged, timestamp) => {
         if (ackStatusHost) {
             ackStatusHost.textContent = isAcknowledged ? "Submitted in Hapara" : "Waiting for acknowledgement";
@@ -906,6 +936,15 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         if (docRefHost) {
             const value = String(docRefInput?.value || "").trim();
             docRefHost.textContent = value || "Not provided";
+        }
+
+        if (trelloRefHost) {
+            const safeCardUrl = toSafeTrelloCardUrl(trelloCardInput?.value || "");
+            if (safeCardUrl) {
+                trelloRefHost.innerHTML = `<a href="${escapeHtml(safeCardUrl)}" target="_blank" rel="noreferrer">${escapeHtml(safeCardUrl)}</a>`;
+            } else {
+                trelloRefHost.textContent = "Not linked";
+            }
         }
     };
 
@@ -922,6 +961,12 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         const docReference = String(docRefInput?.value || "").trim();
         if (!docReference) {
             setStatus("Add the document name/reference from Hapara Drive before acknowledging.", true);
+            return;
+        }
+
+        const trelloCardUrl = toSafeTrelloCardUrl(trelloCardInput?.value || "");
+        if (isProjectManagementTopic && !trelloCardUrl) {
+            setStatus("Project Management requires a valid Trello card link before acknowledging.", true);
             return;
         }
 
@@ -943,6 +988,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             haparaLocation: haparaSpaceName,
             haparaDriveClassUrl: haparaClassDriveUrl,
             haparaDocumentRef: docReference,
+            trelloCardUrl,
             reviewStatus: "pending"
         });
 
@@ -954,6 +1000,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             submission.haparaLocation = haparaSpaceName;
             submission.haparaDriveClassUrl = haparaClassDriveUrl;
             submission.haparaDocumentRef = docReference;
+            submission.trelloCardUrl = trelloCardUrl;
             submission.submittedAt = submittedAt;
             submission.reviewStatus = "pending";
 
@@ -983,6 +1030,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             haparaLocation: haparaSpaceName,
             haparaDriveClassUrl: haparaClassDriveUrl,
             haparaDocumentRef: String(docRefInput?.value || "").trim(),
+            trelloCardUrl: toSafeTrelloCardUrl(trelloCardInput?.value || ""),
             reviewStatus: submission.reviewStatus
         });
 
