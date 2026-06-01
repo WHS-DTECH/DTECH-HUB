@@ -3,6 +3,7 @@ const express = require("express");
 const multer = require("multer");
 const mammoth = require("mammoth");
 const nodemailer = require("nodemailer");
+const { PDFParse } = require("pdf-parse");
 const { Pool } = require("pg");
 
 const app = express();
@@ -37,7 +38,11 @@ const DTECH_HUB_NAME = "DTECH-HUB";
 const SEWING_ROOM_HUB_NAME = "SEWING-ROOM-HUB";
 const NZQA_BASE_URL = "https://www.nzqa.govt.nz";
 const NZQA_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const NZQA_LINKS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const NZQA_DETAILS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const nzqaStandardsCache = new Map();
+const nzqaStandardLinksCache = new Map();
+const nzqaStandardDetailsCache = new Map();
 const NZQA_STANDARDS_FALLBACK = [
   // Digital Technologies (aligned with NZQA level pages)
   { standard_number: "92004", standard_name: "Create a computer program", version: "2024", level: 1, credits: 5, stream: "digital", assessment_type: "Internal" },
@@ -89,7 +94,7 @@ function buildNzqaLinks(standardNumber) {
     return { details_url: "", pdf_url: "", docx_url: "" };
   }
 
-  const details_url = `${NZQA_BASE_URL}/ncea/assessment/search.do?query=${encodeURIComponent(number)}`;
+  const details_url = `${NZQA_BASE_URL}/ncea/assessment/search.do?query=${encodeURIComponent(number)}&view=all`;
   return {
     details_url,
     pdf_url: "",
@@ -97,9 +102,245 @@ function buildNzqaLinks(standardNumber) {
   };
 }
 
-async function fetchNzqaStandards(stream, level) {
+function stripNzqaHtmlToText(html) {
+  const source = String(html || "");
+  const withoutScripts = source
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ");
+  const text = withoutScripts
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<\/div>/gi, "\n")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#39;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/\r/g, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return text;
+}
+
+function extractHrefListFromHtml(html) {
+  const source = String(html || "");
+  const hrefs = [];
+  const regex = /href\s*=\s*["']([^"']+)["']/gi;
+  let match = regex.exec(source);
+  while (match) {
+    const value = String(match?.[1] || "").trim().replace(/&amp;/gi, "&");
+    if (value) {
+      hrefs.push(value);
+    }
+    match = regex.exec(source);
+  }
+  return hrefs;
+}
+
+function toNzqaAbsoluteUrl(href) {
+  const value = String(href || "").trim();
+  if (!value) return "";
+  if (/^https?:\/\//i.test(value)) return value;
+  try {
+    return new URL(value, `${NZQA_BASE_URL}/`).toString();
+  } catch (_error) {
+    return "";
+  }
+}
+
+function pickNzqaAttachmentsFromHrefs(hrefs) {
+  const values = Array.isArray(hrefs) ? hrefs : [];
+  let pdfUrl = "";
+  let docxUrl = "";
+
+  values.forEach((href) => {
+    const absolute = toNzqaAbsoluteUrl(href);
+    if (!absolute) return;
+
+    if (!pdfUrl && /\.pdf(?:$|[?#])/i.test(absolute)) {
+      pdfUrl = absolute;
+    }
+    if (!docxUrl && /\.(?:doc|docx)(?:$|[?#])/i.test(absolute)) {
+      docxUrl = absolute;
+    }
+  });
+
+  return { pdfUrl, docxUrl };
+}
+
+function pickNzqaDetailPageUrl(hrefs, standardNumber) {
+  const number = String(standardNumber || "").trim();
+  if (!number) return "";
+
+  const candidates = (Array.isArray(hrefs) ? hrefs : [])
+    .map((href) => toNzqaAbsoluteUrl(href))
+    .filter(Boolean)
+    .filter((href) => href.includes("nzqa.govt.nz") && href.includes("/ncea/assessment/"));
+
+  const byNumber = candidates.find((href) => href.includes(number));
+  if (byNumber) return byNumber;
+
+  return candidates.find((href) => /search\.do\?|view\//i.test(href)) || "";
+}
+
+async function fetchNzqaAttachmentLinks(standardNumber) {
+  const number = String(standardNumber || "").trim();
+  if (!number) {
+    return { details_url: "", pdf_url: "", docx_url: "" };
+  }
+
+  const cacheKey = number;
+  const cached = nzqaStandardLinksCache.get(cacheKey);
+  const now = Date.now();
+  if (cached && Number(cached.timestamp) + NZQA_LINKS_CACHE_TTL_MS > now && cached.value) {
+    return cached.value;
+  }
+
+  const fallback = buildNzqaLinks(number);
+  try {
+    const searchResponse = await fetch(fallback.details_url, {
+      headers: {
+        "user-agent": "Mozilla/5.0 (DTECH-HUB/1.0)",
+        "accept": "text/html,application/xhtml+xml"
+      }
+    });
+    const searchHtml = await searchResponse.text();
+    const searchHrefs = extractHrefListFromHtml(searchHtml);
+    const searchAttachments = pickNzqaAttachmentsFromHrefs(searchHrefs);
+    const detailUrl = pickNzqaDetailPageUrl(searchHrefs, number) || fallback.details_url;
+
+    let pdfUrl = searchAttachments.pdfUrl;
+    let docxUrl = searchAttachments.docxUrl;
+
+    if ((!pdfUrl || !docxUrl) && detailUrl) {
+      try {
+        const detailResponse = await fetch(detailUrl, {
+          headers: {
+            "user-agent": "Mozilla/5.0 (DTECH-HUB/1.0)",
+            "accept": "text/html,application/xhtml+xml"
+          }
+        });
+        const detailHtml = await detailResponse.text();
+        const detailAttachments = pickNzqaAttachmentsFromHrefs(extractHrefListFromHtml(detailHtml));
+        if (!pdfUrl && detailAttachments.pdfUrl) {
+          pdfUrl = detailAttachments.pdfUrl;
+        }
+        if (!docxUrl && detailAttachments.docxUrl) {
+          docxUrl = detailAttachments.docxUrl;
+        }
+      } catch (_error) {
+        // Keep fallback URLs if detail page fetch fails.
+      }
+    }
+
+    const value = {
+      details_url: detailUrl || fallback.details_url,
+      pdf_url: pdfUrl || "",
+      docx_url: docxUrl || ""
+    };
+    nzqaStandardLinksCache.set(cacheKey, { timestamp: now, value });
+    return value;
+  } catch (_error) {
+    nzqaStandardLinksCache.set(cacheKey, { timestamp: now, value: fallback });
+    return fallback;
+  }
+}
+
+async function fetchNzqaStandardDetails(standardNumber) {
+  const number = String(standardNumber || "").trim();
+  if (!number) {
+    throw new Error("standard number is required");
+  }
+
+  const cacheKey = number;
+  const now = Date.now();
+  const cached = nzqaStandardDetailsCache.get(cacheKey);
+  if (cached && Number(cached.timestamp) + NZQA_DETAILS_CACHE_TTL_MS > now && cached.value) {
+    return cached.value;
+  }
+
+  const links = await fetchNzqaAttachmentLinks(number);
+  const result = {
+    standard_number: number,
+    details_url: String(links.details_url || ""),
+    pdf_url: String(links.pdf_url || ""),
+    docx_url: String(links.docx_url || ""),
+    source_type: "none",
+    extracted_text: "",
+    fetched_at: new Date().toISOString()
+  };
+
+  if (result.pdf_url) {
+    try {
+      const response = await fetch(result.pdf_url, {
+        headers: {
+          "user-agent": "Mozilla/5.0 (DTECH-HUB/1.0)",
+          "accept": "application/pdf"
+        }
+      });
+      const bytes = Buffer.from(await response.arrayBuffer());
+      const parser = new PDFParse({ data: bytes, verbosity: 0 });
+      const extraction = await parser.getText();
+      result.source_type = "pdf";
+      result.extracted_text = String(extraction?.text || "").replace(/\r/g, "").trim();
+    } catch (_error) {
+      // Fallback below.
+    }
+  }
+
+  if (!result.extracted_text && result.docx_url && /\.docx(?:$|[?#])/i.test(result.docx_url)) {
+    try {
+      const response = await fetch(result.docx_url, {
+        headers: {
+          "user-agent": "Mozilla/5.0 (DTECH-HUB/1.0)",
+          "accept": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        }
+      });
+      const bytes = Buffer.from(await response.arrayBuffer());
+      const extraction = await mammoth.extractRawText({ buffer: bytes });
+      result.source_type = "docx";
+      result.extracted_text = String(extraction?.value || "").replace(/\r/g, "").trim();
+    } catch (_error) {
+      // Fallback below.
+    }
+  }
+
+  if (!result.extracted_text && result.details_url) {
+    try {
+      const response = await fetch(result.details_url, {
+        headers: {
+          "user-agent": "Mozilla/5.0 (DTECH-HUB/1.0)",
+          "accept": "text/html,application/xhtml+xml"
+        }
+      });
+      const html = await response.text();
+      result.source_type = "html";
+      result.extracted_text = stripNzqaHtmlToText(html);
+    } catch (_error) {
+      // Keep empty result.
+    }
+  }
+
+  if (!result.extracted_text) {
+    result.extracted_text = "No downloadable PDF/DOCX content could be extracted for this standard.";
+  }
+
+  nzqaStandardDetailsCache.set(cacheKey, {
+    timestamp: now,
+    value: result
+  });
+
+  return result;
+}
+
+async function fetchNzqaStandards(stream, level, options = {}) {
   const normalizedStream = String(stream || "").trim().toLowerCase();
   const normalizedLevel = Number.parseInt(level, 10);
+  const includeDocs = options?.includeDocs === true;
 
   if (!["digital", "computing"].includes(normalizedStream)) {
     return [];
@@ -109,14 +350,14 @@ async function fetchNzqaStandards(stream, level) {
     return [];
   }
 
-  const cacheKey = `${normalizedStream}:${normalizedLevel}`;
+  const cacheKey = `${normalizedStream}:${normalizedLevel}:${includeDocs ? "docs" : "base"}`;
   const now = Date.now();
   const cached = nzqaStandardsCache.get(cacheKey);
   if (cached && Number(cached.timestamp) + NZQA_CACHE_TTL_MS > now && Array.isArray(cached.rows)) {
     return cached.rows;
   }
 
-  const rows = NZQA_STANDARDS_FALLBACK
+  let rows = NZQA_STANDARDS_FALLBACK
     .filter((row) => String(row.stream || "").toLowerCase() === normalizedStream)
     .filter((row) => Number.parseInt(row.level, 10) === normalizedLevel)
     .map((row) => {
@@ -135,6 +376,18 @@ async function fetchNzqaStandards(stream, level) {
       };
     })
     .sort((left, right) => String(left.standard_number || "").localeCompare(String(right.standard_number || ""), undefined, { numeric: true }));
+
+  if (includeDocs && rows.length) {
+    rows = await Promise.all(rows.map(async (row) => {
+      const links = await fetchNzqaAttachmentLinks(row.standard_number);
+      return {
+        ...row,
+        details_url: links.details_url || row.details_url,
+        pdf_url: links.pdf_url || row.pdf_url,
+        docx_url: links.docx_url || row.docx_url
+      };
+    }));
+  }
 
   nzqaStandardsCache.set(cacheKey, {
     timestamp: now,
@@ -566,6 +819,18 @@ const unitPlanUpload = multer({
     const isDocxMime = mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     const isDocxName = name.endsWith(".docx");
     callback(null, isDocxMime || isDocxName);
+  }
+});
+
+const courseOutlinePdfUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (_req, file, callback) => {
+    const mime = String(file.mimetype || "").toLowerCase();
+    const name = String(file.originalname || "").toLowerCase();
+    const isPdfMime = mime === "application/pdf";
+    const isPdfName = name.endsWith(".pdf");
+    callback(null, isPdfMime || isPdfName);
   }
 });
 
@@ -2517,6 +2782,138 @@ async function parseDocxBufferToUnitPlanPayload(buffer, originalName, userEmail)
   return payload;
 }
 
+function normalizePdfWhitespace(value) {
+  return String(value || "").replace(/\r/g, "").trim();
+}
+
+function extractStandardRowsFromCourseOutlineText(text) {
+  const source = normalizePdfWhitespace(text);
+  if (!source) {
+    return [];
+  }
+
+  const standards = [];
+  const seen = new Set();
+  const matches = Array.from(source.matchAll(/\b(9\d{4})\s+([\s\S]*?)(?=\n\s*\d+\s+\d+\s+\d+\s+\d+\s+|\n\s*9\d{4}\b|$)/g));
+
+  matches.forEach((match) => {
+    const standardNumber = String(match?.[1] || "").trim();
+    let titleBlock = String(match?.[2] || "")
+      .replace(/\s+/g, " ")
+      .replace(/\s+-\s+/g, " - ")
+      .trim();
+
+    if (!standardNumber || !titleBlock) {
+      return;
+    }
+
+    if (seen.has(standardNumber)) {
+      return;
+    }
+
+    const titleStart = titleBlock.search(/(Digital Technologies|Computing|Hangarau Matihiko|Technology)/i);
+    if (titleStart > 0) {
+      titleBlock = titleBlock.slice(titleStart).trim();
+    }
+
+    const trailingNoiseIndex = titleBlock.search(/\b(Practical Demonstration|Opportunity|Topic Start|Assessment Date|External:)\b/i);
+    if (trailingNoiseIndex > 0) {
+      titleBlock = titleBlock.slice(0, trailingNoiseIndex).trim();
+    }
+
+    if (!titleBlock) {
+      return;
+    }
+
+    const snippet = source.slice(match.index, Math.min(source.length, match.index + 500));
+    const metricsMatch = snippet.match(/\n\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\b/);
+    const version = Number.parseInt(metricsMatch?.[1], 10);
+    const level = Number.parseInt(metricsMatch?.[2], 10);
+    const credits = Number.parseInt(metricsMatch?.[3], 10);
+
+    standards.push({
+      standardNumber,
+      title: titleBlock,
+      version: Number.isInteger(version) ? version : null,
+      level: Number.isInteger(level) ? level : null,
+      credits: Number.isInteger(credits) ? credits : null,
+      standardLabel: [
+        standardNumber,
+        titleBlock,
+        Number.isInteger(level) ? `L${level}` : "",
+        Number.isInteger(credits) ? `${credits} credits` : ""
+      ].filter(Boolean).join(" | ")
+    });
+
+    seen.add(standardNumber);
+  });
+
+  return standards;
+}
+
+function parseCourseOutlineFromPdfText(text, sourceName = "") {
+  const source = normalizePdfWhitespace(text);
+  const nowYear = new Date().getFullYear();
+
+  const courseLineMatch = source.match(/^(Level\s+\d+[^\n]+)/im);
+  const extractedCourseName = String(courseLineMatch?.[1] || "").replace(/\s+/g, " ").trim();
+
+  const sourceBaseName = String(sourceName || "").replace(/\.pdf$/i, "").trim();
+  const baseCourseName = sourceBaseName.replace(/\s*-\s*assessment\s+statement\s*\d{4}?/i, "").trim();
+  const courseName = extractedCourseName || baseCourseName || "";
+
+  const yearMatch = source.match(/\bYear\s*:?\s*(\d{1,2})\b/i);
+  const yearLevel = yearMatch ? `Year ${yearMatch[1]}` : "";
+
+  const yearVersionMatch = source.match(/\b(20\d{2})\b/);
+  const yearVersion = Number.parseInt(yearVersionMatch?.[1], 10) || nowYear;
+
+  const summaryMatch = source.match(/(This Level[\s\S]{80,}?)(?=\n\s*Course is endorsable|\n\s*Teacher\b|\n\s*Signature\b)/i);
+  const summary = String(summaryMatch?.[1] || "")
+    .replace(/\s+/g, " ")
+    .replace(/\s*Course is endorsable[\s\S]*$/i, "")
+    .trim();
+
+  const subjectStream = /\bDigital Technolog/i.test(source) ? "DTECH" : "";
+  const standards = extractStandardRowsFromCourseOutlineText(source);
+
+  return {
+    courseName,
+    yearLevel,
+    yearVersion,
+    subjectStream,
+    summary,
+    standards,
+    source: String(sourceName || "").trim()
+  };
+}
+
+app.post("/api/course-outlines/parse-pdf", requireActivityWriteAccess, courseOutlinePdfUpload.single("courseOutlineFile"), async (req, res) => {
+  const file = req.file;
+  if (!file?.buffer) {
+    res.status(400).json({ error: "A .pdf file is required." });
+    return;
+  }
+
+  try {
+    const parser = new PDFParse({
+      data: file.buffer,
+      verbosity: 0
+    });
+    const extraction = await parser.getText();
+    const parsed = parseCourseOutlineFromPdfText(extraction?.text || "", file.originalname || "");
+
+    res.json({
+      ok: true,
+      source: file.originalname,
+      parsed,
+      standardCount: Array.isArray(parsed?.standards) ? parsed.standards.length : 0
+    });
+  } catch (error) {
+    res.status(400).json({ error: error?.message || "Could not parse course outline PDF" });
+  }
+});
+
 app.post("/api/unit-plans/import-docx", unitPlanUpload.single("unitPlanFile"), async (req, res) => {
   const userEmail = normalizeEmail(req.body?.created_by_email || req.body?.user_email || getRequestUserEmail(req));
   if (!userEmail || !(await canManagePracticalSchedule(userEmail))) {
@@ -4364,6 +4761,7 @@ app.get("/api/admin/nzqa-standards", requireAdminAccess, async (req, res) => {
   const levelParam = String(req.query?.level || "all").trim().toLowerCase();
   const streamParam = String(req.query?.stream || "digital").trim().toLowerCase();
   const standardQuery = String(req.query?.standard || "").trim().toLowerCase();
+  const includeDocs = String(req.query?.include_docs || "false").trim().toLowerCase() === "true";
 
   const levels = levelParam === "all"
     ? [1, 2, 3]
@@ -4387,7 +4785,7 @@ app.get("/api/admin/nzqa-standards", requireAdminAccess, async (req, res) => {
     const jobs = [];
     levels.forEach((level) => {
       streams.forEach((stream) => {
-        jobs.push(fetchNzqaStandards(stream, level));
+        jobs.push(fetchNzqaStandards(stream, level, { includeDocs }));
       });
     });
 
@@ -4412,13 +4810,40 @@ app.get("/api/admin/nzqa-standards", requireAdminAccess, async (req, res) => {
       filters: {
         level: levelParam,
         stream: streamParam,
-        standard: standardQuery
+        standard: standardQuery,
+        include_docs: includeDocs
       },
       count: standards.length,
       standards
     });
   } catch (error) {
     res.status(500).json({ error: `Could not load NZQA standards: ${String(error?.message || "unknown error")}` });
+  }
+});
+
+// GET /api/admin/nzqa-standards/details — load standard details text from PDF/DOCX/HTML
+app.get("/api/admin/nzqa-standards/details", requireAdminAccess, async (req, res) => {
+  const standardNumber = String(req.query?.standard || "").trim();
+  const force = String(req.query?.force || "").trim().toLowerCase() === "true";
+
+  if (!standardNumber) {
+    res.status(400).json({ error: "standard is required" });
+    return;
+  }
+
+  if (force) {
+    nzqaStandardDetailsCache.delete(standardNumber);
+    nzqaStandardLinksCache.delete(standardNumber);
+  }
+
+  try {
+    const details = await fetchNzqaStandardDetails(standardNumber);
+    res.json({
+      ok: true,
+      details
+    });
+  } catch (error) {
+    res.status(500).json({ error: `Could not load standard details: ${String(error?.message || "unknown error")}` });
   }
 });
 

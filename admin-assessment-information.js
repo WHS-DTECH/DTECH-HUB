@@ -7,12 +7,17 @@ const refreshButton = document.getElementById("nzqa-refresh");
 const statusElement = document.getElementById("standards-status");
 const metaElement = document.getElementById("standards-results-meta");
 const tableBody = document.getElementById("standards-table-body");
+const standardDetailTitle = document.getElementById("standard-detail-title");
+const standardDetailMeta = document.getElementById("standard-detail-meta");
+const standardDetailLinks = document.getElementById("standard-detail-links");
+const standardDetailText = document.getElementById("standard-detail-text");
 const standardCardForm = document.getElementById("standard-card-form");
 const standardCardIdInput = document.getElementById("standard-card-id");
 const standardCardResetButton = document.getElementById("standard-card-reset");
 const standardCardStatus = document.getElementById("standard-card-status");
 const standardCardTableBody = document.getElementById("standard-card-table-body");
 let loadedStandardCards = [];
+let loadedStandards = [];
 
 function standardsGetStoredEmail() {
     const raw = localStorage.getItem(STANDARDS_AUTH_KEY) || sessionStorage.getItem(STANDARDS_AUTH_KEY);
@@ -111,7 +116,7 @@ function renderRows(rows) {
 
         return `
             <tr>
-                <td><strong>${escapeHtml(standardNumber)}</strong></td>
+            <td><button type="button" class="standards-select-button" data-standard-select="${escapeHtml(standardNumber)}">${escapeHtml(standardNumber)}</button></td>
                 <td>${escapeHtml(standardName)}</td>
                 <td>${escapeHtml(version)}</td>
                 <td><span class="standards-pill">L${escapeHtml(level)}</span></td>
@@ -122,6 +127,100 @@ function renderRows(rows) {
             </tr>
         `;
     }).join("");
+}
+
+function renderDetailLinks(details) {
+    if (!standardDetailLinks) return;
+
+    const pdfUrl = String(details?.pdf_url || "").trim();
+    const docxUrl = String(details?.docx_url || "").trim();
+    const detailsUrl = String(details?.details_url || "").trim();
+
+    const links = [];
+    if (pdfUrl) {
+        links.push(`<a class="standards-link" href="${escapeHtml(pdfUrl)}" target="_blank" rel="noreferrer">Open PDF</a>`);
+    }
+    if (docxUrl) {
+        links.push(`<a class="standards-link" href="${escapeHtml(docxUrl)}" target="_blank" rel="noreferrer">Open DOC/DOCX</a>`);
+    }
+    if (detailsUrl) {
+        links.push(`<a class="standards-link" href="${escapeHtml(detailsUrl)}" target="_blank" rel="noreferrer">Open NZQA Page</a>`);
+    }
+
+    standardDetailLinks.innerHTML = links.length
+        ? links.join(" ")
+        : `<span class="standards-empty">No source links found for this standard.</span>`;
+}
+
+function setStandardDetailState({ title, meta, text, details = null }) {
+    if (standardDetailTitle) {
+        standardDetailTitle.textContent = title || "Standard details";
+    }
+    if (standardDetailMeta) {
+        standardDetailMeta.textContent = meta || "";
+    }
+    if (standardDetailText) {
+        standardDetailText.textContent = text || "";
+    }
+    renderDetailLinks(details);
+}
+
+async function loadStandardDetail(standardNumber) {
+    const email = standardsGetStoredEmail();
+    if (!email) {
+        setStandardDetailState({
+            title: "Standard details",
+            meta: "Sign in as admin to load standard details.",
+            text: ""
+        });
+        return;
+    }
+
+    const selected = loadedStandards.find((row) => String(row?.standard_number || "").trim() === String(standardNumber || "").trim());
+    const titleBits = [
+        String(selected?.standard_number || standardNumber || "").trim(),
+        String(selected?.standard_name || "").trim()
+    ].filter(Boolean);
+
+    setStandardDetailState({
+        title: titleBits.join(" - ") || "Standard details",
+        meta: "Loading details from NZQA document sources...",
+        text: "Please wait...",
+        details: selected || null
+    });
+
+    try {
+        const response = await fetch(`/api/admin/nzqa-standards/details?standard=${encodeURIComponent(String(standardNumber || "").trim())}`, {
+            headers: {
+                "x-user-email": email
+            }
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(payload.error || "Could not load standard details.");
+        }
+
+        const details = payload?.details || {};
+        const sourceType = String(details?.source_type || "unknown").toUpperCase();
+        const fetchedAt = String(details?.fetched_at || "").trim();
+        const meta = fetchedAt
+            ? `Source: ${sourceType} | Fetched: ${new Date(fetchedAt).toLocaleString()}`
+            : `Source: ${sourceType}`;
+
+        setStandardDetailState({
+            title: titleBits.join(" - ") || "Standard details",
+            meta,
+            text: String(details?.extracted_text || "No details text available."),
+            details
+        });
+    } catch (error) {
+        setStandardDetailState({
+            title: titleBits.join(" - ") || "Standard details",
+            meta: String(error?.message || "Could not load standard details."),
+            text: "",
+            details: selected || null
+        });
+    }
 }
 
 function formatCardUpdatedAt(value) {
@@ -330,6 +429,7 @@ function buildQuery() {
     const params = new URLSearchParams();
     params.set("stream", String(streamInput?.value || "digital").trim().toLowerCase());
     params.set("level", String(levelInput?.value || "all").trim().toLowerCase());
+    params.set("include_docs", "true");
 
     const standardQuery = String(standardSearchInput?.value || "").trim();
     if (standardQuery) {
@@ -366,6 +466,7 @@ async function loadStandards({ force = false } = {}) {
         }
 
         const standards = Array.isArray(payload?.standards) ? payload.standards : [];
+        loadedStandards = standards;
         renderRows(standards);
 
         const stream = payload?.filters?.stream || params.get("stream") || "digital";
@@ -379,6 +480,7 @@ async function loadStandards({ force = false } = {}) {
 
         setStatus("NZQA standards loaded.");
     } catch (error) {
+        loadedStandards = [];
         renderRows([]);
         if (metaElement) {
             metaElement.textContent = "";
@@ -412,6 +514,20 @@ function bindEvents() {
 
     if (refreshButton) {
         refreshButton.addEventListener("click", () => loadStandards({ force: true }));
+    }
+
+    if (tableBody) {
+        tableBody.addEventListener("click", (event) => {
+            const button = event.target.closest("button[data-standard-select]");
+            if (!button) {
+                return;
+            }
+            const standardNumber = String(button.getAttribute("data-standard-select") || "").trim();
+            if (!standardNumber) {
+                return;
+            }
+            void loadStandardDetail(standardNumber);
+        });
     }
 
     if (standardCardForm) {

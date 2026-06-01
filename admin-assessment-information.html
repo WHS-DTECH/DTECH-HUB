@@ -175,6 +175,73 @@
       font-style: italic;
     }
 
+    .standards-select-button {
+      border: none;
+      background: transparent;
+      color: #2f74b9;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 0;
+      text-align: left;
+      font-family: inherit;
+      font-size: inherit;
+    }
+
+    .standards-select-button:hover {
+      text-decoration: underline;
+    }
+
+    .standard-detail-section {
+      margin-top: 14px;
+      border: 1px solid #cdd9e7;
+      border-radius: 12px;
+      background: #f8fbff;
+      padding: 12px;
+    }
+
+    .standard-detail-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .standard-detail-header h3 {
+      margin: 0;
+      color: #163f66;
+      font-size: 1.02rem;
+      font-family: "Fraunces", serif;
+    }
+
+    .standard-detail-meta {
+      margin: 0 0 8px;
+      font-size: 0.8rem;
+      color: #4c6681;
+    }
+
+    .standard-detail-links {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+      font-size: 0.8rem;
+    }
+
+    .standard-detail-text {
+      border: 1px solid #d7e3f0;
+      background: #ffffff;
+      border-radius: 8px;
+      padding: 10px;
+      max-height: 320px;
+      overflow: auto;
+      white-space: pre-wrap;
+      color: #203e5b;
+      font-size: 0.82rem;
+      line-height: 1.4;
+    }
+
     .template-section {
       margin-top: 18px;
       background: #eef8f4;
@@ -440,6 +507,15 @@
             </tr>
           </tbody>
         </table>
+      </section>
+
+      <section class="standard-detail-section" aria-label="Selected standard details">
+        <div class="standard-detail-header">
+          <h3 id="standard-detail-title">Standard details</h3>
+        </div>
+        <p id="standard-detail-meta" class="standard-detail-meta">Click any standard number to load details from NZQA PDF/DOCX where available.</p>
+        <div class="standard-detail-links" id="standard-detail-links"></div>
+        <div id="standard-detail-text" class="standard-detail-text">No standard selected yet.</div>
       </section>
 
       <section class="template-section" aria-label="Assessment Standard Cards">
