@@ -1,4 +1,5 @@
 const path = require("path");
+const fs = require("fs");
 const express = require("express");
 const multer = require("multer");
 const mammoth = require("mammoth");
@@ -44,6 +45,7 @@ const SCHOOL_EMAIL_DOMAIN = "westlandhigh.school.nz";
 const DTECH_HUB_NAME = "DTECH-HUB";
 const SEWING_ROOM_HUB_NAME = "SEWING-ROOM-HUB";
 const NZQA_BASE_URL = "https://www.nzqa.govt.nz";
+const LOCAL_STANDARDS_DIR = path.join(__dirname, "TeacherFiles", "Standards");
 const NZQA_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const NZQA_LINKS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const NZQA_DETAILS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -107,6 +109,64 @@ function buildNzqaLinks(standardNumber) {
     pdf_url: "",
     docx_url: ""
   };
+}
+
+function toStaticUrlPath(relativePath) {
+  return `/${String(relativePath || "").replace(/\\/g, "/")}`;
+}
+
+function findLocalStandardDocuments(standardNumber) {
+  const number = String(standardNumber || "").trim();
+  if (!number) {
+    return { pdf_url: "", docx_url: "" };
+  }
+
+  try {
+    if (!fs.existsSync(LOCAL_STANDARDS_DIR)) {
+      return { pdf_url: "", docx_url: "" };
+    }
+
+    const entries = fs.readdirSync(LOCAL_STANDARDS_DIR, { withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => String(entry.name || "").trim())
+      .filter(Boolean);
+
+    const matching = entries.filter((name) =>
+      String(name || "").toLowerCase().includes(number.toLowerCase())
+    );
+
+    const pick = (regex) => matching.find((name) => regex.test(name)) || "";
+    const pdfName = pick(/\.pdf$/i);
+    const docName = pick(/\.(?:doc|docx)$/i);
+
+    return {
+      pdf_url: pdfName ? toStaticUrlPath(path.join("TeacherFiles", "Standards", pdfName)) : "",
+      docx_url: docName ? toStaticUrlPath(path.join("TeacherFiles", "Standards", docName)) : ""
+    };
+  } catch (_error) {
+    return { pdf_url: "", docx_url: "" };
+  }
+}
+
+function readLocalStandardDocumentBuffer(urlPath) {
+  const url = String(urlPath || "").trim();
+  if (!url || !url.startsWith("/TeacherFiles/Standards/")) {
+    return null;
+  }
+
+  try {
+    const decoded = decodeURIComponent(url);
+    const absolutePath = path.join(__dirname, decoded.replace(/^\//, ""));
+    if (!absolutePath.startsWith(LOCAL_STANDARDS_DIR)) {
+      return null;
+    }
+    if (!fs.existsSync(absolutePath)) {
+      return null;
+    }
+    return fs.readFileSync(absolutePath);
+  } catch (_error) {
+    return null;
+  }
 }
 
 function stripNzqaHtmlToText(html) {
@@ -308,6 +368,15 @@ async function fetchNzqaAttachmentLinks(standardNumber) {
     return { details_url: "", pdf_url: "", docx_url: "" };
   }
 
+  const localDocuments = findLocalStandardDocuments(number);
+  if (localDocuments.pdf_url || localDocuments.docx_url) {
+    return {
+      details_url: buildNzqaLinks(number).details_url,
+      pdf_url: localDocuments.pdf_url,
+      docx_url: localDocuments.docx_url
+    };
+  }
+
   const cacheKey = number;
   const cached = nzqaStandardLinksCache.get(cacheKey);
   const now = Date.now();
@@ -392,13 +461,16 @@ async function fetchNzqaStandardDetails(standardNumber) {
   // Prefer DOCX first because it tends to contain cleaner section text for parsing.
   if (!result.extracted_text && result.docx_url && /\.docx(?:$|[?#])/i.test(result.docx_url)) {
     try {
-      const response = await fetch(result.docx_url, {
-        headers: {
-          "user-agent": "Mozilla/5.0 (DTECH-HUB/1.0)",
-          "accept": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        }
-      });
-      const bytes = Buffer.from(await response.arrayBuffer());
+      const localBuffer = readLocalStandardDocumentBuffer(result.docx_url);
+      const bytes = localBuffer || await (async () => {
+        const response = await fetch(result.docx_url, {
+          headers: {
+            "user-agent": "Mozilla/5.0 (DTECH-HUB/1.0)",
+            "accept": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          }
+        });
+        return Buffer.from(await response.arrayBuffer());
+      })();
       const extraction = await mammoth.extractRawText({ buffer: bytes });
       result.source_type = "docx";
       result.extracted_text = String(extraction?.value || "").replace(/\r/g, "").trim();
@@ -409,14 +481,17 @@ async function fetchNzqaStandardDetails(standardNumber) {
 
   if (!result.extracted_text && result.pdf_url) {
     try {
-      const response = await fetch(result.pdf_url, {
-        headers: {
-          "user-agent": "Mozilla/5.0 (DTECH-HUB/1.0)",
-          "accept": "application/pdf"
-        }
-      });
+      const localBuffer = readLocalStandardDocumentBuffer(result.pdf_url);
+      const bytes = localBuffer || await (async () => {
+        const response = await fetch(result.pdf_url, {
+          headers: {
+            "user-agent": "Mozilla/5.0 (DTECH-HUB/1.0)",
+            "accept": "application/pdf"
+          }
+        });
+        return Buffer.from(await response.arrayBuffer());
+      })();
       if (PDFParse) {
-        const bytes = Buffer.from(await response.arrayBuffer());
         const parser = new PDFParse({ data: bytes, verbosity: 0 });
         const extraction = await parser.getText();
         result.source_type = "pdf";
