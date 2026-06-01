@@ -212,6 +212,24 @@ function extractAssessmentCriteriaFromText(text) {
     };
   }
 
+  // First pass: NZQA achievement criteria table layout.
+  const tableBlockMatch = source.match(/Achievement\s+Criteria([\s\S]{0,2200}?)(?:Explanatory\s+Notes|\n\s*Page\s+\d+\s+of\s+\d+|$)/i);
+  if (tableBlockMatch) {
+    const tableBlock = String(tableBlockMatch[1] || "");
+    const bulletSegments = tableBlock
+      .split(/(?:^|\n)\s*[\u2022\u25CF\u2023\u00B7]\s*/)
+      .map((segment) => normalizeCriteriaSectionText(segment))
+      .filter(Boolean);
+
+    if (bulletSegments.length >= 3) {
+      return {
+        achieved_text: bulletSegments[0],
+        merit_text: bulletSegments[1],
+        excellence_text: bulletSegments[2]
+      };
+    }
+  }
+
   const headingPatterns = [
     { key: "achieved", regex: /(^|\n)\s*(Achieved|Achievement)\s*(Criteria|Requirements|Evidence)?\s*[:\-]?/ig },
     { key: "merit", regex: /(^|\n)\s*Merit\s*(Criteria|Requirements|Evidence)?\s*[:\-]?/ig },
