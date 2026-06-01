@@ -741,9 +741,31 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const standardNumber = extractPrimaryStandardNumberFromRows(coerceArray(detailData?.standardDetails));
     const standardKey = buildTaskTopicSubmissionStandardKey(taskTopicTitle, standardNumber);
     const isRelevantImplicationsTopic = taskTopicTitle.toLowerCase().includes("relevant implication");
+    const haparaWorkspacePublicUrl = "https://bit.ly/4uO74lI";
+    const haparaWorkspaceEmbedUrl = "https://workspace.teacherdashboard.com/public/#/w/6a1cc0549131d4df96cb4f7f?embed=true";
+    const shouldShowHaparaEmbed = isRelevantImplicationsTopic;
     const haparaSpaceName = isRelevantImplicationsTopic
         ? "Relevant Implication Documentation"
         : "Workspace Evidence";
+    const haparaEmbedHtml = shouldShowHaparaEmbed
+        ? `
+            <section class="proposal-section task-topic-submission-panel task-topic-hapara-embed-panel">
+                <h2>Hapara Workspace</h2>
+                <p class="task-topic-submission-intro">Use this embedded workspace to upload your write-up to <strong>${escapeHtml(haparaSpaceName)}</strong>.</p>
+                <div class="task-topic-hapara-embed-wrap">
+                    <iframe
+                        class="task-topic-hapara-embed"
+                        src="${escapeHtml(haparaWorkspaceEmbedUrl)}"
+                        title="Hapara Relevant Implication Documentation"
+                        loading="lazy"
+                        referrerpolicy="strict-origin-when-cross-origin"
+                        allowfullscreen
+                    ></iframe>
+                </div>
+                <p class="task-topic-hapara-embed-link"><a href="${escapeHtml(haparaWorkspacePublicUrl)}" target="_blank" rel="noreferrer">Open Hapara in a new tab</a></p>
+            </section>
+        `
+        : "";
 
     if (isTeacher) {
         const students = Array.isArray(interestData?.students) ? interestData.students : [];
@@ -775,6 +797,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
 
         panelHost.innerHTML = `
             <div class="task-topic-submission-teacher-panel">
+                ${haparaEmbedHtml}
                 <p class="task-topic-submission-note">Students submit work in Hapara <strong>${escapeHtml(haparaSpaceName)}</strong>. This panel tracks who has acknowledged they submitted.</p>
                 <div class="task-topic-submission-meta">
                     <p><strong>Acknowledged:</strong> ${rows.filter((row) => row.acknowledged).length} of ${rows.length}</p>
@@ -813,6 +836,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
 
     panelHost.innerHTML = `
         <form id="task-topic-submission-form" class="task-topic-submission-form" novalidate>
+            ${haparaEmbedHtml}
             <p class="task-topic-submission-note">Upload your write-up to Hapara <strong>${escapeHtml(haparaSpaceName)}</strong>, then click acknowledge below so this system records completion.</p>
 
             <div class="task-topic-submission-actions">
