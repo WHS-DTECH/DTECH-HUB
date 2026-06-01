@@ -377,6 +377,22 @@ function applyAssessmentStandardCardTemplate(card) {
     const meritLines = pickLines(card.merit_text, card.merit_checklist);
     const excellenceLines = pickLines(card.excellence_text, card.excellence_checklist);
 
+    const templateTaskTopics = [
+        ...achievedLines,
+        ...meritLines,
+        ...excellenceLines
+    ].map((line) => String(line || "").trim()).filter(Boolean);
+
+    const existingTaskTopics = linesToArray(form?.tasksList?.value || "");
+    const nextTaskTopics = [];
+    const seenTopics = new Set();
+    [...existingTaskTopics, ...templateTaskTopics].forEach((line) => {
+        const key = String(line || "").trim().toLowerCase();
+        if (!key || seenTopics.has(key)) return;
+        seenTopics.add(key);
+        nextTaskTopics.push(String(line || "").trim());
+    });
+
     if (form.achieved) {
         form.achieved.value = achievedLines.join("\n");
         autoResizeTextarea(form.achieved);
@@ -397,6 +413,11 @@ function applyAssessmentStandardCardTemplate(card) {
 
     if (form.cardColor) {
         form.cardColor.value = "Teal";
+    }
+
+    if (form.tasksList) {
+        form.tasksList.value = nextTaskTopics.join("\n");
+        autoResizeTextarea(form.tasksList);
     }
 }
 

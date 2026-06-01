@@ -346,12 +346,14 @@ function normalizeTaskTopicRows(value) {
 }
 
 function collectTaskTopicsFromActivityRecord(record) {
-    const grouped = [
-        ...normalizeTaskTopicRows(record?.tasks_list),
-        ...normalizeTaskTopicRows(record?.achieved),
-        ...normalizeTaskTopicRows(record?.merit),
-        ...normalizeTaskTopicRows(record?.excellence)
-    ];
+    const taskListRows = normalizeTaskTopicRows(record?.tasks_list);
+    const grouped = taskListRows.length
+        ? taskListRows
+        : [
+            ...normalizeTaskTopicRows(record?.achieved),
+            ...normalizeTaskTopicRows(record?.merit),
+            ...normalizeTaskTopicRows(record?.excellence)
+        ];
 
     const seen = new Set();
     const unique = [];
