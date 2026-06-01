@@ -211,7 +211,7 @@ function autoFillCardFormFromStandardSelection(selected, details) {
     if (filledCount > 0) {
         setCardStatus(`Loaded ${filledCount}/3 criteria section(s) from ${String(details?.source_type || "document").toUpperCase()} source.`);
     } else {
-        setCardStatus("Standard selected. No explicit Achieved/Merit/Excellence headings were detected in the source file.");
+        setCardStatus("Standard selected. Could not detect explicit Achieved/Merit/Excellence sections in this source. You can still enter criteria manually.");
     }
 }
 

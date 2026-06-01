@@ -231,6 +231,20 @@ function toNzqaAbsoluteUrl(href) {
   }
 }
 
+function isDocumentAttachmentUrl(url) {
+  const value = String(url || "").trim();
+  if (!value) return false;
+  return /\.(?:pdf|doc|docx)(?:$|[?#])/i.test(value);
+}
+
+function looksLikeBinaryGarble(text) {
+  const sample = String(text || "").slice(0, 300);
+  if (!sample) return false;
+  if (/^PK[\x00-\x7F]{0,40}/.test(sample)) return true;
+  const replacementCount = (sample.match(/�/g) || []).length;
+  return replacementCount > 8;
+}
+
 function pickNzqaAttachmentsFromHrefs(hrefs) {
   const values = Array.isArray(hrefs) ? hrefs : [];
   let pdfUrl = "";
@@ -258,9 +272,10 @@ function pickNzqaDetailPageUrl(hrefs, standardNumber) {
   const candidates = (Array.isArray(hrefs) ? hrefs : [])
     .map((href) => toNzqaAbsoluteUrl(href))
     .filter(Boolean)
-    .filter((href) => href.includes("nzqa.govt.nz") && href.includes("/ncea/assessment/"));
+    .filter((href) => href.includes("nzqa.govt.nz") && href.includes("/ncea/assessment/"))
+    .filter((href) => !isDocumentAttachmentUrl(href));
 
-  const byNumber = candidates.find((href) => href.includes(number));
+  const byNumber = candidates.find((href) => href.includes(number) && /search\.do\?|view\//i.test(href));
   if (byNumber) return byNumber;
 
   return candidates.find((href) => /search\.do\?|view\//i.test(href)) || "";
@@ -390,7 +405,7 @@ async function fetchNzqaStandardDetails(standardNumber) {
     }
   }
 
-  if (!result.extracted_text && result.details_url) {
+  if (!result.extracted_text && result.details_url && !isDocumentAttachmentUrl(result.details_url)) {
     try {
       const response = await fetch(result.details_url, {
         headers: {
@@ -398,11 +413,40 @@ async function fetchNzqaStandardDetails(standardNumber) {
           "accept": "text/html,application/xhtml+xml"
         }
       });
+      const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+      if (!contentType.includes("text/html")) {
+        throw new Error("NZQA details URL did not return HTML");
+      }
       const html = await response.text();
       result.source_type = "html";
       result.extracted_text = stripNzqaHtmlToText(html);
     } catch (_error) {
       // Keep empty result.
+    }
+  }
+
+  // Last-resort HTML fallback from search page in case prior detail URL was not usable.
+  if (!result.extracted_text || looksLikeBinaryGarble(result.extracted_text)) {
+    try {
+      const fallbackDetailsUrl = buildNzqaLinks(number).details_url;
+      const response = await fetch(fallbackDetailsUrl, {
+        headers: {
+          "user-agent": "Mozilla/5.0 (DTECH-HUB/1.0)",
+          "accept": "text/html,application/xhtml+xml"
+        }
+      });
+      const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+      if (contentType.includes("text/html")) {
+        const html = await response.text();
+        const cleaned = stripNzqaHtmlToText(html);
+        if (cleaned && !looksLikeBinaryGarble(cleaned)) {
+          result.source_type = "html";
+          result.extracted_text = cleaned;
+          result.details_url = fallbackDetailsUrl;
+        }
+      }
+    } catch (_error) {
+      // Keep existing extraction state.
     }
   }
 
