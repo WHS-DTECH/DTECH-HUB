@@ -9,6 +9,7 @@ const metaElement = document.getElementById("standards-results-meta");
 const tableBody = document.getElementById("standards-table-body");
 const standardDetailTitle = document.getElementById("standard-detail-title");
 const standardDetailMeta = document.getElementById("standard-detail-meta");
+const standardDetailMatch = document.getElementById("standard-detail-match");
 const standardDetailLinks = document.getElementById("standard-detail-links");
 const standardDetailText = document.getElementById("standard-detail-text");
 const standardDetailForceRefreshButton = document.getElementById("standard-detail-force-refresh");
@@ -154,12 +155,15 @@ function renderDetailLinks(details) {
         : `<span class="standards-empty">No source links found for this standard.</span>`;
 }
 
-function setStandardDetailState({ title, meta, text, details = null }) {
+function setStandardDetailState({ title, meta, match, text, details = null }) {
     if (standardDetailTitle) {
         standardDetailTitle.textContent = title || "Standard details";
     }
     if (standardDetailMeta) {
         standardDetailMeta.textContent = meta || "";
+    }
+    if (standardDetailMatch) {
+        standardDetailMatch.textContent = match || "";
     }
     if (standardDetailText) {
         standardDetailText.textContent = text || "";
@@ -223,6 +227,7 @@ async function loadStandardDetail(standardNumber, { force = false } = {}) {
         setStandardDetailState({
             title: "Standard details",
             meta: "Sign in as admin to load standard details.",
+            match: "",
             text: ""
         });
         return;
@@ -243,6 +248,7 @@ async function loadStandardDetail(standardNumber, { force = false } = {}) {
     setStandardDetailState({
         title: titleBits.join(" - ") || "Standard details",
         meta: "Loading details from NZQA document sources...",
+        match: "",
         text: "Please wait...",
         details: selected || null
     });
@@ -270,10 +276,23 @@ async function loadStandardDetail(standardNumber, { force = false } = {}) {
         const meta = fetchedAt
             ? `Source: ${sourceType} | Fetched: ${new Date(fetchedAt).toLocaleString()}`
             : `Source: ${sourceType}`;
+        const normalizedNumber = String(standardNumber || "").trim();
+        const sourceUrl = sourceType === "PDF"
+            ? String(details?.pdf_url || "").trim()
+            : sourceType === "DOCX"
+                ? String(details?.docx_url || "").trim()
+                : String(details?.details_url || "").trim();
+        const sourceHasNumber = normalizedNumber && sourceUrl
+            ? sourceUrl.toLowerCase().includes(normalizedNumber.toLowerCase())
+            : false;
+        const matchLabel = sourceUrl
+            ? `Matched source URL for ${normalizedNumber}: ${sourceHasNumber ? "Yes" : "Partial"} (${sourceUrl})`
+            : `Matched source URL for ${normalizedNumber}: Not available`;
 
         setStandardDetailState({
             title: titleBits.join(" - ") || "Standard details",
             meta,
+            match: matchLabel,
             text: String(details?.extracted_text || "No details text available."),
             details
         });
@@ -283,6 +302,7 @@ async function loadStandardDetail(standardNumber, { force = false } = {}) {
         setStandardDetailState({
             title: titleBits.join(" - ") || "Standard details",
             meta: String(error?.message || "Could not load standard details."),
+            match: "",
             text: "",
             details: selected || null
         });
