@@ -13,12 +13,16 @@ const coAddAchieved = document.querySelector("#co-add-achieved");
 const coAddMerit = document.querySelector("#co-add-merit");
 const coAddExcellence = document.querySelector("#co-add-excellence");
 const coAutofillNote = document.querySelector("#co-autofill-note");
+const coPdfFileInput = document.querySelector("#co-pdf-file");
+const coImportPdfButton = document.querySelector("#co-import-pdf");
+const coImportStatus = document.querySelector("#co-import-status");
 
 const COURSE_OUTLINE_DRAFT_KEY = "dtechHub:uploadCourseOutlineDraft:v1";
 const CO_AUTH_KEY = "hub_google_auth_v1";
 
 // In-memory list of standard entries for this outline.
 let coStandardEntries = []; // [{standardLabel, achieved, merit, excellence}]
+const coTemplatesByCode = new Map();
 
 // ─── Auth helpers ────────────────────────────────────────────────────────────
 
@@ -65,6 +69,12 @@ function coSetStatus(message, isError = false) {
     coUploadStatus.classList.add(isError ? "is-error" : "is-success");
 }
 
+function coSetImportStatus(message, isError = false) {
+    if (!coImportStatus) return;
+    coImportStatus.textContent = String(message || "").trim();
+    coImportStatus.classList.toggle("is-error", Boolean(isError));
+}
+
 // ─── Draft persistence ───────────────────────────────────────────────────────
 
 function coSaveDraft() {
@@ -98,6 +108,10 @@ function coRestoreDraft() {
 function coClearDraft() {
     try { localStorage.removeItem(COURSE_OUTLINE_DRAFT_KEY); } catch (_) {}
     if (coForm) coForm.reset();
+    if (coPdfFileInput) {
+        coPdfFileInput.value = "";
+    }
+    coSetImportStatus("");
     coStandardEntries = [];
     coRenderStandardsList();
     coSetStatus("");
@@ -178,20 +192,75 @@ async function coLoadStandardsOptions() {
     coStandardPicker.disabled = true;
     if (coAddStandardBtn) coAddStandardBtn.disabled = true;
 
+    coTemplatesByCode.clear();
+
     try {
-        const response = await fetch("/api/assessment-standards/options?stream=both&level=all", {
-            headers: coWithEmailHeader({})
-        });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok || !Array.isArray(payload?.options) || !payload.options.length) {
+        const [cardsResponse, standardsResponse] = await Promise.all([
+            fetch("/api/assessment-standard-cards", {
+                headers: coWithEmailHeader({})
+            }),
+            fetch("/api/assessment-standards/options?stream=both&level=all", {
+                headers: coWithEmailHeader({})
+            })
+        ]);
+
+        const cardsPayload = await cardsResponse.json().catch(() => ({}));
+        const standardsPayload = await standardsResponse.json().catch(() => ({}));
+
+        const cards = cardsResponse.ok && Array.isArray(cardsPayload?.cards) ? cardsPayload.cards : [];
+        const standards = standardsResponse.ok && Array.isArray(standardsPayload?.options) ? standardsPayload.options : [];
+
+        const cardRows = cards
+            .map((card) => {
+                const courseName = String(card?.course_name || "").trim();
+                const standardCodes = Array.isArray(card?.standard_codes)
+                    ? card.standard_codes.map((value) => String(value || "").trim()).filter(Boolean)
+                    : [];
+                const textSource = [courseName, ...standardCodes].join(" ");
+                const codeMatch = textSource.match(/\b(\d{5})\b/);
+                const code = codeMatch ? codeMatch[1] : "";
+                if (!code) return null;
+
+                const title = standardCodes.find((value) => !/\b\d{5}\b/.test(value)) || "Saved Assessment Standard Card";
+                const level = String(card?.year_level || "").trim();
+                const version = Number.parseInt(card?.year_version, 10);
+                const credits = Number.parseInt(card?.credits, 10);
+                const label = [
+                    code,
+                    title,
+                    level ? `${level}` : "",
+                    Number.isInteger(version) ? `Version ${version}` : "",
+                    Number.isInteger(credits) ? `${credits} credits` : "",
+                    "Template"
+                ].filter(Boolean).join(" | ");
+
+                coTemplatesByCode.set(code, card);
+                return { code, label };
+            })
+            .filter(Boolean);
+
+        const seenCodes = new Set(cardRows.map((row) => row.code));
+        const standardsRows = standards
+            .map((row) => {
+                const text = coFormatStandardOption(row);
+                const code = coExtractStandardCode(text);
+                if (code && seenCodes.has(code)) {
+                    return null;
+                }
+                return { code, label: text };
+            })
+            .filter(Boolean);
+
+        const mergedRows = [...cardRows, ...standardsRows];
+        if (!mergedRows.length) {
             coStandardPicker.innerHTML = `<option value="">No standards available</option>`;
             return;
         }
+
         coStandardPicker.innerHTML = [
             `<option value="">Select a standard...</option>`,
-            ...payload.options.map((row) => {
-                const text = coFormatStandardOption(row);
-                return `<option value="${escapeHtml(text)}">${escapeHtml(text)}</option>`;
+            ...mergedRows.map((row) => {
+                return `<option value="${escapeHtml(row.label)}">${escapeHtml(row.label)}</option>`;
             })
         ].join("");
     } catch (_) {
@@ -200,6 +269,33 @@ async function coLoadStandardsOptions() {
         coStandardPicker.disabled = false;
         if (coAddStandardBtn) coAddStandardBtn.disabled = false;
     }
+}
+
+function coPickLines(text, checklist) {
+    const list = Array.isArray(checklist)
+        ? checklist.map((l) => String(l || "").trim()).filter(Boolean)
+        : [];
+    if (list.length) return list.join("\n");
+    return String(text || "").trim();
+}
+
+function coApplyTemplateToInputs(card, message) {
+    if (!card) return;
+
+    if (coAddAchieved) coAddAchieved.value = coPickLines(card.achieved_text, card.achieved_checklist);
+    if (coAddMerit) coAddMerit.value = coPickLines(card.merit_text, card.merit_checklist);
+    if (coAddExcellence) coAddExcellence.value = coPickLines(card.excellence_text, card.excellence_checklist);
+
+    if (coAutofillNote) {
+        coAutofillNote.textContent = message;
+        coAutofillNote.hidden = false;
+    }
+}
+
+function coGetTemplateByCode(code) {
+    const normalized = String(code || "").trim();
+    if (!normalized) return null;
+    return coTemplatesByCode.get(normalized) || null;
 }
 
 // ─── Auto-populate A/M/E from Assessment Standard Card ──────────────────────
@@ -216,6 +312,13 @@ async function coTryAutofill(standardLabel) {
     const code = coExtractStandardCode(standardLabel);
     if (!code) return;
 
+    const localTemplate = coGetTemplateByCode(code);
+    if (localTemplate) {
+        const templateLabel = String(localTemplate?.course_name || code).trim();
+        coApplyTemplateToInputs(localTemplate, `Criteria pre-filled from saved Assessment Standard Card (${templateLabel}).`);
+        return;
+    }
+
     const params = new URLSearchParams();
     params.set("standard", code);
     const year = new Date().getFullYear();
@@ -229,23 +332,162 @@ async function coTryAutofill(standardLabel) {
         if (!response.ok || !payload?.matched || !payload?.card) return;
 
         const card = payload.card;
-        const pickLines = (text, checklist) => {
-            const list = Array.isArray(checklist)
-                ? checklist.map((l) => String(l || "").trim()).filter(Boolean)
-                : [];
-            if (list.length) return list.join("\n");
-            return String(text || "").trim();
-        };
-
-        if (coAddAchieved) coAddAchieved.value = pickLines(card.achieved_text, card.achieved_checklist);
-        if (coAddMerit) coAddMerit.value = pickLines(card.merit_text, card.merit_checklist);
-        if (coAddExcellence) coAddExcellence.value = pickLines(card.excellence_text, card.excellence_checklist);
-
-        const templateLabel = String(card?.course_name || "").trim();
-        coAutofillNote.textContent = `Criteria pre-filled from Assessment Standard Card${templateLabel ? ` (${templateLabel})` : ""}.`;
-        coAutofillNote.hidden = false;
+        const templateLabel = String(card?.course_name || code).trim();
+        coApplyTemplateToInputs(card, `Criteria pre-filled from Assessment Standard Card${templateLabel ? ` (${templateLabel})` : ""}.`);
     } catch (_) {
         // Keep the flow resilient.
+    }
+}
+
+async function coFetchTemplateForStandard(standardLabel, options = {}) {
+    const code = coExtractStandardCode(standardLabel);
+    if (!code) return null;
+
+    const localTemplate = coGetTemplateByCode(code);
+    if (localTemplate) {
+        return localTemplate;
+    }
+
+    const params = new URLSearchParams();
+    params.set("standard", code);
+
+    const yearLevel = String(options.yearLevel || coForm?.yearLevel?.value || "").trim();
+    if (yearLevel) {
+        params.set("year_level", yearLevel);
+    }
+
+    const courseName = String(options.courseName || coForm?.courseName?.value || "").trim();
+    if (courseName) {
+        params.set("course_name", courseName);
+    }
+
+    const yearVersion = Number.parseInt(options.yearVersion || coForm?.yearVersion?.value || "", 10) || new Date().getFullYear();
+    params.set("year", String(yearVersion));
+
+    try {
+        const response = await fetch(`/api/assessment-standard-cards/match?${params.toString()}`, {
+            headers: coWithEmailHeader({})
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload?.matched || !payload?.card) {
+            return null;
+        }
+        return payload.card;
+    } catch (_error) {
+        return null;
+    }
+}
+
+function coGetTemplateLines(card, kind) {
+    const checklistKey = `${kind}_checklist`;
+    const textKey = `${kind}_text`;
+    const checklist = Array.isArray(card?.[checklistKey])
+        ? card[checklistKey].map((line) => String(line || "").trim()).filter(Boolean)
+        : [];
+    if (checklist.length) {
+        return checklist.join("\n");
+    }
+    return String(card?.[textKey] || "").trim();
+}
+
+async function coEnrichImportedStandards(entries, options = {}) {
+    const rows = Array.isArray(entries) ? entries : [];
+    if (!rows.length) return [];
+
+    const enriched = [];
+    for (const row of rows) {
+        const standardLabel = String(row?.standardLabel || "").trim();
+        if (!standardLabel) continue;
+
+        const template = await coFetchTemplateForStandard(standardLabel, options);
+        enriched.push({
+            standardLabel,
+            achieved: String(row?.achieved || "").trim() || (template ? coGetTemplateLines(template, "achieved") : ""),
+            merit: String(row?.merit || "").trim() || (template ? coGetTemplateLines(template, "merit") : ""),
+            excellence: String(row?.excellence || "").trim() || (template ? coGetTemplateLines(template, "excellence") : "")
+        });
+    }
+
+    return enriched;
+}
+
+async function coImportFromPdf() {
+    if (!coIsAuthenticated()) {
+        coSetImportStatus("Sign in first to import a course outline PDF.", true);
+        return;
+    }
+
+    const file = coPdfFileInput?.files?.[0];
+    if (!file) {
+        coSetImportStatus("Choose a PDF file first.", true);
+        return;
+    }
+
+    if (!/\.pdf$/i.test(file.name) && String(file.type || "").toLowerCase() !== "application/pdf") {
+        coSetImportStatus("Only PDF files are supported.", true);
+        return;
+    }
+
+    coSetImportStatus("Importing PDF and mapping standards...");
+    if (coImportPdfButton) coImportPdfButton.disabled = true;
+
+    try {
+        const formData = new FormData();
+        formData.append("courseOutlineFile", file);
+
+        const response = await fetch("/api/course-outlines/parse-pdf", {
+            method: "POST",
+            headers: coWithEmailHeader({}),
+            body: formData
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            coSetImportStatus(payload?.error || "Could not parse this PDF.", true);
+            return;
+        }
+
+        const parsed = payload?.parsed || {};
+        const importedStandards = Array.isArray(parsed?.standards)
+            ? parsed.standards.map((row) => ({
+                standardLabel: String(row?.standardLabel || "").trim(),
+                achieved: "",
+                merit: "",
+                excellence: ""
+            })).filter((row) => row.standardLabel)
+            : [];
+
+        if (coForm?.courseName && parsed?.courseName) {
+            coForm.courseName.value = String(parsed.courseName || "").trim();
+        }
+        if (coForm?.yearLevel && parsed?.yearLevel) {
+            coForm.yearLevel.value = String(parsed.yearLevel || "").trim();
+        }
+        if (coForm?.yearVersion && parsed?.yearVersion) {
+            coForm.yearVersion.value = String(parsed.yearVersion || "").trim();
+        }
+        if (coForm?.subjectStream && parsed?.subjectStream) {
+            coForm.subjectStream.value = String(parsed.subjectStream || "").trim();
+        }
+        if (coForm?.summary && parsed?.summary) {
+            coForm.summary.value = String(parsed.summary || "").trim();
+        }
+
+        const enrichedStandards = await coEnrichImportedStandards(importedStandards, {
+            courseName: coForm?.courseName?.value,
+            yearLevel: coForm?.yearLevel?.value,
+            yearVersion: coForm?.yearVersion?.value
+        });
+
+        coStandardEntries = enrichedStandards;
+        coRenderStandardsList();
+        coSaveDraft();
+
+        coSetImportStatus(`Imported ${coStandardEntries.length} standard(s) from ${file.name}.`);
+        coSetStatus(`Imported course outline from PDF. Review A/M/E criteria and save when ready.`);
+    } catch (_error) {
+        coSetImportStatus("Import failed. Please try again.", true);
+    } finally {
+        if (coImportPdfButton) coImportPdfButton.disabled = false;
     }
 }
 
@@ -344,7 +586,9 @@ function coCheckAuth() {
     if (!coIsAuthenticated()) {
         coAuthStatus.textContent = "You must be signed in with a @westlandhigh.school.nz account to use this page.";
         coAuthStatus.classList.add("is-error");
-        if (coForm) coForm.querySelectorAll("input, select, textarea, button[type='submit']").forEach((el) => { el.disabled = true; });
+        if (coForm) coForm.querySelectorAll("input, select, textarea, button").forEach((el) => { el.disabled = true; });
+        if (coImportPdfButton) coImportPdfButton.disabled = true;
+        if (coPdfFileInput) coPdfFileInput.disabled = true;
     } else {
         coAuthStatus.textContent = "";
     }
@@ -368,6 +612,9 @@ function coInit() {
     });
 
     coAddStandardBtn?.addEventListener("click", coAddStandard);
+    coImportPdfButton?.addEventListener("click", () => {
+        void coImportFromPdf();
+    });
 
     coForm?.addEventListener("submit", coHandleSubmit);
     coForm?.addEventListener("input", coSaveDraft);
