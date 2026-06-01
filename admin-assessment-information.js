@@ -99,6 +99,29 @@ function setCardStatus(message, isError = false) {
     standardCardStatus.className = isError ? "template-status is-error" : "template-status";
 }
 
+function findSavedCardForStandard(selected) {
+    const standardNumber = String(selected?.standard_number || "").trim().toLowerCase();
+    const standardName = String(selected?.standard_name || "").trim().toLowerCase();
+
+    if (!standardNumber && !standardName) {
+        return null;
+    }
+
+    return loadedStandardCards.find((card) => {
+        const courseName = String(card?.course_name || "").trim().toLowerCase();
+        const codes = Array.isArray(card?.standard_codes)
+            ? card.standard_codes.map((value) => String(value || "").trim().toLowerCase()).filter(Boolean)
+            : [];
+
+        const matchesNumber = Boolean(standardNumber)
+            && (courseName === standardNumber || codes.includes(standardNumber));
+        const matchesName = Boolean(standardName)
+            && (courseName === standardName || codes.includes(standardName));
+
+        return matchesNumber || matchesName;
+    }) || null;
+}
+
 function autoResizeTextarea(field) {
     if (!(field instanceof HTMLTextAreaElement)) {
         return;
@@ -200,6 +223,13 @@ function setStandardDetailState({ title, meta, match, text, details = null }) {
 
 function autoFillCardFormFromStandardSelection(selected, details) {
     if (!standardCardForm) {
+        return;
+    }
+
+    const savedCard = findSavedCardForStandard(selected);
+    if (savedCard) {
+        fillCardForm(savedCard);
+        setCardStatus(`Loaded saved Assessment Standard Card for ${String(selected?.standard_number || "this standard").trim()}.`);
         return;
     }
 
