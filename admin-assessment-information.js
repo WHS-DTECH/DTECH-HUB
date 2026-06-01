@@ -99,6 +99,33 @@ function setCardStatus(message, isError = false) {
     standardCardStatus.className = isError ? "template-status is-error" : "template-status";
 }
 
+function autoResizeTextarea(field) {
+    if (!(field instanceof HTMLTextAreaElement)) {
+        return;
+    }
+    field.style.height = "auto";
+    field.style.height = `${Math.max(field.scrollHeight, 84)}px`;
+}
+
+function resizeCardTextareas() {
+    if (!standardCardForm) {
+        return;
+    }
+    const textareas = Array.from(standardCardForm.querySelectorAll("textarea"));
+    textareas.forEach((field) => autoResizeTextarea(field));
+}
+
+function setupCardTextareaAutosize() {
+    if (!standardCardForm) {
+        return;
+    }
+    const textareas = Array.from(standardCardForm.querySelectorAll("textarea"));
+    textareas.forEach((field) => {
+        autoResizeTextarea(field);
+        field.addEventListener("input", () => autoResizeTextarea(field));
+    });
+}
+
 function renderRows(rows) {
     if (!tableBody) return;
 
@@ -219,6 +246,8 @@ function autoFillCardFormFromStandardSelection(selected, details) {
     } else {
         setCardStatus("Standard selected. Could not detect explicit Achieved/Merit/Excellence sections in this source. You can still enter criteria manually.");
     }
+
+    resizeCardTextareas();
 }
 
 async function loadStandardDetail(standardNumber, { force = false } = {}) {
@@ -359,6 +388,7 @@ function resetCardForm() {
     if (standardCardIdInput) {
         standardCardIdInput.value = "";
     }
+    resizeCardTextareas();
     setCardStatus("");
 }
 
@@ -381,6 +411,7 @@ function fillCardForm(card) {
     standardCardForm.meritChecklist.value = Array.isArray(card.merit_checklist) ? card.merit_checklist.join("\n") : "";
     standardCardForm.excellenceChecklist.value = Array.isArray(card.excellence_checklist) ? card.excellence_checklist.join("\n") : "";
 
+    resizeCardTextareas();
     setCardStatus("Card loaded. You can now edit and save.");
 }
 
@@ -671,6 +702,8 @@ function bindEvents() {
 }
 
 async function initAssessmentStandardsPage() {
+    setupCardTextareaAutosize();
+
     const email = await enforceAdminAccess();
     if (!email) return;
 
