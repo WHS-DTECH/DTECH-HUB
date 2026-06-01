@@ -576,6 +576,8 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
         haparaAcknowledged: false,
         haparaSubmittedAt: "",
         haparaLocation: "",
+        haparaDriveClassUrl: "",
+        haparaDocumentRef: "",
         submittedAt: "",
         reviewStatus: "pending"
     };
@@ -626,6 +628,16 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
             return;
         }
 
+        if (text.startsWith("HAPARA_CLASS_DRIVE|")) {
+            result.haparaDriveClassUrl = text.slice("HAPARA_CLASS_DRIVE|".length).trim();
+            return;
+        }
+
+        if (text.startsWith("HAPARA_DOC_REF|")) {
+            result.haparaDocumentRef = text.slice("HAPARA_DOC_REF|".length).trim();
+            return;
+        }
+
         if (text.startsWith("SUBMITTED_AT|")) {
             result.submittedAt = text.slice("SUBMITTED_AT|".length).trim();
             return;
@@ -659,6 +671,8 @@ function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     const haparaAcknowledged = Boolean(payload?.haparaAcknowledged);
     const haparaSubmittedAt = String(payload?.haparaSubmittedAt || "").trim();
     const haparaLocation = String(payload?.haparaLocation || "").trim();
+    const haparaDriveClassUrl = String(payload?.haparaDriveClassUrl || "").trim();
+    const haparaDocumentRef = String(payload?.haparaDocumentRef || "").trim();
     const reviewStatusRaw = String(payload?.reviewStatus || "").trim().toLowerCase();
     const reviewStatus = reviewStatusRaw === "reviewed"
         ? "reviewed"
@@ -688,6 +702,12 @@ function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     }
     if (haparaLocation) {
         steps.push({ text: `HAPARA_LOCATION|${haparaLocation}`, done: true });
+    }
+    if (haparaDriveClassUrl) {
+        steps.push({ text: `HAPARA_CLASS_DRIVE|${haparaDriveClassUrl}`, done: true });
+    }
+    if (haparaDocumentRef) {
+        steps.push({ text: `HAPARA_DOC_REF|${haparaDocumentRef}`, done: true });
     }
     steps.push({ text: `REVIEW|${reviewStatus}`, done: reviewStatus === "reviewed" });
 
@@ -743,6 +763,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const isRelevantImplicationsTopic = taskTopicTitle.toLowerCase().includes("relevant implication");
     const haparaWorkspacePublicUrl = "https://bit.ly/4uO74lI";
     const haparaWorkspaceEmbedUrl = "https://workspace.teacherdashboard.com/public/#/w/6a1cc0549131d4df96cb4f7f?embed=true";
+    const haparaClassDriveUrl = "https://app.hapara.com/dashboard/drive/4-1-12comp-vp-2026@westlandhigh.school.nz/all";
     const shouldShowHaparaEmbed = isRelevantImplicationsTopic;
     const haparaSpaceName = isRelevantImplicationsTopic
         ? "Relevant Implication Documentation"
@@ -798,6 +819,10 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         panelHost.innerHTML = `
             <div class="task-topic-submission-teacher-panel">
                 ${haparaEmbedHtml}
+                <div class="task-topic-drive-links">
+                    <a class="detail-action detail-action-secondary" href="${escapeHtml(haparaClassDriveUrl)}" target="_blank" rel="noreferrer">Open Class Hapara Drive</a>
+                    <a class="detail-action detail-action-secondary" href="${escapeHtml(haparaWorkspacePublicUrl)}" target="_blank" rel="noreferrer">Open Hapara Workspace</a>
+                </div>
                 <p class="task-topic-submission-note">Students submit work in Hapara <strong>${escapeHtml(haparaSpaceName)}</strong>. This panel tracks who has acknowledged they submitted.</p>
                 <div class="task-topic-submission-meta">
                     <p><strong>Acknowledged:</strong> ${rows.filter((row) => row.acknowledged).length} of ${rows.length}</p>
@@ -807,6 +832,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                         <div class="task-topic-teacher-status-item">
                             <span class="task-topic-teacher-status-email">${escapeHtml(row.email)}</span>
                             <span class="task-topic-teacher-status-pill ${row.acknowledged ? "is-acknowledged" : "is-pending"}">${row.acknowledged ? "Submitted in Hapara" : "Not acknowledged"}</span>
+                            <span class="task-topic-teacher-status-doc">${escapeHtml(parseTaskTopicSubmissionFromEvidenceRows((students.find((student) => String(student?.email || "").trim().toLowerCase() === row.email) || {}).evidence_steps, standardKey).haparaDocumentRef || "No document reference")}</span>
                             <span class="task-topic-teacher-status-time">${escapeHtml(formatSubmissionTimestamp(row.submittedAt))}</span>
                         </div>
                     `).join("")}
@@ -833,11 +859,19 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const submission = parseTaskTopicSubmissionFromEvidenceRows(evidenceRows, standardKey);
     const acknowledged = Boolean(submission.haparaAcknowledged);
     const acknowledgedAt = submission.haparaSubmittedAt || submission.submittedAt || "";
+    const currentDocRef = String(submission.haparaDocumentRef || "").trim();
 
     panelHost.innerHTML = `
         <form id="task-topic-submission-form" class="task-topic-submission-form" novalidate>
             ${haparaEmbedHtml}
-            <p class="task-topic-submission-note">Upload your write-up to Hapara <strong>${escapeHtml(haparaSpaceName)}</strong>, then click acknowledge below so this system records completion.</p>
+            <p class="task-topic-submission-note">Save your write-up into the class Hapara Drive folder, then acknowledge below so this system records completion.</p>
+            <div class="task-topic-drive-links">
+                <a class="detail-action detail-action-secondary" href="${escapeHtml(haparaClassDriveUrl)}" target="_blank" rel="noreferrer">Open Class Hapara Drive</a>
+                <a class="detail-action detail-action-secondary" href="${escapeHtml(haparaWorkspacePublicUrl)}" target="_blank" rel="noreferrer">Open Hapara Workspace</a>
+            </div>
+
+            <label class="task-topic-submission-label" for="task-topic-hapara-doc-ref">Document Name or Drive Reference</label>
+            <input id="task-topic-hapara-doc-ref" class="task-topic-submission-input" type="text" placeholder="Example: Relevant Implications - Victor McKewen" value="${escapeHtml(currentDocRef)}" required>
 
             <div class="task-topic-submission-actions">
                 <button type="submit" class="detail-action">I Submitted In Hapara</button>
@@ -849,14 +883,17 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             <p><strong>Status:</strong> <span id="task-topic-ack-status">${acknowledged ? "Submitted in Hapara" : "Waiting for acknowledgement"}</span></p>
             <p><strong>Acknowledged At:</strong> <span id="task-topic-last-submitted">${escapeHtml(formatSubmissionTimestamp(acknowledgedAt))}</span></p>
             <p><strong>Hapara Space:</strong> <span>${escapeHtml(haparaSpaceName)}</span></p>
+            <p><strong>Document Reference:</strong> <span id="task-topic-doc-reference">${escapeHtml(currentDocRef || "Not provided")}</span></p>
         </div>
     `;
 
     const form = panelHost.querySelector("#task-topic-submission-form");
     const clearAckButton = panelHost.querySelector("#task-topic-clear-acknowledgement");
+    const docRefInput = panelHost.querySelector("#task-topic-hapara-doc-ref");
     const statusHost = panelHost.querySelector("#task-topic-submission-status");
     const ackStatusHost = panelHost.querySelector("#task-topic-ack-status");
     const lastSubmittedHost = panelHost.querySelector("#task-topic-last-submitted");
+    const docRefHost = panelHost.querySelector("#task-topic-doc-reference");
     const updateMeta = (isAcknowledged, timestamp) => {
         if (ackStatusHost) {
             ackStatusHost.textContent = isAcknowledged ? "Submitted in Hapara" : "Waiting for acknowledgement";
@@ -864,6 +901,11 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
 
         if (lastSubmittedHost) {
             lastSubmittedHost.textContent = formatSubmissionTimestamp(timestamp);
+        }
+
+        if (docRefHost) {
+            const value = String(docRefInput?.value || "").trim();
+            docRefHost.textContent = value || "Not provided";
         }
     };
 
@@ -877,6 +919,11 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
 
     form?.addEventListener("submit", async (event) => {
         event.preventDefault();
+        const docReference = String(docRefInput?.value || "").trim();
+        if (!docReference) {
+            setStatus("Add the document name/reference from Hapara Drive before acknowledging.", true);
+            return;
+        }
 
         const submitButton = form.querySelector("button[type='submit']");
         if (submitButton) {
@@ -894,6 +941,8 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             haparaAcknowledged: true,
             haparaSubmittedAt: submittedAt,
             haparaLocation: haparaSpaceName,
+            haparaDriveClassUrl: haparaClassDriveUrl,
+            haparaDocumentRef: docReference,
             reviewStatus: "pending"
         });
 
@@ -903,6 +952,8 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             submission.haparaAcknowledged = true;
             submission.haparaSubmittedAt = submittedAt;
             submission.haparaLocation = haparaSpaceName;
+            submission.haparaDriveClassUrl = haparaClassDriveUrl;
+            submission.haparaDocumentRef = docReference;
             submission.submittedAt = submittedAt;
             submission.reviewStatus = "pending";
 
@@ -930,6 +981,8 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             haparaAcknowledged: false,
             haparaSubmittedAt: "",
             haparaLocation: haparaSpaceName,
+            haparaDriveClassUrl: haparaClassDriveUrl,
+            haparaDocumentRef: String(docRefInput?.value || "").trim(),
             reviewStatus: submission.reviewStatus
         });
 

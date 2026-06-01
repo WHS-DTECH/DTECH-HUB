@@ -443,6 +443,13 @@ h1 {
     gap: 8px;
 }
 
+.task-topic-drive-links {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 2px 0 8px;
+}
+
 .task-topic-submission-status {
     margin: 0;
     min-height: 1em;
@@ -518,6 +525,11 @@ h1 {
 .task-topic-teacher-status-time {
     font-size: 0.74rem;
     color: #6a5735;
+}
+
+.task-topic-teacher-status-doc {
+    font-size: 0.75rem;
+    color: #5d4a28;
 }
 
 .task-topic-hapara-embed-panel {
