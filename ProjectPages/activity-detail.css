@@ -593,6 +593,12 @@ h1 {
     width: 100%;
 }
 
+@media (max-width: 760px) {
+    .task-topic-teacher-summary-row {
+        grid-template-columns: 1fr;
+    }
+}
+
 .task-topic-teacher-status-doc {
     font-size: 0.75rem;
     color: #5d4a28;

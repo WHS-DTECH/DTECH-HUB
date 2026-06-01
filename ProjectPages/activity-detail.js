@@ -582,6 +582,11 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
         trelloLastLogDate: "",
         trelloLastLogAt: "",
         trelloLastLogNote: "",
+        mediaAssetFolderUrl: "",
+        mediaReviewUrl: "",
+        mediaVersionLogDate: "",
+        mediaVersionLogAt: "",
+        mediaVersionLogNote: "",
         submittedAt: "",
         reviewStatus: "pending"
     };
@@ -662,6 +667,31 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
             return;
         }
 
+        if (text.startsWith("MEDIA_ASSET_FOLDER_URL|")) {
+            result.mediaAssetFolderUrl = toSafeExternalUrl(text.slice("MEDIA_ASSET_FOLDER_URL|".length).trim());
+            return;
+        }
+
+        if (text.startsWith("MEDIA_REVIEW_URL|")) {
+            result.mediaReviewUrl = toSafeExternalUrl(text.slice("MEDIA_REVIEW_URL|".length).trim());
+            return;
+        }
+
+        if (text.startsWith("MEDIA_VERSION_LOG_DATE|")) {
+            result.mediaVersionLogDate = text.slice("MEDIA_VERSION_LOG_DATE|".length).trim();
+            return;
+        }
+
+        if (text.startsWith("MEDIA_VERSION_LOG_AT|")) {
+            result.mediaVersionLogAt = text.slice("MEDIA_VERSION_LOG_AT|".length).trim();
+            return;
+        }
+
+        if (text.startsWith("MEDIA_VERSION_LOG_NOTE|")) {
+            result.mediaVersionLogNote = text.slice("MEDIA_VERSION_LOG_NOTE|".length).trim();
+            return;
+        }
+
         if (text.startsWith("SUBMITTED_AT|")) {
             result.submittedAt = text.slice("SUBMITTED_AT|".length).trim();
             return;
@@ -701,6 +731,11 @@ function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     const trelloLastLogDate = String(payload?.trelloLastLogDate || "").trim();
     const trelloLastLogAt = String(payload?.trelloLastLogAt || "").trim();
     const trelloLastLogNote = String(payload?.trelloLastLogNote || "").trim();
+    const mediaAssetFolderUrl = toSafeExternalUrl(payload?.mediaAssetFolderUrl);
+    const mediaReviewUrl = toSafeExternalUrl(payload?.mediaReviewUrl);
+    const mediaVersionLogDate = String(payload?.mediaVersionLogDate || "").trim();
+    const mediaVersionLogAt = String(payload?.mediaVersionLogAt || "").trim();
+    const mediaVersionLogNote = String(payload?.mediaVersionLogNote || "").trim();
     const reviewStatusRaw = String(payload?.reviewStatus || "").trim().toLowerCase();
     const reviewStatus = reviewStatusRaw === "reviewed"
         ? "reviewed"
@@ -748,6 +783,21 @@ function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     }
     if (trelloLastLogNote) {
         steps.push({ text: `TRELLO_LAST_LOG_NOTE|${trelloLastLogNote}`, done: true });
+    }
+    if (mediaAssetFolderUrl) {
+        steps.push({ text: `MEDIA_ASSET_FOLDER_URL|${mediaAssetFolderUrl}`, done: true });
+    }
+    if (mediaReviewUrl) {
+        steps.push({ text: `MEDIA_REVIEW_URL|${mediaReviewUrl}`, done: true });
+    }
+    if (mediaVersionLogDate) {
+        steps.push({ text: `MEDIA_VERSION_LOG_DATE|${mediaVersionLogDate}`, done: true });
+    }
+    if (mediaVersionLogAt) {
+        steps.push({ text: `MEDIA_VERSION_LOG_AT|${mediaVersionLogAt}`, done: true });
+    }
+    if (mediaVersionLogNote) {
+        steps.push({ text: `MEDIA_VERSION_LOG_NOTE|${mediaVersionLogNote}`, done: true });
     }
     steps.push({ text: `REVIEW|${reviewStatus}`, done: reviewStatus === "reviewed" });
 
@@ -820,6 +870,14 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const isProjectManagementTopic = taskTopicTitle.toLowerCase().includes("project management")
         || normalizedTaskTopicShortName.includes("project management")
         || normalizedDerivedShortName.includes("project management");
+    const isAssetVersionControlTopic = taskTopicTitle.toLowerCase().includes("asset management")
+        || taskTopicTitle.toLowerCase().includes("version control")
+        || normalizedTaskTopicShortName.includes("asset management")
+        || normalizedTaskTopicShortName.includes("version control")
+        || normalizedDerivedShortName.includes("asset management")
+        || normalizedDerivedShortName.includes("version control");
+    const isMediaAssetWorkflowTopic = isAssetVersionControlTopic && !isProjectManagementTopic;
+    const isTrackedWorkflowTopic = isProjectManagementTopic || isMediaAssetWorkflowTopic;
     const haparaWorkspacePublicUrl = "https://bit.ly/4uO74lI";
     const haparaWorkspaceEmbedUrl = "https://workspace.teacherdashboard.com/public/#/w/6a1cc0549131d4df96cb4f7f?embed=true";
     const haparaClassDriveUrl = "https://app.hapara.com/dashboard/drive/4-1-12comp-vp-2026@westlandhigh.school.nz/all";
@@ -867,16 +925,49 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                     acknowledged: Boolean(submission.haparaAcknowledged),
                     submittedAt: submission.haparaSubmittedAt || submission.submittedAt || "",
                     trelloCardUrl: submission.trelloCardUrl || "",
+                    mediaAssetFolderUrl: submission.mediaAssetFolderUrl || "",
+                    mediaReviewUrl: submission.mediaReviewUrl || "",
                     docRef: submission.haparaDocumentRef || "",
                     lastLogDate: String(submission.trelloLastLogDate || "").trim(),
-                    lastLogAt: String(submission.trelloLastLogAt || "").trim()
+                    lastLogAt: String(submission.trelloLastLogAt || "").trim(),
+                    mediaLastVersionLogDate: String(submission.mediaVersionLogDate || "").trim(),
+                    mediaLastVersionLogAt: String(submission.mediaVersionLogAt || "").trim()
                 };
             })
             .filter(Boolean);
 
         const todayNz = getNzDateKey();
-        const missingTrelloRows = rows.filter((row) => !String(row.trelloCardUrl || "").trim());
-        const missingLogRows = rows.filter((row) => row.lastLogDate !== todayNz);
+        const missingPrimaryLinkRows = rows.filter((row) => {
+            if (isProjectManagementTopic) {
+                return !String(row.trelloCardUrl || "").trim();
+            }
+            if (isMediaAssetWorkflowTopic) {
+                return !String(row.mediaAssetFolderUrl || "").trim();
+            }
+            return false;
+        });
+        const missingLogRows = rows.filter((row) => {
+            if (isProjectManagementTopic) {
+                return row.lastLogDate !== todayNz;
+            }
+            if (isMediaAssetWorkflowTopic) {
+                return row.mediaLastVersionLogDate !== todayNz;
+            }
+            return false;
+        });
+        const loggedTodayCount = rows.filter((row) => {
+            if (isProjectManagementTopic) {
+                return row.lastLogDate === todayNz;
+            }
+            if (isMediaAssetWorkflowTopic) {
+                return row.mediaLastVersionLogDate === todayNz;
+            }
+            return false;
+        }).length;
+        const summaryPrimaryLabel = isProjectManagementTopic ? "Missing Trello Link" : "Missing Asset Folder Link";
+        const summaryLogLabel = isProjectManagementTopic ? "Missing Today's Log" : "Missing Today's Version Log";
+        const logCompleteText = isProjectManagementTopic ? "Logged today" : "Version log updated today";
+        const logMissingText = isProjectManagementTopic ? "Missing today's log" : "Missing today's version log";
 
         if (!rows.length) {
             panelHost.innerHTML = `<p class="task-topic-submission-note">No student records are ready for acknowledgement tracking yet.</p>`;
@@ -893,27 +984,27 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 <p class="task-topic-submission-note">Students submit work in Hapara <strong>${escapeHtml(haparaSpaceName)}</strong>. This panel tracks who has acknowledged they submitted.</p>
                 <div class="task-topic-submission-meta">
                     <p><strong>Acknowledged:</strong> ${rows.filter((row) => row.acknowledged).length} of ${rows.length}</p>
-                    ${isProjectManagementTopic ? `<p><strong>Logged today:</strong> ${rows.filter((row) => row.lastLogDate === todayNz).length} of ${rows.length}</p>` : ""}
+                    ${isTrackedWorkflowTopic ? `<p><strong>Logged today:</strong> ${loggedTodayCount} of ${rows.length}</p>` : ""}
                 </div>
-                ${isProjectManagementTopic ? `
+                ${isTrackedWorkflowTopic ? `
                     <div class="task-topic-teacher-summary-row">
                         <div class="task-topic-teacher-summary-item">
-                            <span class="task-topic-teacher-summary-label">Missing Trello Link</span>
-                            <span class="task-topic-teacher-summary-value">${missingTrelloRows.length}</span>
+                            <span class="task-topic-teacher-summary-label">${escapeHtml(summaryPrimaryLabel)}</span>
+                            <span class="task-topic-teacher-summary-value">${missingPrimaryLinkRows.length}</span>
                         </div>
                         <div class="task-topic-teacher-summary-item">
-                            <span class="task-topic-teacher-summary-label">Missing Today's Log</span>
+                            <span class="task-topic-teacher-summary-label">${escapeHtml(summaryLogLabel)}</span>
                             <span class="task-topic-teacher-summary-value">${missingLogRows.length}</span>
                         </div>
                         <div class="task-topic-teacher-summary-action">
-                            <button type="button" class="detail-action detail-action-secondary" id="task-topic-export-missing-log">Export Missing Today's Log</button>
+                            <button type="button" class="detail-action detail-action-secondary" id="task-topic-export-missing-log">Export Missing Logs</button>
                         </div>
                     </div>
                 ` : ""}
-                ${isProjectManagementTopic ? `
+                ${isTrackedWorkflowTopic ? `
                     <div class="task-topic-submission-actions task-topic-teacher-filter-actions">
-                        <button type="button" class="detail-action detail-action-secondary" id="task-topic-filter-missing-trello">Show Missing Trello Links</button>
-                        <button type="button" class="detail-action detail-action-secondary" id="task-topic-filter-missing-log">Show Missing Today's Log</button>
+                        <button type="button" class="detail-action detail-action-secondary" id="task-topic-filter-missing-trello">${isProjectManagementTopic ? "Show Missing Trello Links" : "Show Missing Asset Folder Links"}</button>
+                        <button type="button" class="detail-action detail-action-secondary" id="task-topic-filter-missing-log">${isProjectManagementTopic ? "Show Missing Today's Log" : "Show Missing Today's Version Log"}</button>
                         <button type="button" class="detail-action detail-action-secondary" id="task-topic-filter-show-all" hidden>Show All Students</button>
                     </div>
                 ` : ""}
@@ -923,12 +1014,25 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                             <span class="task-topic-teacher-status-email">${escapeHtml(row.email)}</span>
                             <span class="task-topic-teacher-status-pill ${row.acknowledged ? "is-acknowledged" : "is-pending"}">${row.acknowledged ? "Submitted in Hapara" : "Not acknowledged"}</span>
                             <span class="task-topic-teacher-status-doc">${escapeHtml(row.docRef || "No document reference")}</span>
-                            ${row.trelloCardUrl
-                                ? `<a class="task-topic-teacher-status-trello" href="${escapeHtml(row.trelloCardUrl)}" target="_blank" rel="noreferrer">Open Trello Card</a>`
-                                : `<span class="task-topic-teacher-status-trello task-topic-teacher-status-trello-missing">No Trello card linked</span>`
-                            }
                             ${isProjectManagementTopic
-                                ? `<span class="task-topic-teacher-status-log ${row.lastLogDate === todayNz ? "is-complete" : "is-missing"}">${row.lastLogDate === todayNz ? "Logged today" : "Missing today's log"}</span>`
+                                ? (row.trelloCardUrl
+                                    ? `<a class="task-topic-teacher-status-trello" href="${escapeHtml(row.trelloCardUrl)}" target="_blank" rel="noreferrer">Open Trello Card</a>`
+                                    : `<span class="task-topic-teacher-status-trello task-topic-teacher-status-trello-missing">No Trello card linked</span>`
+                                )
+                                : (isMediaAssetWorkflowTopic
+                                    ? (row.mediaAssetFolderUrl
+                                        ? `<a class="task-topic-teacher-status-trello" href="${escapeHtml(row.mediaAssetFolderUrl)}" target="_blank" rel="noreferrer">Open Asset Folder</a>`
+                                        : `<span class="task-topic-teacher-status-trello task-topic-teacher-status-trello-missing">No asset folder linked</span>`
+                                    )
+                                    : ""
+                                )
+                            }
+                            ${isMediaAssetWorkflowTopic && row.mediaReviewUrl
+                                ? `<a class="task-topic-teacher-status-trello" href="${escapeHtml(row.mediaReviewUrl)}" target="_blank" rel="noreferrer">Open Review Link</a>`
+                                : ""
+                            }
+                            ${isTrackedWorkflowTopic
+                                ? `<span class="task-topic-teacher-status-log ${(isProjectManagementTopic ? row.lastLogDate : row.mediaLastVersionLogDate) === todayNz ? "is-complete" : "is-missing"}">${(isProjectManagementTopic ? row.lastLogDate : row.mediaLastVersionLogDate) === todayNz ? logCompleteText : logMissingText}</span>`
                                 : ""
                             }
                             <span class="task-topic-teacher-status-time">${escapeHtml(formatSubmissionTimestamp(row.submittedAt))}</span>
@@ -938,7 +1042,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             </div>
         `;
 
-        if (isProjectManagementTopic) {
+        if (isTrackedWorkflowTopic) {
             const missingFilterButton = panelHost.querySelector("#task-topic-filter-missing-trello");
             const missingLogFilterButton = panelHost.querySelector("#task-topic-filter-missing-log");
             const showAllButton = panelHost.querySelector("#task-topic-filter-show-all");
@@ -974,16 +1078,26 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             showAllButton?.addEventListener("click", () => applyFilter("all"));
 
             exportMissingLogButton?.addEventListener("click", () => {
-                const rowsToExport = rows.filter((row) => row.lastLogDate !== todayNz);
+                const rowsToExport = rows.filter((row) => {
+                    if (isProjectManagementTopic) {
+                        return row.lastLogDate !== todayNz;
+                    }
+                    if (isMediaAssetWorkflowTopic) {
+                        return row.mediaLastVersionLogDate !== todayNz;
+                    }
+                    return false;
+                });
                 const quoteCsv = (value) => `"${String(value || "").replace(/"/g, '""')}"`;
                 const csvLines = [
-                    ["student_email", "acknowledged", "trello_linked", "last_log_date", "last_log_at", "document_reference"].join(","),
+                    ["student_email", "acknowledged", "trello_linked", "asset_folder_linked", "last_log_date", "last_log_at", "review_link", "document_reference"].join(","),
                     ...rowsToExport.map((row) => [
                         quoteCsv(row.email),
                         quoteCsv(row.acknowledged ? "yes" : "no"),
                         quoteCsv(row.trelloCardUrl ? "yes" : "no"),
-                        quoteCsv(row.lastLogDate || ""),
-                        quoteCsv(row.lastLogAt || ""),
+                        quoteCsv(row.mediaAssetFolderUrl ? "yes" : "no"),
+                        quoteCsv(isProjectManagementTopic ? (row.lastLogDate || "") : (row.mediaLastVersionLogDate || "")),
+                        quoteCsv(isProjectManagementTopic ? (row.lastLogAt || "") : (row.mediaLastVersionLogAt || "")),
+                        quoteCsv(row.mediaReviewUrl || ""),
                         quoteCsv(row.docRef || "")
                     ].join(","))
                 ];
@@ -1021,8 +1135,14 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const acknowledgedAt = submission.haparaSubmittedAt || submission.submittedAt || "";
     const currentDocRef = String(submission.haparaDocumentRef || "").trim();
     const currentTrelloCardUrl = toSafeTrelloCardUrl(submission.trelloCardUrl);
+    const currentMediaAssetFolderUrl = toSafeExternalUrl(submission.mediaAssetFolderUrl);
+    const currentMediaReviewUrl = toSafeExternalUrl(submission.mediaReviewUrl);
     const todayNz = getNzDateKey();
-    const hasLoggedToday = String(submission.trelloLastLogDate || "").trim() === todayNz;
+    const hasLoggedToday = isProjectManagementTopic
+        ? String(submission.trelloLastLogDate || "").trim() === todayNz
+        : isMediaAssetWorkflowTopic
+            ? String(submission.mediaVersionLogDate || "").trim() === todayNz
+            : false;
 
     panelHost.innerHTML = `
         <form id="task-topic-submission-form" class="task-topic-submission-form" novalidate>
@@ -1064,6 +1184,23 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 </div>
             ` : ""}
 
+            ${isMediaAssetWorkflowTopic ? `
+                <label class="task-topic-submission-label" for="task-topic-media-asset-url">Master Asset Folder Link</label>
+                <input id="task-topic-media-asset-url" class="task-topic-submission-input" type="url" placeholder="https://drive.google.com/... or OneDrive folder" value="${escapeHtml(currentMediaAssetFolderUrl)}" required>
+                <p class="task-topic-submission-note">Asset Management evidence requires a shared folder link where your current media files are managed.</p>
+
+                <label class="task-topic-submission-label" for="task-topic-media-review-url">Review Link (Optional)</label>
+                <input id="task-topic-media-review-url" class="task-topic-submission-input" type="url" placeholder="https://frame.io/... or review board" value="${escapeHtml(currentMediaReviewUrl)}">
+
+                <div class="task-topic-trello-log-box">
+                    <p class="task-topic-submission-note ${hasLoggedToday ? "task-topic-submission-note-success" : "task-topic-submission-note-warning"}">${hasLoggedToday ? "Version log complete for today." : "Daily prompt: add a version log entry for your media updates now."}</p>
+                    <label class="task-topic-submission-label" for="task-topic-media-log-note">Today's Version Log</label>
+                    <textarea id="task-topic-media-log-note" class="task-topic-submission-input task-topic-submission-textarea" placeholder="What asset changed today? Which version/file name did you produce? What feedback or next revision is planned?"></textarea>
+                    <button type="button" class="detail-action" id="task-topic-save-media-log">Save Today's Version Log</button>
+                    <p class="task-topic-submission-status" id="task-topic-media-log-status" aria-live="polite"></p>
+                </div>
+            ` : ""}
+
             <div class="task-topic-submission-actions">
                 <button type="submit" class="detail-action">I Submitted In Hapara</button>
                 <button type="button" class="detail-action detail-action-secondary" id="task-topic-clear-acknowledgement">Clear Acknowledgement</button>
@@ -1083,6 +1220,18 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 ? `<p><strong>Last Trello Log:</strong> <span id="task-topic-trello-last-log">${escapeHtml(formatSubmissionTimestamp(submission.trelloLastLogAt || ""))}</span></p>`
                 : ""
             }
+            ${isMediaAssetWorkflowTopic
+                ? `<p><strong>Asset Folder:</strong> <span id="task-topic-media-asset-reference">${currentMediaAssetFolderUrl ? `<a href="${escapeHtml(currentMediaAssetFolderUrl)}" target="_blank" rel="noreferrer">${escapeHtml(currentMediaAssetFolderUrl)}</a>` : "Not linked"}</span></p>`
+                : ""
+            }
+            ${isMediaAssetWorkflowTopic
+                ? `<p><strong>Review Link:</strong> <span id="task-topic-media-review-reference">${currentMediaReviewUrl ? `<a href="${escapeHtml(currentMediaReviewUrl)}" target="_blank" rel="noreferrer">${escapeHtml(currentMediaReviewUrl)}</a>` : "Not linked"}</span></p>`
+                : ""
+            }
+            ${isMediaAssetWorkflowTopic
+                ? `<p><strong>Last Version Log:</strong> <span id="task-topic-media-last-log">${escapeHtml(formatSubmissionTimestamp(submission.mediaVersionLogAt || ""))}</span></p>`
+                : ""
+            }
         </div>
     `;
 
@@ -1097,12 +1246,20 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const trelloLogNoteInput = panelHost.querySelector("#task-topic-trello-log-note");
     const trelloLogButton = panelHost.querySelector("#task-topic-send-trello-log");
     const trelloLogStatusHost = panelHost.querySelector("#task-topic-trello-log-status");
+    const mediaAssetInput = panelHost.querySelector("#task-topic-media-asset-url");
+    const mediaReviewInput = panelHost.querySelector("#task-topic-media-review-url");
+    const mediaLogNoteInput = panelHost.querySelector("#task-topic-media-log-note");
+    const mediaLogButton = panelHost.querySelector("#task-topic-save-media-log");
+    const mediaLogStatusHost = panelHost.querySelector("#task-topic-media-log-status");
     const statusHost = panelHost.querySelector("#task-topic-submission-status");
     const ackStatusHost = panelHost.querySelector("#task-topic-ack-status");
     const lastSubmittedHost = panelHost.querySelector("#task-topic-last-submitted");
     const docRefHost = panelHost.querySelector("#task-topic-doc-reference");
     const trelloRefHost = panelHost.querySelector("#task-topic-trello-reference");
     const trelloLastLogHost = panelHost.querySelector("#task-topic-trello-last-log");
+    const mediaAssetRefHost = panelHost.querySelector("#task-topic-media-asset-reference");
+    const mediaReviewRefHost = panelHost.querySelector("#task-topic-media-review-reference");
+    const mediaLastLogHost = panelHost.querySelector("#task-topic-media-last-log");
     const updateMeta = (isAcknowledged, timestamp) => {
         if (ackStatusHost) {
             ackStatusHost.textContent = isAcknowledged ? "Submitted in Hapara" : "Waiting for acknowledgement";
@@ -1125,6 +1282,24 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 trelloRefHost.textContent = "Not linked";
             }
         }
+
+        if (mediaAssetRefHost) {
+            const safeAssetUrl = toSafeExternalUrl(mediaAssetInput?.value || "");
+            if (safeAssetUrl) {
+                mediaAssetRefHost.innerHTML = `<a href="${escapeHtml(safeAssetUrl)}" target="_blank" rel="noreferrer">${escapeHtml(safeAssetUrl)}</a>`;
+            } else {
+                mediaAssetRefHost.textContent = "Not linked";
+            }
+        }
+
+        if (mediaReviewRefHost) {
+            const safeReviewUrl = toSafeExternalUrl(mediaReviewInput?.value || "");
+            if (safeReviewUrl) {
+                mediaReviewRefHost.innerHTML = `<a href="${escapeHtml(safeReviewUrl)}" target="_blank" rel="noreferrer">${escapeHtml(safeReviewUrl)}</a>`;
+            } else {
+                mediaReviewRefHost.textContent = "Not linked";
+            }
+        }
     };
 
     const setStatus = (message, isError = false) => {
@@ -1145,6 +1320,12 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         if (!trelloLogStatusHost) return;
         trelloLogStatusHost.textContent = String(message || "");
         trelloLogStatusHost.classList.toggle("is-error", Boolean(isError));
+    };
+
+    const setMediaLogStatus = (message, isError = false) => {
+        if (!mediaLogStatusHost) return;
+        mediaLogStatusHost.textContent = String(message || "");
+        mediaLogStatusHost.classList.toggle("is-error", Boolean(isError));
     };
 
     if (isProjectManagementTopic && trelloBoardSelect && trelloListSelect) {
@@ -1312,6 +1493,74 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         });
     }
 
+    if (isMediaAssetWorkflowTopic) {
+        mediaLogButton?.addEventListener("click", async () => {
+            const safeAssetUrl = toSafeExternalUrl(mediaAssetInput?.value || "");
+            const safeReviewUrl = toSafeExternalUrl(mediaReviewInput?.value || "");
+            const note = String(mediaLogNoteInput?.value || "").trim();
+
+            if (!safeAssetUrl) {
+                setMediaLogStatus("Add a valid master asset folder link first.", true);
+                return;
+            }
+            if (!note) {
+                setMediaLogStatus("Add your version log note before saving.", true);
+                return;
+            }
+
+            if (mediaLogButton) mediaLogButton.disabled = true;
+            setMediaLogStatus("Saving version log...");
+
+            try {
+                const nowIso = new Date().toISOString();
+                const logDate = getNzDateKey(new Date());
+                const nextRows = upsertTaskTopicSubmissionEvidenceRows(evidenceRows, standardKey, {
+                    writtenEvidence: submission.writtenEvidence,
+                    evidenceLink: submission.evidenceLink,
+                    fileName: submission.fileName,
+                    fileUrl: submission.fileUrl,
+                    submittedAt: submission.submittedAt,
+                    haparaAcknowledged: submission.haparaAcknowledged,
+                    haparaSubmittedAt: submission.haparaSubmittedAt,
+                    haparaLocation: submission.haparaLocation,
+                    haparaDriveClassUrl: submission.haparaDriveClassUrl,
+                    haparaDocumentRef: submission.haparaDocumentRef,
+                    trelloCardUrl: submission.trelloCardUrl,
+                    trelloLastLogDate: submission.trelloLastLogDate,
+                    trelloLastLogAt: submission.trelloLastLogAt,
+                    trelloLastLogNote: submission.trelloLastLogNote,
+                    mediaAssetFolderUrl: safeAssetUrl,
+                    mediaReviewUrl: safeReviewUrl,
+                    mediaVersionLogDate: logDate,
+                    mediaVersionLogAt: nowIso,
+                    mediaVersionLogNote: note,
+                    reviewStatus: submission.reviewStatus
+                });
+
+                await saveEvidenceRows(projectId, email, nextRows);
+                evidenceRows = nextRows;
+                submission.mediaAssetFolderUrl = safeAssetUrl;
+                submission.mediaReviewUrl = safeReviewUrl;
+                submission.mediaVersionLogDate = logDate;
+                submission.mediaVersionLogAt = nowIso;
+                submission.mediaVersionLogNote = note;
+
+                if (mediaLastLogHost) {
+                    mediaLastLogHost.textContent = formatSubmissionTimestamp(nowIso);
+                }
+                if (mediaLogNoteInput) {
+                    mediaLogNoteInput.value = "";
+                }
+                updateMeta(acknowledged, acknowledgedAt);
+                setMediaLogStatus("Version log saved. Daily prompt complete for today.");
+            } catch (_error) {
+                setMediaLogStatus("Could not save version log right now.", true);
+            } finally {
+                if (mediaLogButton && mediaLogButton.isConnected) mediaLogButton.disabled = false;
+            }
+        });
+    }
+
     form?.addEventListener("submit", async (event) => {
         event.preventDefault();
         const docReference = String(docRefInput?.value || "").trim();
@@ -1323,6 +1572,13 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         const trelloCardUrl = toSafeTrelloCardUrl(trelloCardInput?.value || "");
         if (isProjectManagementTopic && !trelloCardUrl) {
             setStatus("Project Management requires a valid Trello card link before acknowledging.", true);
+            return;
+        }
+
+        const mediaAssetFolderUrl = toSafeExternalUrl(mediaAssetInput?.value || "");
+        const mediaReviewUrl = toSafeExternalUrl(mediaReviewInput?.value || "");
+        if (isMediaAssetWorkflowTopic && !mediaAssetFolderUrl) {
+            setStatus("Asset Management requires a valid master asset folder link before acknowledging.", true);
             return;
         }
 
@@ -1348,6 +1604,11 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             trelloLastLogDate: submission.trelloLastLogDate,
             trelloLastLogAt: submission.trelloLastLogAt,
             trelloLastLogNote: submission.trelloLastLogNote,
+            mediaAssetFolderUrl,
+            mediaReviewUrl,
+            mediaVersionLogDate: submission.mediaVersionLogDate,
+            mediaVersionLogAt: submission.mediaVersionLogAt,
+            mediaVersionLogNote: submission.mediaVersionLogNote,
             reviewStatus: "pending"
         });
 
@@ -1360,6 +1621,8 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             submission.haparaDriveClassUrl = haparaClassDriveUrl;
             submission.haparaDocumentRef = docReference;
             submission.trelloCardUrl = trelloCardUrl;
+            submission.mediaAssetFolderUrl = mediaAssetFolderUrl;
+            submission.mediaReviewUrl = mediaReviewUrl;
             submission.submittedAt = submittedAt;
             submission.reviewStatus = "pending";
 
@@ -1393,6 +1656,11 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             trelloLastLogDate: submission.trelloLastLogDate,
             trelloLastLogAt: submission.trelloLastLogAt,
             trelloLastLogNote: submission.trelloLastLogNote,
+            mediaAssetFolderUrl: toSafeExternalUrl(mediaAssetInput?.value || ""),
+            mediaReviewUrl: toSafeExternalUrl(mediaReviewInput?.value || ""),
+            mediaVersionLogDate: submission.mediaVersionLogDate,
+            mediaVersionLogAt: submission.mediaVersionLogAt,
+            mediaVersionLogNote: submission.mediaVersionLogNote,
             reviewStatus: submission.reviewStatus
         });
 
