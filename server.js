@@ -1358,11 +1358,13 @@ function normalizeStandardCodeList(value) {
 function normalizeAssessmentStandardCardRow(row) {
   const source = row && typeof row === "object" ? row : {};
   const yearVersionRaw = Number.parseInt(source.year_version ?? source.year ?? source.yearVersion, 10);
+  const creditsRaw = Number.parseInt(source.credits, 10);
   return {
     id: String(source.id || "").trim(),
     course_name: String(source.course_name || source.courseName || "").trim(),
     year_level: String(source.year_level || source.yearLevel || "").trim(),
     year_version: Number.isInteger(yearVersionRaw) ? yearVersionRaw : null,
+    credits: Number.isInteger(creditsRaw) && creditsRaw >= 0 ? creditsRaw : null,
     standard_codes: normalizeStandardCodeList(source.standard_codes || source.standardCodes),
     achieved_text: String(source.achieved_text || source.achievedText || "").trim(),
     merit_text: String(source.merit_text || source.meritText || "").trim(),
@@ -1430,6 +1432,7 @@ async function ensureAssessmentStandardCardsSchema() {
       course_name TEXT NOT NULL,
       year_level TEXT NOT NULL,
       year_version INTEGER NOT NULL,
+      credits INTEGER,
       standard_codes JSONB NOT NULL DEFAULT '[]'::jsonb,
       achieved_text TEXT NOT NULL DEFAULT '',
       merit_text TEXT NOT NULL DEFAULT '',
@@ -1449,6 +1452,7 @@ async function ensureAssessmentStandardCardsSchema() {
   await pool.query(`ALTER TABLE assessment_standard_cards ADD COLUMN IF NOT EXISTS course_name TEXT`);
   await pool.query(`ALTER TABLE assessment_standard_cards ADD COLUMN IF NOT EXISTS year_level TEXT`);
   await pool.query(`ALTER TABLE assessment_standard_cards ADD COLUMN IF NOT EXISTS year_version INTEGER`);
+  await pool.query(`ALTER TABLE assessment_standard_cards ADD COLUMN IF NOT EXISTS credits INTEGER`);
   await pool.query(`ALTER TABLE assessment_standard_cards ADD COLUMN IF NOT EXISTS standard_codes JSONB NOT NULL DEFAULT '[]'::jsonb`);
   await pool.query(`ALTER TABLE assessment_standard_cards ADD COLUMN IF NOT EXISTS achieved_text TEXT NOT NULL DEFAULT ''`);
   await pool.query(`ALTER TABLE assessment_standard_cards ADD COLUMN IF NOT EXISTS merit_text TEXT NOT NULL DEFAULT ''`);
@@ -5006,6 +5010,8 @@ app.post("/api/admin/assessment-standard-cards", requireAdminAccess, async (req,
   const courseName = String(body.course_name || body.courseName || "").trim();
   const yearLevel = String(body.year_level || body.yearLevel || "").trim();
   const yearVersion = Number.parseInt(body.year_version ?? body.yearVersion ?? body.year, 10);
+  const creditsRaw = Number.parseInt(body.credits, 10);
+  const credits = Number.isInteger(creditsRaw) && creditsRaw >= 0 ? creditsRaw : null;
   const standardCodes = normalizeStandardCodeList(body.standard_codes || body.standardCodes);
   const achievedText = String(body.achieved_text || body.achievedText || "").trim();
   const meritText = String(body.merit_text || body.meritText || "").trim();
@@ -5044,6 +5050,7 @@ app.post("/api/admin/assessment-standard-cards", requireAdminAccess, async (req,
       course_name: courseName,
       year_level: yearLevel,
       year_version: yearVersion,
+      credits,
       standard_codes: standardCodes,
       achieved_text: achievedText,
       merit_text: meritText,
@@ -5071,6 +5078,7 @@ app.post("/api/admin/assessment-standard-cards", requireAdminAccess, async (req,
           course_name,
           year_level,
           year_version,
+          credits,
           standard_codes,
           achieved_text,
           merit_text,
@@ -5090,17 +5098,18 @@ app.post("/api/admin/assessment-standard-cards", requireAdminAccess, async (req,
           $2,
           $3,
           $4,
-          $5::jsonb,
-          $6,
+          $5,
+          $6::jsonb,
           $7,
           $8,
-          $9::jsonb,
+          $9,
           $10::jsonb,
           $11::jsonb,
+          $12::jsonb,
           'Teal',
-          $12,
           $13,
           $14,
+          $15,
           NOW(),
           NOW()
         )
@@ -5108,6 +5117,7 @@ app.post("/api/admin/assessment-standard-cards", requireAdminAccess, async (req,
           course_name = EXCLUDED.course_name,
           year_level = EXCLUDED.year_level,
           year_version = EXCLUDED.year_version,
+          credits = EXCLUDED.credits,
           standard_codes = EXCLUDED.standard_codes,
           achieved_text = EXCLUDED.achieved_text,
           merit_text = EXCLUDED.merit_text,
@@ -5126,6 +5136,7 @@ app.post("/api/admin/assessment-standard-cards", requireAdminAccess, async (req,
         courseName,
         yearLevel,
         yearVersion,
+        credits,
         JSON.stringify(standardCodes),
         achievedText,
         meritText,

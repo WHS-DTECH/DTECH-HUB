@@ -236,7 +236,7 @@ function renderStandardCards(rows) {
 
     const list = Array.isArray(rows) ? rows : [];
     if (!list.length) {
-        standardCardTableBody.innerHTML = `<tr><td colspan="7" class="standards-empty">No Assessment Standard Cards yet.</td></tr>`;
+        standardCardTableBody.innerHTML = `<tr><td colspan="8" class="standards-empty">No Assessment Standard Cards yet.</td></tr>`;
         return;
     }
 
@@ -248,6 +248,7 @@ function renderStandardCards(rows) {
                 <td>${escapeHtml(row?.course_name || "")}</td>
                 <td>${escapeHtml(row?.year_level || "")}</td>
                 <td>${escapeHtml(row?.year_version || "")}</td>
+                <td>${Number.isFinite(Number(row?.credits)) ? escapeHtml(String(Number(row.credits))) : "-"}</td>
                 <td>${escapeHtml(codes.join(", ") || "-")}</td>
                 <td><span class="template-card-color-pill">${escapeHtml(row?.card_color || "Teal")}</span></td>
                 <td>${escapeHtml(formatCardUpdatedAt(row?.updated_at))}</td>
@@ -281,6 +282,7 @@ function fillCardForm(card) {
     standardCardForm.courseName.value = String(card.course_name || "").trim();
     standardCardForm.yearLevel.value = String(card.year_level || "").trim();
     standardCardForm.yearVersion.value = String(card.year_version || "").trim();
+    standardCardForm.credits.value = Number.isFinite(Number(card.credits)) ? String(Number(card.credits)) : "";
     standardCardForm.standardCodes.value = Array.isArray(card.standard_codes) ? card.standard_codes.join(", ") : "";
     standardCardForm.achievedText.value = String(card.achieved_text || "").trim();
     standardCardForm.meritText.value = String(card.merit_text || "").trim();
@@ -331,6 +333,8 @@ async function saveAssessmentStandardCard(event) {
     }
 
     const yearVersion = Number.parseInt(standardCardForm.yearVersion.value, 10);
+    const creditsRaw = String(standardCardForm.credits?.value || "").trim();
+    const credits = creditsRaw ? Number.parseInt(creditsRaw, 10) : null;
     const standardCodes = parseCodesFromInput(standardCardForm.standardCodes.value);
     const courseName = String(standardCardForm.courseName.value || "").trim();
     const yearLevel = String(standardCardForm.yearLevel.value || "").trim();
@@ -347,6 +351,10 @@ async function saveAssessmentStandardCard(event) {
         setCardStatus("Year (version) must be a whole number.", true);
         return;
     }
+    if (creditsRaw && (!Number.isInteger(credits) || credits < 0)) {
+        setCardStatus("Credits must be a whole number 0 or higher.", true);
+        return;
+    }
     if (!standardCodes.length) {
         setCardStatus("At least one standard code is required.", true);
         return;
@@ -357,6 +365,7 @@ async function saveAssessmentStandardCard(event) {
         course_name: courseName,
         year_level: yearLevel,
         year_version: yearVersion,
+        credits,
         standard_codes: standardCodes,
         achieved_text: String(standardCardForm.achievedText.value || "").trim(),
         merit_text: String(standardCardForm.meritText.value || "").trim(),

@@ -526,16 +526,20 @@
           <input id="standard-card-id" name="id" type="hidden">
           <div class="template-grid">
             <div class="standards-field">
-              <label for="standard-card-course-name">Course Name</label>
-              <input id="standard-card-course-name" name="courseName" type="text" placeholder="e.g. DTEC L2 Programming" required>
+              <label for="standard-card-course-name">Standard Number</label>
+              <input id="standard-card-course-name" name="courseName" type="text" placeholder="e.g. 91897" required>
             </div>
             <div class="standards-field">
-              <label for="standard-card-year-level">Year Level</label>
-              <input id="standard-card-year-level" name="yearLevel" type="text" placeholder="e.g. Year 12" required>
+              <label for="standard-card-year-level">Standard Level</label>
+              <input id="standard-card-year-level" name="yearLevel" type="text" placeholder="e.g. Level 2" required>
             </div>
             <div class="standards-field">
-              <label for="standard-card-year-version">Year (Version)</label>
+              <label for="standard-card-year-version">Standard Version</label>
               <input id="standard-card-year-version" name="yearVersion" type="number" min="2000" max="2100" required>
+            </div>
+            <div class="standards-field">
+              <label for="standard-card-credits">Credits</label>
+              <input id="standard-card-credits" name="credits" type="number" min="0" step="1" placeholder="e.g. 6">
             </div>
             <div class="standards-field">
               <label>Card Colour</label>
@@ -586,9 +590,10 @@
           <table class="template-cards-table">
             <thead>
               <tr>
-                <th>Course</th>
-                <th>Year Level</th>
-                <th>Year</th>
+                <th>Standard Number</th>
+                <th>Standard Level</th>
+                <th>Standard Version</th>
+                <th>Credits</th>
                 <th>Standard Code(s)</th>
                 <th>Colour</th>
                 <th>Updated</th>
@@ -597,7 +602,7 @@
             </thead>
             <tbody id="standard-card-table-body">
               <tr>
-                <td colspan="7" class="standards-empty">Loading Assessment Standard Cards...</td>
+                <td colspan="8" class="standards-empty">Loading Assessment Standard Cards...</td>
               </tr>
             </tbody>
           </table>
