@@ -2132,6 +2132,23 @@ function getYearLevels() {
     });
 }
 
+const YEAR_LEVEL_GROUPS = {
+    "Junior School": new Set(["Year 9", "Year 10"]),
+    "Middle School": new Set(["Year 11"]),
+    "Senior School": new Set(["Year 12", "Year 13"])
+};
+
+function getYearFilterOptions() {
+    const explicitYears = getYearLevels().filter((year) => year !== "Other");
+    return [
+        "All",
+        "Junior School",
+        "Middle School",
+        "Senior School",
+        ...explicitYears
+    ];
+}
+
 function getTypes() {
     return ["All", "active", "planning", "archive"];
 }
@@ -2197,7 +2214,9 @@ function filterProjects(items) {
     return items.filter((project) => {
         const yearMatch = project.className.match(/Year\s+\d+/i);
         const projectYear = yearMatch ? yearMatch[0] : "Other";
-        const matchesYear = state.year === "All" || projectYear === state.year;
+        const selectedYearGroup = YEAR_LEVEL_GROUPS[state.year];
+        const matchesYear = state.year === "All"
+            || (selectedYearGroup ? selectedYearGroup.has(projectYear) : projectYear === state.year);
         const matchesType = state.type === "All" || project.status === state.type;
         const matchesCategory = state.category === "All" || project.activityCategory === state.category;
         const matchesContent =
@@ -2601,7 +2620,7 @@ function populateFilters() {
     const yearLevelPills = document.getElementById("year-filter-pills");
     if (yearLevelPills) {
         yearLevelPills.innerHTML = "";
-        const years = ["All", ...getYearLevels()];
+        const years = getYearFilterOptions();
         years.forEach(year => {
             const pill = document.createElement("button");
             pill.className = `filter-chip ${state.year === year ? 'active' : ''}`;
