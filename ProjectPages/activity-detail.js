@@ -843,6 +843,26 @@ function getNzDateKey(date = new Date()) {
     }
 }
 
+function deriveInitialsFromEmail(value) {
+    const raw = String(value || "").trim().toLowerCase();
+    const localPart = raw.includes("@") ? raw.split("@")[0] : raw;
+    const parts = localPart
+        .split(/[^a-z0-9]+/)
+        .map((part) => part.trim())
+        .filter(Boolean);
+
+    if (!parts.length) {
+        return "xx";
+    }
+
+    if (parts.length === 1) {
+        const token = parts[0];
+        return (token.slice(0, 2) || "xx").toLowerCase();
+    }
+
+    return `${parts[0][0] || "x"}${parts[parts.length - 1][0] || "x"}`.toLowerCase();
+}
+
 async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, email, isTeacher, interestData }) {
     const panelHost = host?.querySelector("#task-topic-submission-live-panel");
     if (!panelHost) {
@@ -1138,6 +1158,8 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const currentMediaAssetFolderUrl = toSafeExternalUrl(submission.mediaAssetFolderUrl);
     const currentMediaReviewUrl = toSafeExternalUrl(submission.mediaReviewUrl);
     const todayNz = getNzDateKey();
+    const studentInitials = deriveInitialsFromEmail(email);
+    const mediaFileExample = `client-project_asset-type_v03_${todayNz}_${studentInitials}.ext`;
     const hasLoggedToday = isProjectManagementTopic
         ? String(submission.trelloLastLogDate || "").trim() === todayNz
         : isMediaAssetWorkflowTopic
@@ -1202,7 +1224,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                         <li>Keep names lowercase and use hyphens instead of spaces.</li>
                         <li>Store final exports in a final-exports folder inside your master asset folder.</li>
                     </ul>
-                    <p class="task-topic-media-naming-example">Example: te-ao-fitness_social-cut_v03_2026-06-01_vm.mp4</p>
+                    <p class="task-topic-media-naming-example">Example: ${escapeHtml(mediaFileExample)}</p>
                 </div>
 
                 <div class="task-topic-trello-log-box">
