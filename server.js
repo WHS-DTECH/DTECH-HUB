@@ -234,7 +234,7 @@ function toNzqaAbsoluteUrl(href) {
 function isDocumentAttachmentUrl(url) {
   const value = String(url || "").trim();
   if (!value) return false;
-  return /\.(?:pdf|doc|docx)(?:$|[?#])/i.test(value);
+  return /\.(?:pdf|doc|docx)(?:\b|[^a-z0-9])/i.test(value);
 }
 
 function looksLikeBinaryGarble(text) {
@@ -245,24 +245,45 @@ function looksLikeBinaryGarble(text) {
   return replacementCount > 8;
 }
 
-function pickNzqaAttachmentsFromHrefs(hrefs) {
+function isPdfAttachmentUrl(url) {
+  return /\.pdf(?:\b|[^a-z0-9])/i.test(String(url || ""));
+}
+
+function isDocAttachmentUrl(url) {
+  return /\.(?:doc|docx)(?:\b|[^a-z0-9])/i.test(String(url || ""));
+}
+
+function scoreAttachmentUrlForStandard(url, standardNumber) {
+  const href = String(url || "").toLowerCase();
+  const number = String(standardNumber || "").trim().toLowerCase();
+  if (!href) return 0;
+
+  let score = 0;
+  if (number && href.includes(number)) score += 10;
+  if (number && href.includes(`as${number}`)) score += 6;
+  if (isPdfAttachmentUrl(href) || isDocAttachmentUrl(href)) score += 2;
+  if (/download|attachment|resource/i.test(href)) score += 1;
+  return score;
+}
+
+function pickNzqaAttachmentsFromHrefs(hrefs, standardNumber = "") {
   const values = Array.isArray(hrefs) ? hrefs : [];
-  let pdfUrl = "";
-  let docxUrl = "";
+  const ranked = values
+    .map((href) => toNzqaAbsoluteUrl(href))
+    .filter(Boolean)
+    .map((absolute) => ({
+      url: absolute,
+      score: scoreAttachmentUrlForStandard(absolute, standardNumber)
+    }))
+    .sort((a, b) => b.score - a.score);
 
-  values.forEach((href) => {
-    const absolute = toNzqaAbsoluteUrl(href);
-    if (!absolute) return;
+  const pdfMatch = ranked.find((row) => isPdfAttachmentUrl(row.url));
+  const docMatch = ranked.find((row) => isDocAttachmentUrl(row.url));
 
-    if (!pdfUrl && /\.pdf(?:$|[?#])/i.test(absolute)) {
-      pdfUrl = absolute;
-    }
-    if (!docxUrl && /\.(?:doc|docx)(?:$|[?#])/i.test(absolute)) {
-      docxUrl = absolute;
-    }
-  });
-
-  return { pdfUrl, docxUrl };
+  return {
+    pdfUrl: pdfMatch?.url || "",
+    docxUrl: docMatch?.url || ""
+  };
 }
 
 function pickNzqaDetailPageUrl(hrefs, standardNumber) {
@@ -304,7 +325,7 @@ async function fetchNzqaAttachmentLinks(standardNumber) {
     });
     const searchHtml = await searchResponse.text();
     const searchHrefs = extractHrefListFromHtml(searchHtml);
-    const searchAttachments = pickNzqaAttachmentsFromHrefs(searchHrefs);
+    const searchAttachments = pickNzqaAttachmentsFromHrefs(searchHrefs, number);
     const detailUrl = pickNzqaDetailPageUrl(searchHrefs, number) || fallback.details_url;
 
     let pdfUrl = searchAttachments.pdfUrl;
@@ -319,7 +340,7 @@ async function fetchNzqaAttachmentLinks(standardNumber) {
           }
         });
         const detailHtml = await detailResponse.text();
-        const detailAttachments = pickNzqaAttachmentsFromHrefs(extractHrefListFromHtml(detailHtml));
+        const detailAttachments = pickNzqaAttachmentsFromHrefs(extractHrefListFromHtml(detailHtml), number);
         if (!pdfUrl && detailAttachments.pdfUrl) {
           pdfUrl = detailAttachments.pdfUrl;
         }
