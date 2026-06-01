@@ -527,6 +527,10 @@ h1 {
     color: #6a5735;
 }
 
+.task-topic-teacher-filter-actions {
+    margin-top: 2px;
+}
+
 .task-topic-teacher-status-doc {
     font-size: 0.75rem;
     color: #5d4a28;

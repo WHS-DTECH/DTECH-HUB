@@ -840,6 +840,12 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 <div class="task-topic-submission-meta">
                     <p><strong>Acknowledged:</strong> ${rows.filter((row) => row.acknowledged).length} of ${rows.length}</p>
                 </div>
+                ${isProjectManagementTopic ? `
+                    <div class="task-topic-submission-actions task-topic-teacher-filter-actions">
+                        <button type="button" class="detail-action detail-action-secondary" id="task-topic-filter-missing-trello">Show Missing Trello Links</button>
+                        <button type="button" class="detail-action detail-action-secondary" id="task-topic-filter-show-all" hidden>Show All Students</button>
+                    </div>
+                ` : ""}
                 <div class="task-topic-teacher-status-list">
                     ${rows.map((row) => `
                         <div class="task-topic-teacher-status-item">
@@ -856,6 +862,29 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 </div>
             </div>
         `;
+
+        if (isProjectManagementTopic) {
+            const missingFilterButton = panelHost.querySelector("#task-topic-filter-missing-trello");
+            const showAllButton = panelHost.querySelector("#task-topic-filter-show-all");
+            const items = Array.from(panelHost.querySelectorAll(".task-topic-teacher-status-item"));
+
+            const applyFilter = (showMissingOnly) => {
+                items.forEach((item) => {
+                    const hasMissingBadge = Boolean(item.querySelector(".task-topic-teacher-status-trello-missing"));
+                    item.hidden = showMissingOnly ? !hasMissingBadge : false;
+                });
+
+                if (missingFilterButton) {
+                    missingFilterButton.hidden = showMissingOnly;
+                }
+                if (showAllButton) {
+                    showAllButton.hidden = !showMissingOnly;
+                }
+            };
+
+            missingFilterButton?.addEventListener("click", () => applyFilter(true));
+            showAllButton?.addEventListener("click", () => applyFilter(false));
+        }
         return;
     }
 
