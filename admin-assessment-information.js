@@ -165,6 +165,56 @@ function setStandardDetailState({ title, meta, text, details = null }) {
     renderDetailLinks(details);
 }
 
+function autoFillCardFormFromStandardSelection(selected, details) {
+    if (!standardCardForm) {
+        return;
+    }
+
+    const standardNumber = String(selected?.standard_number || details?.standard_number || "").trim();
+    const standardLevelRaw = Number.parseInt(selected?.level, 10);
+    const standardVersionRaw = Number.parseInt(selected?.version, 10);
+    const creditsRaw = Number.parseInt(selected?.credits, 10);
+    const criteria = details?.criteria && typeof details.criteria === "object" ? details.criteria : {};
+
+    if (standardNumber) {
+        standardCardForm.courseName.value = standardNumber;
+        standardCardForm.standardCodes.value = standardNumber;
+    }
+
+    if (Number.isInteger(standardLevelRaw)) {
+        standardCardForm.yearLevel.value = `Level ${standardLevelRaw}`;
+    }
+
+    if (Number.isInteger(standardVersionRaw)) {
+        standardCardForm.yearVersion.value = String(standardVersionRaw);
+    }
+
+    if (Number.isInteger(creditsRaw) && creditsRaw >= 0) {
+        standardCardForm.credits.value = String(creditsRaw);
+    }
+
+    const achievedText = String(criteria?.achieved_text || "").trim();
+    const meritText = String(criteria?.merit_text || "").trim();
+    const excellenceText = String(criteria?.excellence_text || "").trim();
+
+    if (achievedText) {
+        standardCardForm.achievedText.value = achievedText;
+    }
+    if (meritText) {
+        standardCardForm.meritText.value = meritText;
+    }
+    if (excellenceText) {
+        standardCardForm.excellenceText.value = excellenceText;
+    }
+
+    const filledCount = [achievedText, meritText, excellenceText].filter(Boolean).length;
+    if (filledCount > 0) {
+        setCardStatus(`Loaded ${filledCount}/3 criteria section(s) from ${String(details?.source_type || "document").toUpperCase()} source.`);
+    } else {
+        setCardStatus("Standard selected. No explicit Achieved/Merit/Excellence headings were detected in the source file.");
+    }
+}
+
 async function loadStandardDetail(standardNumber) {
     const email = standardsGetStoredEmail();
     if (!email) {
@@ -213,6 +263,8 @@ async function loadStandardDetail(standardNumber) {
             text: String(details?.extracted_text || "No details text available."),
             details
         });
+
+        autoFillCardFormFromStandardSelection(selected, details);
     } catch (error) {
         setStandardDetailState({
             title: titleBits.join(" - ") || "Standard details",

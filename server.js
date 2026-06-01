@@ -133,6 +133,78 @@ function stripNzqaHtmlToText(html) {
   return text;
 }
 
+function normalizeCriteriaSectionText(value) {
+  return String(value || "")
+    .replace(/\r/g, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/^[\s\-:;,.]+|[\s\-:;,.]+$/g, "")
+    .trim();
+}
+
+function extractAssessmentCriteriaFromText(text) {
+  const source = String(text || "").replace(/\r/g, "");
+  if (!source) {
+    return {
+      achieved_text: "",
+      merit_text: "",
+      excellence_text: ""
+    };
+  }
+
+  const headingPatterns = [
+    { key: "achieved", regex: /(^|\n)\s*(Achieved|Achievement)\s*(Criteria|Requirements|Evidence)?\s*[:\-]?/ig },
+    { key: "merit", regex: /(^|\n)\s*Merit\s*(Criteria|Requirements|Evidence)?\s*[:\-]?/ig },
+    { key: "excellence", regex: /(^|\n)\s*Excellence\s*(Criteria|Requirements|Evidence)?\s*[:\-]?/ig }
+  ];
+
+  const hits = [];
+  headingPatterns.forEach((pattern) => {
+    let match = pattern.regex.exec(source);
+    while (match) {
+      hits.push({
+        key: pattern.key,
+        index: match.index,
+        length: String(match[0] || "").length
+      });
+      match = pattern.regex.exec(source);
+    }
+  });
+
+  if (!hits.length) {
+    return {
+      achieved_text: "",
+      merit_text: "",
+      excellence_text: ""
+    };
+  }
+
+  hits.sort((a, b) => a.index - b.index);
+
+  const sections = {
+    achieved: "",
+    merit: "",
+    excellence: ""
+  };
+
+  for (let index = 0; index < hits.length; index += 1) {
+    const current = hits[index];
+    const next = hits[index + 1];
+    const start = current.index + current.length;
+    const end = next ? next.index : source.length;
+    const segment = normalizeCriteriaSectionText(source.slice(start, end));
+    if (segment && !sections[current.key]) {
+      sections[current.key] = segment;
+    }
+  }
+
+  return {
+    achieved_text: sections.achieved,
+    merit_text: sections.merit,
+    excellence_text: sections.excellence
+  };
+}
+
 function extractHrefListFromHtml(html) {
   const source = String(html || "");
   const hrefs = [];
@@ -337,6 +409,8 @@ async function fetchNzqaStandardDetails(standardNumber) {
   if (!result.extracted_text) {
     result.extracted_text = "No downloadable PDF/DOCX content could be extracted for this standard.";
   }
+
+  result.criteria = extractAssessmentCriteriaFromText(result.extracted_text);
 
   nzqaStandardDetailsCache.set(cacheKey, {
     timestamp: now,
