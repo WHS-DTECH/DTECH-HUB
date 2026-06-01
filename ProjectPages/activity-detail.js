@@ -572,6 +572,7 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
         writtenEvidence: "",
         evidenceLink: "",
         fileName: "",
+        fileUrl: "",
         submittedAt: "",
         reviewStatus: "pending"
     };
@@ -598,6 +599,11 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
 
         if (text.startsWith("FILE|")) {
             result.fileName = text.slice("FILE|".length).trim();
+            return;
+        }
+
+        if (text.startsWith("FILE_URL|")) {
+            result.fileUrl = text.slice("FILE_URL|".length).trim();
             return;
         }
 
@@ -629,6 +635,7 @@ function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     const writtenEvidence = String(payload?.writtenEvidence || "").trim();
     const evidenceLink = toSafeExternalUrl(payload?.evidenceLink);
     const fileName = String(payload?.fileName || "").trim();
+    const fileUrl = String(payload?.fileUrl || "").trim();
     const submittedAt = String(payload?.submittedAt || "").trim();
     const reviewStatusRaw = String(payload?.reviewStatus || "").trim().toLowerCase();
     const reviewStatus = reviewStatusRaw === "reviewed"
@@ -646,6 +653,9 @@ function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     }
     if (fileName) {
         steps.push({ text: `FILE|${fileName}`, done: true });
+    }
+    if (fileUrl) {
+        steps.push({ text: `FILE_URL|${fileUrl}`, done: true });
     }
     if (submittedAt) {
         steps.push({ text: `SUBMITTED_AT|${submittedAt}`, done: true });
@@ -736,6 +746,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 <div class="task-topic-submission-meta">
                     <p><strong>Last Submitted:</strong> <span id="task-topic-teacher-last-submitted">Not submitted yet</span></p>
                     <p><strong>Evidence Link:</strong> <span id="task-topic-teacher-evidence-link">No link submitted</span></p>
+                    <p><strong>Submitted File:</strong> <span id="task-topic-teacher-file-link">No file submitted</span></p>
                 </div>
 
                 <label class="task-topic-submission-label" for="task-topic-teacher-written-preview">Written Evidence (preview)</label>
@@ -749,6 +760,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         const statusMessage = panelHost.querySelector("#task-topic-teacher-review-message");
         const submittedHost = panelHost.querySelector("#task-topic-teacher-last-submitted");
         const linkHost = panelHost.querySelector("#task-topic-teacher-evidence-link");
+        const fileHost = panelHost.querySelector("#task-topic-teacher-file-link");
         const previewHost = panelHost.querySelector("#task-topic-teacher-written-preview");
 
         let selectedStudent = students[0];
@@ -757,6 +769,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             writtenEvidence: "",
             evidenceLink: "",
             fileName: "",
+            fileUrl: "",
             submittedAt: "",
             reviewStatus: "pending"
         };
@@ -798,6 +811,15 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                         linkHost.textContent = "No link submitted";
                     }
                 }
+                if (fileHost) {
+                    const safeFileUrl = String(selectedSubmission.fileUrl || "").trim();
+                    const safeFileName = String(selectedSubmission.fileName || "").trim() || "Download evidence file";
+                    if (safeFileUrl) {
+                        fileHost.innerHTML = `<a href="${escapeHtml(safeFileUrl)}" download="${escapeHtml(safeFileName)}">${escapeHtml(safeFileName)}</a>`;
+                    } else {
+                        fileHost.textContent = "No file submitted";
+                    }
+                }
 
                 setTeacherStatusMessage(`Loaded submission for ${selectedStudent}.`);
             } catch (_error) {
@@ -806,6 +828,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                     writtenEvidence: "",
                     evidenceLink: "",
                     fileName: "",
+                    fileUrl: "",
                     submittedAt: "",
                     reviewStatus: "pending"
                 };
@@ -821,6 +844,9 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 }
                 if (linkHost) {
                     linkHost.textContent = "No link submitted";
+                }
+                if (fileHost) {
+                    fileHost.textContent = "No file submitted";
                 }
 
                 setTeacherStatusMessage("Could not load this student submission right now.", true);
@@ -840,6 +866,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 writtenEvidence: selectedSubmission.writtenEvidence,
                 evidenceLink: selectedSubmission.evidenceLink,
                 fileName: selectedSubmission.fileName,
+                fileUrl: selectedSubmission.fileUrl,
                 submittedAt: selectedSubmission.submittedAt,
                 reviewStatus: nextStatus
             });
@@ -878,6 +905,8 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
 
     const submission = parseTaskTopicSubmissionFromEvidenceRows(evidenceRows, standardKey);
     const reviewLabel = getReviewStatusLabel(submission.reviewStatus);
+    const submittedFileName = String(submission.fileName || "").trim();
+    const submittedFileUrl = String(submission.fileUrl || "").trim();
 
     panelHost.innerHTML = `
         <form id="task-topic-submission-form" class="task-topic-submission-form" novalidate>
@@ -899,6 +928,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         <div class="task-topic-submission-meta">
             <p><strong>Last Submitted:</strong> <span id="task-topic-last-submitted">${escapeHtml(formatSubmissionTimestamp(submission.submittedAt))}</span></p>
             <p><strong>Teacher Review:</strong> <span id="task-topic-review-status">${escapeHtml(reviewLabel)}</span></p>
+            <p><strong>Submitted File:</strong> <span id="task-topic-submitted-file">${submittedFileUrl ? `<a href="${escapeHtml(submittedFileUrl)}" download="${escapeHtml(submittedFileName || "evidence-file")}">${escapeHtml(submittedFileName || "Download evidence file")}</a>` : "No file submitted"}</span></p>
         </div>
     `;
 
@@ -910,6 +940,8 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const statusHost = panelHost.querySelector("#task-topic-submission-status");
     const lastSubmittedHost = panelHost.querySelector("#task-topic-last-submitted");
     const reviewStatusHost = panelHost.querySelector("#task-topic-review-status");
+    const submittedFileHost = panelHost.querySelector("#task-topic-submitted-file");
+    let selectedFile = null;
     let selectedFileName = submission.fileName;
 
     const setStatus = (message, isError = false) => {
@@ -921,6 +953,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     };
 
     fileInput?.addEventListener("change", () => {
+        selectedFile = fileInput.files?.[0] || null;
         const chosen = fileInput.files?.[0]?.name ? String(fileInput.files[0].name).trim() : "";
         selectedFileName = chosen || submission.fileName;
         if (fileNameHost) {
@@ -943,11 +976,42 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         }
         setStatus("Saving submission...");
 
+        let uploadedFileUrl = String(submission.fileUrl || "").trim();
+        if (selectedFile) {
+            const uploadFormData = new FormData();
+            uploadFormData.append("evidenceFile", selectedFile);
+
+            try {
+                setStatus("Uploading file...");
+                const uploadResponse = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interests/${encodeURIComponent(email)}/evidence-upload`, {
+                    method: "POST",
+                    headers: email ? { "x-user-email": email } : {},
+                    body: uploadFormData
+                });
+
+                if (!uploadResponse.ok) {
+                    const uploadResult = await uploadResponse.json().catch(() => ({}));
+                    throw new Error(uploadResult.error || "Could not upload evidence file.");
+                }
+
+                const uploadResult = await uploadResponse.json().catch(() => ({}));
+                selectedFileName = String(uploadResult.file_name || selectedFileName || "").trim();
+                uploadedFileUrl = String(uploadResult.file_url || uploadedFileUrl || "").trim();
+            } catch (error) {
+                setStatus(error.message || "Could not upload evidence file.", true);
+                if (submitButton && submitButton.isConnected) {
+                    submitButton.disabled = false;
+                }
+                return;
+            }
+        }
+
         const submittedAt = new Date().toISOString();
         const nextRows = upsertTaskTopicSubmissionEvidenceRows(evidenceRows, standardKey, {
             writtenEvidence,
             evidenceLink,
             fileName: selectedFileName,
+            fileUrl: uploadedFileUrl,
             submittedAt,
             reviewStatus: "pending"
         });
@@ -958,14 +1022,30 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             submission.writtenEvidence = writtenEvidence;
             submission.evidenceLink = toSafeExternalUrl(evidenceLink);
             submission.fileName = selectedFileName;
+            submission.fileUrl = uploadedFileUrl;
             submission.submittedAt = submittedAt;
             submission.reviewStatus = "pending";
+            selectedFile = null;
+
+            if (fileInput) {
+                fileInput.value = "";
+            }
+            if (fileNameHost) {
+                fileNameHost.textContent = selectedFileName ? `Selected: ${selectedFileName}` : "No file selected";
+            }
 
             if (lastSubmittedHost) {
                 lastSubmittedHost.textContent = formatSubmissionTimestamp(submittedAt);
             }
             if (reviewStatusHost) {
                 reviewStatusHost.textContent = getReviewStatusLabel("pending");
+            }
+            if (submittedFileHost) {
+                if (uploadedFileUrl) {
+                    submittedFileHost.innerHTML = `<a href="${escapeHtml(uploadedFileUrl)}" download="${escapeHtml(selectedFileName || "evidence-file")}">${escapeHtml(selectedFileName || "Download evidence file")}</a>`;
+                } else {
+                    submittedFileHost.textContent = "No file submitted";
+                }
             }
             setStatus("Submission saved.");
         } catch (_error) {
