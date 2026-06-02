@@ -354,7 +354,7 @@ function createProjectPayload() {
     const formData = new FormData(form);
     const name = String(formData.get("activityName") || "").trim();
     const editingId = getEditingProjectId();
-    const subjectStream = normalizeSubjectStream(formData.get("subjectStream"));
+    const subjectStream = normalizeSubjectStream(formData.get("subjectStream")) || "DTECH";
 
     return {
         id: editingId || slugify(name),
@@ -466,9 +466,20 @@ if (form) {
     form.addEventListener("submit", async (event) => {
         event.preventDefault();
 
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            setStatus("Please complete all required fields before saving.", true);
+            return;
+        }
+
         const payload = createProjectPayload();
         if (!payload.name) {
             setStatus("Project name is required.", true);
+            return;
+        }
+
+        if (String(payload.subject_stream || "").toUpperCase() === "TEXT") {
+            setStatus("TEXT stream items are filtered from DTECH library. Choose DTECH, COMP, or DTONLINE for this hub.", true);
             return;
         }
 
@@ -476,7 +487,7 @@ if (form) {
             const saved = await saveProjectShared(payload);
             localStorage.setItem("dtechHub:lastProjectDraft", JSON.stringify(payload));
             localStorage.setItem("dtechHub:lastSavedProjectId", String(saved.id || payload.id || ""));
-            setStatus("Project saved to Activities Library.");
+            setStatus("Project saved to Activities Library. Refresh the homepage library to see it.");
             saveProjectDraft();
         } catch (error) {
             setStatus(`Save failed: ${error.message}`, true);

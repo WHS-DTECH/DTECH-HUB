@@ -59,14 +59,18 @@
                     </p>
                 </div>
 
-                <aside class="hero-stats" aria-label="Hub summary">
-                    <div class="stat-card">
-                        <span class="stat-label">Activities currently running</span>
-                        <strong id="stat-total-count">0</strong>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-label">Projects currently running</span>
-                        <strong id="stat-category-count">0</strong>
+                <aside class="hero-stats" aria-label="New this week summary">
+                    <div class="stat-card new-week-panel">
+                        <div class="new-week-header">
+                            <span class="stat-label">New This Week</span>
+                            <a class="new-week-settings" href="settings.html">Settings</a>
+                        </div>
+                        <div class="new-week-summary-row">
+                            <strong id="new-week-count">0</strong>
+                            <span id="new-week-window" class="new-week-window">14-day window</span>
+                        </div>
+                        <p id="new-this-week-empty" class="new-week-empty" hidden>No new assessment tasks or projects yet.</p>
+                        <ul id="new-this-week-list" class="new-week-list" aria-live="polite"></ul>
                     </div>
                 </aside>
             </div>

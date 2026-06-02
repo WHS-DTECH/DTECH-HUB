@@ -229,7 +229,7 @@ function restoreAssessmentDraftIfAvailable() {
         }
 
         if (key === "activityCategory") {
-            field.value = "Assessment Task";
+            field.value = normalizeCardCategory(draft[key], "Assessment Task");
             return;
         }
 
@@ -530,7 +530,7 @@ async function prefillFormIfEditing() {
         form.activityName.value = String(data.name || "").trim();
         form.yearLevel.value = String(data.year_level || "").trim();
         form.type.value = String(data.type || "").trim();
-        form.activityCategory.value = "Assessment Task";
+        form.activityCategory.value = normalizeCardCategory(data.activity_category || data.category, "Assessment Task");
         form.difficulty.value = String(data.difficulty || "").trim();
         form.cardColor.value = String(data.card_color || data.card_colour || data.color || "Slate").trim() || "Slate";
         if (form.cardUrl) {
@@ -619,7 +619,7 @@ function createAssessmentPayload() {
         name,
         year_level: String(formData.get("yearLevel") || "").trim(),
         type: String(formData.get("type") || "").trim(),
-        activity_category: "Assessment Task",
+        activity_category: normalizeCardCategory(formData.get("activityCategory"), "Assessment Task"),
         duration_minutes: 1,
         difficulty: String(formData.get("difficulty") || "").trim(),
         card_color: String(formData.get("cardColor") || "Slate").trim(),

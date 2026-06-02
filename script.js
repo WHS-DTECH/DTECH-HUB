@@ -1144,6 +1144,64 @@ function getUnifiedLibraryItems() {
     ];
 }
 
+const DEFAULT_NEW_EVENT_WINDOW_DAYS = 14;
+const NEW_EVENT_WINDOW_STORAGE_KEY = "dtechHub:newEventWindowDays:v1";
+const NEW_EVENT_WINDOW_OPTIONS = new Set([7, 14, 30]);
+
+function getConfiguredNewEventWindowDays() {
+    try {
+        const stored = Number.parseInt(String(localStorage.getItem(NEW_EVENT_WINDOW_STORAGE_KEY) || ""), 10);
+        if (NEW_EVENT_WINDOW_OPTIONS.has(stored)) {
+            return stored;
+        }
+    } catch (_error) {
+    }
+
+    return DEFAULT_NEW_EVENT_WINDOW_DAYS;
+}
+
+function setConfiguredNewEventWindowDays(days) {
+    const normalized = Number.parseInt(String(days || ""), 10);
+    if (!NEW_EVENT_WINDOW_OPTIONS.has(normalized)) {
+        return false;
+    }
+
+    try {
+        localStorage.setItem(NEW_EVENT_WINDOW_STORAGE_KEY, String(normalized));
+        return true;
+    } catch (_error) {
+        return false;
+    }
+}
+
+function parseDateSafe(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return null;
+    const parsed = new Date(raw);
+    return Number.isFinite(parsed.getTime()) ? parsed : null;
+}
+
+function isAssessmentOrProjectEvent(project) {
+    const sourceType = inferSourceTypeFromRecord(project);
+    if (sourceType === "project") return true;
+
+    if (sourceType !== "assessment") return false;
+
+    const category = String(project?.activityCategory || project?.activity_category || project?.category || "").trim().toLowerCase();
+    return category.includes("assessment");
+}
+
+function isRecentEvent(project, maxAgeDays = getConfiguredNewEventWindowDays()) {
+    if (!isAssessmentOrProjectEvent(project)) return false;
+
+    const createdAt = parseDateSafe(project?.created_at || project?.createdAt || project?.updated);
+    if (!createdAt) return false;
+
+    const ageMs = Date.now() - createdAt.getTime();
+    const maxAgeMs = Math.max(1, Number(maxAgeDays) || DEFAULT_NEW_EVENT_WINDOW_DAYS) * 24 * 60 * 60 * 1000;
+    return ageMs >= 0 && ageMs <= maxAgeMs;
+}
+
 const HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 
 function getHubStoredAuthRaw() {
@@ -1251,7 +1309,8 @@ function renderGlobalNavbar() {
             </div>
         </details>
     `;
-    const topbarMenu = `${browseMenu}${uploadMenu}${studentWorkMenu}`;
+    const settingsLink = `<a href="/settings.html">Settings</a>`;
+    const topbarMenu = `${browseMenu}${uploadMenu}${studentWorkMenu}${settingsLink}`;
 
     topbar.dataset.globalNavbar = "true";
     topbar.setAttribute("aria-label", "Primary");
@@ -1366,10 +1425,10 @@ const typeSelect = document.querySelector("#type-filter");
 const categorySelect = document.querySelector("#category-filter");
 const libraryResultsMeta = document.querySelector("#library-results-meta");
 const labProjectResultsMeta = document.querySelector("#lab-project-results-meta");
-const activeCount = document.querySelector("#stat-active-count");
-const runningDetail = document.querySelector("#stat-running-detail");
-const totalCount = document.querySelector("#stat-total-count");
-const categoryCount = document.querySelector("#stat-category-count");
+const newWeekCount = document.querySelector("#new-week-count");
+const newWeekWindow = document.querySelector("#new-week-window");
+const newWeekList = document.querySelector("#new-this-week-list");
+const newWeekEmpty = document.querySelector("#new-this-week-empty");
 const hubStaffLink = document.querySelector("#hub-staff-link");
 const hubAdminLink = document.querySelector("#hub-admin-link");
 const hubAccessBadge = document.querySelector("#hub-access-badge");
@@ -2490,6 +2549,10 @@ function createProjectCard(project, options = {}) {
     const assignmentBadge = assignedStudentCount > 0
         ? `<span class="project-meta project-meta-assigned" title="Assigned to ${assignedStudentCount} student${assignedStudentCount === 1 ? "" : "s"}">Assigned (${assignedStudentCount})</span>`
         : "";
+    const activeWindowDays = getConfiguredNewEventWindowDays();
+    const newEventBadge = isRecentEvent(project)
+        ? `<span class="project-meta project-meta-new" title="Added in the last ${activeWindowDays} days">NEW EVENT</span>`
+        : "";
     const standardPill = (sourceType === "task-topic" || String(project?.activityCategory || "").toLowerCase().includes("standard")) && String(project?.standardNumber || "").trim()
         ? `<span class="project-tag">${escapeHtml(String(project.standardNumber))}</span>`
         : "";
@@ -2511,6 +2574,7 @@ function createProjectCard(project, options = {}) {
             </div>
             <div class="project-footer">
                 <span class="project-meta">${escapeHtml(contentTypeLabel)}</span>
+                ${newEventBadge}
                 ${assignmentBadge}
             </div>
         </div>
@@ -2815,8 +2879,13 @@ function renderCurrentWeek() {
 function renderLibrary() {
     libraryGrid.innerHTML = "";
     const visibleProjects = sortProjects(filterProjects(getUnifiedLibraryItems()));
+    const activeWindowDays = getConfiguredNewEventWindowDays();
 
-    libraryResultsMeta.textContent = `${visibleProjects.length} item${visibleProjects.length === 1 ? "" : "s"} shown`;
+    const newEventCount = visibleProjects.reduce((count, item) => {
+        return count + (isRecentEvent(item) ? 1 : 0);
+    }, 0);
+
+    libraryResultsMeta.textContent = `${visibleProjects.length} item${visibleProjects.length === 1 ? "" : "s"} shown${newEventCount > 0 ? ` • ${newEventCount} new event${newEventCount === 1 ? "" : "s"} (${activeWindowDays}d)` : ""}`;
 
     if (!visibleProjects.length) {
         clearTaskTopicMergeSelection();
@@ -2934,12 +3003,53 @@ function renderLabProjectLibrary() {
 }
 
 function renderStats() {
-    const runningItems = getUnifiedLibraryItems().filter((item) => item.showThisWeek);
-    const runningActivities = runningItems.filter((item) => inferSourceTypeFromRecord(item) === "activity").length;
-    const runningProjects = runningItems.filter((item) => inferSourceTypeFromRecord(item) === "project").length;
+    const items = getUnifiedLibraryItems()
+        .filter((item) => isRecentEvent(item))
+        .sort((left, right) => {
+            const leftDate = parseDateSafe(left?.created_at || left?.createdAt || left?.updated)?.getTime() || 0;
+            const rightDate = parseDateSafe(right?.created_at || right?.createdAt || right?.updated)?.getTime() || 0;
+            return rightDate - leftDate;
+        })
+        .slice(0, 6);
 
-    totalCount.textContent = runningActivities;
-    categoryCount.textContent = runningProjects;
+    const activeWindowDays = getConfiguredNewEventWindowDays();
+
+    if (newWeekWindow) {
+        newWeekWindow.textContent = `${activeWindowDays}-day window`;
+    }
+
+    if (newWeekCount) {
+        newWeekCount.textContent = String(items.length);
+    }
+
+    if (!newWeekList) {
+        return;
+    }
+
+    newWeekList.innerHTML = "";
+    if (!items.length) {
+        if (newWeekEmpty) {
+            newWeekEmpty.hidden = false;
+        }
+        return;
+    }
+
+    if (newWeekEmpty) {
+        newWeekEmpty.hidden = true;
+    }
+
+    items.forEach((item) => {
+        const row = document.createElement("li");
+        row.className = "new-week-item";
+        const typeLabel = inferSourceTypeFromRecord(item) === "project" ? "Project" : "Assessment";
+        const href = String(item?.href || "").trim() || "#project-library";
+        row.innerHTML = `
+            <span class="new-week-dot" aria-hidden="true"></span>
+            <a class="new-week-link" href="${escapeHtml(href)}">${escapeHtml(String(item?.title || "Untitled").trim())}</a>
+            <span class="new-week-pill">${escapeHtml(typeLabel)}</span>
+        `;
+        newWeekList.appendChild(row);
+    });
 }
 
 function createFeaturedCard(project) {
@@ -3086,6 +3196,19 @@ function bindControls() {
         applyCompactCardLayout();
     });
 }
+
+window.addEventListener("storage", (event) => {
+    if (event.key !== NEW_EVENT_WINDOW_STORAGE_KEY) {
+        return;
+    }
+
+    if (!isHomepagePath()) {
+        return;
+    }
+
+    renderStats();
+    renderLibrary();
+});
 
 function bindLabProjectControls() {
     if (!labProjectSearchInput || !labProjectSortSelect) return;

@@ -141,6 +141,21 @@
             font-size: 0.9rem;
             font-style: italic;
         }
+        .course-outline-import-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            margin: 8px 0 2px;
+        }
+        .course-outline-import-status {
+            font-size: 0.86rem;
+            margin: 0;
+            color: #1a7070;
+        }
+        .course-outline-import-status.is-error {
+            color: #b03838;
+        }
         .course-outline-teal-badge {
             display: inline-block;
             background: #4db8b8;
@@ -193,6 +208,11 @@
             <div class="upload-page-tools">
                 <button class="button-cancel" type="button" id="clear-course-outline-draft">Clear Draft</button>
             </div>
+            <div class="upload-page-tools course-outline-import-row">
+                <input id="co-pdf-file" type="file" accept="application/pdf,.pdf" aria-label="Select course outline PDF">
+                <button class="button-save" type="button" id="co-import-pdf">Import From Course Outline PDF</button>
+                <p id="co-import-status" class="course-outline-import-status" aria-live="polite"></p>
+            </div>
 
             <section class="upload-panel" aria-label="Upload course outline form">
                 <form id="upload-course-outline-form" class="upload-form">
@@ -203,7 +223,7 @@
                         <div class="form-grid">
                             <div class="field">
                                 <label for="co-course-name">Course Name</label>
-                                <input id="co-course-name" name="courseName" type="text" required placeholder="e.g. Digital Technologies Year 12">
+                                <input id="co-course-name" name="courseName" type="text" required placeholder="e.g. Level 2 Digital Technology">
                             </div>
                             <div class="field">
                                 <label for="co-year-level">Year Level</label>

@@ -1351,6 +1351,9 @@ async function resolveActivityCategoryForInsert(activityCategory, activityType, 
   const rawCategory = String(activityCategory || "").trim();
   const rawCategoryLower = rawCategory.toLowerCase();
   const preferAssessment = Boolean(options?.preferAssessment) || ["assessment", "assessment activity", "assessment task"].includes(rawCategoryLower);
+  const isExplicitProjectRequest = rawCategoryLower === "project";
+  const isExplicitPracticeRequest = ["practice", "skill activity", "practice activity"].includes(rawCategoryLower);
+  const isExplicitActivityRequest = rawCategoryLower === "activity";
 
   if (!hasDatabase) {
     if (preferAssessment) {
@@ -1392,16 +1395,24 @@ async function resolveActivityCategoryForInsert(activityCategory, activityType, 
     }
   }
 
+  const preferredFallbacks = preferAssessment
+    ? ["Assessment", "Assessment Task", "Assessment Activity", "Project", "Practice", "Activity"]
+    : (isExplicitProjectRequest
+      ? ["Project", "Practice", "Activity", "Assessment", "Assessment Task", "Assessment Activity"]
+      : (isExplicitPracticeRequest
+        ? ["Practice", "Activity", "Project", "Assessment", "Assessment Task", "Assessment Activity"]
+        : (isExplicitActivityRequest
+          ? ["Activity", "Practice", "Project", "Assessment", "Assessment Task", "Assessment Activity"]
+          : ["Project", "Practice", "Activity", "Assessment", "Assessment Task", "Assessment Activity"]
+        )
+      )
+    );
+
   const candidateValues = [
     rawCategory,
     rawCategory.replace(/\s*activity\s*$/i, "").trim(),
     String(activityType || "").trim(),
-    "Assessment",
-    "Assessment Task",
-    "Assessment Activity",
-    "Project",
-    "Practice",
-    "Activity"
+    ...preferredFallbacks
   ].filter(Boolean);
 
   const matched = findAllowed(candidateValues);
@@ -4139,6 +4150,14 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
   const id = String(body.id || slugify(name));
   const requestedActivityCategory = String(body.activity_category || body.activityCategory || "").trim();
   const isExplicitActivityRequest = isExplicitActivityCategoryLabel(requestedActivityCategory);
+  const isExplicitNonAssessmentCategoryRequest = [
+    "project",
+    "activity",
+    "practice",
+    "practice activity",
+    "skill activity",
+    "lesson"
+  ].includes(String(requestedActivityCategory || "").trim().toLowerCase());
   const hasAssessmentPayload = hasAssessmentSignals(body) || hasAssessmentPayloadShape(body);
   const resolvedRequestedCategory = (() => {
     const normalizedRequested = requestedActivityCategory.toLowerCase();
@@ -4275,13 +4294,15 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     const feedbackTriallingColumn = pickExistingColumn(activityColumns, ["feedback_trialling"]);
 
     const categoryRequestsAssessment = ["assessment", "assessment activity", "assessment task"].includes(String(payload.activity_category || "").toLowerCase());
+    const shouldPreferAssessmentResolution = categoryRequestsAssessment || (!requestedActivityCategory && hasAssessmentPayload);
+
     let resolvedActivityCategory = activityCategoryColumn
       ? await resolveActivityCategoryForInsert(payload.activity_category, payload.type, {
-          preferAssessment: hasAssessmentPayload || categoryRequestsAssessment
+          preferAssessment: shouldPreferAssessmentResolution
         })
       : payload.activity_category;
 
-    if (hasAssessmentPayload && !isAssessmentCategoryLabel(resolvedActivityCategory) && !isExplicitActivityRequest) {
+    if (hasAssessmentPayload && !isAssessmentCategoryLabel(resolvedActivityCategory) && !isExplicitNonAssessmentCategoryRequest) {
       console.warn(
         `[assessment-category-guard] Non-assessment category resolved for assessment payload id=${payload.id} name="${payload.name}" category="${resolvedActivityCategory}"`
       );

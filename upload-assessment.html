@@ -86,7 +86,12 @@
                             </div>
                             <div class="field">
                                 <label for="activity-category">Card Category</label>
-                                <input id="activity-category" name="activityCategory" type="text" value="Assessment Task" readonly>
+                                <select id="activity-category" name="activityCategory" required>
+                                    <option>Activity</option>
+                                    <option>Project</option>
+                                    <option selected>Assessment Task</option>
+                                    <option>Lesson</option>
+                                </select>
                             </div>
                             <div class="field">
                                 <label for="subject-stream">Subject Stream</label>

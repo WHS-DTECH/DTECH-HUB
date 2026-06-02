@@ -2684,6 +2684,8 @@ function defaultDetailShape(id, data) {
 
 function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selectedTaskShortName = "") {
     const isAssessmentTask = String(data?.activityCategory || "").toLowerCase().includes("assessment");
+    const normalizedCategory = normalizeCardCategory(data?.activityCategory, "Activity");
+    const canConvertCategory = canEdit && !selectedTaskTopic && Boolean(String(id || "").match(/^\d+$/));
     const cardUrl = toSafeExternalUrl(data?.cardUrl);
     const taskTopicTitle = String(selectedTaskTopic || "").trim();
     const isTaskTopicView = Boolean(taskTopicTitle);
@@ -2737,6 +2739,13 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         <header class="toolbar">
             <span class="toolbar-label">${toolbarLabel}</span>
             <div class="toolbar-actions">
+                ${canConvertCategory ? `
+                    <div class="detail-convert-actions" role="group" aria-label="Convert category">
+                        <button type="button" class="detail-action detail-action-secondary" data-convert-category="Project" ${normalizedCategory === "Project" ? "disabled" : ""}>Convert to Project</button>
+                        <button type="button" class="detail-action detail-action-secondary" data-convert-category="Assessment Task" ${normalizedCategory === "Assessment Task" ? "disabled" : ""}>Convert to Assessment</button>
+                        <button type="button" class="detail-action detail-action-secondary" data-convert-category="Activity" ${normalizedCategory === "Activity" ? "disabled" : ""}>Convert to Activity</button>
+                    </div>
+                ` : ""}
                 ${canEdit ? '<button type="button" class="detail-action" id="detail-edit-button">Edit Details</button>' : ""}
                 ${canEdit ? '<button type="button" class="detail-action detail-action-danger" id="detail-delete-button">Delete</button>' : ""}
                 <a href="../index.html">Back to Hub</a>
@@ -3042,6 +3051,47 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 deleteButton.disabled = false;
                 window.alert(error.message || "Could not delete this activity/project.");
             }
+        });
+    }
+
+    const convertButtons = Array.from(host.querySelectorAll("button[data-convert-category]"));
+    if (convertButtons.length) {
+        const setConvertDisabled = (disabled) => {
+            convertButtons.forEach((button) => {
+                button.disabled = disabled;
+            });
+        };
+
+        convertButtons.forEach((button) => {
+            button.addEventListener("click", async () => {
+                const targetCategory = normalizeCardCategory(button.getAttribute("data-convert-category"), "Activity");
+                const currentCategory = normalizeCardCategory(data?.activityCategory, "Activity");
+                if (!targetCategory || targetCategory === currentCategory) {
+                    return;
+                }
+
+                const confirmed = window.confirm(`Convert "${data.title}" to ${targetCategory}?`);
+                if (!confirmed) {
+                    return;
+                }
+
+                setConvertDisabled(true);
+                if (editButton) editButton.disabled = true;
+                if (deleteButton) deleteButton.disabled = true;
+
+                try {
+                    const draft = defaultDetailShape(id, data);
+                    draft.activityCategory = targetCategory;
+                    const saved = await saveDetails(id, draft);
+                    DETAIL_DATA[id] = saved;
+                    renderDetailView(host, id, saved, canEdit, selectedTaskTopic, selectedTaskShortName);
+                } catch (error) {
+                    setConvertDisabled(false);
+                    if (editButton) editButton.disabled = false;
+                    if (deleteButton) deleteButton.disabled = false;
+                    window.alert(error.message || "Could not convert this item category.");
+                }
+            });
         });
     }
 }

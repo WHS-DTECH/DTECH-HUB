@@ -667,6 +667,101 @@ a {
     letter-spacing: 0.03em;
 }
 
+.new-week-panel {
+    min-height: 166px;
+}
+
+.new-week-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.new-week-settings {
+    display: inline-flex;
+    align-items: center;
+    min-height: 20px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.36);
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.new-week-summary-row {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-top: 4px;
+    margin-bottom: 8px;
+}
+
+.new-week-window {
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 0.69rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.new-week-empty {
+    margin: 8px 0 0;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.74rem;
+    line-height: 1.4;
+}
+
+.new-week-list {
+    list-style: none;
+    margin: 6px 0 0;
+    padding: 0;
+    display: grid;
+    gap: 6px;
+}
+
+.new-week-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 8px;
+}
+
+.new-week-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #9ff0c5;
+    box-shadow: 0 0 0 3px rgba(159, 240, 197, 0.2);
+}
+
+.new-week-link {
+    color: #ffffff;
+    font-size: 0.74rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.new-week-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 18px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    color: rgba(255, 255, 255, 0.94);
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
 .panel-section {
     width: min(920px, calc(100% - 28px));
     margin: 18px auto 0;
@@ -1021,6 +1116,17 @@ body.public-home-access .controls-panel {
     font-size: 0.65rem;
     color: var(--ink-soft);
     font-weight: 600;
+}
+
+.project-meta-new {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(168, 49, 57, 0.45);
+    background: rgba(168, 49, 57, 0.12);
+    color: #842c34;
+    font-weight: 800;
 }
 
 .project-card.is-task-topic-selected {
@@ -2910,6 +3016,17 @@ body.public-home-access .controls-panel {
     font-size: 0.68rem;
     color: var(--ink-soft);
     font-weight: 600;
+}
+
+.project-meta-new {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(168, 49, 57, 0.45);
+    background: rgba(168, 49, 57, 0.12);
+    color: #842c34;
+    font-weight: 800;
 }
 
 .project-meta-assigned {
