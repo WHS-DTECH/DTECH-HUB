@@ -1894,6 +1894,19 @@ function normalizeActivityCategoryForResponse(activity) {
   return row;
 }
 
+function getDefaultCardColorForCategory(categoryValue) {
+  const category = String(categoryValue || "").trim().toLowerCase();
+
+  if (category.includes("task topic")) return "Azure";
+  if (category.includes("standard")) return "Teal";
+  if (category.includes("lesson")) return "Rose";
+  if (category.includes("assessment")) return "Slate";
+  if (category.includes("project")) return "Violet";
+  if (category.includes("activity") || category.includes("practice")) return "Amber";
+
+  return "Amber";
+}
+
 function filterDtechActivities(rows) {
   return (Array.isArray(rows) ? rows : [])
     .filter((row) => !isExcludedNonDtechActivity(row))
@@ -4149,6 +4162,7 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
 
   const id = String(body.id || slugify(name));
   const requestedActivityCategory = String(body.activity_category || body.activityCategory || "").trim();
+  const explicitCardColor = String(body.card_color || body.cardColor || "").trim();
   const isExplicitActivityRequest = isExplicitActivityCategoryLabel(requestedActivityCategory);
   const isExplicitNonAssessmentCategoryRequest = [
     "project",
@@ -4179,11 +4193,7 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     duration_minutes: Number.isInteger(durationMinutesInput) && durationMinutesInput > 0 ? durationMinutesInput : 1,
     difficulty: String(body.difficulty || "Beginner").trim() || "Beginner",
     subject_stream: String(body.subject_stream || body.subject || "").trim().toUpperCase(),
-    card_color: (() => {
-      const normalizedCategory = String(resolvedRequestedCategory || requestedActivityCategory || "").toLowerCase();
-      const fallbackColor = normalizedCategory.includes("assessment") ? "Slate" : "Amber";
-      return String(body.card_color || fallbackColor).trim() || fallbackColor;
-    })(),
+    card_color: explicitCardColor || getDefaultCardColorForCategory(resolvedRequestedCategory || requestedActivityCategory),
     card_url: String(body.card_url || "").trim(),
     outcome_image_url: String(body.outcome_image_url || "").trim(),
     description: String(body.description || "").trim(),
@@ -4315,6 +4325,10 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
           resolvedActivityCategory = forcedAssessmentCategory;
         }
       }
+    }
+
+    if (!explicitCardColor) {
+      payload.card_color = getDefaultCardColorForCategory(resolvedActivityCategory || payload.activity_category);
     }
 
     const idMetadata = idColumn ? activityColumnMetadata.get(String(idColumn).toLowerCase()) : null;

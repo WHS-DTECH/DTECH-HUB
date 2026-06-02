@@ -271,6 +271,20 @@ function colorToPalette(colorName) {
     return palettes[String(colorName || "").toLowerCase()] || palettes.rose;
 }
 
+function getDefaultCardColorForCategory(categoryValue, sourceType = "") {
+    const category = String(categoryValue || "").trim().toLowerCase();
+    const source = String(sourceType || "").trim().toLowerCase();
+
+    if (category.includes("task topic")) return "Azure";
+    if (category.includes("standard")) return "Teal";
+    if (category.includes("lesson") || source === "lesson") return "Rose";
+    if (category.includes("assessment") || source === "assessment") return "Slate";
+    if (category.includes("project") || source === "project") return "Violet";
+    if (category.includes("activity") || category.includes("practice") || source === "activity") return "Amber";
+
+    return "Amber";
+}
+
 function escapeHtml(value) {
     return String(value || "")
         .replace(/&/g, "&amp;")
@@ -811,7 +825,7 @@ async function loadSharedProjects() {
                 const imageUrl = isGeneratedUploadedActivityImageUrl(rawImageUrl) ? "" : rawImageUrl;
                 const showInThisWeek = Boolean(item.show_in_this_week ?? item.show_this_week ?? item.is_pinned ?? item.is_this_week);
                 const sourceType = inferSourceTypeFromRecord(item);
-                const defaultCardColor = sourceType === "assessment" ? "Slate" : "Amber";
+                const defaultCardColor = getDefaultCardColorForCategory(category, sourceType);
                 const taskTopics = collectTaskTopicsFromActivityRecord(item);
                 const standardDetails = normalizeStandardDetailsRows(item.standard_details);
 
