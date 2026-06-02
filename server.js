@@ -5338,6 +5338,145 @@ app.get("/api/assessment-standard-cards", requireActivityWriteAccess, async (_re
   }
 });
 
+app.post("/api/admin/maintenance/repair-activity-categories", requireAdminAccess, async (req, res) => {
+  const confirmation = String(req.body?.confirm || "").trim();
+  if (confirmation !== "REPAIR_ACTIVITY_CATEGORIES") {
+    res.status(400).json({
+      error: "Confirmation token is required.",
+      expected: "REPAIR_ACTIVITY_CATEGORIES"
+    });
+    return;
+  }
+
+  if (!hasDatabase) {
+    const rows = Array.from(memoryActivities.values());
+    let repaired = 0;
+
+    rows.forEach((row) => {
+      const next = normalizeActivityCategoryForResponse(row);
+      const nextCategory = String(next?.activity_category || row?.activity_category || row?.category || "Activity").trim() || "Activity";
+      const nextColor = getDefaultCardColorForCategory(nextCategory);
+
+      const currentCategory = String(row?.activity_category || row?.category || "").trim();
+      const currentColor = String(row?.card_color || row?.card_colour || row?.color || "").trim();
+      if (currentCategory !== nextCategory || currentColor !== nextColor) {
+        row.activity_category = nextCategory;
+        row.card_color = nextColor;
+        row.updated_at = new Date().toISOString();
+        repaired += 1;
+      }
+
+      if (row?.id) {
+        memoryActivities.set(String(row.id), row);
+      }
+    });
+
+    res.status(200).json({
+      ok: true,
+      dryRun: false,
+      hasDatabase: false,
+      scanned: rows.length,
+      repaired,
+      unchanged: Math.max(0, rows.length - repaired),
+      samples: []
+    });
+    return;
+  }
+
+  try {
+    const activityColumns = await getAllTableColumns("activities");
+    const idColumn = pickExistingColumn(activityColumns, ["id"]);
+    const categoryColumn = pickExistingColumn(activityColumns, ["activity_category", "category"]);
+    const cardColorColumn = pickExistingColumn(activityColumns, ["card_color", "card_colour", "color"]);
+    const updatedAtColumn = pickExistingColumn(activityColumns, ["updated_at", "updatedon", "last_updated"]);
+
+    if (!idColumn || !categoryColumn) {
+      res.status(500).json({
+        error: "Could not repair categories because activities table is missing id or category columns."
+      });
+      return;
+    }
+
+    const allRowsResult = await pool.query(`SELECT * FROM activities`);
+    const rows = Array.isArray(allRowsResult?.rows) ? allRowsResult.rows : [];
+
+    let repaired = 0;
+    const samples = [];
+
+    for (const row of rows) {
+      const normalized = normalizeActivityCategoryForResponse(row);
+      const currentCategory = String(row?.[categoryColumn] || row?.activity_category || row?.category || "").trim();
+      const nextCategory = String(normalized?.activity_category || currentCategory || "Activity").trim() || "Activity";
+
+      const currentColor = cardColorColumn
+        ? String(row?.[cardColorColumn] || row?.card_color || row?.card_colour || row?.color || "").trim()
+        : "";
+      const nextColor = getDefaultCardColorForCategory(nextCategory);
+
+      const shouldUpdateCategory = currentCategory !== nextCategory;
+      const shouldUpdateColor = Boolean(cardColorColumn) && currentColor !== nextColor;
+
+      if (!shouldUpdateCategory && !shouldUpdateColor) {
+        continue;
+      }
+
+      const setClauses = [];
+      const values = [];
+
+      if (shouldUpdateCategory) {
+        values.push(nextCategory);
+        setClauses.push(`${quoteIdentifier(categoryColumn)} = $${values.length}`);
+      }
+
+      if (shouldUpdateColor && cardColorColumn) {
+        values.push(nextColor);
+        setClauses.push(`${quoteIdentifier(cardColorColumn)} = $${values.length}`);
+      }
+
+      if (updatedAtColumn) {
+        setClauses.push(`${quoteIdentifier(updatedAtColumn)} = NOW()`);
+      }
+
+      values.push(row[idColumn]);
+      await pool.query(
+        `
+          UPDATE activities
+          SET ${setClauses.join(", ")}
+          WHERE ${quoteIdentifier(idColumn)} = $${values.length}
+        `,
+        values
+      );
+
+      repaired += 1;
+      if (samples.length < 25) {
+        samples.push({
+          id: String(row[idColumn] || ""),
+          beforeCategory: currentCategory || "",
+          afterCategory: nextCategory,
+          beforeColor: currentColor || "",
+          afterColor: shouldUpdateColor ? nextColor : currentColor || nextColor
+        });
+      }
+    }
+
+    res.status(200).json({
+      ok: true,
+      dryRun: false,
+      hasDatabase: true,
+      scanned: rows.length,
+      repaired,
+      unchanged: Math.max(0, rows.length - repaired),
+      samples
+    });
+  } catch (error) {
+    console.error("[admin-repair-activity-categories]", error);
+    res.status(500).json({
+      error: "Could not repair activity categories.",
+      detail: String(error?.message || "unknown error")
+    });
+  }
+});
+
 app.post("/api/admin/assessment-standard-cards", requireAdminAccess, async (req, res) => {
   const body = req.body && typeof req.body === "object" ? req.body : {};
   const requestEmail = normalizeEmail(getRequestUserEmail(req));

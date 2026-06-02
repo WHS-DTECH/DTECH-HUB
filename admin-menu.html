@@ -79,6 +79,14 @@
         <h2>Assessment Standards Manager</h2>
         <p>Search NZQA standards by level and standard number, with quick links to current PDF and DOC files.</p>
       </a>
+      <section class="admin-panel" aria-label="Maintenance">
+        <div class="admin-nav-card">
+          <h2>Maintenance: Repair Legacy Categories</h2>
+          <p>One-time backfill to persist correct card categories and mapped colors for older records.</p>
+          <button id="admin-repair-activity-categories" class="button button-secondary" type="button">Run Category Repair</button>
+          <p id="admin-repair-status" class="upload-status" aria-live="polite" hidden></p>
+        </div>
+      </section>
     </section>
     </div>
 
@@ -90,6 +98,7 @@
 
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="script.js"></script>
+  <script src="admin-menu.js"></script>
 </body>
 </html>
 

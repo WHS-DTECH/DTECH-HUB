@@ -355,18 +355,21 @@ function createProjectPayload() {
     const name = String(formData.get("activityName") || "").trim();
     const editingId = getEditingProjectId();
     const subjectStream = normalizeSubjectStream(formData.get("subjectStream")) || "DTECH";
+    const lockedCategory = "Project";
+    const selectedCardColor = String(formData.get("cardColor") || "").trim();
+    const normalizedCardColor = selectedCardColor || "Violet";
 
     return {
         id: editingId || slugify(name),
         name,
         year_level: String(formData.get("yearLevel") || "").trim(),
         type: String(formData.get("type") || "Project").trim(),
-        activity_category: normalizeCardCategory(formData.get("activityCategory"), "Project"),
+        activity_category: lockedCategory,
         duration_minutes: 1,
         time_sensitive: Boolean(formData.get("timeSensitive")),
         difficulty: String(formData.get("difficulty") || "").trim(),
         subject_stream: subjectStream,
-        card_color: String(formData.get("cardColor") || "").trim(),
+        card_color: normalizedCardColor,
             card_url: String(formData.get("cardUrl") || "").trim(),
             outcome_image_url: String(formData.get("outcomeImageUrl") || "").trim(),
         show_in_this_week: Boolean(formData.get("showThisWeek")),
@@ -485,9 +488,22 @@ if (form) {
 
         try {
             const saved = await saveProjectShared(payload);
+            const savedCategory = normalizeCardCategory(saved?.activity_category || saved?.activityCategory, "");
+            const savedStream = normalizeSubjectStream(saved?.subject_stream);
+
+            if (savedCategory && savedCategory !== "Project") {
+                setStatus(`Saved, but server returned category ${savedCategory}. Please run Admin > Maintenance repair and try again.`, true);
+                return;
+            }
+
+            if (savedStream && String(savedStream).toUpperCase() === "TEXT") {
+                setStatus("Saved, but server returned TEXT stream, which is hidden from DTECH library. Please change to DTECH/COMP/DTONLINE.", true);
+                return;
+            }
+
             localStorage.setItem("dtechHub:lastProjectDraft", JSON.stringify(payload));
             localStorage.setItem("dtechHub:lastSavedProjectId", String(saved.id || payload.id || ""));
-            setStatus("Project saved to Activities Library. Refresh the homepage library to see it.");
+            setStatus(`Project saved. Category: Project. Stream: ${savedStream || payload.subject_stream}.`);
             saveProjectDraft();
         } catch (error) {
             setStatus(`Save failed: ${error.message}`, true);
