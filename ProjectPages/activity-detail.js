@@ -378,6 +378,19 @@ function normalizeCardCategory(value, fallback = "Activity") {
     return fallback;
 }
 
+function getDefaultCardColorForCategory(categoryValue) {
+    const category = String(categoryValue || "").trim().toLowerCase();
+
+    if (category.includes("task topic")) return "Azure";
+    if (category.includes("standard")) return "Teal";
+    if (category.includes("lesson")) return "Rose";
+    if (category.includes("assessment")) return "Slate";
+    if (category.includes("project")) return "Violet";
+    if (category.includes("activity") || category.includes("practice")) return "Amber";
+
+    return "Amber";
+}
+
 function isGeneratedUploadedActivityImageUrl(value) {
     const raw = String(value || "").trim().toLowerCase();
     if (!raw) {
@@ -2635,6 +2648,7 @@ function defaultDetailShape(id, data) {
         duration: String(data?.duration || "120 mins").trim() || "120 mins",
         term: String(data?.term || "Term 2").trim() || "Term 2",
         activityCategory: normalizeCardCategory(data?.activityCategory || data?.activity_category || data?.category, inferredAssessmentCategory),
+        cardColor: String(data?.cardColor || data?.card_color || data?.color || "").trim() || getDefaultCardColorForCategory(data?.activityCategory || data?.activity_category || data?.category || inferredAssessmentCategory),
         showInThisWeek: Boolean(data?.showInThisWeek),
         summary: String(data?.summary || "").trim(),
         resources: Array.isArray(data?.resources) ? data.resources : [],
@@ -2744,6 +2758,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                         <button type="button" class="detail-action detail-action-secondary" data-convert-category="Project" ${normalizedCategory === "Project" ? "disabled" : ""}>Convert to Project</button>
                         <button type="button" class="detail-action detail-action-secondary" data-convert-category="Assessment Task" ${normalizedCategory === "Assessment Task" ? "disabled" : ""}>Convert to Assessment</button>
                         <button type="button" class="detail-action detail-action-secondary" data-convert-category="Activity" ${normalizedCategory === "Activity" ? "disabled" : ""}>Convert to Activity</button>
+                        <button type="button" class="detail-action detail-action-secondary" id="detail-reapply-category-color">Reapply Category Color</button>
                     </div>
                 ` : ""}
                 ${canEdit ? '<button type="button" class="detail-action" id="detail-edit-button">Edit Details</button>' : ""}
@@ -3055,11 +3070,15 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     }
 
     const convertButtons = Array.from(host.querySelectorAll("button[data-convert-category]"));
+    const reapplyColorButton = host.querySelector("#detail-reapply-category-color");
     if (convertButtons.length) {
         const setConvertDisabled = (disabled) => {
             convertButtons.forEach((button) => {
                 button.disabled = disabled;
             });
+            if (reapplyColorButton) {
+                reapplyColorButton.disabled = disabled;
+            }
         };
 
         convertButtons.forEach((button) => {
@@ -3082,6 +3101,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 try {
                     const draft = defaultDetailShape(id, data);
                     draft.activityCategory = targetCategory;
+                    draft.cardColor = getDefaultCardColorForCategory(targetCategory);
                     const saved = await saveDetails(id, draft);
                     DETAIL_DATA[id] = saved;
                     renderDetailView(host, id, saved, canEdit, selectedTaskTopic, selectedTaskShortName);
@@ -3093,6 +3113,35 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 }
             });
         });
+
+        if (reapplyColorButton) {
+            reapplyColorButton.addEventListener("click", async () => {
+                const currentCategory = normalizeCardCategory(data?.activityCategory, "Activity");
+                const targetColor = getDefaultCardColorForCategory(currentCategory);
+                const confirmed = window.confirm(`Reapply ${targetColor} color for category ${currentCategory}?`);
+                if (!confirmed) {
+                    return;
+                }
+
+                setConvertDisabled(true);
+                if (editButton) editButton.disabled = true;
+                if (deleteButton) deleteButton.disabled = true;
+
+                try {
+                    const draft = defaultDetailShape(id, data);
+                    draft.activityCategory = currentCategory;
+                    draft.cardColor = targetColor;
+                    const saved = await saveDetails(id, draft);
+                    DETAIL_DATA[id] = saved;
+                    renderDetailView(host, id, saved, canEdit, selectedTaskTopic, selectedTaskShortName);
+                } catch (error) {
+                    setConvertDisabled(false);
+                    if (editButton) editButton.disabled = false;
+                    if (deleteButton) deleteButton.disabled = false;
+                    window.alert(error.message || "Could not reapply category color.");
+                }
+            });
+        }
     }
 }
 
@@ -3137,6 +3186,7 @@ async function saveDetails(id, draft) {
         year_level: draft.yearLevel,
         type: draft.type,
             activity_category: normalizeCardCategory(draft.activityCategory, "Activity"),
+        card_color: String(draft.cardColor || "").trim(),
         duration_minutes: parseDurationMinutes(draft.durationMinutes),
         outcome_image_url: isGeneratedUploadedActivityImageUrl(draft.image) ? "" : draft.image,
         description: draft.summary,
@@ -3195,6 +3245,7 @@ async function saveDetails(id, draft) {
             : `${parseDurationMinutes(draft.durationMinutes)} mins`,
         term: result.term || draft.term,
         activityCategory: normalizeCardCategory(result.activity_category || draft.activityCategory, "Activity"),
+        cardColor: String(result.card_color || draft.cardColor || "").trim() || getDefaultCardColorForCategory(result.activity_category || draft.activityCategory),
         showInThisWeek: Boolean(result.show_in_this_week ?? result.show_this_week ?? result.is_pinned ?? result.is_this_week ?? draft.showInThisWeek),
         summary: String(result.description || result.summary || draft.summary || "").trim(),
         resources: Array.isArray(result.resources) ? result.resources : draft.resources,
