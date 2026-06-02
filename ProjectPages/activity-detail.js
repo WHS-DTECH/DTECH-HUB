@@ -2697,15 +2697,15 @@ function defaultDetailShape(id, data) {
 }
 
 function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selectedTaskShortName = "") {
-    const isAssessmentTask = String(data?.activityCategory || "").toLowerCase().includes("assessment");
     const normalizedCategory = normalizeCardCategory(data?.activityCategory, "Activity");
+    const isAssessmentTask = normalizedCategory === "Assessment Task";
     const canConvertCategory = canEdit && !selectedTaskTopic && Boolean(String(id || "").match(/^\d+$/));
     const cardUrl = toSafeExternalUrl(data?.cardUrl);
     const taskTopicTitle = String(selectedTaskTopic || "").trim();
     const isTaskTopicView = Boolean(taskTopicTitle);
     const toolbarLabel = isTaskTopicView
         ? "Task Topic Card"
-        : (isAssessmentTask ? "Assessment Task Details" : "Activity");
+        : (isAssessmentTask ? "Assessment Task Details" : (normalizedCategory === "Project" ? "Project" : "Activity"));
     const standardTaskTopicUrl = cardUrl || `${window.location.origin}/ProjectPages/custom-activity.html?id=${encodeURIComponent(String(id || ""))}`;
     const parentAssessmentUrl = `custom-activity.html?id=${encodeURIComponent(String(id || ""))}`;
     const resolvedTaskShortName = String(selectedTaskShortName || "").trim()

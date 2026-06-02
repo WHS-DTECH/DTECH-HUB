@@ -1862,6 +1862,39 @@ function isExplicitActivityCategoryLabel(value) {
   return normalized === "activity" || normalized === "skill activity" || normalized === "practice" || normalized === "practice activity";
 }
 
+function hasMeaningfulCategorySignalValue(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || "").trim()).filter(Boolean).length > 0;
+  }
+
+  const text = String(value || "").trim();
+  if (!text) return false;
+  if (text === "[]" || text === "{}") return false;
+
+  const lowered = text.toLowerCase();
+  if (lowered === "null" || lowered === "undefined" || lowered === "none" || lowered === "n/a") return false;
+
+  return true;
+}
+
+function hasProjectPayloadShape(row) {
+  const candidate = row && typeof row === "object" ? row : {};
+  return [
+    candidate.start_date,
+    candidate.startDate,
+    candidate.contact_name,
+    candidate.contactName,
+    candidate.contact_email,
+    candidate.contactEmail,
+    candidate.company,
+    candidate.address,
+    candidate.overview,
+    candidate.services,
+    candidate.costs,
+    candidate.outcomes
+  ].some((value) => hasMeaningfulCategorySignalValue(value));
+}
+
 function normalizeActivityCategoryForResponse(activity) {
   const row = activity && typeof activity === "object" ? { ...activity } : {};
   const resolvedCategoryText = String(row.activity_category || row.category || "").trim();
@@ -1870,6 +1903,7 @@ function normalizeActivityCategoryForResponse(activity) {
   }
 
   const rawCategory = String(row.activity_category || "").trim().toLowerCase();
+  const hasProjectShape = hasProjectPayloadShape(row);
   const normalizedTitle = String(row.name || row.title || "").trim().toLowerCase();
   const isKnownLegacyAssessmentTitle = normalizedTitle === "making interview show";
   const assessmentText = [row.name, row.title, row.description, row.summary]
@@ -1887,8 +1921,18 @@ function normalizeActivityCategoryForResponse(activity) {
     return row;
   }
 
+  if ((rawCategory === "activity" || rawCategory === "practice" || rawCategory === "practice activity" || rawCategory === "skill activity") && hasProjectShape && !hasAssessmentSignals(row)) {
+    row.activity_category = "Project";
+    return row;
+  }
+
   if (rawCategory === "" && (hasAssessmentSignals(row) || hasAssessmentTextSignal)) {
     row.activity_category = "Assessment Task";
+    return row;
+  }
+
+  if (rawCategory === "" && hasProjectShape) {
+    row.activity_category = "Project";
   }
 
   return row;
@@ -4173,6 +4217,7 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     "lesson"
   ].includes(String(requestedActivityCategory || "").trim().toLowerCase());
   const hasAssessmentPayload = hasAssessmentSignals(body) || hasAssessmentPayloadShape(body);
+  const hasProjectPayload = hasProjectPayloadShape(body);
   const resolvedRequestedCategory = (() => {
     const normalizedRequested = requestedActivityCategory.toLowerCase();
     if (normalizedRequested === "assessment" || normalizedRequested === "assessment activity") {
@@ -4180,6 +4225,9 @@ app.post("/api/activities", requireActivityWriteAccess, async (req, res) => {
     }
     if (normalizedRequested === "" && hasAssessmentPayload) {
       return "Assessment Task";
+    }
+    if (normalizedRequested === "" && hasProjectPayload) {
+      return "Project";
     }
     return requestedActivityCategory || "Activity";
   })();
