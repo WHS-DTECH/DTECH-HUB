@@ -23,14 +23,30 @@ This folder contains the native Windows tray companion app for DTECH Hub.
 
 ## Build
 
+Run these from the DTECH-HUB repository root.
+
 ```powershell
 dotnet build .\tray\DTECHHubTray\DTECHHubTray.csproj -c Release
 ```
 
+Or from any folder using an absolute path:
+
+```powershell
+dotnet build "C:\Users\VanessaPringle.WHS\OneDrive - Westland High School\Documents\web\WHS System\TechSpace\DTECH-HUB\tray\DTECHHubTray\DTECHHubTray.csproj" -c Release
+```
+
 ## Run
+
+Run these from the DTECH-HUB repository root.
 
 ```powershell
 dotnet run --project .\tray\DTECHHubTray\DTECHHubTray.csproj
+```
+
+Or from any folder using an absolute path:
+
+```powershell
+dotnet run --project "C:\Users\VanessaPringle.WHS\OneDrive - Westland High School\Documents\web\WHS System\TechSpace\DTECH-HUB\tray\DTECHHubTray\DTECHHubTray.csproj"
 ```
 
 Optional args:
