@@ -422,7 +422,7 @@ function readStoredHubAccessToken() {
         if (!parsed?.expiresAt || Number(parsed.expiresAt) <= Date.now()) {
             return "";
         }
-        return String(parsed?.accessToken || "").trim();
+        return String(parsed?.idToken || parsed?.accessToken || "").trim();
     } catch (_error) {
         return "";
     }
@@ -2253,7 +2253,7 @@ function hasDetailPageAccess() {
 
     try {
         const parsed = JSON.parse(raw);
-        if (!parsed?.accessToken || !parsed?.expiresAt || Number(parsed.expiresAt) <= Date.now()) {
+        if (!(parsed?.idToken || parsed?.accessToken) || !parsed?.expiresAt || Number(parsed.expiresAt) <= Date.now()) {
             return false;
         }
 

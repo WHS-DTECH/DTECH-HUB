@@ -109,7 +109,7 @@ function loadHubProfile() {
     const profile = normalizeHubAuthProfile(parsed?.profile);
 
     if (profile) {
-      if (!parsed?.accessToken || !parsed?.expiresAt || parsed.expiresAt <= Date.now()) {
+      if (!(parsed?.idToken || parsed?.accessToken) || !parsed?.expiresAt || parsed.expiresAt <= Date.now()) {
         try {
           localStorage.setItem(HUB_AUTH_STORAGE_KEY, JSON.stringify({
             accessToken: null,

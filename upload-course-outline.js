@@ -46,7 +46,7 @@ function coGetAccessToken() {
         const data = JSON.parse(raw);
         const expiresAt = Number(data?.expiresAt || 0);
         if (expiresAt <= Date.now()) return "";
-        return String(data?.accessToken || "").trim();
+        return String(data?.idToken || data?.accessToken || "").trim();
     } catch (_) {
         return "";
     }
@@ -70,7 +70,7 @@ function coIsAuthenticated() {
     if (!raw) return false;
     try {
         const data = JSON.parse(raw);
-        return Boolean(data?.accessToken) && Number(data?.expiresAt) > Date.now();
+        return Boolean(data?.idToken || data?.accessToken) && Number(data?.expiresAt) > Date.now();
     } catch (_) { return false; }
 }
 

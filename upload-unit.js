@@ -225,7 +225,7 @@ function getSignedInAccessToken() {
         if (expiresAt <= Date.now()) {
             return "";
         }
-        return String(data?.accessToken || "").trim();
+        return String(data?.idToken || data?.accessToken || "").trim();
     } catch (_error) {
         return "";
     }

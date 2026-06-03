@@ -25,7 +25,7 @@ function getAuthState() {
         const auth = JSON.parse(authKey);
         const email = String(auth?.profile?.email || auth?.email || "").trim().toLowerCase();
         const expiresAt = Number(auth?.expiresAt || 0);
-        const accessToken = expiresAt > Date.now() ? String(auth?.accessToken || "").trim() : "";
+        const accessToken = expiresAt > Date.now() ? String(auth?.idToken || auth?.accessToken || "").trim() : "";
         return { email, accessToken };
     } catch {
         return { email: "", accessToken: "" };

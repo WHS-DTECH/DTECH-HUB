@@ -65,7 +65,7 @@
         if (!auth?.expiresAt || Number(auth.expiresAt) <= Date.now()) {
             return "";
         }
-        return String(auth?.accessToken || "").trim();
+        return String(auth?.idToken || auth?.accessToken || "").trim();
     }
 
     function normalizeEmail(value) {

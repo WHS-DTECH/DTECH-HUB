@@ -1383,10 +1383,12 @@ const hubAllowedDomain =
         .toLowerCase();
 
 const hubAuthState = {
+    idToken: null,
     accessToken: null,
     expiresAt: 0,
     profile: null,
-    tokenClient: null
+    tokenClient: null,
+    idClientReady: false
 };
 
 const hubAccessState = {
@@ -1552,8 +1554,8 @@ function getActiveHubEmail() {
     return normalizeEmail(hubAuthState.profile?.email || getHubStoredSignedInEmail());
 }
 
-function getActiveHubAccessToken() {
-    const fromState = String(hubAuthState.accessToken || "").trim();
+function getActiveHubBearerToken() {
+    const fromState = String(hubAuthState.idToken || hubAuthState.accessToken || "").trim();
     if (fromState && Number(hubAuthState.expiresAt || 0) > Date.now()) {
         return fromState;
     }
@@ -1568,7 +1570,7 @@ function getActiveHubAccessToken() {
         if (!parsed?.expiresAt || Number(parsed.expiresAt) <= Date.now()) {
             return "";
         }
-        return String(parsed?.accessToken || "").trim();
+        return String(parsed?.idToken || parsed?.accessToken || "").trim();
     } catch (_error) {
         return "";
     }
@@ -1580,9 +1582,9 @@ function withHubAuthHeaders(headers = {}, email = getActiveHubEmail()) {
     }
 
     const nextHeaders = { ...headers, "x-user-email": email };
-    const accessToken = getActiveHubAccessToken();
-    if (accessToken && accessToken.startsWith("eyJ") && accessToken.split(".").length === 3) {
-        nextHeaders.Authorization = `Bearer ${accessToken}`;
+    const bearerToken = getActiveHubBearerToken();
+    if (bearerToken && bearerToken.startsWith("eyJ") && bearerToken.split(".").length === 3) {
+        nextHeaders.Authorization = `Bearer ${bearerToken}`;
     }
 
     return nextHeaders;
@@ -1696,7 +1698,10 @@ function enforceDetailAccess(event) {
     event.preventDefault();
     event.stopPropagation();
 
-    if (hubAuthState.tokenClient) {
+    if (hubAuthState.idClientReady && window.google?.accounts?.id) {
+        alert("Please sign in with your Westland High account to open details.");
+        window.google.accounts.id.prompt();
+    } else if (hubAuthState.tokenClient) {
         alert("Please sign in with your Westland High account to open details.");
         hubAuthState.tokenClient.requestAccessToken({ prompt: "consent" });
     } else {
@@ -1879,12 +1884,14 @@ function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {
 }
 
 function saveHubAuthState() {
-    if (!hubAuthState.accessToken || !hubAuthState.profile) {
+    const bearerToken = String(hubAuthState.idToken || hubAuthState.accessToken || "").trim();
+    if (!bearerToken || !hubAuthState.profile) {
         clearHubStoredAuthRaw();
         return;
     }
 
     const payload = {
+        idToken: hubAuthState.idToken,
         accessToken: hubAuthState.accessToken,
         expiresAt: hubAuthState.expiresAt,
         profile: hubAuthState.profile
@@ -1893,6 +1900,7 @@ function saveHubAuthState() {
 }
 
 function clearHubAuthState() {
+    hubAuthState.idToken = null;
     hubAuthState.accessToken = null;
     hubAuthState.expiresAt = 0;
     hubAuthState.profile = null;
@@ -1954,11 +1962,13 @@ function loadHubAuthState() {
 
     try {
         const parsed = JSON.parse(raw);
+        const parsedBearer = String(parsed?.idToken || parsed?.accessToken || "").trim();
         const hasProfile = Boolean(parsed.profile?.email);
-        const tokenIsValid = Boolean(parsed.accessToken && parsed.expiresAt && parsed.expiresAt > Date.now());
+        const tokenIsValid = Boolean(parsedBearer && parsed.expiresAt && parsed.expiresAt > Date.now());
 
         if (tokenIsValid) {
-            hubAuthState.accessToken = parsed.accessToken;
+            hubAuthState.idToken = parsedBearer;
+            hubAuthState.accessToken = parsed.accessToken || null;
             hubAuthState.expiresAt = parsed.expiresAt;
             hubAuthState.profile = parsed.profile || null;
             return;
@@ -1966,6 +1976,7 @@ function loadHubAuthState() {
 
         if (hasProfile) {
             // Keep profile state across pages even when the Google token has expired.
+            hubAuthState.idToken = null;
             hubAuthState.accessToken = null;
             hubAuthState.expiresAt = 0;
             hubAuthState.profile = parsed.profile;
@@ -2107,6 +2118,55 @@ async function fetchGoogleUserProfile(accessToken) {
     return response.json();
 }
 
+function decodeBase64UrlValue(value) {
+    const normalized = String(value || "").replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+    return atob(padded);
+}
+
+function parseJwtPayload(token) {
+    const raw = String(token || "").trim();
+    if (!raw || raw.split(".").length !== 3) {
+        throw new Error("Invalid ID token format.");
+    }
+
+    const payloadSegment = raw.split(".")[1];
+    const payloadText = decodeBase64UrlValue(payloadSegment);
+    return JSON.parse(payloadText);
+}
+
+function buildHubProfileFromIdTokenPayload(payload) {
+    return {
+        email: String(payload?.email || "").trim().toLowerCase(),
+        email_verified: payload?.email_verified !== false,
+        name: String(payload?.name || payload?.given_name || payload?.email || "").trim(),
+        given_name: String(payload?.given_name || "").trim(),
+        picture: String(payload?.picture || "").trim()
+    };
+}
+
+async function handleHubGoogleCredential(credentialResponse) {
+    const idToken = String(credentialResponse?.credential || "").trim();
+    if (!idToken) {
+        throw new Error("Google sign-in did not return an ID token.");
+    }
+
+    const payload = parseJwtPayload(idToken);
+    const profile = buildHubProfileFromIdTokenPayload(payload);
+    if (!isAllowedHubAccount(profile)) {
+        throw new Error("This Google account is not allowed for this hub.");
+    }
+
+    const expSeconds = Number(payload?.exp || 0);
+    hubAuthState.idToken = idToken;
+    hubAuthState.accessToken = null;
+    hubAuthState.expiresAt = expSeconds > 0 ? expSeconds * 1000 : Date.now() + 60 * 60 * 1000;
+    hubAuthState.profile = profile;
+    saveHubAuthState();
+    await resolveHubAccessState();
+    renderHubAuthUi();
+}
+
 async function handleHubGoogleToken(tokenResponse) {
     if (!tokenResponse?.access_token) {
         throw new Error("Google sign-in did not return an access token.");
@@ -2135,12 +2195,20 @@ function signOutHubGoogle() {
     }
 
     clearHubAuthState();
+    if (window.google?.accounts?.id) {
+        window.google.accounts.id.disableAutoSelect();
+    }
     renderHubAuthUi();
 }
 
 function bindHubAuthControls() {
     if (hubSignInButton) {
         hubSignInButton.addEventListener("click", () => {
+            if (hubAuthState.idClientReady && window.google?.accounts?.id) {
+                window.google.accounts.id.prompt();
+                return;
+            }
+
             if (!hubAuthState.tokenClient) {
                 alert("Google sign-in is not configured yet. Add your Google client ID in the page metadata.");
                 return;
@@ -2198,7 +2266,23 @@ function initHubGoogleAuth() {
     }
 
     const waitForGoogleLibrary = (attemptsLeft = 30) => {
-        if (window.google?.accounts?.oauth2) {
+        if (window.google?.accounts?.id && !hubAuthState.idClientReady) {
+            window.google.accounts.id.initialize({
+                client_id: hubGoogleClientId,
+                callback: async (credentialResponse) => {
+                    try {
+                        await handleHubGoogleCredential(credentialResponse);
+                    } catch (error) {
+                        clearHubAuthState();
+                        renderHubAuthUi();
+                        alert(error.message || "Google sign-in failed.");
+                    }
+                }
+            });
+            hubAuthState.idClientReady = true;
+        }
+
+        if (window.google?.accounts?.oauth2 && !hubAuthState.tokenClient) {
             hubAuthState.tokenClient = window.google.accounts.oauth2.initTokenClient({
                 client_id: hubGoogleClientId,
                 scope: "openid email profile",
@@ -2212,6 +2296,9 @@ function initHubGoogleAuth() {
                     }
                 }
             });
+        }
+
+        if (hubAuthState.idClientReady || hubAuthState.tokenClient) {
             return;
         }
 

@@ -48,7 +48,7 @@ function standardsGetStoredAuthState() {
         }
         return {
             email: String(parsed?.profile?.email || "").trim().toLowerCase(),
-            accessToken: String(parsed?.accessToken || "").trim()
+            accessToken: String(parsed?.idToken || parsed?.accessToken || "").trim()
         };
     } catch (_error) {
         return { email: "", accessToken: "" };

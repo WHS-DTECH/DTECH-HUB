@@ -27,7 +27,7 @@ function getSignedInAccessToken() {
         if (!parsed?.expiresAt || Number(parsed.expiresAt) <= Date.now()) {
             return "";
         }
-        return String(parsed?.accessToken || "").trim();
+        return String(parsed?.idToken || parsed?.accessToken || "").trim();
     } catch (_error) {
         return "";
     }
