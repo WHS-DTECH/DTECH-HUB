@@ -1451,6 +1451,8 @@ const hubAdminLink = document.querySelector("#hub-admin-link");
 const hubAccessBadge = document.querySelector("#hub-access-badge");
 const hubSignInButton = document.querySelector("#hub-google-signin");
 const hubSignOutButton = document.querySelector("#hub-google-signout");
+const hubStartupSignInBanner = document.querySelector("#hub-startup-signin-banner");
+const hubStartupSignInCta = document.querySelector("#hub-startup-signin-cta");
 const hubUserBadge = document.querySelector("#hub-user-badge");
 const hubProfilePanel = document.querySelector("#hub-user-profile");
 const hubProfileAvatar = document.querySelector("#hub-profile-avatar");
@@ -2034,6 +2036,12 @@ function renderHubAuthUi() {
     if (hubSignInButton) {
         hubSignInButton.hidden = signedIn;
     }
+    if (hubStartupSignInBanner) {
+        const showStartupBanner = !signedIn
+            && isHomepagePath()
+            && isHubAutoLoginRequestedByUrl();
+        hubStartupSignInBanner.hidden = !showStartupBanner;
+    }
     if (hubSignOutButton) {
         hubSignOutButton.hidden = !signedIn;
     }
@@ -2225,6 +2233,12 @@ function bindHubAuthControls() {
 
     if (hubSignOutButton) {
         hubSignOutButton.addEventListener("click", signOutHubGoogle);
+    }
+
+    if (hubStartupSignInCta && hubSignInButton) {
+        hubStartupSignInCta.addEventListener("click", () => {
+            hubSignInButton.click();
+        });
     }
 
     if (hubStaffLink) {
