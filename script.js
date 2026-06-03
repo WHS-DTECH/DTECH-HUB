@@ -1467,6 +1467,7 @@ const hubBrowseButtons = Array.from(document.querySelectorAll("[data-auth-browse
 const hubUnitPlansButtons = Array.from(document.querySelectorAll("[data-auth-unit-plans]"));
 const HUB_VIEW_MODE_STORAGE_KEY = "hub_view_mode_v1";
 const HUB_GLOBAL_SIDEBAR_SESSION_KEY = "hub_global_sidebar_seen_v1";
+const HUB_AUTO_LOGIN_PROMPT_SESSION_KEY = "hub_auto_login_prompted_v1";
 
 let hubGlobalSidebarNodes = null;
 
@@ -2252,6 +2253,54 @@ function bindHubAuthControls() {
     }
 }
 
+function isHubAppModeWindow() {
+    try {
+        if (window.matchMedia("(display-mode: standalone)").matches) return true;
+        if (window.matchMedia("(display-mode: minimal-ui)").matches) return true;
+        if (window.matchMedia("(display-mode: fullscreen)").matches) return true;
+    } catch (_error) {
+    }
+
+    return Boolean(window.navigator?.standalone);
+}
+
+function hasAutoPromptedHubSignInThisSession() {
+    try {
+        return sessionStorage.getItem(HUB_AUTO_LOGIN_PROMPT_SESSION_KEY) === "1";
+    } catch (_error) {
+        return false;
+    }
+}
+
+function markAutoPromptedHubSignInThisSession() {
+    try {
+        sessionStorage.setItem(HUB_AUTO_LOGIN_PROMPT_SESSION_KEY, "1");
+    } catch (_error) {
+    }
+}
+
+function maybeAutoPromptHubSignIn() {
+    if (!hubAuthState.idClientReady || !window.google?.accounts?.id) {
+        return;
+    }
+
+    if (hasAllowedSignedInHubAccount()) {
+        return;
+    }
+
+    // Keep auto-prompt targeted to the app-mode startup experience on the homepage.
+    if (!isHomepagePath() || !isHubAppModeWindow()) {
+        return;
+    }
+
+    if (hasAutoPromptedHubSignInThisSession()) {
+        return;
+    }
+
+    markAutoPromptedHubSignInThisSession();
+    window.google.accounts.id.prompt();
+}
+
 function initHubGoogleAuth() {
     loadHubAuthState();
     renderHubAuthUi();
@@ -2280,6 +2329,7 @@ function initHubGoogleAuth() {
                 }
             });
             hubAuthState.idClientReady = true;
+            maybeAutoPromptHubSignIn();
         }
 
         if (window.google?.accounts?.oauth2 && !hubAuthState.tokenClient) {
@@ -2299,6 +2349,7 @@ function initHubGoogleAuth() {
         }
 
         if (hubAuthState.idClientReady || hubAuthState.tokenClient) {
+            maybeAutoPromptHubSignIn();
             return;
         }
 
