@@ -148,7 +148,7 @@ function withBrowseUnitAuthHeaders(headers = {}, email = readSignedInEmail()) {
 
     const nextHeaders = { ...headers, "x-user-email": email };
     const accessToken = readSignedInAccessToken();
-    if (accessToken) {
+    if (accessToken && accessToken.split(".").length === 3) {
         nextHeaders.Authorization = `Bearer ${accessToken}`;
     }
 

@@ -43,7 +43,7 @@ function classWithAuthHeaders(headers = {}, email = classGetStoredEmail()) {
 
     const nextHeaders = { ...headers, "x-user-email": email };
     const accessToken = classGetStoredAccessToken();
-    if (accessToken) {
+    if (accessToken && accessToken.split(".").length === 3) {
         nextHeaders.Authorization = `Bearer ${accessToken}`;
     }
 

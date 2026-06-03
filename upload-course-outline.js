@@ -39,9 +39,30 @@ function coGetUserEmail() {
     } catch (_) { return ""; }
 }
 
+function coGetAccessToken() {
+    const raw = coGetAuthRaw();
+    if (!raw) return "";
+    try {
+        const data = JSON.parse(raw);
+        const expiresAt = Number(data?.expiresAt || 0);
+        if (expiresAt <= Date.now()) return "";
+        return String(data?.accessToken || "").trim();
+    } catch (_) {
+        return "";
+    }
+}
+
 function coWithEmailHeader(headers) {
     const email = coGetUserEmail();
-    return email ? { ...headers, "x-user-email": email } : headers;
+    if (!email) return headers;
+
+    const nextHeaders = { ...headers, "x-user-email": email };
+    const accessToken = coGetAccessToken();
+    if (accessToken && accessToken.split(".").length === 3) {
+        nextHeaders.Authorization = `Bearer ${accessToken}`;
+    }
+
+    return nextHeaders;
 }
 
 function coIsAuthenticated() {

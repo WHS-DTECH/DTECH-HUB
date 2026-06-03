@@ -436,7 +436,7 @@ function buildAuthHeaders(headers = {}) {
     }
 
     const accessToken = readStoredHubAccessToken();
-    if (accessToken) {
+    if (accessToken && accessToken.split(".").length === 3) {
         nextHeaders.Authorization = `Bearer ${accessToken}`;
     }
 

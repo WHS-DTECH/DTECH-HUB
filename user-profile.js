@@ -759,7 +759,7 @@
         }
 
         const accessToken = getStoredAccessToken();
-        if (accessToken) {
+        if (accessToken && accessToken.split(".").length === 3) {
             headers.Authorization = `Bearer ${accessToken}`;
         }
 

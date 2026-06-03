@@ -213,16 +213,41 @@ function getSignedInEmail() {
     }
 }
 
+function getSignedInAccessToken() {
+    const raw = getHubStoredAuthRaw();
+    if (!raw) {
+        return "";
+    }
+
+    try {
+        const data = JSON.parse(raw);
+        const expiresAt = Number(data?.expiresAt || 0);
+        if (expiresAt <= Date.now()) {
+            return "";
+        }
+        return String(data?.accessToken || "").trim();
+    } catch (_error) {
+        return "";
+    }
+}
+
 function withUserEmailHeader(headers = {}) {
     const email = getSignedInEmail();
     if (!email) {
         return headers;
     }
 
-    return {
+    const nextHeaders = {
         ...headers,
         "x-user-email": email
     };
+
+    const accessToken = getSignedInAccessToken();
+    if (accessToken && accessToken.split(".").length === 3) {
+        nextHeaders.Authorization = `Bearer ${accessToken}`;
+    }
+
+    return nextHeaders;
 }
 
 function setStatus(message, isError = false) {

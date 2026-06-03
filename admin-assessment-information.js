@@ -66,7 +66,7 @@ function withStandardsAuthHeaders(headers = {}) {
         "x-user-email": email
     };
 
-    if (accessToken) {
+    if (accessToken && accessToken.split(".").length === 3) {
         nextHeaders.Authorization = `Bearer ${accessToken}`;
     }
 

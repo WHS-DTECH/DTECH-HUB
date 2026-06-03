@@ -39,6 +39,38 @@ function getSignedInEmail() {
     }
 }
 
+function getSignedInAccessToken() {
+    const raw = getHubStoredAuthRaw();
+    if (!raw) {
+        return "";
+    }
+
+    try {
+        const parsed = JSON.parse(raw);
+        const expiresAt = Number(parsed?.expiresAt || 0);
+        if (expiresAt <= Date.now()) {
+            return "";
+        }
+        return String(parsed?.accessToken || "").trim();
+    } catch (_error) {
+        return "";
+    }
+}
+
+function withTeacherAuthHeaders(headers = {}, email = getSignedInEmail()) {
+    if (!email) {
+        return headers;
+    }
+
+    const nextHeaders = { ...headers, "x-user-email": email };
+    const accessToken = getSignedInAccessToken();
+    if (accessToken && accessToken.split(".").length === 3) {
+        nextHeaders.Authorization = `Bearer ${accessToken}`;
+    }
+
+    return nextHeaders;
+}
+
 async function enforceTeacherViewAccess() {
     const signedInEmail = getSignedInEmail();
     if (!signedInEmail) {
@@ -47,7 +79,9 @@ async function enforceTeacherViewAccess() {
     }
 
     try {
-        const response = await fetch(`/api/auth/user-access?email=${encodeURIComponent(signedInEmail)}`);
+        const response = await fetch(`/api/auth/user-access?email=${encodeURIComponent(signedInEmail)}`, {
+            headers: withTeacherAuthHeaders({}, signedInEmail)
+        });
         if (!response.ok) {
             window.location.replace("index.html");
             return false;
@@ -193,7 +227,7 @@ function extractStudentYearGroup(row) {
 
 async function fetchProjectInterestSummary() {
     const email = getSignedInEmail();
-    const headers = email ? { "x-user-email": email } : {};
+    const headers = withTeacherAuthHeaders({}, email);
     const response = await fetch("/api/project-interests", { headers });
     if (!response.ok) {
         throw new Error("Could not load project interests");

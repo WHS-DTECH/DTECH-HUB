@@ -458,7 +458,7 @@ function withPracticalAuthHeaders(headers = {}, email = signedInEmail || readSig
 
     const nextHeaders = { ...headers, "x-user-email": email };
     const accessToken = readSignedInAccessToken();
-    if (accessToken) {
+    if (accessToken && accessToken.split(".").length === 3) {
         nextHeaders.Authorization = `Bearer ${accessToken}`;
     }
 

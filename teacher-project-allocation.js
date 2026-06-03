@@ -31,7 +31,7 @@ function allocWithAuthHeaders(headers = {}, email = allocGetStoredEmail()) {
 
     const nextHeaders = { ...headers, "x-user-email": email };
     const accessToken = allocGetStoredAccessToken();
-    if (accessToken) {
+    if (accessToken && accessToken.split(".").length === 3) {
         nextHeaders.Authorization = `Bearer ${accessToken}`;
     }
 

@@ -313,7 +313,7 @@ function withUserEmailHeader(headers) {
     }
 
     const nextHeaders = { ...headers, "x-user-email": email };
-    if (accessToken) {
+    if (accessToken && accessToken.split(".").length === 3) {
         nextHeaders.Authorization = `Bearer ${accessToken}`;
     }
 

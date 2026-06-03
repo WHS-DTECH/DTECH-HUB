@@ -70,7 +70,7 @@ function withAdminAuthHeaders(headers = {}) {
     };
 
     const accessToken = getActiveHubAccessToken();
-    if (accessToken) {
+    if (accessToken && accessToken.split(".").length === 3) {
         nextHeaders.Authorization = `Bearer ${accessToken}`;
     }
 

@@ -40,7 +40,7 @@ function withSignedInAuthHeaders(headers = {}, email = getSignedInEmail()) {
 
     const nextHeaders = { ...headers, "x-user-email": email };
     const accessToken = getSignedInAccessToken();
-    if (accessToken) {
+    if (accessToken && accessToken.split(".").length === 3) {
         nextHeaders.Authorization = `Bearer ${accessToken}`;
     }
 

@@ -15,18 +15,41 @@ function setStatus(message, isError = false) {
     }
 }
 
-function getAuthEmail() {
-    const authKey = localStorage.getItem("hub_google_auth_v1");
+function getAuthState() {
+    const authKey = localStorage.getItem("hub_google_auth_v1") || sessionStorage.getItem("hub_google_auth_v1");
     if (!authKey) {
-        return null;
+        return { email: "", accessToken: "" };
     }
 
     try {
         const auth = JSON.parse(authKey);
-        return String(auth?.email || "").trim() || null;
+        const email = String(auth?.profile?.email || auth?.email || "").trim().toLowerCase();
+        const expiresAt = Number(auth?.expiresAt || 0);
+        const accessToken = expiresAt > Date.now() ? String(auth?.accessToken || "").trim() : "";
+        return { email, accessToken };
     } catch {
-        return null;
+        return { email: "", accessToken: "" };
     }
+}
+
+function getAuthEmail() {
+    const auth = getAuthState();
+    return auth.email || null;
+}
+
+function withLessonAuthHeaders(headers = {}) {
+    const { email, accessToken } = getAuthState();
+    const nextHeaders = { ...headers };
+
+    if (email) {
+        nextHeaders["x-user-email"] = email;
+    }
+
+    if (accessToken && accessToken.split(".").length === 3) {
+        nextHeaders.Authorization = `Bearer ${accessToken}`;
+    }
+
+    return nextHeaders;
 }
 
 function collectLessonPayload() {
@@ -85,10 +108,9 @@ async function saveLessonToServer(payload) {
         const userEmail = getAuthEmail();
         const response = await fetch("/api/lessons", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "x-user-email": userEmail || ""
-            },
+            headers: withLessonAuthHeaders({
+                "Content-Type": "application/json"
+            }),
             body: JSON.stringify(payload)
         });
 
