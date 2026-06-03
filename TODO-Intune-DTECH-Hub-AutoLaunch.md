@@ -2,8 +2,16 @@
 
 Purpose: Prepare an implementation plan for System Administrator review so DTECH Hub auto-launches for all DTECH desktops at Windows sign-in.
 
-Status: Draft with review notes (updated June 2026)
+Status: In progress with completed local pilot setup (updated June 2026)
 Owner: DTECH Team + System Administrator
+
+## Completed So Far (June 2026)
+- [x] Production URL confirmed as `https://dtech-hub2.onrender.com`.
+- [x] Startup shortcut app-mode command confirmed: `msedge.exe --app=https://dtech-hub2.onrender.com`.
+- [x] Intune user-context install script prepared: `intune/Install-DTECHHub-Autolaunch.ps1`.
+- [x] Intune rollback script prepared: `intune/Remove-DTECHHub-Autolaunch.ps1`.
+- [x] Local Non-Intune Pilot setup command executed on laptop.
+- [x] Local Startup shortcut validated (target + arguments).
 
 ## Confirmed Decisions (From DTECH Team)
 - DTECH desktops are shared multi-user devices.
@@ -23,7 +31,7 @@ Recommended production choice (based on confirmed decisions):
 - [ ] Confirm user-based assignment groups for shared multi-user devices (students + staff).
 - [ ] Confirm whether any device-based assignment is still required for room-specific controls.
 - [ ] Confirm pilot ring (small class + staff) before full rollout.
-- [ ] Confirm production DTECH Hub URL to launch.
+- [x] Confirm production DTECH Hub URL to launch.
 
 ## 2) Edge Policy (Primary Launch Method)
 Create an Intune Settings Catalog profile for Microsoft Edge as fallback control (not parallel primary launch) with:
@@ -41,7 +49,7 @@ Use startup shortcut to run Edge app mode:
 - Command format:
     msedge.exe --app=https://dtech-hub2.onrender.com
 
-- [ ] Confirm if app-mode window is preferred over normal browser tab launch.
+- [x] Confirm if app-mode window is preferred over normal browser tab launch.
 - [ ] Confirm icon/branding requirements for shortcut name and icon.
 
 ## 4) Intune PowerShell Script (User Context, Recommended Primary)
@@ -184,16 +192,23 @@ Pilot decision matrix:
 ## 12) Local Non-Intune Pilot (Laptop)
 You can test this on a single laptop before Intune by manually creating the same Startup shortcut in user profile:
 
-1. Confirm DTECH Hub production URL.
-2. Create shortcut in startup folder:
+1. [x] Confirm DTECH Hub production URL.
+2. [x] Create shortcut in startup folder:
      - Path: `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup`
      - Target: `msedge.exe`
     - Arguments: `--app=https://dtech-hub2.onrender.com`
-3. Sign out/sign in and confirm behavior.
+3. [ ] Sign out/sign in and confirm behavior.
 4. Validate:
      - Single app window launch.
      - No duplicate tab + app windows.
      - Google sign-in behavior acceptable for student workflow.
+
+Local pilot execution log:
+- Date: 2026-06-03
+- Executed: Startup shortcut creation command (user context)
+- Result: Shortcut created at `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\DTECH Hub.lnk`
+- Verified target: `C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`
+- Verified arguments: `--app=https://dtech-hub2.onrender.com`
 
 Optional one-time local command example:
 ```powershell
@@ -211,9 +226,9 @@ $sc.Save()
 
 ## 13) System Admin Technical Rundown (DTECH Hub)
 - Google sign-in setup:
-    - Frontend uses Google Identity Services OAuth token client.
-    - User signs in with Google; profile fetched from Google userinfo API.
-    - Client stores auth profile in local storage (`hub_google_auth_v1`) and sends `x-user-email` header to backend APIs.
+    - Frontend now uses Google Identity Services ID token credential flow for backend authorization.
+    - Client stores auth profile in local storage (`hub_google_auth_v1`) with ID token-first behavior.
+    - Backend authorization now validates Google ID bearer tokens server-side (hybrid mode currently active).
     - Access control is enforced in backend routes using school email/domain + role checks.
 - What was used to build it:
     - Custom web app built with Node.js + Express backend and vanilla HTML/CSS/JavaScript frontend.
