@@ -12,6 +12,7 @@ Owner: DTECH Team + System Administrator
 - [x] Intune rollback script prepared: `intune/Remove-DTECHHub-Autolaunch.ps1`.
 - [x] Local Non-Intune Pilot setup command executed on laptop.
 - [x] Local Startup shortcut validated (target + arguments).
+- [x] Local fallback startup method configured: `HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\DTECHHubAutoLaunch`.
 
 ## Confirmed Decisions (From DTECH Team)
 - DTECH desktops are shared multi-user devices.
@@ -209,6 +210,9 @@ Local pilot execution log:
 - Result: Shortcut created at `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\DTECH Hub.lnk`
 - Verified target: `C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`
 - Verified arguments: `--app=https://dtech-hub2.onrender.com`
+- Follow-up: Startup shortcut did not auto-run after sign-out/sign-in on this laptop.
+- Adjustment: Switched to single-method launch via HKCU Run entry (`DTECHHubAutoLaunch`) and marked as enabled in `StartupApproved\\Run`.
+- Task Scheduler fallback attempt: blocked by local permissions (`Access is denied`), so not used.
 
 Optional one-time local command example:
 ```powershell
