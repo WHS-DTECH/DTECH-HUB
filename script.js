@@ -2205,16 +2205,21 @@ function signOutHubGoogle() {
 function bindHubAuthControls() {
     if (hubSignInButton) {
         hubSignInButton.addEventListener("click", () => {
+            // For explicit user clicks always prefer the OAuth popup — One Tap is
+            // suppressed by Google in app-mode/standalone windows and is not
+            // suitable as a manually triggered action.
+            if (hubAuthState.tokenClient) {
+                hubAuthState.tokenClient.requestAccessToken({ prompt: "select_account" });
+                return;
+            }
+
+            // Fallback: try One Tap prompt if no token client yet.
             if (hubAuthState.idClientReady && window.google?.accounts?.id) {
                 window.google.accounts.id.prompt();
                 return;
             }
 
-            if (!hubAuthState.tokenClient) {
-                alert("Google sign-in is not configured yet. Add your Google client ID in the page metadata.");
-                return;
-            }
-            hubAuthState.tokenClient.requestAccessToken({ prompt: "consent" });
+            alert("Google sign-in is not ready yet. Please wait a moment and try again.");
         });
     }
 
@@ -2314,13 +2319,21 @@ function maybeAutoPromptHubSignIn() {
     }
 
     markAutoPromptedHubSignInThisSession();
+
+    // In app-mode windows One Tap is frequently suppressed by Google.
+    // Prefer the OAuth popup flow for auto-prompt in startup contexts.
+    if (hubAuthState.tokenClient) {
+        hubAuthState.tokenClient.requestAccessToken({ prompt: "select_account" });
+        return;
+    }
+
     window.google.accounts.id.prompt((notification) => {
         const notDisplayed = typeof notification?.isNotDisplayed === "function" && notification.isNotDisplayed();
         const skippedMoment = typeof notification?.isSkippedMoment === "function" && notification.isSkippedMoment();
 
-        // Fallback for constrained environments where One Tap cannot render.
+        // Fallback if One Tap cannot render.
         if ((notDisplayed || skippedMoment) && hubAuthState.tokenClient) {
-            hubAuthState.tokenClient.requestAccessToken({ prompt: "consent" });
+            hubAuthState.tokenClient.requestAccessToken({ prompt: "select_account" });
         }
     });
 }
