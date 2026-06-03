@@ -646,6 +646,11 @@ function extractTaskTopicQualifier(topicText) {
 }
 
 function resolveTaskTopicMergeDecision(project, shortName, topics) {
+    const canPromptForMerge = hasAllowedSignedInHubAccount() && hubAccessState.canAdmin;
+    if (!canPromptForMerge) {
+        return false;
+    }
+
     const projectId = String(project?.id || "").trim();
     const signature = getTaskTopicMergeSignature(topics);
     if (!projectId || !signature) {
