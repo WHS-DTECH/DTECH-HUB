@@ -5399,14 +5399,42 @@ app.post("/api/admin/maintenance/repair-activity-categories", requireAdminAccess
 
     const allRowsResult = await pool.query(`SELECT * FROM activities`);
     const rows = Array.isArray(allRowsResult?.rows) ? allRowsResult.rows : [];
+    const allowedActivityCategories = await getCheckConstraintAllowedValues(
+      "activities",
+      "activities_activity_category_check"
+    );
+    const allowedByLower = new Map(
+      (Array.isArray(allowedActivityCategories) ? allowedActivityCategories : [])
+        .map((value) => String(value || "").trim())
+        .filter(Boolean)
+        .map((value) => [value.toLowerCase(), value])
+    );
+
+    const toConstraintSafeCategory = async (candidateCategory, fallbackType) => {
+      const raw = String(candidateCategory || "").trim();
+      if (!raw) {
+        return await resolveActivityCategoryForInsert("Activity", fallbackType, { preferAssessment: false });
+      }
+
+      const directMatch = allowedByLower.get(raw.toLowerCase());
+      if (directMatch) {
+        return directMatch;
+      }
+
+      return await resolveActivityCategoryForInsert(raw, fallbackType, {
+        preferAssessment: isAssessmentCategoryLabel(raw)
+      });
+    };
 
     let repaired = 0;
     const samples = [];
+    const failures = [];
 
     for (const row of rows) {
       const normalized = normalizeActivityCategoryForResponse(row);
       const currentCategory = String(row?.[categoryColumn] || row?.activity_category || row?.category || "").trim();
-      const nextCategory = String(normalized?.activity_category || currentCategory || "Activity").trim() || "Activity";
+      const normalizedNextCategory = String(normalized?.activity_category || currentCategory || "Activity").trim() || "Activity";
+      const nextCategory = await toConstraintSafeCategory(normalizedNextCategory, row?.type);
 
       const currentColor = cardColorColumn
         ? String(row?.[cardColorColumn] || row?.card_color || row?.card_colour || row?.color || "").trim()
@@ -5420,42 +5448,52 @@ app.post("/api/admin/maintenance/repair-activity-categories", requireAdminAccess
         continue;
       }
 
-      const setClauses = [];
-      const values = [];
+      try {
+        const setClauses = [];
+        const values = [];
 
-      if (shouldUpdateCategory) {
-        values.push(nextCategory);
-        setClauses.push(`${quoteIdentifier(categoryColumn)} = $${values.length}`);
-      }
+        if (shouldUpdateCategory) {
+          values.push(nextCategory);
+          setClauses.push(`${quoteIdentifier(categoryColumn)} = $${values.length}`);
+        }
 
-      if (shouldUpdateColor && cardColorColumn) {
-        values.push(nextColor);
-        setClauses.push(`${quoteIdentifier(cardColorColumn)} = $${values.length}`);
-      }
+        if (shouldUpdateColor && cardColorColumn) {
+          values.push(nextColor);
+          setClauses.push(`${quoteIdentifier(cardColorColumn)} = $${values.length}`);
+        }
 
-      if (updatedAtColumn) {
-        setClauses.push(`${quoteIdentifier(updatedAtColumn)} = NOW()`);
-      }
+        if (updatedAtColumn) {
+          setClauses.push(`${quoteIdentifier(updatedAtColumn)} = NOW()`);
+        }
 
-      values.push(row[idColumn]);
-      await pool.query(
-        `
-          UPDATE activities
-          SET ${setClauses.join(", ")}
-          WHERE ${quoteIdentifier(idColumn)} = $${values.length}
-        `,
-        values
-      );
+        values.push(row[idColumn]);
+        await pool.query(
+          `
+            UPDATE activities
+            SET ${setClauses.join(", ")}
+            WHERE ${quoteIdentifier(idColumn)} = $${values.length}
+          `,
+          values
+        );
 
-      repaired += 1;
-      if (samples.length < 25) {
-        samples.push({
-          id: String(row[idColumn] || ""),
-          beforeCategory: currentCategory || "",
-          afterCategory: nextCategory,
-          beforeColor: currentColor || "",
-          afterColor: shouldUpdateColor ? nextColor : currentColor || nextColor
-        });
+        repaired += 1;
+        if (samples.length < 25) {
+          samples.push({
+            id: String(row[idColumn] || ""),
+            beforeCategory: currentCategory || "",
+            afterCategory: nextCategory,
+            beforeColor: currentColor || "",
+            afterColor: shouldUpdateColor ? nextColor : currentColor || nextColor
+          });
+        }
+      } catch (rowError) {
+        if (failures.length < 25) {
+          failures.push({
+            id: String(row[idColumn] || ""),
+            categoryAttempted: nextCategory,
+            detail: String(rowError?.message || "unknown error")
+          });
+        }
       }
     }
 
@@ -5466,7 +5504,9 @@ app.post("/api/admin/maintenance/repair-activity-categories", requireAdminAccess
       scanned: rows.length,
       repaired,
       unchanged: Math.max(0, rows.length - repaired),
-      samples
+      failed: failures.length,
+      samples,
+      failures
     });
   } catch (error) {
     console.error("[admin-repair-activity-categories]", error);

@@ -95,7 +95,7 @@ async function runCategoryRepair() {
 
         const result = await response.json().catch(() => ({}));
         if (!response.ok) {
-            throw new Error(result.error || result.message || `HTTP ${response.status}`);
+            throw new Error(result.detail || result.error || result.message || `HTTP ${response.status}`);
         }
 
         const scanned = Number(result.scanned || 0);

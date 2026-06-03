@@ -1873,6 +1873,23 @@ body.public-home-access .controls-panel {
     font-size: 0.84rem;
 }
 
+#admin-repair-activity-categories {
+    color: #163f66;
+    border-color: #9fb3c9;
+    background: #edf3fa;
+}
+
+#admin-repair-activity-categories:hover {
+    background: #e3ebf5;
+}
+
+#admin-repair-activity-categories:disabled {
+    color: #4f5f73;
+    background: #e8edf3;
+    border-color: #c8d2df;
+    opacity: 1;
+}
+
 .admin-layout {
     display: grid;
     grid-template-columns: 170px 260px minmax(0, 1fr);
