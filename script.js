@@ -826,6 +826,9 @@ async function loadSharedProjects() {
                 const showInThisWeek = Boolean(item.show_in_this_week ?? item.show_this_week ?? item.is_pinned ?? item.is_this_week);
                 const sourceType = inferSourceTypeFromRecord(item);
                 const defaultCardColor = getDefaultCardColorForCategory(category, sourceType);
+                const resolvedCardColor = sourceType === "project"
+                    ? "Violet"
+                    : String(item.card_color || item.card_colour || item.color || defaultCardColor);
                 const taskTopics = collectTaskTopicsFromActivityRecord(item);
                 const standardDetails = normalizeStandardDetailsRows(item.standard_details);
 
@@ -850,7 +853,7 @@ async function loadSharedProjects() {
                     visual: {
                         icon: textToIcon(type),
                         label: "Teacher Upload",
-                        palette: colorToPalette(item.card_color || item.card_colour || item.color || defaultCardColor)
+                        palette: colorToPalette(resolvedCardColor)
                     }
                 };
             })
