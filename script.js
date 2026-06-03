@@ -1581,7 +1581,7 @@ function withHubAuthHeaders(headers = {}, email = getActiveHubEmail()) {
 
     const nextHeaders = { ...headers, "x-user-email": email };
     const accessToken = getActiveHubAccessToken();
-    if (accessToken && accessToken.split(".").length === 3) {
+    if (accessToken && accessToken.startsWith("eyJ") && accessToken.split(".").length === 3) {
         nextHeaders.Authorization = `Bearer ${accessToken}`;
     }
 

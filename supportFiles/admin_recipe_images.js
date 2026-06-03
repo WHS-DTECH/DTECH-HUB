@@ -109,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
       'x-user-email': currentUserEmail
     });
     const accessToken = readStoredAccessToken();
-    if (accessToken && accessToken.split(".").length === 3) {
+    if (accessToken && accessToken.startsWith("eyJ") && accessToken.split(".").length === 3) {
       headers.Authorization = `Bearer ${accessToken}`;
     }
     const response = await fetch(path, Object.assign({}, options || {}, { headers }));

@@ -322,7 +322,7 @@ function withUserEmailHeader(headers = {}) {
         "x-user-email": email
     };
 
-    if (accessToken && accessToken.split(".").length === 3) {
+    if (accessToken && accessToken.startsWith("eyJ") && accessToken.split(".").length === 3) {
         nextHeaders.Authorization = `Bearer ${accessToken}`;
     }
 
