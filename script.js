@@ -2264,6 +2264,16 @@ function isHubAppModeWindow() {
     return Boolean(window.navigator?.standalone);
 }
 
+function isHubAutoLoginRequestedByUrl() {
+    try {
+        const params = new URLSearchParams(window.location.search || "");
+        const value = String(params.get("autologin") || "").trim().toLowerCase();
+        return value === "1" || value === "true" || value === "yes";
+    } catch (_error) {
+        return false;
+    }
+}
+
 function hasAutoPromptedHubSignInThisSession() {
     try {
         return sessionStorage.getItem(HUB_AUTO_LOGIN_PROMPT_SESSION_KEY) === "1";
@@ -2288,8 +2298,14 @@ function maybeAutoPromptHubSignIn() {
         return;
     }
 
-    // Keep auto-prompt targeted to the app-mode startup experience on the homepage.
-    if (!isHomepagePath() || !isHubAppModeWindow()) {
+    // Keep auto-prompt targeted to startup contexts on the homepage.
+    if (!isHomepagePath()) {
+        return;
+    }
+
+    // Some Edge app-mode windows do not expose display-mode reliably.
+    // Allow explicit startup URL flag as a deterministic trigger.
+    if (!isHubAppModeWindow() && !isHubAutoLoginRequestedByUrl()) {
         return;
     }
 
@@ -2298,7 +2314,15 @@ function maybeAutoPromptHubSignIn() {
     }
 
     markAutoPromptedHubSignInThisSession();
-    window.google.accounts.id.prompt();
+    window.google.accounts.id.prompt((notification) => {
+        const notDisplayed = typeof notification?.isNotDisplayed === "function" && notification.isNotDisplayed();
+        const skippedMoment = typeof notification?.isSkippedMoment === "function" && notification.isSkippedMoment();
+
+        // Fallback for constrained environments where One Tap cannot render.
+        if ((notDisplayed || skippedMoment) && hubAuthState.tokenClient) {
+            hubAuthState.tokenClient.requestAccessToken({ prompt: "consent" });
+        }
+    });
 }
 
 function initHubGoogleAuth() {
