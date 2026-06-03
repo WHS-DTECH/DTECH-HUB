@@ -1,6 +1,7 @@
+(() => {
 const REPAIR_BUTTON = document.querySelector("#admin-repair-activity-categories");
 const REPAIR_STATUS = document.querySelector("#admin-repair-status");
-const HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
+const ADMIN_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 
 function normalizeEmail(value) {
     return String(value || "").trim().toLowerCase();
@@ -11,13 +12,13 @@ function getStoredAuthRaw() {
     let sessionValue = null;
 
     try {
-        localValue = localStorage.getItem(HUB_AUTH_STORAGE_KEY);
+        localValue = localStorage.getItem(ADMIN_HUB_AUTH_STORAGE_KEY);
     } catch (_error) {
         localValue = null;
     }
 
     try {
-        sessionValue = sessionStorage.getItem(HUB_AUTH_STORAGE_KEY);
+        sessionValue = sessionStorage.getItem(ADMIN_HUB_AUTH_STORAGE_KEY);
     } catch (_error) {
         sessionValue = null;
     }
@@ -115,3 +116,4 @@ if (REPAIR_BUTTON) {
         void runCategoryRepair();
     });
 }
+})();
