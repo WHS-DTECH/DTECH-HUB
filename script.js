@@ -1075,7 +1075,7 @@ async function loadAssessmentStandardCardsForLibrary() {
                         String(card?.year_level || ""),
                         ...standardCodes
                     ].map((value) => String(value || "").trim()).filter(Boolean),
-                    sourceType: "assessment",
+                    sourceType: "standard",
                     standardNumber,
                     standardDetails: [
                         courseName,
@@ -1154,7 +1154,7 @@ function getUnifiedLibraryItems() {
         })),
         ...standardCards.map((card) => ({
             ...card,
-            sourceType: "assessment"
+            sourceType: "standard"
         })),
         ...taskTopicItems,
         ...labProjects.map(mapLabProjectToLibraryItem)
@@ -2300,7 +2300,7 @@ function filterProjects(items) {
             (state.content === "Activities" && project.sourceType === "activity") ||
             (state.content === "Projects" && project.sourceType === "project") ||
             (state.content === "Assessments" && project.sourceType === "assessment") ||
-            (state.content === "Standards" && hasStandardReference(project)) ||
+            (state.content === "Standards" && (project.sourceType === "standard" || project.activityCategory === "Standard")) ||
             (state.content === "Lessons" && project.sourceType === "lesson") ||
             (state.content === "Task Topics" && project.sourceType === "task-topic");
         const haystack = [
