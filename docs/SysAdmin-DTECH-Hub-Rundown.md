@@ -14,13 +14,29 @@ DTECH Hub is a web application used in DTECH classes for project/activity access
 - Backend enforces school-domain and role-based checks for protected operations.
 
 Current security note:
-- Identity context currently relies on client-supplied email header patterns in many routes.
-- Server-side Google ID token verification support is now activated in backend middleware (staged rollout mode).
+- Server-side Google ID token verification support is activated in backend middleware (staged rollout mode).
+- Current backend policy is hybrid:
+	- Verified bearer ID token is accepted and preferred when present.
+	- Legacy `x-user-email` fallback remains temporarily available for compatibility.
+	- If an invalid bearer token is presented, request is rejected (no legacy fallback for that request).
 - A hardening plan is provided in `docs/Google-Identity-Hardening-Plan.md` for full strict enforcement cutover.
 
 Current rollout mode:
-- `AUTH_MODE=hybrid` is recommended during migration.
-- `AUTH_MODE=strict` can be enabled once all protected frontend calls send bearer ID tokens.
+- `AUTH_MODE=hybrid` is currently enabled in production.
+- Google token audience configuration is active (`google_id_token_audiences_configured > 0`).
+- `AUTH_MODE=strict` can be enabled once remaining protected frontend calls all send bearer ID tokens.
+
+Migration status (June 2026):
+- Bearer token headers added to high-risk frontend flows:
+	- Upload flows (Activity, Assessment, Project)
+	- Admin maintenance + Assessment Standards management
+	- Teacher allocation flows (Project + Assessment)
+- Remaining lower-risk routes still need the same bearer-header pattern before strict mode cutover.
+
+Live verification status:
+- Health endpoint confirms hybrid mode and audience configuration.
+- Invalid bearer token test returns `401` with token verification failure.
+- Header-only compatibility path still functions in hybrid mode.
 
 ## 3) What It Was Built With
 - Backend: Node.js + Express

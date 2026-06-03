@@ -289,21 +289,35 @@ function getHubStoredAuthRaw() {
     return localValue || sessionValue;
 }
 
-function withUserEmailHeader(headers) {
-    const auth = getHubStoredAuthRaw();
-    if (!auth) return headers;
-
-    try {
-        const data = JSON.parse(auth);
-        const email = normalizeEmail(data?.profile?.email || "");
-        if (email) {
-            return { ...headers, "x-user-email": email };
-        }
-    } catch (_error) {
-        // Ignore parsing errors.
+function getHubStoredAuthState() {
+    const raw = getHubStoredAuthRaw();
+    if (!raw) {
+        return { email: "", accessToken: "" };
     }
 
-    return headers;
+    try {
+        const parsed = JSON.parse(raw);
+        const email = normalizeEmail(parsed?.profile?.email || "");
+        const expiresAt = Number(parsed?.expiresAt || 0);
+        const accessToken = expiresAt > Date.now() ? String(parsed?.accessToken || "").trim() : "";
+        return { email, accessToken };
+    } catch (_error) {
+        return { email: "", accessToken: "" };
+    }
+}
+
+function withUserEmailHeader(headers) {
+    const { email, accessToken } = getHubStoredAuthState();
+    if (!email) {
+        return headers;
+    }
+
+    const nextHeaders = { ...headers, "x-user-email": email };
+    if (accessToken) {
+        nextHeaders.Authorization = `Bearer ${accessToken}`;
+    }
+
+    return nextHeaders;
 }
 
 function getCurrentStandardLines() {

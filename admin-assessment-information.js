@@ -34,6 +34,45 @@ function standardsGetStoredEmail() {
     }
 }
 
+function standardsGetStoredAuthState() {
+    const raw = localStorage.getItem(STANDARDS_AUTH_KEY) || sessionStorage.getItem(STANDARDS_AUTH_KEY);
+    if (!raw) {
+        return { email: "", accessToken: "" };
+    }
+
+    try {
+        const parsed = JSON.parse(raw);
+        const expiresAt = Number(parsed?.expiresAt || 0);
+        if (expiresAt <= Date.now()) {
+            return { email: "", accessToken: "" };
+        }
+        return {
+            email: String(parsed?.profile?.email || "").trim().toLowerCase(),
+            accessToken: String(parsed?.accessToken || "").trim()
+        };
+    } catch (_error) {
+        return { email: "", accessToken: "" };
+    }
+}
+
+function withStandardsAuthHeaders(headers = {}) {
+    const { email, accessToken } = standardsGetStoredAuthState();
+    if (!email) {
+        return headers;
+    }
+
+    const nextHeaders = {
+        ...headers,
+        "x-user-email": email
+    };
+
+    if (accessToken) {
+        nextHeaders.Authorization = `Bearer ${accessToken}`;
+    }
+
+    return nextHeaders;
+}
+
 async function enforceAdminAccess() {
     const email = standardsGetStoredEmail();
     if (!email) {
@@ -42,7 +81,9 @@ async function enforceAdminAccess() {
     }
 
     try {
-        const response = await fetch(`/api/auth/user-access?email=${encodeURIComponent(email)}`);
+        const response = await fetch(`/api/auth/user-access?email=${encodeURIComponent(email)}`, {
+            headers: withStandardsAuthHeaders({})
+        });
         if (!response.ok) {
             setStatus("Could not verify admin access right now. Please sign out and sign in again.", true);
             return "";
@@ -320,9 +361,7 @@ async function loadStandardDetail(standardNumber, { force = false } = {}) {
         }
 
         const response = await fetch(`/api/admin/nzqa-standards/details?${params.toString()}`, {
-            headers: {
-                "x-user-email": email
-            }
+            headers: withStandardsAuthHeaders({})
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
@@ -455,9 +494,7 @@ async function loadAssessmentStandardCards() {
 
     try {
         const response = await fetch("/api/admin/assessment-standard-cards", {
-            headers: {
-                "x-user-email": email
-            }
+            headers: withStandardsAuthHeaders({})
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
@@ -531,10 +568,7 @@ async function saveAssessmentStandardCard(event) {
     try {
         const response = await fetch("/api/admin/assessment-standard-cards", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "x-user-email": email
-            },
+            headers: withStandardsAuthHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify(payload)
         });
         const result = await response.json().catch(() => ({}));
@@ -566,9 +600,7 @@ async function deleteAssessmentStandardCard(id) {
     try {
         const response = await fetch(`/api/admin/assessment-standard-cards/${encodeURIComponent(id)}`, {
             method: "DELETE",
-            headers: {
-                "x-user-email": email
-            }
+            headers: withStandardsAuthHeaders({})
         });
         const result = await response.json().catch(() => ({}));
         if (!response.ok) {
@@ -615,9 +647,7 @@ async function loadStandards({ force = false } = {}) {
 
     try {
         const response = await fetch(`/api/admin/nzqa-standards?${params.toString()}`, {
-            headers: {
-                "x-user-email": email
-            }
+            headers: withStandardsAuthHeaders({})
         });
         const payload = await response.json().catch(() => ({}));
 

@@ -12,6 +12,32 @@ function allocGetStoredEmail() {
     }
 }
 
+function allocGetStoredAccessToken() {
+    const raw = localStorage.getItem(ALLOC_AUTH_KEY) || sessionStorage.getItem(ALLOC_AUTH_KEY);
+    if (!raw) return "";
+    try {
+        const parsed = JSON.parse(raw);
+        if (!parsed?.expiresAt || Number(parsed.expiresAt) <= Date.now()) return "";
+        return String(parsed?.accessToken || "").trim();
+    } catch (_e) {
+        return "";
+    }
+}
+
+function allocWithAuthHeaders(headers = {}, email = allocGetStoredEmail()) {
+    if (!email) {
+        return headers;
+    }
+
+    const nextHeaders = { ...headers, "x-user-email": email };
+    const accessToken = allocGetStoredAccessToken();
+    if (accessToken) {
+        nextHeaders.Authorization = `Bearer ${accessToken}`;
+    }
+
+    return nextHeaders;
+}
+
 async function allocEnforceAccess() {
     const email = allocGetStoredEmail();
     if (!email) {
@@ -197,7 +223,7 @@ async function handleAllocationAction(btn, projectId, email) {
     const action = btn.getAttribute("data-action");
 
     btn.disabled = true;
-    const headers = { "Content-Type": "application/json", "x-user-email": email };
+    const headers = allocWithAuthHeaders({ "Content-Type": "application/json" }, email);
 
     try {
         if (action === "confirm") {
@@ -264,7 +290,7 @@ async function loadAllocations() {
     try {
         const [activitiesResponse, interestsResponse] = await Promise.all([
             fetch("/api/activities"),
-            fetch("/api/project-interests", { headers: { "x-user-email": email } })
+            fetch("/api/project-interests", { headers: allocWithAuthHeaders({}, email) })
         ]);
 
         if (!activitiesResponse.ok) {

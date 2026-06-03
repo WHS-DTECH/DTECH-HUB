@@ -294,16 +294,39 @@ function getSignedInEmail() {
     }
 }
 
+function getHubStoredAuthState() {
+    const raw = getHubStoredAuthRaw();
+    if (!raw) {
+        return { email: "", accessToken: "" };
+    }
+
+    try {
+        const parsed = JSON.parse(raw);
+        const email = normalizeEmail(parsed?.profile?.email || "");
+        const expiresAt = Number(parsed?.expiresAt || 0);
+        const accessToken = expiresAt > Date.now() ? String(parsed?.accessToken || "").trim() : "";
+        return { email, accessToken };
+    } catch (_error) {
+        return { email: "", accessToken: "" };
+    }
+}
+
 function withUserEmailHeader(headers = {}) {
-    const email = getSignedInEmail();
+    const { email, accessToken } = getHubStoredAuthState();
     if (!email) {
         return headers;
     }
 
-    return {
+    const nextHeaders = {
         ...headers,
         "x-user-email": email
     };
+
+    if (accessToken) {
+        nextHeaders.Authorization = `Bearer ${accessToken}`;
+    }
+
+    return nextHeaders;
 }
 
 function renderActivityAuthStatus() {

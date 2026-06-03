@@ -40,6 +40,43 @@ function getActiveHubEmail() {
     }
 }
 
+function getActiveHubAccessToken() {
+    const raw = getStoredAuthRaw();
+    if (!raw) {
+        return "";
+    }
+
+    try {
+        const parsed = JSON.parse(raw);
+        const expiresAt = Number(parsed?.expiresAt || 0);
+        if (expiresAt <= Date.now()) {
+            return "";
+        }
+        return String(parsed?.accessToken || "").trim();
+    } catch (_error) {
+        return "";
+    }
+}
+
+function withAdminAuthHeaders(headers = {}) {
+    const email = getActiveHubEmail();
+    if (!email) {
+        return headers;
+    }
+
+    const nextHeaders = {
+        ...headers,
+        "x-user-email": email
+    };
+
+    const accessToken = getActiveHubAccessToken();
+    if (accessToken) {
+        nextHeaders.Authorization = `Bearer ${accessToken}`;
+    }
+
+    return nextHeaders;
+}
+
 function setRepairStatus(message, isError = false) {
     if (!REPAIR_STATUS) return;
 
@@ -84,10 +121,7 @@ async function runCategoryRepair() {
     try {
         const response = await fetch("/api/admin/maintenance/repair-activity-categories", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "x-user-email": email
-            },
+            headers: withAdminAuthHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify({
                 confirm: "REPAIR_ACTIVITY_CATEGORIES"
             })
