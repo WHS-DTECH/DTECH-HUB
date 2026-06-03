@@ -3,6 +3,17 @@
 Date: June 2026
 Audience: DTECH Team + SysAdmin
 
+## Implementation Status (June 2026)
+- Prototype implemented in repo at `tray/DTECHHubTray`
+- Platform: .NET 8 Windows Forms + WebView2
+- MVP implemented:
+  - Tray icon + context menu
+  - Open/focus hub window
+  - Open with autologin URL
+  - Startup registration toggle (HKCU Run)
+  - Single-instance guard
+- Build and run instructions in `tray/README.md`
+
 ## 1) Objective
 Deliver a lightweight Windows desktop companion that provides:
 - A persistent system tray icon
