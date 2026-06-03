@@ -6,6 +6,14 @@ const mammoth = require("mammoth");
 const nodemailer = require("nodemailer");
 const { Pool } = require("pg");
 
+let OAuth2Client = null;
+try {
+  ({ OAuth2Client } = require("google-auth-library"));
+} catch (_error) {
+  OAuth2Client = null;
+  console.warn("[startup] Optional dependency 'google-auth-library' is not available. Verified Google ID token auth is disabled until installed.");
+}
+
 let PDFParse = null;
 try {
   ({ PDFParse } = require("pdf-parse"));
@@ -19,6 +27,21 @@ const PORT = process.env.PORT || 3000;
 const SERVER_STARTED_AT = new Date().toISOString();
 const hasDatabase = Boolean(process.env.DATABASE_URL);
 const TRELLO_API_KEY = String(process.env.TRELLO_API_KEY || "").trim();
+const AUTH_MODE = String(process.env.AUTH_MODE || "hybrid").trim().toLowerCase();
+const GOOGLE_ID_TOKEN_AUDIENCES = Array.from(
+  new Set(
+    [
+      process.env.HUB_GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_OAUTH_CLIENT_ID,
+      ...(String(process.env.GOOGLE_ID_TOKEN_AUDIENCES || "")
+        .split(",")
+        .map((value) => String(value || "").trim())
+        .filter(Boolean))
+    ]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean)
+  )
+);
 const staffDirectoryApiUrl = String(process.env.STAFF_DIRECTORY_API_URL || "").trim();
 const staffDirectoryApiKey = String(process.env.STAFF_DIRECTORY_API_KEY || "").trim();
 const memoryActivities = new Map();
@@ -37,6 +60,8 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
+
+const googleAuthClient = OAuth2Client ? new OAuth2Client() : null;
 
 const STAFF_TABLE_CANDIDATES = ["staff_upload", "upload_staff"];
 const STUDENT_TABLE_CANDIDATES = ["student_details_upload", "student_upload", "student_timetable", "upload_student"];
@@ -3619,6 +3644,40 @@ async function syncDtechExcludedActivitiesVisibility() {
 }
 
 app.use(express.json({ limit: "8mb" }));
+app.use(async (req, _res, next) => {
+  req.auth_identity = {
+    mode: effectiveAuthMode,
+    token_present: false,
+    verified: false,
+    source: "none",
+    error: "",
+    email: ""
+  };
+
+  const bearerToken = extractBearerToken(req);
+  if (!bearerToken) {
+    next();
+    return;
+  }
+
+  req.auth_identity.token_present = true;
+  const verification = await verifyGoogleIdTokenAndExtractIdentity(bearerToken);
+  if (!verification.ok) {
+    req.auth_identity.error = verification.error || "token_verification_failed";
+    next();
+    return;
+  }
+
+  req.auth_identity.verified = true;
+  req.auth_identity.source = "google_id_token";
+  req.auth_identity.email = verification.email;
+  req.auth_identity.subject = verification.subject;
+  req.auth_identity.audience = verification.audience;
+  req.auth_identity.issuer = verification.issuer;
+  req.authenticated_email = verification.email;
+
+  next();
+});
 app.use("/images/activities", express.static(path.join(__dirname, "images", "activities")));
 app.use("/images/activities", express.static(path.join(__dirname, "public", "images", "activities")));
 app.use(express.static(__dirname));
@@ -3870,7 +3929,91 @@ function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function getEffectiveAuthMode() {
+  if (AUTH_MODE === "legacy" || AUTH_MODE === "hybrid" || AUTH_MODE === "strict") {
+    return AUTH_MODE;
+  }
+  return "hybrid";
+}
+
+const effectiveAuthMode = getEffectiveAuthMode();
+if (effectiveAuthMode !== AUTH_MODE) {
+  console.warn(`[startup] Invalid AUTH_MODE='${AUTH_MODE}'. Falling back to '${effectiveAuthMode}'.`);
+}
+
+function extractBearerToken(req) {
+  const header = String(req?.headers?.authorization || "").trim();
+  if (!header) {
+    return "";
+  }
+
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  return match?.[1] ? String(match[1]).trim() : "";
+}
+
+async function verifyGoogleIdTokenAndExtractIdentity(idToken) {
+  const token = String(idToken || "").trim();
+  if (!token) {
+    return { ok: false, error: "missing_token" };
+  }
+
+  if (!googleAuthClient) {
+    return { ok: false, error: "google_auth_library_unavailable" };
+  }
+
+  if (!GOOGLE_ID_TOKEN_AUDIENCES.length) {
+    return { ok: false, error: "missing_google_audience_config" };
+  }
+
+  try {
+    const ticket = await googleAuthClient.verifyIdToken({
+      idToken: token,
+      audience: GOOGLE_ID_TOKEN_AUDIENCES
+    });
+
+    const payload = ticket?.getPayload?.() || {};
+    const email = normalizeEmail(payload?.email || "");
+    const emailVerified = Boolean(payload?.email_verified);
+    const hostedDomain = String(payload?.hd || "").trim().toLowerCase();
+
+    if (!email || !emailVerified) {
+      return { ok: false, error: "email_not_verified" };
+    }
+
+    if (!isSchoolEmail(email)) {
+      return { ok: false, error: "non_school_email" };
+    }
+
+    return {
+      ok: true,
+      email,
+      hostedDomain,
+      subject: String(payload?.sub || "").trim(),
+      audience: String(payload?.aud || "").trim(),
+      issuer: String(payload?.iss || "").trim()
+    };
+  } catch (_error) {
+    return { ok: false, error: "token_verification_failed" };
+  }
+}
+
 function getRequestUserEmail(req) {
+  if (req?.authenticated_email) {
+    return normalizeEmail(req.authenticated_email);
+  }
+
+  if (effectiveAuthMode === "strict") {
+    return "";
+  }
+
+  if (effectiveAuthMode === "hybrid") {
+    const tokenPresented = Boolean(req?.auth_identity?.token_present);
+    const tokenVerified = Boolean(req?.auth_identity?.verified);
+    if (tokenPresented && !tokenVerified) {
+      return "";
+    }
+  }
+
   return normalizeEmail(
     req?.headers?.["x-user-email"] ||
     req?.headers?.["x-ms-client-principal-name"] ||
@@ -4064,7 +4207,14 @@ async function resolveActivityWriteAccess(email) {
 async function requireActivityWriteAccess(req, res, next) {
   const email = getRequestUserEmail(req);
   if (!email) {
-    res.status(401).json({ error: "User email is required" });
+    const authError = req?.auth_identity?.error || "";
+    const strictMessage = effectiveAuthMode === "strict"
+      ? "Google ID token is required. Send Authorization: Bearer <id_token>."
+      : "User email is required";
+    const hybridMessage = authError
+      ? "Google token verification failed. Please sign in again and retry."
+      : strictMessage;
+    res.status(401).json({ error: hybridMessage, auth_mode: effectiveAuthMode, auth_error: authError || undefined });
     return;
   }
 
@@ -4075,13 +4225,21 @@ async function requireActivityWriteAccess(req, res, next) {
   }
 
   req.user_email = access.email;
+  req.user_auth_source = req?.auth_identity?.verified ? "google_id_token" : "legacy_header";
   next();
 }
 
 async function requireAdminAccess(req, res, next) {
   const email = getRequestUserEmail(req);
   if (!email) {
-    res.status(401).json({ error: "User email is required" });
+    const authError = req?.auth_identity?.error || "";
+    const strictMessage = effectiveAuthMode === "strict"
+      ? "Google ID token is required. Send Authorization: Bearer <id_token>."
+      : "User email is required";
+    const hybridMessage = authError
+      ? "Google token verification failed. Please sign in again and retry."
+      : strictMessage;
+    res.status(401).json({ error: hybridMessage, auth_mode: effectiveAuthMode, auth_error: authError || undefined });
     return;
   }
 
@@ -4094,6 +4252,10 @@ async function requireAdminAccess(req, res, next) {
   ).trim().toLowerCase();
 
   if (roleHint === "admin" || roleHint === "student admin" || roleHint === "student_admin") {
+    if (effectiveAuthMode === "strict" && !req?.auth_identity?.verified) {
+      res.status(401).json({ error: "Verified Google identity is required for admin access.", auth_mode: effectiveAuthMode });
+      return;
+    }
     req.user_email = email;
     next();
     return;
@@ -4121,7 +4283,11 @@ async function requireAdminAccess(req, res, next) {
 }
 
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true });
+  res.json({
+    ok: true,
+    auth_mode: effectiveAuthMode,
+    google_id_token_audiences_configured: GOOGLE_ID_TOKEN_AUDIENCES.length
+  });
 });
 
 app.get("/api/activities", async (_req, res) => {
@@ -4623,7 +4789,7 @@ app.post("/api/activities/:id/upload-image", requireActivityWriteAccess, async (
 // POST /api/activities/:id/interest — toggle a student's interest in a project
 app.post("/api/activities/:id/interest", async (req, res) => {
   const projectId = String(req.params.id || "").trim();
-  const email = normalizeEmail(req.headers["x-user-email"] || "");
+  const email = normalizeEmail(getRequestUserEmail(req));
 
   if (!projectId) {
     res.status(400).json({ error: "Project ID is required" });
@@ -4717,7 +4883,7 @@ app.post("/api/activities/:id/interests", requireActivityWriteAccess, async (req
 // GET /api/activities/:id/interests — get interest count/list for a project
 app.get("/api/activities/:id/interests", async (req, res) => {
   const projectId = String(req.params.id || "").trim();
-  const email = normalizeEmail(req.headers["x-user-email"] || "");
+  const email = normalizeEmail(getRequestUserEmail(req));
 
   if (!projectId) {
     res.status(400).json({ error: "Project ID is required" });
@@ -4870,7 +5036,7 @@ app.patch("/api/activities/:id/interests/:studentEmail/standards", requireActivi
 app.get("/api/activities/:id/interests/:studentEmail/evidence", async (req, res) => {
   const projectId = String(req.params.id || "").trim();
   const studentEmail = normalizeEmail(req.params.studentEmail || "");
-  const requesterEmail = normalizeEmail(req.headers["x-user-email"] || "");
+  const requesterEmail = normalizeEmail(getRequestUserEmail(req));
 
   if (!projectId || !studentEmail) {
     res.status(400).json({ error: "Project ID and student email are required" });
@@ -4931,7 +5097,7 @@ app.get("/api/activities/:id/interests/:studentEmail/evidence", async (req, res)
 app.patch("/api/activities/:id/interests/:studentEmail/evidence", async (req, res) => {
   const projectId = String(req.params.id || "").trim();
   const studentEmail = normalizeEmail(req.params.studentEmail || "");
-  const requesterEmail = normalizeEmail(req.headers["x-user-email"] || "");
+  const requesterEmail = normalizeEmail(getRequestUserEmail(req));
 
   if (!projectId || !studentEmail) {
     res.status(400).json({ error: "Project ID and student email are required" });
@@ -7479,7 +7645,7 @@ app.post("/api/lessons", async (req, res) => {
     lesson_notes: String(body.lesson_notes || body.lessonNotes || "").trim(),
     publish_activity: Boolean(body.publish_activity ?? body.publishActivity),
     add_to_calendar: Boolean(body.add_to_calendar ?? body.addToCalendar),
-    created_by_email: String(body.created_by_email || req.headers["x-user-email"] || "").trim(),
+    created_by_email: String(body.created_by_email || getRequestUserEmail(req) || "").trim(),
     created_at: String(body.created_at || new Date().toISOString()),
     updated_at: new Date().toISOString()
   };
