@@ -1021,9 +1021,7 @@ async function loadAssessmentStandardCardsForLibrary() {
 
     try {
         const response = await fetch("/api/assessment-standard-cards", {
-            headers: {
-                "x-user-email": email
-            }
+            headers: withHubAuthHeaders({}, email)
         });
         if (!response.ok) return [];
 
@@ -1554,6 +1552,42 @@ function getActiveHubEmail() {
     return normalizeEmail(hubAuthState.profile?.email || getHubStoredSignedInEmail());
 }
 
+function getActiveHubAccessToken() {
+    const fromState = String(hubAuthState.accessToken || "").trim();
+    if (fromState && Number(hubAuthState.expiresAt || 0) > Date.now()) {
+        return fromState;
+    }
+
+    const raw = getHubStoredAuthRaw();
+    if (!raw) {
+        return "";
+    }
+
+    try {
+        const parsed = JSON.parse(raw);
+        if (!parsed?.expiresAt || Number(parsed.expiresAt) <= Date.now()) {
+            return "";
+        }
+        return String(parsed?.accessToken || "").trim();
+    } catch (_error) {
+        return "";
+    }
+}
+
+function withHubAuthHeaders(headers = {}, email = getActiveHubEmail()) {
+    if (!email) {
+        return headers;
+    }
+
+    const nextHeaders = { ...headers, "x-user-email": email };
+    const accessToken = getActiveHubAccessToken();
+    if (accessToken) {
+        nextHeaders.Authorization = `Bearer ${accessToken}`;
+    }
+
+    return nextHeaders;
+}
+
 function rerenderAssignmentIndicators() {
     if (!libraryGrid) {
         return;
@@ -1593,9 +1627,7 @@ async function loadProjectAssignmentSummaries(force = false) {
 
     try {
         const response = await fetch("/api/project-interests", {
-            headers: {
-                "x-user-email": email
-            }
+            headers: withHubAuthHeaders({}, email)
         });
 
         if (!response.ok) {

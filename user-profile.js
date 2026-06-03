@@ -60,6 +60,14 @@
         return null;
     }
 
+    function getStoredAccessToken() {
+        const auth = getStoredAuth();
+        if (!auth?.expiresAt || Number(auth.expiresAt) <= Date.now()) {
+            return "";
+        }
+        return String(auth?.accessToken || "").trim();
+    }
+
     function normalizeEmail(value) {
         return String(value || "").trim().toLowerCase();
     }
@@ -748,6 +756,11 @@
         const headers = { "Content-Type": "application/json" };
         if (email) {
             headers["x-user-email"] = email;
+        }
+
+        const accessToken = getStoredAccessToken();
+        if (accessToken) {
+            headers.Authorization = `Bearer ${accessToken}`;
         }
 
         const response = await fetch(path, {

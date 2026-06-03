@@ -19,6 +19,34 @@ function getSignedInEmail() {
     }
 }
 
+function getSignedInAccessToken() {
+    const raw = getAuthRaw();
+    if (!raw) return "";
+    try {
+        const parsed = JSON.parse(raw);
+        if (!parsed?.expiresAt || Number(parsed.expiresAt) <= Date.now()) {
+            return "";
+        }
+        return String(parsed?.accessToken || "").trim();
+    } catch (_error) {
+        return "";
+    }
+}
+
+function withSignedInAuthHeaders(headers = {}, email = getSignedInEmail()) {
+    if (!email) {
+        return headers;
+    }
+
+    const nextHeaders = { ...headers, "x-user-email": email };
+    const accessToken = getSignedInAccessToken();
+    if (accessToken) {
+        nextHeaders.Authorization = `Bearer ${accessToken}`;
+    }
+
+    return nextHeaders;
+}
+
 function getUrlParam(name) {
     const value = new URLSearchParams(window.location.search).get(name);
     return String(value || "").trim();
@@ -103,9 +131,7 @@ async function loadStandardCard() {
 
     try {
         const response = await fetch("/api/assessment-standard-cards", {
-            headers: {
-                "x-user-email": email
-            }
+            headers: withSignedInAuthHeaders({}, email)
         });
         const payload = await response.json().catch(() => ({}));
 

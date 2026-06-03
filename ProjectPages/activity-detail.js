@@ -413,13 +413,38 @@ function readStoredHubEmail() {
     }
 }
 
-function buildWriteHeaders() {
-    const email = readStoredHubEmail();
-    const headers = { "Content-Type": "application/json" };
-    if (email) {
-        headers["x-user-email"] = email;
+function readStoredHubAccessToken() {
+    const raw = localStorage.getItem(DETAIL_HUB_AUTH_STORAGE_KEY) || sessionStorage.getItem(DETAIL_HUB_AUTH_STORAGE_KEY);
+    if (!raw) return "";
+
+    try {
+        const parsed = JSON.parse(raw);
+        if (!parsed?.expiresAt || Number(parsed.expiresAt) <= Date.now()) {
+            return "";
+        }
+        return String(parsed?.accessToken || "").trim();
+    } catch (_error) {
+        return "";
     }
-    return headers;
+}
+
+function buildAuthHeaders(headers = {}) {
+    const email = readStoredHubEmail();
+    const nextHeaders = { ...headers };
+    if (email) {
+        nextHeaders["x-user-email"] = email;
+    }
+
+    const accessToken = readStoredHubAccessToken();
+    if (accessToken) {
+        nextHeaders.Authorization = `Bearer ${accessToken}`;
+    }
+
+    return nextHeaders;
+}
+
+function buildWriteHeaders() {
+    return buildAuthHeaders({ "Content-Type": "application/json" });
 }
 
 function getTrelloCardStorageKey(projectId, email) {
@@ -3953,8 +3978,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     const email = readStoredHubEmail();
     const isAssessmentTask = String(detailData?.activityCategory || "").toLowerCase().includes("assessment");
 
-    const fetchHeaders = {};
-    if (email) fetchHeaders["x-user-email"] = email;
+    const fetchHeaders = buildAuthHeaders({});
 
     let interestData = { count: 0, my_interest: false, emails: [], confirmed: [], my_allocation: null };
     try {
@@ -4173,10 +4197,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         try {
             const response = await fetch("/api/integrations/trello/work-log", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "x-user-email": email
-                },
+                headers: buildWriteHeaders(),
                 body: JSON.stringify({
                     card_url: cardUrl,
                     note,
@@ -4217,7 +4238,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             try {
                 const resp = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interest`, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json", "x-user-email": email }
+                    headers: buildWriteHeaders()
                 });
                 if (resp.ok) {
                     const data = await resp.json();
@@ -4271,7 +4292,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             try {
                 const resp = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interests`, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json", "x-user-email": email },
+                    headers: buildWriteHeaders(),
                     body: JSON.stringify({ student_email: normalizedEmail })
                 });
 
@@ -4305,7 +4326,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                     `/api/activities/${encodeURIComponent(projectId)}/interests/${encodeURIComponent(studentEmail)}/confirm`,
                     {
                         method: "PATCH",
-                        headers: { "Content-Type": "application/json", "x-user-email": email },
+                        headers: buildWriteHeaders(),
                         body: JSON.stringify({ confirmed: newConfirmed })
                     }
                 );

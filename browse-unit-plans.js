@@ -111,6 +111,50 @@ function readSignedInEmail() {
     }
 }
 
+function readSignedInAccessToken() {
+    let localValue = null;
+    let sessionValue = null;
+
+    try {
+        localValue = localStorage.getItem(BROWSE_UNIT_AUTH_KEY);
+    } catch (_error) {
+        localValue = null;
+    }
+
+    try {
+        sessionValue = sessionStorage.getItem(BROWSE_UNIT_AUTH_KEY);
+    } catch (_error) {
+        sessionValue = null;
+    }
+
+    const raw = localValue || sessionValue || "";
+    if (!raw) return "";
+
+    try {
+        const parsed = JSON.parse(raw);
+        if (!parsed?.expiresAt || Number(parsed.expiresAt) <= Date.now()) {
+            return "";
+        }
+        return String(parsed?.accessToken || "").trim();
+    } catch (_error) {
+        return "";
+    }
+}
+
+function withBrowseUnitAuthHeaders(headers = {}, email = readSignedInEmail()) {
+    if (!email) {
+        return headers;
+    }
+
+    const nextHeaders = { ...headers, "x-user-email": email };
+    const accessToken = readSignedInAccessToken();
+    if (accessToken) {
+        nextHeaders.Authorization = `Bearer ${accessToken}`;
+    }
+
+    return nextHeaders;
+}
+
 function formatDateTime(value) {
     const parsed = new Date(String(value || ""));
     if (Number.isNaN(parsed.getTime())) {
@@ -1055,10 +1099,7 @@ async function resyncAllUnitPlanLessons() {
 
         const response = await fetch("/api/unit-plans/resync-lessons", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "x-user-email": email
-            },
+            headers: withBrowseUnitAuthHeaders({ "Content-Type": "application/json" }, email),
             body: JSON.stringify({ user_email: email })
         });
 
@@ -1089,7 +1130,9 @@ async function resolveAccess() {
     }
 
     try {
-        const response = await fetch(`/api/auth/user-access?email=${encodeURIComponent(email)}`);
+        const response = await fetch(`/api/auth/user-access?email=${encodeURIComponent(email)}`, {
+            headers: withBrowseUnitAuthHeaders({}, email)
+        });
         if (!response.ok) {
             throw new Error("Could not resolve your access.");
         }
@@ -1158,9 +1201,7 @@ async function deleteUnitPlan(unitPlanId, deleteLessons) {
         });
         const response = await fetch(`/api/unit-plans/${encodeURIComponent(unitPlanId)}?${query.toString()}`, {
             method: "DELETE",
-            headers: {
-                "x-user-email": email
-            }
+            headers: withBrowseUnitAuthHeaders({}, email)
         });
 
         const data = await response.json().catch(() => ({}));

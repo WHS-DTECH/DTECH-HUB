@@ -351,10 +351,7 @@ async function handleStudentPracticalAction(button) {
 
         const response = await fetch(requestUrl, {
             method: requestMethod,
-            headers: {
-                "Content-Type": "application/json",
-                "x-user-email": signedInEmail
-            },
+            headers: withPracticalAuthHeaders({ "Content-Type": "application/json" }),
             body: requestBody ? JSON.stringify(requestBody) : undefined
         });
 
@@ -381,11 +378,11 @@ async function loadStudentPracticalTracker() {
         setStatus(studentPracticalStatus, "Loading student practical tracker...");
         const [studentsResponse, activitiesResponse, interestsResponse] = await Promise.all([
             fetch("/api/class-management/students?current_only=true&dtech_only=false", {
-                headers: { "x-user-email": signedInEmail }
+                headers: withPracticalAuthHeaders({})
             }),
             fetch("/api/activities"),
             fetch("/api/project-interests", {
-                headers: { "x-user-email": signedInEmail }
+                headers: withPracticalAuthHeaders({})
             })
         ]);
 
@@ -437,6 +434,35 @@ function readSignedInEmail() {
     } catch (_error) {
         return "";
     }
+}
+
+function readSignedInAccessToken() {
+    const raw = localStorage.getItem(BROWSE_PRACTICALS_AUTH_KEY) || sessionStorage.getItem(BROWSE_PRACTICALS_AUTH_KEY);
+    if (!raw) return "";
+
+    try {
+        const parsed = JSON.parse(raw);
+        if (!parsed?.expiresAt || Number(parsed.expiresAt) <= Date.now()) {
+            return "";
+        }
+        return String(parsed?.accessToken || "").trim();
+    } catch (_error) {
+        return "";
+    }
+}
+
+function withPracticalAuthHeaders(headers = {}, email = signedInEmail || readSignedInEmail()) {
+    if (!email) {
+        return headers;
+    }
+
+    const nextHeaders = { ...headers, "x-user-email": email };
+    const accessToken = readSignedInAccessToken();
+    if (accessToken) {
+        nextHeaders.Authorization = `Bearer ${accessToken}`;
+    }
+
+    return nextHeaders;
 }
 
 function parseIsoDate(value) {
@@ -635,7 +661,9 @@ async function resolveManageAccess() {
     }
 
     try {
-        const response = await fetch(`/api/auth/user-access?email=${encodeURIComponent(signedInEmail)}`);
+        const response = await fetch(`/api/auth/user-access?email=${encodeURIComponent(signedInEmail)}`, {
+            headers: withPracticalAuthHeaders({}, signedInEmail)
+        });
         if (!response.ok) {
             if (practicalsManage) practicalsManage.hidden = true;
             return;

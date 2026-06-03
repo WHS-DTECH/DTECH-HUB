@@ -24,6 +24,32 @@ function classGetStoredEmail() {
     }
 }
 
+function classGetStoredAccessToken() {
+    const raw = localStorage.getItem(CLASS_AUTH_KEY) || sessionStorage.getItem(CLASS_AUTH_KEY);
+    if (!raw) return "";
+    try {
+        const parsed = JSON.parse(raw);
+        if (!parsed?.expiresAt || Number(parsed.expiresAt) <= Date.now()) return "";
+        return String(parsed?.accessToken || "").trim();
+    } catch (_error) {
+        return "";
+    }
+}
+
+function classWithAuthHeaders(headers = {}, email = classGetStoredEmail()) {
+    if (!email) {
+        return headers;
+    }
+
+    const nextHeaders = { ...headers, "x-user-email": email };
+    const accessToken = classGetStoredAccessToken();
+    if (accessToken) {
+        nextHeaders.Authorization = `Bearer ${accessToken}`;
+    }
+
+    return nextHeaders;
+}
+
 async function classEnforceTeacherAccess() {
     const email = classGetStoredEmail();
     if (!email) {
@@ -32,7 +58,9 @@ async function classEnforceTeacherAccess() {
     }
 
     try {
-        const response = await fetch(`/api/auth/user-access?email=${encodeURIComponent(email)}`);
+        const response = await fetch(`/api/auth/user-access?email=${encodeURIComponent(email)}`, {
+            headers: classWithAuthHeaders({}, email)
+        });
         if (!response.ok) {
             window.location.replace("index.html");
             return false;
@@ -140,7 +168,7 @@ function updateDataFreshness(students) {
 async function loadFreshnessThresholds(email) {
     try {
         const response = await fetch("/api/class-management/freshness-config", {
-            headers: { "x-user-email": email }
+            headers: classWithAuthHeaders({}, email)
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
@@ -392,7 +420,7 @@ async function loadClassManagement() {
     try {
         await loadFreshnessThresholds(email);
         const response = await fetch("/api/class-management/students?current_only=false&dtech_only=false", {
-            headers: { "x-user-email": email }
+            headers: classWithAuthHeaders({}, email)
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {

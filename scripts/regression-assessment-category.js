@@ -21,6 +21,7 @@ async function requestJson(url, options) {
 async function run() {
   const baseUrl = String(process.env.HUB_BASE_URL || "http://localhost:3000").replace(/\/$/, "");
   const userEmail = String(process.env.HUB_TEST_USER_EMAIL || "").trim().toLowerCase();
+  const bearerToken = String(process.env.HUB_TEST_BEARER_TOKEN || "").trim();
 
   if (!userEmail) {
     fail("Missing HUB_TEST_USER_EMAIL. Set a teacher/admin email that can save activities.");
@@ -31,6 +32,10 @@ async function run() {
     "Content-Type": "application/json",
     "x-user-email": userEmail
   };
+
+  if (bearerToken) {
+    headers.Authorization = `Bearer ${bearerToken}`;
+  }
 
   const createPayload = {
     id,

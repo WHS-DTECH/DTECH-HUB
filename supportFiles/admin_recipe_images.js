@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const clearBtn = document.getElementById('clearRecipeImageBtn');
 
   const FALLBACK_IMAGE = 'https://images.pexels.com/photos/1640774/pexels-photo-1640774.jpeg?auto=compress&cs=tinysrgb&w=1200';
+  const HUB_AUTH_KEY = 'hub_google_auth_v1';
 
   let currentUserEmail = '';
   let recipes = [];
@@ -91,10 +92,26 @@ document.addEventListener('DOMContentLoaded', () => {
     renderList();
   }
 
+  function readStoredAccessToken() {
+    const raw = localStorage.getItem(HUB_AUTH_KEY) || sessionStorage.getItem(HUB_AUTH_KEY);
+    if (!raw) return '';
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed?.expiresAt || Number(parsed.expiresAt) <= Date.now()) return '';
+      return String(parsed?.accessToken || '').trim();
+    } catch (_error) {
+      return '';
+    }
+  }
+
   async function api(path, options) {
     const headers = Object.assign({}, options && options.headers ? options.headers : {}, {
       'x-user-email': currentUserEmail
     });
+    const accessToken = readStoredAccessToken();
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
+    }
     const response = await fetch(path, Object.assign({}, options || {}, { headers }));
     const payload = await response.json().catch(() => ({}));
     if (!response.ok || payload.success === false) {
