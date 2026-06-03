@@ -2318,22 +2318,24 @@ function maybeAutoPromptHubSignIn() {
         return;
     }
 
-    markAutoPromptedHubSignInThisSession();
-
-    // In app-mode windows One Tap is frequently suppressed by Google.
-    // Prefer the OAuth popup flow for auto-prompt in startup contexts.
+    // Prefer silent OAuth token refresh first. This can succeed without
+    // requiring a popup/user gesture when the browser already has session state.
     if (hubAuthState.tokenClient) {
-        hubAuthState.tokenClient.requestAccessToken({ prompt: "select_account" });
+        markAutoPromptedHubSignInThisSession();
+        hubAuthState.autoPromptInFlight = true;
+        hubAuthState.tokenClient.requestAccessToken({ prompt: "" });
         return;
     }
 
+    markAutoPromptedHubSignInThisSession();
     window.google.accounts.id.prompt((notification) => {
         const notDisplayed = typeof notification?.isNotDisplayed === "function" && notification.isNotDisplayed();
         const skippedMoment = typeof notification?.isSkippedMoment === "function" && notification.isSkippedMoment();
 
         // Fallback if One Tap cannot render.
         if ((notDisplayed || skippedMoment) && hubAuthState.tokenClient) {
-            hubAuthState.tokenClient.requestAccessToken({ prompt: "select_account" });
+            hubAuthState.autoPromptInFlight = true;
+            hubAuthState.tokenClient.requestAccessToken({ prompt: "" });
         }
     });
 }
@@ -2374,13 +2376,25 @@ function initHubGoogleAuth() {
                 client_id: hubGoogleClientId,
                 scope: "openid email profile",
                 callback: async (tokenResponse) => {
+                    if (tokenResponse?.error) {
+                        // Silent auto-login can legitimately fail with
+                        // interaction_required/popup-related outcomes.
+                        // Keep UI stable and rely on explicit sign-in click.
+                        hubAuthState.autoPromptInFlight = false;
+                        return;
+                    }
+
                     try {
                         await handleHubGoogleToken(tokenResponse);
                     } catch (error) {
+                        hubAuthState.autoPromptInFlight = false;
                         clearHubAuthState();
                         renderHubAuthUi();
                         alert(error.message || "Google sign-in failed.");
+                        return;
                     }
+
+                    hubAuthState.autoPromptInFlight = false;
                 }
             });
         }
