@@ -261,6 +261,8 @@ $sc.Save()
     - `intune/Remove-DTECHHub-Autolaunch.ps1`
 - Security hardening plan (server-side Google ID token verification):
     - `docs/Google-Identity-Hardening-Plan.md`
+- Phase 2 native tray-app plan:
+    - `docs/System-Tray-Phase2-Plan.md`
 
 ---
 Notes:
