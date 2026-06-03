@@ -2,7 +2,7 @@
 
 Purpose: Prepare an implementation plan for System Administrator review so DTECH Hub auto-launches for all DTECH desktops at Windows sign-in.
 
-Status: In progress with completed local pilot setup (updated June 2026)
+Status: In progress with completed local pilot setup + auto-login prompt (updated June 2026)
 Owner: DTECH Team + System Administrator
 
 ## Completed So Far (June 2026)
@@ -13,6 +13,7 @@ Owner: DTECH Team + System Administrator
 - [x] Local Non-Intune Pilot setup command executed on laptop.
 - [x] Local Startup shortcut validated (target + arguments).
 - [x] Local fallback startup method configured: `HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\DTECHHubAutoLaunch`.
+- [x] App-mode startup auto-login prompt implemented (homepage, once per session).
 
 ## Confirmed Decisions (From DTECH Team)
 - DTECH desktops are shared multi-user devices.
@@ -126,7 +127,7 @@ if (Test-Path $shortcutPath) {
 ## 5) Authentication and SSO Validation
 Given students have linked Microsoft + Google accounts:
 - [ ] Confirm expected sign-in identity provider path for DTECH Hub.
-- [ ] Confirm first-run behavior (silent SSO vs one-time prompt).
+- [x] Confirm first-run behavior (silent SSO vs one-time prompt): one-time Google prompt now auto-triggers in app-mode startup.
 - [ ] Confirm cookie/session policies on shared desktops.
 
 ## 6) Pilot Test Plan
@@ -213,6 +214,8 @@ Local pilot execution log:
 - Follow-up: Startup shortcut did not auto-run after sign-out/sign-in on this laptop.
 - Adjustment: Switched to single-method launch via HKCU Run entry (`DTECHHubAutoLaunch`) and marked as enabled in `StartupApproved\\Run`.
 - Task Scheduler fallback attempt: blocked by local permissions (`Access is denied`), so not used.
+- Date: 2026-06-04
+- Follow-up enhancement: app-mode startup now triggers Google sign-in prompt automatically on homepage (once per session).
 
 Optional one-time local command example:
 ```powershell
