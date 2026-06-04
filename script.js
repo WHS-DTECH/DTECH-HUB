@@ -1305,8 +1305,13 @@ function renderGlobalNavbar() {
     }
 
     const browseMenu = `
-        <a id="hub-browse-practicals-link" data-auth-browse href="/browse-practicals.html" hidden>Browse Practicals</a>
-        <a id="hub-browse-unit-plans-link" data-auth-unit-plans href="/browse-unit-plans.html" hidden>Browse Unit Plans</a>
+        <details class="nav-dropdown" id="hub-browse-menu" data-nav-dropdown hidden>
+            <summary>Browse</summary>
+            <div class="nav-drawer" role="menu">
+                <a id="hub-browse-practicals-link" data-auth-browse role="menuitem" href="/browse-practicals.html" hidden>Practicals</a>
+                <a id="hub-browse-unit-plans-link" data-auth-unit-plans role="menuitem" href="/browse-unit-plans.html" hidden>Unit Plans</a>
+            </div>
+        </details>
     `;
 
     const uploadMenu = `
