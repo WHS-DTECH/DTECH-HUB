@@ -270,6 +270,10 @@ a {
     gap: 10px;
 }
 
+.hub-startup-signin-banner[hidden] {
+    display: none !important;
+}
+
 .hub-startup-signin-banner p {
     margin: 0;
     color: #fff6de;

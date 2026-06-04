@@ -1335,7 +1335,7 @@ function renderGlobalNavbar() {
             </div>
         </details>
     `;
-    const settingsLink = `<a href="/settings.html">Settings</a>`;
+    const settingsLink = `<a id="hub-settings-link" href="/settings.html" hidden>Settings</a>`;
     const topbarMenu = `${browseMenu}${uploadMenu}${studentWorkMenu}${settingsLink}`;
 
     topbar.dataset.globalNavbar = "true";
@@ -1459,6 +1459,7 @@ const newWeekList = document.querySelector("#new-this-week-list");
 const newWeekEmpty = document.querySelector("#new-this-week-empty");
 const hubStaffLink = document.querySelector("#hub-staff-link");
 const hubAdminLink = document.querySelector("#hub-admin-link");
+const hubSettingsLink = document.querySelector("#hub-settings-link");
 const hubAccessBadge = document.querySelector("#hub-access-badge");
 const hubSignInButton = document.querySelector("#hub-google-signin");
 const hubSignOutButton = document.querySelector("#hub-google-signout");
@@ -2072,6 +2073,9 @@ function renderHubAuthUi() {
     }
     if (hubAdminLink) {
         hubAdminLink.hidden = !canAdmin;
+    }
+    if (hubSettingsLink) {
+        hubSettingsLink.hidden = !canAdmin;
     }
     if (hubUploadMenu) {
         hubUploadMenu.hidden = !(canAdmin || (canTeacherView && inTeacherMode));
