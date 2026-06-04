@@ -1310,6 +1310,7 @@ function renderGlobalNavbar() {
             <div class="nav-drawer" role="menu">
                 <a id="hub-browse-practicals-link" data-auth-browse role="menuitem" href="/browse-practicals.html" hidden>Practicals</a>
                 <a id="hub-browse-unit-plans-link" data-auth-unit-plans role="menuitem" href="/browse-unit-plans.html" hidden>Unit Plans</a>
+                <a id="hub-browse-course-outlines-link" data-auth-course-outlines role="menuitem" href="/browse-course-outlines.html" hidden>Course Outlines</a>
             </div>
         </details>
     `;
@@ -1477,6 +1478,7 @@ const hubUploadMenu = document.querySelector("#hub-upload-menu");
 const hubStudentWorkMenu = document.querySelector("#hub-student-work-menu");
 const hubBrowseButtons = Array.from(document.querySelectorAll("[data-auth-browse]"));
 const hubUnitPlansButtons = Array.from(document.querySelectorAll("[data-auth-unit-plans]"));
+const hubCourseOutlinesButtons = Array.from(document.querySelectorAll("[data-auth-course-outlines]"));
 const HUB_VIEW_MODE_STORAGE_KEY = "hub_view_mode_v1";
 const HUB_GLOBAL_SIDEBAR_SESSION_KEY = "hub_global_sidebar_seen_v1";
 const HUB_AUTO_LOGIN_PROMPT_SESSION_KEY = "hub_auto_login_prompted_v1";
@@ -2023,6 +2025,7 @@ function renderHubAuthUi() {
     const canAdmin = signedIn && hubAccessState.canAdmin;
     const normalizedRole = String(hubAccessState.additionalRole || "").trim().toLowerCase().replace(/\s+/g, " ");
     const canBrowseUnitPlans = signedIn && (canAdmin || normalizedRole === "teacher" || normalizedRole === "lead teacher");
+    const canBrowseCourseOutlines = signedIn && (canAdmin || normalizedRole === "teacher" || normalizedRole === "lead teacher");
     const canToggleView = canTeacherView || canAdmin;
 
     if (canToggleView && isTeacherWorkspacePath()) {
@@ -2101,6 +2104,11 @@ function renderHubAuthUi() {
     if (hubUnitPlansButtons.length) {
         hubUnitPlansButtons.forEach((element) => {
             element.hidden = !canBrowseUnitPlans;
+        });
+    }
+    if (hubCourseOutlinesButtons.length) {
+        hubCourseOutlinesButtons.forEach((element) => {
+            element.hidden = !canBrowseCourseOutlines;
         });
     }
 
