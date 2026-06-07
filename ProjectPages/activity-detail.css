@@ -1443,3 +1443,37 @@ h1 {
 .evidence-step-remove:hover {
     background: #ffeaea;
 }
+
+.evidence-step-system-list {
+    grid-column: 2 / -1;
+    margin-top: 2px;
+    padding: 8px 10px;
+    border: 1px solid #d5dfec;
+    border-radius: 8px;
+    background: #f4f8fc;
+    display: grid;
+    gap: 6px;
+}
+
+.evidence-step-system-title {
+    margin: 0;
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: #305476;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.evidence-step-system-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.78rem;
+    color: #264665;
+    font-weight: 600;
+}
+
+.evidence-step-system-item input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+}

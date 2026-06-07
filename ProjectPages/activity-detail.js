@@ -1848,6 +1848,41 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
 
     const stripStepLevel = (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim();
 
+    const inferStudentSystemConnections = () => {
+        let trelloConnected = Boolean(toSafeTrelloCardUrl(readStoredTrelloCardLink(projectId, studentEmail)));
+        let githubConnected = false;
+
+        Object.values(state).forEach((steps) => {
+            (Array.isArray(steps) ? steps : []).forEach((step) => {
+                const text = String(step?.text || "").trim();
+                if (!text) {
+                    return;
+                }
+
+                const textLower = text.toLowerCase();
+                if (text.startsWith("TRELLO_CARD_URL|")) {
+                    const trelloUrl = toSafeTrelloCardUrl(text.slice("TRELLO_CARD_URL|".length).trim());
+                    if (trelloUrl) {
+                        trelloConnected = true;
+                    }
+                }
+
+                if (textLower.includes("trello.com/")) {
+                    trelloConnected = true;
+                }
+
+                if (/(github\.com|gist\.github\.com|raw\.githubusercontent\.com)/i.test(textLower)) {
+                    githubConnected = true;
+                }
+            });
+        });
+
+        return {
+            trelloConnected,
+            githubConnected
+        };
+    };
+
     let showTaskDetail = () => {};
     const openTaskTopicCard = ({ text, topicIndex }) => {
         const safeText = String(text || "").trim();
@@ -1871,6 +1906,7 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
     const renderStepRows = (rowsHost, standardCode, levelFilter = "") => {
         const steps = Array.isArray(state[standardCode]) ? state[standardCode] : [];
         rowsHost.innerHTML = "";
+        const systemConnections = inferStudentSystemConnections();
 
         const filtered = steps
             .map((step, index) => ({ step, index }))
@@ -1943,6 +1979,24 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
             });
 
             row.append(check, input, removeButton);
+
+            const rowLevel = String(levelFilter || getStepLevel(step?.text)).trim().toLowerCase();
+            const rowTaskText = stripStepLevel(step?.text).toLowerCase();
+            const showProjectManagementConnections = String(standardCode) === "91897"
+                && rowLevel === "achieved"
+                && rowTaskText.includes("project management");
+
+            if (showProjectManagementConnections) {
+                const systems = document.createElement("div");
+                systems.className = "evidence-step-system-list";
+                systems.innerHTML = `
+                    <p class="evidence-step-system-title">Connected Systems</p>
+                    <label class="evidence-step-system-item"><input type="checkbox" disabled ${systemConnections.trelloConnected ? "checked" : ""}> Trello</label>
+                    <label class="evidence-step-system-item"><input type="checkbox" disabled ${systemConnections.githubConnected ? "checked" : ""}> GitHub</label>
+                `;
+                row.appendChild(systems);
+            }
+
             rowsHost.appendChild(row);
         });
     };
