@@ -3378,7 +3378,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     const submissionPrimaryEvidenceType = isProjectManagementTopic
         ? "Trello Link + Work Log"
         : (isDecompositionTopic ? "Decomposition Plan + Trello To Do Cards"
-        : (isRelevantImplicationsTopic ? "Written Evidence" : "Evidence Upload");
+        : (isRelevantImplicationsTopic ? "Written Evidence" : "Evidence Upload"));
     if (!submissionTaskItems.length) {
         submissionTaskItems.push("Upload evidence that clearly demonstrates completion of this task topic.");
     }
