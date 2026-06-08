@@ -4466,11 +4466,16 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                 const progress = await progressResponse.json().catch(() => ({}));
                 const toDoCount = Number(progress?.todo_count);
                 const doingCount = Number(progress?.doing_count);
-                if (!Number.isFinite(toDoCount) || !Number.isFinite(doingCount)) {
+                const doneCount = Number(progress?.done_count);
+                const completionPercent = Number(progress?.completion_percent);
+                if (!Number.isFinite(toDoCount) || !Number.isFinite(doingCount) || !Number.isFinite(doneCount)) {
                     return;
                 }
 
-                const syncText = `To Do ${toDoCount} | Doing ${doingCount}`;
+                const safeCompletionPercent = Number.isFinite(completionPercent)
+                    ? Math.max(0, Math.min(100, Math.round(completionPercent)))
+                    : 0;
+                const syncText = `To Do ${toDoCount} | Doing ${doingCount} | Done ${doneCount} | ${safeCompletionPercent}% complete`;
                 cell.innerHTML = `${cell.innerHTML}<span class="interest-status" style="margin-left:8px;">${escapeHtml(syncText)}</span>`;
             } catch (_error) {
                 // Keep baseline Trello status if list-progress sync fails.

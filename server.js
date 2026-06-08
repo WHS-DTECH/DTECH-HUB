@@ -7228,6 +7228,9 @@ app.get("/api/integrations/trello/list-progress", requireActivityWriteAccess, as
     const doingListIds = openLists
       .filter((list) => /(^|\s)doing($|\s)|in\s*progress/i.test(list.name))
       .map((list) => list.id);
+    const doneListIds = openLists
+      .filter((list) => /(^|\s)done($|\s)|complete(d)?|finished/i.test(list.name))
+      .map((list) => list.id);
 
     const openCards = (Array.isArray(cards) ? cards : []).map((card) => ({
       id: String(card?.id || "").trim(),
@@ -7237,6 +7240,11 @@ app.get("/api/integrations/trello/list-progress", requireActivityWriteAccess, as
 
     const toDoCount = openCards.filter((card) => toDoListIds.includes(card.idList)).length;
     const doingCount = openCards.filter((card) => doingListIds.includes(card.idList)).length;
+    const doneCount = openCards.filter((card) => doneListIds.includes(card.idList)).length;
+    const trackedTotal = toDoCount + doingCount + doneCount;
+    const completionPercent = trackedTotal > 0
+      ? Math.round((doneCount / trackedTotal) * 100)
+      : 0;
 
     res.json({
       student_email: studentEmail,
@@ -7244,8 +7252,11 @@ app.get("/api/integrations/trello/list-progress", requireActivityWriteAccess, as
       open_cards_total: openCards.length,
       todo_count: toDoCount,
       doing_count: doingCount,
+      done_count: doneCount,
+      completion_percent: completionPercent,
       todo_lists: toDoListIds.map((id) => listNameById.get(id) || id),
-      doing_lists: doingListIds.map((id) => listNameById.get(id) || id)
+      doing_lists: doingListIds.map((id) => listNameById.get(id) || id),
+      done_lists: doneListIds.map((id) => listNameById.get(id) || id)
     });
   } catch (error) {
     const status = Number(error?.status) || 500;
