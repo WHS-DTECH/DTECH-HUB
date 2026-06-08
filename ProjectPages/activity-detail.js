@@ -3268,7 +3268,17 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     const isRelevantImplicationsTopic = taskTopicTitle.toLowerCase().includes("relevant implication");
     const isProjectManagementTopic = taskTopicTitle.toLowerCase().includes("project management")
         || resolvedTaskShortName.toLowerCase().includes("project management");
+    const isDecompositionTopic = taskTopicTitle.toLowerCase().includes("decompos")
+        || resolvedTaskShortName.toLowerCase().includes("decompos");
     const submissionTaskItems = Array.from(new Set([
+        ...(isDecompositionTopic
+            ? [
+                "Break the assessment into clear decomposition steps (one step per line in the planner).",
+                "Save your decomposition plan in DTECH so your teacher can review your thinking.",
+                "Select your Trello board and To Do list, then push the decomposition steps to Trello.",
+                "Keep your Trello To Do list updated as steps are started, completed, or refined."
+            ]
+            : []),
         ...(isProjectManagementTopic
             ? [
                 "Add your Trello card or board link so your teacher can verify project management evidence.",
@@ -3280,8 +3290,12 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             : []),
         ...submissionRequirements
     ]));
+    const submissionIntroText = isDecompositionTopic
+        ? "Students plan decomposition here, then push those steps to Trello To Do for execution and tracking."
+        : "Students submit evidence here to show they have completed this task topic.";
     const submissionPrimaryEvidenceType = isProjectManagementTopic
         ? "Trello Link + Work Log"
+        : (isDecompositionTopic ? "Decomposition Plan + Trello To Do Cards"
         : (isRelevantImplicationsTopic ? "Written Evidence" : "Evidence Upload");
     if (!submissionTaskItems.length) {
         submissionTaskItems.push("Upload evidence that clearly demonstrates completion of this task topic.");
@@ -3427,7 +3441,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 <aside class="task-topic-submission-column">
                     <section class="proposal-section task-topic-submission-panel">
                         <h2>Submission Tasks</h2>
-                        <p class="task-topic-submission-intro">Students submit evidence here to show they have completed this task topic.</p>
+                        <p class="task-topic-submission-intro">${escapeHtml(submissionIntroText)}</p>
                         <div class="task-topic-submission-evidence-type">
                             <span class="task-topic-card-label">Primary Evidence Type</span>
                             <p class="task-topic-card-value">${submissionPrimaryEvidenceType}</p>
