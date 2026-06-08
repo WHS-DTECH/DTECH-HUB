@@ -591,9 +591,91 @@ function evidenceMapToRows(state, standards) {
     );
 }
 
+function normalizeRequirementText(value) {
+    return String(value || "")
+        .replace(/^(Achieved|Merit|Excellence)\s*:\s*/i, "")
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+function inferConnectedSystemsFromEvidenceRows(rows) {
+    const normalizedRows = normalizeEvidenceSteps(rows);
+    let trelloConnected = false;
+    let githubConnected = false;
+
+    normalizedRows.forEach((row) => {
+        (Array.isArray(row?.steps) ? row.steps : []).forEach((step) => {
+            const text = String(step?.text || "").trim();
+            if (!text) {
+                return;
+            }
+
+            const textLower = text.toLowerCase();
+            if (text.startsWith("TRELLO_CARD_URL|")) {
+                const trelloUrl = toSafeTrelloCardUrl(text.slice("TRELLO_CARD_URL|".length).trim());
+                if (trelloUrl) {
+                    trelloConnected = true;
+                }
+            }
+
+            if (textLower.includes("trello.com/")) {
+                trelloConnected = true;
+            }
+
+            if (/(github\.com|gist\.github\.com|raw\.githubusercontent\.com)/i.test(textLower)) {
+                githubConnected = true;
+            }
+        });
+    });
+
+    return { trelloConnected, githubConnected };
+}
+
 function getEvidenceCompletionPercentFromRows(rows, standards) {
     const map = evidenceRowsToMap(rows);
     const targetStandards = Array.isArray(standards) ? standards : [];
+
+    if (targetStandards.includes("91897")) {
+        const defaults91897 = (Array.isArray(EVIDENCE_STEPS_DEFAULTS?.["91897"]) ? EVIDENCE_STEPS_DEFAULTS["91897"] : [])
+            .map((line) => String(line || "").trim())
+            .filter((line) => /^achieved\s*:/i.test(line));
+        const requiredKeys = defaults91897.map((line) => normalizeRequirementText(line));
+
+        if (requiredKeys.length) {
+            const requiredStatus = new Map(requiredKeys.map((key) => [key, false]));
+            const items91897 = Array.isArray(map["91897"]) ? map["91897"] : [];
+
+            items91897.forEach((item) => {
+                const text = String(item?.text || "").trim();
+                if (!text || !/^achieved\s*:/i.test(text)) {
+                    return;
+                }
+
+                const key = normalizeRequirementText(text);
+                if (!requiredStatus.has(key)) {
+                    return;
+                }
+
+                if (Boolean(item?.done)) {
+                    requiredStatus.set(key, true);
+                }
+            });
+
+            const projectManagementKey = normalizeRequirementText("Achieved: Use appropriate project management tools and techniques to plan the development of a digital technologies outcome.");
+            if (requiredStatus.has(projectManagementKey)) {
+                const systems = inferConnectedSystemsFromEvidenceRows(rows);
+                if (systems.trelloConnected || systems.githubConnected) {
+                    requiredStatus.set(projectManagementKey, true);
+                }
+            }
+
+            const totalRequired = requiredStatus.size;
+            const doneRequired = Array.from(requiredStatus.values()).filter(Boolean).length;
+            return totalRequired ? Math.round((doneRequired / totalRequired) * 100) : 0;
+        }
+    }
+
     let total = 0;
     let done = 0;
 
@@ -4656,7 +4738,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                     : `<span class="interest-status interest-pending">Not linked</span>`
                 );
             const progressButton = assignedStandards.length
-                ? `<button type="button" class="detail-action detail-action-secondary interest-progress-btn" data-student-email="${escapeHtml(studentEmail)}" data-standards="${escapeHtml(assignedStandards.join(","))}">Progress ${completionPercent}%</button>`
+                ? `<button type="button" class="detail-action detail-action-secondary interest-progress-btn" data-student-email="${escapeHtml(studentEmail)}" data-standards="${escapeHtml(assignedStandards.join(","))}">Progress to Achieved Requirements ${completionPercent}%</button>`
                 : "";
 
             html += `<tr data-student="${escapeHtml(studentEmail)}"><td>${escapeHtml(studentEmail)}</td><td>${statusBadge}</td><td class="interest-trello-status-cell" data-student-email="${escapeHtml(studentEmail)}" data-trello-url="${escapeHtml(trelloCardUrl || "")}">${trelloStatusHtml}</td><td><div class="interest-action-group"><button type="button" class="detail-action interest-confirm-btn" data-confirmed="${isConfirmed}">${confirmBtnText}</button>${progressButton}</div></td></tr>`;
