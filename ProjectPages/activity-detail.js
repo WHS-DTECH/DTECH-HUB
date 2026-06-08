@@ -895,6 +895,7 @@ function summarizeStudentSubmissionStatus(evidenceRows, todayNzKey = getNzDateKe
     let acknowledged = false;
     let trelloLogDate = "";
     let mediaLogDate = "";
+    let trelloLinked = false;
 
     rows.forEach((row) => {
         (Array.isArray(row?.steps) ? row.steps : []).forEach((step) => {
@@ -914,6 +915,14 @@ function summarizeStudentSubmissionStatus(evidenceRows, todayNzKey = getNzDateKe
                 return;
             }
 
+            if (text.startsWith("TRELLO_CARD_URL|")) {
+                const trelloUrl = toSafeTrelloCardUrl(text.slice("TRELLO_CARD_URL|".length).trim());
+                if (trelloUrl) {
+                    trelloLinked = true;
+                }
+                return;
+            }
+
             if (text.startsWith("MEDIA_VERSION_LOG_DATE|")) {
                 mediaLogDate = text.slice("MEDIA_VERSION_LOG_DATE|".length).trim();
             }
@@ -921,7 +930,7 @@ function summarizeStudentSubmissionStatus(evidenceRows, todayNzKey = getNzDateKe
     });
 
     const loggedToday = trelloLogDate === todayNzKey || mediaLogDate === todayNzKey;
-    return { acknowledged, loggedToday };
+    return { acknowledged, loggedToday, trelloLinked };
 }
 
 function getReviewStatusLabel(value) {
@@ -2935,12 +2944,23 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         .map((line) => String(line || "").trim())
         .filter(Boolean);
     const isRelevantImplicationsTopic = taskTopicTitle.toLowerCase().includes("relevant implication");
+    const isProjectManagementTopic = taskTopicTitle.toLowerCase().includes("project management")
+        || resolvedTaskShortName.toLowerCase().includes("project management");
     const submissionTaskItems = Array.from(new Set([
+        ...(isProjectManagementTopic
+            ? [
+                "Add your Trello card or board link so your teacher can verify project management evidence.",
+                "Post a daily Trello work log update for progress tracking."
+            ]
+            : []),
         ...(isRelevantImplicationsTopic
             ? ["Written evidence that explains your relevant implications and justifies your design decisions."]
             : []),
         ...submissionRequirements
     ]));
+    const submissionPrimaryEvidenceType = isProjectManagementTopic
+        ? "Trello Link + Work Log"
+        : (isRelevantImplicationsTopic ? "Written Evidence" : "Evidence Upload");
     if (!submissionTaskItems.length) {
         submissionTaskItems.push("Upload evidence that clearly demonstrates completion of this task topic.");
     }
@@ -3088,7 +3108,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                         <p class="task-topic-submission-intro">Students submit evidence here to show they have completed this task topic.</p>
                         <div class="task-topic-submission-evidence-type">
                             <span class="task-topic-card-label">Primary Evidence Type</span>
-                            <p class="task-topic-card-value">${isRelevantImplicationsTopic ? "Written Evidence" : "Evidence Upload"}</p>
+                            <p class="task-topic-card-value">${submissionPrimaryEvidenceType}</p>
                         </div>
                         <ul class="list task-topic-submission-list">${renderList(submissionTaskItems)}</ul>
                         <div id="task-topic-submission-live-panel" class="task-topic-submission-live-panel"></div>
@@ -4177,8 +4197,14 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     if (isTeacher && isAssessmentTask && !isTaskTopicPage) {
         const students = Array.isArray(interestData?.students) ? interestData.students : [];
         const todayNz = getNzDateKey();
-        const acknowledgedCount = students.filter((student) => summarizeStudentSubmissionStatus(student?.evidence_steps, todayNz).acknowledged).length;
-        const loggedTodayCount = students.filter((student) => summarizeStudentSubmissionStatus(student?.evidence_steps, todayNz).loggedToday).length;
+        const summaryStatuses = students.map((student) => summarizeStudentSubmissionStatus(student?.evidence_steps, todayNz));
+        const acknowledgedCount = summaryStatuses.filter((status) => status.acknowledged).length;
+        const loggedTodayCount = summaryStatuses.filter((status) => status.loggedToday).length;
+        const trelloLinkedCount = summaryStatuses.filter((status) => status.trelloLinked).length;
+        const hasProjectManagementTopic = [
+            ...coerceArray(detailData?.tasksList),
+            ...coerceArray(detailData?.assessmentFocus ?? detailData?.assessment_focus ?? detailData?.assessmentFocusRaw)
+        ].some((line) => String(line || "").toLowerCase().includes("project management"));
 
         html += `
             <div class="task-topic-submission-teacher-panel assessment-submission-summary-panel">
@@ -4191,6 +4217,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                 <div class="task-topic-submission-meta">
                     <p><strong>Acknowledged:</strong> ${acknowledgedCount} of ${students.length}</p>
                     <p><strong>Logged today:</strong> ${loggedTodayCount} of ${students.length}</p>
+                    ${hasProjectManagementTopic ? `<p><strong>Trello linked:</strong> ${trelloLinkedCount} of ${students.length}</p>` : ""}
                 </div>
             </div>
         `;
