@@ -933,6 +933,26 @@ function summarizeStudentSubmissionStatus(evidenceRows, todayNzKey = getNzDateKe
     return { acknowledged, loggedToday, trelloLinked };
 }
 
+function getFirstTrelloCardUrlFromEvidenceRows(evidenceRows) {
+    const rows = normalizeEvidenceSteps(evidenceRows);
+    for (const row of rows) {
+        const steps = Array.isArray(row?.steps) ? row.steps : [];
+        for (const step of steps) {
+            const text = String(step?.text || "").trim();
+            if (!text.startsWith("TRELLO_CARD_URL|")) {
+                continue;
+            }
+
+            const url = toSafeTrelloCardUrl(text.slice("TRELLO_CARD_URL|".length).trim());
+            if (url) {
+                return url;
+            }
+        }
+    }
+
+    return "";
+}
+
 function getReviewStatusLabel(value) {
     const status = String(value || "").trim().toLowerCase();
     if (status === "reviewed") {
@@ -4270,9 +4290,33 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     if (isTeacher && interestData.emails.length > 0) {
         const studentsByEmail = new Map((Array.isArray(interestData.students) ? interestData.students : [])
             .map((student) => [String(student?.email || "").toLowerCase(), student]));
+        const trelloConnectionByEmail = new Map();
+        try {
+            const emails = interestData.emails
+                .map((studentEmail) => String(studentEmail || "").trim().toLowerCase())
+                .filter(Boolean);
+            if (emails.length) {
+                const response = await fetch(`/api/integrations/trello/connections?emails=${encodeURIComponent(emails.join(","))}`, {
+                    headers: buildWriteHeaders()
+                });
+                if (response.ok) {
+                    const payload = await response.json().catch(() => ({}));
+                    const rows = Array.isArray(payload?.connections) ? payload.connections : [];
+                    rows.forEach((row) => {
+                        const normalizedEmail = String(row?.email || "").trim().toLowerCase();
+                        if (!normalizedEmail) {
+                            return;
+                        }
+                        trelloConnectionByEmail.set(normalizedEmail, Boolean(row?.connected));
+                    });
+                }
+            }
+        } catch (_error) {
+            // Keep table rendering even if Trello status cannot be loaded.
+        }
 
         html += `<div class="interest-student-list"><h3>Interested Students</h3>`;
-        html += `<table class="interest-table"><thead><tr><th>Student Email</th><th>Status</th><th>Action</th></tr></thead><tbody>`;
+        html += `<table class="interest-table"><thead><tr><th>Student Email</th><th>Status</th><th>Trello</th><th>Action</th></tr></thead><tbody>`;
         for (const studentEmail of interestData.emails) {
             const isConfirmed = interestData.confirmed.includes(studentEmail);
             const statusBadge = isConfirmed
@@ -4283,11 +4327,19 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             const studentRecord = studentsByEmail.get(String(studentEmail || "").toLowerCase()) || null;
             const assignedStandards = getEffectiveAssignedStandards(studentRecord, detailData);
             const completionPercent = getEvidenceCompletionPercentFromRows(studentRecord?.evidence_steps, assignedStandards);
+            const trelloCardUrl = getFirstTrelloCardUrlFromEvidenceRows(studentRecord?.evidence_steps);
+            const trelloConnected = Boolean(trelloConnectionByEmail.get(String(studentEmail || "").trim().toLowerCase()));
+            const trelloStatusHtml = trelloCardUrl
+                ? `<a class="interest-status interest-confirmed" href="${escapeHtml(trelloCardUrl)}" target="_blank" rel="noreferrer">Open Trello</a>`
+                : (trelloConnected
+                    ? `<span class="interest-status interest-confirmed">Connected</span>`
+                    : `<span class="interest-status interest-pending">Not linked</span>`
+                );
             const progressButton = assignedStandards.length
                 ? `<button type="button" class="detail-action detail-action-secondary interest-progress-btn" data-student-email="${escapeHtml(studentEmail)}" data-standards="${escapeHtml(assignedStandards.join(","))}">Progress ${completionPercent}%</button>`
                 : "";
 
-            html += `<tr data-student="${escapeHtml(studentEmail)}"><td>${escapeHtml(studentEmail)}</td><td>${statusBadge}</td><td><div class="interest-action-group"><button type="button" class="detail-action interest-confirm-btn" data-confirmed="${isConfirmed}">${confirmBtnText}</button>${progressButton}</div></td></tr>`;
+            html += `<tr data-student="${escapeHtml(studentEmail)}"><td>${escapeHtml(studentEmail)}</td><td>${statusBadge}</td><td>${trelloStatusHtml}</td><td><div class="interest-action-group"><button type="button" class="detail-action interest-confirm-btn" data-confirmed="${isConfirmed}">${confirmBtnText}</button>${progressButton}</div></td></tr>`;
         }
         html += `</tbody></table></div>`;
     } else if (isTeacher && interestData.count === 0) {
