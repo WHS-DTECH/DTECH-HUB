@@ -4654,6 +4654,8 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
 
     const selectedTaskTopic = String(new URLSearchParams(window.location.search || "").get("taskTopic") || "").trim();
     const isTaskTopicPage = Boolean(selectedTaskTopic);
+    const isProjectManagementTaskTopicPage = isTaskTopicPage
+        && selectedTaskTopic.toLowerCase().includes("project management");
 
     if (isTeacher && isAssessmentTask && !isTaskTopicPage) {
         const students = Array.isArray(interestData?.students) ? interestData.students : [];
@@ -4704,31 +4706,33 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         const btnText = interestData.my_interest ? "\u2713 I'm Interested" : "I'm Interested";
         html += `<button type="button" class="${btnClass}" id="interest-toggle-btn">${btnText}</button>`;
 
-        const myAllocation = interestData?.my_allocation || null;
-        const assignedStandards = getEffectiveAssignedStandards(myAllocation, detailData);
-        const completionPercent = getEvidenceCompletionPercentFromRows(myAllocation?.evidence_steps, assignedStandards);
-        const sharedTrelloCardLink = getFirstTrelloCardUrlFromEvidenceRows(myAllocation?.evidence_steps);
-        const localTrelloCardLink = readStoredTrelloCardLink(projectId, email);
-        const savedCardLink = escapeHtml(sharedTrelloCardLink || localTrelloCardLink);
-        const trelloBoardHint = getTrelloBoardHint(sharedTrelloCardLink || localTrelloCardLink);
+        if (isProjectManagementTaskTopicPage) {
+            const myAllocation = interestData?.my_allocation || null;
+            const assignedStandards = getEffectiveAssignedStandards(myAllocation, detailData);
+            const completionPercent = getEvidenceCompletionPercentFromRows(myAllocation?.evidence_steps, assignedStandards);
+            const sharedTrelloCardLink = getFirstTrelloCardUrlFromEvidenceRows(myAllocation?.evidence_steps);
+            const localTrelloCardLink = readStoredTrelloCardLink(projectId, email);
+            const savedCardLink = escapeHtml(sharedTrelloCardLink || localTrelloCardLink);
+            const trelloBoardHint = getTrelloBoardHint(sharedTrelloCardLink || localTrelloCardLink);
 
-        html += `
-            <div class="trello-sync-panel" id="trello-sync-panel">
-                <h3>Trello Sync</h3>
-                <p>Open your Trello card quickly or send this work update to Trello.</p>
-                <label for="trello-card-url" class="trello-sync-label">Trello card or board link</label>
-                <input id="trello-card-url" class="trello-sync-input" type="url" placeholder="https://trello.com/c/xxxx1234 or /b/xxxx/board-name" value="${savedCardLink}">
-                ${trelloBoardHint ? `<p class="task-topic-submission-note">Expected shared board: <strong>${escapeHtml(trelloBoardHint)}</strong></p>` : ""}
-                <label for="trello-work-note" class="trello-sync-label">Work note</label>
-                <textarea id="trello-work-note" class="trello-sync-input trello-sync-note" placeholder="What did you complete today?"></textarea>
-                <div class="trello-sync-actions">
-                    <button type="button" class="detail-action detail-action-secondary" id="trello-save-link-btn">Save Trello Link</button>
-                    <button type="button" class="detail-action detail-action-secondary" id="trello-open-card-btn">Open Trello Card</button>
-                    <button type="button" class="detail-action" id="trello-send-log-btn">Send Log to Trello (${completionPercent}%)</button>
+            html += `
+                <div class="trello-sync-panel" id="trello-sync-panel">
+                    <h3>Trello Sync</h3>
+                    <p>Open your Trello card quickly or send this work update to Trello.</p>
+                    <label for="trello-card-url" class="trello-sync-label">Trello card or board link</label>
+                    <input id="trello-card-url" class="trello-sync-input" type="url" placeholder="https://trello.com/c/xxxx1234 or /b/xxxx/board-name" value="${savedCardLink}">
+                    ${trelloBoardHint ? `<p class="task-topic-submission-note">Expected shared board: <strong>${escapeHtml(trelloBoardHint)}</strong></p>` : ""}
+                    <label for="trello-work-note" class="trello-sync-label">Work note</label>
+                    <textarea id="trello-work-note" class="trello-sync-input trello-sync-note" placeholder="What did you complete today?"></textarea>
+                    <div class="trello-sync-actions">
+                        <button type="button" class="detail-action detail-action-secondary" id="trello-save-link-btn">Save Trello Link</button>
+                        <button type="button" class="detail-action detail-action-secondary" id="trello-open-card-btn">Open Trello Card</button>
+                        <button type="button" class="detail-action" id="trello-send-log-btn">Send Log to Trello (${completionPercent}%)</button>
+                    </div>
+                    <p class="trello-sync-status" id="trello-sync-status" aria-live="polite"></p>
                 </div>
-                <p class="trello-sync-status" id="trello-sync-status" aria-live="polite"></p>
-            </div>
-        `;
+            `;
+        }
     }
 
     // Teachers see the full list of interested students
