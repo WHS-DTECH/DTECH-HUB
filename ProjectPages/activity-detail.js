@@ -4230,6 +4230,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                 <label for="trello-work-note" class="trello-sync-label">Work note</label>
                 <textarea id="trello-work-note" class="trello-sync-input trello-sync-note" placeholder="What did you complete today?"></textarea>
                 <div class="trello-sync-actions">
+                    <button type="button" class="detail-action detail-action-secondary" id="trello-save-link-btn">Save Trello Link</button>
                     <button type="button" class="detail-action detail-action-secondary" id="trello-open-card-btn">Open Trello Card</button>
                     <button type="button" class="detail-action" id="trello-send-log-btn">Send Log to Trello (${completionPercent}%)</button>
                 </div>
@@ -4326,6 +4327,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
 
     const trelloCardInput = section.querySelector("#trello-card-url");
     const trelloWorkNoteInput = section.querySelector("#trello-work-note");
+    const trelloSaveLinkBtn = section.querySelector("#trello-save-link-btn");
     const trelloOpenCardBtn = section.querySelector("#trello-open-card-btn");
     const trelloSendLogBtn = section.querySelector("#trello-send-log-btn");
     const trelloStatus = section.querySelector("#trello-sync-status");
@@ -4346,12 +4348,28 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     };
 
     trelloCardInput?.addEventListener("change", () => {
-        const safe = readCardUrl();
+        const raw = String(trelloCardInput.value || "").trim();
+        if (!raw) {
+            setTrelloStatus("");
+            return;
+        }
+
+        const safe = toSafeTrelloCardUrl(raw);
         if (!safe) {
             setTrelloStatus("Enter a valid Trello card or board link (trello.com/c/... or trello.com/b/...).", true);
         } else {
-            setTrelloStatus("Card link saved.");
+            setTrelloStatus("Link looks valid. Click Save Trello Link.");
         }
+    });
+
+    trelloSaveLinkBtn?.addEventListener("click", () => {
+        const cardUrl = readCardUrl();
+        if (!cardUrl) {
+            setTrelloStatus("Enter a valid Trello card or board link first.", true);
+            return;
+        }
+
+        setTrelloStatus("Trello link saved.");
     });
 
     trelloOpenCardBtn?.addEventListener("click", () => {
@@ -4362,7 +4380,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         }
 
         window.open(cardUrl, "_blank", "noopener,noreferrer");
-        setTrelloStatus("Opened Trello card.");
+        setTrelloStatus("Opened Trello link.");
     });
 
     trelloSendLogBtn?.addEventListener("click", async () => {
