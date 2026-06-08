@@ -117,6 +117,9 @@ const EVIDENCE_STEPS_DEFAULTS = {
     ]
 };
 
+const HAPARA_WORKSPACE_PUBLIC_URL = "https://bit.ly/4uO74lI";
+const HAPARA_CLASS_DRIVE_URL = "https://app.hapara.com/dashboard/drive/4-1-12comp-vp-2026@westlandhigh.school.nz/all";
+
 const detailAllowedDomain =
     (document.querySelector('meta[name="hub-google-allowed-domain"]')?.content || "")
         .trim()
@@ -885,6 +888,40 @@ function formatSubmissionTimestamp(value) {
     }
 
     return parsed.toLocaleString();
+}
+
+function summarizeStudentSubmissionStatus(evidenceRows, todayNzKey = getNzDateKey()) {
+    const rows = normalizeEvidenceSteps(evidenceRows);
+    let acknowledged = false;
+    let trelloLogDate = "";
+    let mediaLogDate = "";
+
+    rows.forEach((row) => {
+        (Array.isArray(row?.steps) ? row.steps : []).forEach((step) => {
+            const text = String(step?.text || "").trim();
+            if (!text) {
+                return;
+            }
+
+            if (text.startsWith("HAPARA_ACK|")) {
+                const value = text.slice("HAPARA_ACK|".length).trim().toLowerCase();
+                acknowledged = value === "true" || value === "1" || value === "yes";
+                return;
+            }
+
+            if (text.startsWith("TRELLO_LAST_LOG_DATE|")) {
+                trelloLogDate = text.slice("TRELLO_LAST_LOG_DATE|".length).trim();
+                return;
+            }
+
+            if (text.startsWith("MEDIA_VERSION_LOG_DATE|")) {
+                mediaLogDate = text.slice("MEDIA_VERSION_LOG_DATE|".length).trim();
+            }
+        });
+    });
+
+    const loggedToday = trelloLogDate === todayNzKey || mediaLogDate === todayNzKey;
+    return { acknowledged, loggedToday };
 }
 
 function getReviewStatusLabel(value) {
@@ -4081,6 +4118,31 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             : `${interestData.count} students are interested in this ${isAssessmentTask ? "task" : "project"}.`;
 
     let html = `<h2>Student Interest</h2><p class="interest-count" id="interest-count-text">${countText}</p>`;
+
+    const selectedTaskTopic = String(new URLSearchParams(window.location.search || "").get("taskTopic") || "").trim();
+    const isTaskTopicPage = Boolean(selectedTaskTopic);
+
+    if (isTeacher && isAssessmentTask && !isTaskTopicPage) {
+        const students = Array.isArray(interestData?.students) ? interestData.students : [];
+        const todayNz = getNzDateKey();
+        const acknowledgedCount = students.filter((student) => summarizeStudentSubmissionStatus(student?.evidence_steps, todayNz).acknowledged).length;
+        const loggedTodayCount = students.filter((student) => summarizeStudentSubmissionStatus(student?.evidence_steps, todayNz).loggedToday).length;
+
+        html += `
+            <div class="task-topic-submission-teacher-panel assessment-submission-summary-panel">
+                <h3>Submission Tasks</h3>
+                <p class="task-topic-submission-note">Students submit work in Hapara <strong>Workspace Evidence</strong>. This panel tracks who has acknowledged they submitted.</p>
+                <div class="task-topic-drive-links">
+                    <a class="detail-action detail-action-secondary" href="${escapeHtml(HAPARA_CLASS_DRIVE_URL)}" target="_blank" rel="noreferrer">Open Class Hapara Drive</a>
+                    <a class="detail-action detail-action-secondary" href="${escapeHtml(HAPARA_WORKSPACE_PUBLIC_URL)}" target="_blank" rel="noreferrer">Open Hapara Workspace</a>
+                </div>
+                <div class="task-topic-submission-meta">
+                    <p><strong>Acknowledged:</strong> ${acknowledgedCount} of ${students.length}</p>
+                    <p><strong>Logged today:</strong> ${loggedTodayCount} of ${students.length}</p>
+                </div>
+            </div>
+        `;
+    }
 
     if (isTeacher && isAssessmentTask) {
         const domainHint = detailAllowedDomain ? ` (${escapeHtml(detailAllowedDomain)} domain)` : "";
