@@ -953,6 +953,28 @@ function getFirstTrelloCardUrlFromEvidenceRows(evidenceRows) {
     return "";
 }
 
+async function persistStudentTrelloLink(projectId, studentEmail, trelloCardUrl) {
+    const safeUrl = toSafeTrelloCardUrl(trelloCardUrl);
+    if (!safeUrl) {
+        throw new Error("Enter a valid Trello card or board link first.");
+    }
+
+    const rows = await fetchEvidenceRows(projectId, studentEmail);
+    const normalizedRows = normalizeEvidenceSteps(rows).filter(
+        (row) => String(row?.standard || "").trim() !== "trello-sync"
+    );
+
+    normalizedRows.push({
+        standard: "trello-sync",
+        steps: [
+            { text: `TRELLO_CARD_URL|${safeUrl}`, done: true },
+            { text: `TRELLO_SAVED_AT|${new Date().toISOString()}`, done: true }
+        ]
+    });
+
+    await saveEvidenceRows(projectId, studentEmail, normalizedRows);
+}
+
 function getReviewStatusLabel(value) {
     const status = String(value || "").trim().toLowerCase();
     if (status === "reviewed") {
@@ -4441,14 +4463,23 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         }
     });
 
-    trelloSaveLinkBtn?.addEventListener("click", () => {
+    trelloSaveLinkBtn?.addEventListener("click", async () => {
         const cardUrl = readCardUrl();
         if (!cardUrl) {
             setTrelloStatus("Enter a valid Trello card or board link first.", true);
             return;
         }
 
-        setTrelloStatus("Trello link saved.");
+        if (trelloSaveLinkBtn) trelloSaveLinkBtn.disabled = true;
+        setTrelloStatus("Saving Trello link...");
+        try {
+            await persistStudentTrelloLink(projectId, email, cardUrl);
+            setTrelloStatus("Trello link saved and shared with teacher view.");
+        } catch (error) {
+            setTrelloStatus(error.message || "Could not save Trello link right now.", true);
+        } finally {
+            if (trelloSaveLinkBtn && trelloSaveLinkBtn.isConnected) trelloSaveLinkBtn.disabled = false;
+        }
     });
 
     trelloOpenCardBtn?.addEventListener("click", () => {
