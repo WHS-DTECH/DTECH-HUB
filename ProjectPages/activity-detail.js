@@ -1065,7 +1065,22 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                         });
                     }
                 } catch (_error) {
-                    // Non-fatal: keep rendering with card-link-only signals.
+                    // Fallback for environments without the bulk endpoint yet.
+                    await Promise.all(emails.map(async (studentEmail) => {
+                        try {
+                            const statusResponse = await fetch("/api/integrations/trello/status", {
+                                headers: { "x-user-email": studentEmail }
+                            });
+                            if (!statusResponse.ok) {
+                                return;
+                            }
+
+                            const statusPayload = await statusResponse.json().catch(() => ({}));
+                            trelloConnectionByEmail.set(studentEmail, Boolean(statusPayload?.connected));
+                        } catch (_statusError) {
+                            // Ignore individual lookup failures.
+                        }
+                    }));
                 }
             }
         }
