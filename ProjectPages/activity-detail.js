@@ -2499,21 +2499,25 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
                 void persistState(sidebar.querySelector("#evidence-sidebar-status"));
             });
 
-            const removeButton = document.createElement("button");
-            removeButton.type = "button";
-            removeButton.className = "evidence-step-remove";
-            removeButton.textContent = "Remove";
-            removeButton.addEventListener("click", () => {
-                state[standardCode].splice(index, 1);
-                if (!isSelfTaskListView && !state[standardCode].length) {
-                    const fallbackText = levelFilter ? `${levelFilter}: ` : "";
-                    state[standardCode].push({ text: fallbackText, done: false });
-                }
-                void persistState(sidebar.querySelector("#evidence-sidebar-status"));
-                renderStepRows(rowsHost, standardCode, levelFilter);
-            });
+            row.append(check, input);
 
-            row.append(check, input, removeButton);
+            if (!isSelfTaskListView) {
+                const removeButton = document.createElement("button");
+                removeButton.type = "button";
+                removeButton.className = "evidence-step-remove";
+                removeButton.textContent = "Remove";
+                removeButton.addEventListener("click", () => {
+                    state[standardCode].splice(index, 1);
+                    if (!state[standardCode].length) {
+                        const fallbackText = levelFilter ? `${levelFilter}: ` : "";
+                        state[standardCode].push({ text: fallbackText, done: false });
+                    }
+                    void persistState(sidebar.querySelector("#evidence-sidebar-status"));
+                    renderStepRows(rowsHost, standardCode, levelFilter);
+                });
+
+                row.append(removeButton);
+            }
 
             const rowLevel = String(levelFilter || getStepLevel(step?.text)).trim().toLowerCase();
             const rowTaskText = stripStepLevel(step?.text).toLowerCase();
