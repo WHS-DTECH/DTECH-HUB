@@ -959,20 +959,16 @@ async function persistStudentTrelloLink(projectId, studentEmail, trelloCardUrl) 
         throw new Error("Enter a valid Trello card or board link first.");
     }
 
-    const rows = await fetchEvidenceRows(projectId, studentEmail);
-    const normalizedRows = normalizeEvidenceSteps(rows).filter(
-        (row) => String(row?.standard || "").trim() !== "trello-sync"
-    );
-
-    normalizedRows.push({
-        standard: "trello-sync",
-        steps: [
-            { text: `TRELLO_CARD_URL|${safeUrl}`, done: true },
-            { text: `TRELLO_SAVED_AT|${new Date().toISOString()}`, done: true }
-        ]
+    const response = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interests/${encodeURIComponent(studentEmail)}/trello-link`, {
+        method: "PATCH",
+        headers: buildWriteHeaders(),
+        body: JSON.stringify({ trello_card_url: safeUrl })
     });
 
-    await saveEvidenceRows(projectId, studentEmail, normalizedRows);
+    if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.error || "Could not save Trello link.");
+    }
 }
 
 function getReviewStatusLabel(value) {

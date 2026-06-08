@@ -3706,6 +3706,19 @@ function normalizeEvidenceStepsPayload(value) {
     .filter(Boolean);
 }
 
+function upsertEvidenceRow(rows, standardKey, nextSteps) {
+  const normalizedRows = normalizeEvidenceStepsPayload(rows).filter(
+    (row) => String(row?.standard || "").trim() !== String(standardKey || "").trim()
+  );
+
+  normalizedRows.push({
+    standard: String(standardKey || "").trim(),
+    steps: Array.isArray(nextSteps) ? nextSteps : []
+  });
+
+  return normalizeEvidenceStepsPayload(normalizedRows);
+}
+
 async function canManagePracticalSchedule(email) {
   const normalizedEmail = normalizeEmail(email);
   if (!normalizedEmail) return false;
@@ -5155,6 +5168,83 @@ app.patch("/api/activities/:id/interests/:studentEmail/evidence", async (req, re
     });
   } catch (_error) {
     res.status(500).json({ error: "Could not save evidence steps" });
+  }
+});
+
+app.patch("/api/activities/:id/interests/:studentEmail/trello-link", async (req, res) => {
+  const projectId = String(req.params.id || "").trim();
+  const studentEmail = normalizeEmail(req.params.studentEmail || "");
+  const requesterEmail = normalizeEmail(getRequestUserEmail(req));
+  const trelloCardUrl = String(req.body?.trello_card_url || req.body?.trelloCardUrl || "").trim();
+
+  if (!projectId || !studentEmail) {
+    res.status(400).json({ error: "Project ID and student email are required" });
+    return;
+  }
+
+  if (!requesterEmail || !requesterEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required" });
+    return;
+  }
+
+  let isTeacher = false;
+  try {
+    const access = await resolveActivityWriteAccess(requesterEmail);
+    isTeacher = Boolean(access.allowed);
+  } catch (_error) {
+    isTeacher = false;
+  }
+
+  if (!isTeacher && requesterEmail !== studentEmail) {
+    res.status(403).json({ error: "Access denied" });
+    return;
+  }
+
+  if (!trelloCardUrl) {
+    res.status(400).json({ error: "Trello card or board link is required" });
+    return;
+  }
+
+  if (!hasDatabase) {
+    res.json({ student_email: studentEmail, trello_card_url: trelloCardUrl, saved: true });
+    return;
+  }
+
+  try {
+    const currentResult = await pool.query(
+      "SELECT evidence_steps FROM project_interests WHERE project_id = $1 AND student_email = $2 LIMIT 1",
+      [projectId, studentEmail]
+    );
+
+    if (!currentResult.rowCount) {
+      res.status(404).json({ error: "Student allocation not found" });
+      return;
+    }
+
+    const existingRows = normalizeEvidenceStepsPayload(currentResult.rows?.[0]?.evidence_steps);
+    const nextRows = upsertEvidenceRow(existingRows, "trello-sync", [
+      { text: `TRELLO_CARD_URL|${trelloCardUrl}`, done: true },
+      { text: `TRELLO_SAVED_AT|${new Date().toISOString()}`, done: true }
+    ]);
+
+    await pool.query(
+      `
+        UPDATE project_interests
+        SET evidence_steps = $1::jsonb,
+            updated_at = NOW()
+        WHERE project_id = $2 AND student_email = $3
+      `,
+      [JSON.stringify(nextRows), projectId, studentEmail]
+    );
+
+    res.json({
+      student_email: studentEmail,
+      trello_card_url: trelloCardUrl,
+      evidence_steps: nextRows,
+      saved: true
+    });
+  } catch (_error) {
+    res.status(500).json({ error: "Could not save Trello link" });
   }
 });
 
@@ -6994,6 +7084,67 @@ app.get("/api/integrations/trello/status", async (req, res) => {
     });
   } catch (_error) {
     res.status(500).json({ error: "Could not load Trello connection status" });
+  }
+});
+
+app.get("/api/integrations/trello/connections", requireActivityWriteAccess, async (req, res) => {
+  const emailsParam = String(req.query?.emails || "").trim();
+  const parsedEmails = emailsParam
+    .split(",")
+    .map((value) => normalizeEmail(value))
+    .filter((value) => isSchoolEmail(value));
+  const uniqueEmails = Array.from(new Set(parsedEmails));
+
+  if (!uniqueEmails.length) {
+    res.json({ connections: [] });
+    return;
+  }
+
+  try {
+    if (!hasDatabase) {
+      const rows = uniqueEmails.map((email) => {
+        const existing = memoryTrelloConnections.get(email) || null;
+        return {
+          email,
+          connected: Boolean(existing?.trello_token),
+          connected_at: existing?.connected_at || null,
+          updated_at: existing?.updated_at || null
+        };
+      });
+      res.json({ connections: rows });
+      return;
+    }
+
+    await ensureTrelloConnectionsSchema();
+    const result = await pool.query(
+      `
+        SELECT student_email, trello_token, connected_at, updated_at
+        FROM student_trello_connections
+        WHERE student_email = ANY($1::text[])
+      `,
+      [uniqueEmails]
+    );
+
+    const byEmail = new Map(
+      (result.rows || []).map((row) => [
+        normalizeEmail(row.student_email),
+        {
+          email: normalizeEmail(row.student_email),
+          connected: Boolean(row?.trello_token),
+          connected_at: row?.connected_at || null,
+          updated_at: row?.updated_at || null
+        }
+      ])
+    );
+
+    const rows = uniqueEmails.map((email) => {
+      const found = byEmail.get(email);
+      return found || { email, connected: false, connected_at: null, updated_at: null };
+    });
+
+    res.json({ connections: rows });
+  } catch (_error) {
+    res.status(500).json({ error: "Could not load Trello connection statuses" });
   }
 });
 
