@@ -4359,7 +4359,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                 ? `<button type="button" class="detail-action detail-action-secondary interest-progress-btn" data-student-email="${escapeHtml(studentEmail)}" data-standards="${escapeHtml(assignedStandards.join(","))}">Progress ${completionPercent}%</button>`
                 : "";
 
-            html += `<tr data-student="${escapeHtml(studentEmail)}"><td>${escapeHtml(studentEmail)}</td><td>${statusBadge}</td><td>${trelloStatusHtml}</td><td><div class="interest-action-group"><button type="button" class="detail-action interest-confirm-btn" data-confirmed="${isConfirmed}">${confirmBtnText}</button>${progressButton}</div></td></tr>`;
+            html += `<tr data-student="${escapeHtml(studentEmail)}"><td>${escapeHtml(studentEmail)}</td><td>${statusBadge}</td><td class="interest-trello-status-cell" data-student-email="${escapeHtml(studentEmail)}">${trelloStatusHtml}</td><td><div class="interest-action-group"><button type="button" class="detail-action interest-confirm-btn" data-confirmed="${isConfirmed}">${confirmBtnText}</button>${progressButton}</div></td></tr>`;
         }
         html += `</tbody></table></div>`;
     } else if (isTeacher && interestData.count === 0) {
@@ -4397,6 +4397,33 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     }
 
     if (isTeacher && email) {
+        const trelloStatusCells = Array.from(section.querySelectorAll(".interest-trello-status-cell[data-student-email]"));
+        await Promise.all(trelloStatusCells.map(async (cell) => {
+            const studentEmail = String(cell.getAttribute("data-student-email") || "").trim().toLowerCase();
+            if (!studentEmail) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interests/${encodeURIComponent(studentEmail)}/evidence`, {
+                    headers: buildWriteHeaders()
+                });
+                if (!response.ok) {
+                    return;
+                }
+
+                const payload = await response.json().catch(() => ({}));
+                const trelloCardUrl = getFirstTrelloCardUrlFromEvidenceRows(payload?.evidence_steps);
+                if (!trelloCardUrl) {
+                    return;
+                }
+
+                cell.innerHTML = `<a class="interest-status interest-confirmed" href="${escapeHtml(trelloCardUrl)}" target="_blank" rel="noreferrer">Open Trello</a>`;
+            } catch (_error) {
+                // Keep the current fallback status if the evidence refresh fails.
+            }
+        }));
+
         section.querySelectorAll(".interest-progress-btn").forEach((button) => {
             button.addEventListener("click", async () => {
                 const studentEmail = String(button.getAttribute("data-student-email") || "").trim().toLowerCase();
