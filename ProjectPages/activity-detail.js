@@ -1045,6 +1045,31 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             return;
         }
 
+        const trelloConnectionByEmail = new Map();
+        if (isProjectManagementTopic) {
+            const emails = students
+                .map((student) => String(student?.email || "").trim().toLowerCase())
+                .filter(Boolean);
+            if (emails.length) {
+                try {
+                    const response = await fetch(`/api/integrations/trello/connections?emails=${encodeURIComponent(emails.join(","))}`, {
+                        headers: buildWriteHeaders()
+                    });
+                    if (response.ok) {
+                        const payload = await response.json().catch(() => ({}));
+                        const rows = Array.isArray(payload?.connections) ? payload.connections : [];
+                        rows.forEach((row) => {
+                            const email = String(row?.email || "").trim().toLowerCase();
+                            if (!email) return;
+                            trelloConnectionByEmail.set(email, Boolean(row?.connected));
+                        });
+                    }
+                } catch (_error) {
+                    // Non-fatal: keep rendering with card-link-only signals.
+                }
+            }
+        }
+
         const rows = students
             .map((student) => {
                 const studentEmail = String(student?.email || "").trim().toLowerCase();
@@ -1058,6 +1083,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                     acknowledged: Boolean(submission.haparaAcknowledged),
                     submittedAt: submission.haparaSubmittedAt || submission.submittedAt || "",
                     trelloCardUrl: submission.trelloCardUrl || "",
+                    trelloConnected: Boolean(trelloConnectionByEmail.get(studentEmail)),
                     mediaAssetFolderUrl: submission.mediaAssetFolderUrl || "",
                     mediaReviewUrl: submission.mediaReviewUrl || "",
                     docRef: submission.haparaDocumentRef || "",
@@ -1072,7 +1098,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         const todayNz = getNzDateKey();
         const missingPrimaryLinkRows = rows.filter((row) => {
             if (isProjectManagementTopic) {
-                return !String(row.trelloCardUrl || "").trim();
+                return !String(row.trelloCardUrl || "").trim() && !row.trelloConnected;
             }
             if (isMediaAssetWorkflowTopic) {
                 return !String(row.mediaAssetFolderUrl || "").trim();
@@ -1150,7 +1176,10 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                             ${isProjectManagementTopic
                                 ? (row.trelloCardUrl
                                     ? `<a class="task-topic-teacher-status-trello" href="${escapeHtml(row.trelloCardUrl)}" target="_blank" rel="noreferrer">Open Trello Card</a>`
-                                    : `<span class="task-topic-teacher-status-trello task-topic-teacher-status-trello-missing">No Trello card linked</span>`
+                                    : (row.trelloConnected
+                                        ? `<span class="task-topic-teacher-status-trello">Trello connected</span>`
+                                        : `<span class="task-topic-teacher-status-trello task-topic-teacher-status-trello-missing">No Trello card linked</span>`
+                                    )
                                 )
                                 : (isMediaAssetWorkflowTopic
                                     ? (row.mediaAssetFolderUrl
@@ -1226,7 +1255,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                     ...rowsToExport.map((row) => [
                         quoteCsv(row.email),
                         quoteCsv(row.acknowledged ? "yes" : "no"),
-                        quoteCsv(row.trelloCardUrl ? "yes" : "no"),
+                        quoteCsv(row.trelloCardUrl || row.trelloConnected ? "yes" : "no"),
                         quoteCsv(row.mediaAssetFolderUrl ? "yes" : "no"),
                         quoteCsv(isProjectManagementTopic ? (row.lastLogDate || "") : (row.mediaLastVersionLogDate || "")),
                         quoteCsv(isProjectManagementTopic ? (row.lastLogAt || "") : (row.mediaLastVersionLogAt || "")),
