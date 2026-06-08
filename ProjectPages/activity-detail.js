@@ -480,6 +480,10 @@ function toSafeTrelloCardUrl(value) {
     const raw = String(value || "").trim();
     if (!raw) return "";
 
+    const trelloBoardAliases = new Map([
+        ["n06v7lY2", "n06w7IY2"]
+    ]);
+
     try {
         const parsed = new URL(raw);
         const host = String(parsed.hostname || "").toLowerCase();
@@ -496,10 +500,11 @@ function toSafeTrelloCardUrl(value) {
         // Also accept board URLs: /b/xxxx/board-name — store the canonical board URL
         const boardMatch = parsed.pathname.match(/\/b\/([a-zA-Z0-9]+)/i);
         if (boardMatch?.[1]) {
+            const boardId = trelloBoardAliases.get(boardMatch[1]) || boardMatch[1];
             const boardSlug = parsed.pathname.split("/").filter(Boolean).slice(2).join("/");
             return boardSlug
-                ? `https://trello.com/b/${boardMatch[1]}/${boardSlug}`
-                : `https://trello.com/b/${boardMatch[1]}`;
+                ? `https://trello.com/b/${boardId}/${boardSlug}`
+                : `https://trello.com/b/${boardId}`;
         }
 
         return "";
