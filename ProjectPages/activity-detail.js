@@ -1078,32 +1078,6 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         || normalizedDerivedShortName.includes("version control");
     const isMediaAssetWorkflowTopic = isAssetVersionControlTopic && !isProjectManagementTopic;
     const isTrackedWorkflowTopic = isProjectManagementTopic || isMediaAssetWorkflowTopic;
-    const haparaWorkspacePublicUrl = "https://bit.ly/4uO74lI";
-    const haparaWorkspaceEmbedUrl = "https://workspace.teacherdashboard.com/public/#/w/6a1cc0549131d4df96cb4f7f?embed=true";
-    const haparaClassDriveUrl = "https://app.hapara.com/dashboard/drive/4-1-12comp-vp-2026@westlandhigh.school.nz/all";
-    const shouldShowHaparaEmbed = isRelevantImplicationsTopic;
-    const haparaSpaceName = isRelevantImplicationsTopic
-        ? "Relevant Implication Documentation"
-        : "Workspace Evidence";
-    const haparaEmbedHtml = shouldShowHaparaEmbed
-        ? `
-            <section class="proposal-section task-topic-submission-panel task-topic-hapara-embed-panel">
-                <h2>Hapara Workspace</h2>
-                <p class="task-topic-submission-intro">Use this embedded workspace to upload your write-up to <strong>${escapeHtml(haparaSpaceName)}</strong>.</p>
-                <div class="task-topic-hapara-embed-wrap">
-                    <iframe
-                        class="task-topic-hapara-embed"
-                        src="${escapeHtml(haparaWorkspaceEmbedUrl)}"
-                        title="Hapara Relevant Implication Documentation"
-                        loading="lazy"
-                        referrerpolicy="strict-origin-when-cross-origin"
-                        allowfullscreen
-                    ></iframe>
-                </div>
-                <p class="task-topic-hapara-embed-link"><a href="${escapeHtml(haparaWorkspacePublicUrl)}" target="_blank" rel="noreferrer">Open Hapara in a new tab</a></p>
-            </section>
-        `
-        : "";
 
     if (isTeacher) {
         const students = Array.isArray(interestData?.students) ? interestData.students : [];
@@ -1217,12 +1191,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
 
         panelHost.innerHTML = `
             <div class="task-topic-submission-teacher-panel">
-                ${haparaEmbedHtml}
-                <div class="task-topic-drive-links">
-                    <a class="detail-action detail-action-secondary" href="${escapeHtml(haparaClassDriveUrl)}" target="_blank" rel="noreferrer">Open Class Hapara Drive</a>
-                    <a class="detail-action detail-action-secondary" href="${escapeHtml(haparaWorkspacePublicUrl)}" target="_blank" rel="noreferrer">Open Hapara Workspace</a>
-                </div>
-                <p class="task-topic-submission-note">Students submit work in Hapara <strong>${escapeHtml(haparaSpaceName)}</strong>. This panel tracks who has acknowledged they submitted.</p>
+                <p class="task-topic-submission-note">Students submit evidence for this task topic. This panel tracks who has acknowledged they submitted.</p>
                 <div class="task-topic-submission-meta">
                     <p><strong>Acknowledged:</strong> ${rows.filter((row) => row.acknowledged).length} of ${rows.length}</p>
                     ${isTrackedWorkflowTopic ? `<p><strong>Logged today:</strong> ${loggedTodayCount} of ${rows.length}</p>` : ""}
@@ -1253,7 +1222,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                     ${rows.map((row) => `
                         <div class="task-topic-teacher-status-item">
                             <span class="task-topic-teacher-status-email">${escapeHtml(row.email)}</span>
-                            <span class="task-topic-teacher-status-pill ${row.acknowledged ? "is-acknowledged" : "is-pending"}">${row.acknowledged ? "Submitted in Hapara" : "Not acknowledged"}</span>
+                            <span class="task-topic-teacher-status-pill ${row.acknowledged ? "is-acknowledged" : "is-pending"}">${row.acknowledged ? "Submitted evidence" : "Not acknowledged"}</span>
                             <span class="task-topic-teacher-status-doc">${escapeHtml(row.docRef || "No document reference")}</span>
                             ${isProjectManagementTopic
                                 ? (row.trelloCardUrl
@@ -1392,15 +1361,10 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
 
     panelHost.innerHTML = `
         <form id="task-topic-submission-form" class="task-topic-submission-form" novalidate>
-            ${haparaEmbedHtml}
-            <p class="task-topic-submission-note">Save your write-up into the class Hapara Drive folder, then acknowledge below so this system records completion.</p>
-            <div class="task-topic-drive-links">
-                <a class="detail-action detail-action-secondary" href="${escapeHtml(haparaClassDriveUrl)}" target="_blank" rel="noreferrer">Open Class Hapara Drive</a>
-                <a class="detail-action detail-action-secondary" href="${escapeHtml(haparaWorkspacePublicUrl)}" target="_blank" rel="noreferrer">Open Hapara Workspace</a>
-            </div>
+            <p class="task-topic-submission-note">Add your evidence reference, then acknowledge below so this system records completion.</p>
 
-            <label class="task-topic-submission-label" for="task-topic-hapara-doc-ref">Document Name or Drive Reference</label>
-            <input id="task-topic-hapara-doc-ref" class="task-topic-submission-input" type="text" placeholder="Example: Relevant Implications - Victor McKewen" value="${escapeHtml(currentDocRef)}" required>
+            <label class="task-topic-submission-label" for="task-topic-hapara-doc-ref">Evidence Document Name or Reference</label>
+            <input id="task-topic-hapara-doc-ref" class="task-topic-submission-input" type="text" placeholder="Example: Decomposition notes - Vincent" value="${escapeHtml(currentDocRef)}" required>
 
             ${isProjectManagementTopic ? `
                 <label class="task-topic-submission-label" for="task-topic-trello-card-url">Trello Card or Board Link</label>
@@ -1461,15 +1425,14 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             ` : ""}
 
             <div class="task-topic-submission-actions">
-                <button type="submit" class="detail-action">I Submitted In Hapara</button>
+                <button type="submit" class="detail-action">I Submitted Evidence</button>
                 <button type="button" class="detail-action detail-action-secondary" id="task-topic-clear-acknowledgement">Clear Acknowledgement</button>
             </div>
             <p class="task-topic-submission-status" id="task-topic-submission-status" aria-live="polite"></p>
         </form>
         <div class="task-topic-submission-meta">
-            <p><strong>Status:</strong> <span id="task-topic-ack-status">${acknowledged ? "Submitted in Hapara" : "Waiting for acknowledgement"}</span></p>
+            <p><strong>Status:</strong> <span id="task-topic-ack-status">${acknowledged ? "Submitted evidence" : "Waiting for acknowledgement"}</span></p>
             <p><strong>Acknowledged At:</strong> <span id="task-topic-last-submitted">${escapeHtml(formatSubmissionTimestamp(acknowledgedAt))}</span></p>
-            <p><strong>Hapara Space:</strong> <span>${escapeHtml(haparaSpaceName)}</span></p>
             <p><strong>Document Reference:</strong> <span id="task-topic-doc-reference">${escapeHtml(currentDocRef || "Not provided")}</span></p>
             ${isProjectManagementTopic
                 ? `<p><strong>Trello Card:</strong> <span id="task-topic-trello-reference">${currentTrelloCardUrl ? `<a href="${escapeHtml(currentTrelloCardUrl)}" target="_blank" rel="noreferrer">${escapeHtml(currentTrelloCardUrl)}</a>` : "Not linked"}</span></p>`
@@ -1521,7 +1484,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const mediaLastLogHost = panelHost.querySelector("#task-topic-media-last-log");
     const updateMeta = (isAcknowledged, timestamp) => {
         if (ackStatusHost) {
-            ackStatusHost.textContent = isAcknowledged ? "Submitted in Hapara" : "Waiting for acknowledgement";
+            ackStatusHost.textContent = isAcknowledged ? "Submitted evidence" : "Waiting for acknowledgement";
         }
 
         if (lastSubmittedHost) {
@@ -1886,7 +1849,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             submission.reviewStatus = "pending";
 
             updateMeta(true, submittedAt);
-            setStatus("Acknowledged. Your Hapara submission has been recorded.");
+            setStatus("Acknowledged. Your evidence submission has been recorded.");
         } catch (_error) {
             setStatus("Could not save acknowledgement right now.", true);
         } finally {
