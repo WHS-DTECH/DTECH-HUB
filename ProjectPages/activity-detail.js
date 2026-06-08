@@ -513,6 +513,21 @@ function toSafeTrelloCardUrl(value) {
     }
 }
 
+function getTrelloBoardHint(value) {
+    const safeUrl = toSafeTrelloCardUrl(value);
+    const boardMatch = String(safeUrl || "").match(/\/b\/([a-zA-Z0-9]+)(?:\/([^/?#]+))?/i);
+    if (!boardMatch?.[1]) {
+        return "";
+    }
+
+    const boardSlug = String(boardMatch[2] || "").replace(/-/g, " ").trim();
+    if (boardSlug) {
+        return `${boardSlug.charAt(0).toUpperCase()}${boardSlug.slice(1)}`;
+    }
+
+    return "Trello board";
+}
+
 function toStandardCode(value) {
     const match = String(value || "").match(/\b\d{5}\b/);
     return match ? match[0] : "";
@@ -4292,6 +4307,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         const sharedTrelloCardLink = getFirstTrelloCardUrlFromEvidenceRows(myAllocation?.evidence_steps);
         const localTrelloCardLink = readStoredTrelloCardLink(projectId, email);
         const savedCardLink = escapeHtml(sharedTrelloCardLink || localTrelloCardLink);
+        const trelloBoardHint = getTrelloBoardHint(sharedTrelloCardLink || localTrelloCardLink);
 
         html += `
             <div class="trello-sync-panel" id="trello-sync-panel">
@@ -4299,6 +4315,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                 <p>Open your Trello card quickly or send this work update to Trello.</p>
                 <label for="trello-card-url" class="trello-sync-label">Trello card or board link</label>
                 <input id="trello-card-url" class="trello-sync-input" type="url" placeholder="https://trello.com/c/xxxx1234 or /b/xxxx/board-name" value="${savedCardLink}">
+                ${trelloBoardHint ? `<p class="task-topic-submission-note">Expected shared board: <strong>${escapeHtml(trelloBoardHint)}</strong></p>` : ""}
                 <label for="trello-work-note" class="trello-sync-label">Work note</label>
                 <textarea id="trello-work-note" class="trello-sync-input trello-sync-note" placeholder="What did you complete today?"></textarea>
                 <div class="trello-sync-actions">
