@@ -4288,7 +4288,9 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         const myAllocation = interestData?.my_allocation || null;
         const assignedStandards = getEffectiveAssignedStandards(myAllocation, detailData);
         const completionPercent = getEvidenceCompletionPercentFromRows(myAllocation?.evidence_steps, assignedStandards);
-        const savedCardLink = escapeHtml(readStoredTrelloCardLink(projectId, email));
+        const sharedTrelloCardLink = getFirstTrelloCardUrlFromEvidenceRows(myAllocation?.evidence_steps);
+        const localTrelloCardLink = readStoredTrelloCardLink(projectId, email);
+        const savedCardLink = escapeHtml(sharedTrelloCardLink || localTrelloCardLink);
 
         html += `
             <div class="trello-sync-panel" id="trello-sync-panel">
@@ -4439,6 +4441,10 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         trelloStatus.classList.toggle("is-error", Boolean(isError));
     };
 
+    const backendTrelloCardLink = getFirstTrelloCardUrlFromEvidenceRows(interestData?.my_allocation?.evidence_steps);
+    const localTrelloCardLink = readStoredTrelloCardLink(projectId, email);
+    const needsLegacyTrelloMigration = !backendTrelloCardLink && Boolean(localTrelloCardLink);
+
     const readCardUrl = () => {
         const safe = toSafeTrelloCardUrl(trelloCardInput?.value || "");
         if (trelloCardInput && safe && trelloCardInput.value !== safe) {
@@ -4447,6 +4453,25 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         writeStoredTrelloCardLink(projectId, email, safe);
         return safe;
     };
+
+    if (needsLegacyTrelloMigration && trelloCardInput) {
+        trelloCardInput.value = toSafeTrelloCardUrl(localTrelloCardLink) || localTrelloCardLink;
+        setTrelloStatus("This Trello link was only saved in this browser before. Saving it now will share it with teacher view.");
+
+        void (async () => {
+            try {
+                const safeLocalUrl = toSafeTrelloCardUrl(localTrelloCardLink);
+                if (!safeLocalUrl) {
+                    return;
+                }
+
+                await persistStudentTrelloLink(projectId, email, safeLocalUrl);
+                setTrelloStatus("Your Trello link has been synced to teacher view.");
+            } catch (_error) {
+                // Keep the prompt visible so the student can use Save Trello Link manually.
+            }
+        })();
+    }
 
     trelloCardInput?.addEventListener("change", () => {
         const raw = String(trelloCardInput.value || "").trim();
