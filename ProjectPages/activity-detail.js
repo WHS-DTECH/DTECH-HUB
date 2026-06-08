@@ -2302,13 +2302,18 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
     }
 
     const section = host.querySelector("#interest-section");
-    if (section && !section.querySelector("#evidence-sidebar-open")) {
+    const triggerRow = host.querySelector("#detail-under-hero-actions") || section;
+    const existingTriggerButton = host.querySelector("#evidence-sidebar-open");
+    if (existingTriggerButton) {
+        existingTriggerButton.remove();
+    }
+    if (triggerRow) {
         const triggerButton = document.createElement("button");
         triggerButton.type = "button";
         triggerButton.id = "evidence-sidebar-open";
         triggerButton.className = "detail-action evidence-sidebar-open-btn";
         triggerButton.textContent = "Open Task List";
-        section.appendChild(triggerButton);
+        triggerRow.appendChild(triggerButton);
     }
 
     const backdrop = document.createElement("div");
@@ -3464,6 +3469,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 <img src="${escapeHtml(data.image)}" alt="${escapeHtml(displayTitle)} project image" loading="lazy">
             </div>
         </section>
+
+        <div class="detail-under-hero-actions" id="detail-under-hero-actions"></div>
 
         ${
             isTaskTopicView ? `

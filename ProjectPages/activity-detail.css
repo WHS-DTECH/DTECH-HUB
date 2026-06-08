@@ -240,6 +240,12 @@ h1 {
     display: block;
 }
 
+.detail-under-hero-actions {
+    margin-top: 10px;
+    display: flex;
+    justify-content: flex-end;
+}
+
 .grid {
     margin-top: 10px;
     display: grid;
@@ -1263,8 +1269,7 @@ h1 {
 }
 
 .evidence-sidebar-open-btn {
-    align-self: flex-start;
-    margin-top: 4px;
+    margin-top: 0;
 }
 
 .evidence-sidebar-backdrop {
