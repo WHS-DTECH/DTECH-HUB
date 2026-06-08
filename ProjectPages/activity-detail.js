@@ -995,6 +995,14 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const isProjectManagementTopic = taskTopicTitle.toLowerCase().includes("project management")
         || normalizedTaskTopicShortName.includes("project management")
         || normalizedDerivedShortName.includes("project management");
+
+    // Keep Project Management task-topic cards focused on card content.
+    // Submission/Hapara tracking is available on the main Assessment Task page.
+    if (isProjectManagementTopic) {
+        panelHost.innerHTML = "";
+        return;
+    }
+
     const isAssetVersionControlTopic = taskTopicTitle.toLowerCase().includes("asset management")
         || taskTopicTitle.toLowerCase().includes("version control")
         || normalizedTaskTopicShortName.includes("asset management")
