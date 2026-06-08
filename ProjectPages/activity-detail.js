@@ -2330,9 +2330,12 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
         backdrop.classList.add("is-open");
     };
 
+    const isSelfTaskListView = normalizeEmail(viewerEmail) === normalizeEmail(studentEmail);
     const state = evidenceRowsToMap(await fetchEvidenceRows(projectId, studentEmail).catch(() => []));
     standards.forEach((code) => {
-        if (!Array.isArray(state[code]) || !state[code].length) {
+        const hasExistingStandard = Object.prototype.hasOwnProperty.call(state, code);
+        const shouldSeedDefaults = !hasExistingStandard || (!isSelfTaskListView && (!Array.isArray(state[code]) || !state[code].length));
+        if (shouldSeedDefaults) {
             const defaultSteps = Array.isArray(taskDefaultsByStandard?.[code])
                 ? taskDefaultsByStandard[code]
                 : (Array.isArray(EVIDENCE_STEPS_DEFAULTS[code]) ? EVIDENCE_STEPS_DEFAULTS[code] : [""]);
@@ -2345,7 +2348,7 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
             }
         }
 
-        if (String(code) === "91897") {
+        if (!isSelfTaskListView && String(code) === "91897") {
             const defaultsFor91897 = Array.isArray(taskDefaultsByStandard?.[code]) ? taskDefaultsByStandard[code] : [];
             state[code] = normalize91897RowsWithRequirementFallback(state[code], defaultsFor91897);
         }
@@ -2502,7 +2505,7 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
             removeButton.textContent = "Remove";
             removeButton.addEventListener("click", () => {
                 state[standardCode].splice(index, 1);
-                if (!state[standardCode].length) {
+                if (!isSelfTaskListView && !state[standardCode].length) {
                     const fallbackText = levelFilter ? `${levelFilter}: ` : "";
                     state[standardCode].push({ text: fallbackText, done: false });
                 }
