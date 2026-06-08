@@ -484,12 +484,22 @@ function toSafeTrelloCardUrl(value) {
             return "";
         }
 
-        const match = parsed.pathname.match(/\/c\/([a-zA-Z0-9]+)/i);
-        if (!match?.[1]) {
-            return "";
+        // Accept card URLs: /c/xxxx
+        const cardMatch = parsed.pathname.match(/\/c\/([a-zA-Z0-9]+)/i);
+        if (cardMatch?.[1]) {
+            return `https://trello.com/c/${cardMatch[1]}`;
         }
 
-        return `https://trello.com/c/${match[1]}`;
+        // Also accept board URLs: /b/xxxx/board-name — store the canonical board URL
+        const boardMatch = parsed.pathname.match(/\/b\/([a-zA-Z0-9]+)/i);
+        if (boardMatch?.[1]) {
+            const boardSlug = parsed.pathname.split("/").filter(Boolean).slice(2).join("/");
+            return boardSlug
+                ? `https://trello.com/b/${boardMatch[1]}/${boardSlug}`
+                : `https://trello.com/b/${boardMatch[1]}`;
+        }
+
+        return "";
     } catch (_error) {
         return "";
     }
@@ -1217,9 +1227,9 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             <input id="task-topic-hapara-doc-ref" class="task-topic-submission-input" type="text" placeholder="Example: Relevant Implications - Victor McKewen" value="${escapeHtml(currentDocRef)}" required>
 
             ${isProjectManagementTopic ? `
-                <label class="task-topic-submission-label" for="task-topic-trello-card-url">Trello Card Link</label>
-                <input id="task-topic-trello-card-url" class="task-topic-submission-input" type="url" placeholder="https://trello.com/c/xxxx1234" value="${escapeHtml(currentTrelloCardUrl)}" required>
-                <p class="task-topic-submission-note">Project Management evidence requires your Trello card link. This gives your teacher one-click access for marking.</p>
+                <label class="task-topic-submission-label" for="task-topic-trello-card-url">Trello Card or Board Link</label>
+                <input id="task-topic-trello-card-url" class="task-topic-submission-input" type="url" placeholder="https://trello.com/c/xxxx1234 or /b/xxxx/board-name" value="${escapeHtml(currentTrelloCardUrl)}" required>
+                <p class="task-topic-submission-note">Project Management evidence requires your Trello card or board link. This gives your teacher one-click access for marking.</p>
 
                 <div class="task-topic-trello-create-box">
                     <p class="task-topic-submission-note">Create a Trello card automatically (optional):</p>
@@ -1497,7 +1507,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             const safeCardUrl = toSafeTrelloCardUrl(trelloCardInput?.value || "");
             const note = String(trelloLogNoteInput?.value || "").trim();
             if (!safeCardUrl) {
-                setTrelloLogStatus("Add a valid Trello card link first.", true);
+                setTrelloLogStatus("Add a valid Trello card or board link first.", true);
                 return;
             }
             if (!note) {
@@ -4084,8 +4094,8 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             <div class="trello-sync-panel" id="trello-sync-panel">
                 <h3>Trello Sync</h3>
                 <p>Open your Trello card quickly or send this work update to Trello.</p>
-                <label for="trello-card-url" class="trello-sync-label">Trello card link</label>
-                <input id="trello-card-url" class="trello-sync-input" type="url" placeholder="https://trello.com/c/xxxx1234" value="${savedCardLink}">
+                <label for="trello-card-url" class="trello-sync-label">Trello card or board link</label>
+                <input id="trello-card-url" class="trello-sync-input" type="url" placeholder="https://trello.com/c/xxxx1234 or /b/xxxx/board-name" value="${savedCardLink}">
                 <label for="trello-work-note" class="trello-sync-label">Work note</label>
                 <textarea id="trello-work-note" class="trello-sync-input trello-sync-note" placeholder="What did you complete today?"></textarea>
                 <div class="trello-sync-actions">
@@ -4213,7 +4223,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     trelloCardInput?.addEventListener("change", () => {
         const safe = readCardUrl();
         if (!safe) {
-            setTrelloStatus("Enter a valid Trello card link (trello.com/c/...).", true);
+            setTrelloStatus("Enter a valid Trello card or board link (trello.com/c/... or trello.com/b/...).", true);
         } else {
             setTrelloStatus("Card link saved.");
         }
@@ -4222,7 +4232,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     trelloOpenCardBtn?.addEventListener("click", () => {
         const cardUrl = readCardUrl();
         if (!cardUrl) {
-            setTrelloStatus("Enter a valid Trello card link first.", true);
+            setTrelloStatus("Enter a valid Trello card or board link first.", true);
             return;
         }
 
@@ -4233,7 +4243,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     trelloSendLogBtn?.addEventListener("click", async () => {
         const cardUrl = readCardUrl();
         if (!cardUrl) {
-            setTrelloStatus("Enter a valid Trello card link first.", true);
+            setTrelloStatus("Enter a valid Trello card or board link first.", true);
             return;
         }
 
