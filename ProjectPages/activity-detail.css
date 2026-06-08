@@ -440,7 +440,8 @@ h1 {
 }
 
 .task-topic-trello-create-box,
-.task-topic-trello-log-box {
+.task-topic-trello-log-box,
+.task-topic-decomp-box {
     border: 1px solid #e1c790;
     border-radius: 8px;
     background: #fff8e9;

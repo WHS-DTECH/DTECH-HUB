@@ -678,6 +678,9 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
         mediaVersionLogDate: "",
         mediaVersionLogAt: "",
         mediaVersionLogNote: "",
+        decompositionSteps: [],
+        decompositionLastPushAt: "",
+        decompositionLastPushCount: 0,
         submittedAt: "",
         reviewStatus: "pending"
     };
@@ -783,6 +786,25 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
             return;
         }
 
+        if (text.startsWith("DECOMP_STEP|")) {
+            const stepText = text.slice("DECOMP_STEP|".length).trim();
+            if (stepText) {
+                result.decompositionSteps.push(stepText);
+            }
+            return;
+        }
+
+        if (text.startsWith("DECOMP_PUSH_AT|")) {
+            result.decompositionLastPushAt = text.slice("DECOMP_PUSH_AT|".length).trim();
+            return;
+        }
+
+        if (text.startsWith("DECOMP_PUSH_COUNT|")) {
+            const count = Number(text.slice("DECOMP_PUSH_COUNT|".length).trim());
+            result.decompositionLastPushCount = Number.isFinite(count) ? Math.max(0, Math.round(count)) : 0;
+            return;
+        }
+
         if (text.startsWith("SUBMITTED_AT|")) {
             result.submittedAt = text.slice("SUBMITTED_AT|".length).trim();
             return;
@@ -804,6 +826,7 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
 }
 
 function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
+    const existingSubmission = parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey);
     const sourceRows = normalizeEvidenceSteps(rows).filter(
         (row) => String(row?.standard || "").trim() !== standardKey
     );
@@ -827,6 +850,15 @@ function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     const mediaVersionLogDate = String(payload?.mediaVersionLogDate || "").trim();
     const mediaVersionLogAt = String(payload?.mediaVersionLogAt || "").trim();
     const mediaVersionLogNote = String(payload?.mediaVersionLogNote || "").trim();
+    const decompositionSteps = Array.isArray(payload?.decompositionSteps)
+        ? parseDecompositionStepsText(payload.decompositionSteps.join("\n"))
+        : parseDecompositionStepsText((existingSubmission.decompositionSteps || []).join("\n"));
+    const decompositionLastPushAt = payload?.decompositionLastPushAt !== undefined
+        ? String(payload?.decompositionLastPushAt || "").trim()
+        : String(existingSubmission.decompositionLastPushAt || "").trim();
+    const decompositionLastPushCount = payload?.decompositionLastPushCount !== undefined
+        ? Math.max(0, Math.round(Number(payload?.decompositionLastPushCount) || 0))
+        : Math.max(0, Math.round(Number(existingSubmission.decompositionLastPushCount) || 0));
     const reviewStatusRaw = String(payload?.reviewStatus || "").trim().toLowerCase();
     const reviewStatus = reviewStatusRaw === "reviewed"
         ? "reviewed"
@@ -889,6 +921,15 @@ function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     }
     if (mediaVersionLogNote) {
         steps.push({ text: `MEDIA_VERSION_LOG_NOTE|${mediaVersionLogNote}`, done: true });
+    }
+    decompositionSteps.forEach((stepText) => {
+        steps.push({ text: `DECOMP_STEP|${stepText}`, done: true });
+    });
+    if (decompositionLastPushAt) {
+        steps.push({ text: `DECOMP_PUSH_AT|${decompositionLastPushAt}`, done: true });
+    }
+    if (decompositionLastPushCount > 0) {
+        steps.push({ text: `DECOMP_PUSH_COUNT|${decompositionLastPushCount}`, done: true });
     }
     steps.push({ text: `REVIEW|${reviewStatus}`, done: reviewStatus === "reviewed" });
 
@@ -1035,6 +1076,23 @@ function deriveInitialsFromEmail(value) {
     return `${parts[0][0] || "x"}${parts[parts.length - 1][0] || "x"}`.toLowerCase();
 }
 
+function parseDecompositionStepsText(value) {
+    const seen = new Set();
+    return String(value || "")
+        .split(/\r?\n/)
+        .map((line) => line.replace(/^[\-*\d\.)\s]+/, "").trim())
+        .filter(Boolean)
+        .filter((line) => {
+            const key = line.toLowerCase();
+            if (seen.has(key)) {
+                return false;
+            }
+            seen.add(key);
+            return true;
+        })
+        .slice(0, 30);
+}
+
 async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, email, isTeacher, interestData }) {
     const panelHost = host?.querySelector("#task-topic-submission-live-panel");
     if (!panelHost) {
@@ -1076,6 +1134,9 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         || normalizedTaskTopicShortName.includes("version control")
         || normalizedDerivedShortName.includes("asset management")
         || normalizedDerivedShortName.includes("version control");
+    const isDecompositionTopic = taskTopicTitle.toLowerCase().includes("decompos")
+        || normalizedTaskTopicShortName.includes("decompos")
+        || normalizedDerivedShortName.includes("decompos");
     const isMediaAssetWorkflowTopic = isAssetVersionControlTopic && !isProjectManagementTopic;
     const isTrackedWorkflowTopic = isProjectManagementTopic || isMediaAssetWorkflowTopic;
 
@@ -1350,6 +1411,8 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const currentTrelloCardUrl = toSafeTrelloCardUrl(submission.trelloCardUrl);
     const currentMediaAssetFolderUrl = toSafeExternalUrl(submission.mediaAssetFolderUrl);
     const currentMediaReviewUrl = toSafeExternalUrl(submission.mediaReviewUrl);
+    const currentDecompositionSteps = Array.isArray(submission.decompositionSteps) ? submission.decompositionSteps : [];
+    const decompositionTextValue = currentDecompositionSteps.join("\n");
     const todayNz = getNzDateKey();
     const studentInitials = deriveInitialsFromEmail(email);
     const mediaFileExample = `client-project_asset-type_v03_${todayNz}_${studentInitials}.ext`;
@@ -1424,6 +1487,30 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 </div>
             ` : ""}
 
+            ${isDecompositionTopic ? `
+                <div class="task-topic-decomp-box">
+                    <p class="task-topic-submission-note">Plan your decomposition steps here. Save in DTECH first, then push the steps to your Trello To Do list.</p>
+                    <label class="task-topic-submission-label" for="task-topic-decomp-steps">Decomposition Steps (one per line)</label>
+                    <textarea id="task-topic-decomp-steps" class="task-topic-submission-input task-topic-submission-textarea" placeholder="Break the assessment into clear, checkable steps...">${escapeHtml(decompositionTextValue)}</textarea>
+
+                    <label class="task-topic-submission-label" for="task-topic-decomp-board">Trello Board</label>
+                    <select id="task-topic-decomp-board" class="task-topic-submission-input">
+                        <option value="">Select board</option>
+                    </select>
+
+                    <label class="task-topic-submission-label" for="task-topic-decomp-list">Trello To Do List</label>
+                    <select id="task-topic-decomp-list" class="task-topic-submission-input">
+                        <option value="">Select list</option>
+                    </select>
+
+                    <div class="task-topic-submission-actions">
+                        <button type="button" class="detail-action detail-action-secondary" id="task-topic-save-decomp-plan">Save Decomposition Plan</button>
+                        <button type="button" class="detail-action" id="task-topic-push-decomp-trello">Push Steps to Trello To Do</button>
+                    </div>
+                    <p class="task-topic-submission-status" id="task-topic-decomp-status" aria-live="polite"></p>
+                </div>
+            ` : ""}
+
             <div class="task-topic-submission-actions">
                 <button type="submit" class="detail-action">I Submitted Evidence</button>
                 <button type="button" class="detail-action detail-action-secondary" id="task-topic-clear-acknowledgement">Clear Acknowledgement</button>
@@ -1454,6 +1541,14 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 ? `<p><strong>Last Version Log:</strong> <span id="task-topic-media-last-log">${escapeHtml(formatSubmissionTimestamp(submission.mediaVersionLogAt || ""))}</span></p>`
                 : ""
             }
+            ${isDecompositionTopic
+                ? `<p><strong>Decomposition Plan Steps:</strong> <span id="task-topic-decomp-count">${currentDecompositionSteps.length}</span></p>`
+                : ""
+            }
+            ${isDecompositionTopic
+                ? `<p><strong>Last Trello To Do Push:</strong> <span id="task-topic-decomp-last-push">${escapeHtml(formatSubmissionTimestamp(submission.decompositionLastPushAt || ""))}</span></p>`
+                : ""
+            }
         </div>
     `;
 
@@ -1473,6 +1568,12 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const mediaLogNoteInput = panelHost.querySelector("#task-topic-media-log-note");
     const mediaLogButton = panelHost.querySelector("#task-topic-save-media-log");
     const mediaLogStatusHost = panelHost.querySelector("#task-topic-media-log-status");
+    const decompStepsInput = panelHost.querySelector("#task-topic-decomp-steps");
+    const decompBoardSelect = panelHost.querySelector("#task-topic-decomp-board");
+    const decompListSelect = panelHost.querySelector("#task-topic-decomp-list");
+    const decompSaveButton = panelHost.querySelector("#task-topic-save-decomp-plan");
+    const decompPushButton = panelHost.querySelector("#task-topic-push-decomp-trello");
+    const decompStatusHost = panelHost.querySelector("#task-topic-decomp-status");
     const statusHost = panelHost.querySelector("#task-topic-submission-status");
     const ackStatusHost = panelHost.querySelector("#task-topic-ack-status");
     const lastSubmittedHost = panelHost.querySelector("#task-topic-last-submitted");
@@ -1482,6 +1583,8 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const mediaAssetRefHost = panelHost.querySelector("#task-topic-media-asset-reference");
     const mediaReviewRefHost = panelHost.querySelector("#task-topic-media-review-reference");
     const mediaLastLogHost = panelHost.querySelector("#task-topic-media-last-log");
+    const decompCountHost = panelHost.querySelector("#task-topic-decomp-count");
+    const decompLastPushHost = panelHost.querySelector("#task-topic-decomp-last-push");
     const updateMeta = (isAcknowledged, timestamp) => {
         if (ackStatusHost) {
             ackStatusHost.textContent = isAcknowledged ? "Submitted evidence" : "Waiting for acknowledgement";
@@ -1548,6 +1651,12 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         if (!mediaLogStatusHost) return;
         mediaLogStatusHost.textContent = String(message || "");
         mediaLogStatusHost.classList.toggle("is-error", Boolean(isError));
+    };
+
+    const setDecompStatus = (message, isError = false) => {
+        if (!decompStatusHost) return;
+        decompStatusHost.textContent = String(message || "");
+        decompStatusHost.classList.toggle("is-error", Boolean(isError));
     };
 
     if (isProjectManagementTopic && trelloBoardSelect && trelloListSelect) {
@@ -1779,6 +1888,198 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 setMediaLogStatus("Could not save version log right now.", true);
             } finally {
                 if (mediaLogButton && mediaLogButton.isConnected) mediaLogButton.disabled = false;
+            }
+        });
+    }
+
+    if (isDecompositionTopic && decompBoardSelect && decompListSelect) {
+        try {
+            const boardsResponse = await fetch("/api/integrations/trello/boards", { headers: buildWriteHeaders() });
+            if (boardsResponse.ok) {
+                const boards = await boardsResponse.json().catch(() => []);
+                const boardOptions = (Array.isArray(boards) ? boards : [])
+                    .map((board) => `<option value="${escapeHtml(board.id)}">${escapeHtml(board.name || board.id)}</option>`)
+                    .join("");
+                decompBoardSelect.innerHTML = `<option value="">Select board</option>${boardOptions}`;
+            } else {
+                setDecompStatus("Connect Trello first (Student Work page), then reload.", true);
+            }
+        } catch (_error) {
+            setDecompStatus("Could not load Trello boards right now.", true);
+        }
+
+        decompBoardSelect.addEventListener("change", async () => {
+            const boardId = String(decompBoardSelect.value || "").trim();
+            decompListSelect.innerHTML = `<option value="">Loading lists...</option>`;
+            if (!boardId) {
+                decompListSelect.innerHTML = `<option value="">Select list</option>`;
+                return;
+            }
+
+            try {
+                const listsResponse = await fetch(`/api/integrations/trello/boards/${encodeURIComponent(boardId)}/lists`, { headers: buildWriteHeaders() });
+                if (!listsResponse.ok) {
+                    throw new Error("Could not load lists.");
+                }
+
+                const lists = await listsResponse.json().catch(() => []);
+                const listOptions = (Array.isArray(lists) ? lists : [])
+                    .map((list) => `<option value="${escapeHtml(list.id)}">${escapeHtml(list.name || list.id)}</option>`)
+                    .join("");
+                decompListSelect.innerHTML = `<option value="">Select list</option>${listOptions}`;
+            } catch (_error) {
+                decompListSelect.innerHTML = `<option value="">Select list</option>`;
+                setDecompStatus("Could not load Trello lists.", true);
+            }
+        });
+
+        decompSaveButton?.addEventListener("click", async () => {
+            const decompositionSteps = parseDecompositionStepsText(decompStepsInput?.value || "");
+            if (!decompositionSteps.length) {
+                setDecompStatus("Add at least one decomposition step before saving.", true);
+                return;
+            }
+
+            if (decompSaveButton) decompSaveButton.disabled = true;
+            setDecompStatus("Saving decomposition plan...");
+            try {
+                const nextRows = upsertTaskTopicSubmissionEvidenceRows(evidenceRows, standardKey, {
+                    writtenEvidence: submission.writtenEvidence,
+                    evidenceLink: submission.evidenceLink,
+                    fileName: submission.fileName,
+                    fileUrl: submission.fileUrl,
+                    submittedAt: submission.submittedAt,
+                    haparaAcknowledged: submission.haparaAcknowledged,
+                    haparaSubmittedAt: submission.haparaSubmittedAt,
+                    haparaLocation: submission.haparaLocation,
+                    haparaDriveClassUrl: submission.haparaDriveClassUrl,
+                    haparaDocumentRef: submission.haparaDocumentRef,
+                    trelloCardUrl: submission.trelloCardUrl,
+                    trelloLastLogDate: submission.trelloLastLogDate,
+                    trelloLastLogAt: submission.trelloLastLogAt,
+                    trelloLastLogNote: submission.trelloLastLogNote,
+                    mediaAssetFolderUrl: submission.mediaAssetFolderUrl,
+                    mediaReviewUrl: submission.mediaReviewUrl,
+                    mediaVersionLogDate: submission.mediaVersionLogDate,
+                    mediaVersionLogAt: submission.mediaVersionLogAt,
+                    mediaVersionLogNote: submission.mediaVersionLogNote,
+                    decompositionSteps,
+                    decompositionLastPushAt: submission.decompositionLastPushAt,
+                    decompositionLastPushCount: submission.decompositionLastPushCount,
+                    reviewStatus: submission.reviewStatus
+                });
+
+                await saveEvidenceRows(projectId, email, nextRows);
+                evidenceRows = nextRows;
+                submission.decompositionSteps = decompositionSteps;
+                if (decompCountHost) {
+                    decompCountHost.textContent = String(decompositionSteps.length);
+                }
+                setDecompStatus(`Saved ${decompositionSteps.length} decomposition step${decompositionSteps.length === 1 ? "" : "s"}.`);
+            } catch (_error) {
+                setDecompStatus("Could not save decomposition plan right now.", true);
+            } finally {
+                if (decompSaveButton && decompSaveButton.isConnected) decompSaveButton.disabled = false;
+            }
+        });
+
+        decompPushButton?.addEventListener("click", async () => {
+            const listId = String(decompListSelect.value || "").trim();
+            const decompositionSteps = parseDecompositionStepsText(decompStepsInput?.value || "");
+
+            if (!listId) {
+                setDecompStatus("Select a Trello To Do list first.", true);
+                return;
+            }
+            if (!decompositionSteps.length) {
+                setDecompStatus("Add at least one decomposition step before pushing.", true);
+                return;
+            }
+
+            if (decompPushButton) decompPushButton.disabled = true;
+            setDecompStatus("Pushing decomposition steps to Trello To Do...");
+
+            let createdCount = 0;
+            const failedSteps = [];
+            try {
+                for (const step of decompositionSteps) {
+                    const cardName = `${detailData?.title || "Assessment Task"}: ${step}`;
+                    const cardDesc = [
+                        `Student: ${email}`,
+                        `Task Topic: ${taskTopicTitle}`,
+                        "",
+                        "Created from DTECH Decomposition Planner"
+                    ].join("\n");
+
+                    const createResponse = await fetch("/api/integrations/trello/cards", {
+                        method: "POST",
+                        headers: buildWriteHeaders(),
+                        body: JSON.stringify({
+                            list_id: listId,
+                            name: cardName,
+                            desc: cardDesc,
+                            pos: "top"
+                        })
+                    });
+
+                    if (!createResponse.ok) {
+                        failedSteps.push(step);
+                        continue;
+                    }
+                    createdCount += 1;
+                }
+
+                const nowIso = new Date().toISOString();
+                const nextRows = upsertTaskTopicSubmissionEvidenceRows(evidenceRows, standardKey, {
+                    writtenEvidence: submission.writtenEvidence,
+                    evidenceLink: submission.evidenceLink,
+                    fileName: submission.fileName,
+                    fileUrl: submission.fileUrl,
+                    submittedAt: submission.submittedAt,
+                    haparaAcknowledged: submission.haparaAcknowledged,
+                    haparaSubmittedAt: submission.haparaSubmittedAt,
+                    haparaLocation: submission.haparaLocation,
+                    haparaDriveClassUrl: submission.haparaDriveClassUrl,
+                    haparaDocumentRef: submission.haparaDocumentRef,
+                    trelloCardUrl: submission.trelloCardUrl,
+                    trelloLastLogDate: submission.trelloLastLogDate,
+                    trelloLastLogAt: submission.trelloLastLogAt,
+                    trelloLastLogNote: submission.trelloLastLogNote,
+                    mediaAssetFolderUrl: submission.mediaAssetFolderUrl,
+                    mediaReviewUrl: submission.mediaReviewUrl,
+                    mediaVersionLogDate: submission.mediaVersionLogDate,
+                    mediaVersionLogAt: submission.mediaVersionLogAt,
+                    mediaVersionLogNote: submission.mediaVersionLogNote,
+                    decompositionSteps,
+                    decompositionLastPushAt: createdCount > 0 ? nowIso : submission.decompositionLastPushAt,
+                    decompositionLastPushCount: createdCount,
+                    reviewStatus: submission.reviewStatus
+                });
+
+                await saveEvidenceRows(projectId, email, nextRows);
+                evidenceRows = nextRows;
+                submission.decompositionSteps = decompositionSteps;
+                if (createdCount > 0) {
+                    submission.decompositionLastPushAt = nowIso;
+                    submission.decompositionLastPushCount = createdCount;
+                }
+
+                if (decompCountHost) {
+                    decompCountHost.textContent = String(decompositionSteps.length);
+                }
+                if (decompLastPushHost && createdCount > 0) {
+                    decompLastPushHost.textContent = formatSubmissionTimestamp(nowIso);
+                }
+
+                if (failedSteps.length) {
+                    setDecompStatus(`Created ${createdCount} card(s). ${failedSteps.length} step(s) could not be created.`, true);
+                } else {
+                    setDecompStatus(`Created ${createdCount} Trello To Do card${createdCount === 1 ? "" : "s"}.`);
+                }
+            } catch (_error) {
+                setDecompStatus("Could not push decomposition steps to Trello right now.", true);
+            } finally {
+                if (decompPushButton && decompPushButton.isConnected) decompPushButton.disabled = false;
             }
         });
     }
