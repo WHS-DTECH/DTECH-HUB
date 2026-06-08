@@ -510,6 +510,26 @@ function toStandardCode(value) {
     return match ? match[0] : "";
 }
 
+function deriveEvidenceStandardsFromDetailData(detailData) {
+    return coerceArray(detailData?.standardDetails)
+        .map((line) => {
+            const match = String(line || "").match(/\b(\d{5})\b/);
+            return match ? match[1] : "";
+        })
+        .filter((code) => code && EVIDENCE_STEPS_TARGET_STANDARDS.has(code));
+}
+
+function getEffectiveAssignedStandards(record, detailData) {
+    const fromRecord = [
+        toStandardCode(record?.standard_1),
+        toStandardCode(record?.standard_2)
+    ].filter((code) => code && EVIDENCE_STEPS_TARGET_STANDARDS.has(code));
+    if (fromRecord.length) {
+        return fromRecord;
+    }
+    return deriveEvidenceStandardsFromDetailData(detailData);
+}
+
 function normalizeEvidenceSteps(rows) {
     const source = Array.isArray(rows) ? rows : [];
     return source
@@ -4083,10 +4103,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         html += `<button type="button" class="${btnClass}" id="interest-toggle-btn">${btnText}</button>`;
 
         const myAllocation = interestData?.my_allocation || null;
-        const assignedStandards = [
-            toStandardCode(myAllocation?.standard_1),
-            toStandardCode(myAllocation?.standard_2)
-        ].filter((code) => EVIDENCE_STEPS_TARGET_STANDARDS.has(code));
+        const assignedStandards = getEffectiveAssignedStandards(myAllocation, detailData);
         const completionPercent = getEvidenceCompletionPercentFromRows(myAllocation?.evidence_steps, assignedStandards);
         const savedCardLink = escapeHtml(readStoredTrelloCardLink(projectId, email));
 
@@ -4122,10 +4139,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             const confirmBtnText = isConfirmed ? "Unconfirm" : "Confirm";
 
             const studentRecord = studentsByEmail.get(String(studentEmail || "").toLowerCase()) || null;
-            const assignedStandards = [
-                toStandardCode(studentRecord?.standard_1),
-                toStandardCode(studentRecord?.standard_2)
-            ].filter((code) => EVIDENCE_STEPS_TARGET_STANDARDS.has(code));
+            const assignedStandards = getEffectiveAssignedStandards(studentRecord, detailData);
             const completionPercent = getEvidenceCompletionPercentFromRows(studentRecord?.evidence_steps, assignedStandards);
             const progressButton = assignedStandards.length
                 ? `<button type="button" class="detail-action detail-action-secondary interest-progress-btn" data-student-email="${escapeHtml(studentEmail)}" data-standards="${escapeHtml(assignedStandards.join(","))}">Progress ${completionPercent}%</button>`
@@ -4152,10 +4166,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
 
     if (!isTeacher && isAssessmentTask && email) {
         const myAllocation = interestData?.my_allocation || null;
-        const assignedStandards = [
-            toStandardCode(myAllocation?.standard_1),
-            toStandardCode(myAllocation?.standard_2)
-        ].filter((code) => EVIDENCE_STEPS_TARGET_STANDARDS.has(code));
+        const assignedStandards = getEffectiveAssignedStandards(myAllocation, detailData);
         const taskDefaultsByStandard = buildTaskDefaultsByStandard(assignedStandards, detailData);
 
         if (assignedStandards.length) {
@@ -4248,10 +4259,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         }
 
         const myAllocation = interestData?.my_allocation || null;
-        const assignedStandards = [
-            toStandardCode(myAllocation?.standard_1),
-            toStandardCode(myAllocation?.standard_2)
-        ].filter((code) => EVIDENCE_STEPS_TARGET_STANDARDS.has(code));
+        const assignedStandards = getEffectiveAssignedStandards(myAllocation, detailData);
         const completionPercent = getEvidenceCompletionPercentFromRows(myAllocation?.evidence_steps, assignedStandards);
 
         const note = String(trelloWorkNoteInput?.value || "").trim();
@@ -4363,6 +4371,23 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                 if (!resp.ok) {
                     const errorData = await resp.json().catch(() => ({}));
                     throw new Error(errorData.error || "Could not add student.");
+                }
+
+                // Auto-assign standards from activity details so Progress button appears immediately.
+                const autoStandards = deriveEvidenceStandardsFromDetailData(detailData);
+                if (autoStandards.length) {
+                    try {
+                        await fetch(`/api/activities/${encodeURIComponent(projectId)}/interests/${encodeURIComponent(normalizedEmail)}/standards`, {
+                            method: "PATCH",
+                            headers: buildWriteHeaders(),
+                            body: JSON.stringify({
+                                standard_1: autoStandards[0] || "",
+                                standard_2: autoStandards[1] || ""
+                            })
+                        });
+                    } catch (_ignoreStandardsError) {
+                        // Non-fatal: progress will still work via client-side fallback.
+                    }
                 }
 
                 setAssignStatus("Student allocated.");
