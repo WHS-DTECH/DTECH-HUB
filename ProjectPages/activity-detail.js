@@ -2852,6 +2852,45 @@ function hasDetailPageAccess() {
     }
 }
 
+const DETAIL_HUB_VIEW_MODE_KEY = "hub_view_mode_v1";
+
+function isTeacherWorkspacePathForDetail() {
+    const path = String(window.location.pathname || "").toLowerCase();
+    return path.endsWith("/teacher-view.html")
+        || path.endsWith("/upload-activity.html")
+        || path.endsWith("/upload-project.html")
+        || path.endsWith("/upload-menu.html")
+        || path.endsWith("/teacher-project-allocation.html")
+        || path.endsWith("/teacher-assessment-allocation.html")
+        || path.endsWith("/class-management.html");
+}
+
+function readStoredHubViewModeForDetail() {
+    try {
+        const value = localStorage.getItem(DETAIL_HUB_VIEW_MODE_KEY);
+        return value === "teacher" || value === "student" ? value : "";
+    } catch (_error) {
+        return "";
+    }
+}
+
+function resolveDetailTeacherMode(canEditRole) {
+    if (!canEditRole) {
+        return false;
+    }
+
+    if (isTeacherWorkspacePathForDetail()) {
+        return true;
+    }
+
+    const mode = readStoredHubViewModeForDetail();
+    if (mode === "student") {
+        return false;
+    }
+
+    return true;
+}
+
 async function canEditDetails() {
     const email = readStoredHubEmail();
     if (!email) return false;
@@ -4567,11 +4606,12 @@ async function initDetail() {
     const selectedTaskTopic = resolveRequestedTaskTopic(resolvedData, params);
     const selectedTaskShortName = String(params.get("taskShortName") || "").trim()
         || getTaskTopicShortNameOverride(id, selectedTaskTopic);
-    const isTeacher = await canEditDetails();
+    const canEditRole = await canEditDetails();
+    const isTeacher = resolveDetailTeacherMode(canEditRole);
 
     document.title = `${selectedTaskShortName || selectedTaskTopic || resolvedData.title} | Computer Lab`;
 
-    // Show Edit/Delete buttons if user is a teacher or admin
+    // In student view mode, teachers should see the same page experience as students.
     renderDetailView(host, id, resolvedData, isTeacher, selectedTaskTopic, selectedTaskShortName);
 
     // Load interest section only for backend-stored items (numeric IDs)
