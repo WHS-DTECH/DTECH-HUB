@@ -1538,8 +1538,8 @@ function setPublicHomepageUiState(signedIn) {
 
 // Ensure public-home-access and refresh library on page load
 document.addEventListener("DOMContentLoaded", function() {
-    // If hubAuthState is not available yet, fallback to not signed in
-    var signedIn = (typeof hubAuthState !== 'undefined' && hubAuthState.profile && hubAuthState.profile.email);
+    // Keep homepage state aligned with the same valid-token rule used by protected routes.
+    var signedIn = hasAllowedSignedInHubAccount();
     setPublicHomepageUiState(!!signedIn);
 
     // If on homepage and library grid exists, refresh activities from backend
@@ -1695,7 +1695,8 @@ function getHubDisplayName(profile) {
 
 function hasAllowedSignedInHubAccount() {
     const email = normalizeEmail(hubAuthState.profile?.email || "");
-    if (!email) {
+    const activeBearerToken = getActiveHubBearerToken();
+    if (!email || !activeBearerToken) {
         return false;
     }
 
