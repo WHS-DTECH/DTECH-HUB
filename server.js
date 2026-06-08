@@ -4064,6 +4064,27 @@ function parseTrelloCardIdentifier(value) {
   return "";
 }
 
+function parseTrelloBoardIdentifier(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  const shortLinkFromRaw = raw.match(/^[a-zA-Z0-9]{8}$/);
+  if (shortLinkFromRaw) {
+    return shortLinkFromRaw[0];
+  }
+
+  try {
+    const parsed = new URL(raw);
+    const boardMatch = parsed.pathname.match(/\/b\/([a-zA-Z0-9]+)/i);
+    if (boardMatch?.[1]) {
+      return boardMatch[1];
+    }
+  } catch (_error) {
+  }
+
+  return "";
+}
+
 function formatTrelloCommentText({ activityTitle, progressPercent, note, createdByEmail }) {
   const lines = [];
   lines.push(`[DTECH-HUB] Work log update`);
@@ -7145,6 +7166,90 @@ app.get("/api/integrations/trello/connections", requireActivityWriteAccess, asyn
     res.json({ connections: rows });
   } catch (_error) {
     res.status(500).json({ error: "Could not load Trello connection statuses" });
+  }
+});
+
+app.get("/api/integrations/trello/list-progress", requireActivityWriteAccess, async (req, res) => {
+  const studentEmail = normalizeEmail(req.query?.student_email || req.query?.studentEmail || "");
+  const boardUrl = String(req.query?.board_url || req.query?.boardUrl || "").trim();
+
+  if (!isSchoolEmail(studentEmail)) {
+    res.status(400).json({ error: "A valid student email is required" });
+    return;
+  }
+
+  if (!boardUrl) {
+    res.status(400).json({ error: "A Trello board or card URL is required" });
+    return;
+  }
+
+  try {
+    const existing = await getStoredTrelloConnection(studentEmail);
+    if (!existing?.trello_token) {
+      res.status(404).json({ error: "Student has not connected Trello" });
+      return;
+    }
+
+    let boardId = parseTrelloBoardIdentifier(boardUrl);
+    if (!boardId) {
+      const cardId = parseTrelloCardIdentifier(boardUrl);
+      if (cardId) {
+        const card = await trelloApiRequest(`/cards/${encodeURIComponent(cardId)}`, {
+          token: existing.trello_token,
+          query: { fields: "id,idBoard,url" }
+        });
+        boardId = String(card?.idBoard || "").trim();
+      }
+    }
+
+    if (!boardId) {
+      res.status(400).json({ error: "Could not resolve Trello board id from URL" });
+      return;
+    }
+
+    const lists = await trelloApiRequest(`/boards/${encodeURIComponent(boardId)}/lists`, {
+      token: existing.trello_token,
+      query: { fields: "id,name,closed", filter: "open" }
+    });
+    const cards = await trelloApiRequest(`/boards/${encodeURIComponent(boardId)}/cards`, {
+      token: existing.trello_token,
+      query: { fields: "id,idList,closed", filter: "open" }
+    });
+
+    const openLists = (Array.isArray(lists) ? lists : []).map((list) => ({
+      id: String(list?.id || "").trim(),
+      name: String(list?.name || "").trim()
+    })).filter((list) => list.id);
+
+    const listNameById = new Map(openLists.map((list) => [list.id, list.name]));
+    const toDoListIds = openLists
+      .filter((list) => /(^|\s)to\s*do($|\s)|^todo$/i.test(list.name))
+      .map((list) => list.id);
+    const doingListIds = openLists
+      .filter((list) => /(^|\s)doing($|\s)|in\s*progress/i.test(list.name))
+      .map((list) => list.id);
+
+    const openCards = (Array.isArray(cards) ? cards : []).map((card) => ({
+      id: String(card?.id || "").trim(),
+      idList: String(card?.idList || "").trim(),
+      closed: Boolean(card?.closed)
+    })).filter((card) => card.id && card.idList && !card.closed);
+
+    const toDoCount = openCards.filter((card) => toDoListIds.includes(card.idList)).length;
+    const doingCount = openCards.filter((card) => doingListIds.includes(card.idList)).length;
+
+    res.json({
+      student_email: studentEmail,
+      board_id: boardId,
+      open_cards_total: openCards.length,
+      todo_count: toDoCount,
+      doing_count: doingCount,
+      todo_lists: toDoListIds.map((id) => listNameById.get(id) || id),
+      doing_lists: doingListIds.map((id) => listNameById.get(id) || id)
+    });
+  } catch (error) {
+    const status = Number(error?.status) || 500;
+    res.status(status).json({ error: error.message || "Could not load Trello list progress" });
   }
 });
 

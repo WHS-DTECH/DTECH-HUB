@@ -4381,7 +4381,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                 ? `<button type="button" class="detail-action detail-action-secondary interest-progress-btn" data-student-email="${escapeHtml(studentEmail)}" data-standards="${escapeHtml(assignedStandards.join(","))}">Progress ${completionPercent}%</button>`
                 : "";
 
-            html += `<tr data-student="${escapeHtml(studentEmail)}"><td>${escapeHtml(studentEmail)}</td><td>${statusBadge}</td><td class="interest-trello-status-cell" data-student-email="${escapeHtml(studentEmail)}">${trelloStatusHtml}</td><td><div class="interest-action-group"><button type="button" class="detail-action interest-confirm-btn" data-confirmed="${isConfirmed}">${confirmBtnText}</button>${progressButton}</div></td></tr>`;
+            html += `<tr data-student="${escapeHtml(studentEmail)}"><td>${escapeHtml(studentEmail)}</td><td>${statusBadge}</td><td class="interest-trello-status-cell" data-student-email="${escapeHtml(studentEmail)}" data-trello-url="${escapeHtml(trelloCardUrl || "")}">${trelloStatusHtml}</td><td><div class="interest-action-group"><button type="button" class="detail-action interest-confirm-btn" data-confirmed="${isConfirmed}">${confirmBtnText}</button>${progressButton}</div></td></tr>`;
         }
         html += `</tbody></table></div>`;
     } else if (isTeacher && interestData.count === 0) {
@@ -4440,9 +4440,40 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                     return;
                 }
 
+                cell.setAttribute("data-trello-url", trelloCardUrl);
                 cell.innerHTML = `<a class="interest-status interest-confirmed" href="${escapeHtml(trelloCardUrl)}" target="_blank" rel="noreferrer">Open Trello</a>`;
             } catch (_error) {
                 // Keep the current fallback status if the evidence refresh fails.
+            }
+        }));
+
+        await Promise.all(trelloStatusCells.map(async (cell) => {
+            const studentEmail = String(cell.getAttribute("data-student-email") || "").trim().toLowerCase();
+            const trelloUrl = String(cell.getAttribute("data-trello-url") || "").trim();
+            if (!studentEmail || !trelloUrl) {
+                return;
+            }
+
+            try {
+                const progressResponse = await fetch(
+                    `/api/integrations/trello/list-progress?student_email=${encodeURIComponent(studentEmail)}&board_url=${encodeURIComponent(trelloUrl)}`,
+                    { headers: buildWriteHeaders() }
+                );
+                if (!progressResponse.ok) {
+                    return;
+                }
+
+                const progress = await progressResponse.json().catch(() => ({}));
+                const toDoCount = Number(progress?.todo_count);
+                const doingCount = Number(progress?.doing_count);
+                if (!Number.isFinite(toDoCount) || !Number.isFinite(doingCount)) {
+                    return;
+                }
+
+                const syncText = `To Do ${toDoCount} | Doing ${doingCount}`;
+                cell.innerHTML = `${cell.innerHTML}<span class="interest-status" style="margin-left:8px;">${escapeHtml(syncText)}</span>`;
+            } catch (_error) {
+                // Keep baseline Trello status if list-progress sync fails.
             }
         }));
 
