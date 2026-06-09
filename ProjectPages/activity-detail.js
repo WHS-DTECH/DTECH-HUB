@@ -3431,7 +3431,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         : (isDecompositionTopic ? "Decomposition Plan + Trello To Do Cards"
         : (isRelevantImplicationsTopic ? "Written Evidence" : "Evidence Upload"));
     const topicGuideTitle = isProjectManagementTopic
-        ? "Trello"
+        ? "Project Management: Trello"
         : (isDecompositionTopic ? "Decomposition + Trello" : "Topic Tasks");
     const topicGuideInstructions = isProjectManagementTopic
         ? [
