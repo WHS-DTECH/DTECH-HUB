@@ -3430,6 +3430,46 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         ? "Trello Link + Work Log"
         : (isDecompositionTopic ? "Decomposition Plan + Trello To Do Cards"
         : (isRelevantImplicationsTopic ? "Written Evidence" : "Evidence Upload"));
+    const topicGuideTitle = isProjectManagementTopic
+        ? "Trello"
+        : (isDecompositionTopic ? "Decomposition + Trello" : "Topic Tasks");
+    const topicGuideInstructions = isProjectManagementTopic
+        ? [
+            "Log in to Trello using Google Sign In.",
+            "Create a board for this assessment if you do not already have one.",
+            "Add three list headings: To Do, Doing, Done.",
+            "Create or open your task card for this topic and keep it updated each lesson."
+        ]
+        : (isDecompositionTopic
+            ? [
+                "Open the Decomposition page for this task topic.",
+                "Write one decomposed step per line in the planner.",
+                "Select your Trello board, then choose the To Do list.",
+                "Push the decomposition steps to Trello and track progress through Doing and Done."
+            ]
+            : [
+                "Read each submission requirement carefully.",
+                "Prepare evidence that matches the task expectations.",
+                "Upload or link your evidence before acknowledging submission."
+            ]);
+    const topicGuideTaskItems = isProjectManagementTopic
+        ? [
+            "Copy your Trello board or card URL.",
+            "Paste the URL into Project Management and click Save Trello Link.",
+            "Send a daily Trello work log update from this page.",
+            "Keep your card up to date so your teacher can verify progress."
+        ]
+        : (isDecompositionTopic
+            ? [
+                "Add decomposed tasks in the Decomposition page planner.",
+                "Push the decomposed tasks to your Trello To Do list.",
+                "Move tasks through Doing and Done as you complete them.",
+                "Submit and acknowledge evidence after your plan and Trello tasks are updated."
+            ]
+            : submissionTaskItems);
+    const topicGuideSourceUrl = (isProjectManagementTopic || isDecompositionTopic)
+        ? "https://trello.com/"
+        : "";
     if (!submissionTaskItems.length) {
         submissionTaskItems.push("Upload evidence that clearly demonstrates completion of this task topic.");
     }
@@ -3574,6 +3614,23 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 </div>
 
                 <aside class="task-topic-submission-column">
+                    <section class="proposal-section task-topic-guide-panel">
+                        <p class="task-topic-guide-eyebrow">Topic Tasks</p>
+                        <h2>${escapeHtml(topicGuideTitle)}</h2>
+                        <p class="task-topic-guide-intro">Use this guide to complete the Submission Tasks correctly.</p>
+                        ${topicGuideSourceUrl ? `<p class="task-topic-guide-source">Source: <a href="${escapeHtml(topicGuideSourceUrl)}" target="_blank" rel="noreferrer">${escapeHtml(topicGuideSourceUrl)}</a></p>` : ""}
+
+                        <section class="task-topic-guide-block">
+                            <h3>Instructions</h3>
+                            <ul class="list task-topic-guide-list">${renderList(topicGuideInstructions)}</ul>
+                        </section>
+
+                        <section class="task-topic-guide-block">
+                            <h3>Trello Tasks</h3>
+                            <ul class="list task-topic-guide-list">${renderList(topicGuideTaskItems)}</ul>
+                        </section>
+                    </section>
+
                     <section class="proposal-section task-topic-submission-panel">
                         <h2>Submission Tasks</h2>
                         <p class="task-topic-submission-intro">${escapeHtml(submissionIntroText)}</p>
