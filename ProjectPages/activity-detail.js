@@ -3470,6 +3470,20 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     const topicGuideSourceUrl = (isProjectManagementTopic || isDecompositionTopic)
         ? "https://trello.com/"
         : "";
+    const githubGuideTitle = "Version Control: GitHub";
+    const githubGuideSourceUrl = "https://github.com/";
+    const githubGuideInstructions = [
+        "Log in to GitHub using Google Sign In (or your school-linked GitHub account).",
+        "Create a repository for this assessment project.",
+        "Add a clear README with your project purpose and key milestones.",
+        "Use commits regularly so your progress history is visible to your teacher."
+    ];
+    const githubGuideTaskItems = [
+        "Create TODO, DOING, and DONE tracking items in your repo (Project board or Issues).",
+        "Link commit messages to the task you completed.",
+        "Push your latest changes before each lesson ends.",
+        "Copy your GitHub repository URL and keep it available for submission evidence."
+    ];
     if (!submissionTaskItems.length) {
         submissionTaskItems.push("Upload evidence that clearly demonstrates completion of this task topic.");
     }
@@ -3630,6 +3644,25 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                             <ul class="list task-topic-guide-list">${renderList(topicGuideTaskItems)}</ul>
                         </section>
                     </section>
+
+                    ${isProjectManagementTopic ? `
+                    <section class="proposal-section task-topic-guide-panel">
+                        <p class="task-topic-guide-eyebrow">Topic Tasks</p>
+                        <h2>${escapeHtml(githubGuideTitle)}</h2>
+                        <p class="task-topic-guide-intro">Use this guide to track version control evidence alongside your Trello workflow.</p>
+                        <p class="task-topic-guide-source">Source: <a href="${escapeHtml(githubGuideSourceUrl)}" target="_blank" rel="noreferrer">${escapeHtml(githubGuideSourceUrl)}</a></p>
+
+                        <section class="task-topic-guide-block">
+                            <h3>Instructions</h3>
+                            <ul class="list task-topic-guide-list">${renderList(githubGuideInstructions)}</ul>
+                        </section>
+
+                        <section class="task-topic-guide-block">
+                            <h3>GitHub Tasks</h3>
+                            <ul class="list task-topic-guide-list">${renderList(githubGuideTaskItems)}</ul>
+                        </section>
+                    </section>
+                    ` : ""}
 
                     <section class="proposal-section task-topic-submission-panel">
                         <h2>Submission Tasks</h2>
