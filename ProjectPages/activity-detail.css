@@ -394,8 +394,8 @@ h1 {
 }
 
 .task-topic-guide-panel {
-    background: #fef7ea;
-    border: 1px solid #e2c89a;
+    background: #edf9f0;
+    border: 1px solid #b7ddc0;
 }
 
 .task-topic-guide-eyebrow {
@@ -404,35 +404,35 @@ h1 {
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: #8b4b1f;
+    color: #246542;
 }
 
 .task-topic-guide-panel h2 {
     margin: 2px 0 4px;
-    color: #9a3f12;
+    color: #1f6d48;
 }
 
 .task-topic-guide-intro {
     margin: 0 0 8px;
     font-size: 0.82rem;
-    color: #664220;
+    color: #2f5f45;
 }
 
 .task-topic-guide-source {
     margin: 0 0 10px;
     font-size: 0.78rem;
-    color: #6c4b29;
+    color: #356248;
 }
 
 .task-topic-guide-source a {
-    color: #ad3f12;
+    color: #1f754b;
     font-weight: 700;
 }
 
 .task-topic-guide-block {
-    border: 1px solid #e7cca3;
+    border: 1px solid #c3e1ca;
     border-radius: 8px;
-    background: #fffdf8;
+    background: #f8fff9;
     padding: 9px 10px;
     margin-top: 8px;
 }
@@ -440,14 +440,14 @@ h1 {
 .task-topic-guide-block h3 {
     margin: 0 0 6px;
     font-size: 0.88rem;
-    color: #8f3c12;
+    color: #2a6c49;
     letter-spacing: 0.02em;
     text-transform: uppercase;
 }
 
 .task-topic-guide-list {
     margin: 0;
-    color: #3f2a14;
+    color: #1f3f2e;
 }
 
 .task-topic-submission-intro {
