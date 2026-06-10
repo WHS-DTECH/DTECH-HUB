@@ -3614,6 +3614,36 @@ async function ensureCourseOutlinesSchema() {
   await pool.query(`CREATE INDEX IF NOT EXISTS course_outlines_active_idx ON course_outlines (is_active)`);
 }
 
+async function backfillClientProjectsAllocations() {
+  if (!hasDatabase) {
+    return 0;
+  }
+
+  const clientProjectsTaskId = String(CLIENT_PROJECTS_TASK_ID || "").trim();
+  if (!clientProjectsTaskId) {
+    return 0;
+  }
+
+  const result = await pool.query(
+    `
+      INSERT INTO project_interests (project_id, student_email, confirmed)
+      SELECT
+        $1 AS project_id,
+        pi.student_email,
+        BOOL_OR(COALESCE(pi.confirmed, FALSE)) AS confirmed
+      FROM project_interests pi
+      JOIN activities a ON a.id::text = pi.project_id::text
+      WHERE pi.project_id::text <> $1
+        AND LOWER(COALESCE(a.activity_category, '')) = 'project'
+      GROUP BY pi.student_email
+      ON CONFLICT (project_id, student_email) DO NOTHING
+    `,
+    [clientProjectsTaskId]
+  );
+
+  return Number(result.rowCount || 0);
+}
+
 async function ensureSchema() {
   await ensureActivitiesSchema();
   await ensureProjectInterestsSchema();
@@ -3621,6 +3651,10 @@ async function ensureSchema() {
   await ensureUnitPlanSchema();
   await ensureAssessmentStandardCardsSchema();
   await ensureCourseOutlinesSchema();
+  const seededClientProjectAllocations = await backfillClientProjectsAllocations();
+  if (seededClientProjectAllocations > 0) {
+    console.log(`[startup] Backfilled ${seededClientProjectAllocations} student allocation(s) into Client Projects (${CLIENT_PROJECTS_TASK_ID}).`);
+  }
 }
 
 async function syncDtechExcludedActivitiesVisibility() {
