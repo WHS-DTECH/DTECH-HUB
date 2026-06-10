@@ -3634,7 +3634,6 @@ async function backfillClientProjectsAllocations() {
       FROM project_interests pi
       JOIN activities a ON a.id::text = pi.project_id::text
       WHERE pi.project_id::text <> $1
-        AND LOWER(TRIM(COALESCE(a.activity_category, to_jsonb(a)->>'category', ''))) LIKE '%project%'
         AND LOWER(TRIM(COALESCE(a.activity_category, to_jsonb(a)->>'category', ''))) NOT LIKE '%assessment%'
       GROUP BY pi.student_email
       ON CONFLICT (project_id, student_email) DO NOTHING
@@ -4953,7 +4952,7 @@ app.post("/api/activities/:id/interests", requireActivityWriteAccess, async (req
         const rawCat = String(activityRow.rows?.[0]?.activity_category || activityRow.rows?.[0]?.legacy_category || "")
           .toLowerCase()
           .trim();
-        const isProjectCategory = rawCat.includes("project") && !rawCat.includes("assessment");
+        const isProjectCategory = !rawCat.includes("assessment");
         if (isProjectCategory) {
           await pool.query(
             "INSERT INTO project_interests (project_id, student_email) VALUES ($1, $2) ON CONFLICT DO NOTHING",
