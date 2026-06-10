@@ -3484,6 +3484,20 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         "Push your latest changes before each lesson ends.",
         "Copy your GitHub repository URL and keep it available for submission evidence."
     ];
+    const frameGuideTitle = "Version Control: Frame.io";
+    const frameGuideSourceUrl = "https://frame.io/";
+    const frameGuideInstructions = [
+        "Log in to Frame.io (use Google Sign In when your school account allows it).",
+        "Create a project and folder structure for your assessment media.",
+        "Upload draft versions with clear names (v01, v02, v03).",
+        "Invite your teacher/reviewer so comments and approvals are tracked in one place."
+    ];
+    const frameGuideTaskItems = [
+        "Upload each new edit as a new version instead of replacing files manually.",
+        "Review timestamped comments and apply changes in your next version.",
+        "Move approved versions to a final exports folder.",
+        "Copy and save your Frame.io project/review link as submission evidence."
+    ];
     if (!submissionTaskItems.length) {
         submissionTaskItems.push("Upload evidence that clearly demonstrates completion of this task topic.");
     }
@@ -3660,6 +3674,23 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                         <section class="task-topic-guide-block">
                             <h3>GitHub Tasks</h3>
                             <ul class="list task-topic-guide-list">${renderList(githubGuideTaskItems)}</ul>
+                        </section>
+                    </section>
+
+                    <section class="proposal-section task-topic-guide-panel">
+                        <p class="task-topic-guide-eyebrow">Topic Tasks</p>
+                        <h2>${escapeHtml(frameGuideTitle)}</h2>
+                        <p class="task-topic-guide-intro">Use this guide for image/video version control and review tracking.</p>
+                        <p class="task-topic-guide-source">Source: <a href="${escapeHtml(frameGuideSourceUrl)}" target="_blank" rel="noreferrer">${escapeHtml(frameGuideSourceUrl)}</a></p>
+
+                        <section class="task-topic-guide-block">
+                            <h3>Instructions</h3>
+                            <ul class="list task-topic-guide-list">${renderList(frameGuideInstructions)}</ul>
+                        </section>
+
+                        <section class="task-topic-guide-block">
+                            <h3>Frame.io Tasks</h3>
+                            <ul class="list task-topic-guide-list">${renderList(frameGuideTaskItems)}</ul>
                         </section>
                     </section>
                     ` : ""}
