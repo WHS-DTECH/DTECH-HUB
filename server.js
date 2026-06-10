@@ -5396,6 +5396,26 @@ app.get("/api/my-allocations", async (req, res) => {
   }
 });
 
+// POST /api/client-projects/backfill — teacher/admin manual backfill for existing project allocations
+app.post("/api/client-projects/backfill", requireActivityWriteAccess, async (_req, res) => {
+  if (!hasDatabase) {
+    res.json({ ok: true, inserted: 0, client_projects_task_id: CLIENT_PROJECTS_TASK_ID });
+    return;
+  }
+
+  try {
+    const inserted = await backfillClientProjectsAllocations();
+    res.json({
+      ok: true,
+      inserted,
+      client_projects_task_id: CLIENT_PROJECTS_TASK_ID
+    });
+  } catch (error) {
+    console.error("[client-projects-backfill] Failed:", error.message);
+    res.status(500).json({ error: "Could not run client projects backfill" });
+  }
+});
+
 // GET /api/project-interests — all projects with interest summaries (teacher-only)
 app.get("/api/project-interests", requireActivityWriteAccess, async (_req, res) => {
   if (!hasDatabase) {

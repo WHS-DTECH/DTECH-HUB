@@ -4732,6 +4732,10 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
 
     const email = readStoredHubEmail();
     const isAssessmentTask = String(detailData?.activityCategory || "").toLowerCase().includes("assessment");
+    const isClientProjectsAssessment = isAssessmentTask && (
+        String(projectId || "").trim() === "49"
+        || String(detailData?.title || "").toLowerCase().includes("client project")
+    );
 
     const fetchHeaders = buildAuthHeaders({});
 
@@ -4783,6 +4787,12 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                     <p><strong>Logged today:</strong> ${loggedTodayCount} of ${students.length}</p>
                     ${hasProjectManagementTopic ? `<p><strong>Trello linked:</strong> ${trelloLinkedCount} of ${students.length}</p>` : ""}
                 </div>
+                ${isClientProjectsAssessment ? `
+                <div class="task-topic-drive-links" style="margin-top:8px;">
+                    <button type="button" class="detail-action detail-action-secondary" id="client-projects-backfill-btn">Run Client Projects Backfill Now</button>
+                </div>
+                <p class="interest-assign-status" id="client-projects-backfill-status" aria-live="polite"></p>
+                ` : ""}
             </div>
         `;
     }
@@ -5253,6 +5263,40 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                 setAssignStatus(error.message || "Could not add student.", true);
             } finally {
                 if (assignBtn && assignBtn.isConnected) assignBtn.disabled = false;
+            }
+        });
+    }
+
+    const backfillButton = section.querySelector("#client-projects-backfill-btn");
+    if (backfillButton && email) {
+        const backfillStatus = section.querySelector("#client-projects-backfill-status");
+        const setBackfillStatus = (message, isError = false) => {
+            if (!backfillStatus) return;
+            backfillStatus.textContent = String(message || "");
+            backfillStatus.classList.toggle("is-error", Boolean(isError));
+        };
+
+        backfillButton.addEventListener("click", async () => {
+            backfillButton.disabled = true;
+            setBackfillStatus("Running backfill...");
+            try {
+                const resp = await fetch("/api/client-projects/backfill", {
+                    method: "POST",
+                    headers: buildWriteHeaders()
+                });
+                if (!resp.ok) {
+                    const payload = await resp.json().catch(() => ({}));
+                    throw new Error(payload?.error || "Could not run backfill.");
+                }
+
+                const payload = await resp.json().catch(() => ({}));
+                const inserted = Number(payload?.inserted || 0);
+                setBackfillStatus(`Backfill complete. ${inserted} student allocation(s) added.`);
+                await loadAndRenderInterestSection(host, projectId, isTeacher, detailData);
+            } catch (error) {
+                setBackfillStatus(error.message || "Could not run backfill.", true);
+            } finally {
+                if (backfillButton && backfillButton.isConnected) backfillButton.disabled = false;
             }
         });
     }
