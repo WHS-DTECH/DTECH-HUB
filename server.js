@@ -3634,8 +3634,8 @@ async function backfillClientProjectsAllocations() {
       FROM project_interests pi
       JOIN activities a ON a.id::text = pi.project_id::text
       WHERE pi.project_id::text <> $1
-        AND LOWER(TRIM(COALESCE(a.activity_category, a.category, ''))) LIKE '%project%'
-        AND LOWER(TRIM(COALESCE(a.activity_category, a.category, ''))) NOT LIKE '%assessment%'
+        AND LOWER(TRIM(COALESCE(a.activity_category, to_jsonb(a)->>'category', ''))) LIKE '%project%'
+        AND LOWER(TRIM(COALESCE(a.activity_category, to_jsonb(a)->>'category', ''))) NOT LIKE '%assessment%'
       GROUP BY pi.student_email
       ON CONFLICT (project_id, student_email) DO NOTHING
     `,
@@ -4947,10 +4947,10 @@ app.post("/api/activities/:id/interests", requireActivityWriteAccess, async (req
     if (clientProjectsTaskId && clientProjectsTaskId !== projectId) {
       try {
         const activityRow = await pool.query(
-          "SELECT activity_category, category FROM activities WHERE id = $1 LIMIT 1",
+          "SELECT activity_category, to_jsonb(activities)->>'category' AS legacy_category FROM activities WHERE id = $1 LIMIT 1",
           [projectId]
         );
-        const rawCat = String(activityRow.rows?.[0]?.activity_category || activityRow.rows?.[0]?.category || "")
+        const rawCat = String(activityRow.rows?.[0]?.activity_category || activityRow.rows?.[0]?.legacy_category || "")
           .toLowerCase()
           .trim();
         const isProjectCategory = rawCat.includes("project") && !rawCat.includes("assessment");
