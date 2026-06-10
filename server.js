@@ -5320,6 +5320,48 @@ app.delete("/api/activities/:id/interests/:studentEmail", requireActivityWriteAc
   }
 });
 
+// GET /api/my-allocations — returns all projects and assessment tasks the signed-in student is allocated to
+app.get("/api/my-allocations", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email) {
+    res.status(401).json({ error: "Sign in required" });
+    return;
+  }
+
+  if (!hasDatabase) {
+    res.json({ assessment_tasks: [], projects: [] });
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT a.id, a.name, a.activity_category
+       FROM project_interests pi
+       JOIN activities a ON a.id::text = pi.project_id::text
+       WHERE pi.student_email = $1
+       ORDER BY a.name ASC`,
+      [email]
+    );
+
+    const assessmentTasks = [];
+    const projects = [];
+    for (const row of result.rows) {
+      const cat = String(row.activity_category || "").toLowerCase();
+      const item = { id: String(row.id), name: String(row.name || "Untitled") };
+      if (cat.includes("assessment")) {
+        assessmentTasks.push(item);
+      } else {
+        projects.push(item);
+      }
+    }
+
+    res.json({ assessment_tasks: assessmentTasks, projects });
+  } catch (error) {
+    console.error("[my-allocations] Query failed:", error.message);
+    res.status(500).json({ error: "Could not load allocations" });
+  }
+});
+
 // GET /api/project-interests — all projects with interest summaries (teacher-only)
 app.get("/api/project-interests", requireActivityWriteAccess, async (_req, res) => {
   if (!hasDatabase) {

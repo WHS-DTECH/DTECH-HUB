@@ -1809,14 +1809,22 @@ function ensureGlobalHubSidebar() {
             <button type="button" class="hub-global-sidebar-close" id="hub-global-sidebar-close">Close</button>
         </header>
         <p class="hub-global-sidebar-copy" id="hub-global-sidebar-copy">Quick access while signed in.</p>
-        <nav class="hub-global-sidebar-links" aria-label="Sidebar links">
-            <a href="/index.html">Home</a>
-            <a href="/browse-practicals.html">Browse Practicals</a>
-            <a href="/user-profile.html">My Profile</a>
+        <nav class="hub-global-sidebar-links" aria-label="Sidebar links" id="hub-global-sidebar-nav">
             <a href="/teacher-view.html" id="hub-global-sidebar-teacher-link" hidden>Teacher View</a>
             <a href="/admin-menu.html" id="hub-global-sidebar-admin-link" hidden>Admin Menu</a>
             <button type="button" id="hub-global-sidebar-tasklist-link" hidden>Open Task List</button>
         </nav>
+        <div id="hub-global-sidebar-allocations" hidden>
+            <section class="hub-sidebar-alloc-section" id="hub-sidebar-assessment-section" hidden>
+                <h3 class="hub-sidebar-alloc-heading">My Assessment Tasks</h3>
+                <ul class="hub-sidebar-alloc-list" id="hub-sidebar-assessment-list"></ul>
+            </section>
+            <section class="hub-sidebar-alloc-section" id="hub-sidebar-projects-section" hidden>
+                <h3 class="hub-sidebar-alloc-heading">My Projects</h3>
+                <ul class="hub-sidebar-alloc-list" id="hub-sidebar-projects-list"></ul>
+            </section>
+            <p class="hub-sidebar-alloc-empty" id="hub-sidebar-alloc-empty" hidden>No tasks or projects allocated yet.</p>
+        </div>
     `;
 
     const setOpen = (isOpen) => {
@@ -1866,22 +1874,24 @@ function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {
     const teacherLink = panel.querySelector("#hub-global-sidebar-teacher-link");
     const adminLink = panel.querySelector("#hub-global-sidebar-admin-link");
     const taskListButton = panel.querySelector("#hub-global-sidebar-tasklist-link");
+    const nav = panel.querySelector("#hub-global-sidebar-nav");
+    const allocationsHost = panel.querySelector("#hub-global-sidebar-allocations");
     const copy = panel.querySelector("#hub-global-sidebar-copy");
 
+    const isStudentView = getEffectiveHubViewMode() !== "teacher";
     const canToggleView = Boolean(canTeacherView || canAdmin);
+
+    // Show teacher/admin nav links for staff, hide them for pure student view
+    if (nav) nav.hidden = isStudentView && !canToggleView;
     if (teacherLink) {
         teacherLink.hidden = !canToggleView;
         if (canToggleView) {
-            const inTeacherMode = getEffectiveHubViewMode() === "teacher";
+            const inTeacherMode = !isStudentView;
             teacherLink.textContent = inTeacherMode ? "Switch to Student View" : "Switch to Teacher View";
             teacherLink.href = inTeacherMode ? "/index.html" : "/teacher-view.html";
         }
     }
-
-    if (adminLink) {
-        adminLink.hidden = !canAdmin;
-    }
-
+    if (adminLink) adminLink.hidden = !canAdmin;
     if (taskListButton) {
         const hasTaskListTrigger = document.querySelector("#evidence-sidebar-open") instanceof HTMLElement;
         taskListButton.hidden = !hasTaskListTrigger;
@@ -1894,9 +1904,57 @@ function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {
             : "Quick access is available on every page.";
     }
 
+    // Load and render student allocations
+    if (allocationsHost) {
+        allocationsHost.hidden = false;
+        void loadAndRenderSidebarAllocations(panel);
+    }
+
     if (!readGlobalSidebarSeenThisSession()) {
         markGlobalSidebarSeenThisSession();
         setTimeout(() => setOpen(true), 180);
+    }
+}
+
+async function loadAndRenderSidebarAllocations(panel) {
+    const assessmentSection = panel.querySelector("#hub-sidebar-assessment-section");
+    const assessmentList = panel.querySelector("#hub-sidebar-assessment-list");
+    const projectsSection = panel.querySelector("#hub-sidebar-projects-section");
+    const projectsList = panel.querySelector("#hub-sidebar-projects-list");
+    const emptyNote = panel.querySelector("#hub-sidebar-alloc-empty");
+
+    if (!assessmentSection || !projectsSection) return;
+
+    const bearerToken = getActiveHubBearerToken();
+    const email = normalizeEmail(hubAuthState.profile?.email || "");
+    if (!bearerToken || !email) return;
+
+    try {
+        const resp = await fetch("/api/my-allocations", {
+            headers: { "Authorization": `Bearer ${bearerToken}`, "x-user-email": email }
+        });
+        if (!resp.ok) return;
+
+        const data = await resp.json();
+        const assessments = Array.isArray(data.assessment_tasks) ? data.assessment_tasks : [];
+        const projects = Array.isArray(data.projects) ? data.projects : [];
+
+        if (assessmentList) {
+            assessmentList.innerHTML = assessments.map((item) =>
+                `<li class="hub-sidebar-alloc-item"><a href="/ProjectPages/custom-activity.html?id=${encodeURIComponent(item.id)}">${escapeHtml(item.name)}</a></li>`
+            ).join("");
+        }
+        if (projectsList) {
+            projectsList.innerHTML = projects.map((item) =>
+                `<li class="hub-sidebar-alloc-item"><a href="/ProjectPages/custom-activity.html?id=${encodeURIComponent(item.id)}">${escapeHtml(item.name)}</a></li>`
+            ).join("");
+        }
+
+        if (assessmentSection) assessmentSection.hidden = assessments.length === 0;
+        if (projectsSection) projectsSection.hidden = projects.length === 0;
+        if (emptyNote) emptyNote.hidden = assessments.length > 0 || projects.length > 0;
+    } catch (_err) {
+        // Silent fail — sidebar is non-critical
     }
 }
 

@@ -421,6 +421,50 @@ a {
     background: rgba(255, 255, 255, 0.18);
 }
 
+.hub-sidebar-alloc-section {
+    margin-top: 14px;
+}
+
+.hub-sidebar-alloc-heading {
+    margin: 0 0 6px;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.hub-sidebar-alloc-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 5px;
+}
+
+.hub-sidebar-alloc-item a {
+    display: block;
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+    font-size: 0.76rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.hub-sidebar-alloc-item a:hover {
+    background: rgba(255, 255, 255, 0.18);
+}
+
+.hub-sidebar-alloc-empty {
+    margin-top: 14px;
+    font-size: 0.76rem;
+    color: rgba(255, 255, 255, 0.55);
+}
+
 .user-badge {
     display: inline-flex;
     align-items: center;
