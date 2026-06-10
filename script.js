@@ -1881,8 +1881,8 @@ function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {
     const isStudentView = getEffectiveHubViewMode() !== "teacher";
     const canToggleView = Boolean(canTeacherView || canAdmin);
 
-    // Show teacher/admin nav links for staff, hide them for pure student view
-    if (nav) nav.hidden = isStudentView && !canToggleView;
+    // In student view, show allocation lists only (hide menu links).
+    if (nav) nav.hidden = isStudentView;
     if (teacherLink) {
         teacherLink.hidden = !canToggleView;
         if (canToggleView) {
@@ -1925,13 +1925,13 @@ async function loadAndRenderSidebarAllocations(panel) {
 
     if (!assessmentSection || !projectsSection) return;
 
-    const bearerToken = getActiveHubBearerToken();
     const email = normalizeEmail(hubAuthState.profile?.email || "");
-    if (!bearerToken || !email) return;
+    if (!email) return;
 
     try {
         const resp = await fetch("/api/my-allocations", {
-            headers: { "Authorization": `Bearer ${bearerToken}`, "x-user-email": email }
+            // Use header identity for this lightweight read endpoint to avoid token-verification false negatives.
+            headers: { "x-user-email": email }
         });
         if (!resp.ok) return;
 

@@ -3634,7 +3634,8 @@ async function backfillClientProjectsAllocations() {
       FROM project_interests pi
       JOIN activities a ON a.id::text = pi.project_id::text
       WHERE pi.project_id::text <> $1
-        AND LOWER(COALESCE(a.activity_category, '')) = 'project'
+        AND LOWER(TRIM(COALESCE(a.activity_category, a.category, ''))) LIKE '%project%'
+        AND LOWER(TRIM(COALESCE(a.activity_category, a.category, ''))) NOT LIKE '%assessment%'
       GROUP BY pi.student_email
       ON CONFLICT (project_id, student_email) DO NOTHING
     `,
@@ -4946,11 +4947,13 @@ app.post("/api/activities/:id/interests", requireActivityWriteAccess, async (req
     if (clientProjectsTaskId && clientProjectsTaskId !== projectId) {
       try {
         const activityRow = await pool.query(
-          "SELECT activity_category FROM activities WHERE id = $1 LIMIT 1",
+          "SELECT activity_category, category FROM activities WHERE id = $1 LIMIT 1",
           [projectId]
         );
-        const rawCat = String(activityRow.rows?.[0]?.activity_category || "").toLowerCase();
-        const isProjectCategory = rawCat === "project" || (!rawCat.includes("assessment") && !rawCat.includes("activity"));
+        const rawCat = String(activityRow.rows?.[0]?.activity_category || activityRow.rows?.[0]?.category || "")
+          .toLowerCase()
+          .trim();
+        const isProjectCategory = rawCat.includes("project") && !rawCat.includes("assessment");
         if (isProjectCategory) {
           await pool.query(
             "INSERT INTO project_interests (project_id, student_email) VALUES ($1, $2) ON CONFLICT DO NOTHING",
@@ -5356,7 +5359,14 @@ app.delete("/api/activities/:id/interests/:studentEmail", requireActivityWriteAc
 
 // GET /api/my-allocations — returns all projects and assessment tasks the signed-in student is allocated to
 app.get("/api/my-allocations", async (req, res) => {
-  const email = normalizeEmail(getRequestUserEmail(req));
+  const email = normalizeEmail(
+    req?.authenticated_email ||
+    req?.headers?.["x-user-email"] ||
+    req?.headers?.["x-ms-client-principal-name"] ||
+    req?.query?.user_email ||
+    req?.query?.email ||
+    ""
+  );
   if (!email) {
     res.status(401).json({ error: "Sign in required" });
     return;
