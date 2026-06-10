@@ -3309,6 +3309,7 @@ function defaultDetailShape(id, data) {
         type: String(data?.type || "").trim() || "Digital Learning",
         duration: String(data?.duration || "120 mins").trim() || "120 mins",
         term: String(data?.term || "Term 2").trim() || "Term 2",
+        subjectStream: String(data?.subjectStream || data?.subject_stream || data?.subject || "").trim().toUpperCase(),
         activityCategory: normalizeCardCategory(data?.activityCategory || data?.activity_category || data?.category, inferredAssessmentCategory),
         cardColor: String(data?.cardColor || data?.card_color || data?.color || "").trim() || getDefaultCardColorForCategory(data?.activityCategory || data?.activity_category || data?.category || inferredAssessmentCategory),
         showInThisWeek: Boolean(data?.showInThisWeek),
@@ -3403,6 +3404,18 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         || resolvedTaskShortName.toLowerCase().includes("project management");
     const isDecompositionTopic = taskTopicTitle.toLowerCase().includes("decompos")
         || resolvedTaskShortName.toLowerCase().includes("decompos");
+    const subjectStream = String(data?.subjectStream || data?.subject_stream || data?.subject || "").trim().toUpperCase();
+    const contextSignals = [
+        subjectStream,
+        String(data?.type || ""),
+        String(data?.title || ""),
+        taskTopicTitle,
+        resolvedTaskShortName
+    ].join(" ").toUpperCase();
+    const isDigitalMediaContext = /(DIGITAL\s*MEDIA|MEDIA|FILM|VIDEO|AUDIO|MUSIC|PHOTOGRAPH|ANIMATION|GRAPHIC)/i.test(contextSignals);
+    const isProgrammingContext = /(DTECH|PROGRAMM|CODING|COMPUT|SOFTWARE|WEB|APP|PYTHON|JAVASCRIPT|ROBOTIC)/i.test(contextSignals);
+    const showGithubGuide = isProjectManagementTopic && isProgrammingContext && !isDigitalMediaContext;
+    const showFrameGuide = isProjectManagementTopic && isDigitalMediaContext;
     const submissionTaskItems = Array.from(new Set([
         ...(isDecompositionTopic
             ? [
@@ -3659,7 +3672,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                         </section>
                     </section>
 
-                    ${isProjectManagementTopic ? `
+                    ${showGithubGuide ? `
                     <section class="proposal-section task-topic-guide-panel">
                         <p class="task-topic-guide-eyebrow">Topic Tasks</p>
                         <h2>${escapeHtml(githubGuideTitle)}</h2>
@@ -3676,7 +3689,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                             <ul class="list task-topic-guide-list">${renderList(githubGuideTaskItems)}</ul>
                         </section>
                     </section>
+                    ` : ""}
 
+                    ${showFrameGuide ? `
                     <section class="proposal-section task-topic-guide-panel">
                         <p class="task-topic-guide-eyebrow">Topic Tasks</p>
                         <h2>${escapeHtml(frameGuideTitle)}</h2>
