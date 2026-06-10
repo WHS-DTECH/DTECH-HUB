@@ -1189,6 +1189,28 @@ h1 {
     gap: 6px;
 }
 
+.interest-projects-cell {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.interest-project-chip {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #204c76;
+    background: #e7f0fb;
+    border: 1px solid #bfd4ea;
+}
+
+.interest-project-empty {
+    color: #7a8da3;
+    font-style: italic;
+}
+
 .interest-status {
     display: inline-block;
     padding: 2px 8px;

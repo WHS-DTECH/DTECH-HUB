@@ -4876,7 +4876,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         }
 
         html += `<div class="interest-student-list"><h3>Interested Students</h3>`;
-        html += `<table class="interest-table"><thead><tr><th>Student Email</th><th>Status</th><th>Trello</th><th>Action</th></tr></thead><tbody>`;
+        html += `<table class="interest-table"><thead><tr><th>Student Email</th><th>Project(s)</th><th>Status</th><th>Trello</th><th>Action</th></tr></thead><tbody>`;
         for (const studentEmail of interestData.emails) {
             const isConfirmed = interestData.confirmed.includes(studentEmail);
             const statusBadge = isConfirmed
@@ -4885,6 +4885,12 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             const confirmBtnText = isConfirmed ? "Unconfirm" : "Confirm";
 
             const studentRecord = studentsByEmail.get(String(studentEmail || "").toLowerCase()) || null;
+            const sourceProjects = Array.isArray(studentRecord?.source_projects)
+                ? studentRecord.source_projects.map((name) => String(name || "").trim()).filter(Boolean)
+                : [];
+            const sourceProjectsHtml = sourceProjects.length
+                ? sourceProjects.map((name) => `<span class="interest-project-chip">${escapeHtml(name)}</span>`).join("")
+                : `<span class="interest-project-empty">-</span>`;
             const assignedStandards = getEffectiveAssignedStandards(studentRecord, detailData);
             const completionPercent = getEvidenceCompletionPercentFromRows(studentRecord?.evidence_steps, assignedStandards);
             const trelloCardUrl = getFirstTrelloCardUrlFromEvidenceRows(studentRecord?.evidence_steps);
@@ -4899,7 +4905,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                 ? `<button type="button" class="detail-action detail-action-secondary interest-progress-btn" data-student-email="${escapeHtml(studentEmail)}" data-standards="${escapeHtml(assignedStandards.join(","))}">Progress to Achieved Requirements ${completionPercent}%</button>`
                 : "";
 
-            html += `<tr data-student="${escapeHtml(studentEmail)}"><td>${escapeHtml(studentEmail)}</td><td>${statusBadge}</td><td class="interest-trello-status-cell" data-student-email="${escapeHtml(studentEmail)}" data-trello-url="${escapeHtml(trelloCardUrl || "")}">${trelloStatusHtml}</td><td><div class="interest-action-group"><button type="button" class="detail-action interest-confirm-btn" data-confirmed="${isConfirmed}">${confirmBtnText}</button>${progressButton}</div></td></tr>`;
+            html += `<tr data-student="${escapeHtml(studentEmail)}"><td>${escapeHtml(studentEmail)}</td><td class="interest-projects-cell">${sourceProjectsHtml}</td><td>${statusBadge}</td><td class="interest-trello-status-cell" data-student-email="${escapeHtml(studentEmail)}" data-trello-url="${escapeHtml(trelloCardUrl || "")}">${trelloStatusHtml}</td><td><div class="interest-action-group"><button type="button" class="detail-action interest-confirm-btn" data-confirmed="${isConfirmed}">${confirmBtnText}</button>${progressButton}</div></td></tr>`;
         }
         html += `</tbody></table></div>`;
     } else if (isTeacher && interestData.count === 0) {

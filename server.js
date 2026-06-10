@@ -5004,6 +5004,42 @@ app.get("/api/activities/:id/interests", async (req, res) => {
       } catch (_err) {}
     }
 
+    const sourceProjectsByEmail = new Map();
+    const isClientProjectsTask = String(projectId) === String(CLIENT_PROJECTS_TASK_ID);
+    if (isTeacher && isClientProjectsTask && result.rows.length) {
+      const studentEmails = result.rows
+        .map((row) => normalizeEmail(row?.student_email || ""))
+        .filter(Boolean);
+
+      if (studentEmails.length) {
+        const sourceResult = await pool.query(
+          `
+            SELECT pi.student_email, a.name AS project_name
+            FROM project_interests pi
+            JOIN activities a ON a.id::text = pi.project_id::text
+            WHERE pi.student_email = ANY($1::text[])
+              AND pi.project_id::text <> $2
+              AND LOWER(TRIM(COALESCE(a.activity_category, to_jsonb(a)->>'category', ''))) NOT LIKE '%assessment%'
+            ORDER BY a.name ASC
+          `,
+          [studentEmails, projectId]
+        );
+
+        for (const row of sourceResult.rows || []) {
+          const student = normalizeEmail(row?.student_email || "");
+          const projectName = String(row?.project_name || "").trim();
+          if (!student || !projectName) {
+            continue;
+          }
+          const existing = sourceProjectsByEmail.get(student) || [];
+          if (!existing.includes(projectName)) {
+            existing.push(projectName);
+          }
+          sourceProjectsByEmail.set(student, existing);
+        }
+      }
+    }
+
     const myAllocationRow = email ? result.rows.find((r) => r.student_email === email) : null;
     const myInterest = Boolean(myAllocationRow);
     res.json({
@@ -5026,7 +5062,8 @@ app.get("/api/activities/:id/interests", async (req, res) => {
           confirmed: Boolean(r.confirmed),
           standard_1: String(r.standard_1 || "").trim(),
           standard_2: String(r.standard_2 || "").trim(),
-          evidence_steps: normalizeEvidenceStepsPayload(r.evidence_steps)
+          evidence_steps: normalizeEvidenceStepsPayload(r.evidence_steps),
+          source_projects: sourceProjectsByEmail.get(normalizeEmail(r.student_email || "")) || []
         }))
         : []
     });
