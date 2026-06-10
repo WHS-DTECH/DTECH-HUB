@@ -2287,7 +2287,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     });
 }
 
-async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmail, standards, studentLabel = "Student", taskDefaultsByStandard = {} }) {
+async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmail, standards, studentLabel = "Student", taskDefaultsByStandard = {}, detailData = null, taskTopic = "" }) {
     if (!host || !studentEmail || !projectId || !Array.isArray(standards) || !standards.length) {
         return;
     }
@@ -2336,6 +2336,14 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
     };
 
     const isSelfTaskListView = normalizeEmail(viewerEmail) === normalizeEmail(studentEmail);
+    const contextSignals = [
+        String(taskTopic || ""),
+        String(detailData?.subjectStream || detailData?.subject_stream || detailData?.subject || ""),
+        String(detailData?.type || ""),
+        String(detailData?.title || "")
+    ].join(" ").toUpperCase();
+    const isDigitalMediaTaskContext = /(DIGITAL\s*MEDIA|MEDIA|FILM|VIDEO|AUDIO|MUSIC|PHOTOGRAPH|ANIMATION|GRAPHIC)/i.test(contextSignals);
+    const secondarySystemLabel = isDigitalMediaTaskContext ? "Frame.io" : "GitHub";
     const state = evidenceRowsToMap(await fetchEvidenceRows(projectId, studentEmail).catch(() => []));
     standards.forEach((code) => {
         const hasExistingStandard = Object.prototype.hasOwnProperty.call(state, code);
@@ -2391,6 +2399,7 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
     const inferStudentSystemConnections = () => {
         let trelloConnected = Boolean(toSafeTrelloCardUrl(readStoredTrelloCardLink(projectId, studentEmail)));
         let githubConnected = false;
+        let frameConnected = false;
 
         Object.values(state).forEach((steps) => {
             (Array.isArray(steps) ? steps : []).forEach((step) => {
@@ -2414,12 +2423,21 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
                 if (/(github\.com|gist\.github\.com|raw\.githubusercontent\.com)/i.test(textLower)) {
                     githubConnected = true;
                 }
+
+                if (text.startsWith("MEDIA_ASSET_FOLDER_URL|") || text.startsWith("MEDIA_REVIEW_URL|")) {
+                    frameConnected = true;
+                }
+
+                if (/(frame\.io)/i.test(textLower)) {
+                    frameConnected = true;
+                }
             });
         });
 
         return {
             trelloConnected,
-            githubConnected
+            githubConnected,
+            frameConnected
         };
     };
 
@@ -2536,7 +2554,7 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
                 systems.innerHTML = `
                     <p class="evidence-step-system-title">Connected Systems</p>
                     <label class="evidence-step-system-item"><input type="checkbox" disabled ${systemConnections.trelloConnected ? "checked" : ""}> Trello</label>
-                    <label class="evidence-step-system-item"><input type="checkbox" disabled ${systemConnections.githubConnected ? "checked" : ""}> GitHub</label>
+                    <label class="evidence-step-system-item"><input type="checkbox" disabled ${isDigitalMediaTaskContext ? (systemConnections.frameConnected ? "checked" : "") : (systemConnections.githubConnected ? "checked" : "")}> ${secondarySystemLabel}</label>
                 `;
                 row.appendChild(systems);
             }
@@ -4983,7 +5001,9 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                 studentEmail: email,
                 standards: Array.from(new Set(assignedStandards)),
                 studentLabel: "My progress",
-                taskDefaultsByStandard
+                taskDefaultsByStandard,
+                detailData,
+                taskTopic: selectedTaskTopic
             });
         }
     }
@@ -5073,7 +5093,9 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                     studentEmail,
                     standards,
                     studentLabel: studentEmail,
-                    taskDefaultsByStandard
+                    taskDefaultsByStandard,
+                    detailData,
+                    taskTopic: selectedTaskTopic
                 });
             });
         });
