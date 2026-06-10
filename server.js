@@ -67,6 +67,9 @@ const STAFF_TABLE_CANDIDATES = ["staff_upload", "upload_staff"];
 const STUDENT_TABLE_CANDIDATES = ["student_details_upload", "student_upload", "student_timetable", "upload_student"];
 const TEACHER_TIMETABLE_TABLE_CANDIDATES = ["kamar_timetable", "upload_timetable", "timetable", "teacher_timetable"];
 const SCHOOL_EMAIL_DOMAIN = "westlandhigh.school.nz";
+// ID of the "Client Projects" Assessment Task. Students assigned to any Project are
+// automatically allocated to this task too. Override via CLIENT_PROJECTS_TASK_ID env var.
+const CLIENT_PROJECTS_TASK_ID = process.env.CLIENT_PROJECTS_TASK_ID || "49";
 const DTECH_HUB_NAME = "DTECH-HUB";
 const SEWING_ROOM_HUB_NAME = "SEWING-ROOM-HUB";
 const NZQA_BASE_URL = "https://www.nzqa.govt.nz";
@@ -4903,6 +4906,28 @@ app.post("/api/activities/:id/interests", requireActivityWriteAccess, async (req
       "SELECT COUNT(*)::int AS count FROM project_interests WHERE project_id = $1",
       [projectId]
     );
+
+    // Auto-allocate to Client Projects assessment when assigning to a Project category item
+    const clientProjectsTaskId = String(CLIENT_PROJECTS_TASK_ID || "").trim();
+    if (clientProjectsTaskId && clientProjectsTaskId !== projectId) {
+      try {
+        const activityRow = await pool.query(
+          "SELECT activity_category FROM activities WHERE id = $1 LIMIT 1",
+          [projectId]
+        );
+        const rawCat = String(activityRow.rows?.[0]?.activity_category || "").toLowerCase();
+        const isProjectCategory = rawCat === "project" || (!rawCat.includes("assessment") && !rawCat.includes("activity"));
+        if (isProjectCategory) {
+          await pool.query(
+            "INSERT INTO project_interests (project_id, student_email) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+            [clientProjectsTaskId, studentEmail]
+          );
+        }
+      } catch (_autoAllocErr) {
+        // Non-fatal: log but do not block the main response
+        console.error("[auto-alloc] Could not allocate to Client Projects task:", _autoAllocErr.message);
+      }
+    }
 
     res.status(201).json({
       ok: true,
