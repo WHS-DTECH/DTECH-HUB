@@ -848,6 +848,11 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
             return;
         }
 
+        if (text.startsWith("ONEDRIVE_PROJECT_FOLDER_URL|")) {
+            result.mediaAssetFolderUrl = toSafeExternalUrl(text.slice("ONEDRIVE_PROJECT_FOLDER_URL|".length).trim());
+            return;
+        }
+
         if (text.startsWith("MEDIA_REVIEW_URL|")) {
             result.mediaReviewUrl = toSafeExternalUrl(text.slice("MEDIA_REVIEW_URL|".length).trim());
             return;
@@ -927,11 +932,21 @@ function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     const trelloLastLogDate = String(payload?.trelloLastLogDate || "").trim();
     const trelloLastLogAt = String(payload?.trelloLastLogAt || "").trim();
     const trelloLastLogNote = String(payload?.trelloLastLogNote || "").trim();
-    const mediaAssetFolderUrl = toSafeExternalUrl(payload?.mediaAssetFolderUrl);
-    const mediaReviewUrl = toSafeExternalUrl(payload?.mediaReviewUrl);
-    const mediaVersionLogDate = String(payload?.mediaVersionLogDate || "").trim();
-    const mediaVersionLogAt = String(payload?.mediaVersionLogAt || "").trim();
-    const mediaVersionLogNote = String(payload?.mediaVersionLogNote || "").trim();
+    const mediaAssetFolderUrl = payload?.mediaAssetFolderUrl !== undefined
+        ? toSafeExternalUrl(payload?.mediaAssetFolderUrl)
+        : toSafeExternalUrl(existingSubmission.mediaAssetFolderUrl);
+    const mediaReviewUrl = payload?.mediaReviewUrl !== undefined
+        ? toSafeExternalUrl(payload?.mediaReviewUrl)
+        : toSafeExternalUrl(existingSubmission.mediaReviewUrl);
+    const mediaVersionLogDate = payload?.mediaVersionLogDate !== undefined
+        ? String(payload?.mediaVersionLogDate || "").trim()
+        : String(existingSubmission.mediaVersionLogDate || "").trim();
+    const mediaVersionLogAt = payload?.mediaVersionLogAt !== undefined
+        ? String(payload?.mediaVersionLogAt || "").trim()
+        : String(existingSubmission.mediaVersionLogAt || "").trim();
+    const mediaVersionLogNote = payload?.mediaVersionLogNote !== undefined
+        ? String(payload?.mediaVersionLogNote || "").trim()
+        : String(existingSubmission.mediaVersionLogNote || "").trim();
     const decompositionSteps = Array.isArray(payload?.decompositionSteps)
         ? parseDecompositionStepsText(payload.decompositionSteps.join("\n"))
         : parseDecompositionStepsText((existingSubmission.decompositionSteps || []).join("\n"));
@@ -991,6 +1006,7 @@ function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     }
     if (mediaAssetFolderUrl) {
         steps.push({ text: `MEDIA_ASSET_FOLDER_URL|${mediaAssetFolderUrl}`, done: true });
+        steps.push({ text: `ONEDRIVE_PROJECT_FOLDER_URL|${mediaAssetFolderUrl}`, done: true });
     }
     if (mediaReviewUrl) {
         steps.push({ text: `MEDIA_REVIEW_URL|${mediaReviewUrl}`, done: true });
@@ -1492,6 +1508,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const currentDocRef = String(submission.haparaDocumentRef || "").trim();
     const currentTrelloCardUrl = toSafeTrelloCardUrl(submission.trelloCardUrl);
     const currentMediaAssetFolderUrl = toSafeExternalUrl(submission.mediaAssetFolderUrl);
+    const currentOneDriveProjectFolderUrl = toSafeExternalUrl(submission.mediaAssetFolderUrl);
     const currentMediaReviewUrl = toSafeExternalUrl(submission.mediaReviewUrl);
     const currentDecompositionSteps = Array.isArray(submission.decompositionSteps) ? submission.decompositionSteps : [];
     const decompositionTextValue = currentDecompositionSteps.join("\n");
@@ -1515,6 +1532,11 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 <label class="task-topic-submission-label" for="task-topic-trello-card-url">Trello Card or Board Link</label>
                 <input id="task-topic-trello-card-url" class="task-topic-submission-input" type="url" placeholder="https://trello.com/c/xxxx1234 or /b/xxxx/board-name" value="${escapeHtml(currentTrelloCardUrl)}" required>
                 <p class="task-topic-submission-note">Project Management evidence requires your Trello card or board link. This gives your teacher one-click access for marking.</p>
+
+                <label class="task-topic-submission-label" for="task-topic-onedrive-folder-url">OneDrive Project Folder Link</label>
+                <input id="task-topic-onedrive-folder-url" class="task-topic-submission-input" type="url" placeholder="https://onedrive.live.com/... or school OneDrive/SharePoint folder" value="${escapeHtml(currentOneDriveProjectFolderUrl)}" required>
+                <p class="task-topic-submission-note">Create your project folder inside OneDrive Documents and link that folder here so DTECH HUB can track your version-control location.</p>
+                <p class="task-topic-submission-note task-topic-onedrive-warning">Important: Downloads and Videos folders are not backed up to OneDrive. Save all project files in your OneDrive Documents project folder.</p>
 
                 <div class="task-topic-trello-create-box">
                     <p class="task-topic-submission-note">Create a Trello card automatically (optional):</p>
@@ -1611,6 +1633,10 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 ? `<p><strong>Last Trello Log:</strong> <span id="task-topic-trello-last-log">${escapeHtml(formatSubmissionTimestamp(submission.trelloLastLogAt || ""))}</span></p>`
                 : ""
             }
+            ${isProjectManagementTopic
+                ? `<p><strong>OneDrive Project Folder:</strong> <span id="task-topic-onedrive-reference">${currentOneDriveProjectFolderUrl ? `<a href="${escapeHtml(currentOneDriveProjectFolderUrl)}" target="_blank" rel="noreferrer">${escapeHtml(currentOneDriveProjectFolderUrl)}</a>` : "Not linked"}</span></p>`
+                : ""
+            }
             ${isMediaAssetWorkflowTopic
                 ? `<p><strong>Asset Folder:</strong> <span id="task-topic-media-asset-reference">${currentMediaAssetFolderUrl ? `<a href="${escapeHtml(currentMediaAssetFolderUrl)}" target="_blank" rel="noreferrer">${escapeHtml(currentMediaAssetFolderUrl)}</a>` : "Not linked"}</span></p>`
                 : ""
@@ -1645,6 +1671,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const trelloLogNoteInput = panelHost.querySelector("#task-topic-trello-log-note");
     const trelloLogButton = panelHost.querySelector("#task-topic-send-trello-log");
     const trelloLogStatusHost = panelHost.querySelector("#task-topic-trello-log-status");
+    const oneDriveFolderInput = panelHost.querySelector("#task-topic-onedrive-folder-url");
     const mediaAssetInput = panelHost.querySelector("#task-topic-media-asset-url");
     const mediaReviewInput = panelHost.querySelector("#task-topic-media-review-url");
     const mediaLogNoteInput = panelHost.querySelector("#task-topic-media-log-note");
@@ -1662,6 +1689,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const docRefHost = panelHost.querySelector("#task-topic-doc-reference");
     const trelloRefHost = panelHost.querySelector("#task-topic-trello-reference");
     const trelloLastLogHost = panelHost.querySelector("#task-topic-trello-last-log");
+    const oneDriveRefHost = panelHost.querySelector("#task-topic-onedrive-reference");
     const mediaAssetRefHost = panelHost.querySelector("#task-topic-media-asset-reference");
     const mediaReviewRefHost = panelHost.querySelector("#task-topic-media-review-reference");
     const mediaLastLogHost = panelHost.querySelector("#task-topic-media-last-log");
@@ -1687,6 +1715,15 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 trelloRefHost.innerHTML = `<a href="${escapeHtml(safeCardUrl)}" target="_blank" rel="noreferrer">${escapeHtml(safeCardUrl)}</a>`;
             } else {
                 trelloRefHost.textContent = "Not linked";
+            }
+        }
+
+        if (oneDriveRefHost) {
+            const safeOneDriveUrl = toSafeExternalUrl(oneDriveFolderInput?.value || "");
+            if (safeOneDriveUrl) {
+                oneDriveRefHost.innerHTML = `<a href="${escapeHtml(safeOneDriveUrl)}" target="_blank" rel="noreferrer">${escapeHtml(safeOneDriveUrl)}</a>`;
+            } else {
+                oneDriveRefHost.textContent = "Not linked";
             }
         }
 
@@ -2180,7 +2217,13 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             return;
         }
 
-        const mediaAssetFolderUrl = toSafeExternalUrl(mediaAssetInput?.value || "");
+        const oneDriveProjectFolderUrl = toSafeExternalUrl(oneDriveFolderInput?.value || "");
+        if (isProjectManagementTopic && !oneDriveProjectFolderUrl) {
+            setStatus("Project Management requires a valid OneDrive project folder link before acknowledging.", true);
+            return;
+        }
+
+        const mediaAssetFolderUrl = oneDriveProjectFolderUrl || toSafeExternalUrl(mediaAssetInput?.value || "");
         const mediaReviewUrl = toSafeExternalUrl(mediaReviewInput?.value || "");
         if (isMediaAssetWorkflowTopic && !mediaAssetFolderUrl) {
             setStatus("Asset Management requires a valid master asset folder link before acknowledging.", true);
@@ -2261,7 +2304,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             trelloLastLogDate: submission.trelloLastLogDate,
             trelloLastLogAt: submission.trelloLastLogAt,
             trelloLastLogNote: submission.trelloLastLogNote,
-            mediaAssetFolderUrl: toSafeExternalUrl(mediaAssetInput?.value || ""),
+            mediaAssetFolderUrl: toSafeExternalUrl(oneDriveFolderInput?.value || "") || toSafeExternalUrl(mediaAssetInput?.value || ""),
             mediaReviewUrl: toSafeExternalUrl(mediaReviewInput?.value || ""),
             mediaVersionLogDate: submission.mediaVersionLogDate,
             mediaVersionLogAt: submission.mediaVersionLogAt,
@@ -2343,7 +2386,7 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
         String(detailData?.title || "")
     ].join(" ").toUpperCase();
     const isDigitalMediaTaskContext = /(DIGITAL\s*MEDIA|MEDIA|FILM|VIDEO|AUDIO|MUSIC|PHOTOGRAPH|ANIMATION|GRAPHIC)/i.test(contextSignals);
-    const secondarySystemLabel = isDigitalMediaTaskContext ? "Frame.io" : "GitHub";
+    const secondarySystemLabel = isDigitalMediaTaskContext ? "OneDrive" : "GitHub";
     const state = evidenceRowsToMap(await fetchEvidenceRows(projectId, studentEmail).catch(() => []));
     standards.forEach((code) => {
         const hasExistingStandard = Object.prototype.hasOwnProperty.call(state, code);
@@ -2399,7 +2442,7 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
     const inferStudentSystemConnections = () => {
         let trelloConnected = Boolean(toSafeTrelloCardUrl(readStoredTrelloCardLink(projectId, studentEmail)));
         let githubConnected = false;
-        let frameConnected = false;
+        let oneDriveConnected = false;
 
         Object.values(state).forEach((steps) => {
             (Array.isArray(steps) ? steps : []).forEach((step) => {
@@ -2424,12 +2467,12 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
                     githubConnected = true;
                 }
 
-                if (text.startsWith("MEDIA_ASSET_FOLDER_URL|") || text.startsWith("MEDIA_REVIEW_URL|")) {
-                    frameConnected = true;
+                if (text.startsWith("MEDIA_ASSET_FOLDER_URL|") || text.startsWith("MEDIA_REVIEW_URL|") || text.startsWith("ONEDRIVE_PROJECT_FOLDER_URL|")) {
+                    oneDriveConnected = true;
                 }
 
-                if (/(frame\.io)/i.test(textLower)) {
-                    frameConnected = true;
+                if (/(onedrive\.live\.com|1drv\.ms|sharepoint\.com|onedrive)/i.test(textLower)) {
+                    oneDriveConnected = true;
                 }
             });
         });
@@ -2437,7 +2480,7 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
         return {
             trelloConnected,
             githubConnected,
-            frameConnected
+            oneDriveConnected
         };
     };
 
@@ -2554,7 +2597,7 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
                 systems.innerHTML = `
                     <p class="evidence-step-system-title">Connected Systems</p>
                     <label class="evidence-step-system-item"><input type="checkbox" disabled ${systemConnections.trelloConnected ? "checked" : ""}> Trello</label>
-                    <label class="evidence-step-system-item"><input type="checkbox" disabled ${isDigitalMediaTaskContext ? (systemConnections.frameConnected ? "checked" : "") : (systemConnections.githubConnected ? "checked" : "")}> ${secondarySystemLabel}</label>
+                    <label class="evidence-step-system-item"><input type="checkbox" disabled ${isDigitalMediaTaskContext ? (systemConnections.oneDriveConnected ? "checked" : "") : (systemConnections.githubConnected ? "checked" : "")}> ${secondarySystemLabel}</label>
                 `;
                 row.appendChild(systems);
             }
@@ -3433,7 +3476,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     const isDigitalMediaContext = /(DIGITAL\s*MEDIA|MEDIA|FILM|VIDEO|AUDIO|MUSIC|PHOTOGRAPH|ANIMATION|GRAPHIC)/i.test(contextSignals);
     const isProgrammingContext = /(DTECH|PROGRAMM|CODING|COMPUT|SOFTWARE|WEB|APP|PYTHON|JAVASCRIPT|ROBOTIC)/i.test(contextSignals);
     const showGithubGuide = isProjectManagementTopic && isProgrammingContext && !isDigitalMediaContext;
-    const showFrameGuide = isProjectManagementTopic && isDigitalMediaContext;
+    const showOneDriveGuide = isProjectManagementTopic && isDigitalMediaContext;
     const submissionTaskItems = Array.from(new Set([
         ...(isDecompositionTopic
             ? [
@@ -3515,20 +3558,21 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         "Push your latest changes before each lesson ends.",
         "Copy your GitHub repository URL and keep it available for submission evidence."
     ];
-    const frameGuideTitle = "Version Control: Frame.io";
-    const frameGuideSourceUrl = "https://frame.io/";
-    const frameGuideInstructions = [
-        "Log in to Frame.io (use Google Sign In when your school account allows it).",
-        "Create a project and folder structure for your assessment media.",
-        "Upload draft versions with clear names (v01, v02, v03).",
-        "Invite your teacher/reviewer so comments and approvals are tracked in one place."
+    const oneDriveGuideTitle = "Version Control: Microsoft OneDrive";
+    const oneDriveGuideSourceUrl = "https://www.microsoft.com/microsoft-365/onedrive/online-cloud-storage";
+    const oneDriveGuideInstructions = [
+        "Log in to Microsoft OneDrive with your school account.",
+        "Open Documents in OneDrive and create a project folder for this assessment.",
+        "Keep all project source files inside that OneDrive Documents project folder.",
+        "Copy the share link for the folder and paste it into DTECH HUB on this page."
     ];
-    const frameGuideTaskItems = [
-        "Upload each new edit as a new version instead of replacing files manually.",
-        "Review timestamped comments and apply changes in your next version.",
-        "Move approved versions to a final exports folder.",
-        "Copy and save your Frame.io project/review link as submission evidence."
+    const oneDriveGuideTaskItems = [
+        "Create a project folder path like Documents/AssessmentName/ProjectName.",
+        "Use clear version file names such as v01, v02, v03.",
+        "Save working files and exports into your OneDrive project folder, not local temporary folders.",
+        "Keep the DTECH HUB OneDrive folder link updated for teacher access."
     ];
+    const oneDriveGuideWarning = "Important: Downloads and Videos folders are not backed up to OneDrive. Save project files in your OneDrive Documents project folder.";
     if (!submissionTaskItems.length) {
         submissionTaskItems.push("Upload evidence that clearly demonstrates completion of this task topic.");
     }
@@ -3709,21 +3753,22 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                     </section>
                     ` : ""}
 
-                    ${showFrameGuide ? `
+                    ${showOneDriveGuide ? `
                     <section class="proposal-section task-topic-guide-panel">
                         <p class="task-topic-guide-eyebrow">Topic Tasks</p>
-                        <h2>${escapeHtml(frameGuideTitle)}</h2>
-                        <p class="task-topic-guide-intro">Use this guide for image/video version control and review tracking.</p>
-                        <p class="task-topic-guide-source">Source: <a href="${escapeHtml(frameGuideSourceUrl)}" target="_blank" rel="noreferrer">${escapeHtml(frameGuideSourceUrl)}</a></p>
+                        <h2>${escapeHtml(oneDriveGuideTitle)}</h2>
+                        <p class="task-topic-guide-intro">Use this guide for image/video version control and teacher folder access tracking.</p>
+                        <p class="task-topic-guide-source">Source: <a href="${escapeHtml(oneDriveGuideSourceUrl)}" target="_blank" rel="noreferrer">${escapeHtml(oneDriveGuideSourceUrl)}</a></p>
+                        <p class="task-topic-guide-alert">${escapeHtml(oneDriveGuideWarning)}</p>
 
                         <section class="task-topic-guide-block">
                             <h3>Instructions</h3>
-                            <ul class="list task-topic-guide-list">${renderList(frameGuideInstructions)}</ul>
+                            <ul class="list task-topic-guide-list">${renderList(oneDriveGuideInstructions)}</ul>
                         </section>
 
                         <section class="task-topic-guide-block">
-                            <h3>Frame.io Tasks</h3>
-                            <ul class="list task-topic-guide-list">${renderList(frameGuideTaskItems)}</ul>
+                            <h3>OneDrive Tasks</h3>
+                            <ul class="list task-topic-guide-list">${renderList(oneDriveGuideTaskItems)}</ul>
                         </section>
                     </section>
                     ` : ""}

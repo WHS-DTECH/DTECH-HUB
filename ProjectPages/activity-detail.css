@@ -450,6 +450,18 @@ h1 {
     color: #1f3f2e;
 }
 
+.task-topic-guide-alert {
+    margin: 8px 0 0;
+    border: 1px solid #d47f1f;
+    border-radius: 8px;
+    background: #fff0d8;
+    color: #7a3e00;
+    font-size: 0.82rem;
+    font-weight: 800;
+    line-height: 1.4;
+    padding: 8px 10px;
+}
+
 .task-topic-submission-intro {
     margin: 0 0 8px;
     font-size: 0.83rem;
@@ -495,6 +507,13 @@ h1 {
     border-color: #9fd3a6;
     background: #eaf8ed;
     color: #24552c;
+}
+
+.task-topic-onedrive-warning {
+    border-color: #d47f1f;
+    background: #fff0d8;
+    color: #7a3e00;
+    font-weight: 800;
 }
 
 .task-topic-submission-form {
