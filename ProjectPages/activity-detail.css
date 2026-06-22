@@ -1484,6 +1484,15 @@ h1 {
     font-size: 0.9rem;
 }
 
+.evidence-digital-outcome-block {
+    background: #f4f0ff;
+    border-color: #c1b0e8;
+}
+
+.evidence-digital-outcome-heading {
+    color: #3d1f8a !important;
+}
+
 .evidence-level-group {
     margin-top: 8px;
     padding-top: 8px;

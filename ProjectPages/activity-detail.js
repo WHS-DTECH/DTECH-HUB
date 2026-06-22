@@ -88,6 +88,15 @@ const DETAIL_DATA = {
 const DETAIL_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 const TRELLO_CARD_LINK_STORAGE_PREFIX = "hub_trello_card_link_v1";
 const EVIDENCE_STEPS_TARGET_STANDARDS = new Set(["92005", "91897", "91907"]);
+
+const DIGITAL_OUTCOME_DETAILS_TASKS = [
+    "Describe the Digital Outcome: What is it, who is it for, and what should it do?",
+    "Identify the target audience or end user for this outcome.",
+    "List the key features or requirements the outcome must include.",
+    "Explain how the outcome will be developed and what tools/technologies will be used.",
+    "State how success will be measured or evaluated."
+];
+
 const EVIDENCE_STEPS_DEFAULTS = {
     "92005": [
         "Define what the digital outcome needs to do.",
@@ -2640,6 +2649,33 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
     };
 
     const standardsHost = sidebar.querySelector("#evidence-standard-list");
+
+    // Always render a Digital Outcome Details block above the standards for assessment tasks.
+    (() => {
+        const doCode = "digital-outcome";
+        if (!Object.prototype.hasOwnProperty.call(state, doCode)) {
+            state[doCode] = DIGITAL_OUTCOME_DETAILS_TASKS.map((text) => ({ text, done: false }));
+        }
+        const doBlock = document.createElement("section");
+        doBlock.className = "evidence-standard-block evidence-digital-outcome-block";
+        doBlock.innerHTML = `
+            <h3 class="evidence-digital-outcome-heading">Digital Outcome Details</h3>
+            <div class="evidence-step-list" id="evidence-step-list-digital-outcome"></div>
+            ${!isSelfTaskListView ? `<button type="button" class="detail-action detail-action-secondary evidence-step-add" data-do-add>Add Step</button>` : ""}
+        `;
+        const doRowsHost = doBlock.querySelector("#evidence-step-list-digital-outcome");
+        const doAddButton = doBlock.querySelector("[data-do-add]");
+        if (doAddButton) {
+            doAddButton.addEventListener("click", () => {
+                state[doCode].push({ text: "", done: false });
+                void persistState(sidebar.querySelector("#evidence-sidebar-status"));
+                renderStepRows(doRowsHost, doCode);
+            });
+        }
+        renderStepRows(doRowsHost, doCode);
+        standardsHost.appendChild(doBlock);
+    })();
+
     standards.forEach((code) => {
         const block = document.createElement("section");
         block.className = "evidence-standard-block";
@@ -3465,6 +3501,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         || resolvedTaskShortName.toLowerCase().includes("project management");
     const isDecompositionTopic = taskTopicTitle.toLowerCase().includes("decompos")
         || resolvedTaskShortName.toLowerCase().includes("decompos");
+    const isDigitalOutcomeTopic = taskTopicTitle.toLowerCase().includes("digital outcome")
+        || resolvedTaskShortName.toLowerCase().includes("digital outcome");
     const subjectStream = String(data?.subjectStream || data?.subject_stream || data?.subject || "").trim().toUpperCase();
     const contextSignals = [
         subjectStream,
@@ -3506,7 +3544,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         : (isRelevantImplicationsTopic ? "Written Evidence" : "Evidence Upload"));
     const topicGuideTitle = isProjectManagementTopic
         ? "Project Management: Trello"
-        : (isDecompositionTopic ? "Decomposition + Trello" : "Topic Tasks");
+        : (isDecompositionTopic ? "Decomposition + Trello"
+        : (isDigitalOutcomeTopic ? "Digital Outcome Details" : "Topic Tasks"));
     const topicGuideInstructions = isProjectManagementTopic
         ? [
             "Log in to Trello using Google Sign In.",
@@ -3521,11 +3560,18 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 "Select your Trello board, then choose the To Do list.",
                 "Push the decomposition steps to Trello and track progress through Doing and Done."
             ]
-            : [
-                "Read each submission requirement carefully.",
-                "Prepare evidence that matches the task expectations.",
-                "Upload or link your evidence before acknowledging submission."
-            ]);
+            : (isDigitalOutcomeTopic
+                ? [
+                    "Read the assessment brief carefully before writing your description.",
+                    "Describe the digital outcome clearly: what it is, who it is for, and what it must do.",
+                    "Identify the target audience or end user and explain their needs.",
+                    "List the key features or requirements the outcome must include."
+                ]
+                : [
+                    "Read each submission requirement carefully.",
+                    "Prepare evidence that matches the task expectations.",
+                    "Upload or link your evidence before acknowledging submission."
+                ]));
     const topicGuideTaskItems = isProjectManagementTopic
         ? [
             "Copy your Trello board or card URL.",
@@ -3540,10 +3586,21 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 "Move tasks through Doing and Done as you complete them.",
                 "Submit and acknowledge evidence after your plan and Trello tasks are updated."
             ]
-            : submissionTaskItems);
+            : (isDigitalOutcomeTopic
+                ? [
+                    "Describe the Digital Outcome: what it is, who it is for, and what it must do.",
+                    "Identify the target audience or end user for this outcome.",
+                    "List the key features or requirements the outcome must include.",
+                    "Explain how the outcome will be developed and what tools/technologies will be used.",
+                    "State how success will be measured or evaluated."
+                ]
+                : submissionTaskItems));
     const topicGuideSourceUrl = (isProjectManagementTopic || isDecompositionTopic)
         ? "https://trello.com/"
-        : "";
+        : (isDigitalOutcomeTopic ? "" : "");
+    const topicGuideIntroText = isDigitalOutcomeTopic
+        ? "Use this guide to write and record a clear description of your digital outcome before starting development."
+        : "Use this guide to complete the Submission Tasks correctly.";
     const githubGuideTitle = "Version Control: GitHub";
     const githubGuideSourceUrl = "https://github.com/";
     const githubGuideInstructions = [
@@ -3720,7 +3777,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                     <section class="proposal-section task-topic-guide-panel">
                         <p class="task-topic-guide-eyebrow">Topic Tasks</p>
                         <h2>${escapeHtml(topicGuideTitle)}</h2>
-                        <p class="task-topic-guide-intro">Use this guide to complete the Submission Tasks correctly.</p>
+                        <p class="task-topic-guide-intro">${escapeHtml(topicGuideIntroText)}</p>
                         ${topicGuideSourceUrl ? `<p class="task-topic-guide-source">Source: <a href="${escapeHtml(topicGuideSourceUrl)}" target="_blank" rel="noreferrer">${escapeHtml(topicGuideSourceUrl)}</a></p>` : ""}
 
                         <section class="task-topic-guide-block">
