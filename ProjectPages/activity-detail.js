@@ -3162,6 +3162,7 @@ function deriveTaskShortName(value) {
 
     const normalized = raw.toLowerCase();
     const phraseMap = [
+        { pattern: /describe\s+the\s+digital\s+outcome|describe.*digital\s+outcome/, label: "Digital Outcome Details" },
         { pattern: /project\s+management/, label: "Project Management" },
         { pattern: /relevant\s+implications/, label: "Relevant Implications" },
         { pattern: /version\s+control/, label: "Version Control" },
