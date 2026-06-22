@@ -90,7 +90,7 @@ const TRELLO_CARD_LINK_STORAGE_PREFIX = "hub_trello_card_link_v1";
 const EVIDENCE_STEPS_TARGET_STANDARDS = new Set(["92005", "91897", "91907"]);
 
 const DIGITAL_OUTCOME_DETAILS_TASKS = [
-    "Describe the Digital Outcome: What is it, who is it for, and what should it do?",
+    "Description - Google Slides: Describe the Digital Outcome: What is it, who is it for, and what should it do?",
     "Identify the target audience or end user for this outcome.",
     "List the key features or requirements the outcome must include.",
     "Explain how the outcome will be developed and what tools/technologies will be used.",
@@ -764,6 +764,7 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
         trelloLastLogDate: "",
         trelloLastLogAt: "",
         trelloLastLogNote: "",
+        googleSlidesUrl: "",
         mediaAssetFolderUrl: "",
         mediaReviewUrl: "",
         mediaVersionLogDate: "",
@@ -793,6 +794,9 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
 
         if (text.startsWith("LINK|")) {
             result.evidenceLink = text.slice("LINK|".length).trim();
+            if (!result.googleSlidesUrl && /docs\.google\.com\/presentation/i.test(result.evidenceLink)) {
+                result.googleSlidesUrl = toSafeExternalUrl(result.evidenceLink);
+            }
             return;
         }
 
@@ -849,6 +853,11 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
 
         if (text.startsWith("TRELLO_LAST_LOG_NOTE|")) {
             result.trelloLastLogNote = text.slice("TRELLO_LAST_LOG_NOTE|".length).trim();
+            return;
+        }
+
+        if (text.startsWith("GOOGLE_SLIDES_URL|")) {
+            result.googleSlidesUrl = toSafeExternalUrl(text.slice("GOOGLE_SLIDES_URL|".length).trim());
             return;
         }
 
@@ -941,6 +950,9 @@ function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     const trelloLastLogDate = String(payload?.trelloLastLogDate || "").trim();
     const trelloLastLogAt = String(payload?.trelloLastLogAt || "").trim();
     const trelloLastLogNote = String(payload?.trelloLastLogNote || "").trim();
+    const googleSlidesUrl = payload?.googleSlidesUrl !== undefined
+        ? toSafeExternalUrl(payload?.googleSlidesUrl)
+        : toSafeExternalUrl(existingSubmission.googleSlidesUrl || existingSubmission.evidenceLink);
     const mediaAssetFolderUrl = payload?.mediaAssetFolderUrl !== undefined
         ? toSafeExternalUrl(payload?.mediaAssetFolderUrl)
         : toSafeExternalUrl(existingSubmission.mediaAssetFolderUrl);
@@ -1012,6 +1024,10 @@ function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     }
     if (trelloLastLogNote) {
         steps.push({ text: `TRELLO_LAST_LOG_NOTE|${trelloLastLogNote}`, done: true });
+    }
+    if (googleSlidesUrl) {
+        steps.push({ text: `GOOGLE_SLIDES_URL|${googleSlidesUrl}`, done: true });
+        steps.push({ text: `LINK|${googleSlidesUrl}`, done: true });
     }
     if (mediaAssetFolderUrl) {
         steps.push({ text: `MEDIA_ASSET_FOLDER_URL|${mediaAssetFolderUrl}`, done: true });
@@ -1244,6 +1260,9 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const isDecompositionTopic = taskTopicTitle.toLowerCase().includes("decompos")
         || normalizedTaskTopicShortName.includes("decompos")
         || normalizedDerivedShortName.includes("decompos");
+    const isDigitalOutcomeTopic = taskTopicTitle.toLowerCase().includes("digital outcome")
+        || normalizedTaskTopicShortName.includes("digital outcome")
+        || normalizedDerivedShortName.includes("digital outcome");
     const isMediaAssetWorkflowTopic = isAssetVersionControlTopic && !isProjectManagementTopic;
     const isTrackedWorkflowTopic = isProjectManagementTopic || isMediaAssetWorkflowTopic;
 
@@ -1515,6 +1534,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const acknowledged = Boolean(submission.haparaAcknowledged);
     const acknowledgedAt = submission.haparaSubmittedAt || submission.submittedAt || "";
     const currentDocRef = String(submission.haparaDocumentRef || "").trim();
+    const currentGoogleSlidesUrl = toSafeExternalUrl(submission.googleSlidesUrl || submission.evidenceLink);
     const currentTrelloCardUrl = toSafeTrelloCardUrl(submission.trelloCardUrl);
     const currentMediaAssetFolderUrl = toSafeExternalUrl(submission.mediaAssetFolderUrl);
     const currentOneDriveProjectFolderUrl = toSafeExternalUrl(submission.mediaAssetFolderUrl);
@@ -1536,6 +1556,13 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
 
             <label class="task-topic-submission-label" for="task-topic-hapara-doc-ref">Evidence Document Name or Reference</label>
             <input id="task-topic-hapara-doc-ref" class="task-topic-submission-input" type="text" placeholder="Example: Decomposition notes - Vincent" value="${escapeHtml(currentDocRef)}" required>
+
+            ${isDigitalOutcomeTopic ? `
+                <label class="task-topic-submission-label" for="task-topic-google-slides-url">Digital Outcome Description - Google Slides Link</label>
+                <input id="task-topic-google-slides-url" class="task-topic-submission-input" type="url" placeholder="https://docs.google.com/presentation/..." value="${escapeHtml(currentGoogleSlidesUrl)}" required>
+                <p class="task-topic-submission-note">Create a Google Slideshow and include at least one slide that clearly describes the digital outcome.</p>
+                <p class="task-topic-submission-note">For a clear intent statement, explain: what the idea is, why it should exist, who it is for, and what success looks like.</p>
+            ` : ""}
 
             ${isProjectManagementTopic ? `
                 <label class="task-topic-submission-label" for="task-topic-trello-card-url">Trello Card or Board Link</label>
@@ -1634,6 +1661,10 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             <p><strong>Status:</strong> <span id="task-topic-ack-status">${acknowledged ? "Submitted evidence" : "Waiting for acknowledgement"}</span></p>
             <p><strong>Acknowledged At:</strong> <span id="task-topic-last-submitted">${escapeHtml(formatSubmissionTimestamp(acknowledgedAt))}</span></p>
             <p><strong>Document Reference:</strong> <span id="task-topic-doc-reference">${escapeHtml(currentDocRef || "Not provided")}</span></p>
+            ${isDigitalOutcomeTopic
+                ? `<p><strong>Description - Google Slides:</strong> <span id="task-topic-google-slides-reference">${currentGoogleSlidesUrl ? `<a href="${escapeHtml(currentGoogleSlidesUrl)}" target="_blank" rel="noreferrer">${escapeHtml(currentGoogleSlidesUrl)}</a>` : "Not linked"}</span></p>`
+                : ""
+            }
             ${isProjectManagementTopic
                 ? `<p><strong>Trello Card:</strong> <span id="task-topic-trello-reference">${currentTrelloCardUrl ? `<a href="${escapeHtml(currentTrelloCardUrl)}" target="_blank" rel="noreferrer">${escapeHtml(currentTrelloCardUrl)}</a>` : "Not linked"}</span></p>`
                 : ""
@@ -1672,6 +1703,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const form = panelHost.querySelector("#task-topic-submission-form");
     const clearAckButton = panelHost.querySelector("#task-topic-clear-acknowledgement");
     const docRefInput = panelHost.querySelector("#task-topic-hapara-doc-ref");
+    const googleSlidesInput = panelHost.querySelector("#task-topic-google-slides-url");
     const trelloCardInput = panelHost.querySelector("#task-topic-trello-card-url");
     const trelloBoardSelect = panelHost.querySelector("#task-topic-trello-board");
     const trelloListSelect = panelHost.querySelector("#task-topic-trello-list");
@@ -1696,6 +1728,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const ackStatusHost = panelHost.querySelector("#task-topic-ack-status");
     const lastSubmittedHost = panelHost.querySelector("#task-topic-last-submitted");
     const docRefHost = panelHost.querySelector("#task-topic-doc-reference");
+    const googleSlidesRefHost = panelHost.querySelector("#task-topic-google-slides-reference");
     const trelloRefHost = panelHost.querySelector("#task-topic-trello-reference");
     const trelloLastLogHost = panelHost.querySelector("#task-topic-trello-last-log");
     const oneDriveRefHost = panelHost.querySelector("#task-topic-onedrive-reference");
@@ -1716,6 +1749,15 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         if (docRefHost) {
             const value = String(docRefInput?.value || "").trim();
             docRefHost.textContent = value || "Not provided";
+        }
+
+        if (googleSlidesRefHost) {
+            const safeSlidesUrl = toSafeExternalUrl(googleSlidesInput?.value || "");
+            if (safeSlidesUrl) {
+                googleSlidesRefHost.innerHTML = `<a href="${escapeHtml(safeSlidesUrl)}" target="_blank" rel="noreferrer">${escapeHtml(safeSlidesUrl)}</a>`;
+            } else {
+                googleSlidesRefHost.textContent = "Not linked";
+            }
         }
 
         if (trelloRefHost) {
@@ -2226,6 +2268,12 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             return;
         }
 
+        const googleSlidesUrl = toSafeExternalUrl(googleSlidesInput?.value || "");
+        if (isDigitalOutcomeTopic && !googleSlidesUrl) {
+            setStatus("Digital Outcome Description requires a valid Google Slides link before acknowledging.", true);
+            return;
+        }
+
         const oneDriveProjectFolderUrl = toSafeExternalUrl(oneDriveFolderInput?.value || "");
         if (isProjectManagementTopic && !oneDriveProjectFolderUrl) {
             setStatus("Project Management requires a valid OneDrive project folder link before acknowledging.", true);
@@ -2257,6 +2305,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             haparaLocation: haparaSpaceName,
             haparaDriveClassUrl: haparaClassDriveUrl,
             haparaDocumentRef: docReference,
+            googleSlidesUrl,
             trelloCardUrl,
             trelloLastLogDate: submission.trelloLastLogDate,
             trelloLastLogAt: submission.trelloLastLogAt,
@@ -2277,6 +2326,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             submission.haparaLocation = haparaSpaceName;
             submission.haparaDriveClassUrl = haparaClassDriveUrl;
             submission.haparaDocumentRef = docReference;
+            submission.googleSlidesUrl = googleSlidesUrl;
             submission.trelloCardUrl = trelloCardUrl;
             submission.mediaAssetFolderUrl = mediaAssetFolderUrl;
             submission.mediaReviewUrl = mediaReviewUrl;
@@ -2309,6 +2359,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             haparaLocation: haparaSpaceName,
             haparaDriveClassUrl: haparaClassDriveUrl,
             haparaDocumentRef: String(docRefInput?.value || "").trim(),
+            googleSlidesUrl: toSafeExternalUrl(googleSlidesInput?.value || ""),
             trelloCardUrl: toSafeTrelloCardUrl(trelloCardInput?.value || ""),
             trelloLastLogDate: submission.trelloLastLogDate,
             trelloLastLogAt: submission.trelloLastLogAt,
@@ -2327,6 +2378,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             submission.haparaAcknowledged = false;
             submission.haparaSubmittedAt = "";
             submission.submittedAt = "";
+            submission.googleSlidesUrl = toSafeExternalUrl(googleSlidesInput?.value || "");
             updateMeta(false, "");
             setStatus("Acknowledgement cleared.");
         } catch (_error) {
@@ -2452,6 +2504,7 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
         let trelloConnected = Boolean(toSafeTrelloCardUrl(readStoredTrelloCardLink(projectId, studentEmail)));
         let githubConnected = false;
         let oneDriveConnected = false;
+        let googleSlidesConnected = false;
 
         Object.values(state).forEach((steps) => {
             (Array.isArray(steps) ? steps : []).forEach((step) => {
@@ -2476,6 +2529,17 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
                     githubConnected = true;
                 }
 
+                if (text.startsWith("GOOGLE_SLIDES_URL|")) {
+                    const slidesUrl = toSafeExternalUrl(text.slice("GOOGLE_SLIDES_URL|".length).trim());
+                    if (slidesUrl) {
+                        googleSlidesConnected = true;
+                    }
+                }
+
+                if (/(docs\.google\.com\/presentation)/i.test(textLower)) {
+                    googleSlidesConnected = true;
+                }
+
                 if (text.startsWith("MEDIA_ASSET_FOLDER_URL|") || text.startsWith("MEDIA_REVIEW_URL|") || text.startsWith("ONEDRIVE_PROJECT_FOLDER_URL|")) {
                     oneDriveConnected = true;
                 }
@@ -2489,7 +2553,8 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
         return {
             trelloConnected,
             githubConnected,
-            oneDriveConnected
+            oneDriveConnected,
+            googleSlidesConnected
         };
     };
 
@@ -2599,6 +2664,8 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
             const showProjectManagementConnections = String(standardCode) === "91897"
                 && rowLevel === "achieved"
                 && rowTaskText.includes("project management");
+            const showDigitalOutcomeSlidesConnection = String(standardCode) === "digital-outcome"
+                && rowTaskText.includes("describe the digital outcome");
 
             if (showProjectManagementConnections) {
                 const systems = document.createElement("div");
@@ -2607,6 +2674,16 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
                     <p class="evidence-step-system-title">Connected Systems</p>
                     <label class="evidence-step-system-item"><input type="checkbox" disabled ${systemConnections.trelloConnected ? "checked" : ""}> Trello</label>
                     <label class="evidence-step-system-item"><input type="checkbox" disabled ${isDigitalMediaTaskContext ? (systemConnections.oneDriveConnected ? "checked" : "") : (systemConnections.githubConnected ? "checked" : "")}> ${secondarySystemLabel}</label>
+                `;
+                row.appendChild(systems);
+            }
+
+            if (showDigitalOutcomeSlidesConnection) {
+                const systems = document.createElement("div");
+                systems.className = "evidence-step-system-list";
+                systems.innerHTML = `
+                    <p class="evidence-step-system-title">Connected Systems</p>
+                    <label class="evidence-step-system-item"><input type="checkbox" disabled ${systemConnections.googleSlidesConnected ? "checked" : ""}> Description - Google Slides</label>
                 `;
                 row.appendChild(systems);
             }
@@ -2659,7 +2736,7 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
         const doBlock = document.createElement("section");
         doBlock.className = "evidence-standard-block evidence-digital-outcome-block";
         doBlock.innerHTML = `
-            <h3 class="evidence-digital-outcome-heading">Digital Outcome Details</h3>
+            <h3 class="evidence-digital-outcome-heading">Digital Outcome Description</h3>
             <div class="evidence-step-list" id="evidence-step-list-digital-outcome"></div>
             ${!isSelfTaskListView ? `<button type="button" class="detail-action detail-action-secondary evidence-step-add" data-do-add>Add Step</button>` : ""}
         `;
@@ -3162,7 +3239,7 @@ function deriveTaskShortName(value) {
 
     const normalized = raw.toLowerCase();
     const phraseMap = [
-        { pattern: /describe\s+the\s+digital\s+outcome|describe.*digital\s+outcome/, label: "Digital Outcome Details" },
+        { pattern: /describe\s+the\s+digital\s+outcome|describe.*digital\s+outcome/, label: "Digital Outcome Description" },
         { pattern: /project\s+management/, label: "Project Management" },
         { pattern: /relevant\s+implications/, label: "Relevant Implications" },
         { pattern: /version\s+control/, label: "Version Control" },
@@ -3546,7 +3623,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     const topicGuideTitle = isProjectManagementTopic
         ? "Project Management: Trello"
         : (isDecompositionTopic ? "Decomposition + Trello"
-        : (isDigitalOutcomeTopic ? "Digital Outcome Details" : "Topic Tasks"));
+        : (isDigitalOutcomeTopic ? "Digital Outcome Description" : "Topic Tasks"));
     const topicGuideInstructions = isProjectManagementTopic
         ? [
             "Log in to Trello using Google Sign In.",
@@ -3563,10 +3640,10 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             ]
             : (isDigitalOutcomeTopic
                 ? [
-                    "Read the assessment brief carefully before writing your description.",
-                    "Describe the digital outcome clearly: what it is, who it is for, and what it must do.",
-                    "Identify the target audience or end user and explain their needs.",
-                    "List the key features or requirements the outcome must include."
+                    "Create a Google Slideshow for this topic.",
+                    "Include a slide that describes the digital outcome: what it is, who it is for, and what it must do.",
+                    "Explain the intent of the idea clearly: problem, purpose, audience, and expected impact.",
+                    "Use concise wording and evidence-based reasoning so your idea is easy to evaluate."
                 ]
                 : [
                     "Read each submission requirement carefully.",
@@ -3589,7 +3666,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             ]
             : (isDigitalOutcomeTopic
                 ? [
-                    "Describe the Digital Outcome: what it is, who it is for, and what it must do.",
+                    "Description - Google Slides: Describe the Digital Outcome: what it is, who it is for, and what it must do.",
                     "Identify the target audience or end user for this outcome.",
                     "List the key features or requirements the outcome must include.",
                     "Explain how the outcome will be developed and what tools/technologies will be used.",
@@ -3602,6 +3679,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     const topicGuideIntroText = isDigitalOutcomeTopic
         ? "Use this guide to write and record a clear description of your digital outcome before starting development."
         : "Use this guide to complete the Submission Tasks correctly.";
+    const topicGuideTaskHeading = isProjectManagementTopic
+        ? "Trello Tasks"
+        : (isDigitalOutcomeTopic ? "Description - Google Slides" : "Task List");
     const githubGuideTitle = "Version Control: GitHub";
     const githubGuideSourceUrl = "https://github.com/";
     const githubGuideInstructions = [
@@ -3787,7 +3867,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                         </section>
 
                         <section class="task-topic-guide-block">
-                            <h3>Trello Tasks</h3>
+                            <h3>${escapeHtml(topicGuideTaskHeading)}</h3>
                             <ul class="list task-topic-guide-list">${renderList(topicGuideTaskItems)}</ul>
                         </section>
                     </section>
