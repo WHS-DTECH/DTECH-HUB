@@ -4896,6 +4896,31 @@ app.post("/api/activities/:id/interest", async (req, res) => {
         [projectId, email]
       );
       interested = true;
+
+      // Keep Client Projects assessment in sync when a student self-registers
+      // interest in a non-assessment project.
+      const clientProjectsTaskId = String(CLIENT_PROJECTS_TASK_ID || "").trim();
+      if (clientProjectsTaskId && clientProjectsTaskId !== projectId) {
+        try {
+          const activityRow = await pool.query(
+            "SELECT activity_category, to_jsonb(activities)->>'category' AS legacy_category FROM activities WHERE id = $1 LIMIT 1",
+            [projectId]
+          );
+          const rawCat = String(activityRow.rows?.[0]?.activity_category || activityRow.rows?.[0]?.legacy_category || "")
+            .toLowerCase()
+            .trim();
+          const isProjectCategory = !rawCat.includes("assessment");
+          if (isProjectCategory) {
+            await pool.query(
+              "INSERT INTO project_interests (project_id, student_email) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+              [clientProjectsTaskId, email]
+            );
+          }
+        } catch (_autoAllocErr) {
+          // Non-fatal: do not block the main interest toggle path.
+          console.error("[interest-auto-alloc] Could not allocate to Client Projects task:", _autoAllocErr.message);
+        }
+      }
     }
 
     const countResult = await pool.query(
