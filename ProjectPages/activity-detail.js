@@ -92,7 +92,6 @@ const EVIDENCE_STEPS_TARGET_STANDARDS = new Set(["92005", "91897", "91907"]);
 const DIGITAL_OUTCOME_DETAILS_TASKS = [
     "Description - Google Slides: Describe the Digital Outcome: What is it, who is it for, and what should it do?",
     "Identify the target audience or end user for this outcome.",
-    "List the key features or requirements the outcome must include.",
     "Explain how the outcome will be developed and what tools/technologies will be used.",
     "State how success will be measured or evaluated."
 ];
@@ -108,6 +107,7 @@ const EVIDENCE_STEPS_DEFAULTS = {
     "91897": [
         "Achieved: Use appropriate project management tools and techniques to plan the development of a digital technologies outcome.",
         "Achieved: Decompose the outcome into smaller components.",
+        "Achieved: List the key features or requirements the outcome must include.",
         "Achieved: Trial the components of the digital technologies outcome.",
         "Achieved: Test that the digital technologies outcome functions as intended.",
         "Achieved: Explain relevant implications.",
@@ -373,6 +373,26 @@ function normalizeStudentEmailInput(value) {
         return `${trimmed}@${detailAllowedDomain}`;
     }
     return trimmed;
+}
+
+function isFeaturesRequirementSubitem(text) {
+    const normalized = stripStepLevel(text)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+    return normalized.includes("list the key features")
+        && normalized.includes("requirements")
+        && normalized.includes("outcome");
+}
+
+function isDecompositionParentStep(text) {
+    const normalized = stripStepLevel(text)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+    return normalized.includes("decompos")
+        && normalized.includes("outcome")
+        && normalized.includes("smaller components");
 }
 
 function normalizeCardCategory(value, fallback = "Activity") {
@@ -2630,6 +2650,16 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
                 return level === levelFilter;
             });
 
+        if (String(standardCode) === "91897" && String(levelFilter || "").toLowerCase() === "achieved") {
+            const subitemIndex = filtered.findIndex(({ step }) => isFeaturesRequirementSubitem(step?.text));
+            const parentIndex = filtered.findIndex(({ step }) => isDecompositionParentStep(step?.text));
+            if (subitemIndex >= 0 && parentIndex >= 0 && subitemIndex !== parentIndex + 1) {
+                const [subitemRow] = filtered.splice(subitemIndex, 1);
+                const insertAt = subitemIndex < parentIndex ? parentIndex : parentIndex + 1;
+                filtered.splice(insertAt, 0, subitemRow);
+            }
+        }
+
         if (!filtered.length && levelFilter) {
             const empty = document.createElement("p");
             empty.className = "evidence-level-empty";
@@ -2641,6 +2671,9 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
         filtered.forEach(({ step, index }) => {
             const row = document.createElement("div");
             row.className = "evidence-step-row";
+            if (String(standardCode) === "91897" && String(levelFilter || "").toLowerCase() === "achieved" && isFeaturesRequirementSubitem(step?.text)) {
+                row.classList.add("is-subitem");
+            }
 
             const check = document.createElement("input");
             check.type = "checkbox";
@@ -3711,7 +3744,6 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 ? [
                     "Description - Google Slides: Describe the Digital Outcome: what it is, who it is for, and what it must do.",
                     "Identify the target audience or end user for this outcome.",
-                    "List the key features or requirements the outcome must include.",
                     "Explain how the outcome will be developed and what tools/technologies will be used.",
                     "State how success will be measured or evaluated."
                 ]

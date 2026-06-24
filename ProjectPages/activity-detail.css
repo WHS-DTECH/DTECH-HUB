@@ -1527,6 +1527,16 @@ h1 {
     gap: 8px;
 }
 
+.evidence-step-row.is-subitem {
+    grid-template-columns: 20px 1fr auto;
+}
+
+.evidence-step-row.is-subitem .evidence-step-input {
+    margin-left: 18px;
+    border-style: dashed;
+    background: #f8fbff;
+}
+
 .evidence-step-check {
     width: 16px;
     height: 16px;
