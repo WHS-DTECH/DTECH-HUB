@@ -314,9 +314,7 @@ function normalize91897RowsWithRequirementFallback(existingRows, defaultRows) {
         ? defaultRows.map((text) => ({ text: String(text || "").trim(), done: false })).filter((row) => row.text)
         : [];
 
-    if (!defaults.length) {
-        return expandedExisting;
-    }
+    const ensuredSubitemText = "Achieved: List the key features or requirements the outcome must include.";
 
     const getLevel = (text) => {
         const raw = String(text || "").trim().toLowerCase();
@@ -325,6 +323,37 @@ function normalize91897RowsWithRequirementFallback(existingRows, defaultRows) {
         if (raw.startsWith("excellence:")) return "excellence";
         return "";
     };
+
+    const ensureSubitemPlacement = (rows) => {
+        const safeRows = Array.isArray(rows) ? rows.map((row) => ({
+            text: String(row?.text || "").trim(),
+            done: Boolean(row?.done)
+        })).filter((row) => row.text) : [];
+
+        if (safeRows.some((row) => isFeaturesRequirementSubitem(row.text))) {
+            return safeRows;
+        }
+
+        const parentIndex = safeRows.findIndex((row) => isDecompositionParentStep(row.text));
+        const nextRow = { text: ensuredSubitemText, done: false };
+        if (parentIndex >= 0) {
+            safeRows.splice(parentIndex + 1, 0, nextRow);
+            return safeRows;
+        }
+
+        const firstNonAchievedIndex = safeRows.findIndex((row) => getLevel(row.text) && getLevel(row.text) !== "achieved");
+        if (firstNonAchievedIndex >= 0) {
+            safeRows.splice(firstNonAchievedIndex, 0, nextRow);
+        } else {
+            safeRows.push(nextRow);
+        }
+
+        return safeRows;
+    };
+
+    if (!defaults.length) {
+        return ensureSubitemPlacement(expandedExisting);
+    }
 
     const existingCounts = { achieved: 0, merit: 0, excellence: 0 };
     const defaultCounts = { achieved: 0, merit: 0, excellence: 0 };
@@ -346,7 +375,7 @@ function normalize91897RowsWithRequirementFallback(existingRows, defaultRows) {
         existingCounts.excellence < defaultCounts.excellence;
 
     if (!shouldRebuildFromRequirements) {
-        return expandedExisting;
+        return ensureSubitemPlacement(expandedExisting);
     }
 
     const doneByText = new Map();
@@ -356,13 +385,13 @@ function normalize91897RowsWithRequirementFallback(existingRows, defaultRows) {
         doneByText.set(key, Boolean(row?.done));
     });
 
-    return defaults.map((row) => {
+    return ensureSubitemPlacement(defaults.map((row) => {
         const key = String(row.text || "").trim().toLowerCase();
         return {
             text: row.text,
             done: doneByText.get(key) || false
         };
-    });
+    }));
 }
 
 function normalizeStudentEmailInput(value) {
