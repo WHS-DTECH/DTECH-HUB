@@ -376,7 +376,8 @@ function normalizeStudentEmailInput(value) {
 }
 
 function isFeaturesRequirementSubitem(text) {
-    const normalized = stripStepLevel(text)
+    const normalized = String(text || "")
+        .replace(/^(Achieved|Merit|Excellence):\s*/i, "")
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, " ")
         .trim();
@@ -386,7 +387,8 @@ function isFeaturesRequirementSubitem(text) {
 }
 
 function isDecompositionParentStep(text) {
-    const normalized = stripStepLevel(text)
+    const normalized = String(text || "")
+        .replace(/^(Achieved|Merit|Excellence):\s*/i, "")
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, " ")
         .trim();
