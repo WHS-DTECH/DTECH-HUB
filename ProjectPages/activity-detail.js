@@ -2598,6 +2598,7 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
         nextUrl.searchParams.set("id", String(projectId || ""));
         nextUrl.searchParams.set("taskTopic", safeText);
         nextUrl.searchParams.set("taskShortName", taskShortName);
+        nextUrl.searchParams.set("taskList", "hide");
         if (Number.isFinite(Number(topicIndex)) && Number(topicIndex) > 0) {
             nextUrl.searchParams.set("taskTopicIndex", String(topicIndex));
         }
@@ -2849,7 +2850,14 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
     const openButton = host.querySelector("#evidence-sidebar-open");
     openButton?.addEventListener("click", openSidebar);
 
-    openSidebar();
+    const url = new URL(window.location.href);
+    const shouldStartHidden = String(url.searchParams.get("taskList") || "").trim().toLowerCase() === "hide";
+    if (shouldStartHidden) {
+        url.searchParams.delete("taskList");
+        window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    } else {
+        openSidebar();
+    }
 }
 
 let detailStandardsOptionsCache = null;
