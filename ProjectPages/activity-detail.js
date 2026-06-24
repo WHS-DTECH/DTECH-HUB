@@ -2603,7 +2603,11 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
             nextUrl.searchParams.set("taskTopicIndex", String(topicIndex));
         }
 
-        window.location.href = `${nextUrl.pathname}${nextUrl.search}`;
+        // Close the sidebar first so users get immediate visual feedback.
+        closeSidebar();
+        window.setTimeout(() => {
+            window.location.href = `${nextUrl.pathname}${nextUrl.search}`;
+        }, 90);
     };
 
     const renderStepRows = (rowsHost, standardCode, levelFilter = "") => {
