@@ -126,9 +126,6 @@ const EVIDENCE_STEPS_DEFAULTS = {
     ]
 };
 
-const HAPARA_WORKSPACE_PUBLIC_URL = "https://bit.ly/4uO74lI";
-const HAPARA_CLASS_DRIVE_URL = "https://app.hapara.com/dashboard/drive/4-1-12comp-vp-2026@westlandhigh.school.nz/all";
-
 const detailAllowedDomain =
     (document.querySelector('meta[name="hub-google-allowed-domain"]')?.content || "")
         .trim()
@@ -1094,6 +1091,14 @@ function summarizeStudentSubmissionStatus(evidenceRows, todayNzKey = getNzDateKe
                 return;
             }
 
+            if (text.startsWith("SUBMITTED_AT|")) {
+                const value = text.slice("SUBMITTED_AT|".length).trim();
+                if (value) {
+                    acknowledged = true;
+                }
+                return;
+            }
+
             if (text.startsWith("TRELLO_LAST_LOG_DATE|")) {
                 trelloLogDate = text.slice("TRELLO_LAST_LOG_DATE|".length).trim();
                 return;
@@ -1262,7 +1267,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         || normalizedDerivedShortName.includes("project management");
 
     // Keep Project Management task-topic cards focused on card content.
-    // Submission/Hapara tracking is available on the main Assessment Task page.
+    // Submission tracking is available on the main Assessment Task page.
     if (isProjectManagementTopic) {
         panelHost.innerHTML = "";
         return;
@@ -1286,7 +1291,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     if (isTeacher) {
         const students = Array.isArray(interestData?.students) ? interestData.students : [];
         if (!students.length) {
-            panelHost.innerHTML = `<p class="task-topic-submission-note">No allocated students yet. Add or confirm a student first, then Hapara acknowledgement statuses will appear here.</p>`;
+            panelHost.innerHTML = `<p class="task-topic-submission-note">No allocated students yet. Add or confirm a student first, then evidence submission statuses will appear here.</p>`;
             return;
         }
 
@@ -1391,15 +1396,15 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         const logMissingText = isProjectManagementTopic ? "Missing today's log" : "Missing today's version log";
 
         if (!rows.length) {
-            panelHost.innerHTML = `<p class="task-topic-submission-note">No student records are ready for acknowledgement tracking yet.</p>`;
+            panelHost.innerHTML = `<p class="task-topic-submission-note">No student records are ready for evidence submission tracking yet.</p>`;
             return;
         }
 
         panelHost.innerHTML = `
             <div class="task-topic-submission-teacher-panel">
-                <p class="task-topic-submission-note">Students submit evidence for this task topic. This panel tracks who has acknowledged they submitted.</p>
+                <p class="task-topic-submission-note">Students submit evidence for this task topic. This panel tracks who has submitted evidence and linked their work.</p>
                 <div class="task-topic-submission-meta">
-                    <p><strong>Acknowledged:</strong> ${rows.filter((row) => row.acknowledged).length} of ${rows.length}</p>
+                    <p><strong>Submitted:</strong> ${rows.filter((row) => row.acknowledged).length} of ${rows.length}</p>
                     ${isTrackedWorkflowTopic ? `<p><strong>Logged today:</strong> ${loggedTodayCount} of ${rows.length}</p>` : ""}
                 </div>
                 ${isTrackedWorkflowTopic ? `
@@ -1429,7 +1434,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                         <div class="task-topic-teacher-status-item">
                             <span class="task-topic-teacher-status-email">${escapeHtml(row.name)}</span>
                             <span class="task-topic-teacher-status-email">${escapeHtml(row.email)}</span>
-                            <span class="task-topic-teacher-status-pill ${row.acknowledged ? "is-acknowledged" : "is-pending"}">${row.acknowledged ? "Submitted evidence" : "Not acknowledged"}</span>
+                            <span class="task-topic-teacher-status-pill ${row.acknowledged ? "is-acknowledged" : "is-pending"}">${row.acknowledged ? "Submitted evidence" : "Not submitted"}</span>
                             <span class="task-topic-teacher-status-doc">${escapeHtml(row.docRef || "No document reference")}</span>
                             ${isDigitalOutcomeTopic
                                 ? (row.googleSlidesUrl
@@ -1558,8 +1563,8 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     }
 
     const submission = parseTaskTopicSubmissionFromEvidenceRows(evidenceRows, standardKey);
-    const haparaSpaceName = String(submission.haparaLocation || "Hapara Workspace Evidence").trim();
-    const haparaClassDriveUrl = String(submission.haparaDriveClassUrl || HAPARA_CLASS_DRIVE_URL).trim();
+    const haparaSpaceName = String(submission.haparaLocation || "").trim();
+    const haparaClassDriveUrl = String(submission.haparaDriveClassUrl || "").trim();
     const acknowledged = Boolean(submission.haparaAcknowledged);
     const acknowledgedAt = submission.haparaSubmittedAt || submission.submittedAt || "";
     const currentDocRef = String(submission.haparaDocumentRef || "").trim();
@@ -1581,10 +1586,10 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
 
     panelHost.innerHTML = `
         <form id="task-topic-submission-form" class="task-topic-submission-form" novalidate>
-            <p class="task-topic-submission-note">Add your evidence reference, then acknowledge below so this system records completion.</p>
+            <p class="task-topic-submission-note">Link your evidence below, then submit so your teacher can verify completion.</p>
 
-            <label class="task-topic-submission-label" for="task-topic-hapara-doc-ref">Evidence Document Name or Reference</label>
-            <input id="task-topic-hapara-doc-ref" class="task-topic-submission-input" type="text" placeholder="Example: Decomposition notes - Vincent" value="${escapeHtml(currentDocRef)}" required>
+            <label class="task-topic-submission-label" for="task-topic-hapara-doc-ref">Evidence Note (Optional)</label>
+            <input id="task-topic-hapara-doc-ref" class="task-topic-submission-input" type="text" placeholder="Example: Slide deck draft 2" value="${escapeHtml(currentDocRef)}">
 
             ${isDigitalOutcomeTopic ? `
                 <label class="task-topic-submission-label" for="task-topic-google-slides-url">Digital Outcome Description - Google Slides Link</label>
@@ -1681,15 +1686,15 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             ` : ""}
 
             <div class="task-topic-submission-actions">
-                <button type="submit" class="detail-action">I Submitted Evidence</button>
-                <button type="button" class="detail-action detail-action-secondary" id="task-topic-clear-acknowledgement">Clear Acknowledgement</button>
+                <button type="submit" class="detail-action">Submit Evidence Link</button>
+                <button type="button" class="detail-action detail-action-secondary" id="task-topic-clear-acknowledgement">Clear Submission</button>
             </div>
             <p class="task-topic-submission-status" id="task-topic-submission-status" aria-live="polite"></p>
         </form>
         <div class="task-topic-submission-meta">
-            <p><strong>Status:</strong> <span id="task-topic-ack-status">${acknowledged ? "Submitted evidence" : "Waiting for acknowledgement"}</span></p>
-            <p><strong>Acknowledged At:</strong> <span id="task-topic-last-submitted">${escapeHtml(formatSubmissionTimestamp(acknowledgedAt))}</span></p>
-            <p><strong>Document Reference:</strong> <span id="task-topic-doc-reference">${escapeHtml(currentDocRef || "Not provided")}</span></p>
+            <p><strong>Status:</strong> <span id="task-topic-ack-status">${acknowledged ? "Submitted evidence" : "Waiting for submission"}</span></p>
+            <p><strong>Submitted At:</strong> <span id="task-topic-last-submitted">${escapeHtml(formatSubmissionTimestamp(acknowledgedAt))}</span></p>
+            <p><strong>Evidence Note:</strong> <span id="task-topic-doc-reference">${escapeHtml(currentDocRef || "Not provided")}</span></p>
             ${isDigitalOutcomeTopic
                 ? `<p><strong>Description - Google Slides:</strong> <span id="task-topic-google-slides-reference">${currentGoogleSlidesUrl ? `<a href="${escapeHtml(currentGoogleSlidesUrl)}" target="_blank" rel="noreferrer">${escapeHtml(currentGoogleSlidesUrl)}</a>` : "Not linked"}</span></p>`
                 : ""
@@ -1768,7 +1773,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const decompLastPushHost = panelHost.querySelector("#task-topic-decomp-last-push");
     const updateMeta = (isAcknowledged, timestamp) => {
         if (ackStatusHost) {
-            ackStatusHost.textContent = isAcknowledged ? "Submitted evidence" : "Waiting for acknowledgement";
+            ackStatusHost.textContent = isAcknowledged ? "Submitted evidence" : "Waiting for submission";
         }
 
         if (lastSubmittedHost) {
@@ -2286,10 +2291,6 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     form?.addEventListener("submit", async (event) => {
         event.preventDefault();
         const docReference = String(docRefInput?.value || "").trim();
-        if (!docReference) {
-            setStatus("Add the document name/reference from Hapara Drive before acknowledging.", true);
-            return;
-        }
 
         const trelloCardUrl = toSafeTrelloCardUrl(trelloCardInput?.value || "");
         if (isProjectManagementTopic && !trelloCardUrl) {
@@ -2320,7 +2321,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         if (submitButton) {
             submitButton.disabled = true;
         }
-        setStatus("Saving acknowledgement...");
+        setStatus("Saving evidence submission...");
 
         const submittedAt = new Date().toISOString();
         const nextRows = upsertTaskTopicSubmissionEvidenceRows(evidenceRows, standardKey, {
@@ -2363,9 +2364,9 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             submission.reviewStatus = "pending";
 
             updateMeta(true, submittedAt);
-            setStatus("Acknowledged. Your evidence submission has been recorded.");
+            setStatus("Saved. Your evidence submission has been recorded.");
         } catch (error) {
-            setStatus(error?.message || "Could not save acknowledgement right now.", true);
+            setStatus(error?.message || "Could not save your evidence submission right now.", true);
         } finally {
             if (submitButton && submitButton.isConnected) {
                 submitButton.disabled = false;
@@ -2375,7 +2376,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
 
     clearAckButton?.addEventListener("click", async () => {
         clearAckButton.disabled = true;
-        setStatus("Clearing acknowledgement...");
+        setStatus("Clearing submission...");
 
         const nextRows = upsertTaskTopicSubmissionEvidenceRows(evidenceRows, standardKey, {
             writtenEvidence: submission.writtenEvidence,
@@ -2409,9 +2410,9 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             submission.submittedAt = "";
             submission.googleSlidesUrl = toSafeExternalUrl(googleSlidesInput?.value || "");
             updateMeta(false, "");
-            setStatus("Acknowledgement cleared.");
+            setStatus("Submission cleared.");
         } catch (_error) {
-            setStatus("Could not clear acknowledgement right now.", true);
+            setStatus("Could not clear submission right now.", true);
         } finally {
             if (clearAckButton && clearAckButton.isConnected) {
                 clearAckButton.disabled = false;
@@ -5065,13 +5066,9 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         html += `
             <div class="task-topic-submission-teacher-panel assessment-submission-summary-panel">
                 <h3>Submission Tasks</h3>
-                <p class="task-topic-submission-note">Students submit work in Hapara <strong>Workspace Evidence</strong>. This panel tracks who has acknowledged they submitted.</p>
-                <div class="task-topic-drive-links">
-                    <a class="detail-action detail-action-secondary" href="${escapeHtml(HAPARA_CLASS_DRIVE_URL)}" target="_blank" rel="noreferrer">Open Class Hapara Drive</a>
-                    <a class="detail-action detail-action-secondary" href="${escapeHtml(HAPARA_WORKSPACE_PUBLIC_URL)}" target="_blank" rel="noreferrer">Open Hapara Workspace</a>
-                </div>
+                <p class="task-topic-submission-note">Students submit evidence links (for example Google Slides) through DTECH HUB. This panel tracks who has submitted.</p>
                 <div class="task-topic-submission-meta">
-                    <p><strong>Acknowledged:</strong> ${acknowledgedCount} of ${students.length}</p>
+                    <p><strong>Submitted:</strong> ${acknowledgedCount} of ${students.length}</p>
                     <p><strong>Logged today:</strong> ${loggedTodayCount} of ${students.length}</p>
                     ${hasProjectManagementTopic ? `<p><strong>Trello linked:</strong> ${trelloLinkedCount} of ${students.length}</p>` : ""}
                 </div>
