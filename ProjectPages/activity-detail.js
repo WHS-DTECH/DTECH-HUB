@@ -1199,6 +1199,23 @@ function deriveInitialsFromEmail(value) {
     return `${parts[0][0] || "x"}${parts[parts.length - 1][0] || "x"}`.toLowerCase();
 }
 
+function deriveDisplayNameFromEmail(value) {
+    const raw = String(value || "").trim().toLowerCase();
+    const localPart = raw.includes("@") ? raw.split("@")[0] : raw;
+    const parts = localPart
+        .split(/[^a-z0-9]+/)
+        .map((part) => part.trim())
+        .filter(Boolean);
+
+    if (!parts.length) {
+        return "Student";
+    }
+
+    return parts
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ");
+}
+
 function parseDecompositionStepsText(value) {
     const seen = new Set();
     return String(value || "")
@@ -1323,8 +1340,10 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 const submission = parseTaskTopicSubmissionFromEvidenceRows(student?.evidence_steps, standardKey);
                 return {
                     email: studentEmail,
+                    name: deriveDisplayNameFromEmail(studentEmail),
                     acknowledged: Boolean(submission.haparaAcknowledged),
                     submittedAt: submission.haparaSubmittedAt || submission.submittedAt || "",
+                    googleSlidesUrl: toSafeExternalUrl(submission.googleSlidesUrl || submission.evidenceLink),
                     trelloCardUrl: submission.trelloCardUrl || "",
                     trelloConnected: Boolean(trelloConnectionByEmail.get(studentEmail)),
                     mediaAssetFolderUrl: submission.mediaAssetFolderUrl || "",
@@ -1408,9 +1427,17 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 <div class="task-topic-teacher-status-list">
                     ${rows.map((row) => `
                         <div class="task-topic-teacher-status-item">
+                            <span class="task-topic-teacher-status-email">${escapeHtml(row.name)}</span>
                             <span class="task-topic-teacher-status-email">${escapeHtml(row.email)}</span>
                             <span class="task-topic-teacher-status-pill ${row.acknowledged ? "is-acknowledged" : "is-pending"}">${row.acknowledged ? "Submitted evidence" : "Not acknowledged"}</span>
                             <span class="task-topic-teacher-status-doc">${escapeHtml(row.docRef || "No document reference")}</span>
+                            ${isDigitalOutcomeTopic
+                                ? (row.googleSlidesUrl
+                                    ? `<a class="task-topic-teacher-status-trello" href="${escapeHtml(row.googleSlidesUrl)}" target="_blank" rel="noreferrer">Open Google Slides</a>`
+                                    : `<span class="task-topic-teacher-status-trello task-topic-teacher-status-trello-missing">No Google Slides link</span>`
+                                )
+                                : ""
+                            }
                             ${isProjectManagementTopic
                                 ? (row.trelloCardUrl
                                     ? `<a class="task-topic-teacher-status-trello" href="${escapeHtml(row.trelloCardUrl)}" target="_blank" rel="noreferrer">Open Trello Card</a>`
@@ -1435,7 +1462,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                                 ? `<span class="task-topic-teacher-status-log ${(isProjectManagementTopic ? row.lastLogDate : row.mediaLastVersionLogDate) === todayNz ? "is-complete" : "is-missing"}">${(isProjectManagementTopic ? row.lastLogDate : row.mediaLastVersionLogDate) === todayNz ? logCompleteText : logMissingText}</span>`
                                 : ""
                             }
-                            <span class="task-topic-teacher-status-time">${escapeHtml(formatSubmissionTimestamp(row.submittedAt))}</span>
+                            <span class="task-topic-teacher-status-time">Submitted: ${escapeHtml(formatSubmissionTimestamp(row.submittedAt))}</span>
                         </div>
                     `).join("")}
                 </div>
@@ -2335,8 +2362,8 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
 
             updateMeta(true, submittedAt);
             setStatus("Acknowledged. Your evidence submission has been recorded.");
-        } catch (_error) {
-            setStatus("Could not save acknowledgement right now.", true);
+        } catch (error) {
+            setStatus(error?.message || "Could not save acknowledgement right now.", true);
         } finally {
             if (submitButton && submitButton.isConnected) {
                 submitButton.disabled = false;
