@@ -1587,6 +1587,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     panelHost.innerHTML = `
         <form id="task-topic-submission-form" class="task-topic-submission-form" novalidate>
             <p class="task-topic-submission-note">Link your evidence below, then submit so your teacher can verify completion.</p>
+            <p class="task-topic-submission-note">When all parts are ready, go to <a href="/hapara-submission.html" target="_blank" rel="noreferrer">Hapara Submission Checklist</a> to submit each item in one place.</p>
 
             <label class="task-topic-submission-label" for="task-topic-hapara-doc-ref">Evidence Note (Optional)</label>
             <input id="task-topic-hapara-doc-ref" class="task-topic-submission-input" type="text" placeholder="Example: Slide deck draft 2" value="${escapeHtml(currentDocRef)}">
