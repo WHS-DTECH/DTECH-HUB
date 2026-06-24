@@ -1558,6 +1558,8 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     }
 
     const submission = parseTaskTopicSubmissionFromEvidenceRows(evidenceRows, standardKey);
+    const haparaSpaceName = String(submission.haparaLocation || "Hapara Workspace Evidence").trim();
+    const haparaClassDriveUrl = String(submission.haparaDriveClassUrl || HAPARA_CLASS_DRIVE_URL).trim();
     const acknowledged = Boolean(submission.haparaAcknowledged);
     const acknowledgedAt = submission.haparaSubmittedAt || submission.submittedAt || "";
     const currentDocRef = String(submission.haparaDocumentRef || "").trim();
