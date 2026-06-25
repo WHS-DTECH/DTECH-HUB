@@ -762,7 +762,8 @@ async function fetchEvidenceRows(projectId, studentEmail) {
     });
 
     if (!response.ok) {
-        throw new Error("Could not load evidence steps.");
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.error || "Could not load evidence steps.");
     }
 
     const payload = await response.json().catch(() => ({}));
@@ -777,7 +778,20 @@ async function saveEvidenceRows(projectId, studentEmail, rows) {
     });
 
     if (!response.ok) {
-        throw new Error("Could not save evidence steps.");
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.error || "Could not save evidence steps.");
+    }
+}
+
+async function ensureStudentInterestAllocation(projectId) {
+    const response = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interest`, {
+        method: "POST",
+        headers: buildWriteHeaders()
+    });
+
+    if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.error || "Could not prepare student allocation.");
     }
 }
 
@@ -1289,6 +1303,7 @@ async function persistStudentOneDriveFolderLink(projectId, studentEmail, detailD
     const standardNumber = extractPrimaryStandardNumberFromRows(coerceArray(detailData?.standardDetails));
     const standardKey = buildTaskTopicSubmissionStandardKey(safeTaskTopic, standardNumber);
 
+    await ensureStudentInterestAllocation(projectId);
     const evidenceRows = await fetchEvidenceRows(projectId, studentEmail);
     const nextRows = upsertTaskTopicSubmissionEvidenceRows(evidenceRows, standardKey, {
         mediaAssetFolderUrl: safeUrl
@@ -1314,6 +1329,7 @@ async function persistStudentGoogleDriveFolderLink(projectId, studentEmail, deta
     const standardNumber = extractPrimaryStandardNumberFromRows(coerceArray(detailData?.standardDetails));
     const standardKey = buildTaskTopicSubmissionStandardKey(safeTaskTopic, standardNumber);
 
+    await ensureStudentInterestAllocation(projectId);
     const evidenceRows = await fetchEvidenceRows(projectId, studentEmail);
     const nextRows = upsertTaskTopicSubmissionEvidenceRows(evidenceRows, standardKey, {
         googleDriveProjectFolderUrl: safeUrl
