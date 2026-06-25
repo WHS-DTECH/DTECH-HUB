@@ -1,4 +1,10 @@
 const WORK_AUTH_KEY = "hub_google_auth_v1";
+const DIGITAL_OUTCOME_DESCRIPTION_TASKS = [
+    "Description - Google Slides: Describe the Digital Outcome: What is it, who is it for, and what should it do?",
+    "Identify the target audience or end user for this outcome.",
+    "Explain how the outcome will be developed and what tools/technologies will be used.",
+    "State how success will be measured or evaluated."
+];
 
 const workState = {
     email: "",
@@ -338,7 +344,10 @@ function buildAllRecords() {
         const category = String(activity?.activity_category || "").toLowerCase();
         if (!category.includes("assessment")) return;
 
-        const taskTopics = normalizeTaskTopicRows(activity?.tasks_list || activity?.tasksList)
+        const taskTopics = DIGITAL_OUTCOME_DESCRIPTION_TASKS
+            .concat(
+                normalizeTaskTopicRows(activity?.tasks_list || activity?.tasksList)
+            )
             .concat(
                 normalizeTaskTopicRows(activity?.achieved || []),
                 normalizeTaskTopicRows(activity?.merit || []),
