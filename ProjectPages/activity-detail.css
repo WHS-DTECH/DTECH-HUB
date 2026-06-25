@@ -382,6 +382,37 @@ h1 {
     align-items: start;
 }
 
+.page.task-topic-screen.student-task-topic-screen .task-topic-detail-layout {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 760px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.page.task-topic-screen.student-task-topic-screen .task-topic-detail-main {
+    display: none;
+}
+
+.page.task-topic-screen.student-task-topic-screen .task-topic-submission-column {
+    gap: 12px;
+}
+
+.page.task-topic-screen.student-task-topic-screen .task-topic-guide-panel,
+.page.task-topic-screen.student-task-topic-screen .task-topic-submission-panel {
+    padding: 12px;
+}
+
+.page.task-topic-screen.student-task-topic-screen .task-topic-guide-panel h2,
+.page.task-topic-screen.student-task-topic-screen .task-topic-submission-panel h2 {
+    font-size: 1.05rem;
+}
+
+.page.task-topic-screen.student-task-topic-screen .task-topic-guide-intro,
+.page.task-topic-screen.student-task-topic-screen .task-topic-submission-intro,
+.page.task-topic-screen.student-task-topic-screen .task-topic-submission-note {
+    font-size: 0.86rem;
+}
+
 .task-topic-detail-main,
 .task-topic-submission-column {
     display: grid;

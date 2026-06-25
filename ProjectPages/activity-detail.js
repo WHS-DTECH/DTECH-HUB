@@ -3697,6 +3697,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     const cardUrl = toSafeExternalUrl(data?.cardUrl);
     const taskTopicTitle = String(selectedTaskTopic || "").trim();
     const isTaskTopicView = Boolean(taskTopicTitle);
+    const isStudentTaskTopicView = isTaskTopicView && !canEdit;
     const toolbarLabel = isTaskTopicView
         ? "Task Topic Card"
         : (isAssessmentTask ? "Assessment Task Details" : (normalizedCategory === "Project" ? "Project" : "Activity"));
@@ -3871,6 +3872,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     }
 
     host.classList.toggle("task-topic-screen", isTaskTopicView);
+    host.classList.toggle("student-task-topic-screen", isStudentTaskTopicView);
 
     host.innerHTML = `
         <header class="toolbar">
@@ -3990,6 +3992,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                     </section>
                     `}
 
+                    ${canEdit ? `
                     <section class="proposal-section task-topic-display-options">
                         <h2>Display Options</h2>
                         <div class="task-topic-display-grid">
@@ -4007,6 +4010,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                             </div>
                         </div>
                     </section>
+                    ` : ""}
                 </div>
 
                 <aside class="task-topic-submission-column">
@@ -5215,9 +5219,12 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
 
     // Signed-in non-teacher students see the toggle button
     if (email && !isTeacher) {
-        const btnClass = interestData.my_interest ? "detail-action interest-btn is-interested" : "detail-action interest-btn";
-        const btnText = interestData.my_interest ? "\u2713 I'm Interested" : "I'm Interested";
-        html += `<button type="button" class="${btnClass}" id="interest-toggle-btn">${btnText}</button>`;
+        const showStudentInterestToggle = !(isAssessmentTask && isTaskTopicPage);
+        if (showStudentInterestToggle) {
+            const btnClass = interestData.my_interest ? "detail-action interest-btn is-interested" : "detail-action interest-btn";
+            const btnText = interestData.my_interest ? "\u2713 I'm Interested" : "I'm Interested";
+            html += `<button type="button" class="${btnClass}" id="interest-toggle-btn">${btnText}</button>`;
+        }
     }
 
     // Teachers see the full list of interested students
