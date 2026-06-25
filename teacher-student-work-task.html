@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="styles.css">
   <style>
     .work-page {
-      width: min(1500px, calc(100% - 28px));
+      width: min(1800px, calc(100% - 16px));
       margin: 20px auto 40px;
     }
 
@@ -93,7 +93,7 @@
     }
 
     .work-table-wrap {
-      overflow-x: auto;
+      overflow-x: visible;
       border: 1px solid #ccd8e8;
       border-radius: 10px;
       background: #f6f9fd;
@@ -104,7 +104,8 @@
       width: 100%;
       border-collapse: collapse;
       font-size: 0.82rem;
-      min-width: 980px;
+      min-width: 0;
+      table-layout: fixed;
     }
 
     .work-table th {
@@ -119,6 +120,11 @@
       padding: 8px 10px;
       border-bottom: 1px solid #dbe5f1;
       vertical-align: middle;
+      word-break: break-word;
+    }
+
+    .work-table th {
+      word-break: break-word;
     }
 
     .work-table tr:last-child td {
