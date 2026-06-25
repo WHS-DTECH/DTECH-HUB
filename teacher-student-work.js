@@ -420,6 +420,21 @@ function inferGlobalWorkLinksFromEvidenceRows(evidenceRows) {
                     return;
                 }
             }
+
+            if (/trello\.com/i.test(text)) {
+                const match = text.match(/https?:\/\/[^\s)]+/i);
+                if (match?.[0]) {
+                    pushLink("Trello", match[0]);
+                    return;
+                }
+            }
+
+            if (/(onedrive\.live\.com|1drv\.ms|sharepoint\.com)/i.test(text)) {
+                const match = text.match(/https?:\/\/[^\s)]+/i);
+                if (match?.[0]) {
+                    pushLink("OneDrive", match[0]);
+                }
+            }
         });
     });
 
@@ -751,6 +766,7 @@ function renderSelectedTaskPage() {
     }
 
     const slidesLinked = rows.filter((row) => Boolean(row.googleSlidesUrl)).length;
+    const oneDriveLinked = rows.filter((row) => (Array.isArray(row.links) ? row.links : []).some((link) => /(onedrive\.live\.com|1drv\.ms|sharepoint\.com)/i.test(String(link?.url || "")))).length;
     const submittedCount = rows.filter((row) => Boolean(row.submitted)).length;
     const studentGroups = new Map();
     rows.forEach((row) => {
@@ -772,7 +788,7 @@ function renderSelectedTaskPage() {
     trackerSummary.innerHTML = `
         <span>Total students: ${students.length}</span>
         <span>Total records: ${rows.length}</span>
-        <span>Google Slides linked: ${slidesLinked}</span>
+        <span>OneDrive linked: ${oneDriveLinked}</span>
         <span>Submitted: ${submittedCount}</span>
     `;
 
@@ -783,7 +799,6 @@ function renderSelectedTaskPage() {
                     <tr>
                         <th>Student</th>
                         <th>Assessment Tasks</th>
-                        <th>Google Slides</th>
                         <th>Submitted</th>
                         <th>Other Links</th>
                         <th>Open Task Items</th>
@@ -791,12 +806,7 @@ function renderSelectedTaskPage() {
                 </thead>
                 <tbody>
                     ${students.map((student) => {
-                        const slidesEntries = student.entries.filter((entry) => Boolean(entry.googleSlidesUrl));
                         const submittedEntries = student.entries.filter((entry) => Boolean(entry.submitted));
-
-                        const slidesCell = slidesEntries.length
-                            ? `<div class="work-link-list">${slidesEntries.map((entry) => buildChipLink(entry.googleSlidesUrl, `${entry.activityName} Slides`)).join("")}</div> <span class="slides-pill is-linked">${slidesEntries.length} linked</span>`
-                            : `<span class="slides-pill is-missing">Missing</span>`;
 
                         const submittedCell = submittedEntries.length
                             ? `<span class="submitted-pill">${submittedEntries.length}/${student.entries.length} submitted</span>`
@@ -828,7 +838,6 @@ function renderSelectedTaskPage() {
                             <tr>
                                 <td>${escapeHtml(student.studentName)}</td>
                                 <td>${assessmentsCell}</td>
-                                <td>${slidesCell}</td>
                                 <td>${submittedCell}</td>
                                 <td>${linksCell}</td>
                                 <td>${taskLinksCell}</td>
