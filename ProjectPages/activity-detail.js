@@ -2640,6 +2640,7 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
     ].join(" ").toUpperCase();
     const isDigitalMediaTaskContext = /(DIGITAL\s*MEDIA|MEDIA|FILM|VIDEO|AUDIO|MUSIC|PHOTOGRAPH|ANIMATION|GRAPHIC)/i.test(contextSignals);
     const secondarySystemLabel = isDigitalMediaTaskContext ? "Cloud Folder" : "GitHub";
+    const digitalOutcomeTopicType = String(detailData?.type || "").trim();
     const state = evidenceRowsToMap(await fetchEvidenceRows(projectId, studentEmail).catch(() => []));
     standards.forEach((code) => {
         const hasExistingStandard = Object.prototype.hasOwnProperty.call(state, code);
@@ -2894,10 +2895,13 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
                 const systems = document.createElement("div");
                 systems.className = "evidence-step-system-list";
                 const cloudFolderConnected = Boolean(systemConnections.oneDriveConnected || systemConnections.googleDriveConnected);
+                const secondaryTooltip = isDigitalMediaTaskContext
+                    ? "Cloud Folder accepts either Microsoft OneDrive or Google Drive project folder links."
+                    : "Version-control repository link (for example GitHub).";
                 systems.innerHTML = `
                     <p class="evidence-step-system-title">Connected Systems</p>
                     <label class="evidence-step-system-item"><input type="checkbox" disabled ${systemConnections.trelloConnected ? "checked" : ""}> Trello</label>
-                    <label class="evidence-step-system-item"><input type="checkbox" disabled ${isDigitalMediaTaskContext ? (cloudFolderConnected ? "checked" : "") : (systemConnections.githubConnected ? "checked" : "")}> ${secondarySystemLabel}</label>
+                    <label class="evidence-step-system-item" title="${escapeHtml(secondaryTooltip)}"><input type="checkbox" disabled ${isDigitalMediaTaskContext ? (cloudFolderConnected ? "checked" : "") : (systemConnections.githubConnected ? "checked" : "")}> ${secondarySystemLabel}</label>
                 `;
                 row.appendChild(systems);
             }
@@ -2960,6 +2964,18 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
         const doBlock = document.createElement("section");
         doBlock.className = "evidence-standard-block evidence-digital-outcome-block";
         doBlock.innerHTML = `
+            <h3 class="evidence-digital-outcome-heading">Digital Outcome Topic</h3>
+            <div class="evidence-step-list evidence-digital-outcome-topic-list">
+                <div class="evidence-step-row evidence-step-row-readonly">
+                    <input
+                        type="text"
+                        class="evidence-step-input"
+                        value="${escapeHtml(digitalOutcomeTopicType || "Not Set") }"
+                        title="${escapeHtml(digitalOutcomeTopicType || "Topic Type not set on Upload Assessment Task page") }"
+                        readonly
+                    >
+                </div>
+            </div>
             <h3 class="evidence-digital-outcome-heading">Digital Outcome Description</h3>
             <div class="evidence-step-list" id="evidence-step-list-digital-outcome"></div>
             ${!isSelfTaskListView ? `<button type="button" class="detail-action detail-action-secondary evidence-step-add" data-do-add>Add Step</button>` : ""}
