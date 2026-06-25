@@ -263,6 +263,97 @@ function normalizeTaskTopicText(value) {
         .trim();
 }
 
+function getTaskTopicGroup(topic) {
+    const text = normalizeTaskTopicText(topic).toLowerCase();
+
+    if (!text) return "other";
+
+    if (
+        /describe\s+the\s+digital\s+outcome|description\s*-\s*google\s+slides|target\s+audience|success\s+will\s+be\s+measured|outcome\s+will\s+be\s+developed/.test(text)
+    ) {
+        return "digital_outcome";
+    }
+
+    if (
+        /effectively\s+using\s+project\s+management|trialling\s+multiple\s+components|using\s+information\s+appropriately\s+from\s+testing|addressing\s+relevant\s+implications/.test(text)
+    ) {
+        return "merit";
+    }
+
+    if (/discussing\s+how\s+the\s+information\s+from\s+planning|high-\s*quality\s+outcome/.test(text)) {
+        return "excellence";
+    }
+
+    if (
+        /using\s+appropriate\s+project\s+management|decompos|key\s+features\s+or\s+requirements|trialling\s+the\s+components|testing\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions|explaining\s+relevant\s+implications/.test(text)
+    ) {
+        return "achieved";
+    }
+
+    return "other";
+}
+
+function getTaskTopicSubRank(topic, group) {
+    const text = normalizeTaskTopicText(topic).toLowerCase();
+
+    const orderMaps = {
+        digital_outcome: [
+            /description\s*-\s*google\s+slides|describe\s+the\s+digital\s+outcome/,
+            /identify\s+the\s+target\s+audience/,
+            /explain\s+how\s+the\s+outcome\s+will\s+be\s+developed/,
+            /state\s+how\s+success\s+will\s+be\s+measured/
+        ],
+        achieved: [
+            /using\s+appropriate\s+project\s+management/,
+            /decompos/,
+            /key\s+features\s+or\s+requirements/,
+            /trialling\s+the\s+components/,
+            /testing\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/,
+            /explaining\s+relevant\s+implications/
+        ],
+        merit: [
+            /effectively\s+using\s+project\s+management/,
+            /trialling\s+multiple\s+components/,
+            /using\s+information\s+appropriately\s+from\s+testing/,
+            /addressing\s+relevant\s+implications/
+        ],
+        excellence: [
+            /discussing\s+how\s+the\s+information\s+from\s+planning/
+        ]
+    };
+
+    const patterns = orderMaps[group] || [];
+    const index = patterns.findIndex((pattern) => pattern.test(text));
+    return index >= 0 ? index + 1 : 999;
+}
+
+function compareTaskTopics(leftTopic, rightTopic) {
+    const groupOrder = {
+        digital_outcome: 1,
+        achieved: 2,
+        merit: 3,
+        excellence: 4,
+        other: 5
+    };
+
+    const leftGroup = getTaskTopicGroup(leftTopic);
+    const rightGroup = getTaskTopicGroup(rightTopic);
+    const leftGroupRank = groupOrder[leftGroup] || 99;
+    const rightGroupRank = groupOrder[rightGroup] || 99;
+
+    if (leftGroupRank !== rightGroupRank) {
+        return leftGroupRank - rightGroupRank;
+    }
+
+    const leftSub = getTaskTopicSubRank(leftTopic, leftGroup);
+    const rightSub = getTaskTopicSubRank(rightTopic, rightGroup);
+    if (leftSub !== rightSub) {
+        return leftSub - rightSub;
+    }
+
+    return String(leftTopic || "").localeCompare(String(rightTopic || ""));
+}
+
 function buildTaskTopicSubmissionStandardKey(taskTopicTitle, standardNumber = "") {
     const topicSlug = normalizeTaskTopicText(taskTopicTitle)
         .toLowerCase()
@@ -627,7 +718,7 @@ function getOrderedTaskTopics() {
         topics.push(String(record?.taskTopic || "").trim());
     });
 
-    return topics.sort((a, b) => a.localeCompare(b));
+    return topics.sort((a, b) => compareTaskTopics(a, b));
 }
 
 function findCanonicalTaskTopic(topic) {
@@ -713,26 +804,66 @@ function renderTaskLinks() {
         if (record.submitted) bucket.submitted += 1;
     });
 
-    const entries = Array.from(grouped.values()).sort((a, b) => a.taskTopic.localeCompare(b.taskTopic));
+    const entries = Array.from(grouped.values()).sort((a, b) => compareTaskTopics(a.taskTopic, b.taskTopic));
     if (!entries.length) {
         taskLinkGrid.innerHTML = `<div class="work-empty">No assessment task items found yet.</div>`;
         return;
     }
 
-    taskLinkGrid.innerHTML = entries.map((item) => {
-        const href = `teacher-student-work-task.html?task=${encodeURIComponent(item.taskTopic)}`;
-        return `
-            <article class="task-link-card">
-                <h3>${escapeHtml(item.taskTopic)}</h3>
-                <div class="task-link-meta">
-                    <span>${item.total} student record${item.total === 1 ? "" : "s"}</span>
-                    <span>${item.slidesLinked} Google Slides linked</span>
-                    <span>${item.submitted} submitted</span>
-                </div>
-                <a href="${escapeHtml(href)}">Open page</a>
-            </article>
-        `;
-    }).join("");
+    const groupLabels = {
+        digital_outcome: "Digital Outcome Description",
+        achieved: "Achieved Tasks",
+        merit: "Merit Tasks",
+        excellence: "Excellence Tasks",
+        other: "Other Tasks"
+    };
+
+    const groupedEntries = {
+        digital_outcome: [],
+        achieved: [],
+        merit: [],
+        excellence: [],
+        other: []
+    };
+
+    entries.forEach((item) => {
+        const group = getTaskTopicGroup(item.taskTopic);
+        if (!groupedEntries[group]) {
+            groupedEntries.other.push(item);
+            return;
+        }
+        groupedEntries[group].push(item);
+    });
+
+    const orderedGroups = ["digital_outcome", "achieved", "merit", "excellence", "other"];
+    taskLinkGrid.innerHTML = orderedGroups
+        .filter((group) => groupedEntries[group].length > 0)
+        .map((group) => {
+            const cardsHtml = groupedEntries[group].map((item) => {
+                const href = `teacher-student-work-task.html?task=${encodeURIComponent(item.taskTopic)}`;
+                return `
+                    <article class="task-link-card">
+                        <h3>${escapeHtml(item.taskTopic)}</h3>
+                        <div class="task-link-meta">
+                            <span>${item.total} student record${item.total === 1 ? "" : "s"}</span>
+                            <span>${item.slidesLinked} Google Slides linked</span>
+                            <span>${item.submitted} submitted</span>
+                        </div>
+                        <a href="${escapeHtml(href)}">Open page</a>
+                    </article>
+                `;
+            }).join("");
+
+            return `
+                <section class="task-link-group">
+                    <h3>${escapeHtml(groupLabels[group] || "Task Group")}</h3>
+                    <div class="task-link-grid-group">
+                        ${cardsHtml}
+                    </div>
+                </section>
+            `;
+        })
+        .join("");
 }
 
 function renderSelectedTaskPage() {
