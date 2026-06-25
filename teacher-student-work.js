@@ -45,6 +45,21 @@ function escapeHtml(value) {
         .replace(/'/g, "&#039;");
 }
 
+function compactLabel(value, maxLength = 24) {
+    const text = String(value || "").trim();
+    const limit = Number.isFinite(Number(maxLength)) ? Math.max(8, Math.round(Number(maxLength))) : 24;
+    if (!text) return "";
+    if (text.length <= limit) return text;
+    return `${text.slice(0, Math.max(1, limit - 1)).trim()}...`;
+}
+
+function buildChipLink(url, label) {
+    const safeUrl = String(url || "").trim();
+    const fullLabel = String(label || "Link").trim() || "Link";
+    const shortLabel = compactLabel(fullLabel);
+    return `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noreferrer" title="${escapeHtml(fullLabel)}">${escapeHtml(shortLabel)}</a>`;
+}
+
 function normalizeEmail(value) {
     return String(value || "").trim().toLowerCase();
 }
@@ -713,7 +728,7 @@ function renderSelectedTaskPage() {
                         const submittedEntries = student.entries.filter((entry) => Boolean(entry.submitted));
 
                         const slidesCell = slidesEntries.length
-                            ? `<div class="work-link-list">${slidesEntries.map((entry) => `<a href="${escapeHtml(entry.googleSlidesUrl)}" target="_blank" rel="noreferrer">${escapeHtml(entry.activityName)} Slides</a>`).join("")}</div> <span class="slides-pill is-linked">${slidesEntries.length} linked</span>`
+                            ? `<div class="work-link-list">${slidesEntries.map((entry) => buildChipLink(entry.googleSlidesUrl, `${entry.activityName} Slides`)).join("")}</div> <span class="slides-pill is-linked">${slidesEntries.length} linked</span>`
                             : `<span class="slides-pill is-missing">Missing</span>`;
 
                         const submittedCell = submittedEntries.length
@@ -735,12 +750,12 @@ function renderSelectedTaskPage() {
                         });
 
                         const linksCell = uniqueOtherLinks.length
-                            ? `<div class="work-link-list">${uniqueOtherLinks.map((link) => `<a href="${escapeHtml(link.url)}" target="_blank" rel="noreferrer">${escapeHtml(link.label)}</a>`).join("")}</div>`
+                            ? `<div class="work-link-list">${uniqueOtherLinks.map((link) => buildChipLink(link.url, link.label)).join("")}</div>`
                             : "-";
 
-                        const taskLinksCell = `<div class="work-link-list">${student.entries.map((entry) => `<a href="${escapeHtml(entry.taskUrl)}" target="_blank" rel="noreferrer">${escapeHtml(entry.activityName)}</a>`).join("")}</div>`;
+                        const taskLinksCell = `<div class="work-link-list">${student.entries.map((entry) => buildChipLink(entry.taskUrl, entry.activityName)).join("")}</div>`;
 
-                        const assessmentsCell = `<div class="work-link-list">${student.entries.map((entry) => `<span>${escapeHtml(entry.activityName)}</span>`).join("")}</div>`;
+                        const assessmentsCell = `<div class="work-link-list">${student.entries.map((entry) => `<span title="${escapeHtml(entry.activityName)}">${escapeHtml(compactLabel(entry.activityName))}</span>`).join("")}</div>`;
 
                         return `
                             <tr>
