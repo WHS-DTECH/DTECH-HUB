@@ -784,14 +784,41 @@ async function saveEvidenceRows(projectId, studentEmail, rows) {
 }
 
 async function ensureStudentInterestAllocation(projectId) {
-    const response = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interest`, {
-        method: "POST",
+    const statusResponse = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interests`, {
         headers: buildWriteHeaders()
     });
+    if (!statusResponse.ok) {
+        const payload = await statusResponse.json().catch(() => ({}));
+        throw new Error(payload?.error || "Could not check student allocation.");
+    }
 
-    if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload?.error || "Could not prepare student allocation.");
+    const statusPayload = await statusResponse.json().catch(() => ({}));
+    if (Boolean(statusPayload?.my_interest)) {
+        return;
+    }
+
+    const toggleInterest = async () => {
+        const response = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interest`, {
+            method: "POST",
+            headers: buildWriteHeaders()
+        });
+
+        if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            throw new Error(payload?.error || "Could not prepare student allocation.");
+        }
+
+        return response.json().catch(() => ({}));
+    };
+
+    const firstResult = await toggleInterest();
+    if (Boolean(firstResult?.interested)) {
+        return;
+    }
+
+    const secondResult = await toggleInterest();
+    if (!Boolean(secondResult?.interested)) {
+        throw new Error("Could not prepare student allocation.");
     }
 }
 
