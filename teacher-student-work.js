@@ -376,6 +376,56 @@ function parseTaskTopicEvidence(evidenceRows, standardKey) {
     return result;
 }
 
+function inferGlobalWorkLinksFromEvidenceRows(evidenceRows) {
+    const rows = Array.isArray(evidenceRows) ? evidenceRows : [];
+    const links = [];
+    const seen = new Set();
+
+    const pushLink = (label, url) => {
+        const safeUrl = toSafeExternalUrl(url);
+        if (!safeUrl || seen.has(safeUrl)) return;
+        seen.add(safeUrl);
+        links.push({ label, url: safeUrl });
+    };
+
+    rows.forEach((row) => {
+        const steps = Array.isArray(row?.steps) ? row.steps : [];
+        steps.forEach((step) => {
+            const text = String(step?.text || "").trim();
+            if (!text) return;
+
+            if (text.startsWith("TRELLO_CARD_URL|")) {
+                pushLink("Trello", text.slice("TRELLO_CARD_URL|".length).trim());
+                return;
+            }
+
+            if (text.startsWith("ONEDRIVE_PROJECT_FOLDER_URL|")) {
+                pushLink("OneDrive", text.slice("ONEDRIVE_PROJECT_FOLDER_URL|".length).trim());
+                return;
+            }
+
+            if (text.startsWith("MEDIA_ASSET_FOLDER_URL|")) {
+                pushLink("Asset Folder", text.slice("MEDIA_ASSET_FOLDER_URL|".length).trim());
+                return;
+            }
+
+            if (text.startsWith("LINK|")) {
+                const rawLink = text.slice("LINK|".length).trim();
+                if (/trello\.com/i.test(rawLink)) {
+                    pushLink("Trello", rawLink);
+                    return;
+                }
+                if (/(onedrive\.live\.com|1drv\.ms|sharepoint\.com)/i.test(rawLink)) {
+                    pushLink("OneDrive", rawLink);
+                    return;
+                }
+            }
+        });
+    });
+
+    return links;
+}
+
 function hasTaskTopicEvidence(result) {
     if (!result || typeof result !== "object") return false;
     return Boolean(
@@ -512,6 +562,23 @@ function buildAllRecords() {
                 const topicKey = normalizeTaskTopicText(taskTopic).toLowerCase();
                 const resolved = parseTaskTopicEvidenceForActivity(evidenceRows, taskTopic, standardNumbers);
                 const evidence = resolved.evidence;
+                const isProjectManagementTopic = topicKey.includes("project management");
+                const isVersionControlTopic = topicKey.includes("version control") || topicKey.includes("asset management");
+
+                const mergedLinks = [];
+                const seenMergedLink = new Set();
+                const addMergedLink = (link) => {
+                    const url = toSafeExternalUrl(link?.url);
+                    const label = String(link?.label || "Link").trim() || "Link";
+                    if (!url || seenMergedLink.has(url)) return;
+                    seenMergedLink.add(url);
+                    mergedLinks.push({ label, url });
+                };
+
+                (Array.isArray(evidence.links) ? evidence.links : []).forEach(addMergedLink);
+                if (isProjectManagementTopic || isVersionControlTopic) {
+                    inferGlobalWorkLinksFromEvidenceRows(evidenceRows).forEach(addMergedLink);
+                }
 
                 records.push({
                     taskTopic,
@@ -522,7 +589,7 @@ function buildAllRecords() {
                     studentName: String(workState.studentNameByEmail.get(studentEmail) || formatNameFromEmail(studentEmail) || studentEmail).trim(),
                     standardKey: String(resolved.matchedStandardKey || "").trim(),
                     googleSlidesUrl: evidence.googleSlidesUrl,
-                    links: evidence.links,
+                    links: mergedLinks,
                     submitted: Boolean(evidence.submitted),
                     submittedAt: evidence.submittedAt,
                     taskUrl: `ProjectPages/activity-detail.html?id=${encodeURIComponent(activityId)}&taskTopic=${encodeURIComponent(taskTopic)}`
