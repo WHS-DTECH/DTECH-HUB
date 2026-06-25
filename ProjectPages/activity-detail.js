@@ -814,6 +814,7 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
         trelloLastLogNote: "",
         googleSlidesUrl: "",
         mediaAssetFolderUrl: "",
+        googleDriveProjectFolderUrl: "",
         mediaReviewUrl: "",
         mediaVersionLogDate: "",
         mediaVersionLogAt: "",
@@ -919,6 +920,11 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
             return;
         }
 
+        if (text.startsWith("GOOGLE_DRIVE_PROJECT_FOLDER_URL|")) {
+            result.googleDriveProjectFolderUrl = toSafeExternalUrl(text.slice("GOOGLE_DRIVE_PROJECT_FOLDER_URL|".length).trim());
+            return;
+        }
+
         if (text.startsWith("MEDIA_REVIEW_URL|")) {
             result.mediaReviewUrl = toSafeExternalUrl(text.slice("MEDIA_REVIEW_URL|".length).trim());
             return;
@@ -1004,6 +1010,9 @@ function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     const mediaAssetFolderUrl = payload?.mediaAssetFolderUrl !== undefined
         ? toSafeExternalUrl(payload?.mediaAssetFolderUrl)
         : toSafeExternalUrl(existingSubmission.mediaAssetFolderUrl);
+    const googleDriveProjectFolderUrl = payload?.googleDriveProjectFolderUrl !== undefined
+        ? toSafeExternalUrl(payload?.googleDriveProjectFolderUrl)
+        : toSafeExternalUrl(existingSubmission.googleDriveProjectFolderUrl);
     const mediaReviewUrl = payload?.mediaReviewUrl !== undefined
         ? toSafeExternalUrl(payload?.mediaReviewUrl)
         : toSafeExternalUrl(existingSubmission.mediaReviewUrl);
@@ -1080,6 +1089,10 @@ function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     if (mediaAssetFolderUrl) {
         steps.push({ text: `MEDIA_ASSET_FOLDER_URL|${mediaAssetFolderUrl}`, done: true });
         steps.push({ text: `ONEDRIVE_PROJECT_FOLDER_URL|${mediaAssetFolderUrl}`, done: true });
+    }
+    if (googleDriveProjectFolderUrl) {
+        steps.push({ text: `GOOGLE_DRIVE_PROJECT_FOLDER_URL|${googleDriveProjectFolderUrl}`, done: true });
+        steps.push({ text: `LINK|${googleDriveProjectFolderUrl}`, done: true });
     }
     if (mediaReviewUrl) {
         steps.push({ text: `MEDIA_REVIEW_URL|${mediaReviewUrl}`, done: true });
@@ -1221,6 +1234,29 @@ function getFirstOneDriveFolderUrlFromEvidenceRows(evidenceRows) {
     return "";
 }
 
+function getFirstGoogleDriveFolderUrlFromEvidenceRows(evidenceRows) {
+    const rows = normalizeEvidenceSteps(evidenceRows);
+    for (const row of rows) {
+        const steps = Array.isArray(row?.steps) ? row.steps : [];
+        for (const step of steps) {
+            const text = String(step?.text || "").trim();
+            if (text.startsWith("GOOGLE_DRIVE_PROJECT_FOLDER_URL|")) {
+                const url = toSafeExternalUrl(text.slice("GOOGLE_DRIVE_PROJECT_FOLDER_URL|".length).trim());
+                if (url) return url;
+            }
+
+            if (text.startsWith("LINK|")) {
+                const url = toSafeExternalUrl(text.slice("LINK|".length).trim());
+                if (url && /(drive\.google\.com)/i.test(url)) {
+                    return url;
+                }
+            }
+        }
+    }
+
+    return "";
+}
+
 async function persistStudentTrelloLink(projectId, studentEmail, trelloCardUrl) {
     const safeUrl = toSafeTrelloCardUrl(trelloCardUrl);
     if (!safeUrl) {
@@ -1256,6 +1292,31 @@ async function persistStudentOneDriveFolderLink(projectId, studentEmail, detailD
     const evidenceRows = await fetchEvidenceRows(projectId, studentEmail);
     const nextRows = upsertTaskTopicSubmissionEvidenceRows(evidenceRows, standardKey, {
         mediaAssetFolderUrl: safeUrl
+    });
+    await saveEvidenceRows(projectId, studentEmail, nextRows);
+}
+
+async function persistStudentGoogleDriveFolderLink(projectId, studentEmail, detailData, taskTopicTitle, googleDriveFolderUrl) {
+    const safeUrl = toSafeExternalUrl(googleDriveFolderUrl);
+    if (!safeUrl) {
+        throw new Error("Enter a valid Google Drive folder link first.");
+    }
+
+    if (!/(drive\.google\.com)/i.test(safeUrl)) {
+        throw new Error("Use a Google Drive folder URL.");
+    }
+
+    const safeTaskTopic = String(taskTopicTitle || "").trim();
+    if (!safeTaskTopic) {
+        throw new Error("Open a task-topic page before saving Google Drive link.");
+    }
+
+    const standardNumber = extractPrimaryStandardNumberFromRows(coerceArray(detailData?.standardDetails));
+    const standardKey = buildTaskTopicSubmissionStandardKey(safeTaskTopic, standardNumber);
+
+    const evidenceRows = await fetchEvidenceRows(projectId, studentEmail);
+    const nextRows = upsertTaskTopicSubmissionEvidenceRows(evidenceRows, standardKey, {
+        googleDriveProjectFolderUrl: safeUrl
     });
     await saveEvidenceRows(projectId, studentEmail, nextRows);
 }
@@ -2578,7 +2639,7 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
         String(detailData?.title || "")
     ].join(" ").toUpperCase();
     const isDigitalMediaTaskContext = /(DIGITAL\s*MEDIA|MEDIA|FILM|VIDEO|AUDIO|MUSIC|PHOTOGRAPH|ANIMATION|GRAPHIC)/i.test(contextSignals);
-    const secondarySystemLabel = isDigitalMediaTaskContext ? "OneDrive" : "GitHub";
+    const secondarySystemLabel = isDigitalMediaTaskContext ? "Cloud Folder" : "GitHub";
     const state = evidenceRowsToMap(await fetchEvidenceRows(projectId, studentEmail).catch(() => []));
     standards.forEach((code) => {
         const hasExistingStandard = Object.prototype.hasOwnProperty.call(state, code);
@@ -2635,6 +2696,7 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
         let trelloConnected = Boolean(toSafeTrelloCardUrl(readStoredTrelloCardLink(projectId, studentEmail)));
         let githubConnected = false;
         let oneDriveConnected = false;
+        let googleDriveConnected = false;
         let googleSlidesConnected = false;
 
         Object.values(state).forEach((steps) => {
@@ -2675,8 +2737,19 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
                     oneDriveConnected = true;
                 }
 
+                if (text.startsWith("GOOGLE_DRIVE_PROJECT_FOLDER_URL|")) {
+                    const driveUrl = toSafeExternalUrl(text.slice("GOOGLE_DRIVE_PROJECT_FOLDER_URL|".length).trim());
+                    if (driveUrl) {
+                        googleDriveConnected = true;
+                    }
+                }
+
                 if (/(onedrive\.live\.com|1drv\.ms|sharepoint\.com|onedrive)/i.test(textLower)) {
                     oneDriveConnected = true;
+                }
+
+                if (/(drive\.google\.com)/i.test(textLower)) {
+                    googleDriveConnected = true;
                 }
             });
         });
@@ -2685,6 +2758,7 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
             trelloConnected,
             githubConnected,
             oneDriveConnected,
+            googleDriveConnected,
             googleSlidesConnected
         };
     };
@@ -2819,10 +2893,11 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
             if (showProjectManagementConnections) {
                 const systems = document.createElement("div");
                 systems.className = "evidence-step-system-list";
+                const cloudFolderConnected = Boolean(systemConnections.oneDriveConnected || systemConnections.googleDriveConnected);
                 systems.innerHTML = `
                     <p class="evidence-step-system-title">Connected Systems</p>
                     <label class="evidence-step-system-item"><input type="checkbox" disabled ${systemConnections.trelloConnected ? "checked" : ""}> Trello</label>
-                    <label class="evidence-step-system-item"><input type="checkbox" disabled ${isDigitalMediaTaskContext ? (systemConnections.oneDriveConnected ? "checked" : "") : (systemConnections.githubConnected ? "checked" : "")}> ${secondarySystemLabel}</label>
+                    <label class="evidence-step-system-item"><input type="checkbox" disabled ${isDigitalMediaTaskContext ? (cloudFolderConnected ? "checked" : "") : (systemConnections.githubConnected ? "checked" : "")}> ${secondarySystemLabel}</label>
                 `;
                 row.appendChild(systems);
             }
@@ -5332,6 +5407,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         const oneDriveSlot = host.querySelector("#task-topic-onedrive-sync-slot");
         if (oneDriveSlot) {
             const savedOneDriveLink = getFirstOneDriveFolderUrlFromEvidenceRows(myAllocation?.evidence_steps);
+            const savedGoogleDriveLink = getFirstGoogleDriveFolderUrlFromEvidenceRows(myAllocation?.evidence_steps);
             oneDriveSlot.innerHTML = `
                 <div class="trello-sync-panel" id="onedrive-sync-panel">
                     <h3>Microsoft OneDrive Sync</h3>
@@ -5343,6 +5419,18 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                         <button type="button" class="detail-action detail-action-secondary" id="onedrive-open-folder-btn">Open OneDrive Folder</button>
                     </div>
                     <p class="trello-sync-status" id="onedrive-sync-status" aria-live="polite"></p>
+                </div>
+
+                <div class="trello-sync-panel" id="google-drive-sync-panel" style="margin-top:10px;">
+                    <h3>Google Drive Sync</h3>
+                    <p>Save your Google Drive project folder link so your teacher can verify files and version history.</p>
+                    <label for="google-drive-folder-url" class="trello-sync-label">Google Drive project folder link</label>
+                    <input id="google-drive-folder-url" class="trello-sync-input" type="url" placeholder="https://drive.google.com/..." value="${escapeHtml(savedGoogleDriveLink)}">
+                    <div class="trello-sync-actions">
+                        <button type="button" class="detail-action detail-action-secondary" id="google-drive-save-link-btn">Save Google Drive Link</button>
+                        <button type="button" class="detail-action detail-action-secondary" id="google-drive-open-folder-btn">Open Google Drive Folder</button>
+                    </div>
+                    <p class="trello-sync-status" id="google-drive-sync-status" aria-live="polite"></p>
                 </div>
             `;
         }
@@ -5480,6 +5568,10 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     const oneDriveSaveLinkBtn = section.querySelector("#onedrive-save-link-btn");
     const oneDriveOpenFolderBtn = section.querySelector("#onedrive-open-folder-btn");
     const oneDriveStatus = section.querySelector("#onedrive-sync-status");
+    const googleDriveFolderInput = section.querySelector("#google-drive-folder-url");
+    const googleDriveSaveLinkBtn = section.querySelector("#google-drive-save-link-btn");
+    const googleDriveOpenFolderBtn = section.querySelector("#google-drive-open-folder-btn");
+    const googleDriveStatus = section.querySelector("#google-drive-sync-status");
 
     const setTrelloStatus = (message, isError = false) => {
         if (!trelloStatus) return;
@@ -5491,6 +5583,12 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         if (!oneDriveStatus) return;
         oneDriveStatus.textContent = String(message || "");
         oneDriveStatus.classList.toggle("is-error", Boolean(isError));
+    };
+
+    const setGoogleDriveStatus = (message, isError = false) => {
+        if (!googleDriveStatus) return;
+        googleDriveStatus.textContent = String(message || "");
+        googleDriveStatus.classList.toggle("is-error", Boolean(isError));
     };
 
     const backendTrelloCardLink = getFirstTrelloCardUrlFromEvidenceRows(interestData?.my_allocation?.evidence_steps);
@@ -5678,6 +5776,65 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
 
         window.open(folderUrl, "_blank", "noopener,noreferrer");
         setOneDriveStatus("Opened OneDrive folder.");
+    });
+
+    const readGoogleDriveFolderUrl = () => {
+        const safe = toSafeExternalUrl(googleDriveFolderInput?.value || "");
+        if (googleDriveFolderInput && safe && googleDriveFolderInput.value !== safe) {
+            googleDriveFolderInput.value = safe;
+        }
+        return safe;
+    };
+
+    googleDriveFolderInput?.addEventListener("change", () => {
+        const raw = String(googleDriveFolderInput.value || "").trim();
+        if (!raw) {
+            setGoogleDriveStatus("");
+            return;
+        }
+
+        const safe = toSafeExternalUrl(raw);
+        if (!safe) {
+            setGoogleDriveStatus("Enter a valid Google Drive folder link.", true);
+            return;
+        }
+
+        if (!/(drive\.google\.com)/i.test(safe)) {
+            setGoogleDriveStatus("Use a Google Drive folder URL so teacher access works.", true);
+            return;
+        }
+
+        setGoogleDriveStatus("Link looks valid. Click Save Google Drive Link.");
+    });
+
+    googleDriveSaveLinkBtn?.addEventListener("click", async () => {
+        const folderUrl = readGoogleDriveFolderUrl();
+        if (!folderUrl) {
+            setGoogleDriveStatus("Enter a valid Google Drive folder link first.", true);
+            return;
+        }
+
+        if (googleDriveSaveLinkBtn) googleDriveSaveLinkBtn.disabled = true;
+        setGoogleDriveStatus("Saving Google Drive link...");
+        try {
+            await persistStudentGoogleDriveFolderLink(projectId, email, detailData, taskTopicValue, folderUrl);
+            setGoogleDriveStatus("Google Drive link saved and shared with teacher view.");
+        } catch (error) {
+            setGoogleDriveStatus(error.message || "Could not save Google Drive link right now.", true);
+        } finally {
+            if (googleDriveSaveLinkBtn && googleDriveSaveLinkBtn.isConnected) googleDriveSaveLinkBtn.disabled = false;
+        }
+    });
+
+    googleDriveOpenFolderBtn?.addEventListener("click", () => {
+        const folderUrl = readGoogleDriveFolderUrl();
+        if (!folderUrl) {
+            setGoogleDriveStatus("Enter a valid Google Drive folder link first.", true);
+            return;
+        }
+
+        window.open(folderUrl, "_blank", "noopener,noreferrer");
+        setGoogleDriveStatus("Opened Google Drive folder.");
     });
 
     // Toggle interest button handler
