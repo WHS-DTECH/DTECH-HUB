@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="styles.css">
   <style>
     .work-page {
-      width: min(1800px, calc(100% - 16px));
+      width: min(1900px, calc(100% - 12px));
       margin: 20px auto 40px;
     }
 
@@ -157,6 +157,13 @@
       background: #edf3fc;
       color: #2a4f76;
       border-color: #c3d2e7;
+      white-space: nowrap;
+    }
+
+    .work-table th:nth-child(4),
+    .work-table td:nth-child(4) {
+      white-space: nowrap;
+      min-width: 132px;
     }
 
     .work-empty {
