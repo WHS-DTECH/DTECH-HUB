@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: dtech-hub
+    name: dtech-hub2
     runtime: node
     repo: https://github.com/WHS-DTECH/DTECH-HUB
     branch: main
