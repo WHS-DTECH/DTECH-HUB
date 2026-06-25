@@ -763,7 +763,9 @@ async function fetchEvidenceRows(projectId, studentEmail) {
 
     if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
-        throw new Error(payload?.error || "Could not load evidence steps.");
+        const error = new Error(payload?.error || "Could not load evidence steps.");
+        error.status = Number(response.status || 0);
+        throw error;
     }
 
     const payload = await response.json().catch(() => ({}));
@@ -783,18 +785,14 @@ async function saveEvidenceRows(projectId, studentEmail, rows) {
     }
 }
 
-async function ensureStudentInterestAllocation(projectId) {
-    const statusResponse = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interests`, {
-        headers: buildWriteHeaders()
-    });
-    if (!statusResponse.ok) {
-        const payload = await statusResponse.json().catch(() => ({}));
-        throw new Error(payload?.error || "Could not check student allocation.");
-    }
-
-    const statusPayload = await statusResponse.json().catch(() => ({}));
-    if (Boolean(statusPayload?.my_interest)) {
-        return;
+async function fetchEvidenceRowsEnsuringAllocation(projectId, studentEmail) {
+    try {
+        return await fetchEvidenceRows(projectId, studentEmail);
+    } catch (error) {
+        const status = Number(error?.status || 0);
+        if (status !== 404) {
+            throw error;
+        }
     }
 
     const toggleInterest = async () => {
@@ -812,14 +810,14 @@ async function ensureStudentInterestAllocation(projectId) {
     };
 
     const firstResult = await toggleInterest();
-    if (Boolean(firstResult?.interested)) {
-        return;
+    if (!Boolean(firstResult?.interested)) {
+        const secondResult = await toggleInterest();
+        if (!Boolean(secondResult?.interested)) {
+            throw new Error("Could not prepare student allocation.");
+        }
     }
 
-    const secondResult = await toggleInterest();
-    if (!Boolean(secondResult?.interested)) {
-        throw new Error("Could not prepare student allocation.");
-    }
+    return fetchEvidenceRows(projectId, studentEmail);
 }
 
 function buildTaskTopicSubmissionStandardKey(taskTopicTitle, standardNumber = "") {
@@ -1330,8 +1328,7 @@ async function persistStudentOneDriveFolderLink(projectId, studentEmail, detailD
     const standardNumber = extractPrimaryStandardNumberFromRows(coerceArray(detailData?.standardDetails));
     const standardKey = buildTaskTopicSubmissionStandardKey(safeTaskTopic, standardNumber);
 
-    await ensureStudentInterestAllocation(projectId);
-    const evidenceRows = await fetchEvidenceRows(projectId, studentEmail);
+    const evidenceRows = await fetchEvidenceRowsEnsuringAllocation(projectId, studentEmail);
     const nextRows = upsertTaskTopicSubmissionEvidenceRows(evidenceRows, standardKey, {
         mediaAssetFolderUrl: safeUrl
     });
@@ -1356,8 +1353,7 @@ async function persistStudentGoogleDriveFolderLink(projectId, studentEmail, deta
     const standardNumber = extractPrimaryStandardNumberFromRows(coerceArray(detailData?.standardDetails));
     const standardKey = buildTaskTopicSubmissionStandardKey(safeTaskTopic, standardNumber);
 
-    await ensureStudentInterestAllocation(projectId);
-    const evidenceRows = await fetchEvidenceRows(projectId, studentEmail);
+    const evidenceRows = await fetchEvidenceRowsEnsuringAllocation(projectId, studentEmail);
     const nextRows = upsertTaskTopicSubmissionEvidenceRows(evidenceRows, standardKey, {
         googleDriveProjectFolderUrl: safeUrl
     });
