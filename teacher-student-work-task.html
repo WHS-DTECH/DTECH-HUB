@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Student Work Tracker | Computer Lab</title>
+  <title>Task Item Student Work | Computer Lab</title>
   <meta name="hub-google-client-id" content="239433605438-ur2omagmkluhhn7i319g0i82l4l5l1j8.apps.googleusercontent.com">
   <meta name="hub-google-allowed-domain" content="westlandhigh.school.nz">
   <link rel="icon" type="image/x-icon" href="images/favicon.ico">
@@ -39,57 +39,6 @@
 
     .work-status.is-error {
       color: #b23939;
-    }
-
-    .task-link-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 10px;
-      margin-bottom: 12px;
-    }
-
-    .task-link-card {
-      border: 1px solid #c6d6ea;
-      border-radius: 10px;
-      background: #f7fbff;
-      padding: 10px 12px;
-    }
-
-    .task-link-card h3 {
-      margin: 0;
-      font-size: 0.95rem;
-      color: #173f63;
-      line-height: 1.25;
-    }
-
-    .task-link-meta {
-      margin-top: 6px;
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      font-size: 0.74rem;
-      color: #3e5f81;
-    }
-
-    .task-link-meta span {
-      border: 1px solid #c4d5e8;
-      border-radius: 999px;
-      background: #edf4fc;
-      padding: 2px 8px;
-      font-weight: 700;
-    }
-
-    .task-link-card a {
-      display: inline-block;
-      margin-top: 8px;
-      text-decoration: none;
-      color: #2f74b9;
-      font-weight: 700;
-      font-size: 0.8rem;
-    }
-
-    .task-link-card a:hover {
-      text-decoration: underline;
     }
 
     .tracker-summary {
@@ -212,7 +161,7 @@
             <a href="teacher-view.html">Teacher View</a>
             <a href="teacher-assessment-allocation.html">Assessment Allocations</a>
             <a href="teacher-project-allocation.html">Project Allocations</a>
-            <a href="teacher-student-work.html" aria-current="page">Student Work Tracker</a>
+            <a href="teacher-student-work.html">Task Item Pages</a>
           </div>
           <div class="utility-actions" aria-label="Utility actions">
             <a id="hub-staff-link" href="teacher-view.html" hidden>Teacher View</a>
@@ -228,15 +177,15 @@
 
     <main class="work-page">
       <section class="panel-section work-header">
-        <h1>Student Work Tracker By Task Item</h1>
-        <p>Open a task item page to see all students across assessment tasks and who has connected required evidence (for example Google Slides).</p>
+        <h1 id="tracker-title">Task Item Student Evidence</h1>
+        <p>This page is dedicated to one task item. Use the table to check who has linked Google Slides and submitted.</p>
+        <p><a href="teacher-student-work.html">Back to Task Item Pages</a></p>
         <p id="work-status" class="work-status" aria-live="polite"></p>
       </section>
 
       <section class="panel-section">
-        <h2>Task Item Pages</h2>
-        <p class="section-copy">Each card opens a dedicated page for that single task item.</p>
-        <div id="task-link-grid" class="task-link-grid" aria-live="polite"></div>
+        <div id="tracker-summary" class="tracker-summary"></div>
+        <div id="work-table-host"></div>
       </section>
     </main>
   </div>

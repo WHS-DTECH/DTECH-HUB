@@ -1,6 +1,6 @@
 const WORK_AUTH_KEY = "hub_google_auth_v1";
 
-const state = {
+const workState = {
     email: "",
     activitiesById: new Map(),
     interestRows: [],
@@ -80,11 +80,11 @@ function readStoredAccessToken() {
 }
 
 function withAuthHeaders(headers = {}) {
-    if (!state.email) {
+    if (!workState.email) {
         return headers;
     }
 
-    const nextHeaders = { ...headers, "x-user-email": state.email };
+    const nextHeaders = { ...headers, "x-user-email": workState.email };
     const accessToken = readStoredAccessToken();
     if (accessToken && accessToken.startsWith("eyJ") && accessToken.split(".").length === 3) {
         nextHeaders.Authorization = `Bearer ${accessToken}`;
@@ -301,13 +301,13 @@ async function fetchJson(url, options = {}) {
 }
 
 async function enforceAccess() {
-    state.email = readStoredEmail();
-    if (!state.email) {
+    workState.email = readStoredEmail();
+    if (!workState.email) {
         window.location.replace("teacher-view.html");
         return false;
     }
 
-    const access = await fetchJson(`/api/auth/user-access?email=${encodeURIComponent(state.email)}`, {
+    const access = await fetchJson(`/api/auth/user-access?email=${encodeURIComponent(workState.email)}`, {
         headers: withAuthHeaders()
     });
 
@@ -321,9 +321,9 @@ async function enforceAccess() {
 
 function buildAllRecords() {
     const records = [];
-    state.interestRows.forEach((interest) => {
+    workState.interestRows.forEach((interest) => {
         const activityId = String(interest?.project_id || "").trim();
-        const activity = state.activitiesById.get(activityId);
+        const activity = workState.activitiesById.get(activityId);
         if (!activity) return;
 
         const category = String(activity?.activity_category || "").toLowerCase();
@@ -384,7 +384,7 @@ function renderTaskLinks() {
     if (!taskLinkGrid) return;
 
     const grouped = new Map();
-    state.records.forEach((record) => {
+    workState.records.forEach((record) => {
         const key = record.topicKey;
         if (!grouped.has(key)) {
             grouped.set(key, {
@@ -408,7 +408,7 @@ function renderTaskLinks() {
     }
 
     taskLinkGrid.innerHTML = entries.map((item) => {
-        const href = `teacher-student-work.html?task=${encodeURIComponent(item.taskTopic)}`;
+        const href = `teacher-student-work-task.html?task=${encodeURIComponent(item.taskTopic)}`;
         return `
             <article class="task-link-card">
                 <h3>${escapeHtml(item.taskTopic)}</h3>
@@ -426,7 +426,7 @@ function renderTaskLinks() {
 function renderSelectedTaskPage() {
     if (!tableHost || !trackerTitle || !trackerSummary) return;
 
-    const selectedKey = normalizeTaskTopicText(state.selectedTask).toLowerCase();
+    const selectedKey = normalizeTaskTopicText(workState.selectedTask).toLowerCase();
     if (!selectedKey) {
         trackerTitle.textContent = "Select a task item page";
         trackerSummary.innerHTML = "";
@@ -434,7 +434,7 @@ function renderSelectedTaskPage() {
         return;
     }
 
-    const rows = state.records
+    const rows = workState.records
         .filter((record) => record.topicKey === selectedKey)
         .sort((left, right) => {
             if (left.activityName !== right.activityName) {
@@ -443,7 +443,7 @@ function renderSelectedTaskPage() {
             return left.studentEmail.localeCompare(right.studentEmail);
         });
 
-    trackerTitle.textContent = `${state.selectedTask} - Student Evidence`;
+    trackerTitle.textContent = `${workState.selectedTask} - Student Evidence`;
 
     if (!rows.length) {
         trackerSummary.innerHTML = "";
@@ -507,7 +507,7 @@ function renderSelectedTaskPage() {
 
 function readSelectedTaskFromUrl() {
     const params = new URLSearchParams(window.location.search || "");
-    state.selectedTask = String(params.get("task") || "").trim();
+    workState.selectedTask = String(params.get("task") || "").trim();
 }
 
 async function init() {
@@ -524,9 +524,9 @@ async function init() {
 
         const activityRows = Array.isArray(activities) ? activities : [];
         const interestRows = Array.isArray(interests) ? interests : [];
-        state.activitiesById = new Map(activityRows.map((row) => [String(row?.id || "").trim(), row]));
-        state.interestRows = interestRows;
-        state.records = buildAllRecords();
+        workState.activitiesById = new Map(activityRows.map((row) => [String(row?.id || "").trim(), row]));
+        workState.interestRows = interestRows;
+        workState.records = buildAllRecords();
         readSelectedTaskFromUrl();
 
         renderTaskLinks();
