@@ -1193,6 +1193,34 @@ function getFirstTrelloCardUrlFromEvidenceRows(evidenceRows) {
     return "";
 }
 
+function getFirstOneDriveFolderUrlFromEvidenceRows(evidenceRows) {
+    const rows = normalizeEvidenceSteps(evidenceRows);
+    for (const row of rows) {
+        const steps = Array.isArray(row?.steps) ? row.steps : [];
+        for (const step of steps) {
+            const text = String(step?.text || "").trim();
+            if (text.startsWith("ONEDRIVE_PROJECT_FOLDER_URL|")) {
+                const url = toSafeExternalUrl(text.slice("ONEDRIVE_PROJECT_FOLDER_URL|".length).trim());
+                if (url) return url;
+            }
+
+            if (text.startsWith("MEDIA_ASSET_FOLDER_URL|")) {
+                const url = toSafeExternalUrl(text.slice("MEDIA_ASSET_FOLDER_URL|".length).trim());
+                if (url) return url;
+            }
+
+            if (text.startsWith("LINK|")) {
+                const url = toSafeExternalUrl(text.slice("LINK|".length).trim());
+                if (url && /(onedrive\.live\.com|1drv\.ms|sharepoint\.com)/i.test(url)) {
+                    return url;
+                }
+            }
+        }
+    }
+
+    return "";
+}
+
 async function persistStudentTrelloLink(projectId, studentEmail, trelloCardUrl) {
     const safeUrl = toSafeTrelloCardUrl(trelloCardUrl);
     if (!safeUrl) {
@@ -1209,6 +1237,27 @@ async function persistStudentTrelloLink(projectId, studentEmail, trelloCardUrl) 
         const payload = await response.json().catch(() => ({}));
         throw new Error(payload?.error || "Could not save Trello link.");
     }
+}
+
+async function persistStudentOneDriveFolderLink(projectId, studentEmail, detailData, taskTopicTitle, oneDriveFolderUrl) {
+    const safeUrl = toSafeExternalUrl(oneDriveFolderUrl);
+    if (!safeUrl) {
+        throw new Error("Enter a valid OneDrive or SharePoint folder link first.");
+    }
+
+    const safeTaskTopic = String(taskTopicTitle || "").trim();
+    if (!safeTaskTopic) {
+        throw new Error("Open a task-topic page before saving OneDrive link.");
+    }
+
+    const standardNumber = extractPrimaryStandardNumberFromRows(coerceArray(detailData?.standardDetails));
+    const standardKey = buildTaskTopicSubmissionStandardKey(safeTaskTopic, standardNumber);
+
+    const evidenceRows = await fetchEvidenceRows(projectId, studentEmail);
+    const nextRows = upsertTaskTopicSubmissionEvidenceRows(evidenceRows, standardKey, {
+        mediaAssetFolderUrl: safeUrl
+    });
+    await saveEvidenceRows(projectId, studentEmail, nextRows);
 }
 
 function getReviewStatusLabel(value) {
@@ -3976,6 +4025,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                             <h3>${escapeHtml(topicGuideTaskHeading)}</h3>
                             <ul class="list task-topic-guide-list">${renderList(topicGuideTaskItems)}</ul>
                         </section>
+
+                        ${isProjectManagementTopic ? `<div id="task-topic-trello-sync-slot"></div>` : ""}
                     </section>
 
                     ${showGithubGuide ? `
@@ -4014,6 +4065,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                             <h3>OneDrive Tasks</h3>
                             <ul class="list task-topic-guide-list">${renderList(oneDriveGuideTaskItems)}</ul>
                         </section>
+
+                        <div id="task-topic-onedrive-sync-slot"></div>
                     </section>
                     ` : ""}
 
@@ -5165,34 +5218,6 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         const btnClass = interestData.my_interest ? "detail-action interest-btn is-interested" : "detail-action interest-btn";
         const btnText = interestData.my_interest ? "\u2713 I'm Interested" : "I'm Interested";
         html += `<button type="button" class="${btnClass}" id="interest-toggle-btn">${btnText}</button>`;
-
-        if (isProjectManagementTaskTopicPage) {
-            const myAllocation = interestData?.my_allocation || null;
-            const assignedStandards = getEffectiveAssignedStandards(myAllocation, detailData);
-            const completionPercent = getEvidenceCompletionPercentFromRows(myAllocation?.evidence_steps, assignedStandards);
-            const sharedTrelloCardLink = getFirstTrelloCardUrlFromEvidenceRows(myAllocation?.evidence_steps);
-            const localTrelloCardLink = readStoredTrelloCardLink(projectId, email);
-            const savedCardLink = escapeHtml(sharedTrelloCardLink || localTrelloCardLink);
-            const trelloBoardHint = getTrelloBoardHint(sharedTrelloCardLink || localTrelloCardLink);
-
-            html += `
-                <div class="trello-sync-panel" id="trello-sync-panel">
-                    <h3>Trello Sync</h3>
-                    <p>Open your Trello card quickly or send this work update to Trello.</p>
-                    <label for="trello-card-url" class="trello-sync-label">Trello card or board link</label>
-                    <input id="trello-card-url" class="trello-sync-input" type="url" placeholder="https://trello.com/c/xxxx1234 or /b/xxxx/board-name" value="${savedCardLink}">
-                    ${trelloBoardHint ? `<p class="task-topic-submission-note">Expected shared board: <strong>${escapeHtml(trelloBoardHint)}</strong></p>` : ""}
-                    <label for="trello-work-note" class="trello-sync-label">Work note</label>
-                    <textarea id="trello-work-note" class="trello-sync-input trello-sync-note" placeholder="What did you complete today?"></textarea>
-                    <div class="trello-sync-actions">
-                        <button type="button" class="detail-action detail-action-secondary" id="trello-save-link-btn">Save Trello Link</button>
-                        <button type="button" class="detail-action detail-action-secondary" id="trello-open-card-btn">Open Trello Card</button>
-                        <button type="button" class="detail-action" id="trello-send-log-btn">Send Log to Trello (${completionPercent}%)</button>
-                    </div>
-                    <p class="trello-sync-status" id="trello-sync-status" aria-live="polite"></p>
-                </div>
-            `;
-        }
     }
 
     // Teachers see the full list of interested students
@@ -5263,6 +5288,58 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
 
     section.innerHTML = html;
     host.appendChild(section);
+
+    const taskTopicValue = String(selectedTaskTopic || "").trim();
+    if (email && !isTeacher && isTaskTopicPage) {
+        const myAllocation = interestData?.my_allocation || null;
+        const assignedStandards = getEffectiveAssignedStandards(myAllocation, detailData);
+        const completionPercent = getEvidenceCompletionPercentFromRows(myAllocation?.evidence_steps, assignedStandards);
+
+        if (isProjectManagementTaskTopicPage) {
+            const sharedTrelloCardLink = getFirstTrelloCardUrlFromEvidenceRows(myAllocation?.evidence_steps);
+            const localTrelloCardLink = readStoredTrelloCardLink(projectId, email);
+            const savedCardLink = escapeHtml(sharedTrelloCardLink || localTrelloCardLink);
+            const trelloBoardHint = getTrelloBoardHint(sharedTrelloCardLink || localTrelloCardLink);
+            const trelloSlot = host.querySelector("#task-topic-trello-sync-slot");
+            if (trelloSlot) {
+                trelloSlot.innerHTML = `
+                    <div class="trello-sync-panel" id="trello-sync-panel">
+                        <h3>Trello Sync</h3>
+                        <p>Open your Trello card quickly or send this work update to Trello.</p>
+                        <label for="trello-card-url" class="trello-sync-label">Trello card or board link</label>
+                        <input id="trello-card-url" class="trello-sync-input" type="url" placeholder="https://trello.com/c/xxxx1234 or /b/xxxx/board-name" value="${savedCardLink}">
+                        ${trelloBoardHint ? `<p class="task-topic-submission-note">Expected shared board: <strong>${escapeHtml(trelloBoardHint)}</strong></p>` : ""}
+                        <label for="trello-work-note" class="trello-sync-label">Work note</label>
+                        <textarea id="trello-work-note" class="trello-sync-input trello-sync-note" placeholder="What did you complete today?"></textarea>
+                        <div class="trello-sync-actions">
+                            <button type="button" class="detail-action detail-action-secondary" id="trello-save-link-btn">Save Trello Link</button>
+                            <button type="button" class="detail-action detail-action-secondary" id="trello-open-card-btn">Open Trello Card</button>
+                            <button type="button" class="detail-action" id="trello-send-log-btn">Send Log to Trello (${completionPercent}%)</button>
+                        </div>
+                        <p class="trello-sync-status" id="trello-sync-status" aria-live="polite"></p>
+                    </div>
+                `;
+            }
+        }
+
+        const oneDriveSlot = host.querySelector("#task-topic-onedrive-sync-slot");
+        if (oneDriveSlot) {
+            const savedOneDriveLink = getFirstOneDriveFolderUrlFromEvidenceRows(myAllocation?.evidence_steps);
+            oneDriveSlot.innerHTML = `
+                <div class="trello-sync-panel" id="onedrive-sync-panel">
+                    <h3>Microsoft OneDrive Sync</h3>
+                    <p>Save your OneDrive project folder link so your teacher can verify files and version history.</p>
+                    <label for="onedrive-folder-url" class="trello-sync-label">OneDrive project folder link</label>
+                    <input id="onedrive-folder-url" class="trello-sync-input" type="url" placeholder="https://onedrive.live.com/... or school SharePoint folder" value="${escapeHtml(savedOneDriveLink)}">
+                    <div class="trello-sync-actions">
+                        <button type="button" class="detail-action detail-action-secondary" id="onedrive-save-link-btn">Save OneDrive Link</button>
+                        <button type="button" class="detail-action detail-action-secondary" id="onedrive-open-folder-btn">Open OneDrive Folder</button>
+                    </div>
+                    <p class="trello-sync-status" id="onedrive-sync-status" aria-live="polite"></p>
+                </div>
+            `;
+        }
+    }
 
     await renderTaskTopicSubmissionPanel({
         host,
@@ -5392,11 +5469,21 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     const trelloOpenCardBtn = section.querySelector("#trello-open-card-btn");
     const trelloSendLogBtn = section.querySelector("#trello-send-log-btn");
     const trelloStatus = section.querySelector("#trello-sync-status");
+    const oneDriveFolderInput = section.querySelector("#onedrive-folder-url");
+    const oneDriveSaveLinkBtn = section.querySelector("#onedrive-save-link-btn");
+    const oneDriveOpenFolderBtn = section.querySelector("#onedrive-open-folder-btn");
+    const oneDriveStatus = section.querySelector("#onedrive-sync-status");
 
     const setTrelloStatus = (message, isError = false) => {
         if (!trelloStatus) return;
         trelloStatus.textContent = String(message || "");
         trelloStatus.classList.toggle("is-error", Boolean(isError));
+    };
+
+    const setOneDriveStatus = (message, isError = false) => {
+        if (!oneDriveStatus) return;
+        oneDriveStatus.textContent = String(message || "");
+        oneDriveStatus.classList.toggle("is-error", Boolean(isError));
     };
 
     const backendTrelloCardLink = getFirstTrelloCardUrlFromEvidenceRows(interestData?.my_allocation?.evidence_steps);
@@ -5525,6 +5612,65 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         } finally {
             if (trelloSendLogBtn && trelloSendLogBtn.isConnected) trelloSendLogBtn.disabled = false;
         }
+    });
+
+    const readOneDriveFolderUrl = () => {
+        const safe = toSafeExternalUrl(oneDriveFolderInput?.value || "");
+        if (oneDriveFolderInput && safe && oneDriveFolderInput.value !== safe) {
+            oneDriveFolderInput.value = safe;
+        }
+        return safe;
+    };
+
+    oneDriveFolderInput?.addEventListener("change", () => {
+        const raw = String(oneDriveFolderInput.value || "").trim();
+        if (!raw) {
+            setOneDriveStatus("");
+            return;
+        }
+
+        const safe = toSafeExternalUrl(raw);
+        if (!safe) {
+            setOneDriveStatus("Enter a valid OneDrive or SharePoint folder link.", true);
+            return;
+        }
+
+        if (!/(onedrive\.live\.com|1drv\.ms|sharepoint\.com)/i.test(safe)) {
+            setOneDriveStatus("Use a OneDrive or SharePoint folder URL so teacher access works.", true);
+            return;
+        }
+
+        setOneDriveStatus("Link looks valid. Click Save OneDrive Link.");
+    });
+
+    oneDriveSaveLinkBtn?.addEventListener("click", async () => {
+        const folderUrl = readOneDriveFolderUrl();
+        if (!folderUrl) {
+            setOneDriveStatus("Enter a valid OneDrive or SharePoint folder link first.", true);
+            return;
+        }
+
+        if (oneDriveSaveLinkBtn) oneDriveSaveLinkBtn.disabled = true;
+        setOneDriveStatus("Saving OneDrive link...");
+        try {
+            await persistStudentOneDriveFolderLink(projectId, email, detailData, taskTopicValue, folderUrl);
+            setOneDriveStatus("OneDrive link saved and shared with teacher view.");
+        } catch (error) {
+            setOneDriveStatus(error.message || "Could not save OneDrive link right now.", true);
+        } finally {
+            if (oneDriveSaveLinkBtn && oneDriveSaveLinkBtn.isConnected) oneDriveSaveLinkBtn.disabled = false;
+        }
+    });
+
+    oneDriveOpenFolderBtn?.addEventListener("click", () => {
+        const folderUrl = readOneDriveFolderUrl();
+        if (!folderUrl) {
+            setOneDriveStatus("Enter a valid OneDrive or SharePoint folder link first.", true);
+            return;
+        }
+
+        window.open(folderUrl, "_blank", "noopener,noreferrer");
+        setOneDriveStatus("Opened OneDrive folder.");
     });
 
     // Toggle interest button handler
