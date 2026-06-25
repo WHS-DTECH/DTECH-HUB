@@ -176,6 +176,29 @@ function extractPrimaryStandardNumber(activity) {
     return "task-topic";
 }
 
+function extractStandardNumbers(activity) {
+    const rows = toArray(activity?.standard_details || activity?.standardDetails || activity?.assessment_focus || activity?.assessmentFocus);
+    const seen = new Set();
+    const output = [];
+
+    rows.forEach((row) => {
+        const matches = String(row || "").match(/\b\d{4,6}\b/g) || [];
+        matches.forEach((match) => {
+            const key = String(match || "").trim();
+            if (!key || seen.has(key)) return;
+            seen.add(key);
+            output.push(key);
+        });
+    });
+
+    const primary = extractPrimaryStandardNumber(activity);
+    if (primary && !seen.has(primary)) {
+        output.unshift(primary);
+    }
+
+    return output;
+}
+
 function normalizeTaskTopicText(value) {
     return String(value || "")
         .replace(/[\u2022\u25CF\u25E6\u25AA\u2023\u2043\u00B7\u2219]/g, " ")
@@ -296,6 +319,61 @@ function parseTaskTopicEvidence(evidenceRows, standardKey) {
     return result;
 }
 
+function hasTaskTopicEvidence(result) {
+    if (!result || typeof result !== "object") return false;
+    return Boolean(
+        result.googleSlidesUrl ||
+        result.submitted ||
+        result.submittedAt ||
+        (Array.isArray(result.links) && result.links.length)
+    );
+}
+
+function parseTaskTopicEvidenceForActivity(evidenceRows, taskTopic, standardNumbers) {
+    const standards = Array.isArray(standardNumbers) ? standardNumbers : [];
+    const candidateKeys = [];
+
+    standards.forEach((standardNumber) => {
+        const key = buildTaskTopicSubmissionStandardKey(taskTopic, standardNumber);
+        if (key && !candidateKeys.includes(key)) {
+            candidateKeys.push(key);
+        }
+    });
+
+    const fallbackKey = buildTaskTopicSubmissionStandardKey(taskTopic, "");
+    if (fallbackKey && !candidateKeys.includes(fallbackKey)) {
+        candidateKeys.push(fallbackKey);
+    }
+
+    for (const standardKey of candidateKeys) {
+        const parsed = parseTaskTopicEvidence(evidenceRows, standardKey);
+        if (hasTaskTopicEvidence(parsed)) {
+            return { evidence: parsed, matchedStandardKey: standardKey };
+        }
+    }
+
+    const topicSlug = normalizeTaskTopicText(taskTopic)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+    const rows = Array.isArray(evidenceRows) ? evidenceRows : [];
+    const wildcardRow = rows.find((row) => {
+        const standard = String(row?.standard || "").trim().toLowerCase();
+        return standard.startsWith("task-topic:") && standard.endsWith(`:${topicSlug}`);
+    });
+
+    if (wildcardRow) {
+        const wildcardKey = String(wildcardRow.standard || "").trim();
+        const parsed = parseTaskTopicEvidence(evidenceRows, wildcardKey);
+        return { evidence: parsed, matchedStandardKey: wildcardKey };
+    }
+
+    return {
+        evidence: parseTaskTopicEvidence(evidenceRows, candidateKeys[0] || fallbackKey || ""),
+        matchedStandardKey: candidateKeys[0] || fallbackKey || ""
+    };
+}
+
 function formatSubmissionTimestamp(value) {
     const raw = String(value || "").trim();
     if (!raw) return "-";
@@ -365,7 +443,7 @@ function buildAllRecords() {
 
         if (!uniqueTopics.length) return;
 
-        const standardNumber = extractPrimaryStandardNumber(activity);
+        const standardNumbers = extractStandardNumbers(activity);
         const students = Array.isArray(interest?.students) ? interest.students : [];
 
         students.forEach((student) => {
@@ -375,8 +453,8 @@ function buildAllRecords() {
             const evidenceRows = Array.isArray(student?.evidence_steps) ? student.evidence_steps : [];
             uniqueTopics.forEach((taskTopic) => {
                 const topicKey = normalizeTaskTopicText(taskTopic).toLowerCase();
-                const standardKey = buildTaskTopicSubmissionStandardKey(taskTopic, standardNumber);
-                const evidence = parseTaskTopicEvidence(evidenceRows, standardKey);
+                const resolved = parseTaskTopicEvidenceForActivity(evidenceRows, taskTopic, standardNumbers);
+                const evidence = resolved.evidence;
 
                 records.push({
                     taskTopic,
@@ -384,7 +462,7 @@ function buildAllRecords() {
                     activityId,
                     activityName: String(activity?.name || "Assessment Task").trim(),
                     studentEmail,
-                    standardKey,
+                    standardKey: String(resolved.matchedStandardKey || "").trim(),
                     googleSlidesUrl: evidence.googleSlidesUrl,
                     links: evidence.links,
                     submitted: Boolean(evidence.submitted),
@@ -549,8 +627,24 @@ function renderSelectedTaskPage() {
 
     const slidesLinked = rows.filter((row) => Boolean(row.googleSlidesUrl)).length;
     const submittedCount = rows.filter((row) => Boolean(row.submitted)).length;
+    const studentGroups = new Map();
+    rows.forEach((row) => {
+        const key = row.studentEmail;
+        if (!studentGroups.has(key)) {
+            studentGroups.set(key, []);
+        }
+        studentGroups.get(key).push(row);
+    });
+
+    const students = Array.from(studentGroups.entries())
+        .map(([studentEmail, entries]) => ({
+            studentEmail,
+            entries: entries.slice().sort((left, right) => left.activityName.localeCompare(right.activityName))
+        }))
+        .sort((left, right) => left.studentEmail.localeCompare(right.studentEmail));
 
     trackerSummary.innerHTML = `
+        <span>Total students: ${students.length}</span>
         <span>Total records: ${rows.length}</span>
         <span>Google Slides linked: ${slidesLinked}</span>
         <span>Submitted: ${submittedCount}</span>
@@ -562,36 +656,56 @@ function renderSelectedTaskPage() {
                 <thead>
                     <tr>
                         <th>Student</th>
-                        <th>Assessment Task</th>
+                        <th>Assessment Tasks</th>
                         <th>Google Slides</th>
                         <th>Submitted</th>
                         <th>Other Links</th>
-                        <th>Open Task Item</th>
+                        <th>Open Task Items</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${rows.map((row) => {
-                        const slidesCell = row.googleSlidesUrl
-                            ? `<a href="${escapeHtml(row.googleSlidesUrl)}" target="_blank" rel="noreferrer">Open Slides</a> <span class="slides-pill is-linked">Linked</span>`
+                    ${students.map((student) => {
+                        const slidesEntries = student.entries.filter((entry) => Boolean(entry.googleSlidesUrl));
+                        const submittedEntries = student.entries.filter((entry) => Boolean(entry.submitted));
+
+                        const slidesCell = slidesEntries.length
+                            ? `<div class="work-link-list">${slidesEntries.map((entry) => `<a href="${escapeHtml(entry.googleSlidesUrl)}" target="_blank" rel="noreferrer">${escapeHtml(entry.activityName)} Slides</a>`).join("")}</div> <span class="slides-pill is-linked">${slidesEntries.length} linked</span>`
                             : `<span class="slides-pill is-missing">Missing</span>`;
 
-                        const submittedCell = row.submitted
-                            ? `<span class="submitted-pill">Yes - ${escapeHtml(formatSubmissionTimestamp(row.submittedAt))}</span>`
+                        const submittedCell = submittedEntries.length
+                            ? `<span class="submitted-pill">${submittedEntries.length}/${student.entries.length} submitted</span>`
                             : `<span class="submitted-pill">No</span>`;
 
-                        const otherLinks = row.links.filter((link) => link.url !== row.googleSlidesUrl);
-                        const linksCell = otherLinks.length
-                            ? `<div class="work-link-list">${otherLinks.map((link) => `<a href="${escapeHtml(link.url)}" target="_blank" rel="noreferrer">${escapeHtml(link.label)}</a>`).join("")}</div>`
+                        const uniqueOtherLinks = [];
+                        const seenOtherLink = new Set();
+                        student.entries.forEach((entry) => {
+                            (Array.isArray(entry.links) ? entry.links : []).forEach((link) => {
+                                const url = String(link?.url || "").trim();
+                                if (!url || url === entry.googleSlidesUrl || seenOtherLink.has(url)) return;
+                                seenOtherLink.add(url);
+                                uniqueOtherLinks.push({
+                                    label: `${entry.activityName} ${String(link?.label || "Link").trim()}`,
+                                    url
+                                });
+                            });
+                        });
+
+                        const linksCell = uniqueOtherLinks.length
+                            ? `<div class="work-link-list">${uniqueOtherLinks.map((link) => `<a href="${escapeHtml(link.url)}" target="_blank" rel="noreferrer">${escapeHtml(link.label)}</a>`).join("")}</div>`
                             : "-";
+
+                        const taskLinksCell = `<div class="work-link-list">${student.entries.map((entry) => `<a href="${escapeHtml(entry.taskUrl)}" target="_blank" rel="noreferrer">${escapeHtml(entry.activityName)}</a>`).join("")}</div>`;
+
+                        const assessmentsCell = `<div class="work-link-list">${student.entries.map((entry) => `<span>${escapeHtml(entry.activityName)}</span>`).join("")}</div>`;
 
                         return `
                             <tr>
-                                <td>${escapeHtml(row.studentEmail)}</td>
-                                <td>${escapeHtml(row.activityName)}</td>
+                                <td>${escapeHtml(student.studentEmail)}</td>
+                                <td>${assessmentsCell}</td>
                                 <td>${slidesCell}</td>
                                 <td>${submittedCell}</td>
                                 <td>${linksCell}</td>
-                                <td><a href="${escapeHtml(row.taskUrl)}" target="_blank" rel="noreferrer">Open</a></td>
+                                <td>${taskLinksCell}</td>
                             </tr>
                         `;
                     }).join("")}
@@ -621,15 +735,30 @@ async function init() {
         if (!accessOk) return;
 
         setStatus("Loading assessment tasks and student evidence...");
-        const [activities, interests] = await Promise.all([
-            fetchJson("/api/activities", { headers: withAuthHeaders() }),
-            fetchJson("/api/project-interests", { headers: withAuthHeaders() })
-        ]);
+        const activities = await fetchJson("/api/activities", { headers: withAuthHeaders() });
 
         const activityRows = Array.isArray(activities) ? activities : [];
-        const interestRows = Array.isArray(interests) ? interests : [];
+        const assessmentActivities = activityRows.filter((activity) => String(activity?.activity_category || activity?.category || "").toLowerCase().includes("assessment"));
+        const interestRows = await Promise.all(
+            assessmentActivities.map(async (activity) => {
+                const projectId = String(activity?.id || "").trim();
+                if (!projectId) return null;
+                try {
+                    const response = await fetchJson(`/api/activities/${encodeURIComponent(projectId)}/interests`, { headers: withAuthHeaders() });
+                    return {
+                        project_id: projectId,
+                        students: Array.isArray(response?.students) ? response.students : []
+                    };
+                } catch (_error) {
+                    return {
+                        project_id: projectId,
+                        students: []
+                    };
+                }
+            })
+        );
         workState.activitiesById = new Map(activityRows.map((row) => [String(row?.id || "").trim(), row]));
-        workState.interestRows = interestRows;
+        workState.interestRows = interestRows.filter(Boolean);
         workState.records = buildAllRecords();
         readSelectedTaskFromUrl();
 
