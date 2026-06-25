@@ -105,7 +105,7 @@
       border-collapse: collapse;
       font-size: 0.82rem;
       min-width: 0;
-      table-layout: fixed;
+      table-layout: auto;
     }
 
     .work-table th {
@@ -120,11 +120,6 @@
       padding: 8px 10px;
       border-bottom: 1px solid #dbe5f1;
       vertical-align: middle;
-      word-break: break-word;
-    }
-
-    .work-table th {
-      word-break: break-word;
     }
 
     .work-table tr:last-child td {
@@ -188,6 +183,12 @@
       background: #edf4fc;
       padding: 2px 8px;
       font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .work-table td:first-child,
+    .work-table th:first-child {
+      white-space: nowrap;
     }
   </style>
 </head>

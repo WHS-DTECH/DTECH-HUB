@@ -10,6 +10,7 @@ const workState = {
     email: "",
     activitiesById: new Map(),
     interestRows: [],
+    studentNameByEmail: new Map(),
     records: [],
     selectedTask: ""
 };
@@ -46,6 +47,47 @@ function escapeHtml(value) {
 
 function normalizeEmail(value) {
     return String(value || "").trim().toLowerCase();
+}
+
+function formatNameFromEmail(email) {
+    const localPart = String(email || "").trim().toLowerCase().split("@")[0] || "";
+    const parts = localPart
+        .split(/[^a-z0-9]+/)
+        .map((part) => part.trim())
+        .filter(Boolean);
+
+    if (!parts.length) {
+        return String(email || "").trim();
+    }
+
+    return parts
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ");
+}
+
+function buildStudentNameMap(students) {
+    const map = new Map();
+    const rows = Array.isArray(students) ? students : [];
+
+    rows.forEach((student) => {
+        const studentName = String(student?.student_name || student?.full_name || student?.name || "").trim();
+        const linkedEmails = Array.isArray(student?.linked_emails) ? student.linked_emails : [];
+
+        linkedEmails
+            .map((email) => normalizeEmail(email))
+            .filter(Boolean)
+            .forEach((email) => {
+                if (studentName) {
+                    map.set(email, studentName);
+                    return;
+                }
+                if (!map.has(email)) {
+                    map.set(email, formatNameFromEmail(email));
+                }
+            });
+    });
+
+    return map;
 }
 
 function readStoredAuthRaw() {
@@ -462,6 +504,7 @@ function buildAllRecords() {
                     activityId,
                     activityName: String(activity?.name || "Assessment Task").trim(),
                     studentEmail,
+                    studentName: String(workState.studentNameByEmail.get(studentEmail) || formatNameFromEmail(studentEmail) || studentEmail).trim(),
                     standardKey: String(resolved.matchedStandardKey || "").trim(),
                     googleSlidesUrl: evidence.googleSlidesUrl,
                     links: evidence.links,
@@ -639,9 +682,10 @@ function renderSelectedTaskPage() {
     const students = Array.from(studentGroups.entries())
         .map(([studentEmail, entries]) => ({
             studentEmail,
+            studentName: String(entries[0]?.studentName || workState.studentNameByEmail.get(studentEmail) || formatNameFromEmail(studentEmail) || studentEmail).trim(),
             entries: entries.slice().sort((left, right) => left.activityName.localeCompare(right.activityName))
         }))
-        .sort((left, right) => left.studentEmail.localeCompare(right.studentEmail));
+        .sort((left, right) => left.studentName.localeCompare(right.studentName));
 
     trackerSummary.innerHTML = `
         <span>Total students: ${students.length}</span>
@@ -700,7 +744,7 @@ function renderSelectedTaskPage() {
 
                         return `
                             <tr>
-                                <td>${escapeHtml(student.studentEmail)}</td>
+                                <td>${escapeHtml(student.studentName)}</td>
                                 <td>${assessmentsCell}</td>
                                 <td>${slidesCell}</td>
                                 <td>${submittedCell}</td>
@@ -736,8 +780,10 @@ async function init() {
 
         setStatus("Loading assessment tasks and student evidence...");
         const activities = await fetchJson("/api/activities", { headers: withAuthHeaders() });
+        const classManagementPayload = await fetchJson("/api/class-management/students?current_only=false&dtech_only=false", { headers: withAuthHeaders() }).catch(() => ({}));
 
         const activityRows = Array.isArray(activities) ? activities : [];
+        workState.studentNameByEmail = buildStudentNameMap(classManagementPayload?.students);
         const assessmentActivities = activityRows.filter((activity) => String(activity?.activity_category || activity?.category || "").toLowerCase().includes("assessment"));
         const interestRows = await Promise.all(
             assessmentActivities.map(async (activity) => {
