@@ -13,6 +13,15 @@ const taskLinkGrid = document.querySelector("#task-link-grid");
 const trackerTitle = document.querySelector("#tracker-title");
 const trackerSummary = document.querySelector("#tracker-summary");
 const tableHost = document.querySelector("#work-table-host");
+const taskPageNav = document.querySelector("#task-page-nav");
+const taskPrevButton = document.querySelector("#task-prev-button");
+const taskNextButton = document.querySelector("#task-next-button");
+const taskCurrentLabel = document.querySelector("#task-current-label");
+
+function isTaskDetailPage() {
+    const path = String(window.location.pathname || "").toLowerCase();
+    return path.endsWith("/teacher-student-work-task.html");
+}
 
 function setStatus(message, isError = false) {
     if (!statusHost) return;
@@ -380,6 +389,82 @@ function buildAllRecords() {
     return records;
 }
 
+function getOrderedTaskTopics() {
+    const seen = new Set();
+    const topics = [];
+
+    workState.records.forEach((record) => {
+        const key = String(record?.topicKey || "").trim().toLowerCase();
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        topics.push(String(record?.taskTopic || "").trim());
+    });
+
+    return topics.sort((a, b) => a.localeCompare(b));
+}
+
+function findCanonicalTaskTopic(topic) {
+    const selectedKey = normalizeTaskTopicText(topic).toLowerCase();
+    if (!selectedKey) return "";
+
+    const topics = getOrderedTaskTopics();
+    const match = topics.find((item) => normalizeTaskTopicText(item).toLowerCase() === selectedKey);
+    return match || "";
+}
+
+function updateTaskQueryParam(taskTopic) {
+    const safeTask = String(taskTopic || "").trim();
+    if (!safeTask) return;
+
+    const url = new URL(window.location.href);
+    url.searchParams.set("task", safeTask);
+    window.history.replaceState({}, "", url.toString());
+}
+
+function navigateTaskByDelta(delta) {
+    const offset = Number(delta || 0);
+    if (!offset) return;
+
+    const topics = getOrderedTaskTopics();
+    if (!topics.length) return;
+
+    const selectedKey = normalizeTaskTopicText(workState.selectedTask).toLowerCase();
+    const index = topics.findIndex((topic) => normalizeTaskTopicText(topic).toLowerCase() === selectedKey);
+    if (index < 0) return;
+
+    const nextIndex = index + offset;
+    if (nextIndex < 0 || nextIndex >= topics.length) return;
+
+    workState.selectedTask = topics[nextIndex];
+    updateTaskQueryParam(workState.selectedTask);
+    renderSelectedTaskPage();
+}
+
+function renderTaskPageNavigation() {
+    if (!isTaskDetailPage() || !taskPageNav || !taskPrevButton || !taskNextButton || !taskCurrentLabel) {
+        return;
+    }
+
+    const topics = getOrderedTaskTopics();
+    if (!topics.length) {
+        taskPageNav.hidden = true;
+        return;
+    }
+
+    const selectedKey = normalizeTaskTopicText(workState.selectedTask).toLowerCase();
+    const index = topics.findIndex((topic) => normalizeTaskTopicText(topic).toLowerCase() === selectedKey);
+
+    if (index < 0) {
+        taskPageNav.hidden = true;
+        return;
+    }
+
+    taskPageNav.hidden = false;
+    taskCurrentLabel.textContent = `Task ${index + 1} of ${topics.length}`;
+    taskPrevButton.disabled = index === 0;
+    taskNextButton.disabled = index === topics.length - 1;
+}
+
 function renderTaskLinks() {
     if (!taskLinkGrid) return;
 
@@ -431,6 +516,7 @@ function renderSelectedTaskPage() {
         trackerTitle.textContent = "Select a task item page";
         trackerSummary.innerHTML = "";
         tableHost.innerHTML = `<div class="work-empty">Choose a task item from the cards above to see student evidence in one place.</div>`;
+        renderTaskPageNavigation();
         return;
     }
 
@@ -448,6 +534,7 @@ function renderSelectedTaskPage() {
     if (!rows.length) {
         trackerSummary.innerHTML = "";
         tableHost.innerHTML = `<div class="work-empty">No student rows found for this task item yet.</div>`;
+        renderTaskPageNavigation();
         return;
     }
 
@@ -503,11 +590,19 @@ function renderSelectedTaskPage() {
             </table>
         </div>
     `;
+
+    renderTaskPageNavigation();
 }
 
 function readSelectedTaskFromUrl() {
     const params = new URLSearchParams(window.location.search || "");
     workState.selectedTask = String(params.get("task") || "").trim();
+}
+
+function wireTaskNavigationEvents() {
+    if (!taskPrevButton || !taskNextButton) return;
+    taskPrevButton.addEventListener("click", () => navigateTaskByDelta(-1));
+    taskNextButton.addEventListener("click", () => navigateTaskByDelta(1));
 }
 
 async function init() {
@@ -528,6 +623,20 @@ async function init() {
         workState.interestRows = interestRows;
         workState.records = buildAllRecords();
         readSelectedTaskFromUrl();
+
+        const canonicalSelectedTask = findCanonicalTaskTopic(workState.selectedTask);
+        if (canonicalSelectedTask) {
+            workState.selectedTask = canonicalSelectedTask;
+            updateTaskQueryParam(workState.selectedTask);
+        } else if (isTaskDetailPage()) {
+            const topics = getOrderedTaskTopics();
+            if (topics.length) {
+                workState.selectedTask = topics[0];
+                updateTaskQueryParam(workState.selectedTask);
+            }
+        }
+
+        wireTaskNavigationEvents();
 
         renderTaskLinks();
         renderSelectedTaskPage();
