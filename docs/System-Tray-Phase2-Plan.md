@@ -27,7 +27,7 @@ Current rollout uses Edge app-mode startup. This is good for fast launch, but it
 ## 3) Recommended Technical Approach
 Recommended stack:
 - .NET 8 WPF tray app (NotifyIcon)
-- Microsoft Edge WebView2 runtime for in-app window hosting of `https://dtech-hub2.onrender.com`
+- Microsoft Edge WebView2 runtime for in-app window hosting of `https://dtech-hub.onrender.com`
 
 Why this option:
 - Native Windows tray support is straightforward and reliable

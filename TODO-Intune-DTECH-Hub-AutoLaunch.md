@@ -6,8 +6,8 @@ Status: In progress with completed local pilot setup + auto-login prompt (update
 Owner: DTECH Team + System Administrator
 
 ## Completed So Far (June 2026)
-- [x] Production URL confirmed as `https://dtech-hub2.onrender.com`.
-- [x] Startup shortcut app-mode command confirmed: `msedge.exe --app=https://dtech-hub2.onrender.com`.
+- [x] Production URL confirmed as `https://dtech-hub.onrender.com`.
+- [x] Startup shortcut app-mode command confirmed: `msedge.exe --app=https://dtech-hub.onrender.com`.
 - [x] Intune user-context install script prepared: `intune/Install-DTECHHub-Autolaunch.ps1`.
 - [x] Intune rollback script prepared: `intune/Remove-DTECHHub-Autolaunch.ps1`.
 - [x] Local Non-Intune Pilot setup command executed on laptop.
@@ -49,7 +49,7 @@ Admin validation points:
 ## 3) App-Like Launch Window (Optional but Recommended)
 Use startup shortcut to run Edge app mode:
 - Command format:
-    msedge.exe --app=https://dtech-hub2.onrender.com
+    msedge.exe --app=https://dtech-hub.onrender.com
 
 - [x] Confirm if app-mode window is preferred over normal browser tab launch.
 - [ ] Confirm icon/branding requirements for shortcut name and icon.
@@ -69,7 +69,7 @@ Script requirements:
 Draft script (for SysAdmin review):
 
 ```powershell
-$hubUrl = "https://dtech-hub2.onrender.com"
+$hubUrl = "https://dtech-hub.onrender.com"
 $shortcutName = "DTECH Hub.lnk"
 $startupFolder = [Environment]::GetFolderPath("Startup")
 $shortcutPath = Join-Path $startupFolder $shortcutName
@@ -198,7 +198,7 @@ You can test this on a single laptop before Intune by manually creating the same
 2. [x] Create shortcut in startup folder:
      - Path: `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup`
      - Target: `msedge.exe`
-    - Arguments: `--app=https://dtech-hub2.onrender.com`
+    - Arguments: `--app=https://dtech-hub.onrender.com`
 3. [ ] Sign out/sign in and confirm behavior.
 4. Validate:
      - Single app window launch.
@@ -210,7 +210,7 @@ Local pilot execution log:
 - Executed: Startup shortcut creation command (user context)
 - Result: Shortcut created at `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\DTECH Hub.lnk`
 - Verified target: `C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe`
-- Verified arguments: `--app=https://dtech-hub2.onrender.com`
+- Verified arguments: `--app=https://dtech-hub.onrender.com`
 - Follow-up: Startup shortcut did not auto-run after sign-out/sign-in on this laptop.
 - Adjustment: Switched to single-method launch via HKCU Run entry (`DTECHHubAutoLaunch`) and marked as enabled in `StartupApproved\\Run`.
 - Task Scheduler fallback attempt: blocked by local permissions (`Access is denied`), so not used.
@@ -226,7 +226,7 @@ if (-not (Test-Path $edge)) { $edge = "${env:ProgramFiles}\Microsoft\Edge\Applic
 $wsh = New-Object -ComObject WScript.Shell
 $sc = $wsh.CreateShortcut($lnk)
 $sc.TargetPath = $edge
-$sc.Arguments = "--app=https://dtech-hub2.onrender.com"
+$sc.Arguments = "--app=https://dtech-hub.onrender.com"
 $sc.WorkingDirectory = Split-Path $edge
 $sc.Save()
 ```
