@@ -507,6 +507,21 @@ function buildWriteHeaders() {
     return buildAuthHeaders({ "Content-Type": "application/json" });
 }
 
+function formatApiDebugSuffix(error) {
+    const parts = [];
+    if (Number.isFinite(Number(error?.status)) && Number(error.status) > 0) {
+        parts.push(`status ${Number(error.status)}`);
+    }
+    if (error?.stage) {
+        parts.push(`stage ${String(error.stage)}`);
+    }
+    if (error?.endpoint) {
+        parts.push(String(error.endpoint));
+    }
+
+    return parts.length ? ` [debug: ${parts.join(" | ")}]` : "";
+}
+
 function getTrelloCardStorageKey(projectId, email) {
     return `${TRELLO_CARD_LINK_STORAGE_PREFIX}:${String(projectId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
 }
@@ -757,6 +772,7 @@ function getEvidenceCompletionPercentFromRows(rows, standards) {
 }
 
 async function fetchEvidenceRows(projectId, studentEmail) {
+    const endpoint = `/api/activities/${encodeURIComponent(projectId)}/interests/${encodeURIComponent(studentEmail)}/evidence`;
     const response = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interests/${encodeURIComponent(studentEmail)}/evidence`, {
         headers: buildWriteHeaders()
     });
@@ -765,6 +781,8 @@ async function fetchEvidenceRows(projectId, studentEmail) {
         const payload = await response.json().catch(() => ({}));
         const error = new Error(payload?.error || "Could not load evidence steps.");
         error.status = Number(response.status || 0);
+        error.endpoint = endpoint;
+        error.stage = "load-evidence";
         throw error;
     }
 
@@ -773,6 +791,7 @@ async function fetchEvidenceRows(projectId, studentEmail) {
 }
 
 async function saveEvidenceRows(projectId, studentEmail, rows) {
+    const endpoint = `/api/activities/${encodeURIComponent(projectId)}/interests/${encodeURIComponent(studentEmail)}/evidence`;
     const response = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interests/${encodeURIComponent(studentEmail)}/evidence`, {
         method: "PATCH",
         headers: buildWriteHeaders(),
@@ -781,7 +800,11 @@ async function saveEvidenceRows(projectId, studentEmail, rows) {
 
     if (!response.ok) {
         const payload = await response.json().catch(() => ({}));
-        throw new Error(payload?.error || "Could not save evidence steps.");
+        const error = new Error(payload?.error || "Could not save evidence steps.");
+        error.status = Number(response.status || 0);
+        error.endpoint = endpoint;
+        error.stage = "save-evidence";
+        throw error;
     }
 }
 
@@ -796,6 +819,7 @@ async function fetchEvidenceRowsEnsuringAllocation(projectId, studentEmail) {
     }
 
     const toggleInterest = async () => {
+        const endpoint = `/api/activities/${encodeURIComponent(projectId)}/interest`;
         const response = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interest`, {
             method: "POST",
             headers: buildWriteHeaders()
@@ -803,7 +827,11 @@ async function fetchEvidenceRowsEnsuringAllocation(projectId, studentEmail) {
 
         if (!response.ok) {
             const payload = await response.json().catch(() => ({}));
-            throw new Error(payload?.error || "Could not prepare student allocation.");
+            const error = new Error(payload?.error || "Could not prepare student allocation.");
+            error.status = Number(response.status || 0);
+            error.endpoint = endpoint;
+            error.stage = "ensure-allocation";
+            throw error;
         }
 
         return response.json().catch(() => ({}));
@@ -5816,7 +5844,8 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             await persistStudentOneDriveFolderLink(projectId, email, detailData, taskTopicValue, folderUrl);
             setOneDriveStatus("OneDrive link saved and shared with teacher view.");
         } catch (error) {
-            setOneDriveStatus(error.message || "Could not save OneDrive link right now.", true);
+            const fallback = "Could not save OneDrive link right now.";
+            setOneDriveStatus(`${error?.message || fallback}${formatApiDebugSuffix(error)}`, true);
         } finally {
             if (oneDriveSaveLinkBtn && oneDriveSaveLinkBtn.isConnected) oneDriveSaveLinkBtn.disabled = false;
         }
@@ -5875,7 +5904,8 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             await persistStudentGoogleDriveFolderLink(projectId, email, detailData, taskTopicValue, folderUrl);
             setGoogleDriveStatus("Google Drive link saved and shared with teacher view.");
         } catch (error) {
-            setGoogleDriveStatus(error.message || "Could not save Google Drive link right now.", true);
+            const fallback = "Could not save Google Drive link right now.";
+            setGoogleDriveStatus(`${error?.message || fallback}${formatApiDebugSuffix(error)}`, true);
         } finally {
             if (googleDriveSaveLinkBtn && googleDriveSaveLinkBtn.isConnected) googleDriveSaveLinkBtn.disabled = false;
         }
