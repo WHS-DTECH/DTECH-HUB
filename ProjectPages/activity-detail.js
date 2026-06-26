@@ -4138,6 +4138,21 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         "Keep the DTECH HUB OneDrive folder link updated for teacher access."
     ];
     const oneDriveGuideWarning = "Important: Downloads and Videos folders are not backed up to OneDrive. Save project files in your OneDrive Documents project folder.";
+    const googleDriveGuideTitle = "Version Control: Google Drive";
+    const googleDriveGuideSourceUrl = "https://workspace.google.com/products/drive/";
+    const googleDriveGuideInstructions = [
+        "Log in to Google Drive with your school account.",
+        "Create a project folder for this assessment and keep all source files in that folder.",
+        "Open the Share settings for the project folder.",
+        "Set sharing to Anyone with a link and copy the folder URL into DTECH HUB on this page."
+    ];
+    const googleDriveGuideTaskItems = [
+        "Create a folder path like My Drive/AssessmentName/ProjectName.",
+        "Use clear version file names such as v01, v02, v03.",
+        "Keep exports and working files in the same Google Drive project folder.",
+        "Recheck that folder sharing remains Anyone with a link so teachers can verify your evidence."
+    ];
+    const googleDriveGuideWarningHtml = "Important: Set sharing to <span class=\"task-topic-guide-alert-highlight\">Anyone with a link</span> so your teacher can open the folder evidence.";
     if (!submissionTaskItems.length) {
         submissionTaskItems.push("Upload evidence that clearly demonstrates completion of this task topic.");
     }
@@ -4342,6 +4357,24 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                         </section>
 
                         <div id="task-topic-onedrive-sync-slot"></div>
+                    </section>
+
+                    <section class="proposal-section task-topic-guide-panel">
+                        <p class="task-topic-guide-eyebrow">Topic Tasks</p>
+                        <h2>${escapeHtml(googleDriveGuideTitle)}</h2>
+                        <p class="task-topic-guide-intro">Use this guide if you are managing version control files in Google Drive.</p>
+                        <p class="task-topic-guide-source">Source: <a href="${escapeHtml(googleDriveGuideSourceUrl)}" target="_blank" rel="noreferrer">${escapeHtml(googleDriveGuideSourceUrl)}</a></p>
+                        <p class="task-topic-guide-alert">${googleDriveGuideWarningHtml}</p>
+
+                        <section class="task-topic-guide-block">
+                            <h3>Instructions</h3>
+                            <ul class="list task-topic-guide-list">${renderList(googleDriveGuideInstructions)}</ul>
+                        </section>
+
+                        <section class="task-topic-guide-block">
+                            <h3>Google Drive Tasks</h3>
+                            <ul class="list task-topic-guide-list">${renderList(googleDriveGuideTaskItems)}</ul>
+                        </section>
                     </section>
                     ` : ""}
 

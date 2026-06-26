@@ -493,6 +493,18 @@ h1 {
     padding: 8px 10px;
 }
 
+.task-topic-guide-alert-highlight {
+    display: inline-block;
+    margin: 0 2px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: #7a3e00;
+    color: #fff8ef;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
 .task-topic-submission-intro {
     margin: 0 0 8px;
     font-size: 0.83rem;
