@@ -507,6 +507,119 @@ function buildWriteHeaders() {
     return buildAuthHeaders({ "Content-Type": "application/json" });
 }
 
+function getActiveSyncContext() {
+    const params = new URLSearchParams(window.location.search || "");
+    const projectId = String(params.get("id") || "").trim();
+    const email = readStoredHubEmail();
+    const taskTopicValue = String(params.get("taskTopic") || "").trim();
+    const detailData = projectId ? (DETAIL_DATA?.[projectId] || null) : null;
+
+    return {
+        projectId,
+        email,
+        taskTopicValue,
+        detailData
+    };
+}
+
+function installCloudSyncDelegatedFallbackHandlers() {
+    if (window.__dtechCloudSyncFallbackBound) {
+        return;
+    }
+    window.__dtechCloudSyncFallbackBound = true;
+
+    const setStatus = (selector, message, isError = false) => {
+        const el = document.querySelector(selector);
+        if (!el) return;
+        el.textContent = String(message || "");
+        el.classList.toggle("is-error", Boolean(isError));
+    };
+
+    const readUrlValue = (selector) => toSafeExternalUrl(document.querySelector(selector)?.value || "");
+
+    document.addEventListener("click", async (event) => {
+        const button = event.target?.closest?.("button");
+        if (!button) {
+            return;
+        }
+
+        if (button.id === "onedrive-open-folder-btn" && button.dataset.syncBound !== "1") {
+            const url = readUrlValue("#onedrive-folder-url");
+            if (!url) {
+                setStatus("#onedrive-sync-status", "Enter a valid OneDrive or SharePoint folder link first.", true);
+                return;
+            }
+            window.open(url, "_blank", "noopener,noreferrer");
+            setStatus("#onedrive-sync-status", "Opened OneDrive folder.");
+            return;
+        }
+
+        if (button.id === "google-drive-open-folder-btn" && button.dataset.syncBound !== "1") {
+            const url = readUrlValue("#google-drive-folder-url");
+            if (!url) {
+                setStatus("#google-drive-sync-status", "Enter a valid Google Drive folder link first.", true);
+                return;
+            }
+            window.open(url, "_blank", "noopener,noreferrer");
+            setStatus("#google-drive-sync-status", "Opened Google Drive folder.");
+            return;
+        }
+
+        if (button.id === "onedrive-save-link-btn" && button.dataset.syncBound !== "1") {
+            const url = readUrlValue("#onedrive-folder-url");
+            if (!url) {
+                setStatus("#onedrive-sync-status", "Enter a valid OneDrive or SharePoint folder link first.", true);
+                return;
+            }
+
+            const ctx = getActiveSyncContext();
+            if (!ctx.projectId || !ctx.email || !ctx.taskTopicValue) {
+                setStatus("#onedrive-sync-status", "Open a task-topic page before saving OneDrive link.", true);
+                return;
+            }
+
+            button.disabled = true;
+            setStatus("#onedrive-sync-status", "Saving OneDrive link...");
+            try {
+                await persistStudentOneDriveFolderLink(ctx.projectId, ctx.email, ctx.detailData, ctx.taskTopicValue, url);
+                setStatus("#onedrive-sync-status", "OneDrive link saved and shared with teacher view.");
+            } catch (error) {
+                const fallback = "Could not save OneDrive link right now.";
+                setStatus("#onedrive-sync-status", `${error?.message || fallback}${formatApiDebugSuffix(error)}`, true);
+            } finally {
+                if (button.isConnected) button.disabled = false;
+            }
+            return;
+        }
+
+        if (button.id === "google-drive-save-link-btn" && button.dataset.syncBound !== "1") {
+            const url = readUrlValue("#google-drive-folder-url");
+            if (!url) {
+                setStatus("#google-drive-sync-status", "Enter a valid Google Drive folder link first.", true);
+                return;
+            }
+
+            const ctx = getActiveSyncContext();
+            if (!ctx.projectId || !ctx.email || !ctx.taskTopicValue) {
+                setStatus("#google-drive-sync-status", "Open a task-topic page before saving Google Drive link.", true);
+                return;
+            }
+
+            button.disabled = true;
+            setStatus("#google-drive-sync-status", "Saving Google Drive link...");
+            try {
+                await persistStudentGoogleDriveFolderLink(ctx.projectId, ctx.email, ctx.detailData, ctx.taskTopicValue, url);
+                setStatus("#google-drive-sync-status", "Google Drive link saved and shared with teacher view.");
+            } catch (error) {
+                const fallback = "Could not save Google Drive link right now.";
+                setStatus("#google-drive-sync-status", `${error?.message || fallback}${formatApiDebugSuffix(error)}`, true);
+            } finally {
+                if (button.isConnected) button.disabled = false;
+            }
+        }
+    });
+}
+
 function formatApiDebugSuffix(error) {
     const parts = [];
     if (Number.isFinite(Number(error?.status)) && Number(error.status) > 0) {
@@ -5293,6 +5406,8 @@ async function initDetail() {
 }
 
 async function loadAndRenderInterestSection(host, projectId, isTeacher, detailData) {
+    installCloudSyncDelegatedFallbackHandlers();
+
     const existingSection = host.querySelector("#interest-section");
     if (existingSection) {
         existingSection.remove();
@@ -5663,6 +5778,11 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     const googleDriveSaveLinkBtn = section.querySelector("#google-drive-save-link-btn");
     const googleDriveOpenFolderBtn = section.querySelector("#google-drive-open-folder-btn");
     const googleDriveStatus = section.querySelector("#google-drive-sync-status");
+
+    if (oneDriveSaveLinkBtn) oneDriveSaveLinkBtn.dataset.syncBound = "1";
+    if (oneDriveOpenFolderBtn) oneDriveOpenFolderBtn.dataset.syncBound = "1";
+    if (googleDriveSaveLinkBtn) googleDriveSaveLinkBtn.dataset.syncBound = "1";
+    if (googleDriveOpenFolderBtn) googleDriveOpenFolderBtn.dataset.syncBound = "1";
 
     const setTrelloStatus = (message, isError = false) => {
         if (!trelloStatus) return;
