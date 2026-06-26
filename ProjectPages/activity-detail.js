@@ -4375,6 +4375,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                             <h3>Google Drive Tasks</h3>
                             <ul class="list task-topic-guide-list">${renderList(googleDriveGuideTaskItems)}</ul>
                         </section>
+
+                        <div id="task-topic-google-drive-sync-slot"></div>
                     </section>
                     ` : ""}
 
@@ -5638,7 +5640,6 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         const oneDriveSlot = host.querySelector("#task-topic-onedrive-sync-slot");
         if (oneDriveSlot) {
             const savedOneDriveLink = getFirstOneDriveFolderUrlFromEvidenceRows(myAllocation?.evidence_steps);
-            const savedGoogleDriveLink = getFirstGoogleDriveFolderUrlFromEvidenceRows(myAllocation?.evidence_steps);
             oneDriveSlot.innerHTML = `
                 <div class="trello-sync-panel" id="onedrive-sync-panel">
                     <h3>Microsoft OneDrive Sync</h3>
@@ -5651,7 +5652,13 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                     </div>
                     <p class="trello-sync-status" id="onedrive-sync-status" aria-live="polite"></p>
                 </div>
+            `;
+        }
 
+        const googleDriveSlot = host.querySelector("#task-topic-google-drive-sync-slot");
+        if (googleDriveSlot) {
+            const savedGoogleDriveLink = getFirstGoogleDriveFolderUrlFromEvidenceRows(myAllocation?.evidence_steps);
+            googleDriveSlot.innerHTML = `
                 <div class="trello-sync-panel" id="google-drive-sync-panel" style="margin-top:10px;">
                     <h3>Google Drive Sync</h3>
                     <p>Save your Google Drive project folder link so your teacher can verify files and version history.</p>
