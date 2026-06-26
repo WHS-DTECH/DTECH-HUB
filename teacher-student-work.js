@@ -803,7 +803,7 @@ function renderTaskPageNavigation() {
     }
 
     taskPageNav.hidden = false;
-    taskCurrentLabel.textContent = `Task ${index + 1} of ${topics.length}`;
+    taskCurrentLabel.textContent = `#${index + 1}/${topics.length}`;
     taskPrevButton.disabled = index === 0;
     taskNextButton.disabled = index === topics.length - 1;
 }
@@ -945,12 +945,12 @@ function renderSelectedTaskPage() {
         .sort((left, right) => left.studentName.localeCompare(right.studentName));
 
     trackerSummary.innerHTML = `
-        <span>Total students: ${students.length}</span>
-        <span>Total records: ${rows.length}</span>
-        <span>Trello linked: ${trelloLinked}</span>
-        <span>OneDrive linked: ${oneDriveLinked}</span>
-        <span>Google Drive linked: ${googleDriveLinked}</span>
-        <span>Submitted: ${submittedCount}</span>
+        <span title="Total students">👥 ${students.length}</span>
+        <span title="Total records">🧾 ${rows.length}</span>
+        <span title="Trello linked">🗂 ${trelloLinked}</span>
+        <span title="OneDrive linked">☁ M ${oneDriveLinked}</span>
+        <span title="Google Drive linked">☁ G ${googleDriveLinked}</span>
+        <span title="Submitted">✓ ${submittedCount}</span>
     `;
 
     tableHost.innerHTML = `
@@ -958,14 +958,14 @@ function renderSelectedTaskPage() {
             <table class="work-table ${isProjectManagementTask ? "is-project-management" : ""}">
                 <thead>
                     <tr>
-                        <th>Student</th>
-                        <th>Assessment Tasks</th>
-                        <th>Submitted</th>
+                        <th>Learner</th>
+                        <th>Tasks</th>
+                        <th title="Submitted">✓</th>
                         ${isProjectManagementTask
-                            ? `<th>Trello</th><th>OneDrive</th><th>Google Drive</th>`
-                            : `<th>Other Links</th>`
+                            ? `<th title="Trello">🗂</th><th title="OneDrive">☁ M</th><th title="Google Drive">☁ G</th>`
+                            : `<th>🔗</th>`
                         }
-                        <th>Open Task Items</th>
+                        <th>Open</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -973,8 +973,8 @@ function renderSelectedTaskPage() {
                         const submittedEntries = student.entries.filter((entry) => Boolean(entry.submitted));
 
                         const submittedCell = submittedEntries.length
-                            ? `<span class="submitted-pill">${submittedEntries.length}/${student.entries.length} submitted</span>`
-                            : `<span class="submitted-pill">No</span>`;
+                            ? `<span class="submitted-pill is-yes" title="${submittedEntries.length} of ${student.entries.length} submitted">✓ ${submittedEntries.length}/${student.entries.length}</span>`
+                            : `<span class="submitted-pill is-no" title="No submitted records">○</span>`;
 
                         const uniqueOtherLinks = [];
                         const seenOtherLink = new Set();
