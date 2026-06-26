@@ -895,6 +895,7 @@ function renderSelectedTaskPage() {
     if (!tableHost || !trackerTitle || !trackerSummary) return;
 
     const selectedKey = normalizeTaskTopicText(workState.selectedTask).toLowerCase();
+    const isProjectManagementTask = selectedKey.includes("project management");
     if (!selectedKey) {
         trackerTitle.textContent = "Select a task item page";
         trackerSummary.innerHTML = "";
@@ -960,7 +961,10 @@ function renderSelectedTaskPage() {
                         <th>Student</th>
                         <th>Assessment Tasks</th>
                         <th>Submitted</th>
-                        <th>Other Links</th>
+                        ${isProjectManagementTask
+                            ? `<th>Trello</th><th>OneDrive</th><th>Google Drive</th>`
+                            : `<th>Other Links</th>`
+                        }
                         <th>Open Task Items</th>
                     </tr>
                 </thead>
@@ -974,20 +978,56 @@ function renderSelectedTaskPage() {
 
                         const uniqueOtherLinks = [];
                         const seenOtherLink = new Set();
+                        const trelloLinks = [];
+                        const oneDriveLinks = [];
+                        const googleDriveLinks = [];
+                        const seenTrello = new Set();
+                        const seenOneDrive = new Set();
+                        const seenGoogleDrive = new Set();
+
+                        const addCategorizedLink = (collection, seenSet, label, url) => {
+                            const safeUrl = toSafeExternalUrl(url);
+                            if (!safeUrl || seenSet.has(safeUrl)) return;
+                            seenSet.add(safeUrl);
+                            collection.push({ label, url: safeUrl });
+                        };
+
                         student.entries.forEach((entry) => {
                             (Array.isArray(entry.links) ? entry.links : []).forEach((link) => {
                                 const url = String(link?.url || "").trim();
-                                if (!url || url === entry.googleSlidesUrl || seenOtherLink.has(url)) return;
+                                if (!url || url === entry.googleSlidesUrl) return;
+
+                                const label = `${entry.activityName} ${String(link?.label || "Link").trim()}`;
+                                if (/trello\.com/i.test(url)) {
+                                    addCategorizedLink(trelloLinks, seenTrello, label, url);
+                                    return;
+                                }
+                                if (/(onedrive\.live\.com|1drv\.ms|sharepoint\.com)/i.test(url)) {
+                                    addCategorizedLink(oneDriveLinks, seenOneDrive, label, url);
+                                    return;
+                                }
+                                if (/drive\.google\.com/i.test(url)) {
+                                    addCategorizedLink(googleDriveLinks, seenGoogleDrive, label, url);
+                                    return;
+                                }
+
+                                if (seenOtherLink.has(url)) return;
                                 seenOtherLink.add(url);
-                                uniqueOtherLinks.push({
-                                    label: `${entry.activityName} ${String(link?.label || "Link").trim()}`,
-                                    url
-                                });
+                                uniqueOtherLinks.push({ label, url });
                             });
                         });
 
                         const linksCell = uniqueOtherLinks.length
                             ? `<div class="work-link-list">${uniqueOtherLinks.map((link) => buildChipLink(link.url, link.label)).join("")}</div>`
+                            : "-";
+                        const trelloCell = trelloLinks.length
+                            ? `<div class="work-link-list">${trelloLinks.map((link) => buildChipLink(link.url, link.label)).join("")}</div>`
+                            : "-";
+                        const oneDriveCell = oneDriveLinks.length
+                            ? `<div class="work-link-list">${oneDriveLinks.map((link) => buildChipLink(link.url, link.label)).join("")}</div>`
+                            : "-";
+                        const googleDriveCell = googleDriveLinks.length
+                            ? `<div class="work-link-list">${googleDriveLinks.map((link) => buildChipLink(link.url, link.label)).join("")}</div>`
                             : "-";
 
                         const taskLinksCell = `<div class="work-link-list">${student.entries.map((entry) => buildChipLink(entry.taskUrl, entry.activityName)).join("")}</div>`;
@@ -999,7 +1039,10 @@ function renderSelectedTaskPage() {
                                 <td>${escapeHtml(student.studentName)}</td>
                                 <td>${assessmentsCell}</td>
                                 <td>${submittedCell}</td>
-                                <td>${linksCell}</td>
+                                ${isProjectManagementTask
+                                    ? `<td>${trelloCell}</td><td>${oneDriveCell}</td><td>${googleDriveCell}</td>`
+                                    : `<td>${linksCell}</td>`
+                                }
                                 <td>${taskLinksCell}</td>
                             </tr>
                         `;
