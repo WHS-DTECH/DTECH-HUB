@@ -5519,14 +5519,18 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         }
     }
 
-    await renderTaskTopicSubmissionPanel({
-        host,
-        projectId,
-        detailData,
-        email,
-        isTeacher,
-        interestData
-    });
+    try {
+        await renderTaskTopicSubmissionPanel({
+            host,
+            projectId,
+            detailData,
+            email,
+            isTeacher,
+            interestData
+        });
+    } catch (_error) {
+        // Keep sync controls interactive even if submission panel rendering fails.
+    }
 
     if (!isTeacher && isAssessmentTask && email) {
         const myAllocation = interestData?.my_allocation || null;
@@ -5534,17 +5538,21 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         const taskDefaultsByStandard = buildTaskDefaultsByStandard(assignedStandards, detailData);
 
         if (assignedStandards.length) {
-            await renderEvidenceSidebar({
-                host,
-                projectId,
-                viewerEmail: email,
-                studentEmail: email,
-                standards: Array.from(new Set(assignedStandards)),
-                studentLabel: "My progress",
-                taskDefaultsByStandard,
-                detailData,
-                taskTopic: selectedTaskTopic
-            });
+            try {
+                await renderEvidenceSidebar({
+                    host,
+                    projectId,
+                    viewerEmail: email,
+                    studentEmail: email,
+                    standards: Array.from(new Set(assignedStandards)),
+                    studentLabel: "My progress",
+                    taskDefaultsByStandard,
+                    detailData,
+                    taskTopic: selectedTaskTopic
+                });
+            } catch (_error) {
+                // Sidebar issues should not block sync button handlers.
+            }
         }
     }
 
