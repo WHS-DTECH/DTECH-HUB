@@ -962,7 +962,7 @@ function renderSelectedTaskPage() {
                         <th>Tasks</th>
                         <th title="Submitted">✓</th>
                         ${isProjectManagementTask
-                            ? `<th title="Trello">🗂</th><th title="OneDrive">☁ M</th><th title="Google Drive">☁ G</th>`
+                            ? `<th>Trello</th><th>OneDrive</th><th>Google Drive</th>`
                             : `<th>🔗</th>`
                         }
                         <th>Open</th>
@@ -997,21 +997,21 @@ function renderSelectedTaskPage() {
                                 const url = String(link?.url || "").trim();
                                 if (!url || url === entry.googleSlidesUrl) return;
 
-                                const activityLabel = compactLabel(entry.activityName, 16);
-                                const label = `${activityLabel} ${String(link?.label || "Link").trim()}`;
                                 if (/trello\.com/i.test(url)) {
-                                    addCategorizedLink(trelloLinks, seenTrello, label, url);
+                                    addCategorizedLink(trelloLinks, seenTrello, "Trello", url);
                                     return;
                                 }
                                 if (/(onedrive\.live\.com|1drv\.ms|sharepoint\.com)/i.test(url)) {
-                                    addCategorizedLink(oneDriveLinks, seenOneDrive, label, url);
+                                    addCategorizedLink(oneDriveLinks, seenOneDrive, "OneDrive", url);
                                     return;
                                 }
                                 if (/drive\.google\.com/i.test(url)) {
-                                    addCategorizedLink(googleDriveLinks, seenGoogleDrive, label, url);
+                                    addCategorizedLink(googleDriveLinks, seenGoogleDrive, "Google Drive", url);
                                     return;
                                 }
 
+                                const activityLabel = compactLabel(entry.activityName, 16);
+                                const label = `${activityLabel} ${String(link?.label || "Link").trim()}`;
                                 if (seenOtherLink.has(url)) return;
                                 seenOtherLink.add(url);
                                 uniqueOtherLinks.push({ label, url });
