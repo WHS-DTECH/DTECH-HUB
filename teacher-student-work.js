@@ -420,7 +420,15 @@ function parseTaskTopicEvidence(evidenceRows, standardKey) {
                 result.googleSlidesUrl = link;
             }
             if (link) {
-                pushLink("Evidence Link", link);
+                if (/trello\.com/i.test(link)) {
+                    pushLink("Trello", link);
+                } else if (/(onedrive\.live\.com|1drv\.ms|sharepoint\.com)/i.test(link)) {
+                    pushLink("OneDrive", link);
+                } else if (/drive\.google\.com/i.test(link)) {
+                    pushLink("Google Drive", link);
+                } else {
+                    pushLink("Evidence Link", link);
+                }
             }
             return;
         }
@@ -432,6 +440,11 @@ function parseTaskTopicEvidence(evidenceRows, standardKey) {
 
         if (text.startsWith("ONEDRIVE_PROJECT_FOLDER_URL|")) {
             pushLink("OneDrive", text.slice("ONEDRIVE_PROJECT_FOLDER_URL|".length).trim());
+            return;
+        }
+
+        if (text.startsWith("GOOGLE_DRIVE_PROJECT_FOLDER_URL|")) {
+            pushLink("Google Drive", text.slice("GOOGLE_DRIVE_PROJECT_FOLDER_URL|".length).trim());
             return;
         }
 
@@ -510,6 +523,10 @@ function inferGlobalWorkLinksFromEvidenceRows(evidenceRows) {
                     pushLink("OneDrive", rawLink);
                     return;
                 }
+                if (/drive\.google\.com/i.test(rawLink)) {
+                    pushLink("Google Drive", rawLink);
+                    return;
+                }
             }
 
             if (/trello\.com/i.test(text)) {
@@ -524,6 +541,14 @@ function inferGlobalWorkLinksFromEvidenceRows(evidenceRows) {
                 const match = text.match(/https?:\/\/[^\s)]+/i);
                 if (match?.[0]) {
                     pushLink("OneDrive", match[0]);
+                }
+                return;
+            }
+
+            if (/drive\.google\.com/i.test(text)) {
+                const match = text.match(/https?:\/\/[^\s)]+/i);
+                if (match?.[0]) {
+                    pushLink("Google Drive", match[0]);
                 }
             }
         });
@@ -897,7 +922,9 @@ function renderSelectedTaskPage() {
     }
 
     const slidesLinked = rows.filter((row) => Boolean(row.googleSlidesUrl)).length;
+    const trelloLinked = rows.filter((row) => (Array.isArray(row.links) ? row.links : []).some((link) => /trello\.com/i.test(String(link?.url || "")))).length;
     const oneDriveLinked = rows.filter((row) => (Array.isArray(row.links) ? row.links : []).some((link) => /(onedrive\.live\.com|1drv\.ms|sharepoint\.com)/i.test(String(link?.url || "")))).length;
+    const googleDriveLinked = rows.filter((row) => (Array.isArray(row.links) ? row.links : []).some((link) => /drive\.google\.com/i.test(String(link?.url || "")))).length;
     const submittedCount = rows.filter((row) => Boolean(row.submitted)).length;
     const studentGroups = new Map();
     rows.forEach((row) => {
@@ -919,7 +946,9 @@ function renderSelectedTaskPage() {
     trackerSummary.innerHTML = `
         <span>Total students: ${students.length}</span>
         <span>Total records: ${rows.length}</span>
+        <span>Trello linked: ${trelloLinked}</span>
         <span>OneDrive linked: ${oneDriveLinked}</span>
+        <span>Google Drive linked: ${googleDriveLinked}</span>
         <span>Submitted: ${submittedCount}</span>
     `;
 
