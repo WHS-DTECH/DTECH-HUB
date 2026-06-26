@@ -955,7 +955,7 @@ function renderSelectedTaskPage() {
 
     tableHost.innerHTML = `
         <div class="work-table-wrap">
-            <table class="work-table">
+            <table class="work-table ${isProjectManagementTask ? "is-project-management" : ""}">
                 <thead>
                     <tr>
                         <th>Student</th>
@@ -997,7 +997,8 @@ function renderSelectedTaskPage() {
                                 const url = String(link?.url || "").trim();
                                 if (!url || url === entry.googleSlidesUrl) return;
 
-                                const label = `${entry.activityName} ${String(link?.label || "Link").trim()}`;
+                                const activityLabel = compactLabel(entry.activityName, 16);
+                                const label = `${activityLabel} ${String(link?.label || "Link").trim()}`;
                                 if (/trello\.com/i.test(url)) {
                                     addCategorizedLink(trelloLinks, seenTrello, label, url);
                                     return;

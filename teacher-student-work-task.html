@@ -93,7 +93,7 @@
     }
 
     .work-table-wrap {
-      overflow-x: visible;
+      overflow-x: hidden;
       border: 1px solid #ccd8e8;
       border-radius: 10px;
       background: #f6f9fd;
@@ -107,6 +107,33 @@
       min-width: 0;
       table-layout: auto;
     }
+
+    .work-table.is-project-management {
+      table-layout: fixed;
+      font-size: 0.78rem;
+    }
+
+    .work-table.is-project-management th,
+    .work-table.is-project-management td {
+      padding: 6px 7px;
+      vertical-align: top;
+      word-break: break-word;
+    }
+
+    .work-table.is-project-management th:nth-child(1),
+    .work-table.is-project-management td:nth-child(1) { width: 13%; }
+    .work-table.is-project-management th:nth-child(2),
+    .work-table.is-project-management td:nth-child(2) { width: 14%; }
+    .work-table.is-project-management th:nth-child(3),
+    .work-table.is-project-management td:nth-child(3) { width: 8%; }
+    .work-table.is-project-management th:nth-child(4),
+    .work-table.is-project-management td:nth-child(4) { width: 17%; }
+    .work-table.is-project-management th:nth-child(5),
+    .work-table.is-project-management td:nth-child(5) { width: 17%; }
+    .work-table.is-project-management th:nth-child(6),
+    .work-table.is-project-management td:nth-child(6) { width: 17%; }
+    .work-table.is-project-management th:nth-child(7),
+    .work-table.is-project-management td:nth-child(7) { width: 14%; }
 
     .work-table th {
       text-align: left;
@@ -181,6 +208,12 @@
       flex-wrap: wrap;
     }
 
+    .work-table.is-project-management .work-link-list {
+      display: grid;
+      gap: 4px;
+      align-content: start;
+    }
+
     .work-link-list a {
       font-size: 0.74rem;
       text-decoration: none;
@@ -193,8 +226,16 @@
       white-space: nowrap;
     }
 
-    .work-table td:first-child,
-    .work-table th:first-child {
+    .work-table.is-project-management .work-link-list a {
+      white-space: normal;
+      line-height: 1.2;
+      padding: 2px 6px;
+      width: fit-content;
+      max-width: 100%;
+    }
+
+    .work-table:not(.is-project-management) td:first-child,
+    .work-table:not(.is-project-management) th:first-child {
       white-space: nowrap;
     }
   </style>
