@@ -1320,7 +1320,7 @@ function renderGlobalNavbar() {
         <details class="nav-dropdown" id="hub-student-work-menu" data-nav-dropdown hidden>
             <summary>Student Work</summary>
             <div class="nav-drawer" role="menu">
-                <a role="menuitem" href="/teacher-student-work.html">Task Item Pages</a>
+                <a role="menuitem" href="/teacher-student-work.html">Student Work Tracker</a>
                 <a role="menuitem" href="/user-profile.html#trello-integration-card">Trello</a>
             </div>
         </details>
