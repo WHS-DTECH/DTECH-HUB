@@ -55,6 +55,20 @@ body {
     flex-wrap: wrap;
 }
 
+/* Staff controls are hard-hidden by default and only shown in teacher mode. */
+.template-hero-actions [data-staff-only="true"],
+#template-sync-status[data-staff-only="true"] {
+    display: none !important;
+}
+
+body.template-staff-mode .template-hero-actions [data-staff-only="true"] {
+    display: inline-block !important;
+}
+
+body.template-staff-mode #template-sync-status[data-staff-only="true"] {
+    display: block !important;
+}
+
 .template-button {
     display: inline-block;
     border-radius: 999px;

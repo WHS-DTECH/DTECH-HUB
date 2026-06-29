@@ -131,6 +131,7 @@ async function loadLibraryAccess() {
 
 function applyLibraryRoleVisibility(access) {
     const canManage = canManageTemplates();
+    document.body.classList.toggle("template-staff-mode", canManage);
     const staffOnlyElements = document.querySelectorAll("[data-staff-only='true']");
     staffOnlyElements.forEach((element) => {
         element.hidden = !canManage;
