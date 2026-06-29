@@ -113,7 +113,7 @@ async function loadLibraryAccess() {
         }
         const payload = await response.json().catch(() => ({}));
         return {
-            can_teacher_view: Boolean(payload?.can_teacher_view),
+    const DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly";
             can_admin: Boolean(payload?.can_admin)
         };
     } catch (_error) {
