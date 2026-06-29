@@ -55,6 +55,7 @@ const memoryPracticalEvents = [];
 let memoryPracticalEventId = 1;
 const memoryTrelloConnections = new Map();
 const memoryAssessmentStandardCards = new Map();
+const memoryStudentHaparaFolders = new Map();
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -3575,6 +3576,34 @@ async function ensureTrelloConnectionsSchema() {
   await pool.query(`ALTER TABLE student_trello_connections ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 }
 
+async function ensureStudentHaparaFoldersSchema() {
+  if (!hasDatabase) {
+    return;
+  }
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS student_hapara_folders (
+      student_email TEXT PRIMARY KEY,
+      folder_url TEXT NOT NULL,
+      folder_id TEXT NOT NULL,
+      class_label TEXT,
+      notes TEXT,
+      updated_by_email TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`ALTER TABLE student_hapara_folders ADD COLUMN IF NOT EXISTS folder_url TEXT`);
+  await pool.query(`ALTER TABLE student_hapara_folders ADD COLUMN IF NOT EXISTS folder_id TEXT`);
+  await pool.query(`ALTER TABLE student_hapara_folders ADD COLUMN IF NOT EXISTS class_label TEXT`);
+  await pool.query(`ALTER TABLE student_hapara_folders ADD COLUMN IF NOT EXISTS notes TEXT`);
+  await pool.query(`ALTER TABLE student_hapara_folders ADD COLUMN IF NOT EXISTS updated_by_email TEXT`);
+  await pool.query(`ALTER TABLE student_hapara_folders ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await pool.query(`ALTER TABLE student_hapara_folders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS student_hapara_folders_class_idx ON student_hapara_folders (class_label)`);
+}
+
 async function ensureCourseOutlinesSchema() {
   if (!hasDatabase) {
     return;
@@ -3648,6 +3677,7 @@ async function ensureSchema() {
   await ensureActivitiesSchema();
   await ensureProjectInterestsSchema();
   await ensureTrelloConnectionsSchema();
+  await ensureStudentHaparaFoldersSchema();
   await ensureUnitPlanSchema();
   await ensureAssessmentStandardCardsSchema();
   await ensureCourseOutlinesSchema();
@@ -4255,6 +4285,172 @@ async function deleteTrelloConnection(email) {
   }
 
   await pool.query(`DELETE FROM student_trello_connections WHERE student_email = $1`, [normalizedEmail]);
+}
+
+function extractGoogleDriveFolderId(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  if (/^[A-Za-z0-9_-]{20,}$/.test(raw)) {
+    return raw;
+  }
+
+  try {
+    const parsed = new URL(raw);
+    const host = String(parsed.hostname || "").toLowerCase();
+    if (!host.includes("google.com")) {
+      return "";
+    }
+
+    const folderPathMatch = String(parsed.pathname || "").match(/\/folders\/([A-Za-z0-9_-]+)/i);
+    if (folderPathMatch?.[1]) {
+      return String(folderPathMatch[1]).trim();
+    }
+
+    const queryId = String(parsed.searchParams.get("id") || "").trim();
+    if (/^[A-Za-z0-9_-]{20,}$/.test(queryId)) {
+      return queryId;
+    }
+  } catch (_error) {
+    return "";
+  }
+
+  return "";
+}
+
+function normalizeGoogleDriveFolderUrl(value) {
+  const folderId = extractGoogleDriveFolderId(value);
+  if (!folderId) return "";
+  return `https://drive.google.com/drive/folders/${folderId}`;
+}
+
+async function listStudentHaparaFolders() {
+  if (!hasDatabase) {
+    return Array.from(memoryStudentHaparaFolders.values())
+      .sort((a, b) => String(a?.student_email || "").localeCompare(String(b?.student_email || "")));
+  }
+
+  await ensureStudentHaparaFoldersSchema();
+  const result = await pool.query(
+    `
+      SELECT student_email, folder_url, folder_id, class_label, notes, updated_by_email, created_at, updated_at
+      FROM student_hapara_folders
+      ORDER BY student_email ASC
+    `
+  );
+
+  return Array.isArray(result?.rows) ? result.rows : [];
+}
+
+async function upsertStudentHaparaFoldersBulk(rows, updatedByEmail = "") {
+  const sourceRows = Array.isArray(rows) ? rows : [];
+  const dedupedByEmail = new Map();
+  let skipped = 0;
+
+  sourceRows.forEach((entry) => {
+    const studentEmail = normalizeEmail(entry?.student_email || entry?.email || entry?.studentEmail || "");
+    const rawFolderValue = String(entry?.folder_url || entry?.folderUrl || entry?.folder_id || entry?.folderId || "").trim();
+    const folderId = extractGoogleDriveFolderId(rawFolderValue);
+    const folderUrl = normalizeGoogleDriveFolderUrl(rawFolderValue);
+
+    if (!studentEmail || !folderId || !folderUrl) {
+      skipped += 1;
+      return;
+    }
+
+    dedupedByEmail.set(studentEmail, {
+      student_email: studentEmail,
+      folder_url: folderUrl,
+      folder_id: folderId,
+      class_label: String(entry?.class_label || entry?.classLabel || entry?.class || "").trim(),
+      notes: String(entry?.notes || "").trim(),
+      updated_by_email: normalizeEmail(updatedByEmail)
+    });
+  });
+
+  const normalizedRows = Array.from(dedupedByEmail.values());
+  if (!normalizedRows.length) {
+    return { upserted: 0, skipped, rows: [] };
+  }
+
+  if (!hasDatabase) {
+    normalizedRows.forEach((row) => {
+      const existing = memoryStudentHaparaFolders.get(row.student_email) || {};
+      const next = {
+        ...existing,
+        ...row,
+        created_at: existing?.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      memoryStudentHaparaFolders.set(row.student_email, next);
+    });
+
+    return { upserted: normalizedRows.length, skipped, rows: normalizedRows };
+  }
+
+  await ensureStudentHaparaFoldersSchema();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    for (const row of normalizedRows) {
+      await client.query(
+        `
+          INSERT INTO student_hapara_folders (
+            student_email,
+            folder_url,
+            folder_id,
+            class_label,
+            notes,
+            updated_by_email,
+            created_at,
+            updated_at
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+          ON CONFLICT (student_email)
+          DO UPDATE SET
+            folder_url = EXCLUDED.folder_url,
+            folder_id = EXCLUDED.folder_id,
+            class_label = EXCLUDED.class_label,
+            notes = EXCLUDED.notes,
+            updated_by_email = EXCLUDED.updated_by_email,
+            updated_at = NOW()
+        `,
+        [
+          row.student_email,
+          row.folder_url,
+          row.folder_id,
+          row.class_label || null,
+          row.notes || null,
+          row.updated_by_email || null
+        ]
+      );
+    }
+
+    await client.query("COMMIT");
+    return { upserted: normalizedRows.length, skipped, rows: normalizedRows };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function deleteStudentHaparaFolder(email) {
+  const studentEmail = normalizeEmail(email);
+  if (!studentEmail) return false;
+
+  if (!hasDatabase) {
+    return memoryStudentHaparaFolders.delete(studentEmail);
+  }
+
+  await ensureStudentHaparaFoldersSchema();
+  const result = await pool.query(
+    `DELETE FROM student_hapara_folders WHERE student_email = $1`,
+    [studentEmail]
+  );
+  return Number(result?.rowCount || 0) > 0;
 }
 
 async function resolveActivityWriteAccess(email) {
@@ -5771,6 +5967,54 @@ app.get("/api/admin/assessment-standard-cards", requireAdminAccess, async (req, 
     res.json({ count: cards.length, cards });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not load Assessment Standard Cards" });
+  }
+});
+
+app.get("/api/admin/hapara-folders", requireAdminAccess, async (_req, res) => {
+  try {
+    const rows = await listStudentHaparaFolders();
+    res.json({ count: rows.length, folders: rows });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not load Hapara folder mappings" });
+  }
+});
+
+app.post("/api/admin/hapara-folders/bulk", requireAdminAccess, async (req, res) => {
+  const payloadRows = Array.isArray(req.body?.rows) ? req.body.rows : [];
+  if (!payloadRows.length) {
+    res.status(400).json({ error: "rows array is required" });
+    return;
+  }
+
+  if (payloadRows.length > 5000) {
+    res.status(400).json({ error: "Maximum 5000 rows per upload" });
+    return;
+  }
+
+  try {
+    const result = await upsertStudentHaparaFoldersBulk(payloadRows, req.user_email || "");
+    res.json({
+      ok: true,
+      upserted: Number(result?.upserted || 0),
+      skipped: Number(result?.skipped || 0)
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not save Hapara folder mappings" });
+  }
+});
+
+app.delete("/api/admin/hapara-folders/:email", requireAdminAccess, async (req, res) => {
+  const email = normalizeEmail(req.params?.email || "");
+  if (!email) {
+    res.status(400).json({ error: "Valid email is required" });
+    return;
+  }
+
+  try {
+    const deleted = await deleteStudentHaparaFolder(email);
+    res.json({ ok: true, deleted: Boolean(deleted) });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not delete mapping" });
   }
 });
 
