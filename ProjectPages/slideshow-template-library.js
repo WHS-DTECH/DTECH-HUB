@@ -98,6 +98,37 @@ function withLibraryAuthHeaders(headers = {}) {
     return next;
 }
 
+async function loadLibraryAccess() {
+    const email = getLibraryEmail();
+    if (!email) {
+        return { can_teacher_view: false, can_admin: false };
+    }
+
+    try {
+        const response = await fetch(`/api/auth/user-access?email=${encodeURIComponent(email)}`, {
+            headers: withLibraryAuthHeaders({})
+        });
+        if (!response.ok) {
+            return { can_teacher_view: false, can_admin: false };
+        }
+        const payload = await response.json().catch(() => ({}));
+        return {
+            can_teacher_view: Boolean(payload?.can_teacher_view),
+            can_admin: Boolean(payload?.can_admin)
+        };
+    } catch (_error) {
+        return { can_teacher_view: false, can_admin: false };
+    }
+}
+
+function applyLibraryRoleVisibility(access) {
+    const canManage = Boolean(access?.can_teacher_view || access?.can_admin);
+    const staffOnlyElements = document.querySelectorAll("[data-staff-only='true']");
+    staffOnlyElements.forEach((element) => {
+        element.hidden = !canManage;
+    });
+}
+
 function initDriveTokenClient() {
     if (!window.google?.accounts?.oauth2) return null;
     const clientId = document.querySelector('meta[name="hub-google-client-id"]')?.content.trim() || "";
@@ -176,7 +207,7 @@ function renderSetupBanner(setup) {
     if (!setup || !setup.configured) {
         banner.innerHTML = `
             <div class="template-setup-banner-inner template-setup-banner-warn">
-                <p class="template-setup-banner-text">Your Hapara folder has not been configured by your teacher yet. Templates are still available using the standard Google copy link.<br><strong>Signed-in account:</strong> ${escapeHtml(signedInEmail)}<br><a class="template-setup-banner-link" href="../admin-hapara-folders.html" target="_blank" rel="noreferrer">Open Hapara Folder Upload page</a> to verify this email has a mapped Google Drive folder URL.</p>
+                <p class="template-setup-banner-text">No Hapara mapping was found for your signed-in account.<br><strong>Signed-in account:</strong> ${escapeHtml(signedInEmail)}<br><strong>Mapping status:</strong> No mapping found for this email.<br>Templates are still available using the standard Google copy link.<br><a class="template-setup-banner-link" href="../admin-hapara-folders.html" target="_blank" rel="noreferrer">Open Hapara Folder Upload page</a> to verify this email has a mapped Google Drive folder URL.</p>
             </div>`;
         banner.hidden = false;
         return;
@@ -375,6 +406,9 @@ function renderLibrary() {
 }
 
 async function initLibrary() {
+    const access = await loadLibraryAccess();
+    applyLibraryRoleVisibility(access);
+
     renderLibrary();
 
     const banner = document.querySelector("#template-setup-banner");
