@@ -27,6 +27,7 @@ let templateLibraryData = Array.isArray(DEFAULT_TEMPLATE_LIBRARY)
 let libraryAccess = { can_teacher_view: false, can_admin: false };
 let libraryHandlersBound = false;
 const SYNC_FOLDER_NAME = "Process Slide Templates";
+const HUB_VIEW_MODE_STORAGE_KEY = "hub_view_mode_v1";
 
 const DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly";
 const LIB_AUTH_KEY = "hub_google_auth_v1";
@@ -129,7 +130,7 @@ async function loadLibraryAccess() {
 }
 
 function applyLibraryRoleVisibility(access) {
-    const canManage = Boolean(access?.can_teacher_view || access?.can_admin);
+    const canManage = canManageTemplates();
     const staffOnlyElements = document.querySelectorAll("[data-staff-only='true']");
     staffOnlyElements.forEach((element) => {
         element.hidden = !canManage;
@@ -239,7 +240,18 @@ async function loadTemplateLibraryEntries() {
 }
 
 function canManageTemplates() {
-    return Boolean(libraryAccess?.can_teacher_view || libraryAccess?.can_admin);
+    const hasStaffRole = Boolean(libraryAccess?.can_teacher_view || libraryAccess?.can_admin);
+    if (!hasStaffRole) return false;
+    return getHubViewMode() === "teacher";
+}
+
+function getHubViewMode() {
+    try {
+        const value = String(localStorage.getItem(HUB_VIEW_MODE_STORAGE_KEY) || "").trim().toLowerCase();
+        return value === "teacher" ? "teacher" : "student";
+    } catch (_error) {
+        return "student";
+    }
 }
 
 function setTemplateSyncStatus(message, isError = false) {
