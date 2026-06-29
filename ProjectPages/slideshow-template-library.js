@@ -1,4 +1,4 @@
-const TEMPLATE_LIBRARY = [
+const DEFAULT_TEMPLATE_LIBRARY = [
     {
         id: "digital-outcome-description",
         title: "Digital Outcome Description",
@@ -20,6 +20,10 @@ const TEMPLATE_LIBRARY = [
         status: "coming-soon"
     }
 ];
+
+let templateLibraryData = Array.isArray(DEFAULT_TEMPLATE_LIBRARY)
+    ? DEFAULT_TEMPLATE_LIBRARY.map((entry) => ({ ...entry }))
+    : [];
 
 const DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly";
 const LIB_AUTH_KEY = "hub_google_auth_v1";
@@ -193,6 +197,46 @@ async function loadDriveSetup() {
     }
 }
 
+function normalizeTemplateLibraryEntries(items) {
+    if (!Array.isArray(items)) return [];
+    return items
+        .map((row, index) => {
+            const id = String(row?.id || row?.templateId || "").trim();
+            const title = String(row?.title || "").trim();
+            const templateUrl = String(row?.templateUrl || "").trim();
+            if (!id || !title || !templateUrl) return null;
+
+            return {
+                id,
+                title,
+                standardCodes: Array.isArray(row?.standardCodes) ? row.standardCodes.map((code) => String(code || "").trim()).filter(Boolean) : [],
+                criteriaText: String(row?.criteriaText || "").trim(),
+                summary: String(row?.summary || "").trim(),
+                imageUrl: String(row?.imageUrl || "").trim(),
+                templateUrl,
+                status: String(row?.status || "live").trim().toLowerCase() === "coming-soon" ? "coming-soon" : "live",
+                sortOrder: Number(row?.sortOrder ?? index + 1) || (index + 1)
+            };
+        })
+        .filter(Boolean)
+        .sort((left, right) => Number(left?.sortOrder || 0) - Number(right?.sortOrder || 0));
+}
+
+async function loadTemplateLibraryEntries() {
+    try {
+        const response = await fetch("/api/template-library");
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) return;
+
+        const fromApi = normalizeTemplateLibraryEntries(payload?.entries);
+        if (fromApi.length) {
+            templateLibraryData = fromApi;
+        }
+    } catch (_error) {
+        // Keep defaults when API is unavailable.
+    }
+}
+
 function renderSetupBanner(setup) {
     const banner = document.querySelector("#template-setup-banner");
     if (!banner) return;
@@ -291,7 +335,7 @@ async function handleConfirmFolder() {
 }
 
 async function handleUseTemplate(templateId) {
-    const item = TEMPLATE_LIBRARY.find((entry) => entry.id === templateId);
+    const item = templateLibraryData.find((entry) => entry.id === templateId);
     if (!item) return;
 
     const fileId = extractSlidesFileId(item.templateUrl);
@@ -441,11 +485,11 @@ function renderTemplateCard(item) {
 function renderLibrary() {
     const host = document.querySelector("#template-list");
     if (!host) return;
-    if (!Array.isArray(TEMPLATE_LIBRARY) || !TEMPLATE_LIBRARY.length) {
+    if (!Array.isArray(templateLibraryData) || !templateLibraryData.length) {
         host.innerHTML = '<p class="template-empty">No templates are listed yet.</p>';
         return;
     }
-    host.innerHTML = TEMPLATE_LIBRARY.map((item) => renderTemplateCard(item)).join("");
+    host.innerHTML = templateLibraryData.map((item) => renderTemplateCard(item)).join("");
 
     host.addEventListener("click", (event) => {
         const target = event.target.closest("[data-use-template]");
@@ -459,6 +503,7 @@ async function initLibrary() {
     const access = await loadLibraryAccess();
     applyLibraryRoleVisibility(access);
 
+    await loadTemplateLibraryEntries();
     renderLibrary();
 
     const banner = document.querySelector("#template-setup-banner");

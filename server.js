@@ -57,6 +57,34 @@ const memoryTrelloConnections = new Map();
 const memoryAssessmentStandardCards = new Map();
 const memoryStudentHaparaFolders = new Map();
 const memoryStudentDriveSetup = new Map();
+const memoryTemplateLibraryEntries = new Map();
+
+const DEFAULT_TEMPLATE_LIBRARY_ENTRIES = [
+  {
+    id: "digital-outcome-description",
+    title: "Digital Outcome Description",
+    standardCodes: ["91897", "91907"],
+    criteriaText: "Describe what the digital outcome is, who it is for, and what it must do.",
+    summary: "Uses a two-column prompt-and-response slide structure for clear assessment evidence.",
+    imageUrl: "https://placehold.co/540x760/e7dec0/1f3a56?text=Digital+Outcome+Description+Slide+Preview",
+    templateUrl: "https://docs.google.com/presentation/d/1brOY70u9aJdsoiEtxVepr82vRhiv9VzpMm8TUv3lcTo/edit?usp=sharing",
+    status: "live",
+    sortOrder: 1,
+    sourceFolderId: ""
+  },
+  {
+    id: "speaker-notes-criteria-mapping",
+    title: "Speaker Notes Criteria Mapping",
+    standardCodes: ["91897"],
+    criteriaText: "Map each presented slide to assessment criteria in Speaker Notes.",
+    summary: "Template slot reserved. Add the final template URL when this slide is complete.",
+    imageUrl: "https://placehold.co/540x760/d8e6d9/1f3a56?text=Coming+Soon+Template",
+    templateUrl: "",
+    status: "coming-soon",
+    sortOrder: 2,
+    sourceFolderId: ""
+  }
+];
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -4471,6 +4499,152 @@ async function ensureStudentDriveSetupSchema() {
   await pool.query(`ALTER TABLE student_drive_setup ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 }
 
+async function ensureTemplateLibrarySchema() {
+  if (!hasDatabase) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS template_library_entries (
+      template_id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      standard_codes JSONB NOT NULL DEFAULT '[]'::jsonb,
+      criteria_text TEXT,
+      summary TEXT,
+      image_url TEXT,
+      template_url TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'live',
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      source_folder_id TEXT,
+      updated_by_email TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  await pool.query(`ALTER TABLE template_library_entries ADD COLUMN IF NOT EXISTS standard_codes JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE template_library_entries ADD COLUMN IF NOT EXISTS criteria_text TEXT`);
+  await pool.query(`ALTER TABLE template_library_entries ADD COLUMN IF NOT EXISTS summary TEXT`);
+  await pool.query(`ALTER TABLE template_library_entries ADD COLUMN IF NOT EXISTS image_url TEXT`);
+  await pool.query(`ALTER TABLE template_library_entries ADD COLUMN IF NOT EXISTS template_url TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE template_library_entries ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'live'`);
+  await pool.query(`ALTER TABLE template_library_entries ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE template_library_entries ADD COLUMN IF NOT EXISTS source_folder_id TEXT`);
+  await pool.query(`ALTER TABLE template_library_entries ADD COLUMN IF NOT EXISTS updated_by_email TEXT`);
+  await pool.query(`ALTER TABLE template_library_entries ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await pool.query(`ALTER TABLE template_library_entries ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+}
+
+function toTemplateLibraryEntry(row, fallbackIndex = 0) {
+  const standardCodes = Array.isArray(row?.standard_codes)
+    ? row.standard_codes
+    : (Array.isArray(row?.standardCodes) ? row.standardCodes : []);
+  return {
+    id: String(row?.template_id || row?.id || "").trim(),
+    title: String(row?.title || "Untitled Template").trim(),
+    standardCodes: standardCodes.map((code) => String(code || "").trim()).filter(Boolean),
+    criteriaText: String(row?.criteria_text || row?.criteriaText || "").trim(),
+    summary: String(row?.summary || "").trim(),
+    imageUrl: String(row?.image_url || row?.imageUrl || "").trim(),
+    templateUrl: String(row?.template_url || row?.templateUrl || "").trim(),
+    status: String(row?.status || "live").trim().toLowerCase() === "coming-soon" ? "coming-soon" : "live",
+    sortOrder: Number(row?.sort_order ?? row?.sortOrder ?? fallbackIndex + 1) || fallbackIndex + 1,
+    sourceFolderId: String(row?.source_folder_id || row?.sourceFolderId || "").trim()
+  };
+}
+
+async function listTemplateLibraryEntries() {
+  if (!hasDatabase) {
+    const rows = Array.from(memoryTemplateLibraryEntries.values())
+      .sort((left, right) => Number(left?.sortOrder || 0) - Number(right?.sortOrder || 0));
+    const memoryEntries = rows.map((row, index) => toTemplateLibraryEntry(row, index));
+    return memoryEntries.length ? memoryEntries : DEFAULT_TEMPLATE_LIBRARY_ENTRIES.map((row, index) => toTemplateLibraryEntry(row, index));
+  }
+
+  await ensureTemplateLibrarySchema();
+  const result = await pool.query(
+    `
+      SELECT template_id, title, standard_codes, criteria_text, summary, image_url, template_url, status, sort_order, source_folder_id
+      FROM template_library_entries
+      ORDER BY sort_order ASC, lower(title) ASC
+    `
+  );
+
+  const entries = Array.isArray(result?.rows) ? result.rows.map((row, index) => toTemplateLibraryEntry(row, index)) : [];
+  return entries.length ? entries : DEFAULT_TEMPLATE_LIBRARY_ENTRIES.map((row, index) => toTemplateLibraryEntry(row, index));
+}
+
+async function upsertTemplateLibraryEntries(entries, updatedByEmail = "") {
+  const source = Array.isArray(entries) ? entries : [];
+  const normalized = source
+    .map((row, index) => toTemplateLibraryEntry(row, index))
+    .filter((row) => row.id && row.templateUrl);
+
+  if (!normalized.length) {
+    return { upserted: 0 };
+  }
+
+  if (!hasDatabase) {
+    normalized.forEach((entry, index) => {
+      memoryTemplateLibraryEntries.set(entry.id, {
+        ...entry,
+        sortOrder: entry.sortOrder || index + 1,
+        updatedByEmail: normalizeEmail(updatedByEmail),
+        updatedAt: new Date().toISOString()
+      });
+    });
+    return { upserted: normalized.length };
+  }
+
+  await ensureTemplateLibrarySchema();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    for (const entry of normalized) {
+      await client.query(
+        `
+          INSERT INTO template_library_entries (
+            template_id, title, standard_codes, criteria_text, summary, image_url, template_url,
+            status, sort_order, source_folder_id, updated_by_email, created_at, updated_at
+          )
+          VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+          ON CONFLICT (template_id)
+          DO UPDATE SET
+            title = EXCLUDED.title,
+            standard_codes = EXCLUDED.standard_codes,
+            criteria_text = EXCLUDED.criteria_text,
+            summary = EXCLUDED.summary,
+            image_url = EXCLUDED.image_url,
+            template_url = EXCLUDED.template_url,
+            status = EXCLUDED.status,
+            sort_order = EXCLUDED.sort_order,
+            source_folder_id = EXCLUDED.source_folder_id,
+            updated_by_email = EXCLUDED.updated_by_email,
+            updated_at = NOW()
+        `,
+        [
+          entry.id,
+          entry.title,
+          JSON.stringify(entry.standardCodes || []),
+          entry.criteriaText || null,
+          entry.summary || null,
+          entry.imageUrl || null,
+          entry.templateUrl,
+          entry.status || "live",
+          Number(entry.sortOrder || 0),
+          entry.sourceFolderId || null,
+          normalizeEmail(updatedByEmail) || null
+        ]
+      );
+    }
+
+    await client.query("COMMIT");
+    return { upserted: normalized.length };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 async function driveApiRequest(pathname, { accessToken, method = "GET", queryParams = {}, body = null } = {}) {
   const params = new URLSearchParams();
   Object.entries(queryParams || {}).forEach(([key, value]) => {
@@ -4566,6 +4740,24 @@ async function driveCopyFile(fileId, destinationFolderId, copyName, accessToken)
   });
 }
 
+async function driveListSlidesInFolder(folderId, accessToken) {
+  const safeFolder = String(folderId || "").trim().replace(/'/g, "\\'");
+  if (!safeFolder) return [];
+  const q = `'${safeFolder}' in parents and mimeType = 'application/vnd.google-apps.presentation' and trashed = false`;
+  const result = await driveApiRequest("/files", {
+    accessToken,
+    queryParams: {
+      q,
+      fields: "files(id,name,webViewLink,thumbnailLink,modifiedTime)",
+      orderBy: "name_natural asc",
+      pageSize: 200,
+      includeItemsFromAllDrives: true,
+      supportsAllDrives: true
+    }
+  });
+  return Array.isArray(result?.files) ? result.files : [];
+}
+
 function extractSlidesFileId(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
@@ -4636,6 +4828,83 @@ async function saveStudentDriveSetup(email, processAssessmentFolderId) {
   );
   return r.rows?.[0] || null;
 }
+
+app.get("/api/template-library", async (_req, res) => {
+  try {
+    const entries = await listTemplateLibraryEntries();
+    res.json({ ok: true, entries });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not load template library." });
+  }
+});
+
+app.post("/api/template-library/sync", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email) {
+    res.status(401).json({ error: "Sign in is required." });
+    return;
+  }
+
+  const access = await resolveActivityWriteAccess(email);
+  if (!access.allowed) {
+    res.status(403).json({ error: "Teacher/Admin access is required." });
+    return;
+  }
+
+  const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
+  const folderName = String(req.body?.folderName || "Process Slide Templates").trim();
+  if (!driveAccessToken) {
+    res.status(400).json({ error: "driveAccessToken is required." });
+    return;
+  }
+
+  try {
+    const folder = await driveFindFolderByNameAnywhere(folderName, driveAccessToken);
+    if (!folder?.id) {
+      res.status(404).json({ error: `Could not find a Google Drive folder named "${folderName}".` });
+      return;
+    }
+
+    const slides = await driveListSlidesInFolder(folder.id, driveAccessToken);
+    const syncEntries = slides.map((file, index) => {
+      const title = String(file?.name || "Untitled Template").trim();
+      const standardCodes = Array.from(new Set((title.match(/\b\d{5}\b/g) || []).map((code) => String(code || "").trim())));
+      return {
+        id: String(file?.id || "").trim(),
+        title,
+        standardCodes,
+        criteriaText: "",
+        summary: `Synced from ${folderName}.`,
+        imageUrl: String(file?.thumbnailLink || "").trim(),
+        templateUrl: String(file?.webViewLink || `https://docs.google.com/presentation/d/${String(file?.id || "").trim()}/edit`).trim(),
+        status: "live",
+        sortOrder: index + 1,
+        sourceFolderId: String(folder.id).trim()
+      };
+    });
+
+    if (!syncEntries.length) {
+      res.status(400).json({ error: `No Google Slides files were found in "${folderName}".` });
+      return;
+    }
+
+    const result = await upsertTemplateLibraryEntries(syncEntries, access.email);
+    const entries = await listTemplateLibraryEntries();
+
+    res.json({
+      ok: true,
+      folder: {
+        id: String(folder.id || "").trim(),
+        name: String(folder.name || folderName).trim(),
+        url: String(folder.webViewLink || `https://drive.google.com/drive/folders/${folder.id}`).trim()
+      },
+      syncedCount: Number(result?.upserted || 0),
+      entries
+    });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not sync template library." });
+  }
+});
 
 app.get("/api/student/drive-setup", async (req, res) => {
   const email = normalizeEmail(getRequestUserEmail(req));

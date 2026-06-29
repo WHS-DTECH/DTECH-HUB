@@ -4,7 +4,17 @@ const teacherStatus = document.querySelector("#teacher-status");
 const standardsLinksHost = document.querySelector("#standards-links");
 const standardsSummaryHost = document.querySelector("#standards-summary");
 const standardsMeta = document.querySelector("#standards-results-meta");
+const templateSyncButton = document.querySelector("#teacher-sync-template-library");
+const templateSyncStatus = document.querySelector("#teacher-sync-status");
+const templateSyncFolderInput = document.querySelector("#teacher-template-folder-name");
 const TEACHER_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
+const TEACHER_TEMPLATE_SYNC_SCOPES = "https://www.googleapis.com/auth/drive.readonly";
+const teacherDriveState = {
+    tokenClient: null,
+    accessToken: "",
+    tokenExpiry: 0,
+    pendingResolve: null
+};
 
 function getHubStoredAuthRaw() {
     let localValue = null;
@@ -104,6 +114,134 @@ function setTeacherStatus(message, isError = false) {
     if (!teacherStatus) return;
     teacherStatus.textContent = message;
     teacherStatus.style.color = isError ? "#bb3f3f" : "#2f4e73";
+}
+
+function setTemplateSyncStatus(message, isError = false) {
+    if (!templateSyncStatus) return;
+    templateSyncStatus.textContent = String(message || "").trim();
+    templateSyncStatus.style.color = isError ? "#bb3f3f" : "#2f4e73";
+}
+
+function initTeacherDriveTokenClient() {
+    if (!window.google?.accounts?.oauth2) return null;
+    const clientId = document.querySelector('meta[name="hub-google-client-id"]')?.content?.trim() || "";
+    if (!clientId) return null;
+
+    return window.google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: TEACHER_TEMPLATE_SYNC_SCOPES,
+        callback: (response) => {
+            if (teacherDriveState.pendingResolve) {
+                teacherDriveState.pendingResolve(response || {});
+                teacherDriveState.pendingResolve = null;
+            }
+            if (response?.access_token && !response?.error) {
+                teacherDriveState.accessToken = response.access_token;
+                teacherDriveState.tokenExpiry = Date.now() + (Number(response.expires_in) || 3600) * 1000;
+            }
+        },
+        error_callback: (error) => {
+            if (teacherDriveState.pendingResolve) {
+                teacherDriveState.pendingResolve({ error: error?.type || "access_denied" });
+                teacherDriveState.pendingResolve = null;
+            }
+        }
+    });
+}
+
+function requestTeacherDriveToken(options = {}) {
+    const forceConsent = Boolean(options?.forceConsent);
+    return new Promise((resolve) => {
+        if (teacherDriveState.accessToken && teacherDriveState.tokenExpiry > Date.now() + 60000) {
+            resolve({ access_token: teacherDriveState.accessToken });
+            return;
+        }
+
+        if (!teacherDriveState.tokenClient) {
+            teacherDriveState.tokenClient = initTeacherDriveTokenClient();
+        }
+
+        if (!teacherDriveState.tokenClient) {
+            resolve({ error: "Drive sign-in is not available." });
+            return;
+        }
+
+        teacherDriveState.pendingResolve = resolve;
+        teacherDriveState.tokenClient.requestAccessToken({ prompt: forceConsent ? "consent" : "" });
+    });
+}
+
+async function handleTemplateLibrarySync() {
+    if (!templateSyncButton) return;
+    templateSyncButton.disabled = true;
+    setTemplateSyncStatus("Requesting Google Drive access...");
+
+    const tokenResponse = await requestTeacherDriveToken();
+    if (tokenResponse.error) {
+        templateSyncButton.disabled = false;
+        setTemplateSyncStatus("Drive access was not granted. Please try again.", true);
+        return;
+    }
+
+    const folderName = String(templateSyncFolderInput?.value || "Process Slide Templates").trim() || "Process Slide Templates";
+    setTemplateSyncStatus(`Syncing slides from ${folderName}...`);
+
+    try {
+        const response = await fetch("/api/template-library/sync", {
+            method: "POST",
+            headers: withTeacherAuthHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({
+                driveAccessToken: tokenResponse.access_token,
+                folderName
+            })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || `Error ${response.status}`);
+
+        const syncedCount = Number(payload?.syncedCount || 0);
+        const folderUrl = String(payload?.folder?.url || "").trim();
+        if (folderUrl) {
+            setTemplateSyncStatus(`Synced ${syncedCount} template${syncedCount === 1 ? "" : "s"}.`);
+        } else {
+            setTemplateSyncStatus(`Synced ${syncedCount} template${syncedCount === 1 ? "" : "s"}.`);
+        }
+    } catch (error) {
+        const message = String(error?.message || "Sync failed.");
+        const needsConsentRetry = /insufficient|forbidden|has not granted the app|read access/i.test(message);
+        if (!needsConsentRetry) {
+            setTemplateSyncStatus(message, true);
+            templateSyncButton.disabled = false;
+            return;
+        }
+
+        teacherDriveState.accessToken = "";
+        teacherDriveState.tokenExpiry = 0;
+        const consentTokenResponse = await requestTeacherDriveToken({ forceConsent: true });
+        if (consentTokenResponse.error) {
+            setTemplateSyncStatus("Google Drive permission is required to sync templates.", true);
+            templateSyncButton.disabled = false;
+            return;
+        }
+
+        try {
+            const response = await fetch("/api/template-library/sync", {
+                method: "POST",
+                headers: withTeacherAuthHeaders({ "Content-Type": "application/json" }),
+                body: JSON.stringify({
+                    driveAccessToken: consentTokenResponse.access_token,
+                    folderName
+                })
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(payload.error || `Error ${response.status}`);
+            const syncedCount = Number(payload?.syncedCount || 0);
+            setTemplateSyncStatus(`Synced ${syncedCount} template${syncedCount === 1 ? "" : "s"}.`);
+        } catch (retryError) {
+            setTemplateSyncStatus(String(retryError?.message || "Sync failed."), true);
+        }
+    }
+
+    templateSyncButton.disabled = false;
 }
 
 async function fetchSharedActivities() {
@@ -425,6 +563,13 @@ if (clearButton) {
 async function initTeacherView() {
     const allowed = await enforceTeacherViewAccess();
     if (!allowed) return;
+
+    if (templateSyncButton) {
+        templateSyncButton.addEventListener("click", () => {
+            void handleTemplateLibrarySync();
+        });
+    }
+
     await renderNzqaStandardsSnapshot();
 }
 

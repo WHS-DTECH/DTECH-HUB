@@ -93,6 +93,44 @@
         .standards-task-link:hover {
             text-decoration: underline;
         }
+
+        .template-sync-panel {
+            border: 1px solid #d7e3f1;
+            border-radius: 12px;
+            background: #f8fbff;
+            padding: 12px;
+            margin-bottom: 14px;
+        }
+
+        .template-sync-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .template-sync-field {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: #173f63;
+            font-weight: 700;
+        }
+
+        .template-sync-field input {
+            border: 1px solid #b8d1ea;
+            border-radius: 8px;
+            padding: 8px 10px;
+            min-width: 240px;
+            font-size: 0.84rem;
+        }
+
+        .template-sync-status {
+            margin: 8px 0 0;
+            font-size: 0.82rem;
+            color: #2f4e73;
+        }
     </style>
 </head>
 <body>
@@ -155,6 +193,18 @@
         <main>
             <div class="home-grid single-column">
                 <div class="hub-column activities-column">
+                    <section class="template-sync-panel" aria-label="Template library sync">
+                        <div class="template-sync-row">
+                            <label class="template-sync-field" for="teacher-template-folder-name">
+                                Google Drive Folder
+                                <input id="teacher-template-folder-name" type="text" value="Process Slide Templates" autocomplete="off">
+                            </label>
+                            <button id="teacher-sync-template-library" class="button button-secondary" type="button">Sync Slideshows To Library</button>
+                            <a class="button button-secondary" href="ProjectPages/slideshow-template-library.html">Open Template Library</a>
+                        </div>
+                        <p id="teacher-sync-status" class="template-sync-status" aria-live="polite"></p>
+                    </section>
+
                     <section id="nzqa-standards" class="panel-section library-section">
                         <div class="section-heading library-heading">
                             <div>
