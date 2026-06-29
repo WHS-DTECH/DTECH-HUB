@@ -148,10 +148,12 @@ function parseInputRows(rawText) {
     const hasHeader = firstColumns.includes("student_email") || firstColumns.includes("email");
 
     const indexes = {
-        email: hasHeader ? firstColumns.findIndex((key) => ["student_email", "email", "studentemail"].includes(key)) : 0,
+        email: hasHeader ? firstColumns.findIndex((key) => ["student_email", "email", "studentemail", "student email - school", "student email", "school email"].includes(key)) : 0,
         folderUrl: hasHeader ? firstColumns.findIndex((key) => ["folder_url", "folderurl", "folder", "folder_id", "folderid"].includes(key)) : 1,
-        classLabel: hasHeader ? firstColumns.findIndex((key) => ["class_label", "classlabel", "class", "group"].includes(key)) : 2,
-        notes: hasHeader ? firstColumns.findIndex((key) => ["notes", "note"].includes(key)) : 3
+        primaryFolder: hasHeader ? firstColumns.findIndex((key) => ["primary hapara", "primary_hapara", "hapara primary", "primary folder"].includes(key)) : -1,
+        secondaryFolder: hasHeader ? firstColumns.findIndex((key) => ["secondary hapara", "secondary_hapara", "hapara secondary", "secondary folder"].includes(key)) : -1,
+        classLabel: hasHeader ? firstColumns.findIndex((key) => ["class_label", "classlabel", "class", "group", "timetable class", "timetable_class"].includes(key)) : 2,
+        notes: hasHeader ? firstColumns.findIndex((key) => ["notes", "note", "last name", "first name"].includes(key)) : 3
     };
 
     const startIndex = hasHeader ? 1 : 0;
@@ -160,7 +162,11 @@ function parseInputRows(rawText) {
     for (let index = startIndex; index < lines.length; index += 1) {
         const columns = splitCsvLine(lines[index]);
         const email = normalizeEmail(indexes.email >= 0 ? columns[indexes.email] : "");
-        const folderValue = String(indexes.folderUrl >= 0 ? columns[indexes.folderUrl] : "").trim();
+        const primaryFolderValue = String(indexes.primaryFolder >= 0 ? columns[indexes.primaryFolder] : "").trim();
+        const secondaryFolderValue = String(indexes.secondaryFolder >= 0 ? columns[indexes.secondaryFolder] : "").trim();
+        const folderValue = String(indexes.folderUrl >= 0 ? columns[indexes.folderUrl] : "").trim()
+            || primaryFolderValue
+            || secondaryFolderValue;
         const classLabel = String(indexes.classLabel >= 0 ? columns[indexes.classLabel] : "").trim();
         const notes = String(indexes.notes >= 0 ? columns[indexes.notes] : "").trim();
 
@@ -216,6 +222,7 @@ function renderPreview(rows) {
     const validCount = previewRows.filter((row) => row.student_email && row.folder_url).length;
     const invalidCount = previewRows.length - validCount;
     previewMeta.textContent = `Preview: ${previewRows.length} row(s) parsed — ${validCount} ready to upload${invalidCount ? `, ${invalidCount} missing email or folder` : ""}. Saved mappings table will update after upload.`;
+    renderRows(previewRows, "preview");
 }
 
 async function loadSavedMappings() {
