@@ -21,7 +21,7 @@ const TEMPLATE_LIBRARY = [
     }
 ];
 
-const DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.metadata.readonly";
+const DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly";
 const LIB_AUTH_KEY = "hub_google_auth_v1";
 
 const driveState = {
@@ -113,7 +113,7 @@ async function loadLibraryAccess() {
         }
         const payload = await response.json().catch(() => ({}));
         return {
-    const DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly";
+            can_teacher_view: Boolean(payload?.can_teacher_view),
             can_admin: Boolean(payload?.can_admin)
         };
     } catch (_error) {
@@ -156,7 +156,8 @@ function initDriveTokenClient() {
     });
 }
 
-function requestDriveToken() {
+function requestDriveToken(options = {}) {
+    const forceConsent = Boolean(options?.forceConsent);
     return new Promise((resolve) => {
         if (driveState.accessToken && driveState.tokenExpiry > Date.now() + 60000) {
             resolve({ access_token: driveState.accessToken });
@@ -173,7 +174,7 @@ function requestDriveToken() {
         }
 
         driveState.pendingResolve = resolve;
-        driveState.tokenClient.requestAccessToken({ prompt: "" });
+        driveState.tokenClient.requestAccessToken({ prompt: forceConsent ? "consent" : "" });
     });
 }
 
@@ -316,6 +317,17 @@ async function handleUseTemplate(templateId) {
     const button = document.querySelector(`[data-use-template="${CSS.escape(templateId)}"]`);
     if (button) { button.disabled = true; button.textContent = "Copying\u2026"; }
 
+    const copyTemplateWithToken = async (accessToken) => {
+        const response = await fetch("/api/student/drive-setup/copy-template", {
+            method: "POST",
+            headers: withLibraryAuthHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ driveAccessToken: accessToken, templateTitle: item.title, templateFileId: fileId })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || `Error ${response.status}`);
+        return payload;
+    };
+
     const tokenResponse = await requestDriveToken();
     if (tokenResponse.error) {
         if (button) { button.disabled = false; button.textContent = "Use Template"; }
@@ -324,20 +336,38 @@ async function handleUseTemplate(templateId) {
     }
 
     try {
-        const response = await fetch("/api/student/drive-setup/copy-template", {
-            method: "POST",
-            headers: withLibraryAuthHeaders({ "Content-Type": "application/json" }),
-            body: JSON.stringify({ driveAccessToken: tokenResponse.access_token, templateTitle: item.title, templateFileId: fileId })
-        });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(payload.error || `Error ${response.status}`);
+        const payload = await copyTemplateWithToken(tokenResponse.access_token);
 
         driveState.copyMap[templateId] = { fileUrl: payload.fileUrl, fileName: payload.fileName };
         updateCardAfterCopy(templateId, payload);
         window.open(payload.fileUrl, "_blank", "noopener");
     } catch (error) {
-        if (button) { button.disabled = false; button.textContent = "Use Template"; }
-        alert(`Could not copy template: ${error.message || "Unknown error"}`);
+        const message = String(error?.message || "");
+        const needsConsentRetry = /has not granted the app|read access to the file|insufficient permissions|forbidden/i.test(message);
+        if (!needsConsentRetry) {
+            if (button) { button.disabled = false; button.textContent = "Use Template"; }
+            alert(`Could not copy template: ${error.message || "Unknown error"}`);
+            return;
+        }
+
+        driveState.accessToken = null;
+        driveState.tokenExpiry = 0;
+        const consentTokenResponse = await requestDriveToken({ forceConsent: true });
+        if (consentTokenResponse.error) {
+            if (button) { button.disabled = false; button.textContent = "Use Template"; }
+            alert("Google Drive needs one-time permission to read templates before copying. Please allow access and try again.");
+            return;
+        }
+
+        try {
+            const retryPayload = await copyTemplateWithToken(consentTokenResponse.access_token);
+            driveState.copyMap[templateId] = { fileUrl: retryPayload.fileUrl, fileName: retryPayload.fileName };
+            updateCardAfterCopy(templateId, retryPayload);
+            window.open(retryPayload.fileUrl, "_blank", "noopener");
+        } catch (retryError) {
+            if (button) { button.disabled = false; button.textContent = "Use Template"; }
+            alert(`Could not copy template: ${retryError.message || "Unknown error"}`);
+        }
     }
 }
 
