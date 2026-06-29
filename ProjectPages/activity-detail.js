@@ -3921,6 +3921,8 @@ function defaultDetailShape(id, data) {
         instructions: Array.isArray(data?.instructions) ? data.instructions : [],
         cardUrl: String(data?.cardUrl || data?.card_url || data?.activity_url || data?.url || "").trim(),
         image: String(data?.image || "").trim() || "https://placehold.co/900x560/3f89cf/ffffff?text=Uploaded+Activity",
+        slideshowTemplateImage: toSafeExternalUrl(data?.slideshowTemplateImage || data?.slideTemplateImage || ""),
+        slideshowTemplateFileUrl: toSafeExternalUrl(data?.slideshowTemplateFileUrl || data?.slideTemplateFileUrl || data?.speakerNotesCriteriaUrl || ""),
         
         // Project Proposal Fields
         startDate: String(data?.startDate || "").trim(),
@@ -4009,6 +4011,28 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         || resolvedTaskShortName.toLowerCase().includes("decompos");
     const isDigitalOutcomeTopic = taskTopicTitle.toLowerCase().includes("digital outcome")
         || resolvedTaskShortName.toLowerCase().includes("digital outcome");
+    const slideshowTemplateLibraryUrl = "slideshow-template-library.html";
+    const slideshowTemplateImage = toSafeExternalUrl(data?.slideshowTemplateImage || data?.slideTemplateImage || "");
+    const slideshowTemplateFileUrl = toSafeExternalUrl(data?.slideshowTemplateFileUrl || data?.slideTemplateFileUrl || data?.speakerNotesCriteriaUrl || "");
+    const heroVisualImage = (isDigitalOutcomeTopic ? (slideshowTemplateImage || data.image) : data.image)
+        || "https://placehold.co/900x560/3f89cf/ffffff?text=Uploaded+Activity";
+    const heroVisualAlt = isDigitalOutcomeTopic
+        ? `${displayTitle} slideshow template preview`
+        : `${displayTitle} project image`;
+    const heroImageHtml = isDigitalOutcomeTopic
+        ? `
+                <div class="task-topic-template-hero">
+                    <img src="${escapeHtml(heroVisualImage)}" alt="${escapeHtml(heroVisualAlt)}" loading="lazy">
+                    <div class="task-topic-template-hero-actions">
+                        <a class="detail-action detail-action-secondary" href="${escapeHtml(slideshowTemplateLibraryUrl)}">Open Template Library</a>
+                        ${slideshowTemplateFileUrl
+                            ? `<a class="detail-action" href="${escapeHtml(slideshowTemplateFileUrl)}" target="_blank" rel="noreferrer">Open Slideshow File</a>`
+                            : ""
+                        }
+                    </div>
+                </div>
+            `
+        : `<img src="${escapeHtml(heroVisualImage)}" alt="${escapeHtml(heroVisualAlt)}" loading="lazy">`;
     const subjectStream = String(data?.subjectStream || data?.subject_stream || data?.subject || "").trim().toUpperCase();
     const contextSignals = [
         subjectStream,
@@ -4070,6 +4094,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 ? [
                     "Create a Google Slideshow for this topic.",
                     "Include a slide that describes the digital outcome: what it is, who it is for, and what it must do.",
+                        "Record the assessment criteria page in Speaker Notes so markers can verify how each point is addressed.",
                     "Explain the intent of the idea clearly: problem, purpose, audience, and expected impact.",
                     "Use concise wording and evidence-based reasoning so your idea is easy to evaluate."
                 ]
@@ -4102,7 +4127,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 : submissionTaskItems));
     const topicGuideSourceUrl = (isProjectManagementTopic || isDecompositionTopic)
         ? "https://trello.com/"
-        : (isDigitalOutcomeTopic ? "" : "");
+        : (isDigitalOutcomeTopic ? slideshowTemplateLibraryUrl : "");
     const topicGuideIntroText = isDigitalOutcomeTopic
         ? "Use this guide to write and record a clear description of your digital outcome before starting development."
         : "Use this guide to complete the Submission Tasks correctly.";
@@ -4190,7 +4215,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 <p>${displaySummaryHtml}</p>
             </div>
             <div class="hero-image">
-                <img src="${escapeHtml(data.image)}" alt="${escapeHtml(displayTitle)} project image" loading="lazy">
+                ${heroImageHtml}
             </div>
         </section>
 
@@ -4823,6 +4848,8 @@ function renderTaskTopicEditForm(host, id, data, canEdit, selectedTaskTopic, sel
         || deriveTaskShortName(currentTopic);
     const standardTaskTopicUrl = toSafeExternalUrl(data?.cardUrl)
         || `${window.location.origin}/ProjectPages/custom-activity.html?id=${encodeURIComponent(String(id || ""))}`;
+    const currentTemplateImageUrl = toSafeExternalUrl(data?.slideshowTemplateImage || data?.slideTemplateImage || "");
+    const currentTemplateFileUrl = toSafeExternalUrl(data?.slideshowTemplateFileUrl || data?.slideTemplateFileUrl || data?.speakerNotesCriteriaUrl || "");
     const renderOptions = (options, selectedValue) => options
         .map((option) => {
             const safeOption = String(option || "").trim();
@@ -4910,6 +4937,14 @@ function renderTaskTopicEditForm(host, id, data, canEdit, selectedTaskTopic, sel
                     <label class="detail-field detail-field-full">
                         <span>Card URL</span>
                         <input name="taskTopicUrl" type="url" value="${escapeHtml(standardTaskTopicUrl)}" readonly>
+                    </label>
+                    <label class="detail-field detail-field-full">
+                        <span>Slideshow Template Preview Image URL</span>
+                        <input name="taskTopicTemplateImageUrl" type="url" placeholder="https://..." value="${escapeHtml(currentTemplateImageUrl)}">
+                    </label>
+                    <label class="detail-field detail-field-full">
+                        <span>Slideshow Template File URL</span>
+                        <input name="taskTopicTemplateFileUrl" type="url" placeholder="https://docs.google.com/presentation/..." value="${escapeHtml(currentTemplateFileUrl)}">
                     </label>
                     <label class="detail-field detail-field-full">
                         <span>Short Description</span>
@@ -5104,6 +5139,8 @@ function renderTaskTopicEditForm(host, id, data, canEdit, selectedTaskTopic, sel
             instructions: coerceArray(data.instructions),
             cardUrl: data.cardUrl,
             image: data.image,
+            slideshowTemplateImage: toSafeExternalUrl(formData.get("taskTopicTemplateImageUrl")) || "",
+            slideshowTemplateFileUrl: toSafeExternalUrl(formData.get("taskTopicTemplateFileUrl")) || "",
             startDate: data.startDate,
             contactName: data.contactName,
             contactPhone: data.contactPhone,
@@ -5358,6 +5395,8 @@ function renderEditForm(host, id, data) {
             activityCategory: normalizeCardCategory(formData.get("activityCategory"), data?.activityCategory || "Assessment Task"),
             summary: String(formData.get("summary") || "").trim(),
             image: String(formData.get("image") || "").trim() || "https://placehold.co/900x560/3f89cf/ffffff?text=Uploaded+Activity",
+            slideshowTemplateImage: toSafeExternalUrl(data?.slideshowTemplateImage || data?.slideTemplateImage || ""),
+            slideshowTemplateFileUrl: toSafeExternalUrl(data?.slideshowTemplateFileUrl || data?.slideTemplateFileUrl || data?.speakerNotesCriteriaUrl || ""),
             resources: parseLines(formData.get("resources")),
             equipment: parseLines(formData.get("equipment")),
             instructions: parseLines(formData.get("instructions")),
