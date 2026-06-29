@@ -220,10 +220,16 @@ function renderSetupBanner(setup) {
     if (!hasDriveFolder) {
         const mappedDescription = mappedLabel || mappedValue || "Mapped (non-Drive value)";
         banner.innerHTML = `
-            <div class="template-setup-banner-inner template-setup-banner-warn">
-                <p class="template-setup-banner-text">Your account has a Hapara mapping, but it is not a Google Drive folder link yet.<br><strong>Signed-in account:</strong> ${escapeHtml(signedInEmail)}<br><strong>Mapped value:</strong> ${escapeHtml(mappedDescription)}<br>Templates are still available using the standard Google copy link.<br><a class="template-setup-banner-link" href="../admin-hapara-folders.html" target="_blank" rel="noreferrer">Open Hapara Folder Upload page</a> to upload a Drive folder URL when ready.</p>
+            <div class="template-setup-banner-inner template-setup-banner-action">
+                <p class="template-setup-banner-text">Your account has a Hapara mapping by folder name.<br><strong>Signed-in account:</strong> ${escapeHtml(signedInEmail)}<br><strong>Mapped value:</strong> ${escapeHtml(mappedDescription)}<br>Click confirm and we will try to find this folder in your Google Drive, then create your <strong>Process Assessment</strong> sub-folder automatically.</p>
+                <button type="button" class="template-setup-confirm-button" id="template-setup-confirm">Confirm My Folder</button>
+                <p class="template-setup-banner-status" id="template-setup-status" aria-live="polite"></p>
+                <p class="template-setup-banner-text"><a class="template-setup-banner-link" href="../admin-hapara-folders.html" target="_blank" rel="noreferrer">Open Hapara Folder Upload page</a> to upload a Drive folder URL if name lookup does not find the correct folder.</p>
             </div>`;
         banner.hidden = false;
+        document.querySelector("#template-setup-confirm")?.addEventListener("click", () => {
+            void handleConfirmFolder();
+        });
         return;
     }
 

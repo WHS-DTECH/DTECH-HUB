@@ -4500,8 +4500,40 @@ async function driveFindFolderByName(parentFolderId, folderName, accessToken) {
   const safeName = folderName.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
   const safeParent = parentFolderId.replace(/'/g, "\\'");
   const q = `name = '${safeName}' and mimeType = 'application/vnd.google-apps.folder' and '${safeParent}' in parents and trashed = false`;
-  const result = await driveApiRequest("/files", { accessToken, queryParams: { q, fields: "files(id,name,webViewLink)", pageSize: 1 } });
+  const result = await driveApiRequest("/files", {
+    accessToken,
+    queryParams: {
+      q,
+      fields: "files(id,name,webViewLink)",
+      pageSize: 1,
+      includeItemsFromAllDrives: true,
+      supportsAllDrives: true
+    }
+  });
   return result.files?.[0] || null;
+}
+
+async function driveFindFolderByNameAnywhere(folderName, accessToken) {
+  const name = String(folderName || "").trim().replace(/^\/+|\/+$/g, "");
+  if (!name) return null;
+
+  const safeName = name.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  const q = `name = '${safeName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+  const result = await driveApiRequest("/files", {
+    accessToken,
+    queryParams: {
+      q,
+      fields: "files(id,name,webViewLink)",
+      orderBy: "modifiedTime desc",
+      pageSize: 25,
+      includeItemsFromAllDrives: true,
+      supportsAllDrives: true
+    }
+  });
+
+  const matches = Array.isArray(result.files) ? result.files : [];
+  const exactMatch = matches.find((file) => String(file?.name || "").trim().toLowerCase() === name.toLowerCase());
+  return exactMatch || matches[0] || null;
 }
 
 async function driveCreateFolder(parentFolderId, folderName, accessToken) {
@@ -4640,12 +4672,44 @@ app.post("/api/student/drive-setup/confirm", async (req, res) => {
   const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
   if (!driveAccessToken) { res.status(400).json({ error: "driveAccessToken is required." }); return; }
   try {
-    const setup = await getStudentDriveSetup(email);
-    if (!setup?.haparaFolderId) {
+    let setup = await getStudentDriveSetup(email);
+    if (!setup) {
       res.status(404).json({ error: "Your Hapara folder has not been set up by your teacher yet. Please ask your teacher." });
       return;
     }
-    const folder = await driveEnsureProcessAssessmentFolder(setup.haparaFolderId, driveAccessToken);
+
+    let haparaFolderId = String(setup.haparaFolderId || "").trim();
+    if (!haparaFolderId) {
+      const mappedFolderName = String(setup.haparaFolderUrl || "").trim().replace(/^\/+|\/+$/g, "");
+      if (!mappedFolderName) {
+        res.status(404).json({ error: "Your Hapara mapping exists but no folder name was provided." });
+        return;
+      }
+
+      const resolvedFolder = await driveFindFolderByNameAnywhere(mappedFolderName, driveAccessToken);
+      if (!resolvedFolder?.id) {
+        res.status(404).json({ error: `Could not find a Google Drive folder named \"${mappedFolderName}\". Open Drive to confirm the exact folder name or upload a folder URL.` });
+        return;
+      }
+
+      await upsertStudentHaparaFoldersBulk([
+        {
+          student_email: email,
+          folder_url: String(resolvedFolder.webViewLink || `https://drive.google.com/drive/folders/${resolvedFolder.id}`),
+          class_label: String(setup.classLabel || "").trim()
+        }
+      ], email);
+
+      setup = await getStudentDriveSetup(email);
+      haparaFolderId = String(setup?.haparaFolderId || "").trim();
+    }
+
+    if (!haparaFolderId) {
+      res.status(400).json({ error: "Could not resolve your Hapara folder to a Drive folder ID." });
+      return;
+    }
+
+    const folder = await driveEnsureProcessAssessmentFolder(haparaFolderId, driveAccessToken);
     if (!folder?.id) { res.status(500).json({ error: "Could not find or create the Process Assessment folder." }); return; }
     await saveStudentDriveSetup(email, folder.id);
     res.json({ ok: true, processAssessmentFolderId: folder.id, processAssessmentFolderUrl: folder.webViewLink || `https://drive.google.com/drive/folders/${folder.id}` });
