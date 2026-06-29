@@ -6,7 +6,7 @@ const TEMPLATE_LIBRARY = [
         criteriaText: "Describe what the digital outcome is, who it is for, and what it must do.",
         summary: "Uses a two-column prompt-and-response slide structure for clear assessment evidence.",
         imageUrl: "https://placehold.co/540x760/e7dec0/1f3a56?text=Digital+Outcome+Description+Slide+Preview",
-        templateUrl: "https://docs.google.com/presentation/create",
+        templateUrl: "",
         status: "live"
     },
     {
@@ -46,12 +46,41 @@ function toSafeExternalUrl(value) {
     return "";
 }
 
+function toSlidesLaunchUrl(value) {
+    const safeUrl = toSafeExternalUrl(value);
+    if (!safeUrl) return "";
+
+    let parsed;
+    try {
+        parsed = new URL(safeUrl);
+    } catch (_error) {
+        return "";
+    }
+
+    const host = parsed.hostname.toLowerCase();
+    const pathname = parsed.pathname;
+    if (host !== "docs.google.com") {
+        return safeUrl;
+    }
+
+    if (/^\/presentation\/create\/?$/i.test(pathname)) {
+        return "";
+    }
+
+    const idMatch = pathname.match(/^\/presentation\/d\/([^/]+)/i);
+    if (!idMatch || !idMatch[1]) {
+        return safeUrl;
+    }
+
+    return `https://docs.google.com/presentation/d/${idMatch[1]}/copy`;
+}
+
 function renderTemplateCard(item) {
     const title = String(item?.title || "Untitled Template").trim();
     const criteriaText = String(item?.criteriaText || "").trim();
     const summary = String(item?.summary || "").trim();
     const imageUrl = toSafeExternalUrl(item?.imageUrl);
-    const templateUrl = toSafeExternalUrl(item?.templateUrl);
+    const templateUrl = toSlidesLaunchUrl(item?.templateUrl);
     const standards = Array.isArray(item?.standardCodes)
         ? item.standardCodes.map((code) => String(code || "").trim()).filter(Boolean)
         : [];
@@ -74,8 +103,9 @@ function renderTemplateCard(item) {
                 </div>
                 ${criteriaText ? `<p><strong>Assessment Criteria:</strong> ${escapeHtml(criteriaText)}</p>` : ""}
                 ${summary ? `<p>${escapeHtml(summary)}</p>` : ""}
+                ${status === "live" && !canOpen ? `<p><strong>Template link not set:</strong> add the Google Slides template file URL in TEMPLATE_LIBRARY.</p>` : ""}
                 <div class="template-card-actions">
-                    <a class="template-card-open" href="${canOpen ? escapeHtml(templateUrl) : "#"}" ${canOpen ? 'target="_blank" rel="noreferrer"' : 'aria-disabled="true"'}>${canOpen ? "Use Template" : "Template Coming Soon"}</a>
+                    <a class="template-card-open" href="${canOpen ? escapeHtml(templateUrl) : "#"}" ${canOpen ? 'target="_blank" rel="noreferrer"' : 'aria-disabled="true"'}>${canOpen ? "Use Template" : (status === "live" ? "Template Link Needed" : "Template Coming Soon")}</a>
                 </div>
             </div>
         </article>
