@@ -6,7 +6,7 @@ const TEMPLATE_LIBRARY = [
         criteriaText: "Describe what the digital outcome is, who it is for, and what it must do.",
         summary: "Uses a two-column prompt-and-response slide structure for clear assessment evidence.",
         imageUrl: "https://placehold.co/540x760/e7dec0/1f3a56?text=Digital+Outcome+Description+Slide+Preview",
-        templateUrl: "",
+        templateUrl: "https://docs.google.com/presentation/d/1brOY70u9aJdsoiEtxVepr82vRhiv9VzpMm8TUv3lcTo/edit?usp=sharing",
         status: "live"
     },
     {
