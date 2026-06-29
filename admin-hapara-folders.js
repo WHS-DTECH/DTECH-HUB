@@ -16,6 +16,10 @@ function normalizeEmail(value) {
     return String(value || "").trim().toLowerCase();
 }
 
+function isHttpUrl(value) {
+    return /^https?:\/\//i.test(String(value || "").trim());
+}
+
 function getStoredAuthState() {
     const raw = localStorage.getItem(AUTH_KEY) || sessionStorage.getItem(AUTH_KEY);
     if (!raw) {
@@ -200,6 +204,11 @@ function renderRows(rows, mode = "saved") {
         const folderId = String(row?.folder_id || "").trim();
         const classLabel = String(row?.class_label || "").trim();
         const notes = String(row?.notes || "").trim();
+        const folderCell = folderUrl
+            ? (isHttpUrl(folderUrl)
+                ? `<a class="hapara-link" href="${escapeHtml(folderUrl)}" target="_blank" rel="noreferrer">${escapeHtml(folderUrl)}</a>`
+                : `<span>${escapeHtml(folderUrl)}</span>`)
+            : '<span class="hapara-empty">Missing</span>';
         const deleteCell = mode === "saved" && email
             ? `<button type="button" class="hapara-delete" data-delete-email="${escapeHtml(email)}">Delete</button>`
             : '<span class="hapara-empty">-</span>';
@@ -208,7 +217,7 @@ function renderRows(rows, mode = "saved") {
             <tr>
                 <td>${email ? escapeHtml(email) : '<span class="hapara-empty">Missing</span>'}</td>
                 <td>${folderId ? escapeHtml(folderId) : '<span class="hapara-empty">Auto on save</span>'}</td>
-                <td>${folderUrl ? `<a class="hapara-link" href="${escapeHtml(folderUrl)}" target="_blank" rel="noreferrer">${escapeHtml(folderUrl)}</a>` : '<span class="hapara-empty">Missing</span>'}</td>
+                <td>${folderCell}</td>
                 <td>${classLabel ? escapeHtml(classLabel) : '<span class="hapara-empty">-</span>'}</td>
                 <td>${notes ? escapeHtml(notes) : '<span class="hapara-empty">-</span>'}</td>
                 <td>${deleteCell}</td>

@@ -4353,9 +4353,10 @@ async function upsertStudentHaparaFoldersBulk(rows, updatedByEmail = "") {
     const studentEmail = normalizeEmail(entry?.student_email || entry?.email || entry?.studentEmail || "");
     const rawFolderValue = String(entry?.folder_url || entry?.folderUrl || entry?.folder_id || entry?.folderId || "").trim();
     const folderId = extractGoogleDriveFolderId(rawFolderValue);
-    const folderUrl = normalizeGoogleDriveFolderUrl(rawFolderValue);
+    const normalizedDriveFolderUrl = normalizeGoogleDriveFolderUrl(rawFolderValue);
+    const folderUrl = normalizedDriveFolderUrl || rawFolderValue;
 
-    if (!studentEmail || !folderId || !folderUrl) {
+    if (!studentEmail || !folderUrl) {
       skipped += 1;
       return;
     }
@@ -4363,7 +4364,7 @@ async function upsertStudentHaparaFoldersBulk(rows, updatedByEmail = "") {
     dedupedByEmail.set(studentEmail, {
       student_email: studentEmail,
       folder_url: folderUrl,
-      folder_id: folderId,
+      folder_id: folderId || "",
       class_label: String(entry?.class_label || entry?.classLabel || entry?.class || "").trim(),
       notes: String(entry?.notes || "").trim(),
       updated_by_email: normalizeEmail(updatedByEmail)
@@ -4420,8 +4421,8 @@ async function upsertStudentHaparaFoldersBulk(rows, updatedByEmail = "") {
         `,
         [
           row.student_email,
-          row.folder_url,
-          row.folder_id,
+          row.folder_url || "",
+          row.folder_id || "",
           row.class_label || null,
           row.notes || null,
           row.updated_by_email || null
@@ -4609,8 +4610,25 @@ app.get("/api/student/drive-setup", async (req, res) => {
   if (!email) { res.status(401).json({ error: "Sign in is required." }); return; }
   try {
     const setup = await getStudentDriveSetup(email);
-    if (!setup) { res.json({ configured: false, haparaFolderId: null, haparaFolderUrl: null, classLabel: null, processAssessmentFolderId: null, confirmed: false }); return; }
-    res.json({ configured: true, ...setup });
+    if (!setup) {
+      res.json({
+        configured: false,
+        driveReady: false,
+        haparaFolderId: null,
+        haparaFolderUrl: null,
+        classLabel: null,
+        processAssessmentFolderId: null,
+        confirmed: false
+      });
+      return;
+    }
+
+    const haparaFolderId = String(setup.haparaFolderId || "").trim();
+    res.json({
+      configured: true,
+      driveReady: Boolean(haparaFolderId),
+      ...setup
+    });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not load drive setup" });
   }

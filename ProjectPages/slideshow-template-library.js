@@ -213,6 +213,20 @@ function renderSetupBanner(setup) {
         return;
     }
 
+    const hasDriveFolder = Boolean(String(setup.haparaFolderId || "").trim());
+    const mappedValue = String(setup.haparaFolderUrl || "").trim();
+    const mappedLabel = String(setup.classLabel || "").trim();
+
+    if (!hasDriveFolder) {
+        const mappedDescription = mappedLabel || mappedValue || "Mapped (non-Drive value)";
+        banner.innerHTML = `
+            <div class="template-setup-banner-inner template-setup-banner-warn">
+                <p class="template-setup-banner-text">Your account has a Hapara mapping, but it is not a Google Drive folder link yet.<br><strong>Signed-in account:</strong> ${escapeHtml(signedInEmail)}<br><strong>Mapped value:</strong> ${escapeHtml(mappedDescription)}<br>Templates are still available using the standard Google copy link.<br><a class="template-setup-banner-link" href="../admin-hapara-folders.html" target="_blank" rel="noreferrer">Open Hapara Folder Upload page</a> to upload a Drive folder URL when ready.</p>
+            </div>`;
+        banner.hidden = false;
+        return;
+    }
+
     if (setup.confirmed && setup.processAssessmentFolderId) {
         banner.innerHTML = `
             <div class="template-setup-banner-inner template-setup-banner-ok">
