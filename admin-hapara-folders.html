@@ -117,17 +117,18 @@
     }
 
     .hapara-table-wrap {
-      overflow: auto;
+      overflow: visible;
       border: 1px solid #ccdae8;
       border-radius: 10px;
       background: #ffffff;
-      max-height: 520px;
+      max-height: none;
     }
 
     .hapara-table {
       width: 100%;
       border-collapse: collapse;
-      min-width: 760px;
+      min-width: 0;
+      table-layout: fixed;
       font-size: 0.8rem;
       color: #163f66;
     }
@@ -147,6 +148,8 @@
       padding: 8px 10px;
       border-bottom: 1px solid #dde6f0;
       vertical-align: top;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
 
     .hapara-table tr:hover td {
@@ -187,10 +190,6 @@
     @media (max-width: 1080px) {
       .hapara-grid {
         grid-template-columns: 1fr;
-      }
-
-      .hapara-table {
-        min-width: 620px;
       }
     }
   </style>
