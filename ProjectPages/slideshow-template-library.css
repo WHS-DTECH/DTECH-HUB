@@ -105,7 +105,7 @@ button.template-button {
 
 .template-card {
     display: grid;
-    grid-template-columns: 128px minmax(0, 1fr);
+    grid-template-columns: 220px minmax(0, 1fr);
     gap: 12px;
     align-items: start;
     border-radius: 12px;
@@ -117,19 +117,19 @@ button.template-button {
 
 .template-card-preview {
     display: block;
-    width: 128px;
-    height: 176px;
+    width: 220px;
+    height: 124px;
     border-radius: 8px;
     overflow: hidden;
     border: 1px solid #b8cadf;
-    background: #dfeaf6;
+    background: #ffffff;
     text-decoration: none;
 }
 
 .template-card-preview img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
     display: block;
 }
 
@@ -235,12 +235,12 @@ button.template-button {
     padding: 0;
     cursor: pointer;
     display: block;
-    width: 128px;
-    height: 176px;
+    width: 220px;
+    height: 124px;
     border-radius: 8px;
     overflow: hidden;
     border: 1px solid #b8cadf;
-    background: #dfeaf6;
+    background: #ffffff;
     text-decoration: none;
 }
 
@@ -396,8 +396,15 @@ button.template-button {
 
     .template-card-preview {
         width: 100%;
-        max-width: 220px;
+        max-width: 320px;
         height: auto;
-        aspect-ratio: 9 / 13;
+        aspect-ratio: 16 / 9;
+    }
+
+    .template-card-preview-button {
+        width: 100%;
+        max-width: 320px;
+        height: auto;
+        aspect-ratio: 16 / 9;
     }
 }
