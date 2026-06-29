@@ -5,7 +5,7 @@ const DEFAULT_TEMPLATE_LIBRARY = [
         standardCodes: ["91897", "91907"],
         criteriaText: "Describe what the digital outcome is, who it is for, and what it must do.",
         summary: "Uses a two-column prompt-and-response slide structure for clear assessment evidence.",
-        imageUrl: "https://placehold.co/540x760/e7dec0/1f3a56?text=Digital+Outcome+Description+Slide+Preview",
+        imageUrl: "https://drive.google.com/thumbnail?id=1brOY70u9aJdsoiEtxVepr82vRhiv9VzpMm8TUv3lcTo&sz=w1000",
         templateUrl: "https://docs.google.com/presentation/d/1brOY70u9aJdsoiEtxVepr82vRhiv9VzpMm8TUv3lcTo/edit?usp=sharing",
         status: "live"
     },
@@ -24,6 +24,8 @@ const DEFAULT_TEMPLATE_LIBRARY = [
 let templateLibraryData = Array.isArray(DEFAULT_TEMPLATE_LIBRARY)
     ? DEFAULT_TEMPLATE_LIBRARY.map((entry) => ({ ...entry }))
     : [];
+let libraryAccess = { can_teacher_view: false, can_admin: false };
+let libraryHandlersBound = false;
 
 const DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly";
 const LIB_AUTH_KEY = "hub_google_auth_v1";
@@ -224,17 +226,19 @@ function normalizeTemplateLibraryEntries(items) {
 
 async function loadTemplateLibraryEntries() {
     try {
-        const response = await fetch("/api/template-library");
+        const response = await fetch("/api/template-library", { headers: withLibraryAuthHeaders({}) });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) return;
 
         const fromApi = normalizeTemplateLibraryEntries(payload?.entries);
-        if (fromApi.length) {
-            templateLibraryData = fromApi;
-        }
+        templateLibraryData = fromApi;
     } catch (_error) {
         // Keep defaults when API is unavailable.
     }
+}
+
+function canManageTemplates() {
+    return Boolean(libraryAccess?.can_teacher_view || libraryAccess?.can_admin);
 }
 
 function renderSetupBanner(setup) {
@@ -423,10 +427,44 @@ function updateCardAfterCopy(templateId, copyResult) {
     if (!actionsArea) return;
 
     const existingLabel = copyResult.alreadyExists ? "Opened your existing copy." : "Saved to Process Assessment.";
+    const deleteButtonHtml = canManageTemplates()
+        ? `<button type="button" class="template-card-delete" data-delete-template="${escapeHtml(templateId)}">Delete</button>`
+        : "";
+
     actionsArea.innerHTML = `
         <a class="template-card-open template-card-open-existing" href="${escapeHtml(copyResult.fileUrl)}" target="_blank" rel="noreferrer">Open Your Copy</a>
+        ${deleteButtonHtml}
         <p class="template-card-copy-note">${escapeHtml(existingLabel)}</p>
     `;
+}
+
+async function handleDeleteTemplate(templateId, clickedButton) {
+    if (!canManageTemplates()) return;
+
+    const id = String(templateId || "").trim();
+    if (!id) return;
+    const entry = templateLibraryData.find((item) => String(item?.id || "") === id);
+    const title = String(entry?.title || "this template");
+    const confirmed = window.confirm(`Delete ${title} from the library?`);
+    if (!confirmed) return;
+
+    if (clickedButton) clickedButton.disabled = true;
+    try {
+        const response = await fetch(`/api/template-library/${encodeURIComponent(id)}`, {
+            method: "DELETE",
+            headers: withLibraryAuthHeaders({})
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || `Error ${response.status}`);
+
+        const fromApi = normalizeTemplateLibraryEntries(payload?.entries);
+        templateLibraryData = fromApi;
+        delete driveState.copyMap[id];
+        renderLibrary();
+    } catch (error) {
+        if (clickedButton) clickedButton.disabled = false;
+        alert(`Could not delete template: ${error.message || "Unknown error"}`);
+    }
 }
 
 function renderTemplateCard(item) {
@@ -444,12 +482,15 @@ function renderTemplateCard(item) {
     const imageAlt = `${title} preview`;
     const standardsLabel = standards.length ? standards.join(", ") : "Not set";
     const existingCopy = driveState.copyMap[item.id];
+    const deleteButtonHtml = canManageTemplates()
+        ? `<button type="button" class="template-card-delete" data-delete-template="${escapeHtml(item.id)}">Delete</button>`
+        : "";
 
     const actionHtml = !canUse
         ? `<button class="template-card-open" aria-disabled="true" disabled>${status === "live" ? "Template Link Needed" : "Template Coming Soon"}</button>`
         : existingCopy
-            ? `<a class="template-card-open template-card-open-existing" href="${escapeHtml(existingCopy.fileUrl)}" target="_blank" rel="noreferrer">Open Your Copy</a><p class="template-card-copy-note">Saved to Process Assessment.</p>`
-            : `<button class="template-card-open" type="button" data-use-template="${escapeHtml(item.id)}">Use Template</button>`;
+            ? `<a class="template-card-open template-card-open-existing" href="${escapeHtml(existingCopy.fileUrl)}" target="_blank" rel="noreferrer">Open Your Copy</a>${deleteButtonHtml}<p class="template-card-copy-note">Saved to Process Assessment.</p>`
+            : `<button class="template-card-open" type="button" data-use-template="${escapeHtml(item.id)}">Use Template</button>${deleteButtonHtml}`;
 
     const previewClickHtml = canUse && !existingCopy
         ? `<button class="template-card-preview template-card-preview-button" type="button" data-use-template="${escapeHtml(item.id)}" aria-label="Use template: ${escapeHtml(title)}">`
@@ -491,17 +532,29 @@ function renderLibrary() {
     }
     host.innerHTML = templateLibraryData.map((item) => renderTemplateCard(item)).join("");
 
-    host.addEventListener("click", (event) => {
-        const target = event.target.closest("[data-use-template]");
-        if (!target) return;
-        const templateId = target.getAttribute("data-use-template") || "";
-        if (templateId) void handleUseTemplate(templateId);
-    });
+    if (!libraryHandlersBound) {
+        libraryHandlersBound = true;
+        host.addEventListener("click", (event) => {
+            const useButton = event.target.closest("[data-use-template]");
+            if (useButton) {
+                const templateId = useButton.getAttribute("data-use-template") || "";
+                if (templateId) {
+                    void handleUseTemplate(templateId);
+                    return;
+                }
+            }
+
+            const deleteButton = event.target.closest("[data-delete-template]");
+            if (!deleteButton) return;
+            const templateId = deleteButton.getAttribute("data-delete-template") || "";
+            if (templateId) void handleDeleteTemplate(templateId, deleteButton);
+        });
+    }
 }
 
 async function initLibrary() {
-    const access = await loadLibraryAccess();
-    applyLibraryRoleVisibility(access);
+    libraryAccess = await loadLibraryAccess();
+    applyLibraryRoleVisibility(libraryAccess);
 
     await loadTemplateLibraryEntries();
     renderLibrary();

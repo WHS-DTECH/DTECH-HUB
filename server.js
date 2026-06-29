@@ -66,7 +66,7 @@ const DEFAULT_TEMPLATE_LIBRARY_ENTRIES = [
     standardCodes: ["91897", "91907"],
     criteriaText: "Describe what the digital outcome is, who it is for, and what it must do.",
     summary: "Uses a two-column prompt-and-response slide structure for clear assessment evidence.",
-    imageUrl: "https://placehold.co/540x760/e7dec0/1f3a56?text=Digital+Outcome+Description+Slide+Preview",
+    imageUrl: "https://drive.google.com/thumbnail?id=1brOY70u9aJdsoiEtxVepr82vRhiv9VzpMm8TUv3lcTo&sz=w1000",
     templateUrl: "https://docs.google.com/presentation/d/1brOY70u9aJdsoiEtxVepr82vRhiv9VzpMm8TUv3lcTo/edit?usp=sharing",
     status: "live",
     sortOrder: 1,
@@ -4645,6 +4645,22 @@ async function upsertTemplateLibraryEntries(entries, updatedByEmail = "") {
   }
 }
 
+async function deleteTemplateLibraryEntry(templateId) {
+  const id = String(templateId || "").trim();
+  if (!id) return false;
+
+  if (!hasDatabase) {
+    return memoryTemplateLibraryEntries.delete(id);
+  }
+
+  await ensureTemplateLibrarySchema();
+  const result = await pool.query(
+    `DELETE FROM template_library_entries WHERE template_id = $1`,
+    [id]
+  );
+  return Number(result?.rowCount || 0) > 0;
+}
+
 async function driveApiRequest(pathname, { accessToken, method = "GET", queryParams = {}, body = null } = {}) {
   const params = new URLSearchParams();
   Object.entries(queryParams || {}).forEach(([key, value]) => {
@@ -4903,6 +4919,34 @@ app.post("/api/template-library/sync", async (req, res) => {
     });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not sync template library." });
+  }
+});
+
+app.delete("/api/template-library/:templateId", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email) {
+    res.status(401).json({ error: "Sign in is required." });
+    return;
+  }
+
+  const access = await resolveActivityWriteAccess(email);
+  if (!access.allowed) {
+    res.status(403).json({ error: "Teacher/Admin access is required." });
+    return;
+  }
+
+  const templateId = String(req.params?.templateId || "").trim();
+  if (!templateId) {
+    res.status(400).json({ error: "templateId is required." });
+    return;
+  }
+
+  try {
+    const deleted = await deleteTemplateLibraryEntry(templateId);
+    const entries = await listTemplateLibraryEntries();
+    res.json({ ok: true, deleted, entries });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not delete template." });
   }
 });
 

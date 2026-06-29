@@ -171,6 +171,10 @@ body {
 
 .template-card-actions {
     margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
 }
 
 .template-card-open {
@@ -264,6 +268,29 @@ body {
     font-size: 0.74rem;
     color: #2a5c38;
     font-weight: 700;
+    width: 100%;
+}
+
+.template-card-delete {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 6px 10px;
+    border: 1px solid #b94a4a;
+    background: #fff5f5;
+    color: #8f2424;
+    text-decoration: none;
+    font-size: 0.78rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.template-card-delete:hover {
+    background: #ffe3e3;
+}
+
+.template-card-delete:disabled {
+    opacity: 0.55;
+    cursor: wait;
 }
 
 .template-setup-banner {
