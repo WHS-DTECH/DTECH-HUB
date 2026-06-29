@@ -246,12 +246,26 @@ function canManageTemplates() {
 }
 
 function getHubViewMode() {
+    if (typeof window.getEffectiveHubViewMode === "function") {
+        try {
+            const resolved = String(window.getEffectiveHubViewMode() || "").trim().toLowerCase();
+            return resolved === "teacher" ? "teacher" : "student";
+        } catch (_error) {
+            // Fall through to storage-based fallback.
+        }
+    }
+
     try {
         const value = String(localStorage.getItem(LIB_HUB_VIEW_MODE_STORAGE_KEY) || "").trim().toLowerCase();
         return value === "teacher" ? "teacher" : "student";
     } catch (_error) {
         return "student";
     }
+}
+
+function refreshStaffOnlyUi() {
+    applyLibraryRoleVisibility(libraryAccess);
+    renderLibrary();
 }
 
 function setTemplateSyncStatus(message, isError = false) {
@@ -624,6 +638,12 @@ async function initLibrary() {
 
     await loadTemplateLibraryEntries();
     renderLibrary();
+
+    // Keep staff-only controls aligned with global auth mode toggles.
+    window.setTimeout(() => { refreshStaffOnlyUi(); }, 250);
+    window.setTimeout(() => { refreshStaffOnlyUi(); }, 1200);
+    window.addEventListener("storage", () => { refreshStaffOnlyUi(); });
+    window.addEventListener("focus", () => { refreshStaffOnlyUi(); });
 
     const banner = document.querySelector("#template-setup-banner");
     if (banner) banner.hidden = true;
