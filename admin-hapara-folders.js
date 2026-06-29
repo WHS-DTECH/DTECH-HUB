@@ -214,8 +214,8 @@ function renderRows(rows, mode = "saved") {
 function renderPreview(rows) {
     previewRows = Array.isArray(rows) ? rows : [];
     const validCount = previewRows.filter((row) => row.student_email && row.folder_url).length;
-    previewMeta.textContent = `Preview rows: ${previewRows.length}. Ready to upload (email + folder): ${validCount}.`;
-    renderRows(previewRows, "preview");
+    const invalidCount = previewRows.length - validCount;
+    previewMeta.textContent = `Preview: ${previewRows.length} row(s) parsed — ${validCount} ready to upload${invalidCount ? `, ${invalidCount} missing email or folder` : ""}. Saved mappings table will update after upload.`;
 }
 
 async function loadSavedMappings() {
@@ -306,13 +306,14 @@ async function deleteMapping(email) {
 previewButton?.addEventListener("click", () => {
     const rows = parseInputRows(inputField?.value || "");
     if (!rows.length) {
-        setStatus("No valid rows found to preview.", true);
-        renderPreview([]);
+        setStatus("No valid rows found to preview. Check your CSV format.", true);
+        previewRows = [];
+        previewMeta.textContent = "No rows parsed. Saved mappings table unchanged.";
         return;
     }
 
-    setStatus(`Preview ready for ${rows.length} row(s).`, false, true);
     renderPreview(rows);
+    setStatus(`${rows.length} row(s) parsed and ready. Click Upload Mappings to save.`, false, true);
 });
 
 uploadButton?.addEventListener("click", () => {
