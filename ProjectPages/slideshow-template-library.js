@@ -242,6 +242,16 @@ async function loadTemplateLibraryEntries() {
 function canManageTemplates() {
     const hasStaffRole = Boolean(libraryAccess?.can_teacher_view || libraryAccess?.can_admin);
     if (!hasStaffRole) return false;
+    return isTeacherModeActiveOnPage();
+}
+
+function isTeacherModeActiveOnPage() {
+    const staffLink = document.querySelector("#hub-staff-link");
+    if (staffLink && !staffLink.hidden) {
+        const href = String(staffLink.getAttribute("href") || "").toLowerCase();
+        if (href.includes("/index.html") || href === "index.html") return true;
+        if (href.includes("/teacher-view.html") || href === "teacher-view.html") return false;
+    }
     return getHubViewMode() === "teacher";
 }
 
@@ -644,6 +654,12 @@ async function initLibrary() {
     window.setTimeout(() => { refreshStaffOnlyUi(); }, 1200);
     window.addEventListener("storage", () => { refreshStaffOnlyUi(); });
     window.addEventListener("focus", () => { refreshStaffOnlyUi(); });
+
+    const staffLink = document.querySelector("#hub-staff-link");
+    if (staffLink && typeof MutationObserver !== "undefined") {
+        const modeObserver = new MutationObserver(() => { refreshStaffOnlyUi(); });
+        modeObserver.observe(staffLink, { attributes: true, attributeFilter: ["href", "hidden"], childList: true, subtree: true });
+    }
 
     const banner = document.querySelector("#template-setup-banner");
     if (banner) banner.hidden = true;
