@@ -165,7 +165,9 @@ function renderSetupBanner(setup) {
     const banner = document.querySelector("#template-setup-banner");
     if (!banner) return;
 
-    if (!getLibraryEmail()) {
+    const signedInEmail = getLibraryEmail();
+
+    if (!signedInEmail) {
         banner.innerHTML = "";
         banner.hidden = true;
         return;
@@ -174,7 +176,7 @@ function renderSetupBanner(setup) {
     if (!setup || !setup.configured) {
         banner.innerHTML = `
             <div class="template-setup-banner-inner template-setup-banner-warn">
-                <p class="template-setup-banner-text">Your Hapara folder has not been configured by your teacher yet. Templates are still available using the standard Google copy link.</p>
+                <p class="template-setup-banner-text">Your Hapara folder has not been configured by your teacher yet. Templates are still available using the standard Google copy link.<br><strong>Signed-in account:</strong> ${escapeHtml(signedInEmail)}<br><a class="template-setup-banner-link" href="../admin-hapara-folders.html" target="_blank" rel="noreferrer">Open Hapara Folder Upload page</a> to verify this email has a mapped Google Drive folder URL.</p>
             </div>`;
         banner.hidden = false;
         return;
