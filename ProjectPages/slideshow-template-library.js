@@ -366,9 +366,13 @@ function renderSetupBanner(setup) {
     }
 
     if (setup.confirmed && setup.processAssessmentFolderId) {
+        const processAssessmentFolderId = String(setup.processAssessmentFolderId || "").trim();
+        const processAssessmentFolderUrl = processAssessmentFolderId
+            ? `https://drive.google.com/drive/folders/${encodeURIComponent(processAssessmentFolderId)}`
+            : "";
         banner.innerHTML = `
             <div class="template-setup-banner-inner template-setup-banner-ok">
-                <p class="template-setup-banner-text">&#10003; Your <strong>Process Assessment</strong> folder is ready. Templates copied will go directly there.</p>
+                <p class="template-setup-banner-text">&#10003; Your <strong><a class="template-setup-banner-link" href="${escapeHtml(processAssessmentFolderUrl)}" target="_blank" rel="noreferrer">Process Assessment</a></strong> folder is ready. Templates copied will go directly there.</p>
             </div>`;
         banner.hidden = false;
         return;
