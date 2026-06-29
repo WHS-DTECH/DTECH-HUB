@@ -67,6 +67,11 @@ body {
     background: #ffffff;
 }
 
+button.template-button {
+    cursor: pointer;
+    font-family: inherit;
+}
+
 .template-button:hover {
     background: #f3f9ff;
 }
@@ -79,6 +84,18 @@ body {
 
 .template-button-muted:hover {
     background: rgba(11, 44, 72, 0.5);
+}
+
+.template-button:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
+.template-sync-status {
+    margin: 8px 0 0;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.92);
 }
 
 .template-list {

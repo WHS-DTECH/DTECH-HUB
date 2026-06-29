@@ -26,6 +26,7 @@ let templateLibraryData = Array.isArray(DEFAULT_TEMPLATE_LIBRARY)
     : [];
 let libraryAccess = { can_teacher_view: false, can_admin: false };
 let libraryHandlersBound = false;
+const SYNC_FOLDER_NAME = "Process Slide Templates";
 
 const DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly";
 const LIB_AUTH_KEY = "hub_google_auth_v1";
@@ -239,6 +240,52 @@ async function loadTemplateLibraryEntries() {
 
 function canManageTemplates() {
     return Boolean(libraryAccess?.can_teacher_view || libraryAccess?.can_admin);
+}
+
+function setTemplateSyncStatus(message, isError = false) {
+    const statusEl = document.querySelector("#template-sync-status");
+    if (!statusEl) return;
+    statusEl.textContent = String(message || "").trim();
+    statusEl.style.color = isError ? "#ffd5d5" : "rgba(255, 255, 255, 0.92)";
+}
+
+async function handleSyncTemplateLibrary() {
+    const syncButton = document.querySelector("#template-sync-button");
+    if (!syncButton || !canManageTemplates()) return;
+
+    syncButton.disabled = true;
+    setTemplateSyncStatus("Requesting Google Drive access...");
+
+    const tokenResponse = await requestDriveToken();
+    if (tokenResponse.error) {
+        syncButton.disabled = false;
+        setTemplateSyncStatus("Drive access was not granted.", true);
+        return;
+    }
+
+    setTemplateSyncStatus(`Syncing slides from ${SYNC_FOLDER_NAME}...`);
+    try {
+        const response = await fetch("/api/template-library/sync", {
+            method: "POST",
+            headers: withLibraryAuthHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({
+                driveAccessToken: tokenResponse.access_token,
+                folderName: SYNC_FOLDER_NAME
+            })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || `Error ${response.status}`);
+
+        const fromApi = normalizeTemplateLibraryEntries(payload?.entries);
+        templateLibraryData = fromApi;
+        renderLibrary();
+        const syncedCount = Number(payload?.syncedCount || fromApi.length || 0);
+        setTemplateSyncStatus(`Synced ${syncedCount} template${syncedCount === 1 ? "" : "s"}.`);
+    } catch (error) {
+        setTemplateSyncStatus(`Sync failed: ${error.message || "Unknown error"}`, true);
+    }
+
+    syncButton.disabled = false;
 }
 
 function renderSetupBanner(setup) {
@@ -555,6 +602,13 @@ function renderLibrary() {
 async function initLibrary() {
     libraryAccess = await loadLibraryAccess();
     applyLibraryRoleVisibility(libraryAccess);
+
+    const syncButton = document.querySelector("#template-sync-button");
+    if (syncButton && canManageTemplates()) {
+        syncButton.addEventListener("click", () => {
+            void handleSyncTemplateLibrary();
+        });
+    }
 
     await loadTemplateLibraryEntries();
     renderLibrary();
