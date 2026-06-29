@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "dgSpecHash": "5z8WpZu+8/c=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\VanessaPringle.WHS\\OneDrive - Westland High School\\Documents\\web\\WHS System\\TechSpace\\DTECH-HUB\\tray\\DTECHHubTray\\DTECHHubTray.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\VanessaPringle.WHS\\.nuget\\packages\\microsoft.web.webview2\\1.0.3240.44\\microsoft.web.webview2.1.0.3240.44.nupkg.sha512",
+    "C:\\Users\\VanessaPringle.WHS\\.nuget\\packages\\microsoft.netcore.app.ref\\8.0.28\\microsoft.netcore.app.ref.8.0.28.nupkg.sha512",
+    "C:\\Users\\VanessaPringle.WHS\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\8.0.28\\microsoft.windowsdesktop.app.ref.8.0.28.nupkg.sha512",
+    "C:\\Users\\VanessaPringle.WHS\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\8.0.28\\microsoft.aspnetcore.app.ref.8.0.28.nupkg.sha512",
+    "C:\\Users\\VanessaPringle.WHS\\.nuget\\packages\\microsoft.netcore.app.host.win-x64\\8.0.28\\microsoft.netcore.app.host.win-x64.8.0.28.nupkg.sha512"
+  ],
+  "logs": []
+}
