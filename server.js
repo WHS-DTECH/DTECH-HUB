@@ -56,6 +56,7 @@ let memoryPracticalEventId = 1;
 const memoryTrelloConnections = new Map();
 const memoryAssessmentStandardCards = new Map();
 const memoryStudentHaparaFolders = new Map();
+const memoryStudentDriveSetup = new Map();
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -3678,6 +3679,7 @@ async function ensureSchema() {
   await ensureProjectInterestsSchema();
   await ensureTrelloConnectionsSchema();
   await ensureStudentHaparaFoldersSchema();
+  await ensureStudentDriveSetupSchema();
   await ensureUnitPlanSchema();
   await ensureAssessmentStandardCardsSchema();
   await ensureCourseOutlinesSchema();
@@ -4452,6 +4454,224 @@ async function deleteStudentHaparaFolder(email) {
   );
   return Number(result?.rowCount || 0) > 0;
 }
+
+async function ensureStudentDriveSetupSchema() {
+  if (!hasDatabase) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS student_drive_setup (
+      student_email TEXT PRIMARY KEY,
+      process_assessment_folder_id TEXT,
+      confirmed_at TIMESTAMPTZ,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  await pool.query(`ALTER TABLE student_drive_setup ADD COLUMN IF NOT EXISTS process_assessment_folder_id TEXT`);
+  await pool.query(`ALTER TABLE student_drive_setup ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE student_drive_setup ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+}
+
+async function driveApiRequest(pathname, { accessToken, method = "GET", queryParams = {}, body = null } = {}) {
+  const params = new URLSearchParams();
+  Object.entries(queryParams || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") params.set(key, String(value));
+  });
+  const qs = params.toString();
+  const url = `https://www.googleapis.com/drive/v3${pathname}${qs ? `?${qs}` : ""}`;
+  const response = await fetch(url, {
+    method,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      ...(body ? { "Content-Type": "application/json" } : {})
+    },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = String(payload?.error?.message || `Drive API error (${response.status})`);
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
+  }
+  return payload;
+}
+
+async function driveFindFolderByName(parentFolderId, folderName, accessToken) {
+  const safeName = folderName.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  const safeParent = parentFolderId.replace(/'/g, "\\'");
+  const q = `name = '${safeName}' and mimeType = 'application/vnd.google-apps.folder' and '${safeParent}' in parents and trashed = false`;
+  const result = await driveApiRequest("/files", { accessToken, queryParams: { q, fields: "files(id,name,webViewLink)", pageSize: 1 } });
+  return result.files?.[0] || null;
+}
+
+async function driveCreateFolder(parentFolderId, folderName, accessToken) {
+  return driveApiRequest("/files", {
+    accessToken, method: "POST",
+    body: { name: folderName, mimeType: "application/vnd.google-apps.folder", parents: [parentFolderId] },
+    queryParams: { fields: "id,name,webViewLink" }
+  });
+}
+
+async function driveEnsureProcessAssessmentFolder(haparaFolderId, accessToken) {
+  const existing = await driveFindFolderByName(haparaFolderId, "Process Assessment", accessToken);
+  if (existing?.id) return existing;
+  return driveCreateFolder(haparaFolderId, "Process Assessment", accessToken);
+}
+
+async function driveFindTemplateInFolder(folderId, templateTitle, accessToken) {
+  const safeTitle = templateTitle.replace(/\\/g, "\\\\").replace(/'/g, "\\'").slice(0, 60);
+  const safeFolder = folderId.replace(/'/g, "\\'");
+  const q = `name contains '${safeTitle}' and '${safeFolder}' in parents and trashed = false and mimeType = 'application/vnd.google-apps.presentation'`;
+  const result = await driveApiRequest("/files", { accessToken, queryParams: { q, fields: "files(id,name,webViewLink)", pageSize: 5 } });
+  return Array.isArray(result.files) ? result.files : [];
+}
+
+async function driveCopyFile(fileId, destinationFolderId, copyName, accessToken) {
+  return driveApiRequest(`/files/${encodeURIComponent(fileId)}/copy`, {
+    accessToken, method: "POST",
+    body: { name: copyName, parents: [destinationFolderId] },
+    queryParams: { fields: "id,name,webViewLink" }
+  });
+}
+
+function extractSlidesFileId(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const parsed = new URL(raw);
+    if (!parsed.hostname.includes("google.com")) return "";
+    const match = parsed.pathname.match(/\/presentation\/d\/([A-Za-z0-9_-]+)/i);
+    return match?.[1] || "";
+  } catch (_error) {
+    return "";
+  }
+}
+
+async function getStudentDriveSetup(email) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) return null;
+
+  const haparaRow = hasDatabase
+    ? await (async () => {
+        await ensureStudentHaparaFoldersSchema();
+        const r = await pool.query(`SELECT * FROM student_hapara_folders WHERE student_email = $1 LIMIT 1`, [normalizedEmail]);
+        return r.rows?.[0] || null;
+      })()
+    : memoryStudentHaparaFolders.get(normalizedEmail) || null;
+
+  if (!haparaRow) return null;
+
+  const setupRow = hasDatabase
+    ? await (async () => {
+        await ensureStudentDriveSetupSchema();
+        const r = await pool.query(`SELECT * FROM student_drive_setup WHERE student_email = $1 LIMIT 1`, [normalizedEmail]);
+        return r.rows?.[0] || null;
+      })()
+    : memoryStudentDriveSetup.get(normalizedEmail) || null;
+
+  return {
+    haparaFolderId: String(haparaRow.folder_id || "").trim(),
+    haparaFolderUrl: String(haparaRow.folder_url || "").trim(),
+    classLabel: String(haparaRow.class_label || "").trim(),
+    processAssessmentFolderId: String(setupRow?.process_assessment_folder_id || "").trim(),
+    confirmed: Boolean(setupRow?.confirmed_at)
+  };
+}
+
+async function saveStudentDriveSetup(email, processAssessmentFolderId) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail || !processAssessmentFolderId) return null;
+
+  if (!hasDatabase) {
+    const existing = memoryStudentDriveSetup.get(normalizedEmail) || {};
+    const next = { ...existing, student_email: normalizedEmail, process_assessment_folder_id: processAssessmentFolderId, confirmed_at: existing.confirmed_at || new Date().toISOString(), updated_at: new Date().toISOString() };
+    memoryStudentDriveSetup.set(normalizedEmail, next);
+    return next;
+  }
+
+  await ensureStudentDriveSetupSchema();
+  const r = await pool.query(
+    `
+      INSERT INTO student_drive_setup (student_email, process_assessment_folder_id, confirmed_at, updated_at)
+      VALUES ($1, $2, NOW(), NOW())
+      ON CONFLICT (student_email) DO UPDATE SET
+        process_assessment_folder_id = EXCLUDED.process_assessment_folder_id,
+        confirmed_at = COALESCE(student_drive_setup.confirmed_at, NOW()),
+        updated_at = NOW()
+      RETURNING *
+    `,
+    [normalizedEmail, processAssessmentFolderId]
+  );
+  return r.rows?.[0] || null;
+}
+
+app.get("/api/student/drive-setup", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email) { res.status(401).json({ error: "Sign in is required." }); return; }
+  try {
+    const setup = await getStudentDriveSetup(email);
+    if (!setup) { res.json({ configured: false, haparaFolderId: null, haparaFolderUrl: null, classLabel: null, processAssessmentFolderId: null, confirmed: false }); return; }
+    res.json({ configured: true, ...setup });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not load drive setup" });
+  }
+});
+
+app.post("/api/student/drive-setup/confirm", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email) { res.status(401).json({ error: "Sign in is required." }); return; }
+  const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
+  if (!driveAccessToken) { res.status(400).json({ error: "driveAccessToken is required." }); return; }
+  try {
+    const setup = await getStudentDriveSetup(email);
+    if (!setup?.haparaFolderId) {
+      res.status(404).json({ error: "Your Hapara folder has not been set up by your teacher yet. Please ask your teacher." });
+      return;
+    }
+    const folder = await driveEnsureProcessAssessmentFolder(setup.haparaFolderId, driveAccessToken);
+    if (!folder?.id) { res.status(500).json({ error: "Could not find or create the Process Assessment folder." }); return; }
+    await saveStudentDriveSetup(email, folder.id);
+    res.json({ ok: true, processAssessmentFolderId: folder.id, processAssessmentFolderUrl: folder.webViewLink || `https://drive.google.com/drive/folders/${folder.id}` });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not confirm drive setup." });
+  }
+});
+
+app.post("/api/student/drive-setup/copy-template", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email) { res.status(401).json({ error: "Sign in is required." }); return; }
+  const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
+  const templateTitle = String(req.body?.templateTitle || "").trim();
+  const templateFileId = String(req.body?.templateFileId || "").trim();
+  if (!driveAccessToken || !templateTitle || !templateFileId) {
+    res.status(400).json({ error: "driveAccessToken, templateTitle, and templateFileId are required." });
+    return;
+  }
+  if (!/^[A-Za-z0-9_-]{20,}$/.test(templateFileId)) {
+    res.status(400).json({ error: "Invalid templateFileId." });
+    return;
+  }
+  try {
+    const setup = await getStudentDriveSetup(email);
+    if (!setup?.processAssessmentFolderId) {
+      res.status(400).json({ error: "Please confirm your Process Assessment folder first." });
+      return;
+    }
+    const folderId = setup.processAssessmentFolderId;
+    const existing = await driveFindTemplateInFolder(folderId, templateTitle, driveAccessToken);
+    if (existing.length > 0) {
+      const file = existing[0];
+      return res.json({ ok: true, alreadyExists: true, fileId: file.id, fileUrl: file.webViewLink || `https://docs.google.com/presentation/d/${file.id}/edit`, fileName: file.name });
+    }
+    const emailUsername = email.split("@")[0];
+    const firstName = emailUsername.split(/[._]/)[0] || emailUsername;
+    const formattedFirstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
+    const copyName = `${templateTitle} - ${formattedFirstName}`;
+    const copied = await driveCopyFile(templateFileId, folderId, copyName, driveAccessToken);
+    res.json({ ok: true, alreadyExists: false, fileId: copied.id, fileUrl: copied.webViewLink || `https://docs.google.com/presentation/d/${copied.id}/edit`, fileName: copied.name });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not copy template." });
+  }
+});
 
 async function resolveActivityWriteAccess(email) {
   const normalizedEmail = normalizeEmail(email);
