@@ -27,7 +27,7 @@ let templateLibraryData = Array.isArray(DEFAULT_TEMPLATE_LIBRARY)
 let libraryAccess = { can_teacher_view: false, can_admin: false };
 let libraryHandlersBound = false;
 const SYNC_FOLDER_NAME = "Process Slide Templates";
-const HUB_VIEW_MODE_STORAGE_KEY = "hub_view_mode_v1";
+const LIB_HUB_VIEW_MODE_STORAGE_KEY = "hub_view_mode_v1";
 
 const DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly";
 const LIB_AUTH_KEY = "hub_google_auth_v1";
@@ -247,7 +247,7 @@ function canManageTemplates() {
 
 function getHubViewMode() {
     try {
-        const value = String(localStorage.getItem(HUB_VIEW_MODE_STORAGE_KEY) || "").trim().toLowerCase();
+        const value = String(localStorage.getItem(LIB_HUB_VIEW_MODE_STORAGE_KEY) || "").trim().toLowerCase();
         return value === "teacher" ? "teacher" : "student";
     } catch (_error) {
         return "student";
