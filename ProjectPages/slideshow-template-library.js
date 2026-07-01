@@ -366,10 +366,10 @@ function renderSetupBanner(setup) {
         const mappedDescription = mappedLabel || mappedValue || "Mapped (non-Drive value)";
         banner.innerHTML = `
             <div class="template-setup-banner-inner template-setup-banner-action">
-                <p class="template-setup-banner-text">Your account has a Hapara mapping by folder name.<br><strong>Signed-in account:</strong> ${escapeHtml(signedInEmail)}<br><strong>Mapped value:</strong> ${escapeHtml(mappedDescription)}<br>Click confirm and we will try to find this folder in your Google Drive, then create your <strong>Process Assessment</strong> sub-folder automatically.</p>
+                <p class="template-setup-banner-text">Your account has a Hapara mapping by folder name.<br><strong>Signed-in account:</strong> ${escapeHtml(signedInEmail)}<br><strong>Mapped value:</strong> ${escapeHtml(mappedDescription)}<br>Click confirm and we will create or use your <strong>SeniorDTECH</strong> folder, then create your <strong>Process Assessment</strong> sub-folder automatically.</p>
                 <button type="button" class="template-setup-confirm-button" id="template-setup-confirm">Confirm My Folder</button>
                 <p class="template-setup-banner-status" id="template-setup-status" aria-live="polite"></p>
-                <p class="template-setup-banner-text"><a class="template-setup-banner-link" href="../admin-hapara-folders.html" target="_blank" rel="noreferrer">Open Hapara Folder Upload page</a> to upload a Drive folder URL if name lookup does not find the correct folder.</p>
+                <p class="template-setup-banner-text"><a class="template-setup-banner-link" href="../admin-hapara-folders.html" target="_blank" rel="noreferrer">Open Hapara Folder Upload page</a> to maintain class mapping details.</p>
             </div>`;
         banner.hidden = false;
         document.querySelector("#template-setup-confirm")?.addEventListener("click", () => {
@@ -395,7 +395,7 @@ function renderSetupBanner(setup) {
     const classLabel = String(setup.classLabel || "your Hapara folder").trim();
     banner.innerHTML = `
         <div class="template-setup-banner-inner template-setup-banner-action">
-            <p class="template-setup-banner-text">Your Hapara folder has been set: <strong>${escapeHtml(classLabel)}</strong>${folderUrl ? ` &mdash; <a class="template-setup-banner-link" href="${escapeHtml(folderUrl)}" target="_blank" rel="noreferrer">Open folder</a>` : ""}.<br>Confirm to create your <strong>Process Assessment</strong> sub-folder so templates save there automatically.</p>
+            <p class="template-setup-banner-text">Your Hapara mapping is set: <strong>${escapeHtml(classLabel)}</strong>${folderUrl ? ` &mdash; <a class="template-setup-banner-link" href="${escapeHtml(folderUrl)}" target="_blank" rel="noreferrer">Open folder</a>` : ""}.<br>Confirm to create your <strong>Process Assessment</strong> sub-folder inside <strong>SeniorDTECH</strong> so templates save there automatically.</p>
             <button type="button" class="template-setup-confirm-button" id="template-setup-confirm">Confirm My Folder</button>
             <p class="template-setup-banner-status" id="template-setup-status" aria-live="polite"></p>
         </div>`;
@@ -419,7 +419,7 @@ async function handleConfirmFolder() {
         return;
     }
 
-    if (statusEl) statusEl.textContent = "Creating Process Assessment folder\u2026";
+    if (statusEl) statusEl.textContent = "Creating SeniorDTECH/Process Assessment folders\u2026";
 
     try {
         const response = await fetch("/api/student/drive-setup/confirm", {
@@ -433,8 +433,38 @@ async function handleConfirmFolder() {
         driveState.setupState = { ...driveState.setupState, confirmed: true, processAssessmentFolderId: payload.processAssessmentFolderId };
         renderSetupBanner(driveState.setupState);
     } catch (error) {
-        if (statusEl) statusEl.textContent = `Could not confirm folder: ${error.message || "Unknown error"}`;
-        if (confirmButton) confirmButton.disabled = false;
+        const message = String(error?.message || "");
+        const needsConsentRetry = /has not granted the app|read access to the file|insufficient permissions|forbidden/i.test(message);
+        if (!needsConsentRetry) {
+            if (statusEl) statusEl.textContent = `Could not confirm folder: ${error.message || "Unknown error"}`;
+            if (confirmButton) confirmButton.disabled = false;
+            return;
+        }
+
+        driveState.accessToken = null;
+        driveState.tokenExpiry = 0;
+        const consentTokenResponse = await requestDriveToken({ forceConsent: true });
+        if (consentTokenResponse.error) {
+            if (statusEl) statusEl.textContent = "Google Drive permission is required to create your SeniorDTECH/Process Assessment folders.";
+            if (confirmButton) confirmButton.disabled = false;
+            return;
+        }
+
+        try {
+            const retryResponse = await fetch("/api/student/drive-setup/confirm", {
+                method: "POST",
+                headers: withLibraryAuthHeaders({ "Content-Type": "application/json" }),
+                body: JSON.stringify({ driveAccessToken: consentTokenResponse.access_token })
+            });
+            const retryPayload = await retryResponse.json().catch(() => ({}));
+            if (!retryResponse.ok) throw new Error(retryPayload.error || `Error ${retryResponse.status}`);
+
+            driveState.setupState = { ...driveState.setupState, confirmed: true, processAssessmentFolderId: retryPayload.processAssessmentFolderId };
+            renderSetupBanner(driveState.setupState);
+        } catch (retryError) {
+            if (statusEl) statusEl.textContent = `Could not confirm folder: ${retryError.message || "Unknown error"}`;
+            if (confirmButton) confirmButton.disabled = false;
+        }
     }
 }
 
@@ -454,11 +484,10 @@ async function handleUseTemplate(templateId) {
         return;
     }
 
-    // If no confirmed setup, fall back to standard copy link
+    // Do not allow template use until setup is confirmed.
     const setup = driveState.setupState;
     if (!setup?.confirmed || !setup?.processAssessmentFolderId) {
-        const copyUrl = `https://docs.google.com/presentation/d/${fileId}/copy`;
-        window.open(copyUrl, "_blank", "noopener");
+        alert("Please click Confirm My Folder first. We only allow templates after Process Assessment is set up.");
         return;
     }
 

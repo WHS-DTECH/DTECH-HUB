@@ -4758,6 +4758,12 @@ async function driveEnsureProcessAssessmentFolder(haparaFolderId, accessToken) {
   return driveCreateFolder(haparaFolderId, "Process Assessment", accessToken);
 }
 
+async function driveEnsureFolder(parentFolderId, folderName, accessToken) {
+  const existing = await driveFindFolderByName(parentFolderId, folderName, accessToken);
+  if (existing?.id) return existing;
+  return driveCreateFolder(parentFolderId, folderName, accessToken);
+}
+
 async function driveFindTemplateInFolder(folderId, templateTitle, accessToken) {
   const safeTitle = templateTitle.replace(/\\/g, "\\\\").replace(/'/g, "\\'").slice(0, 60);
   const safeFolder = folderId.replace(/'/g, "\\'");
@@ -4817,8 +4823,6 @@ async function getStudentDriveSetup(email) {
       })()
     : memoryStudentHaparaFolders.get(normalizedEmail) || null;
 
-  if (!haparaRow) return null;
-
   const setupRow = hasDatabase
     ? await (async () => {
         await ensureStudentDriveSetupSchema();
@@ -4827,10 +4831,12 @@ async function getStudentDriveSetup(email) {
       })()
     : memoryStudentDriveSetup.get(normalizedEmail) || null;
 
+  if (!haparaRow && !setupRow) return null;
+
   return {
-    haparaFolderId: String(haparaRow.folder_id || "").trim(),
-    haparaFolderUrl: String(haparaRow.folder_url || "").trim(),
-    classLabel: String(haparaRow.class_label || "").trim(),
+    haparaFolderId: String(haparaRow?.folder_id || "").trim(),
+    haparaFolderUrl: String(haparaRow?.folder_url || "").trim(),
+    classLabel: String(haparaRow?.class_label || "").trim(),
     processAssessmentFolderId: String(setupRow?.process_assessment_folder_id || "").trim(),
     confirmed: Boolean(setupRow?.confirmed_at)
   };
@@ -5003,47 +5009,20 @@ app.post("/api/student/drive-setup/confirm", async (req, res) => {
   const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
   if (!driveAccessToken) { res.status(400).json({ error: "driveAccessToken is required." }); return; }
   try {
-    let setup = await getStudentDriveSetup(email);
-    if (!setup) {
-      res.status(404).json({ error: "Your Hapara folder has not been set up by your teacher yet. Please ask your teacher." });
-      return;
-    }
+    const seniorDtechFolder = await driveEnsureFolder("root", "SeniorDTECH", driveAccessToken);
+    if (!seniorDtechFolder?.id) { res.status(500).json({ error: "Could not find or create the SeniorDTECH folder." }); return; }
 
-    let haparaFolderId = String(setup.haparaFolderId || "").trim();
-    if (!haparaFolderId) {
-      const mappedFolderName = String(setup.haparaFolderUrl || "").trim().replace(/^\/+|\/+$/g, "");
-      if (!mappedFolderName) {
-        res.status(404).json({ error: "Your Hapara mapping exists but no folder name was provided." });
-        return;
-      }
-
-      const resolvedFolder = await driveFindFolderByNameAnywhere(mappedFolderName, driveAccessToken);
-      if (!resolvedFolder?.id) {
-        res.status(404).json({ error: `Could not find a Google Drive folder named \"${mappedFolderName}\". Open Drive to confirm the exact folder name or upload a folder URL.` });
-        return;
-      }
-
-      await upsertStudentHaparaFoldersBulk([
-        {
-          student_email: email,
-          folder_url: String(resolvedFolder.webViewLink || `https://drive.google.com/drive/folders/${resolvedFolder.id}`),
-          class_label: String(setup.classLabel || "").trim()
-        }
-      ], email);
-
-      setup = await getStudentDriveSetup(email);
-      haparaFolderId = String(setup?.haparaFolderId || "").trim();
-    }
-
-    if (!haparaFolderId) {
-      res.status(400).json({ error: "Could not resolve your Hapara folder to a Drive folder ID." });
-      return;
-    }
-
-    const folder = await driveEnsureProcessAssessmentFolder(haparaFolderId, driveAccessToken);
+    const folder = await driveEnsureFolder(String(seniorDtechFolder.id), "Process Assessment", driveAccessToken);
     if (!folder?.id) { res.status(500).json({ error: "Could not find or create the Process Assessment folder." }); return; }
+
     await saveStudentDriveSetup(email, folder.id);
-    res.json({ ok: true, processAssessmentFolderId: folder.id, processAssessmentFolderUrl: folder.webViewLink || `https://drive.google.com/drive/folders/${folder.id}` });
+    res.json({
+      ok: true,
+      seniorDtechFolderId: seniorDtechFolder.id,
+      seniorDtechFolderUrl: seniorDtechFolder.webViewLink || `https://drive.google.com/drive/folders/${seniorDtechFolder.id}`,
+      processAssessmentFolderId: folder.id,
+      processAssessmentFolderUrl: folder.webViewLink || `https://drive.google.com/drive/folders/${folder.id}`
+    });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not confirm drive setup." });
   }
