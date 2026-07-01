@@ -4549,10 +4549,28 @@ function toTemplateLibraryEntry(row, fallbackIndex = 0) {
   };
 }
 
+function compareTemplateLibraryEntries(left, right) {
+  const leftTitle = String(left?.title || "").trim().toLowerCase();
+  const rightTitle = String(right?.title || "").trim().toLowerCase();
+  const leftPriority = leftTitle === "process slide templates" ? 0 : 1;
+  const rightPriority = rightTitle === "process slide templates" ? 0 : 1;
+  if (leftPriority !== rightPriority) {
+    return leftPriority - rightPriority;
+  }
+
+  const leftSort = Number(left?.sortOrder || 0);
+  const rightSort = Number(right?.sortOrder || 0);
+  if (leftSort !== rightSort) {
+    return leftSort - rightSort;
+  }
+
+  return leftTitle.localeCompare(rightTitle);
+}
+
 async function listTemplateLibraryEntries() {
   if (!hasDatabase) {
     const rows = Array.from(memoryTemplateLibraryEntries.values())
-      .sort((left, right) => Number(left?.sortOrder || 0) - Number(right?.sortOrder || 0));
+      .sort(compareTemplateLibraryEntries);
     const memoryEntries = rows.map((row, index) => toTemplateLibraryEntry(row, index));
     return memoryEntries.length ? memoryEntries : DEFAULT_TEMPLATE_LIBRARY_ENTRIES.map((row, index) => toTemplateLibraryEntry(row, index));
   }
@@ -4562,11 +4580,11 @@ async function listTemplateLibraryEntries() {
     `
       SELECT template_id, title, standard_codes, criteria_text, summary, image_url, template_url, status, sort_order, source_folder_id
       FROM template_library_entries
-      ORDER BY sort_order ASC, lower(title) ASC
+      ORDER BY lower(title) = 'process slide templates' ASC, sort_order ASC, lower(title) ASC
     `
   );
 
-  const entries = Array.isArray(result?.rows) ? result.rows.map((row, index) => toTemplateLibraryEntry(row, index)) : [];
+  const entries = Array.isArray(result?.rows) ? result.rows.map((row, index) => toTemplateLibraryEntry(row, index)).sort(compareTemplateLibraryEntries) : [];
   return entries.length ? entries : DEFAULT_TEMPLATE_LIBRARY_ENTRIES.map((row, index) => toTemplateLibraryEntry(row, index));
 }
 
