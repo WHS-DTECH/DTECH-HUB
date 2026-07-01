@@ -224,17 +224,19 @@ function normalizeTemplateLibraryEntries(items) {
             };
         })
         .filter(Boolean)
-        .sort((left, right) => {
-            const leftTitle = String(left?.title || "").trim().toLowerCase();
-            const rightTitle = String(right?.title || "").trim().toLowerCase();
-            const leftPriority = leftTitle === "process slide templates" ? 0 : 1;
-            const rightPriority = rightTitle === "process slide templates" ? 0 : 1;
-            if (leftPriority !== rightPriority) return leftPriority - rightPriority;
-            const leftSort = Number(left?.sortOrder || 0);
-            const rightSort = Number(right?.sortOrder || 0);
-            if (leftSort !== rightSort) return leftSort - rightSort;
-            return leftTitle.localeCompare(rightTitle);
-        });
+        .sort(compareTemplateEntries);
+}
+
+function compareTemplateEntries(left, right) {
+    const leftTitle = String(left?.title || "").trim().toLowerCase();
+    const rightTitle = String(right?.title || "").trim().toLowerCase();
+    const leftPriority = leftTitle === "process slide templates" ? 0 : 1;
+    const rightPriority = rightTitle === "process slide templates" ? 0 : 1;
+    if (leftPriority !== rightPriority) return leftPriority - rightPriority;
+    const leftSort = Number(left?.sortOrder || 0);
+    const rightSort = Number(right?.sortOrder || 0);
+    if (leftSort !== rightSort) return leftSort - rightSort;
+    return leftTitle.localeCompare(rightTitle);
 }
 
 async function loadTemplateLibraryEntries() {
@@ -624,6 +626,7 @@ function renderTemplateCard(item) {
 function renderLibrary() {
     const host = document.querySelector("#template-list");
     if (!host) return;
+    templateLibraryData = Array.isArray(templateLibraryData) ? [...templateLibraryData].sort(compareTemplateEntries) : [];
     if (!Array.isArray(templateLibraryData) || !templateLibraryData.length) {
         host.innerHTML = '<p class="template-empty">No templates are listed yet.</p>';
         return;
