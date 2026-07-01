@@ -224,7 +224,17 @@ function normalizeTemplateLibraryEntries(items) {
             };
         })
         .filter(Boolean)
-        .sort((left, right) => Number(left?.sortOrder || 0) - Number(right?.sortOrder || 0));
+        .sort((left, right) => {
+            const leftTitle = String(left?.title || "").trim().toLowerCase();
+            const rightTitle = String(right?.title || "").trim().toLowerCase();
+            const leftPriority = leftTitle === "process slide templates" ? 0 : 1;
+            const rightPriority = rightTitle === "process slide templates" ? 0 : 1;
+            if (leftPriority !== rightPriority) return leftPriority - rightPriority;
+            const leftSort = Number(left?.sortOrder || 0);
+            const rightSort = Number(right?.sortOrder || 0);
+            if (leftSort !== rightSort) return leftSort - rightSort;
+            return leftTitle.localeCompare(rightTitle);
+        });
 }
 
 async function loadTemplateLibraryEntries() {

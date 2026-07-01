@@ -4580,7 +4580,7 @@ async function listTemplateLibraryEntries() {
     `
       SELECT template_id, title, standard_codes, criteria_text, summary, image_url, template_url, status, sort_order, source_folder_id
       FROM template_library_entries
-      ORDER BY lower(title) = 'process slide templates' ASC, sort_order ASC, lower(title) ASC
+      ORDER BY CASE WHEN lower(title) = 'process slide templates' THEN 0 ELSE 1 END ASC, sort_order ASC, lower(title) ASC
     `
   );
 
@@ -4912,7 +4912,7 @@ app.post("/api/template-library/sync", async (req, res) => {
         imageUrl: String(file?.thumbnailLink || "").trim(),
         templateUrl: String(file?.webViewLink || `https://docs.google.com/presentation/d/${String(file?.id || "").trim()}/edit`).trim(),
         status: "live",
-        sortOrder: index + 1,
+        sortOrder: title.toLowerCase() === "process slide templates" ? 0 : index + 1,
         sourceFolderId: String(folder.id).trim()
       };
     });
