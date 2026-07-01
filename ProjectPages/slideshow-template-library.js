@@ -351,10 +351,16 @@ function renderSetupBanner(setup) {
 
     if (!setup || !setup.configured) {
         banner.innerHTML = `
-            <div class="template-setup-banner-inner template-setup-banner-warn">
-                <p class="template-setup-banner-text">No Hapara mapping was found for your signed-in account.<br><strong>Signed-in account:</strong> ${escapeHtml(signedInEmail)}<br><strong>Mapping status:</strong> No mapping found for this email.<br>Templates are still available using the standard Google copy link.<br><a class="template-setup-banner-link" href="../admin-hapara-folders.html" target="_blank" rel="noreferrer">Open Hapara Folder Upload page</a> to verify this email has a mapped Google Drive folder URL.</p>
+            <div class="template-setup-banner-inner template-setup-banner-action">
+                <p class="template-setup-banner-text">No Hapara mapping was found for your signed-in account.<br><strong>Signed-in account:</strong> ${escapeHtml(signedInEmail)}<br>That is okay. Click confirm and we will create or use your <strong>SeniorDTECH</strong> folder, then create your <strong>Process Assessment</strong> sub-folder automatically.</p>
+                <button type="button" class="template-setup-confirm-button" id="template-setup-confirm">Confirm My Folder</button>
+                <p class="template-setup-banner-status" id="template-setup-status" aria-live="polite"></p>
+                <p class="template-setup-banner-text"><a class="template-setup-banner-link" href="../admin-hapara-folders.html" target="_blank" rel="noreferrer">Open Hapara Folder Upload page</a> only if your school wants to keep class mapping details.</p>
             </div>`;
         banner.hidden = false;
+        document.querySelector("#template-setup-confirm")?.addEventListener("click", () => {
+            void handleConfirmFolder();
+        });
         return;
     }
 
