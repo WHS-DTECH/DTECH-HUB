@@ -6879,7 +6879,20 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             localGithubRepoLibrary
         )
     );
-    const needsLegacyTrelloMigration = !backendTrelloCardLink && Boolean(localTrelloCardLink);
+    const legacyLibraryMigrationUrl = (() => {
+        if (backendTrelloCardLink) {
+            return "";
+        }
+        const fromDirect = toSafeTrelloCardUrl(localTrelloCardLink);
+        if (fromDirect) {
+            return fromDirect;
+        }
+        const firstLibraryUrl = Array.isArray(trelloCardLibrary) && trelloCardLibrary.length
+            ? toSafeTrelloCardUrl(trelloCardLibrary[0]?.url || "")
+            : "";
+        return firstLibraryUrl;
+    })();
+    const needsLegacyTrelloMigration = Boolean(legacyLibraryMigrationUrl);
 
     if (backendGithubRepoLink) {
         setGithubStatus("Saved GitHub repository loaded.", false, true);
@@ -6988,7 +7001,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
 
         void (async () => {
             try {
-                const safeLocalUrl = toSafeTrelloCardUrl(localTrelloCardLink);
+                const safeLocalUrl = toSafeTrelloCardUrl(legacyLibraryMigrationUrl);
                 if (!safeLocalUrl) {
                     return;
                 }
