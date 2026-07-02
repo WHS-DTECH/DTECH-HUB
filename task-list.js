@@ -172,14 +172,6 @@ async function loadTaskListAllocations() {
             totalHost.textContent = String(total);
         }
 
-        const firstChecklistId = String(assessmentTasks[0]?.id || projects[0]?.id || "").trim();
-        if (firstChecklistId) {
-            setTaskListStatus("Opening checklist...");
-            if (navigateToChecklist(buildCustomActivityLink(firstChecklistId))) {
-                return;
-            }
-        }
-
         if (!total) {
             setTaskListStatus("No allocations found yet. Ask your teacher to assign your task or project.");
             return;
