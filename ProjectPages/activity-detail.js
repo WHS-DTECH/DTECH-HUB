@@ -1723,6 +1723,30 @@ async function persistStudentTrelloLinkForTaskTopic(projectId, studentEmail, det
     await saveEvidenceRows(projectId, studentEmail, nextRows);
 }
 
+async function persistStudentTrelloLinkDirectlyToEvidence(projectId, studentEmail, detailData, taskTopicTitle, trelloCardUrl) {
+    const safeUrl = toSafeTrelloCardUrl(trelloCardUrl);
+    if (!safeUrl) {
+        throw new Error("Enter a valid Trello card or board link first.");
+    }
+
+    let nextRows = await fetchEvidenceRowsEnsuringAllocation(projectId, studentEmail);
+    nextRows = upsertEvidenceStandardRow(nextRows, "trello-sync", [
+        { text: `TRELLO_CARD_URL|${safeUrl}`, done: true },
+        { text: `TRELLO_SAVED_AT|${new Date().toISOString()}`, done: true }
+    ]);
+
+    const safeTaskTopic = String(taskTopicTitle || "").trim();
+    if (safeTaskTopic) {
+        const standardNumber = extractPrimaryStandardNumberFromRows(coerceArray(detailData?.standardDetails));
+        const standardKey = buildTaskTopicSubmissionStandardKey(safeTaskTopic, standardNumber);
+        nextRows = upsertTaskTopicSubmissionEvidenceRows(nextRows, standardKey, {
+            trelloCardUrl: safeUrl
+        });
+    }
+
+    await saveEvidenceRows(projectId, studentEmail, nextRows);
+}
+
 async function persistStudentGithubSync(projectId, studentEmail, githubRepoUrl, githubNote = "") {
     const safeRepoUrl = toSafeGithubRepoUrl(githubRepoUrl);
     if (!safeRepoUrl) {
@@ -6435,8 +6459,14 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         if (trelloSaveLinkBtn) trelloSaveLinkBtn.disabled = true;
         setTrelloStatus("Saving Trello link...");
         try {
-            await persistStudentTrelloLink(projectId, email, cardUrl);
-            await persistStudentTrelloLinkForTaskTopic(projectId, email, detailData, taskTopicValue, cardUrl);
+            // Primary strategy: persist directly through evidence rows (same path as checklist saves).
+            await persistStudentTrelloLinkDirectlyToEvidence(projectId, email, detailData, taskTopicValue, cardUrl);
+
+            // Secondary best-effort sync path; ignore errors because evidence rows already persisted.
+            try {
+                await persistStudentTrelloLink(projectId, email, cardUrl);
+            } catch (_endpointError) {
+            }
 
             const verifiedRows = await fetchEvidenceRowsEnsuringAllocation(projectId, email);
             const verifiedUrl = toSafeTrelloCardUrl(getFirstTrelloCardUrlFromEvidenceRows(verifiedRows));
