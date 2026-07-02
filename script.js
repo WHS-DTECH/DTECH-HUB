@@ -1850,27 +1850,7 @@ function ensureGlobalHubSidebar() {
 }
 
 function getTaskListPageUrl() {
-    try {
-        const params = new URLSearchParams(window.location.search || "");
-        const activityId = String(params.get("id") || params.get("activityId") || "").trim();
-        const taskTopic = String(params.get("taskTopic") || "").trim();
-        const taskShortName = String(params.get("taskShortName") || "").trim();
-        const targetParams = new URLSearchParams();
-        if (activityId) {
-            targetParams.set("id", activityId);
-        }
-        if (taskTopic) {
-            targetParams.set("taskTopic", taskTopic);
-        }
-        if (taskShortName) {
-            targetParams.set("taskShortName", taskShortName);
-        }
-
-        const query = targetParams.toString();
-        return query ? `/task-list.html?${query}` : "/task-list.html";
-    } catch (_error) {
-        return "/task-list.html";
-    }
+    return "/task-list.html";
 }
 
 function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {

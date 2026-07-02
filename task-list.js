@@ -46,173 +46,158 @@ function buildCustomActivityLink(id, taskTopic = "") {
     return `/ProjectPages/custom-activity.html?${params.toString()}`;
 }
 
-function getContextChecklistTarget() {
-    try {
-        const params = new URLSearchParams(window.location.search || "");
-        const activityId = String(params.get("id") || params.get("activityId") || "").trim();
-        if (!activityId) {
-            return "";
-        }
-        const taskTopic = String(params.get("taskTopic") || "").trim();
-        return buildCustomActivityLink(activityId, taskTopic);
-    } catch (_error) {
-        return "";
-    }
+function getTopicTypeLabel(detail) {
+    const type = String(detail?.type || detail?.topicType || "").trim();
+    return type || "Not set";
 }
 
-function navigateToChecklist(targetHref) {
-    const href = String(targetHref || "").trim();
-    if (!href) {
-        return false;
+async function loadJson(url, headers = {}) {
+    const response = await fetch(url, { headers });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        const error = new Error(payload?.error || `Request failed (${response.status})`);
+        error.status = Number(response.status || 0);
+        throw error;
     }
-    window.location.href = href;
-    return true;
+    return payload;
 }
 
-function pickPreferredAllocationTarget(assessmentTasks, projects) {
-    const assessments = Array.isArray(assessmentTasks) ? assessmentTasks : [];
-    const projectRows = Array.isArray(projects) ? projects : [];
-
-    const preferredAssessment = assessments.find((item) =>
-        String(item?.name || "").toLowerCase().includes("client projects")
-    );
-    if (preferredAssessment?.id) {
-        return buildCustomActivityLink(preferredAssessment.id);
-    }
-
-    const firstAssessment = assessments[0];
-    if (firstAssessment?.id) {
-        return buildCustomActivityLink(firstAssessment.id);
-    }
-
-    const firstProject = projectRows[0];
-    if (firstProject?.id) {
-        return buildCustomActivityLink(firstProject.id);
-    }
-
-    return "";
+async function getSignedInEmail() {
+    const auth = readTaskListAuth();
+    return String(auth?.profile?.email || "").trim().toLowerCase();
 }
 
-function renderContextCallout() {
-    const contextHost = document.querySelector("#task-list-context");
-    if (!contextHost) return;
+async function fetchAllocations() {
+    const email = await getSignedInEmail();
+    if (!email) {
+        return { assessment_tasks: [], projects: [] };
+    }
+    const payload = await loadJson("/api/my-allocations", buildTaskListHeaders({}));
+    return {
+        assessment_tasks: Array.isArray(payload?.assessment_tasks) ? payload.assessment_tasks : [],
+        projects: Array.isArray(payload?.projects) ? payload.projects : []
+    };
+}
 
+function getQueryContext() {
     const params = new URLSearchParams(window.location.search || "");
-    const activityId = String(params.get("id") || params.get("activityId") || "").trim();
+    const id = String(params.get("id") || "").trim();
     const taskTopic = String(params.get("taskTopic") || "").trim();
     const taskShortName = String(params.get("taskShortName") || "").trim();
-
-    if (!activityId) {
-        contextHost.hidden = true;
-        contextHost.innerHTML = "";
-        return;
-    }
-
-    const openHref = buildCustomActivityLink(activityId, taskTopic);
-    contextHost.hidden = false;
-    contextHost.innerHTML = `
-        <h3>Current Context</h3>
-        <p class="task-list-empty">Continue from the task you were just viewing.</p>
-        <p class="task-list-meta"><strong>Activity ID:</strong> ${escapeTaskListHtml(activityId)}${taskTopic ? ` | <strong>Task Topic:</strong> ${escapeTaskListHtml(taskTopic)}` : ""}${taskShortName ? ` | <strong>Task:</strong> ${escapeTaskListHtml(taskShortName)}` : ""}</p>
-        <p><a class="detail-action" href="${escapeTaskListHtml(openHref)}">Open This Task Topic</a></p>
-    `;
+    return { id, taskTopic, taskShortName };
 }
 
-function renderAllocationList(hostId, emptyId, items, label) {
-    const host = document.querySelector(hostId);
-    const empty = document.querySelector(emptyId);
-    if (!host || !empty) return;
-
-    const rows = Array.isArray(items) ? items : [];
-    if (!rows.length) {
-        host.innerHTML = "";
-        empty.hidden = false;
-        return;
-    }
-
-    empty.hidden = true;
-    host.innerHTML = rows.map((item) => {
-        const id = String(item?.id || "").trim();
-        const name = String(item?.name || "Untitled").trim() || "Untitled";
-        const href = buildCustomActivityLink(id);
-        return `
-            <li class="task-list-alloc-item">
-                <div>
-                    <p class="task-list-alloc-name">${escapeTaskListHtml(name)}</p>
-                    <p class="task-list-meta">${escapeTaskListHtml(label)} ID: ${escapeTaskListHtml(id)}</p>
-                </div>
-                <a class="detail-action detail-action-secondary" href="${escapeTaskListHtml(href)}">Open Task List</a>
-            </li>
-        `;
-    }).join("");
-}
-
-function setTaskListStatus(message, isError = false) {
+function setStatus(message, isError = false) {
     const status = document.querySelector("#task-list-status");
     if (!status) return;
     status.textContent = String(message || "");
     status.classList.toggle("is-error", Boolean(isError));
 }
 
-async function loadTaskListAllocations() {
-    renderContextCallout();
+function renderHeader(summary) {
+    const hero = document.querySelector("#task-list-hero");
+    if (!hero) return;
+    hero.innerHTML = `
+        <div class="task-list-hero-copy">
+            <p class="eyebrow">COMPUTER LAB</p>
+            <h1>My Task List</h1>
+            <p class="hero-text">Track the checklist for the current task while keeping all connected assessment and project evidence visible.</p>
+        </div>
+        <aside class="task-list-hero-stats">
+            <div class="stat-card">
+                <span class="stat-label">Linked items</span>
+                <strong>${escapeTaskListHtml(String(summary.totalLinked || 0))}</strong>
+                <span class="stat-subline">Assessments and projects</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">Checklist items</span>
+                <strong>${escapeTaskListHtml(String(summary.totalChecklist || 0))}</strong>
+                <span class="stat-subline">current task</span>
+            </div>
+        </aside>
+    `;
+}
 
-    const contextTarget = getContextChecklistTarget();
-    if (contextTarget) {
-        setTaskListStatus("Opening checklist...");
-        if (navigateToChecklist(contextTarget)) {
+function renderAllocationPills(assessmentTasks, projects) {
+    const renderList = (hostId, emptyId, items, label) => {
+        const host = document.querySelector(hostId);
+        const empty = document.querySelector(emptyId);
+        if (!host || !empty) return;
+
+        const rows = Array.isArray(items) ? items : [];
+        if (!rows.length) {
+            host.innerHTML = "";
+            empty.hidden = false;
             return;
         }
-    }
 
-    const email = getTaskListEmail();
+        empty.hidden = true;
+        host.innerHTML = rows.map((item) => {
+            const href = buildCustomActivityLink(item.id);
+            return `
+                <li class="task-list-alloc-item">
+                    <div>
+                        <p class="task-list-alloc-name">${escapeTaskListHtml(String(item?.name || "Untitled"))}</p>
+                        <p class="task-list-meta">${escapeTaskListHtml(label)} ID: ${escapeTaskListHtml(String(item?.id || ""))}${item?.topic_type ? ` • Topic Type: ${escapeTaskListHtml(item.topic_type)}` : ""}</p>
+                    </div>
+                    <a class="detail-action detail-action-secondary" href="${escapeTaskListHtml(href)}">Open Task</a>
+                </li>
+            `;
+        }).join("");
+    };
+
+    renderList("#task-list-assessments", "#task-list-assessments-empty", assessmentTasks, "Assessment");
+    renderList("#task-list-projects", "#task-list-projects-empty", projects, "Project");
+}
+
+async function renderTaskListPage() {
+    const email = await getSignedInEmail();
     if (!email) {
-        setTaskListStatus("Sign in with your school account to view your Task Lists.", true);
+        setStatus("Sign in with your school account to view your Task List.", true);
         return;
     }
 
-    setTaskListStatus("Loading your task lists...");
-
+    const context = getQueryContext();
+    let allocations = { assessment_tasks: [], projects: [] };
     try {
-        const response = await fetch("/api/my-allocations", {
-            headers: buildTaskListHeaders({})
-        });
+        allocations = await fetchAllocations();
+    } catch (_error) {
+        allocations = { assessment_tasks: [], projects: [] };
+    }
 
-        if (!response.ok) {
-            const payload = await response.json().catch(() => ({}));
-            throw new Error(payload?.error || "Could not load allocations.");
+    const allItems = [
+        ...allocations.assessment_tasks,
+        ...allocations.projects
+    ];
+
+    renderHeader({
+        totalLinked: allItems.length,
+        totalChecklist: allItems.length
+    });
+    renderAllocationPills(allocations.assessment_tasks, allocations.projects);
+
+    const contextHost = document.querySelector("#task-list-context");
+    if (contextHost) {
+        const contextParts = [];
+        if (context.id) contextParts.push(`Activity ID: ${escapeTaskListHtml(context.id)}`);
+        if (context.taskTopic) contextParts.push(`Task Topic: ${escapeTaskListHtml(context.taskTopic)}`);
+        if (context.taskShortName) contextParts.push(`Task: ${escapeTaskListHtml(context.taskShortName)}`);
+        if (contextParts.length) {
+            contextHost.hidden = false;
+            contextHost.innerHTML = `
+                <h3>Current Context</h3>
+                <p class="task-list-empty">You came from a task topic page. Use the list below to open your allocated assessment or project.</p>
+                <p class="task-list-meta">${contextParts.join(" | ")}</p>
+            `;
         }
+    }
 
-        const payload = await response.json().catch(() => ({}));
-        const assessmentTasks = Array.isArray(payload?.assessment_tasks) ? payload.assessment_tasks : [];
-        const projects = Array.isArray(payload?.projects) ? payload.projects : [];
-
-        const preferredTarget = pickPreferredAllocationTarget(assessmentTasks, projects);
-        if (preferredTarget) {
-            setTaskListStatus("Opening your task checklist...");
-            if (navigateToChecklist(preferredTarget)) {
-                return;
-            }
-        }
-
-        renderAllocationList("#task-list-assessments", "#task-list-assessments-empty", assessmentTasks, "Assessment");
-        renderAllocationList("#task-list-projects", "#task-list-projects-empty", projects, "Project");
-
-        const total = assessmentTasks.length + projects.length;
-        const totalHost = document.querySelector("#task-list-total");
-        if (totalHost) {
-            totalHost.textContent = String(total);
-        }
-
-        if (!total) {
-            setTaskListStatus("No allocations found yet. Ask your teacher to assign your task or project.");
-            return;
-        }
-
-        setTaskListStatus("Task lists loaded.");
-    } catch (error) {
-        setTaskListStatus(error?.message || "Could not load task lists right now.", true);
+    const statusHost = document.querySelector("#task-list-status");
+    if (statusHost) {
+        statusHost.textContent = `Loaded ${allItems.length} allocated item${allItems.length === 1 ? "" : "s"}.`;
     }
 }
 
-void loadTaskListAllocations();
+document.addEventListener("DOMContentLoaded", () => {
+    void renderTaskListPage();
+});
