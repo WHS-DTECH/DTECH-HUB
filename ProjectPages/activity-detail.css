@@ -1757,9 +1757,9 @@ h1 {
 }
 
 .evidence-step-row.is-system-complete {
-    border-color: #77cfa0;
-    background: #f2fff7;
-    box-shadow: inset 0 0 0 1px #d6f3e4;
+    border-color: #7aa9e8;
+    background: #f1f7ff;
+    box-shadow: inset 0 0 0 1px #d3e5ff;
 }
 
 .evidence-step-row.is-subitem .evidence-step-input {
@@ -1769,8 +1769,8 @@ h1 {
 }
 
 .evidence-step-check {
-    width: 16px;
-    height: 16px;
+    width: 19px;
+    height: 19px;
 }
 
 .evidence-step-input {
@@ -1828,9 +1828,9 @@ h1 {
 }
 
 .evidence-step-system-item input[type="checkbox"] {
-    width: 14px;
-    height: 14px;
-    accent-color: #0ba95a;
+    width: 18px;
+    height: 18px;
+    accent-color: #1d4ed8;
 }
 
 .evidence-step-system-item input[type="checkbox"]:disabled {
@@ -1842,15 +1842,15 @@ h1 {
 }
 
 .evidence-step-system-item:has(input[type="checkbox"]:checked) {
-    background: #e9fff2;
-    border: 1px solid #8dd7ae;
+    background: #eaf2ff;
+    border: 1px solid #95baf0;
     border-radius: 7px;
     padding: 2px 7px;
-    color: #0f5b35;
+    color: #133b7a;
 }
 
 .evidence-step-check {
-    accent-color: #0ba95a;
+    accent-color: #1d4ed8;
 }
 
 .evidence-step-check:checked {
