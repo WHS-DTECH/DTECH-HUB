@@ -5800,7 +5800,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                     ` : ""}
                 </div>
 
-                <aside class="task-topic-submission-column">
+                <aside class="task-topic-submission-column${isDigitalOutcomeTopic ? " task-topic-submission-column-digital-outcome" : ""}">
                     <div class="task-topic-sync-grid">
                     <section class="proposal-section task-topic-guide-panel">
                         <p class="task-topic-guide-eyebrow">Topic Tasks</p>
