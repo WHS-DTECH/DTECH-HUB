@@ -481,27 +481,33 @@ function renderChecklistCards(detail, allItems) {
                 <section class="task-list-level-group">
                     <h4>${escapeTaskListHtml(level)}</h4>
                     <div class="task-list-step-list">
-                        ${levelRows.map((step) => `
-                            <div class="task-list-step-row">
-                                <label class="task-list-step-check-wrap">
-                                    <input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${step._index}">
-                                    ${(() => {
-                                        const stepText = stripStepLevel(step?.text);
-                                        const href = getTaskTopicHrefForStep(standard, level, stepText);
-                                        return href
+                        ${levelRows.map((step) => {
+                            const stepText = stripStepLevel(step?.text);
+                            const href = getTaskTopicHrefForStep(standard, level, stepText);
+                            const isProjectManagementRow = String(level) === "Achieved"
+                                && stepText.toLowerCase().includes("project management");
+                            const isSystemComplete = isProjectManagementRow
+                                && systemConnections.trelloConnected
+                                && systemConnections.githubConnected;
+
+                            return `
+                                <div class="task-list-step-row ${isSystemComplete ? "is-system-complete" : ""}">
+                                    <label class="task-list-step-check-wrap">
+                                        <input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${step._index}">
+                                        ${href
                                             ? `<a class="task-list-step-link" href="${escapeTaskListHtml(href)}">${escapeTaskListHtml(stepText)}</a>`
-                                            : `<span class="task-list-step-text">${escapeTaskListHtml(stepText)}</span>`;
-                                    })()}
-                                </label>
-                                ${String(level) === "Achieved" && stripStepLevel(step?.text).toLowerCase().includes("project management") ? `
-                                    <div class="task-list-system-list">
-                                        <p class="task-list-system-title">Connected Systems</p>
-                                        <label class="task-list-system-item"><input type="checkbox" disabled ${systemConnections.trelloConnected ? "checked" : ""}> Trello</label>
-                                        <label class="task-list-system-item"><input type="checkbox" disabled ${systemConnections.githubConnected ? "checked" : ""}> GitHub</label>
-                                    </div>
-                                ` : ""}
-                            </div>
-                        `).join("")}
+                                            : `<span class="task-list-step-text">${escapeTaskListHtml(stepText)}</span>`}
+                                    </label>
+                                    ${isProjectManagementRow ? `
+                                        <div class="task-list-system-list">
+                                            <p class="task-list-system-title">Connected Systems</p>
+                                            <label class="task-list-system-item"><input type="checkbox" disabled ${systemConnections.trelloConnected ? "checked" : ""}> Trello</label>
+                                            <label class="task-list-system-item"><input type="checkbox" disabled ${systemConnections.githubConnected ? "checked" : ""}> GitHub</label>
+                                        </div>
+                                    ` : ""}
+                                </div>
+                            `;
+                        }).join("")}
                     </div>
                 </section>
             `;

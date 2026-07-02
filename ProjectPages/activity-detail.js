@@ -3861,6 +3861,10 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
                 && systemConnections.trelloConnected
                 && systemConnections.githubConnected;
 
+            if (autoCompleteProjectManagementRow) {
+                row.classList.add("is-system-complete");
+            }
+
             const doneValue = Boolean(step?.done) || autoCompleteProjectManagementRow;
             if (autoCompleteProjectManagementRow && !Boolean(step?.done)) {
                 state[standardCode][index].done = true;

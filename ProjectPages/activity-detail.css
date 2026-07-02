@@ -1756,6 +1756,12 @@ h1 {
     grid-template-columns: 20px 1fr auto;
 }
 
+.evidence-step-row.is-system-complete {
+    border-color: #77cfa0;
+    background: #f2fff7;
+    box-shadow: inset 0 0 0 1px #d6f3e4;
+}
+
 .evidence-step-row.is-subitem .evidence-step-input {
     margin-left: 18px;
     border-style: dashed;
@@ -1824,13 +1830,29 @@ h1 {
 .evidence-step-system-item input[type="checkbox"] {
     width: 14px;
     height: 14px;
-    accent-color: #0b5bd3;
+    accent-color: #0ba95a;
 }
 
 .evidence-step-system-item input[type="checkbox"]:disabled {
     opacity: 1;
 }
 
+.evidence-step-system-item input[type="checkbox"]:checked {
+    filter: saturate(180%) contrast(130%);
+}
+
+.evidence-step-system-item:has(input[type="checkbox"]:checked) {
+    background: #e9fff2;
+    border: 1px solid #8dd7ae;
+    border-radius: 7px;
+    padding: 2px 7px;
+    color: #0f5b35;
+}
+
 .evidence-step-check {
-    accent-color: #0b5bd3;
+    accent-color: #0ba95a;
+}
+
+.evidence-step-check:checked {
+    filter: saturate(180%) contrast(130%);
 }
