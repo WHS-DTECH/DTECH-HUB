@@ -91,6 +91,7 @@ const TRELLO_CARD_LIBRARY_STORAGE_PREFIX = "hub_trello_card_library_v1";
 const GITHUB_REPO_LIBRARY_STORAGE_PREFIX = "hub_github_repo_library_v1";
 const ONEDRIVE_LINK_LIBRARY_STORAGE_PREFIX = "hub_onedrive_link_library_v1";
 const GOOGLE_DRIVE_LINK_LIBRARY_STORAGE_PREFIX = "hub_google_drive_link_library_v1";
+const TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX = "hub_task_topic_slide_sync_v1";
 const EVIDENCE_STEPS_TARGET_STANDARDS = new Set(["92005", "91897", "91907"]);
 
 const DIGITAL_OUTCOME_DETAILS_TASKS = [
@@ -3126,6 +3127,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const acknowledgedAt = submission.haparaSubmittedAt || submission.submittedAt || "";
     const currentDocRef = String(submission.haparaDocumentRef || "").trim();
     const currentGoogleSlidesUrl = toSafeExternalUrl(submission.googleSlidesUrl || submission.evidenceLink);
+    let syncedGoogleSlidesUrl = currentGoogleSlidesUrl || readStoredTaskTopicSlideSyncLink(projectId, email, taskTopicTitle, taskTopicShortName);
     const currentTrelloCardUrl = toSafeTrelloCardUrl(submission.trelloCardUrl);
     const currentMediaAssetFolderUrl = toSafeExternalUrl(submission.mediaAssetFolderUrl);
     const currentOneDriveProjectFolderUrl = toSafeExternalUrl(submission.mediaAssetFolderUrl);
@@ -3150,6 +3152,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             <input id="task-topic-hapara-doc-ref" class="task-topic-submission-input" type="text" placeholder="Example: Slide deck draft 2" value="${escapeHtml(currentDocRef)}">
 
             ${isDigitalOutcomeTopic ? `
+                <p class="task-topic-submission-note task-topic-google-sync-note"><strong>Synced Slide:</strong> <span id="task-topic-google-slides-sync-reference">${syncedGoogleSlidesUrl ? `<a href="${escapeHtml(syncedGoogleSlidesUrl)}" target="_blank" rel="noreferrer">${escapeHtml(syncedGoogleSlidesUrl)}</a>` : "No synced slide yet. Open Template Library and click Use Template to link your personal slide copy."}</span></p>
                 <label class="task-topic-submission-label" for="task-topic-google-slides-url">Digital Outcome Description - Google Slides Link</label>
                 <input id="task-topic-google-slides-url" class="task-topic-submission-input" type="url" placeholder="https://docs.google.com/presentation/..." value="${escapeHtml(currentGoogleSlidesUrl)}" required>
                 <p class="task-topic-submission-note">Create a Google Slideshow and include at least one slide that clearly describes the digital outcome.</p>
@@ -3321,6 +3324,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const lastSubmittedHost = panelHost.querySelector("#task-topic-last-submitted");
     const docRefHost = panelHost.querySelector("#task-topic-doc-reference");
     const googleSlidesRefHost = panelHost.querySelector("#task-topic-google-slides-reference");
+    const googleSlidesSyncRefHost = panelHost.querySelector("#task-topic-google-slides-sync-reference");
     const trelloRefHost = panelHost.querySelector("#task-topic-trello-reference");
     const trelloLastLogHost = panelHost.querySelector("#task-topic-trello-last-log");
     const oneDriveRefHost = panelHost.querySelector("#task-topic-onedrive-reference");
@@ -3349,6 +3353,19 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 googleSlidesRefHost.innerHTML = `<a href="${escapeHtml(safeSlidesUrl)}" target="_blank" rel="noreferrer">${escapeHtml(safeSlidesUrl)}</a>`;
             } else {
                 googleSlidesRefHost.textContent = "Not linked";
+            }
+        }
+
+        if (googleSlidesSyncRefHost) {
+            const safeSlidesUrl = toSafeExternalUrl(googleSlidesInput?.value || "");
+            if (safeSlidesUrl) {
+                syncedGoogleSlidesUrl = safeSlidesUrl;
+                writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopicTitle, taskTopicShortName, safeSlidesUrl);
+                googleSlidesSyncRefHost.innerHTML = `<a href="${escapeHtml(syncedGoogleSlidesUrl)}" target="_blank" rel="noreferrer">${escapeHtml(syncedGoogleSlidesUrl)}</a>`;
+            } else if (syncedGoogleSlidesUrl) {
+                googleSlidesSyncRefHost.innerHTML = `<a href="${escapeHtml(syncedGoogleSlidesUrl)}" target="_blank" rel="noreferrer">${escapeHtml(syncedGoogleSlidesUrl)}</a>`;
+            } else {
+                googleSlidesSyncRefHost.textContent = "No synced slide yet. Open Template Library and click Use Template to link your personal slide copy.";
             }
         }
 
@@ -3396,6 +3413,15 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         statusHost.textContent = String(message || "");
         statusHost.classList.toggle("is-error", Boolean(isError));
     };
+
+    googleSlidesInput?.addEventListener("input", () => {
+        const safeSlidesUrl = toSafeExternalUrl(googleSlidesInput?.value || "");
+        if (safeSlidesUrl) {
+            syncedGoogleSlidesUrl = safeSlidesUrl;
+            writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopicTitle, taskTopicShortName, safeSlidesUrl);
+        }
+        updateMeta(acknowledged, acknowledgedAt);
+    });
 
     const setTrelloCreateStatus = (message, isError = false) => {
         if (!trelloCreateStatusHost) return;
@@ -5039,6 +5065,53 @@ function getTaskTopicShortNameOverride(activityId, topicText) {
 
     try {
         return String(window.hubGetTaskTopicShortNameOverride(activityId, topicText) || "").trim();
+    } catch (_error) {
+        return "";
+    }
+}
+
+function normalizeTaskTopicStorageSlug(value) {
+    return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 120);
+}
+
+function getTaskTopicSlideSyncStorageKey(projectId, email, taskTopic, taskShortName = "") {
+    const safeProjectId = String(projectId || "").trim();
+    const safeEmail = String(email || "").trim().toLowerCase();
+    const topicSlug = normalizeTaskTopicStorageSlug(taskTopic);
+    const shortSlug = normalizeTaskTopicStorageSlug(taskShortName);
+    return `${TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX}:${safeProjectId}:${safeEmail}:${topicSlug}:${shortSlug}`;
+}
+
+function readStoredTaskTopicSlideSyncLink(projectId, email, taskTopic, taskShortName = "") {
+    const key = getTaskTopicSlideSyncStorageKey(projectId, email, taskTopic, taskShortName);
+    try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return "";
+        const parsed = JSON.parse(raw);
+        return toSafeExternalUrl(parsed?.url || "");
+    } catch (_error) {
+        return "";
+    }
+}
+
+function writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopic, taskShortName = "", value = "") {
+    const key = getTaskTopicSlideSyncStorageKey(projectId, email, taskTopic, taskShortName);
+    const safeUrl = toSafeExternalUrl(value);
+    try {
+        if (!safeUrl) {
+            localStorage.removeItem(key);
+            return "";
+        }
+        localStorage.setItem(key, JSON.stringify({
+            url: safeUrl,
+            savedAt: new Date().toISOString()
+        }));
+        return safeUrl;
     } catch (_error) {
         return "";
     }

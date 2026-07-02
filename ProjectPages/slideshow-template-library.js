@@ -29,6 +29,8 @@ let libraryAccess = { can_teacher_view: false, can_admin: false };
 let libraryHandlersBound = false;
 const SYNC_FOLDER_NAME = "Process Slide Templates";
 const LIB_HUB_VIEW_MODE_STORAGE_KEY = "hub_view_mode_v1";
+const LIB_TEMPLATE_COPY_MAP_STORAGE_PREFIX = "hub_template_copy_map_v1";
+const LIB_TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX = "hub_task_topic_slide_sync_v1";
 
 const DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly";
 const LIB_AUTH_KEY = "hub_google_auth_v1";
@@ -48,10 +50,11 @@ const templateUsageContext = (() => {
         return {
             activityId: String(params.get("activityId") || "").trim(),
             taskTopic: String(params.get("taskTopic") || "").trim(),
-            taskShortName: String(params.get("taskShortName") || "").trim()
+            taskShortName: String(params.get("taskShortName") || "").trim(),
+            templateId: String(params.get("templateId") || "").trim()
         };
     } catch (_error) {
-        return { activityId: "", taskTopic: "", taskShortName: "" };
+        return { activityId: "", taskTopic: "", taskShortName: "", templateId: "" };
     }
 })();
 
@@ -72,6 +75,83 @@ function toSafeExternalUrl(value) {
         if (parsed.protocol === "http:" || parsed.protocol === "https:") return parsed.toString();
     } catch (_error) {}
     return "";
+}
+
+function normalizeStorageSlug(value) {
+    return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 120);
+}
+
+function getTemplateCopyMapStorageKey(activityId, email) {
+    const safeActivityId = String(activityId || "").trim();
+    const safeEmail = String(email || "").trim().toLowerCase();
+    return `${LIB_TEMPLATE_COPY_MAP_STORAGE_PREFIX}:${safeActivityId}:${safeEmail}`;
+}
+
+function readStoredTemplateCopyMap(activityId, email) {
+    const key = getTemplateCopyMapStorageKey(activityId, email);
+    try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        const next = {};
+        Object.entries(parsed || {}).forEach(([templateId, entry]) => {
+            const fileUrl = toSafeExternalUrl(entry?.fileUrl || "");
+            const fileName = String(entry?.fileName || "").trim();
+            if (fileUrl) {
+                next[String(templateId || "").trim()] = { fileUrl, fileName };
+            }
+        });
+        return next;
+    } catch (_error) {
+        return {};
+    }
+}
+
+function writeStoredTemplateCopyMap(activityId, email, value) {
+    const key = getTemplateCopyMapStorageKey(activityId, email);
+    try {
+        localStorage.setItem(key, JSON.stringify(value || {}));
+    } catch (_error) {
+    }
+}
+
+function persistCurrentTemplateCopyMap() {
+    const email = getLibraryEmail();
+    const activityId = String(templateUsageContext.activityId || "").trim();
+    if (!email || !activityId) return;
+    writeStoredTemplateCopyMap(activityId, email, driveState.copyMap || {});
+}
+
+function getTaskTopicSlideSyncStorageKey(activityId, email, taskTopic, taskShortName = "") {
+    const safeActivityId = String(activityId || "").trim();
+    const safeEmail = String(email || "").trim().toLowerCase();
+    const topicSlug = normalizeStorageSlug(taskTopic);
+    const shortSlug = normalizeStorageSlug(taskShortName);
+    return `${LIB_TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX}:${safeActivityId}:${safeEmail}:${topicSlug}:${shortSlug}`;
+}
+
+function persistTaskTopicSlideSyncLink(fileUrl) {
+    const safeUrl = toSafeExternalUrl(fileUrl);
+    const email = getLibraryEmail();
+    const activityId = String(templateUsageContext.activityId || "").trim();
+    const taskTopic = String(templateUsageContext.taskTopic || "").trim();
+    const taskShortName = String(templateUsageContext.taskShortName || "").trim();
+    if (!safeUrl || !email || !activityId || !taskTopic) return;
+
+    const key = getTaskTopicSlideSyncStorageKey(activityId, email, taskTopic, taskShortName);
+    try {
+        localStorage.setItem(key, JSON.stringify({
+            url: safeUrl,
+            savedAt: new Date().toISOString(),
+            templateId: String(templateUsageContext.templateId || "").trim()
+        }));
+    } catch (_error) {
+    }
 }
 
 function extractSlidesFileId(value) {
@@ -636,6 +716,8 @@ async function handleUseTemplate(templateId) {
 
     // If already copied this session, open existing
     if (driveState.copyMap[templateId]) {
+        persistTaskTopicSlideSyncLink(driveState.copyMap[templateId].fileUrl);
+        persistCurrentTemplateCopyMap();
         void markConnectedTaskItemDone(templateId).catch((error) => {
             console.warn("Could not update Task List completion after template open.", error);
         });
@@ -675,6 +757,8 @@ async function handleUseTemplate(templateId) {
         const payload = await copyTemplateWithToken(tokenResponse.access_token);
 
         driveState.copyMap[templateId] = { fileUrl: payload.fileUrl, fileName: payload.fileName };
+        persistTaskTopicSlideSyncLink(payload.fileUrl);
+        persistCurrentTemplateCopyMap();
         updateCardAfterCopy(templateId, payload);
         void markConnectedTaskItemDone(templateId).catch((error) => {
             console.warn("Could not update Task List completion after template copy.", error);
@@ -701,6 +785,8 @@ async function handleUseTemplate(templateId) {
         try {
             const retryPayload = await copyTemplateWithToken(consentTokenResponse.access_token);
             driveState.copyMap[templateId] = { fileUrl: retryPayload.fileUrl, fileName: retryPayload.fileName };
+            persistTaskTopicSlideSyncLink(retryPayload.fileUrl);
+            persistCurrentTemplateCopyMap();
             updateCardAfterCopy(templateId, retryPayload);
             void markConnectedTaskItemDone(templateId).catch((warnError) => {
                 console.warn("Could not update Task List completion after template copy.", warnError);
@@ -817,6 +903,20 @@ function renderTemplateCard(item) {
     `;
 }
 
+function focusRequestedTemplateCard() {
+    const requestedId = String(templateUsageContext.templateId || "").trim();
+    if (!requestedId) return;
+
+    const cards = Array.from(document.querySelectorAll(".template-card"));
+    cards.forEach((card) => card.classList.remove("is-requested"));
+
+    const target = document.querySelector(`[data-template-id="${CSS.escape(requestedId)}"]`);
+    if (!target) return;
+
+    target.classList.add("is-requested");
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
 function renderLibrary() {
     const host = document.querySelector("#template-list");
     const searchStatus = document.querySelector("#template-search-status");
@@ -852,6 +952,7 @@ function renderLibrary() {
     }
 
     host.innerHTML = filteredTemplates.map((item) => renderTemplateCard(item)).join("");
+    focusRequestedTemplateCard();
 
     if (!libraryHandlersBound) {
         libraryHandlersBound = true;
@@ -923,6 +1024,11 @@ async function initLibrary() {
         if (!email) {
             renderSetupBanner(null);
             return false;
+        }
+
+        const activityId = String(templateUsageContext.activityId || "").trim();
+        if (activityId) {
+            driveState.copyMap = readStoredTemplateCopyMap(activityId, email);
         }
 
         // Re-resolve role access once an email is available so page controls match sign-in state.

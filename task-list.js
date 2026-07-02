@@ -84,12 +84,20 @@ function buildTaskListHeaders(headers = {}) {
     };
 }
 
-function buildCustomActivityLink(id, taskTopic = "") {
+function buildCustomActivityLink(id, taskTopic = "", taskShortName = "", templateId = "") {
     const params = new URLSearchParams();
     params.set("id", String(id || "").trim());
     const safeTaskTopic = String(taskTopic || "").trim();
+    const safeTaskShortName = String(taskShortName || "").trim();
+    const safeTemplateId = String(templateId || "").trim();
     if (safeTaskTopic) {
         params.set("taskTopic", safeTaskTopic);
+    }
+    if (safeTaskShortName) {
+        params.set("taskShortName", safeTaskShortName);
+    }
+    if (safeTemplateId) {
+        params.set("templateId", safeTemplateId);
     }
     return `/ProjectPages/custom-activity.html?${params.toString()}`;
 }
@@ -104,6 +112,7 @@ function deriveTaskShortName(taskTopic) {
     if (!normalized) return "Task List";
     if (/client projects/i.test(normalized)) return "Client Projects";
     if (/project management/i.test(normalized)) return "Project Management";
+    if (/describe.*digital outcome|description\s*-\s*google\s*slides/i.test(normalized)) return "Digital Outcome Description";
     if (/digital outcome/i.test(normalized)) return "Digital Outcome";
     return normalized;
 }
@@ -132,7 +141,7 @@ function getTaskTopicHrefForStep(standard, level, text) {
     }
 
     if (String(standard) === "digital-outcome" && normalized.includes("describe the digital outcome")) {
-        return buildCustomActivityLink(taskListState.selectedId, "Digital Outcome");
+        return buildCustomActivityLink(taskListState.selectedId, safeText, "Digital Outcome Description", "digital-outcome-description");
     }
 
     if (normalizedLevel === "achieved" && normalized.includes("version control")) {

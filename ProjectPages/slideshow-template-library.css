@@ -166,6 +166,11 @@ button.template-button {
     box-shadow: 0 8px 18px rgba(31, 58, 86, 0.08);
 }
 
+.template-card.is-requested {
+    border-color: #2f74b9;
+    box-shadow: 0 0 0 3px rgba(47, 116, 185, 0.24), 0 12px 22px rgba(31, 58, 86, 0.14);
+}
+
 .template-card-preview {
     display: block;
     width: 220px;
