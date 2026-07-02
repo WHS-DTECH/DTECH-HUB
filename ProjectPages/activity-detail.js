@@ -1749,7 +1749,46 @@ async function persistStudentTrelloLinkDirectlyToEvidence(projectId, studentEmai
         throw new Error("Enter a valid Trello card or board link first.");
     }
 
-    let nextRows = await fetchEvidenceRowsEnsuringAllocation(projectId, studentEmail);
+    const fetchMyEvidenceRows = async () => {
+        const response = await fetch(`/api/activities/${encodeURIComponent(projectId)}/my-evidence`, {
+            headers: buildWriteHeaders()
+        });
+        if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            const error = new Error(payload?.error || "Could not load my evidence rows.");
+            error.status = Number(response.status || 0);
+            throw error;
+        }
+        const payload = await response.json().catch(() => ({}));
+        return normalizeEvidenceSteps(payload?.evidence_steps);
+    };
+
+    const saveMyEvidenceRows = async (rows) => {
+        const response = await fetch(`/api/activities/${encodeURIComponent(projectId)}/my-evidence`, {
+            method: "PATCH",
+            headers: buildWriteHeaders(),
+            body: JSON.stringify({ evidence_steps: normalizeEvidenceSteps(rows) })
+        });
+        if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            const error = new Error(payload?.error || "Could not save my evidence rows.");
+            error.status = Number(response.status || 0);
+            throw error;
+        }
+    };
+
+    let nextRows = [];
+    try {
+        nextRows = await fetchMyEvidenceRows();
+    } catch (error) {
+        if (Number(error?.status || 0) !== 404) {
+            throw error;
+        }
+        // Ensure allocation exists then retry my-evidence endpoint.
+        await fetchEvidenceRowsEnsuringAllocation(projectId, studentEmail);
+        nextRows = await fetchMyEvidenceRows();
+    }
+
     nextRows = upsertEvidenceStandardRow(nextRows, "trello-sync", [
         { text: `TRELLO_CARD_URL|${safeUrl}`, done: true },
         { text: `TRELLO_SAVED_AT|${new Date().toISOString()}`, done: true }
@@ -1764,7 +1803,7 @@ async function persistStudentTrelloLinkDirectlyToEvidence(projectId, studentEmai
         });
     }
 
-    await saveEvidenceRows(projectId, studentEmail, nextRows);
+    await saveMyEvidenceRows(nextRows);
 }
 
 async function persistStudentGithubSync(projectId, studentEmail, githubRepoUrl, githubNote = "") {

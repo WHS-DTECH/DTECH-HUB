@@ -6059,6 +6059,53 @@ app.get("/api/activities/:id/interests/:studentEmail/evidence", async (req, res)
   }
 });
 
+app.get("/api/activities/:id/interests/me/evidence", async (req, res) => {
+  const projectId = String(req.params.id || "").trim();
+  const requesterEmail = normalizeEmail(getRequestUserEmail(req));
+
+  if (!projectId) {
+    res.status(400).json({ error: "Project ID is required" });
+    return;
+  }
+
+  if (!requesterEmail || !requesterEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required" });
+    return;
+  }
+
+  if (!hasDatabase) {
+    res.json({
+      student_email: requesterEmail,
+      standard_1: "",
+      standard_2: "",
+      evidence_steps: []
+    });
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      "SELECT standard_1, standard_2, evidence_steps FROM project_interests WHERE project_id = $1 AND student_email = $2 LIMIT 1",
+      [projectId, requesterEmail]
+    );
+
+    if (!result.rowCount) {
+      res.status(404).json({ error: "Student allocation not found" });
+      return;
+    }
+
+    const row = result.rows[0] || {};
+    res.json({
+      student_email: requesterEmail,
+      standard_1: String(row.standard_1 || "").trim(),
+      standard_2: String(row.standard_2 || "").trim(),
+      evidence_steps: normalizeEvidenceStepsPayload(row.evidence_steps)
+    });
+  } catch (_error) {
+    res.status(500).json({ error: "Could not load evidence steps" });
+  }
+});
+
 app.patch("/api/activities/:id/interests/:studentEmail/evidence", async (req, res) => {
   const projectId = String(req.params.id || "").trim();
   const studentEmail = normalizeEmail(req.params.studentEmail || "");
@@ -6118,6 +6165,139 @@ app.patch("/api/activities/:id/interests/:studentEmail/evidence", async (req, re
       student_email: studentEmail,
       evidence_steps: evidenceSteps
     });
+  } catch (_error) {
+    res.status(500).json({ error: "Could not save evidence steps" });
+  }
+});
+
+app.patch("/api/activities/:id/interests/me/evidence", async (req, res) => {
+  const projectId = String(req.params.id || "").trim();
+  const requesterEmail = normalizeEmail(getRequestUserEmail(req));
+
+  if (!projectId) {
+    res.status(400).json({ error: "Project ID is required" });
+    return;
+  }
+
+  if (!requesterEmail || !requesterEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required" });
+    return;
+  }
+
+  const evidenceSteps = normalizeEvidenceStepsPayload(req.body?.evidence_steps);
+
+  if (!hasDatabase) {
+    res.json({
+      student_email: requesterEmail,
+      evidence_steps: evidenceSteps
+    });
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        UPDATE project_interests
+        SET evidence_steps = $1::jsonb,
+            updated_at = NOW()
+        WHERE project_id = $2 AND student_email = $3
+        RETURNING student_email
+      `,
+      [JSON.stringify(evidenceSteps), projectId, requesterEmail]
+    );
+
+    if (!result.rowCount) {
+      res.status(404).json({ error: "Student allocation not found" });
+      return;
+    }
+
+    res.json({
+      student_email: requesterEmail,
+      evidence_steps: evidenceSteps
+    });
+  } catch (_error) {
+    res.status(500).json({ error: "Could not save evidence steps" });
+  }
+});
+
+app.get("/api/activities/:id/my-evidence", async (req, res) => {
+  const projectId = String(req.params.id || "").trim();
+  const requesterEmail = normalizeEmail(getRequestUserEmail(req));
+
+  if (!projectId) {
+    res.status(400).json({ error: "Project ID is required" });
+    return;
+  }
+
+  if (!requesterEmail || !requesterEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required" });
+    return;
+  }
+
+  if (!hasDatabase) {
+    res.json({ student_email: requesterEmail, evidence_steps: [] });
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      "SELECT evidence_steps FROM project_interests WHERE project_id = $1 AND student_email = $2 LIMIT 1",
+      [projectId, requesterEmail]
+    );
+
+    if (!result.rowCount) {
+      res.status(404).json({ error: "Student allocation not found" });
+      return;
+    }
+
+    res.json({
+      student_email: requesterEmail,
+      evidence_steps: normalizeEvidenceStepsPayload(result.rows?.[0]?.evidence_steps)
+    });
+  } catch (_error) {
+    res.status(500).json({ error: "Could not load evidence steps" });
+  }
+});
+
+app.patch("/api/activities/:id/my-evidence", async (req, res) => {
+  const projectId = String(req.params.id || "").trim();
+  const requesterEmail = normalizeEmail(getRequestUserEmail(req));
+
+  if (!projectId) {
+    res.status(400).json({ error: "Project ID is required" });
+    return;
+  }
+
+  if (!requesterEmail || !requesterEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required" });
+    return;
+  }
+
+  const evidenceSteps = normalizeEvidenceStepsPayload(req.body?.evidence_steps);
+
+  if (!hasDatabase) {
+    res.json({ student_email: requesterEmail, evidence_steps: evidenceSteps });
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        UPDATE project_interests
+        SET evidence_steps = $1::jsonb,
+            updated_at = NOW()
+        WHERE project_id = $2 AND student_email = $3
+        RETURNING student_email
+      `,
+      [JSON.stringify(evidenceSteps), projectId, requesterEmail]
+    );
+
+    if (!result.rowCount) {
+      res.status(404).json({ error: "Student allocation not found" });
+      return;
+    }
+
+    res.json({ student_email: requesterEmail, evidence_steps: evidenceSteps });
   } catch (_error) {
     res.status(500).json({ error: "Could not save evidence steps" });
   }
