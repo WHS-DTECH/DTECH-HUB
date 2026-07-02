@@ -406,7 +406,6 @@ function renderChecklistCards(detail, allItems) {
                 ${standard === "digital-outcome" ? `
                     <h3>Digital Outcome Topic</h3>
                     <div class="task-list-do-chip">${escapeTaskListHtml(topicType)}</div>
-                    <p class="task-list-meta"><strong>${escapeTaskListHtml(taskTitle)}</strong> • ${escapeTaskListHtml(deriveTaskShortName(taskTopic))}</p>
                 ` : `<h3>${title}</h3>`}
                 ${renderRowsForStandard(standard, rows)}
             </article>
