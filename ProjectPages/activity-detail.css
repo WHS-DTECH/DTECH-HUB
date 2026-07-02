@@ -1828,9 +1828,16 @@ h1 {
 }
 
 .evidence-step-system-item input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
     width: 18px;
     height: 18px;
-    accent-color: #1d4ed8;
+    border: 2px solid #7aa9e8;
+    border-radius: 4px;
+    background: #ffffff;
+    position: relative;
+    margin: 0;
+    flex: 0 0 auto;
 }
 
 .evidence-step-system-item input[type="checkbox"]:disabled {
@@ -1838,7 +1845,20 @@ h1 {
 }
 
 .evidence-step-system-item input[type="checkbox"]:checked {
-    filter: saturate(180%) contrast(130%);
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+}
+
+.evidence-step-system-item input[type="checkbox"]:checked::after {
+    content: "";
+    position: absolute;
+    left: 5px;
+    top: 1px;
+    width: 4px;
+    height: 9px;
+    border: solid #ffffff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
 }
 
 .evidence-step-system-item:has(input[type="checkbox"]:checked) {
