@@ -100,6 +100,9 @@ const DIGITAL_OUTCOME_DETAILS_TASKS = [
     "State how success will be measured or evaluated."
 ];
 
+const DIGITAL_OUTCOME_DESCRIPTION_TITLE = "Digital Outcome Description";
+const DIGITAL_OUTCOME_DESCRIPTION_TEMPLATE_PREVIEW_URL = "https://drive.google.com/thumbnail?id=1brOY70u9aJdsoiEtxVepr82vRhiv9VzpMm8TUv3lcTo&sz=w1400";
+
 const EVIDENCE_STEPS_DEFAULTS = {
     "92005": [
         "Define what the digital outcome needs to do.",
@@ -5013,6 +5016,22 @@ function deriveTaskShortName(value) {
         .join(" ");
 }
 
+function isDigitalOutcomeDescriptionCriterion(taskTopicTitle, taskShortName = "") {
+    const topicText = String(taskTopicTitle || "").trim().toLowerCase();
+    const shortNameText = String(taskShortName || "").trim().toLowerCase();
+    if (!topicText && !shortNameText) {
+        return false;
+    }
+
+    if (/description\s*-\s*google\s*slides/.test(topicText)) {
+        return true;
+    }
+    if (/describe.*digital\s+outcome/.test(topicText)) {
+        return true;
+    }
+    return shortNameText === DIGITAL_OUTCOME_DESCRIPTION_TITLE.toLowerCase();
+}
+
 function getTaskTopicShortNameOverride(activityId, topicText) {
     if (typeof window === "undefined" || typeof window.hubGetTaskTopicShortNameOverride !== "function") {
         return "";
@@ -5285,11 +5304,14 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     const resolvedTaskShortName = String(selectedTaskShortName || "").trim()
         || (taskTopicTitle ? getTaskTopicShortNameOverride(id, taskTopicTitle) : "")
         || (taskTopicTitle ? deriveTaskShortName(taskTopicTitle) : "");
+    const isDigitalOutcomeDescriptionTopic = isDigitalOutcomeDescriptionCriterion(taskTopicTitle, resolvedTaskShortName);
     const mergedTaskTopicLinks = isTaskTopicView
         ? collectMergedTaskTopicLinks(data, id, taskTopicTitle, resolvedTaskShortName)
         : [];
     const showMergedTaskTopicLayout = mergedTaskTopicLinks.length > 1;
-    const displayTitle = resolvedTaskShortName || taskTopicTitle || data.title;
+    const displayTitle = isDigitalOutcomeDescriptionTopic
+        ? DIGITAL_OUTCOME_DESCRIPTION_TITLE
+        : (resolvedTaskShortName || taskTopicTitle || data.title);
     const displaySummaryHtml = taskTopicTitle
         ? `Task topic from <a class="task-topic-parent-link" href="${parentAssessmentUrl}">${escapeHtml(data.title)}</a>`
         : escapeHtml(data.summary);
@@ -5325,8 +5347,12 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     if (resolvedTaskShortName) {
         templateLibraryParams.set("taskShortName", resolvedTaskShortName);
     }
+    if (isDigitalOutcomeDescriptionTopic) {
+        templateLibraryParams.set("templateId", "digital-outcome-description");
+    }
     const slideshowTemplateLibraryUrl = `slideshow-template-library.html?${templateLibraryParams.toString()}`;
-    const slideshowTemplateImage = toSafeExternalUrl(data?.slideshowTemplateImage || data?.slideTemplateImage || "");
+    const slideshowTemplateImage = toSafeExternalUrl(data?.slideshowTemplateImage || data?.slideTemplateImage || "")
+        || (isDigitalOutcomeDescriptionTopic ? DIGITAL_OUTCOME_DESCRIPTION_TEMPLATE_PREVIEW_URL : "");
     const slideshowTemplateFileUrl = toSafeExternalUrl(data?.slideshowTemplateFileUrl || data?.slideTemplateFileUrl || data?.speakerNotesCriteriaUrl || "");
     const heroVisualImage = (isDigitalOutcomeTopic ? (slideshowTemplateImage || data.image) : data.image)
         || "https://placehold.co/900x560/3f89cf/ffffff?text=Uploaded+Activity";
@@ -6786,10 +6812,13 @@ async function initDetail() {
     const selectedTaskTopic = resolveRequestedTaskTopic(resolvedData, params);
     const selectedTaskShortName = String(params.get("taskShortName") || "").trim()
         || getTaskTopicShortNameOverride(id, selectedTaskTopic);
+    const titleOverride = isDigitalOutcomeDescriptionCriterion(selectedTaskTopic, selectedTaskShortName)
+        ? DIGITAL_OUTCOME_DESCRIPTION_TITLE
+        : "";
     const canEditRole = await canEditDetails();
     const isTeacher = resolveDetailTeacherMode(canEditRole);
 
-    document.title = `${selectedTaskShortName || selectedTaskTopic || resolvedData.title} | Computer Lab`;
+    document.title = `${titleOverride || selectedTaskShortName || selectedTaskTopic || resolvedData.title} | Computer Lab`;
 
     // In student view mode, teachers should see the same page experience as students.
     renderDetailView(host, id, resolvedData, isTeacher, selectedTaskTopic, selectedTaskShortName);

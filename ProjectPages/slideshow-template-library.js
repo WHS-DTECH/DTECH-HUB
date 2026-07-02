@@ -92,6 +92,8 @@ function getLibraryEmail() {
         const raw = localStorage.getItem(LIB_AUTH_KEY) || sessionStorage.getItem(LIB_AUTH_KEY);
         if (!raw) return "";
         const parsed = JSON.parse(raw);
+        const profileEmail = String(parsed?.profile?.email || "").trim().toLowerCase();
+        if (profileEmail) return profileEmail;
         if (!parsed?.expiresAt || Number(parsed.expiresAt) <= Date.now()) return "";
         return String(parsed?.profile?.email || "").trim().toLowerCase();
     } catch (_error) {
@@ -916,11 +918,34 @@ async function initLibrary() {
     const banner = document.querySelector("#template-setup-banner");
     if (banner) banner.hidden = true;
 
-    const email = getLibraryEmail();
-    if (!email) return;
+    const hydrateSignedInLibraryState = async () => {
+        const email = getLibraryEmail();
+        if (!email) {
+            renderSetupBanner(null);
+            return false;
+        }
 
-    const setup = await loadDriveSetup();
-    renderSetupBanner(setup);
+        // Re-resolve role access once an email is available so page controls match sign-in state.
+        libraryAccess = await loadLibraryAccess();
+        applyLibraryRoleVisibility(libraryAccess);
+
+        const setup = await loadDriveSetup();
+        renderSetupBanner(setup);
+        return true;
+    };
+
+    let hydrated = await hydrateSignedInLibraryState();
+    if (!hydrated) {
+        for (let attempt = 0; attempt < 8; attempt += 1) {
+            await new Promise((resolve) => setTimeout(resolve, 300));
+            hydrated = await hydrateSignedInLibraryState();
+            if (hydrated) {
+                break;
+            }
+        }
+    }
+
+    if (!hydrated) return;
 
     // Pre-initialize drive token client silently
     const waitForGoogle = (tries = 20) => {
