@@ -1833,6 +1833,13 @@ function ensureGlobalHubSidebar() {
         if (trigger instanceof HTMLElement) {
             trigger.click();
             setOpen(false);
+            return;
+        }
+
+        const taskListTarget = getTaskListNavigationTarget();
+        if (taskListTarget) {
+            window.location.href = taskListTarget;
+            setOpen(false);
         }
     });
 
@@ -1849,6 +1856,27 @@ function ensureGlobalHubSidebar() {
     document.body.append(toggle, backdrop, panel);
     hubGlobalSidebarNodes = { toggle, backdrop, panel, setOpen };
     return hubGlobalSidebarNodes;
+}
+
+function getTaskListNavigationTarget() {
+    try {
+        const params = new URLSearchParams(window.location.search || "");
+        const activityId = String(params.get("id") || params.get("activityId") || "").trim();
+        if (!activityId) {
+            return "";
+        }
+
+        const taskTopic = String(params.get("taskTopic") || "").trim();
+        const targetParams = new URLSearchParams();
+        targetParams.set("id", activityId);
+        if (taskTopic) {
+            targetParams.set("taskTopic", taskTopic);
+        }
+
+        return `/ProjectPages/custom-activity.html?${targetParams.toString()}`;
+    } catch (_error) {
+        return "";
+    }
 }
 
 function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {
@@ -1885,7 +1913,8 @@ function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {
     if (adminLink) adminLink.hidden = !canAdmin;
     if (taskListButton) {
         const hasTaskListTrigger = document.querySelector("#evidence-sidebar-open") instanceof HTMLElement;
-        taskListButton.hidden = !hasTaskListTrigger;
+        const hasTaskListTarget = Boolean(getTaskListNavigationTarget());
+        taskListButton.hidden = !(hasTaskListTrigger || hasTaskListTarget);
     }
 
     if (copy) {
