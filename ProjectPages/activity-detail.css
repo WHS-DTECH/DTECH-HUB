@@ -1524,6 +1524,57 @@ h1 {
     font-size: 0.7rem;
 }
 
+.evidence-digital-outcome-allocation-wrap {
+    margin: 8px 0 10px;
+    border: 1px solid #d3dcf0;
+    border-radius: 10px;
+    background: #f7f9ff;
+    padding: 8px;
+}
+
+.evidence-digital-outcome-allocation-title {
+    margin: 0 0 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #29496d;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.evidence-digital-outcome-allocation-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 6px;
+}
+
+.evidence-digital-outcome-allocation-item {
+    border: 1px solid #dbe4f5;
+    border-radius: 8px;
+    background: #ffffff;
+    padding: 6px 8px;
+    display: grid;
+    gap: 2px;
+}
+
+.evidence-digital-outcome-allocation-name {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #1f3450;
+}
+
+.evidence-digital-outcome-allocation-meta {
+    font-size: 0.72rem;
+    color: #3f5f7f;
+}
+
+.evidence-digital-outcome-allocation-empty {
+    margin: 8px 0 10px;
+    font-size: 0.75rem;
+    color: #4b6682;
+}
+
 .evidence-sidebar-open-btn {
     margin-top: 0;
 }

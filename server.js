@@ -6248,7 +6248,7 @@ app.get("/api/my-allocations", async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT a.id, a.name, a.activity_category
+      `SELECT a.id, a.name, a.activity_category, a.type
        FROM project_interests pi
        JOIN activities a ON a.id::text = pi.project_id::text
        WHERE pi.student_email = $1
@@ -6260,7 +6260,12 @@ app.get("/api/my-allocations", async (req, res) => {
     const projects = [];
     for (const row of result.rows) {
       const cat = String(row.activity_category || "").toLowerCase();
-      const item = { id: String(row.id), name: String(row.name || "Untitled") };
+      const item = {
+        id: String(row.id),
+        name: String(row.name || "Untitled"),
+        topic_type: String(row.type || "").trim(),
+        activity_category: String(row.activity_category || "").trim()
+      };
       if (cat.includes("assessment")) {
         assessmentTasks.push(item);
       } else {

@@ -3086,6 +3086,40 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
     const isDigitalMediaTaskContext = /(DIGITAL\s*MEDIA|MEDIA|FILM|VIDEO|AUDIO|MUSIC|PHOTOGRAPH|ANIMATION|GRAPHIC)/i.test(contextSignals);
     const secondarySystemLabel = isDigitalMediaTaskContext ? "Cloud Folder" : "GitHub";
     const digitalOutcomeTopicType = String(detailData?.type || "").trim();
+    let digitalOutcomeAllocations = [];
+    if (isSelfTaskListView) {
+        try {
+            const response = await fetch("/api/my-allocations", {
+                headers: buildWriteHeaders()
+            });
+            if (response.ok) {
+                const payload = await response.json().catch(() => ({}));
+                const assessments = (Array.isArray(payload?.assessment_tasks) ? payload.assessment_tasks : [])
+                    .map((item) => ({
+                        id: String(item?.id || "").trim(),
+                        name: String(item?.name || "Untitled").trim() || "Untitled",
+                        topicType: String(item?.topic_type || "").trim(),
+                        kind: "Assessment"
+                    }));
+                const projects = (Array.isArray(payload?.projects) ? payload.projects : [])
+                    .map((item) => ({
+                        id: String(item?.id || "").trim(),
+                        name: String(item?.name || "Untitled").trim() || "Untitled",
+                        topicType: String(item?.topic_type || "").trim(),
+                        kind: "Project"
+                    }));
+
+                const byId = new Map();
+                [...assessments, ...projects].forEach((item) => {
+                    if (!item.id) return;
+                    byId.set(item.id, item);
+                });
+                digitalOutcomeAllocations = Array.from(byId.values());
+            }
+        } catch (_error) {
+            digitalOutcomeAllocations = [];
+        }
+    }
     const state = evidenceRowsToMap(await fetchEvidenceRows(projectId, studentEmail).catch(() => []));
     standards.forEach((code) => {
         const hasExistingStandard = Object.prototype.hasOwnProperty.call(state, code);
@@ -3408,6 +3442,21 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
         }
         const doBlock = document.createElement("section");
         doBlock.className = "evidence-standard-block evidence-digital-outcome-block";
+        const digitalOutcomeAllocationHtml = digitalOutcomeAllocations.length
+            ? `
+                <div class="evidence-digital-outcome-allocation-wrap">
+                    <p class="evidence-digital-outcome-allocation-title">Assessments and Projects</p>
+                    <ul class="evidence-digital-outcome-allocation-list">
+                        ${digitalOutcomeAllocations.map((item) => `
+                            <li class="evidence-digital-outcome-allocation-item">
+                                <span class="evidence-digital-outcome-allocation-name">${escapeHtml(item.name)}</span>
+                                <span class="evidence-digital-outcome-allocation-meta">${escapeHtml(item.kind)} • Topic Type: ${escapeHtml(item.topicType || "Not Set")}</span>
+                            </li>
+                        `).join("")}
+                    </ul>
+                </div>
+            `
+            : `<p class="evidence-digital-outcome-allocation-empty">No linked assessments or projects found.</p>`;
         doBlock.innerHTML = `
             <h3 class="evidence-digital-outcome-heading">Digital Outcome Topic</h3>
             <div class="evidence-step-list evidence-digital-outcome-topic-list">
@@ -3421,6 +3470,7 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
                     >
                 </div>
             </div>
+            ${digitalOutcomeAllocationHtml}
             <h3 class="evidence-digital-outcome-heading">Digital Outcome Description</h3>
             <div class="evidence-step-list" id="evidence-step-list-digital-outcome"></div>
             ${!isSelfTaskListView ? `<button type="button" class="detail-action detail-action-secondary evidence-step-add" data-do-add>Add Step</button>` : ""}
