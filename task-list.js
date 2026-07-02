@@ -1,5 +1,50 @@
 const TASK_LIST_AUTH_KEY = "hub_google_auth_v1";
 
+const DIGITAL_OUTCOME_DETAILS_TASKS = [
+    "Description - Google Slides: Describe the Digital Outcome: What is it, who is it for, and what should it do?",
+    "Identify the target audience or end user for this outcome.",
+    "Explain how the outcome will be developed and what tools/technologies will be used.",
+    "State how success will be measured or evaluated."
+];
+
+const EVIDENCE_STEPS_DEFAULTS = {
+    "92005": [
+        "Define what the digital outcome needs to do.",
+        "Collect and review evidence of user or stakeholder needs.",
+        "Build and test versions of the outcome.",
+        "Record changes and justify decisions using evidence.",
+        "Evaluate the final outcome against requirements."
+    ],
+    "91897": [
+        "Achieved: Use appropriate project management tools and techniques to plan the development of a digital technologies outcome.",
+        "Achieved: Decompose the outcome into smaller components.",
+        "Achieved: List the key features or requirements the outcome must include.",
+        "Achieved: Trial the components of the digital technologies outcome.",
+        "Achieved: Test that the digital technologies outcome functions as intended.",
+        "Achieved: Explain relevant implications.",
+        "Merit: Effectively use project management and version control tools and techniques to manage development of a digital technologies outcome.",
+        "Merit: Trial multiple components and/or techniques and select those that are most suitable.",
+        "Merit: Use information from testing and trialling to improve the functionality of the digital technologies outcome.",
+        "Merit: Address relevant implications.",
+        "Excellence: Discuss how planning, testing, and trialling information assisted the development of a high-quality outcome."
+    ],
+    "91907": [
+        "Establish the project purpose and design requirements.",
+        "Develop and trial design options.",
+        "Document implementation decisions and technical evidence.",
+        "Test against requirements and refine.",
+        "Summarize final evidence for achieved, merit, or excellence."
+    ]
+};
+
+const state = {
+    allItems: [],
+    selectedId: "",
+    checklistState: {},
+    checklistStandards: [],
+    taskTopic: ""
+};
+
 function escapeTaskListHtml(value) {
     return String(value || "")
         .replace(/&/g, "&amp;")
@@ -47,12 +92,21 @@ function buildCustomActivityLink(id, taskTopic = "") {
 }
 
 function getTopicTypeLabel(detail) {
-    const type = String(detail?.type || detail?.topicType || "").trim();
+    const type = String(detail?.type || detail?.topicType || detail?.topic_type || "").trim();
     return type || "Not set";
 }
 
-async function loadJson(url, headers = {}) {
-    const response = await fetch(url, { headers });
+function deriveTaskShortName(taskTopic) {
+    const normalized = String(taskTopic || "").trim();
+    if (!normalized) return "Task List";
+    if (/client projects/i.test(normalized)) return "Client Projects";
+    if (/project management/i.test(normalized)) return "Project Management";
+    if (/digital outcome/i.test(normalized)) return "Digital Outcome";
+    return normalized;
+}
+
+async function loadJson(url, options = {}) {
+    const response = await fetch(url, options);
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
         const error = new Error(payload?.error || `Request failed (${response.status})`);
@@ -72,11 +126,84 @@ async function fetchAllocations() {
     if (!email) {
         return { assessment_tasks: [], projects: [] };
     }
-    const payload = await loadJson("/api/my-allocations", buildTaskListHeaders({}));
+    const payload = await loadJson("/api/my-allocations", { headers: buildTaskListHeaders({}) });
     return {
         assessment_tasks: Array.isArray(payload?.assessment_tasks) ? payload.assessment_tasks : [],
         projects: Array.isArray(payload?.projects) ? payload.projects : []
     };
+}
+
+async function fetchActivityDetail(id) {
+    if (!id) return null;
+    try {
+        return await loadJson(`/api/activities/${encodeURIComponent(id)}`, { headers: buildTaskListHeaders({}) });
+    } catch (_error) {
+        return null;
+    }
+}
+
+function normalizeEvidenceSteps(rows) {
+    const source = Array.isArray(rows) ? rows : [];
+    return source
+        .map((row) => {
+            const standard = String(row?.standard || "").trim();
+            if (!standard) return null;
+
+            const steps = Array.isArray(row?.steps)
+                ? row.steps
+                    .map((step) => ({
+                        text: String(step?.text || "").trim(),
+                        done: Boolean(step?.done)
+                    }))
+                    .filter((step) => step.text)
+                : [];
+
+            return { standard, steps };
+        })
+        .filter(Boolean);
+}
+
+function evidenceRowsToMap(rows) {
+    const map = {};
+    normalizeEvidenceSteps(rows).forEach((row) => {
+        map[row.standard] = row.steps.map((step) => ({ text: step.text, done: Boolean(step.done) }));
+    });
+    return map;
+}
+
+function evidenceMapToRows(currentState, standards) {
+    const source = Array.isArray(standards) ? standards : [];
+    return source
+        .map((standard) => ({
+            standard,
+            steps: Array.isArray(currentState?.[standard]) ? currentState[standard] : []
+        }))
+        .map((row) => ({
+            standard: String(row.standard || "").trim(),
+            steps: Array.isArray(row.steps)
+                ? row.steps
+                    .map((step) => ({
+                        text: String(step?.text || "").trim(),
+                        done: Boolean(step?.done)
+                    }))
+                    .filter((step) => step.text)
+                : []
+        }))
+        .filter((row) => row.standard);
+}
+
+async function fetchMyEvidence(projectId) {
+    if (!projectId) return [];
+    const payload = await loadJson(`/api/activities/${encodeURIComponent(projectId)}/my-evidence`, { headers: buildTaskListHeaders({}) });
+    return normalizeEvidenceSteps(payload?.evidence_steps);
+}
+
+async function saveMyEvidence(projectId, rows) {
+    return loadJson(`/api/activities/${encodeURIComponent(projectId)}/my-evidence`, {
+        method: "PATCH",
+        headers: buildTaskListHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ evidence_steps: normalizeEvidenceSteps(rows) })
+    });
 }
 
 function getQueryContext() {
@@ -118,7 +245,7 @@ function renderHeader(summary) {
     `;
 }
 
-function renderAllocationPills(assessmentTasks, projects) {
+function renderAllocationLists(assessmentTasks, projects) {
     const renderList = (hostId, emptyId, items, label) => {
         const host = document.querySelector(hostId);
         const empty = document.querySelector(emptyId);
@@ -150,6 +277,134 @@ function renderAllocationPills(assessmentTasks, projects) {
     renderList("#task-list-projects", "#task-list-projects-empty", projects, "Project");
 }
 
+function renderTaskPicker(allItems, selectedId) {
+    const picker = document.querySelector("#task-list-picker");
+    if (!picker) return;
+
+    if (!allItems.length) {
+        picker.innerHTML = '<option value="">No tasks available</option>';
+        picker.disabled = true;
+        return;
+    }
+
+    picker.disabled = false;
+    picker.innerHTML = allItems.map((item) => {
+        const kind = item.kind === "Project" ? "Project" : "Assessment";
+        const selected = String(item.id) === String(selectedId) ? "selected" : "";
+        return `<option value="${escapeTaskListHtml(String(item.id))}" ${selected}>${escapeTaskListHtml(String(item.name || "Untitled"))} (${escapeTaskListHtml(kind)})</option>`;
+    }).join("");
+}
+
+function renderChecklistCards(detail, allItems) {
+    const checklistHost = document.querySelector("#task-list-checklist");
+    if (!checklistHost) return;
+
+    const taskTitle = String(detail?.name || "Task List").trim();
+    const taskTopic = state.taskTopic || taskTitle;
+    const topicType = getTopicTypeLabel(detail);
+
+    const linkedList = allItems.map((item) => `
+        <li class="task-list-link-card">
+            <div>
+                <p class="task-list-link-title">${escapeTaskListHtml(String(item?.name || "Untitled"))}</p>
+                <p class="task-list-link-meta">${escapeTaskListHtml(item.kind)} • Topic Type: ${escapeTaskListHtml(getTopicTypeLabel(item))}</p>
+            </div>
+        </li>
+    `).join("");
+
+    const cardsHtml = state.checklistStandards.map((standard) => {
+        const title = standard === "digital-outcome" ? "Digital Outcome Description" : `Standard ${escapeTaskListHtml(standard)}`;
+        const rows = Array.isArray(state.checklistState[standard]) ? state.checklistState[standard] : [];
+
+        return `
+            <article class="task-list-checklist-card">
+                ${standard === "digital-outcome" ? `
+                    <h3>Digital Outcome Topic</h3>
+                    <div class="task-list-do-chip">${escapeTaskListHtml(topicType)}</div>
+                    <p class="task-list-meta"><strong>${escapeTaskListHtml(taskTitle)}</strong> • ${escapeTaskListHtml(deriveTaskShortName(taskTopic))}</p>
+                    <p class="task-list-meta">Assessments and Projects linked to this task:</p>
+                    <ul class="task-list-link-list">${linkedList}</ul>
+                ` : `<h3>${title}</h3>`}
+                <div class="task-list-step-list">
+                    ${rows.map((step, index) => `
+                        <div class="task-list-step-row">
+                            <label class="task-list-step-check-wrap">
+                                <input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">
+                                <span class="task-list-step-text">${escapeTaskListHtml(String(step?.text || ""))}</span>
+                            </label>
+                        </div>
+                    `).join("")}
+                </div>
+            </article>
+        `;
+    }).join("");
+
+    checklistHost.innerHTML = cardsHtml;
+}
+
+function getStandardCodes(detail) {
+    const fromDetails = Array.isArray(detail?.standardDetails)
+        ? detail.standardDetails.map((line) => String(line || "").match(/\b(\d{5})\b/)?.[1]).filter(Boolean)
+        : [];
+
+    if (!fromDetails.length) {
+        return ["digital-outcome", "91897", "91907"];
+    }
+
+    return ["digital-outcome", ...fromDetails.filter((code, index, arr) => arr.indexOf(code) === index)];
+}
+
+function buildChecklistState(standardCodes, evidenceMap) {
+    const next = {};
+    standardCodes.forEach((standard) => {
+        const existing = Array.isArray(evidenceMap[standard]) ? evidenceMap[standard] : [];
+        if (existing.length) {
+            next[standard] = existing.map((step) => ({ text: String(step?.text || "").trim(), done: Boolean(step?.done) }));
+            return;
+        }
+
+        if (standard === "digital-outcome") {
+            next[standard] = DIGITAL_OUTCOME_DETAILS_TASKS.map((text) => ({ text, done: false }));
+            return;
+        }
+
+        const defaults = Array.isArray(EVIDENCE_STEPS_DEFAULTS[standard]) ? EVIDENCE_STEPS_DEFAULTS[standard] : ["Add a step..."];
+        next[standard] = defaults.map((text) => ({ text, done: false }));
+    });
+    return next;
+}
+
+async function loadChecklistForTask(taskId) {
+    const selected = state.allItems.find((item) => String(item.id) === String(taskId));
+    if (!selected) {
+        return;
+    }
+
+    state.selectedId = String(selected.id);
+    const detail = await fetchActivityDetail(state.selectedId);
+    state.taskTopic = String(detail?.name || selected?.name || "Task List").trim();
+
+    const evidenceRows = await fetchMyEvidence(state.selectedId).catch(() => []);
+    const evidenceMap = evidenceRowsToMap(evidenceRows);
+    state.checklistStandards = getStandardCodes(detail || selected);
+    state.checklistState = buildChecklistState(state.checklistStandards, evidenceMap);
+
+    renderHeader({
+        totalLinked: state.allItems.length,
+        totalChecklist: Object.values(state.checklistState).reduce((sum, rows) => sum + (Array.isArray(rows) ? rows.length : 0), 0)
+    });
+
+    renderTaskPicker(state.allItems, state.selectedId);
+    renderChecklistCards(detail || selected, state.allItems);
+
+    const openLink = document.querySelector("#task-list-open-topic");
+    if (openLink) {
+        openLink.setAttribute("href", buildCustomActivityLink(state.selectedId, state.taskTopic));
+    }
+
+    setStatus(`Loaded checklist for ${selected.name || "task"}.`);
+}
+
 async function renderTaskListPage() {
     const email = await getSignedInEmail();
     if (!email) {
@@ -165,16 +420,16 @@ async function renderTaskListPage() {
         allocations = { assessment_tasks: [], projects: [] };
     }
 
-    const allItems = [
-        ...allocations.assessment_tasks,
-        ...allocations.projects
+    state.allItems = [
+        ...allocations.assessment_tasks.map((item) => ({ ...item, kind: "Assessment" })),
+        ...allocations.projects.map((item) => ({ ...item, kind: "Project" }))
     ];
 
     renderHeader({
-        totalLinked: allItems.length,
-        totalChecklist: allItems.length
+        totalLinked: state.allItems.length,
+        totalChecklist: 0
     });
-    renderAllocationPills(allocations.assessment_tasks, allocations.projects);
+    renderAllocationLists(allocations.assessment_tasks, allocations.projects);
 
     const contextHost = document.querySelector("#task-list-context");
     if (contextHost) {
@@ -186,16 +441,55 @@ async function renderTaskListPage() {
             contextHost.hidden = false;
             contextHost.innerHTML = `
                 <h3>Current Context</h3>
-                <p class="task-list-empty">You came from a task topic page. Use the list below to open your allocated assessment or project.</p>
+                <p class="task-list-empty">This checklist can load from your selected task below.</p>
                 <p class="task-list-meta">${contextParts.join(" | ")}</p>
             `;
         }
     }
 
-    const statusHost = document.querySelector("#task-list-status");
-    if (statusHost) {
-        statusHost.textContent = `Loaded ${allItems.length} allocated item${allItems.length === 1 ? "" : "s"}.`;
+    if (!state.allItems.length) {
+        renderTaskPicker([], "");
+        setStatus("No allocations found yet. Ask your teacher to assign a task.", true);
+        return;
     }
+
+    const preferred = context.id
+        ? state.allItems.find((item) => String(item.id) === String(context.id)) || null
+        : state.allItems.find((item) => /client projects/i.test(String(item.name || ""))) || state.allItems[0];
+
+    await loadChecklistForTask(String(preferred?.id || state.allItems[0].id));
+
+    const picker = document.querySelector("#task-list-picker");
+    picker?.addEventListener("change", async (event) => {
+        const nextId = String(event?.target?.value || "").trim();
+        if (!nextId) return;
+        await loadChecklistForTask(nextId);
+
+        const nextUrl = new URL(window.location.href);
+        nextUrl.searchParams.set("id", nextId);
+        history.replaceState({}, "", nextUrl.toString());
+    });
+
+    document.addEventListener("change", async (event) => {
+        const checkbox = event.target?.closest?.("[data-step-check]");
+        if (!checkbox) return;
+
+        const key = String(checkbox.getAttribute("data-step-check") || "");
+        const [standard, indexRaw] = key.split(":");
+        const index = Number(indexRaw);
+        if (!standard || !Number.isFinite(index)) return;
+
+        const rows = Array.isArray(state.checklistState[standard]) ? state.checklistState[standard] : [];
+        if (!rows[index]) return;
+        rows[index].done = Boolean(checkbox.checked);
+
+        try {
+            await saveMyEvidence(state.selectedId, evidenceMapToRows(state.checklistState, state.checklistStandards));
+            setStatus("Saved.");
+        } catch (error) {
+            setStatus(error?.message || "Could not save right now.", true);
+        }
+    });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
