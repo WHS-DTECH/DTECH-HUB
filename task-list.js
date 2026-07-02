@@ -1,6 +1,7 @@
 const TASK_LIST_AUTH_KEY = "hub_google_auth_v1";
 const TASK_LIST_TRELLO_CARD_LINK_STORAGE_PREFIX = "hub_trello_card_link_v1";
 const TASK_LIST_TRELLO_CARD_LIBRARY_STORAGE_PREFIX = "hub_trello_card_library_v1";
+const TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX = "hub_task_topic_slide_sync_v1";
 
 const DIGITAL_OUTCOME_DETAILS_TASKS = [
     "Description - Google Slides: Describe the Digital Outcome: What is it, who is it for, and what should it do?",
@@ -113,8 +114,55 @@ function deriveTaskShortName(taskTopic) {
     if (/client projects/i.test(normalized)) return "Client Projects";
     if (/project management/i.test(normalized)) return "Project Management";
     if (/describe.*digital outcome|description\s*-\s*google\s*slides/i.test(normalized)) return "Digital Outcome Description";
+    if (/identify\s+the\s+target\s+audience|target\s+audience|end\s+user/i.test(normalized)) return "Target Audience";
     if (/digital outcome/i.test(normalized)) return "Digital Outcome";
     return normalized;
+}
+
+function normalizeTaskTopicStorageSlug(value) {
+    return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 120);
+}
+
+function getTaskTopicSlideSyncStorageKey(projectId, email, taskTopic, taskShortName = "") {
+    const safeProjectId = String(projectId || "").trim();
+    const safeEmail = String(email || "").trim().toLowerCase();
+    const topicSlug = normalizeTaskTopicStorageSlug(taskTopic);
+    const shortSlug = normalizeTaskTopicStorageSlug(taskShortName);
+    return `${TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX}:${safeProjectId}:${safeEmail}:${topicSlug}:${shortSlug}`;
+}
+
+function readStoredTaskTopicSlideSyncEntry(projectId, email, taskTopic, taskShortName = "") {
+    const key = getTaskTopicSlideSyncStorageKey(projectId, email, taskTopic, taskShortName);
+    try {
+        const raw = localStorage.getItem(key);
+        if (!raw) {
+            return { url: "" };
+        }
+        const parsed = JSON.parse(raw);
+        const url = String(parsed?.url || "").trim();
+        return { url };
+    } catch (_error) {
+        return { url: "" };
+    }
+}
+
+function hasSyncedSlideForTaskTopic(projectId, email, taskTopicText) {
+    const safeTopic = String(taskTopicText || "").trim();
+    if (!projectId || !email || !safeTopic) {
+        return false;
+    }
+    const derivedShort = deriveTaskShortName(safeTopic);
+    const withShort = readStoredTaskTopicSlideSyncEntry(projectId, email, safeTopic, derivedShort);
+    if (String(withShort.url || "").trim()) {
+        return true;
+    }
+    const withoutShort = readStoredTaskTopicSlideSyncEntry(projectId, email, safeTopic, "");
+    return Boolean(String(withoutShort.url || "").trim());
 }
 
 function getStepLevel(text) {
@@ -260,6 +308,34 @@ function autoTickProjectManagementRequirement(stateMap) {
             changed = true;
         }
     });
+    return changed;
+}
+
+function autoTickDigitalOutcomeRequirements(stateMap, projectId, email) {
+    const rows = Array.isArray(stateMap?.["digital-outcome"]) ? stateMap["digital-outcome"] : [];
+    if (!rows.length || !projectId || !email) {
+        return false;
+    }
+
+    let changed = false;
+    rows.forEach((row) => {
+        const text = String(row?.text || "").trim();
+        if (!text) return;
+
+        const normalized = text.toLowerCase();
+        const isTemplateDrivenRow = normalized.includes("describe the digital outcome")
+            || normalized.includes("identify the target audience")
+            || normalized.includes("end user for this outcome");
+        if (!isTemplateDrivenRow) {
+            return;
+        }
+
+        if (hasSyncedSlideForTaskTopic(projectId, email, text) && !Boolean(row?.done)) {
+            row.done = true;
+            changed = true;
+        }
+    });
+
     return changed;
 }
 
@@ -490,12 +566,6 @@ function renderChecklistCards(detail, allItems) {
                                         : `<span class="task-list-step-text">${escapeTaskListHtml(stepText)}</span>`;
                                 })()}
                             </label>
-                            ${String(standard) === "digital-outcome" && index === 0 ? `
-                                <div class="task-list-system-list">
-                                    <p class="task-list-system-title">Connected Systems</p>
-                                    <label class="task-list-system-item"><input type="checkbox" disabled ${systemConnections.googleSlidesConnected ? "checked" : ""}> Description - Google Slides</label>
-                                </div>
-                            ` : ""}
                         </div>
                     `).join("")}
                 </div>
@@ -624,8 +694,10 @@ async function loadChecklistForTask(taskId) {
         }
     });
 
-    const autoChangedChecklist = autoTickProjectManagementRequirement(taskListState.checklistState);
-    const autoChangedEvidence = autoTickProjectManagementRequirement(taskListState.fullEvidenceState);
+    const autoChangedChecklist = autoTickProjectManagementRequirement(taskListState.checklistState)
+        || autoTickDigitalOutcomeRequirements(taskListState.checklistState, taskListState.selectedId, getTaskListEmail());
+    const autoChangedEvidence = autoTickProjectManagementRequirement(taskListState.fullEvidenceState)
+        || autoTickDigitalOutcomeRequirements(taskListState.fullEvidenceState, taskListState.selectedId, getTaskListEmail());
     if (autoChangedChecklist || autoChangedEvidence) {
         const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
         await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});

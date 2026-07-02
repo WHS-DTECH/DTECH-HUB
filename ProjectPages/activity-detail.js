@@ -4379,6 +4379,22 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
         };
     };
 
+    const hasSyncedSlideForTaskTopic = (taskTopicText) => {
+        const safeTopic = String(taskTopicText || "").trim();
+        if (!safeTopic || !projectId || !studentEmail) {
+            return false;
+        }
+
+        const derivedShort = deriveTaskShortName(safeTopic);
+        const withShort = readStoredTaskTopicSlideSyncEntry(projectId, studentEmail, safeTopic, derivedShort);
+        if (toSafeExternalUrl(withShort?.url || "")) {
+            return true;
+        }
+
+        const withoutShort = readStoredTaskTopicSlideSyncEntry(projectId, studentEmail, safeTopic, "");
+        return Boolean(toSafeExternalUrl(withoutShort?.url || ""));
+    };
+
     let showTaskDetail = () => {};
     const openTaskTopicCard = ({ text, topicIndex }) => {
         const safeText = String(text || "").trim();
@@ -4454,13 +4470,28 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
                 && rowTaskText.includes("project management")
                 && systemConnections.trelloConnected
                 && systemConnections.githubConnected;
+            const autoCompleteDigitalOutcomeTemplateRow = String(standardCode) === "digital-outcome"
+                && (rowTaskText.includes("describe the digital outcome")
+                    || rowTaskText.includes("identify the target audience")
+                    || rowTaskText.includes("end user for this outcome"))
+                && hasSyncedSlideForTaskTopic(levelFilter ? stripStepLevel(step?.text) : String(step?.text || ""));
 
             if (autoCompleteProjectManagementRow) {
                 row.classList.add("is-system-complete");
             }
 
-            const doneValue = Boolean(step?.done) || autoCompleteProjectManagementRow;
+            if (autoCompleteDigitalOutcomeTemplateRow) {
+                row.classList.add("is-system-complete");
+            }
+
+            const doneValue = Boolean(step?.done) || autoCompleteProjectManagementRow || autoCompleteDigitalOutcomeTemplateRow;
             if (autoCompleteProjectManagementRow && !Boolean(step?.done)) {
+                state[standardCode][index].done = true;
+                step.done = true;
+                autoUpdated = true;
+            }
+
+            if (autoCompleteDigitalOutcomeTemplateRow && !Boolean(step?.done)) {
                 state[standardCode][index].done = true;
                 step.done = true;
                 autoUpdated = true;
@@ -4522,9 +4553,6 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
             const showProjectManagementConnections = String(standardCode) === "91897"
                 && rowLevel === "achieved"
                 && rowTaskText.includes("project management");
-            const showDigitalOutcomeSlidesConnection = String(standardCode) === "digital-outcome"
-                && rowTaskText.includes("describe the digital outcome");
-
             if (showProjectManagementConnections) {
                 const systems = document.createElement("div");
                 systems.className = "evidence-step-system-list";
@@ -4534,16 +4562,6 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
                     <label class="evidence-step-system-item"><input type="checkbox" disabled ${systemConnections.githubConnected ? "checked" : ""}> GitHub</label>
                     <label class="evidence-step-system-item"><input type="checkbox" disabled ${systemConnections.oneDriveConnected ? "checked" : ""}> OneDrive</label>
                     <label class="evidence-step-system-item"><input type="checkbox" disabled ${systemConnections.googleDriveConnected ? "checked" : ""}> Google Drive</label>
-                `;
-                row.appendChild(systems);
-            }
-
-            if (showDigitalOutcomeSlidesConnection) {
-                const systems = document.createElement("div");
-                systems.className = "evidence-step-system-list";
-                systems.innerHTML = `
-                    <p class="evidence-step-system-title">Connected Systems</p>
-                    <label class="evidence-step-system-item"><input type="checkbox" disabled ${systemConnections.googleSlidesConnected ? "checked" : ""}> Description - Google Slides</label>
                 `;
                 row.appendChild(systems);
             }
