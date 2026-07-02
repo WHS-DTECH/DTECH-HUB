@@ -3631,21 +3631,6 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
         }
         const doBlock = document.createElement("section");
         doBlock.className = "evidence-standard-block evidence-digital-outcome-block";
-        const digitalOutcomeAllocationHtml = digitalOutcomeAllocations.length
-            ? `
-                <div class="evidence-digital-outcome-allocation-wrap">
-                    <p class="evidence-digital-outcome-allocation-title">Assessments and Projects</p>
-                    <ul class="evidence-digital-outcome-allocation-list">
-                        ${digitalOutcomeAllocations.map((item) => `
-                            <li class="evidence-digital-outcome-allocation-item">
-                                <span class="evidence-digital-outcome-allocation-name">${escapeHtml(item.name)}</span>
-                                <span class="evidence-digital-outcome-allocation-meta">${escapeHtml(item.kind)} • Topic Type: ${escapeHtml(item.topicType || "Not Set")}</span>
-                            </li>
-                        `).join("")}
-                    </ul>
-                </div>
-            `
-            : `<p class="evidence-digital-outcome-allocation-empty">No linked assessments or projects found.</p>`;
         doBlock.innerHTML = `
             <h3 class="evidence-digital-outcome-heading">Digital Outcome Topic</h3>
             <div class="evidence-step-list evidence-digital-outcome-topic-list">
@@ -3659,7 +3644,6 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
                     >
                 </div>
             </div>
-            ${digitalOutcomeAllocationHtml}
             <h3 class="evidence-digital-outcome-heading">Digital Outcome Description</h3>
             <div class="evidence-step-list" id="evidence-step-list-digital-outcome"></div>
             ${!isSelfTaskListView ? `<button type="button" class="detail-action detail-action-secondary evidence-step-add" data-do-add>Add Step</button>` : ""}
