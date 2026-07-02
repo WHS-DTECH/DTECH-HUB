@@ -338,7 +338,16 @@ function renderChecklistCards(detail, allItems) {
 
     const taskTitle = String(detail?.name || "Task List").trim();
     const taskTopic = taskListState.taskTopic || taskTitle;
-    const topicType = getTopicTypeLabel(detail);
+    const selectedTopicType = getTopicTypeLabel(detail);
+    const allTopicTypes = Array.from(new Set(
+        (Array.isArray(allItems) ? allItems : [])
+            .map((item) => getTopicTypeLabel(item))
+            .map((label) => String(label || "").trim())
+            .filter(Boolean)
+    ));
+    if (selectedTopicType && !allTopicTypes.includes(selectedTopicType)) {
+        allTopicTypes.unshift(selectedTopicType);
+    }
 
     const systemConnections = inferStudentSystemConnections(taskListState.checklistState);
 
@@ -405,7 +414,11 @@ function renderChecklistCards(detail, allItems) {
             <article class="task-list-checklist-card">
                 ${standard === "digital-outcome" ? `
                     <h3>Digital Outcome Topic</h3>
-                    <div class="task-list-do-chip">${escapeTaskListHtml(topicType)}</div>
+                    <div class="task-list-do-chip-list">
+                        ${(allTopicTypes.length ? allTopicTypes : ["Not set"]).map((topicType) => `
+                            <span class="task-list-do-chip">${escapeTaskListHtml(topicType)}</span>
+                        `).join("")}
+                    </div>
                 ` : `<h3>${title}</h3>`}
                 ${renderRowsForStandard(standard, rows)}
             </article>
