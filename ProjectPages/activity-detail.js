@@ -104,6 +104,7 @@ const DIGITAL_OUTCOME_DETAILS_TASKS = [
 const DIGITAL_OUTCOME_DESCRIPTION_TITLE = "Digital Outcome Description";
 const DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE = "Target Audience";
 const DIGITAL_OUTCOME_DESCRIPTION_TEMPLATE_PREVIEW_URL = "https://drive.google.com/thumbnail?id=1brOY70u9aJdsoiEtxVepr82vRhiv9VzpMm8TUv3lcTo&sz=w1400";
+const DIGITAL_OUTCOME_TARGET_AUDIENCE_TEMPLATE_PREVIEW_URL = "../images/target-audience-template-preview.svg";
 
 const EVIDENCE_STEPS_DEFAULTS = {
     "92005": [
@@ -163,6 +164,30 @@ function toSafeExternalUrl(value) {
     }
 
     return "";
+}
+
+function extractSlidesIdFromValue(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+
+    const direct = raw.match(/^[A-Za-z0-9_-]{20,}$/);
+    if (direct?.[0]) return direct[0];
+
+    const pathMatch = raw.match(/\/presentation\/d\/([A-Za-z0-9_-]{20,})/i);
+    if (pathMatch?.[1]) return pathMatch[1];
+
+    const queryIdMatch = raw.match(/[?&]id=([A-Za-z0-9_-]{20,})/i);
+    if (queryIdMatch?.[1]) return queryIdMatch[1];
+
+    return "";
+}
+
+function toGoogleSlidesThumbnailUrl(value) {
+    const slideId = extractSlidesIdFromValue(value);
+    if (!slideId) {
+        return "";
+    }
+    return `https://drive.google.com/thumbnail?id=${encodeURIComponent(slideId)}&sz=w1400`;
 }
 
 function toSafeOneDriveFolderUrl(value) {
@@ -5508,8 +5533,18 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         templateLibraryParams.set("templateId", "digital-outcome-description");
     }
     const slideshowTemplateLibraryUrl = `slideshow-template-library.html?${templateLibraryParams.toString()}`;
+    const viewerEmail = readStoredHubEmail();
+    const targetAudienceSyncedSlideThumbnail = isDigitalOutcomeTargetAudienceTopic
+        ? toGoogleSlidesThumbnailUrl(
+            readStoredTaskTopicSlideSyncEntry(id, viewerEmail, taskTopicTitle, resolvedTaskShortName)?.url || ""
+        )
+        : "";
+    const digitalOutcomeTemplateFallbackImage = isDigitalOutcomeTargetAudienceTopic
+        ? DIGITAL_OUTCOME_TARGET_AUDIENCE_TEMPLATE_PREVIEW_URL
+        : DIGITAL_OUTCOME_DESCRIPTION_TEMPLATE_PREVIEW_URL;
     const slideshowTemplateImage = toSafeExternalUrl(data?.slideshowTemplateImage || data?.slideTemplateImage || "")
-        || (useDigitalOutcomeTemplateHero ? DIGITAL_OUTCOME_DESCRIPTION_TEMPLATE_PREVIEW_URL : "");
+        || targetAudienceSyncedSlideThumbnail
+        || (useDigitalOutcomeTemplateHero ? digitalOutcomeTemplateFallbackImage : "");
     const slideshowTemplateFileUrl = toSafeExternalUrl(data?.slideshowTemplateFileUrl || data?.slideTemplateFileUrl || data?.speakerNotesCriteriaUrl || "");
     const heroVisualImage = ((isDigitalOutcomeTopic || useDigitalOutcomeTemplateHero) ? (slideshowTemplateImage || data.image) : data.image)
         || "https://placehold.co/900x560/3f89cf/ffffff?text=Uploaded+Activity";
