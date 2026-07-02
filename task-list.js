@@ -46,6 +46,29 @@ function buildCustomActivityLink(id, taskTopic = "") {
     return `/ProjectPages/custom-activity.html?${params.toString()}`;
 }
 
+function getContextChecklistTarget() {
+    try {
+        const params = new URLSearchParams(window.location.search || "");
+        const activityId = String(params.get("id") || params.get("activityId") || "").trim();
+        if (!activityId) {
+            return "";
+        }
+        const taskTopic = String(params.get("taskTopic") || "").trim();
+        return buildCustomActivityLink(activityId, taskTopic);
+    } catch (_error) {
+        return "";
+    }
+}
+
+function navigateToChecklist(targetHref) {
+    const href = String(targetHref || "").trim();
+    if (!href) {
+        return false;
+    }
+    window.location.href = href;
+    return true;
+}
+
 function renderContextCallout() {
     const contextHost = document.querySelector("#task-list-context");
     if (!contextHost) return;
@@ -110,6 +133,14 @@ function setTaskListStatus(message, isError = false) {
 async function loadTaskListAllocations() {
     renderContextCallout();
 
+    const contextTarget = getContextChecklistTarget();
+    if (contextTarget) {
+        setTaskListStatus("Opening checklist...");
+        if (navigateToChecklist(contextTarget)) {
+            return;
+        }
+    }
+
     const email = getTaskListEmail();
     if (!email) {
         setTaskListStatus("Sign in with your school account to view your Task Lists.", true);
@@ -139,6 +170,14 @@ async function loadTaskListAllocations() {
         const totalHost = document.querySelector("#task-list-total");
         if (totalHost) {
             totalHost.textContent = String(total);
+        }
+
+        const firstChecklistId = String(assessmentTasks[0]?.id || projects[0]?.id || "").trim();
+        if (firstChecklistId) {
+            setTaskListStatus("Opening checklist...");
+            if (navigateToChecklist(buildCustomActivityLink(firstChecklistId))) {
+                return;
+            }
         }
 
         if (!total) {
