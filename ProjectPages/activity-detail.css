@@ -448,6 +448,11 @@ h1 {
     gap: 10px;
 }
 
+.task-topic-sync-grid {
+    display: grid;
+    gap: 10px;
+}
+
 .task-topic-submission-panel {
     background: #fffaf1;
     border-color: #e9d3a7;
@@ -1144,6 +1149,17 @@ h1 {
 
     .task-topic-detail-layout {
         grid-template-columns: 1fr;
+    }
+}
+
+@media (min-width: 1280px) {
+    .task-topic-sync-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: start;
+    }
+
+    .page.task-topic-screen.student-task-topic-screen .task-topic-detail-layout {
+        max-width: min(1320px, calc(100% - 24px));
     }
 }
 

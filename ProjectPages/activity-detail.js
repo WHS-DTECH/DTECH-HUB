@@ -5174,6 +5174,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 </div>
 
                 <aside class="task-topic-submission-column">
+                    <div class="task-topic-sync-grid">
                     <section class="proposal-section task-topic-guide-panel">
                         <p class="task-topic-guide-eyebrow">Topic Tasks</p>
                         <h2>${escapeHtml(topicGuideTitle)}</h2>
@@ -5213,6 +5214,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                         <div id="task-topic-github-sync-slot"></div>
                     </section>
                     ` : ""}
+                    </div>
 
                     ${showOneDriveGuide ? `
                     <section class="proposal-section task-topic-guide-panel">
