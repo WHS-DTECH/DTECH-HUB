@@ -4532,17 +4532,43 @@ async function ensureTemplateLibrarySchema() {
 }
 
 function toTemplateLibraryEntry(row, fallbackIndex = 0) {
+  const buildStableTemplateThumbnailUrl = (templateUrl = "", imageUrl = "") => {
+    const template = String(templateUrl || "").trim();
+    const image = String(imageUrl || "").trim();
+
+    const extractSlidesId = (value) => {
+      const raw = String(value || "").trim();
+      if (!raw) return "";
+      const directIdMatch = raw.match(/^[A-Za-z0-9_-]{20,}$/);
+      if (directIdMatch) return directIdMatch[0];
+      const pathMatch = raw.match(/\/presentation\/d\/([A-Za-z0-9_-]{20,})/i);
+      if (pathMatch?.[1]) return pathMatch[1];
+      return "";
+    };
+
+    const templateId = extractSlidesId(template);
+    const imageId = extractSlidesId(image);
+    const stableId = templateId || imageId;
+    if (stableId) {
+      return `https://drive.google.com/thumbnail?id=${encodeURIComponent(stableId)}&sz=w1400`;
+    }
+
+    return image;
+  };
+
   const standardCodes = Array.isArray(row?.standard_codes)
     ? row.standard_codes
     : (Array.isArray(row?.standardCodes) ? row.standardCodes : []);
+  const safeTemplateUrl = String(row?.template_url || row?.templateUrl || "").trim();
+  const safeImageUrl = buildStableTemplateThumbnailUrl(safeTemplateUrl, String(row?.image_url || row?.imageUrl || "").trim());
   return {
     id: String(row?.template_id || row?.id || "").trim(),
     title: String(row?.title || "Untitled Template").trim(),
     standardCodes: standardCodes.map((code) => String(code || "").trim()).filter(Boolean),
     criteriaText: String(row?.criteria_text || row?.criteriaText || "").trim(),
     summary: String(row?.summary || "").trim(),
-    imageUrl: String(row?.image_url || row?.imageUrl || "").trim(),
-    templateUrl: String(row?.template_url || row?.templateUrl || "").trim(),
+    imageUrl: safeImageUrl,
+    templateUrl: safeTemplateUrl,
     status: String(row?.status || "live").trim().toLowerCase() === "coming-soon" ? "coming-soon" : "live",
     sortOrder: Number(row?.sort_order ?? row?.sortOrder ?? fallbackIndex + 1) || fallbackIndex + 1,
     sourceFolderId: String(row?.source_folder_id || row?.sourceFolderId || "").trim()

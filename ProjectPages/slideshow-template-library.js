@@ -30,7 +30,9 @@ let libraryHandlersBound = false;
 const SYNC_FOLDER_NAME = "Process Slide Templates";
 const LIB_HUB_VIEW_MODE_STORAGE_KEY = "hub_view_mode_v1";
 const LIB_TEMPLATE_COPY_MAP_STORAGE_PREFIX = "hub_template_copy_map_v1";
+const LIB_TEMPLATE_COPY_MAP_GLOBAL_STORAGE_KEY = "hub_template_copy_map_global_v1";
 const LIB_TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX = "hub_task_topic_slide_sync_v1";
+const TEMPLATE_PREVIEW_FALLBACK_URL = "../images/template-preview-placeholder.svg";
 
 const DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly";
 const LIB_AUTH_KEY = "hub_google_auth_v1";
@@ -77,6 +79,33 @@ function toSafeExternalUrl(value) {
     return "";
 }
 
+function extractSlidesIdFromValue(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    const direct = raw.match(/^[A-Za-z0-9_-]{20,}$/);
+    if (direct?.[0]) return direct[0];
+    const pathMatch = raw.match(/\/presentation\/d\/([A-Za-z0-9_-]{20,})/i);
+    if (pathMatch?.[1]) return pathMatch[1];
+    const queryIdMatch = raw.match(/[?&]id=([A-Za-z0-9_-]{20,})/i);
+    if (queryIdMatch?.[1]) return queryIdMatch[1];
+    return "";
+}
+
+function resolveTemplatePreviewUrl(item) {
+    const rawImageUrl = toSafeExternalUrl(item?.imageUrl || "");
+    const templateId = extractSlidesIdFromValue(item?.templateUrl || "");
+
+    if (templateId) {
+        return `https://drive.google.com/thumbnail?id=${encodeURIComponent(templateId)}&sz=w1400`;
+    }
+
+    if (rawImageUrl) {
+        return rawImageUrl;
+    }
+
+    return TEMPLATE_PREVIEW_FALLBACK_URL;
+}
+
 function normalizeStorageSlug(value) {
     return String(value || "")
         .trim()
@@ -95,18 +124,25 @@ function getTemplateCopyMapStorageKey(activityId, email) {
 function readStoredTemplateCopyMap(activityId, email) {
     const key = getTemplateCopyMapStorageKey(activityId, email);
     try {
-        const raw = localStorage.getItem(key);
-        if (!raw) return {};
-        const parsed = JSON.parse(raw);
-        const next = {};
-        Object.entries(parsed || {}).forEach(([templateId, entry]) => {
+        const parseMap = (raw) => {
+            const parsed = JSON.parse(raw || "{}");
+            const next = {};
+            Object.entries(parsed || {}).forEach(([templateId, entry]) => {
             const fileUrl = toSafeExternalUrl(entry?.fileUrl || "");
             const fileName = String(entry?.fileName || "").trim();
             if (fileUrl) {
                 next[String(templateId || "").trim()] = { fileUrl, fileName };
             }
         });
-        return next;
+            return next;
+        };
+
+        const scopedRaw = localStorage.getItem(key) || "{}";
+        const globalRaw = localStorage.getItem(LIB_TEMPLATE_COPY_MAP_GLOBAL_STORAGE_KEY) || "{}";
+        return {
+            ...parseMap(globalRaw),
+            ...parseMap(scopedRaw)
+        };
     } catch (_error) {
         return {};
     }
@@ -123,8 +159,16 @@ function writeStoredTemplateCopyMap(activityId, email, value) {
 function persistCurrentTemplateCopyMap() {
     const email = getLibraryEmail();
     const activityId = String(templateUsageContext.activityId || "").trim();
-    if (!email || !activityId) return;
-    writeStoredTemplateCopyMap(activityId, email, driveState.copyMap || {});
+    const copyMap = driveState.copyMap || {};
+
+    try {
+        localStorage.setItem(LIB_TEMPLATE_COPY_MAP_GLOBAL_STORAGE_KEY, JSON.stringify(copyMap));
+    } catch (_error) {
+    }
+
+    if (email && activityId) {
+        writeStoredTemplateCopyMap(activityId, email, copyMap);
+    }
 }
 
 function getTaskTopicSlideSyncStorageKey(activityId, email, taskTopic, taskShortName = "") {
@@ -851,7 +895,7 @@ function renderTemplateCard(item) {
     const title = String(item?.title || "Untitled Template").trim();
     const criteriaText = String(item?.criteriaText || "").trim();
     const summary = String(item?.summary || "").trim();
-    const imageUrl = toSafeExternalUrl(item?.imageUrl);
+    const imageUrl = resolveTemplatePreviewUrl(item);
     const fileId = extractSlidesFileId(item?.templateUrl || "");
     const standards = Array.isArray(item?.standardCodes)
         ? item.standardCodes.map((code) => String(code || "").trim()).filter(Boolean)
@@ -882,7 +926,7 @@ function renderTemplateCard(item) {
     return `
         <article class="template-card" data-template-status="${escapeHtml(status)}" data-template-id="${escapeHtml(item.id)}">
             ${previewClickHtml}
-                <img src="${escapeHtml(imageUrl || "https://placehold.co/540x760/d7e2ef/355674?text=Template+Preview")}" alt="${escapeHtml(imageAlt)}" loading="lazy">
+                <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(imageAlt)}" loading="lazy" onerror="this.onerror=null;this.src='${escapeHtml(TEMPLATE_PREVIEW_FALLBACK_URL)}';">
             ${previewCloseHtml}
             <div class="template-card-body">
                 <h2>${canUse && !existingCopy
@@ -1004,6 +1048,10 @@ async function initLibrary() {
 
     renderLibrary();
 
+    // Load persisted copy state early so cards can show Open Your Copy even before auth hydration settles.
+    driveState.copyMap = readStoredTemplateCopyMap(String(templateUsageContext.activityId || "").trim(), getLibraryEmail());
+    renderLibrary();
+
     // Keep staff-only controls aligned with global auth mode toggles.
     window.setTimeout(() => { refreshStaffOnlyUi(); }, 250);
     window.setTimeout(() => { refreshStaffOnlyUi(); }, 1200);
@@ -1022,6 +1070,8 @@ async function initLibrary() {
     const hydrateSignedInLibraryState = async () => {
         const email = getLibraryEmail();
         if (!email) {
+            driveState.copyMap = readStoredTemplateCopyMap(String(templateUsageContext.activityId || "").trim(), "");
+            renderLibrary();
             renderSetupBanner(null);
             return false;
         }
