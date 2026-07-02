@@ -340,15 +340,6 @@ function renderChecklistCards(detail, allItems) {
     const taskTopic = taskListState.taskTopic || taskTitle;
     const topicType = getTopicTypeLabel(detail);
 
-    const linkedList = allItems.map((item) => `
-        <li class="task-list-link-card">
-            <div>
-                <p class="task-list-link-title">${escapeTaskListHtml(String(item?.name || "Untitled"))}</p>
-                <p class="task-list-link-meta">${escapeTaskListHtml(item.kind)} • Topic Type: ${escapeTaskListHtml(getTopicTypeLabel(item))}</p>
-            </div>
-        </li>
-    `).join("");
-
     const systemConnections = inferStudentSystemConnections(taskListState.checklistState);
 
     const renderRowsForStandard = (standard, rows) => {
@@ -410,8 +401,6 @@ function renderChecklistCards(detail, allItems) {
                     <h3>Digital Outcome Topic</h3>
                     <div class="task-list-do-chip">${escapeTaskListHtml(topicType)}</div>
                     <p class="task-list-meta"><strong>${escapeTaskListHtml(taskTitle)}</strong> • ${escapeTaskListHtml(deriveTaskShortName(taskTopic))}</p>
-                    <p class="task-list-meta">Assessments and Projects linked to this task:</p>
-                    <ul class="task-list-link-list">${linkedList}</ul>
                     <div class="task-list-system-list">
                         <p class="task-list-system-title">Connected Systems</p>
                         <label class="task-list-system-item"><input type="checkbox" checked disabled> Description - Google Slides</label>
