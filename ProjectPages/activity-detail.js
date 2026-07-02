@@ -591,6 +591,37 @@ async function fetchStudentProcessAssessmentFolderUrl() {
     }
 }
 
+async function findProcessAssessmentSlideMatch(taskTopic = "") {
+    const accessToken = readStoredHubAccessToken();
+    if (!accessToken) {
+        return { fileUrl: "", fileName: "", modifiedTime: "" };
+    }
+
+    try {
+        const response = await fetch("/api/student/drive-setup/find-slide", {
+            method: "POST",
+            headers: buildWriteHeaders(),
+            body: JSON.stringify({
+                driveAccessToken: accessToken,
+                taskTopic: String(taskTopic || "").trim()
+            })
+        });
+
+        if (!response.ok) {
+            return { fileUrl: "", fileName: "", modifiedTime: "" };
+        }
+
+        const payload = await response.json().catch(() => ({}));
+        return {
+            fileUrl: toSafeExternalUrl(payload?.fileUrl || ""),
+            fileName: String(payload?.fileName || "").trim(),
+            modifiedTime: String(payload?.modifiedTime || "").trim()
+        };
+    } catch (_error) {
+        return { fileUrl: "", fileName: "", modifiedTime: "" };
+    }
+}
+
 function installCloudSyncDelegatedFallbackHandlers() {
     if (window.__dtechCloudSyncFallbackBound) {
         return;
@@ -3190,6 +3221,16 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         const processAssessmentFolderUrl = await fetchStudentProcessAssessmentFolderUrl();
         const isTargetAudienceTopic = isDigitalOutcomeTargetAudienceCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle));
         const syncTopicLabel = isTargetAudienceTopic ? "Target Audience" : "Digital Outcome: Description";
+        if (!syncedGoogleSlidesUrl) {
+            const topicMatch = await findProcessAssessmentSlideMatch(syncTopicLabel);
+            if (topicMatch.fileUrl) {
+                syncedGoogleSlidesUrl = topicMatch.fileUrl;
+                if (!syncedGoogleSlidesSavedAt) {
+                    syncedGoogleSlidesSavedAt = topicMatch.modifiedTime;
+                }
+                writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopicTitle, taskTopicShortName, syncedGoogleSlidesUrl);
+            }
+        }
         if (!syncedGoogleSlidesSavedAt) {
             syncedGoogleSlidesSavedAt = String(submission.haparaSubmittedAt || submission.submittedAt || "").trim();
         }

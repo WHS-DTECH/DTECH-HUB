@@ -5091,6 +5091,93 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
   }
 });
 
+app.post("/api/student/drive-setup/find-slide", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email) {
+    res.status(401).json({ error: "Sign in is required." });
+    return;
+  }
+
+  const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
+  const taskTopic = String(req.body?.taskTopic || "").trim().toLowerCase();
+  if (!driveAccessToken) {
+    res.status(400).json({ error: "driveAccessToken is required." });
+    return;
+  }
+
+  try {
+    const setup = await getStudentDriveSetup(email);
+    const folderId = String(setup?.processAssessmentFolderId || "").trim();
+    if (!folderId) {
+      res.status(400).json({ error: "Please confirm your Process Assessment folder first." });
+      return;
+    }
+
+    const slides = await driveListSlidesInFolder(folderId, driveAccessToken);
+    if (!slides.length) {
+      res.status(404).json({ error: "No Google Slides files found in Process Assessment folder." });
+      return;
+    }
+
+    const normalizeText = (value) => String(value || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+
+    const tokens = normalizeText(taskTopic).split(/\s+/).filter(Boolean);
+    const wantsTargetAudience = tokens.includes("target") || tokens.includes("audience") || (tokens.includes("end") && tokens.includes("user"));
+    const wantsDescription = tokens.includes("description") || (tokens.includes("digital") && tokens.includes("outcome"));
+
+    const scored = slides
+      .map((file) => {
+        const name = String(file?.name || "").trim();
+        const normalizedName = normalizeText(name);
+        let score = 0;
+
+        if (wantsTargetAudience) {
+          if (normalizedName.includes("target audience")) score += 100;
+          if (normalizedName.includes("audience")) score += 50;
+          if (normalizedName.includes("end user")) score += 40;
+        }
+
+        if (wantsDescription) {
+          if (normalizedName.includes("digital outcome description")) score += 100;
+          if (normalizedName.includes("description")) score += 40;
+        }
+
+        if (!wantsTargetAudience && !wantsDescription) {
+          score += tokens.reduce((sum, token) => sum + (normalizedName.includes(token) ? 5 : 0), 0);
+        }
+
+        return {
+          file,
+          score,
+          modifiedTs: Date.parse(String(file?.modifiedTime || "")) || 0
+        };
+      })
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return b.modifiedTs - a.modifiedTs;
+      });
+
+    const best = scored[0]?.file;
+    if (!best) {
+      res.status(404).json({ error: "No matching slide found." });
+      return;
+    }
+
+    res.json({
+      ok: true,
+      fileId: String(best.id || "").trim(),
+      fileName: String(best.name || "").trim(),
+      fileUrl: String(best.webViewLink || `https://docs.google.com/presentation/d/${String(best.id || "").trim()}/edit`).trim(),
+      modifiedTime: String(best.modifiedTime || "").trim()
+    });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not find matching slide." });
+  }
+});
+
 async function resolveActivityWriteAccess(email) {
   const normalizedEmail = normalizeEmail(email);
   if (!normalizedEmail) {
