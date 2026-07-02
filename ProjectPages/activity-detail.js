@@ -5479,6 +5479,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                     </div>
 
                     ${showOneDriveGuide ? `
+                    <div class="task-topic-sync-grid">
                     <section class="proposal-section task-topic-guide-panel">
                         <p class="task-topic-guide-eyebrow">Topic Tasks</p>
                         <h2>${escapeHtml(oneDriveGuideTitle)}</h2>
@@ -5518,6 +5519,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
 
                         <div id="task-topic-google-drive-sync-slot"></div>
                     </section>
+                    </div>
                     ` : ""}
 
                     <section class="proposal-section task-topic-submission-panel">
