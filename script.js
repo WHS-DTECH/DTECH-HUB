@@ -1223,6 +1223,7 @@ function isRecentEvent(project, maxAgeDays = getConfiguredNewEventWindowDays()) 
 }
 
 const HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
+const HUB_UNIFIED_OAUTH_SCOPES = "openid email profile https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly";
 
 function getHubStoredAuthRaw() {
     let localValue = null;
@@ -1388,6 +1389,7 @@ const hubAllowedDomain =
 const hubAuthState = {
     idToken: null,
     accessToken: null,
+    grantedScopes: "",
     expiresAt: 0,
     profile: null,
     tokenClient: null,
@@ -1965,6 +1967,7 @@ function saveHubAuthState() {
     const payload = {
         idToken: hubAuthState.idToken,
         accessToken: hubAuthState.accessToken,
+        grantedScopes: hubAuthState.grantedScopes,
         expiresAt: hubAuthState.expiresAt,
         profile: hubAuthState.profile
     };
@@ -1974,6 +1977,7 @@ function saveHubAuthState() {
 function clearHubAuthState() {
     hubAuthState.idToken = null;
     hubAuthState.accessToken = null;
+    hubAuthState.grantedScopes = "";
     hubAuthState.expiresAt = 0;
     hubAuthState.profile = null;
     hubAccessState.resolved = false;
@@ -2041,6 +2045,7 @@ function loadHubAuthState() {
         if (tokenIsValid) {
             hubAuthState.idToken = parsedBearer;
             hubAuthState.accessToken = parsed.accessToken || null;
+            hubAuthState.grantedScopes = String(parsed?.grantedScopes || "").trim();
             hubAuthState.expiresAt = parsed.expiresAt;
             hubAuthState.profile = parsed.profile || null;
             return;
@@ -2050,6 +2055,7 @@ function loadHubAuthState() {
             // Keep profile state across pages even when the Google token has expired.
             hubAuthState.idToken = null;
             hubAuthState.accessToken = null;
+            hubAuthState.grantedScopes = String(parsed?.grantedScopes || "").trim();
             hubAuthState.expiresAt = 0;
             hubAuthState.profile = parsed.profile;
             // Do NOT clear storage, just update it to reflect token expiry.
@@ -2247,6 +2253,7 @@ async function handleHubGoogleCredential(credentialResponse) {
     const expSeconds = Number(payload?.exp || 0);
     hubAuthState.idToken = idToken;
     hubAuthState.accessToken = null;
+    hubAuthState.grantedScopes = "";
     hubAuthState.expiresAt = expSeconds > 0 ? expSeconds * 1000 : Date.now() + 60 * 60 * 1000;
     hubAuthState.profile = profile;
     saveHubAuthState();
@@ -2265,6 +2272,7 @@ async function handleHubGoogleToken(tokenResponse) {
     }
 
     hubAuthState.accessToken = tokenResponse.access_token;
+    hubAuthState.grantedScopes = String(tokenResponse.scope || hubAuthState.grantedScopes || "").trim();
     hubAuthState.expiresAt = Date.now() + (Number(tokenResponse.expires_in) || 3600) * 1000;
     hubAuthState.profile = profile;
     saveHubAuthState();
@@ -2466,7 +2474,8 @@ function initHubGoogleAuth() {
         if (window.google?.accounts?.oauth2 && !hubAuthState.tokenClient) {
             hubAuthState.tokenClient = window.google.accounts.oauth2.initTokenClient({
                 client_id: hubGoogleClientId,
-                scope: "openid email profile",
+                scope: HUB_UNIFIED_OAUTH_SCOPES,
+                include_granted_scopes: true,
                 callback: async (tokenResponse) => {
                     if (tokenResponse?.error) {
                         // Silent auto-login can legitimately fail with

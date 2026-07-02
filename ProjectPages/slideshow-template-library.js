@@ -237,6 +237,44 @@ function getLibraryBearerToken() {
     }
 }
 
+function readLibraryAuthPayload() {
+    try {
+        const raw = localStorage.getItem(LIB_AUTH_KEY) || sessionStorage.getItem(LIB_AUTH_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw);
+    } catch (_error) {
+        return null;
+    }
+}
+
+function authPayloadHasDriveScopes(payload) {
+    const scopeText = String(payload?.grantedScopes || payload?.scope || "").toLowerCase();
+    if (!scopeText) return false;
+    return scopeText.includes("https://www.googleapis.com/auth/drive.file")
+        || scopeText.includes("https://www.googleapis.com/auth/drive.readonly");
+}
+
+function getLibraryStoredDriveAccessToken() {
+    const payload = readLibraryAuthPayload();
+    if (!payload) return "";
+
+    const expiresAt = Number(payload?.expiresAt || 0);
+    if (!expiresAt || expiresAt <= Date.now() + 60000) {
+        return "";
+    }
+
+    const token = String(payload?.accessToken || "").trim();
+    if (!token) {
+        return "";
+    }
+
+    if (!authPayloadHasDriveScopes(payload)) {
+        return "";
+    }
+
+    return token;
+}
+
 function withLibraryAuthHeaders(headers = {}) {
     const email = getLibraryEmail();
     const token = getLibraryBearerToken();
@@ -420,6 +458,7 @@ function initDriveTokenClient() {
     return window.google.accounts.oauth2.initTokenClient({
         client_id: clientId,
         scope: DRIVE_SCOPES,
+        include_granted_scopes: true,
         callback: (response) => {
             if (driveState.pendingResolve) {
                 driveState.pendingResolve(response);
@@ -444,6 +483,14 @@ function requestDriveToken(options = {}) {
     return new Promise((resolve) => {
         if (driveState.accessToken && driveState.tokenExpiry > Date.now() + 60000) {
             resolve({ access_token: driveState.accessToken });
+            return;
+        }
+
+        const storedToken = getLibraryStoredDriveAccessToken();
+        if (storedToken) {
+            driveState.accessToken = storedToken;
+            driveState.tokenExpiry = Date.now() + (55 * 60 * 1000);
+            resolve({ access_token: storedToken });
             return;
         }
 
