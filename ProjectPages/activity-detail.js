@@ -2882,7 +2882,8 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         || normalizedDerivedShortName.includes("decompos");
     const isDigitalOutcomeTopic = taskTopicTitle.toLowerCase().includes("digital outcome")
         || normalizedTaskTopicShortName.includes("digital outcome")
-        || normalizedDerivedShortName.includes("digital outcome");
+        || normalizedDerivedShortName.includes("digital outcome")
+        || isDigitalOutcomeTargetAudienceCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle));
     const isMediaAssetWorkflowTopic = isAssetVersionControlTopic && !isProjectManagementTopic;
     const isTrackedWorkflowTopic = isProjectManagementTopic || isMediaAssetWorkflowTopic;
 
@@ -3187,13 +3188,15 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
 
     if (isDigitalOutcomeTopic) {
         const processAssessmentFolderUrl = await fetchStudentProcessAssessmentFolderUrl();
+        const isTargetAudienceTopic = isDigitalOutcomeTargetAudienceCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle));
+        const syncTopicLabel = isTargetAudienceTopic ? "Target Audience" : "Digital Outcome: Description";
         if (!syncedGoogleSlidesSavedAt) {
             syncedGoogleSlidesSavedAt = String(submission.haparaSubmittedAt || submission.submittedAt || "").trim();
         }
 
         panelHost.innerHTML = `
             <div class="task-topic-sync-only-panel" aria-label="Digital Outcome sync links">
-                <p class="task-topic-submission-note task-topic-sync-only-note">Showing synced Google links for <strong>Digital Outcome: Description</strong>.</p>
+                <p class="task-topic-submission-note task-topic-sync-only-note">Showing synced Google links for <strong>${escapeHtml(syncTopicLabel)}</strong>.</p>
                 ${processAssessmentFolderUrl
                     ? `<p class="task-topic-sync-folder-link"><a href="${escapeHtml(processAssessmentFolderUrl)}" target="_blank" rel="noreferrer">Open Process Assessment folder in Google Drive</a></p>`
                     : ""
@@ -3203,7 +3206,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                         <ul class="task-topic-sync-link-list" aria-label="Synced slide links">
                             <li class="task-topic-sync-link-item">
                                 <div class="task-topic-sync-link-main">
-                                    <p class="task-topic-sync-link-title">Digital Outcome: Description slide deck</p>
+                                    <p class="task-topic-sync-link-title">${escapeHtml(syncTopicLabel)} slide deck</p>
                                     <a href="${escapeHtml(syncedGoogleSlidesUrl)}" target="_blank" rel="noreferrer">${escapeHtml(syncedGoogleSlidesUrl)}</a>
                                 </div>
                                 <div class="task-topic-sync-link-meta">
@@ -3213,7 +3216,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                             </li>
                         </ul>
                     `
-                    : `<p class="task-topic-submission-note">No synced Digital Outcome: Description slide link yet. Open Template Library and use the Digital Outcome template first.</p>`
+                    : `<p class="task-topic-submission-note">No synced ${escapeHtml(syncTopicLabel)} slide link yet. Open Template Library and use the Digital Outcome template first.</p>`
                 }
             </div>
         `;
@@ -5520,7 +5523,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     const isDecompositionTopic = taskTopicTitle.toLowerCase().includes("decompos")
         || resolvedTaskShortName.toLowerCase().includes("decompos");
     const isDigitalOutcomeTopic = taskTopicTitle.toLowerCase().includes("digital outcome")
-        || resolvedTaskShortName.toLowerCase().includes("digital outcome");
+        || resolvedTaskShortName.toLowerCase().includes("digital outcome")
+        || isDigitalOutcomeTargetAudienceTopic;
     const templateLibraryParams = new URLSearchParams();
     templateLibraryParams.set("activityId", String(id || "").trim());
     if (taskTopicTitle) {
