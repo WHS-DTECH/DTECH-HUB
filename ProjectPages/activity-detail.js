@@ -1582,6 +1582,21 @@ async function persistStudentTrelloLink(projectId, studentEmail, trelloCardUrl) 
         throw new Error("Enter a valid Trello card or board link first.");
     }
 
+    const saveTrelloLinkViaEvidence = async () => {
+        const rows = await fetchEvidenceRowsEnsuringAllocation(projectId, studentEmail);
+        const nextRows = normalizeEvidenceSteps(rows).filter(
+            (row) => String(row?.standard || "").trim() !== "trello-sync"
+        );
+        nextRows.push({
+            standard: "trello-sync",
+            steps: [
+                { text: `TRELLO_CARD_URL|${safeUrl}`, done: true },
+                { text: `TRELLO_SAVED_AT|${new Date().toISOString()}`, done: true }
+            ]
+        });
+        await saveEvidenceRows(projectId, studentEmail, nextRows);
+    };
+
     const saveTrelloLink = async () => {
         const response = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interests/${encodeURIComponent(studentEmail)}/trello-link`, {
             method: "PATCH",
@@ -1600,13 +1615,19 @@ async function persistStudentTrelloLink(projectId, studentEmail, trelloCardUrl) 
     try {
         await saveTrelloLink();
     } catch (error) {
-        if (Number(error?.status || 0) !== 404) {
-            throw error;
+        if (Number(error?.status || 0) === 404) {
+            // Ensure allocation exists, then retry once.
+            await fetchEvidenceRowsEnsuringAllocation(projectId, studentEmail);
+            try {
+                await saveTrelloLink();
+                return;
+            } catch (_retryError) {
+                // Fall through to evidence-row fallback.
+            }
         }
 
-        // Ensure allocation exists, then retry once.
-        await fetchEvidenceRowsEnsuringAllocation(projectId, studentEmail);
-        await saveTrelloLink();
+        // Fallback path: save directly into evidence rows so teacher view still gets the Trello URL.
+        await saveTrelloLinkViaEvidence();
     }
 }
 

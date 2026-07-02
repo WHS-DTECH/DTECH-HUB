@@ -1300,6 +1300,7 @@ function renderGlobalNavbar() {
                 <a id="hub-browse-practicals-link" data-auth-browse role="menuitem" href="/browse-practicals.html" hidden>Practicals</a>
                 <a id="hub-browse-unit-plans-link" data-auth-unit-plans role="menuitem" href="/browse-unit-plans.html" hidden>Unit Plans</a>
                 <a id="hub-browse-course-outlines-link" data-auth-course-outlines role="menuitem" href="/browse-course-outlines.html" hidden>Course Outlines</a>
+                <a id="hub-browse-task-list-link" data-auth-browse role="menuitem" href="/task-list.html" hidden>Task List</a>
                 <a id="hub-browse-template-library-link" data-auth-browse role="menuitem" href="/ProjectPages/slideshow-template-library.html" hidden>Template Library</a>
             </div>
         </details>
@@ -1829,18 +1830,8 @@ function ensureGlobalHubSidebar() {
 
     const taskListButton = panel.querySelector("#hub-global-sidebar-tasklist-link");
     taskListButton?.addEventListener("click", () => {
-        const trigger = document.querySelector("#evidence-sidebar-open");
-        if (trigger instanceof HTMLElement) {
-            trigger.click();
-            setOpen(false);
-            return;
-        }
-
-        const taskListTarget = getTaskListNavigationTarget(panel);
-        if (taskListTarget) {
-            window.location.href = taskListTarget;
-            setOpen(false);
-        }
+        window.location.href = getTaskListPageUrl();
+        setOpen(false);
     });
 
     const teacherLink = panel.querySelector("#hub-global-sidebar-teacher-link");
@@ -1858,29 +1849,27 @@ function ensureGlobalHubSidebar() {
     return hubGlobalSidebarNodes;
 }
 
-function getTaskListNavigationTarget(panel = null) {
+function getTaskListPageUrl() {
     try {
         const params = new URLSearchParams(window.location.search || "");
         const activityId = String(params.get("id") || params.get("activityId") || "").trim();
-        if (!activityId) {
-            const firstAllocLink = panel?.querySelector?.("#hub-sidebar-assessment-list a, #hub-sidebar-projects-list a") || null;
-            if (firstAllocLink instanceof HTMLAnchorElement) {
-                const href = String(firstAllocLink.getAttribute("href") || "").trim();
-                return href || "";
-            }
-            return "";
-        }
-
         const taskTopic = String(params.get("taskTopic") || "").trim();
+        const taskShortName = String(params.get("taskShortName") || "").trim();
         const targetParams = new URLSearchParams();
-        targetParams.set("id", activityId);
+        if (activityId) {
+            targetParams.set("id", activityId);
+        }
         if (taskTopic) {
             targetParams.set("taskTopic", taskTopic);
         }
+        if (taskShortName) {
+            targetParams.set("taskShortName", taskShortName);
+        }
 
-        return `/ProjectPages/custom-activity.html?${targetParams.toString()}`;
+        const query = targetParams.toString();
+        return query ? `/task-list.html?${query}` : "/task-list.html";
     } catch (_error) {
-        return "";
+        return "/task-list.html";
     }
 }
 
@@ -1917,9 +1906,7 @@ function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {
     }
     if (adminLink) adminLink.hidden = !canAdmin;
     if (taskListButton) {
-        const hasTaskListTrigger = document.querySelector("#evidence-sidebar-open") instanceof HTMLElement;
-        const hasTaskListTarget = Boolean(getTaskListNavigationTarget(panel));
-        taskListButton.hidden = !(hasTaskListTrigger || hasTaskListTarget);
+        taskListButton.hidden = false;
     }
 
     if (copy) {
@@ -1977,9 +1964,7 @@ async function loadAndRenderSidebarAllocations(panel) {
 
         const taskListButton = panel.querySelector("#hub-global-sidebar-tasklist-link");
         if (taskListButton) {
-            const hasTaskListTrigger = document.querySelector("#evidence-sidebar-open") instanceof HTMLElement;
-            const hasTaskListTarget = Boolean(getTaskListNavigationTarget(panel));
-            taskListButton.hidden = !(hasTaskListTrigger || hasTaskListTarget);
+            taskListButton.hidden = false;
         }
 
         if (assessmentSection) assessmentSection.hidden = assessments.length === 0;
