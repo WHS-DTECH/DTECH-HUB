@@ -3338,7 +3338,11 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
             statusHost.classList.remove("is-error");
         }
         try {
-            await saveEvidenceRows(projectId, studentEmail, evidenceMapToRows(state, standards));
+            const allStandards = Array.from(new Set([
+                ...(Array.isArray(standards) ? standards : []),
+                ...Object.keys(state)
+            ]));
+            await saveEvidenceRows(projectId, studentEmail, evidenceMapToRows(state, allStandards));
             if (statusHost) {
                 statusHost.textContent = "Saved.";
                 statusHost.classList.remove("is-error");

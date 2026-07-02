@@ -40,6 +40,7 @@ const EVIDENCE_STEPS_DEFAULTS = {
 const taskListState = {
     allItems: [],
     selectedId: "",
+    fullEvidenceState: {},
     checklistState: {},
     checklistStandards: [],
     taskTopic: ""
@@ -371,7 +372,7 @@ function renderChecklistCards(detail, allItems) {
         allTopicTypes.unshift(selectedTopicType);
     }
 
-    const systemConnections = inferStudentSystemConnections(taskListState.checklistState);
+    const systemConnections = inferStudentSystemConnections(taskListState.fullEvidenceState);
 
     const renderRowsForStandard = (standard, rows) => {
         const safeRows = Array.isArray(rows) ? rows : [];
@@ -506,8 +507,16 @@ async function loadChecklistForTask(taskId) {
 
     const evidenceRows = await fetchMyEvidence(taskListState.selectedId).catch(() => []);
     const evidenceMap = evidenceRowsToMap(evidenceRows);
+    taskListState.fullEvidenceState = { ...evidenceMap };
     taskListState.checklistStandards = getStandardCodes(detail || selected);
     taskListState.checklistState = buildChecklistState(taskListState.checklistStandards, evidenceMap);
+    taskListState.checklistStandards.forEach((standard) => {
+        if (!Array.isArray(taskListState.fullEvidenceState[standard])) {
+            taskListState.fullEvidenceState[standard] = Array.isArray(taskListState.checklistState[standard])
+                ? taskListState.checklistState[standard].map((step) => ({ text: String(step?.text || "").trim(), done: Boolean(step?.done) }))
+                : [];
+        }
+    });
 
     renderHeader({
         totalLinked: taskListState.allItems.length,
@@ -602,9 +611,16 @@ async function renderTaskListPage() {
         const rows = Array.isArray(taskListState.checklistState[standard]) ? taskListState.checklistState[standard] : [];
         if (!rows[index]) return;
         rows[index].done = Boolean(checkbox.checked);
+        if (!Array.isArray(taskListState.fullEvidenceState[standard])) {
+            taskListState.fullEvidenceState[standard] = rows.map((step) => ({ text: String(step?.text || "").trim(), done: Boolean(step?.done) }));
+        }
+        if (taskListState.fullEvidenceState[standard][index]) {
+            taskListState.fullEvidenceState[standard][index].done = Boolean(checkbox.checked);
+        }
 
         try {
-            await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.checklistState, taskListState.checklistStandards));
+            const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
+            await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards));
             setStatus("Saved.");
         } catch (error) {
             setStatus(error?.message || "Could not save right now.", true);
