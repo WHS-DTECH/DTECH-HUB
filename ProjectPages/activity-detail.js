@@ -4317,6 +4317,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     const isDigitalMediaContext = /(DIGITAL\s*MEDIA|MEDIA|FILM|VIDEO|AUDIO|MUSIC|PHOTOGRAPH|ANIMATION|GRAPHIC)/i.test(contextSignals);
     const isProgrammingContext = /(DTECH|PROGRAMM|CODING|COMPUT|SOFTWARE|WEB|APP|PYTHON|JAVASCRIPT|ROBOTIC)/i.test(contextSignals);
     const showGithubGuide = isProjectManagementTopic && !isDigitalMediaContext;
+    const snowGithubGuide = showGithubGuide;
     const showOneDriveGuide = isProjectManagementTopic && isDigitalMediaContext;
     const submissionTaskItems = Array.from(new Set([
         ...(isDecompositionTopic
