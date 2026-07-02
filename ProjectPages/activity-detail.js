@@ -562,6 +562,48 @@ function installCloudSyncDelegatedFallbackHandlers() {
 
     const readUrlValue = (selector) => toSafeExternalUrl(document.querySelector(selector)?.value || "");
 
+    const refreshTrelloLibraryUi = (projectId, email) => {
+        const library = document.querySelector("#trello-link-library");
+        const list = document.querySelector("#trello-link-library-list");
+        const count = document.querySelector("#trello-link-library-count");
+        if (!library || !list) {
+            return;
+        }
+
+        const items = readStoredTrelloCardLibrary(projectId, email);
+        if (!items.length) {
+            library.hidden = true;
+            if (count) count.textContent = "(0)";
+            list.innerHTML = "";
+            return;
+        }
+
+        const activeUrl = toSafeTrelloCardUrl(document.querySelector("#trello-card-url")?.value || "");
+        library.hidden = false;
+        if (count) count.textContent = `(${items.length})`;
+        list.innerHTML = items
+            .map((item) => {
+                const url = toSafeTrelloCardUrl(item?.url || "");
+                if (!url) {
+                    return "";
+                }
+                const isActive = Boolean(activeUrl && activeUrl === url);
+                return `
+                    <li class="trello-link-library-item${isActive ? " is-active" : ""}" data-trello-link-item="${escapeHtml(url)}">
+                        <div class="trello-link-library-link-wrap">
+                            <a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(url)}</a>
+                            <span class="trello-link-library-savedat">${escapeHtml(formatLibrarySavedAtLabel(item?.savedAt))}</span>
+                        </div>
+                        <div class="trello-link-library-actions">
+                            <button type="button" class="detail-action detail-action-secondary" data-trello-library-use="${escapeHtml(url)}">Use</button>
+                            <button type="button" class="detail-action detail-action-secondary" data-trello-library-open="${escapeHtml(url)}">Open</button>
+                        </div>
+                    </li>
+                `;
+            })
+            .join("");
+    };
+
     document.addEventListener("click", async (event) => {
         const button = event.target?.closest?.("button");
         if (!button) {
@@ -660,6 +702,8 @@ function installCloudSyncDelegatedFallbackHandlers() {
             setStatus("#trello-sync-status", "Saving Trello link...");
             try {
                 await persistStudentTrelloLinkDirectlyToEvidence(ctx.projectId, ctx.email, ctx.detailData, ctx.taskTopicValue, url);
+                addStoredTrelloCardLibraryLink(ctx.projectId, ctx.email, url);
+                refreshTrelloLibraryUi(ctx.projectId, ctx.email);
                 setStatus("#trello-sync-status", "Trello link saved.");
             } catch (error) {
                 setStatus("#trello-sync-status", `${error?.message || "Could not save Trello link right now."}${formatApiDebugSuffix(error)}`, true);
@@ -802,6 +846,8 @@ function installCloudSyncDelegatedFallbackHandlers() {
         setStatus("#trello-sync-status", "Saving Trello link...");
         try {
             await persistStudentTrelloLinkDirectlyToEvidence(ctx.projectId, ctx.email, ctx.detailData, ctx.taskTopicValue, url);
+            addStoredTrelloCardLibraryLink(ctx.projectId, ctx.email, url);
+            refreshTrelloLibraryUi(ctx.projectId, ctx.email);
             setStatus("#trello-sync-status", "Trello link saved.");
         } catch (error) {
             setStatus("#trello-sync-status", `${error?.message || "Could not save Trello link right now."}${formatApiDebugSuffix(error)}`, true);
