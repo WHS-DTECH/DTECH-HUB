@@ -1654,7 +1654,7 @@ async function persistStudentTrelloLink(projectId, studentEmail, trelloCardUrl) 
         await saveEvidenceRows(projectId, studentEmail, nextRows);
     };
 
-    const saveTrelloLink = async () => {
+    const saveTrelloLinkEndpoint = async () => {
         const response = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interests/${encodeURIComponent(studentEmail)}/trello-link`, {
             method: "PATCH",
             headers: buildWriteHeaders(),
@@ -1669,22 +1669,14 @@ async function persistStudentTrelloLink(projectId, studentEmail, trelloCardUrl) 
         }
     };
 
-    try {
-        await saveTrelloLink();
-    } catch (error) {
-        if (Number(error?.status || 0) === 404) {
-            // Ensure allocation exists, then retry once.
-            await fetchEvidenceRowsEnsuringAllocation(projectId, studentEmail);
-            try {
-                await saveTrelloLink();
-                return;
-            } catch (_retryError) {
-                // Fall through to evidence-row fallback.
-            }
-        }
+    // Primary path: persist via evidence rows (most reliable in this page context).
+    await saveTrelloLinkViaEvidence();
 
-        // Fallback path: save directly into evidence rows so teacher view still gets the Trello URL.
-        await saveTrelloLinkViaEvidence();
+    // Secondary path: keep dedicated endpoint in sync, but do not block success.
+    try {
+        await saveTrelloLinkEndpoint();
+    } catch (_error) {
+        // Evidence rows already contain the Trello URL; keep UX successful.
     }
 }
 
@@ -4324,7 +4316,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     ].join(" ").toUpperCase();
     const isDigitalMediaContext = /(DIGITAL\s*MEDIA|MEDIA|FILM|VIDEO|AUDIO|MUSIC|PHOTOGRAPH|ANIMATION|GRAPHIC)/i.test(contextSignals);
     const isProgrammingContext = /(DTECH|PROGRAMM|CODING|COMPUT|SOFTWARE|WEB|APP|PYTHON|JAVASCRIPT|ROBOTIC)/i.test(contextSignals);
-    const showGithubGuide = isProjectManagementTopic && isProgrammingContext && !isDigitalMediaContext;
+    const showGithubGuide = isProjectManagementTopic && !isDigitalMediaContext;
     const showOneDriveGuide = isProjectManagementTopic && isDigitalMediaContext;
     const submissionTaskItems = Array.from(new Set([
         ...(isDecompositionTopic
