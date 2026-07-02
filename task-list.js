@@ -37,7 +37,7 @@ const EVIDENCE_STEPS_DEFAULTS = {
     ]
 };
 
-const state = {
+const taskListState = {
     allItems: [],
     selectedId: "",
     checklistState: {},
@@ -300,7 +300,7 @@ function renderChecklistCards(detail, allItems) {
     if (!checklistHost) return;
 
     const taskTitle = String(detail?.name || "Task List").trim();
-    const taskTopic = state.taskTopic || taskTitle;
+    const taskTopic = taskListState.taskTopic || taskTitle;
     const topicType = getTopicTypeLabel(detail);
 
     const linkedList = allItems.map((item) => `
@@ -312,9 +312,9 @@ function renderChecklistCards(detail, allItems) {
         </li>
     `).join("");
 
-    const cardsHtml = state.checklistStandards.map((standard) => {
+    const cardsHtml = taskListState.checklistStandards.map((standard) => {
         const title = standard === "digital-outcome" ? "Digital Outcome Description" : `Standard ${escapeTaskListHtml(standard)}`;
-        const rows = Array.isArray(state.checklistState[standard]) ? state.checklistState[standard] : [];
+        const rows = Array.isArray(taskListState.checklistState[standard]) ? taskListState.checklistState[standard] : [];
 
         return `
             <article class="task-list-checklist-card">
@@ -375,31 +375,31 @@ function buildChecklistState(standardCodes, evidenceMap) {
 }
 
 async function loadChecklistForTask(taskId) {
-    const selected = state.allItems.find((item) => String(item.id) === String(taskId));
+    const selected = taskListState.allItems.find((item) => String(item.id) === String(taskId));
     if (!selected) {
         return;
     }
 
-    state.selectedId = String(selected.id);
-    const detail = await fetchActivityDetail(state.selectedId);
-    state.taskTopic = String(detail?.name || selected?.name || "Task List").trim();
+    taskListState.selectedId = String(selected.id);
+    const detail = await fetchActivityDetail(taskListState.selectedId);
+    taskListState.taskTopic = String(detail?.name || selected?.name || "Task List").trim();
 
-    const evidenceRows = await fetchMyEvidence(state.selectedId).catch(() => []);
+    const evidenceRows = await fetchMyEvidence(taskListState.selectedId).catch(() => []);
     const evidenceMap = evidenceRowsToMap(evidenceRows);
-    state.checklistStandards = getStandardCodes(detail || selected);
-    state.checklistState = buildChecklistState(state.checklistStandards, evidenceMap);
+    taskListState.checklistStandards = getStandardCodes(detail || selected);
+    taskListState.checklistState = buildChecklistState(taskListState.checklistStandards, evidenceMap);
 
     renderHeader({
-        totalLinked: state.allItems.length,
-        totalChecklist: Object.values(state.checklistState).reduce((sum, rows) => sum + (Array.isArray(rows) ? rows.length : 0), 0)
+        totalLinked: taskListState.allItems.length,
+        totalChecklist: Object.values(taskListState.checklistState).reduce((sum, rows) => sum + (Array.isArray(rows) ? rows.length : 0), 0)
     });
 
-    renderTaskPicker(state.allItems, state.selectedId);
-    renderChecklistCards(detail || selected, state.allItems);
+    renderTaskPicker(taskListState.allItems, taskListState.selectedId);
+    renderChecklistCards(detail || selected, taskListState.allItems);
 
     const openLink = document.querySelector("#task-list-open-topic");
     if (openLink) {
-        openLink.setAttribute("href", buildCustomActivityLink(state.selectedId, state.taskTopic));
+        openLink.setAttribute("href", buildCustomActivityLink(taskListState.selectedId, taskListState.taskTopic));
     }
 
     setStatus(`Loaded checklist for ${selected.name || "task"}.`);
@@ -420,13 +420,13 @@ async function renderTaskListPage() {
         allocations = { assessment_tasks: [], projects: [] };
     }
 
-    state.allItems = [
+    taskListState.allItems = [
         ...allocations.assessment_tasks.map((item) => ({ ...item, kind: "Assessment" })),
         ...allocations.projects.map((item) => ({ ...item, kind: "Project" }))
     ];
 
     renderHeader({
-        totalLinked: state.allItems.length,
+        totalLinked: taskListState.allItems.length,
         totalChecklist: 0
     });
     renderAllocationLists(allocations.assessment_tasks, allocations.projects);
@@ -447,17 +447,17 @@ async function renderTaskListPage() {
         }
     }
 
-    if (!state.allItems.length) {
+    if (!taskListState.allItems.length) {
         renderTaskPicker([], "");
         setStatus("No allocations found yet. Ask your teacher to assign a task.", true);
         return;
     }
 
     const preferred = context.id
-        ? state.allItems.find((item) => String(item.id) === String(context.id)) || null
-        : state.allItems.find((item) => /client projects/i.test(String(item.name || ""))) || state.allItems[0];
+        ? taskListState.allItems.find((item) => String(item.id) === String(context.id)) || null
+        : taskListState.allItems.find((item) => /client projects/i.test(String(item.name || ""))) || taskListState.allItems[0];
 
-    await loadChecklistForTask(String(preferred?.id || state.allItems[0].id));
+    await loadChecklistForTask(String(preferred?.id || taskListState.allItems[0].id));
 
     const picker = document.querySelector("#task-list-picker");
     picker?.addEventListener("change", async (event) => {
@@ -479,12 +479,12 @@ async function renderTaskListPage() {
         const index = Number(indexRaw);
         if (!standard || !Number.isFinite(index)) return;
 
-        const rows = Array.isArray(state.checklistState[standard]) ? state.checklistState[standard] : [];
+        const rows = Array.isArray(taskListState.checklistState[standard]) ? taskListState.checklistState[standard] : [];
         if (!rows[index]) return;
         rows[index].done = Boolean(checkbox.checked);
 
         try {
-            await saveMyEvidence(state.selectedId, evidenceMapToRows(state.checklistState, state.checklistStandards));
+            await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.checklistState, taskListState.checklistStandards));
             setStatus("Saved.");
         } catch (error) {
             setStatus(error?.message || "Could not save right now.", true);
