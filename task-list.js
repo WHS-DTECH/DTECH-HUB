@@ -117,6 +117,31 @@ function stripStepLevel(text) {
     return String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim();
 }
 
+function inferStudentSystemConnections(currentState) {
+    let trelloConnected = false;
+    let githubConnected = false;
+
+    Object.values(currentState || {}).forEach((steps) => {
+        (Array.isArray(steps) ? steps : []).forEach((step) => {
+            const text = String(step?.text || "").trim();
+            if (!text) return;
+
+            const textLower = text.toLowerCase();
+            if (text.startsWith("TRELLO_CARD_URL|")) {
+                trelloConnected = true;
+            }
+            if (textLower.includes("trello.com/")) {
+                trelloConnected = true;
+            }
+            if (/(github\.com|gist\.github\.com|raw\.githubusercontent\.com)/i.test(textLower)) {
+                githubConnected = true;
+            }
+        });
+    });
+
+    return { trelloConnected, githubConnected };
+}
+
 async function loadJson(url, options = {}) {
     const response = await fetch(url, options);
     const payload = await response.json().catch(() => ({}));
@@ -324,6 +349,8 @@ function renderChecklistCards(detail, allItems) {
         </li>
     `).join("");
 
+    const systemConnections = inferStudentSystemConnections(taskListState.checklistState);
+
     const renderRowsForStandard = (standard, rows) => {
         const safeRows = Array.isArray(rows) ? rows : [];
 
@@ -358,6 +385,13 @@ function renderChecklistCards(detail, allItems) {
                                     <input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${step._index}">
                                     <span class="task-list-step-text">${escapeTaskListHtml(stripStepLevel(step?.text))}</span>
                                 </label>
+                                ${String(level) === "Achieved" && stripStepLevel(step?.text).toLowerCase().includes("project management") ? `
+                                    <div class="task-list-system-list">
+                                        <p class="task-list-system-title">Connected Systems</p>
+                                        <label class="task-list-system-item"><input type="checkbox" disabled ${systemConnections.trelloConnected ? "checked" : ""}> Trello</label>
+                                        <label class="task-list-system-item"><input type="checkbox" disabled ${systemConnections.githubConnected ? "checked" : ""}> GitHub</label>
+                                    </div>
+                                ` : ""}
                             </div>
                         `).join("")}
                     </div>
