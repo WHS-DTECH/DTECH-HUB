@@ -655,6 +655,44 @@ function installCloudSyncDelegatedFallbackHandlers() {
             setStatus("#trello-sync-status", "Opened Trello link.");
             return;
         }
+
+        if (button.id === "github-save-link-btn" && button.dataset.syncBound !== "1") {
+            const repoUrl = toSafeGithubRepoUrl(document.querySelector("#github-repo-url")?.value || "");
+            if (!repoUrl) {
+                setStatus("#github-sync-status", "Enter a valid GitHub repository URL first.", true);
+                return;
+            }
+
+            const note = String(document.querySelector("#github-work-note")?.value || "").trim();
+            const ctx = getActiveSyncContext();
+            if (!ctx.projectId || !ctx.email) {
+                setStatus("#github-sync-status", "Sign in again, then retry Save GitHub Sync.", true);
+                return;
+            }
+
+            button.disabled = true;
+            setStatus("#github-sync-status", "Saving GitHub sync...");
+            try {
+                await persistStudentGithubSyncDirectlyToEvidence(ctx.projectId, ctx.email, ctx.detailData, ctx.taskTopicValue, repoUrl, note);
+                setStatus("#github-sync-status", "GitHub sync saved.");
+            } catch (error) {
+                setStatus("#github-sync-status", `${error?.message || "Could not save GitHub sync right now."}${formatApiDebugSuffix(error)}`, true);
+            } finally {
+                if (button.isConnected) button.disabled = false;
+            }
+            return;
+        }
+
+        if (button.id === "github-open-repo-btn" && button.dataset.syncBound !== "1") {
+            const repoUrl = toSafeGithubRepoUrl(document.querySelector("#github-repo-url")?.value || "");
+            if (!repoUrl) {
+                setStatus("#github-sync-status", "Enter a valid GitHub repository URL first.", true);
+                return;
+            }
+            window.open(repoUrl, "_blank", "noopener,noreferrer");
+            setStatus("#github-sync-status", "Opened GitHub repository.");
+            return;
+        }
     });
 
     document.addEventListener("click", async (event) => {
@@ -663,11 +701,54 @@ function installCloudSyncDelegatedFallbackHandlers() {
             return;
         }
 
-        if (button.id !== "trello-save-link-btn" && button.id !== "trello-open-card-btn") {
+        if (
+            button.id !== "trello-save-link-btn"
+            && button.id !== "trello-open-card-btn"
+            && button.id !== "github-save-link-btn"
+            && button.id !== "github-open-repo-btn"
+        ) {
             return;
         }
 
         event.stopImmediatePropagation();
+
+        if (button.id === "github-open-repo-btn") {
+            const repoUrl = toSafeGithubRepoUrl(document.querySelector("#github-repo-url")?.value || "");
+            if (!repoUrl) {
+                setStatus("#github-sync-status", "Enter a valid GitHub repository URL first.", true);
+                return;
+            }
+            window.open(repoUrl, "_blank", "noopener,noreferrer");
+            setStatus("#github-sync-status", "Opened GitHub repository.");
+            return;
+        }
+
+        if (button.id === "github-save-link-btn") {
+            const repoUrl = toSafeGithubRepoUrl(document.querySelector("#github-repo-url")?.value || "");
+            if (!repoUrl) {
+                setStatus("#github-sync-status", "Enter a valid GitHub repository URL first.", true);
+                return;
+            }
+
+            const note = String(document.querySelector("#github-work-note")?.value || "").trim();
+            const ctx = getActiveSyncContext();
+            if (!ctx.projectId || !ctx.email) {
+                setStatus("#github-sync-status", "Sign in again, then retry Save GitHub Sync.", true);
+                return;
+            }
+
+            button.disabled = true;
+            setStatus("#github-sync-status", "Saving GitHub sync...");
+            try {
+                await persistStudentGithubSyncDirectlyToEvidence(ctx.projectId, ctx.email, ctx.detailData, ctx.taskTopicValue, repoUrl, note);
+                setStatus("#github-sync-status", "GitHub sync saved.");
+            } catch (error) {
+                setStatus("#github-sync-status", `${error?.message || "Could not save GitHub sync right now."}${formatApiDebugSuffix(error)}`, true);
+            } finally {
+                if (button.isConnected) button.disabled = false;
+            }
+            return;
+        }
 
         const url = toSafeTrelloCardUrl(document.querySelector("#trello-card-url")?.value || "");
         if (button.id === "trello-open-card-btn") {
