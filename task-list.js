@@ -117,41 +117,26 @@ function stripStepLevel(text) {
     return String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim();
 }
 
-function normalizeTopicRows(value) {
-    if (Array.isArray(value)) {
-        return value
-            .map((row) => String(row || "").trim())
-            .filter(Boolean);
+function getTaskTopicHrefForStep(standard, level, text) {
+    const safeText = String(text || "").trim();
+    if (!safeText || !taskListState.selectedId) return "";
+
+    const normalized = safeText.toLowerCase();
+    const normalizedLevel = String(level || "").toLowerCase();
+
+    if (String(standard) === "91897" && normalized.includes("project management")) {
+        return buildCustomActivityLink(taskListState.selectedId, "Project Management");
     }
 
-    const raw = String(value || "").trim();
-    if (!raw) return [];
-    return raw
-        .split(/\r?\n/)
-        .map((row) => String(row || "").trim())
-        .filter(Boolean);
-}
-
-function collectTaskTopics(detail, fallbackTopic) {
-    const candidates = [
-        ...normalizeTopicRows(detail?.tasks_list),
-        ...normalizeTopicRows(detail?.task_list),
-        ...normalizeTopicRows(detail?.assessment_focus),
-        ...normalizeTopicRows(detail?.achieved),
-        ...normalizeTopicRows(detail?.merit),
-        ...normalizeTopicRows(detail?.excellence)
-    ];
-
-    const normalized = candidates
-        .map((row) => String(row || "").replace(/^[-*\d.\s]+/, "").trim())
-        .map((row) => row.replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim())
-        .filter(Boolean);
-
-    const unique = Array.from(new Set(normalized));
-    if (!unique.length) {
-        return String(fallbackTopic || "").trim() ? [String(fallbackTopic || "").trim()] : [];
+    if (String(standard) === "digital-outcome" && normalized.includes("describe the digital outcome")) {
+        return buildCustomActivityLink(taskListState.selectedId, "Digital Outcome");
     }
-    return unique;
+
+    if (normalizedLevel === "achieved" && normalized.includes("version control")) {
+        return buildCustomActivityLink(taskListState.selectedId, "Project Management");
+    }
+
+    return "";
 }
 
 function inferStudentSystemConnections(currentState) {
@@ -375,7 +360,6 @@ function renderChecklistCards(detail, allItems) {
 
     const taskTitle = String(detail?.name || "Task List").trim();
     const taskTopic = taskListState.taskTopic || taskTitle;
-    const taskTopics = collectTaskTopics(detail, taskTopic);
     const selectedTopicType = getTopicTypeLabel(detail);
     const allTopicTypes = Array.from(new Set(
         (Array.isArray(allItems) ? allItems : [])
@@ -399,7 +383,13 @@ function renderChecklistCards(detail, allItems) {
                         <div class="task-list-step-row">
                             <label class="task-list-step-check-wrap">
                                 <input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">
-                                <span class="task-list-step-text">${escapeTaskListHtml(String(step?.text || ""))}</span>
+                                ${(() => {
+                                    const stepText = String(step?.text || "");
+                                    const href = getTaskTopicHrefForStep(standard, "", stepText);
+                                    return href
+                                        ? `<a class="task-list-step-link" href="${escapeTaskListHtml(href)}">${escapeTaskListHtml(stepText)}</a>`
+                                        : `<span class="task-list-step-text">${escapeTaskListHtml(stepText)}</span>`;
+                                })()}
                             </label>
                             ${String(standard) === "digital-outcome" && index === 0 ? `
                                 <div class="task-list-system-list">
@@ -427,7 +417,13 @@ function renderChecklistCards(detail, allItems) {
                             <div class="task-list-step-row">
                                 <label class="task-list-step-check-wrap">
                                     <input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${step._index}">
-                                    <span class="task-list-step-text">${escapeTaskListHtml(stripStepLevel(step?.text))}</span>
+                                    ${(() => {
+                                        const stepText = stripStepLevel(step?.text);
+                                        const href = getTaskTopicHrefForStep(standard, level, stepText);
+                                        return href
+                                            ? `<a class="task-list-step-link" href="${escapeTaskListHtml(href)}">${escapeTaskListHtml(stepText)}</a>`
+                                            : `<span class="task-list-step-text">${escapeTaskListHtml(stepText)}</span>`;
+                                    })()}
                                 </label>
                                 ${String(level) === "Achieved" && stripStepLevel(step?.text).toLowerCase().includes("project management") ? `
                                     <div class="task-list-system-list">
@@ -457,13 +453,6 @@ function renderChecklistCards(detail, allItems) {
                             <span class="task-list-do-chip">${escapeTaskListHtml(topicType)}</span>
                         `).join("")}
                     </div>
-                    ${taskTopics.length ? `
-                        <div class="task-list-topic-links" aria-label="Task topic links">
-                            ${taskTopics.map((topic) => `
-                                <a class="task-list-topic-link" href="${escapeTaskListHtml(buildCustomActivityLink(taskListState.selectedId, topic))}">${escapeTaskListHtml(topic)}</a>
-                            `).join("")}
-                        </div>
-                    ` : ""}
                 ` : `<h3>${title}</h3>`}
                 ${renderRowsForStandard(standard, rows)}
             </article>
