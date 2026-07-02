@@ -1204,6 +1204,43 @@ async function saveEvidenceRows(projectId, studentEmail, rows) {
     }
 }
 
+async function fetchMyEvidenceRows(projectId) {
+    const endpoint = `/api/activities/${encodeURIComponent(projectId)}/my-evidence`;
+    const response = await fetch(endpoint, {
+        headers: buildWriteHeaders()
+    });
+
+    if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        const error = new Error(payload?.error || "Could not load my evidence steps.");
+        error.status = Number(response.status || 0);
+        error.endpoint = endpoint;
+        error.stage = "load-my-evidence";
+        throw error;
+    }
+
+    const payload = await response.json().catch(() => ({}));
+    return normalizeEvidenceSteps(payload?.evidence_steps);
+}
+
+async function saveMyEvidenceRows(projectId, rows) {
+    const endpoint = `/api/activities/${encodeURIComponent(projectId)}/my-evidence`;
+    const response = await fetch(endpoint, {
+        method: "PATCH",
+        headers: buildWriteHeaders(),
+        body: JSON.stringify({ evidence_steps: normalizeEvidenceSteps(rows) })
+    });
+
+    if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        const error = new Error(payload?.error || "Could not save my evidence steps.");
+        error.status = Number(response.status || 0);
+        error.endpoint = endpoint;
+        error.stage = "save-my-evidence";
+        throw error;
+    }
+}
+
 async function fetchEvidenceRowsEnsuringAllocation(projectId, studentEmail) {
     try {
         return await fetchEvidenceRows(projectId, studentEmail);
@@ -3466,7 +3503,40 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
             digitalOutcomeAllocations = [];
         }
     }
-    const state = evidenceRowsToMap(await fetchEvidenceRows(projectId, studentEmail).catch(() => []));
+    const loadRowsForSidebar = async () => {
+        if (isSelfTaskListView) {
+            try {
+                return await fetchMyEvidenceRows(projectId);
+            } catch (error) {
+                if (Number(error?.status || 0) !== 404) {
+                    throw error;
+                }
+                return [];
+            }
+        }
+
+        return fetchEvidenceRows(projectId, studentEmail);
+    };
+
+    const saveRowsForSidebar = async (rows) => {
+        if (isSelfTaskListView) {
+            try {
+                await saveMyEvidenceRows(projectId, rows);
+                return;
+            } catch (error) {
+                if (Number(error?.status || 0) !== 404) {
+                    throw error;
+                }
+                await fetchEvidenceRowsEnsuringAllocation(projectId, studentEmail);
+                await saveMyEvidenceRows(projectId, rows);
+                return;
+            }
+        }
+
+        await saveEvidenceRows(projectId, studentEmail, rows);
+    };
+
+    const state = evidenceRowsToMap(await loadRowsForSidebar().catch(() => []));
     standards.forEach((code) => {
         const hasExistingStandard = Object.prototype.hasOwnProperty.call(state, code);
         const shouldSeedDefaults = !hasExistingStandard || (!isSelfTaskListView && (!Array.isArray(state[code]) || !state[code].length));
@@ -3499,7 +3569,7 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
                 ...(Array.isArray(standards) ? standards : []),
                 ...Object.keys(state)
             ]));
-            await saveEvidenceRows(projectId, studentEmail, evidenceMapToRows(state, allStandards));
+            await saveRowsForSidebar(evidenceMapToRows(state, allStandards));
             if (statusHost) {
                 statusHost.textContent = "Saved.";
                 statusHost.classList.remove("is-error");
@@ -6599,14 +6669,16 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         googleDriveStatus.classList.toggle("is-error", Boolean(isError));
     };
 
-    const setGithubStatus = (message, isError = false) => {
+    const setGithubStatus = (message, isError = false, isSuccess = false) => {
         if (!githubStatus) return;
         githubStatus.textContent = String(message || "");
         githubStatus.classList.toggle("is-error", Boolean(isError));
+        githubStatus.classList.toggle("is-success", Boolean(isSuccess) && !Boolean(isError));
     };
 
     const backendTrelloCardLink = getFirstTrelloCardUrlFromEvidenceRows(interestData?.my_allocation?.evidence_steps);
     const backendTrelloCardLinks = getAllTrelloCardUrlsFromEvidenceRows(interestData?.my_allocation?.evidence_steps);
+    const backendGithubRepoLink = getFirstGithubRepoUrlFromEvidenceRows(interestData?.my_allocation?.evidence_steps);
     const localTrelloCardLink = readStoredTrelloCardLink(projectId, email);
     const localTrelloCardLibrary = readStoredTrelloCardLibrary(projectId, email);
     let trelloCardLibrary = writeStoredTrelloCardLibrary(
@@ -6619,6 +6691,10 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         )
     );
     const needsLegacyTrelloMigration = !backendTrelloCardLink && Boolean(localTrelloCardLink);
+
+    if (backendGithubRepoLink) {
+        setGithubStatus("Saved GitHub repository loaded.", false, true);
+    }
 
     const renderTrelloCardLibrary = () => {
         if (!trelloLinkLibrary || !trelloLinkLibraryList) {
@@ -6824,7 +6900,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                 throw new Error("GitHub link did not persist to your Task List evidence.");
             }
 
-            setGithubStatus("GitHub sync saved and shared with teacher view.");
+            setGithubStatus("GitHub sync saved and shared with teacher view.", false, true);
         } catch (error) {
             setGithubStatus(`${error?.message || "Could not save GitHub sync right now."}${formatApiDebugSuffix(error)}`, true);
         } finally {
@@ -6840,7 +6916,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         }
 
         window.open(repoUrl, "_blank", "noopener,noreferrer");
-        setGithubStatus("Opened GitHub repository.");
+        setGithubStatus("Opened GitHub repository.", false, true);
     });
 
     trelloOpenCardBtn?.addEventListener("click", () => {
