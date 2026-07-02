@@ -24,6 +24,7 @@ const DEFAULT_TEMPLATE_LIBRARY = [
 let templateLibraryData = Array.isArray(DEFAULT_TEMPLATE_LIBRARY)
     ? DEFAULT_TEMPLATE_LIBRARY.map((entry) => ({ ...entry }))
     : [];
+let templateSearchQuery = "";
 let libraryAccess = { can_teacher_view: false, can_admin: false };
 let libraryHandlersBound = false;
 const SYNC_FOLDER_NAME = "Process Slide Templates";
@@ -816,13 +817,39 @@ function renderTemplateCard(item) {
 
 function renderLibrary() {
     const host = document.querySelector("#template-list");
+    const searchStatus = document.querySelector("#template-search-status");
     if (!host) return;
     templateLibraryData = Array.isArray(templateLibraryData) ? [...templateLibraryData].sort(compareTemplateEntries) : [];
+    const normalizedQuery = String(templateSearchQuery || "").trim().toLowerCase();
+    const filteredTemplates = normalizedQuery
+        ? templateLibraryData.filter((item) => {
+            const title = String(item?.title || "").toLowerCase();
+            return title.includes(normalizedQuery);
+        })
+        : templateLibraryData;
+
     if (!Array.isArray(templateLibraryData) || !templateLibraryData.length) {
+        if (searchStatus) {
+            searchStatus.textContent = "";
+        }
         host.innerHTML = '<p class="template-empty">No templates are listed yet.</p>';
         return;
     }
-    host.innerHTML = templateLibraryData.map((item) => renderTemplateCard(item)).join("");
+
+    if (searchStatus) {
+        if (!normalizedQuery) {
+            searchStatus.textContent = `Showing ${templateLibraryData.length} template${templateLibraryData.length === 1 ? "" : "s"}.`;
+        } else {
+            searchStatus.textContent = `Showing ${filteredTemplates.length} result${filteredTemplates.length === 1 ? "" : "s"} for "${templateSearchQuery}".`;
+        }
+    }
+
+    if (!filteredTemplates.length) {
+        host.innerHTML = `<p class="template-empty">No templates match "${escapeHtml(templateSearchQuery)}".</p>`;
+        return;
+    }
+
+    host.innerHTML = filteredTemplates.map((item) => renderTemplateCard(item)).join("");
 
     if (!libraryHandlersBound) {
         libraryHandlersBound = true;
@@ -856,6 +883,22 @@ async function initLibrary() {
     }
 
     await loadTemplateLibraryEntries();
+
+    const searchInput = document.querySelector("#template-search-input");
+    if (searchInput) {
+        searchInput.addEventListener("input", (event) => {
+            templateSearchQuery = String(event?.target?.value || "").trim();
+            renderLibrary();
+        });
+        searchInput.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") {
+                searchInput.value = "";
+                templateSearchQuery = "";
+                renderLibrary();
+            }
+        });
+    }
+
     renderLibrary();
 
     // Keep staff-only controls aligned with global auth mode toggles.
