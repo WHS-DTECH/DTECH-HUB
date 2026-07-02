@@ -117,6 +117,43 @@ function stripStepLevel(text) {
     return String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim();
 }
 
+function normalizeTopicRows(value) {
+    if (Array.isArray(value)) {
+        return value
+            .map((row) => String(row || "").trim())
+            .filter(Boolean);
+    }
+
+    const raw = String(value || "").trim();
+    if (!raw) return [];
+    return raw
+        .split(/\r?\n/)
+        .map((row) => String(row || "").trim())
+        .filter(Boolean);
+}
+
+function collectTaskTopics(detail, fallbackTopic) {
+    const candidates = [
+        ...normalizeTopicRows(detail?.tasks_list),
+        ...normalizeTopicRows(detail?.task_list),
+        ...normalizeTopicRows(detail?.assessment_focus),
+        ...normalizeTopicRows(detail?.achieved),
+        ...normalizeTopicRows(detail?.merit),
+        ...normalizeTopicRows(detail?.excellence)
+    ];
+
+    const normalized = candidates
+        .map((row) => String(row || "").replace(/^[-*\d.\s]+/, "").trim())
+        .map((row) => row.replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim())
+        .filter(Boolean);
+
+    const unique = Array.from(new Set(normalized));
+    if (!unique.length) {
+        return String(fallbackTopic || "").trim() ? [String(fallbackTopic || "").trim()] : [];
+    }
+    return unique;
+}
+
 function inferStudentSystemConnections(currentState) {
     let trelloConnected = false;
     let githubConnected = false;
@@ -338,6 +375,7 @@ function renderChecklistCards(detail, allItems) {
 
     const taskTitle = String(detail?.name || "Task List").trim();
     const taskTopic = taskListState.taskTopic || taskTitle;
+    const taskTopics = collectTaskTopics(detail, taskTopic);
     const selectedTopicType = getTopicTypeLabel(detail);
     const allTopicTypes = Array.from(new Set(
         (Array.isArray(allItems) ? allItems : [])
@@ -419,6 +457,13 @@ function renderChecklistCards(detail, allItems) {
                             <span class="task-list-do-chip">${escapeTaskListHtml(topicType)}</span>
                         `).join("")}
                     </div>
+                    ${taskTopics.length ? `
+                        <div class="task-list-topic-links" aria-label="Task topic links">
+                            ${taskTopics.map((topic) => `
+                                <a class="task-list-topic-link" href="${escapeTaskListHtml(buildCustomActivityLink(taskListState.selectedId, topic))}">${escapeTaskListHtml(topic)}</a>
+                            `).join("")}
+                        </div>
+                    ` : ""}
                 ` : `<h3>${title}</h3>`}
                 ${renderRowsForStandard(standard, rows)}
             </article>
