@@ -102,6 +102,7 @@ const DIGITAL_OUTCOME_DETAILS_TASKS = [
 ];
 
 const DIGITAL_OUTCOME_DESCRIPTION_TITLE = "Digital Outcome Description";
+const DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE = "Target Audience";
 const DIGITAL_OUTCOME_DESCRIPTION_TEMPLATE_PREVIEW_URL = "https://drive.google.com/thumbnail?id=1brOY70u9aJdsoiEtxVepr82vRhiv9VzpMm8TUv3lcTo&sz=w1400";
 
 const EVIDENCE_STEPS_DEFAULTS = {
@@ -5053,6 +5054,7 @@ function deriveTaskShortName(value) {
     const normalized = raw.toLowerCase();
     const phraseMap = [
         { pattern: /describe\s+the\s+digital\s+outcome|describe.*digital\s+outcome/, label: "Digital Outcome Description" },
+        { pattern: /identify\s+the\s+target\s+audience|target\s+audience|end\s+user/, label: "Target Audience" },
         { pattern: /project\s+management/, label: "Project Management" },
         { pattern: /relevant\s+implications/, label: "Relevant Implications" },
         { pattern: /version\s+control/, label: "Version Control" },
@@ -5107,6 +5109,22 @@ function isDigitalOutcomeDescriptionCriterion(taskTopicTitle, taskShortName = ""
         return true;
     }
     return shortNameText === DIGITAL_OUTCOME_DESCRIPTION_TITLE.toLowerCase();
+}
+
+function isDigitalOutcomeTargetAudienceCriterion(taskTopicTitle, taskShortName = "") {
+    const topicText = String(taskTopicTitle || "").trim().toLowerCase();
+    const shortNameText = String(taskShortName || "").trim().toLowerCase();
+    if (!topicText && !shortNameText) {
+        return false;
+    }
+
+    if (/identify\s+the\s+target\s+audience/.test(topicText)) {
+        return true;
+    }
+    if (/end\s+user\s+for\s+this\s+outcome/.test(topicText)) {
+        return true;
+    }
+    return shortNameText === DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE.toLowerCase();
 }
 
 function getTaskTopicShortNameOverride(activityId, topicText) {
@@ -5440,13 +5458,17 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         || (taskTopicTitle ? getTaskTopicShortNameOverride(id, taskTopicTitle) : "")
         || (taskTopicTitle ? deriveTaskShortName(taskTopicTitle) : "");
     const isDigitalOutcomeDescriptionTopic = isDigitalOutcomeDescriptionCriterion(taskTopicTitle, resolvedTaskShortName);
+    const isDigitalOutcomeTargetAudienceTopic = isDigitalOutcomeTargetAudienceCriterion(taskTopicTitle, resolvedTaskShortName);
+    const useDigitalOutcomeTemplateHero = isDigitalOutcomeDescriptionTopic || isDigitalOutcomeTargetAudienceTopic;
     const mergedTaskTopicLinks = isTaskTopicView
         ? collectMergedTaskTopicLinks(data, id, taskTopicTitle, resolvedTaskShortName)
         : [];
     const showMergedTaskTopicLayout = mergedTaskTopicLinks.length > 1;
     const displayTitle = isDigitalOutcomeDescriptionTopic
         ? DIGITAL_OUTCOME_DESCRIPTION_TITLE
-        : (resolvedTaskShortName || taskTopicTitle || data.title);
+        : (isDigitalOutcomeTargetAudienceTopic
+            ? DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE
+            : (resolvedTaskShortName || taskTopicTitle || data.title));
     const displaySummaryHtml = taskTopicTitle
         ? `Task topic from <a class="task-topic-parent-link" href="${parentAssessmentUrl}">${escapeHtml(data.title)}</a>`
         : escapeHtml(data.summary);
@@ -5482,19 +5504,19 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     if (resolvedTaskShortName) {
         templateLibraryParams.set("taskShortName", resolvedTaskShortName);
     }
-    if (isDigitalOutcomeDescriptionTopic) {
+    if (useDigitalOutcomeTemplateHero) {
         templateLibraryParams.set("templateId", "digital-outcome-description");
     }
     const slideshowTemplateLibraryUrl = `slideshow-template-library.html?${templateLibraryParams.toString()}`;
     const slideshowTemplateImage = toSafeExternalUrl(data?.slideshowTemplateImage || data?.slideTemplateImage || "")
-        || (isDigitalOutcomeDescriptionTopic ? DIGITAL_OUTCOME_DESCRIPTION_TEMPLATE_PREVIEW_URL : "");
+        || (useDigitalOutcomeTemplateHero ? DIGITAL_OUTCOME_DESCRIPTION_TEMPLATE_PREVIEW_URL : "");
     const slideshowTemplateFileUrl = toSafeExternalUrl(data?.slideshowTemplateFileUrl || data?.slideTemplateFileUrl || data?.speakerNotesCriteriaUrl || "");
-    const heroVisualImage = (isDigitalOutcomeTopic ? (slideshowTemplateImage || data.image) : data.image)
+    const heroVisualImage = ((isDigitalOutcomeTopic || useDigitalOutcomeTemplateHero) ? (slideshowTemplateImage || data.image) : data.image)
         || "https://placehold.co/900x560/3f89cf/ffffff?text=Uploaded+Activity";
-    const heroVisualAlt = isDigitalOutcomeTopic
+    const heroVisualAlt = (isDigitalOutcomeTopic || useDigitalOutcomeTemplateHero)
         ? `${displayTitle} slideshow template preview`
         : `${displayTitle} project image`;
-    const heroImageHtml = isDigitalOutcomeTopic
+    const heroImageHtml = (isDigitalOutcomeTopic || useDigitalOutcomeTemplateHero)
         ? `
                 <div class="task-topic-template-hero">
                     <img src="${escapeHtml(heroVisualImage)}" alt="${escapeHtml(heroVisualAlt)}" loading="lazy">
