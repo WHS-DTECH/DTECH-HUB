@@ -354,6 +354,12 @@ function renderChecklistCards(detail, allItems) {
                                 <input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">
                                 <span class="task-list-step-text">${escapeTaskListHtml(String(step?.text || ""))}</span>
                             </label>
+                            ${String(standard) === "digital-outcome" && index === 0 ? `
+                                <div class="task-list-system-list">
+                                    <p class="task-list-system-title">Connected Systems</p>
+                                    <label class="task-list-system-item"><input type="checkbox" checked disabled> Description - Google Slides</label>
+                                </div>
+                            ` : ""}
                         </div>
                     `).join("")}
                 </div>
@@ -401,10 +407,6 @@ function renderChecklistCards(detail, allItems) {
                     <h3>Digital Outcome Topic</h3>
                     <div class="task-list-do-chip">${escapeTaskListHtml(topicType)}</div>
                     <p class="task-list-meta"><strong>${escapeTaskListHtml(taskTitle)}</strong> • ${escapeTaskListHtml(deriveTaskShortName(taskTopic))}</p>
-                    <div class="task-list-system-list">
-                        <p class="task-list-system-title">Connected Systems</p>
-                        <label class="task-list-system-item"><input type="checkbox" checked disabled> Description - Google Slides</label>
-                    </div>
                 ` : `<h3>${title}</h3>`}
                 ${renderRowsForStandard(standard, rows)}
             </article>
