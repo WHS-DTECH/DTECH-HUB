@@ -5671,7 +5671,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     const topicGuideTitle = isProjectManagementTopic
         ? "Project Management: Trello"
         : (isDecompositionTopic ? "Decomposition + Trello"
-        : (isDigitalOutcomeTopic ? "Digital Outcome Description" : "Topic Tasks"));
+        : (isDigitalOutcomeTopic
+            ? (isDigitalOutcomeTargetAudienceTopic ? "Target Audience" : "Digital Outcome Description")
+            : "Topic Tasks"));
     const topicGuideInstructions = isProjectManagementTopic
         ? [
             "Log in to Trello using Google Sign In.",
@@ -5687,13 +5689,21 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 "Push the decomposition steps to Trello and track progress through Doing and Done."
             ]
             : (isDigitalOutcomeTopic
-                ? [
-                    "Create a Google Slideshow for this topic.",
-                    "Include a slide that describes the digital outcome: what it is, who it is for, and what it must do.",
+                ? (isDigitalOutcomeTargetAudienceTopic
+                    ? [
+                        "Create a Google Slideshow for this topic.",
+                        "Define who the target audience or end user is for your project.",
+                        "Describe audience needs, context, and pain points your project should respond to.",
+                        "Explain why this audience is the right focus and how your project decisions support them.",
+                        "Use clear evidence, examples, or observations to justify your audience choices."
+                    ]
+                    : [
+                        "Create a Google Slideshow for this topic.",
+                        "Include a slide that describes the digital outcome: what it is, who it is for, and what it must do.",
                         "Record the assessment criteria page in Speaker Notes so markers can verify how each point is addressed.",
-                    "Explain the intent of the idea clearly: problem, purpose, audience, and expected impact.",
-                    "Use concise wording and evidence-based reasoning so your idea is easy to evaluate."
-                ]
+                        "Explain the intent of the idea clearly: problem, purpose, audience, and expected impact.",
+                        "Use concise wording and evidence-based reasoning so your idea is easy to evaluate."
+                    ])
                 : [
                     "Read each submission requirement carefully.",
                     "Prepare evidence that matches the task expectations.",
@@ -5714,22 +5724,33 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 "Submit and acknowledge evidence after your plan and Trello tasks are updated."
             ]
             : (isDigitalOutcomeTopic
-                ? [
-                    "Description - Google Slides: Describe the Digital Outcome: what it is, who it is for, and what it must do.",
-                    "Identify the target audience or end user for this outcome.",
-                    "Explain how the outcome will be developed and what tools/technologies will be used.",
-                    "State how success will be measured or evaluated."
-                ]
+                ? (isDigitalOutcomeTargetAudienceTopic
+                    ? [
+                        "Target Audience - Google Slides: Identify who your project is for and describe them clearly.",
+                        "Describe demographics and context: age/role, environment, and likely use situation.",
+                        "Describe psychographics and motivations: values, interests, and reasons they would use your project.",
+                        "Identify pain points and explain how your project addresses those specific needs."
+                    ]
+                    : [
+                        "Description - Google Slides: Describe the Digital Outcome: what it is, who it is for, and what it must do.",
+                        "Identify the target audience or end user for this outcome.",
+                        "Explain how the outcome will be developed and what tools/technologies will be used.",
+                        "State how success will be measured or evaluated."
+                    ])
                 : submissionTaskItems));
     const topicGuideSourceUrl = (isProjectManagementTopic || isDecompositionTopic)
         ? "https://trello.com/"
         : (isDigitalOutcomeTopic ? slideshowTemplateLibraryUrl : "");
     const topicGuideIntroText = isDigitalOutcomeTopic
-        ? "Use this guide to write and record a clear description of your digital outcome before starting development."
+        ? (isDigitalOutcomeTargetAudienceTopic
+            ? "Use this guide to define your project's target audience clearly and justify why they are the right users to design for."
+            : "Use this guide to write and record a clear description of your digital outcome before starting development.")
         : "Use this guide to complete the Submission Tasks correctly.";
     const topicGuideTaskHeading = isProjectManagementTopic
         ? "Trello Tasks"
-        : (isDigitalOutcomeTopic ? "Description - Google Slides" : "Task List");
+        : (isDigitalOutcomeTopic
+            ? (isDigitalOutcomeTargetAudienceTopic ? "Target Audience - Google Slides" : "Description - Google Slides")
+            : "Task List");
     const githubGuideTitle = "Version Control: GitHub";
     const githubGuideSourceUrl = "https://github.com/";
     const githubGuideInstructions = [
