@@ -1438,6 +1438,75 @@ h1 {
     color: #b23a3a;
 }
 
+.trello-sync-status.is-success {
+    color: #1f6b4a;
+    font-weight: 700;
+}
+
+.trello-link-library {
+    margin-top: 10px;
+    border: 1px solid #c2d8c8;
+    border-radius: 10px;
+    background: #eef8ef;
+    padding: 8px;
+}
+
+.trello-link-library-title {
+    margin: 0 0 6px;
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: #235339;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.trello-link-library-count {
+    font-weight: 600;
+    color: #2c6b47;
+}
+
+.trello-link-library-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 6px;
+}
+
+.trello-link-library-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    border: 1px solid #d7e7db;
+    border-radius: 8px;
+    background: #fff;
+    padding: 6px 8px;
+}
+
+.trello-link-library-item.is-active {
+    border-color: #88b99a;
+    box-shadow: 0 0 0 2px rgba(71, 141, 95, 0.14);
+}
+
+.trello-link-library-item a {
+    min-width: 0;
+    color: #18486b;
+    font-size: 0.74rem;
+    word-break: break-all;
+}
+
+.trello-link-library-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.trello-link-library-actions .detail-action {
+    padding: 4px 8px;
+    font-size: 0.7rem;
+}
+
 .evidence-sidebar-open-btn {
     margin-top: 0;
 }

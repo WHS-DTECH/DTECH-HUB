@@ -87,6 +87,7 @@ const DETAIL_DATA = {
 
 const DETAIL_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 const TRELLO_CARD_LINK_STORAGE_PREFIX = "hub_trello_card_link_v1";
+const TRELLO_CARD_LIBRARY_STORAGE_PREFIX = "hub_trello_card_library_v1";
 const EVIDENCE_STEPS_TARGET_STANDARDS = new Set(["92005", "91897", "91907"]);
 
 const DIGITAL_OUTCOME_DETAILS_TASKS = [
@@ -637,6 +638,63 @@ function formatApiDebugSuffix(error) {
 
 function getTrelloCardStorageKey(projectId, email) {
     return `${TRELLO_CARD_LINK_STORAGE_PREFIX}:${String(projectId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
+}
+
+function getTrelloCardLibraryStorageKey(projectId, email) {
+    return `${TRELLO_CARD_LIBRARY_STORAGE_PREFIX}:${String(projectId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
+}
+
+function normalizeTrelloCardLibrary(values) {
+    const seen = new Set();
+    const list = [];
+    const source = Array.isArray(values) ? values : [];
+    source.forEach((value) => {
+        const safeUrl = toSafeTrelloCardUrl(value);
+        if (!safeUrl || seen.has(safeUrl)) {
+            return;
+        }
+        seen.add(safeUrl);
+        list.push(safeUrl);
+    });
+    return list.slice(0, 12);
+}
+
+function readStoredTrelloCardLibrary(projectId, email) {
+    const storageKey = getTrelloCardLibraryStorageKey(projectId, email);
+    try {
+        const raw = localStorage.getItem(storageKey);
+        if (!raw) {
+            return [];
+        }
+        return normalizeTrelloCardLibrary(JSON.parse(raw));
+    } catch (_error) {
+        return [];
+    }
+}
+
+function writeStoredTrelloCardLibrary(projectId, email, values) {
+    const storageKey = getTrelloCardLibraryStorageKey(projectId, email);
+    const nextValues = normalizeTrelloCardLibrary(values);
+    try {
+        if (!nextValues.length) {
+            localStorage.removeItem(storageKey);
+            return [];
+        }
+        localStorage.setItem(storageKey, JSON.stringify(nextValues));
+    } catch (_error) {
+    }
+    return nextValues;
+}
+
+function addStoredTrelloCardLibraryLink(projectId, email, value) {
+    const safeUrl = toSafeTrelloCardUrl(value);
+    if (!safeUrl) {
+        return readStoredTrelloCardLibrary(projectId, email);
+    }
+
+    const current = readStoredTrelloCardLibrary(projectId, email);
+    const next = normalizeTrelloCardLibrary([safeUrl, ...current]);
+    return writeStoredTrelloCardLibrary(projectId, email, next);
 }
 
 function readStoredTrelloCardLink(projectId, email) {
@@ -1384,6 +1442,26 @@ function getFirstTrelloCardUrlFromEvidenceRows(evidenceRows) {
     }
 
     return "";
+}
+
+function getAllTrelloCardUrlsFromEvidenceRows(evidenceRows) {
+    const rows = normalizeEvidenceSteps(evidenceRows);
+    const collected = [];
+    rows.forEach((row) => {
+        const steps = Array.isArray(row?.steps) ? row.steps : [];
+        steps.forEach((step) => {
+            const text = String(step?.text || "").trim();
+            if (!text.startsWith("TRELLO_CARD_URL|")) {
+                return;
+            }
+
+            const url = toSafeTrelloCardUrl(text.slice("TRELLO_CARD_URL|".length).trim());
+            if (url) {
+                collected.push(url);
+            }
+        });
+    });
+    return normalizeTrelloCardLibrary(collected);
 }
 
 function getFirstOneDriveFolderUrlFromEvidenceRows(evidenceRows) {
@@ -5659,7 +5737,14 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
 
         if (isProjectManagementTaskTopicPage) {
             const sharedTrelloCardLink = getFirstTrelloCardUrlFromEvidenceRows(myAllocation?.evidence_steps);
+            const sharedTrelloCardLinks = getAllTrelloCardUrlsFromEvidenceRows(myAllocation?.evidence_steps);
             const localTrelloCardLink = readStoredTrelloCardLink(projectId, email);
+            const localTrelloCardLibrary = readStoredTrelloCardLibrary(projectId, email);
+            const mergedTrelloCardLibrary = writeStoredTrelloCardLibrary(
+                projectId,
+                email,
+                normalizeTrelloCardLibrary([sharedTrelloCardLink, localTrelloCardLink, ...sharedTrelloCardLinks, ...localTrelloCardLibrary])
+            );
             const savedCardLink = escapeHtml(sharedTrelloCardLink || localTrelloCardLink);
             const trelloBoardHint = getTrelloBoardHint(sharedTrelloCardLink || localTrelloCardLink);
             const trelloSlot = host.querySelector("#task-topic-trello-sync-slot");
@@ -5679,6 +5764,20 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                             <button type="button" class="detail-action" id="trello-send-log-btn">Send Log to Trello (${completionPercent}%)</button>
                         </div>
                         <p class="trello-sync-status" id="trello-sync-status" aria-live="polite"></p>
+                        <div class="trello-link-library" id="trello-link-library" ${mergedTrelloCardLibrary.length ? "" : "hidden"}>
+                            <p class="trello-link-library-title">Saved Trello Links <span class="trello-link-library-count" id="trello-link-library-count">(${mergedTrelloCardLibrary.length})</span></p>
+                            <ul class="trello-link-library-list" id="trello-link-library-list">
+                                ${mergedTrelloCardLibrary.map((url) => `
+                                    <li class="trello-link-library-item" data-trello-link-item="${escapeHtml(url)}">
+                                        <a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(url)}</a>
+                                        <div class="trello-link-library-actions">
+                                            <button type="button" class="detail-action detail-action-secondary" data-trello-library-use="${escapeHtml(url)}">Use</button>
+                                            <button type="button" class="detail-action detail-action-secondary" data-trello-library-open="${escapeHtml(url)}">Open</button>
+                                        </div>
+                                    </li>
+                                `).join("")}
+                            </ul>
+                        </div>
                     </div>
                 `;
             }
@@ -5857,6 +5956,9 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     const trelloOpenCardBtn = section.querySelector("#trello-open-card-btn");
     const trelloSendLogBtn = section.querySelector("#trello-send-log-btn");
     const trelloStatus = section.querySelector("#trello-sync-status");
+    const trelloLinkLibrary = section.querySelector("#trello-link-library");
+    const trelloLinkLibraryList = section.querySelector("#trello-link-library-list");
+    const trelloLinkLibraryCount = section.querySelector("#trello-link-library-count");
     const oneDriveFolderInput = section.querySelector("#onedrive-folder-url");
     const oneDriveSaveLinkBtn = section.querySelector("#onedrive-save-link-btn");
     const oneDriveOpenFolderBtn = section.querySelector("#onedrive-open-folder-btn");
@@ -5871,10 +5973,11 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     if (googleDriveSaveLinkBtn) googleDriveSaveLinkBtn.dataset.syncBound = "1";
     if (googleDriveOpenFolderBtn) googleDriveOpenFolderBtn.dataset.syncBound = "1";
 
-    const setTrelloStatus = (message, isError = false) => {
+    const setTrelloStatus = (message, isError = false, isSuccess = false) => {
         if (!trelloStatus) return;
         trelloStatus.textContent = String(message || "");
         trelloStatus.classList.toggle("is-error", Boolean(isError));
+        trelloStatus.classList.toggle("is-success", Boolean(isSuccess) && !Boolean(isError));
     };
 
     const setOneDriveStatus = (message, isError = false) => {
@@ -5890,8 +5993,50 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     };
 
     const backendTrelloCardLink = getFirstTrelloCardUrlFromEvidenceRows(interestData?.my_allocation?.evidence_steps);
+    const backendTrelloCardLinks = getAllTrelloCardUrlsFromEvidenceRows(interestData?.my_allocation?.evidence_steps);
     const localTrelloCardLink = readStoredTrelloCardLink(projectId, email);
+    const localTrelloCardLibrary = readStoredTrelloCardLibrary(projectId, email);
+    let trelloCardLibrary = writeStoredTrelloCardLibrary(
+        projectId,
+        email,
+        normalizeTrelloCardLibrary([backendTrelloCardLink, localTrelloCardLink, ...backendTrelloCardLinks, ...localTrelloCardLibrary])
+    );
     const needsLegacyTrelloMigration = !backendTrelloCardLink && Boolean(localTrelloCardLink);
+
+    const renderTrelloCardLibrary = () => {
+        if (!trelloLinkLibrary || !trelloLinkLibraryList) {
+            return;
+        }
+
+        if (!trelloCardLibrary.length) {
+            trelloLinkLibrary.hidden = true;
+            if (trelloLinkLibraryCount) {
+                trelloLinkLibraryCount.textContent = "(0)";
+            }
+            trelloLinkLibraryList.innerHTML = "";
+            return;
+        }
+
+        const activeUrl = toSafeTrelloCardUrl(trelloCardInput?.value || "");
+        trelloLinkLibrary.hidden = false;
+        if (trelloLinkLibraryCount) {
+            trelloLinkLibraryCount.textContent = `(${trelloCardLibrary.length})`;
+        }
+        trelloLinkLibraryList.innerHTML = trelloCardLibrary
+            .map((url) => {
+                const isActive = Boolean(activeUrl && activeUrl === url);
+                return `
+                    <li class="trello-link-library-item${isActive ? " is-active" : ""}" data-trello-link-item="${escapeHtml(url)}">
+                        <a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(url)}</a>
+                        <div class="trello-link-library-actions">
+                            <button type="button" class="detail-action detail-action-secondary" data-trello-library-use="${escapeHtml(url)}">Use</button>
+                            <button type="button" class="detail-action detail-action-secondary" data-trello-library-open="${escapeHtml(url)}">Open</button>
+                        </div>
+                    </li>
+                `;
+            })
+            .join("");
+    };
 
     const readCardUrl = () => {
         const safe = toSafeTrelloCardUrl(trelloCardInput?.value || "");
@@ -5899,8 +6044,11 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             trelloCardInput.value = safe;
         }
         writeStoredTrelloCardLink(projectId, email, safe);
+        renderTrelloCardLibrary();
         return safe;
     };
+
+    renderTrelloCardLibrary();
 
     if (needsLegacyTrelloMigration && trelloCardInput) {
         trelloCardInput.value = toSafeTrelloCardUrl(localTrelloCardLink) || localTrelloCardLink;
@@ -5934,6 +6082,34 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         } else {
             setTrelloStatus("Link looks valid. Click Save Trello Link.");
         }
+        renderTrelloCardLibrary();
+    });
+
+    trelloLinkLibraryList?.addEventListener("click", (event) => {
+        const useButton = event.target.closest("[data-trello-library-use]");
+        if (useButton) {
+            const selectedUrl = toSafeTrelloCardUrl(useButton.getAttribute("data-trello-library-use") || "");
+            if (!selectedUrl) {
+                return;
+            }
+            if (trelloCardInput) {
+                trelloCardInput.value = selectedUrl;
+            }
+            writeStoredTrelloCardLink(projectId, email, selectedUrl);
+            setTrelloStatus("Selected saved Trello link.", false, true);
+            renderTrelloCardLibrary();
+            return;
+        }
+
+        const openButton = event.target.closest("[data-trello-library-open]");
+        if (openButton) {
+            const selectedUrl = toSafeTrelloCardUrl(openButton.getAttribute("data-trello-library-open") || "");
+            if (!selectedUrl) {
+                return;
+            }
+            window.open(selectedUrl, "_blank", "noopener,noreferrer");
+            setTrelloStatus("Opened saved Trello link.", false, true);
+        }
     });
 
     trelloSaveLinkBtn?.addEventListener("click", async () => {
@@ -5947,7 +6123,9 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         setTrelloStatus("Saving Trello link...");
         try {
             await persistStudentTrelloLink(projectId, email, cardUrl);
-            setTrelloStatus("Trello link saved and shared with teacher view.");
+            trelloCardLibrary = addStoredTrelloCardLibraryLink(projectId, email, cardUrl);
+            renderTrelloCardLibrary();
+            setTrelloStatus("Trello link saved and shared with teacher view.", false, true);
         } catch (error) {
             setTrelloStatus(error.message || "Could not save Trello link right now.", true);
         } finally {
@@ -5963,7 +6141,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         }
 
         window.open(cardUrl, "_blank", "noopener,noreferrer");
-        setTrelloStatus("Opened Trello link.");
+        setTrelloStatus("Opened Trello link.", false, true);
     });
 
     trelloSendLogBtn?.addEventListener("click", async () => {
@@ -6007,9 +6185,11 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             if (cardUrlFromApi && trelloCardInput) {
                 trelloCardInput.value = cardUrlFromApi;
                 writeStoredTrelloCardLink(projectId, email, cardUrlFromApi);
+                trelloCardLibrary = addStoredTrelloCardLibraryLink(projectId, email, cardUrlFromApi);
+                renderTrelloCardLibrary();
             }
 
-            setTrelloStatus("Work log sent to Trello.");
+            setTrelloStatus("Work log sent to Trello.", false, true);
         } catch (error) {
             setTrelloStatus(error.message || "Could not send log to Trello.", true);
         } finally {
