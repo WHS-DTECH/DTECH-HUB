@@ -1909,6 +1909,74 @@ async function persistStudentGithubSync(projectId, studentEmail, githubRepoUrl, 
     await saveEvidenceRows(projectId, studentEmail, nextRows);
 }
 
+async function persistStudentGithubSyncDirectlyToEvidence(projectId, studentEmail, detailData, taskTopicTitle, githubRepoUrl, githubNote = "") {
+    const safeRepoUrl = toSafeGithubRepoUrl(githubRepoUrl);
+    if (!safeRepoUrl) {
+        throw new Error("Enter a valid GitHub repository link first.");
+    }
+
+    const safeNote = String(githubNote || "").trim();
+
+    const fetchMyEvidenceRows = async () => {
+        const response = await fetch(`/api/activities/${encodeURIComponent(projectId)}/my-evidence`, {
+            headers: buildWriteHeaders()
+        });
+        if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            const error = new Error(payload?.error || "Could not load my evidence rows.");
+            error.status = Number(response.status || 0);
+            throw error;
+        }
+        const payload = await response.json().catch(() => ({}));
+        return normalizeEvidenceSteps(payload?.evidence_steps);
+    };
+
+    const saveMyEvidenceRows = async (rows) => {
+        const response = await fetch(`/api/activities/${encodeURIComponent(projectId)}/my-evidence`, {
+            method: "PATCH",
+            headers: buildWriteHeaders(),
+            body: JSON.stringify({ evidence_steps: normalizeEvidenceSteps(rows) })
+        });
+        if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            const error = new Error(payload?.error || "Could not save my evidence rows.");
+            error.status = Number(response.status || 0);
+            throw error;
+        }
+    };
+
+    let nextRows = [];
+    try {
+        nextRows = await fetchMyEvidenceRows();
+    } catch (error) {
+        if (Number(error?.status || 0) !== 404) {
+            throw error;
+        }
+        await fetchEvidenceRowsEnsuringAllocation(projectId, studentEmail);
+        nextRows = await fetchMyEvidenceRows();
+    }
+
+    const steps = [
+        { text: `GITHUB_REPO_URL|${safeRepoUrl}`, done: true },
+        { text: `GITHUB_SAVED_AT|${new Date().toISOString()}`, done: true }
+    ];
+    if (safeNote) {
+        steps.push({ text: `GITHUB_WORK_NOTE|${safeNote}`, done: true });
+    }
+    nextRows = upsertEvidenceStandardRow(nextRows, "github-sync", steps);
+
+    const safeTaskTopic = String(taskTopicTitle || "").trim();
+    if (safeTaskTopic) {
+        const standardNumber = extractPrimaryStandardNumberFromRows(coerceArray(detailData?.standardDetails));
+        const standardKey = buildTaskTopicSubmissionStandardKey(safeTaskTopic, standardNumber);
+        nextRows = upsertTaskTopicSubmissionEvidenceRows(nextRows, standardKey, {
+            evidenceLink: safeRepoUrl
+        });
+    }
+
+    await saveMyEvidenceRows(nextRows);
+}
+
 async function persistStudentOneDriveFolderLink(projectId, studentEmail, detailData, taskTopicTitle, oneDriveFolderUrl) {
     const safeUrl = toSafeExternalUrl(oneDriveFolderUrl);
     if (!safeUrl) {
@@ -6654,8 +6722,20 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         if (githubSaveLinkBtn) githubSaveLinkBtn.disabled = true;
         setGithubStatus("Saving GitHub sync...");
         try {
-            await persistStudentGithubSync(projectId, email, repoUrl, note);
-            setGithubStatus("GitHub sync saved for your task evidence.");
+            await persistStudentGithubSyncDirectlyToEvidence(projectId, email, detailData, taskTopicValue, repoUrl, note);
+            try {
+                await persistStudentGithubSync(projectId, email, repoUrl, note);
+            } catch (_legacyError) {
+                // my-evidence already contains github-sync rows; keep UX successful.
+            }
+
+            const verifiedRows = await fetchEvidenceRowsEnsuringAllocation(projectId, email);
+            const verifiedRepoUrl = toSafeGithubRepoUrl(getFirstGithubRepoUrlFromEvidenceRows(verifiedRows));
+            if (!verifiedRepoUrl) {
+                throw new Error("GitHub link did not persist to your Task List evidence.");
+            }
+
+            setGithubStatus("GitHub sync saved and shared with teacher view.");
         } catch (error) {
             setGithubStatus(`${error?.message || "Could not save GitHub sync right now."}${formatApiDebugSuffix(error)}`, true);
         } finally {
