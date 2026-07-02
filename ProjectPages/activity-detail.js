@@ -4011,7 +4011,15 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         || resolvedTaskShortName.toLowerCase().includes("decompos");
     const isDigitalOutcomeTopic = taskTopicTitle.toLowerCase().includes("digital outcome")
         || resolvedTaskShortName.toLowerCase().includes("digital outcome");
-    const slideshowTemplateLibraryUrl = "slideshow-template-library.html";
+    const templateLibraryParams = new URLSearchParams();
+    templateLibraryParams.set("activityId", String(id || "").trim());
+    if (taskTopicTitle) {
+        templateLibraryParams.set("taskTopic", taskTopicTitle);
+    }
+    if (resolvedTaskShortName) {
+        templateLibraryParams.set("taskShortName", resolvedTaskShortName);
+    }
+    const slideshowTemplateLibraryUrl = `slideshow-template-library.html?${templateLibraryParams.toString()}`;
     const slideshowTemplateImage = toSafeExternalUrl(data?.slideshowTemplateImage || data?.slideTemplateImage || "");
     const slideshowTemplateFileUrl = toSafeExternalUrl(data?.slideshowTemplateFileUrl || data?.slideTemplateFileUrl || data?.speakerNotesCriteriaUrl || "");
     const heroVisualImage = (isDigitalOutcomeTopic ? (slideshowTemplateImage || data.image) : data.image)

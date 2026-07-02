@@ -41,6 +41,19 @@ const driveState = {
     copyMap: {}          // templateId → { fileUrl, fileName }
 };
 
+const templateUsageContext = (() => {
+    try {
+        const params = new URLSearchParams(window.location.search || "");
+        return {
+            activityId: String(params.get("activityId") || "").trim(),
+            taskTopic: String(params.get("taskTopic") || "").trim(),
+            taskShortName: String(params.get("taskShortName") || "").trim()
+        };
+    } catch (_error) {
+        return { activityId: "", taskTopic: "", taskShortName: "" };
+    }
+})();
+
 function escapeHtml(value) {
     return String(value || "")
         .replace(/&/g, "&amp;")
@@ -104,6 +117,140 @@ function withLibraryAuthHeaders(headers = {}) {
     if (email) next["x-user-email"] = email;
     if (token && token.startsWith("eyJ") && token.split(".").length === 3) next.Authorization = `Bearer ${token}`;
     return next;
+}
+
+function normalizeEvidenceRows(rows) {
+    const source = Array.isArray(rows) ? rows : [];
+    return source
+        .map((row) => {
+            const standard = String(row?.standard || "").trim();
+            if (!standard) return null;
+
+            const steps = Array.isArray(row?.steps)
+                ? row.steps
+                    .map((step) => ({
+                        text: String(step?.text || "").trim(),
+                        done: Boolean(step?.done)
+                    }))
+                    .filter((step) => step.text)
+                : [];
+
+            return { standard, steps };
+        })
+        .filter(Boolean);
+}
+
+async function fetchActivityEvidenceRows(activityId, studentEmail) {
+    const response = await fetch(`/api/activities/${encodeURIComponent(activityId)}/interests/${encodeURIComponent(studentEmail)}/evidence`, {
+        headers: withLibraryAuthHeaders({})
+    });
+
+    if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        const error = new Error(payload?.error || "Could not load evidence steps.");
+        error.status = Number(response.status || 0);
+        throw error;
+    }
+
+    const payload = await response.json().catch(() => ({}));
+    return normalizeEvidenceRows(payload?.evidence_steps);
+}
+
+async function saveActivityEvidenceRows(activityId, studentEmail, rows) {
+    const response = await fetch(`/api/activities/${encodeURIComponent(activityId)}/interests/${encodeURIComponent(studentEmail)}/evidence`, {
+        method: "PATCH",
+        headers: withLibraryAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ evidence_steps: normalizeEvidenceRows(rows) })
+    });
+
+    if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.error || "Could not save evidence steps.");
+    }
+}
+
+async function ensureStudentAllocationForActivity(activityId) {
+    const response = await fetch(`/api/activities/${encodeURIComponent(activityId)}/interest`, {
+        method: "POST",
+        headers: withLibraryAuthHeaders({})
+    });
+
+    if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload?.error || "Could not prepare student allocation.");
+    }
+
+    const payload = await response.json().catch(() => ({}));
+    if (!Boolean(payload?.interested)) {
+        const second = await fetch(`/api/activities/${encodeURIComponent(activityId)}/interest`, {
+            method: "POST",
+            headers: withLibraryAuthHeaders({})
+        });
+        if (!second.ok) {
+            const secondPayload = await second.json().catch(() => ({}));
+            throw new Error(secondPayload?.error || "Could not prepare student allocation.");
+        }
+    }
+}
+
+function getTemplateStepMatchers(templateId) {
+    const id = String(templateId || "").trim().toLowerCase();
+    const contextText = `${templateUsageContext.taskTopic} ${templateUsageContext.taskShortName}`.toLowerCase();
+
+    if (id === "digital-outcome-description") {
+        return [/^description\s*-\s*google\s*slides\b/i];
+    }
+
+    if (id === "speaker-notes-criteria-mapping") {
+        return [/speaker\s*notes/i, /criteria\s*mapping/i];
+    }
+
+    if (contextText.includes("digital outcome")) {
+        return [/^description\s*-\s*google\s*slides\b/i];
+    }
+
+    return [/google\s*slides/i];
+}
+
+async function markConnectedTaskItemDone(templateId) {
+    const activityId = String(templateUsageContext.activityId || "").trim();
+    const studentEmail = getLibraryEmail();
+    if (!activityId || !studentEmail) return;
+
+    let evidenceRows = [];
+    try {
+        evidenceRows = await fetchActivityEvidenceRows(activityId, studentEmail);
+    } catch (error) {
+        if (Number(error?.status || 0) !== 404) {
+            throw error;
+        }
+        await ensureStudentAllocationForActivity(activityId);
+        evidenceRows = await fetchActivityEvidenceRows(activityId, studentEmail);
+    }
+
+    const matchers = getTemplateStepMatchers(templateId);
+    let changed = false;
+    const nextRows = evidenceRows.map((row) => {
+        const nextSteps = Array.isArray(row?.steps)
+            ? row.steps.map((step) => {
+                const text = String(step?.text || "").trim();
+                const alreadyDone = Boolean(step?.done);
+                const isMatch = text && matchers.some((matcher) => matcher.test(text));
+                if (!isMatch || alreadyDone) {
+                    return { text, done: alreadyDone };
+                }
+                changed = true;
+                return { text, done: true };
+            })
+            : [];
+        return { standard: String(row?.standard || "").trim(), steps: nextSteps };
+    });
+
+    if (!changed) {
+        return;
+    }
+
+    await saveActivityEvidenceRows(activityId, studentEmail, nextRows);
 }
 
 async function loadLibraryAccess() {
@@ -486,6 +633,9 @@ async function handleUseTemplate(templateId) {
 
     // If already copied this session, open existing
     if (driveState.copyMap[templateId]) {
+        void markConnectedTaskItemDone(templateId).catch((error) => {
+            console.warn("Could not update Task List completion after template open.", error);
+        });
         window.open(driveState.copyMap[templateId].fileUrl, "_blank", "noopener");
         return;
     }
@@ -523,6 +673,9 @@ async function handleUseTemplate(templateId) {
 
         driveState.copyMap[templateId] = { fileUrl: payload.fileUrl, fileName: payload.fileName };
         updateCardAfterCopy(templateId, payload);
+        void markConnectedTaskItemDone(templateId).catch((error) => {
+            console.warn("Could not update Task List completion after template copy.", error);
+        });
         window.open(payload.fileUrl, "_blank", "noopener");
     } catch (error) {
         const message = String(error?.message || "");
@@ -546,6 +699,9 @@ async function handleUseTemplate(templateId) {
             const retryPayload = await copyTemplateWithToken(consentTokenResponse.access_token);
             driveState.copyMap[templateId] = { fileUrl: retryPayload.fileUrl, fileName: retryPayload.fileName };
             updateCardAfterCopy(templateId, retryPayload);
+            void markConnectedTaskItemDone(templateId).catch((warnError) => {
+                console.warn("Could not update Task List completion after template copy.", warnError);
+            });
             window.open(retryPayload.fileUrl, "_blank", "noopener");
         } catch (retryError) {
             if (button) { button.disabled = false; button.textContent = "Use Template"; }

@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("DTECHHubTray")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f418c4ff0c57b9c6b7497abd372fe0552ae34997")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e58e494fa17957ce736f5977d80ee3639ceb5ce6")]
 [assembly: System.Reflection.AssemblyProductAttribute("DTECHHubTray")]
 [assembly: System.Reflection.AssemblyTitleAttribute("DTECHHubTray")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
