@@ -1525,6 +1525,29 @@ function getAllTrelloCardUrlsFromEvidenceRows(evidenceRows) {
     return normalizeTrelloCardLibrary(collected);
 }
 
+function getLatestTrelloSavedAtFromEvidenceRows(evidenceRows) {
+    const rows = normalizeEvidenceSteps(evidenceRows);
+    let latestIso = "";
+    rows.forEach((row) => {
+        const steps = Array.isArray(row?.steps) ? row.steps : [];
+        steps.forEach((step) => {
+            const text = String(step?.text || "").trim();
+            if (!text.startsWith("TRELLO_SAVED_AT|")) {
+                return;
+            }
+            const value = text.slice("TRELLO_SAVED_AT|".length).trim();
+            const parsed = Date.parse(value);
+            if (!Number.isFinite(parsed)) {
+                return;
+            }
+            if (!latestIso || parsed > Date.parse(latestIso)) {
+                latestIso = new Date(parsed).toISOString();
+            }
+        });
+    });
+    return latestIso;
+}
+
 function toSafeGithubRepoUrl(value) {
     const safeUrl = toSafeExternalUrl(value);
     if (!safeUrl) return "";
@@ -6414,9 +6437,22 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         try {
             await persistStudentTrelloLink(projectId, email, cardUrl);
             await persistStudentTrelloLinkForTaskTopic(projectId, email, detailData, taskTopicValue, cardUrl);
+
+            const verifiedRows = await fetchEvidenceRowsEnsuringAllocation(projectId, email);
+            const verifiedUrl = toSafeTrelloCardUrl(getFirstTrelloCardUrlFromEvidenceRows(verifiedRows));
+            const latestSavedAt = getLatestTrelloSavedAtFromEvidenceRows(verifiedRows);
+            if (!verifiedUrl) {
+                throw new Error("Trello link did not persist to your Task List evidence.");
+            }
+
             trelloCardLibrary = addStoredTrelloCardLibraryLink(projectId, email, cardUrl);
             renderTrelloCardLibrary();
-            setTrelloStatus("Trello link saved and shared with teacher view.", false, true);
+
+            if (latestSavedAt) {
+                setTrelloStatus(`Trello link saved and shared with teacher view (${formatSubmissionTimestamp(latestSavedAt)}).`, false, true);
+            } else {
+                setTrelloStatus("Trello link saved and shared with teacher view.", false, true);
+            }
         } catch (error) {
             setTrelloStatus(`${error.message || "Could not save Trello link right now."}${formatApiDebugSuffix(error)}`, true);
         } finally {
