@@ -524,6 +524,29 @@ function getActiveSyncContext() {
     };
 }
 
+async function fetchStudentProcessAssessmentFolderUrl() {
+    try {
+        const response = await fetch("/api/student/drive-setup", { headers: buildWriteHeaders() });
+        if (!response.ok) {
+            return "";
+        }
+
+        const payload = await response.json().catch(() => ({}));
+        const directUrl = toSafeExternalUrl(payload?.processAssessmentFolderUrl || "");
+        if (directUrl) {
+            return directUrl;
+        }
+
+        const folderId = String(payload?.processAssessmentFolderId || "").trim();
+        if (!folderId) {
+            return "";
+        }
+        return `https://drive.google.com/drive/folders/${encodeURIComponent(folderId)}`;
+    } catch (_error) {
+        return "";
+    }
+}
+
 function installCloudSyncDelegatedFallbackHandlers() {
     if (window.__dtechCloudSyncFallbackBound) {
         return;
@@ -4915,9 +4938,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     ].join(" ").toUpperCase();
     const isDigitalMediaContext = /(DIGITAL\s*MEDIA|MEDIA|FILM|VIDEO|AUDIO|MUSIC|PHOTOGRAPH|ANIMATION|GRAPHIC)/i.test(contextSignals);
     const isProgrammingContext = /(DTECH|PROGRAMM|CODING|COMPUT|SOFTWARE|WEB|APP|PYTHON|JAVASCRIPT|ROBOTIC)/i.test(contextSignals);
-    const showGithubGuide = isProjectManagementTopic;
+    const showGithubGuide = isProjectManagementTopic && isProgrammingContext;
     const snowGithubGuide = showGithubGuide;
-    const showOneDriveGuide = isProjectManagementTopic && isDigitalMediaContext;
+    const showOneDriveGuide = isProjectManagementTopic;
     const submissionTaskItems = Array.from(new Set([
         ...(isDecompositionTopic
             ? [
@@ -6395,7 +6418,14 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     const isTaskTopicPage = Boolean(selectedTaskTopic);
     const isProjectManagementTaskTopicPage = isTaskTopicPage
         && selectedTaskTopic.toLowerCase().includes("project management");
-    const showGithubGuide = isProjectManagementTaskTopicPage;
+    const taskTopicContextSignals = [
+        selectedTaskTopic,
+        String(detailData?.subjectStream || detailData?.subject_stream || detailData?.subject || ""),
+        String(detailData?.type || ""),
+        String(detailData?.title || "")
+    ].join(" ").toUpperCase();
+    const isProgrammingTaskContext = /(DTECH|PROGRAMM|CODING|COMPUT|SOFTWARE|WEB|APP|PYTHON|JAVASCRIPT|ROBOTIC)/i.test(taskTopicContextSignals);
+    const showGithubGuide = isProjectManagementTaskTopicPage && isProgrammingTaskContext;
 
     if (isTeacher && isAssessmentTask && !isTaskTopicPage) {
         const students = Array.isArray(interestData?.students) ? interestData.students : [];
@@ -6526,6 +6556,9 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         const myAllocation = interestData?.my_allocation || null;
         const assignedStandards = getEffectiveAssignedStandards(myAllocation, detailData);
         const completionPercent = getEvidenceCompletionPercentFromRows(myAllocation?.evidence_steps, assignedStandards);
+        const templateLibraryProcessAssessmentUrl = isProjectManagementTaskTopicPage
+            ? await fetchStudentProcessAssessmentFolderUrl()
+            : "";
 
         if (isProjectManagementTaskTopicPage) {
             const sharedTrelloCardLink = getFirstTrelloCardUrlFromEvidenceRows(myAllocation?.evidence_steps);
@@ -6650,13 +6683,16 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
 
         const googleDriveSlot = host.querySelector("#task-topic-google-drive-sync-slot");
         if (googleDriveSlot) {
-            const savedGoogleDriveLink = getFirstGoogleDriveFolderUrlFromEvidenceRows(myAllocation?.evidence_steps);
+            const evidenceGoogleDriveLink = getFirstGoogleDriveFolderUrlFromEvidenceRows(myAllocation?.evidence_steps);
+            const savedGoogleDriveLink = evidenceGoogleDriveLink || templateLibraryProcessAssessmentUrl;
+            const usingTemplateLibraryProcessAssessment = !evidenceGoogleDriveLink && Boolean(templateLibraryProcessAssessmentUrl);
             googleDriveSlot.innerHTML = `
                 <div class="trello-sync-panel" id="google-drive-sync-panel" style="margin-top:10px;">
                     <h3>Google Drive Sync</h3>
                     <p>Save your Google Drive project folder link so your teacher can verify files and version history.</p>
                     <label for="google-drive-folder-url" class="trello-sync-label">Google Drive project folder link</label>
                     <input id="google-drive-folder-url" class="trello-sync-input" type="url" placeholder="https://drive.google.com/..." value="${escapeHtml(savedGoogleDriveLink)}">
+                    ${usingTemplateLibraryProcessAssessment ? `<p class="task-topic-submission-note">Loaded from your Template Library <strong>SeniorDTECH/Process Assessment</strong> folder setup.</p>` : ""}
                     <div class="trello-sync-actions">
                         <button type="button" class="detail-action detail-action-secondary" id="google-drive-save-link-btn">Save Google Drive Link</button>
                         <button type="button" class="detail-action detail-action-secondary" id="google-drive-open-folder-btn">Open Google Drive Folder</button>
