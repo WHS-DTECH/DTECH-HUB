@@ -140,7 +140,7 @@ function getTaskTopicHrefForStep(standard, level, text) {
         return buildCustomActivityLink(taskListState.selectedId, "Project Management");
     }
 
-    if (String(standard) === "digital-outcome" && normalized.includes("describe the digital outcome")) {
+    if (String(standard) === "digital-outcome" && (normalized.includes("describe the digital outcome") || normalized.includes("identify the target audience") || normalized.includes("end user"))) {
         return buildCustomActivityLink(taskListState.selectedId, safeText, "Digital Outcome Description", "digital-outcome-description");
     }
 
