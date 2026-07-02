@@ -69,6 +69,30 @@ function navigateToChecklist(targetHref) {
     return true;
 }
 
+function pickPreferredAllocationTarget(assessmentTasks, projects) {
+    const assessments = Array.isArray(assessmentTasks) ? assessmentTasks : [];
+    const projectRows = Array.isArray(projects) ? projects : [];
+
+    const preferredAssessment = assessments.find((item) =>
+        String(item?.name || "").toLowerCase().includes("client projects")
+    );
+    if (preferredAssessment?.id) {
+        return buildCustomActivityLink(preferredAssessment.id);
+    }
+
+    const firstAssessment = assessments[0];
+    if (firstAssessment?.id) {
+        return buildCustomActivityLink(firstAssessment.id);
+    }
+
+    const firstProject = projectRows[0];
+    if (firstProject?.id) {
+        return buildCustomActivityLink(firstProject.id);
+    }
+
+    return "";
+}
+
 function renderContextCallout() {
     const contextHost = document.querySelector("#task-list-context");
     if (!contextHost) return;
@@ -162,6 +186,14 @@ async function loadTaskListAllocations() {
         const payload = await response.json().catch(() => ({}));
         const assessmentTasks = Array.isArray(payload?.assessment_tasks) ? payload.assessment_tasks : [];
         const projects = Array.isArray(payload?.projects) ? payload.projects : [];
+
+        const preferredTarget = pickPreferredAllocationTarget(assessmentTasks, projects);
+        if (preferredTarget) {
+            setTaskListStatus("Opening your task checklist...");
+            if (navigateToChecklist(preferredTarget)) {
+                return;
+            }
+        }
 
         renderAllocationList("#task-list-assessments", "#task-list-assessments-empty", assessmentTasks, "Assessment");
         renderAllocationList("#task-list-projects", "#task-list-projects-empty", projects, "Project");
