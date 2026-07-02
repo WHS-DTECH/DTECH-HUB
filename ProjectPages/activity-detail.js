@@ -4366,7 +4366,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     ].join(" ").toUpperCase();
     const isDigitalMediaContext = /(DIGITAL\s*MEDIA|MEDIA|FILM|VIDEO|AUDIO|MUSIC|PHOTOGRAPH|ANIMATION|GRAPHIC)/i.test(contextSignals);
     const isProgrammingContext = /(DTECH|PROGRAMM|CODING|COMPUT|SOFTWARE|WEB|APP|PYTHON|JAVASCRIPT|ROBOTIC)/i.test(contextSignals);
-    const showGithubGuide = isProjectManagementTopic && !isDigitalMediaContext;
+    const showGithubGuide = isProjectManagementTopic;
     const snowGithubGuide = showGithubGuide;
     const showOneDriveGuide = isProjectManagementTopic && isDigitalMediaContext;
     const submissionTaskItems = Array.from(new Set([
@@ -5844,6 +5844,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     const isTaskTopicPage = Boolean(selectedTaskTopic);
     const isProjectManagementTaskTopicPage = isTaskTopicPage
         && selectedTaskTopic.toLowerCase().includes("project management");
+    const showGithubGuide = isProjectManagementTaskTopicPage;
 
     if (isTeacher && isAssessmentTask && !isTaskTopicPage) {
         const students = Array.isArray(interestData?.students) ? interestData.students : [];
