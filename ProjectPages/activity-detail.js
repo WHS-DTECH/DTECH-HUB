@@ -90,6 +90,7 @@ const TRELLO_CARD_LINK_STORAGE_PREFIX = "hub_trello_card_link_v1";
 const TRELLO_CARD_LIBRARY_STORAGE_PREFIX = "hub_trello_card_library_v1";
 const GITHUB_REPO_LIBRARY_STORAGE_PREFIX = "hub_github_repo_library_v1";
 const ONEDRIVE_LINK_LIBRARY_STORAGE_PREFIX = "hub_onedrive_link_library_v1";
+const GOOGLE_DRIVE_LINK_LIBRARY_STORAGE_PREFIX = "hub_google_drive_link_library_v1";
 const EVIDENCE_STEPS_TARGET_STANDARDS = new Set(["92005", "91897", "91907"]);
 
 const DIGITAL_OUTCOME_DETAILS_TASKS = [
@@ -163,6 +164,12 @@ function toSafeOneDriveFolderUrl(value) {
     const safeUrl = toSafeExternalUrl(value);
     if (!safeUrl) return "";
     return /(onedrive\.live\.com|1drv\.ms|sharepoint\.com)/i.test(safeUrl) ? safeUrl : "";
+}
+
+function toSafeGoogleDriveFolderUrl(value) {
+    const safeUrl = toSafeExternalUrl(value);
+    if (!safeUrl) return "";
+    return /(drive\.google\.com)/i.test(safeUrl) ? safeUrl : "";
 }
 
 function parseDurationMinutes(raw) {
@@ -653,9 +660,86 @@ function installCloudSyncDelegatedFallbackHandlers() {
             .join("");
     };
 
+    const refreshGoogleDriveLibraryUi = (projectId, email) => {
+        const library = document.querySelector("#google-drive-link-library");
+        const list = document.querySelector("#google-drive-link-library-list");
+        const count = document.querySelector("#google-drive-link-library-count");
+        if (!library || !list) {
+            return;
+        }
+
+        const items = readStoredGoogleDriveLinkLibrary(projectId, email);
+        if (!items.length) {
+            library.hidden = true;
+            if (count) count.textContent = "(0)";
+            list.innerHTML = "";
+            return;
+        }
+
+        const activeUrl = toSafeGoogleDriveFolderUrl(document.querySelector("#google-drive-folder-url")?.value || "");
+        library.hidden = false;
+        if (count) count.textContent = `(${items.length})`;
+        list.innerHTML = items
+            .map((item) => {
+                const url = toSafeGoogleDriveFolderUrl(item?.url || "");
+                if (!url) {
+                    return "";
+                }
+                const isActive = Boolean(activeUrl && activeUrl === url);
+                return `
+                    <li class="trello-link-library-item${isActive ? " is-active" : ""}" data-google-drive-link-item="${escapeHtml(url)}">
+                        <div class="trello-link-library-link-wrap">
+                            <a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(url)}</a>
+                            <span class="trello-link-library-savedat">${escapeHtml(formatLibrarySavedAtLabel(item?.savedAt))}</span>
+                        </div>
+                        <div class="trello-link-library-actions">
+                            <button type="button" class="detail-action detail-action-secondary" data-google-drive-library-use="${escapeHtml(url)}">Use</button>
+                            <button type="button" class="detail-action detail-action-secondary" data-google-drive-library-open="${escapeHtml(url)}">Open</button>
+                        </div>
+                    </li>
+                `;
+            })
+            .join("");
+    };
+
     document.addEventListener("click", async (event) => {
         const button = event.target?.closest?.("button");
         if (!button) {
+            return;
+        }
+
+        const useGoogleLibraryBtn = button.closest("[data-google-drive-library-use]");
+        if (useGoogleLibraryBtn) {
+            if (document.querySelector("#google-drive-save-link-btn")?.dataset?.syncBound === "1") {
+                return;
+            }
+            const selectedUrl = toSafeGoogleDriveFolderUrl(useGoogleLibraryBtn.getAttribute("data-google-drive-library-use") || "");
+            if (!selectedUrl) {
+                return;
+            }
+            const input = document.querySelector("#google-drive-folder-url");
+            if (input) {
+                input.value = selectedUrl;
+            }
+            setStatus("#google-drive-sync-status", "Selected saved Google Drive link.");
+            const ctx = getActiveSyncContext();
+            if (ctx.projectId && ctx.email) {
+                refreshGoogleDriveLibraryUi(ctx.projectId, ctx.email);
+            }
+            return;
+        }
+
+        const openGoogleLibraryBtn = button.closest("[data-google-drive-library-open]");
+        if (openGoogleLibraryBtn) {
+            if (document.querySelector("#google-drive-save-link-btn")?.dataset?.syncBound === "1") {
+                return;
+            }
+            const selectedUrl = toSafeGoogleDriveFolderUrl(openGoogleLibraryBtn.getAttribute("data-google-drive-library-open") || "");
+            if (!selectedUrl) {
+                return;
+            }
+            window.open(selectedUrl, "_blank", "noopener,noreferrer");
+            setStatus("#google-drive-sync-status", "Opened saved Google Drive link.");
             return;
         }
 
@@ -671,7 +755,7 @@ function installCloudSyncDelegatedFallbackHandlers() {
         }
 
         if (button.id === "google-drive-open-folder-btn" && button.dataset.syncBound !== "1") {
-            const url = readUrlValue("#google-drive-folder-url");
+            const url = toSafeGoogleDriveFolderUrl(document.querySelector("#google-drive-folder-url")?.value || "");
             if (!url) {
                 setStatus("#google-drive-sync-status", "Enter a valid Google Drive folder link first.", true);
                 return;
@@ -711,7 +795,7 @@ function installCloudSyncDelegatedFallbackHandlers() {
         }
 
         if (button.id === "google-drive-save-link-btn" && button.dataset.syncBound !== "1") {
-            const url = readUrlValue("#google-drive-folder-url");
+            const url = toSafeGoogleDriveFolderUrl(document.querySelector("#google-drive-folder-url")?.value || "");
             if (!url) {
                 setStatus("#google-drive-sync-status", "Enter a valid Google Drive folder link first.", true);
                 return;
@@ -727,6 +811,8 @@ function installCloudSyncDelegatedFallbackHandlers() {
             setStatus("#google-drive-sync-status", "Saving Google Drive link...");
             try {
                 await persistStudentGoogleDriveFolderLink(ctx.projectId, ctx.email, ctx.detailData, ctx.taskTopicValue, url);
+                addStoredGoogleDriveLinkLibraryLink(ctx.projectId, ctx.email, url);
+                refreshGoogleDriveLibraryUi(ctx.projectId, ctx.email);
                 setStatus("#google-drive-sync-status", "Google Drive link saved and shared with teacher view.");
             } catch (error) {
                 const fallback = "Could not save Google Drive link right now.";
@@ -937,6 +1023,10 @@ function getGithubRepoLibraryStorageKey(projectId, email) {
 
 function getOneDriveLinkLibraryStorageKey(projectId, email) {
     return `${ONEDRIVE_LINK_LIBRARY_STORAGE_PREFIX}:${String(projectId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
+}
+
+function getGoogleDriveLinkLibraryStorageKey(projectId, email) {
+    return `${GOOGLE_DRIVE_LINK_LIBRARY_STORAGE_PREFIX}:${String(projectId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
 }
 
 function normalizeTrelloCardLibrary(values) {
@@ -1225,6 +1315,93 @@ function addStoredOneDriveLinkLibraryLink(projectId, email, value) {
     const current = readStoredOneDriveLinkLibrary(projectId, email);
     const next = normalizeOneDriveLinkLibrary([{ url: safeUrl, savedAt: new Date().toISOString() }, ...current]);
     return writeStoredOneDriveLinkLibrary(projectId, email, next);
+}
+
+function normalizeGoogleDriveLinkLibrary(values) {
+    const seenIndexByUrl = new Map();
+    const list = [];
+    const source = Array.isArray(values) ? values : [];
+    source.forEach((value) => {
+        const candidateUrl = typeof value === "object" && value
+            ? value.url
+            : value;
+        const safeUrl = toSafeGoogleDriveFolderUrl(candidateUrl);
+        if (!safeUrl) {
+            return;
+        }
+
+        let savedAt = "";
+        if (typeof value === "object" && value) {
+            const parsed = Date.parse(String(value.savedAt || "").trim());
+            savedAt = Number.isFinite(parsed) ? new Date(parsed).toISOString() : "";
+        }
+
+        if (seenIndexByUrl.has(safeUrl)) {
+            const existingIndex = Number(seenIndexByUrl.get(safeUrl));
+            const existing = list[existingIndex] || { url: safeUrl, savedAt: "" };
+            if (!existing.savedAt && savedAt) {
+                list[existingIndex] = { url: safeUrl, savedAt };
+            }
+            return;
+        }
+
+        seenIndexByUrl.set(safeUrl, list.length);
+        list.push({ url: safeUrl, savedAt });
+    });
+    return list.slice(0, 12);
+}
+
+function mergeGoogleDriveLinkLibrarySources(...sources) {
+    const merged = [];
+    sources.forEach((source) => {
+        const values = Array.isArray(source) ? source : [];
+        values.forEach((value) => {
+            if (typeof value === "string") {
+                merged.push({ url: value, savedAt: "" });
+                return;
+            }
+            merged.push(value);
+        });
+    });
+    return normalizeGoogleDriveLinkLibrary(merged);
+}
+
+function readStoredGoogleDriveLinkLibrary(projectId, email) {
+    const storageKey = getGoogleDriveLinkLibraryStorageKey(projectId, email);
+    try {
+        const raw = localStorage.getItem(storageKey);
+        if (!raw) {
+            return [];
+        }
+        return normalizeGoogleDriveLinkLibrary(JSON.parse(raw));
+    } catch (_error) {
+        return [];
+    }
+}
+
+function writeStoredGoogleDriveLinkLibrary(projectId, email, values) {
+    const storageKey = getGoogleDriveLinkLibraryStorageKey(projectId, email);
+    const nextValues = normalizeGoogleDriveLinkLibrary(values);
+    try {
+        if (!nextValues.length) {
+            localStorage.removeItem(storageKey);
+            return [];
+        }
+        localStorage.setItem(storageKey, JSON.stringify(nextValues));
+    } catch (_error) {
+    }
+    return nextValues;
+}
+
+function addStoredGoogleDriveLinkLibraryLink(projectId, email, value) {
+    const safeUrl = toSafeGoogleDriveFolderUrl(value);
+    if (!safeUrl) {
+        return readStoredGoogleDriveLinkLibrary(projectId, email);
+    }
+
+    const current = readStoredGoogleDriveLinkLibrary(projectId, email);
+    const next = normalizeGoogleDriveLinkLibrary([{ url: safeUrl, savedAt: new Date().toISOString() }, ...current]);
+    return writeStoredGoogleDriveLinkLibrary(projectId, email, next);
 }
 
 function readStoredTrelloCardLink(projectId, email) {
@@ -2230,6 +2407,33 @@ function getFirstGoogleDriveFolderUrlFromEvidenceRows(evidenceRows) {
     }
 
     return "";
+}
+
+function getAllGoogleDriveFolderUrlsFromEvidenceRows(evidenceRows) {
+    const rows = normalizeEvidenceSteps(evidenceRows);
+    const urls = [];
+    const seen = new Set();
+
+    rows.forEach((row) => {
+        (Array.isArray(row?.steps) ? row.steps : []).forEach((step) => {
+            const text = String(step?.text || "").trim();
+            if (!text) return;
+
+            let candidate = "";
+            if (text.startsWith("GOOGLE_DRIVE_PROJECT_FOLDER_URL|")) {
+                candidate = text.slice("GOOGLE_DRIVE_PROJECT_FOLDER_URL|".length).trim();
+            } else if (text.startsWith("LINK|")) {
+                candidate = text.slice("LINK|".length).trim();
+            }
+
+            const safe = toSafeGoogleDriveFolderUrl(candidate);
+            if (!safe || seen.has(safe)) return;
+            seen.add(safe);
+            urls.push(safe);
+        });
+    });
+
+    return urls;
 }
 
 async function persistStudentTrelloLink(projectId, studentEmail, trelloCardUrl) {
@@ -6929,7 +7133,18 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         const googleDriveSlot = host.querySelector("#task-topic-google-drive-sync-slot");
         if (googleDriveSlot) {
             const evidenceGoogleDriveLink = getFirstGoogleDriveFolderUrlFromEvidenceRows(myAllocation?.evidence_steps);
+            const evidenceGoogleDriveLinks = getAllGoogleDriveFolderUrlsFromEvidenceRows(myAllocation?.evidence_steps);
             const savedGoogleDriveLink = evidenceGoogleDriveLink || templateLibraryProcessAssessmentUrl;
+            const localGoogleDriveLinkLibrary = readStoredGoogleDriveLinkLibrary(projectId, email);
+            const mergedGoogleDriveLinkLibrary = writeStoredGoogleDriveLinkLibrary(
+                projectId,
+                email,
+                mergeGoogleDriveLinkLibrarySources(
+                    [{ url: evidenceGoogleDriveLink, savedAt: "" }, { url: templateLibraryProcessAssessmentUrl, savedAt: "" }],
+                    evidenceGoogleDriveLinks.map((url) => ({ url, savedAt: "" })),
+                    localGoogleDriveLinkLibrary
+                )
+            );
             const usingTemplateLibraryProcessAssessment = !evidenceGoogleDriveLink && Boolean(templateLibraryProcessAssessmentUrl);
             googleDriveSlot.innerHTML = `
                 <div class="trello-sync-panel" id="google-drive-sync-panel" style="margin-top:10px;">
@@ -6943,6 +7158,23 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                         <button type="button" class="detail-action detail-action-secondary" id="google-drive-open-folder-btn">Open Google Drive Folder</button>
                     </div>
                     <p class="trello-sync-status" id="google-drive-sync-status" aria-live="polite"></p>
+                    <div class="trello-link-library" id="google-drive-link-library" ${mergedGoogleDriveLinkLibrary.length ? "" : "hidden"}>
+                        <p class="trello-link-library-title">Saved Google Links <span class="trello-link-library-count" id="google-drive-link-library-count">(${mergedGoogleDriveLinkLibrary.length})</span></p>
+                        <ul class="trello-link-library-list" id="google-drive-link-library-list">
+                            ${mergedGoogleDriveLinkLibrary.map((item) => `
+                                <li class="trello-link-library-item" data-google-drive-link-item="${escapeHtml(item.url)}">
+                                    <div class="trello-link-library-link-wrap">
+                                        <a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.url)}</a>
+                                        <span class="trello-link-library-savedat">${escapeHtml(formatLibrarySavedAtLabel(item.savedAt))}</span>
+                                    </div>
+                                    <div class="trello-link-library-actions">
+                                        <button type="button" class="detail-action detail-action-secondary" data-google-drive-library-use="${escapeHtml(item.url)}">Use</button>
+                                        <button type="button" class="detail-action detail-action-secondary" data-google-drive-library-open="${escapeHtml(item.url)}">Open</button>
+                                    </div>
+                                </li>
+                            `).join("")}
+                        </ul>
+                    </div>
                 </div>
             `;
         }
@@ -7098,6 +7330,9 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     const googleDriveSaveLinkBtn = section.querySelector("#google-drive-save-link-btn");
     const googleDriveOpenFolderBtn = section.querySelector("#google-drive-open-folder-btn");
     const googleDriveStatus = section.querySelector("#google-drive-sync-status");
+    const googleDriveLinkLibrary = section.querySelector("#google-drive-link-library");
+    const googleDriveLinkLibraryList = section.querySelector("#google-drive-link-library-list");
+    const googleDriveLinkLibraryCount = section.querySelector("#google-drive-link-library-count");
     const githubRepoInput = section.querySelector("#github-repo-url");
     const githubWorkNoteInput = section.querySelector("#github-work-note");
     const githubSaveLinkBtn = section.querySelector("#github-save-link-btn");
@@ -7144,10 +7379,13 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     const backendGithubRepoLinks = getAllGithubRepoUrlsFromEvidenceRows(interestData?.my_allocation?.evidence_steps);
     const backendOneDriveLink = getFirstOneDriveFolderUrlFromEvidenceRows(interestData?.my_allocation?.evidence_steps);
     const backendOneDriveLinks = getAllOneDriveFolderUrlsFromEvidenceRows(interestData?.my_allocation?.evidence_steps);
+    const backendGoogleDriveLink = getFirstGoogleDriveFolderUrlFromEvidenceRows(interestData?.my_allocation?.evidence_steps);
+    const backendGoogleDriveLinks = getAllGoogleDriveFolderUrlsFromEvidenceRows(interestData?.my_allocation?.evidence_steps);
     const localTrelloCardLink = readStoredTrelloCardLink(projectId, email);
     const localTrelloCardLibrary = readStoredTrelloCardLibrary(projectId, email);
     const localGithubRepoLibrary = readStoredGithubRepoLibrary(projectId, email);
     const localOneDriveLinkLibrary = readStoredOneDriveLinkLibrary(projectId, email);
+    const localGoogleDriveLinkLibrary = readStoredGoogleDriveLinkLibrary(projectId, email);
     let trelloCardLibrary = writeStoredTrelloCardLibrary(
         projectId,
         email,
@@ -7173,6 +7411,15 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             [{ url: backendOneDriveLink, savedAt: "" }],
             backendOneDriveLinks.map((url) => ({ url, savedAt: "" })),
             localOneDriveLinkLibrary
+        )
+    );
+    let googleDriveLinkLibraryState = writeStoredGoogleDriveLinkLibrary(
+        projectId,
+        email,
+        mergeGoogleDriveLinkLibrarySources(
+            [{ url: backendGoogleDriveLink, savedAt: "" }],
+            backendGoogleDriveLinks.map((url) => ({ url, savedAt: "" })),
+            localGoogleDriveLinkLibrary
         )
     );
     const legacyLibraryMigrationUrl = (() => {
@@ -7330,9 +7577,52 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             .join("");
     };
 
+    const renderGoogleDriveLinkLibrary = () => {
+        if (!googleDriveLinkLibrary || !googleDriveLinkLibraryList) {
+            return;
+        }
+
+        if (!googleDriveLinkLibraryState.length) {
+            googleDriveLinkLibrary.hidden = true;
+            if (googleDriveLinkLibraryCount) {
+                googleDriveLinkLibraryCount.textContent = "(0)";
+            }
+            googleDriveLinkLibraryList.innerHTML = "";
+            return;
+        }
+
+        const activeUrl = toSafeGoogleDriveFolderUrl(googleDriveFolderInput?.value || "");
+        googleDriveLinkLibrary.hidden = false;
+        if (googleDriveLinkLibraryCount) {
+            googleDriveLinkLibraryCount.textContent = `(${googleDriveLinkLibraryState.length})`;
+        }
+        googleDriveLinkLibraryList.innerHTML = googleDriveLinkLibraryState
+            .map((item) => {
+                const url = toSafeGoogleDriveFolderUrl(item?.url || "");
+                if (!url) {
+                    return "";
+                }
+                const isActive = Boolean(activeUrl && activeUrl === url);
+                return `
+                    <li class="trello-link-library-item${isActive ? " is-active" : ""}" data-google-drive-link-item="${escapeHtml(url)}">
+                        <div class="trello-link-library-link-wrap">
+                            <a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(url)}</a>
+                            <span class="trello-link-library-savedat">${escapeHtml(formatLibrarySavedAtLabel(item?.savedAt))}</span>
+                        </div>
+                        <div class="trello-link-library-actions">
+                            <button type="button" class="detail-action detail-action-secondary" data-google-drive-library-use="${escapeHtml(url)}">Use</button>
+                            <button type="button" class="detail-action detail-action-secondary" data-google-drive-library-open="${escapeHtml(url)}">Open</button>
+                        </div>
+                    </li>
+                `;
+            })
+            .join("");
+    };
+
     renderTrelloCardLibrary();
     renderGithubRepoLibrary();
     renderOneDriveLinkLibrary();
+    renderGoogleDriveLinkLibrary();
 
     if (needsLegacyTrelloMigration && trelloCardInput) {
         trelloCardInput.value = toSafeTrelloCardUrl(localTrelloCardLink) || localTrelloCardLink;
@@ -7692,10 +7982,11 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     });
 
     const readGoogleDriveFolderUrl = () => {
-        const safe = toSafeExternalUrl(googleDriveFolderInput?.value || "");
+        const safe = toSafeGoogleDriveFolderUrl(googleDriveFolderInput?.value || "");
         if (googleDriveFolderInput && safe && googleDriveFolderInput.value !== safe) {
             googleDriveFolderInput.value = safe;
         }
+        renderGoogleDriveLinkLibrary();
         return safe;
     };
 
@@ -7718,6 +8009,33 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         }
 
         setGoogleDriveStatus("Link looks valid. Click Save Google Drive Link.");
+        renderGoogleDriveLinkLibrary();
+    });
+
+    googleDriveLinkLibraryList?.addEventListener("click", (event) => {
+        const useButton = event.target.closest("[data-google-drive-library-use]");
+        if (useButton) {
+            const selectedUrl = toSafeGoogleDriveFolderUrl(useButton.getAttribute("data-google-drive-library-use") || "");
+            if (!selectedUrl) {
+                return;
+            }
+            if (googleDriveFolderInput) {
+                googleDriveFolderInput.value = selectedUrl;
+            }
+            setGoogleDriveStatus("Selected saved Google Drive link.");
+            renderGoogleDriveLinkLibrary();
+            return;
+        }
+
+        const openButton = event.target.closest("[data-google-drive-library-open]");
+        if (openButton) {
+            const selectedUrl = toSafeGoogleDriveFolderUrl(openButton.getAttribute("data-google-drive-library-open") || "");
+            if (!selectedUrl) {
+                return;
+            }
+            window.open(selectedUrl, "_blank", "noopener,noreferrer");
+            setGoogleDriveStatus("Opened saved Google Drive link.");
+        }
     });
 
     googleDriveSaveLinkBtn?.addEventListener("click", async () => {
@@ -7731,6 +8049,8 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         setGoogleDriveStatus("Saving Google Drive link...");
         try {
             await persistStudentGoogleDriveFolderLink(projectId, email, detailData, taskTopicValue, folderUrl);
+            googleDriveLinkLibraryState = addStoredGoogleDriveLinkLibraryLink(projectId, email, folderUrl);
+            renderGoogleDriveLinkLibrary();
             setGoogleDriveStatus("Google Drive link saved and shared with teacher view.");
         } catch (error) {
             const fallback = "Could not save Google Drive link right now.";
