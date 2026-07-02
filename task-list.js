@@ -143,6 +143,7 @@ function getTaskTopicHrefForStep(standard, level, text) {
 function inferStudentSystemConnections(currentState) {
     let trelloConnected = false;
     let githubConnected = false;
+    let googleSlidesConnected = false;
 
     Object.values(currentState || {}).forEach((steps) => {
         (Array.isArray(steps) ? steps : []).forEach((step) => {
@@ -159,10 +160,17 @@ function inferStudentSystemConnections(currentState) {
             if (/(github\.com|gist\.github\.com|raw\.githubusercontent\.com)/i.test(textLower)) {
                 githubConnected = true;
             }
+
+            if (text.startsWith("GOOGLE_SLIDES_URL|")) {
+                googleSlidesConnected = true;
+            }
+            if (/(docs\.google\.com\/presentation)/i.test(textLower)) {
+                googleSlidesConnected = true;
+            }
         });
     });
 
-    return { trelloConnected, githubConnected };
+    return { trelloConnected, githubConnected, googleSlidesConnected };
 }
 
 async function loadJson(url, options = {}) {
@@ -395,7 +403,7 @@ function renderChecklistCards(detail, allItems) {
                             ${String(standard) === "digital-outcome" && index === 0 ? `
                                 <div class="task-list-system-list">
                                     <p class="task-list-system-title">Connected Systems</p>
-                                    <label class="task-list-system-item"><input type="checkbox" checked disabled> Description - Google Slides</label>
+                                    <label class="task-list-system-item"><input type="checkbox" disabled ${systemConnections.googleSlidesConnected ? "checked" : ""}> Description - Google Slides</label>
                                 </div>
                             ` : ""}
                         </div>

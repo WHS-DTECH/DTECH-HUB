@@ -1463,10 +1463,18 @@ function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     const haparaLocation = String(payload?.haparaLocation || "").trim();
     const haparaDriveClassUrl = String(payload?.haparaDriveClassUrl || "").trim();
     const haparaDocumentRef = String(payload?.haparaDocumentRef || "").trim();
-    const trelloCardUrl = toSafeTrelloCardUrl(payload?.trelloCardUrl);
-    const trelloLastLogDate = String(payload?.trelloLastLogDate || "").trim();
-    const trelloLastLogAt = String(payload?.trelloLastLogAt || "").trim();
-    const trelloLastLogNote = String(payload?.trelloLastLogNote || "").trim();
+    const trelloCardUrl = payload?.trelloCardUrl !== undefined
+        ? toSafeTrelloCardUrl(payload?.trelloCardUrl)
+        : toSafeTrelloCardUrl(existingSubmission.trelloCardUrl);
+    const trelloLastLogDate = payload?.trelloLastLogDate !== undefined
+        ? String(payload?.trelloLastLogDate || "").trim()
+        : String(existingSubmission.trelloLastLogDate || "").trim();
+    const trelloLastLogAt = payload?.trelloLastLogAt !== undefined
+        ? String(payload?.trelloLastLogAt || "").trim()
+        : String(existingSubmission.trelloLastLogAt || "").trim();
+    const trelloLastLogNote = payload?.trelloLastLogNote !== undefined
+        ? String(payload?.trelloLastLogNote || "").trim()
+        : String(existingSubmission.trelloLastLogNote || "").trim();
     const googleSlidesUrl = payload?.googleSlidesUrl !== undefined
         ? toSafeExternalUrl(payload?.googleSlidesUrl)
         : toSafeExternalUrl(existingSubmission.googleSlidesUrl || existingSubmission.evidenceLink);

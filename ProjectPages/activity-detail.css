@@ -1808,4 +1808,13 @@ h1 {
 .evidence-step-system-item input[type="checkbox"] {
     width: 14px;
     height: 14px;
+    accent-color: #0b5bd3;
+}
+
+.evidence-step-system-item input[type="checkbox"]:disabled {
+    opacity: 1;
+}
+
+.evidence-step-check {
+    accent-color: #0b5bd3;
 }
