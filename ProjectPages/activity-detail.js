@@ -88,6 +88,7 @@ const DETAIL_DATA = {
 const DETAIL_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 const TRELLO_CARD_LINK_STORAGE_PREFIX = "hub_trello_card_link_v1";
 const TRELLO_CARD_LIBRARY_STORAGE_PREFIX = "hub_trello_card_library_v1";
+const GITHUB_REPO_LIBRARY_STORAGE_PREFIX = "hub_github_repo_library_v1";
 const EVIDENCE_STEPS_TARGET_STANDARDS = new Set(["92005", "91897", "91907"]);
 
 const DIGITAL_OUTCOME_DETAILS_TASKS = [
@@ -674,6 +675,7 @@ function installCloudSyncDelegatedFallbackHandlers() {
             setStatus("#github-sync-status", "Saving GitHub sync...");
             try {
                 await persistStudentGithubSyncDirectlyToEvidence(ctx.projectId, ctx.email, ctx.detailData, ctx.taskTopicValue, repoUrl, note);
+                addStoredGithubRepoLibraryLink(ctx.projectId, ctx.email, repoUrl);
                 setStatus("#github-sync-status", "GitHub sync saved.");
             } catch (error) {
                 setStatus("#github-sync-status", `${error?.message || "Could not save GitHub sync right now."}${formatApiDebugSuffix(error)}`, true);
@@ -741,6 +743,7 @@ function installCloudSyncDelegatedFallbackHandlers() {
             setStatus("#github-sync-status", "Saving GitHub sync...");
             try {
                 await persistStudentGithubSyncDirectlyToEvidence(ctx.projectId, ctx.email, ctx.detailData, ctx.taskTopicValue, repoUrl, note);
+                addStoredGithubRepoLibraryLink(ctx.projectId, ctx.email, repoUrl);
                 setStatus("#github-sync-status", "GitHub sync saved.");
             } catch (error) {
                 setStatus("#github-sync-status", `${error?.message || "Could not save GitHub sync right now."}${formatApiDebugSuffix(error)}`, true);
@@ -806,6 +809,10 @@ function getTrelloCardStorageKey(projectId, email) {
 
 function getTrelloCardLibraryStorageKey(projectId, email) {
     return `${TRELLO_CARD_LIBRARY_STORAGE_PREFIX}:${String(projectId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
+}
+
+function getGithubRepoLibraryStorageKey(projectId, email) {
+    return `${GITHUB_REPO_LIBRARY_STORAGE_PREFIX}:${String(projectId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
 }
 
 function normalizeTrelloCardLibrary(values) {
@@ -920,6 +927,93 @@ function addStoredTrelloCardLibraryLink(projectId, email, value) {
     const current = readStoredTrelloCardLibrary(projectId, email);
     const next = normalizeTrelloCardLibrary([{ url: safeUrl, savedAt: new Date().toISOString() }, ...current]);
     return writeStoredTrelloCardLibrary(projectId, email, next);
+}
+
+function normalizeGithubRepoLibrary(values) {
+    const seenIndexByUrl = new Map();
+    const list = [];
+    const source = Array.isArray(values) ? values : [];
+    source.forEach((value) => {
+        const candidateUrl = typeof value === "object" && value
+            ? value.url
+            : value;
+        const safeUrl = toSafeGithubRepoUrl(candidateUrl);
+        if (!safeUrl) {
+            return;
+        }
+
+        let savedAt = "";
+        if (typeof value === "object" && value) {
+            const parsed = Date.parse(String(value.savedAt || "").trim());
+            savedAt = Number.isFinite(parsed) ? new Date(parsed).toISOString() : "";
+        }
+
+        if (seenIndexByUrl.has(safeUrl)) {
+            const existingIndex = Number(seenIndexByUrl.get(safeUrl));
+            const existing = list[existingIndex] || { url: safeUrl, savedAt: "" };
+            if (!existing.savedAt && savedAt) {
+                list[existingIndex] = { url: safeUrl, savedAt };
+            }
+            return;
+        }
+
+        seenIndexByUrl.set(safeUrl, list.length);
+        list.push({ url: safeUrl, savedAt });
+    });
+    return list.slice(0, 12);
+}
+
+function mergeGithubRepoLibrarySources(...sources) {
+    const merged = [];
+    sources.forEach((source) => {
+        const values = Array.isArray(source) ? source : [];
+        values.forEach((value) => {
+            if (typeof value === "string") {
+                merged.push({ url: value, savedAt: "" });
+                return;
+            }
+            merged.push(value);
+        });
+    });
+    return normalizeGithubRepoLibrary(merged);
+}
+
+function readStoredGithubRepoLibrary(projectId, email) {
+    const storageKey = getGithubRepoLibraryStorageKey(projectId, email);
+    try {
+        const raw = localStorage.getItem(storageKey);
+        if (!raw) {
+            return [];
+        }
+        return normalizeGithubRepoLibrary(JSON.parse(raw));
+    } catch (_error) {
+        return [];
+    }
+}
+
+function writeStoredGithubRepoLibrary(projectId, email, values) {
+    const storageKey = getGithubRepoLibraryStorageKey(projectId, email);
+    const nextValues = normalizeGithubRepoLibrary(values);
+    try {
+        if (!nextValues.length) {
+            localStorage.removeItem(storageKey);
+            return [];
+        }
+        localStorage.setItem(storageKey, JSON.stringify(nextValues));
+    } catch (_error) {
+    }
+    return nextValues;
+}
+
+function addStoredGithubRepoLibraryLink(projectId, email, value) {
+    const safeUrl = toSafeGithubRepoUrl(value);
+    if (!safeUrl) {
+        return readStoredGithubRepoLibrary(projectId, email);
+    }
+
+    const current = readStoredGithubRepoLibrary(projectId, email);
+    const next = normalizeGithubRepoLibrary([{ url: safeUrl, savedAt: new Date().toISOString() }, ...current]);
+    return writeStoredGithubRepoLibrary(projectId, email, next);
 }
 
 function readStoredTrelloCardLink(projectId, email) {
@@ -1805,6 +1899,33 @@ function getFirstGithubRepoUrlFromEvidenceRows(evidenceRows) {
     }
 
     return "";
+}
+
+function getAllGithubRepoUrlsFromEvidenceRows(evidenceRows) {
+    const rows = normalizeEvidenceSteps(evidenceRows);
+    const urls = [];
+    const seen = new Set();
+
+    rows.forEach((row) => {
+        (Array.isArray(row?.steps) ? row.steps : []).forEach((step) => {
+            const text = String(step?.text || "").trim();
+            if (!text) return;
+
+            let candidate = "";
+            if (text.startsWith("GITHUB_REPO_URL|")) {
+                candidate = text.slice("GITHUB_REPO_URL|".length).trim();
+            } else if (text.startsWith("LINK|")) {
+                candidate = text.slice("LINK|".length).trim();
+            }
+
+            const safe = toSafeGithubRepoUrl(candidate);
+            if (!safe || seen.has(safe)) return;
+            seen.add(safe);
+            urls.push(safe);
+        });
+    });
+
+    return urls;
 }
 
 function upsertEvidenceStandardRow(rows, standardKey, steps) {
@@ -6436,13 +6557,24 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
 
             const githubSlot = host.querySelector("#task-topic-github-sync-slot");
             if (githubSlot && showGithubGuide) {
-                const savedGithubLink = getFirstGithubRepoUrlFromEvidenceRows(myAllocation?.evidence_steps);
+                const sharedGithubLink = getFirstGithubRepoUrlFromEvidenceRows(myAllocation?.evidence_steps);
+                const sharedGithubLinks = getAllGithubRepoUrlsFromEvidenceRows(myAllocation?.evidence_steps);
+                const localGithubRepoLibrary = readStoredGithubRepoLibrary(projectId, email);
+                const mergedGithubRepoLibrary = writeStoredGithubRepoLibrary(
+                    projectId,
+                    email,
+                    mergeGithubRepoLibrarySources(
+                        [{ url: sharedGithubLink, savedAt: "" }],
+                        sharedGithubLinks.map((url) => ({ url, savedAt: "" })),
+                        localGithubRepoLibrary
+                    )
+                );
                 githubSlot.innerHTML = `
                     <div class="trello-sync-panel" id="github-sync-panel" style="margin-top:10px;">
                         <h3>GitHub Sync</h3>
                         <p>Save your repository URL and a short progress note for version-control evidence.</p>
                         <label for="github-repo-url" class="trello-sync-label">GitHub repository link</label>
-                        <input id="github-repo-url" class="trello-sync-input" type="url" placeholder="https://github.com/org/repo" value="${escapeHtml(savedGithubLink)}">
+                        <input id="github-repo-url" class="trello-sync-input" type="url" placeholder="https://github.com/org/repo" value="${escapeHtml(sharedGithubLink)}">
                         <label for="github-work-note" class="trello-sync-label">Work note</label>
                         <textarea id="github-work-note" class="trello-sync-input trello-sync-note" placeholder="What commit or change did you complete?"></textarea>
                         <div class="trello-sync-actions">
@@ -6450,6 +6582,23 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                             <button type="button" class="detail-action detail-action-secondary" id="github-open-repo-btn">Open Repository</button>
                         </div>
                         <p class="trello-sync-status" id="github-sync-status" aria-live="polite"></p>
+                        <div class="trello-link-library" id="github-link-library" ${mergedGithubRepoLibrary.length ? "" : "hidden"}>
+                            <p class="trello-link-library-title">Saved GitHub Links <span class="trello-link-library-count" id="github-link-library-count">(${mergedGithubRepoLibrary.length})</span></p>
+                            <ul class="trello-link-library-list" id="github-link-library-list">
+                                ${mergedGithubRepoLibrary.map((item) => `
+                                    <li class="trello-link-library-item" data-github-link-item="${escapeHtml(item.url)}">
+                                        <div class="trello-link-library-link-wrap">
+                                            <a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.url)}</a>
+                                            <span class="trello-link-library-savedat">${escapeHtml(formatLibrarySavedAtLabel(item.savedAt))}</span>
+                                        </div>
+                                        <div class="trello-link-library-actions">
+                                            <button type="button" class="detail-action detail-action-secondary" data-github-library-use="${escapeHtml(item.url)}">Use</button>
+                                            <button type="button" class="detail-action detail-action-secondary" data-github-library-open="${escapeHtml(item.url)}">Open</button>
+                                        </div>
+                                    </li>
+                                `).join("")}
+                            </ul>
+                        </div>
                     </div>
                 `;
             }
@@ -6644,6 +6793,9 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     const githubSaveLinkBtn = section.querySelector("#github-save-link-btn");
     const githubOpenRepoBtn = section.querySelector("#github-open-repo-btn");
     const githubStatus = section.querySelector("#github-sync-status");
+    const githubLinkLibrary = section.querySelector("#github-link-library");
+    const githubLinkLibraryList = section.querySelector("#github-link-library-list");
+    const githubLinkLibraryCount = section.querySelector("#github-link-library-count");
 
     if (oneDriveSaveLinkBtn) oneDriveSaveLinkBtn.dataset.syncBound = "1";
     if (oneDriveOpenFolderBtn) oneDriveOpenFolderBtn.dataset.syncBound = "1";
@@ -6679,8 +6831,10 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     const backendTrelloCardLink = getFirstTrelloCardUrlFromEvidenceRows(interestData?.my_allocation?.evidence_steps);
     const backendTrelloCardLinks = getAllTrelloCardUrlsFromEvidenceRows(interestData?.my_allocation?.evidence_steps);
     const backendGithubRepoLink = getFirstGithubRepoUrlFromEvidenceRows(interestData?.my_allocation?.evidence_steps);
+    const backendGithubRepoLinks = getAllGithubRepoUrlsFromEvidenceRows(interestData?.my_allocation?.evidence_steps);
     const localTrelloCardLink = readStoredTrelloCardLink(projectId, email);
     const localTrelloCardLibrary = readStoredTrelloCardLibrary(projectId, email);
+    const localGithubRepoLibrary = readStoredGithubRepoLibrary(projectId, email);
     let trelloCardLibrary = writeStoredTrelloCardLibrary(
         projectId,
         email,
@@ -6688,6 +6842,15 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             [{ url: backendTrelloCardLink, savedAt: "" }, { url: localTrelloCardLink, savedAt: "" }],
             backendTrelloCardLinks.map((url) => ({ url, savedAt: "" })),
             localTrelloCardLibrary
+        )
+    );
+    let githubRepoLibrary = writeStoredGithubRepoLibrary(
+        projectId,
+        email,
+        mergeGithubRepoLibrarySources(
+            [{ url: backendGithubRepoLink, savedAt: "" }],
+            backendGithubRepoLinks.map((url) => ({ url, savedAt: "" })),
+            localGithubRepoLibrary
         )
     );
     const needsLegacyTrelloMigration = !backendTrelloCardLink && Boolean(localTrelloCardLink);
@@ -6748,7 +6911,50 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         return safe;
     };
 
+    const renderGithubRepoLibrary = () => {
+        if (!githubLinkLibrary || !githubLinkLibraryList) {
+            return;
+        }
+
+        if (!githubRepoLibrary.length) {
+            githubLinkLibrary.hidden = true;
+            if (githubLinkLibraryCount) {
+                githubLinkLibraryCount.textContent = "(0)";
+            }
+            githubLinkLibraryList.innerHTML = "";
+            return;
+        }
+
+        const activeUrl = toSafeGithubRepoUrl(githubRepoInput?.value || "");
+        githubLinkLibrary.hidden = false;
+        if (githubLinkLibraryCount) {
+            githubLinkLibraryCount.textContent = `(${githubRepoLibrary.length})`;
+        }
+        githubLinkLibraryList.innerHTML = githubRepoLibrary
+            .map((item) => {
+                const url = toSafeGithubRepoUrl(item?.url || "");
+                if (!url) {
+                    return "";
+                }
+                const isActive = Boolean(activeUrl && activeUrl === url);
+                return `
+                    <li class="trello-link-library-item${isActive ? " is-active" : ""}" data-github-link-item="${escapeHtml(url)}">
+                        <div class="trello-link-library-link-wrap">
+                            <a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(url)}</a>
+                            <span class="trello-link-library-savedat">${escapeHtml(formatLibrarySavedAtLabel(item?.savedAt))}</span>
+                        </div>
+                        <div class="trello-link-library-actions">
+                            <button type="button" class="detail-action detail-action-secondary" data-github-library-use="${escapeHtml(url)}">Use</button>
+                            <button type="button" class="detail-action detail-action-secondary" data-github-library-open="${escapeHtml(url)}">Open</button>
+                        </div>
+                    </li>
+                `;
+            })
+            .join("");
+    };
+
     renderTrelloCardLibrary();
+    renderGithubRepoLibrary();
 
     if (needsLegacyTrelloMigration && trelloCardInput) {
         trelloCardInput.value = toSafeTrelloCardUrl(localTrelloCardLink) || localTrelloCardLink;
@@ -6858,6 +7064,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         if (githubRepoInput && safe && githubRepoInput.value !== safe) {
             githubRepoInput.value = safe;
         }
+        renderGithubRepoLibrary();
         return safe;
     };
 
@@ -6874,6 +7081,33 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             return;
         }
         setGithubStatus("Repository link looks valid. Click Save GitHub Sync.");
+        renderGithubRepoLibrary();
+    });
+
+    githubLinkLibraryList?.addEventListener("click", (event) => {
+        const useButton = event.target.closest("[data-github-library-use]");
+        if (useButton) {
+            const selectedUrl = toSafeGithubRepoUrl(useButton.getAttribute("data-github-library-use") || "");
+            if (!selectedUrl) {
+                return;
+            }
+            if (githubRepoInput) {
+                githubRepoInput.value = selectedUrl;
+            }
+            setGithubStatus("Selected saved GitHub repository.", false, true);
+            renderGithubRepoLibrary();
+            return;
+        }
+
+        const openButton = event.target.closest("[data-github-library-open]");
+        if (openButton) {
+            const selectedUrl = toSafeGithubRepoUrl(openButton.getAttribute("data-github-library-open") || "");
+            if (!selectedUrl) {
+                return;
+            }
+            window.open(selectedUrl, "_blank", "noopener,noreferrer");
+            setGithubStatus("Opened saved GitHub repository.", false, true);
+        }
     });
 
     githubSaveLinkBtn?.addEventListener("click", async () => {
@@ -6900,6 +7134,8 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                 throw new Error("GitHub link did not persist to your Task List evidence.");
             }
 
+            githubRepoLibrary = addStoredGithubRepoLibraryLink(projectId, email, repoUrl);
+            renderGithubRepoLibrary();
             setGithubStatus("GitHub sync saved and shared with teacher view.", false, true);
         } catch (error) {
             setGithubStatus(`${error?.message || "Could not save GitHub sync right now."}${formatApiDebugSuffix(error)}`, true);
