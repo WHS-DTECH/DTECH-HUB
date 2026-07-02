@@ -89,6 +89,7 @@ const DETAIL_HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 const TRELLO_CARD_LINK_STORAGE_PREFIX = "hub_trello_card_link_v1";
 const TRELLO_CARD_LIBRARY_STORAGE_PREFIX = "hub_trello_card_library_v1";
 const GITHUB_REPO_LIBRARY_STORAGE_PREFIX = "hub_github_repo_library_v1";
+const ONEDRIVE_LINK_LIBRARY_STORAGE_PREFIX = "hub_onedrive_link_library_v1";
 const EVIDENCE_STEPS_TARGET_STANDARDS = new Set(["92005", "91897", "91907"]);
 
 const DIGITAL_OUTCOME_DETAILS_TASKS = [
@@ -156,6 +157,12 @@ function toSafeExternalUrl(value) {
     }
 
     return "";
+}
+
+function toSafeOneDriveFolderUrl(value) {
+    const safeUrl = toSafeExternalUrl(value);
+    if (!safeUrl) return "";
+    return /(onedrive\.live\.com|1drv\.ms|sharepoint\.com)/i.test(safeUrl) ? safeUrl : "";
 }
 
 function parseDurationMinutes(raw) {
@@ -604,6 +611,48 @@ function installCloudSyncDelegatedFallbackHandlers() {
             .join("");
     };
 
+    const refreshOneDriveLibraryUi = (projectId, email) => {
+        const library = document.querySelector("#onedrive-link-library");
+        const list = document.querySelector("#onedrive-link-library-list");
+        const count = document.querySelector("#onedrive-link-library-count");
+        if (!library || !list) {
+            return;
+        }
+
+        const items = readStoredOneDriveLinkLibrary(projectId, email);
+        if (!items.length) {
+            library.hidden = true;
+            if (count) count.textContent = "(0)";
+            list.innerHTML = "";
+            return;
+        }
+
+        const activeUrl = toSafeOneDriveFolderUrl(document.querySelector("#onedrive-folder-url")?.value || "");
+        library.hidden = false;
+        if (count) count.textContent = `(${items.length})`;
+        list.innerHTML = items
+            .map((item) => {
+                const url = toSafeOneDriveFolderUrl(item?.url || "");
+                if (!url) {
+                    return "";
+                }
+                const isActive = Boolean(activeUrl && activeUrl === url);
+                return `
+                    <li class="trello-link-library-item${isActive ? " is-active" : ""}" data-onedrive-link-item="${escapeHtml(url)}">
+                        <div class="trello-link-library-link-wrap">
+                            <a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(url)}</a>
+                            <span class="trello-link-library-savedat">${escapeHtml(formatLibrarySavedAtLabel(item?.savedAt))}</span>
+                        </div>
+                        <div class="trello-link-library-actions">
+                            <button type="button" class="detail-action detail-action-secondary" data-onedrive-library-use="${escapeHtml(url)}">Use</button>
+                            <button type="button" class="detail-action detail-action-secondary" data-onedrive-library-open="${escapeHtml(url)}">Open</button>
+                        </div>
+                    </li>
+                `;
+            })
+            .join("");
+    };
+
     document.addEventListener("click", async (event) => {
         const button = event.target?.closest?.("button");
         if (!button) {
@@ -649,6 +698,8 @@ function installCloudSyncDelegatedFallbackHandlers() {
             setStatus("#onedrive-sync-status", "Saving OneDrive link...");
             try {
                 await persistStudentOneDriveFolderLink(ctx.projectId, ctx.email, ctx.detailData, ctx.taskTopicValue, url);
+                addStoredOneDriveLinkLibraryLink(ctx.projectId, ctx.email, url);
+                refreshOneDriveLibraryUi(ctx.projectId, ctx.email);
                 setStatus("#onedrive-sync-status", "OneDrive link saved and shared with teacher view.");
             } catch (error) {
                 const fallback = "Could not save OneDrive link right now.";
@@ -884,6 +935,10 @@ function getGithubRepoLibraryStorageKey(projectId, email) {
     return `${GITHUB_REPO_LIBRARY_STORAGE_PREFIX}:${String(projectId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
 }
 
+function getOneDriveLinkLibraryStorageKey(projectId, email) {
+    return `${ONEDRIVE_LINK_LIBRARY_STORAGE_PREFIX}:${String(projectId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
+}
+
 function normalizeTrelloCardLibrary(values) {
     const seenIndexByUrl = new Map();
     const list = [];
@@ -1083,6 +1138,93 @@ function addStoredGithubRepoLibraryLink(projectId, email, value) {
     const current = readStoredGithubRepoLibrary(projectId, email);
     const next = normalizeGithubRepoLibrary([{ url: safeUrl, savedAt: new Date().toISOString() }, ...current]);
     return writeStoredGithubRepoLibrary(projectId, email, next);
+}
+
+function normalizeOneDriveLinkLibrary(values) {
+    const seenIndexByUrl = new Map();
+    const list = [];
+    const source = Array.isArray(values) ? values : [];
+    source.forEach((value) => {
+        const candidateUrl = typeof value === "object" && value
+            ? value.url
+            : value;
+        const safeUrl = toSafeOneDriveFolderUrl(candidateUrl);
+        if (!safeUrl) {
+            return;
+        }
+
+        let savedAt = "";
+        if (typeof value === "object" && value) {
+            const parsed = Date.parse(String(value.savedAt || "").trim());
+            savedAt = Number.isFinite(parsed) ? new Date(parsed).toISOString() : "";
+        }
+
+        if (seenIndexByUrl.has(safeUrl)) {
+            const existingIndex = Number(seenIndexByUrl.get(safeUrl));
+            const existing = list[existingIndex] || { url: safeUrl, savedAt: "" };
+            if (!existing.savedAt && savedAt) {
+                list[existingIndex] = { url: safeUrl, savedAt };
+            }
+            return;
+        }
+
+        seenIndexByUrl.set(safeUrl, list.length);
+        list.push({ url: safeUrl, savedAt });
+    });
+    return list.slice(0, 12);
+}
+
+function mergeOneDriveLinkLibrarySources(...sources) {
+    const merged = [];
+    sources.forEach((source) => {
+        const values = Array.isArray(source) ? source : [];
+        values.forEach((value) => {
+            if (typeof value === "string") {
+                merged.push({ url: value, savedAt: "" });
+                return;
+            }
+            merged.push(value);
+        });
+    });
+    return normalizeOneDriveLinkLibrary(merged);
+}
+
+function readStoredOneDriveLinkLibrary(projectId, email) {
+    const storageKey = getOneDriveLinkLibraryStorageKey(projectId, email);
+    try {
+        const raw = localStorage.getItem(storageKey);
+        if (!raw) {
+            return [];
+        }
+        return normalizeOneDriveLinkLibrary(JSON.parse(raw));
+    } catch (_error) {
+        return [];
+    }
+}
+
+function writeStoredOneDriveLinkLibrary(projectId, email, values) {
+    const storageKey = getOneDriveLinkLibraryStorageKey(projectId, email);
+    const nextValues = normalizeOneDriveLinkLibrary(values);
+    try {
+        if (!nextValues.length) {
+            localStorage.removeItem(storageKey);
+            return [];
+        }
+        localStorage.setItem(storageKey, JSON.stringify(nextValues));
+    } catch (_error) {
+    }
+    return nextValues;
+}
+
+function addStoredOneDriveLinkLibraryLink(projectId, email, value) {
+    const safeUrl = toSafeOneDriveFolderUrl(value);
+    if (!safeUrl) {
+        return readStoredOneDriveLinkLibrary(projectId, email);
+    }
+
+    const current = readStoredOneDriveLinkLibrary(projectId, email);
+    const next = normalizeOneDriveLinkLibrary([{ url: safeUrl, savedAt: new Date().toISOString() }, ...current]);
+    return writeStoredOneDriveLinkLibrary(projectId, email, next);
 }
 
 function readStoredTrelloCardLink(projectId, email) {
@@ -2036,6 +2178,35 @@ function getFirstOneDriveFolderUrlFromEvidenceRows(evidenceRows) {
     }
 
     return "";
+}
+
+function getAllOneDriveFolderUrlsFromEvidenceRows(evidenceRows) {
+    const rows = normalizeEvidenceSteps(evidenceRows);
+    const urls = [];
+    const seen = new Set();
+
+    rows.forEach((row) => {
+        (Array.isArray(row?.steps) ? row.steps : []).forEach((step) => {
+            const text = String(step?.text || "").trim();
+            if (!text) return;
+
+            let candidate = "";
+            if (text.startsWith("ONEDRIVE_PROJECT_FOLDER_URL|")) {
+                candidate = text.slice("ONEDRIVE_PROJECT_FOLDER_URL|".length).trim();
+            } else if (text.startsWith("MEDIA_ASSET_FOLDER_URL|")) {
+                candidate = text.slice("MEDIA_ASSET_FOLDER_URL|".length).trim();
+            } else if (text.startsWith("LINK|")) {
+                candidate = text.slice("LINK|".length).trim();
+            }
+
+            const safe = toSafeOneDriveFolderUrl(candidate);
+            if (!safe || seen.has(safe)) return;
+            seen.add(safe);
+            urls.push(safe);
+        });
+    });
+
+    return urls;
 }
 
 function getFirstGoogleDriveFolderUrlFromEvidenceRows(evidenceRows) {
@@ -6711,18 +6882,46 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
 
         const oneDriveSlot = host.querySelector("#task-topic-onedrive-sync-slot");
         if (oneDriveSlot) {
-            const savedOneDriveLink = getFirstOneDriveFolderUrlFromEvidenceRows(myAllocation?.evidence_steps);
+            const sharedOneDriveLink = getFirstOneDriveFolderUrlFromEvidenceRows(myAllocation?.evidence_steps);
+            const sharedOneDriveLinks = getAllOneDriveFolderUrlsFromEvidenceRows(myAllocation?.evidence_steps);
+            const localOneDriveLinkLibrary = readStoredOneDriveLinkLibrary(projectId, email);
+            const mergedOneDriveLinkLibrary = writeStoredOneDriveLinkLibrary(
+                projectId,
+                email,
+                mergeOneDriveLinkLibrarySources(
+                    [{ url: sharedOneDriveLink, savedAt: "" }],
+                    sharedOneDriveLinks.map((url) => ({ url, savedAt: "" })),
+                    localOneDriveLinkLibrary
+                )
+            );
             oneDriveSlot.innerHTML = `
                 <div class="trello-sync-panel" id="onedrive-sync-panel">
                     <h3>Microsoft OneDrive Sync</h3>
                     <p>Save your OneDrive project folder link so your teacher can verify files and version history.</p>
                     <label for="onedrive-folder-url" class="trello-sync-label">OneDrive project folder link</label>
-                    <input id="onedrive-folder-url" class="trello-sync-input" type="url" placeholder="https://onedrive.live.com/... or school SharePoint folder" value="${escapeHtml(savedOneDriveLink)}">
+                    <input id="onedrive-folder-url" class="trello-sync-input" type="url" placeholder="https://onedrive.live.com/... or school SharePoint folder" value="${escapeHtml(sharedOneDriveLink)}">
                     <div class="trello-sync-actions">
                         <button type="button" class="detail-action detail-action-secondary" id="onedrive-save-link-btn">Save OneDrive Link</button>
                         <button type="button" class="detail-action detail-action-secondary" id="onedrive-open-folder-btn">Open OneDrive Folder</button>
                     </div>
                     <p class="trello-sync-status" id="onedrive-sync-status" aria-live="polite"></p>
+                    <div class="trello-link-library" id="onedrive-link-library" ${mergedOneDriveLinkLibrary.length ? "" : "hidden"}>
+                        <p class="trello-link-library-title">Saved OneDrive Links <span class="trello-link-library-count" id="onedrive-link-library-count">(${mergedOneDriveLinkLibrary.length})</span></p>
+                        <ul class="trello-link-library-list" id="onedrive-link-library-list">
+                            ${mergedOneDriveLinkLibrary.map((item) => `
+                                <li class="trello-link-library-item" data-onedrive-link-item="${escapeHtml(item.url)}">
+                                    <div class="trello-link-library-link-wrap">
+                                        <a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.url)}</a>
+                                        <span class="trello-link-library-savedat">${escapeHtml(formatLibrarySavedAtLabel(item.savedAt))}</span>
+                                    </div>
+                                    <div class="trello-link-library-actions">
+                                        <button type="button" class="detail-action detail-action-secondary" data-onedrive-library-use="${escapeHtml(item.url)}">Use</button>
+                                        <button type="button" class="detail-action detail-action-secondary" data-onedrive-library-open="${escapeHtml(item.url)}">Open</button>
+                                    </div>
+                                </li>
+                            `).join("")}
+                        </ul>
+                    </div>
                 </div>
             `;
         }
@@ -6892,6 +7091,9 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     const oneDriveSaveLinkBtn = section.querySelector("#onedrive-save-link-btn");
     const oneDriveOpenFolderBtn = section.querySelector("#onedrive-open-folder-btn");
     const oneDriveStatus = section.querySelector("#onedrive-sync-status");
+    const oneDriveLinkLibrary = section.querySelector("#onedrive-link-library");
+    const oneDriveLinkLibraryList = section.querySelector("#onedrive-link-library-list");
+    const oneDriveLinkLibraryCount = section.querySelector("#onedrive-link-library-count");
     const googleDriveFolderInput = section.querySelector("#google-drive-folder-url");
     const googleDriveSaveLinkBtn = section.querySelector("#google-drive-save-link-btn");
     const googleDriveOpenFolderBtn = section.querySelector("#google-drive-open-folder-btn");
@@ -6940,9 +7142,12 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     const backendTrelloCardLinks = getAllTrelloCardUrlsFromEvidenceRows(interestData?.my_allocation?.evidence_steps);
     const backendGithubRepoLink = getFirstGithubRepoUrlFromEvidenceRows(interestData?.my_allocation?.evidence_steps);
     const backendGithubRepoLinks = getAllGithubRepoUrlsFromEvidenceRows(interestData?.my_allocation?.evidence_steps);
+    const backendOneDriveLink = getFirstOneDriveFolderUrlFromEvidenceRows(interestData?.my_allocation?.evidence_steps);
+    const backendOneDriveLinks = getAllOneDriveFolderUrlsFromEvidenceRows(interestData?.my_allocation?.evidence_steps);
     const localTrelloCardLink = readStoredTrelloCardLink(projectId, email);
     const localTrelloCardLibrary = readStoredTrelloCardLibrary(projectId, email);
     const localGithubRepoLibrary = readStoredGithubRepoLibrary(projectId, email);
+    const localOneDriveLinkLibrary = readStoredOneDriveLinkLibrary(projectId, email);
     let trelloCardLibrary = writeStoredTrelloCardLibrary(
         projectId,
         email,
@@ -6959,6 +7164,15 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             [{ url: backendGithubRepoLink, savedAt: "" }],
             backendGithubRepoLinks.map((url) => ({ url, savedAt: "" })),
             localGithubRepoLibrary
+        )
+    );
+    let oneDriveLinkLibraryState = writeStoredOneDriveLinkLibrary(
+        projectId,
+        email,
+        mergeOneDriveLinkLibrarySources(
+            [{ url: backendOneDriveLink, savedAt: "" }],
+            backendOneDriveLinks.map((url) => ({ url, savedAt: "" })),
+            localOneDriveLinkLibrary
         )
     );
     const legacyLibraryMigrationUrl = (() => {
@@ -7074,8 +7288,51 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             .join("");
     };
 
+    const renderOneDriveLinkLibrary = () => {
+        if (!oneDriveLinkLibrary || !oneDriveLinkLibraryList) {
+            return;
+        }
+
+        if (!oneDriveLinkLibraryState.length) {
+            oneDriveLinkLibrary.hidden = true;
+            if (oneDriveLinkLibraryCount) {
+                oneDriveLinkLibraryCount.textContent = "(0)";
+            }
+            oneDriveLinkLibraryList.innerHTML = "";
+            return;
+        }
+
+        const activeUrl = toSafeOneDriveFolderUrl(oneDriveFolderInput?.value || "");
+        oneDriveLinkLibrary.hidden = false;
+        if (oneDriveLinkLibraryCount) {
+            oneDriveLinkLibraryCount.textContent = `(${oneDriveLinkLibraryState.length})`;
+        }
+        oneDriveLinkLibraryList.innerHTML = oneDriveLinkLibraryState
+            .map((item) => {
+                const url = toSafeOneDriveFolderUrl(item?.url || "");
+                if (!url) {
+                    return "";
+                }
+                const isActive = Boolean(activeUrl && activeUrl === url);
+                return `
+                    <li class="trello-link-library-item${isActive ? " is-active" : ""}" data-onedrive-link-item="${escapeHtml(url)}">
+                        <div class="trello-link-library-link-wrap">
+                            <a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(url)}</a>
+                            <span class="trello-link-library-savedat">${escapeHtml(formatLibrarySavedAtLabel(item?.savedAt))}</span>
+                        </div>
+                        <div class="trello-link-library-actions">
+                            <button type="button" class="detail-action detail-action-secondary" data-onedrive-library-use="${escapeHtml(url)}">Use</button>
+                            <button type="button" class="detail-action detail-action-secondary" data-onedrive-library-open="${escapeHtml(url)}">Open</button>
+                        </div>
+                    </li>
+                `;
+            })
+            .join("");
+    };
+
     renderTrelloCardLibrary();
     renderGithubRepoLibrary();
+    renderOneDriveLinkLibrary();
 
     if (needsLegacyTrelloMigration && trelloCardInput) {
         trelloCardInput.value = toSafeTrelloCardUrl(localTrelloCardLink) || localTrelloCardLink;
@@ -7345,10 +7602,11 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     });
 
     const readOneDriveFolderUrl = () => {
-        const safe = toSafeExternalUrl(oneDriveFolderInput?.value || "");
+        const safe = toSafeOneDriveFolderUrl(oneDriveFolderInput?.value || "");
         if (oneDriveFolderInput && safe && oneDriveFolderInput.value !== safe) {
             oneDriveFolderInput.value = safe;
         }
+        renderOneDriveLinkLibrary();
         return safe;
     };
 
@@ -7371,6 +7629,33 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         }
 
         setOneDriveStatus("Link looks valid. Click Save OneDrive Link.");
+        renderOneDriveLinkLibrary();
+    });
+
+    oneDriveLinkLibraryList?.addEventListener("click", (event) => {
+        const useButton = event.target.closest("[data-onedrive-library-use]");
+        if (useButton) {
+            const selectedUrl = toSafeOneDriveFolderUrl(useButton.getAttribute("data-onedrive-library-use") || "");
+            if (!selectedUrl) {
+                return;
+            }
+            if (oneDriveFolderInput) {
+                oneDriveFolderInput.value = selectedUrl;
+            }
+            setOneDriveStatus("Selected saved OneDrive link.");
+            renderOneDriveLinkLibrary();
+            return;
+        }
+
+        const openButton = event.target.closest("[data-onedrive-library-open]");
+        if (openButton) {
+            const selectedUrl = toSafeOneDriveFolderUrl(openButton.getAttribute("data-onedrive-library-open") || "");
+            if (!selectedUrl) {
+                return;
+            }
+            window.open(selectedUrl, "_blank", "noopener,noreferrer");
+            setOneDriveStatus("Opened saved OneDrive link.");
+        }
     });
 
     oneDriveSaveLinkBtn?.addEventListener("click", async () => {
@@ -7384,6 +7669,8 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         setOneDriveStatus("Saving OneDrive link...");
         try {
             await persistStudentOneDriveFolderLink(projectId, email, detailData, taskTopicValue, folderUrl);
+            oneDriveLinkLibraryState = addStoredOneDriveLinkLibraryLink(projectId, email, folderUrl);
+            renderOneDriveLinkLibrary();
             setOneDriveStatus("OneDrive link saved and shared with teacher view.");
         } catch (error) {
             const fallback = "Could not save OneDrive link right now.";
