@@ -1582,15 +1582,31 @@ async function persistStudentTrelloLink(projectId, studentEmail, trelloCardUrl) 
         throw new Error("Enter a valid Trello card or board link first.");
     }
 
-    const response = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interests/${encodeURIComponent(studentEmail)}/trello-link`, {
-        method: "PATCH",
-        headers: buildWriteHeaders(),
-        body: JSON.stringify({ trello_card_url: safeUrl })
-    });
+    const saveTrelloLink = async () => {
+        const response = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interests/${encodeURIComponent(studentEmail)}/trello-link`, {
+            method: "PATCH",
+            headers: buildWriteHeaders(),
+            body: JSON.stringify({ trello_card_url: safeUrl })
+        });
 
-    if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload?.error || "Could not save Trello link.");
+        if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            const error = new Error(payload?.error || "Could not save Trello link.");
+            error.status = Number(response.status || 0);
+            throw error;
+        }
+    };
+
+    try {
+        await saveTrelloLink();
+    } catch (error) {
+        if (Number(error?.status || 0) !== 404) {
+            throw error;
+        }
+
+        // Ensure allocation exists, then retry once.
+        await fetchEvidenceRowsEnsuringAllocation(projectId, studentEmail);
+        await saveTrelloLink();
     }
 }
 
