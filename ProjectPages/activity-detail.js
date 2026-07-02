@@ -4174,14 +4174,12 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
             if (showProjectManagementConnections) {
                 const systems = document.createElement("div");
                 systems.className = "evidence-step-system-list";
-                const cloudFolderConnected = Boolean(systemConnections.oneDriveConnected || systemConnections.googleDriveConnected);
-                const secondaryTooltip = isDigitalMediaTaskContext
-                    ? "Cloud Folder accepts either Microsoft OneDrive or Google Drive project folder links."
-                    : "Version-control repository link (for example GitHub).";
                 systems.innerHTML = `
                     <p class="evidence-step-system-title">Connected Systems</p>
                     <label class="evidence-step-system-item"><input type="checkbox" disabled ${systemConnections.trelloConnected ? "checked" : ""}> Trello</label>
-                    <label class="evidence-step-system-item" title="${escapeHtml(secondaryTooltip)}"><input type="checkbox" disabled ${isDigitalMediaTaskContext ? (cloudFolderConnected ? "checked" : "") : (systemConnections.githubConnected ? "checked" : "")}> ${secondarySystemLabel}</label>
+                    <label class="evidence-step-system-item"><input type="checkbox" disabled ${systemConnections.githubConnected ? "checked" : ""}> GitHub</label>
+                    <label class="evidence-step-system-item"><input type="checkbox" disabled ${systemConnections.oneDriveConnected ? "checked" : ""}> OneDrive</label>
+                    <label class="evidence-step-system-item"><input type="checkbox" disabled ${systemConnections.googleDriveConnected ? "checked" : ""}> Google Drive</label>
                 `;
                 row.appendChild(systems);
             }
@@ -5155,7 +5153,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     ].join(" ").toUpperCase();
     const isDigitalMediaContext = /(DIGITAL\s*MEDIA|MEDIA|FILM|VIDEO|AUDIO|MUSIC|PHOTOGRAPH|ANIMATION|GRAPHIC)/i.test(contextSignals);
     const isProgrammingContext = /(DTECH|PROGRAMM|CODING|COMPUT|SOFTWARE|WEB|APP|PYTHON|JAVASCRIPT|ROBOTIC)/i.test(contextSignals);
-    const showGithubGuide = isProjectManagementTopic && isProgrammingContext;
+    const showGithubGuide = isProjectManagementTopic;
     const snowGithubGuide = showGithubGuide;
     const showOneDriveGuide = isProjectManagementTopic;
     const submissionTaskItems = Array.from(new Set([
@@ -6642,7 +6640,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         String(detailData?.title || "")
     ].join(" ").toUpperCase();
     const isProgrammingTaskContext = /(DTECH|PROGRAMM|CODING|COMPUT|SOFTWARE|WEB|APP|PYTHON|JAVASCRIPT|ROBOTIC)/i.test(taskTopicContextSignals);
-    const showGithubGuide = isProjectManagementTaskTopicPage && isProgrammingTaskContext;
+    const showGithubGuide = isProjectManagementTaskTopicPage;
 
     if (isTeacher && isAssessmentTask && !isTaskTopicPage) {
         const students = Array.isArray(interestData?.students) ? interestData.students : [];

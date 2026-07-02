@@ -146,6 +146,8 @@ function inferStudentSystemConnections(currentState) {
     let trelloConnected = false;
     let githubConnected = false;
     let googleSlidesConnected = false;
+    let oneDriveConnected = false;
+    let googleDriveConnected = false;
 
     Object.values(currentState || {}).forEach((steps) => {
         (Array.isArray(steps) ? steps : []).forEach((step) => {
@@ -168,6 +170,22 @@ function inferStudentSystemConnections(currentState) {
             }
             if (/(docs\.google\.com\/presentation)/i.test(textLower)) {
                 googleSlidesConnected = true;
+            }
+
+            if (text.startsWith("MEDIA_ASSET_FOLDER_URL|") || text.startsWith("MEDIA_REVIEW_URL|") || text.startsWith("ONEDRIVE_PROJECT_FOLDER_URL|")) {
+                oneDriveConnected = true;
+            }
+
+            if (text.startsWith("GOOGLE_DRIVE_PROJECT_FOLDER_URL|")) {
+                googleDriveConnected = true;
+            }
+
+            if (/(onedrive\.live\.com|1drv\.ms|sharepoint\.com|onedrive)/i.test(textLower)) {
+                oneDriveConnected = true;
+            }
+
+            if (/(drive\.google\.com)/i.test(textLower)) {
+                googleDriveConnected = true;
             }
         });
     });
@@ -204,7 +222,7 @@ function inferStudentSystemConnections(currentState) {
         }
     }
 
-    return { trelloConnected, githubConnected, googleSlidesConnected };
+    return { trelloConnected, githubConnected, googleSlidesConnected, oneDriveConnected, googleDriveConnected };
 }
 
 function autoTickProjectManagementRequirement(stateMap) {
@@ -503,6 +521,8 @@ function renderChecklistCards(detail, allItems) {
                                             <p class="task-list-system-title">Connected Systems</p>
                                             <label class="task-list-system-item"><input type="checkbox" disabled ${systemConnections.trelloConnected ? "checked" : ""}> Trello</label>
                                             <label class="task-list-system-item"><input type="checkbox" disabled ${systemConnections.githubConnected ? "checked" : ""}> GitHub</label>
+                                            <label class="task-list-system-item"><input type="checkbox" disabled ${systemConnections.oneDriveConnected ? "checked" : ""}> OneDrive</label>
+                                            <label class="task-list-system-item"><input type="checkbox" disabled ${systemConnections.googleDriveConnected ? "checked" : ""}> Google Drive</label>
                                         </div>
                                     ` : ""}
                                 </div>
