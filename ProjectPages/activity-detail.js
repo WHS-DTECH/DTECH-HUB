@@ -2129,6 +2129,20 @@ function formatSubmissionTimestamp(value) {
     return parsed.toLocaleString();
 }
 
+function formatSyncCreatedDate(value) {
+    const raw = String(value || "").trim();
+    if (!raw) {
+        return "Unknown";
+    }
+
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) {
+        return "Unknown";
+    }
+
+    return parsed.toLocaleString();
+}
+
 function summarizeStudentSubmissionStatus(evidenceRows, todayNzKey = getNzDateKey()) {
     const rows = normalizeEvidenceSteps(evidenceRows);
     let acknowledged = false;
@@ -3127,7 +3141,9 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const acknowledgedAt = submission.haparaSubmittedAt || submission.submittedAt || "";
     const currentDocRef = String(submission.haparaDocumentRef || "").trim();
     const currentGoogleSlidesUrl = toSafeExternalUrl(submission.googleSlidesUrl || submission.evidenceLink);
-    let syncedGoogleSlidesUrl = currentGoogleSlidesUrl || readStoredTaskTopicSlideSyncLink(projectId, email, taskTopicTitle, taskTopicShortName);
+    const storedSyncEntry = readStoredTaskTopicSlideSyncEntry(projectId, email, taskTopicTitle, taskTopicShortName);
+    let syncedGoogleSlidesUrl = storedSyncEntry.url || currentGoogleSlidesUrl;
+    let syncedGoogleSlidesSavedAt = String(storedSyncEntry.savedAt || "").trim();
     const currentTrelloCardUrl = toSafeTrelloCardUrl(submission.trelloCardUrl);
     const currentMediaAssetFolderUrl = toSafeExternalUrl(submission.mediaAssetFolderUrl);
     const currentOneDriveProjectFolderUrl = toSafeExternalUrl(submission.mediaAssetFolderUrl);
@@ -3142,6 +3158,41 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         : isMediaAssetWorkflowTopic
             ? String(submission.mediaVersionLogDate || "").trim() === todayNz
             : false;
+
+    if (isDigitalOutcomeTopic) {
+        const processAssessmentFolderUrl = await fetchStudentProcessAssessmentFolderUrl();
+        if (!syncedGoogleSlidesSavedAt) {
+            syncedGoogleSlidesSavedAt = String(submission.haparaSubmittedAt || submission.submittedAt || "").trim();
+        }
+
+        panelHost.innerHTML = `
+            <div class="task-topic-sync-only-panel" aria-label="Digital Outcome sync links">
+                <p class="task-topic-submission-note task-topic-sync-only-note">Showing synced Google links for <strong>Digital Outcome: Description</strong>.</p>
+                ${processAssessmentFolderUrl
+                    ? `<p class="task-topic-sync-folder-link"><a href="${escapeHtml(processAssessmentFolderUrl)}" target="_blank" rel="noreferrer">Open Process Assessment folder in Google Drive</a></p>`
+                    : ""
+                }
+                ${syncedGoogleSlidesUrl
+                    ? `
+                        <ul class="task-topic-sync-link-list" aria-label="Synced slide links">
+                            <li class="task-topic-sync-link-item">
+                                <div class="task-topic-sync-link-main">
+                                    <p class="task-topic-sync-link-title">Digital Outcome: Description slide deck</p>
+                                    <a href="${escapeHtml(syncedGoogleSlidesUrl)}" target="_blank" rel="noreferrer">${escapeHtml(syncedGoogleSlidesUrl)}</a>
+                                </div>
+                                <div class="task-topic-sync-link-meta">
+                                    <span class="task-topic-sync-created-label">Created Date</span>
+                                    <span class="task-topic-sync-created-value">${escapeHtml(formatSyncCreatedDate(syncedGoogleSlidesSavedAt))}</span>
+                                </div>
+                            </li>
+                        </ul>
+                    `
+                    : `<p class="task-topic-submission-note">No synced Digital Outcome: Description slide link yet. Open Template Library and use the Digital Outcome template first.</p>`
+                }
+            </div>
+        `;
+        return;
+    }
 
     panelHost.innerHTML = `
         <form id="task-topic-submission-form" class="task-topic-submission-form" novalidate>
@@ -5088,14 +5139,25 @@ function getTaskTopicSlideSyncStorageKey(projectId, email, taskTopic, taskShortN
 }
 
 function readStoredTaskTopicSlideSyncLink(projectId, email, taskTopic, taskShortName = "") {
+    const entry = readStoredTaskTopicSlideSyncEntry(projectId, email, taskTopic, taskShortName);
+    return entry.url;
+}
+
+function readStoredTaskTopicSlideSyncEntry(projectId, email, taskTopic, taskShortName = "") {
     const key = getTaskTopicSlideSyncStorageKey(projectId, email, taskTopic, taskShortName);
     try {
         const raw = localStorage.getItem(key);
-        if (!raw) return "";
+        if (!raw) {
+            return { url: "", savedAt: "", templateId: "" };
+        }
         const parsed = JSON.parse(raw);
-        return toSafeExternalUrl(parsed?.url || "");
+        return {
+            url: toSafeExternalUrl(parsed?.url || ""),
+            savedAt: String(parsed?.savedAt || "").trim(),
+            templateId: String(parsed?.templateId || "").trim()
+        };
     } catch (_error) {
-        return "";
+        return { url: "", savedAt: "", templateId: "" };
     }
 }
 

@@ -487,11 +487,15 @@ h1 {
     margin: 0 0 10px;
     font-size: 0.78rem;
     color: #356248;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .task-topic-guide-source a {
     color: #1f754b;
     font-weight: 700;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .task-topic-guide-block {
@@ -513,6 +517,8 @@ h1 {
 .task-topic-guide-list {
     margin: 0;
     color: #1f3f2e;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .task-topic-guide-alert {
@@ -561,6 +567,83 @@ h1 {
     margin-top: 10px;
     display: grid;
     gap: 10px;
+}
+
+.task-topic-sync-only-panel {
+    display: grid;
+    gap: 8px;
+}
+
+.task-topic-sync-only-note {
+    margin-bottom: 0;
+}
+
+.task-topic-sync-folder-link {
+    margin: 0;
+    font-size: 0.79rem;
+    color: #5b4420;
+}
+
+.task-topic-sync-folder-link a {
+    color: #1f5b93;
+    font-weight: 700;
+}
+
+.task-topic-sync-link-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+}
+
+.task-topic-sync-link-item {
+    border: 1px solid #e1c790;
+    border-radius: 8px;
+    background: #fff8e9;
+    padding: 10px;
+    display: grid;
+    gap: 8px;
+}
+
+.task-topic-sync-link-main {
+    display: grid;
+    gap: 4px;
+}
+
+.task-topic-sync-link-title {
+    margin: 0;
+    font-size: 0.83rem;
+    font-weight: 800;
+    color: #5b4520;
+}
+
+.task-topic-sync-link-main a {
+    font-size: 0.8rem;
+    line-height: 1.35;
+    word-break: break-all;
+    color: #1f5b93;
+}
+
+.task-topic-sync-link-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.task-topic-sync-created-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-weight: 800;
+    color: #6a5228;
+}
+
+.task-topic-sync-created-value {
+    font-size: 0.79rem;
+    color: #5b4520;
+    font-weight: 600;
 }
 
 .task-topic-submission-note {
