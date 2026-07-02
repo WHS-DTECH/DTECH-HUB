@@ -6195,6 +6195,16 @@ app.patch("/api/activities/:id/interests/me/evidence", async (req, res) => {
   }
 
   try {
+    const ensureRow = await pool.query(
+      `
+        INSERT INTO project_interests (project_id, student_email, confirmed, created_at, updated_at, evidence_steps)
+        VALUES ($1, $2, FALSE, NOW(), NOW(), '[]'::jsonb)
+        ON CONFLICT (project_id, student_email) DO NOTHING
+        RETURNING student_email
+      `,
+      [projectId, requesterEmail]
+    );
+
     const result = await pool.query(
       `
         UPDATE project_interests
@@ -6206,7 +6216,7 @@ app.patch("/api/activities/:id/interests/me/evidence", async (req, res) => {
       [JSON.stringify(evidenceSteps), projectId, requesterEmail]
     );
 
-    if (!result.rowCount) {
+    if (!result.rowCount && !ensureRow.rowCount) {
       res.status(404).json({ error: "Student allocation not found" });
       return;
     }
@@ -6281,6 +6291,16 @@ app.patch("/api/activities/:id/my-evidence", async (req, res) => {
   }
 
   try {
+    const ensureRow = await pool.query(
+      `
+        INSERT INTO project_interests (project_id, student_email, confirmed, created_at, updated_at, evidence_steps)
+        VALUES ($1, $2, FALSE, NOW(), NOW(), '[]'::jsonb)
+        ON CONFLICT (project_id, student_email) DO NOTHING
+        RETURNING student_email
+      `,
+      [projectId, requesterEmail]
+    );
+
     const result = await pool.query(
       `
         UPDATE project_interests
@@ -6292,7 +6312,7 @@ app.patch("/api/activities/:id/my-evidence", async (req, res) => {
       [JSON.stringify(evidenceSteps), projectId, requesterEmail]
     );
 
-    if (!result.rowCount) {
+    if (!result.rowCount && !ensureRow.rowCount) {
       res.status(404).json({ error: "Student allocation not found" });
       return;
     }
