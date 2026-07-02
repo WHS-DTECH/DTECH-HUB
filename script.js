@@ -1836,7 +1836,7 @@ function ensureGlobalHubSidebar() {
             return;
         }
 
-        const taskListTarget = getTaskListNavigationTarget();
+        const taskListTarget = getTaskListNavigationTarget(panel);
         if (taskListTarget) {
             window.location.href = taskListTarget;
             setOpen(false);
@@ -1858,11 +1858,16 @@ function ensureGlobalHubSidebar() {
     return hubGlobalSidebarNodes;
 }
 
-function getTaskListNavigationTarget() {
+function getTaskListNavigationTarget(panel = null) {
     try {
         const params = new URLSearchParams(window.location.search || "");
         const activityId = String(params.get("id") || params.get("activityId") || "").trim();
         if (!activityId) {
+            const firstAllocLink = panel?.querySelector?.("#hub-sidebar-assessment-list a, #hub-sidebar-projects-list a") || null;
+            if (firstAllocLink instanceof HTMLAnchorElement) {
+                const href = String(firstAllocLink.getAttribute("href") || "").trim();
+                return href || "";
+            }
             return "";
         }
 
@@ -1913,7 +1918,7 @@ function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {
     if (adminLink) adminLink.hidden = !canAdmin;
     if (taskListButton) {
         const hasTaskListTrigger = document.querySelector("#evidence-sidebar-open") instanceof HTMLElement;
-        const hasTaskListTarget = Boolean(getTaskListNavigationTarget());
+        const hasTaskListTarget = Boolean(getTaskListNavigationTarget(panel));
         taskListButton.hidden = !(hasTaskListTrigger || hasTaskListTarget);
     }
 
@@ -1968,6 +1973,13 @@ async function loadAndRenderSidebarAllocations(panel) {
             projectsList.innerHTML = projects.map((item) =>
                 `<li class="hub-sidebar-alloc-item"><a href="/ProjectPages/custom-activity.html?id=${encodeURIComponent(item.id)}">${escapeHtml(item.name)}</a></li>`
             ).join("");
+        }
+
+        const taskListButton = panel.querySelector("#hub-global-sidebar-tasklist-link");
+        if (taskListButton) {
+            const hasTaskListTrigger = document.querySelector("#evidence-sidebar-open") instanceof HTMLElement;
+            const hasTaskListTarget = Boolean(getTaskListNavigationTarget(panel));
+            taskListButton.hidden = !(hasTaskListTrigger || hasTaskListTarget);
         }
 
         if (assessmentSection) assessmentSection.hidden = assessments.length === 0;
