@@ -6200,6 +6200,77 @@ app.patch("/api/activities/:id/interests/:studentEmail/trello-link", async (req,
   }
 });
 
+app.patch("/api/activities/:id/interests/me/trello-link", async (req, res) => {
+  const projectId = String(req.params.id || "").trim();
+  const requesterEmail = normalizeEmail(getRequestUserEmail(req));
+  const trelloCardUrl = String(req.body?.trello_card_url || req.body?.trelloCardUrl || "").trim();
+
+  if (!projectId) {
+    res.status(400).json({ error: "Project ID is required" });
+    return;
+  }
+
+  if (!requesterEmail || !requesterEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required" });
+    return;
+  }
+
+  if (!trelloCardUrl) {
+    res.status(400).json({ error: "Trello card or board link is required" });
+    return;
+  }
+
+  if (!hasDatabase) {
+    res.json({ student_email: requesterEmail, trello_card_url: trelloCardUrl, saved: true });
+    return;
+  }
+
+  try {
+    const currentResult = await pool.query(
+      "SELECT evidence_steps FROM project_interests WHERE project_id = $1 AND student_email = $2 LIMIT 1",
+      [projectId, requesterEmail]
+    );
+
+    let existingRows = [];
+    if (currentResult.rowCount) {
+      existingRows = normalizeEvidenceStepsPayload(currentResult.rows?.[0]?.evidence_steps);
+    } else {
+      await pool.query(
+        `
+          INSERT INTO project_interests (project_id, student_email, confirmed, created_at, updated_at, evidence_steps)
+          VALUES ($1, $2, FALSE, NOW(), NOW(), '[]'::jsonb)
+          ON CONFLICT (project_id, student_email) DO NOTHING
+        `,
+        [projectId, requesterEmail]
+      );
+    }
+
+    const nextRows = upsertEvidenceRow(existingRows, "trello-sync", [
+      { text: `TRELLO_CARD_URL|${trelloCardUrl}`, done: true },
+      { text: `TRELLO_SAVED_AT|${new Date().toISOString()}`, done: true }
+    ]);
+
+    await pool.query(
+      `
+        UPDATE project_interests
+        SET evidence_steps = $1::jsonb,
+            updated_at = NOW()
+        WHERE project_id = $2 AND student_email = $3
+      `,
+      [JSON.stringify(nextRows), projectId, requesterEmail]
+    );
+
+    res.json({
+      student_email: requesterEmail,
+      trello_card_url: trelloCardUrl,
+      evidence_steps: nextRows,
+      saved: true
+    });
+  } catch (_error) {
+    res.status(500).json({ error: "Could not save Trello link" });
+  }
+});
+
 // DELETE /api/activities/:id/interests/:studentEmail — teacher removes a student's interest
 app.delete("/api/activities/:id/interests/:studentEmail", requireActivityWriteAccess, async (req, res) => {
   const projectId = String(req.params.id || "").trim();

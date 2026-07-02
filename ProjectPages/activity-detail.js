@@ -1677,7 +1677,22 @@ async function persistStudentTrelloLink(projectId, studentEmail, trelloCardUrl) 
         await saveEvidenceRows(projectId, studentEmail, nextRows);
     };
 
-    const saveTrelloLinkEndpoint = async () => {
+    const saveTrelloLinkMeEndpoint = async () => {
+        const response = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interests/me/trello-link`, {
+            method: "PATCH",
+            headers: buildWriteHeaders(),
+            body: JSON.stringify({ trello_card_url: safeUrl })
+        });
+
+        if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            const error = new Error(payload?.error || "Could not save Trello link.");
+            error.status = Number(response.status || 0);
+            throw error;
+        }
+    };
+
+    const saveTrelloLinkLegacyEndpoint = async () => {
         const response = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interests/${encodeURIComponent(studentEmail)}/trello-link`, {
             method: "PATCH",
             headers: buildWriteHeaders(),
@@ -1697,9 +1712,14 @@ async function persistStudentTrelloLink(projectId, studentEmail, trelloCardUrl) 
 
     // Secondary path: keep dedicated endpoint in sync, but do not block success.
     try {
-        await saveTrelloLinkEndpoint();
+        await saveTrelloLinkMeEndpoint();
     } catch (_error) {
-        // Evidence rows already contain the Trello URL; keep UX successful.
+        // Fallback to original student-email endpoint for backward compatibility.
+        try {
+            await saveTrelloLinkLegacyEndpoint();
+        } catch (_legacyError) {
+            // Evidence rows already contain the Trello URL; keep UX successful.
+        }
     }
 }
 
