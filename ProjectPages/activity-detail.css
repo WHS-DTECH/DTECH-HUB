@@ -1267,6 +1267,10 @@ h1 {
         align-items: start;
     }
 
+    .page.task-topic-screen.student-task-topic-screen .task-topic-submission-column-digital-outcome > .task-topic-sync-grid:first-of-type {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
     .page.task-topic-screen.student-task-topic-screen .task-topic-detail-layout {
         max-width: min(1320px, calc(100% - 24px));
     }
