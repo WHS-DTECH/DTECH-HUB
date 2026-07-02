@@ -1,4 +1,6 @@
 const TASK_LIST_AUTH_KEY = "hub_google_auth_v1";
+const TASK_LIST_TRELLO_CARD_LINK_STORAGE_PREFIX = "hub_trello_card_link_v1";
+const TASK_LIST_TRELLO_CARD_LIBRARY_STORAGE_PREFIX = "hub_trello_card_library_v1";
 
 const DIGITAL_OUTCOME_DETAILS_TASKS = [
     "Description - Google Slides: Describe the Digital Outcome: What is it, who is it for, and what should it do?",
@@ -170,7 +172,64 @@ function inferStudentSystemConnections(currentState) {
         });
     });
 
+    if (!trelloConnected) {
+        const projectId = String(taskListState.selectedId || "").trim();
+        const email = getTaskListEmail();
+        if (projectId && email) {
+            const linkStorageKey = `${TASK_LIST_TRELLO_CARD_LINK_STORAGE_PREFIX}:${projectId}:${email}`;
+            const libraryStorageKey = `${TASK_LIST_TRELLO_CARD_LIBRARY_STORAGE_PREFIX}:${projectId}:${email}`;
+            try {
+                const localLink = String(localStorage.getItem(linkStorageKey) || "").trim();
+                if (localLink && /trello\.com\//i.test(localLink)) {
+                    trelloConnected = true;
+                }
+            } catch (_error) {
+            }
+
+            if (!trelloConnected) {
+                try {
+                    const rawLibrary = localStorage.getItem(libraryStorageKey);
+                    const parsedLibrary = rawLibrary ? JSON.parse(rawLibrary) : [];
+                    const hasAnyTrelloLibraryLink = Array.isArray(parsedLibrary)
+                        && parsedLibrary.some((item) => {
+                            const candidate = typeof item === "string" ? item : item?.url;
+                            return /trello\.com\//i.test(String(candidate || ""));
+                        });
+                    if (hasAnyTrelloLibraryLink) {
+                        trelloConnected = true;
+                    }
+                } catch (_error) {
+                }
+            }
+        }
+    }
+
     return { trelloConnected, githubConnected, googleSlidesConnected };
+}
+
+function autoTickProjectManagementRequirement(stateMap) {
+    const rows = Array.isArray(stateMap?.["91897"]) ? stateMap["91897"] : [];
+    if (!rows.length) {
+        return false;
+    }
+
+    const systems = inferStudentSystemConnections(stateMap || {});
+    if (!systems.trelloConnected || !systems.githubConnected) {
+        return false;
+    }
+
+    let changed = false;
+    rows.forEach((row) => {
+        const text = String(row?.text || "").trim();
+        if (!text) return;
+        if (getStepLevel(text) !== "Achieved") return;
+        if (!stripStepLevel(text).toLowerCase().includes("project management")) return;
+        if (!Boolean(row?.done)) {
+            row.done = true;
+            changed = true;
+        }
+    });
+    return changed;
 }
 
 async function loadJson(url, options = {}) {
@@ -525,6 +584,13 @@ async function loadChecklistForTask(taskId) {
                 : [];
         }
     });
+
+    const autoChangedChecklist = autoTickProjectManagementRequirement(taskListState.checklistState);
+    const autoChangedEvidence = autoTickProjectManagementRequirement(taskListState.fullEvidenceState);
+    if (autoChangedChecklist || autoChangedEvidence) {
+        const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
+        await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});
+    }
 
     renderHeader({
         totalLinked: taskListState.allItems.length,

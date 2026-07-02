@@ -3714,7 +3714,8 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
     const stripStepLevel = (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim();
 
     const inferStudentSystemConnections = () => {
-        let trelloConnected = Boolean(toSafeTrelloCardUrl(readStoredTrelloCardLink(projectId, studentEmail)));
+        let trelloConnected = Boolean(toSafeTrelloCardUrl(readStoredTrelloCardLink(projectId, studentEmail)))
+            || readStoredTrelloCardLibrary(projectId, studentEmail).length > 0;
         let githubConnected = false;
         let oneDriveConnected = false;
         let googleDriveConnected = false;
@@ -3843,6 +3844,8 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
             return;
         }
 
+        let autoUpdated = false;
+
         filtered.forEach(({ step, index }) => {
             const row = document.createElement("div");
             row.className = "evidence-step-row";
@@ -3850,10 +3853,25 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
                 row.classList.add("is-subitem");
             }
 
+            const rowLevel = String(levelFilter || getStepLevel(step?.text)).trim().toLowerCase();
+            const rowTaskText = stripStepLevel(step?.text).toLowerCase();
+            const autoCompleteProjectManagementRow = String(standardCode) === "91897"
+                && rowLevel === "achieved"
+                && rowTaskText.includes("project management")
+                && systemConnections.trelloConnected
+                && systemConnections.githubConnected;
+
+            const doneValue = Boolean(step?.done) || autoCompleteProjectManagementRow;
+            if (autoCompleteProjectManagementRow && !Boolean(step?.done)) {
+                state[standardCode][index].done = true;
+                step.done = true;
+                autoUpdated = true;
+            }
+
             const check = document.createElement("input");
             check.type = "checkbox";
             check.className = "evidence-step-check";
-            check.checked = Boolean(step?.done);
+            check.checked = doneValue;
             check.addEventListener("change", () => {
                 state[standardCode][index].done = check.checked;
                 void persistState(sidebar.querySelector("#evidence-sidebar-status"));
@@ -3903,8 +3921,6 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
                 row.append(removeButton);
             }
 
-            const rowLevel = String(levelFilter || getStepLevel(step?.text)).trim().toLowerCase();
-            const rowTaskText = stripStepLevel(step?.text).toLowerCase();
             const showProjectManagementConnections = String(standardCode) === "91897"
                 && rowLevel === "achieved"
                 && rowTaskText.includes("project management");
@@ -3938,6 +3954,10 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
 
             rowsHost.appendChild(row);
         });
+
+        if (autoUpdated) {
+            void persistState(sidebar.querySelector("#evidence-sidebar-status"));
+        }
     };
 
     sidebar.innerHTML = `
@@ -6969,7 +6989,11 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                     return;
                 }
 
-                await persistStudentTrelloLink(projectId, email, safeLocalUrl);
+                await persistStudentTrelloLinkDirectlyToEvidence(projectId, email, detailData, taskTopicValue, safeLocalUrl);
+                try {
+                    await persistStudentTrelloLink(projectId, email, safeLocalUrl);
+                } catch (_legacyError) {
+                }
                 setTrelloStatus("Your Trello link has been synced to teacher view.");
             } catch (_error) {
                 // Keep the prompt visible so the student can use Save Trello Link manually.
