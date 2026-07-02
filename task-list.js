@@ -105,6 +105,18 @@ function deriveTaskShortName(taskTopic) {
     return normalized;
 }
 
+function getStepLevel(text) {
+    const normalized = String(text || "").trim().toLowerCase();
+    if (normalized.startsWith("achieved:")) return "Achieved";
+    if (normalized.startsWith("merit:")) return "Merit";
+    if (normalized.startsWith("excellence:")) return "Excellence";
+    return "";
+}
+
+function stripStepLevel(text) {
+    return String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim();
+}
+
 async function loadJson(url, options = {}) {
     const response = await fetch(url, options);
     const payload = await response.json().catch(() => ({}));
@@ -312,6 +324,48 @@ function renderChecklistCards(detail, allItems) {
         </li>
     `).join("");
 
+    const renderRowsForStandard = (standard, rows) => {
+        const safeRows = Array.isArray(rows) ? rows : [];
+
+        if (String(standard) !== "91897") {
+            return `
+                <div class="task-list-step-list">
+                    ${safeRows.map((step, index) => `
+                        <div class="task-list-step-row">
+                            <label class="task-list-step-check-wrap">
+                                <input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">
+                                <span class="task-list-step-text">${escapeTaskListHtml(String(step?.text || ""))}</span>
+                            </label>
+                        </div>
+                    `).join("")}
+                </div>
+            `;
+        }
+
+        const levels = ["Achieved", "Merit", "Excellence"];
+        return levels.map((level) => {
+            const levelRows = safeRows
+                .map((step, index) => ({ ...step, _index: index }))
+                .filter((step) => getStepLevel(step?.text) === level);
+
+            return `
+                <section class="task-list-level-group">
+                    <h4>${escapeTaskListHtml(level)}</h4>
+                    <div class="task-list-step-list">
+                        ${levelRows.map((step) => `
+                            <div class="task-list-step-row">
+                                <label class="task-list-step-check-wrap">
+                                    <input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${step._index}">
+                                    <span class="task-list-step-text">${escapeTaskListHtml(stripStepLevel(step?.text))}</span>
+                                </label>
+                            </div>
+                        `).join("")}
+                    </div>
+                </section>
+            `;
+        }).join("");
+    };
+
     const cardsHtml = taskListState.checklistStandards.map((standard) => {
         const title = standard === "digital-outcome" ? "Digital Outcome Description" : `Standard ${escapeTaskListHtml(standard)}`;
         const rows = Array.isArray(taskListState.checklistState[standard]) ? taskListState.checklistState[standard] : [];
@@ -324,17 +378,12 @@ function renderChecklistCards(detail, allItems) {
                     <p class="task-list-meta"><strong>${escapeTaskListHtml(taskTitle)}</strong> • ${escapeTaskListHtml(deriveTaskShortName(taskTopic))}</p>
                     <p class="task-list-meta">Assessments and Projects linked to this task:</p>
                     <ul class="task-list-link-list">${linkedList}</ul>
+                    <div class="task-list-system-list">
+                        <p class="task-list-system-title">Connected Systems</p>
+                        <label class="task-list-system-item"><input type="checkbox" checked disabled> Description - Google Slides</label>
+                    </div>
                 ` : `<h3>${title}</h3>`}
-                <div class="task-list-step-list">
-                    ${rows.map((step, index) => `
-                        <div class="task-list-step-row">
-                            <label class="task-list-step-check-wrap">
-                                <input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">
-                                <span class="task-list-step-text">${escapeTaskListHtml(String(step?.text || ""))}</span>
-                            </label>
-                        </div>
-                    `).join("")}
-                </div>
+                ${renderRowsForStandard(standard, rows)}
             </article>
         `;
     }).join("");
