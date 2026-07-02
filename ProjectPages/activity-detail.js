@@ -618,7 +618,90 @@ function installCloudSyncDelegatedFallbackHandlers() {
                 if (button.isConnected) button.disabled = false;
             }
         }
+
+        if (button.id === "trello-save-link-btn" && button.dataset.syncBound !== "1") {
+            const url = toSafeTrelloCardUrl(document.querySelector("#trello-card-url")?.value || "");
+            if (!url) {
+                setStatus("#trello-sync-status", "Enter a valid Trello card or board link first.", true);
+                return;
+            }
+
+            const ctx = getActiveSyncContext();
+            if (!ctx.projectId || !ctx.email) {
+                setStatus("#trello-sync-status", "Sign in again, then retry Save Trello Link.", true);
+                return;
+            }
+
+            button.disabled = true;
+            setStatus("#trello-sync-status", "Saving Trello link...");
+            try {
+                await persistStudentTrelloLinkDirectlyToEvidence(ctx.projectId, ctx.email, ctx.detailData, ctx.taskTopicValue, url);
+                setStatus("#trello-sync-status", "Trello link saved.");
+            } catch (error) {
+                setStatus("#trello-sync-status", `${error?.message || "Could not save Trello link right now."}${formatApiDebugSuffix(error)}`, true);
+            } finally {
+                if (button.isConnected) button.disabled = false;
+            }
+            return;
+        }
+
+        if (button.id === "trello-open-card-btn" && button.dataset.syncBound !== "1") {
+            const url = toSafeTrelloCardUrl(document.querySelector("#trello-card-url")?.value || "");
+            if (!url) {
+                setStatus("#trello-sync-status", "Enter a valid Trello card or board link first.", true);
+                return;
+            }
+            window.open(url, "_blank", "noopener,noreferrer");
+            setStatus("#trello-sync-status", "Opened Trello link.");
+            return;
+        }
     });
+
+    document.addEventListener("click", async (event) => {
+        const button = event.target?.closest?.("button");
+        if (!button) {
+            return;
+        }
+
+        if (button.id !== "trello-save-link-btn" && button.id !== "trello-open-card-btn") {
+            return;
+        }
+
+        event.stopImmediatePropagation();
+
+        const url = toSafeTrelloCardUrl(document.querySelector("#trello-card-url")?.value || "");
+        if (button.id === "trello-open-card-btn") {
+            if (!url) {
+                setStatus("#trello-sync-status", "Enter a valid Trello card or board link first.", true);
+                return;
+            }
+            window.open(url, "_blank", "noopener,noreferrer");
+            setStatus("#trello-sync-status", "Opened Trello link.");
+            return;
+        }
+
+        if (!url) {
+            setStatus("#trello-sync-status", "Enter a valid Trello card or board link first.", true);
+            return;
+        }
+
+        const ctx = getActiveSyncContext();
+        if (!ctx.projectId || !ctx.email) {
+            setStatus("#trello-sync-status", "Sign in again, then retry Save Trello Link.", true);
+            return;
+        }
+
+        button.disabled = true;
+        setStatus("#trello-sync-status", "Saving Trello link...");
+        try {
+            await persistStudentTrelloLinkDirectlyToEvidence(ctx.projectId, ctx.email, ctx.detailData, ctx.taskTopicValue, url);
+            setStatus("#trello-sync-status", "Trello link saved.");
+        } catch (error) {
+            setStatus("#trello-sync-status", `${error?.message || "Could not save Trello link right now."}${formatApiDebugSuffix(error)}`, true);
+        } finally {
+            if (button.isConnected) button.disabled = false;
+        }
+    }, true);
 }
 
 function formatApiDebugSuffix(error) {
