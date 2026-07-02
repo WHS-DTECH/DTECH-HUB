@@ -645,18 +645,79 @@ function getTrelloCardLibraryStorageKey(projectId, email) {
 }
 
 function normalizeTrelloCardLibrary(values) {
-    const seen = new Set();
+    const seenIndexByUrl = new Map();
     const list = [];
     const source = Array.isArray(values) ? values : [];
     source.forEach((value) => {
-        const safeUrl = toSafeTrelloCardUrl(value);
-        if (!safeUrl || seen.has(safeUrl)) {
+        const candidateUrl = typeof value === "object" && value
+            ? value.url
+            : value;
+        const safeUrl = toSafeTrelloCardUrl(candidateUrl);
+        if (!safeUrl) {
             return;
         }
-        seen.add(safeUrl);
-        list.push(safeUrl);
+
+        let savedAt = "";
+        if (typeof value === "object" && value) {
+            const parsed = Date.parse(String(value.savedAt || "").trim());
+            savedAt = Number.isFinite(parsed) ? new Date(parsed).toISOString() : "";
+        }
+
+        if (seenIndexByUrl.has(safeUrl)) {
+            const existingIndex = Number(seenIndexByUrl.get(safeUrl));
+            const existing = list[existingIndex] || { url: safeUrl, savedAt: "" };
+            if (!existing.savedAt && savedAt) {
+                list[existingIndex] = { url: safeUrl, savedAt };
+            }
+            return;
+        }
+
+        seenIndexByUrl.set(safeUrl, list.length);
+        list.push({ url: safeUrl, savedAt });
     });
     return list.slice(0, 12);
+}
+
+function mergeTrelloCardLibrarySources(...sources) {
+    const merged = [];
+    sources.forEach((source) => {
+        const values = Array.isArray(source) ? source : [];
+        values.forEach((value) => {
+            if (typeof value === "string") {
+                merged.push({ url: value, savedAt: "" });
+                return;
+            }
+            merged.push(value);
+        });
+    });
+    return normalizeTrelloCardLibrary(merged);
+}
+
+function formatLibrarySavedAtLabel(savedAt) {
+    const parsed = Date.parse(String(savedAt || "").trim());
+    if (!Number.isFinite(parsed)) {
+        return "saved earlier";
+    }
+
+    const now = Date.now();
+    const diffMs = Math.max(0, now - parsed);
+    const minuteMs = 60 * 1000;
+    const hourMs = 60 * minuteMs;
+    const dayMs = 24 * hourMs;
+
+    if (diffMs < minuteMs) {
+        return "saved just now";
+    }
+    if (diffMs < hourMs) {
+        const minutes = Math.round(diffMs / minuteMs);
+        return `saved ${minutes} min${minutes === 1 ? "" : "s"} ago`;
+    }
+    if (diffMs < dayMs) {
+        const hours = Math.round(diffMs / hourMs);
+        return `saved ${hours} hr${hours === 1 ? "" : "s"} ago`;
+    }
+    const days = Math.round(diffMs / dayMs);
+    return `saved ${days} day${days === 1 ? "" : "s"} ago`;
 }
 
 function readStoredTrelloCardLibrary(projectId, email) {
@@ -693,7 +754,7 @@ function addStoredTrelloCardLibraryLink(projectId, email, value) {
     }
 
     const current = readStoredTrelloCardLibrary(projectId, email);
-    const next = normalizeTrelloCardLibrary([safeUrl, ...current]);
+    const next = normalizeTrelloCardLibrary([{ url: safeUrl, savedAt: new Date().toISOString() }, ...current]);
     return writeStoredTrelloCardLibrary(projectId, email, next);
 }
 
@@ -5743,7 +5804,11 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             const mergedTrelloCardLibrary = writeStoredTrelloCardLibrary(
                 projectId,
                 email,
-                normalizeTrelloCardLibrary([sharedTrelloCardLink, localTrelloCardLink, ...sharedTrelloCardLinks, ...localTrelloCardLibrary])
+                mergeTrelloCardLibrarySources(
+                    [{ url: sharedTrelloCardLink, savedAt: "" }, { url: localTrelloCardLink, savedAt: "" }],
+                    sharedTrelloCardLinks.map((url) => ({ url, savedAt: "" })),
+                    localTrelloCardLibrary
+                )
             );
             const savedCardLink = escapeHtml(sharedTrelloCardLink || localTrelloCardLink);
             const trelloBoardHint = getTrelloBoardHint(sharedTrelloCardLink || localTrelloCardLink);
@@ -5767,12 +5832,15 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                         <div class="trello-link-library" id="trello-link-library" ${mergedTrelloCardLibrary.length ? "" : "hidden"}>
                             <p class="trello-link-library-title">Saved Trello Links <span class="trello-link-library-count" id="trello-link-library-count">(${mergedTrelloCardLibrary.length})</span></p>
                             <ul class="trello-link-library-list" id="trello-link-library-list">
-                                ${mergedTrelloCardLibrary.map((url) => `
-                                    <li class="trello-link-library-item" data-trello-link-item="${escapeHtml(url)}">
-                                        <a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(url)}</a>
+                                ${mergedTrelloCardLibrary.map((item) => `
+                                    <li class="trello-link-library-item" data-trello-link-item="${escapeHtml(item.url)}">
+                                        <div class="trello-link-library-link-wrap">
+                                            <a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.url)}</a>
+                                            <span class="trello-link-library-savedat">${escapeHtml(formatLibrarySavedAtLabel(item.savedAt))}</span>
+                                        </div>
                                         <div class="trello-link-library-actions">
-                                            <button type="button" class="detail-action detail-action-secondary" data-trello-library-use="${escapeHtml(url)}">Use</button>
-                                            <button type="button" class="detail-action detail-action-secondary" data-trello-library-open="${escapeHtml(url)}">Open</button>
+                                            <button type="button" class="detail-action detail-action-secondary" data-trello-library-use="${escapeHtml(item.url)}">Use</button>
+                                            <button type="button" class="detail-action detail-action-secondary" data-trello-library-open="${escapeHtml(item.url)}">Open</button>
                                         </div>
                                     </li>
                                 `).join("")}
@@ -5999,7 +6067,11 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     let trelloCardLibrary = writeStoredTrelloCardLibrary(
         projectId,
         email,
-        normalizeTrelloCardLibrary([backendTrelloCardLink, localTrelloCardLink, ...backendTrelloCardLinks, ...localTrelloCardLibrary])
+        mergeTrelloCardLibrarySources(
+            [{ url: backendTrelloCardLink, savedAt: "" }, { url: localTrelloCardLink, savedAt: "" }],
+            backendTrelloCardLinks.map((url) => ({ url, savedAt: "" })),
+            localTrelloCardLibrary
+        )
     );
     const needsLegacyTrelloMigration = !backendTrelloCardLink && Boolean(localTrelloCardLink);
 
@@ -6023,11 +6095,18 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             trelloLinkLibraryCount.textContent = `(${trelloCardLibrary.length})`;
         }
         trelloLinkLibraryList.innerHTML = trelloCardLibrary
-            .map((url) => {
+            .map((item) => {
+                const url = toSafeTrelloCardUrl(item?.url || "");
+                if (!url) {
+                    return "";
+                }
                 const isActive = Boolean(activeUrl && activeUrl === url);
                 return `
                     <li class="trello-link-library-item${isActive ? " is-active" : ""}" data-trello-link-item="${escapeHtml(url)}">
-                        <a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(url)}</a>
+                        <div class="trello-link-library-link-wrap">
+                            <a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(url)}</a>
+                            <span class="trello-link-library-savedat">${escapeHtml(formatLibrarySavedAtLabel(item?.savedAt))}</span>
+                        </div>
                         <div class="trello-link-library-actions">
                             <button type="button" class="detail-action detail-action-secondary" data-trello-library-use="${escapeHtml(url)}">Use</button>
                             <button type="button" class="detail-action detail-action-secondary" data-trello-library-open="${escapeHtml(url)}">Open</button>

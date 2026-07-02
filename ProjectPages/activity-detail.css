@@ -1496,6 +1496,23 @@ h1 {
     word-break: break-all;
 }
 
+.trello-link-library-link-wrap {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+}
+
+.trello-link-library-savedat {
+    display: inline-block;
+    width: fit-content;
+    font-size: 0.68rem;
+    color: #38664c;
+    background: #e3f2e5;
+    border: 1px solid #c5dfcb;
+    border-radius: 999px;
+    padding: 1px 7px;
+}
+
 .trello-link-library-actions {
     display: flex;
     gap: 6px;
