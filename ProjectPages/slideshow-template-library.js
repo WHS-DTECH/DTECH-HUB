@@ -366,8 +366,52 @@ function getTemplateStepMatchers(templateId) {
         return [/^description\s*-\s*google\s*slides\b/i];
     }
 
+    if (id === "target-audience") {
+        return [/target\s+audience/i, /end\s+user/i];
+    }
+
+    if (id === "relevant-implications" || id === "development-steps") {
+        return [
+            /explain\s+how\s+the\s+outcome\s+will\s+be\s+developed/i,
+            /tools\/?technologies/i,
+            /development\s+steps/i,
+            /outcome\s+developed/i,
+            /relevant\s+implications/i
+        ];
+    }
+
+    if (id === "project-success-criteria") {
+        return [
+            /state\s+how\s+success\s+will\s+be\s+measured/i,
+            /success\s+will\s+be\s+evaluated/i,
+            /success\s+criteria/i
+        ];
+    }
+
     if (id === "speaker-notes-criteria-mapping") {
         return [/speaker\s*notes/i, /criteria\s*mapping/i];
+    }
+
+    if (contextText.includes("target audience") || contextText.includes("end user")) {
+        return [/target\s+audience/i, /end\s+user/i];
+    }
+
+    if (contextText.includes("development") || contextText.includes("tools") || contextText.includes("technologies")) {
+        return [
+            /explain\s+how\s+the\s+outcome\s+will\s+be\s+developed/i,
+            /tools\/?technologies/i,
+            /development\s+steps/i,
+            /outcome\s+developed/i,
+            /relevant\s+implications/i
+        ];
+    }
+
+    if (contextText.includes("success") || contextText.includes("measured") || contextText.includes("evaluated")) {
+        return [
+            /state\s+how\s+success\s+will\s+be\s+measured/i,
+            /success\s+will\s+be\s+evaluated/i,
+            /success\s+criteria/i
+        ];
     }
 
     if (contextText.includes("digital outcome")) {

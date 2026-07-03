@@ -4593,6 +4593,64 @@ function compareTemplateLibraryEntries(left, right) {
   return leftTitle.localeCompare(rightTitle);
 }
 
+function inferCanonicalTemplateIdentityFromTitle(title) {
+  const normalizedTitle = String(title || "").trim().toLowerCase();
+
+  if (!normalizedTitle) {
+    return null;
+  }
+
+  if (normalizedTitle.includes("process slide templates")) {
+    return {
+      id: "process-slide-templates",
+      title: "Process Slide Templates",
+      criteriaText: ""
+    };
+  }
+
+  if (/digital\s*outcome\s*description|description\s*-\s*google\s*slides/.test(normalizedTitle)) {
+    return {
+      id: "digital-outcome-description",
+      title: "Digital Outcome Description",
+      criteriaText: "Describe what the digital outcome is, who it is for, and what it must do."
+    };
+  }
+
+  if (/target\s+audience|end\s+user/.test(normalizedTitle)) {
+    return {
+      id: "target-audience",
+      title: "Target Audience",
+      criteriaText: "Identify the target audience or end user for this outcome."
+    };
+  }
+
+  if (/development\s+steps|outcome\s+developed|developed|development|tools\/?technologies|relevant\s+implications/.test(normalizedTitle)) {
+    return {
+      id: "relevant-implications",
+      title: "Development Steps",
+      criteriaText: "Explain how the outcome will be developed and what tools/technologies will be used."
+    };
+  }
+
+  if (/project\s+success\s+criteria|success\s+criteria|success\s+will\s+be\s+measured|success\s+will\s+be\s+evaluated/.test(normalizedTitle)) {
+    return {
+      id: "project-success-criteria",
+      title: "Project Success Criteria",
+      criteriaText: "State how success will be measured or evaluated."
+    };
+  }
+
+  if (/speaker\s*notes|criteria\s*mapping/.test(normalizedTitle)) {
+    return {
+      id: "speaker-notes-criteria-mapping",
+      title: "Speaker Notes Criteria Mapping",
+      criteriaText: "Map each presented slide to assessment criteria in Speaker Notes."
+    };
+  }
+
+  return null;
+}
+
 async function listTemplateLibraryEntries() {
   if (!hasDatabase) {
     const rows = Array.from(memoryTemplateLibraryEntries.values())
@@ -4934,17 +4992,18 @@ app.post("/api/template-library/sync", async (req, res) => {
     const slides = await driveListSlidesInFolder(folder.id, driveAccessToken);
     const syncEntries = slides.map((file, index) => {
       const title = String(file?.name || "Untitled Template").trim();
+      const canonical = inferCanonicalTemplateIdentityFromTitle(title);
       const standardCodes = Array.from(new Set((title.match(/\b\d{5}\b/g) || []).map((code) => String(code || "").trim())));
       return {
-        id: String(file?.id || "").trim(),
-        title,
+        id: String(canonical?.id || file?.id || "").trim(),
+        title: String(canonical?.title || title).trim(),
         standardCodes,
-        criteriaText: "",
+        criteriaText: String(canonical?.criteriaText || "").trim(),
         summary: `Synced from ${folderName}.`,
         imageUrl: String(file?.thumbnailLink || "").trim(),
         templateUrl: String(file?.webViewLink || `https://docs.google.com/presentation/d/${String(file?.id || "").trim()}/edit`).trim(),
         status: "live",
-        sortOrder: title.toLowerCase() === "process slide templates" ? 0 : index + 1,
+        sortOrder: String(canonical?.id || "") === "process-slide-templates" ? 0 : index + 1,
         sourceFolderId: String(folder.id).trim()
       };
     });
