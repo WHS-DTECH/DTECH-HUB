@@ -4763,6 +4763,32 @@ async function deleteTemplateLibraryEntry(templateId) {
   return Number(result?.rowCount || 0) > 0;
 }
 
+async function deleteTemplateLibraryEntriesBySourceFolder(sourceFolderId) {
+  const safeSourceFolderId = String(sourceFolderId || "").trim();
+  if (!safeSourceFolderId) {
+    return { deleted: 0 };
+  }
+
+  if (!hasDatabase) {
+    let deleted = 0;
+    for (const [templateId, entry] of memoryTemplateLibraryEntries.entries()) {
+      const entrySourceFolderId = String(entry?.sourceFolderId || entry?.source_folder_id || "").trim();
+      if (entrySourceFolderId && entrySourceFolderId === safeSourceFolderId) {
+        memoryTemplateLibraryEntries.delete(templateId);
+        deleted += 1;
+      }
+    }
+    return { deleted };
+  }
+
+  await ensureTemplateLibrarySchema();
+  const result = await pool.query(
+    `DELETE FROM template_library_entries WHERE source_folder_id = $1`,
+    [safeSourceFolderId]
+  );
+  return { deleted: Number(result?.rowCount || 0) };
+}
+
 async function driveApiRequest(pathname, { accessToken, method = "GET", queryParams = {}, body = null } = {}) {
   const params = new URLSearchParams();
   Object.entries(queryParams || {}).forEach(([key, value]) => {
@@ -5013,6 +5039,7 @@ app.post("/api/template-library/sync", async (req, res) => {
       return;
     }
 
+    await deleteTemplateLibraryEntriesBySourceFolder(folder.id);
     const result = await upsertTemplateLibraryEntries(syncEntries, access.email);
     const entries = await listTemplateLibraryEntries();
 
