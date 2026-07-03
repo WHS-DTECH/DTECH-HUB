@@ -3245,10 +3245,14 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                     syncedGoogleSlidesSavedAt = topicMatch.modifiedTime;
                 }
                 writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopicTitle, taskTopicShortName, syncedGoogleSlidesUrl);
+                writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopicTitle, syncTopicLabel, syncedGoogleSlidesUrl);
             }
         }
         if (!syncedGoogleSlidesSavedAt) {
             syncedGoogleSlidesSavedAt = String(submission.haparaSubmittedAt || submission.submittedAt || "").trim();
+        }
+        if (syncedGoogleSlidesUrl) {
+            updateTaskTopicTemplateHeroPreview(host, syncedGoogleSlidesUrl, syncTopicLabel);
         }
 
         panelHost.innerHTML = `
@@ -5398,6 +5402,73 @@ function readStoredTaskTopicSlideSyncEntryByShortName(projectId, email, taskShor
     return bestMatch;
 }
 
+function readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, templateId = "") {
+    const safeProjectId = String(projectId || "").trim();
+    const safeEmail = String(email || "").trim().toLowerCase();
+    const targetTemplateId = String(templateId || "").trim().toLowerCase();
+    if (!safeProjectId || !safeEmail || !targetTemplateId) {
+        return { url: "", savedAt: "", templateId: "" };
+    }
+
+    const keyPrefix = `${TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX}:${safeProjectId}:${safeEmail}:`;
+    let bestMatch = { url: "", savedAt: "", templateId: "" };
+    let bestTime = 0;
+
+    try {
+        for (let index = 0; index < localStorage.length; index += 1) {
+            const key = String(localStorage.key(index) || "");
+            if (!key.startsWith(keyPrefix)) {
+                continue;
+            }
+
+            const raw = localStorage.getItem(key);
+            if (!raw) {
+                continue;
+            }
+
+            const parsed = JSON.parse(raw);
+            const parsedTemplateId = String(parsed?.templateId || "").trim().toLowerCase();
+            const safeUrl = toSafeExternalUrl(parsed?.url || "");
+            if (!safeUrl || parsedTemplateId !== targetTemplateId) {
+                continue;
+            }
+
+            const savedAt = String(parsed?.savedAt || "").trim();
+            const savedTs = Date.parse(savedAt);
+            const ts = Number.isFinite(savedTs) ? savedTs : 0;
+            if (ts >= bestTime) {
+                bestTime = ts;
+                bestMatch = {
+                    url: safeUrl,
+                    savedAt,
+                    templateId: String(parsed?.templateId || "").trim()
+                };
+            }
+        }
+    } catch (_error) {
+        return { url: "", savedAt: "", templateId: "" };
+    }
+
+    return bestMatch;
+}
+
+function updateTaskTopicTemplateHeroPreview(host, slidesUrl, topicLabel = "") {
+    const heroImage = host?.querySelector(".task-topic-template-hero img");
+    if (!heroImage) {
+        return;
+    }
+
+    const thumbnailUrl = toGoogleSlidesThumbnailUrl(slidesUrl);
+    if (!thumbnailUrl) {
+        return;
+    }
+
+    heroImage.src = thumbnailUrl;
+    if (topicLabel) {
+        heroImage.alt = `${String(topicLabel).trim()} slideshow template preview`;
+    }
+}
+
 function writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopic, taskShortName = "", value = "") {
     const key = getTaskTopicSlideSyncStorageKey(projectId, email, taskTopic, taskShortName);
     const safeUrl = toSafeExternalUrl(value);
@@ -5744,12 +5815,12 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     if (resolvedTaskShortName) {
         templateLibraryParams.set("taskShortName", resolvedTaskShortName);
     }
+    const preferredTemplateId = digitalOutcomeTopicKey === "target-audience"
+        ? "target-audience"
+        : (digitalOutcomeTopicKey === "development-tools"
+            ? "relevant-implications"
+            : (digitalOutcomeTopicKey === "success-criteria" ? "project-success-criteria" : "digital-outcome-description"));
     if (useDigitalOutcomeTemplateHero) {
-        const preferredTemplateId = digitalOutcomeTopicKey === "target-audience"
-            ? "target-audience"
-            : (digitalOutcomeTopicKey === "development-tools"
-                ? "relevant-implications"
-                : (digitalOutcomeTopicKey === "success-criteria" ? "project-success-criteria" : "digital-outcome-description"));
         templateLibraryParams.set("templateId", preferredTemplateId);
     }
     const slideshowTemplateLibraryUrl = `slideshow-template-library.html?${templateLibraryParams.toString()}`;
@@ -5758,7 +5829,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         readStoredTaskTopicSlideSyncEntry(id, viewerEmail, taskTopicTitle, resolvedTaskShortName),
         readStoredTaskTopicSlideSyncEntryByShortName(id, viewerEmail, resolvedTaskShortName),
         readStoredTaskTopicSlideSyncEntryByShortName(id, viewerEmail, displayTitle),
-        readStoredTaskTopicSlideSyncEntry(id, viewerEmail, taskTopicTitle, displayTitle)
+        readStoredTaskTopicSlideSyncEntry(id, viewerEmail, taskTopicTitle, displayTitle),
+        readStoredTaskTopicSlideSyncEntryByTemplateId(id, viewerEmail, preferredTemplateId)
     ];
     const syncedTaskTopicEntry = syncedTaskTopicEntryCandidates.find((entry) => toSafeExternalUrl(entry?.url || ""));
     const taskTopicSyncedSlideThumbnail = toGoogleSlidesThumbnailUrl(syncedTaskTopicEntry?.url || "");
