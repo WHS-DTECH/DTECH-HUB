@@ -5127,6 +5127,8 @@ app.post("/api/student/drive-setup/find-slide", async (req, res) => {
     const tokens = normalizeText(taskTopic).split(/\s+/).filter(Boolean);
     const wantsTargetAudience = tokens.includes("target") || tokens.includes("audience") || (tokens.includes("end") && tokens.includes("user"));
     const wantsDescription = tokens.includes("description") || (tokens.includes("digital") && tokens.includes("outcome"));
+    const wantsDevelopmentTools = tokens.includes("developed") || tokens.includes("tools") || tokens.includes("technologies");
+    const wantsSuccessCriteria = tokens.includes("success") || tokens.includes("measured") || tokens.includes("evaluated");
 
     const scored = slides
       .map((file) => {
@@ -5145,7 +5147,19 @@ app.post("/api/student/drive-setup/find-slide", async (req, res) => {
           if (normalizedName.includes("description")) score += 40;
         }
 
-        if (!wantsTargetAudience && !wantsDescription) {
+        if (wantsDevelopmentTools) {
+          if (normalizedName.includes("relevant implications")) score += 100;
+          if (normalizedName.includes("project success criteria")) score += 80;
+          if (normalizedName.includes("tools") || normalizedName.includes("technologies")) score += 35;
+        }
+
+        if (wantsSuccessCriteria) {
+          if (normalizedName.includes("project success criteria")) score += 110;
+          if (normalizedName.includes("success")) score += 45;
+          if (normalizedName.includes("criteria")) score += 25;
+        }
+
+        if (!wantsTargetAudience && !wantsDescription && !wantsDevelopmentTools && !wantsSuccessCriteria) {
           score += tokens.reduce((sum, token) => sum + (normalizedName.includes(token) ? 5 : 0), 0);
         }
 

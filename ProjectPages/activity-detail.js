@@ -103,6 +103,8 @@ const DIGITAL_OUTCOME_DETAILS_TASKS = [
 
 const DIGITAL_OUTCOME_DESCRIPTION_TITLE = "Digital Outcome Description";
 const DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE = "Target Audience";
+const DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE = "Development and Tools";
+const DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE = "Success Criteria";
 const DIGITAL_OUTCOME_DESCRIPTION_TEMPLATE_PREVIEW_URL = "https://drive.google.com/thumbnail?id=1brOY70u9aJdsoiEtxVepr82vRhiv9VzpMm8TUv3lcTo&sz=w1400";
 const DIGITAL_OUTCOME_TARGET_AUDIENCE_TEMPLATE_PREVIEW_URL = "../images/target-audience-template-preview.svg";
 
@@ -2914,7 +2916,9 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const isDigitalOutcomeTopic = taskTopicTitle.toLowerCase().includes("digital outcome")
         || normalizedTaskTopicShortName.includes("digital outcome")
         || normalizedDerivedShortName.includes("digital outcome")
-        || isDigitalOutcomeTargetAudienceCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle));
+        || isDigitalOutcomeTargetAudienceCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
+        || isDigitalOutcomeDevelopmentToolsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
+        || isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle));
     const isMediaAssetWorkflowTopic = isAssetVersionControlTopic && !isProjectManagementTopic;
     const isTrackedWorkflowTopic = isProjectManagementTopic || isMediaAssetWorkflowTopic;
 
@@ -3220,7 +3224,13 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     if (isDigitalOutcomeTopic) {
         const processAssessmentFolderUrl = await fetchStudentProcessAssessmentFolderUrl();
         const isTargetAudienceTopic = isDigitalOutcomeTargetAudienceCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle));
-        const syncTopicLabel = isTargetAudienceTopic ? "Target Audience" : "Digital Outcome: Description";
+        const isDevelopmentToolsTopic = isDigitalOutcomeDevelopmentToolsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle));
+        const isSuccessCriteriaTopic = isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle));
+        const syncTopicLabel = isTargetAudienceTopic
+            ? "Target Audience"
+            : (isDevelopmentToolsTopic
+                ? "Development and Tools"
+                : (isSuccessCriteriaTopic ? "Success Criteria" : "Digital Outcome: Description"));
         if (!syncedGoogleSlidesUrl) {
             const topicMatch = await findProcessAssessmentSlideMatch(syncTopicLabel);
             if (topicMatch.fileUrl) {
@@ -5148,6 +5158,8 @@ function deriveTaskShortName(value) {
     const phraseMap = [
         { pattern: /describe\s+the\s+digital\s+outcome|describe.*digital\s+outcome/, label: "Digital Outcome Description" },
         { pattern: /identify\s+the\s+target\s+audience|target\s+audience|end\s+user/, label: "Target Audience" },
+        { pattern: /explain\s+how\s+the\s+outcome\s+will\s+be\s+developed|tools\/?technologies/, label: "Development and Tools" },
+        { pattern: /state\s+how\s+success\s+will\s+be\s+measured|success\s+will\s+be\s+evaluated/, label: "Success Criteria" },
         { pattern: /project\s+management/, label: "Project Management" },
         { pattern: /relevant\s+implications/, label: "Relevant Implications" },
         { pattern: /version\s+control/, label: "Version Control" },
@@ -5218,6 +5230,38 @@ function isDigitalOutcomeTargetAudienceCriterion(taskTopicTitle, taskShortName =
         return true;
     }
     return shortNameText === DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE.toLowerCase();
+}
+
+function isDigitalOutcomeDevelopmentToolsCriterion(taskTopicTitle, taskShortName = "") {
+    const topicText = String(taskTopicTitle || "").trim().toLowerCase();
+    const shortNameText = String(taskShortName || "").trim().toLowerCase();
+    if (!topicText && !shortNameText) {
+        return false;
+    }
+
+    if (/explain\s+how\s+the\s+outcome\s+will\s+be\s+developed/.test(topicText)) {
+        return true;
+    }
+    if (/tools\/?technologies\s+will\s+be\s+used/.test(topicText)) {
+        return true;
+    }
+    return shortNameText === DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE.toLowerCase();
+}
+
+function isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, taskShortName = "") {
+    const topicText = String(taskTopicTitle || "").trim().toLowerCase();
+    const shortNameText = String(taskShortName || "").trim().toLowerCase();
+    if (!topicText && !shortNameText) {
+        return false;
+    }
+
+    if (/state\s+how\s+success\s+will\s+be\s+measured/.test(topicText)) {
+        return true;
+    }
+    if (/success\s+will\s+be\s+evaluated/.test(topicText)) {
+        return true;
+    }
+    return shortNameText === DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE.toLowerCase();
 }
 
 function getTaskTopicShortNameOverride(activityId, topicText) {
@@ -5603,7 +5647,12 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         || (taskTopicTitle ? deriveTaskShortName(taskTopicTitle) : "");
     const isDigitalOutcomeDescriptionTopic = isDigitalOutcomeDescriptionCriterion(taskTopicTitle, resolvedTaskShortName);
     const isDigitalOutcomeTargetAudienceTopic = isDigitalOutcomeTargetAudienceCriterion(taskTopicTitle, resolvedTaskShortName);
-    const useDigitalOutcomeTemplateHero = isDigitalOutcomeDescriptionTopic || isDigitalOutcomeTargetAudienceTopic;
+    const isDigitalOutcomeDevelopmentToolsTopic = isDigitalOutcomeDevelopmentToolsCriterion(taskTopicTitle, resolvedTaskShortName);
+    const isDigitalOutcomeSuccessCriteriaTopic = isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, resolvedTaskShortName);
+    const useDigitalOutcomeTemplateHero = isDigitalOutcomeDescriptionTopic
+        || isDigitalOutcomeTargetAudienceTopic
+        || isDigitalOutcomeDevelopmentToolsTopic
+        || isDigitalOutcomeSuccessCriteriaTopic;
     const mergedTaskTopicLinks = isTaskTopicView
         ? collectMergedTaskTopicLinks(data, id, taskTopicTitle, resolvedTaskShortName)
         : [];
@@ -5640,7 +5689,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         || resolvedTaskShortName.toLowerCase().includes("decompos");
     const isDigitalOutcomeTopic = taskTopicTitle.toLowerCase().includes("digital outcome")
         || resolvedTaskShortName.toLowerCase().includes("digital outcome")
-        || isDigitalOutcomeTargetAudienceTopic;
+        || isDigitalOutcomeTargetAudienceTopic
+        || isDigitalOutcomeDevelopmentToolsTopic
+        || isDigitalOutcomeSuccessCriteriaTopic;
     const templateLibraryParams = new URLSearchParams();
     templateLibraryParams.set("activityId", String(id || "").trim());
     if (taskTopicTitle) {
@@ -5650,7 +5701,12 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         templateLibraryParams.set("taskShortName", resolvedTaskShortName);
     }
     if (useDigitalOutcomeTemplateHero) {
-        templateLibraryParams.set("templateId", "digital-outcome-description");
+        const preferredTemplateId = isDigitalOutcomeTargetAudienceTopic
+            ? "target-audience"
+            : (isDigitalOutcomeDevelopmentToolsTopic
+                ? "relevant-implications"
+                : (isDigitalOutcomeSuccessCriteriaTopic ? "project-success-criteria" : "digital-outcome-description"));
+        templateLibraryParams.set("templateId", preferredTemplateId);
     }
     const slideshowTemplateLibraryUrl = `slideshow-template-library.html?${templateLibraryParams.toString()}`;
     const viewerEmail = readStoredHubEmail();
