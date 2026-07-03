@@ -2923,6 +2923,11 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         || isDigitalOutcomeDevelopmentToolsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
         || isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
         || Boolean(keywordMatchedTopicKey);
+    const digitalOutcomeSyncTemplateId = keywordMatchedTopicKey === "target-audience"
+        ? "target-audience"
+        : (keywordMatchedTopicKey === "development-tools"
+            ? "relevant-implications"
+            : (keywordMatchedTopicKey === "success-criteria" ? "project-success-criteria" : "digital-outcome-description"));
     const isMediaAssetWorkflowTopic = isAssetVersionControlTopic && !isProjectManagementTopic;
     const isTrackedWorkflowTopic = isProjectManagementTopic || isMediaAssetWorkflowTopic;
 
@@ -3243,12 +3248,11 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             : (isDevelopmentToolsTopic
                 ? "relevant-implications"
                 : (isSuccessCriteriaTopic ? "project-success-criteria" : "digital-outcome-description"));
-        let matchedTopicThumbnailUrl = "";
+        const topicMatch = await findProcessAssessmentSlideMatch(syncTopicLabel);
+        let matchedTopicThumbnailUrl = toSafeExternalUrl(topicMatch.thumbnailUrl || "");
         if (!syncedGoogleSlidesUrl) {
-            const topicMatch = await findProcessAssessmentSlideMatch(syncTopicLabel);
             if (topicMatch.fileUrl) {
                 syncedGoogleSlidesUrl = topicMatch.fileUrl;
-                matchedTopicThumbnailUrl = toSafeExternalUrl(topicMatch.thumbnailUrl || "");
                 if (!syncedGoogleSlidesSavedAt) {
                     syncedGoogleSlidesSavedAt = topicMatch.modifiedTime;
                 }
@@ -3515,7 +3519,9 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             const safeSlidesUrl = toSafeExternalUrl(googleSlidesInput?.value || "");
             if (safeSlidesUrl) {
                 syncedGoogleSlidesUrl = safeSlidesUrl;
-                writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopicTitle, taskTopicShortName, safeSlidesUrl);
+                writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopicTitle, taskTopicShortName, safeSlidesUrl, {
+                    templateId: digitalOutcomeSyncTemplateId
+                });
                 googleSlidesSyncRefHost.innerHTML = `<a href="${escapeHtml(syncedGoogleSlidesUrl)}" target="_blank" rel="noreferrer">${escapeHtml(syncedGoogleSlidesUrl)}</a>`;
             } else if (syncedGoogleSlidesUrl) {
                 googleSlidesSyncRefHost.innerHTML = `<a href="${escapeHtml(syncedGoogleSlidesUrl)}" target="_blank" rel="noreferrer">${escapeHtml(syncedGoogleSlidesUrl)}</a>`;
@@ -3573,7 +3579,9 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         const safeSlidesUrl = toSafeExternalUrl(googleSlidesInput?.value || "");
         if (safeSlidesUrl) {
             syncedGoogleSlidesUrl = safeSlidesUrl;
-            writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopicTitle, taskTopicShortName, safeSlidesUrl);
+            writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopicTitle, taskTopicShortName, safeSlidesUrl, {
+                templateId: digitalOutcomeSyncTemplateId
+            });
         }
         updateMeta(acknowledged, acknowledgedAt);
     });
@@ -5358,10 +5366,11 @@ function readStoredTaskTopicSlideSyncEntry(projectId, email, taskTopic, taskShor
         return {
             url: toSafeExternalUrl(parsed?.url || ""),
             savedAt: String(parsed?.savedAt || "").trim(),
-            templateId: String(parsed?.templateId || "").trim()
+            templateId: String(parsed?.templateId || "").trim(),
+            thumbnailUrl: toSafeExternalUrl(parsed?.thumbnailUrl || "")
         };
     } catch (_error) {
-        return { url: "", savedAt: "", templateId: "" };
+        return { url: "", savedAt: "", templateId: "", thumbnailUrl: "" };
     }
 }
 
@@ -5370,11 +5379,11 @@ function readStoredTaskTopicSlideSyncEntryByShortName(projectId, email, taskShor
     const safeEmail = String(email || "").trim().toLowerCase();
     const shortSlug = normalizeTaskTopicStorageSlug(taskShortName);
     if (!safeProjectId || !safeEmail || !shortSlug) {
-        return { url: "", savedAt: "", templateId: "" };
+        return { url: "", savedAt: "", templateId: "", thumbnailUrl: "" };
     }
 
     const keyPrefix = `${TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX}:${safeProjectId}:${safeEmail}:`;
-    let bestMatch = { url: "", savedAt: "", templateId: "" };
+    let bestMatch = { url: "", savedAt: "", templateId: "", thumbnailUrl: "" };
     let bestTime = 0;
 
     try {
@@ -5405,12 +5414,13 @@ function readStoredTaskTopicSlideSyncEntryByShortName(projectId, email, taskShor
                 bestMatch = {
                     url: safeUrl,
                     savedAt,
-                    templateId: String(parsed?.templateId || "").trim()
+                    templateId: String(parsed?.templateId || "").trim(),
+                    thumbnailUrl: toSafeExternalUrl(parsed?.thumbnailUrl || "")
                 };
             }
         }
     } catch (_error) {
-        return { url: "", savedAt: "", templateId: "" };
+        return { url: "", savedAt: "", templateId: "", thumbnailUrl: "" };
     }
 
     return bestMatch;
@@ -5421,11 +5431,11 @@ function readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, templat
     const safeEmail = String(email || "").trim().toLowerCase();
     const targetTemplateId = String(templateId || "").trim().toLowerCase();
     if (!safeProjectId || !safeEmail || !targetTemplateId) {
-        return { url: "", savedAt: "", templateId: "" };
+        return { url: "", savedAt: "", templateId: "", thumbnailUrl: "" };
     }
 
     const keyPrefix = `${TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX}:${safeProjectId}:${safeEmail}:`;
-    let bestMatch = { url: "", savedAt: "", templateId: "" };
+    let bestMatch = { url: "", savedAt: "", templateId: "", thumbnailUrl: "" };
     let bestTime = 0;
 
     try {
@@ -5455,12 +5465,13 @@ function readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, templat
                 bestMatch = {
                     url: safeUrl,
                     savedAt,
-                    templateId: String(parsed?.templateId || "").trim()
+                    templateId: String(parsed?.templateId || "").trim(),
+                    thumbnailUrl: toSafeExternalUrl(parsed?.thumbnailUrl || "")
                 };
             }
         }
     } catch (_error) {
-        return { url: "", savedAt: "", templateId: "" };
+        return { url: "", savedAt: "", templateId: "", thumbnailUrl: "" };
     }
 
     return bestMatch;
@@ -5477,12 +5488,11 @@ function updateTaskTopicTemplateHeroPreview(host, slidesUrl, topicLabel = "", pr
         return;
     }
 
-    heroImage.src = thumbnailUrl;
     heroImage.onerror = () => {
         heroImage.onerror = null;
-        const fallback = toGoogleSlidesThumbnailUrl(slidesUrl) || DIGITAL_OUTCOME_GENERIC_TEMPLATE_PREVIEW_URL;
-        heroImage.src = fallback;
+        heroImage.src = DIGITAL_OUTCOME_GENERIC_TEMPLATE_PREVIEW_URL;
     };
+    heroImage.src = thumbnailUrl;
     if (topicLabel) {
         heroImage.alt = `${String(topicLabel).trim()} slideshow template preview`;
     }
@@ -5858,7 +5868,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         readStoredTaskTopicSlideSyncEntryByTemplateId(id, viewerEmail, preferredTemplateId)
     ];
     const syncedTaskTopicEntry = syncedTaskTopicEntryCandidates.find((entry) => toSafeExternalUrl(entry?.url || ""));
-    const taskTopicSyncedSlideThumbnail = toGoogleSlidesThumbnailUrl(syncedTaskTopicEntry?.url || "");
+    const taskTopicSyncedSlideThumbnail = toSafeExternalUrl(syncedTaskTopicEntry?.thumbnailUrl || "")
+        || toGoogleSlidesThumbnailUrl(syncedTaskTopicEntry?.url || "");
     const digitalOutcomeTemplateFallbackImage = digitalOutcomeTopicKey === "target-audience"
         ? DIGITAL_OUTCOME_TARGET_AUDIENCE_TEMPLATE_PREVIEW_URL
         : (digitalOutcomeTopicKey === "description"
