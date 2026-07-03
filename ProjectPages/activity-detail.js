@@ -3280,10 +3280,24 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 : (isSuccessCriteriaTopic
                     ? "project-success-criteria"
                     : (isRelevantImplicationsTopic ? "relevant-implications" : "digital-outcome-description")));
+        const allowFolderMatchAutoLink = syncTemplateId === "digital-outcome-description" || syncTemplateId === "target-audience";
+
+        // For staged rollout, do not pre-connect Relevant Implications (or other non-enabled pages)
+        // from passive folder matches when the student has not explicitly linked/downloaded.
+        const storedSyncSource = String(storedSyncEntry?.syncSource || "").trim().toLowerCase();
+        if (!allowFolderMatchAutoLink && !currentGoogleSlidesUrl) {
+            const isPassiveStoredLink = Boolean(storedSyncEntry?.url)
+                && (storedSyncSource === "folder-match" || !storedSyncSource);
+            if (isPassiveStoredLink) {
+                syncedGoogleSlidesUrl = "";
+                syncedGoogleSlidesSavedAt = "";
+            }
+        }
+
         const canonicalTemplatePreviewUrl = await fetchTemplateLibraryPreviewByTemplateId(syncTemplateId);
         const topicMatch = await findProcessAssessmentSlideMatch(syncTopicLabel);
         let matchedTopicThumbnailUrl = "";
-        if (!syncedGoogleSlidesUrl) {
+        if (!syncedGoogleSlidesUrl && allowFolderMatchAutoLink) {
             if (topicMatch.fileUrl) {
                 syncedGoogleSlidesUrl = topicMatch.fileUrl;
                 matchedTopicThumbnailUrl = toSafeExternalUrl(topicMatch.thumbnailUrl || "");
