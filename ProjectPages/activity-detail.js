@@ -6092,142 +6092,189 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                             ? "Relevant Implications"
                             : "Digital Outcome Description"))))
             : "Topic Tasks"));
-    const topicGuideInstructions = isProjectManagementTopic
-        ? [
-            "Log in to Trello using Google Sign In.",
-            "Create a board for this assessment if you do not already have one.",
-            "Add three list headings: To Do, Doing, Done.",
-            "Create or open your task card for this topic and keep it updated each lesson."
-        ]
-        : (isDecompositionTopic
-            ? [
+    const topicGuideInstructions = (() => {
+        if (isProjectManagementTopic) {
+            return [
+                "Log in to Trello using Google Sign In.",
+                "Create a board for this assessment if you do not already have one.",
+                "Add three list headings: To Do, Doing, Done.",
+                "Create or open your task card for this topic and keep it updated each lesson."
+            ];
+        }
+
+        if (isDecompositionTopic) {
+            return [
                 "Open the Decomposition page for this task topic.",
                 "Write one decomposed step per line in the planner.",
                 "Select your Trello board, then choose the To Do list.",
                 "Push the decomposition steps to Trello and track progress through Doing and Done."
-            ]
-            : (isDigitalOutcomeTopic
-                ? (digitalOutcomeTopicKey === "target-audience"
-                    ? [
-                        "Create a Google Slideshow for this topic.",
-                        "Define who the target audience or end user is for your project.",
-                        "Describe audience needs, context, and pain points your project should respond to.",
-                        "Explain why this audience is the right focus and how your project decisions support them.",
-                        "Use clear evidence, examples, or observations to justify your audience choices."
-                    ]
-                    : (digitalOutcomeTopicKey === "development-tools"
-                        ? [
-                            "Create a Google Slideshow for this topic.",
-                            "Explain how your outcome will be developed from planning through implementation.",
-                            "Name the tools and technologies you will use (for example: HTML/CSS/JS, Python, Trello, GitHub, Figma).",
-                            "Justify why each tool is suitable for your project requirements and users.",
-                            "Outline the build sequence so your development process is clear and testable."
-                        ]
-                        : (digitalOutcomeTopicKey === "success-criteria"
-                            ? [
-                                "Create a Google Slideshow for this topic.",
-                                "Define clear, measurable success criteria for your digital outcome.",
-                                "Explain how success will be tested or evaluated (user feedback, testing results, rubric evidence).",
-                                "Set indicators for what counts as achieved, partially achieved, or unmet.",
-                                "Use evidence language so teachers can verify outcomes against your criteria."
-                            ]
-                            : (digitalOutcomeTopicKey === "relevant-implications"
-                                ? [
-                                    "Create a Google Slideshow for this topic.",
-                                    "Identify the key relevant implications connected to your digital outcome.",
-                                    "Explain legal, ethical, social, and accessibility considerations that apply.",
-                                    "Describe risks and how you will address or mitigate each implication.",
-                                    "Use specific evidence from your design decisions to justify your responses."
-                                ]
-                            : [
-                                "Create a Google Slideshow for this topic.",
-                                "Include a slide that describes the digital outcome: what it is, who it is for, and what it must do.",
-                                "Record the assessment criteria page in Speaker Notes so markers can verify how each point is addressed.",
-                                "Explain the intent of the idea clearly: problem, purpose, audience, and expected impact.",
-                                "Use concise wording and evidence-based reasoning so your idea is easy to evaluate."
-                            ])))
-                : [
-                    "Read each submission requirement carefully.",
-                    "Prepare evidence that matches the task expectations.",
-                    "Upload or link your evidence before acknowledging submission."
-                ]));
-    const topicGuideTaskItems = isProjectManagementTopic
-        ? [
-            "Copy your Trello board or card URL.",
-            "Paste the URL into Project Management and click Save Trello Link.",
-            "Send a daily Trello work log update from this page.",
-            "Keep your card up to date so your teacher can verify progress."
-        ]
-        : (isDecompositionTopic
-            ? [
+            ];
+        }
+
+        if (isDigitalOutcomeTopic) {
+            if (digitalOutcomeTopicKey === "target-audience") {
+                return [
+                    "Create a Google Slideshow for this topic.",
+                    "Define who the target audience or end user is for your project.",
+                    "Describe audience needs, context, and pain points your project should respond to.",
+                    "Explain why this audience is the right focus and how your project decisions support them.",
+                    "Use clear evidence, examples, or observations to justify your audience choices."
+                ];
+            }
+
+            if (digitalOutcomeTopicKey === "development-tools") {
+                return [
+                    "Create a Google Slideshow for this topic.",
+                    "Explain how your outcome will be developed from planning through implementation.",
+                    "Name the tools and technologies you will use (for example: HTML/CSS/JS, Python, Trello, GitHub, Figma).",
+                    "Justify why each tool is suitable for your project requirements and users.",
+                    "Outline the build sequence so your development process is clear and testable."
+                ];
+            }
+
+            if (digitalOutcomeTopicKey === "success-criteria") {
+                return [
+                    "Create a Google Slideshow for this topic.",
+                    "Define clear, measurable success criteria for your digital outcome.",
+                    "Explain how success will be tested or evaluated (user feedback, testing results, rubric evidence).",
+                    "Set indicators for what counts as achieved, partially achieved, or unmet.",
+                    "Use evidence language so teachers can verify outcomes against your criteria."
+                ];
+            }
+
+            if (digitalOutcomeTopicKey === "relevant-implications") {
+                return [
+                    "Create a Google Slideshow for this topic.",
+                    "Identify the key relevant implications connected to your digital outcome.",
+                    "Explain legal, ethical, social, and accessibility considerations that apply.",
+                    "Describe risks and how you will address or mitigate each implication.",
+                    "Use specific evidence from your design decisions to justify your responses."
+                ];
+            }
+
+            return [
+                "Create a Google Slideshow for this topic.",
+                "Include a slide that describes the digital outcome: what it is, who it is for, and what it must do.",
+                "Record the assessment criteria page in Speaker Notes so markers can verify how each point is addressed.",
+                "Explain the intent of the idea clearly: problem, purpose, audience, and expected impact.",
+                "Use concise wording and evidence-based reasoning so your idea is easy to evaluate."
+            ];
+        }
+
+        return [
+            "Read each submission requirement carefully.",
+            "Prepare evidence that matches the task expectations.",
+            "Upload or link your evidence before acknowledging submission."
+        ];
+    })();
+    const topicGuideTaskItems = (() => {
+        if (isProjectManagementTopic) {
+            return [
+                "Copy your Trello board or card URL.",
+                "Paste the URL into Project Management and click Save Trello Link.",
+                "Send a daily Trello work log update from this page.",
+                "Keep your card up to date so your teacher can verify progress."
+            ];
+        }
+
+        if (isDecompositionTopic) {
+            return [
                 "Add decomposed tasks in the Decomposition page planner.",
                 "Push the decomposed tasks to your Trello To Do list.",
                 "Move tasks through Doing and Done as you complete them.",
                 "Submit and acknowledge evidence after your plan and Trello tasks are updated."
-            ]
-            : (isDigitalOutcomeTopic
-                ? (digitalOutcomeTopicKey === "target-audience"
-                    ? [
-                        "Target Audience - Google Slides: Identify who your project is for and describe them clearly.",
-                        "Describe demographics and context: age/role, environment, and likely use situation.",
-                        "Describe psychographics and motivations: values, interests, and reasons they would use your project.",
-                        "Identify pain points and explain how your project addresses those specific needs."
-                    ]
-                    : (digitalOutcomeTopicKey === "development-tools"
-                        ? [
-                            "Development and Tools - Google Slides: Explain how your outcome will be developed.",
-                            "List the tools/technologies you will use and what each tool is responsible for.",
-                            "Describe your workflow from planning to build, testing, and refinement.",
-                            "Justify why these tools are best for your audience and project requirements."
-                        ]
-                        : (digitalOutcomeTopicKey === "success-criteria"
-                            ? [
-                                "Success Criteria - Google Slides: State how success will be measured or evaluated.",
-                                "Define measurable criteria (performance, usability, reliability, or engagement).",
-                                "Explain what evidence will be collected and how it will be assessed.",
-                                "Describe what outcomes indicate success, partial success, or unresolved issues."
-                            ]
-                            : (digitalOutcomeTopicKey === "relevant-implications"
-                                ? [
-                                    "Relevant Implications - Google Slides: Explain the implications linked to your outcome.",
-                                    "Identify legal, ethical, social, and accessibility implications that apply.",
-                                    "Describe risks and impacts for users, stakeholders, and the wider context.",
-                                    "Justify mitigation actions you will take in design, development, and testing."
-                                ]
-                            : [
-                                "Description - Google Slides: Describe the Digital Outcome: what it is, who it is for, and what it must do.",
-                                "Identify the target audience or end user for this outcome.",
-                                "Explain how the outcome will be developed and what tools/technologies will be used.",
-                                "State how success will be measured or evaluated."
-                            ])))
-                : submissionTaskItems));
+            ];
+        }
+
+        if (isDigitalOutcomeTopic) {
+            if (digitalOutcomeTopicKey === "target-audience") {
+                return [
+                    "Target Audience - Google Slides: Identify who your project is for and describe them clearly.",
+                    "Describe demographics and context: age/role, environment, and likely use situation.",
+                    "Describe psychographics and motivations: values, interests, and reasons they would use your project.",
+                    "Identify pain points and explain how your project addresses those specific needs."
+                ];
+            }
+
+            if (digitalOutcomeTopicKey === "development-tools") {
+                return [
+                    "Development and Tools - Google Slides: Explain how your outcome will be developed.",
+                    "List the tools/technologies you will use and what each tool is responsible for.",
+                    "Describe your workflow from planning to build, testing, and refinement.",
+                    "Justify why these tools are best for your audience and project requirements."
+                ];
+            }
+
+            if (digitalOutcomeTopicKey === "success-criteria") {
+                return [
+                    "Success Criteria - Google Slides: State how success will be measured or evaluated.",
+                    "Define measurable criteria (performance, usability, reliability, or engagement).",
+                    "Explain what evidence will be collected and how it will be assessed.",
+                    "Describe what outcomes indicate success, partial success, or unresolved issues."
+                ];
+            }
+
+            if (digitalOutcomeTopicKey === "relevant-implications") {
+                return [
+                    "Relevant Implications - Google Slides: Explain the implications linked to your outcome.",
+                    "Identify legal, ethical, social, and accessibility implications that apply.",
+                    "Describe risks and impacts for users, stakeholders, and the wider context.",
+                    "Justify mitigation actions you will take in design, development, and testing."
+                ];
+            }
+
+            return [
+                "Description - Google Slides: Describe the Digital Outcome: what it is, who it is for, and what it must do.",
+                "Identify the target audience or end user for this outcome.",
+                "Explain how the outcome will be developed and what tools/technologies will be used.",
+                "State how success will be measured or evaluated."
+            ];
+        }
+
+        return submissionTaskItems;
+    })();
     const topicGuideSourceUrl = (isProjectManagementTopic || isDecompositionTopic)
         ? "https://trello.com/"
         : (isDigitalOutcomeTopic ? slideshowTemplateLibraryUrl : "");
-    const topicGuideIntroText = isDigitalOutcomeTopic
-        ? (digitalOutcomeTopicKey === "target-audience"
-            ? "Use this guide to define your project's target audience clearly and justify why they are the right users to design for."
-            : (digitalOutcomeTopicKey === "development-tools"
-                ? "Use this guide to explain how your outcome will be developed and why your chosen tools and technologies are appropriate."
-                : (digitalOutcomeTopicKey === "success-criteria"
-                    ? "Use this guide to define measurable success criteria and explain how your outcome will be evaluated."
-                    : (digitalOutcomeTopicKey === "relevant-implications"
-                        ? "Use this guide to identify relevant implications and justify how your project addresses them."
-                    : "Use this guide to write and record a clear description of your digital outcome before starting development.")))
-        : "Use this guide to complete the Submission Tasks correctly.";
-    const topicGuideTaskHeading = isProjectManagementTopic
-        ? "Trello Tasks"
-        : (isDigitalOutcomeTopic
-            ? (digitalOutcomeTopicKey === "target-audience"
-                ? "Target Audience - Google Slides"
-                : (digitalOutcomeTopicKey === "development-tools"
-                    ? "Development and Tools - Google Slides"
-                    : (digitalOutcomeTopicKey === "success-criteria"
-                        ? "Success Criteria - Google Slides"
-                        : (digitalOutcomeTopicKey === "relevant-implications"
-                            ? "Relevant Implications - Google Slides"
-                        : "Description - Google Slides")))
-            : "Task List");
+    const topicGuideIntroText = (() => {
+        if (!isDigitalOutcomeTopic) {
+            return "Use this guide to complete the Submission Tasks correctly.";
+        }
+        if (digitalOutcomeTopicKey === "target-audience") {
+            return "Use this guide to define your project's target audience clearly and justify why they are the right users to design for.";
+        }
+        if (digitalOutcomeTopicKey === "development-tools") {
+            return "Use this guide to explain how your outcome will be developed and why your chosen tools and technologies are appropriate.";
+        }
+        if (digitalOutcomeTopicKey === "success-criteria") {
+            return "Use this guide to define measurable success criteria and explain how your outcome will be evaluated.";
+        }
+        if (digitalOutcomeTopicKey === "relevant-implications") {
+            return "Use this guide to identify relevant implications and justify how your project addresses them.";
+        }
+        return "Use this guide to write and record a clear description of your digital outcome before starting development.";
+    })();
+    const topicGuideTaskHeading = (() => {
+        if (isProjectManagementTopic) {
+            return "Trello Tasks";
+        }
+        if (!isDigitalOutcomeTopic) {
+            return "Task List";
+        }
+        if (digitalOutcomeTopicKey === "target-audience") {
+            return "Target Audience - Google Slides";
+        }
+        if (digitalOutcomeTopicKey === "development-tools") {
+            return "Development and Tools - Google Slides";
+        }
+        if (digitalOutcomeTopicKey === "success-criteria") {
+            return "Success Criteria - Google Slides";
+        }
+        if (digitalOutcomeTopicKey === "relevant-implications") {
+            return "Relevant Implications - Google Slides";
+        }
+        return "Description - Google Slides";
+    })();
     const githubGuideTitle = "Version Control: GitHub";
     const githubGuideSourceUrl = "https://github.com/";
     const githubGuideInstructions = [
