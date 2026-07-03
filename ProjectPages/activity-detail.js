@@ -105,6 +105,7 @@ const DIGITAL_OUTCOME_DESCRIPTION_TITLE = "Digital Outcome Description";
 const DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE = "Target Audience";
 const DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE = "Development and Tools";
 const DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE = "Success Criteria";
+const DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE = "Relevant Implications";
 const DIGITAL_OUTCOME_DESCRIPTION_TEMPLATE_PREVIEW_URL = "https://drive.google.com/thumbnail?id=1brOY70u9aJdsoiEtxVepr82vRhiv9VzpMm8TUv3lcTo&sz=w1400";
 const DIGITAL_OUTCOME_TARGET_AUDIENCE_TEMPLATE_PREVIEW_URL = "../images/target-audience-template-preview.svg";
 const DIGITAL_OUTCOME_GENERIC_TEMPLATE_PREVIEW_URL = "../images/template-preview-placeholder.svg";
@@ -3263,16 +3264,22 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             || keywordMatchedTopicKey === "development-tools";
         const isSuccessCriteriaTopic = isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
             || keywordMatchedTopicKey === "success-criteria";
+        const isRelevantImplicationsTopic = isDigitalOutcomeRelevantImplicationsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
+            || keywordMatchedTopicKey === "relevant-implications";
         const syncTopicLabel = isTargetAudienceTopic
             ? DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE
             : (isDevelopmentToolsTopic
                 ? DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE
-                : (isSuccessCriteriaTopic ? DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE : "Digital Outcome: Description"));
+                : (isSuccessCriteriaTopic
+                    ? DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE
+                    : (isRelevantImplicationsTopic ? DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE : "Digital Outcome: Description")));
         const syncTemplateId = isTargetAudienceTopic
             ? "target-audience"
             : (isDevelopmentToolsTopic
                 ? "relevant-implications"
-                : (isSuccessCriteriaTopic ? "project-success-criteria" : "digital-outcome-description"));
+                : (isSuccessCriteriaTopic
+                    ? "project-success-criteria"
+                    : (isRelevantImplicationsTopic ? "relevant-implications" : "digital-outcome-description")));
         const canonicalTemplatePreviewUrl = await fetchTemplateLibraryPreviewByTemplateId(syncTemplateId);
         const topicMatch = await findProcessAssessmentSlideMatch(syncTopicLabel);
         let matchedTopicThumbnailUrl = "";
@@ -5359,6 +5366,19 @@ function isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, taskShortName 
     return shortNameText === DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE.toLowerCase();
 }
 
+function isDigitalOutcomeRelevantImplicationsCriterion(taskTopicTitle, taskShortName = "") {
+    const topicText = String(taskTopicTitle || "").trim().toLowerCase();
+    const shortNameText = String(taskShortName || "").trim().toLowerCase();
+    if (!topicText && !shortNameText) {
+        return false;
+    }
+
+    if (/relevant\s+implications/.test(topicText)) {
+        return true;
+    }
+    return shortNameText === DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE.toLowerCase();
+}
+
 function inferDigitalOutcomeTopicKeyFromTitle(pageTitle) {
     const normalized = String(pageTitle || "").trim().toLowerCase();
     if (!normalized) {
@@ -5371,6 +5391,10 @@ function inferDigitalOutcomeTopicKeyFromTitle(pageTitle) {
 
     if (/developed|development|tools\/?technologies|tools|technologies/.test(normalized)) {
         return "development-tools";
+    }
+
+    if (/relevant\s+implications/.test(normalized)) {
+        return "relevant-implications";
     }
 
     if (/success\s+will\s+be\s+measured|success\s+will\s+be\s+evaluated|success\s+criteria|measured|evaluated/.test(normalized)) {
@@ -5894,13 +5918,17 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         || keywordMatchedTopicKey === "development-tools";
     const isDigitalOutcomeSuccessCriteriaTopic = isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, resolvedTaskShortName)
         || keywordMatchedTopicKey === "success-criteria";
+    const isDigitalOutcomeRelevantImplicationsTopic = isDigitalOutcomeRelevantImplicationsCriterion(taskTopicTitle, resolvedTaskShortName)
+        || keywordMatchedTopicKey === "relevant-implications";
     const digitalOutcomeTopicKey = isDigitalOutcomeTargetAudienceTopic
         ? "target-audience"
         : (isDigitalOutcomeDevelopmentToolsTopic
             ? "development-tools"
             : (isDigitalOutcomeSuccessCriteriaTopic
                 ? "success-criteria"
-                : (isDigitalOutcomeDescriptionTopic ? "description" : keywordMatchedTopicKey)));
+                : (isDigitalOutcomeRelevantImplicationsTopic
+                    ? "relevant-implications"
+                    : (isDigitalOutcomeDescriptionTopic ? "description" : keywordMatchedTopicKey))));
     const useDigitalOutcomeTemplateHero = Boolean(digitalOutcomeTopicKey);
     const mergedTaskTopicLinks = isTaskTopicView
         ? collectMergedTaskTopicLinks(data, id, taskTopicTitle, resolvedTaskShortName)
@@ -5914,7 +5942,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 ? DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE
                 : (digitalOutcomeTopicKey === "success-criteria"
                     ? DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE
-                    : (resolvedTaskShortName || taskTopicTitle || data.title))));
+                    : (digitalOutcomeTopicKey === "relevant-implications"
+                        ? DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE
+                        : (resolvedTaskShortName || taskTopicTitle || data.title)))));
     const displaySummaryHtml = taskTopicTitle
         ? `Task topic from <a class="task-topic-parent-link" href="${parentAssessmentUrl}">${escapeHtml(data.title)}</a>`
         : escapeHtml(data.summary);
@@ -5944,7 +5974,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         || resolvedTaskShortName.toLowerCase().includes("digital outcome")
         || isDigitalOutcomeTargetAudienceTopic
         || isDigitalOutcomeDevelopmentToolsTopic
-        || isDigitalOutcomeSuccessCriteriaTopic;
+        || isDigitalOutcomeSuccessCriteriaTopic
+        || isDigitalOutcomeRelevantImplicationsTopic;
     const templateLibraryParams = new URLSearchParams();
     templateLibraryParams.set("activityId", String(id || "").trim());
     if (taskTopicTitle) {
@@ -5957,7 +5988,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         ? "target-audience"
         : (digitalOutcomeTopicKey === "development-tools"
             ? "relevant-implications"
-            : (digitalOutcomeTopicKey === "success-criteria" ? "project-success-criteria" : "digital-outcome-description"));
+            : (digitalOutcomeTopicKey === "success-criteria"
+                ? "project-success-criteria"
+                : (digitalOutcomeTopicKey === "relevant-implications" ? "relevant-implications" : "digital-outcome-description")));
     if (useDigitalOutcomeTemplateHero) {
         templateLibraryParams.set("templateId", preferredTemplateId);
     }
@@ -6055,7 +6088,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                     ? "Development and Tools"
                     : (digitalOutcomeTopicKey === "success-criteria"
                         ? "Success Criteria"
-                        : "Digital Outcome Description")))
+                        : (digitalOutcomeTopicKey === "relevant-implications"
+                            ? "Relevant Implications"
+                            : "Digital Outcome Description"))))
             : "Topic Tasks"));
     const topicGuideInstructions = isProjectManagementTopic
         ? [
@@ -6096,6 +6131,14 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                                 "Set indicators for what counts as achieved, partially achieved, or unmet.",
                                 "Use evidence language so teachers can verify outcomes against your criteria."
                             ]
+                            : (digitalOutcomeTopicKey === "relevant-implications"
+                                ? [
+                                    "Create a Google Slideshow for this topic.",
+                                    "Identify the key relevant implications connected to your digital outcome.",
+                                    "Explain legal, ethical, social, and accessibility considerations that apply.",
+                                    "Describe risks and how you will address or mitigate each implication.",
+                                    "Use specific evidence from your design decisions to justify your responses."
+                                ]
                             : [
                                 "Create a Google Slideshow for this topic.",
                                 "Include a slide that describes the digital outcome: what it is, who it is for, and what it must do.",
@@ -6144,6 +6187,13 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                                 "Explain what evidence will be collected and how it will be assessed.",
                                 "Describe what outcomes indicate success, partial success, or unresolved issues."
                             ]
+                            : (digitalOutcomeTopicKey === "relevant-implications"
+                                ? [
+                                    "Relevant Implications - Google Slides: Explain the implications linked to your outcome.",
+                                    "Identify legal, ethical, social, and accessibility implications that apply.",
+                                    "Describe risks and impacts for users, stakeholders, and the wider context.",
+                                    "Justify mitigation actions you will take in design, development, and testing."
+                                ]
                             : [
                                 "Description - Google Slides: Describe the Digital Outcome: what it is, who it is for, and what it must do.",
                                 "Identify the target audience or end user for this outcome.",
@@ -6161,6 +6211,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 ? "Use this guide to explain how your outcome will be developed and why your chosen tools and technologies are appropriate."
                 : (digitalOutcomeTopicKey === "success-criteria"
                     ? "Use this guide to define measurable success criteria and explain how your outcome will be evaluated."
+                    : (digitalOutcomeTopicKey === "relevant-implications"
+                        ? "Use this guide to identify relevant implications and justify how your project addresses them."
                     : "Use this guide to write and record a clear description of your digital outcome before starting development.")))
         : "Use this guide to complete the Submission Tasks correctly.";
     const topicGuideTaskHeading = isProjectManagementTopic
@@ -6172,6 +6224,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                     ? "Development and Tools - Google Slides"
                     : (digitalOutcomeTopicKey === "success-criteria"
                         ? "Success Criteria - Google Slides"
+                        : (digitalOutcomeTopicKey === "relevant-implications"
+                            ? "Relevant Implications - Google Slides"
                         : "Description - Google Slides")))
             : "Task List");
     const githubGuideTitle = "Version Control: GitHub";
