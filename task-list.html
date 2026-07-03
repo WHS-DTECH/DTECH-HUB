@@ -57,6 +57,19 @@
             min-width: 260px;
         }
 
+        .task-list-stat-list {
+            margin: 6px 0 0;
+            padding-left: 18px;
+            display: grid;
+            gap: 3px;
+            font-size: 0.82rem;
+            color: rgba(255, 255, 255, 0.95);
+        }
+
+        .task-list-stat-list li {
+            line-height: 1.25;
+        }
+
         .task-list-grid {
             display: grid;
             gap: 16px;
@@ -369,18 +382,6 @@
                         </div>
                         <div id="task-list-context" class="task-list-callout" hidden></div>
                         <p id="task-list-status" class="task-list-status" aria-live="polite"></p>
-                    </section>
-
-                    <section class="task-list-card">
-                        <h3 class="task-list-section-title">My Assessment Tasks</h3>
-                        <ul id="task-list-assessments" class="task-list-alloc-list"></ul>
-                        <p id="task-list-assessments-empty" class="task-list-empty" hidden>No assessment tasks allocated yet.</p>
-                    </section>
-
-                    <section class="task-list-card">
-                        <h3 class="task-list-section-title">My Projects</h3>
-                        <ul id="task-list-projects" class="task-list-alloc-list"></ul>
-                        <p id="task-list-projects-empty" class="task-list-empty" hidden>No projects allocated yet.</p>
                     </section>
 
                     <section class="task-list-card">

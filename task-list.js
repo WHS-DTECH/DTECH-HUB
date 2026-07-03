@@ -459,6 +459,13 @@ function setStatus(message, isError = false) {
 function renderHeader(summary) {
     const hero = document.querySelector("#task-list-hero");
     if (!hero) return;
+
+    const assessmentCount = Number(summary?.assessmentCount || 0);
+    const projectCount = Number(summary?.projectCount || 0);
+    const metCount = Number(summary?.metCount || 0);
+    const unresolvedCount = Number(summary?.unresolvedCount || 0);
+    const totalLinked = Number(summary?.totalLinked || 0);
+
     hero.innerHTML = `
         <div class="task-list-hero-copy">
             <p class="eyebrow">COMPUTER LAB</p>
@@ -467,17 +474,35 @@ function renderHeader(summary) {
         </div>
         <aside class="task-list-hero-stats">
             <div class="stat-card">
-                <span class="stat-label">Linked items</span>
-                <strong>${escapeTaskListHtml(String(summary.totalLinked || 0))}</strong>
-                <span class="stat-subline">Assessments and projects</span>
+                <span class="stat-label">Assessments and Projects</span>
+                <strong>${escapeTaskListHtml(String(totalLinked))}</strong>
+                <ul class="task-list-stat-list">
+                    <li>Assessment Tasks: ${escapeTaskListHtml(String(assessmentCount))}</li>
+                    <li>Projects: ${escapeTaskListHtml(String(projectCount))}</li>
+                </ul>
             </div>
             <div class="stat-card">
-                <span class="stat-label">Checklist items</span>
-                <strong>${escapeTaskListHtml(String(summary.totalChecklist || 0))}</strong>
-                <span class="stat-subline">current task</span>
+                <span class="stat-label">Assessment Criteria:</span>
+                <strong>${escapeTaskListHtml(String(metCount + unresolvedCount))}</strong>
+                <ul class="task-list-stat-list">
+                    <li>Met: ${escapeTaskListHtml(String(metCount))}</li>
+                    <li>Unresolved: ${escapeTaskListHtml(String(unresolvedCount))}</li>
+                </ul>
             </div>
         </aside>
     `;
+}
+
+function summarizeChecklistCriteria(stateMap) {
+    const rows = Object.values(stateMap || {}).flatMap((value) => Array.isArray(value) ? value : []);
+    const mainRows = rows.filter((row) => String(row?.text || "").trim().length > 0);
+    const metCount = mainRows.filter((row) => Boolean(row?.done)).length;
+    const unresolvedCount = Math.max(0, mainRows.length - metCount);
+    return {
+        totalCount: mainRows.length,
+        metCount,
+        unresolvedCount
+    };
 }
 
 function renderAllocationLists(assessmentTasks, projects) {
@@ -704,9 +729,16 @@ async function loadChecklistForTask(taskId) {
         await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});
     }
 
+    const checklistSummary = summarizeChecklistCriteria(taskListState.checklistState);
+    const assessmentCount = taskListState.allItems.filter((item) => item.kind !== "Project").length;
+    const projectCount = taskListState.allItems.filter((item) => item.kind === "Project").length;
+
     renderHeader({
         totalLinked: taskListState.allItems.length,
-        totalChecklist: Object.values(taskListState.checklistState).reduce((sum, rows) => sum + (Array.isArray(rows) ? rows.length : 0), 0)
+        assessmentCount,
+        projectCount,
+        metCount: checklistSummary.metCount,
+        unresolvedCount: checklistSummary.unresolvedCount
     });
 
     renderTaskPicker(taskListState.allItems, taskListState.selectedId);
@@ -742,7 +774,10 @@ async function renderTaskListPage() {
 
     renderHeader({
         totalLinked: taskListState.allItems.length,
-        totalChecklist: 0
+        assessmentCount: allocations.assessment_tasks.length,
+        projectCount: allocations.projects.length,
+        metCount: 0,
+        unresolvedCount: 0
     });
     renderAllocationLists(allocations.assessment_tasks, allocations.projects);
 
