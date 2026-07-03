@@ -4381,17 +4381,23 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
 
     const hasSyncedSlideForTaskTopic = (taskTopicText) => {
         const safeTopic = String(taskTopicText || "").trim();
-        if (!safeTopic || !projectId || !studentEmail) {
+        const lookupEmail = normalizeEmail(studentEmail || viewerEmail || readStoredHubEmail());
+        if (!safeTopic || !projectId || !lookupEmail) {
             return false;
         }
 
         const derivedShort = deriveTaskShortName(safeTopic);
-        const withShort = readStoredTaskTopicSlideSyncEntry(projectId, studentEmail, safeTopic, derivedShort);
+        const withShort = readStoredTaskTopicSlideSyncEntry(projectId, lookupEmail, safeTopic, derivedShort);
         if (toSafeExternalUrl(withShort?.url || "")) {
             return true;
         }
 
-        const withoutShort = readStoredTaskTopicSlideSyncEntry(projectId, studentEmail, safeTopic, "");
+        const byShort = readStoredTaskTopicSlideSyncEntryByShortName(projectId, lookupEmail, derivedShort);
+        if (toSafeExternalUrl(byShort?.url || "")) {
+            return true;
+        }
+
+        const withoutShort = readStoredTaskTopicSlideSyncEntry(projectId, lookupEmail, safeTopic, "");
         return Boolean(toSafeExternalUrl(withoutShort?.url || ""));
     };
 
@@ -5264,6 +5270,57 @@ function readStoredTaskTopicSlideSyncEntry(projectId, email, taskTopic, taskShor
     } catch (_error) {
         return { url: "", savedAt: "", templateId: "" };
     }
+}
+
+function readStoredTaskTopicSlideSyncEntryByShortName(projectId, email, taskShortName = "") {
+    const safeProjectId = String(projectId || "").trim();
+    const safeEmail = String(email || "").trim().toLowerCase();
+    const shortSlug = normalizeTaskTopicStorageSlug(taskShortName);
+    if (!safeProjectId || !safeEmail || !shortSlug) {
+        return { url: "", savedAt: "", templateId: "" };
+    }
+
+    const keyPrefix = `${TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX}:${safeProjectId}:${safeEmail}:`;
+    let bestMatch = { url: "", savedAt: "", templateId: "" };
+    let bestTime = 0;
+
+    try {
+        for (let index = 0; index < localStorage.length; index += 1) {
+            const key = String(localStorage.key(index) || "");
+            if (!key.startsWith(keyPrefix)) {
+                continue;
+            }
+            if (!key.endsWith(`:${shortSlug}`)) {
+                continue;
+            }
+
+            const raw = localStorage.getItem(key);
+            if (!raw) {
+                continue;
+            }
+            const parsed = JSON.parse(raw);
+            const safeUrl = toSafeExternalUrl(parsed?.url || "");
+            if (!safeUrl) {
+                continue;
+            }
+
+            const savedAt = String(parsed?.savedAt || "").trim();
+            const savedTs = Date.parse(savedAt);
+            const ts = Number.isFinite(savedTs) ? savedTs : 0;
+            if (ts >= bestTime) {
+                bestTime = ts;
+                bestMatch = {
+                    url: safeUrl,
+                    savedAt,
+                    templateId: String(parsed?.templateId || "").trim()
+                };
+            }
+        }
+    } catch (_error) {
+        return { url: "", savedAt: "", templateId: "" };
+    }
+
+    return bestMatch;
 }
 
 function writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopic, taskShortName = "", value = "") {
