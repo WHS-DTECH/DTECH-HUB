@@ -115,7 +115,8 @@ function deriveTaskShortName(taskTopic) {
     if (/project management/i.test(normalized)) return "Project Management";
     if (/describe.*digital outcome|description\s*-\s*google\s*slides/i.test(normalized)) return "Digital Outcome Description";
     if (/identify\s+the\s+target\s+audience|target\s+audience|end\s+user/i.test(normalized)) return "Target Audience";
-    if (/explain\s+how\s+the\s+outcome\s+will\s+be\s+developed|tools\/?technologies|development\s+steps|outcome\s+developed|relevant\s+implications/i.test(normalized)) return "Development and Tools";
+    if (/explain\s+how\s+the\s+outcome\s+will\s+be\s+developed|tools\/?technologies|development\s+steps|outcome\s+developed/i.test(normalized)) return "Development and Tools";
+    if (/relevant\s+implications/i.test(normalized)) return "Relevant Implications";
     if (/state\s+how\s+success\s+will\s+be\s+measured|success\s+will\s+be\s+evaluated|project\s+success\s+criteria|success\s+criteria/i.test(normalized)) return "Success Criteria";
     if (/digital outcome/i.test(normalized)) return "Digital Outcome";
     return normalized;
@@ -220,6 +221,39 @@ function hasSyncedSlideForTaskTopic(projectId, email, taskTopicText) {
     return false;
 }
 
+function hasEligibleTemplateSyncById(projectId, email, templateId) {
+    const safeProjectId = String(projectId || "").trim();
+    const safeEmail = String(email || "").trim().toLowerCase();
+    const targetTemplateId = String(templateId || "").trim().toLowerCase();
+    if (!safeProjectId || !safeEmail || !targetTemplateId) {
+        return false;
+    }
+
+    const keyPrefix = `${TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX}:${safeProjectId}:${safeEmail}:`;
+    try {
+        for (let index = 0; index < localStorage.length; index += 1) {
+            const key = String(localStorage.key(index) || "");
+            if (!key.startsWith(keyPrefix)) {
+                continue;
+            }
+
+            const raw = localStorage.getItem(key);
+            const parsed = raw ? JSON.parse(raw) : null;
+            const parsedTemplateId = String(parsed?.templateId || "").trim().toLowerCase();
+            if (parsedTemplateId !== targetTemplateId) {
+                continue;
+            }
+
+            if (isCompletionEligibleSyncEntry(parsed || {})) {
+                return true;
+            }
+        }
+    } catch (_error) {
+    }
+
+    return false;
+}
+
 function getStepLevel(text) {
     const normalized = String(text || "").trim().toLowerCase();
     if (normalized.startsWith("achieved:")) return "Achieved";
@@ -241,6 +275,10 @@ function getTaskTopicHrefForStep(standard, level, text) {
 
     if (String(standard) === "91897" && normalized.includes("project management")) {
         return buildCustomActivityLink(taskListState.selectedId, "Project Management");
+    }
+
+    if (String(standard) === "91897" && normalized.includes("relevant implications")) {
+        return buildCustomActivityLink(taskListState.selectedId, safeText, "Relevant Implications", "relevant-implications");
     }
 
     if (String(standard) === "digital-outcome") {
@@ -390,6 +428,36 @@ function autoTickDigitalOutcomeRequirements(stateMap, projectId, email) {
         }
 
         if (!hasEligibleSync && Boolean(row?.done)) {
+            row.done = false;
+            changed = true;
+        }
+    });
+
+    return changed;
+}
+
+function autoTickRelevantImplicationsRequirements(stateMap, projectId, email) {
+    const rows = Array.isArray(stateMap?.["91897"]) ? stateMap["91897"] : [];
+    if (!rows.length || !projectId || !email) {
+        return false;
+    }
+
+    const hasRelevantImplicationsSync = hasEligibleTemplateSyncById(projectId, email, "relevant-implications");
+    let changed = false;
+
+    rows.forEach((row) => {
+        const text = String(row?.text || "").trim().toLowerCase();
+        if (!text || !text.includes("relevant implications")) {
+            return;
+        }
+
+        if (hasRelevantImplicationsSync && !Boolean(row?.done)) {
+            row.done = true;
+            changed = true;
+            return;
+        }
+
+        if (!hasRelevantImplicationsSync && Boolean(row?.done)) {
             row.done = false;
             changed = true;
         }
@@ -811,10 +879,15 @@ async function loadChecklistForTask(taskId) {
         }
     });
 
-    const autoChangedChecklist = autoTickProjectManagementRequirement(taskListState.checklistState)
-        || autoTickDigitalOutcomeRequirements(taskListState.checklistState, taskListState.selectedId, getTaskListEmail());
-    const autoChangedEvidence = autoTickProjectManagementRequirement(taskListState.fullEvidenceState)
-        || autoTickDigitalOutcomeRequirements(taskListState.fullEvidenceState, taskListState.selectedId, getTaskListEmail());
+    const signedInEmail = getTaskListEmail();
+    const autoChangedChecklistPM = autoTickProjectManagementRequirement(taskListState.checklistState);
+    const autoChangedChecklistDO = autoTickDigitalOutcomeRequirements(taskListState.checklistState, taskListState.selectedId, signedInEmail);
+    const autoChangedChecklistRI = autoTickRelevantImplicationsRequirements(taskListState.checklistState, taskListState.selectedId, signedInEmail);
+    const autoChangedChecklist = autoChangedChecklistPM || autoChangedChecklistDO || autoChangedChecklistRI;
+    const autoChangedEvidencePM = autoTickProjectManagementRequirement(taskListState.fullEvidenceState);
+    const autoChangedEvidenceDO = autoTickDigitalOutcomeRequirements(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
+    const autoChangedEvidenceRI = autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
+    const autoChangedEvidence = autoChangedEvidencePM || autoChangedEvidenceDO || autoChangedEvidenceRI;
     if (autoChangedChecklist || autoChangedEvidence) {
         const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
         await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});
