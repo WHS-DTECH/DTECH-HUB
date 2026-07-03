@@ -5459,6 +5459,17 @@ function isCompletionEligibleSyncEntry(entry, taskTopicText = "") {
         }
     }
 
+    // Backward-compatibility: legacy sync entries created before syncSource existed.
+    if (!syncSource) {
+        const normalizedTopic = String(taskTopicText || "").trim().toLowerCase();
+        if (normalizedTopic.includes("describe the digital outcome") || normalizedTopic.includes("description - google slides")) {
+            return true;
+        }
+        if (normalizedTopic.includes("target audience") || normalizedTopic.includes("end user")) {
+            return true;
+        }
+    }
+
     return false;
 }
 
