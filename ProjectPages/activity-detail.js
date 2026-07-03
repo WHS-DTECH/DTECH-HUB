@@ -3249,10 +3249,11 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 ? "relevant-implications"
                 : (isSuccessCriteriaTopic ? "project-success-criteria" : "digital-outcome-description"));
         const topicMatch = await findProcessAssessmentSlideMatch(syncTopicLabel);
-        let matchedTopicThumbnailUrl = toSafeExternalUrl(topicMatch.thumbnailUrl || "");
+        let matchedTopicThumbnailUrl = "";
         if (!syncedGoogleSlidesUrl) {
             if (topicMatch.fileUrl) {
                 syncedGoogleSlidesUrl = topicMatch.fileUrl;
+                matchedTopicThumbnailUrl = toSafeExternalUrl(topicMatch.thumbnailUrl || "");
                 if (!syncedGoogleSlidesSavedAt) {
                     syncedGoogleSlidesSavedAt = topicMatch.modifiedTime;
                 }
@@ -3264,6 +3265,12 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                     templateId: syncTemplateId,
                     thumbnailUrl: topicMatch.thumbnailUrl
                 });
+            }
+        } else {
+            const syncedId = extractSlidesIdFromValue(syncedGoogleSlidesUrl);
+            const matchedId = extractSlidesIdFromValue(topicMatch.fileUrl || "");
+            if (syncedId && matchedId && syncedId === matchedId) {
+                matchedTopicThumbnailUrl = toSafeExternalUrl(topicMatch.thumbnailUrl || "");
             }
         }
         if (!syncedGoogleSlidesSavedAt) {
@@ -5875,9 +5882,13 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         : (digitalOutcomeTopicKey === "description"
             ? DIGITAL_OUTCOME_DESCRIPTION_TEMPLATE_PREVIEW_URL
             : DIGITAL_OUTCOME_GENERIC_TEMPLATE_PREVIEW_URL);
-    const slideshowTemplateImage = toSafeExternalUrl(data?.slideshowTemplateImage || data?.slideTemplateImage || "")
-        || taskTopicSyncedSlideThumbnail
-        || (useDigitalOutcomeTemplateHero ? digitalOutcomeTemplateFallbackImage : "");
+    const slideshowTemplateImage = (isDigitalOutcomeTopic || useDigitalOutcomeTemplateHero)
+        ? (taskTopicSyncedSlideThumbnail
+            || toSafeExternalUrl(data?.slideshowTemplateImage || data?.slideTemplateImage || "")
+            || digitalOutcomeTemplateFallbackImage)
+        : (toSafeExternalUrl(data?.slideshowTemplateImage || data?.slideTemplateImage || "")
+            || taskTopicSyncedSlideThumbnail
+            || (useDigitalOutcomeTemplateHero ? digitalOutcomeTemplateFallbackImage : ""));
     const slideshowTemplateFileUrl = toSafeExternalUrl(data?.slideshowTemplateFileUrl || data?.slideTemplateFileUrl || data?.speakerNotesCriteriaUrl || "");
     const heroVisualImage = ((isDigitalOutcomeTopic || useDigitalOutcomeTemplateHero) ? (slideshowTemplateImage || data.image) : data.image)
         || "https://placehold.co/900x560/3f89cf/ffffff?text=Uploaded+Activity";
