@@ -4474,17 +4474,17 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
 
         const derivedShort = deriveTaskShortName(safeTopic);
         const withShort = readStoredTaskTopicSlideSyncEntry(projectId, lookupEmail, safeTopic, derivedShort);
-        if (isCompletionEligibleSyncEntry(withShort)) {
+        if (isCompletionEligibleSyncEntry(withShort, safeTopic)) {
             return true;
         }
 
         const byShort = readStoredTaskTopicSlideSyncEntryByShortName(projectId, lookupEmail, derivedShort);
-        if (isCompletionEligibleSyncEntry(byShort)) {
+        if (isCompletionEligibleSyncEntry(byShort, safeTopic)) {
             return true;
         }
 
         const withoutShort = readStoredTaskTopicSlideSyncEntry(projectId, lookupEmail, safeTopic, "");
-        return isCompletionEligibleSyncEntry(withoutShort);
+        return isCompletionEligibleSyncEntry(withoutShort, safeTopic);
     };
 
     let showTaskDetail = () => {};
@@ -5438,13 +5438,28 @@ function readStoredTaskTopicSlideSyncEntry(projectId, email, taskTopic, taskShor
     }
 }
 
-function isCompletionEligibleSyncEntry(entry) {
+function isCompletionEligibleSyncEntry(entry, taskTopicText = "") {
     const safeUrl = toSafeExternalUrl(entry?.url || "");
     const syncSource = String(entry?.syncSource || "").trim().toLowerCase();
     if (!safeUrl) {
         return false;
     }
-    return syncSource === "template-use" || syncSource === "manual-link" || syncSource === "manual-submit";
+
+    if (syncSource === "template-use" || syncSource === "manual-link" || syncSource === "manual-submit") {
+        return true;
+    }
+
+    if (syncSource === "folder-match") {
+        const normalizedTopic = String(taskTopicText || "").trim().toLowerCase();
+        if (normalizedTopic.includes("describe the digital outcome") || normalizedTopic.includes("description - google slides")) {
+            return true;
+        }
+        if (normalizedTopic.includes("target audience") || normalizedTopic.includes("end user")) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 function readStoredTaskTopicSlideSyncEntryByShortName(projectId, email, taskShortName = "") {
