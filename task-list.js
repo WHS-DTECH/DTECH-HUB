@@ -115,8 +115,20 @@ function deriveTaskShortName(taskTopic) {
     if (/project management/i.test(normalized)) return "Project Management";
     if (/describe.*digital outcome|description\s*-\s*google\s*slides/i.test(normalized)) return "Digital Outcome Description";
     if (/identify\s+the\s+target\s+audience|target\s+audience|end\s+user/i.test(normalized)) return "Target Audience";
+    if (/explain\s+how\s+the\s+outcome\s+will\s+be\s+developed|tools\/?technologies|development\s+steps|outcome\s+developed|relevant\s+implications/i.test(normalized)) return "Development and Tools";
+    if (/state\s+how\s+success\s+will\s+be\s+measured|success\s+will\s+be\s+evaluated|project\s+success\s+criteria|success\s+criteria/i.test(normalized)) return "Success Criteria";
     if (/digital outcome/i.test(normalized)) return "Digital Outcome";
     return normalized;
+}
+
+function inferDigitalOutcomeTaskTemplateId(taskText) {
+    const normalized = String(taskText || "").trim().toLowerCase();
+    if (!normalized) return "";
+    if (/describe.*digital outcome|description\s*-\s*google\s*slides/.test(normalized)) return "digital-outcome-description";
+    if (/identify\s+the\s+target\s+audience|target\s+audience|end\s+user/.test(normalized)) return "target-audience";
+    if (/explain\s+how\s+the\s+outcome\s+will\s+be\s+developed|tools\/?technologies|development\s+steps|outcome\s+developed|relevant\s+implications/.test(normalized)) return "relevant-implications";
+    if (/state\s+how\s+success\s+will\s+be\s+measured|success\s+will\s+be\s+evaluated|project\s+success\s+criteria|success\s+criteria/.test(normalized)) return "project-success-criteria";
+    return "";
 }
 
 function normalizeTaskTopicStorageSlug(value) {
@@ -162,7 +174,39 @@ function hasSyncedSlideForTaskTopic(projectId, email, taskTopicText) {
         return true;
     }
     const withoutShort = readStoredTaskTopicSlideSyncEntry(projectId, email, safeTopic, "");
-    return Boolean(String(withoutShort.url || "").trim());
+    if (String(withoutShort.url || "").trim()) {
+        return true;
+    }
+
+    const expectedShortName = deriveTaskShortName(safeTopic);
+    const keyPrefix = `${TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX}:${String(projectId || "").trim()}:${String(email || "").trim().toLowerCase()}:`;
+    const shortSlug = normalizeTaskTopicStorageSlug(expectedShortName);
+    if (!shortSlug) {
+        return false;
+    }
+
+    try {
+        for (let index = 0; index < localStorage.length; index += 1) {
+            const key = String(localStorage.key(index) || "");
+            if (!key.startsWith(keyPrefix)) {
+                continue;
+            }
+
+            if (!key.endsWith(`:${shortSlug}`)) {
+                continue;
+            }
+
+            const raw = localStorage.getItem(key);
+            const parsed = raw ? JSON.parse(raw) : null;
+            const url = String(parsed?.url || "").trim();
+            if (url) {
+                return true;
+            }
+        }
+    } catch (_error) {
+    }
+
+    return false;
 }
 
 function getStepLevel(text) {
@@ -188,12 +232,10 @@ function getTaskTopicHrefForStep(standard, level, text) {
         return buildCustomActivityLink(taskListState.selectedId, "Project Management");
     }
 
-    if (String(standard) === "digital-outcome" && normalized.includes("describe the digital outcome")) {
-        return buildCustomActivityLink(taskListState.selectedId, safeText, "Digital Outcome Description", "digital-outcome-description");
-    }
-
-    if (String(standard) === "digital-outcome" && (normalized.includes("identify the target audience") || normalized.includes("end user"))) {
-        return buildCustomActivityLink(taskListState.selectedId, safeText);
+    if (String(standard) === "digital-outcome") {
+        const shortName = deriveTaskShortName(safeText);
+        const templateId = inferDigitalOutcomeTaskTemplateId(safeText);
+        return buildCustomActivityLink(taskListState.selectedId, safeText, shortName, templateId);
     }
 
     if (normalizedLevel === "achieved" && normalized.includes("version control")) {
@@ -324,9 +366,7 @@ function autoTickDigitalOutcomeRequirements(stateMap, projectId, email) {
         if (!text) return;
 
         const normalized = text.toLowerCase();
-        const isTemplateDrivenRow = normalized.includes("describe the digital outcome")
-            || normalized.includes("identify the target audience")
-            || normalized.includes("end user for this outcome");
+        const isTemplateDrivenRow = Boolean(inferDigitalOutcomeTaskTemplateId(normalized));
         if (!isTemplateDrivenRow) {
             return;
         }
