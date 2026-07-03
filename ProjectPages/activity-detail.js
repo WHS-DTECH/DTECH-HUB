@@ -626,6 +626,31 @@ async function findProcessAssessmentSlideMatch(taskTopic = "") {
     }
 }
 
+async function fetchTemplateLibraryPreviewByTemplateId(templateId = "") {
+    const targetTemplateId = String(templateId || "").trim();
+    if (!targetTemplateId) {
+        return "";
+    }
+
+    try {
+        const response = await fetch("/api/template-library", { headers: buildAuthHeaders({}) });
+        if (!response.ok) {
+            return "";
+        }
+
+        const payload = await response.json().catch(() => ({}));
+        const entries = Array.isArray(payload?.entries) ? payload.entries : [];
+        const match = entries.find((entry) => String(entry?.id || "").trim().toLowerCase() === targetTemplateId.toLowerCase());
+        if (!match) {
+            return "";
+        }
+
+        return toSafeExternalUrl(match?.imageUrl || "") || toGoogleSlidesThumbnailUrl(match?.templateUrl || "");
+    } catch (_error) {
+        return "";
+    }
+}
+
 function installCloudSyncDelegatedFallbackHandlers() {
     if (window.__dtechCloudSyncFallbackBound) {
         return;
@@ -3248,6 +3273,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             : (isDevelopmentToolsTopic
                 ? "relevant-implications"
                 : (isSuccessCriteriaTopic ? "project-success-criteria" : "digital-outcome-description"));
+        const canonicalTemplatePreviewUrl = await fetchTemplateLibraryPreviewByTemplateId(syncTemplateId);
         const topicMatch = await findProcessAssessmentSlideMatch(syncTopicLabel);
         let matchedTopicThumbnailUrl = "";
         if (!syncedGoogleSlidesUrl) {
@@ -3277,7 +3303,14 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             syncedGoogleSlidesSavedAt = String(submission.haparaSubmittedAt || submission.submittedAt || "").trim();
         }
         if (syncedGoogleSlidesUrl) {
-            updateTaskTopicTemplateHeroPreview(host, syncedGoogleSlidesUrl, syncTopicLabel, matchedTopicThumbnailUrl);
+            updateTaskTopicTemplateHeroPreview(
+                host,
+                syncedGoogleSlidesUrl,
+                syncTopicLabel,
+                canonicalTemplatePreviewUrl || matchedTopicThumbnailUrl
+            );
+        } else if (canonicalTemplatePreviewUrl) {
+            updateTaskTopicTemplateHeroPreview(host, canonicalTemplatePreviewUrl, syncTopicLabel, canonicalTemplatePreviewUrl);
         }
 
         panelHost.innerHTML = `
