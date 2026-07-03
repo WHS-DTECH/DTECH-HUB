@@ -456,6 +456,27 @@ function setStatus(message, isError = false) {
     status.classList.toggle("is-error", Boolean(isError));
 }
 
+function renderHeroLinkedItems(items, label) {
+    const rows = Array.isArray(items) ? items : [];
+    if (!rows.length) {
+        return `<p class="task-list-hero-linked-empty">No ${escapeTaskListHtml(String(label || "items").toLowerCase())} allocated yet.</p>`;
+    }
+
+    return `
+        <ul class="task-list-hero-linked-list">
+            ${rows.map((item) => {
+                const href = buildCustomActivityLink(item.id);
+                return `
+                    <li class="task-list-hero-linked-item">
+                        <span>${escapeTaskListHtml(String(item?.name || "Untitled"))}</span>
+                        <a href="${escapeTaskListHtml(href)}">Open</a>
+                    </li>
+                `;
+            }).join("")}
+        </ul>
+    `;
+}
+
 function renderHeader(summary) {
     const hero = document.querySelector("#task-list-hero");
     if (!hero) return;
@@ -465,12 +486,24 @@ function renderHeader(summary) {
     const metCount = Number(summary?.metCount || 0);
     const unresolvedCount = Number(summary?.unresolvedCount || 0);
     const totalLinked = Number(summary?.totalLinked || 0);
+    const linkedAssessments = Array.isArray(summary?.linkedAssessments) ? summary.linkedAssessments : [];
+    const linkedProjects = Array.isArray(summary?.linkedProjects) ? summary.linkedProjects : [];
 
     hero.innerHTML = `
         <div class="task-list-hero-copy">
             <p class="eyebrow">COMPUTER LAB</p>
             <h1>My Task List</h1>
             <p class="hero-text">Track the checklist for the current task while keeping all connected assessment and project evidence visible.</p>
+            <div class="task-list-hero-linked-grid">
+                <article class="task-list-hero-linked-card">
+                    <h3 class="task-list-hero-linked-title">My Assessment Tasks</h3>
+                    ${renderHeroLinkedItems(linkedAssessments, "assessment tasks")}
+                </article>
+                <article class="task-list-hero-linked-card">
+                    <h3 class="task-list-hero-linked-title">My Projects</h3>
+                    ${renderHeroLinkedItems(linkedProjects, "projects")}
+                </article>
+            </div>
         </div>
         <aside class="task-list-hero-stats">
             <div class="stat-card">
@@ -733,12 +766,17 @@ async function loadChecklistForTask(taskId) {
     const assessmentCount = taskListState.allItems.filter((item) => item.kind !== "Project").length;
     const projectCount = taskListState.allItems.filter((item) => item.kind === "Project").length;
 
+    const linkedAssessments = taskListState.allItems.filter((item) => item.kind !== "Project");
+    const linkedProjects = taskListState.allItems.filter((item) => item.kind === "Project");
+
     renderHeader({
         totalLinked: taskListState.allItems.length,
         assessmentCount,
         projectCount,
         metCount: checklistSummary.metCount,
-        unresolvedCount: checklistSummary.unresolvedCount
+        unresolvedCount: checklistSummary.unresolvedCount,
+        linkedAssessments,
+        linkedProjects
     });
 
     renderTaskPicker(taskListState.allItems, taskListState.selectedId);
@@ -777,9 +815,10 @@ async function renderTaskListPage() {
         assessmentCount: allocations.assessment_tasks.length,
         projectCount: allocations.projects.length,
         metCount: 0,
-        unresolvedCount: 0
+        unresolvedCount: 0,
+        linkedAssessments: allocations.assessment_tasks,
+        linkedProjects: allocations.projects
     });
-    renderAllocationLists(allocations.assessment_tasks, allocations.projects);
 
     const contextHost = document.querySelector("#task-list-context");
     if (contextHost) {

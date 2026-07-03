@@ -51,6 +51,63 @@
             max-width: 60ch;
         }
 
+        .task-list-hero-linked-grid {
+            margin-top: 12px;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            max-width: 760px;
+        }
+
+        .task-list-hero-linked-card {
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.12);
+            padding: 8px 10px;
+            backdrop-filter: blur(2px);
+        }
+
+        .task-list-hero-linked-title {
+            margin: 0 0 6px;
+            font-size: 0.76rem;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.95);
+        }
+
+        .task-list-hero-linked-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: grid;
+            gap: 5px;
+        }
+
+        .task-list-hero-linked-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.95);
+        }
+
+        .task-list-hero-linked-item a {
+            color: #ffffff;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .task-list-hero-linked-empty {
+            margin: 0;
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.86);
+        }
+
         .task-list-hero-stats {
             display: grid;
             gap: 12px;
@@ -357,6 +414,10 @@
 
             .task-list-hero-copy {
                 min-width: 100%;
+            }
+
+            .task-list-hero-linked-grid {
+                grid-template-columns: 1fr;
             }
         }
     </style>
