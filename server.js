@@ -5271,6 +5271,7 @@ app.post("/api/student/drive-setup/find-slide", async (req, res) => {
       fileId: String(best.id || "").trim(),
       fileName: String(best.name || "").trim(),
       fileUrl: String(best.webViewLink || `https://docs.google.com/presentation/d/${String(best.id || "").trim()}/edit`).trim(),
+      thumbnailUrl: String(best.thumbnailLink || "").trim(),
       modifiedTime: String(best.modifiedTime || "").trim()
     });
   } catch (error) {

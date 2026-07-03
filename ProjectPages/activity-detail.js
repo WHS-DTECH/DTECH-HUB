@@ -597,7 +597,7 @@ async function fetchStudentProcessAssessmentFolderUrl() {
 async function findProcessAssessmentSlideMatch(taskTopic = "") {
     const accessToken = readStoredHubAccessToken();
     if (!accessToken) {
-        return { fileUrl: "", fileName: "", modifiedTime: "" };
+        return { fileUrl: "", fileName: "", thumbnailUrl: "", modifiedTime: "" };
     }
 
     try {
@@ -611,17 +611,18 @@ async function findProcessAssessmentSlideMatch(taskTopic = "") {
         });
 
         if (!response.ok) {
-            return { fileUrl: "", fileName: "", modifiedTime: "" };
+            return { fileUrl: "", fileName: "", thumbnailUrl: "", modifiedTime: "" };
         }
 
         const payload = await response.json().catch(() => ({}));
         return {
             fileUrl: toSafeExternalUrl(payload?.fileUrl || ""),
             fileName: String(payload?.fileName || "").trim(),
+            thumbnailUrl: toSafeExternalUrl(payload?.thumbnailUrl || ""),
             modifiedTime: String(payload?.modifiedTime || "").trim()
         };
     } catch (_error) {
-        return { fileUrl: "", fileName: "", modifiedTime: "" };
+        return { fileUrl: "", fileName: "", thumbnailUrl: "", modifiedTime: "" };
     }
 }
 
@@ -3237,22 +3238,35 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             : (isDevelopmentToolsTopic
                 ? DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE
                 : (isSuccessCriteriaTopic ? DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE : "Digital Outcome: Description"));
+        const syncTemplateId = isTargetAudienceTopic
+            ? "target-audience"
+            : (isDevelopmentToolsTopic
+                ? "relevant-implications"
+                : (isSuccessCriteriaTopic ? "project-success-criteria" : "digital-outcome-description"));
+        let matchedTopicThumbnailUrl = "";
         if (!syncedGoogleSlidesUrl) {
             const topicMatch = await findProcessAssessmentSlideMatch(syncTopicLabel);
             if (topicMatch.fileUrl) {
                 syncedGoogleSlidesUrl = topicMatch.fileUrl;
+                matchedTopicThumbnailUrl = toSafeExternalUrl(topicMatch.thumbnailUrl || "");
                 if (!syncedGoogleSlidesSavedAt) {
                     syncedGoogleSlidesSavedAt = topicMatch.modifiedTime;
                 }
-                writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopicTitle, taskTopicShortName, syncedGoogleSlidesUrl);
-                writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopicTitle, syncTopicLabel, syncedGoogleSlidesUrl);
+                writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopicTitle, taskTopicShortName, syncedGoogleSlidesUrl, {
+                    templateId: syncTemplateId,
+                    thumbnailUrl: topicMatch.thumbnailUrl
+                });
+                writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopicTitle, syncTopicLabel, syncedGoogleSlidesUrl, {
+                    templateId: syncTemplateId,
+                    thumbnailUrl: topicMatch.thumbnailUrl
+                });
             }
         }
         if (!syncedGoogleSlidesSavedAt) {
             syncedGoogleSlidesSavedAt = String(submission.haparaSubmittedAt || submission.submittedAt || "").trim();
         }
         if (syncedGoogleSlidesUrl) {
-            updateTaskTopicTemplateHeroPreview(host, syncedGoogleSlidesUrl, syncTopicLabel);
+            updateTaskTopicTemplateHeroPreview(host, syncedGoogleSlidesUrl, syncTopicLabel, matchedTopicThumbnailUrl);
         }
 
         panelHost.innerHTML = `
@@ -5452,24 +5466,29 @@ function readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, templat
     return bestMatch;
 }
 
-function updateTaskTopicTemplateHeroPreview(host, slidesUrl, topicLabel = "") {
+function updateTaskTopicTemplateHeroPreview(host, slidesUrl, topicLabel = "", preferredThumbnailUrl = "") {
     const heroImage = host?.querySelector(".task-topic-template-hero img");
     if (!heroImage) {
         return;
     }
 
-    const thumbnailUrl = toGoogleSlidesThumbnailUrl(slidesUrl);
+    const thumbnailUrl = toSafeExternalUrl(preferredThumbnailUrl) || toGoogleSlidesThumbnailUrl(slidesUrl);
     if (!thumbnailUrl) {
         return;
     }
 
     heroImage.src = thumbnailUrl;
+    heroImage.onerror = () => {
+        heroImage.onerror = null;
+        const fallback = toGoogleSlidesThumbnailUrl(slidesUrl) || DIGITAL_OUTCOME_GENERIC_TEMPLATE_PREVIEW_URL;
+        heroImage.src = fallback;
+    };
     if (topicLabel) {
         heroImage.alt = `${String(topicLabel).trim()} slideshow template preview`;
     }
 }
 
-function writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopic, taskShortName = "", value = "") {
+function writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopic, taskShortName = "", value = "", options = {}) {
     const key = getTaskTopicSlideSyncStorageKey(projectId, email, taskTopic, taskShortName);
     const safeUrl = toSafeExternalUrl(value);
     try {
@@ -5477,9 +5496,15 @@ function writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopic, taskShor
             localStorage.removeItem(key);
             return "";
         }
+        const existingRaw = localStorage.getItem(key);
+        const existing = existingRaw ? JSON.parse(existingRaw) : {};
+        const nextTemplateId = String(options?.templateId || existing?.templateId || "").trim();
+        const nextThumbnailUrl = toSafeExternalUrl(options?.thumbnailUrl || existing?.thumbnailUrl || "");
         localStorage.setItem(key, JSON.stringify({
             url: safeUrl,
-            savedAt: new Date().toISOString()
+            savedAt: new Date().toISOString(),
+            templateId: nextTemplateId,
+            thumbnailUrl: nextThumbnailUrl
         }));
         return safeUrl;
     } catch (_error) {
