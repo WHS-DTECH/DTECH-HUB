@@ -107,6 +107,7 @@ const DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE = "Development and Tools";
 const DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE = "Success Criteria";
 const DIGITAL_OUTCOME_DESCRIPTION_TEMPLATE_PREVIEW_URL = "https://drive.google.com/thumbnail?id=1brOY70u9aJdsoiEtxVepr82vRhiv9VzpMm8TUv3lcTo&sz=w1400";
 const DIGITAL_OUTCOME_TARGET_AUDIENCE_TEMPLATE_PREVIEW_URL = "../images/target-audience-template-preview.svg";
+const DIGITAL_OUTCOME_GENERIC_TEMPLATE_PREVIEW_URL = "../images/template-preview-placeholder.svg";
 
 const EVIDENCE_STEPS_DEFAULTS = {
     "92005": [
@@ -2893,6 +2894,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const isRelevantImplicationsTopic = taskTopicTitle.toLowerCase().includes("relevant implication");
     const normalizedDerivedShortName = deriveTaskShortName(taskTopicTitle).toLowerCase();
     const normalizedTaskTopicShortName = taskTopicShortName.toLowerCase();
+    const keywordMatchedTopicKey = inferDigitalOutcomeTopicKeyFromTitle(`${taskTopicTitle} ${taskTopicShortName}`);
     const isProjectManagementTopic = taskTopicTitle.toLowerCase().includes("project management")
         || normalizedTaskTopicShortName.includes("project management")
         || normalizedDerivedShortName.includes("project management");
@@ -2918,7 +2920,8 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         || normalizedDerivedShortName.includes("digital outcome")
         || isDigitalOutcomeTargetAudienceCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
         || isDigitalOutcomeDevelopmentToolsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
-        || isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle));
+        || isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
+        || Boolean(keywordMatchedTopicKey);
     const isMediaAssetWorkflowTopic = isAssetVersionControlTopic && !isProjectManagementTopic;
     const isTrackedWorkflowTopic = isProjectManagementTopic || isMediaAssetWorkflowTopic;
 
@@ -3223,14 +3226,17 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
 
     if (isDigitalOutcomeTopic) {
         const processAssessmentFolderUrl = await fetchStudentProcessAssessmentFolderUrl();
-        const isTargetAudienceTopic = isDigitalOutcomeTargetAudienceCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle));
-        const isDevelopmentToolsTopic = isDigitalOutcomeDevelopmentToolsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle));
-        const isSuccessCriteriaTopic = isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle));
+        const isTargetAudienceTopic = isDigitalOutcomeTargetAudienceCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
+            || keywordMatchedTopicKey === "target-audience";
+        const isDevelopmentToolsTopic = isDigitalOutcomeDevelopmentToolsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
+            || keywordMatchedTopicKey === "development-tools";
+        const isSuccessCriteriaTopic = isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
+            || keywordMatchedTopicKey === "success-criteria";
         const syncTopicLabel = isTargetAudienceTopic
-            ? "Target Audience"
+            ? DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE
             : (isDevelopmentToolsTopic
-                ? "Development and Tools"
-                : (isSuccessCriteriaTopic ? "Success Criteria" : "Digital Outcome: Description"));
+                ? DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE
+                : (isSuccessCriteriaTopic ? DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE : "Digital Outcome: Description"));
         if (!syncedGoogleSlidesUrl) {
             const topicMatch = await findProcessAssessmentSlideMatch(syncTopicLabel);
             if (topicMatch.fileUrl) {
@@ -5264,6 +5270,31 @@ function isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, taskShortName 
     return shortNameText === DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE.toLowerCase();
 }
 
+function inferDigitalOutcomeTopicKeyFromTitle(pageTitle) {
+    const normalized = String(pageTitle || "").trim().toLowerCase();
+    if (!normalized) {
+        return "";
+    }
+
+    if (/target\s+audience|end\s+user/.test(normalized)) {
+        return "target-audience";
+    }
+
+    if (/developed|development|tools\/?technologies|tools|technologies/.test(normalized)) {
+        return "development-tools";
+    }
+
+    if (/success\s+will\s+be\s+measured|success\s+will\s+be\s+evaluated|success\s+criteria|measured|evaluated/.test(normalized)) {
+        return "success-criteria";
+    }
+
+    if (/description\s*-\s*google\s*slides|describe.*digital\s+outcome|digital\s+outcome\s+description/.test(normalized)) {
+        return "description";
+    }
+
+    return "";
+}
+
 function getTaskTopicShortNameOverride(activityId, topicText) {
     if (typeof window === "undefined" || typeof window.hubGetTaskTopicShortNameOverride !== "function") {
         return "";
@@ -5645,23 +5676,36 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     const resolvedTaskShortName = String(selectedTaskShortName || "").trim()
         || (taskTopicTitle ? getTaskTopicShortNameOverride(id, taskTopicTitle) : "")
         || (taskTopicTitle ? deriveTaskShortName(taskTopicTitle) : "");
-    const isDigitalOutcomeDescriptionTopic = isDigitalOutcomeDescriptionCriterion(taskTopicTitle, resolvedTaskShortName);
-    const isDigitalOutcomeTargetAudienceTopic = isDigitalOutcomeTargetAudienceCriterion(taskTopicTitle, resolvedTaskShortName);
-    const isDigitalOutcomeDevelopmentToolsTopic = isDigitalOutcomeDevelopmentToolsCriterion(taskTopicTitle, resolvedTaskShortName);
-    const isDigitalOutcomeSuccessCriteriaTopic = isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, resolvedTaskShortName);
-    const useDigitalOutcomeTemplateHero = isDigitalOutcomeDescriptionTopic
-        || isDigitalOutcomeTargetAudienceTopic
-        || isDigitalOutcomeDevelopmentToolsTopic
-        || isDigitalOutcomeSuccessCriteriaTopic;
+    const keywordMatchedTopicKey = inferDigitalOutcomeTopicKeyFromTitle(`${taskTopicTitle} ${resolvedTaskShortName}`);
+    const isDigitalOutcomeDescriptionTopic = isDigitalOutcomeDescriptionCriterion(taskTopicTitle, resolvedTaskShortName)
+        || keywordMatchedTopicKey === "description";
+    const isDigitalOutcomeTargetAudienceTopic = isDigitalOutcomeTargetAudienceCriterion(taskTopicTitle, resolvedTaskShortName)
+        || keywordMatchedTopicKey === "target-audience";
+    const isDigitalOutcomeDevelopmentToolsTopic = isDigitalOutcomeDevelopmentToolsCriterion(taskTopicTitle, resolvedTaskShortName)
+        || keywordMatchedTopicKey === "development-tools";
+    const isDigitalOutcomeSuccessCriteriaTopic = isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, resolvedTaskShortName)
+        || keywordMatchedTopicKey === "success-criteria";
+    const digitalOutcomeTopicKey = isDigitalOutcomeTargetAudienceTopic
+        ? "target-audience"
+        : (isDigitalOutcomeDevelopmentToolsTopic
+            ? "development-tools"
+            : (isDigitalOutcomeSuccessCriteriaTopic
+                ? "success-criteria"
+                : (isDigitalOutcomeDescriptionTopic ? "description" : keywordMatchedTopicKey)));
+    const useDigitalOutcomeTemplateHero = Boolean(digitalOutcomeTopicKey);
     const mergedTaskTopicLinks = isTaskTopicView
         ? collectMergedTaskTopicLinks(data, id, taskTopicTitle, resolvedTaskShortName)
         : [];
     const showMergedTaskTopicLayout = mergedTaskTopicLinks.length > 1;
-    const displayTitle = isDigitalOutcomeDescriptionTopic
+    const displayTitle = digitalOutcomeTopicKey === "description"
         ? DIGITAL_OUTCOME_DESCRIPTION_TITLE
-        : (isDigitalOutcomeTargetAudienceTopic
+        : (digitalOutcomeTopicKey === "target-audience"
             ? DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE
-            : (resolvedTaskShortName || taskTopicTitle || data.title));
+            : (digitalOutcomeTopicKey === "development-tools"
+                ? DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE
+                : (digitalOutcomeTopicKey === "success-criteria"
+                    ? DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE
+                    : (resolvedTaskShortName || taskTopicTitle || data.title))));
     const displaySummaryHtml = taskTopicTitle
         ? `Task topic from <a class="task-topic-parent-link" href="${parentAssessmentUrl}">${escapeHtml(data.title)}</a>`
         : escapeHtml(data.summary);
@@ -5701,25 +5745,30 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         templateLibraryParams.set("taskShortName", resolvedTaskShortName);
     }
     if (useDigitalOutcomeTemplateHero) {
-        const preferredTemplateId = isDigitalOutcomeTargetAudienceTopic
+        const preferredTemplateId = digitalOutcomeTopicKey === "target-audience"
             ? "target-audience"
-            : (isDigitalOutcomeDevelopmentToolsTopic
+            : (digitalOutcomeTopicKey === "development-tools"
                 ? "relevant-implications"
-                : (isDigitalOutcomeSuccessCriteriaTopic ? "project-success-criteria" : "digital-outcome-description"));
+                : (digitalOutcomeTopicKey === "success-criteria" ? "project-success-criteria" : "digital-outcome-description"));
         templateLibraryParams.set("templateId", preferredTemplateId);
     }
     const slideshowTemplateLibraryUrl = `slideshow-template-library.html?${templateLibraryParams.toString()}`;
     const viewerEmail = readStoredHubEmail();
-    const targetAudienceSyncedSlideThumbnail = isDigitalOutcomeTargetAudienceTopic
-        ? toGoogleSlidesThumbnailUrl(
-            readStoredTaskTopicSlideSyncEntry(id, viewerEmail, taskTopicTitle, resolvedTaskShortName)?.url || ""
-        )
-        : "";
-    const digitalOutcomeTemplateFallbackImage = isDigitalOutcomeTargetAudienceTopic
+    const syncedTaskTopicEntryCandidates = [
+        readStoredTaskTopicSlideSyncEntry(id, viewerEmail, taskTopicTitle, resolvedTaskShortName),
+        readStoredTaskTopicSlideSyncEntryByShortName(id, viewerEmail, resolvedTaskShortName),
+        readStoredTaskTopicSlideSyncEntryByShortName(id, viewerEmail, displayTitle),
+        readStoredTaskTopicSlideSyncEntry(id, viewerEmail, taskTopicTitle, displayTitle)
+    ];
+    const syncedTaskTopicEntry = syncedTaskTopicEntryCandidates.find((entry) => toSafeExternalUrl(entry?.url || ""));
+    const taskTopicSyncedSlideThumbnail = toGoogleSlidesThumbnailUrl(syncedTaskTopicEntry?.url || "");
+    const digitalOutcomeTemplateFallbackImage = digitalOutcomeTopicKey === "target-audience"
         ? DIGITAL_OUTCOME_TARGET_AUDIENCE_TEMPLATE_PREVIEW_URL
-        : DIGITAL_OUTCOME_DESCRIPTION_TEMPLATE_PREVIEW_URL;
+        : (digitalOutcomeTopicKey === "description"
+            ? DIGITAL_OUTCOME_DESCRIPTION_TEMPLATE_PREVIEW_URL
+            : DIGITAL_OUTCOME_GENERIC_TEMPLATE_PREVIEW_URL);
     const slideshowTemplateImage = toSafeExternalUrl(data?.slideshowTemplateImage || data?.slideTemplateImage || "")
-        || targetAudienceSyncedSlideThumbnail
+        || taskTopicSyncedSlideThumbnail
         || (useDigitalOutcomeTemplateHero ? digitalOutcomeTemplateFallbackImage : "");
     const slideshowTemplateFileUrl = toSafeExternalUrl(data?.slideshowTemplateFileUrl || data?.slideTemplateFileUrl || data?.speakerNotesCriteriaUrl || "");
     const heroVisualImage = ((isDigitalOutcomeTopic || useDigitalOutcomeTemplateHero) ? (slideshowTemplateImage || data.image) : data.image)
@@ -5785,7 +5834,13 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         ? "Project Management: Trello"
         : (isDecompositionTopic ? "Decomposition + Trello"
         : (isDigitalOutcomeTopic
-            ? (isDigitalOutcomeTargetAudienceTopic ? "Target Audience" : "Digital Outcome Description")
+            ? (digitalOutcomeTopicKey === "target-audience"
+                ? "Target Audience"
+                : (digitalOutcomeTopicKey === "development-tools"
+                    ? "Development and Tools"
+                    : (digitalOutcomeTopicKey === "success-criteria"
+                        ? "Success Criteria"
+                        : "Digital Outcome Description")))
             : "Topic Tasks"));
     const topicGuideInstructions = isProjectManagementTopic
         ? [
@@ -5802,7 +5857,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 "Push the decomposition steps to Trello and track progress through Doing and Done."
             ]
             : (isDigitalOutcomeTopic
-                ? (isDigitalOutcomeTargetAudienceTopic
+                ? (digitalOutcomeTopicKey === "target-audience"
                     ? [
                         "Create a Google Slideshow for this topic.",
                         "Define who the target audience or end user is for your project.",
@@ -5810,13 +5865,29 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                         "Explain why this audience is the right focus and how your project decisions support them.",
                         "Use clear evidence, examples, or observations to justify your audience choices."
                     ]
-                    : [
-                        "Create a Google Slideshow for this topic.",
-                        "Include a slide that describes the digital outcome: what it is, who it is for, and what it must do.",
-                        "Record the assessment criteria page in Speaker Notes so markers can verify how each point is addressed.",
-                        "Explain the intent of the idea clearly: problem, purpose, audience, and expected impact.",
-                        "Use concise wording and evidence-based reasoning so your idea is easy to evaluate."
-                    ])
+                    : (digitalOutcomeTopicKey === "development-tools"
+                        ? [
+                            "Create a Google Slideshow for this topic.",
+                            "Explain how your outcome will be developed from planning through implementation.",
+                            "Name the tools and technologies you will use (for example: HTML/CSS/JS, Python, Trello, GitHub, Figma).",
+                            "Justify why each tool is suitable for your project requirements and users.",
+                            "Outline the build sequence so your development process is clear and testable."
+                        ]
+                        : (digitalOutcomeTopicKey === "success-criteria"
+                            ? [
+                                "Create a Google Slideshow for this topic.",
+                                "Define clear, measurable success criteria for your digital outcome.",
+                                "Explain how success will be tested or evaluated (user feedback, testing results, rubric evidence).",
+                                "Set indicators for what counts as achieved, partially achieved, or unmet.",
+                                "Use evidence language so teachers can verify outcomes against your criteria."
+                            ]
+                            : [
+                                "Create a Google Slideshow for this topic.",
+                                "Include a slide that describes the digital outcome: what it is, who it is for, and what it must do.",
+                                "Record the assessment criteria page in Speaker Notes so markers can verify how each point is addressed.",
+                                "Explain the intent of the idea clearly: problem, purpose, audience, and expected impact.",
+                                "Use concise wording and evidence-based reasoning so your idea is easy to evaluate."
+                            ])))
                 : [
                     "Read each submission requirement carefully.",
                     "Prepare evidence that matches the task expectations.",
@@ -5837,32 +5908,56 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 "Submit and acknowledge evidence after your plan and Trello tasks are updated."
             ]
             : (isDigitalOutcomeTopic
-                ? (isDigitalOutcomeTargetAudienceTopic
+                ? (digitalOutcomeTopicKey === "target-audience"
                     ? [
                         "Target Audience - Google Slides: Identify who your project is for and describe them clearly.",
                         "Describe demographics and context: age/role, environment, and likely use situation.",
                         "Describe psychographics and motivations: values, interests, and reasons they would use your project.",
                         "Identify pain points and explain how your project addresses those specific needs."
                     ]
-                    : [
-                        "Description - Google Slides: Describe the Digital Outcome: what it is, who it is for, and what it must do.",
-                        "Identify the target audience or end user for this outcome.",
-                        "Explain how the outcome will be developed and what tools/technologies will be used.",
-                        "State how success will be measured or evaluated."
-                    ])
+                    : (digitalOutcomeTopicKey === "development-tools"
+                        ? [
+                            "Development and Tools - Google Slides: Explain how your outcome will be developed.",
+                            "List the tools/technologies you will use and what each tool is responsible for.",
+                            "Describe your workflow from planning to build, testing, and refinement.",
+                            "Justify why these tools are best for your audience and project requirements."
+                        ]
+                        : (digitalOutcomeTopicKey === "success-criteria"
+                            ? [
+                                "Success Criteria - Google Slides: State how success will be measured or evaluated.",
+                                "Define measurable criteria (performance, usability, reliability, or engagement).",
+                                "Explain what evidence will be collected and how it will be assessed.",
+                                "Describe what outcomes indicate success, partial success, or unresolved issues."
+                            ]
+                            : [
+                                "Description - Google Slides: Describe the Digital Outcome: what it is, who it is for, and what it must do.",
+                                "Identify the target audience or end user for this outcome.",
+                                "Explain how the outcome will be developed and what tools/technologies will be used.",
+                                "State how success will be measured or evaluated."
+                            ])))
                 : submissionTaskItems));
     const topicGuideSourceUrl = (isProjectManagementTopic || isDecompositionTopic)
         ? "https://trello.com/"
         : (isDigitalOutcomeTopic ? slideshowTemplateLibraryUrl : "");
     const topicGuideIntroText = isDigitalOutcomeTopic
-        ? (isDigitalOutcomeTargetAudienceTopic
+        ? (digitalOutcomeTopicKey === "target-audience"
             ? "Use this guide to define your project's target audience clearly and justify why they are the right users to design for."
-            : "Use this guide to write and record a clear description of your digital outcome before starting development.")
+            : (digitalOutcomeTopicKey === "development-tools"
+                ? "Use this guide to explain how your outcome will be developed and why your chosen tools and technologies are appropriate."
+                : (digitalOutcomeTopicKey === "success-criteria"
+                    ? "Use this guide to define measurable success criteria and explain how your outcome will be evaluated."
+                    : "Use this guide to write and record a clear description of your digital outcome before starting development.")))
         : "Use this guide to complete the Submission Tasks correctly.";
     const topicGuideTaskHeading = isProjectManagementTopic
         ? "Trello Tasks"
         : (isDigitalOutcomeTopic
-            ? (isDigitalOutcomeTargetAudienceTopic ? "Target Audience - Google Slides" : "Description - Google Slides")
+            ? (digitalOutcomeTopicKey === "target-audience"
+                ? "Target Audience - Google Slides"
+                : (digitalOutcomeTopicKey === "development-tools"
+                    ? "Development and Tools - Google Slides"
+                    : (digitalOutcomeTopicKey === "success-criteria"
+                        ? "Success Criteria - Google Slides"
+                        : "Description - Google Slides")))
             : "Task List");
     const githubGuideTitle = "Version Control: GitHub";
     const githubGuideSourceUrl = "https://github.com/";
