@@ -192,7 +192,8 @@ function persistTaskTopicSlideSyncLink(fileUrl) {
         localStorage.setItem(key, JSON.stringify({
             url: safeUrl,
             savedAt: new Date().toISOString(),
-            templateId: String(templateUsageContext.templateId || "").trim()
+            templateId: String(templateUsageContext.templateId || "").trim(),
+            syncSource: "template-use"
         }));
     } catch (_error) {
     }

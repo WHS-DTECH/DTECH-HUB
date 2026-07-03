@@ -3285,11 +3285,13 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 }
                 writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopicTitle, taskTopicShortName, syncedGoogleSlidesUrl, {
                     templateId: syncTemplateId,
-                    thumbnailUrl: topicMatch.thumbnailUrl
+                    thumbnailUrl: topicMatch.thumbnailUrl,
+                    syncSource: "folder-match"
                 });
                 writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopicTitle, syncTopicLabel, syncedGoogleSlidesUrl, {
                     templateId: syncTemplateId,
-                    thumbnailUrl: topicMatch.thumbnailUrl
+                    thumbnailUrl: topicMatch.thumbnailUrl,
+                    syncSource: "folder-match"
                 });
             }
         } else {
@@ -3560,7 +3562,8 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             if (safeSlidesUrl) {
                 syncedGoogleSlidesUrl = safeSlidesUrl;
                 writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopicTitle, taskTopicShortName, safeSlidesUrl, {
-                    templateId: digitalOutcomeSyncTemplateId
+                    templateId: digitalOutcomeSyncTemplateId,
+                    syncSource: "manual-link"
                 });
                 googleSlidesSyncRefHost.innerHTML = `<a href="${escapeHtml(syncedGoogleSlidesUrl)}" target="_blank" rel="noreferrer">${escapeHtml(syncedGoogleSlidesUrl)}</a>`;
             } else if (syncedGoogleSlidesUrl) {
@@ -3620,7 +3623,8 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         if (safeSlidesUrl) {
             syncedGoogleSlidesUrl = safeSlidesUrl;
             writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopicTitle, taskTopicShortName, safeSlidesUrl, {
-                templateId: digitalOutcomeSyncTemplateId
+                templateId: digitalOutcomeSyncTemplateId,
+                syncSource: "manual-link"
             });
         }
         updateMeta(acknowledged, acknowledgedAt);
@@ -4470,17 +4474,17 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
 
         const derivedShort = deriveTaskShortName(safeTopic);
         const withShort = readStoredTaskTopicSlideSyncEntry(projectId, lookupEmail, safeTopic, derivedShort);
-        if (toSafeExternalUrl(withShort?.url || "")) {
+        if (isCompletionEligibleSyncEntry(withShort)) {
             return true;
         }
 
         const byShort = readStoredTaskTopicSlideSyncEntryByShortName(projectId, lookupEmail, derivedShort);
-        if (toSafeExternalUrl(byShort?.url || "")) {
+        if (isCompletionEligibleSyncEntry(byShort)) {
             return true;
         }
 
         const withoutShort = readStoredTaskTopicSlideSyncEntry(projectId, lookupEmail, safeTopic, "");
-        return Boolean(toSafeExternalUrl(withoutShort?.url || ""));
+        return isCompletionEligibleSyncEntry(withoutShort);
     };
 
     let showTaskDetail = () => {};
@@ -4561,8 +4565,27 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
             const autoCompleteDigitalOutcomeTemplateRow = String(standardCode) === "digital-outcome"
                 && (rowTaskText.includes("describe the digital outcome")
                     || rowTaskText.includes("identify the target audience")
-                    || rowTaskText.includes("end user for this outcome"))
+                    || rowTaskText.includes("end user for this outcome")
+                    || rowTaskText.includes("outcome will be developed")
+                    || rowTaskText.includes("tools/technologies")
+                    || rowTaskText.includes("success will be measured")
+                    || rowTaskText.includes("success will be evaluated"))
                 && hasSyncedSlideForTaskTopic(levelFilter ? stripStepLevel(step?.text) : String(step?.text || ""));
+
+            const isAutoManagedDigitalOutcomeTemplateRow = String(standardCode) === "digital-outcome"
+                && (rowTaskText.includes("describe the digital outcome")
+                    || rowTaskText.includes("identify the target audience")
+                    || rowTaskText.includes("end user for this outcome")
+                    || rowTaskText.includes("outcome will be developed")
+                    || rowTaskText.includes("tools/technologies")
+                    || rowTaskText.includes("success will be measured")
+                    || rowTaskText.includes("success will be evaluated"));
+
+            if (isAutoManagedDigitalOutcomeTemplateRow && !autoCompleteDigitalOutcomeTemplateRow && Boolean(step?.done)) {
+                state[standardCode][index].done = false;
+                step.done = false;
+                autoUpdated = true;
+            }
 
             if (autoCompleteProjectManagementRow) {
                 row.classList.add("is-system-complete");
@@ -5407,11 +5430,21 @@ function readStoredTaskTopicSlideSyncEntry(projectId, email, taskTopic, taskShor
             url: toSafeExternalUrl(parsed?.url || ""),
             savedAt: String(parsed?.savedAt || "").trim(),
             templateId: String(parsed?.templateId || "").trim(),
-            thumbnailUrl: toSafeExternalUrl(parsed?.thumbnailUrl || "")
+            thumbnailUrl: toSafeExternalUrl(parsed?.thumbnailUrl || ""),
+            syncSource: String(parsed?.syncSource || "").trim().toLowerCase()
         };
     } catch (_error) {
-        return { url: "", savedAt: "", templateId: "", thumbnailUrl: "" };
+        return { url: "", savedAt: "", templateId: "", thumbnailUrl: "", syncSource: "" };
     }
+}
+
+function isCompletionEligibleSyncEntry(entry) {
+    const safeUrl = toSafeExternalUrl(entry?.url || "");
+    const syncSource = String(entry?.syncSource || "").trim().toLowerCase();
+    if (!safeUrl) {
+        return false;
+    }
+    return syncSource === "template-use" || syncSource === "manual-link" || syncSource === "manual-submit";
 }
 
 function readStoredTaskTopicSlideSyncEntryByShortName(projectId, email, taskShortName = "") {
@@ -5419,11 +5452,11 @@ function readStoredTaskTopicSlideSyncEntryByShortName(projectId, email, taskShor
     const safeEmail = String(email || "").trim().toLowerCase();
     const shortSlug = normalizeTaskTopicStorageSlug(taskShortName);
     if (!safeProjectId || !safeEmail || !shortSlug) {
-        return { url: "", savedAt: "", templateId: "", thumbnailUrl: "" };
+        return { url: "", savedAt: "", templateId: "", thumbnailUrl: "", syncSource: "" };
     }
 
     const keyPrefix = `${TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX}:${safeProjectId}:${safeEmail}:`;
-    let bestMatch = { url: "", savedAt: "", templateId: "", thumbnailUrl: "" };
+    let bestMatch = { url: "", savedAt: "", templateId: "", thumbnailUrl: "", syncSource: "" };
     let bestTime = 0;
 
     try {
@@ -5455,12 +5488,13 @@ function readStoredTaskTopicSlideSyncEntryByShortName(projectId, email, taskShor
                     url: safeUrl,
                     savedAt,
                     templateId: String(parsed?.templateId || "").trim(),
-                    thumbnailUrl: toSafeExternalUrl(parsed?.thumbnailUrl || "")
+                    thumbnailUrl: toSafeExternalUrl(parsed?.thumbnailUrl || ""),
+                    syncSource: String(parsed?.syncSource || "").trim().toLowerCase()
                 };
             }
         }
     } catch (_error) {
-        return { url: "", savedAt: "", templateId: "", thumbnailUrl: "" };
+        return { url: "", savedAt: "", templateId: "", thumbnailUrl: "", syncSource: "" };
     }
 
     return bestMatch;
@@ -5471,11 +5505,11 @@ function readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, templat
     const safeEmail = String(email || "").trim().toLowerCase();
     const targetTemplateId = String(templateId || "").trim().toLowerCase();
     if (!safeProjectId || !safeEmail || !targetTemplateId) {
-        return { url: "", savedAt: "", templateId: "", thumbnailUrl: "" };
+        return { url: "", savedAt: "", templateId: "", thumbnailUrl: "", syncSource: "" };
     }
 
     const keyPrefix = `${TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX}:${safeProjectId}:${safeEmail}:`;
-    let bestMatch = { url: "", savedAt: "", templateId: "", thumbnailUrl: "" };
+    let bestMatch = { url: "", savedAt: "", templateId: "", thumbnailUrl: "", syncSource: "" };
     let bestTime = 0;
 
     try {
@@ -5506,12 +5540,13 @@ function readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, templat
                     url: safeUrl,
                     savedAt,
                     templateId: String(parsed?.templateId || "").trim(),
-                    thumbnailUrl: toSafeExternalUrl(parsed?.thumbnailUrl || "")
+                    thumbnailUrl: toSafeExternalUrl(parsed?.thumbnailUrl || ""),
+                    syncSource: String(parsed?.syncSource || "").trim().toLowerCase()
                 };
             }
         }
     } catch (_error) {
-        return { url: "", savedAt: "", templateId: "", thumbnailUrl: "" };
+        return { url: "", savedAt: "", templateId: "", thumbnailUrl: "", syncSource: "" };
     }
 
     return bestMatch;
@@ -5550,11 +5585,13 @@ function writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopic, taskShor
         const existing = existingRaw ? JSON.parse(existingRaw) : {};
         const nextTemplateId = String(options?.templateId || existing?.templateId || "").trim();
         const nextThumbnailUrl = toSafeExternalUrl(options?.thumbnailUrl || existing?.thumbnailUrl || "");
+        const nextSyncSource = String(options?.syncSource || existing?.syncSource || "").trim().toLowerCase();
         localStorage.setItem(key, JSON.stringify({
             url: safeUrl,
             savedAt: new Date().toISOString(),
             templateId: nextTemplateId,
-            thumbnailUrl: nextThumbnailUrl
+            thumbnailUrl: nextThumbnailUrl,
+            syncSource: nextSyncSource
         }));
         return safeUrl;
     } catch (_error) {

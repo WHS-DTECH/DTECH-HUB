@@ -157,10 +157,22 @@ function readStoredTaskTopicSlideSyncEntry(projectId, email, taskTopic, taskShor
         }
         const parsed = JSON.parse(raw);
         const url = String(parsed?.url || "").trim();
-        return { url };
+        const syncSource = String(parsed?.syncSource || "").trim().toLowerCase();
+        return { url, syncSource };
     } catch (_error) {
-        return { url: "" };
+        return { url: "", syncSource: "" };
     }
+}
+
+function isCompletionEligibleSyncEntry(entry) {
+    const safeUrl = String(entry?.url || "").trim();
+    const syncSource = String(entry?.syncSource || "").trim().toLowerCase();
+    if (!safeUrl) {
+        return false;
+    }
+
+    // Completion should only come from explicit student action.
+    return syncSource === "template-use" || syncSource === "manual-link" || syncSource === "manual-submit";
 }
 
 function hasSyncedSlideForTaskTopic(projectId, email, taskTopicText) {
@@ -170,11 +182,11 @@ function hasSyncedSlideForTaskTopic(projectId, email, taskTopicText) {
     }
     const derivedShort = deriveTaskShortName(safeTopic);
     const withShort = readStoredTaskTopicSlideSyncEntry(projectId, email, safeTopic, derivedShort);
-    if (String(withShort.url || "").trim()) {
+    if (isCompletionEligibleSyncEntry(withShort)) {
         return true;
     }
     const withoutShort = readStoredTaskTopicSlideSyncEntry(projectId, email, safeTopic, "");
-    if (String(withoutShort.url || "").trim()) {
+    if (isCompletionEligibleSyncEntry(withoutShort)) {
         return true;
     }
 
@@ -198,8 +210,7 @@ function hasSyncedSlideForTaskTopic(projectId, email, taskTopicText) {
 
             const raw = localStorage.getItem(key);
             const parsed = raw ? JSON.parse(raw) : null;
-            const url = String(parsed?.url || "").trim();
-            if (url) {
+            if (isCompletionEligibleSyncEntry(parsed || {})) {
                 return true;
             }
         }
@@ -371,8 +382,15 @@ function autoTickDigitalOutcomeRequirements(stateMap, projectId, email) {
             return;
         }
 
-        if (hasSyncedSlideForTaskTopic(projectId, email, text) && !Boolean(row?.done)) {
+        const hasEligibleSync = hasSyncedSlideForTaskTopic(projectId, email, text);
+        if (hasEligibleSync && !Boolean(row?.done)) {
             row.done = true;
+            changed = true;
+            return;
+        }
+
+        if (!hasEligibleSync && Boolean(row?.done)) {
+            row.done = false;
             changed = true;
         }
     });
