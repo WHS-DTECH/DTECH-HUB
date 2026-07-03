@@ -200,7 +200,8 @@ function getTaskTopicHrefForStep(standard, level, text) {
         return buildCustomActivityLink(taskListState.selectedId, "Project Management");
     }
 
-    return "";
+    const derivedShortName = deriveTaskShortName(safeText);
+    return buildCustomActivityLink(taskListState.selectedId, safeText, derivedShortName);
 }
 
 function inferStudentSystemConnections(currentState) {
