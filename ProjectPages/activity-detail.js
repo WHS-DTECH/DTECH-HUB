@@ -3666,6 +3666,25 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
 
             ${isDigitalOutcomeTopic ? `
                 <p class="task-topic-submission-note task-topic-google-sync-note"><strong>Synced Slide:</strong> <span id="task-topic-google-slides-sync-reference">${syncedGoogleSlidesUrl ? `<a href="${escapeHtml(syncedGoogleSlidesUrl)}" target="_blank" rel="noreferrer">${escapeHtml(syncedGoogleSlidesUrl)}</a>` : "No synced slide yet. Open Template Library and click Use Template to link your personal slide copy."}</span></p>
+                
+                ${storedSyncEntry.url && storedSyncEntry.syncSource === "template-use" ? `
+                    <div class="task-topic-student-template-section">
+                        <p class="task-topic-submission-note"><strong>Your Template Selection:</strong></p>
+                        <ul class="task-topic-sync-links">
+                            <li class="task-topic-sync-link">
+                                <div class="task-topic-sync-link-content">
+                                    <p class="task-topic-sync-link-title">Template from Library</p>
+                                    <a href="${escapeHtml(storedSyncEntry.url)}" target="_blank" rel="noreferrer">${escapeHtml(storedSyncEntry.url)}</a>
+                                </div>
+                                <div class="task-topic-sync-link-meta">
+                                    <span class="task-topic-sync-created-label">Selected</span>
+                                    <span class="task-topic-sync-created-value">${escapeHtml(formatSyncCreatedDate(storedSyncEntry.savedAt))}</span>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                ` : ""}
+                
                 <label class="task-topic-submission-label" for="task-topic-google-slides-url">Digital Outcome Description - Google Slides Link</label>
                 <input id="task-topic-google-slides-url" class="task-topic-submission-input" type="url" placeholder="https://docs.google.com/presentation/..." value="${escapeHtml(currentGoogleSlidesUrl)}" required>
                 <p class="task-topic-submission-note">Create a Google Slideshow and include at least one slide that clearly describes the digital outcome.</p>
