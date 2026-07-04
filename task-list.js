@@ -173,7 +173,8 @@ function isCompletionEligibleSyncEntry(entry, taskTopicText = "") {
     }
 
     // Completion should only come from explicit student action.
-    if (syncSource === "template-use" || syncSource === "manual-link" || syncSource === "manual-submit") {
+    // Exclude "manual-link" (teacher Sync Slideshow actions) from auto-completion.
+    if (syncSource === "template-use" || syncSource === "manual-submit") {
         return true;
     }
 
