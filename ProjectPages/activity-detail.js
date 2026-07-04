@@ -2819,6 +2819,294 @@ async function persistStudentGoogleDriveFolderLink(projectId, studentEmail, deta
     await saveEvidenceRows(projectId, studentEmail, nextRows);
 }
 
+// Digital Outcome Task Topic Slideshow Sync
+async function openDigitalOutcomeTaskTopicSyncModal(projectId, email, taskTopicTitle, taskTopicShortName, syncTemplateId, syncTopicLabel) {
+    const container = document.createElement("div");
+    container.className = "modal-overlay";
+    container.id = "task-topic-sync-modal";
+    container.innerHTML = `
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h2>Sync Slideshow for ${escapeHtml(syncTopicLabel)}</h2>
+                <button type="button" class="modal-close" aria-label="Close">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-section">
+                    <label for="sync-slides-url" class="modal-label">Google Slides Link or Folder Link</label>
+                    <input 
+                        id="sync-slides-url" 
+                        type="url" 
+                        class="modal-input" 
+                        placeholder="https://docs.google.com/presentation/d/... or https://drive.google.com/drive/folders/..."
+                        aria-describedby="sync-url-help"
+                    >
+                    <small id="sync-url-help" class="modal-help">Paste a Google Slides URL or a Google Drive folder URL containing slideshows.</small>
+                </div>
+                <div class="modal-section">
+                    <div id="sync-loading" class="modal-message" style="display: none;">Loading slideshows...</div>
+                    <div id="sync-error" class="modal-message modal-error" style="display: none;"></div>
+                    <div id="sync-slideshows" class="modal-section" style="display: none;">
+                        <label for="sync-select-slideshow" class="modal-label">Select Slideshow</label>
+                        <select id="sync-select-slideshow" class="modal-select">
+                            <option value="">Choose a slideshow...</option>
+                        </select>
+                    </div>
+                    <div id="sync-preview" style="display: none;">
+                        <p class="modal-label">Preview</p>
+                        <div class="sync-preview-container">
+                            <img id="sync-preview-image" src="" alt="First slide preview" class="sync-preview-image">
+                            <div id="sync-preview-info" class="sync-preview-info"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="modal-button modal-button-secondary" id="sync-cancel-btn">Cancel</button>
+                <button type="button" class="modal-button" id="sync-confirm-btn" disabled>Confirm & Sync</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(container);
+    
+    const closeBtn = container.querySelector(".modal-close");
+    const cancelBtn = container.querySelector("#sync-cancel-btn");
+    const confirmBtn = container.querySelector("#sync-confirm-btn");
+    const urlInput = container.querySelector("#sync-slides-url");
+    const loadingDiv = container.querySelector("#sync-loading");
+    const errorDiv = container.querySelector("#sync-error");
+    const slideshowsDiv = container.querySelector("#sync-slideshows");
+    const selectSlideshow = container.querySelector("#sync-select-slideshow");
+    const previewDiv = container.querySelector("#sync-preview");
+    const previewImage = container.querySelector("#sync-preview-image");
+    const previewInfo = container.querySelector("#sync-preview-info");
+    
+    let selectedSlideshow = null;
+    
+    const closeModal = () => container.remove();
+    const showError = (msg) => {
+        errorDiv.textContent = msg;
+        errorDiv.style.display = "block";
+    };
+    const clearError = () => {
+        errorDiv.textContent = "";
+        errorDiv.style.display = "none";
+    };
+    
+    closeBtn.addEventListener("click", closeModal);
+    cancelBtn.addEventListener("click", closeModal);
+    
+    // Handle URL input change
+    urlInput.addEventListener("change", async () => {
+        clearError();
+        const url = toSafeExternalUrl(urlInput.value || "");
+        if (!url) {
+            slideshowsDiv.style.display = "none";
+            previewDiv.style.display = "none";
+            confirmBtn.disabled = true;
+            return;
+        }
+        
+        loadingDiv.style.display = "block";
+        slideshowsDiv.style.display = "none";
+        previewDiv.style.display = "none";
+        confirmBtn.disabled = true;
+        selectSlideshow.innerHTML = '<option value="">Choose a slideshow...</option>';
+        selectedSlideshow = null;
+        
+        try {
+            const slideshows = await extractSlideshowsFromUrl(url, email);
+            if (!slideshows || slideshows.length === 0) {
+                showError("No slideshows found at that location.");
+                loadingDiv.style.display = "none";
+                return;
+            }
+            
+            selectSlideshow.innerHTML = '<option value="">Choose a slideshow...</option>' + 
+                slideshows.map((s, i) => `<option value="${i}">${escapeHtml(s.name)}</option>`).join("");
+            slideshowsDiv.style.display = "block";
+            loadingDiv.style.display = "none";
+            
+            // Auto-select if only one slideshow
+            if (slideshows.length === 1) {
+                selectSlideshow.value = "0";
+                await loadSlideShowPreview(slideshows[0]);
+            }
+        } catch (err) {
+            showError(err.message || "Failed to load slideshows.");
+            loadingDiv.style.display = "none";
+        }
+    });
+    
+    // Handle slideshow selection
+    selectSlideshow.addEventListener("change", async () => {
+        const idx = parseInt(selectSlideshow.value, 10);
+        if (isNaN(idx)) {
+            previewDiv.style.display = "none";
+            confirmBtn.disabled = true;
+            selectedSlideshow = null;
+            return;
+        }
+        
+        try {
+            loadingDiv.style.display = "block";
+            const url = toSafeExternalUrl(urlInput.value || "");
+            const slideshows = await extractSlideshowsFromUrl(url, email);
+            const slideshow = slideshows[idx];
+            await loadSlideShowPreview(slideshow);
+            loadingDiv.style.display = "none";
+        } catch (err) {
+            showError(err.message || "Failed to load slideshow preview.");
+            loadingDiv.style.display = "none";
+        }
+    });
+    
+    async function loadSlideShowPreview(slideshow) {
+        try {
+            const thumbnailUrl = await getFirstSlideThumbnail(slideshow.id, email);
+            previewImage.src = thumbnailUrl;
+            previewInfo.innerHTML = `
+                <p><strong>${escapeHtml(slideshow.name)}</strong></p>
+                <p class="sync-preview-meta">ID: ${escapeHtml(slideshow.id)}</p>
+            `;
+            previewDiv.style.display = "block";
+            selectedSlideshow = { ...slideshow, thumbnailUrl };
+            confirmBtn.disabled = false;
+        } catch (err) {
+            showError(err.message || "Failed to load preview.");
+        }
+    }
+    
+    confirmBtn.addEventListener("click", async () => {
+        if (!selectedSlideshow) {
+            showError("Please select a slideshow.");
+            return;
+        }
+        
+        confirmBtn.disabled = true;
+        try {
+            const slideshowUrl = `https://docs.google.com/presentation/d/${encodeURIComponent(selectedSlideshow.id)}/edit`;
+            await persistTaskTopicSlideShowSync(projectId, email, taskTopicTitle, taskTopicShortName, slideshowUrl, {
+                templateId: syncTemplateId,
+                thumbnailUrl: selectedSlideshow.thumbnailUrl || toGoogleSlidesThumbnailUrl(slideshowUrl),
+                syncSource: "manual-link"
+            });
+            
+            // Refresh the page to show updated sync
+            window.location.reload();
+        } catch (err) {
+            showError(err.message || "Failed to save sync.");
+            confirmBtn.disabled = false;
+        }
+    });
+    
+    // Focus the input
+    urlInput.focus();
+}
+
+async function extractSlideshowsFromUrl(url, email) {
+    // Extract folder or presentation ID
+    const folderId = url.match(/\/folders\/([a-zA-Z0-9-_]+)/)?.[1];
+    const presentationId = url.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
+    
+    if (presentationId && !folderId) {
+        // Direct slideshow URL
+        return [{
+            id: presentationId,
+            name: "Selected Presentation"
+        }];
+    }
+    
+    if (folderId) {
+        // Fetch slideshows from folder via backend
+        const accessToken = readStoredHubAccessToken();
+        if (!accessToken) {
+            throw new Error("Not authenticated with Google Drive.");
+        }
+        
+        try {
+            const response = await fetch("/api/student/drive-setup/list-slideshows", {
+                method: "POST",
+                headers: buildWriteHeaders(),
+                body: JSON.stringify({
+                    driveAccessToken: accessToken,
+                    folderId: folderId
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error("Failed to list slideshows in folder.");
+            }
+            
+            const payload = await response.json().catch(() => ({}));
+            const slideshows = Array.isArray(payload?.slideshows) ? payload.slideshows : [];
+            if (!slideshows.length) {
+                throw new Error("No slideshows found in that folder.");
+            }
+            return slideshows;
+        } catch (err) {
+            throw new Error(err.message || "Failed to load slideshows from folder.");
+        }
+    }
+    
+    throw new Error("Please provide a valid Google Slides URL or folder URL.");
+}
+
+async function getFirstSlideThumbnail(presentationId, email) {
+    const accessToken = readStoredHubAccessToken();
+    if (!accessToken) {
+        // Fall back to direct thumbnail URL
+        return toGoogleSlidesThumbnailUrl(`https://docs.google.com/presentation/d/${encodeURIComponent(presentationId)}/edit`);
+    }
+    
+    try {
+        const response = await fetch("/api/student/drive-setup/get-slideshow-thumbnail", {
+            method: "POST",
+            headers: buildWriteHeaders(),
+            body: JSON.stringify({
+                driveAccessToken: accessToken,
+                presentationId: presentationId
+            })
+        });
+        
+        if (!response.ok) {
+            return toGoogleSlidesThumbnailUrl(`https://docs.google.com/presentation/d/${encodeURIComponent(presentationId)}/edit`);
+        }
+        
+        const payload = await response.json().catch(() => ({}));
+        return toSafeExternalUrl(payload?.thumbnailUrl || "") || 
+               toGoogleSlidesThumbnailUrl(`https://docs.google.com/presentation/d/${encodeURIComponent(presentationId)}/edit`);
+    } catch (_err) {
+        return toGoogleSlidesThumbnailUrl(`https://docs.google.com/presentation/d/${encodeURIComponent(presentationId)}/edit`);
+    }
+}
+
+async function persistTaskTopicSlideShowSync(projectId, email, taskTopicTitle, taskTopicShortName, slideshowUrl, metadata = {}) {
+    const safeUrl = toSafeExternalUrl(slideshowUrl);
+    if (!safeUrl) {
+        throw new Error("Invalid slideshow URL.");
+    }
+    
+    if (!safeUrl.includes("docs.google.com") && !safeUrl.includes("presentation")) {
+        throw new Error("Use a Google Slides URL.");
+    }
+    
+    writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopicTitle, taskTopicShortName, safeUrl, metadata);
+    
+    // Also persist to backend for consistency
+    try {
+        const standardNumber = "";
+        const standardKey = buildTaskTopicSubmissionStandardKey(taskTopicTitle, standardNumber);
+        const evidenceRows = await fetchEvidenceRowsEnsuringAllocation(projectId, email);
+        const nextRows = upsertTaskTopicSubmissionEvidenceRows(evidenceRows, standardKey, {
+            taskTopicSlideshowUrl: safeUrl
+        });
+        await saveEvidenceRows(projectId, email, nextRows);
+    } catch (_err) {
+        // Still succeed with localStorage sync even if backend fails
+    }
+}
+
 function getReviewStatusLabel(value) {
     const status = String(value || "").trim().toLowerCase();
     if (status === "reviewed") {
@@ -6354,6 +6642,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 ` : ""}
                 ${canEdit ? '<button type="button" class="detail-action" id="detail-edit-button">Edit Details</button>' : ""}
                 ${canEdit ? '<button type="button" class="detail-action detail-action-danger" id="detail-delete-button">Delete</button>' : ""}
+                ${isTaskTopicView && isDigitalOutcomeTopic ? '<button type="button" class="detail-action" id="task-topic-sync-slides-btn">Sync Slideshow</button>' : ""}
                 <a href="../index.html">Back to Hub</a>
             </div>
         </header>
@@ -6747,6 +7036,44 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 deleteButton.disabled = false;
                 window.alert(error.message || "Could not delete this activity/project.");
             }
+        });
+    }
+
+    const syncSlidesBtn = host.querySelector("#task-topic-sync-slides-btn");
+    if (syncSlidesBtn && isTaskTopicView && isDigitalOutcomeTopic) {
+        syncSlidesBtn.addEventListener("click", async () => {
+            const ctx = getActiveSyncContext();
+            if (!ctx.projectId || !ctx.email) {
+                window.alert("Could not determine project or email. Please refresh and try again.");
+                return;
+            }
+
+            const isTargetAudienceTopic = isDigitalOutcomeTargetAudienceCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
+                || keywordMatchedTopicKey === "target-audience";
+            const isDevelopmentToolsTopic = isDigitalOutcomeDevelopmentToolsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
+                || keywordMatchedTopicKey === "development-tools";
+            const isSuccessCriteriaTopic = isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
+                || keywordMatchedTopicKey === "success-criteria";
+            const isRelevantImplicationsTopic = isDigitalOutcomeRelevantImplicationsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
+                || keywordMatchedTopicKey === "relevant-implications";
+
+            const syncTopicLabel = isTargetAudienceTopic
+                ? DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE
+                : (isDevelopmentToolsTopic
+                    ? DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE
+                    : (isSuccessCriteriaTopic
+                        ? DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE
+                        : (isRelevantImplicationsTopic ? DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE : "Digital Outcome: Description")));
+
+            const syncTemplateId = isTargetAudienceTopic
+                ? "target-audience"
+                : (isDevelopmentToolsTopic
+                    ? "development-tools"
+                    : (isSuccessCriteriaTopic
+                        ? "project-success-criteria"
+                        : (isRelevantImplicationsTopic ? "relevant-implications" : "digital-outcome-description")));
+
+            await openDigitalOutcomeTaskTopicSyncModal(ctx.projectId, ctx.email, taskTopicTitle, taskTopicShortName, syncTemplateId, syncTopicLabel);
         });
     }
 

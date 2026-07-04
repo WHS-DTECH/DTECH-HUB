@@ -2767,6 +2767,221 @@ body.public-home-access .controls-panel {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+/* ─── Modal Overlay & Dialog ─────────────────────────────────────────────── */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: fadeIn 200ms ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.modal-dialog {
+    background: white;
+    border-radius: var(--radius-lg);
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: slideUp 300ms ease;
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.modal-header {
+    padding: 24px;
+    border-bottom: 1px solid var(--panel-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--ink-strong);
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 28px;
+    color: var(--ink-mid);
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 200ms ease;
+}
+
+.modal-close:hover {
+    color: var(--ink-strong);
+}
+
+.modal-body {
+    padding: 24px;
+}
+
+.modal-section {
+    margin-bottom: 24px;
+}
+
+.modal-section:last-child {
+    margin-bottom: 0;
+}
+
+.modal-label {
+    display: block;
+    font-weight: 600;
+    color: var(--ink-strong);
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.modal-input,
+.modal-select {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--ink-strong);
+    background: white;
+    transition: border-color 200ms ease;
+}
+
+.modal-input:focus,
+.modal-select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(74, 27, 111, 0.1);
+}
+
+.modal-input::placeholder {
+    color: var(--ink-soft);
+}
+
+.modal-help {
+    display: block;
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-top: 6px;
+}
+
+.modal-message {
+    padding: 12px;
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.modal-message.modal-error {
+    background: #ffebee;
+    color: #c62828;
+}
+
+.sync-preview-container {
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--panel-bg);
+}
+
+.sync-preview-image {
+    width: 100%;
+    height: auto;
+    display: block;
+    max-height: 300px;
+    object-fit: cover;
+}
+
+.sync-preview-info {
+    padding: 12px;
+    border-top: 1px solid var(--panel-border);
+    font-size: 13px;
+    color: var(--ink-mid);
+}
+
+.sync-preview-info p {
+    margin: 6px 0;
+}
+
+.sync-preview-meta {
+    font-size: 12px;
+    color: var(--ink-soft);
+    word-break: break-all;
+}
+
+.modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid var(--panel-border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.modal-button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 200ms ease;
+    background: var(--accent);
+    color: white;
+}
+
+.modal-button:hover:not(:disabled) {
+    background: var(--accent-strong);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(74, 27, 111, 0.3);
+}
+
+.modal-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.modal-button-secondary {
+    background: var(--panel-bg);
+    color: var(--ink-strong);
+    border: 1px solid var(--panel-border);
+}
+
+.modal-button-secondary:hover:not(:disabled) {
+    background: var(--canvas);
+    border-color: var(--ink-mid);
+}
+
 .carousel-btn:hover {
     background: #ffffff;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
