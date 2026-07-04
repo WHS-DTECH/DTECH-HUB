@@ -103,7 +103,7 @@ const DIGITAL_OUTCOME_DETAILS_TASKS = [
 
 const DIGITAL_OUTCOME_DESCRIPTION_TITLE = "Digital Outcome Description";
 const DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE = "Target Audience";
-const DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE = "Development and Tools";
+const DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE = "Development Steps";
 const DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE = "Success Criteria";
 const DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE = "Relevant Implications";
 const DIGITAL_OUTCOME_DESCRIPTION_TEMPLATE_PREVIEW_URL = "https://drive.google.com/thumbnail?id=1brOY70u9aJdsoiEtxVepr82vRhiv9VzpMm8TUv3lcTo&sz=w1400";
@@ -5565,7 +5565,7 @@ function deriveTaskShortName(value) {
     const phraseMap = [
         { pattern: /describe\s+the\s+digital\s+outcome|describe.*digital\s+outcome/, label: "Digital Outcome Description" },
         { pattern: /identify\s+the\s+target\s+audience|target\s+audience|end\s+user/, label: "Target Audience" },
-        { pattern: /explain\s+how\s+the\s+outcome\s+will\s+be\s+developed|tools\/?technologies/, label: "Development and Tools" },
+        { pattern: /explain\s+how\s+the\s+outcome\s+will\s+be\s+developed|tools\/?technologies/, label: "Development Steps" },
         { pattern: /state\s+how\s+success\s+will\s+be\s+measured|success\s+will\s+be\s+evaluated/, label: "Success Criteria" },
         { pattern: /project\s+management/, label: "Project Management" },
         { pattern: /relevant\s+implications/, label: "Relevant Implications" },
@@ -6390,7 +6390,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             ? (digitalOutcomeTopicKey === "target-audience"
                 ? "Target Audience"
                 : (digitalOutcomeTopicKey === "development-tools"
-                    ? "Development and Tools"
+                    ? "Development Steps"
                     : (digitalOutcomeTopicKey === "success-criteria"
                         ? "Success Criteria"
                         : (digitalOutcomeTopicKey === "relevant-implications"
@@ -6503,7 +6503,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
 
             if (digitalOutcomeTopicKey === "development-tools") {
                 return [
-                    "Development and Tools - Google Slides: Explain how your outcome will be developed.",
+                    "Development Steps - Google Slides: Explain how your outcome will be developed.",
                     "List the tools/technologies you will use and what each tool is responsible for.",
                     "Describe your workflow from planning to build, testing, and refinement.",
                     "Justify why these tools are best for your audience and project requirements."
@@ -6570,7 +6570,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             return "Target Audience - Google Slides";
         }
         if (digitalOutcomeTopicKey === "development-tools") {
-            return "Development and Tools - Google Slides";
+            return "Development Steps - Google Slides";
         }
         if (digitalOutcomeTopicKey === "success-criteria") {
             return "Success Criteria - Google Slides";
