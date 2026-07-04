@@ -1000,7 +1000,7 @@ function renderTemplateCard(item) {
     const imageAlt = `${title} preview`;
     const standardsLabel = standards.length ? standards.join(", ") : "Not set";
     
-    // Check real-time Process Assessment folder files first, then fall back to cached copyMap
+    // Use real-time Process Assessment folder files (no cached fallback to avoid stale data)
     let existingCopy = null;
     const normalizeForMatching = (text) => String(text || "")
         .trim()
@@ -1025,9 +1025,6 @@ function renderTemplateCard(item) {
             fileName: matchingFile.name,
             fileId: matchingFile.id
         };
-    } else {
-        // Fall back to cached copy map if no real-time match found
-        existingCopy = driveState.copyMap[item.id];
     }
     
     const deleteButtonHtml = canManageTemplates()
