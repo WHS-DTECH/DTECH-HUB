@@ -53,10 +53,11 @@ const templateUsageContext = (() => {
             activityId: String(params.get("activityId") || "").trim(),
             taskTopic: String(params.get("taskTopic") || "").trim(),
             taskShortName: String(params.get("taskShortName") || "").trim(),
-            templateId: String(params.get("templateId") || "").trim()
+            templateId: String(params.get("templateId") || "").trim(),
+            preFilterTopic: String(params.get("preFilterTopic") || "").trim()
         };
     } catch (_error) {
-        return { activityId: "", taskTopic: "", taskShortName: "", templateId: "" };
+        return { activityId: "", taskTopic: "", taskShortName: "", templateId: "", preFilterTopic: "" };
     }
 })();
 
@@ -1125,6 +1126,12 @@ async function initLibrary() {
 
     const searchInput = document.querySelector("#template-search-input");
     if (searchInput) {
+        // Pre-populate search with topic name if coming from a Digital Outcome page
+        if (templateUsageContext.preFilterTopic) {
+            searchInput.value = templateUsageContext.preFilterTopic;
+            templateSearchQuery = templateUsageContext.preFilterTopic;
+        }
+        
         searchInput.addEventListener("input", (event) => {
             templateSearchQuery = String(event?.target?.value || "").trim();
             renderLibrary();
