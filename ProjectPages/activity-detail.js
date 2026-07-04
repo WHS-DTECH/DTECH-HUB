@@ -2985,17 +2985,21 @@ async function openDigitalOutcomeTaskTopicSyncModal(projectId, email, taskTopicT
         
         confirmBtn.disabled = true;
         try {
+            // Update the hero preview image without persisting sync entry
+            // Sync Slideshow is for teacher preview only, not for student submission tracking
             const slideshowUrl = `https://docs.google.com/presentation/d/${encodeURIComponent(selectedSlideshow.id)}/edit`;
-            await persistTaskTopicSlideShowSync(projectId, email, taskTopicTitle, taskTopicShortName, slideshowUrl, {
-                templateId: syncTemplateId,
-                thumbnailUrl: selectedSlideshow.thumbnailUrl || toGoogleSlidesThumbnailUrl(slideshowUrl),
-                syncSource: "manual-link"
-            });
+            const thumbnailUrl = selectedSlideshow.thumbnailUrl || toGoogleSlidesThumbnailUrl(slideshowUrl);
             
-            // Refresh the page to show updated sync
-            window.location.reload();
+            updateTaskTopicTemplateHeroPreview(
+                document.querySelector("#task-topic-hero"),
+                slideshowUrl,
+                syncTopicLabel,
+                thumbnailUrl
+            );
+            
+            closeModal();
         } catch (err) {
-            showError(err.message || "Failed to save sync.");
+            showError(err.message || "Failed to update preview.");
             confirmBtn.disabled = false;
         }
     });
@@ -3530,7 +3534,10 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const currentDocRef = String(submission.haparaDocumentRef || "").trim();
     const currentGoogleSlidesUrl = toSafeExternalUrl(submission.googleSlidesUrl || submission.evidenceLink);
     const storedSyncEntry = readStoredTaskTopicSlideSyncEntry(projectId, email, taskTopicTitle, taskTopicShortName);
-    let syncedGoogleSlidesUrl = storedSyncEntry.url || currentGoogleSlidesUrl;
+    const storedSyncSource = String(storedSyncEntry?.syncSource || "").trim().toLowerCase();
+    // Only use stored sync if it's from student action (template-use or folder-match), not teacher preview (manual-link)
+    const shouldUseStoredSync = storedSyncEntry.url && storedSyncSource !== "manual-link";
+    let syncedGoogleSlidesUrl = shouldUseStoredSync ? storedSyncEntry.url : currentGoogleSlidesUrl;
     let syncedGoogleSlidesSavedAt = String(storedSyncEntry.savedAt || "").trim();
     const currentTrelloCardUrl = toSafeTrelloCardUrl(submission.trelloCardUrl);
     const currentMediaAssetFolderUrl = toSafeExternalUrl(submission.mediaAssetFolderUrl);
@@ -3575,7 +3582,6 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
 
         // For staged rollout, do not pre-connect Relevant Implications (or other non-enabled pages)
         // from passive folder matches when the student has not explicitly linked/downloaded.
-        const storedSyncSource = String(storedSyncEntry?.syncSource || "").trim().toLowerCase();
         if (!allowFolderMatchAutoLink && !currentGoogleSlidesUrl) {
             const isPassiveStoredLink = Boolean(storedSyncEntry?.url)
                 && (storedSyncSource === "folder-match" || !storedSyncSource);
