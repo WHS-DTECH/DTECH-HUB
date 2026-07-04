@@ -43,7 +43,8 @@ const driveState = {
     tokenClient: null,
     pendingResolve: null,
     setupState: null,
-    copyMap: {}          // templateId → { fileUrl, fileName }
+    copyMap: {},          // templateId → { fileUrl, fileName }
+    processAssessmentFiles: []  // Real-time list of files in Process Assessment folder
 };
 
 const templateUsageContext = (() => {
@@ -998,7 +999,26 @@ function renderTemplateCard(item) {
     const canUse = status === "live" && Boolean(fileId);
     const imageAlt = `${title} preview`;
     const standardsLabel = standards.length ? standards.join(", ") : "Not set";
-    const existingCopy = driveState.copyMap[item.id];
+    
+    // Check real-time Process Assessment folder files first, then fall back to cached copyMap
+    let existingCopy = null;
+    const matchingFile = driveState.processAssessmentFiles.find((file) => {
+        const fileName = String(file?.name || "").trim().toLowerCase();
+        const templateTitle = String(title || "").trim().toLowerCase();
+        return fileName.includes(templateTitle) || templateTitle.includes(fileName.replace(/\s*-\s*.*$/, ""));
+    });
+    
+    if (matchingFile) {
+        existingCopy = {
+            fileUrl: matchingFile.webViewLink || `https://docs.google.com/presentation/d/${matchingFile.id}/edit`,
+            fileName: matchingFile.name,
+            fileId: matchingFile.id
+        };
+    } else {
+        // Fall back to cached copy map if no real-time match found
+        existingCopy = driveState.copyMap[item.id];
+    }
+    
     const deleteButtonHtml = canManageTemplates()
         ? `<button type="button" class="template-card-delete" data-delete-template="${escapeHtml(item.id)}">Delete</button>`
         : "";
@@ -1052,6 +1072,41 @@ function focusRequestedTemplateCard() {
 
     target.classList.add("is-requested");
     target.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+async function loadProcessAssessmentFiles() {
+    const token = await readStoredHubAccessToken();
+    if (!token) {
+        driveState.processAssessmentFiles = [];
+        return;
+    }
+
+    try {
+        const response = await fetch("/api/student/drive-setup/list-process-assessment-slides", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                ...buildWriteHeaders()
+            },
+            body: JSON.stringify({ driveAccessToken: token })
+        });
+
+        if (!response.ok) {
+            console.warn("Could not load Process Assessment files:", await response.text());
+            driveState.processAssessmentFiles = [];
+            return;
+        }
+
+        const data = await response.json();
+        if (data?.ok && Array.isArray(data.slides)) {
+            driveState.processAssessmentFiles = data.slides;
+        } else {
+            driveState.processAssessmentFiles = [];
+        }
+    } catch (error) {
+        console.warn("Error loading Process Assessment files:", error);
+        driveState.processAssessmentFiles = [];
+    }
 }
 
 function renderLibrary() {
@@ -1201,6 +1256,10 @@ async function initLibrary() {
     }
 
     if (!hydrated) return;
+
+    // Load real-time list of files in Process Assessment folder for status checking
+    await loadProcessAssessmentFiles();
+    renderLibrary();
 
     // Pre-initialize drive token client silently
     const waitForGoogle = (tries = 20) => {

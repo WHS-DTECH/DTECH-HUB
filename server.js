@@ -5279,6 +5279,43 @@ app.post("/api/student/drive-setup/find-slide", async (req, res) => {
   }
 });
 
+app.post("/api/student/drive-setup/list-process-assessment-slides", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email) {
+    res.status(401).json({ error: "Sign in is required." });
+    return;
+  }
+
+  const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
+  if (!driveAccessToken) {
+    res.status(400).json({ error: "driveAccessToken is required." });
+    return;
+  }
+
+  try {
+    const setup = await getStudentDriveSetup(email);
+    const folderId = String(setup?.processAssessmentFolderId || "").trim();
+    if (!folderId) {
+      res.status(400).json({ error: "Please confirm your Process Assessment folder first." });
+      return;
+    }
+
+    const slides = await driveListSlidesInFolder(folderId, driveAccessToken);
+    res.json({
+      ok: true,
+      slides: slides.map((file) => ({
+        id: String(file?.id || "").trim(),
+        name: String(file?.name || "").trim(),
+        webViewLink: String(file?.webViewLink || `https://docs.google.com/presentation/d/${String(file?.id || "").trim()}/edit`).trim(),
+        thumbnailLink: String(file?.thumbnailLink || "").trim(),
+        modifiedTime: String(file?.modifiedTime || "").trim()
+      }))
+    });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not list Process Assessment slides." });
+  }
+});
+
 async function resolveActivityWriteAccess(email) {
   const normalizedEmail = normalizeEmail(email);
   if (!normalizedEmail) {
