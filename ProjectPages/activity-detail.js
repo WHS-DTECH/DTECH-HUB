@@ -3571,19 +3571,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 : (isSuccessCriteriaTopic
                     ? "project-success-criteria"
                     : (isRelevantImplicationsTopic ? "relevant-implications" : "digital-outcome-description")));
-        const allowFolderMatchAutoLink = syncTemplateId === "digital-outcome-description" || syncTemplateId === "target-audience";
-
-        // For staged rollout, do not pre-connect Relevant Implications (or other non-enabled pages)
-        // from passive folder matches when the student has not explicitly linked/downloaded.
-        const storedSyncSource = String(storedSyncEntry?.syncSource || "").trim().toLowerCase();
-        if (!allowFolderMatchAutoLink && !currentGoogleSlidesUrl) {
-            const isPassiveStoredLink = Boolean(storedSyncEntry?.url)
-                && (storedSyncSource === "folder-match" || !storedSyncSource);
-            if (isPassiveStoredLink) {
-                syncedGoogleSlidesUrl = "";
-                syncedGoogleSlidesSavedAt = "";
-            }
-        }
+        const allowFolderMatchAutoLink = isDigitalOutcomeTopic;
 
         const canonicalTemplatePreviewUrl = await fetchTemplateLibraryPreviewByTemplateId(syncTemplateId);
         const topicMatch = await findProcessAssessmentSlideMatch(syncTopicLabel);
@@ -3649,7 +3637,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                             </li>
                         </ul>
                     `
-                    : `<p class="task-topic-submission-note">No synced ${escapeHtml(syncTopicLabel)} slide link yet. Open Template Library and use the Digital Outcome template first.</p>`
+                    : `<p class="task-topic-submission-note task-topic-submission-not-uploaded">Submission Task is not uploaded</p>`
                 }
             </div>
         `;
