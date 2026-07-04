@@ -3669,19 +3669,24 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 
                 ${storedSyncEntry.url && storedSyncEntry.syncSource === "template-use" ? `
                     <div class="task-topic-student-template-section">
-                        <p class="task-topic-submission-note"><strong>Your Template Selection:</strong></p>
-                        <ul class="task-topic-sync-links">
-                            <li class="task-topic-sync-link">
-                                <div class="task-topic-sync-link-content">
-                                    <p class="task-topic-sync-link-title">Template from Library</p>
-                                    <a href="${escapeHtml(storedSyncEntry.url)}" target="_blank" rel="noreferrer">${escapeHtml(storedSyncEntry.url)}</a>
+                        <p class="task-topic-submission-label">Your Template Selection</p>
+                        <div class="task-topic-template-card">
+                            ${storedSyncEntry.thumbnailUrl ? `
+                                <div class="task-topic-template-thumbnail">
+                                    <a href="${escapeHtml(storedSyncEntry.url)}" target="_blank" rel="noreferrer">
+                                        <img src="${escapeHtml(storedSyncEntry.thumbnailUrl)}" alt="${escapeHtml(storedSyncEntry.templateTitle || "Template preview")}" />
+                                    </a>
                                 </div>
-                                <div class="task-topic-sync-link-meta">
-                                    <span class="task-topic-sync-created-label">Selected</span>
-                                    <span class="task-topic-sync-created-value">${escapeHtml(formatSyncCreatedDate(storedSyncEntry.savedAt))}</span>
-                                </div>
-                            </li>
-                        </ul>
+                            ` : ""}
+                            <div class="task-topic-template-details">
+                                <h4 class="task-topic-template-title">${escapeHtml(storedSyncEntry.templateTitle || "Selected Template")}</h4>
+                                <p class="task-topic-template-meta">
+                                    <span class="task-topic-template-label">Selected:</span>
+                                    <span class="task-topic-template-date">${escapeHtml(formatSyncCreatedDate(storedSyncEntry.savedAt))}</span>
+                                </p>
+                                <a href="${escapeHtml(storedSyncEntry.url)}" target="_blank" rel="noreferrer" class="task-topic-template-link">Open in Google Drive →</a>
+                            </div>
+                        </div>
                     </div>
                 ` : ""}
                 

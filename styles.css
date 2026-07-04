@@ -3416,3 +3416,106 @@ body.public-home-access .controls-panel {
         grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     }
 }
+
+/* Template Card Styles for Submission Tasks */
+.task-topic-student-template-section {
+    margin: 16px 0;
+    padding: 0;
+}
+
+.task-topic-template-card {
+    display: flex;
+    gap: 16px;
+    padding: 16px;
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius-md);
+    background: var(--panel-bg);
+    box-shadow: var(--shadow-soft);
+}
+
+.task-topic-template-thumbnail {
+    flex-shrink: 0;
+    width: 120px;
+    height: 160px;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+}
+
+.task-topic-template-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.2s ease;
+}
+
+.task-topic-template-thumbnail a:hover img {
+    transform: scale(1.05);
+}
+
+.task-topic-template-details {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.task-topic-template-title {
+    margin: 0 0 8px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--ink-strong);
+    line-height: 1.3;
+}
+
+.task-topic-template-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 12px 0;
+    font-size: 13px;
+    color: var(--ink-soft);
+}
+
+.task-topic-template-label {
+    font-weight: 600;
+    color: var(--ink-mid);
+}
+
+.task-topic-template-date {
+    color: var(--ink-soft);
+}
+
+.task-topic-template-link {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    padding: 8px 12px;
+    background: var(--hero-mid);
+    color: white;
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-weight: 500;
+    transition: background 0.2s ease;
+    text-decoration: none;
+}
+
+.task-topic-template-link:hover {
+    background: var(--hero-top);
+}
+
+/* Responsive: Stack vertically on mobile */
+@media (max-width: 640px) {
+    .task-topic-template-card {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .task-topic-template-thumbnail {
+        width: 100%;
+        height: auto;
+        aspect-ratio: 3 / 4;
+    }
+}

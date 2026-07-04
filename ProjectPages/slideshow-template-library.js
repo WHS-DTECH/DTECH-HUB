@@ -181,7 +181,7 @@ function getTaskTopicSlideSyncStorageKey(activityId, email, taskTopic, taskShort
     return `${LIB_TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX}:${safeActivityId}:${safeEmail}:${topicSlug}:${shortSlug}`;
 }
 
-function persistTaskTopicSlideSyncLink(fileUrl) {
+function persistTaskTopicSlideSyncLink(fileUrl, metadata = {}) {
     const safeUrl = toSafeExternalUrl(fileUrl);
     const email = getLibraryEmail();
     const activityId = String(templateUsageContext.activityId || "").trim();
@@ -195,7 +195,9 @@ function persistTaskTopicSlideSyncLink(fileUrl) {
             url: safeUrl,
             savedAt: new Date().toISOString(),
             templateId: String(templateUsageContext.templateId || "").trim(),
-            syncSource: "template-use"
+            syncSource: "template-use",
+            thumbnailUrl: String(metadata.thumbnailUrl || "").trim(),
+            templateTitle: String(metadata.templateTitle || "").trim()
         }));
     } catch (_error) {
     }
@@ -854,7 +856,10 @@ async function handleUseTemplate(templateId) {
 
     // If already copied this session, open existing
     if (driveState.copyMap[templateId]) {
-        persistTaskTopicSlideSyncLink(driveState.copyMap[templateId].fileUrl);
+        persistTaskTopicSlideSyncLink(driveState.copyMap[templateId].fileUrl, {
+            thumbnailUrl: item.imageUrl,
+            templateTitle: item.title
+        });
         persistCurrentTemplateCopyMap();
         void markConnectedTaskItemDone(templateId).catch((error) => {
             console.warn("Could not update Task List completion after template open.", error);
@@ -895,7 +900,10 @@ async function handleUseTemplate(templateId) {
         const payload = await copyTemplateWithToken(tokenResponse.access_token);
 
         driveState.copyMap[templateId] = { fileUrl: payload.fileUrl, fileName: payload.fileName };
-        persistTaskTopicSlideSyncLink(payload.fileUrl);
+        persistTaskTopicSlideSyncLink(payload.fileUrl, {
+            thumbnailUrl: item.imageUrl,
+            templateTitle: item.title
+        });
         persistCurrentTemplateCopyMap();
         updateCardAfterCopy(templateId, payload);
         void markConnectedTaskItemDone(templateId).catch((error) => {
@@ -923,7 +931,10 @@ async function handleUseTemplate(templateId) {
         try {
             const retryPayload = await copyTemplateWithToken(consentTokenResponse.access_token);
             driveState.copyMap[templateId] = { fileUrl: retryPayload.fileUrl, fileName: retryPayload.fileName };
-            persistTaskTopicSlideSyncLink(retryPayload.fileUrl);
+            persistTaskTopicSlideSyncLink(retryPayload.fileUrl, {
+                thumbnailUrl: item.imageUrl,
+                templateTitle: item.title
+            });
             persistCurrentTemplateCopyMap();
             updateCardAfterCopy(templateId, retryPayload);
             void markConnectedTaskItemDone(templateId).catch((warnError) => {
