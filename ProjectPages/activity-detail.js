@@ -3276,7 +3276,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         const syncTemplateId = isTargetAudienceTopic
             ? "target-audience"
             : (isDevelopmentToolsTopic
-                ? "relevant-implications"
+                ? "development-tools"
                 : (isSuccessCriteriaTopic
                     ? "project-success-criteria"
                     : (isRelevantImplicationsTopic ? "relevant-implications" : "digital-outcome-description")));
@@ -6001,7 +6001,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     const preferredTemplateId = digitalOutcomeTopicKey === "target-audience"
         ? "target-audience"
         : (digitalOutcomeTopicKey === "development-tools"
-            ? "relevant-implications"
+            ? "development-tools"
             : (digitalOutcomeTopicKey === "success-criteria"
                 ? "project-success-criteria"
                 : (digitalOutcomeTopicKey === "relevant-implications" ? "relevant-implications" : "digital-outcome-description")));
