@@ -6,8 +6,9 @@ const TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX = "hub_task_topic_slide_sync_v1";
 const DIGITAL_OUTCOME_DETAILS_TASKS = [
     "Description - Google Slides: Describe the Digital Outcome: What is it, who is it for, and what should it do?",
     "Identify the target audience or end user for this outcome.",
-    "Explain how the outcome will be developed and what tools/technologies will be used.",
-    "State how success will be measured or evaluated."
+    "Explain how the outcome will be developed.",
+    "State how success will be measured or evaluated.",
+    "What Tools and Techniques will be used?"
 ];
 
 const EVIDENCE_STEPS_DEFAULTS = {
