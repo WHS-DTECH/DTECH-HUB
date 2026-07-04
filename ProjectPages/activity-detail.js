@@ -3667,7 +3667,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             ${isDigitalOutcomeTopic ? `
                 <p class="task-topic-submission-note task-topic-google-sync-note"><strong>Synced Slide:</strong> <span id="task-topic-google-slides-sync-reference">${syncedGoogleSlidesUrl ? `<a href="${escapeHtml(syncedGoogleSlidesUrl)}" target="_blank" rel="noreferrer">${escapeHtml(syncedGoogleSlidesUrl)}</a>` : "No synced slide yet. Open Template Library and click Use Template to link your personal slide copy."}</span></p>
                 
-                ${storedSyncEntry.url && storedSyncEntry.syncSource === "template-use" ? `
+                ${storedSyncEntry.url && storedSyncEntry.syncSource === "template-use" && topicMatch.fileUrl ? `
                     <div class="task-topic-student-template-section">
                         <p class="task-topic-submission-label">Your Template Selection</p>
                         <div class="task-topic-template-card">
