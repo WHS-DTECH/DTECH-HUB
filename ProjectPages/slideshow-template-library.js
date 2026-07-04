@@ -1002,13 +1002,24 @@ function renderTemplateCard(item) {
     
     // Check real-time Process Assessment folder files first, then fall back to cached copyMap
     let existingCopy = null;
+    const normalizeForMatching = (text) => String(text || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .replace(/\s+/g, " ");
+    
+    const normalizedTitle = normalizeForMatching(title);
     const matchingFile = driveState.processAssessmentFiles.find((file) => {
-        const fileName = String(file?.name || "").trim().toLowerCase();
-        const templateTitle = String(title || "").trim().toLowerCase();
-        return fileName.includes(templateTitle) || templateTitle.includes(fileName.replace(/\s*-\s*.*$/, ""));
+        const normalizedFileName = normalizeForMatching(file?.name || "");
+        const isMatch = normalizedFileName.includes(normalizedTitle);
+        if (!isMatch) {
+            console.debug(`No match for "${title}": file "${file?.name}" normalizes to "${normalizedFileName}", template normalizes to "${normalizedTitle}"`);
+        }
+        return isMatch;
     });
     
     if (matchingFile) {
+        console.debug(`Matched "${title}" to file "${matchingFile.name}"`);
         existingCopy = {
             fileUrl: matchingFile.webViewLink || `https://docs.google.com/presentation/d/${matchingFile.id}/edit`,
             fileName: matchingFile.name,
@@ -1075,24 +1086,24 @@ function focusRequestedTemplateCard() {
 }
 
 async function loadProcessAssessmentFiles() {
-    const token = await readStoredHubAccessToken();
-    if (!token) {
-        driveState.processAssessmentFiles = [];
-        return;
-    }
-
     try {
+        // Request Google Drive token to access Process Assessment folder
+        const tokenResponse = await requestDriveToken();
+        if (tokenResponse.error) {
+            console.warn("Could not get Drive token for Process Assessment file listing");
+            driveState.processAssessmentFiles = [];
+            return;
+        }
+
         const response = await fetch("/api/student/drive-setup/list-process-assessment-slides", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                ...buildWriteHeaders()
-            },
-            body: JSON.stringify({ driveAccessToken: token })
+            headers: withLibraryAuthHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ driveAccessToken: tokenResponse.access_token })
         });
 
         if (!response.ok) {
-            console.warn("Could not load Process Assessment files:", await response.text());
+            const errorText = await response.text();
+            console.warn("Could not load Process Assessment files:", response.status, errorText);
             driveState.processAssessmentFiles = [];
             return;
         }
@@ -1100,7 +1111,9 @@ async function loadProcessAssessmentFiles() {
         const data = await response.json();
         if (data?.ok && Array.isArray(data.slides)) {
             driveState.processAssessmentFiles = data.slides;
+            console.log(`Loaded ${data.slides.length} files from Process Assessment folder:`, data.slides.map(f => f.name));
         } else {
+            console.warn("Unexpected response format:", data);
             driveState.processAssessmentFiles = [];
         }
     } catch (error) {
