@@ -3021,7 +3021,7 @@ async function extractSlideshowsFromUrl(url, email) {
         // Fetch slideshows from folder via backend
         const accessToken = readStoredHubAccessToken();
         if (!accessToken) {
-            throw new Error("Not authenticated with Google Drive.");
+            throw new Error("Not authenticated with Google Drive. Please ensure your Google account is linked.");
         }
         
         try {
@@ -3035,7 +3035,8 @@ async function extractSlideshowsFromUrl(url, email) {
             });
             
             if (!response.ok) {
-                throw new Error("Failed to list slideshows in folder.");
+                // Fallback: if backend endpoint doesn't exist, ask user to provide direct slideshow URL
+                throw new Error("Folder browsing not yet available. Please paste a direct Google Slides presentation URL instead.");
             }
             
             const payload = await response.json().catch(() => ({}));
@@ -3045,11 +3046,13 @@ async function extractSlideshowsFromUrl(url, email) {
             }
             return slideshows;
         } catch (err) {
-            throw new Error(err.message || "Failed to load slideshows from folder.");
+            // Enhanced error messaging
+            const errMsg = String(err?.message || "Failed to load slideshows from folder.");
+            throw new Error(errMsg);
         }
     }
     
-    throw new Error("Please provide a valid Google Slides URL or folder URL.");
+    throw new Error("Please provide a valid Google Slides URL (https://docs.google.com/presentation/d/...) or a Google Drive folder URL.");
 }
 
 async function getFirstSlideThumbnail(presentationId, email) {
@@ -7040,7 +7043,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     }
 
     const syncSlidesBtn = host.querySelector("#task-topic-sync-slides-btn");
-    if (syncSlidesBtn && isTaskTopicView && isDigitalOutcomeTopic) {
+    if (syncSlidesBtn && isTaskTopicView && useDigitalOutcomeTemplateHero) {
         syncSlidesBtn.addEventListener("click", async () => {
             const ctx = getActiveSyncContext();
             if (!ctx.projectId || !ctx.email) {
@@ -7048,13 +7051,13 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 return;
             }
 
-            const isTargetAudienceTopic = isDigitalOutcomeTargetAudienceCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
+            const isTargetAudienceTopic = isDigitalOutcomeTargetAudienceCriterion(taskTopicTitle, resolvedTaskShortName)
                 || keywordMatchedTopicKey === "target-audience";
-            const isDevelopmentToolsTopic = isDigitalOutcomeDevelopmentToolsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
+            const isDevelopmentToolsTopic = isDigitalOutcomeDevelopmentToolsCriterion(taskTopicTitle, resolvedTaskShortName)
                 || keywordMatchedTopicKey === "development-tools";
-            const isSuccessCriteriaTopic = isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
+            const isSuccessCriteriaTopic = isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, resolvedTaskShortName)
                 || keywordMatchedTopicKey === "success-criteria";
-            const isRelevantImplicationsTopic = isDigitalOutcomeRelevantImplicationsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
+            const isRelevantImplicationsTopic = isDigitalOutcomeRelevantImplicationsCriterion(taskTopicTitle, resolvedTaskShortName)
                 || keywordMatchedTopicKey === "relevant-implications";
 
             const syncTopicLabel = isTargetAudienceTopic
@@ -7073,7 +7076,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                         ? "project-success-criteria"
                         : (isRelevantImplicationsTopic ? "relevant-implications" : "digital-outcome-description")));
 
-            await openDigitalOutcomeTaskTopicSyncModal(ctx.projectId, ctx.email, taskTopicTitle, taskTopicShortName, syncTemplateId, syncTopicLabel);
+            await openDigitalOutcomeTaskTopicSyncModal(ctx.projectId, ctx.email, taskTopicTitle, resolvedTaskShortName, syncTemplateId, syncTopicLabel);
         });
     }
 
