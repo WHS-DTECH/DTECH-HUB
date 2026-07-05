@@ -50,6 +50,36 @@ const taskListState = {
     taskTopic: ""
 };
 
+function normalizeDigitalOutcomeChecklistRows(rows) {
+    const sourceRows = Array.isArray(rows)
+        ? rows.map((step) => ({ text: String(step?.text || "").trim(), done: Boolean(step?.done) }))
+        : [];
+
+    if (!sourceRows.length) {
+        return DIGITAL_OUTCOME_DETAILS_TASKS.map((text) => ({ text, done: false }));
+    }
+
+    const legacyCombinedPattern = /explain\s+how\s+the\s+outcome\s+will\s+be\s+developed\s+and\s+what\s+tools\/?(?:technologies|techniques)\s+will\s+be\s+used/i;
+    const normalized = DIGITAL_OUTCOME_DETAILS_TASKS.map((targetText) => {
+        const target = String(targetText || "").trim();
+        const exact = sourceRows.find((row) => row.text.toLowerCase() === target.toLowerCase());
+        if (exact) {
+            return { text: target, done: Boolean(exact.done) };
+        }
+
+        if (/^Explain how the outcome will be developed\.?$/i.test(target)) {
+            const legacy = sourceRows.find((row) => legacyCombinedPattern.test(row.text));
+            if (legacy) {
+                return { text: target, done: Boolean(legacy.done) };
+            }
+        }
+
+        return { text: target, done: false };
+    });
+
+    return normalized;
+}
+
 function escapeTaskListHtml(value) {
     return String(value || "")
         .replace(/&/g, "&amp;")
@@ -869,6 +899,11 @@ function buildChecklistState(standardCodes, evidenceMap) {
     standardCodes.forEach((standard) => {
         const existing = Array.isArray(evidenceMap[standard]) ? evidenceMap[standard] : [];
         if (existing.length) {
+            if (standard === "digital-outcome") {
+                next[standard] = normalizeDigitalOutcomeChecklistRows(existing);
+                return;
+            }
+
             next[standard] = existing.map((step) => ({ text: String(step?.text || "").trim(), done: Boolean(step?.done) }));
             return;
         }
@@ -897,6 +932,12 @@ async function loadChecklistForTask(taskId) {
     const evidenceRows = await fetchMyEvidence(taskListState.selectedId).catch(() => []);
     const evidenceMap = evidenceRowsToMap(evidenceRows);
     taskListState.fullEvidenceState = { ...evidenceMap };
+    let migratedDigitalOutcomeRows = false;
+    if (Array.isArray(taskListState.fullEvidenceState["digital-outcome"])) {
+        const beforeMigration = JSON.stringify(taskListState.fullEvidenceState["digital-outcome"]);
+        taskListState.fullEvidenceState["digital-outcome"] = normalizeDigitalOutcomeChecklistRows(taskListState.fullEvidenceState["digital-outcome"]);
+        migratedDigitalOutcomeRows = beforeMigration !== JSON.stringify(taskListState.fullEvidenceState["digital-outcome"]);
+    }
     taskListState.checklistStandards = getStandardCodes(detail || selected);
     taskListState.checklistState = buildChecklistState(taskListState.checklistStandards, evidenceMap);
     taskListState.checklistStandards.forEach((standard) => {
@@ -916,7 +957,7 @@ async function loadChecklistForTask(taskId) {
     const autoChangedEvidenceDO = autoTickDigitalOutcomeRequirements(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
     const autoChangedEvidenceRI = autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
     const autoChangedEvidence = autoChangedEvidencePM || autoChangedEvidenceDO || autoChangedEvidenceRI;
-    if (autoChangedChecklist || autoChangedEvidence) {
+    if (migratedDigitalOutcomeRows || autoChangedChecklist || autoChangedEvidence) {
         const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
         await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});
     }
