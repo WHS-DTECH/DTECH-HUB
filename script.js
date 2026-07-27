@@ -1670,7 +1670,7 @@ async function loadProjectAssignmentSummaries(force = false) {
 }
 
 function getAssignedStudentCount(project, sourceType) {
-    if (sourceType !== "project") {
+    if (sourceType !== "project" && sourceType !== "assessment") {
         return 0;
     }
 

@@ -226,35 +226,39 @@ async function prefillProjectIfEditing() {
 
         const data = await response.json();
 
-        if (data.name) form.activityName.value = data.name;
-        if (data.start_date) form.startDate.value = data.start_date;
-        if (data.year_level) form.yearLevel.value = data.year_level;
-        if (data.type) form.type.value = data.type;
+        form.activityName.value = String(data.name || "");
+        form.startDate.value = String(data.start_date || "");
+        form.yearLevel.value = String(data.year_level || "");
+        form.type.value = String(data.type || "");
         form.activityCategory.value = normalizeCardCategory(data.activity_category, "Project");
-        if (data.difficulty) form.difficulty.value = data.difficulty;
+        form.difficulty.value = String(data.difficulty || "");
         if (data.time_sensitive !== undefined || data.timeSensitive !== undefined) {
             form.timeSensitive.checked = Boolean(data.time_sensitive ?? data.timeSensitive);
+        } else if (form.timeSensitive) {
+            form.timeSensitive.checked = false;
         }
-        if (data.card_color || data.card_colour || data.color) form.cardColor.value = data.card_color || data.card_colour || data.color;
-            if (data.card_url || data.activity_url || data.url) form.cardUrl.value = data.card_url || data.activity_url || data.url;
-            if (data.outcome_image_url || data.image_url) form.outcomeImageUrl.value = data.outcome_image_url || data.image_url;
+        form.cardColor.value = String(data.card_color || data.card_colour || data.color || form.cardColor.value || "");
+        form.cardUrl.value = String(data.card_url || data.activity_url || data.url || "");
+        form.outcomeImageUrl.value = String(data.outcome_image_url || data.image_url || "");
         if (form.subjectStream) {
             form.subjectStream.value =
-                normalizeSubjectStream(data.subject_stream) || extractSubjectStreamFromClassPreparation(data.class_preparation);
+                normalizeSubjectStream(data.subject_stream) || extractSubjectStreamFromClassPreparation(data.class_preparation) || "";
         }
         if (data.show_in_this_week !== undefined || data.show_this_week !== undefined || data.is_this_week !== undefined) {
             form.showThisWeek.checked = Boolean(data.show_in_this_week ?? data.show_this_week ?? data.is_this_week);
+        } else if (form.showThisWeek) {
+            form.showThisWeek.checked = false;
         }
 
-        if (data.contact_name) form.contactName.value = data.contact_name;
-        if (data.contact_phone) form.contactPhone.value = data.contact_phone;
-        if (data.contact_email) form.contactEmail.value = data.contact_email;
-        if (data.company) form.company.value = data.company;
-        if (data.address) form.address.value = data.address;
-        if (data.description) form.shortDescription.value = data.description;
-        if (data.overview) form.overview.value = parseMaybeArray(data.overview).join("\n");
-        if (data.services) form.services.value = parseMaybeArray(data.services).join("\n");
-        if (data.costs) form.costs.value = parseMaybeArray(data.costs).join("\n");
+        form.contactName.value = String(data.contact_name || "");
+        form.contactPhone.value = String(data.contact_phone || "");
+        form.contactEmail.value = String(data.contact_email || "");
+        form.company.value = String(data.company || "");
+        form.address.value = String(data.address || "");
+        form.shortDescription.value = String(data.description || "");
+        form.overview.value = parseMaybeArray(data.overview).join("\n");
+        form.services.value = parseMaybeArray(data.services).join("\n");
+        form.costs.value = parseMaybeArray(data.costs).join("\n");
         syncCommonCostOptionsFromTextarea();
         saveProjectDraft();
     } catch (_error) {
@@ -318,8 +322,10 @@ function restoreProjectDraftIfAvailable() {
     if (!draft || typeof draft !== "object") return;
 
     const editingId = getEditingProjectId();
-    if (editingId && draft.__editingId && String(draft.__editingId) !== String(editingId)) {
-        return;
+    if (editingId) {
+        if (!draft.__editingId || String(draft.__editingId) !== String(editingId)) {
+            return;
+        }
     }
 
     Object.keys(draft).forEach((key) => {
