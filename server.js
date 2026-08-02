@@ -4578,8 +4578,13 @@ function toTemplateLibraryEntry(row, fallbackIndex = 0) {
 function compareTemplateLibraryEntries(left, right) {
   const leftTitle = String(left?.title || "").trim().toLowerCase();
   const rightTitle = String(right?.title || "").trim().toLowerCase();
-  const leftPriority = leftTitle === "process slide templates" ? 0 : 1;
-  const rightPriority = rightTitle === "process slide templates" ? 0 : 1;
+  const isPrimaryProcessTemplateTitle = (value) => {
+    const normalized = String(value || "").trim().toLowerCase();
+    return normalized === "process slide templates"
+      || normalized === "afull - digital outcome details template";
+  };
+  const leftPriority = isPrimaryProcessTemplateTitle(leftTitle) ? 0 : 1;
+  const rightPriority = isPrimaryProcessTemplateTitle(rightTitle) ? 0 : 1;
   if (leftPriority !== rightPriority) {
     return leftPriority - rightPriority;
   }
@@ -4600,10 +4605,13 @@ function inferCanonicalTemplateIdentityFromTitle(title) {
     return null;
   }
 
-  if (normalizedTitle.includes("process slide templates")) {
+  if (
+    normalizedTitle.includes("process slide templates")
+    || /afull\s*-\s*digital\s*outcome\s*details\s*template/.test(normalizedTitle)
+  ) {
     return {
       id: "process-slide-templates",
-      title: "Process Slide Templates",
+      title: "AFULL - Digital Outcome Details Template",
       criteriaText: ""
     };
   }
