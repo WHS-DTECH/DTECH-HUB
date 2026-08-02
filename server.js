@@ -4960,6 +4960,51 @@ async function driveListSlidesInFolder(folderId, accessToken) {
   return Array.isArray(result?.files) ? result.files : [];
 }
 
+async function driveListChildFoldersInFolder(folderId, accessToken) {
+  const safeFolder = String(folderId || "").trim().replace(/'/g, "\\'");
+  if (!safeFolder) return [];
+
+  const q = `'${safeFolder}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+  const result = await driveApiRequest("/files", {
+    accessToken,
+    queryParams: {
+      q,
+      fields: "files(id,name,webViewLink)",
+      orderBy: "name_natural asc",
+      pageSize: 200,
+      includeItemsFromAllDrives: true,
+      supportsAllDrives: true
+    }
+  });
+
+  return Array.isArray(result?.files) ? result.files : [];
+}
+
+async function driveListSlidesInFolderAndSubfolders(folderId, accessToken) {
+  const rootFolderId = String(folderId || "").trim();
+  if (!rootFolderId) return [];
+
+  const rootSlides = await driveListSlidesInFolder(rootFolderId, accessToken);
+  const childFolders = await driveListChildFoldersInFolder(rootFolderId, accessToken);
+
+  const nestedSlides = [];
+  for (const childFolder of childFolders) {
+    const childFolderId = String(childFolder?.id || "").trim();
+    const childFolderName = String(childFolder?.name || "").trim();
+    if (!childFolderId) continue;
+
+    const slides = await driveListSlidesInFolder(childFolderId, accessToken);
+    slides.forEach((file) => {
+      nestedSlides.push({ ...file, sourceSubfolderName: childFolderName });
+    });
+  }
+
+  return [
+    ...rootSlides.map((file) => ({ ...file, sourceSubfolderName: "" })),
+    ...nestedSlides
+  ];
+}
+
 function extractSlidesFileId(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
@@ -5067,17 +5112,20 @@ app.post("/api/template-library/sync", async (req, res) => {
       return;
     }
 
-    const slides = await driveListSlidesInFolder(folder.id, driveAccessToken);
+    const slides = await driveListSlidesInFolderAndSubfolders(folder.id, driveAccessToken);
     const syncEntries = slides.map((file, index) => {
       const title = String(file?.name || "Untitled Template").trim();
       const canonical = inferCanonicalTemplateIdentityFromTitle(title);
       const standardCodes = Array.from(new Set((title.match(/\b\d{5}\b/g) || []).map((code) => String(code || "").trim())));
+      const sourceSubfolderName = String(file?.sourceSubfolderName || "").trim();
       return {
         id: String(canonical?.id || file?.id || "").trim(),
         title: String(canonical?.title || title).trim(),
         standardCodes,
         criteriaText: String(canonical?.criteriaText || "").trim(),
-        summary: `Synced from ${folderName}.`,
+        summary: sourceSubfolderName
+          ? `Synced from ${folderName}/${sourceSubfolderName}.`
+          : `Synced from ${folderName}.`,
         imageUrl: String(file?.thumbnailLink || "").trim(),
         templateUrl: String(file?.webViewLink || `https://docs.google.com/presentation/d/${String(file?.id || "").trim()}/edit`).trim(),
         status: "live",
