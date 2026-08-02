@@ -324,6 +324,29 @@ function stripStepLevel(text) {
     return String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim();
 }
 
+function getAchievedSectionMeta(stepText) {
+    const normalized = String(stepText || "").trim().toLowerCase();
+    if (!normalized) return null;
+
+    if (normalized.includes("project management")) {
+        return { id: "project-management", title: "Section 1: Project Management" };
+    }
+
+    if (normalized.includes("decompose") || normalized.includes("features") || normalized.includes("requirements")) {
+        return { id: "features-requirements", title: "Section 2: Features & Requirements" };
+    }
+
+    if (normalized.includes("trial") || normalized.includes("test")) {
+        return { id: "testing-trialing", title: "Section 3: Testing & Trialing" };
+    }
+
+    if (normalized.includes("relevant implications")) {
+        return { id: "relevant-implications", title: "Section 4: Relevant Implications" };
+    }
+
+    return null;
+}
+
 function getTaskTopicHrefForStep(standard, level, text) {
     const safeText = String(text || "").trim();
     if (!safeText || !taskListState.selectedId) return "";
@@ -820,6 +843,7 @@ function renderChecklistCards(detail, allItems) {
             const levelRows = safeRows
                 .map((step, index) => ({ ...step, _index: index }))
                 .filter((step) => getStepLevel(step?.text) === level);
+            const renderedAchievedSections = new Set();
 
             return `
                 <section class="task-list-level-group">
@@ -828,6 +852,14 @@ function renderChecklistCards(detail, allItems) {
                         ${levelRows.map((step) => {
                             const stepText = stripStepLevel(step?.text);
                             const href = getTaskTopicHrefForStep(standard, level, stepText);
+                            const achievedSectionMeta = level === "Achieved" ? getAchievedSectionMeta(stepText) : null;
+                            const shouldRenderAchievedSectionHeading = Boolean(
+                                achievedSectionMeta
+                                && !renderedAchievedSections.has(achievedSectionMeta.id)
+                            );
+                            if (shouldRenderAchievedSectionHeading && achievedSectionMeta) {
+                                renderedAchievedSections.add(achievedSectionMeta.id);
+                            }
                             const isProjectManagementRow = String(level) === "Achieved"
                                 && stepText.toLowerCase().includes("project management");
                             const isSystemComplete = isProjectManagementRow
@@ -835,6 +867,9 @@ function renderChecklistCards(detail, allItems) {
                                 && systemConnections.githubConnected;
 
                             return `
+                                ${shouldRenderAchievedSectionHeading && achievedSectionMeta
+                                    ? `<p class="task-list-achieved-subheading">${escapeTaskListHtml(achievedSectionMeta.title)}</p>`
+                                    : ""}
                                 <div class="task-list-step-row ${isSystemComplete ? "is-system-complete" : ""}">
                                     <label class="task-list-step-check-wrap">
                                         <input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${step._index}">
