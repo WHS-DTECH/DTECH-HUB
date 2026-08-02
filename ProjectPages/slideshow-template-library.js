@@ -1084,6 +1084,47 @@ function renderTemplateCard(item) {
     `;
 }
 
+function extractTemplateSectionName(item) {
+    const summary = String(item?.summary || "").trim();
+    const subfolderMatch = summary.match(/Synced\s+from\s+[^/]+\/(.+?)\.?$/i);
+    if (subfolderMatch?.[1]) {
+        return String(subfolderMatch[1]).trim();
+    }
+
+    const title = String(item?.title || "").trim();
+    if (/relevant\s+implications|development\s+steps/i.test(title)) {
+        return "Relevant Implications";
+    }
+
+    return "Digital Outcome Details";
+}
+
+function buildTemplateSections(items) {
+    const preferredOrder = ["Digital Outcome Details", "Relevant Implications"];
+    const buckets = new Map();
+
+    (Array.isArray(items) ? items : []).forEach((item) => {
+        const sectionName = extractTemplateSectionName(item);
+        if (!buckets.has(sectionName)) {
+            buckets.set(sectionName, []);
+        }
+        buckets.get(sectionName).push(item);
+    });
+
+    return Array.from(buckets.entries())
+        .sort((left, right) => {
+            const leftName = String(left?.[0] || "").trim();
+            const rightName = String(right?.[0] || "").trim();
+            const leftRank = preferredOrder.indexOf(leftName);
+            const rightRank = preferredOrder.indexOf(rightName);
+            const leftScore = leftRank === -1 ? Number.MAX_SAFE_INTEGER : leftRank;
+            const rightScore = rightRank === -1 ? Number.MAX_SAFE_INTEGER : rightRank;
+            if (leftScore !== rightScore) return leftScore - rightScore;
+            return leftName.localeCompare(rightName);
+        })
+        .map(([name, rows]) => ({ name, rows }));
+}
+
 function focusRequestedTemplateCard() {
     const requestedId = String(templateUsageContext.templateId || "").trim();
     if (!requestedId) return;
@@ -1169,7 +1210,23 @@ function renderLibrary() {
         return;
     }
 
-    host.innerHTML = filteredTemplates.map((item) => renderTemplateCard(item)).join("");
+    const templateSections = buildTemplateSections(filteredTemplates);
+    host.innerHTML = templateSections.map((section, index) => {
+        const sectionNumber = index + 1;
+        const sectionTitle = `Section ${sectionNumber}: ${section.name}`;
+        const itemCount = Array.isArray(section?.rows) ? section.rows.length : 0;
+        return `
+            <details class="template-section" ${index === 0 ? "open" : ""}>
+                <summary class="template-section-summary">
+                    <span class="template-section-title">${escapeHtml(sectionTitle)}</span>
+                    <span class="template-section-count">${escapeHtml(String(itemCount))} template${itemCount === 1 ? "" : "s"}</span>
+                </summary>
+                <div class="template-section-list">
+                    ${section.rows.map((item) => renderTemplateCard(item)).join("")}
+                </div>
+            </details>
+        `;
+    }).join("");
     focusRequestedTemplateCard();
 
     if (!libraryHandlersBound) {

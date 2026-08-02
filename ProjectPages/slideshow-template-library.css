@@ -154,6 +154,53 @@ button.template-button {
     gap: 10px;
 }
 
+.template-section {
+    border: 1px solid #bfd0e4;
+    border-radius: 12px;
+    background: #eef4fb;
+    box-shadow: 0 8px 18px rgba(31, 58, 86, 0.07);
+    overflow: hidden;
+}
+
+.template-section-summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 14px;
+    background: linear-gradient(135deg, #225682 0%, #3873a7 65%, #4d89bf 100%);
+    color: #ffffff;
+}
+
+.template-section-summary::-webkit-details-marker {
+    display: none;
+}
+
+.template-section-title {
+    font-family: "Fraunces", serif;
+    font-size: 1.02rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+.template-section-count {
+    font-size: 0.76rem;
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    border-radius: 999px;
+    padding: 3px 9px;
+    background: rgba(18, 48, 76, 0.26);
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.template-section-list {
+    display: grid;
+    gap: 10px;
+    padding: 10px;
+}
+
 .template-card {
     display: grid;
     grid-template-columns: 220px minmax(0, 1fr);
