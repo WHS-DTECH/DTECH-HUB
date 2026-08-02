@@ -5235,11 +5235,27 @@ app.post("/api/student/drive-setup/confirm", async (req, res) => {
     const folder = await driveEnsureFolder(String(seniorDtechFolder.id), "Process Assessment", driveAccessToken);
     if (!folder?.id) { res.status(500).json({ error: "Could not find or create the Process Assessment folder." }); return; }
 
-    const digitalOutcomeFolder = await driveEnsureFolder(String(folder.id), PROCESS_ASSESSMENT_DIGITAL_OUTCOME_FOLDER_NAME, driveAccessToken);
-    if (!digitalOutcomeFolder?.id) { res.status(500).json({ error: "Could not find or create the Digital Outcome Details folder." }); return; }
+    const setupWarnings = [];
+    let digitalOutcomeFolder = null;
+    let relevantImplicationsFolder = null;
 
-    const relevantImplicationsFolder = await driveEnsureFolder(String(folder.id), PROCESS_ASSESSMENT_RELEVANT_IMPLICATIONS_FOLDER_NAME, driveAccessToken);
-    if (!relevantImplicationsFolder?.id) { res.status(500).json({ error: "Could not find or create the Relevant Implications folder." }); return; }
+    try {
+      digitalOutcomeFolder = await driveEnsureFolder(String(folder.id), PROCESS_ASSESSMENT_DIGITAL_OUTCOME_FOLDER_NAME, driveAccessToken);
+      if (!digitalOutcomeFolder?.id) {
+        setupWarnings.push("Could not confirm the Digital Outcome Details sub-folder yet.");
+      }
+    } catch (subfolderError) {
+      setupWarnings.push(`Could not confirm the Digital Outcome Details sub-folder yet (${String(subfolderError?.message || "Drive error")}).`);
+    }
+
+    try {
+      relevantImplicationsFolder = await driveEnsureFolder(String(folder.id), PROCESS_ASSESSMENT_RELEVANT_IMPLICATIONS_FOLDER_NAME, driveAccessToken);
+      if (!relevantImplicationsFolder?.id) {
+        setupWarnings.push("Could not confirm the Relevant Implications sub-folder yet.");
+      }
+    } catch (subfolderError) {
+      setupWarnings.push(`Could not confirm the Relevant Implications sub-folder yet (${String(subfolderError?.message || "Drive error")}).`);
+    }
 
     await saveStudentDriveSetup(email, folder.id);
     res.json({
@@ -5248,10 +5264,15 @@ app.post("/api/student/drive-setup/confirm", async (req, res) => {
       seniorDtechFolderUrl: seniorDtechFolder.webViewLink || `https://drive.google.com/drive/folders/${seniorDtechFolder.id}`,
       processAssessmentFolderId: folder.id,
       processAssessmentFolderUrl: folder.webViewLink || `https://drive.google.com/drive/folders/${folder.id}`,
-      digitalOutcomeDetailsFolderId: digitalOutcomeFolder.id,
-      digitalOutcomeDetailsFolderUrl: digitalOutcomeFolder.webViewLink || `https://drive.google.com/drive/folders/${digitalOutcomeFolder.id}`,
-      relevantImplicationsFolderId: relevantImplicationsFolder.id,
-      relevantImplicationsFolderUrl: relevantImplicationsFolder.webViewLink || `https://drive.google.com/drive/folders/${relevantImplicationsFolder.id}`
+      digitalOutcomeDetailsFolderId: String(digitalOutcomeFolder?.id || "").trim() || null,
+      digitalOutcomeDetailsFolderUrl: digitalOutcomeFolder?.id
+        ? (digitalOutcomeFolder.webViewLink || `https://drive.google.com/drive/folders/${digitalOutcomeFolder.id}`)
+        : null,
+      relevantImplicationsFolderId: String(relevantImplicationsFolder?.id || "").trim() || null,
+      relevantImplicationsFolderUrl: relevantImplicationsFolder?.id
+        ? (relevantImplicationsFolder.webViewLink || `https://drive.google.com/drive/folders/${relevantImplicationsFolder.id}`)
+        : null,
+      warnings: setupWarnings
     });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not confirm drive setup." });
