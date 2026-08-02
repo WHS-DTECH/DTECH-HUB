@@ -108,6 +108,8 @@ const DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE = "Success Criteria";
 const DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE = "Relevant Implications";
 const DIGITAL_OUTCOME_DESCRIPTION_TEMPLATE_PREVIEW_URL = "https://drive.google.com/thumbnail?id=1brOY70u9aJdsoiEtxVepr82vRhiv9VzpMm8TUv3lcTo&sz=w1400";
 const DIGITAL_OUTCOME_TARGET_AUDIENCE_TEMPLATE_PREVIEW_URL = "../images/target-audience-template-preview.svg";
+const DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_FULL_SET_URL = "https://docs.google.com/presentation/d/1l2bRgY8o4FnVstB3QGq4sh4Yg5IRRijH4EmtHtwvP2Q/edit?usp=sharing";
+const DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TEMPLATE_PREVIEW_URL = "https://drive.google.com/thumbnail?id=1l2bRgY8o4FnVstB3QGq4sh4Yg5IRRijH4EmtHtwvP2Q&sz=w1400";
 const DIGITAL_OUTCOME_GENERIC_TEMPLATE_PREVIEW_URL = "../images/template-preview-placeholder.svg";
 
 const EVIDENCE_STEPS_DEFAULTS = {
@@ -6352,9 +6354,14 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         || toGoogleSlidesThumbnailUrl(syncedTaskTopicEntry?.url || "");
     const digitalOutcomeTemplateFallbackImage = digitalOutcomeTopicKey === "target-audience"
         ? DIGITAL_OUTCOME_TARGET_AUDIENCE_TEMPLATE_PREVIEW_URL
+        : (digitalOutcomeTopicKey === "relevant-implications"
+            ? DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TEMPLATE_PREVIEW_URL
         : (digitalOutcomeTopicKey === "description"
             ? DIGITAL_OUTCOME_DESCRIPTION_TEMPLATE_PREVIEW_URL
-            : DIGITAL_OUTCOME_GENERIC_TEMPLATE_PREVIEW_URL);
+            : DIGITAL_OUTCOME_GENERIC_TEMPLATE_PREVIEW_URL));
+    const defaultDigitalOutcomeTemplateFileUrl = digitalOutcomeTopicKey === "relevant-implications"
+        ? DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_FULL_SET_URL
+        : "";
     const slideshowTemplateImage = (isDigitalOutcomeTopic || useDigitalOutcomeTemplateHero)
         ? (taskTopicSyncedSlideThumbnail
             || toSafeExternalUrl(data?.slideshowTemplateImage || data?.slideTemplateImage || "")
@@ -6362,7 +6369,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         : (toSafeExternalUrl(data?.slideshowTemplateImage || data?.slideTemplateImage || "")
             || taskTopicSyncedSlideThumbnail
             || (useDigitalOutcomeTemplateHero ? digitalOutcomeTemplateFallbackImage : ""));
-    const slideshowTemplateFileUrl = toSafeExternalUrl(data?.slideshowTemplateFileUrl || data?.slideTemplateFileUrl || data?.speakerNotesCriteriaUrl || "");
+    const slideshowTemplateFileUrl = toSafeExternalUrl(data?.slideshowTemplateFileUrl || data?.slideTemplateFileUrl || data?.speakerNotesCriteriaUrl || "")
+        || defaultDigitalOutcomeTemplateFileUrl;
     const heroVisualImage = ((isDigitalOutcomeTopic || useDigitalOutcomeTemplateHero) ? (slideshowTemplateImage || data.image) : data.image)
         || "https://placehold.co/900x560/3f89cf/ffffff?text=Uploaded+Activity";
     const heroVisualAlt = (isDigitalOutcomeTopic || useDigitalOutcomeTemplateHero)
