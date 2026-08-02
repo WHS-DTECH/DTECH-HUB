@@ -4874,6 +4874,58 @@ async function driveEnsureFolder(parentFolderId, folderName, accessToken) {
   return driveCreateFolder(parentFolderId, folderName, accessToken);
 }
 
+const PROCESS_ASSESSMENT_DIGITAL_OUTCOME_FOLDER_NAME = "Digital Outcome Details";
+const PROCESS_ASSESSMENT_RELEVANT_IMPLICATIONS_FOLDER_NAME = "Relevant Implications";
+
+function resolveProcessAssessmentSubfolderName(templateId, templateTitle) {
+  const normalizedTemplateId = String(templateId || "").trim().toLowerCase();
+  const normalizedTitle = String(templateTitle || "").trim().toLowerCase();
+
+  const isDigitalOutcomeTemplate = normalizedTemplateId === "digital-outcome-description"
+    || normalizedTitle.includes("digital outcome description");
+  if (isDigitalOutcomeTemplate) {
+    return PROCESS_ASSESSMENT_DIGITAL_OUTCOME_FOLDER_NAME;
+  }
+
+  const isRelevantImplicationsTemplate = normalizedTemplateId === "relevant-implications"
+    || normalizedTitle.includes("relevant implications");
+  if (isRelevantImplicationsTemplate) {
+    return PROCESS_ASSESSMENT_RELEVANT_IMPLICATIONS_FOLDER_NAME;
+  }
+
+  return "";
+}
+
+async function driveListSlidesInProcessAssessmentTree(processAssessmentFolderId, accessToken) {
+  const rootFolderId = String(processAssessmentFolderId || "").trim();
+  if (!rootFolderId) return [];
+
+  const rootSlides = await driveListSlidesInFolder(rootFolderId, accessToken);
+  const subfolderNames = [
+    PROCESS_ASSESSMENT_DIGITAL_OUTCOME_FOLDER_NAME,
+    PROCESS_ASSESSMENT_RELEVANT_IMPLICATIONS_FOLDER_NAME
+  ];
+
+  const nestedSlides = [];
+  for (const subfolderName of subfolderNames) {
+    const folder = await driveFindFolderByName(rootFolderId, subfolderName, accessToken);
+    const subfolderId = String(folder?.id || "").trim();
+    if (!subfolderId) {
+      continue;
+    }
+
+    const subfolderSlides = await driveListSlidesInFolder(subfolderId, accessToken);
+    subfolderSlides.forEach((file) => {
+      nestedSlides.push({ ...file, processAssessmentSubfolder: subfolderName });
+    });
+  }
+
+  return [
+    ...rootSlides.map((file) => ({ ...file, processAssessmentSubfolder: "" })),
+    ...nestedSlides
+  ];
+}
+
 async function driveFindTemplateInFolder(folderId, templateTitle, accessToken) {
   const safeTitle = templateTitle.replace(/\\/g, "\\\\").replace(/'/g, "\\'").slice(0, 60);
   const safeFolder = folderId.replace(/'/g, "\\'");
@@ -5127,13 +5179,23 @@ app.post("/api/student/drive-setup/confirm", async (req, res) => {
     const folder = await driveEnsureFolder(String(seniorDtechFolder.id), "Process Assessment", driveAccessToken);
     if (!folder?.id) { res.status(500).json({ error: "Could not find or create the Process Assessment folder." }); return; }
 
+    const digitalOutcomeFolder = await driveEnsureFolder(String(folder.id), PROCESS_ASSESSMENT_DIGITAL_OUTCOME_FOLDER_NAME, driveAccessToken);
+    if (!digitalOutcomeFolder?.id) { res.status(500).json({ error: "Could not find or create the Digital Outcome Details folder." }); return; }
+
+    const relevantImplicationsFolder = await driveEnsureFolder(String(folder.id), PROCESS_ASSESSMENT_RELEVANT_IMPLICATIONS_FOLDER_NAME, driveAccessToken);
+    if (!relevantImplicationsFolder?.id) { res.status(500).json({ error: "Could not find or create the Relevant Implications folder." }); return; }
+
     await saveStudentDriveSetup(email, folder.id);
     res.json({
       ok: true,
       seniorDtechFolderId: seniorDtechFolder.id,
       seniorDtechFolderUrl: seniorDtechFolder.webViewLink || `https://drive.google.com/drive/folders/${seniorDtechFolder.id}`,
       processAssessmentFolderId: folder.id,
-      processAssessmentFolderUrl: folder.webViewLink || `https://drive.google.com/drive/folders/${folder.id}`
+      processAssessmentFolderUrl: folder.webViewLink || `https://drive.google.com/drive/folders/${folder.id}`,
+      digitalOutcomeDetailsFolderId: digitalOutcomeFolder.id,
+      digitalOutcomeDetailsFolderUrl: digitalOutcomeFolder.webViewLink || `https://drive.google.com/drive/folders/${digitalOutcomeFolder.id}`,
+      relevantImplicationsFolderId: relevantImplicationsFolder.id,
+      relevantImplicationsFolderUrl: relevantImplicationsFolder.webViewLink || `https://drive.google.com/drive/folders/${relevantImplicationsFolder.id}`
     });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not confirm drive setup." });
@@ -5146,6 +5208,7 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
   const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
   const templateTitle = String(req.body?.templateTitle || "").trim();
   const templateFileId = String(req.body?.templateFileId || "").trim();
+  const templateId = String(req.body?.templateId || "").trim();
   if (!driveAccessToken || !templateTitle || !templateFileId) {
     res.status(400).json({ error: "driveAccessToken, templateTitle, and templateFileId are required." });
     return;
@@ -5160,18 +5223,38 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
       res.status(400).json({ error: "Please confirm your Process Assessment folder first." });
       return;
     }
-    const folderId = setup.processAssessmentFolderId;
+    const processAssessmentFolderId = String(setup.processAssessmentFolderId || "").trim();
+    const subfolderName = resolveProcessAssessmentSubfolderName(templateId, templateTitle);
+    let folderId = processAssessmentFolderId;
+    if (subfolderName) {
+      const subfolder = await driveEnsureFolder(processAssessmentFolderId, subfolderName, driveAccessToken);
+      if (!subfolder?.id) {
+        res.status(500).json({ error: `Could not find or create the ${subfolderName} folder.` });
+        return;
+      }
+      folderId = String(subfolder.id).trim();
+    }
+
     const existing = await driveFindTemplateInFolder(folderId, templateTitle, driveAccessToken);
     if (existing.length > 0) {
       const file = existing[0];
-      return res.json({ ok: true, alreadyExists: true, fileId: file.id, fileUrl: file.webViewLink || `https://docs.google.com/presentation/d/${file.id}/edit`, fileName: file.name });
+      return res.json({ ok: true, alreadyExists: true, fileId: file.id, fileUrl: file.webViewLink || `https://docs.google.com/presentation/d/${file.id}/edit`, fileName: file.name, destinationFolderId: folderId, destinationSubfolderName: subfolderName || "" });
     }
+
+    if (folderId !== processAssessmentFolderId) {
+      const legacyExisting = await driveFindTemplateInFolder(processAssessmentFolderId, templateTitle, driveAccessToken);
+      if (legacyExisting.length > 0) {
+        const file = legacyExisting[0];
+        return res.json({ ok: true, alreadyExists: true, fileId: file.id, fileUrl: file.webViewLink || `https://docs.google.com/presentation/d/${file.id}/edit`, fileName: file.name, destinationFolderId: processAssessmentFolderId, destinationSubfolderName: "" });
+      }
+    }
+
     const emailUsername = email.split("@")[0];
     const firstName = emailUsername.split(/[._]/)[0] || emailUsername;
     const formattedFirstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
     const copyName = `${templateTitle} - ${formattedFirstName}`;
     const copied = await driveCopyFile(templateFileId, folderId, copyName, driveAccessToken);
-    res.json({ ok: true, alreadyExists: false, fileId: copied.id, fileUrl: copied.webViewLink || `https://docs.google.com/presentation/d/${copied.id}/edit`, fileName: copied.name });
+    res.json({ ok: true, alreadyExists: false, fileId: copied.id, fileUrl: copied.webViewLink || `https://docs.google.com/presentation/d/${copied.id}/edit`, fileName: copied.name, destinationFolderId: folderId, destinationSubfolderName: subfolderName || "" });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not copy template." });
   }
@@ -5199,7 +5282,7 @@ app.post("/api/student/drive-setup/find-slide", async (req, res) => {
       return;
     }
 
-    const slides = await driveListSlidesInFolder(folderId, driveAccessToken);
+    const slides = await driveListSlidesInProcessAssessmentTree(folderId, driveAccessToken);
     if (!slides.length) {
       res.status(404).json({ error: "No Google Slides files found in Process Assessment folder." });
       return;
@@ -5300,7 +5383,7 @@ app.post("/api/student/drive-setup/list-process-assessment-slides", async (req, 
       return;
     }
 
-    const slides = await driveListSlidesInFolder(folderId, driveAccessToken);
+    const slides = await driveListSlidesInProcessAssessmentTree(folderId, driveAccessToken);
     res.json({
       ok: true,
       slides: slides.map((file) => ({
@@ -5308,7 +5391,8 @@ app.post("/api/student/drive-setup/list-process-assessment-slides", async (req, 
         name: String(file?.name || "").trim(),
         webViewLink: String(file?.webViewLink || `https://docs.google.com/presentation/d/${String(file?.id || "").trim()}/edit`).trim(),
         thumbnailLink: String(file?.thumbnailLink || "").trim(),
-        modifiedTime: String(file?.modifiedTime || "").trim()
+        modifiedTime: String(file?.modifiedTime || "").trim(),
+        processAssessmentSubfolder: String(file?.processAssessmentSubfolder || "").trim()
       }))
     });
   } catch (error) {

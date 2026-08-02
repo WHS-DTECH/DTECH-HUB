@@ -722,7 +722,7 @@ function renderSetupBanner(setup) {
     if (!setup || !setup.configured) {
         banner.innerHTML = `
             <div class="template-setup-banner-inner template-setup-banner-action">
-                <p class="template-setup-banner-text">No Hapara mapping was found for your signed-in account.<br><strong>Signed-in account:</strong> ${escapeHtml(signedInEmail)}<br>That is okay. Click confirm and we will create or use your <strong>SeniorDTECH</strong> folder, then create your <strong>Process Assessment</strong> sub-folder automatically.</p>
+                <p class="template-setup-banner-text">No Hapara mapping was found for your signed-in account.<br><strong>Signed-in account:</strong> ${escapeHtml(signedInEmail)}<br>That is okay. Click confirm and we will create or use your <strong>SeniorDTECH</strong> folder, then create your <strong>Process Assessment</strong> folder with <strong>Digital Outcome Details</strong> and <strong>Relevant Implications</strong> sub-folders automatically.</p>
                 <button type="button" class="template-setup-confirm-button" id="template-setup-confirm">Confirm My Folder</button>
                 <p class="template-setup-banner-status" id="template-setup-status" aria-live="polite"></p>
                 <p class="template-setup-banner-text"><a class="template-setup-banner-link" href="../admin-hapara-folders.html" target="_blank" rel="noreferrer">Open Hapara Folder Upload page</a> only if your school wants to keep class mapping details.</p>
@@ -742,7 +742,7 @@ function renderSetupBanner(setup) {
         const mappedDescription = mappedLabel || mappedValue || "Mapped (non-Drive value)";
         banner.innerHTML = `
             <div class="template-setup-banner-inner template-setup-banner-action">
-                <p class="template-setup-banner-text">Your account has a Hapara mapping by folder name.<br><strong>Signed-in account:</strong> ${escapeHtml(signedInEmail)}<br><strong>Mapped value:</strong> ${escapeHtml(mappedDescription)}<br>Click confirm and we will create or use your <strong>SeniorDTECH</strong> folder, then create your <strong>Process Assessment</strong> sub-folder automatically.</p>
+                <p class="template-setup-banner-text">Your account has a Hapara mapping by folder name.<br><strong>Signed-in account:</strong> ${escapeHtml(signedInEmail)}<br><strong>Mapped value:</strong> ${escapeHtml(mappedDescription)}<br>Click confirm and we will create or use your <strong>SeniorDTECH</strong> folder, then create your <strong>Process Assessment</strong> folder with <strong>Digital Outcome Details</strong> and <strong>Relevant Implications</strong> sub-folders automatically.</p>
                 <button type="button" class="template-setup-confirm-button" id="template-setup-confirm">Confirm My Folder</button>
                 <p class="template-setup-banner-status" id="template-setup-status" aria-live="polite"></p>
                 <p class="template-setup-banner-text"><a class="template-setup-banner-link" href="../admin-hapara-folders.html" target="_blank" rel="noreferrer">Open Hapara Folder Upload page</a> to maintain class mapping details.</p>
@@ -771,7 +771,7 @@ function renderSetupBanner(setup) {
     const classLabel = String(setup.classLabel || "your Hapara folder").trim();
     banner.innerHTML = `
         <div class="template-setup-banner-inner template-setup-banner-action">
-            <p class="template-setup-banner-text">Your Hapara mapping is set: <strong>${escapeHtml(classLabel)}</strong>${folderUrl ? ` &mdash; <a class="template-setup-banner-link" href="${escapeHtml(folderUrl)}" target="_blank" rel="noreferrer">Open folder</a>` : ""}.<br>Confirm to create your <strong>Process Assessment</strong> sub-folder inside <strong>SeniorDTECH</strong> so templates save there automatically.</p>
+            <p class="template-setup-banner-text">Your Hapara mapping is set: <strong>${escapeHtml(classLabel)}</strong>${folderUrl ? ` &mdash; <a class="template-setup-banner-link" href="${escapeHtml(folderUrl)}" target="_blank" rel="noreferrer">Open folder</a>` : ""}.<br>Confirm to create your <strong>Process Assessment</strong> folder inside <strong>SeniorDTECH</strong> with <strong>Digital Outcome Details</strong> and <strong>Relevant Implications</strong> sub-folders so templates save there automatically.</p>
             <button type="button" class="template-setup-confirm-button" id="template-setup-confirm">Confirm My Folder</button>
             <p class="template-setup-banner-status" id="template-setup-status" aria-live="polite"></p>
         </div>`;
@@ -795,7 +795,7 @@ async function handleConfirmFolder() {
         return;
     }
 
-    if (statusEl) statusEl.textContent = "Creating SeniorDTECH/Process Assessment folders\u2026";
+    if (statusEl) statusEl.textContent = "Creating SeniorDTECH/Process Assessment folders and sub-folders\u2026";
 
     try {
         const response = await fetch("/api/student/drive-setup/confirm", {
@@ -882,7 +882,7 @@ async function handleUseTemplate(templateId) {
         const response = await fetch("/api/student/drive-setup/copy-template", {
             method: "POST",
             headers: withLibraryAuthHeaders({ "Content-Type": "application/json" }),
-            body: JSON.stringify({ driveAccessToken: accessToken, templateTitle: item.title, templateFileId: fileId })
+            body: JSON.stringify({ driveAccessToken: accessToken, templateId: item.id, templateTitle: item.title, templateFileId: fileId })
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(payload.error || `Error ${response.status}`);
