@@ -4632,11 +4632,27 @@ function inferCanonicalTemplateIdentityFromTitle(title) {
     };
   }
 
-  if (/development\s+steps|outcome\s+developed|developed|development|tools\/?technologies|relevant\s+implications/.test(normalizedTitle)) {
+  if (/afull\s*-\s*relevant\s*implications\s*template/.test(normalizedTitle)) {
     return {
       id: "relevant-implications",
+      title: "AFULL - Relevant Implications Template",
+      criteriaText: "Identify relevant implications and justify how your project addresses them."
+    };
+  }
+
+  if (/development\s+steps|outcome\s+developed|developed|development|tools\/?technologies/.test(normalizedTitle)) {
+    return {
+      id: "development-tools",
       title: "Development Steps",
       criteriaText: "Explain how the outcome will be developed and what tools/technologies will be used."
+    };
+  }
+
+  if (/relevant\s+implications/.test(normalizedTitle)) {
+    return {
+      id: "relevant-implications",
+      title: "Relevant Implications",
+      criteriaText: "Identify relevant implications and justify how your project addresses them."
     };
   }
 

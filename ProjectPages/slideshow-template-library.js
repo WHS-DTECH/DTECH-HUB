@@ -375,7 +375,7 @@ function getTemplateStepMatchers(templateId) {
         return [/target\s+audience/i, /end\s+user/i];
     }
 
-    if (id === "relevant-implications" || id === "development-steps") {
+    if (id === "relevant-implications" || id === "development-steps" || id === "development-tools") {
         return [
             /explain\s+how\s+the\s+outcome\s+will\s+be\s+developed/i,
             /tools\/?technologies/i,
