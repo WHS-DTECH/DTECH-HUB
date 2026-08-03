@@ -540,6 +540,28 @@ function readStoredHubAccessToken() {
     }
 }
 
+function readStoredHubDriveAccessToken() {
+    const raw = localStorage.getItem(DETAIL_HUB_AUTH_STORAGE_KEY) || sessionStorage.getItem(DETAIL_HUB_AUTH_STORAGE_KEY);
+    if (!raw) return "";
+
+    try {
+        const parsed = JSON.parse(raw);
+        if (!parsed?.expiresAt || Number(parsed.expiresAt) <= Date.now()) {
+            return "";
+        }
+
+        // Drive API calls must use the OAuth access token, not the ID token.
+        const driveAccessToken = String(parsed?.accessToken || "").trim();
+        if (driveAccessToken) {
+            return driveAccessToken;
+        }
+
+        return String(parsed?.idToken || "").trim();
+    } catch (_error) {
+        return "";
+    }
+}
+
 function buildAuthHeaders(headers = {}) {
     const email = readStoredHubEmail();
     const nextHeaders = { ...headers };
@@ -598,7 +620,7 @@ async function fetchStudentProcessAssessmentFolderUrl() {
 }
 
 async function findProcessAssessmentSlideMatch(taskTopic = "") {
-    const accessToken = readStoredHubAccessToken();
+    const accessToken = readStoredHubDriveAccessToken();
     if (!accessToken) {
         return { fileUrl: "", fileName: "", thumbnailUrl: "", modifiedTime: "" };
     }
@@ -3025,7 +3047,7 @@ async function extractSlideshowsFromUrl(url, email) {
     
     if (folderId) {
         // Fetch slideshows from folder via backend
-        const accessToken = readStoredHubAccessToken();
+        const accessToken = readStoredHubDriveAccessToken();
         if (!accessToken) {
             throw new Error("Not authenticated with Google Drive. Please ensure your Google account is linked.");
         }
@@ -3062,7 +3084,7 @@ async function extractSlideshowsFromUrl(url, email) {
 }
 
 async function getFirstSlideThumbnail(presentationId, email) {
-    const accessToken = readStoredHubAccessToken();
+    const accessToken = readStoredHubDriveAccessToken();
     if (!accessToken) {
         // Fall back to direct thumbnail URL
         return toGoogleSlidesThumbnailUrl(`https://docs.google.com/presentation/d/${encodeURIComponent(presentationId)}/edit`);
