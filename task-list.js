@@ -150,6 +150,31 @@ function buildCustomActivityLink(id, taskTopic = "", taskShortName = "", templat
     return `/ProjectPages/custom-activity.html?${params.toString()}`;
 }
 
+function buildTemplateLibraryLink(id, taskTopic = "", taskShortName = "", templateId = "", preFilterTopic = "") {
+    const params = new URLSearchParams();
+    params.set("activityId", String(id || "").trim());
+
+    const safeTaskTopic = String(taskTopic || "").trim();
+    const safeTaskShortName = String(taskShortName || "").trim();
+    const safeTemplateId = String(templateId || "").trim();
+    const safePreFilterTopic = String(preFilterTopic || "").trim();
+
+    if (safeTaskTopic) {
+        params.set("taskTopic", safeTaskTopic);
+    }
+    if (safeTaskShortName) {
+        params.set("taskShortName", safeTaskShortName);
+    }
+    if (safeTemplateId) {
+        params.set("templateId", safeTemplateId);
+    }
+    if (safePreFilterTopic) {
+        params.set("preFilterTopic", safePreFilterTopic);
+    }
+
+    return `/ProjectPages/slideshow-template-library.html?${params.toString()}`;
+}
+
 function getTopicTypeLabel(detail) {
     const type = String(detail?.type || detail?.topicType || detail?.topic_type || "").trim();
     return type || "Not set";
@@ -968,6 +993,15 @@ function renderChecklistCards(detail, allItems) {
                             const isRelevantCategoryRow = level === "Achieved" && Boolean(relevantCategoryLabel);
                             const stepLabel = isRelevantCategoryRow ? relevantCategoryLabel : stepText;
                             const href = getTaskTopicHrefForStep(standard, level, stepText);
+                            const relevantCategoryTemplateLibraryHref = isRelevantCategoryRow
+                                ? buildTemplateLibraryLink(
+                                    taskListState.selectedId,
+                                    "Relevant Implications",
+                                    "Relevant Implications",
+                                    "relevant-implications",
+                                    "Relevant Implications"
+                                )
+                                : "";
                             const achievedSectionMeta = level === "Achieved" ? getAchievedSectionMeta(stepText) : null;
                             const shouldRenderAchievedSectionHeading = Boolean(
                                 achievedSectionMeta
@@ -994,7 +1028,7 @@ function renderChecklistCards(detail, allItems) {
                                     <label class="task-list-step-check-wrap">
                                         <input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${step._index}">
                                         ${isRelevantCategoryRow
-                                            ? `<span class="task-list-step-text task-list-step-text-category">${escapeTaskListHtml(stepLabel)}</span>`
+                                            ? `<a class="task-list-step-link task-list-step-text-category" href="${escapeTaskListHtml(relevantCategoryTemplateLibraryHref)}">${escapeTaskListHtml(stepLabel)}</a>`
                                             : (href
                                                 ? `<a class="task-list-step-link" href="${escapeTaskListHtml(href)}">${escapeTaskListHtml(stepLabel)}</a>`
                                                 : `<span class="task-list-step-text">${escapeTaskListHtml(stepLabel)}</span>`) }
