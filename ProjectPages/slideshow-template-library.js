@@ -1085,6 +1085,14 @@ function renderTemplateCard(item) {
 }
 
 function extractTemplateSectionName(item) {
+    const templateId = String(item?.id || "").trim().toLowerCase();
+    if (templateId === "development-tools") {
+        return "Digital Outcome Details";
+    }
+    if (templateId === "relevant-implications") {
+        return "Relevant Implications";
+    }
+
     const summary = String(item?.summary || "").trim();
     const subfolderMatch = summary.match(/Synced\s+from\s+[^/]+\/(.+?)\.?$/i);
     if (subfolderMatch?.[1]) {

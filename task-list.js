@@ -11,6 +11,22 @@ const DIGITAL_OUTCOME_DETAILS_TASKS = [
     "What Tools and Techniques will be used?"
 ];
 
+const RELEVANT_IMPLICATIONS_CATEGORIES = [
+    "Social",
+    "Cultural",
+    "Legal",
+    "Ethical",
+    "Intellectual Property",
+    "Privacy",
+    "Accessibility",
+    "Usability",
+    "Functionality",
+    "Aesthetics",
+    "Sustainability and Future Proofing",
+    "End-User Considerations",
+    "Health and Safety"
+];
+
 const EVIDENCE_STEPS_DEFAULTS = {
     "92005": [
         "Define what the digital outcome needs to do.",
@@ -324,6 +340,94 @@ function stripStepLevel(text) {
     return String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim();
 }
 
+function buildRelevantImplicationsCategoryStepText(category) {
+    return `Achieved: Relevant implications category - ${String(category || "").trim()}`;
+}
+
+function normalizeRelevantImplicationsCategoryKey(value) {
+    return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, " ");
+}
+
+function parseRelevantImplicationsCategoryFromStep(text) {
+    const stepText = stripStepLevel(text);
+    const match = String(stepText || "").match(/^relevant\s+implications\s+category\s*-\s*(.+)$/i);
+    return match?.[1] ? String(match[1]).trim() : "";
+}
+
+function isRelevantImplicationsCategoryStep(text) {
+    return Boolean(parseRelevantImplicationsCategoryFromStep(text));
+}
+
+function normalize91897ChecklistRows(rows) {
+    const sourceRows = Array.isArray(rows)
+        ? rows.map((step) => ({ text: String(step?.text || "").trim(), done: Boolean(step?.done) })).filter((step) => step.text)
+        : [];
+
+    if (!sourceRows.length) {
+        return sourceRows;
+    }
+
+    const mainRelevantImplicationsIndex = sourceRows.findIndex((step) => {
+        if (getStepLevel(step?.text) !== "Achieved") {
+            return false;
+        }
+        return stripStepLevel(step?.text).toLowerCase() === "explain relevant implications.";
+    });
+
+    if (mainRelevantImplicationsIndex === -1) {
+        return sourceRows;
+    }
+
+    const existingCategoryDoneMap = new Map();
+    sourceRows.forEach((step) => {
+        const category = parseRelevantImplicationsCategoryFromStep(step?.text);
+        if (!category) return;
+        existingCategoryDoneMap.set(normalizeRelevantImplicationsCategoryKey(category), Boolean(step?.done));
+    });
+
+    const withoutCategoryRows = sourceRows.filter((step) => !isRelevantImplicationsCategoryStep(step?.text));
+    const refreshedMainIndex = withoutCategoryRows.findIndex((step) => {
+        if (getStepLevel(step?.text) !== "Achieved") {
+            return false;
+        }
+        return stripStepLevel(step?.text).toLowerCase() === "explain relevant implications.";
+    });
+
+    if (refreshedMainIndex === -1) {
+        return withoutCategoryRows;
+    }
+
+    const categoryRows = RELEVANT_IMPLICATIONS_CATEGORIES.map((category) => {
+        const key = normalizeRelevantImplicationsCategoryKey(category);
+        return {
+            text: buildRelevantImplicationsCategoryStepText(category),
+            done: Boolean(existingCategoryDoneMap.get(key))
+        };
+    });
+
+    return [
+        ...withoutCategoryRows.slice(0, refreshedMainIndex + 1),
+        ...categoryRows,
+        ...withoutCategoryRows.slice(refreshedMainIndex + 1)
+    ];
+}
+
+function countCompletedRelevantImplicationsCategories(rows) {
+    const sourceRows = Array.isArray(rows) ? rows : [];
+    return sourceRows.filter((step) => {
+        if (getStepLevel(step?.text) !== "Achieved") {
+            return false;
+        }
+        if (!isRelevantImplicationsCategoryStep(step?.text)) {
+            return false;
+        }
+        return Boolean(step?.done);
+    }).length;
+}
+
 function getAchievedSectionMeta(stepText) {
     const normalized = String(stepText || "").trim().toLowerCase();
     if (!normalized) return null;
@@ -519,26 +623,35 @@ function autoTickDigitalOutcomeRequirements(stateMap, projectId, email) {
 
 function autoTickRelevantImplicationsRequirements(stateMap, projectId, email) {
     const rows = Array.isArray(stateMap?.["91897"]) ? stateMap["91897"] : [];
-    if (!rows.length || !projectId || !email) {
+    if (!rows.length) {
         return false;
     }
 
-    const hasRelevantImplicationsSync = hasEligibleTemplateSyncById(projectId, email, "relevant-implications");
+    const completedCategoryCount = countCompletedRelevantImplicationsCategories(rows);
+    const shouldMarkSectionComplete = completedCategoryCount >= 3;
     let changed = false;
 
     rows.forEach((row) => {
-        const text = String(row?.text || "").trim().toLowerCase();
-        if (!text || !text.includes("relevant implications")) {
+        const text = String(row?.text || "").trim();
+        if (!text) {
             return;
         }
 
-        if (hasRelevantImplicationsSync && !Boolean(row?.done)) {
+        if (getStepLevel(text) !== "Achieved") {
+            return;
+        }
+
+        if (stripStepLevel(text).toLowerCase() !== "explain relevant implications.") {
+            return;
+        }
+
+        if (shouldMarkSectionComplete && !Boolean(row?.done)) {
             row.done = true;
             changed = true;
             return;
         }
 
-        if (!hasRelevantImplicationsSync && Boolean(row?.done)) {
+        if (!shouldMarkSectionComplete && Boolean(row?.done)) {
             row.done = false;
             changed = true;
         }
@@ -851,6 +964,9 @@ function renderChecklistCards(detail, allItems) {
                     <div class="task-list-step-list">
                         ${levelRows.map((step) => {
                             const stepText = stripStepLevel(step?.text);
+                            const relevantCategoryLabel = parseRelevantImplicationsCategoryFromStep(step?.text);
+                            const isRelevantCategoryRow = level === "Achieved" && Boolean(relevantCategoryLabel);
+                            const stepLabel = isRelevantCategoryRow ? relevantCategoryLabel : stepText;
                             const href = getTaskTopicHrefForStep(standard, level, stepText);
                             const achievedSectionMeta = level === "Achieved" ? getAchievedSectionMeta(stepText) : null;
                             const shouldRenderAchievedSectionHeading = Boolean(
@@ -865,17 +981,23 @@ function renderChecklistCards(detail, allItems) {
                             const isSystemComplete = isProjectManagementRow
                                 && systemConnections.trelloConnected
                                 && systemConnections.githubConnected;
+                            const relevantCategoryDoneCount = countCompletedRelevantImplicationsCategories(levelRows);
 
                             return `
                                 ${shouldRenderAchievedSectionHeading && achievedSectionMeta
                                     ? `<p class="task-list-achieved-subheading">${escapeTaskListHtml(achievedSectionMeta.title)}</p>`
                                     : ""}
-                                <div class="task-list-step-row ${isSystemComplete ? "is-system-complete" : ""}">
+                                ${shouldRenderAchievedSectionHeading && achievedSectionMeta?.id === "relevant-implications"
+                                    ? `<p class="task-list-achieved-note">Complete any 3 or more categories to mark Section 4 complete. (${relevantCategoryDoneCount}/${RELEVANT_IMPLICATIONS_CATEGORIES.length})</p>`
+                                    : ""}
+                                <div class="task-list-step-row ${isSystemComplete ? "is-system-complete" : ""} ${isRelevantCategoryRow ? "is-relevant-implications-category" : ""}">
                                     <label class="task-list-step-check-wrap">
                                         <input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${step._index}">
-                                        ${href
-                                            ? `<a class="task-list-step-link" href="${escapeTaskListHtml(href)}">${escapeTaskListHtml(stepText)}</a>`
-                                            : `<span class="task-list-step-text">${escapeTaskListHtml(stepText)}</span>`}
+                                        ${isRelevantCategoryRow
+                                            ? `<span class="task-list-step-text task-list-step-text-category">${escapeTaskListHtml(stepLabel)}</span>`
+                                            : (href
+                                                ? `<a class="task-list-step-link" href="${escapeTaskListHtml(href)}">${escapeTaskListHtml(stepLabel)}</a>`
+                                                : `<span class="task-list-step-text">${escapeTaskListHtml(stepLabel)}</span>`) }
                                     </label>
                                     ${isProjectManagementRow ? `
                                         <div class="task-list-system-list">
@@ -939,6 +1061,11 @@ function buildChecklistState(standardCodes, evidenceMap) {
                 return;
             }
 
+            if (standard === "91897") {
+                next[standard] = normalize91897ChecklistRows(existing);
+                return;
+            }
+
             next[standard] = existing.map((step) => ({ text: String(step?.text || "").trim(), done: Boolean(step?.done) }));
             return;
         }
@@ -949,7 +1076,10 @@ function buildChecklistState(standardCodes, evidenceMap) {
         }
 
         const defaults = Array.isArray(EVIDENCE_STEPS_DEFAULTS[standard]) ? EVIDENCE_STEPS_DEFAULTS[standard] : ["Add a step..."];
-        next[standard] = defaults.map((text) => ({ text, done: false }));
+        const defaultRows = defaults.map((text) => ({ text, done: false }));
+        next[standard] = standard === "91897"
+            ? normalize91897ChecklistRows(defaultRows)
+            : defaultRows;
     });
     return next;
 }
@@ -973,6 +1103,12 @@ async function loadChecklistForTask(taskId) {
         taskListState.fullEvidenceState["digital-outcome"] = normalizeDigitalOutcomeChecklistRows(taskListState.fullEvidenceState["digital-outcome"]);
         migratedDigitalOutcomeRows = beforeMigration !== JSON.stringify(taskListState.fullEvidenceState["digital-outcome"]);
     }
+    let migrated91897Rows = false;
+    if (Array.isArray(taskListState.fullEvidenceState["91897"])) {
+        const before91897Migration = JSON.stringify(taskListState.fullEvidenceState["91897"]);
+        taskListState.fullEvidenceState["91897"] = normalize91897ChecklistRows(taskListState.fullEvidenceState["91897"]);
+        migrated91897Rows = before91897Migration !== JSON.stringify(taskListState.fullEvidenceState["91897"]);
+    }
     taskListState.checklistStandards = getStandardCodes(detail || selected);
     taskListState.checklistState = buildChecklistState(taskListState.checklistStandards, evidenceMap);
     taskListState.checklistStandards.forEach((standard) => {
@@ -992,7 +1128,7 @@ async function loadChecklistForTask(taskId) {
     const autoChangedEvidenceDO = autoTickDigitalOutcomeRequirements(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
     const autoChangedEvidenceRI = autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
     const autoChangedEvidence = autoChangedEvidencePM || autoChangedEvidenceDO || autoChangedEvidenceRI;
-    if (migratedDigitalOutcomeRows || autoChangedChecklist || autoChangedEvidence) {
+    if (migratedDigitalOutcomeRows || migrated91897Rows || autoChangedChecklist || autoChangedEvidence) {
         const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
         await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});
     }
@@ -1111,6 +1247,13 @@ async function renderTaskListPage() {
         }
         if (taskListState.fullEvidenceState[standard][index]) {
             taskListState.fullEvidenceState[standard][index].done = Boolean(checkbox.checked);
+        }
+
+        const relevantImplicationsChecklistChanged = autoTickRelevantImplicationsRequirements(taskListState.checklistState, taskListState.selectedId, getTaskListEmail());
+        const relevantImplicationsEvidenceChanged = autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, taskListState.selectedId, getTaskListEmail());
+
+        if (relevantImplicationsChecklistChanged || relevantImplicationsEvidenceChanged) {
+            renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);
         }
 
         try {
