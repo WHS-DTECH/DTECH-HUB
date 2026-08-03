@@ -3582,6 +3582,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                     : (isRelevantImplicationsTopic ? "relevant-implications" : "digital-outcome-description")));
         const allowFolderMatchAutoLink = syncTemplateId === "digital-outcome-description"
             || syncTemplateId === "target-audience"
+            || syncTemplateId === "project-success-criteria"
             || syncTemplateId === "relevant-implications";
 
         // For staged rollout, do not pre-connect Relevant Implications (or other non-enabled pages)
