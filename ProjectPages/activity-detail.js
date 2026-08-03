@@ -3580,7 +3580,9 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 : (isSuccessCriteriaTopic
                     ? "project-success-criteria"
                     : (isRelevantImplicationsTopic ? "relevant-implications" : "digital-outcome-description")));
-        const allowFolderMatchAutoLink = syncTemplateId === "digital-outcome-description" || syncTemplateId === "target-audience";
+        const allowFolderMatchAutoLink = syncTemplateId === "digital-outcome-description"
+            || syncTemplateId === "target-audience"
+            || syncTemplateId === "relevant-implications";
 
         // For staged rollout, do not pre-connect Relevant Implications (or other non-enabled pages)
         // from passive folder matches when the student has not explicitly linked/downloaded.

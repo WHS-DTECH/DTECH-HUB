@@ -353,6 +353,52 @@ function hasEligibleTemplateSyncById(projectId, email, templateId) {
     return false;
 }
 
+function getLatestTemplateSyncUrlById(projectId, email, templateId) {
+    const safeProjectId = String(projectId || "").trim();
+    const safeEmail = String(email || "").trim().toLowerCase();
+    const targetTemplateId = String(templateId || "").trim().toLowerCase();
+    if (!safeProjectId || !safeEmail || !targetTemplateId) {
+        return "";
+    }
+
+    const keyPrefix = `${TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX}:${safeProjectId}:${safeEmail}:`;
+    let bestUrl = "";
+    let bestTs = 0;
+
+    try {
+        for (let index = 0; index < localStorage.length; index += 1) {
+            const key = String(localStorage.key(index) || "");
+            if (!key.startsWith(keyPrefix)) {
+                continue;
+            }
+
+            const raw = localStorage.getItem(key);
+            const parsed = raw ? JSON.parse(raw) : null;
+            const parsedTemplateId = String(parsed?.templateId || "").trim().toLowerCase();
+            if (parsedTemplateId !== targetTemplateId) {
+                continue;
+            }
+
+            const candidateUrl = String(parsed?.url || "").trim();
+            if (!candidateUrl) {
+                continue;
+            }
+
+            const savedAt = String(parsed?.savedAt || "").trim();
+            const ts = Date.parse(savedAt);
+            const safeTs = Number.isFinite(ts) ? ts : 0;
+            if (safeTs >= bestTs) {
+                bestTs = safeTs;
+                bestUrl = candidateUrl;
+            }
+        }
+    } catch (_error) {
+        return "";
+    }
+
+    return bestUrl;
+}
+
 function getStepLevel(text) {
     const normalized = String(text || "").trim().toLowerCase();
     if (normalized.startsWith("achieved:")) return "Achieved";
@@ -993,6 +1039,11 @@ function renderChecklistCards(detail, allItems) {
                             const isRelevantCategoryRow = level === "Achieved" && Boolean(relevantCategoryLabel);
                             const stepLabel = isRelevantCategoryRow ? relevantCategoryLabel : stepText;
                             const href = getTaskTopicHrefForStep(standard, level, stepText);
+                            const relevantImplicationsSyncedSlideUrl = getLatestTemplateSyncUrlById(
+                                taskListState.selectedId,
+                                getTaskListEmail(),
+                                "relevant-implications"
+                            );
                             const relevantCategoryTemplateLibraryHref = isRelevantCategoryRow
                                 ? buildTemplateLibraryLink(
                                     taskListState.selectedId,
@@ -1002,6 +1053,7 @@ function renderChecklistCards(detail, allItems) {
                                     "Relevant Implications"
                                 )
                                 : "";
+                            const relevantCategoryHref = relevantImplicationsSyncedSlideUrl || relevantCategoryTemplateLibraryHref;
                             const achievedSectionMeta = level === "Achieved" ? getAchievedSectionMeta(stepText) : null;
                             const shouldRenderAchievedSectionHeading = Boolean(
                                 achievedSectionMeta
@@ -1028,7 +1080,7 @@ function renderChecklistCards(detail, allItems) {
                                     <label class="task-list-step-check-wrap">
                                         <input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${step._index}">
                                         ${isRelevantCategoryRow
-                                            ? `<a class="task-list-step-link task-list-step-text-category" href="${escapeTaskListHtml(relevantCategoryTemplateLibraryHref)}">${escapeTaskListHtml(stepLabel)}</a>`
+                                            ? `<a class="task-list-step-link task-list-step-text-category" href="${escapeTaskListHtml(relevantCategoryHref)}">${escapeTaskListHtml(stepLabel)}</a>`
                                             : (href
                                                 ? `<a class="task-list-step-link" href="${escapeTaskListHtml(href)}">${escapeTaskListHtml(stepLabel)}</a>`
                                                 : `<span class="task-list-step-text">${escapeTaskListHtml(stepLabel)}</span>`) }
