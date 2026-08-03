@@ -375,7 +375,9 @@ function getLatestTemplateSyncUrlById(projectId, email, templateId) {
             const raw = localStorage.getItem(key);
             const parsed = raw ? JSON.parse(raw) : null;
             const parsedTemplateId = String(parsed?.templateId || "").trim().toLowerCase();
-            if (parsedTemplateId !== targetTemplateId) {
+            const isRelevantImplicationsFamily = targetTemplateId === "relevant-implications"
+                && (parsedTemplateId === "relevant-implications" || parsedTemplateId.startsWith("relevant-implications-"));
+            if (!isRelevantImplicationsFamily && parsedTemplateId !== targetTemplateId) {
                 continue;
             }
 

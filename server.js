@@ -4640,6 +4640,22 @@ function inferCanonicalTemplateIdentityFromTitle(title) {
     };
   }
 
+  const relevantImplicationsSubtopicMatch = String(title || "").trim().match(/^relevant\s+implications\s*-\s*(.+)$/i);
+  if (relevantImplicationsSubtopicMatch?.[1]) {
+    const subtopicRaw = String(relevantImplicationsSubtopicMatch[1] || "").trim();
+    const subtopicSlug = subtopicRaw
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80);
+    const fallbackSlug = subtopicSlug || "topic";
+    return {
+      id: `relevant-implications-${fallbackSlug}`,
+      title: `Relevant Implications - ${subtopicRaw}`,
+      criteriaText: "Identify relevant implications and justify how your project addresses them."
+    };
+  }
+
   if (/development\s+steps|outcome\s+developed|developed|development|tools\/?technologies/.test(normalizedTitle)) {
     return {
       id: "development-tools",
