@@ -6,6 +6,9 @@ This folder is the reusable Practical Skills module for HUB sites.
 
 - `index.html` - Practical Skills homepage (student-facing card library)
 - `app.js` - Homepage rendering logic and API calls
+- `checklist.html` - Standalone Practical Skills Checklist page
+- `checklist.js` - Kit progression and scoreboard logic (local storage)
+- `checklist.css` - Checklist page styling
 - `library.json` - Source-of-truth library card data persisted by admin save
 - `admin.html` - Admin management UI for Practical Skills cards
 - `admin.js` - Admin add/edit/delete/publish logic
