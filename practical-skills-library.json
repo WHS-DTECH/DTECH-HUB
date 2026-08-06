@@ -1,0 +1,16 @@
+[
+  {
+    "id": "practical-skills-checklist",
+    "title": "Practical Skills Checklist",
+    "summary": "Track practical tasks, evidence, and completion checkpoints for class workshop activities.",
+    "yearLevel": "All Years",
+    "area": "Practical Skills",
+    "status": "active",
+    "href": "/task-list.html",
+    "imageUrl": "",
+    "visual": {
+      "icon": "PS",
+      "palette": "linear-gradient(135deg, #2f8f61 0%, #3ca873 54%, #65c494 100%)"
+    }
+  }
+]
