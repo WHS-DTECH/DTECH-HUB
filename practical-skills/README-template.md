@@ -27,6 +27,31 @@ In `server.js`, ensure this file path constant points to this module folder:
 - Global nav Practical Skills item should link to `/practical-skills/`
 - Admin menu Practical Skills manager should link to `/practical-skills/admin.html`
 
+## Quick Rebrand Config
+
+Use this checklist when cloning the module to another HUB.
+
+- `Module Route Base`: `/practical-skills/`
+- `Student Page`: `practical-skills/index.html`
+- `Admin Page`: `practical-skills/admin.html`
+- `Data File`: `practical-skills/library.json`
+- `Server Constant`: `PRACTICAL_SKILLS_LIBRARY_FILE`
+- `Public API`: `GET /api/practical-skills/library`
+- `Admin APIs`: `GET /api/admin/practical-skills/library`, `PUT /api/admin/practical-skills/library`
+- `Navbar Label`: `Practical Skills`
+- `Admin Menu Label`: `Practical Skills Library`
+- `Default Card Palette`: `linear-gradient(135deg, #2f8f61 0%, #3ca873 54%, #65c494 100%)`
+
+### Rebrand Targets
+
+Update these files for site-specific naming and visual tweaks:
+
+- `practical-skills/index.html`
+- `practical-skills/admin.html`
+- `practical-skills/library.json`
+- `script.js`
+- `admin-menu.html`
+
 ## Porting To Another HUB Site
 
 1. Copy the whole `practical-skills/` folder.
