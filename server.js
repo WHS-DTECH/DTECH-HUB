@@ -58,6 +58,7 @@ const memoryAssessmentStandardCards = new Map();
 const memoryStudentHaparaFolders = new Map();
 const memoryStudentDriveSetup = new Map();
 const memoryTemplateLibraryEntries = new Map();
+const PRACTICAL_SKILLS_LIBRARY_FILE = path.join(__dirname, "practical-skills-library.json");
 
 const DEFAULT_TEMPLATE_LIBRARY_ENTRIES = [
   {
@@ -3861,6 +3862,84 @@ async function listPracticalEvents() {
     ORDER BY start_date ASC, title ASC
   `);
   return result.rows;
+}
+
+function normalizePracticalSkillStatus(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (raw === "planning" || raw === "archive" || raw === "active") {
+    return raw;
+  }
+  return "active";
+}
+
+function buildPracticalSkillId(title, fallbackIndex = 0) {
+  const slug = slugify(title || "");
+  if (slug) {
+    return slug;
+  }
+  return `practical-skill-${fallbackIndex + 1}`;
+}
+
+function normalizePracticalSkillLibraryItem(item, fallbackIndex = 0) {
+  const title = String(item?.title || "").trim();
+  if (!title) {
+    return null;
+  }
+
+  const id = String(item?.id || "").trim() || buildPracticalSkillId(title, fallbackIndex);
+  const summary = String(item?.summary || "").trim();
+  const yearLevel = String(item?.yearLevel || item?.year_level || "All Years").trim() || "All Years";
+  const area = String(item?.area || "Practical Skills").trim() || "Practical Skills";
+  const status = normalizePracticalSkillStatus(item?.status);
+  const href = String(item?.href || "/practical-skills.html").trim() || "/practical-skills.html";
+  const imageUrl = String(item?.imageUrl || item?.image_url || "").trim();
+  const visualIcon = String(item?.visual?.icon || "PS").trim() || "PS";
+  const visualPalette = String(item?.visual?.palette || "linear-gradient(135deg, #2f8f61 0%, #3ca873 54%, #65c494 100%)").trim();
+
+  return {
+    id,
+    title,
+    summary,
+    yearLevel,
+    area,
+    status,
+    href,
+    imageUrl,
+    visual: {
+      icon: visualIcon,
+      palette: visualPalette
+    }
+  };
+}
+
+async function readPracticalSkillsLibraryFile() {
+  try {
+    const raw = await fs.promises.readFile(PRACTICAL_SKILLS_LIBRARY_FILE, "utf8");
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .map((item, index) => normalizePracticalSkillLibraryItem(item, index))
+      .filter(Boolean);
+  } catch (_error) {
+    return [];
+  }
+}
+
+async function writePracticalSkillsLibraryFile(items) {
+  const normalized = (Array.isArray(items) ? items : [])
+    .map((item, index) => normalizePracticalSkillLibraryItem(item, index))
+    .filter(Boolean);
+
+  await fs.promises.writeFile(
+    PRACTICAL_SKILLS_LIBRARY_FILE,
+    `${JSON.stringify(normalized, null, 2)}\n`,
+    "utf8"
+  );
+
+  return normalized;
 }
 
 async function getSuggestionRecipients() {
@@ -8217,6 +8296,39 @@ app.get("/api/practicals/events", async (_req, res) => {
     res.json(rows);
   } catch (_error) {
     res.status(500).json({ error: "Could not load practical events" });
+  }
+});
+
+app.get("/api/practical-skills/library", async (_req, res) => {
+  try {
+    const rows = await readPracticalSkillsLibraryFile();
+    res.json(rows);
+  } catch (_error) {
+    res.status(500).json({ error: "Could not load Practical Skills library" });
+  }
+});
+
+app.get("/api/admin/practical-skills/library", requireAdminAccess, async (_req, res) => {
+  try {
+    const rows = await readPracticalSkillsLibraryFile();
+    res.json({ cards: rows });
+  } catch (_error) {
+    res.status(500).json({ error: "Could not load Practical Skills library" });
+  }
+});
+
+app.put("/api/admin/practical-skills/library", requireAdminAccess, async (req, res) => {
+  const cards = Array.isArray(req.body?.cards) ? req.body.cards : null;
+  if (!cards) {
+    res.status(400).json({ error: "cards array is required" });
+    return;
+  }
+
+  try {
+    const saved = await writePracticalSkillsLibraryFile(cards);
+    res.status(200).json({ ok: true, cards: saved, count: saved.length });
+  } catch (_error) {
+    res.status(500).json({ error: "Could not save Practical Skills library" });
   }
 });
 

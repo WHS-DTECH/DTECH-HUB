@@ -2604,10 +2604,67 @@ body.public-home-access .controls-panel {
     background: #fff8ea;
 }
 
+.practical-skills-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.practical-skills-form label {
+    color: #577090;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.practical-skills-form input,
+.practical-skills-form textarea,
+.practical-skills-form select {
+    width: 100%;
+    border: 1px solid #90b5dd;
+    background: #f6f9ff;
+    border-radius: 6px;
+    font: inherit;
+    color: #223653;
+    padding: 8px 10px;
+    min-height: 36px;
+    font-size: 0.8rem;
+}
+
+.practical-skills-form textarea {
+    min-height: 88px;
+    resize: vertical;
+}
+
+.practical-form-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.practical-row-edit,
+.practical-row-delete {
+    min-height: 30px;
+    padding: 4px 10px;
+    font-size: 0.7rem;
+}
+
+.practical-row-delete {
+    border-color: #d9a3a3;
+    color: #7c2c35;
+}
+
 @media (max-width: 980px) {
     .admin-card-grid,
     .admin-layout,
     .admin-form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .practical-skills-form {
         grid-template-columns: 1fr;
     }
 

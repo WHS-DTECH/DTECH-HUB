@@ -1,7 +1,7 @@
 (function () {
     "use strict";
 
-    const dataPath = "/practical-skills-library.json";
+    const dataPath = "/api/practical-skills/library";
     const grid = document.getElementById("practical-skills-grid");
     const meta = document.getElementById("practical-skills-results-meta");
 
