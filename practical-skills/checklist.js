@@ -18,6 +18,13 @@
             description: "Use advanced search techniques to find reliable answers and cite one quality source.",
             points: 100,
             timeframeHours: 24
+        },
+        {
+            id: "kit-minecraft",
+            title: "Minecraft",
+            description: "Complete the Minecraft practical task and demonstrate the required build or design outcome.",
+            points: 100,
+            timeframeHours: 24
         }
     ];
 
