@@ -103,6 +103,21 @@ a {
     background: rgba(255, 255, 255, 0.16);
 }
 
+.nav-dropdown-practical-skills summary {
+    border-color: #2f8f61;
+    background: #2f8f61;
+    color: #f4fff8;
+}
+
+.nav-dropdown-practical-skills[open] summary {
+    background: #3ca873;
+}
+
+.nav-dropdown-practical-skills .nav-drawer {
+    border-color: #2f8f61;
+    background: #1f4f36;
+}
+
 .nav-drawer {
     position: absolute;
     top: calc(100% + 6px);
