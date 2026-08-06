@@ -1323,7 +1323,7 @@ function renderGlobalNavbar() {
         <details class="nav-dropdown nav-dropdown-practical-skills" id="hub-practical-skills-menu" data-nav-dropdown hidden>
             <summary>Practical Skills</summary>
             <div class="nav-drawer" role="menu">
-                <a role="menuitem" href="/practical-skills.html">Practical Skills Home</a>
+                <a role="menuitem" href="/practical-skills/">Practical Skills Home</a>
             </div>
         </details>
     `;

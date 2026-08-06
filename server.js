@@ -58,7 +58,7 @@ const memoryAssessmentStandardCards = new Map();
 const memoryStudentHaparaFolders = new Map();
 const memoryStudentDriveSetup = new Map();
 const memoryTemplateLibraryEntries = new Map();
-const PRACTICAL_SKILLS_LIBRARY_FILE = path.join(__dirname, "practical-skills-library.json");
+const PRACTICAL_SKILLS_LIBRARY_FILE = path.join(__dirname, "practical-skills", "library.json");
 
 const DEFAULT_TEMPLATE_LIBRARY_ENTRIES = [
   {
@@ -3891,7 +3891,7 @@ function normalizePracticalSkillLibraryItem(item, fallbackIndex = 0) {
   const yearLevel = String(item?.yearLevel || item?.year_level || "All Years").trim() || "All Years";
   const area = String(item?.area || "Practical Skills").trim() || "Practical Skills";
   const status = normalizePracticalSkillStatus(item?.status);
-  const href = String(item?.href || "/practical-skills.html").trim() || "/practical-skills.html";
+  const href = String(item?.href || "/practical-skills/").trim() || "/practical-skills/";
   const imageUrl = String(item?.imageUrl || item?.image_url || "").trim();
   const visualIcon = String(item?.visual?.icon || "PS").trim() || "PS";
   const visualPalette = String(item?.visual?.palette || "linear-gradient(135deg, #2f8f61 0%, #3ca873 54%, #65c494 100%)").trim();

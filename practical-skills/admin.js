@@ -194,7 +194,7 @@ function readFormCard() {
     const summary = String(document.querySelector("#practical-summary")?.value || "").trim();
     const yearLevel = String(document.querySelector("#practical-year-level")?.value || "All Years").trim() || "All Years";
     const area = String(document.querySelector("#practical-area")?.value || "Practical Skills").trim() || "Practical Skills";
-    const href = String(document.querySelector("#practical-href")?.value || "/practical-skills.html").trim() || "/practical-skills.html";
+    const href = String(document.querySelector("#practical-href")?.value || "/practical-skills/").trim() || "/practical-skills/";
     const imageUrl = String(document.querySelector("#practical-image-url")?.value || "").trim();
     const status = String(document.querySelector("#practical-status")?.value || "active").trim().toLowerCase();
     const icon = String(document.querySelector("#practical-icon")?.value || "PS").trim() || "PS";
