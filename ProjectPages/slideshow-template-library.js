@@ -813,6 +813,14 @@ async function handleConfirmFolder() {
 
         driveState.setupState = { ...driveState.setupState, confirmed: true, processAssessmentFolderId: payload.processAssessmentFolderId };
         renderSetupBanner(driveState.setupState);
+        
+        // Clear the status element since the banner has been successfully updated
+        if (statusEl) statusEl.textContent = "";
+        
+        // Open the Process Assessment folder in a new window
+        if (payload.processAssessmentFolderUrl) {
+            window.open(payload.processAssessmentFolderUrl, "_blank", "noopener");
+        }
     } catch (error) {
         const message = String(error?.message || "");
         const needsConsentRetry = /has not granted the app|read access to the file|insufficient permissions|forbidden/i.test(message);
@@ -842,6 +850,14 @@ async function handleConfirmFolder() {
 
             driveState.setupState = { ...driveState.setupState, confirmed: true, processAssessmentFolderId: retryPayload.processAssessmentFolderId };
             renderSetupBanner(driveState.setupState);
+            
+            // Clear the status element since the banner has been successfully updated
+            if (statusEl) statusEl.textContent = "";
+            
+            // Open the Process Assessment folder in a new window
+            if (retryPayload.processAssessmentFolderUrl) {
+                window.open(retryPayload.processAssessmentFolderUrl, "_blank", "noopener");
+            }
         } catch (retryError) {
             if (statusEl) statusEl.textContent = `Could not confirm folder: ${retryError.message || "Unknown error"}`;
             if (confirmButton) confirmButton.disabled = false;
