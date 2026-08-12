@@ -8319,6 +8319,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     let html = `<h2>Student Interest</h2><p class="interest-count" id="interest-count-text">${countText}</p>`;
 
     const selectedTaskTopic = String(new URLSearchParams(window.location.search || "").get("taskTopic") || "").trim();
+    const selectedTaskShortName = String(new URLSearchParams(window.location.search || "").get("taskShortName") || "").trim();
     const isTaskTopicPage = Boolean(selectedTaskTopic);
     const isProjectManagementTaskTopicPage = isTaskTopicPage
         && selectedTaskTopic.toLowerCase().includes("project management");
@@ -8676,8 +8677,10 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         // Keep sync controls interactive even if submission panel rendering fails.
     }
 
-    // Render tools & techniques panel for students on task topic pages
-    if (!isTeacher && selectedTaskTopic && email) {
+    // Render tools & techniques panel only on the dedicated Tools and Techniques topic page
+    const isToolsAndTechniquesTopic = /tools\s+and\s+techniques/i.test(selectedTaskShortName)
+        || /what\s+tools\s+and\s+techniques/i.test(selectedTaskTopic);
+    if (!isTeacher && isToolsAndTechniquesTopic && email) {
         try {
             await renderToolsTechniquesPanel({
                 host,
