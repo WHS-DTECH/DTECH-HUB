@@ -3335,6 +3335,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         || normalizedDerivedShortName.includes("digital outcome")
         || isDigitalOutcomeTargetAudienceCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
         || isDigitalOutcomeDevelopmentToolsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
+        || isToolsAndTechniquesCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
         || isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
         || Boolean(keywordMatchedTopicKey);
     const digitalOutcomeSyncTemplateId = keywordMatchedTopicKey === "target-audience"
@@ -3651,30 +3652,38 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         const processAssessmentFolderUrl = await fetchStudentProcessAssessmentFolderUrl();
         const isTargetAudienceTopic = isDigitalOutcomeTargetAudienceCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
             || keywordMatchedTopicKey === "target-audience";
-        const isDevelopmentToolsTopic = isDigitalOutcomeDevelopmentToolsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
-            || keywordMatchedTopicKey === "development-tools";
+        const isToolsAndTechniquesSyncTopic = isToolsAndTechniquesCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
+            || keywordMatchedTopicKey === "tools-and-techniques";
+        const isDevelopmentToolsTopic = !isToolsAndTechniquesSyncTopic && (
+            isDigitalOutcomeDevelopmentToolsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
+            || keywordMatchedTopicKey === "development-tools");
         const isSuccessCriteriaTopic = isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
             || keywordMatchedTopicKey === "success-criteria";
         const isRelevantImplicationsTopic = isDigitalOutcomeRelevantImplicationsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
             || keywordMatchedTopicKey === "relevant-implications";
         const syncTopicLabel = isTargetAudienceTopic
             ? DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE
-            : (isDevelopmentToolsTopic
-                ? DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE
-                : (isSuccessCriteriaTopic
-                    ? DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE
-                    : (isRelevantImplicationsTopic ? DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE : "Digital Outcome: Description")));
+            : (isToolsAndTechniquesSyncTopic
+                ? DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE
+                : (isDevelopmentToolsTopic
+                    ? DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE
+                    : (isSuccessCriteriaTopic
+                        ? DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE
+                        : (isRelevantImplicationsTopic ? DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE : "Digital Outcome: Description"))));
         const syncTemplateId = isTargetAudienceTopic
             ? "target-audience"
-            : (isDevelopmentToolsTopic
-                ? "development-tools"
-                : (isSuccessCriteriaTopic
-                    ? "project-success-criteria"
-                    : (isRelevantImplicationsTopic ? "relevant-implications" : "digital-outcome-description")));
+            : (isToolsAndTechniquesSyncTopic
+                ? "tools-and-techniques"
+                : (isDevelopmentToolsTopic
+                    ? "development-tools"
+                    : (isSuccessCriteriaTopic
+                        ? "project-success-criteria"
+                        : (isRelevantImplicationsTopic ? "relevant-implications" : "digital-outcome-description"))));
         const allowFolderMatchAutoLink = syncTemplateId === "digital-outcome-description"
             || syncTemplateId === "target-audience"
             || syncTemplateId === "project-success-criteria"
-            || syncTemplateId === "relevant-implications";
+            || syncTemplateId === "relevant-implications"
+            || syncTemplateId === "tools-and-techniques";
 
         // For staged rollout, do not pre-connect Relevant Implications (or other non-enabled pages)
         // from passive folder matches when the student has not explicitly linked/downloaded.
@@ -3727,6 +3736,9 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             );
         } else if (canonicalTemplatePreviewUrl) {
             updateTaskTopicTemplateHeroPreview(host, canonicalTemplatePreviewUrl, syncTopicLabel, canonicalTemplatePreviewUrl);
+        } else if (isToolsAndTechniquesSyncTopic) {
+            // No template available yet — show placeholder text in hero rather than a wrong image
+            updateTaskTopicTemplateHeroPreviewNoTemplate(host, syncTopicLabel);
         }
 
         panelHost.innerHTML = `
@@ -6118,6 +6130,10 @@ function inferDigitalOutcomeTopicKeyFromTitle(pageTitle) {
         return "target-audience";
     }
 
+    if (/what\s+tools\s+and\s+techniques/.test(normalized)) {
+        return "tools-and-techniques";
+    }
+
     if (/developed|development|tools\/?technologies|tools|technologies/.test(normalized)) {
         return "development-tools";
     }
@@ -6350,6 +6366,15 @@ function updateTaskTopicTemplateHeroPreview(host, slidesUrl, topicLabel = "", pr
     if (topicLabel) {
         heroImage.alt = `${String(topicLabel).trim()} slideshow template preview`;
     }
+}
+
+function updateTaskTopicTemplateHeroPreviewNoTemplate(host, topicLabel = "") {
+    const heroWrap = host?.querySelector(".task-topic-template-hero");
+    if (!heroWrap) return;
+    heroWrap.innerHTML = `<div class="task-topic-template-hero-no-template">
+        <p class="task-topic-template-hero-no-template-text">No template available yet for <strong>${escapeHtml(topicLabel)}</strong>.</p>
+        <p class="task-topic-template-hero-no-template-sub">When a template is added to the library it will appear here automatically.</p>
+    </div>`;
 }
 
 function writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopic, taskShortName = "", value = "", options = {}) {
