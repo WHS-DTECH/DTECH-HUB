@@ -225,8 +225,8 @@ function deriveTaskShortName(taskTopic) {
     if (/project management/i.test(normalized)) return "Project Management";
     if (/describe.*digital outcome|description\s*-\s*google\s*slides/i.test(normalized)) return "Digital Outcome Description";
     if (/identify\s+the\s+target\s+audience|target\s+audience|end\s+user/i.test(normalized)) return "Target Audience";
-    if (/explain\s+how\s+the\s+outcome\s+will\s+be\s+developed|tools\/?technologies|development\s+steps|outcome\s+developed/i.test(normalized)) return "Development Steps";
     if (/what\s+tools\s+and\s+techniques\s+will\s+be\s+used/i.test(normalized)) return "Tools and Techniques";
+    if (/explain\s+how\s+the\s+outcome\s+will\s+be\s+developed|tools\/?technologies|development\s+steps|outcome\s+developed/i.test(normalized)) return "Development Steps";
     if (/relevant\s+implications/i.test(normalized)) return "Relevant Implications";
     if (/state\s+how\s+success\s+will\s+be\s+measured|success\s+will\s+be\s+evaluated|project\s+success\s+criteria|success\s+criteria/i.test(normalized)) return "Success Criteria";
     if (/digital outcome/i.test(normalized)) return "Digital Outcome";
