@@ -104,6 +104,7 @@ const DIGITAL_OUTCOME_DETAILS_TASKS = [
 const DIGITAL_OUTCOME_DESCRIPTION_TITLE = "Digital Outcome Description";
 const DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE = "Target Audience";
 const DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE = "Development Steps";
+const DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE = "Tools & Techniques";
 const DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE = "Success Criteria";
 const DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE = "Relevant Implications";
 const DIGITAL_OUTCOME_DESCRIPTION_TEMPLATE_PREVIEW_URL = "https://drive.google.com/thumbnail?id=1brOY70u9aJdsoiEtxVepr82vRhiv9VzpMm8TUv3lcTo&sz=w1400";
@@ -5944,10 +5945,14 @@ function isDigitalOutcomeDevelopmentToolsCriterion(taskTopicTitle, taskShortName
     if (/tools\/?technologies\s+will\s+be\s+used/.test(topicText)) {
         return true;
     }
-    if (/what\s+tools\s+and\s+techniques\s+will\s+be\s+used/.test(topicText)) {
-        return true;
-    }
     return shortNameText === DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE.toLowerCase();
+}
+
+function isToolsAndTechniquesCriterion(taskTopicTitle, taskShortName = "") {
+    const topicText = String(taskTopicTitle || "").trim().toLowerCase();
+    const shortNameText = String(taskShortName || "").trim().toLowerCase();
+    if (/what\s+tools\s+and\s+techniques\s+will\s+be\s+used/.test(topicText)) return true;
+    return shortNameText === DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE.toLowerCase();
 }
 
 function isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, taskShortName = "") {
@@ -6516,20 +6521,24 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         || keywordMatchedTopicKey === "target-audience";
     const isDigitalOutcomeDevelopmentToolsTopic = isDigitalOutcomeDevelopmentToolsCriterion(taskTopicTitle, resolvedTaskShortName)
         || keywordMatchedTopicKey === "development-tools";
+    const isToolsAndTechniquesTopic = isToolsAndTechniquesCriterion(taskTopicTitle, resolvedTaskShortName);
     const isDigitalOutcomeSuccessCriteriaTopic = isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, resolvedTaskShortName)
         || keywordMatchedTopicKey === "success-criteria";
     const isDigitalOutcomeRelevantImplicationsTopic = isDigitalOutcomeRelevantImplicationsCriterion(taskTopicTitle, resolvedTaskShortName)
         || keywordMatchedTopicKey === "relevant-implications";
     const digitalOutcomeTopicKey = isDigitalOutcomeTargetAudienceTopic
         ? "target-audience"
-        : (isDigitalOutcomeDevelopmentToolsTopic
+        : (isToolsAndTechniquesTopic
+            ? "tools-and-techniques"
+            : (isDigitalOutcomeDevelopmentToolsTopic
             ? "development-tools"
             : (isDigitalOutcomeSuccessCriteriaTopic
                 ? "success-criteria"
                 : (isDigitalOutcomeRelevantImplicationsTopic
                     ? "relevant-implications"
-                    : (isDigitalOutcomeDescriptionTopic ? "description" : keywordMatchedTopicKey))));
-    const useDigitalOutcomeTemplateHero = Boolean(digitalOutcomeTopicKey);
+                    : (isDigitalOutcomeDescriptionTopic ? "description" : keywordMatchedTopicKey)))));
+    // Tools & Techniques has no template — suppress the hero card for it
+    const useDigitalOutcomeTemplateHero = Boolean(digitalOutcomeTopicKey) && digitalOutcomeTopicKey !== "tools-and-techniques";
     const mergedTaskTopicLinks = isTaskTopicView
         ? collectMergedTaskTopicLinks(data, id, taskTopicTitle, resolvedTaskShortName)
         : [];
@@ -6538,13 +6547,15 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         ? DIGITAL_OUTCOME_DESCRIPTION_TITLE
         : (digitalOutcomeTopicKey === "target-audience"
             ? DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE
-            : (digitalOutcomeTopicKey === "development-tools"
-                ? DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE
-                : (digitalOutcomeTopicKey === "success-criteria"
-                    ? DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE
-                    : (digitalOutcomeTopicKey === "relevant-implications"
-                        ? DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE
-                        : (resolvedTaskShortName || taskTopicTitle || data.title)))));
+            : (digitalOutcomeTopicKey === "tools-and-techniques"
+                ? DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE
+                : (digitalOutcomeTopicKey === "development-tools"
+                    ? DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE
+                    : (digitalOutcomeTopicKey === "success-criteria"
+                        ? DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE
+                        : (digitalOutcomeTopicKey === "relevant-implications"
+                            ? DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE
+                            : (resolvedTaskShortName || taskTopicTitle || data.title))))));;
     const displaySummaryHtml = taskTopicTitle
         ? `Task topic from <a class="task-topic-parent-link" href="${parentAssessmentUrl}">${escapeHtml(data.title)}</a>`
         : escapeHtml(data.summary);
@@ -6574,6 +6585,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         || resolvedTaskShortName.toLowerCase().includes("digital outcome")
         || isDigitalOutcomeTargetAudienceTopic
         || isDigitalOutcomeDevelopmentToolsTopic
+        || isToolsAndTechniquesTopic
         || isDigitalOutcomeSuccessCriteriaTopic
         || isDigitalOutcomeRelevantImplicationsTopic;
     const templateLibraryParams = new URLSearchParams();
@@ -6586,11 +6598,13 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     }
     const preferredTemplateId = digitalOutcomeTopicKey === "target-audience"
         ? "target-audience"
-        : (digitalOutcomeTopicKey === "development-tools"
+        : (digitalOutcomeTopicKey === "tools-and-techniques"
+            ? ""
+            : (digitalOutcomeTopicKey === "development-tools"
             ? "development-tools"
             : (digitalOutcomeTopicKey === "success-criteria"
                 ? "project-success-criteria"
-                : (digitalOutcomeTopicKey === "relevant-implications" ? "relevant-implications" : "digital-outcome-description")));
+                : (digitalOutcomeTopicKey === "relevant-implications" ? "relevant-implications" : "digital-outcome-description"))));
     if (useDigitalOutcomeTemplateHero) {
         templateLibraryParams.set("templateId", preferredTemplateId);
         // Add pre-filter topic name for template library search
@@ -6858,8 +6872,10 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         if (digitalOutcomeTopicKey === "target-audience") {
             return "Use this guide to define your project's target audience clearly and justify why they are the right users to design for.";
         }
+        if (digitalOutcomeTopicKey === "tools-and-techniques") {
+            return "List the tools you plan to use, are currently using, or have used for this task, and describe the techniques you implement with each one.";
+        }
         if (digitalOutcomeTopicKey === "development-tools") {
-            return "Use this guide to explain how your outcome will be developed and why your chosen tools and technologies are appropriate.";
         }
         if (digitalOutcomeTopicKey === "success-criteria") {
             return "Use this guide to define measurable success criteria and explain how your outcome will be evaluated.";
@@ -6878,6 +6894,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         }
         if (digitalOutcomeTopicKey === "target-audience") {
             return "Target Audience - Google Slides";
+        }
+        if (digitalOutcomeTopicKey === "tools-and-techniques") {
+            return "Tools & Techniques Table";
         }
         if (digitalOutcomeTopicKey === "development-tools") {
             return "Development Steps - Google Slides";
