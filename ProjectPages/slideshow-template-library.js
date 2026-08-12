@@ -1224,7 +1224,7 @@ function renderLibrary() {
         const sectionTitle = `Section ${sectionNumber}: ${section.name}`;
         const itemCount = Array.isArray(section?.rows) ? section.rows.length : 0;
         return `
-            <details class="template-section">
+            <details class="template-section" open>
                 <summary class="template-section-summary">
                     <span class="template-section-title">${escapeHtml(sectionTitle)}</span>
                     <span class="template-section-count">${escapeHtml(String(itemCount))} template${itemCount === 1 ? "" : "s"}</span>
