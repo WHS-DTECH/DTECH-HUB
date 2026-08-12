@@ -557,16 +557,32 @@ function applyTemplateCopiesAsRelevantImplicationsState(stateMap, templateCopies
 
     if (!usedCategoryKeys.size) return false;
 
+    // Detect if this is a corruption repair (fewer confirmed categories than currently marked done)
+    const currentDoneCount = rows.filter((r) => isRelevantImplicationsCategoryStep(r?.text) && Boolean(r?.done)).length;
+    const isRepair = currentDoneCount > usedCategoryKeys.size;
+
     let changed = false;
     rows.forEach((row) => {
-        if (!isRelevantImplicationsCategoryStep(row?.text)) return;
-        const category = parseRelevantImplicationsCategoryFromStep(row.text);
-        if (!category) return;
-        const key = normalizeRelevantImplicationsCategoryKey(category);
-        const shouldBeDone = usedCategoryKeys.has(key);
-        if (Boolean(row.done) !== shouldBeDone) {
-            row.done = shouldBeDone;
-            changed = true;
+        const text = String(row?.text || "").trim();
+
+        if (isRelevantImplicationsCategoryStep(text)) {
+            const category = parseRelevantImplicationsCategoryFromStep(text);
+            if (!category) return;
+            const shouldBeDone = usedCategoryKeys.has(normalizeRelevantImplicationsCategoryKey(category));
+            if (Boolean(row.done) !== shouldBeDone) {
+                row.done = shouldBeDone;
+                changed = true;
+            }
+            return;
+        }
+
+        // Also clear Merit "Address relevant implications." if repairing corrupted data
+        if (isRepair && getStepLevel(text) === "Merit"
+            && stripStepLevel(text).toLowerCase().includes("address relevant implications")) {
+            if (Boolean(row.done)) {
+                row.done = false;
+                changed = true;
+            }
         }
     });
     return changed;
@@ -1294,13 +1310,13 @@ async function loadChecklistForTask(taskId) {
 
     const autoChangedChecklistPM = autoTickProjectManagementRequirement(taskListState.checklistState);
     const autoChangedChecklistDO = autoTickDigitalOutcomeRequirements(taskListState.checklistState, taskListState.selectedId, signedInEmail);
-    const autoChangedChecklistRI = autoTickRelevantImplicationsRequirements(taskListState.checklistState, taskListState.selectedId, signedInEmail);
     const autoRepairedChecklistRI = applyTemplateCopiesAsRelevantImplicationsState(taskListState.checklistState, taskListState.templateCopies);
+    const autoChangedChecklistRI = autoTickRelevantImplicationsRequirements(taskListState.checklistState, taskListState.selectedId, signedInEmail);
     const autoChangedChecklist = autoChangedChecklistPM || autoChangedChecklistDO || autoChangedChecklistRI || autoRepairedChecklistRI;
     const autoChangedEvidencePM = autoTickProjectManagementRequirement(taskListState.fullEvidenceState);
     const autoChangedEvidenceDO = autoTickDigitalOutcomeRequirements(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
-    const autoChangedEvidenceRI = autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
     const autoRepairedEvidenceRI = applyTemplateCopiesAsRelevantImplicationsState(taskListState.fullEvidenceState, taskListState.templateCopies);
+    const autoChangedEvidenceRI = autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
     const autoChangedEvidence = autoChangedEvidencePM || autoChangedEvidenceDO || autoChangedEvidenceRI || autoRepairedEvidenceRI;
     if (migratedDigitalOutcomeRows || migrated91897Rows || autoChangedChecklist || autoChangedEvidence) {
         const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
