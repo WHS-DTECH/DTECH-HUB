@@ -375,6 +375,14 @@ function getTemplateStepMatchers(templateId) {
         return [/target\s+audience/i, /end\s+user/i];
     }
 
+    // For category-specific relevant implications templates, only match the specific category
+    if (id.startsWith("relevant-implications-") && id !== "relevant-implications") {
+        const categoryName = extractCategoryFromTemplateId(id);
+        if (categoryName) {
+            return [new RegExp(`^Achieved:\\s*Relevant implications category -\\s*${categoryName}\\s*$`, "i")];
+        }
+    }
+
     if (id === "relevant-implications" || id.startsWith("relevant-implications-") || id === "development-steps" || id === "development-tools") {
         return [
             /explain\s+how\s+the\s+outcome\s+will\s+be\s+developed/i,
@@ -426,6 +434,65 @@ function getTemplateStepMatchers(templateId) {
     return [/google\s*slides/i];
 }
 
+function extractCategoryFromTemplateId(templateId) {
+    // Extract category from templateId like "relevant-implications-functionality"
+    const id = String(templateId || "").trim().toLowerCase();
+    if (!id.startsWith("relevant-implications-")) return null;
+    
+    const categorySlug = id.replace(/^relevant-implications-/, "").trim();
+    if (!categorySlug) return null;
+    
+    // Map slugs to category names
+    const categoryMap = {
+        "social": "Social",
+        "cultural": "Cultural",
+        "legal": "Legal",
+        "ethical": "Ethical",
+        "intellectual-property": "Intellectual Property",
+        "intellectual_property": "Intellectual Property",
+        "privacy": "Privacy",
+        "accessibility": "Accessibility",
+        "usability": "Usability",
+        "functionality": "Functionality",
+        "aesthetics": "Aesthetics",
+        "sustainability-and-future-proofing": "Sustainability and Future Proofing",
+        "sustainability_and_future_proofing": "Sustainability and Future Proofing",
+        "end-user-considerations": "End-User Considerations",
+        "end_user_considerations": "End-User Considerations",
+        "health-and-safety": "Health and Safety",
+        "health_and_safety": "Health and Safety"
+    };
+    
+    return categoryMap[categorySlug] || null;
+}
+
+function extractCategoryFromTemplateTitle(templateTitle) {
+    // Extract category from template title like "Relevant Implications - Functionality"
+    const title = String(templateTitle || "").trim();
+    if (!title.toLowerCase().includes("relevant implications")) return null;
+    
+    // Split by hyphen and get the last part as the category
+    const parts = title.split("-").map((p) => p.trim());
+    if (parts.length < 2) return null;
+    
+    // The category is typically the last part
+    const potentialCategory = parts[parts.length - 1];
+    
+    // Verify it's a known category
+    const KNOWN_CATEGORIES = [
+        "Social", "Cultural", "Legal", "Ethical",
+        "Intellectual Property", "Privacy", "Accessibility",
+        "Usability", "Functionality", "Aesthetics",
+        "Sustainability and Future Proofing", "End-User Considerations", "Health and Safety"
+    ];
+    
+    if (KNOWN_CATEGORIES.some((cat) => cat.toLowerCase() === potentialCategory.toLowerCase())) {
+        return potentialCategory;
+    }
+    
+    return null;
+}
+
 async function markConnectedTaskItemDone(templateId) {
     const activityId = String(templateUsageContext.activityId || "").trim();
     const studentEmail = getLibraryEmail();
@@ -442,7 +509,21 @@ async function markConnectedTaskItemDone(templateId) {
         evidenceRows = await fetchActivityEvidenceRows(activityId, studentEmail);
     }
 
-    const matchers = getTemplateStepMatchers(templateId);
+    // Check if this is a category-specific relevant implications template
+    const templateTitle = String(templateUsageContext.templateTitle || "").trim();
+    const categoryFromTitle = extractCategoryFromTemplateTitle(templateTitle);
+    const categoryFromId = extractCategoryFromTemplateId(templateId);
+    const specificCategory = categoryFromTitle || categoryFromId;
+
+    let matchers;
+    if (specificCategory && (templateId.toLowerCase().includes("relevant-implications") || templateTitle.toLowerCase().includes("relevant implications"))) {
+        // For category-specific templates, only match that category step
+        const categoryStepText = `Achieved: Relevant implications category - ${specificCategory}`;
+        matchers = [new RegExp(`^${categoryStepText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i")];
+    } else {
+        matchers = getTemplateStepMatchers(templateId);
+    }
+
     let changed = false;
     const nextRows = evidenceRows.map((row) => {
         const nextSteps = Array.isArray(row?.steps)
