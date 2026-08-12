@@ -322,6 +322,42 @@
             font-weight: 700;
         }
 
+        .task-list-drive-sync-wrap {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 6px 0 6px;
+            flex-wrap: wrap;
+        }
+
+        .task-list-drive-sync-btn {
+            font-size: 0.76rem;
+            font-weight: 700;
+            padding: 5px 12px;
+            border-radius: 20px;
+            border: 1.5px solid #4285f4;
+            background: #fff;
+            color: #1a56c4;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.15s, color 0.15s;
+        }
+
+        .task-list-drive-sync-btn:hover:not(:disabled) {
+            background: #4285f4;
+            color: #fff;
+        }
+
+        .task-list-drive-sync-btn:disabled {
+            opacity: 0.55;
+            cursor: default;
+        }
+
+        .task-list-drive-sync-status {
+            font-size: 0.76rem;
+            color: #345778;
+        }
+
         .task-list-system-list {
             margin: 8px 0 2px;
             border: 1px solid #d6ddef;

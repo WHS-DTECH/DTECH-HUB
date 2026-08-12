@@ -5635,6 +5635,60 @@ app.post("/api/student/drive-setup/list-process-assessment-slides", async (req, 
   }
 });
 
+// Scans the student's Drive Process Assessment folder and persists recognised template copies to the DB
+app.post("/api/activities/:id/sync-drive-templates", async (req, res) => {
+  const projectId = String(req.params.id || "").trim();
+  const requesterEmail = normalizeEmail(getRequestUserEmail(req));
+  const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
+
+  if (!projectId) { res.status(400).json({ error: "Project ID is required" }); return; }
+  if (!requesterEmail || !requesterEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required" }); return;
+  }
+  if (!driveAccessToken) { res.status(400).json({ error: "driveAccessToken is required" }); return; }
+
+  try {
+    const setup = await getStudentDriveSetup(requesterEmail);
+    const folderId = String(setup?.processAssessmentFolderId || "").trim();
+    if (!folderId) {
+      res.status(400).json({ error: "Please confirm your Process Assessment folder first." });
+      return;
+    }
+
+    const slides = await driveListSlidesInProcessAssessmentTree(folderId, driveAccessToken);
+    const discovered = [];
+
+    for (const slide of slides) {
+      const name = String(slide?.name || "").trim();
+      const parts = name.split(" - ");
+      // Try progressively shorter prefix until a known template identity is matched
+      let identity = null;
+      for (let i = parts.length; i >= 1; i--) {
+        const candidate = parts.slice(0, i).join(" - ").trim();
+        identity = inferCanonicalTemplateIdentityFromTitle(candidate);
+        if (identity) break;
+      }
+      if (!identity) continue;
+      discovered.push({
+        templateId: identity.id,
+        templateTitle: identity.title,
+        fileUrl: String(slide.webViewLink || `https://docs.google.com/presentation/d/${slide.id}/edit`).trim(),
+        fileName: name
+      });
+    }
+
+    if (hasDatabase) {
+      for (const entry of discovered) {
+        await recordTemplateCopyInDb(projectId, requesterEmail, entry).catch(() => {});
+      }
+    }
+
+    res.json({ ok: true, discovered: discovered.length, templates: discovered });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not sync Drive templates." });
+  }
+});
+
 async function resolveActivityWriteAccess(email) {
   const normalizedEmail = normalizeEmail(email);
   if (!normalizedEmail) {
