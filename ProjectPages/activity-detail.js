@@ -142,6 +142,15 @@ const EVIDENCE_STEPS_DEFAULTS = {
     ]
 };
 
+const SUGGESTED_TOOLS_BY_CONTEXT = {
+    "programming": ["Python", "JavaScript", "HTML/CSS", "Java", "C#", "GitHub", "VS Code", "Git", "SQL", "React"],
+    "web": ["HTML", "CSS", "JavaScript", "React", "Vue.js", "Figma", "GitHub", "npm", "Visual Studio Code", "Bootstrap"],
+    "design": ["Figma", "Adobe Photoshop", "Adobe Illustrator", "Canva", "Sketch", "Adobe XD", "Protopie", "InVision", "Pen and Paper", "Wireframing Tools"],
+    "digital-media": ["Adobe Premiere Pro", "Adobe After Effects", "DaVinci Resolve", "Final Cut Pro", "Adobe Audition", "Blender", "OBS Studio", "Figma", "Adobe Photoshop", "Audacity"],
+    "data": ["Excel", "Google Sheets", "Python (Pandas)", "Power BI", "Tableau", "SQL", "Google Data Studio", "R", "Jupyter Notebook", "CSV"],
+    "general": ["Google Workspace", "Microsoft Office", "Trello", "GitHub", "Google Drive", "OneDrive", "Slack", "Zoom", "Figma", "Notion"]
+};
+
 const detailAllowedDomain =
     (document.querySelector('meta[name="hub-google-allowed-domain"]')?.content || "")
         .trim()
@@ -1836,6 +1845,65 @@ async function saveMyEvidenceRows(projectId, rows) {
         error.stage = "save-my-evidence";
         throw error;
     }
+}
+
+async function fetchMyToolsTechniques(projectId) {
+    const endpoint = `/api/activities/${encodeURIComponent(projectId)}/my-tools-techniques`;
+    const response = await fetch(endpoint, {
+        headers: buildWriteHeaders()
+    });
+
+    if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        const error = new Error(payload?.error || "Could not load my tools & techniques.");
+        error.status = Number(response.status || 0);
+        error.endpoint = endpoint;
+        error.stage = "load-my-tools-techniques";
+        throw error;
+    }
+
+    const payload = await response.json().catch(() => ({}));
+    return Array.isArray(payload?.tools_techniques) ? payload.tools_techniques : [];
+}
+
+async function saveMyToolsTechniques(projectId, toolsTechniques) {
+    const endpoint = `/api/activities/${encodeURIComponent(projectId)}/my-tools-techniques`;
+    const response = await fetch(endpoint, {
+        method: "PATCH",
+        headers: buildWriteHeaders(),
+        body: JSON.stringify({ tools_techniques: toolsTechniques })
+    });
+
+    if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        const error = new Error(payload?.error || "Could not save my tools & techniques.");
+        error.status = Number(response.status || 0);
+        error.endpoint = endpoint;
+        error.stage = "save-my-tools-techniques";
+        throw error;
+    }
+}
+
+function getSuggestedToolsForContext(detailData, taskTopic) {
+    const contextSignals = [
+        String(detailData?.subjectStream || detailData?.subject_stream || detailData?.subject || ""),
+        String(detailData?.type || ""),
+        String(detailData?.title || ""),
+        taskTopic
+    ].join(" ").toLowerCase();
+
+    const isProgram = /programm|coding|comput|software|python|javascript|java|react|node/i.test(contextSignals);
+    const isWeb = /web|html|css|frontend|ui|ux/i.test(contextSignals);
+    const isDesign = /design|ui|ux|graphic|visual|figma|adobe/i.test(contextSignals);
+    const isDigitalMedia = /digital\s*media|media|film|video|audio|music|photograph|animation|graphic/i.test(contextSignals);
+    const isData = /data|analytics|excel|sql|statistics|business/i.test(contextSignals);
+
+    if (isProgram) return SUGGESTED_TOOLS_BY_CONTEXT.programming;
+    if (isWeb) return SUGGESTED_TOOLS_BY_CONTEXT.web;
+    if (isDesign) return SUGGESTED_TOOLS_BY_CONTEXT.design;
+    if (isDigitalMedia) return SUGGESTED_TOOLS_BY_CONTEXT["digital-media"];
+    if (isData) return SUGGESTED_TOOLS_BY_CONTEXT.data;
+    return SUGGESTED_TOOLS_BY_CONTEXT.general;
 }
 
 async function fetchEvidenceRowsEnsuringAllocation(projectId, studentEmail) {
@@ -5204,6 +5272,182 @@ function extractStandardCodeFromLabel(value) {
     return match ? String(match[1] || "").trim() : "";
 }
 
+async function renderToolsTechniquesPanel({ host, projectId, detailData, taskTopic = "" }) {
+    if (!host) return;
+
+    const existingPanel = host.querySelector("#tools-techniques-panel");
+    if (existingPanel) {
+        existingPanel.remove();
+    }
+
+    const email = readStoredHubEmail();
+    if (!email) return;
+
+    const panel = document.createElement("section");
+    panel.id = "tools-techniques-panel";
+    panel.className = "tools-techniques-panel proposal-section";
+
+    const suggestedTools = getSuggestedToolsForContext(detailData, taskTopic);
+    const suggestionsHtml = suggestedTools.length
+        ? `<div class="tools-suggestions">
+            <h3>Suggested Tools</h3>
+            <div class="tools-suggestions-grid">
+                ${suggestedTools.map((tool) => `
+                    <button type="button" class="tools-suggestion-chip" data-tool-name="${escapeHtml(tool)}">
+                        ${escapeHtml(tool)}
+                    </button>
+                `).join("")}
+            </div>
+        </div>`
+        : "";
+
+    panel.innerHTML = `
+        <h2>Tools & Techniques</h2>
+        <p class="tools-instructions">List the tools you intend to use, are currently using, or have used for this task. For each tool, describe the techniques or methods you implemented with it.</p>
+        ${suggestionsHtml}
+        <div class="tools-table-wrapper">
+            <table class="tools-table" id="tools-table">
+                <thead>
+                    <tr>
+                        <th>Tool Name</th>
+                        <th>Status</th>
+                        <th>Techniques Implemented</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="tools-tbody">
+                </tbody>
+            </table>
+        </div>
+        <div class="tools-actions">
+            <button type="button" class="detail-action detail-action-secondary" id="add-tool-row-btn">+ Add Tool</button>
+        </div>
+        <p class="tools-status" id="tools-status" aria-live="polite"></p>
+    `;
+
+    host.appendChild(panel);
+
+    let toolsData = [];
+    try {
+        toolsData = await fetchMyToolsTechniques(projectId);
+    } catch (_error) {
+        // Start with empty list if fetch fails
+        toolsData = [];
+    }
+
+    const tbody = panel.querySelector("#tools-tbody");
+    const statusEl = panel.querySelector("#tools-status");
+
+    const renderTable = () => {
+        tbody.innerHTML = toolsData.map((item, index) => `
+            <tr class="tools-row" data-row-id="${escapeHtml(item.id)}">
+                <td>
+                    <input type="text" class="tools-input tools-tool-name" value="${escapeHtml(item.toolName)}" placeholder="e.g., Python, Figma, GitHub" data-row-index="${index}">
+                </td>
+                <td>
+                    <select class="tools-select tools-status-select" data-row-index="${index}">
+                        <option value="Intend to Use" ${item.status === "Intend to Use" ? "selected" : ""}>Intend to Use</option>
+                        <option value="Currently Using" ${item.status === "Currently Using" ? "selected" : ""}>Currently Using</option>
+                        <option value="Have Used" ${item.status === "Have Used" ? "selected" : ""}>Have Used</option>
+                    </select>
+                </td>
+                <td>
+                    <textarea class="tools-input tools-techniques" placeholder="Describe the techniques or methods you used..." data-row-index="${index}">${escapeHtml(item.techniques)}</textarea>
+                </td>
+                <td>
+                    <button type="button" class="detail-action detail-action-secondary tools-delete-btn" data-row-index="${index}" title="Delete this row">×</button>
+                </td>
+            </tr>
+        `).join("");
+    };
+
+    const saveData = async () => {
+        try {
+            statusEl.textContent = "Saving...";
+            statusEl.classList.remove("is-error");
+
+            const rows = Array.from(tbody.querySelectorAll(".tools-row")).map((row) => ({
+                id: row.getAttribute("data-row-id"),
+                toolName: row.querySelector(".tools-tool-name").value.trim(),
+                status: row.querySelector(".tools-status-select").value,
+                techniques: row.querySelector(".tools-techniques").value.trim(),
+                createdAt: toolsData.find((t) => t.id === row.getAttribute("data-row-id"))?.createdAt || new Date().toISOString()
+            })).filter((r) => r.toolName);
+
+            await saveMyToolsTechniques(projectId, rows);
+            toolsData = rows;
+            renderTable();
+            statusEl.textContent = "Saved successfully";
+            setTimeout(() => { statusEl.textContent = ""; }, 2000);
+        } catch (error) {
+            statusEl.textContent = `Error: ${String(error?.message || "Could not save")}`;
+            statusEl.classList.add("is-error");
+        }
+    };
+
+    renderTable();
+
+    // Event listeners
+    panel.querySelector("#add-tool-row-btn").addEventListener("click", () => {
+        const newRow = {
+            id: `tool-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            toolName: "",
+            status: "Intend to Use",
+            techniques: "",
+            createdAt: new Date().toISOString()
+        };
+        toolsData.push(newRow);
+        renderTable();
+        // Focus on the new tool name input
+        setTimeout(() => {
+            const lastInput = tbody.querySelector(".tools-tool-name:last-of-type");
+            if (lastInput) lastInput.focus();
+        }, 0);
+    });
+
+    // Attach change listeners to all inputs
+    const attachListeners = () => {
+        tbody.querySelectorAll(".tools-input, .tools-select").forEach((el) => {
+            el.removeEventListener("change", saveData);
+            el.addEventListener("change", saveData);
+        });
+
+        tbody.querySelectorAll(".tools-delete-btn").forEach((btn) => {
+            btn.removeEventListener("click", () => {});
+            btn.addEventListener("click", async (e) => {
+                const index = Number(btn.getAttribute("data-row-index"));
+                toolsData.splice(index, 1);
+                renderTable();
+                attachListeners();
+                await saveData();
+            });
+        });
+    };
+
+    attachListeners();
+
+    // Add suggestion chip listeners
+    panel.querySelectorAll(".tools-suggestion-chip").forEach((chip) => {
+        chip.addEventListener("click", () => {
+            const toolName = chip.getAttribute("data-tool-name");
+            const lastRow = toolsData[toolsData.length - 1];
+            if (lastRow && !lastRow.toolName) {
+                lastRow.toolName = toolName;
+            } else {
+                toolsData.push({
+                    id: `tool-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    toolName,
+                    status: "Intend to Use",
+                    techniques: "",
+                    createdAt: new Date().toISOString()
+                });
+            }
+            renderTable();
+            attachListeners();
+        });
+    });
+}
+
 async function tryAutofillDetailStandardCard(standardLabel, { onApplied } = {}) {
     const standardCode = extractStandardCodeFromLabel(standardLabel);
     if (!standardCode) return;
@@ -8427,6 +8671,20 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         });
     } catch (_error) {
         // Keep sync controls interactive even if submission panel rendering fails.
+    }
+
+    // Render tools & techniques panel for students on task topic pages
+    if (!isTeacher && selectedTaskTopic && email) {
+        try {
+            await renderToolsTechniquesPanel({
+                host,
+                projectId,
+                detailData,
+                taskTopic: selectedTaskTopic
+            });
+        } catch (_error) {
+            // Keep page functional even if tools & techniques panel fails.
+        }
     }
 
     if (!isTeacher && isAssessmentTask && email) {

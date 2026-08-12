@@ -58,6 +58,7 @@ const memoryAssessmentStandardCards = new Map();
 const memoryStudentHaparaFolders = new Map();
 const memoryStudentDriveSetup = new Map();
 const memoryTemplateLibraryEntries = new Map();
+const memoryStudentToolsTechniques = new Map();
 const PRACTICAL_SKILLS_LIBRARY_FILE = path.join(__dirname, "practical-skills", "library.json");
 
 const DEFAULT_TEMPLATE_LIBRARY_ENTRIES = [
@@ -3567,6 +3568,7 @@ async function ensureProjectInterestsSchema() {
       standard_1 TEXT,
       standard_2 TEXT,
       evidence_steps JSONB NOT NULL DEFAULT '[]'::jsonb,
+      tools_techniques JSONB NOT NULL DEFAULT '[]'::jsonb,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (project_id, student_email)
@@ -3577,6 +3579,7 @@ async function ensureProjectInterestsSchema() {
   await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS standard_1 TEXT`);
   await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS standard_2 TEXT`);
   await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS evidence_steps JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS tools_techniques JSONB NOT NULL DEFAULT '[]'::jsonb`);
   await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 }
@@ -7017,6 +7020,111 @@ app.delete("/api/activities/:id/interests/:studentEmail", requireActivityWriteAc
     res.status(204).send();
   } catch (error) {
     res.status(500).json({ error: "Could not remove interest" });
+  }
+});
+
+// GET /api/activities/:id/my-tools-techniques — get the signed-in student's tools & techniques for a project
+app.get("/api/activities/:id/my-tools-techniques", async (req, res) => {
+  const projectId = String(req.params.id || "").trim();
+  const requesterEmail = normalizeEmail(getRequestUserEmail(req));
+
+  if (!projectId) {
+    res.status(400).json({ error: "Project ID is required" });
+    return;
+  }
+
+  if (!requesterEmail || !requesterEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required" });
+    return;
+  }
+
+  const storageKey = `${projectId}:${requesterEmail}`;
+
+  if (!hasDatabase) {
+    const stored = memoryStudentToolsTechniques.get(storageKey) || { tools_techniques: [] };
+    res.json(stored);
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT tools_techniques FROM project_interests WHERE project_id = $1 AND student_email = $2 LIMIT 1`,
+      [projectId, requesterEmail]
+    );
+
+    if (!result.rowCount) {
+      res.status(404).json({ error: "Student allocation not found" });
+      return;
+    }
+
+    const toolsTechniques = result.rows[0]?.tools_techniques || [];
+    res.json({ tools_techniques: Array.isArray(toolsTechniques) ? toolsTechniques : [] });
+  } catch (_error) {
+    res.status(500).json({ error: "Could not load tools & techniques" });
+  }
+});
+
+// PATCH /api/activities/:id/my-tools-techniques — save the signed-in student's tools & techniques for a project
+app.patch("/api/activities/:id/my-tools-techniques", async (req, res) => {
+  const projectId = String(req.params.id || "").trim();
+  const requesterEmail = normalizeEmail(getRequestUserEmail(req));
+  const toolsTechniques = Array.isArray(req.body?.tools_techniques) ? req.body.tools_techniques : [];
+
+  if (!projectId) {
+    res.status(400).json({ error: "Project ID is required" });
+    return;
+  }
+
+  if (!requesterEmail || !requesterEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required" });
+    return;
+  }
+
+  const storageKey = `${projectId}:${requesterEmail}`;
+  const normalizedTools = toolsTechniques.map((item) => ({
+    id: String(item?.id || "").trim() || `tool-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    toolName: String(item?.toolName || "").trim(),
+    status: String(item?.status || "Intend to Use").trim(),
+    techniques: String(item?.techniques || "").trim(),
+    createdAt: String(item?.createdAt || new Date().toISOString()).trim()
+  })).filter((item) => item.toolName);
+
+  if (!hasDatabase) {
+    memoryStudentToolsTechniques.set(storageKey, { tools_techniques: normalizedTools });
+    res.json({ tools_techniques: normalizedTools });
+    return;
+  }
+
+  try {
+    const ensureRow = await pool.query(
+      `
+        INSERT INTO project_interests (project_id, student_email, confirmed, created_at, updated_at, tools_techniques)
+        VALUES ($1, $2, FALSE, NOW(), NOW(), '[]'::jsonb)
+        ON CONFLICT (project_id, student_email) DO NOTHING
+        RETURNING student_email
+      `,
+      [projectId, requesterEmail]
+    );
+
+    const result = await pool.query(
+      `
+        UPDATE project_interests
+        SET tools_techniques = $1::jsonb,
+            updated_at = NOW()
+        WHERE project_id = $2 AND student_email = $3
+        RETURNING student_email
+      `,
+      [JSON.stringify(normalizedTools), projectId, requesterEmail]
+    );
+
+    if (!result.rowCount && !ensureRow.rowCount) {
+      res.status(404).json({ error: "Student allocation not found" });
+      return;
+    }
+
+    res.json({ tools_techniques: normalizedTools });
+  } catch (_error) {
+    res.status(500).json({ error: "Could not save tools & techniques" });
   }
 });
 
