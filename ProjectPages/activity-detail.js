@@ -6739,7 +6739,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 ? DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE
                 : (preferredTemplateId === "project-success-criteria"
                     ? DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE
-                    : (preferredTemplateId === "relevant-implications" ? DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE : DIGITAL_OUTCOME_DESCRIPTION_TITLE)));
+                    : (preferredTemplateId === "relevant-implications" ? DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE : DIGITAL_OUTCOME_DESCRIPTION_TITLE))));
         templateLibraryParams.set("preFilterTopic", topicDisplayName);
     }
     const slideshowTemplateLibraryUrl = `slideshow-template-library.html?${templateLibraryParams.toString()}`;
