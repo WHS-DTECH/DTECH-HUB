@@ -5858,6 +5858,7 @@ function deriveTaskShortName(value) {
         { pattern: /describe\s+the\s+digital\s+outcome|describe.*digital\s+outcome/, label: "Digital Outcome Description" },
         { pattern: /identify\s+the\s+target\s+audience|target\s+audience|end\s+user/, label: "Target Audience" },
         { pattern: /explain\s+how\s+the\s+outcome\s+will\s+be\s+developed|tools\/?technologies/, label: "Development Steps" },
+        { pattern: /what\s+tools\s+and\s+techniques\s+will\s+be\s+used/, label: "Tools and Techniques" },
         { pattern: /state\s+how\s+success\s+will\s+be\s+measured|success\s+will\s+be\s+evaluated/, label: "Success Criteria" },
         { pattern: /project\s+management/, label: "Project Management" },
         { pattern: /relevant\s+implications/, label: "Relevant Implications" },
