@@ -501,6 +501,83 @@ function countCompletedRelevantImplicationsCategories(rows) {
     }).length;
 }
 
+function extractRelevantImplicationsCategoryFromTemplateId(templateId) {
+    const id = String(templateId || "").trim().toLowerCase();
+    if (!id.startsWith("relevant-implications-")) return null;
+    const categorySlug = id.replace(/^relevant-implications-/, "").trim();
+    if (!categorySlug) return null;
+    const categoryMap = {
+        "social": "Social",
+        "cultural": "Cultural",
+        "legal": "Legal",
+        "ethical": "Ethical",
+        "intellectual-property": "Intellectual Property",
+        "intellectual_property": "Intellectual Property",
+        "privacy": "Privacy",
+        "accessibility": "Accessibility",
+        "usability": "Usability",
+        "functionality": "Functionality",
+        "aesthetics": "Aesthetics",
+        "sustainability-and-future-proofing": "Sustainability and Future Proofing",
+        "sustainability_and_future_proofing": "Sustainability and Future Proofing",
+        "end-user-considerations": "End-User Considerations",
+        "end_user_considerations": "End-User Considerations",
+        "health-and-safety": "Health and Safety",
+        "health_and_safety": "Health and Safety"
+    };
+    return categoryMap[categorySlug] || null;
+}
+
+function autoRepairCorruptedRelevantImplicationsCategories(stateMap, projectId, email) {
+    const rows = Array.isArray(stateMap?.["91897"]) ? stateMap["91897"] : [];
+    if (!rows.length || !projectId || !email) return false;
+
+    const categoryRows = rows.filter((row) => isRelevantImplicationsCategoryStep(row?.text));
+    const allDoneCount = categoryRows.filter((row) => Boolean(row?.done)).length;
+
+    // Only attempt repair when ALL categories are done — that is the corruption fingerprint
+    if (allDoneCount !== RELEVANT_IMPLICATIONS_CATEGORIES.length) return false;
+
+    // Read which specific category templates were copied from localStorage
+    const safeId = String(projectId).trim();
+    const safeEmail = String(email).trim().toLowerCase();
+    const copyMapKey = `hub_template_copy_map_v1:${safeId}:${safeEmail}`;
+    let copyMap = {};
+    try {
+        const scoped = localStorage.getItem(copyMapKey);
+        if (scoped) copyMap = { ...JSON.parse(scoped) };
+    } catch (_error) {}
+    try {
+        const global = localStorage.getItem("hub_template_copy_map_global_v1");
+        if (global) copyMap = { ...JSON.parse(global), ...copyMap };
+    } catch (_error) {}
+
+    const usedCategoryKeys = new Set();
+    Object.keys(copyMap).forEach((tid) => {
+        if (tid.startsWith("relevant-implications-") && tid !== "relevant-implications") {
+            const cat = extractRelevantImplicationsCategoryFromTemplateId(tid);
+            if (cat) usedCategoryKeys.add(normalizeRelevantImplicationsCategoryKey(cat));
+        }
+    });
+
+    // No specific category entries found — cannot safely repair, leave unchanged
+    if (!usedCategoryKeys.size) return false;
+
+    let changed = false;
+    rows.forEach((row) => {
+        if (!isRelevantImplicationsCategoryStep(row?.text)) return;
+        const category = parseRelevantImplicationsCategoryFromStep(row.text);
+        if (!category) return;
+        const key = normalizeRelevantImplicationsCategoryKey(category);
+        const shouldBeDone = usedCategoryKeys.has(key);
+        if (Boolean(row.done) !== shouldBeDone) {
+            row.done = shouldBeDone;
+            changed = true;
+        }
+    });
+    return changed;
+}
+
 function getAchievedSectionMeta(stepText) {
     const normalized = String(stepText || "").trim().toLowerCase();
     if (!normalized) return null;
@@ -1215,11 +1292,13 @@ async function loadChecklistForTask(taskId) {
     const autoChangedChecklistPM = autoTickProjectManagementRequirement(taskListState.checklistState);
     const autoChangedChecklistDO = autoTickDigitalOutcomeRequirements(taskListState.checklistState, taskListState.selectedId, signedInEmail);
     const autoChangedChecklistRI = autoTickRelevantImplicationsRequirements(taskListState.checklistState, taskListState.selectedId, signedInEmail);
-    const autoChangedChecklist = autoChangedChecklistPM || autoChangedChecklistDO || autoChangedChecklistRI;
+    const autoRepairedChecklistRI = autoRepairCorruptedRelevantImplicationsCategories(taskListState.checklistState, taskListState.selectedId, signedInEmail);
+    const autoChangedChecklist = autoChangedChecklistPM || autoChangedChecklistDO || autoChangedChecklistRI || autoRepairedChecklistRI;
     const autoChangedEvidencePM = autoTickProjectManagementRequirement(taskListState.fullEvidenceState);
     const autoChangedEvidenceDO = autoTickDigitalOutcomeRequirements(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
     const autoChangedEvidenceRI = autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
-    const autoChangedEvidence = autoChangedEvidencePM || autoChangedEvidenceDO || autoChangedEvidenceRI;
+    const autoRepairedEvidenceRI = autoRepairCorruptedRelevantImplicationsCategories(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
+    const autoChangedEvidence = autoChangedEvidencePM || autoChangedEvidenceDO || autoChangedEvidenceRI || autoRepairedEvidenceRI;
     if (migratedDigitalOutcomeRows || migrated91897Rows || autoChangedChecklist || autoChangedEvidence) {
         const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
         await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});

@@ -493,7 +493,7 @@ function extractCategoryFromTemplateTitle(templateTitle) {
     return null;
 }
 
-async function markConnectedTaskItemDone(templateId) {
+async function markConnectedTaskItemDone(templateId, templateTitle = "") {
     const activityId = String(templateUsageContext.activityId || "").trim();
     const studentEmail = getLibraryEmail();
     if (!activityId || !studentEmail) return;
@@ -509,15 +509,14 @@ async function markConnectedTaskItemDone(templateId) {
         evidenceRows = await fetchActivityEvidenceRows(activityId, studentEmail);
     }
 
-    // Check if this is a category-specific relevant implications template
-    const templateTitle = String(templateUsageContext.templateTitle || "").trim();
-    const categoryFromTitle = extractCategoryFromTemplateTitle(templateTitle);
+    // Determine if this is a category-specific template by ID or title
     const categoryFromId = extractCategoryFromTemplateId(templateId);
-    const specificCategory = categoryFromTitle || categoryFromId;
+    const categoryFromTitle = extractCategoryFromTemplateTitle(templateTitle);
+    const specificCategory = categoryFromId || categoryFromTitle;
 
     let matchers;
-    if (specificCategory && (templateId.toLowerCase().includes("relevant-implications") || templateTitle.toLowerCase().includes("relevant implications"))) {
-        // For category-specific templates, only match that category step
+    if (specificCategory) {
+        // Only mark the single matching category step as done
         const categoryStepText = `Achieved: Relevant implications category - ${specificCategory}`;
         matchers = [new RegExp(`^${categoryStepText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i")];
     } else {
@@ -963,7 +962,7 @@ async function handleUseTemplate(templateId) {
             templateTitle: item.title
         });
         persistCurrentTemplateCopyMap();
-        void markConnectedTaskItemDone(templateId).catch((error) => {
+        void markConnectedTaskItemDone(templateId, item.title).catch((error) => {
             console.warn("Could not update Task List completion after template open.", error);
         });
         window.open(driveState.copyMap[templateId].fileUrl, "_blank", "noopener");
@@ -1008,7 +1007,7 @@ async function handleUseTemplate(templateId) {
         });
         persistCurrentTemplateCopyMap();
         updateCardAfterCopy(templateId, payload);
-        void markConnectedTaskItemDone(templateId).catch((error) => {
+        void markConnectedTaskItemDone(templateId, item.title).catch((error) => {
             console.warn("Could not update Task List completion after template copy.", error);
         });
         window.open(payload.fileUrl, "_blank", "noopener");
@@ -1039,7 +1038,7 @@ async function handleUseTemplate(templateId) {
             });
             persistCurrentTemplateCopyMap();
             updateCardAfterCopy(templateId, retryPayload);
-            void markConnectedTaskItemDone(templateId).catch((warnError) => {
+            void markConnectedTaskItemDone(templateId, item.title).catch((warnError) => {
                 console.warn("Could not update Task List completion after template copy.", warnError);
             });
             window.open(retryPayload.fileUrl, "_blank", "noopener");
