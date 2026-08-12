@@ -194,7 +194,8 @@ function persistTaskTopicSlideSyncLink(fileUrl, metadata = {}) {
         localStorage.setItem(key, JSON.stringify({
             url: safeUrl,
             savedAt: new Date().toISOString(),
-            templateId: String(templateUsageContext.templateId || "").trim(),
+            // Prefer the actual item templateId over the URL-context templateId so cross-topic usage is not misclassified
+            templateId: String(metadata.templateId || templateUsageContext.templateId || "").trim(),
             syncSource: "template-use",
             thumbnailUrl: String(metadata.thumbnailUrl || "").trim(),
             templateTitle: String(metadata.templateTitle || "").trim()
@@ -958,6 +959,7 @@ async function handleUseTemplate(templateId) {
     // If already copied this session, open existing
     if (driveState.copyMap[templateId]) {
         persistTaskTopicSlideSyncLink(driveState.copyMap[templateId].fileUrl, {
+            templateId: item.id,
             thumbnailUrl: item.imageUrl,
             templateTitle: item.title
         });
@@ -1002,6 +1004,7 @@ async function handleUseTemplate(templateId) {
 
         driveState.copyMap[templateId] = { fileUrl: payload.fileUrl, fileName: payload.fileName };
         persistTaskTopicSlideSyncLink(payload.fileUrl, {
+            templateId: item.id,
             thumbnailUrl: item.imageUrl,
             templateTitle: item.title
         });
@@ -1033,6 +1036,7 @@ async function handleUseTemplate(templateId) {
             const retryPayload = await copyTemplateWithToken(consentTokenResponse.access_token);
             driveState.copyMap[templateId] = { fileUrl: retryPayload.fileUrl, fileName: retryPayload.fileName };
             persistTaskTopicSlideSyncLink(retryPayload.fileUrl, {
+                templateId: item.id,
                 thumbnailUrl: item.imageUrl,
                 templateTitle: item.title
             });
