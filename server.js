@@ -75,6 +75,18 @@ const DEFAULT_TEMPLATE_LIBRARY_ENTRIES = [
     sourceFolderId: ""
   },
   {
+    id: "tools-and-techniques",
+    title: "Tools & Techniques",
+    standardCodes: ["91897", "91907"],
+    criteriaText: "List the tools you use and describe the techniques you implement with each one.",
+    summary: "Two-column slide for listing tools and the techniques applied during development.",
+    imageUrl: "https://drive.google.com/thumbnail?id=1F3F10KG2JCFQ-x41q6TEK15YjoxblmjRCGUZ6d254wg&sz=w1000",
+    templateUrl: "https://docs.google.com/presentation/d/1F3F10KG2JCFQ-x41q6TEK15YjoxblmjRCGUZ6d254wg/edit?usp=sharing",
+    status: "live",
+    sortOrder: 3,
+    sourceFolderId: ""
+  },
+  {
     id: "speaker-notes-criteria-mapping",
     title: "Speaker Notes Criteria Mapping",
     standardCodes: ["91897"],

@@ -3699,7 +3699,9 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         const canonicalTemplatePreviewUrl = await fetchTemplateLibraryPreviewByTemplateId(syncTemplateId);
         const topicMatch = await findProcessAssessmentSlideMatch(syncTopicLabel);
         let matchedTopicThumbnailUrl = "";
-        if (!syncedGoogleSlidesUrl && allowFolderMatchAutoLink) {
+        // For tools-and-techniques, always prefer the Drive folder match over any stale localStorage entry
+        const shouldOverrideWithFolderMatch = isToolsAndTechniquesSyncTopic && topicMatch.fileUrl;
+        if (shouldOverrideWithFolderMatch || (!syncedGoogleSlidesUrl && allowFolderMatchAutoLink)) {
             if (topicMatch.fileUrl) {
                 syncedGoogleSlidesUrl = topicMatch.fileUrl;
                 matchedTopicThumbnailUrl = toSafeExternalUrl(topicMatch.thumbnailUrl || "");
