@@ -67,6 +67,43 @@ const taskListState = {
     templateCopies: []
 };
 
+// Minimal Drive OAuth client for task list — only needs read access to list slides
+const taskListDriveState = { tokenClient: null, accessToken: "", tokenExpiry: 0 };
+const TASK_LIST_DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
+
+function getTaskListGoogleClientId() {
+    return String(document.querySelector('meta[name="hub-google-client-id"]')?.content || "").trim();
+}
+
+function requestTaskListDriveToken() {
+    return new Promise((resolve) => {
+        if (taskListDriveState.accessToken && taskListDriveState.tokenExpiry > Date.now() + 60000) {
+            resolve({ access_token: taskListDriveState.accessToken });
+            return;
+        }
+        const clientId = getTaskListGoogleClientId();
+        if (!clientId || !window.google?.accounts?.oauth2) {
+            resolve({ error: "google_unavailable" });
+            return;
+        }
+        if (!taskListDriveState.tokenClient) {
+            taskListDriveState.tokenClient = window.google.accounts.oauth2.initTokenClient({
+                client_id: clientId,
+                scope: TASK_LIST_DRIVE_SCOPE,
+                callback: (response) => {
+                    if (!response.error && response.access_token) {
+                        taskListDriveState.accessToken = response.access_token;
+                        taskListDriveState.tokenExpiry = Date.now() + (Number(response.expires_in) || 3600) * 1000;
+                    }
+                    resolve(response);
+                },
+                error_callback: (err) => resolve({ error: err?.type || "access_denied" })
+            });
+        }
+        taskListDriveState.tokenClient.requestAccessToken();
+    });
+}
+
 function normalizeDigitalOutcomeChecklistRows(rows) {
     const sourceRows = Array.isArray(rows)
         ? rows.map((step) => ({ text: String(step?.text || "").trim(), done: Boolean(step?.done) }))
@@ -864,76 +901,6 @@ function evidenceMapToRows(currentState, standards) {
         .filter((row) => row.standard);
 }
 
-// Drive OAuth token state — used only for the Sync from Drive feature
-const taskListDriveState = { tokenClient: null, accessToken: "", tokenExpiry: 0, pendingResolve: null };
-
-function initTaskListDriveTokenClient() {
-    if (!window.google?.accounts?.oauth2) return null;
-    const clientId = document.querySelector('meta[name="hub-google-client-id"]')?.content.trim() || "";
-    if (!clientId) return null;
-    return window.google.accounts.oauth2.initTokenClient({
-        client_id: clientId,
-        scope: "https://www.googleapis.com/auth/drive.readonly",
-        callback: (response) => {
-            if (taskListDriveState.pendingResolve) {
-                taskListDriveState.pendingResolve(response);
-                taskListDriveState.pendingResolve = null;
-            }
-            if (!response.error && response.access_token) {
-                taskListDriveState.accessToken = response.access_token;
-                taskListDriveState.tokenExpiry = Date.now() + (Number(response.expires_in) || 3600) * 1000;
-            }
-        },
-        error_callback: (error) => {
-            if (taskListDriveState.pendingResolve) {
-                taskListDriveState.pendingResolve({ error: error?.type || "access_denied" });
-                taskListDriveState.pendingResolve = null;
-            }
-        }
-    });
-}
-
-function requestTaskListDriveToken() {
-    return new Promise((resolve) => {
-        if (taskListDriveState.accessToken && taskListDriveState.tokenExpiry > Date.now() + 60000) {
-            resolve({ access_token: taskListDriveState.accessToken });
-            return;
-        }
-        if (!taskListDriveState.tokenClient) {
-            taskListDriveState.tokenClient = initTaskListDriveTokenClient();
-        }
-        if (!taskListDriveState.tokenClient) {
-            resolve({ error: "drive_unavailable" });
-            return;
-        }
-        taskListDriveState.pendingResolve = resolve;
-        taskListDriveState.tokenClient.requestAccessToken();
-    });
-}
-
-async function syncDriveTemplatesForActivity(projectId, statusCallback) {
-    statusCallback("Requesting Google Drive access\u2026");
-    const tokenResponse = await requestTaskListDriveToken();
-    if (tokenResponse.error) {
-        statusCallback("Drive access was not granted.", true);
-        return false;
-    }
-    statusCallback("Scanning your Process Assessment folder\u2026");
-    try {
-        const payload = await loadJson(`/api/activities/${encodeURIComponent(projectId)}/sync-drive-templates`, {
-            method: "POST",
-            headers: buildTaskListHeaders({ "Content-Type": "application/json" }),
-            body: JSON.stringify({ driveAccessToken: tokenResponse.access_token })
-        });
-        const count = Number(payload?.discovered || 0);
-        statusCallback(count > 0 ? `Found ${count} template${count === 1 ? "" : "s"} in your folder.` : "No recognised templates found in your folder.");
-        return count > 0;
-    } catch (error) {
-        statusCallback(error?.message || "Could not scan Drive folder.", true);
-        return false;
-    }
-}
-
 async function fetchMyEvidence(projectId) {
     if (!projectId) return [];
     const payload = await loadJson(`/api/activities/${encodeURIComponent(projectId)}/my-evidence`, { headers: buildTaskListHeaders({}) });
@@ -1190,11 +1157,7 @@ function renderChecklistCards(detail, allItems) {
                                     ? `<p class="task-list-achieved-subheading">${escapeTaskListHtml(achievedSectionMeta.title)}</p>`
                                     : ""}
                                 ${shouldRenderAchievedSectionHeading && achievedSectionMeta?.id === "relevant-implications"
-                                    ? `<p class="task-list-achieved-note">Complete any 3 or more categories to mark Section 4 complete. (${relevantCategoryDoneCount}/${RELEVANT_IMPLICATIONS_CATEGORIES.length})</p>
-                                       <div class="task-list-drive-sync-wrap">
-                                         <button type="button" class="task-list-drive-sync-btn" id="task-list-sync-drive-btn">&#x2601; Sync from Google Drive</button>
-                                         <span class="task-list-drive-sync-status" id="task-list-sync-drive-status" aria-live="polite"></span>
-                                       </div>`
+                                    ? `<p class="task-list-achieved-note">Complete any 3 or more categories to mark Section 4 complete. (${relevantCategoryDoneCount}/${RELEVANT_IMPLICATIONS_CATEGORIES.length}) <button type="button" class="task-list-sync-drive-btn" id="task-list-sync-drive">&#x21bb; Sync from Google Drive</button></p>`
                                     : ""}
                                 <div class="task-list-step-row ${isSystemComplete ? "is-system-complete" : ""} ${isRelevantCategoryRow ? "is-relevant-implications-category" : ""}">
                                     <label class="task-list-step-check-wrap">
@@ -1448,21 +1411,51 @@ async function renderTaskListPage() {
     });
 
     document.addEventListener("click", async (event) => {
-        const syncBtn = event.target?.closest?.("#task-list-sync-drive-btn");
+        const syncBtn = event.target?.closest?.("#task-list-sync-drive");
         if (!syncBtn || !taskListState.selectedId) return;
 
         syncBtn.disabled = true;
-        const statusEl = document.querySelector("#task-list-sync-drive-status");
-        const setSync = (msg, isError = false) => {
-            if (statusEl) { statusEl.textContent = msg; statusEl.style.color = isError ? "#c0392b" : ""; }
-        };
+        syncBtn.textContent = "Requesting Drive access\u2026";
 
-        const found = await syncDriveTemplatesForActivity(taskListState.selectedId, setSync);
-        syncBtn.disabled = false;
+        const tokenResponse = await requestTaskListDriveToken();
+        if (tokenResponse.error) {
+            syncBtn.disabled = false;
+            syncBtn.textContent = "\u21bb Sync from Google Drive";
+            setStatus("Drive access was not granted.", true);
+            return;
+        }
 
-        if (found) {
-            // Reload task list from fresh DB data after sync
-            await loadChecklistForTask(taskListState.selectedId);
+        syncBtn.textContent = "Scanning\u2026";
+        try {
+            const payload = await loadJson(
+                `/api/activities/${encodeURIComponent(taskListState.selectedId)}/sync-drive-templates`,
+                {
+                    method: "POST",
+                    headers: buildTaskListHeaders({ "Content-Type": "application/json" }),
+                    body: JSON.stringify({ driveAccessToken: tokenResponse.access_token })
+                }
+            );
+
+            taskListState.templateCopies = Array.isArray(payload?.template_copies) ? payload.template_copies : [];
+
+            const repairedChecklist = applyTemplateCopiesAsRelevantImplicationsState(taskListState.checklistState, taskListState.templateCopies);
+            const repairedEvidence = applyTemplateCopiesAsRelevantImplicationsState(taskListState.fullEvidenceState, taskListState.templateCopies);
+
+            autoTickRelevantImplicationsRequirements(taskListState.checklistState, taskListState.selectedId, getTaskListEmail());
+            autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, taskListState.selectedId, getTaskListEmail());
+
+            if (repairedChecklist || repairedEvidence) {
+                const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
+                await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});
+            }
+
+            const synced = Number(payload?.synced || 0);
+            setStatus(`Drive sync complete. Found ${synced} template file${synced === 1 ? "" : "s"}.`);
+            renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);
+        } catch (error) {
+            setStatus(error?.message || "Could not sync from Drive.", true);
+            const btn = document.querySelector("#task-list-sync-drive");
+            if (btn) { btn.disabled = false; btn.textContent = "\u21bb Sync from Google Drive"; }
         }
     });
 

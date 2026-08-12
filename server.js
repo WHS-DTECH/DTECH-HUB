@@ -5597,6 +5597,93 @@ app.post("/api/student/drive-setup/find-slide", async (req, res) => {
   }
 });
 
+const TEMPLATE_ID_FROM_TITLE_PATTERNS = [
+  { pattern: /^relevant\s+implications\s*-\s*(.+?)(?:\s*-\s*.+)?$/i, prefix: "relevant-implications-" },
+  { pattern: /^digital\s+outcome\s+description(?:\s*-\s*.+)?$/i, id: "digital-outcome-description", title: "Digital Outcome Description" },
+  { pattern: /^target\s+audience(?:\s*-\s*.+)?$/i, id: "target-audience", title: "Target Audience" },
+  { pattern: /^development\s+steps(?:\s*-\s*.+)?$/i, id: "development-tools", title: "Development Steps" },
+  { pattern: /^project\s+success\s+criteria(?:\s*-\s*.+)?$/i, id: "project-success-criteria", title: "Project Success Criteria" },
+];
+
+function inferTemplateCopyFromFileName(fileName) {
+  const name = String(fileName || "").trim();
+  if (!name) return null;
+
+  for (const entry of TEMPLATE_ID_FROM_TITLE_PATTERNS) {
+    const match = name.match(entry.pattern);
+    if (!match) continue;
+
+    if (entry.prefix) {
+      // Variable template — category is the first capture group
+      const subtopic = String(match[1] || "").trim();
+      const slug = subtopic.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+      return {
+        templateId: `${entry.prefix}${slug}`,
+        templateTitle: `Relevant Implications - ${subtopic}`,
+        fileUrl: "",
+        fileName: name
+      };
+    }
+
+    return { templateId: entry.id, templateTitle: entry.title, fileUrl: "", fileName: name };
+  }
+
+  return null;
+}
+
+// POST /api/activities/:id/sync-drive-templates — scan Drive folder, infer template copies, save to DB
+app.post("/api/activities/:id/sync-drive-templates", async (req, res) => {
+  const projectId = String(req.params.id || "").trim();
+  const requesterEmail = normalizeEmail(getRequestUserEmail(req));
+  const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
+
+  if (!projectId) { res.status(400).json({ error: "Project ID is required." }); return; }
+  if (!requesterEmail || !requesterEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required." }); return;
+  }
+  if (!driveAccessToken) { res.status(400).json({ error: "driveAccessToken is required." }); return; }
+
+  try {
+    const setup = await getStudentDriveSetup(requesterEmail);
+    const folderId = String(setup?.processAssessmentFolderId || "").trim();
+    if (!folderId) {
+      res.status(400).json({ error: "Please confirm your Process Assessment folder first." });
+      return;
+    }
+
+    const slides = await driveListSlidesInProcessAssessmentTree(folderId, driveAccessToken);
+    const inferred = [];
+
+    for (const file of slides) {
+      const entry = inferTemplateCopyFromFileName(file.name);
+      if (!entry) continue;
+      entry.fileUrl = String(file.webViewLink || `https://docs.google.com/presentation/d/${file.id}/edit`).trim();
+      entry.fileName = String(file.name || "").trim();
+      inferred.push(entry);
+    }
+
+    if (hasDatabase && inferred.length > 0) {
+      for (const entry of inferred) {
+        await recordTemplateCopyInDb(projectId, requesterEmail, entry).catch(() => {});
+      }
+    }
+
+    // Return the full updated list
+    let allCopies = inferred;
+    if (hasDatabase) {
+      const result = await pool.query(
+        `SELECT template_copies FROM project_interests WHERE project_id = $1 AND student_email = $2 LIMIT 1`,
+        [projectId, requesterEmail]
+      );
+      allCopies = Array.isArray(result.rows?.[0]?.template_copies) ? result.rows[0].template_copies : inferred;
+    }
+
+    res.json({ ok: true, synced: inferred.length, template_copies: allCopies });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not sync from Drive." });
+  }
+});
+
 app.post("/api/student/drive-setup/list-process-assessment-slides", async (req, res) => {
   const email = normalizeEmail(getRequestUserEmail(req));
   if (!email) {
@@ -5632,60 +5719,6 @@ app.post("/api/student/drive-setup/list-process-assessment-slides", async (req, 
     });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not list Process Assessment slides." });
-  }
-});
-
-// Scans the student's Drive Process Assessment folder and persists recognised template copies to the DB
-app.post("/api/activities/:id/sync-drive-templates", async (req, res) => {
-  const projectId = String(req.params.id || "").trim();
-  const requesterEmail = normalizeEmail(getRequestUserEmail(req));
-  const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
-
-  if (!projectId) { res.status(400).json({ error: "Project ID is required" }); return; }
-  if (!requesterEmail || !requesterEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
-    res.status(401).json({ error: "School sign-in required" }); return;
-  }
-  if (!driveAccessToken) { res.status(400).json({ error: "driveAccessToken is required" }); return; }
-
-  try {
-    const setup = await getStudentDriveSetup(requesterEmail);
-    const folderId = String(setup?.processAssessmentFolderId || "").trim();
-    if (!folderId) {
-      res.status(400).json({ error: "Please confirm your Process Assessment folder first." });
-      return;
-    }
-
-    const slides = await driveListSlidesInProcessAssessmentTree(folderId, driveAccessToken);
-    const discovered = [];
-
-    for (const slide of slides) {
-      const name = String(slide?.name || "").trim();
-      const parts = name.split(" - ");
-      // Try progressively shorter prefix until a known template identity is matched
-      let identity = null;
-      for (let i = parts.length; i >= 1; i--) {
-        const candidate = parts.slice(0, i).join(" - ").trim();
-        identity = inferCanonicalTemplateIdentityFromTitle(candidate);
-        if (identity) break;
-      }
-      if (!identity) continue;
-      discovered.push({
-        templateId: identity.id,
-        templateTitle: identity.title,
-        fileUrl: String(slide.webViewLink || `https://docs.google.com/presentation/d/${slide.id}/edit`).trim(),
-        fileName: name
-      });
-    }
-
-    if (hasDatabase) {
-      for (const entry of discovered) {
-        await recordTemplateCopyInDb(projectId, requesterEmail, entry).catch(() => {});
-      }
-    }
-
-    res.json({ ok: true, discovered: discovered.length, templates: discovered });
-  } catch (error) {
-    res.status(error.status || 500).json({ error: error.message || "Could not sync Drive templates." });
   }
 });
 
