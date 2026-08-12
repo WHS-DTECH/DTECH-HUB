@@ -6777,7 +6777,16 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         readStoredTaskTopicSlideSyncEntryByShortName(id, viewerEmail, displayTitle),
         readStoredTaskTopicSlideSyncEntry(id, viewerEmail, taskTopicTitle, displayTitle),
         readStoredTaskTopicSlideSyncEntryByTemplateId(id, viewerEmail, preferredTemplateId)
-    ];
+    ].filter((entry) => {
+        if (!toSafeExternalUrl(entry?.url || "")) return false;
+        // Discard entries whose templateId belongs to a different topic to prevent cross-topic bleed
+        const entryTemplateId = String(entry?.templateId || "").trim().toLowerCase();
+        if (!entryTemplateId || !preferredTemplateId) return true;
+        if (preferredTemplateId === "tools-and-techniques") {
+            return entryTemplateId === "tools-and-techniques" || entryTemplateId.startsWith("tools-and-techniques-");
+        }
+        return true;
+    });
     const syncedTaskTopicEntry = syncedTaskTopicEntryCandidates.find((entry) => toSafeExternalUrl(entry?.url || ""));
     const taskTopicSyncedSlideThumbnail = toSafeExternalUrl(syncedTaskTopicEntry?.thumbnailUrl || "")
         || toGoogleSlidesThumbnailUrl(syncedTaskTopicEntry?.url || "");
