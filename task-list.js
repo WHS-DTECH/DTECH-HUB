@@ -547,12 +547,6 @@ function applyTemplateCopiesAsRelevantImplicationsState(stateMap, templateCopies
     // Build set of categories confirmed by DB records
     const usedCategoryKeys = new Set();
     templateCopies.forEach((copy) => {
-        const tid = String(copy?.templateId || "").trim().toLowerCase();
-        // Match by templateId slug
-        if (tid.startsWith("relevant-implications-") && tid !== "relevant-implications") {
-            const cat = extractRelevantImplicationsCategoryFromTemplateId(tid);
-            if (cat) usedCategoryKeys.add(normalizeRelevantImplicationsCategoryKey(cat));
-        }
         // Match by templateTitle (e.g. "Relevant Implications - Functionality")
         const title = String(copy?.templateTitle || "").trim();
         const titleMatch = title.match(/^relevant\s+implications\s*-\s*(.+)$/i);
