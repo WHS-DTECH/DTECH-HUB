@@ -793,31 +793,36 @@ function autoTickRelevantImplicationsRequirements(stateMap, projectId, email) {
 
     const completedCategoryCount = countCompletedRelevantImplicationsCategories(rows);
     const shouldMarkSectionComplete = completedCategoryCount >= 3;
+
+    // Determine whether the Achieved step is actually done after auto-tick logic
+    const achievedStepWillBeDone = shouldMarkSectionComplete;
+
     let changed = false;
 
     rows.forEach((row) => {
         const text = String(row?.text || "").trim();
-        if (!text) {
+        if (!text) return;
+
+        const level = getStepLevel(text);
+        const stripped = stripStepLevel(text).toLowerCase();
+
+        if (level === "Achieved" && stripped === "explain relevant implications.") {
+            if (shouldMarkSectionComplete && !Boolean(row?.done)) {
+                row.done = true;
+                changed = true;
+            } else if (!shouldMarkSectionComplete && Boolean(row?.done)) {
+                row.done = false;
+                changed = true;
+            }
             return;
         }
 
-        if (getStepLevel(text) !== "Achieved") {
-            return;
-        }
-
-        if (stripStepLevel(text).toLowerCase() !== "explain relevant implications.") {
-            return;
-        }
-
-        if (shouldMarkSectionComplete && !Boolean(row?.done)) {
-            row.done = true;
-            changed = true;
-            return;
-        }
-
-        if (!shouldMarkSectionComplete && Boolean(row?.done)) {
-            row.done = false;
-            changed = true;
+        // Merit "Address relevant implications." must not be ticked when Achieved is not done
+        if (level === "Merit" && stripped === "address relevant implications." && !achievedStepWillBeDone) {
+            if (Boolean(row?.done)) {
+                row.done = false;
+                changed = true;
+            }
         }
     });
 
