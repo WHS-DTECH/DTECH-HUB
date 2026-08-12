@@ -383,7 +383,7 @@ function getTemplateStepMatchers(templateId) {
         }
     }
 
-    if (id === "relevant-implications" || id.startsWith("relevant-implications-") || id === "development-steps" || id === "development-tools") {
+    if (id === "relevant-implications" || id.startsWith("relevant-implications-") || id === "development-steps" || id === "development-steps") {
         return [
             /explain\s+how\s+the\s+outcome\s+will\s+be\s+developed/i,
             /tools\/?technologies/i,
@@ -1182,7 +1182,7 @@ function renderTemplateCard(item) {
 
 function extractTemplateSectionName(item) {
     const templateId = String(item?.id || "").trim().toLowerCase();
-    if (templateId === "development-tools") {
+    if (templateId === "development-steps") {
         return "Digital Outcome Details";
     }
     if (templateId === "relevant-implications") {

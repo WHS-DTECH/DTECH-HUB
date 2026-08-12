@@ -3340,7 +3340,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         || Boolean(keywordMatchedTopicKey);
     const digitalOutcomeSyncTemplateId = keywordMatchedTopicKey === "target-audience"
         ? "target-audience"
-        : (keywordMatchedTopicKey === "development-tools"
+        : (keywordMatchedTopicKey === "development-steps"
             ? "relevant-implications"
             : (keywordMatchedTopicKey === "success-criteria" ? "project-success-criteria" : "digital-outcome-description"));
     const isMediaAssetWorkflowTopic = isAssetVersionControlTopic && !isProjectManagementTopic;
@@ -3656,7 +3656,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             || keywordMatchedTopicKey === "tools-and-techniques";
         const isDevelopmentToolsTopic = !isToolsAndTechniquesSyncTopic && (
             isDigitalOutcomeDevelopmentToolsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
-            || keywordMatchedTopicKey === "development-tools");
+            || keywordMatchedTopicKey === "development-steps");
         const isSuccessCriteriaTopic = isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
             || keywordMatchedTopicKey === "success-criteria";
         const isRelevantImplicationsTopic = isDigitalOutcomeRelevantImplicationsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
@@ -3675,7 +3675,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             : (isToolsAndTechniquesSyncTopic
                 ? "tools-and-techniques"
                 : (isDevelopmentToolsTopic
-                    ? "development-tools"
+                    ? "development-steps"
                     : (isSuccessCriteriaTopic
                         ? "project-success-criteria"
                         : (isRelevantImplicationsTopic ? "relevant-implications" : "digital-outcome-description"))));
@@ -6135,7 +6135,7 @@ function inferDigitalOutcomeTopicKeyFromTitle(pageTitle) {
     }
 
     if (/developed|development|tools\/?technologies|tools|technologies/.test(normalized)) {
-        return "development-tools";
+        return "development-steps";
     }
 
     if (/relevant\s+implications/.test(normalized)) {
@@ -6669,7 +6669,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     const isDigitalOutcomeTargetAudienceTopic = isDigitalOutcomeTargetAudienceCriterion(taskTopicTitle, resolvedTaskShortName)
         || keywordMatchedTopicKey === "target-audience";
     const isDigitalOutcomeDevelopmentToolsTopic = isDigitalOutcomeDevelopmentToolsCriterion(taskTopicTitle, resolvedTaskShortName)
-        || keywordMatchedTopicKey === "development-tools";
+        || keywordMatchedTopicKey === "development-steps";
     const isToolsAndTechniquesTopic = isToolsAndTechniquesCriterion(taskTopicTitle, resolvedTaskShortName);
     const isDigitalOutcomeSuccessCriteriaTopic = isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, resolvedTaskShortName)
         || keywordMatchedTopicKey === "success-criteria";
@@ -6680,7 +6680,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         : (isToolsAndTechniquesTopic
             ? "tools-and-techniques"
             : (isDigitalOutcomeDevelopmentToolsTopic
-            ? "development-tools"
+            ? "development-steps"
             : (isDigitalOutcomeSuccessCriteriaTopic
                 ? "success-criteria"
                 : (isDigitalOutcomeRelevantImplicationsTopic
@@ -6697,7 +6697,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             ? DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE
             : (digitalOutcomeTopicKey === "tools-and-techniques"
                 ? DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE
-                : (digitalOutcomeTopicKey === "development-tools"
+                : (digitalOutcomeTopicKey === "development-steps"
                     ? DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE
                     : (digitalOutcomeTopicKey === "success-criteria"
                         ? DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE
@@ -6748,8 +6748,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         ? "target-audience"
         : (digitalOutcomeTopicKey === "tools-and-techniques"
             ? "tools-and-techniques"
-            : (digitalOutcomeTopicKey === "development-tools"
-            ? "development-tools"
+            : (digitalOutcomeTopicKey === "development-steps"
+            ? "development-steps"
             : (digitalOutcomeTopicKey === "success-criteria"
                 ? "project-success-criteria"
                 : (digitalOutcomeTopicKey === "relevant-implications" ? "relevant-implications" : "digital-outcome-description"))));
@@ -6760,7 +6760,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             ? DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE
             : (preferredTemplateId === "tools-and-techniques"
                 ? DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE
-                : (preferredTemplateId === "development-tools"
+                : (preferredTemplateId === "development-steps"
                 ? DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE
                 : (preferredTemplateId === "project-success-criteria"
                     ? DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE
@@ -6863,7 +6863,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         : (isDigitalOutcomeTopic
             ? (digitalOutcomeTopicKey === "target-audience"
                 ? "Target Audience"
-                : (digitalOutcomeTopicKey === "development-tools"
+                : (digitalOutcomeTopicKey === "development-steps"
                     ? "Development Steps"
                     : (digitalOutcomeTopicKey === "success-criteria"
                         ? "Success Criteria"
@@ -6901,7 +6901,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 ];
             }
 
-            if (digitalOutcomeTopicKey === "development-tools") {
+            if (digitalOutcomeTopicKey === "development-steps") {
                 return [
                     "Create a Google Slideshow for this topic.",
                     "Explain how your outcome will be developed from planning through implementation.",
@@ -6975,7 +6975,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 ];
             }
 
-            if (digitalOutcomeTopicKey === "development-tools") {
+            if (digitalOutcomeTopicKey === "development-steps") {
                 return [
                     "Development Steps - Google Slides: Explain how your outcome will be developed.",
                     "List the tools/technologies you will use and what each tool is responsible for.",
@@ -7025,7 +7025,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         if (digitalOutcomeTopicKey === "tools-and-techniques") {
             return "List the tools you plan to use, are currently using, or have used for this task, and describe the techniques you implement with each one.";
         }
-        if (digitalOutcomeTopicKey === "development-tools") {
+        if (digitalOutcomeTopicKey === "development-steps") {
         }
         if (digitalOutcomeTopicKey === "success-criteria") {
             return "Use this guide to define measurable success criteria and explain how your outcome will be evaluated.";
@@ -7048,7 +7048,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         if (digitalOutcomeTopicKey === "tools-and-techniques") {
             return "Tools & Techniques Table";
         }
-        if (digitalOutcomeTopicKey === "development-tools") {
+        if (digitalOutcomeTopicKey === "development-steps") {
             return "Development Steps - Google Slides";
         }
         if (digitalOutcomeTopicKey === "success-criteria") {
@@ -7533,7 +7533,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             const isTargetAudienceTopic = isDigitalOutcomeTargetAudienceCriterion(taskTopicTitle, resolvedTaskShortName)
                 || keywordMatchedTopicKey === "target-audience";
             const isDevelopmentToolsTopic = isDigitalOutcomeDevelopmentToolsCriterion(taskTopicTitle, resolvedTaskShortName)
-                || keywordMatchedTopicKey === "development-tools";
+                || keywordMatchedTopicKey === "development-steps";
             const isSuccessCriteriaTopic = isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, resolvedTaskShortName)
                 || keywordMatchedTopicKey === "success-criteria";
             const isRelevantImplicationsTopic = isDigitalOutcomeRelevantImplicationsCriterion(taskTopicTitle, resolvedTaskShortName)
@@ -7550,7 +7550,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             const syncTemplateId = isTargetAudienceTopic
                 ? "target-audience"
                 : (isDevelopmentToolsTopic
-                    ? "development-tools"
+                    ? "development-steps"
                     : (isSuccessCriteriaTopic
                         ? "project-success-criteria"
                         : (isRelevantImplicationsTopic ? "relevant-implications" : "digital-outcome-description")));

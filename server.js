@@ -4770,7 +4770,7 @@ function inferCanonicalTemplateIdentityFromTitle(title) {
 
   if (/development\s+steps|outcome\s+developed|developed|development|tools\/?technologies/.test(normalizedTitle)) {
     return {
-      id: "development-tools",
+      id: "development-steps",
       title: "Development Steps",
       criteriaText: "Explain how the outcome will be developed and what tools/technologies will be used."
     };
@@ -5601,7 +5601,7 @@ const TEMPLATE_ID_FROM_TITLE_PATTERNS = [
   { pattern: /^relevant\s+implications\s*-\s*(.+?)(?:\s*-\s*.+)?$/i, prefix: "relevant-implications-" },
   { pattern: /^digital\s+outcome\s+description(?:\s*-\s*.+)?$/i, id: "digital-outcome-description", title: "Digital Outcome Description" },
   { pattern: /^target\s+audience(?:\s*-\s*.+)?$/i, id: "target-audience", title: "Target Audience" },
-  { pattern: /^development\s+steps(?:\s*-\s*.+)?$/i, id: "development-tools", title: "Development Steps" },
+  { pattern: /^development\s+steps(?:\s*-\s*.+)?$/i, id: "development-steps", title: "Development Steps" },
   { pattern: /^project\s+success\s+criteria(?:\s*-\s*.+)?$/i, id: "project-success-criteria", title: "Project Success Criteria" },
 ];
 
