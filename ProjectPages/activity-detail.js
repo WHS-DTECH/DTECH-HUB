@@ -6661,8 +6661,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 : (isDigitalOutcomeRelevantImplicationsTopic
                     ? "relevant-implications"
                     : (isDigitalOutcomeDescriptionTopic ? "description" : keywordMatchedTopicKey)))));
-    // Tools & Techniques has no template — suppress the hero card for it
-    const useDigitalOutcomeTemplateHero = Boolean(digitalOutcomeTopicKey) && digitalOutcomeTopicKey !== "tools-and-techniques";
+    const useDigitalOutcomeTemplateHero = Boolean(digitalOutcomeTopicKey);
     const mergedTaskTopicLinks = isTaskTopicView
         ? collectMergedTaskTopicLinks(data, id, taskTopicTitle, resolvedTaskShortName)
         : [];
@@ -6723,7 +6722,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     const preferredTemplateId = digitalOutcomeTopicKey === "target-audience"
         ? "target-audience"
         : (digitalOutcomeTopicKey === "tools-and-techniques"
-            ? ""
+            ? "tools-and-techniques"
             : (digitalOutcomeTopicKey === "development-tools"
             ? "development-tools"
             : (digitalOutcomeTopicKey === "success-criteria"
@@ -6734,7 +6733,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         // Add pre-filter topic name for template library search
         const topicDisplayName = preferredTemplateId === "target-audience"
             ? DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE
-            : (preferredTemplateId === "development-tools"
+            : (preferredTemplateId === "tools-and-techniques"
+                ? DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE
+                : (preferredTemplateId === "development-tools"
                 ? DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE
                 : (preferredTemplateId === "project-success-criteria"
                     ? DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE
