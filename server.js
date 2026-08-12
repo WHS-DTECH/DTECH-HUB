@@ -3569,6 +3569,7 @@ async function ensureProjectInterestsSchema() {
       standard_2 TEXT,
       evidence_steps JSONB NOT NULL DEFAULT '[]'::jsonb,
       tools_techniques JSONB NOT NULL DEFAULT '[]'::jsonb,
+      template_copies JSONB NOT NULL DEFAULT '[]'::jsonb,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (project_id, student_email)
@@ -3580,6 +3581,7 @@ async function ensureProjectInterestsSchema() {
   await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS standard_2 TEXT`);
   await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS evidence_steps JSONB NOT NULL DEFAULT '[]'::jsonb`);
   await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS tools_techniques JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS template_copies JSONB NOT NULL DEFAULT '[]'::jsonb`);
   await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 }
@@ -3818,6 +3820,34 @@ function upsertEvidenceRow(rows, standardKey, nextSteps) {
   });
 
   return normalizeEvidenceStepsPayload(normalizedRows);
+}
+
+async function recordTemplateCopyInDb(projectId, studentEmail, entry) {
+  if (!hasDatabase) return;
+  const safeEntry = {
+    templateId: String(entry?.templateId || "").trim(),
+    templateTitle: String(entry?.templateTitle || "").trim(),
+    fileUrl: String(entry?.fileUrl || "").trim(),
+    fileName: String(entry?.fileName || "").trim(),
+    copiedAt: new Date().toISOString()
+  };
+  if (!safeEntry.templateId) return;
+
+  // Append to array, replacing any earlier entry for the same templateId
+  await pool.query(
+    `UPDATE project_interests
+     SET template_copies = (
+       SELECT jsonb_agg(elem) FROM (
+         SELECT elem FROM jsonb_array_elements(template_copies) AS elem
+         WHERE elem->>'templateId' <> $3
+         UNION ALL
+         SELECT $4::jsonb
+       ) sub
+     ),
+     updated_at = NOW()
+     WHERE project_id = $1 AND student_email = $2`,
+    [projectId, studentEmail, safeEntry.templateId, JSON.stringify(safeEntry)]
+  );
 }
 
 async function canManagePracticalSchedule(email) {
@@ -5445,6 +5475,20 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
     const formattedFirstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
     const copyName = `${templateTitle} - ${formattedFirstName}`;
     const copied = await driveCopyFile(templateFileId, folderId, copyName, driveAccessToken);
+
+    // Record template copy in DB so task list can track it reliably across devices
+    if (hasDatabase && templateId) {
+      const activityId = String(req.body?.activityId || "").trim();
+      if (activityId) {
+        await recordTemplateCopyInDb(activityId, email, {
+          templateId,
+          templateTitle,
+          fileUrl: copied.webViewLink || `https://docs.google.com/presentation/d/${copied.id}/edit`,
+          fileName: copied.name
+        }).catch(() => {});
+      }
+    }
+
     res.json({ ok: true, alreadyExists: false, fileId: copied.id, fileUrl: copied.webViewLink || `https://docs.google.com/presentation/d/${copied.id}/edit`, fileName: copied.name, destinationFolderId: folderId, destinationSubfolderName: subfolderName || "" });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not copy template." });
@@ -6846,6 +6890,33 @@ app.patch("/api/activities/:id/my-evidence", async (req, res) => {
     res.json({ student_email: requesterEmail, evidence_steps: evidenceSteps });
   } catch (_error) {
     res.status(500).json({ error: "Could not save evidence steps" });
+  }
+});
+
+// GET /api/activities/:id/my-template-copies — reliable cross-device record of which templates a student has copied
+app.get("/api/activities/:id/my-template-copies", async (req, res) => {
+  const projectId = String(req.params.id || "").trim();
+  const requesterEmail = normalizeEmail(getRequestUserEmail(req));
+
+  if (!projectId) { res.status(400).json({ error: "Project ID is required" }); return; }
+  if (!requesterEmail || !requesterEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required" }); return;
+  }
+
+  if (!hasDatabase) {
+    res.json({ student_email: requesterEmail, template_copies: [] });
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT template_copies FROM project_interests WHERE project_id = $1 AND student_email = $2 LIMIT 1`,
+      [projectId, requesterEmail]
+    );
+    const copies = Array.isArray(result.rows?.[0]?.template_copies) ? result.rows[0].template_copies : [];
+    res.json({ student_email: requesterEmail, template_copies: copies });
+  } catch (_error) {
+    res.status(500).json({ error: "Could not load template copies" });
   }
 });
 

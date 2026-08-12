@@ -983,7 +983,7 @@ async function handleUseTemplate(templateId) {
         const response = await fetch("/api/student/drive-setup/copy-template", {
             method: "POST",
             headers: withLibraryAuthHeaders({ "Content-Type": "application/json" }),
-            body: JSON.stringify({ driveAccessToken: accessToken, templateId: item.id, templateTitle: item.title, templateFileId: fileId })
+            body: JSON.stringify({ driveAccessToken: accessToken, templateId: item.id, templateTitle: item.title, templateFileId: fileId, activityId: templateUsageContext.activityId })
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(payload.error || `Error ${response.status}`);
