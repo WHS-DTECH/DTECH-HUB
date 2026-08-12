@@ -187,7 +187,7 @@ function deriveTaskShortName(taskTopic) {
     if (/project management/i.test(normalized)) return "Project Management";
     if (/describe.*digital outcome|description\s*-\s*google\s*slides/i.test(normalized)) return "Digital Outcome Description";
     if (/identify\s+the\s+target\s+audience|target\s+audience|end\s+user/i.test(normalized)) return "Target Audience";
-    if (/explain\s+how\s+the\s+outcome\s+will\s+be\s+developed|tools\/?technologies|development\s+steps|outcome\s+developed/i.test(normalized)) return "Development and Tools";
+    if (/explain\s+how\s+the\s+outcome\s+will\s+be\s+developed|what\s+tools\s+and\s+techniques\s+will\s+be\s+used|tools\/?technologies|development\s+steps|outcome\s+developed/i.test(normalized)) return "Development Steps";
     if (/relevant\s+implications/i.test(normalized)) return "Relevant Implications";
     if (/state\s+how\s+success\s+will\s+be\s+measured|success\s+will\s+be\s+evaluated|project\s+success\s+criteria|success\s+criteria/i.test(normalized)) return "Success Criteria";
     if (/digital outcome/i.test(normalized)) return "Digital Outcome";
@@ -537,6 +537,10 @@ function getTaskTopicHrefForStep(standard, level, text) {
 
     if (String(standard) === "91897" && normalized.includes("relevant implications")) {
         return buildCustomActivityLink(taskListState.selectedId, safeText, "Relevant Implications", "relevant-implications");
+    }
+
+    if (String(standard) === "91897" && normalized.includes("what tools and techniques")) {
+        return buildCustomActivityLink(taskListState.selectedId, "What Tools and Techniques will be used?", "Development Steps");
     }
 
     if (String(standard) === "digital-outcome") {

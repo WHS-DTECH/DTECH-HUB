@@ -5944,6 +5944,9 @@ function isDigitalOutcomeDevelopmentToolsCriterion(taskTopicTitle, taskShortName
     if (/tools\/?technologies\s+will\s+be\s+used/.test(topicText)) {
         return true;
     }
+    if (/what\s+tools\s+and\s+techniques\s+will\s+be\s+used/.test(topicText)) {
+        return true;
+    }
     return shortNameText === DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE.toLowerCase();
 }
 
