@@ -1990,6 +1990,73 @@ h1 {
     filter: saturate(180%) contrast(130%);
 }
 
+/* Project Context Card */
+.tools-project-context-card {
+    margin: 18px 0 0;
+}
+.tools-project-context-card h2 {
+    margin: 0 0 10px;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+.tools-context-single-project {
+    margin: 0 0 8px;
+    font-weight: 600;
+    color: #334155;
+}
+.tools-context-project-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.tools-context-project-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 8px 12px;
+    border: 2px solid #d1d5db;
+    border-radius: 10px;
+    background: #f8fafc;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+    transition: border-color 0.15s, background 0.15s;
+}
+.tools-context-project-item:hover { border-color: #6366f1; background: #f0f0ff; }
+.tools-context-project-item.is-active { border-color: #4f46e5; background: #eef2ff; }
+.tools-context-project-name { font-size: 0.88rem; font-weight: 600; color: #1e293b; }
+.tools-context-project-type { font-size: 0.74rem; color: #6366f1; font-weight: 500; }
+.tools-context-type-chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+.tools-context-type-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.tools-context-type-chip {
+    padding: 5px 14px;
+    border-radius: 20px;
+    border: 1.5px solid #c7d2fe;
+    background: #f0f4ff;
+    color: #3730a3;
+    font-size: 0.82rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+.tools-context-type-chip:hover { background: #e0e7ff; border-color: #818cf8; }
+.tools-context-type-chip.is-active { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+
 /* Tools & Techniques Panel */
 .tools-techniques-panel {
     margin: 18px 0;

@@ -5273,8 +5273,21 @@ function extractStandardCodeFromLabel(value) {
     return match ? String(match[1] || "").trim() : "";
 }
 
+function getToolsCategoryForTopicType(topicType) {
+    const t = String(topicType || "").trim().toLowerCase();
+    if (/programm|coding|comput|software|python|javascript|java|react|node/i.test(t)) return "programming";
+    if (/web|html|css|frontend|ui\s*design/i.test(t)) return "web";
+    if (/design|ux|graphic|visual|figma|adobe/i.test(t)) return "design";
+    if (/digital\s*media|media|film|video|audio|music|photograph|animation/i.test(t)) return "digital-media";
+    if (/data|analytic|excel|sql|statistic|business/i.test(t)) return "data";
+    return "general";
+}
+
 async function renderToolsTechniquesPanel({ host, projectId, detailData, taskTopic = "" }) {
     if (!host) return;
+
+    const existingContextCard = host.querySelector("#tools-project-context-card");
+    if (existingContextCard) existingContextCard.remove();
 
     const existingPanel = host.querySelector("#tools-techniques-panel");
     if (existingPanel) {
@@ -5284,28 +5297,137 @@ async function renderToolsTechniquesPanel({ host, projectId, detailData, taskTop
     const email = readStoredHubEmail();
     if (!email) return;
 
+    // Fetch student's allocations for project context card
+    let allAllocations = [];
+    try {
+        const allocPayload = await fetch("/api/my-allocations", { headers: buildWriteHeaders() })
+            .then((r) => r.json()).catch(() => ({}));
+        allAllocations = [
+            ...(Array.isArray(allocPayload?.assessment_tasks) ? allocPayload.assessment_tasks : []),
+            ...(Array.isArray(allocPayload?.projects) ? allocPayload.projects : [])
+        ].filter((a) => String(a?.id || "").trim());
+    } catch (_error) {
+        // Continue without project context if fetch fails
+    }
+
+    // Determine initial selected allocation and topic type
+    const currentAlloc = allAllocations.find((a) => String(a.id) === String(projectId))
+        || allAllocations[0] || null;
+    const getTopicTypes = (alloc) => {
+        const raw = String(alloc?.type || alloc?.topic_type || "").trim();
+        return raw ? raw.split(/[,;|]+/).map((s) => s.trim()).filter(Boolean) : [];
+    };
+    const initialTypes = getTopicTypes(currentAlloc);
+    const initialType = initialTypes[0] || "";
+
+    // Track active state
+    let activeAllocId = currentAlloc ? String(currentAlloc.id) : "";
+    let activeTopicType = initialType;
+
+    // --- Project Context Card ---
+    const contextCard = document.createElement("section");
+    contextCard.id = "tools-project-context-card";
+    contextCard.className = "tools-project-context-card proposal-section";
+
+    const renderContextCard = () => {
+        const activeAlloc = allAllocations.find((a) => String(a.id) === activeAllocId) || allAllocations[0];
+        const activeTypes = getTopicTypes(activeAlloc);
+
+        const projectListHtml = allAllocations.length > 1
+            ? `<div class="tools-context-project-list">
+                ${allAllocations.map((alloc) => {
+                    const allocId = String(alloc.id);
+                    const isActive = allocId === activeAllocId;
+                    const types = getTopicTypes(alloc);
+                    return `<button type="button"
+                        class="tools-context-project-item ${isActive ? "is-active" : ""}"
+                        data-context-project-id="${escapeHtml(allocId)}">
+                        <span class="tools-context-project-name">${escapeHtml(String(alloc.name || alloc.title || "Project").trim())}</span>
+                        ${types.length ? `<span class="tools-context-project-type">${escapeHtml(types.join(", "))}</span>` : ""}
+                    </button>`;
+                }).join("")}
+               </div>`
+            : activeAlloc
+                ? `<p class="tools-context-single-project">${escapeHtml(String(activeAlloc.name || activeAlloc.title || "").trim())}</p>`
+                : "";
+
+        const topicChipsHtml = activeTypes.length
+            ? `<div class="tools-context-type-chips">
+                <span class="tools-context-type-label">Topic Type:</span>
+                ${activeTypes.map((t) => `
+                    <button type="button"
+                        class="tools-context-type-chip ${t === activeTopicType ? "is-active" : ""}"
+                        data-context-type="${escapeHtml(t)}">
+                        ${escapeHtml(t)}
+                    </button>`).join("")}
+               </div>`
+            : "";
+
+        contextCard.innerHTML = `
+            <h2>${allAllocations.length > 1 ? "Which Project?" : "Project"}</h2>
+            ${projectListHtml}
+            ${topicChipsHtml}
+        `;
+    };
+
+    renderContextCard();
+    host.appendChild(contextCard);
+
+    // Event delegation for context card interactions
+    contextCard.addEventListener("click", (e) => {
+        const projectBtn = e.target.closest("[data-context-project-id]");
+        const typeBtn = e.target.closest("[data-context-type]");
+        if (projectBtn) {
+            activeAllocId = projectBtn.getAttribute("data-context-project-id") || activeAllocId;
+            const newTypes = getTopicTypes(allAllocations.find((a) => String(a.id) === activeAllocId));
+            activeTopicType = newTypes[0] || "";
+            renderContextCard();
+            updateSuggestions();
+        } else if (typeBtn) {
+            activeTopicType = typeBtn.getAttribute("data-context-type") || "";
+            renderContextCard();
+            updateSuggestions();
+        }
+    });
+
     const panel = document.createElement("section");
     panel.id = "tools-techniques-panel";
     panel.className = "tools-techniques-panel proposal-section";
 
-    const suggestedTools = getSuggestedToolsForContext(detailData, taskTopic);
-    const suggestionsHtml = suggestedTools.length
-        ? `<div class="tools-suggestions">
-            <h3>Suggested Tools</h3>
-            <div class="tools-suggestions-grid">
-                ${suggestedTools.map((tool) => `
-                    <button type="button" class="tools-suggestion-chip" data-tool-name="${escapeHtml(tool)}">
-                        ${escapeHtml(tool)}
-                    </button>
-                `).join("")}
-            </div>
-        </div>`
-        : "";
+    const buildSuggestionsHtml = (topicTypeOverride) => {
+        const category = topicTypeOverride
+            ? getToolsCategoryForTopicType(topicTypeOverride)
+            : null;
+        const tools = category
+            ? (SUGGESTED_TOOLS_BY_CONTEXT[category] || SUGGESTED_TOOLS_BY_CONTEXT.general)
+            : getSuggestedToolsForContext(detailData, taskTopic);
+        return tools.length
+            ? `<div class="tools-suggestions" id="tools-suggestions-section">
+                <h3>Suggested Tools</h3>
+                <div class="tools-suggestions-grid">
+                    ${tools.map((tool) => `
+                        <button type="button" class="tools-suggestion-chip" data-tool-name="${escapeHtml(tool)}">
+                            ${escapeHtml(tool)}
+                        </button>
+                    `).join("")}
+                </div>
+               </div>`
+            : `<div id="tools-suggestions-section"></div>`;
+    };
+
+    const updateSuggestions = () => {
+        const existing = panel.querySelector("#tools-suggestions-section");
+        if (existing) existing.outerHTML = buildSuggestionsHtml(activeTopicType);
+        // Re-attach chip listeners after DOM update
+        panel.querySelectorAll(".tools-suggestion-chip").forEach((chip) => {
+            chip.addEventListener("click", () => addToolFromChip(chip.getAttribute("data-tool-name")));
+        });
+    };
 
     panel.innerHTML = `
         <h2>Tools & Techniques</h2>
         <p class="tools-instructions">List the tools you intend to use, are currently using, or have used for this task. For each tool, describe the techniques or methods you implemented with it.</p>
-        ${suggestionsHtml}
+        ${buildSuggestionsHtml(activeTopicType)}
         <div class="tools-table-wrapper">
             <table class="tools-table" id="tools-table">
                 <thead>
@@ -5425,27 +5547,29 @@ async function renderToolsTechniquesPanel({ host, projectId, detailData, taskTop
         });
     };
 
+    const addToolFromChip = (toolName) => {
+        if (!toolName) return;
+        const lastRow = toolsData[toolsData.length - 1];
+        if (lastRow && !lastRow.toolName) {
+            lastRow.toolName = toolName;
+        } else {
+            toolsData.push({
+                id: `tool-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                toolName,
+                status: "Intend to Use",
+                techniques: "",
+                createdAt: new Date().toISOString()
+            });
+        }
+        renderTable();
+        attachListeners();
+    };
+
     attachListeners();
 
-    // Add suggestion chip listeners
+    // Attach chip listeners (also called by updateSuggestions after re-render)
     panel.querySelectorAll(".tools-suggestion-chip").forEach((chip) => {
-        chip.addEventListener("click", () => {
-            const toolName = chip.getAttribute("data-tool-name");
-            const lastRow = toolsData[toolsData.length - 1];
-            if (lastRow && !lastRow.toolName) {
-                lastRow.toolName = toolName;
-            } else {
-                toolsData.push({
-                    id: `tool-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                    toolName,
-                    status: "Intend to Use",
-                    techniques: "",
-                    createdAt: new Date().toISOString()
-                });
-            }
-            renderTable();
-            attachListeners();
-        });
+        chip.addEventListener("click", () => addToolFromChip(chip.getAttribute("data-tool-name")));
     });
 }
 
