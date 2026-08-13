@@ -3660,7 +3660,11 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     let syncedGoogleSlidesUrl = shouldUseStoredSync ? storedSyncEntry.url : currentGoogleSlidesUrl;
     let syncedGoogleSlidesSavedAt = String(storedSyncEntry.savedAt || "").trim();
     const currentTrelloCardUrl = toSafeTrelloCardUrl(submission.trelloCardUrl);
-    const currentDecompositionTrelloUrl = currentTrelloCardUrl || getFirstTrelloCardUrlFromEvidenceRows(evidenceRows);
+    const storedTrelloBoardUrl = toSafeTrelloCardUrl(readStoredTrelloCardLink(projectId, email))
+        || toSafeTrelloCardUrl(readStoredTrelloCardLibrary(projectId, email)[0]?.url || "");
+    let currentDecompositionTrelloUrl = currentTrelloCardUrl
+        || getFirstTrelloCardUrlFromEvidenceRows(evidenceRows)
+        || storedTrelloBoardUrl;
     const currentMediaAssetFolderUrl = toSafeExternalUrl(submission.mediaAssetFolderUrl);
     const currentOneDriveProjectFolderUrl = toSafeExternalUrl(submission.mediaAssetFolderUrl);
     const currentMediaReviewUrl = toSafeExternalUrl(submission.mediaReviewUrl);
@@ -4459,6 +4463,8 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     }
 
     if (isDecompositionTopic && decompBoardSelect && decompListSelect) {
+        const boardUrlById = new Map();
+
         decompBoardRefreshButton?.addEventListener("click", () => {
             void loadDecompositionTaskBoard();
         });
@@ -4468,6 +4474,13 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             const boardsResponse = await fetch("/api/integrations/trello/boards", { headers: buildWriteHeaders() });
             if (boardsResponse.ok) {
                 const boards = await boardsResponse.json().catch(() => []);
+                (Array.isArray(boards) ? boards : []).forEach((board) => {
+                    const boardId = String(board?.id || "").trim();
+                    const boardUrl = toSafeTrelloCardUrl(board?.url || "");
+                    if (boardId && boardUrl) {
+                        boardUrlById.set(boardId, boardUrl);
+                    }
+                });
                 const boardOptions = (Array.isArray(boards) ? boards : [])
                     .map((board) => `<option value="${escapeHtml(board.id)}">${escapeHtml(board.name || board.id)}</option>`)
                     .join("");
@@ -4485,6 +4498,27 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             if (!boardId) {
                 decompListSelect.innerHTML = `<option value="">Select list</option>`;
                 return;
+            }
+
+            const selectedBoardUrl = boardUrlById.get(boardId) || "";
+            if (selectedBoardUrl) {
+                try {
+                    await persistStudentTrelloLinkDirectlyToEvidence(
+                        projectId,
+                        email,
+                        detailData,
+                        taskTopicTitle,
+                        selectedBoardUrl
+                    );
+                    addStoredTrelloCardLibraryLink(projectId, email, selectedBoardUrl);
+                    writeStoredTrelloCardLink(projectId, email, selectedBoardUrl);
+                    currentDecompositionTrelloUrl = selectedBoardUrl;
+                    submission.trelloCardUrl = selectedBoardUrl;
+                    void loadDecompositionTaskBoard();
+                    setDecompStatus("Trello board linked with Project Management.");
+                } catch (error) {
+                    setDecompStatus(error?.message || "Could not link this Trello board with Project Management.", true);
+                }
             }
 
             try {
