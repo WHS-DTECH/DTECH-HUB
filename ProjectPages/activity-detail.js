@@ -4464,6 +4464,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
 
     if (isDecompositionTopic && decompBoardSelect && decompListSelect) {
         const boardUrlById = new Map();
+        let linkedBoardId = "";
 
         decompBoardRefreshButton?.addEventListener("click", () => {
             void loadDecompositionTaskBoard();
@@ -4485,6 +4486,9 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                     .map((board) => `<option value="${escapeHtml(board.id)}">${escapeHtml(board.name || board.id)}</option>`)
                     .join("");
                 decompBoardSelect.innerHTML = `<option value="">Select board</option>${boardOptions}`;
+                linkedBoardId = Array.from(boardUrlById.entries()).find(([, boardUrl]) =>
+                    boardUrl === currentDecompositionTrelloUrl
+                )?.[0] || "";
             } else {
                 setDecompStatus("Connect Trello first (Student Work page), then reload.", true);
             }
@@ -4537,6 +4541,11 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 setDecompStatus("Could not load Trello lists.", true);
             }
         });
+
+        if (linkedBoardId) {
+            decompBoardSelect.value = linkedBoardId;
+            decompBoardSelect.dispatchEvent(new Event("change"));
+        }
 
         decompSaveButton?.addEventListener("click", async () => {
             const decompositionSteps = parseDecompositionStepsText(decompStepsInput?.value || "");
