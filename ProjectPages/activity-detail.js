@@ -135,11 +135,16 @@ const EVIDENCE_STEPS_DEFAULTS = {
         "Excellence: Discuss how planning, testing, and trialling information assisted the development of a high-quality outcome."
     ],
     "91907": [
-        "Establish the project purpose and design requirements.",
-        "Develop and trial design options.",
-        "Document implementation decisions and technical evidence.",
-        "Test against requirements and refine.",
-        "Summarize final evidence for achieved, merit, or excellence."
+        "Achieved: Use recognised and appropriate project management techniques to plan the development of a digital technologies outcome.",
+        "Achieved: Decompose the digital technologies outcome into smaller components.",
+        "Achieved: Trial components of the outcome.",
+        "Achieved: Test that the digital technologies outcome functions as intended.",
+        "Achieved: Address relevant implications.",
+        "Merit: Effectively use project management techniques to manage development, feedback and/or collaborative processes.",
+        "Merit: Effectively trial multiple components and/or techniques.",
+        "Merit: Effectively use information from testing and trialling to improve the functionality of the digital technologies outcome.",
+        "Excellence: Synthesise information gained from the planning, testing and trialling of components.",
+        "Excellence: Discuss how this information led to the development of a high-quality digital technologies outcome."
     ]
 };
 

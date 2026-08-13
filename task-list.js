@@ -49,11 +49,16 @@ const EVIDENCE_STEPS_DEFAULTS = {
         "Excellence: Discuss how planning, testing, and trialling information assisted the development of a high-quality outcome."
     ],
     "91907": [
-        "Establish the project purpose and design requirements.",
-        "Develop and trial design options.",
-        "Document implementation decisions and technical evidence.",
-        "Test against requirements and refine.",
-        "Summarize final evidence for achieved, merit, or excellence."
+        "Achieved: Use recognised and appropriate project management techniques to plan the development of a digital technologies outcome.",
+        "Achieved: Decompose the digital technologies outcome into smaller components.",
+        "Achieved: Trial components of the outcome.",
+        "Achieved: Test that the digital technologies outcome functions as intended.",
+        "Achieved: Address relevant implications.",
+        "Merit: Effectively use project management techniques to manage development, feedback and/or collaborative processes.",
+        "Merit: Effectively trial multiple components and/or techniques.",
+        "Merit: Effectively use information from testing and trialling to improve the functionality of the digital technologies outcome.",
+        "Excellence: Synthesise information gained from the planning, testing and trialling of components.",
+        "Excellence: Discuss how this information led to the development of a high-quality digital technologies outcome."
     ]
 };
 
@@ -673,6 +678,33 @@ function getDecompositionSubtasks() {
     ];
 }
 
+function normalize91907ChecklistRows(rows) {
+    const sourceRows = Array.isArray(rows)
+        ? rows.map((step) => ({ text: String(step?.text || "").trim(), done: Boolean(step?.done) })).filter((step) => step.text)
+        : [];
+    const legacyTexts = new Set([
+        "establish the project purpose and design requirements.",
+        "develop and trial design options.",
+        "document implementation decisions and technical evidence.",
+        "test against requirements and refine.",
+        "summarize final evidence for achieved, merit, or excellence."
+    ]);
+    const isLegacyShape = sourceRows.some((step) => legacyTexts.has(step.text.toLowerCase()));
+    if (!isLegacyShape) {
+        return sourceRows;
+    }
+
+    const wasDone = (pattern) => sourceRows.some((step) => Boolean(step.done) && pattern.test(step.text));
+    return EVIDENCE_STEPS_DEFAULTS["91907"].map((text) => ({
+        text,
+        done: /trial components/i.test(text)
+            ? wasDone(/develop and trial/i)
+            : /test that the digital technologies outcome/i.test(text)
+                ? wasDone(/test against requirements/i)
+                : false
+    }));
+}
+
 function inferStudentSystemConnections(currentState) {
     let trelloConnected = false;
     let githubConnected = false;
@@ -1128,7 +1160,7 @@ function renderChecklistCards(detail, allItems) {
     const renderRowsForStandard = (standard, rows) => {
         const safeRows = Array.isArray(rows) ? rows : [];
 
-        if (String(standard) !== "91897") {
+        if (String(standard) !== "91897" && String(standard) !== "91907") {
             return `
                 <div class="task-list-step-list">
                     ${safeRows.map((step, index) => `
@@ -1292,6 +1324,11 @@ function buildChecklistState(standardCodes, evidenceMap) {
                 return;
             }
 
+            if (standard === "91907") {
+                next[standard] = normalize91907ChecklistRows(existing);
+                return;
+            }
+
             next[standard] = existing.map((step) => ({ text: String(step?.text || "").trim(), done: Boolean(step?.done) }));
             return;
         }
@@ -1305,7 +1342,9 @@ function buildChecklistState(standardCodes, evidenceMap) {
         const defaultRows = defaults.map((text) => ({ text, done: false }));
         next[standard] = standard === "91897"
             ? normalize91897ChecklistRows(defaultRows)
-            : defaultRows;
+            : standard === "91907"
+                ? normalize91907ChecklistRows(defaultRows)
+                : defaultRows;
     });
     return next;
 }
@@ -1334,6 +1373,12 @@ async function loadChecklistForTask(taskId) {
         const before91897Migration = JSON.stringify(taskListState.fullEvidenceState["91897"]);
         taskListState.fullEvidenceState["91897"] = normalize91897ChecklistRows(taskListState.fullEvidenceState["91897"]);
         migrated91897Rows = before91897Migration !== JSON.stringify(taskListState.fullEvidenceState["91897"]);
+    }
+    let migrated91907Rows = false;
+    if (Array.isArray(taskListState.fullEvidenceState["91907"])) {
+        const before91907Migration = JSON.stringify(taskListState.fullEvidenceState["91907"]);
+        taskListState.fullEvidenceState["91907"] = normalize91907ChecklistRows(taskListState.fullEvidenceState["91907"]);
+        migrated91907Rows = before91907Migration !== JSON.stringify(taskListState.fullEvidenceState["91907"]);
     }
     taskListState.checklistStandards = getStandardCodes(detail || selected);
     taskListState.checklistState = buildChecklistState(taskListState.checklistStandards, evidenceMap);
@@ -1365,7 +1410,7 @@ async function loadChecklistForTask(taskId) {
     const autoRepairedEvidenceRI = applyTemplateCopiesAsRelevantImplicationsState(taskListState.fullEvidenceState, taskListState.templateCopies);
     const autoChangedEvidenceRI = autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
     const autoChangedEvidence = autoChangedEvidencePM || autoChangedEvidenceDO || autoChangedEvidenceRI || autoRepairedEvidenceRI;
-    if (migratedDigitalOutcomeRows || migrated91897Rows || autoChangedChecklist || autoChangedEvidence) {
+    if (migratedDigitalOutcomeRows || migrated91897Rows || migrated91907Rows || autoChangedChecklist || autoChangedEvidence) {
         const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
         await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});
     }
