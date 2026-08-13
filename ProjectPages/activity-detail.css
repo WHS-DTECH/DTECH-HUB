@@ -741,10 +741,32 @@ h1 {
     gap: 8px;
 }
 
+.task-topic-decomp-box {
+    border-color: #7faed9;
+    background: #eaf4ff;
+    box-shadow: 0 5px 14px rgba(32, 89, 142, 0.13);
+}
+
+.task-topic-decomp-box > .task-topic-submission-note {
+    border-color: #a7c8e5;
+    background: #f7fbff;
+    color: #244f79;
+}
+
+.task-topic-decomp-box .task-topic-submission-label {
+    color: #22527f;
+}
+
+.task-topic-decomp-box .task-topic-submission-input {
+    border-color: #8fb8dc;
+    background: #ffffff;
+    color: #173e63;
+}
+
 .task-topic-decomp-dashboard {
     display: grid;
     gap: 10px;
-    border-top: 1px solid #e1c790;
+    border-top: 1px solid #a7c8e5;
     padding-top: 12px;
 }
 
