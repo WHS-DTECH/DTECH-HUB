@@ -5213,6 +5213,74 @@ async function getStudentDriveSetup(email) {
   };
 }
 
+function buildStudentDriveSetupPayload(setup = {}, extras = {}) {
+  const haparaFolderId = String(setup?.haparaFolderId || "").trim();
+  const processAssessmentFolderId = String(setup?.processAssessmentFolderId || "").trim();
+  const processAssessmentFolderUrl = String(
+    extras?.processAssessmentFolderUrl
+      || (processAssessmentFolderId ? `https://drive.google.com/drive/folders/${encodeURIComponent(processAssessmentFolderId)}` : "")
+  ).trim();
+
+  return {
+    configured: Boolean(haparaFolderId || processAssessmentFolderId),
+    driveReady: Boolean(haparaFolderId),
+    haparaFolderId: haparaFolderId || null,
+    haparaFolderUrl: String(setup?.haparaFolderUrl || "").trim() || null,
+    classLabel: String(setup?.classLabel || "").trim() || null,
+    processAssessmentFolderId: processAssessmentFolderId || null,
+    processAssessmentFolderUrl: processAssessmentFolderUrl || null,
+    confirmed: Boolean(setup?.confirmed || processAssessmentFolderId),
+    inferredFromDrive: Boolean(extras?.inferredFromDrive)
+  };
+}
+
+async function resolveStudentDriveSetupState(email, driveAccessToken = "") {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) return null;
+
+  const baseSetup = await getStudentDriveSetup(normalizedEmail);
+  let mergedSetup = baseSetup ? { ...baseSetup } : {
+    haparaFolderId: "",
+    haparaFolderUrl: "",
+    classLabel: "",
+    processAssessmentFolderId: "",
+    confirmed: false
+  };
+  let inferredFromDrive = false;
+  let processAssessmentFolderUrl = "";
+
+  if (driveAccessToken) {
+    const seniorDtechFolder = await driveFindFolderByName("root", "SeniorDTECH", driveAccessToken);
+    const processAssessmentFolder = seniorDtechFolder?.id
+      ? await driveFindFolderByName(String(seniorDtechFolder.id), "Process Assessment", driveAccessToken)
+      : null;
+
+    if (processAssessmentFolder?.id) {
+      const discoveredId = String(processAssessmentFolder.id || "").trim();
+      processAssessmentFolderUrl = String(processAssessmentFolder.webViewLink || `https://drive.google.com/drive/folders/${discoveredId}`).trim();
+
+      if (!mergedSetup.processAssessmentFolderId || mergedSetup.processAssessmentFolderId !== discoveredId || !mergedSetup.confirmed) {
+        await saveStudentDriveSetup(normalizedEmail, discoveredId);
+        inferredFromDrive = !mergedSetup.processAssessmentFolderId;
+        mergedSetup = {
+          ...mergedSetup,
+          processAssessmentFolderId: discoveredId,
+          confirmed: true
+        };
+      }
+    }
+  }
+
+  if (!baseSetup && !mergedSetup.processAssessmentFolderId && !mergedSetup.haparaFolderId) {
+    return null;
+  }
+
+  return buildStudentDriveSetupPayload(mergedSetup, {
+    processAssessmentFolderUrl,
+    inferredFromDrive
+  });
+}
+
 async function saveStudentDriveSetup(email, processAssessmentFolderId) {
   const normalizedEmail = normalizeEmail(email);
   if (!normalizedEmail || !processAssessmentFolderId) return null;
@@ -5354,28 +5422,41 @@ app.get("/api/student/drive-setup", async (req, res) => {
   const email = normalizeEmail(getRequestUserEmail(req));
   if (!email) { res.status(401).json({ error: "Sign in is required." }); return; }
   try {
-    const setup = await getStudentDriveSetup(email);
+    const setup = await resolveStudentDriveSetupState(email);
     if (!setup) {
-      res.json({
-        configured: false,
-        driveReady: false,
-        haparaFolderId: null,
-        haparaFolderUrl: null,
-        classLabel: null,
-        processAssessmentFolderId: null,
-        confirmed: false
-      });
+      res.json(buildStudentDriveSetupPayload());
       return;
     }
 
-    const haparaFolderId = String(setup.haparaFolderId || "").trim();
-    res.json({
-      configured: true,
-      driveReady: Boolean(haparaFolderId),
-      ...setup
-    });
+    res.json(setup);
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not load drive setup" });
+  }
+});
+
+app.post("/api/student/drive-setup/status", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email) {
+    res.status(401).json({ error: "Sign in is required." });
+    return;
+  }
+
+  const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
+  if (!driveAccessToken) {
+    res.status(400).json({ error: "driveAccessToken is required." });
+    return;
+  }
+
+  try {
+    const setup = await resolveStudentDriveSetupState(email, driveAccessToken);
+    if (!setup) {
+      res.json(buildStudentDriveSetupPayload());
+      return;
+    }
+
+    res.json(setup);
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not check Google Drive setup." });
   }
 });
 

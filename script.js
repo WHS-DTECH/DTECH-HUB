@@ -1351,6 +1351,14 @@ function renderGlobalNavbar() {
                 <a id="hub-staff-link" href="/teacher-view.html" hidden>Teacher View</a>
                 <a id="hub-admin-link" href="/admin-menu.html" hidden>Admin Menu</a>
                 <span id="hub-access-badge" class="hub-access-badge" hidden aria-live="polite"></span>
+                <button id="hub-drive-sync" class="google-drive-sync-button drive-state-unknown" type="button" hidden>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="google-drive-icon" aria-hidden="true">
+                        <path d="M9.6 3h4.9l6.2 10.8h-4.9L9.6 3z" fill="#0F9D58"/>
+                        <path d="M3.3 13.8 5.8 9.5h12.4l-2.5 4.3H3.3z" fill="#4285F4"/>
+                        <path d="m6.2 18.7-2.9-4.9L9.6 3l2.5 4.3-5.9 11.4z" fill="#F4B400"/>
+                    </svg>
+                    <span>Google Drive Sync</span>
+                </button>
                 <button id="hub-google-signin" class="google-signin-button" type="button">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="google-logo">
                         <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -1401,7 +1409,21 @@ const hubAuthState = {
     expiresAt: 0,
     profile: null,
     tokenClient: null,
-    idClientReady: false
+    idClientReady: false,
+    autoPromptInFlight: false,
+    pendingTokenResolvers: []
+};
+
+const hubDriveSetupState = {
+    checked: false,
+    checking: false,
+    configured: false,
+    driveReady: false,
+    confirmed: false,
+    inferredFromDrive: false,
+    haparaFolderId: "",
+    processAssessmentFolderId: "",
+    processAssessmentFolderUrl: ""
 };
 
 const hubAccessState = {
@@ -1463,6 +1485,7 @@ const hubStaffLink = document.querySelector("#hub-staff-link");
 const hubAdminLink = document.querySelector("#hub-admin-link");
 const hubSettingsLink = document.querySelector("#hub-settings-link");
 const hubAccessBadge = document.querySelector("#hub-access-badge");
+const hubDriveSyncButton = document.querySelector("#hub-drive-sync");
 const hubSignInButton = document.querySelector("#hub-google-signin");
 const hubSignOutButton = document.querySelector("#hub-google-signout");
 const hubStartupSignInBanner = document.querySelector("#hub-startup-signin-banner");
@@ -1480,6 +1503,7 @@ const hubBrowseMenu = document.querySelector("#hub-browse-menu");
 const hubUploadMenu = document.querySelector("#hub-upload-menu");
 const hubPracticalSkillsMenu = document.querySelector("#hub-practical-skills-menu");
 const hubStudentWorkMenu = document.querySelector("#hub-student-work-menu");
+const hubTemplateLibraryLink = document.querySelector("#hub-browse-template-library-link");
 const hubBrowseButtons = Array.from(document.querySelectorAll("[data-auth-browse]"));
 const hubUnitPlansButtons = Array.from(document.querySelectorAll("[data-auth-unit-plans]"));
 const hubCourseOutlinesButtons = Array.from(document.querySelectorAll("[data-auth-course-outlines]"));
@@ -1592,6 +1616,291 @@ function getActiveHubBearerToken() {
         return String(parsed?.idToken || parsed?.accessToken || "").trim();
     } catch (_error) {
         return "";
+    }
+}
+
+function getActiveHubAccessToken() {
+    const fromState = String(hubAuthState.accessToken || "").trim();
+    if (fromState && Number(hubAuthState.expiresAt || 0) > Date.now()) {
+        return fromState;
+    }
+
+    const raw = getHubStoredAuthRaw();
+    if (!raw) {
+        return "";
+    }
+
+    try {
+        const parsed = JSON.parse(raw);
+        if (!parsed?.expiresAt || Number(parsed.expiresAt) <= Date.now()) {
+            return "";
+        }
+        return String(parsed?.accessToken || "").trim();
+    } catch (_error) {
+        return "";
+    }
+}
+
+function getActiveHubGrantedScopes() {
+    const fromState = String(hubAuthState.grantedScopes || "").trim();
+    if (fromState) {
+        return fromState;
+    }
+
+    const raw = getHubStoredAuthRaw();
+    if (!raw) {
+        return "";
+    }
+
+    try {
+        const parsed = JSON.parse(raw);
+        return String(parsed?.grantedScopes || parsed?.scope || "").trim();
+    } catch (_error) {
+        return "";
+    }
+}
+
+function hasHubDriveScopes() {
+    const grantedScopes = getActiveHubGrantedScopes().toLowerCase();
+    return grantedScopes.includes("https://www.googleapis.com/auth/drive.file")
+        || grantedScopes.includes("https://www.googleapis.com/auth/drive.readonly");
+}
+
+function getActiveHubDriveAccessToken() {
+    const accessToken = getActiveHubAccessToken();
+    if (!accessToken || !hasHubDriveScopes()) {
+        return "";
+    }
+    return accessToken;
+}
+
+function resetHubDriveSetupState() {
+    hubDriveSetupState.checked = false;
+    hubDriveSetupState.checking = false;
+    hubDriveSetupState.configured = false;
+    hubDriveSetupState.driveReady = false;
+    hubDriveSetupState.confirmed = false;
+    hubDriveSetupState.inferredFromDrive = false;
+    hubDriveSetupState.haparaFolderId = "";
+    hubDriveSetupState.processAssessmentFolderId = "";
+    hubDriveSetupState.processAssessmentFolderUrl = "";
+}
+
+function isHubDriveSetupReady() {
+    return Boolean(hubDriveSetupState.confirmed && hubDriveSetupState.processAssessmentFolderId);
+}
+
+function applyHubDriveSetupState(setup) {
+    hubDriveSetupState.checked = true;
+    hubDriveSetupState.configured = Boolean(setup?.configured);
+    hubDriveSetupState.driveReady = Boolean(setup?.driveReady);
+    hubDriveSetupState.confirmed = Boolean(setup?.confirmed);
+    hubDriveSetupState.inferredFromDrive = Boolean(setup?.inferredFromDrive);
+    hubDriveSetupState.haparaFolderId = String(setup?.haparaFolderId || "").trim();
+    hubDriveSetupState.processAssessmentFolderId = String(setup?.processAssessmentFolderId || "").trim();
+    hubDriveSetupState.processAssessmentFolderUrl = String(
+        setup?.processAssessmentFolderUrl
+        || (setup?.processAssessmentFolderId ? `https://drive.google.com/drive/folders/${encodeURIComponent(String(setup.processAssessmentFolderId).trim())}` : "")
+    ).trim();
+}
+
+function renderHubDriveSyncButton() {
+    if (!hubDriveSyncButton) {
+        return;
+    }
+
+    const signedIn = hasAllowedSignedInHubAccount();
+    hubDriveSyncButton.hidden = !signedIn;
+    if (!signedIn) {
+        hubDriveSyncButton.disabled = false;
+        hubDriveSyncButton.className = "google-drive-sync-button drive-state-unknown";
+        const signedOutLabel = hubDriveSyncButton.querySelector("span");
+        if (signedOutLabel) signedOutLabel.textContent = "Google Drive Sync";
+        return;
+    }
+
+    const label = hubDriveSyncButton.querySelector("span");
+    let nextLabel = "Google Drive Sync";
+    let nextClass = "google-drive-sync-button drive-state-unknown";
+    let title = "Check that your SeniorDTECH/Process Assessment folder is ready.";
+
+    if (hubDriveSetupState.checking) {
+        nextLabel = "Checking Drive...";
+        nextClass = "google-drive-sync-button drive-state-checking";
+        title = "Checking your Google Drive folder setup.";
+    } else if (isHubDriveSetupReady()) {
+        nextLabel = "Drive Ready";
+        nextClass = "google-drive-sync-button drive-state-ready";
+        title = hubDriveSetupState.inferredFromDrive
+            ? "Process Assessment was found in Google Drive and linked automatically."
+            : "Your Process Assessment folder is ready.";
+    } else if (hubDriveSetupState.checked) {
+        nextLabel = "Set Up Drive";
+        nextClass = "google-drive-sync-button drive-state-action";
+        title = "Create or confirm your SeniorDTECH/Process Assessment folder before using Template Library.";
+    }
+
+    hubDriveSyncButton.className = nextClass;
+    hubDriveSyncButton.title = title;
+    if (label) {
+        label.textContent = nextLabel;
+    }
+}
+
+function refreshTemplateLibraryAccessUi(signedIn = hasAllowedSignedInHubAccount()) {
+    if (!hubTemplateLibraryLink) {
+        return;
+    }
+
+    const locked = Boolean(signedIn && !isHubDriveSetupReady());
+    hubTemplateLibraryLink.classList.toggle("nav-link-locked", locked);
+    if (locked) {
+        hubTemplateLibraryLink.setAttribute("aria-disabled", "true");
+        hubTemplateLibraryLink.title = "Set up Google Drive Sync before opening Template Library.";
+    } else {
+        hubTemplateLibraryLink.removeAttribute("aria-disabled");
+        hubTemplateLibraryLink.removeAttribute("title");
+    }
+}
+
+function requestHubDriveAccessToken(options = {}) {
+    const forceConsent = Boolean(options?.forceConsent);
+    const existingToken = getActiveHubDriveAccessToken();
+    if (existingToken) {
+        return Promise.resolve({ access_token: existingToken, scope: getActiveHubGrantedScopes() });
+    }
+
+    if (!hubAuthState.tokenClient) {
+        return Promise.resolve({ error: "Google Drive sign-in is not ready yet." });
+    }
+
+    return new Promise((resolve) => {
+        hubAuthState.pendingTokenResolvers.push(resolve);
+        hubAuthState.tokenClient.requestAccessToken({ prompt: forceConsent ? "consent" : "" });
+    });
+}
+
+async function fetchHubDriveSetup(options = {}) {
+    const email = getActiveHubEmail();
+    if (!email) {
+        resetHubDriveSetupState();
+        renderHubDriveSyncButton();
+        refreshTemplateLibraryAccessUi(false);
+        return null;
+    }
+
+    const requireDriveToken = Boolean(options?.requireDriveToken);
+    let driveAccessToken = getActiveHubDriveAccessToken();
+
+    hubDriveSetupState.checking = true;
+    renderHubDriveSyncButton();
+
+    if (requireDriveToken && !driveAccessToken) {
+        const tokenResponse = await requestHubDriveAccessToken({ forceConsent: Boolean(options?.forceConsent) });
+        if (!tokenResponse?.error) {
+            driveAccessToken = String(tokenResponse?.access_token || "").trim();
+        }
+    }
+
+    try {
+        const response = driveAccessToken
+            ? await fetch("/api/student/drive-setup/status", {
+                method: "POST",
+                headers: withHubAuthHeaders({ "Content-Type": "application/json" }, email),
+                body: JSON.stringify({ driveAccessToken })
+            })
+            : await fetch("/api/student/drive-setup", {
+                headers: withHubAuthHeaders({}, email)
+            });
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(payload?.error || "Could not load Google Drive setup.");
+        }
+
+        applyHubDriveSetupState(payload || {});
+        return payload;
+    } catch (error) {
+        if (!hubDriveSetupState.checked) {
+            resetHubDriveSetupState();
+        }
+        console.warn("Could not load Google Drive setup.", error);
+        return null;
+    } finally {
+        hubDriveSetupState.checking = false;
+        renderHubDriveSyncButton();
+        refreshTemplateLibraryAccessUi();
+    }
+}
+
+async function confirmHubDriveSetup(driveAccessToken) {
+    const email = getActiveHubEmail();
+    const response = await fetch("/api/student/drive-setup/confirm", {
+        method: "POST",
+        headers: withHubAuthHeaders({ "Content-Type": "application/json" }, email),
+        body: JSON.stringify({ driveAccessToken })
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        throw new Error(payload?.error || "Could not confirm Google Drive setup.");
+    }
+
+    applyHubDriveSetupState({
+        configured: true,
+        driveReady: true,
+        confirmed: true,
+        processAssessmentFolderId: payload?.processAssessmentFolderId,
+        processAssessmentFolderUrl: payload?.processAssessmentFolderUrl,
+        haparaFolderId: hubDriveSetupState.haparaFolderId,
+        inferredFromDrive: false
+    });
+    renderHubDriveSyncButton();
+    refreshTemplateLibraryAccessUi();
+    return payload;
+}
+
+async function handleHubDriveSyncClick(options = {}) {
+    if (!hasAllowedSignedInHubAccount()) {
+        alert("Sign in with your Westland High Google account before checking Google Drive Sync.");
+        return false;
+    }
+
+    if (hubDriveSetupState.checking) {
+        return false;
+    }
+
+    try {
+        const currentSetup = await fetchHubDriveSetup({ requireDriveToken: true });
+        if (currentSetup?.confirmed && currentSetup?.processAssessmentFolderId) {
+            if (options.openFolder !== false && currentSetup.processAssessmentFolderUrl) {
+                window.open(currentSetup.processAssessmentFolderUrl, "_blank", "noopener");
+            }
+            return true;
+        }
+
+        const shouldCreateFolder = window.confirm("Template Library is locked until your SeniorDTECH/Process Assessment folder is ready in Google Drive. Create or confirm it now?");
+        if (!shouldCreateFolder) {
+            return false;
+        }
+
+        const tokenResponse = await requestHubDriveAccessToken({ forceConsent: true });
+        if (tokenResponse?.error || !tokenResponse?.access_token) {
+            alert("Google Drive permission is required before DTECH Hub can create your Process Assessment folder.");
+            return false;
+        }
+
+        const payload = await confirmHubDriveSetup(tokenResponse.access_token);
+        if (options.openFolder !== false && payload?.processAssessmentFolderUrl) {
+            window.open(payload.processAssessmentFolderUrl, "_blank", "noopener");
+        }
+        return true;
+    } catch (error) {
+        alert(error?.message || "Could not complete Google Drive Sync.");
+        return false;
+    } finally {
+        hubDriveSetupState.checking = false;
+        renderHubDriveSyncButton();
     }
 }
 
@@ -1989,6 +2298,8 @@ function clearHubAuthState() {
     hubAuthState.grantedScopes = "";
     hubAuthState.expiresAt = 0;
     hubAuthState.profile = null;
+    hubAuthState.autoPromptInFlight = false;
+    hubAuthState.pendingTokenResolvers = [];
     hubAccessState.resolved = false;
     hubAccessState.isStaff = false;
     hubAccessState.isStudent = false;
@@ -1996,6 +2307,7 @@ function clearHubAuthState() {
     hubAccessState.canAdmin = false;
     hubAccessState.defaultView = "student";
     hubAccessState.additionalRole = "";
+    resetHubDriveSetupState();
     clearHubStoredAuthRaw();
     setHubProfileOpen(false);
 }
@@ -2171,6 +2483,7 @@ function renderHubAuthUi() {
         hubAccessBadge.textContent = badgeLabel;
         hubAccessBadge.className = badgeClass ? `hub-access-badge ${badgeClass}` : "hub-access-badge";
     }
+    renderHubDriveSyncButton();
     if (hubBrowseMenu) {
         hubBrowseMenu.hidden = !signedIn;
         if (!signedIn) {
@@ -2192,6 +2505,7 @@ function renderHubAuthUi() {
             element.hidden = !canBrowseCourseOutlines;
         });
     }
+    refreshTemplateLibraryAccessUi(signedIn);
 
     renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin });
 
@@ -2274,6 +2588,7 @@ async function handleHubGoogleCredential(credentialResponse) {
     saveHubAuthState();
     await resolveHubAccessState();
     renderHubAuthUi();
+    void fetchHubDriveSetup();
 }
 
 async function handleHubGoogleToken(tokenResponse) {
@@ -2293,6 +2608,7 @@ async function handleHubGoogleToken(tokenResponse) {
     saveHubAuthState();
     await resolveHubAccessState();
     renderHubAuthUi();
+    void fetchHubDriveSetup({ requireDriveToken: true });
 }
 
 function signOutHubGoogle() {
@@ -2336,6 +2652,12 @@ function bindHubAuthControls() {
         hubSignOutButton.addEventListener("click", signOutHubGoogle);
     }
 
+    if (hubDriveSyncButton) {
+        hubDriveSyncButton.addEventListener("click", () => {
+            void handleHubDriveSyncClick();
+        });
+    }
+
     if (hubStartupSignInCta && hubSignInButton) {
         hubStartupSignInCta.addEventListener("click", () => {
             hubSignInButton.click();
@@ -2365,6 +2687,21 @@ function bindHubAuthControls() {
     if (hubUserBadge) {
         hubUserBadge.addEventListener("click", () => {
             window.location.href = "/user-profile.html";
+        });
+    }
+
+    if (hubTemplateLibraryLink) {
+        hubTemplateLibraryLink.addEventListener("click", async (event) => {
+            if (!hasAllowedSignedInHubAccount() || isHubDriveSetupReady()) {
+                return;
+            }
+
+            event.preventDefault();
+            event.stopPropagation();
+            const unlocked = await handleHubDriveSyncClick({ openFolder: false });
+            if (unlocked) {
+                window.location.href = hubTemplateLibraryLink.href;
+            }
         });
     }
 
@@ -2461,7 +2798,11 @@ function initHubGoogleAuth() {
     bindHubAuthControls();
 
     if (hubAuthState.profile?.email) {
-        resolveHubAccessState().finally(renderHubAuthUi);
+        resolveHubAccessState()
+            .finally(() => {
+                renderHubAuthUi();
+                void fetchHubDriveSetup();
+            });
     }
 
     if (!hubGoogleClientId) {
@@ -2492,11 +2833,16 @@ function initHubGoogleAuth() {
                 scope: HUB_UNIFIED_OAUTH_SCOPES,
                 include_granted_scopes: true,
                 callback: async (tokenResponse) => {
+                    const pendingResolvers = Array.isArray(hubAuthState.pendingTokenResolvers)
+                        ? hubAuthState.pendingTokenResolvers.splice(0)
+                        : [];
+
                     if (tokenResponse?.error) {
                         // Silent auto-login can legitimately fail with
                         // interaction_required/popup-related outcomes.
                         // Keep UI stable and rely on explicit sign-in click.
                         hubAuthState.autoPromptInFlight = false;
+                        pendingResolvers.forEach((resolve) => resolve(tokenResponse));
                         return;
                     }
 
@@ -2506,11 +2852,13 @@ function initHubGoogleAuth() {
                         hubAuthState.autoPromptInFlight = false;
                         clearHubAuthState();
                         renderHubAuthUi();
+                        pendingResolvers.forEach((resolve) => resolve({ error: error?.message || "Google sign-in failed." }));
                         alert(error.message || "Google sign-in failed.");
                         return;
                     }
 
                     hubAuthState.autoPromptInFlight = false;
+                    pendingResolvers.forEach((resolve) => resolve(tokenResponse));
                 }
             });
         }

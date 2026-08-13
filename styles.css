@@ -273,6 +273,59 @@ a {
     height: 18px;
 }
 
+.google-drive-sync-button {
+    background: linear-gradient(135deg, #ffb02e, #e36a10) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(116, 50, 0, 0.38) !important;
+    border-radius: 999px !important;
+    padding: 6px 14px !important;
+    min-height: 30px;
+    box-shadow: 0 8px 18px rgba(112, 53, 8, 0.28);
+}
+
+.google-drive-sync-button:hover {
+    background: linear-gradient(135deg, #ffbd4b, #ef7a1c) !important;
+    box-shadow: 0 10px 20px rgba(112, 53, 8, 0.34) !important;
+}
+
+.google-drive-sync-button.drive-state-checking {
+    background: linear-gradient(135deg, #2d7ff9, #1e56b6) !important;
+    border-color: rgba(9, 39, 97, 0.44) !important;
+    box-shadow: 0 8px 18px rgba(18, 48, 110, 0.28);
+}
+
+.google-drive-sync-button.drive-state-ready {
+    background: linear-gradient(135deg, #24a862, #167345) !important;
+    border-color: rgba(8, 63, 36, 0.42) !important;
+    box-shadow: 0 8px 18px rgba(13, 80, 48, 0.28);
+}
+
+.google-drive-sync-button.drive-state-unknown {
+    background: linear-gradient(135deg, #f0c155, #c98514) !important;
+}
+
+.google-drive-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+.nav-drawer a[aria-disabled="true"] {
+    opacity: 0.72;
+    background: rgba(255, 195, 77, 0.14);
+    color: rgba(255, 245, 217, 0.96);
+}
+
+.nav-drawer a.nav-link-locked::after {
+    content: "Drive setup required";
+    display: block;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: rgba(255, 219, 138, 0.96);
+    margin-top: 2px;
+}
+
 .hub-startup-signin-banner {
     margin: 10px 0 4px;
     padding: 10px 12px;

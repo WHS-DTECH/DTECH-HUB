@@ -43,6 +43,7 @@ const driveState = {
     tokenClient: null,
     pendingResolve: null,
     setupState: null,
+    setupResolved: false,
     copyMap: {},          // templateId → { fileUrl, fileName }
     processAssessmentFiles: []  // Real-time list of files in Process Assessment folder
 };
@@ -640,15 +641,27 @@ function requestDriveToken(options = {}) {
 
 async function loadDriveSetup() {
     const email = getLibraryEmail();
-    if (!email) return null;
+    if (!email) {
+        driveState.setupResolved = true;
+        return null;
+    }
 
     try {
-        const response = await fetch("/api/student/drive-setup", { headers: withLibraryAuthHeaders({}) });
+        const storedDriveAccessToken = getLibraryStoredDriveAccessToken();
+        const response = storedDriveAccessToken
+            ? await fetch("/api/student/drive-setup/status", {
+                method: "POST",
+                headers: withLibraryAuthHeaders({ "Content-Type": "application/json" }),
+                body: JSON.stringify({ driveAccessToken: storedDriveAccessToken })
+            })
+            : await fetch("/api/student/drive-setup", { headers: withLibraryAuthHeaders({}) });
         const payload = await response.json().catch(() => ({}));
+        driveState.setupResolved = true;
         if (!response.ok) return null;
         driveState.setupState = payload;
         return payload;
     } catch (_error) {
+        driveState.setupResolved = true;
         return null;
     }
 }
@@ -805,6 +818,19 @@ function renderSetupBanner(setup) {
         return;
     }
 
+    if (setup?.confirmed && setup?.processAssessmentFolderId) {
+        const processAssessmentFolderId = String(setup.processAssessmentFolderId || "").trim();
+        const processAssessmentFolderUrl = String(setup.processAssessmentFolderUrl || "").trim() || (processAssessmentFolderId
+            ? `https://drive.google.com/drive/folders/${encodeURIComponent(processAssessmentFolderId)}`
+            : "");
+        banner.innerHTML = `
+            <div class="template-setup-banner-inner template-setup-banner-ok">
+                <p class="template-setup-banner-text">&#10003; Your <strong><a class="template-setup-banner-link" href="${escapeHtml(processAssessmentFolderUrl)}" target="_blank" rel="noreferrer">Process Assessment</a></strong> folder is ready. Templates copied will go directly there.</p>
+            </div>`;
+        banner.hidden = false;
+        return;
+    }
+
     if (!setup || !setup.configured) {
         banner.innerHTML = `
             <div class="template-setup-banner-inner template-setup-banner-action">
@@ -837,19 +863,6 @@ function renderSetupBanner(setup) {
         document.querySelector("#template-setup-confirm")?.addEventListener("click", () => {
             void handleConfirmFolder();
         });
-        return;
-    }
-
-    if (setup.confirmed && setup.processAssessmentFolderId) {
-        const processAssessmentFolderId = String(setup.processAssessmentFolderId || "").trim();
-        const processAssessmentFolderUrl = processAssessmentFolderId
-            ? `https://drive.google.com/drive/folders/${encodeURIComponent(processAssessmentFolderId)}`
-            : "";
-        banner.innerHTML = `
-            <div class="template-setup-banner-inner template-setup-banner-ok">
-                <p class="template-setup-banner-text">&#10003; Your <strong><a class="template-setup-banner-link" href="${escapeHtml(processAssessmentFolderUrl)}" target="_blank" rel="noreferrer">Process Assessment</a></strong> folder is ready. Templates copied will go directly there.</p>
-            </div>`;
-        banner.hidden = false;
         return;
     }
 
@@ -1288,6 +1301,15 @@ function renderLibrary() {
     const host = document.querySelector("#template-list");
     const searchStatus = document.querySelector("#template-search-status");
     if (!host) return;
+
+    if (getLibraryEmail() && driveState.setupResolved && !Boolean(driveState.setupState?.confirmed && driveState.setupState?.processAssessmentFolderId)) {
+        if (searchStatus) {
+            searchStatus.textContent = "";
+        }
+        host.innerHTML = '<p class="template-empty">Set up your SeniorDTECH/Process Assessment folder first. Use Google Drive Sync in the top bar or confirm the folder below to unlock the template library.</p>';
+        return;
+    }
+
     templateLibraryData = Array.isArray(templateLibraryData) ? [...templateLibraryData].sort(compareTemplateEntries) : [];
     const normalizedQuery = String(templateSearchQuery || "").trim().toLowerCase();
     const filteredTemplates = normalizedQuery
