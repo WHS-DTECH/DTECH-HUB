@@ -5866,6 +5866,36 @@ async function requireActivityWriteAccess(req, res, next) {
   next();
 }
 
+async function requireTrelloBoardReadAccess(req, res, next) {
+  const requesterEmail = normalizeEmail(getRequestUserEmail(req));
+  const studentEmail = normalizeEmail(req.query?.student_email || req.query?.studentEmail || "");
+
+  if (!requesterEmail) {
+    res.status(401).json({ error: "School sign-in required" });
+    return;
+  }
+
+  if (!isSchoolEmail(studentEmail)) {
+    res.status(400).json({ error: "A valid student email is required" });
+    return;
+  }
+
+  if (requesterEmail === studentEmail) {
+    req.user_email = requesterEmail;
+    next();
+    return;
+  }
+
+  const access = await resolveActivityWriteAccess(requesterEmail);
+  if (!access.allowed) {
+    res.status(403).json({ error: "You can only view your own Trello board." });
+    return;
+  }
+
+  req.user_email = access.email;
+  next();
+}
+
 async function requireAdminAccess(req, res, next) {
   const email = getRequestUserEmail(req);
   if (!email) {
@@ -9416,7 +9446,7 @@ app.get("/api/integrations/trello/connections", requireActivityWriteAccess, asyn
   }
 });
 
-app.get("/api/integrations/trello/list-progress", requireActivityWriteAccess, async (req, res) => {
+app.get("/api/integrations/trello/list-progress", requireTrelloBoardReadAccess, async (req, res) => {
   const studentEmail = normalizeEmail(req.query?.student_email || req.query?.studentEmail || "");
   const boardUrl = String(req.query?.board_url || req.query?.boardUrl || "").trim();
 
@@ -9460,7 +9490,7 @@ app.get("/api/integrations/trello/list-progress", requireActivityWriteAccess, as
     });
     const cards = await trelloApiRequest(`/boards/${encodeURIComponent(boardId)}/cards`, {
       token: existing.trello_token,
-      query: { fields: "id,idList,closed", filter: "open" }
+      query: { fields: "id,idList,name,url,due,dateLastActivity,closed", filter: "open" }
     });
 
     const openLists = (Array.isArray(lists) ? lists : []).map((list) => ({
@@ -9482,6 +9512,10 @@ app.get("/api/integrations/trello/list-progress", requireActivityWriteAccess, as
     const openCards = (Array.isArray(cards) ? cards : []).map((card) => ({
       id: String(card?.id || "").trim(),
       idList: String(card?.idList || "").trim(),
+      name: String(card?.name || "Untitled task").trim(),
+      url: String(card?.url || "").trim(),
+      due: String(card?.due || "").trim(),
+      dateLastActivity: String(card?.dateLastActivity || "").trim(),
       closed: Boolean(card?.closed)
     })).filter((card) => card.id && card.idList && !card.closed);
 
@@ -9493,6 +9527,16 @@ app.get("/api/integrations/trello/list-progress", requireActivityWriteAccess, as
       ? Math.round((doneCount / trackedTotal) * 100)
       : 0;
 
+    const toTaskCards = (listIds) => openCards
+      .filter((card) => listIds.includes(card.idList))
+      .map((card) => ({
+        id: card.id,
+        name: card.name,
+        url: card.url,
+        due: card.due,
+        date_last_activity: card.dateLastActivity
+      }));
+
     res.json({
       student_email: studentEmail,
       board_id: boardId,
@@ -9503,7 +9547,10 @@ app.get("/api/integrations/trello/list-progress", requireActivityWriteAccess, as
       completion_percent: completionPercent,
       todo_lists: toDoListIds.map((id) => listNameById.get(id) || id),
       doing_lists: doingListIds.map((id) => listNameById.get(id) || id),
-      done_lists: doneListIds.map((id) => listNameById.get(id) || id)
+      done_lists: doneListIds.map((id) => listNameById.get(id) || id),
+      todo_cards: toTaskCards(toDoListIds),
+      doing_cards: toTaskCards(doingListIds),
+      done_cards: toTaskCards(doneListIds)
     });
   } catch (error) {
     const status = Number(error?.status) || 500;
@@ -9639,98 +9686,6 @@ app.get("/api/integrations/trello/boards/:boardId/lists", async (req, res) => {
   } catch (error) {
     const status = Number(error?.status) || 500;
     res.status(status).json({ error: error.message || "Could not load Trello lists" });
-  }
-});
-
-app.get("/api/integrations/trello/boards/:boardId/task-snapshot", async (req, res) => {
-  const email = getRequestUserEmail(req);
-  if (!isSchoolEmail(email)) {
-    res.status(401).json({ error: "School sign-in required" });
-    return;
-  }
-
-  const boardId = String(req.params.boardId || "").trim();
-  if (!boardId) {
-    res.status(400).json({ error: "Board id is required" });
-    return;
-  }
-
-  try {
-    const existing = await getStoredTrelloConnection(email);
-    if (!existing?.trello_token) {
-      res.status(404).json({ error: "Connect Trello first" });
-      return;
-    }
-
-    const [board, lists, cards] = await Promise.all([
-      trelloApiRequest(`/boards/${encodeURIComponent(boardId)}`, {
-        token: existing.trello_token,
-        query: { fields: "id,name,url" }
-      }),
-      trelloApiRequest(`/boards/${encodeURIComponent(boardId)}/lists`, {
-        token: existing.trello_token,
-        query: { fields: "id,name,closed,pos", filter: "open" }
-      }),
-      trelloApiRequest(`/boards/${encodeURIComponent(boardId)}/cards`, {
-        token: existing.trello_token,
-        query: { fields: "id,idList,name,url,closed,pos", filter: "open" }
-      })
-    ]);
-
-    const columnForListName = (value) => {
-      const name = String(value || "").trim();
-      if (/(^|\s)to\s*do($|\s)|^todo$/i.test(name)) return "todo";
-      if (/(^|\s)doing($|\s)|in\s*progress/i.test(name)) return "doing";
-      if (/(^|\s)done($|\s)|complete(d)?|finished/i.test(name)) return "done";
-      return "";
-    };
-
-    const listMetadata = (Array.isArray(lists) ? lists : [])
-      .filter((list) => !Boolean(list?.closed))
-      .map((list) => ({
-        id: String(list?.id || "").trim(),
-        name: String(list?.name || "").trim(),
-        pos: Number(list?.pos) || 0
-      }))
-      .filter((list) => list.id);
-    const listById = new Map(listMetadata.map((list) => [list.id, list]));
-    const columns = { todo: [], doing: [], done: [] };
-
-    (Array.isArray(cards) ? cards : [])
-      .filter((card) => !Boolean(card?.closed))
-      .map((card) => ({
-        id: String(card?.id || "").trim(),
-        listId: String(card?.idList || "").trim(),
-        name: String(card?.name || "Untitled task").trim(),
-        url: String(card?.url || "").trim(),
-        pos: Number(card?.pos) || 0
-      }))
-      .filter((card) => card.id && card.listId)
-      .forEach((card) => {
-        const list = listById.get(card.listId);
-        const column = columnForListName(list?.name);
-        if (!column) return;
-        columns[column].push({
-          id: card.id,
-          name: card.name,
-          url: card.url,
-          listName: list.name,
-          pos: card.pos
-        });
-      });
-
-    Object.values(columns).forEach((entries) => entries.sort((left, right) => left.pos - right.pos));
-    res.json({
-      board: {
-        id: String(board?.id || boardId).trim(),
-        name: String(board?.name || "Trello Board").trim(),
-        url: String(board?.url || "").trim()
-      },
-      columns
-    });
-  } catch (error) {
-    const status = Number(error?.status) || 500;
-    res.status(status).json({ error: error.message || "Could not load Trello task snapshot" });
   }
 });
 

@@ -741,104 +741,133 @@ h1 {
     gap: 8px;
 }
 
-.task-topic-trello-board-panel {
-    border: 1px solid #b9d0e8;
-    border-radius: 8px;
-    background: #f4f9ff;
-    padding: 10px;
+.task-topic-decomp-dashboard {
+    display: grid;
+    gap: 10px;
+    border-top: 1px solid #e1c790;
+    padding-top: 12px;
 }
 
-.task-topic-trello-board-header {
+.task-topic-decomp-dashboard-heading {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: 10px;
 }
 
-.task-topic-trello-board-title,
-.task-topic-trello-board-status {
+.task-topic-decomp-dashboard-heading h3,
+.task-topic-decomp-dashboard-kicker {
     margin: 0;
 }
 
-.task-topic-trello-board-title {
-    font-size: 0.84rem;
+.task-topic-decomp-dashboard-heading h3 {
+    color: #314f73;
+    font-size: 1rem;
+}
+
+.task-topic-decomp-dashboard-kicker {
+    color: #7c642e;
+    font-size: 0.66rem;
     font-weight: 800;
-    color: #194d78;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
 }
 
-.task-topic-trello-board-status {
-    margin-top: 5px;
-    min-height: 1em;
-    font-size: 0.74rem;
-    color: #416685;
-}
-
-.task-topic-trello-board-columns {
+.task-topic-decomp-board-columns {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
-    margin-top: 8px;
 }
 
-.task-topic-trello-column {
-    border: 1px solid #c6d8e9;
-    border-radius: 6px;
-    background: #ffffff;
+.task-topic-decomp-board-column {
+    min-width: 0;
+    border: 1px solid #d8c7a3;
+    border-radius: 7px;
+    background: #fffdf8;
     overflow: hidden;
 }
 
-.task-topic-trello-column h4 {
+.task-topic-decomp-board-column > header {
     display: flex;
+    align-items: center;
     justify-content: space-between;
     gap: 6px;
+    padding: 7px 8px;
+    color: #ffffff;
+}
+
+.task-topic-decomp-board-column > header h4 {
     margin: 0;
-    padding: 6px 8px;
-    font-size: 0.74rem;
-    color: #194565;
-    background: #e8f3ff;
+    font-size: 0.77rem;
 }
 
-.task-topic-trello-column.is-doing h4 {
-    background: #fff1d8;
-    color: #76490d;
-}
-
-.task-topic-trello-column.is-done h4 {
-    background: #e6f7ec;
-    color: #1f643b;
-}
-
-.task-topic-trello-column ul {
+.task-topic-decomp-board-column > header span {
     display: grid;
-    gap: 5px;
-    list-style: none;
-    margin: 0;
+    place-items: center;
+    min-width: 19px;
+    height: 19px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.22);
+    font-size: 0.68rem;
+    font-weight: 800;
+}
+
+.task-topic-decomp-board-column-todo > header {
+    background: #547da8;
+}
+
+.task-topic-decomp-board-column-doing > header {
+    background: #c27c27;
+}
+
+.task-topic-decomp-board-column-done > header {
+    background: #397d58;
+}
+
+.task-topic-decomp-card-list {
+    display: grid;
+    gap: 6px;
     padding: 7px;
 }
 
-.task-topic-trello-column li {
-    border: 1px solid #d5e1ec;
+.task-topic-decomp-trello-card {
+    display: grid;
+    gap: 4px;
+    padding: 7px;
+    border: 1px solid #dfd6c2;
     border-radius: 5px;
-    padding: 5px 6px;
-    font-size: 0.72rem;
-    line-height: 1.35;
-    color: #294a65;
-    overflow-wrap: anywhere;
+    background: #ffffff;
 }
 
-.task-topic-trello-column li.is-empty {
-    color: #63798b;
-    font-style: italic;
-}
-
-.task-topic-trello-column a {
-    color: #1c5e98;
+.task-topic-decomp-trello-card a,
+.task-topic-decomp-trello-card p {
+    margin: 0;
+    color: #244d79;
+    font-size: 0.75rem;
     font-weight: 700;
-    text-decoration: none;
+    line-height: 1.35;
 }
 
-.task-topic-trello-column a:hover {
+.task-topic-decomp-trello-card a:hover {
     text-decoration: underline;
+}
+
+.task-topic-decomp-trello-card span {
+    color: #76623f;
+    font-size: 0.67rem;
+}
+
+.task-topic-decomp-board-empty {
+    grid-column: 1 / -1;
+    margin: 0;
+    color: #706043;
+    font-size: 0.76rem;
+}
+
+@media (max-width: 680px) {
+    .task-topic-decomp-board-columns {
+        grid-template-columns: 1fr;
+    }
 }
 
 .task-topic-submission-label {

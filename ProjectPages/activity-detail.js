@@ -3660,6 +3660,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     let syncedGoogleSlidesUrl = shouldUseStoredSync ? storedSyncEntry.url : currentGoogleSlidesUrl;
     let syncedGoogleSlidesSavedAt = String(storedSyncEntry.savedAt || "").trim();
     const currentTrelloCardUrl = toSafeTrelloCardUrl(submission.trelloCardUrl);
+    const currentDecompositionTrelloUrl = currentTrelloCardUrl || getFirstTrelloCardUrlFromEvidenceRows(evidenceRows);
     const currentMediaAssetFolderUrl = toSafeExternalUrl(submission.mediaAssetFolderUrl);
     const currentOneDriveProjectFolderUrl = toSafeExternalUrl(submission.mediaAssetFolderUrl);
     const currentMediaReviewUrl = toSafeExternalUrl(submission.mediaReviewUrl);
@@ -3917,20 +3918,26 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                         <option value="">Select list</option>
                     </select>
 
-                    <div class="task-topic-trello-board-panel" id="task-topic-decomp-board-panel" hidden>
-                        <div class="task-topic-trello-board-header">
-                            <p class="task-topic-trello-board-title">Your Trello Tasks</p>
-                            <button type="button" class="detail-action detail-action-secondary" id="task-topic-refresh-trello-board">Refresh</button>
-                        </div>
-                        <p class="task-topic-trello-board-status" id="task-topic-decomp-board-status" aria-live="polite"></p>
-                        <div class="task-topic-trello-board-columns" id="task-topic-decomp-board-columns"></div>
-                    </div>
-
                     <div class="task-topic-submission-actions">
                         <button type="button" class="detail-action detail-action-secondary" id="task-topic-save-decomp-plan">Save Decomposition Plan</button>
                         <button type="button" class="detail-action" id="task-topic-push-decomp-trello">Push Steps to Trello To Do</button>
                     </div>
                     <p class="task-topic-submission-status" id="task-topic-decomp-status" aria-live="polite"></p>
+
+                    <section class="task-topic-decomp-dashboard" aria-label="Decomposition task board">
+                        <div class="task-topic-decomp-dashboard-heading">
+                            <div>
+                                <p class="task-topic-decomp-dashboard-kicker">Student Trello Board</p>
+                                <h3>Decomposition Task Board</h3>
+                            </div>
+                            <button type="button" class="detail-action detail-action-secondary" id="task-topic-refresh-decomp-board">Refresh Tasks</button>
+                        </div>
+                        <p class="task-topic-submission-note">This shows your decomposed work tasks from Trello. Move cards between To Do, Doing, and Done in Trello; DTECH HUB reflects the current board.</p>
+                        <p class="task-topic-submission-status" id="task-topic-decomp-board-status" aria-live="polite"></p>
+                        <div class="task-topic-decomp-board-columns" id="task-topic-decomp-board-columns">
+                            <p class="task-topic-decomp-board-empty">Loading Trello tasks...</p>
+                        </div>
+                    </section>
                 </div>
             ` : ""}
 
@@ -4007,10 +4014,9 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const decompSaveButton = panelHost.querySelector("#task-topic-save-decomp-plan");
     const decompPushButton = panelHost.querySelector("#task-topic-push-decomp-trello");
     const decompStatusHost = panelHost.querySelector("#task-topic-decomp-status");
-    const decompBoardPanel = panelHost.querySelector("#task-topic-decomp-board-panel");
+    const decompBoardRefreshButton = panelHost.querySelector("#task-topic-refresh-decomp-board");
     const decompBoardStatusHost = panelHost.querySelector("#task-topic-decomp-board-status");
     const decompBoardColumnsHost = panelHost.querySelector("#task-topic-decomp-board-columns");
-    const decompBoardRefreshButton = panelHost.querySelector("#task-topic-refresh-trello-board");
     const statusHost = panelHost.querySelector("#task-topic-submission-status");
     const ackStatusHost = panelHost.querySelector("#task-topic-ack-status");
     const lastSubmittedHost = panelHost.querySelector("#task-topic-last-submitted");
@@ -4145,67 +4151,77 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         decompStatusHost.classList.toggle("is-error", Boolean(isError));
     };
 
-    const renderDecompositionBoardSnapshot = (snapshot) => {
-        if (!decompBoardPanel || !decompBoardColumnsHost) return;
-
-        const columns = snapshot?.columns || {};
-        const definitions = [
-            { key: "todo", label: "To Do", className: "is-todo" },
-            { key: "doing", label: "Doing", className: "is-doing" },
-            { key: "done", label: "Done", className: "is-done" }
-        ];
-
-        decompBoardColumnsHost.innerHTML = definitions.map((definition) => {
-            const cards = Array.isArray(columns?.[definition.key]) ? columns[definition.key] : [];
-            return `
-                <section class="task-topic-trello-column ${definition.className}">
-                    <h4>${escapeHtml(definition.label)} <span>${cards.length}</span></h4>
-                    <ul>
-                        ${cards.length
-                            ? cards.map((card) => {
-                                const cardName = String(card?.name || "Untitled task").trim();
-                                const cardUrl = toSafeExternalUrl(card?.url || "");
-                                return `<li>${cardUrl
-                                    ? `<a href="${escapeHtml(cardUrl)}" target="_blank" rel="noreferrer">${escapeHtml(cardName)}</a>`
-                                    : escapeHtml(cardName)
-                                }</li>`;
-                            }).join("")
-                            : "<li class=\"is-empty\">No tasks</li>"
-                        }
-                    </ul>
-                </section>
-            `;
-        }).join("");
+    const setDecompBoardStatus = (message, isError = false) => {
+        if (!decompBoardStatusHost) return;
+        decompBoardStatusHost.textContent = String(message || "");
+        decompBoardStatusHost.classList.toggle("is-error", Boolean(isError));
     };
 
-    const loadDecompositionBoardSnapshot = async () => {
-        const boardId = String(decompBoardSelect?.value || "").trim();
-        if (!boardId || !decompBoardPanel || !decompBoardColumnsHost) {
-            if (decompBoardPanel) decompBoardPanel.hidden = true;
+    const renderDecompBoardColumn = (title, cards, variant) => {
+        const safeCards = Array.isArray(cards) ? cards : [];
+        return `
+            <section class="task-topic-decomp-board-column task-topic-decomp-board-column-${escapeHtml(variant)}">
+                <header>
+                    <h4>${escapeHtml(title)}</h4>
+                    <span>${safeCards.length}</span>
+                </header>
+                <div class="task-topic-decomp-card-list">
+                    ${safeCards.length
+                        ? safeCards.map((card) => {
+                            const name = String(card?.name || "Untitled task").trim();
+                            const url = toSafeExternalUrl(card?.url || "");
+                            const due = String(card?.due || "").trim();
+                            const dueLabel = due ? `Due ${escapeHtml(formatSubmissionTimestamp(due))}` : "";
+                            return `
+                                <article class="task-topic-decomp-trello-card">
+                                    ${url
+                                        ? `<a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(name)}</a>`
+                                        : `<p>${escapeHtml(name)}</p>`
+                                    }
+                                    ${dueLabel ? `<span>${dueLabel}</span>` : ""}
+                                </article>
+                            `;
+                        }).join("")
+                        : '<p class="task-topic-decomp-board-empty">No tasks in this list.</p>'
+                    }
+                </div>
+            </section>
+        `;
+    };
+
+    const loadDecompositionTaskBoard = async () => {
+        if (!decompBoardColumnsHost) return;
+        if (!currentDecompositionTrelloUrl) {
+            decompBoardColumnsHost.innerHTML = '<p class="task-topic-decomp-board-empty">Add your Trello board or card link in Project Management first, then refresh this board.</p>';
+            setDecompBoardStatus("Trello board link needed.", true);
             return;
         }
 
-        decompBoardPanel.hidden = false;
-        if (decompBoardStatusHost) decompBoardStatusHost.textContent = "Loading Trello tasks...";
         if (decompBoardRefreshButton) decompBoardRefreshButton.disabled = true;
+        decompBoardColumnsHost.innerHTML = '<p class="task-topic-decomp-board-empty">Loading Trello tasks...</p>';
+        setDecompBoardStatus("Loading your current Trello tasks...");
 
         try {
-            const response = await fetch(`/api/integrations/trello/boards/${encodeURIComponent(boardId)}/task-snapshot`, {
-                headers: buildWriteHeaders()
-            });
+            const response = await fetch(
+                `/api/integrations/trello/list-progress?student_email=${encodeURIComponent(email)}&board_url=${encodeURIComponent(currentDecompositionTrelloUrl)}`,
+                { headers: buildWriteHeaders() }
+            );
             const payload = await response.json().catch(() => ({}));
             if (!response.ok) {
                 throw new Error(payload?.error || "Could not load Trello tasks.");
             }
 
-            renderDecompositionBoardSnapshot(payload);
-            const boardName = String(payload?.board?.name || "Trello board").trim();
-            if (decompBoardStatusHost) decompBoardStatusHost.textContent = `Showing open tasks from ${boardName}.`;
+            decompBoardColumnsHost.innerHTML = [
+                renderDecompBoardColumn("To Do", payload?.todo_cards, "todo"),
+                renderDecompBoardColumn("Doing", payload?.doing_cards, "doing"),
+                renderDecompBoardColumn("Done", payload?.done_cards, "done")
+            ].join("");
+            setDecompBoardStatus(`Trello board updated: ${Number(payload?.todo_count || 0)} to do, ${Number(payload?.doing_count || 0)} doing, ${Number(payload?.done_count || 0)} done.`);
         } catch (error) {
-            decompBoardColumnsHost.innerHTML = "";
-            if (decompBoardStatusHost) decompBoardStatusHost.textContent = error?.message || "Could not load Trello tasks.";
+            decompBoardColumnsHost.innerHTML = '<p class="task-topic-decomp-board-empty">Could not load Trello tasks right now.</p>';
+            setDecompBoardStatus(error?.message || "Could not load Trello tasks.", true);
         } finally {
-            if (decompBoardRefreshButton && decompBoardRefreshButton.isConnected) decompBoardRefreshButton.disabled = false;
+            if (decompBoardRefreshButton?.isConnected) decompBoardRefreshButton.disabled = false;
         }
     };
 
@@ -4443,6 +4459,11 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     }
 
     if (isDecompositionTopic && decompBoardSelect && decompListSelect) {
+        decompBoardRefreshButton?.addEventListener("click", () => {
+            void loadDecompositionTaskBoard();
+        });
+        void loadDecompositionTaskBoard();
+
         try {
             const boardsResponse = await fetch("/api/integrations/trello/boards", { headers: buildWriteHeaders() });
             if (boardsResponse.ok) {
@@ -4463,7 +4484,6 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             decompListSelect.innerHTML = `<option value="">Loading lists...</option>`;
             if (!boardId) {
                 decompListSelect.innerHTML = `<option value="">Select list</option>`;
-                if (decompBoardPanel) decompBoardPanel.hidden = true;
                 return;
             }
 
@@ -4478,15 +4498,10 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                     .map((list) => `<option value="${escapeHtml(list.id)}">${escapeHtml(list.name || list.id)}</option>`)
                     .join("");
                 decompListSelect.innerHTML = `<option value="">Select list</option>${listOptions}`;
-                await loadDecompositionBoardSnapshot();
             } catch (_error) {
                 decompListSelect.innerHTML = `<option value="">Select list</option>`;
                 setDecompStatus("Could not load Trello lists.", true);
             }
-        });
-
-        decompBoardRefreshButton?.addEventListener("click", () => {
-            void loadDecompositionBoardSnapshot();
         });
 
         decompSaveButton?.addEventListener("click", async () => {
@@ -4633,7 +4648,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                     setDecompStatus(`Created ${createdCount} Trello To Do card${createdCount === 1 ? "" : "s"}.`);
                 }
                 if (createdCount > 0) {
-                    await loadDecompositionBoardSnapshot();
+                    void loadDecompositionTaskBoard();
                 }
             } catch (_error) {
                 setDecompStatus("Could not push decomposition steps to Trello right now.", true);
