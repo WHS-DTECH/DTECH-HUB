@@ -420,7 +420,9 @@
         }
 
         .task-list-decomposition-subtask {
-            display: block;
+            display: flex;
+            align-items: center;
+            gap: 7px;
             border: 1px solid #bed6e8;
             border-radius: 6px;
             background: #ffffff;
@@ -428,6 +430,47 @@
             font-size: 0.78rem;
             font-weight: 800;
             padding: 6px 8px;
+        }
+
+        .task-list-decomposition-subtask a {
+            color: inherit;
+        }
+
+        .task-list-decomposition-subtask input[type="checkbox"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            margin: 0;
+            flex: 0 0 auto;
+            border: 2px solid #7aa9e8;
+            border-radius: 4px;
+            background: #ffffff;
+            position: relative;
+            opacity: 1;
+        }
+
+        .task-list-decomposition-subtask input[type="checkbox"]:checked {
+            border-color: #1d4ed8;
+            background: #1d4ed8;
+        }
+
+        .task-list-decomposition-subtask input[type="checkbox"]:checked::after {
+            content: "";
+            position: absolute;
+            left: 4px;
+            top: 1px;
+            width: 3px;
+            height: 7px;
+            border: solid #ffffff;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+
+        .task-list-decomposition-subtask.is-complete {
+            background: #eaf2ff;
+            border-color: #95baf0;
+            color: #133b7a;
         }
 
         .task-list-decomposition-subtask:hover {

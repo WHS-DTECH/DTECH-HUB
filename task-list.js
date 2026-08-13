@@ -654,26 +654,37 @@ function getTaskTopicHrefForStep(standard, level, text) {
     return buildCustomActivityLink(taskListState.selectedId, safeText, derivedShortName);
 }
 
-function getDecompositionSubtasks() {
+function getDecompositionSubtasks(stateMap) {
     const activityId = taskListState.selectedId;
     if (!activityId) return [];
+
+    const digitalOutcomeRows = Array.isArray(stateMap?.["digital-outcome"])
+        ? stateMap["digital-outcome"]
+        : [];
+    const isComplete = (matcher) => digitalOutcomeRows.some((step) =>
+        Boolean(step?.done) && matcher.test(String(step?.text || ""))
+    );
 
     return [
         {
             label: "Development Steps",
-            href: buildCustomActivityLink(activityId, "Explain how the outcome will be developed.", "Development Steps", "development-steps")
+            href: buildCustomActivityLink(activityId, "Explain how the outcome will be developed.", "Development Steps", "development-steps"),
+            done: isComplete(/explain how the outcome will be developed/i)
         },
         {
             label: "Tools & Techniques",
-            href: buildCustomActivityLink(activityId, "What Tools and Techniques will be used?", "Tools & Techniques", "tools-and-techniques")
+            href: buildCustomActivityLink(activityId, "What Tools and Techniques will be used?", "Tools & Techniques", "tools-and-techniques"),
+            done: isComplete(/what tools and techniques will be used/i)
         },
         {
             label: "Success Criteria",
-            href: buildCustomActivityLink(activityId, "State how success will be measured or evaluated.", "Success Criteria", "project-success-criteria")
+            href: buildCustomActivityLink(activityId, "State how success will be measured or evaluated.", "Success Criteria", "project-success-criteria"),
+            done: isComplete(/state how success will be measured or evaluated/i)
         },
         {
             label: "Client Interaction",
-            href: buildCustomActivityLink(activityId, "Client Interaction", "Client Interaction")
+            href: buildCustomActivityLink(activityId, "Client Interaction", "Client Interaction"),
+            done: false
         }
     ];
 }
@@ -1229,7 +1240,7 @@ function renderChecklistCards(detail, allItems) {
                                 && systemConnections.trelloConnected
                                 && systemConnections.githubConnected;
                             const relevantCategoryDoneCount = countCompletedRelevantImplicationsCategories(levelRows);
-                            const decompositionSubtasks = isDecompositionRow ? getDecompositionSubtasks() : [];
+                            const decompositionSubtasks = isDecompositionRow ? getDecompositionSubtasks(taskListState.checklistState) : [];
 
                             return `
                                 ${shouldRenderAchievedSectionHeading && achievedSectionMeta
@@ -1261,7 +1272,10 @@ function renderChecklistCards(detail, allItems) {
                                             <p class="task-list-system-title">Decomposition Subtasks</p>
                                             <div class="task-list-decomposition-subtask-list">
                                                 ${decompositionSubtasks.map((subtask) => `
-                                                    <a class="task-list-decomposition-subtask" href="${escapeTaskListHtml(subtask.href)}">${escapeTaskListHtml(subtask.label)}</a>
+                                                    <label class="task-list-decomposition-subtask ${subtask.done ? "is-complete" : ""}">
+                                                        <input type="checkbox" disabled ${subtask.done ? "checked" : ""}>
+                                                        <a href="${escapeTaskListHtml(subtask.href)}">${escapeTaskListHtml(subtask.label)}</a>
+                                                    </label>
                                                 `).join("")}
                                             </div>
                                         </div>
