@@ -623,6 +623,10 @@ function getTaskTopicHrefForStep(standard, level, text) {
         return buildCustomActivityLink(taskListState.selectedId, "Project Management");
     }
 
+    if (String(standard) === "91897" && normalized.includes("decompose")) {
+        return buildCustomActivityLink(taskListState.selectedId, safeText, "Decomposition Tasks", "decomposition-tasks");
+    }
+
     if (String(standard) === "91897" && normalized.includes("relevant implications")) {
         return buildCustomActivityLink(taskListState.selectedId, safeText, "Relevant Implications", "relevant-implications");
     }

@@ -741,6 +741,106 @@ h1 {
     gap: 8px;
 }
 
+.task-topic-trello-board-panel {
+    border: 1px solid #b9d0e8;
+    border-radius: 8px;
+    background: #f4f9ff;
+    padding: 10px;
+}
+
+.task-topic-trello-board-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.task-topic-trello-board-title,
+.task-topic-trello-board-status {
+    margin: 0;
+}
+
+.task-topic-trello-board-title {
+    font-size: 0.84rem;
+    font-weight: 800;
+    color: #194d78;
+}
+
+.task-topic-trello-board-status {
+    margin-top: 5px;
+    min-height: 1em;
+    font-size: 0.74rem;
+    color: #416685;
+}
+
+.task-topic-trello-board-columns {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.task-topic-trello-column {
+    border: 1px solid #c6d8e9;
+    border-radius: 6px;
+    background: #ffffff;
+    overflow: hidden;
+}
+
+.task-topic-trello-column h4 {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+    margin: 0;
+    padding: 6px 8px;
+    font-size: 0.74rem;
+    color: #194565;
+    background: #e8f3ff;
+}
+
+.task-topic-trello-column.is-doing h4 {
+    background: #fff1d8;
+    color: #76490d;
+}
+
+.task-topic-trello-column.is-done h4 {
+    background: #e6f7ec;
+    color: #1f643b;
+}
+
+.task-topic-trello-column ul {
+    display: grid;
+    gap: 5px;
+    list-style: none;
+    margin: 0;
+    padding: 7px;
+}
+
+.task-topic-trello-column li {
+    border: 1px solid #d5e1ec;
+    border-radius: 5px;
+    padding: 5px 6px;
+    font-size: 0.72rem;
+    line-height: 1.35;
+    color: #294a65;
+    overflow-wrap: anywhere;
+}
+
+.task-topic-trello-column li.is-empty {
+    color: #63798b;
+    font-style: italic;
+}
+
+.task-topic-trello-column a {
+    color: #1c5e98;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.task-topic-trello-column a:hover {
+    text-decoration: underline;
+}
+
 .task-topic-submission-label {
     font-size: 0.72rem;
     font-weight: 800;
