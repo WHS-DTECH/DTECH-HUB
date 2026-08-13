@@ -833,10 +833,23 @@ h1 {
 .task-topic-decomp-trello-card {
     display: grid;
     gap: 4px;
-    padding: 7px;
-    border: 1px solid #dfd6c2;
+    padding: 8px;
+    border: 1px solid #b7c9da;
     border-radius: 5px;
-    background: #ffffff;
+    background: #eaf4ff;
+    box-shadow: 0 2px 5px rgba(31, 72, 111, 0.12);
+}
+
+.task-topic-decomp-board-column-doing .task-topic-decomp-trello-card {
+    border-color: #e1b469;
+    background: #fff0d4;
+    box-shadow: 0 2px 5px rgba(126, 77, 13, 0.12);
+}
+
+.task-topic-decomp-board-column-done .task-topic-decomp-trello-card {
+    border-color: #9fcaad;
+    background: #e5f6ea;
+    box-shadow: 0 2px 5px rgba(27, 101, 60, 0.12);
 }
 
 .task-topic-decomp-trello-card a,
@@ -846,6 +859,16 @@ h1 {
     font-size: 0.75rem;
     font-weight: 700;
     line-height: 1.35;
+}
+
+.task-topic-decomp-board-column-doing .task-topic-decomp-trello-card a,
+.task-topic-decomp-board-column-doing .task-topic-decomp-trello-card p {
+    color: #7a4708;
+}
+
+.task-topic-decomp-board-column-done .task-topic-decomp-trello-card a,
+.task-topic-decomp-board-column-done .task-topic-decomp-trello-card p {
+    color: #17613a;
 }
 
 .task-topic-decomp-trello-card a:hover {
