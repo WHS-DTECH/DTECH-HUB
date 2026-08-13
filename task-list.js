@@ -595,11 +595,11 @@ function getAchievedSectionMeta(stepText) {
     const normalized = String(stepText || "").trim().toLowerCase();
     if (!normalized) return null;
 
-    if (normalized.includes("project management")) {
-        return { id: "project-management", title: "Section 1: Project Management" };
+    if (normalized.includes("project management") || normalized.includes("decompos")) {
+        return { id: "project-management", title: "Section 1: Project Management & Decomposition" };
     }
 
-    if (normalized.includes("decompose") || normalized.includes("features") || normalized.includes("requirements")) {
+    if (normalized.includes("features") || normalized.includes("requirements")) {
         return { id: "features-requirements", title: "Section 2: Features & Requirements" };
     }
 
