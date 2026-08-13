@@ -2912,6 +2912,32 @@ async function persistStudentGoogleDriveFolderLink(projectId, studentEmail, deta
     await saveEvidenceRows(projectId, studentEmail, nextRows);
 }
 
+async function ensureStudentProcessAssessmentFolderLink(projectId, studentEmail, detailData, taskTopicTitle, evidenceRows) {
+    const existingLink = getFirstGoogleDriveFolderUrlFromEvidenceRows(evidenceRows);
+    if (existingLink) {
+        return existingLink;
+    }
+
+    const processAssessmentFolderUrl = await fetchStudentProcessAssessmentFolderUrl();
+    if (!processAssessmentFolderUrl) {
+        return "";
+    }
+
+    try {
+        await persistStudentGoogleDriveFolderLink(
+            projectId,
+            studentEmail,
+            detailData,
+            taskTopicTitle,
+            processAssessmentFolderUrl
+        );
+    } catch (error) {
+        console.warn("Could not automatically save the Process Assessment folder link.", error);
+    }
+
+    return processAssessmentFolderUrl;
+}
+
 // Digital Outcome Task Topic Slideshow Sync
 async function openDigitalOutcomeTaskTopicSyncModal(projectId, email, taskTopicTitle, taskTopicShortName, syncTemplateId, syncTopicLabel) {
     const container = document.createElement("div");
@@ -8642,7 +8668,13 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         const assignedStandards = getEffectiveAssignedStandards(myAllocation, detailData);
         const completionPercent = getEvidenceCompletionPercentFromRows(myAllocation?.evidence_steps, assignedStandards);
         const templateLibraryProcessAssessmentUrl = isProjectManagementTaskTopicPage
-            ? await fetchStudentProcessAssessmentFolderUrl()
+            ? await ensureStudentProcessAssessmentFolderLink(
+                projectId,
+                email,
+                detailData,
+                taskTopicValue,
+                myAllocation?.evidence_steps
+            )
             : "";
 
         if (isProjectManagementTaskTopicPage) {
