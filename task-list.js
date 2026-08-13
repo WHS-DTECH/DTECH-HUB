@@ -711,6 +711,20 @@ function getProjectManagementSubtasks(stateMap) {
     ];
 }
 
+function getProjectManagementSystemLogo(systemName) {
+    const system = String(systemName || "").trim().toLowerCase();
+    if (system === "trello") {
+        return `<svg class="task-list-system-logo task-list-system-logo-trello" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4" fill="currentColor"/><rect x="7" y="7" width="4" height="10" rx="1" fill="#ffffff"/><rect x="13" y="7" width="4" height="7" rx="1" fill="#ffffff"/></svg>`;
+    }
+    if (system === "github") {
+        return `<svg class="task-list-system-logo task-list-system-logo-github" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor"/><path d="M8.2 17.5c.7.2 1.1-.3 1.1-.8v-1.1c-1.8.4-2.2-.8-2.2-.8-.3-.8-.7-1- .7-1.2-.1-.1-.2-.2-.2-.3 0-.2.2-.3.4-.3.5 0 .8.5 1 .8.4.7 1.1.5 1.4.4.1-.3.2-.5.4-.7-1.4-.2-2.8-.7-2.8-3.1 0-.7.2-1.2.5-1.7-.1-.2-.2-.8.1-1.6 0 0 .4-.1 1.7.6.5-.1 1-.2 1.6-.2s1.1.1 1.6.2c1.2-.7 1.7-.6 1.7-.6.3.8.2 1.4.1 1.6.3.5.5 1 .5 1.7 0 2.4-1.4 2.9-2.8 3.1.2.2.4.5.4 1v1.5c0 .5.4 1 .9.8A9 9 0 0 0 12 3a9 9 0 0 0-3.8 14.5Z" fill="#ffffff"/></svg>`;
+    }
+    if (system === "onedrive") {
+        return `<svg class="task-list-system-logo task-list-system-logo-onedrive" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.3 17.7h9.1a3.6 3.6 0 0 0 .5-7.1A6.1 6.1 0 0 0 6.4 9.4a4.2 4.2 0 0 0 1.9 8.3Z" fill="currentColor"/><path d="M7.1 16.6h9.6" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+    }
+    return `<svg class="task-list-system-logo task-list-system-logo-drive" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.3 3h5.1l6.3 10.9h-5.1L9.3 3Z" fill="#0f9d58"/><path d="m3.4 13.9 2.5-4.4h12.5l-2.5 4.4H3.4Z" fill="#4285f4"/><path d="m6.3 18.8-2.9-4.9L9.3 3l2.6 4.4-5.6 11.4Z" fill="#f4b400"/></svg>`;
+}
+
 function normalize91907ChecklistRows(rows) {
     const sourceRows = Array.isArray(rows)
         ? rows.map((step) => ({ text: String(step?.text || "").trim(), done: Boolean(step?.done) })).filter((step) => step.text)
@@ -1291,6 +1305,7 @@ function renderChecklistCards(detail, allItems) {
                                                 ${projectManagementSubtasks.map((subtask) => `
                                                     <label class="task-list-decomposition-subtask ${subtask.done ? "is-complete" : ""}">
                                                         <input type="checkbox" disabled ${subtask.done ? "checked" : ""}>
+                                                        ${getProjectManagementSystemLogo(subtask.label)}
                                                         <a href="${escapeTaskListHtml(subtask.href)}">${escapeTaskListHtml(subtask.label)}</a>
                                                     </label>
                                                 `).join("")}
