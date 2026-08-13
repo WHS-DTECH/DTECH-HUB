@@ -649,6 +649,30 @@ function getTaskTopicHrefForStep(standard, level, text) {
     return buildCustomActivityLink(taskListState.selectedId, safeText, derivedShortName);
 }
 
+function getDecompositionSubtasks() {
+    const activityId = taskListState.selectedId;
+    if (!activityId) return [];
+
+    return [
+        {
+            label: "Development Steps",
+            href: buildCustomActivityLink(activityId, "Explain how the outcome will be developed.", "Development Steps", "development-steps")
+        },
+        {
+            label: "Tools & Techniques",
+            href: buildCustomActivityLink(activityId, "What Tools and Techniques will be used?", "Tools & Techniques", "tools-and-techniques")
+        },
+        {
+            label: "Success Criteria",
+            href: buildCustomActivityLink(activityId, "State how success will be measured or evaluated.", "Success Criteria", "project-success-criteria")
+        },
+        {
+            label: "Client Interaction",
+            href: buildCustomActivityLink(activityId, "Client Interaction", "Client Interaction")
+        }
+    ];
+}
+
 function inferStudentSystemConnections(currentState) {
     let trelloConnected = false;
     let githubConnected = false;
@@ -1167,10 +1191,13 @@ function renderChecklistCards(detail, allItems) {
                             }
                             const isProjectManagementRow = String(level) === "Achieved"
                                 && stepText.toLowerCase().includes("project management");
+                            const isDecompositionRow = String(level) === "Achieved"
+                                && stepText.toLowerCase().includes("decompos");
                             const isSystemComplete = isProjectManagementRow
                                 && systemConnections.trelloConnected
                                 && systemConnections.githubConnected;
                             const relevantCategoryDoneCount = countCompletedRelevantImplicationsCategories(levelRows);
+                            const decompositionSubtasks = isDecompositionRow ? getDecompositionSubtasks() : [];
 
                             return `
                                 ${shouldRenderAchievedSectionHeading && achievedSectionMeta
@@ -1195,6 +1222,16 @@ function renderChecklistCards(detail, allItems) {
                                             <label class="task-list-system-item"><input type="checkbox" disabled ${systemConnections.githubConnected ? "checked" : ""}> GitHub</label>
                                             <label class="task-list-system-item"><input type="checkbox" disabled ${systemConnections.oneDriveConnected ? "checked" : ""}> OneDrive</label>
                                             <label class="task-list-system-item"><input type="checkbox" disabled ${systemConnections.googleDriveConnected ? "checked" : ""}> Google Drive</label>
+                                        </div>
+                                    ` : ""}
+                                    ${isDecompositionRow ? `
+                                        <div class="task-list-decomposition-subtasks">
+                                            <p class="task-list-system-title">Decomposition Subtasks</p>
+                                            <div class="task-list-decomposition-subtask-list">
+                                                ${decompositionSubtasks.map((subtask) => `
+                                                    <a class="task-list-decomposition-subtask" href="${escapeTaskListHtml(subtask.href)}">${escapeTaskListHtml(subtask.label)}</a>
+                                                `).join("")}
+                                            </div>
                                         </div>
                                     ` : ""}
                                 </div>

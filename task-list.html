@@ -404,6 +404,37 @@
             color: #133b7a;
         }
 
+        .task-list-decomposition-subtasks {
+            margin: 8px 0 2px 18px;
+            border: 1px solid #a9c7df;
+            border-left: 4px solid #397cad;
+            border-radius: 8px;
+            background: #eef7fc;
+            padding: 8px 10px;
+        }
+
+        .task-list-decomposition-subtask-list {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 6px;
+        }
+
+        .task-list-decomposition-subtask {
+            display: block;
+            border: 1px solid #bed6e8;
+            border-radius: 6px;
+            background: #ffffff;
+            color: #1e5986;
+            font-size: 0.78rem;
+            font-weight: 800;
+            padding: 6px 8px;
+        }
+
+        .task-list-decomposition-subtask:hover {
+            background: #dceefa;
+            border-color: #7aafd3;
+        }
+
         .task-list-step-row {
             border: 1px solid #d9e0ef;
             background: #fff;
