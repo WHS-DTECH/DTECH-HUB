@@ -1199,6 +1199,9 @@ function renderTemplateCard(item) {
 
 function extractTemplateSectionName(item) {
     const templateId = String(item?.id || "").trim().toLowerCase();
+    if (templateId === "decomposition-tasks") {
+        return "Project Management";
+    }
     if (templateId === "development-steps") {
         return "Digital Outcome Details";
     }
@@ -1213,6 +1216,9 @@ function extractTemplateSectionName(item) {
     }
 
     const title = String(item?.title || "").trim();
+    if (/decomposition\s+tasks?|project\s+management/i.test(title)) {
+        return "Project Management";
+    }
     if (/relevant\s+implications|development\s+steps/i.test(title)) {
         return "Relevant Implications";
     }
@@ -1221,7 +1227,7 @@ function extractTemplateSectionName(item) {
 }
 
 function buildTemplateSections(items) {
-    const preferredOrder = ["Digital Outcome Details", "Relevant Implications"];
+    const preferredOrder = ["Digital Outcome Details", "Relevant Implications", "Project Management"];
     const buckets = new Map();
 
     (Array.isArray(items) ? items : []).forEach((item) => {

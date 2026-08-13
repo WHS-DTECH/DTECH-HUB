@@ -4812,6 +4812,14 @@ function inferCanonicalTemplateIdentityFromTitle(title) {
     };
   }
 
+  if (/decomposition\s+tasks?/.test(normalizedTitle)) {
+    return {
+      id: "decomposition-tasks",
+      title: "Decomposition Tasks",
+      criteriaText: "Break the project into smaller, manageable tasks."
+    };
+  }
+
   return null;
 }
 
