@@ -478,6 +478,13 @@ function isRelevantImplicationsCategoryStep(text) {
     return Boolean(parseRelevantImplicationsCategoryFromStep(text));
 }
 
+function isMainRelevantImplicationsStep(text) {
+    if (getStepLevel(text) !== "Achieved") {
+        return false;
+    }
+    return /explain(?:ing)?\s+relevant\s+implications\.?$/i.test(stripStepLevel(text));
+}
+
 function normalize91897ChecklistRows(rows) {
     const sourceRows = Array.isArray(rows)
         ? rows.map((step) => ({ text: String(step?.text || "").trim(), done: Boolean(step?.done) })).filter((step) => step.text)
@@ -487,12 +494,7 @@ function normalize91897ChecklistRows(rows) {
         return sourceRows;
     }
 
-    const mainRelevantImplicationsIndex = sourceRows.findIndex((step) => {
-        if (getStepLevel(step?.text) !== "Achieved") {
-            return false;
-        }
-        return stripStepLevel(step?.text).toLowerCase() === "explain relevant implications.";
-    });
+    const mainRelevantImplicationsIndex = sourceRows.findIndex((step) => isMainRelevantImplicationsStep(step?.text));
 
     if (mainRelevantImplicationsIndex === -1) {
         return sourceRows;
@@ -506,12 +508,7 @@ function normalize91897ChecklistRows(rows) {
     });
 
     const withoutCategoryRows = sourceRows.filter((step) => !isRelevantImplicationsCategoryStep(step?.text));
-    const refreshedMainIndex = withoutCategoryRows.findIndex((step) => {
-        if (getStepLevel(step?.text) !== "Achieved") {
-            return false;
-        }
-        return stripStepLevel(step?.text).toLowerCase() === "explain relevant implications.";
-    });
+    const refreshedMainIndex = withoutCategoryRows.findIndex((step) => isMainRelevantImplicationsStep(step?.text));
 
     if (refreshedMainIndex === -1) {
         return withoutCategoryRows;
@@ -1209,18 +1206,21 @@ function renderChecklistCards(detail, allItems) {
                             const isRelevantCategoryRow = level === "Achieved" && Boolean(relevantCategoryLabel);
                             const stepLabel = isRelevantCategoryRow ? relevantCategoryLabel : stepText;
                             const href = getTaskTopicHrefForStep(standard, level, stepText);
+                            const relevantCategoryTemplateId = isRelevantCategoryRow
+                                ? `relevant-implications-${normalizeTaskTopicStorageSlug(relevantCategoryLabel)}`
+                                : "relevant-implications";
                             const relevantImplicationsSyncedSlideUrl = getLatestTemplateSyncUrlById(
                                 taskListState.selectedId,
                                 getTaskListEmail(),
-                                "relevant-implications"
+                                relevantCategoryTemplateId
                             );
                             const relevantCategoryTemplateLibraryHref = isRelevantCategoryRow
                                 ? buildTemplateLibraryLink(
                                     taskListState.selectedId,
-                                    "Relevant Implications",
-                                    "Relevant Implications",
-                                    "relevant-implications",
-                                    "Relevant Implications"
+                                    `Relevant Implications - ${relevantCategoryLabel}`,
+                                    `Relevant Implications - ${relevantCategoryLabel}`,
+                                    relevantCategoryTemplateId,
+                                    relevantCategoryLabel
                                 )
                                 : "";
                             const relevantCategoryHref = relevantImplicationsSyncedSlideUrl || relevantCategoryTemplateLibraryHref;
