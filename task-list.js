@@ -682,6 +682,35 @@ function getDecompositionSubtasks(stateMap) {
     ];
 }
 
+function getProjectManagementSubtasks(stateMap) {
+    const activityId = taskListState.selectedId;
+    if (!activityId) return [];
+
+    const systems = inferStudentSystemConnections(stateMap || {});
+    return [
+        {
+            label: "Trello",
+            href: buildCustomActivityLink(activityId, "Project Management", "Project Management"),
+            done: systems.trelloConnected
+        },
+        {
+            label: "GitHub",
+            href: buildCustomActivityLink(activityId, "Version Control: GitHub", "Version Control: GitHub"),
+            done: systems.githubConnected
+        },
+        {
+            label: "OneDrive",
+            href: buildCustomActivityLink(activityId, "Version Control: Microsoft OneDrive", "Version Control: Microsoft OneDrive"),
+            done: systems.oneDriveConnected
+        },
+        {
+            label: "Google Drive",
+            href: buildCustomActivityLink(activityId, "Version Control: Google Drive", "Version Control: Google Drive"),
+            done: systems.googleDriveConnected
+        }
+    ];
+}
+
 function normalize91907ChecklistRows(rows) {
     const sourceRows = Array.isArray(rows)
         ? rows.map((step) => ({ text: String(step?.text || "").trim(), done: Boolean(step?.done) })).filter((step) => step.text)
@@ -1237,6 +1266,7 @@ function renderChecklistCards(detail, allItems) {
                                 && systemConnections.githubConnected;
                             const relevantCategoryDoneCount = countCompletedRelevantImplicationsCategories(levelRows);
                             const decompositionSubtasks = isDecompositionRow ? getDecompositionSubtasks(taskListState.checklistState) : [];
+                            const projectManagementSubtasks = isProjectManagementRow ? getProjectManagementSubtasks(taskListState.fullEvidenceState) : [];
 
                             return `
                                 ${shouldRenderAchievedSectionHeading && achievedSectionMeta
@@ -1255,12 +1285,16 @@ function renderChecklistCards(detail, allItems) {
                                                 : `<span class="task-list-step-text">${escapeTaskListHtml(stepLabel)}</span>`) }
                                     </label>
                                     ${isProjectManagementRow ? `
-                                        <div class="task-list-system-list">
-                                            <p class="task-list-system-title">Connected Systems</p>
-                                            <label class="task-list-system-item"><input type="checkbox" disabled ${systemConnections.trelloConnected ? "checked" : ""}> Trello</label>
-                                            <label class="task-list-system-item"><input type="checkbox" disabled ${systemConnections.githubConnected ? "checked" : ""}> GitHub</label>
-                                            <label class="task-list-system-item"><input type="checkbox" disabled ${systemConnections.oneDriveConnected ? "checked" : ""}> OneDrive</label>
-                                            <label class="task-list-system-item"><input type="checkbox" disabled ${systemConnections.googleDriveConnected ? "checked" : ""}> Google Drive</label>
+                                        <div class="task-list-decomposition-subtasks task-list-project-management-subtasks">
+                                            <p class="task-list-system-title">Project Management Subtasks</p>
+                                            <div class="task-list-decomposition-subtask-list">
+                                                ${projectManagementSubtasks.map((subtask) => `
+                                                    <label class="task-list-decomposition-subtask ${subtask.done ? "is-complete" : ""}">
+                                                        <input type="checkbox" disabled ${subtask.done ? "checked" : ""}>
+                                                        <a href="${escapeTaskListHtml(subtask.href)}">${escapeTaskListHtml(subtask.label)}</a>
+                                                    </label>
+                                                `).join("")}
+                                            </div>
                                         </div>
                                     ` : ""}
                                     ${isDecompositionRow ? `
