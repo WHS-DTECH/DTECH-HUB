@@ -835,6 +835,49 @@ function installCloudSyncDelegatedFallbackHandlers() {
             .join("");
     };
 
+    const refreshGithubLibraryUi = (projectId, email) => {
+        const list = document.querySelector("#github-link-library-list");
+        const library = document.querySelector("#github-link-library");
+        const count = document.querySelector("#github-link-library-count");
+        if (!library || !list) {
+            return;
+        }
+
+        const items = readStoredGithubRepoLibrary(projectId, email);
+        if (!items.length) {
+            library.hidden = true;
+            if (count) count.textContent = "(0)";
+            list.innerHTML = "";
+            return;
+        }
+
+        const activeUrl = toSafeGithubRepoUrl(document.querySelector("#github-repo-url")?.value || "");
+        library.hidden = false;
+        if (count) count.textContent = `(${items.length})`;
+        list.innerHTML = items
+            .map((item) => {
+                const url = toSafeGithubRepoUrl(item?.url || "");
+                if (!url) {
+                    return "";
+                }
+                const isActive = Boolean(activeUrl && activeUrl === url);
+                return `
+                    <li class="trello-link-library-item${isActive ? " is-active" : ""}" data-github-link-item="${escapeHtml(url)}">
+                        <div class="trello-link-library-link-wrap">
+                            <a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(url)}</a>
+                            <span class="trello-link-library-savedat">${escapeHtml(formatLibrarySavedAtLabel(item?.savedAt))}</span>
+                        </div>
+                        <div class="trello-link-library-actions">
+                            <button type="button" class="detail-action detail-action-secondary" data-github-library-use="${escapeHtml(url)}">Use</button>
+                            <button type="button" class="detail-action detail-action-secondary" data-github-library-open="${escapeHtml(url)}">Open</button>
+                            <button type="button" class="detail-action detail-action-danger" data-github-library-delete="${escapeHtml(url)}">Delete</button>
+                        </div>
+                    </li>
+                `;
+            })
+            .join("");
+    };
+
     document.addEventListener("click", async (event) => {
         const button = event.target?.closest?.("button");
         if (!button) {
@@ -862,6 +905,32 @@ function installCloudSyncDelegatedFallbackHandlers() {
             } finally {
                 if (ctx.projectId && ctx.email) {
                     refreshTrelloLibraryUi(ctx.projectId, ctx.email);
+                }
+            }
+            return;
+        }
+
+        const deleteGithubLibraryBtn = button.closest("[data-github-library-delete]");
+        if (deleteGithubLibraryBtn) {
+            const selectedUrl = toSafeGithubRepoUrl(deleteGithubLibraryBtn.getAttribute("data-github-library-delete") || "");
+            if (!selectedUrl || !window.confirm("Delete this saved GitHub link?")) {
+                return;
+            }
+            const ctx = getActiveSyncContext();
+            deleteGithubLibraryBtn.disabled = true;
+            try {
+                await removeUrlFromEvidenceSteps(ctx.projectId, ctx.email, selectedUrl, ["GITHUB_REPO_URL|"]);
+                removeStoredGithubRepoLibraryLink(ctx.projectId, ctx.email, selectedUrl);
+                const input = document.querySelector("#github-repo-url");
+                if (input && toSafeGithubRepoUrl(input.value || "") === selectedUrl) {
+                    input.value = "";
+                }
+                setStatus("#github-sync-status", "Removed saved GitHub link.");
+            } catch (_error) {
+                setStatus("#github-sync-status", "Could not remove that GitHub link.", true);
+            } finally {
+                if (ctx.projectId && ctx.email) {
+                    refreshGithubLibraryUi(ctx.projectId, ctx.email);
                 }
             }
             return;
@@ -9024,6 +9093,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                                         <div class="trello-link-library-actions">
                                             <button type="button" class="detail-action detail-action-secondary" data-trello-library-use="${escapeHtml(item.url)}">Use</button>
                                             <button type="button" class="detail-action detail-action-secondary" data-trello-library-open="${escapeHtml(item.url)}">Open</button>
+                                            <button type="button" class="detail-action detail-action-danger" data-trello-library-delete="${escapeHtml(item.url)}">Delete</button>
                                         </div>
                                     </li>
                                 `).join("")}
@@ -9072,6 +9142,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                                         <div class="trello-link-library-actions">
                                             <button type="button" class="detail-action detail-action-secondary" data-github-library-use="${escapeHtml(item.url)}">Use</button>
                                             <button type="button" class="detail-action detail-action-secondary" data-github-library-open="${escapeHtml(item.url)}">Open</button>
+                                            <button type="button" class="detail-action detail-action-danger" data-github-library-delete="${escapeHtml(item.url)}">Delete</button>
                                         </div>
                                     </li>
                                 `).join("")}
@@ -9119,6 +9190,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                                     <div class="trello-link-library-actions">
                                         <button type="button" class="detail-action detail-action-secondary" data-onedrive-library-use="${escapeHtml(item.url)}">Use</button>
                                         <button type="button" class="detail-action detail-action-secondary" data-onedrive-library-open="${escapeHtml(item.url)}">Open</button>
+                                        <button type="button" class="detail-action detail-action-danger" data-onedrive-library-delete="${escapeHtml(item.url)}">Delete</button>
                                     </div>
                                 </li>
                             `).join("")}
@@ -9168,6 +9240,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                                     <div class="trello-link-library-actions">
                                         <button type="button" class="detail-action detail-action-secondary" data-google-drive-library-use="${escapeHtml(item.url)}">Use</button>
                                         <button type="button" class="detail-action detail-action-secondary" data-google-drive-library-open="${escapeHtml(item.url)}">Open</button>
+                                        <button type="button" class="detail-action detail-action-danger" data-google-drive-library-delete="${escapeHtml(item.url)}">Delete</button>
                                     </div>
                                 </li>
                             `).join("")}
