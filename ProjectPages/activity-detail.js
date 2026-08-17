@@ -4335,11 +4335,13 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
 
     panelHost.innerHTML = `
         <form id="task-topic-submission-form" class="task-topic-submission-form" novalidate>
+            ${isDecompositionTopic ? "" : `
             <p class="task-topic-submission-note">Link your evidence below, then submit so your teacher can verify completion.</p>
             <p class="task-topic-submission-note">When all parts are ready, go to <a href="/hapara-submission.html" target="_blank" rel="noreferrer">Hapara Submission Checklist</a> to submit each item in one place.</p>
 
             <label class="task-topic-submission-label" for="task-topic-hapara-doc-ref">Evidence Note (Optional)</label>
             <input id="task-topic-hapara-doc-ref" class="task-topic-submission-input" type="text" placeholder="Example: Slide deck draft 2" value="${escapeHtml(currentDocRef)}">
+            `}
 
             ${isDigitalOutcomeTopic ? `
                 <p class="task-topic-submission-note task-topic-google-sync-note"><strong>Synced Slide:</strong> <span id="task-topic-google-slides-sync-reference">${syncedGoogleSlidesUrl ? `<a href="${escapeHtml(syncedGoogleSlidesUrl)}" target="_blank" rel="noreferrer">${escapeHtml(syncedGoogleSlidesUrl)}</a>` : "No synced slide yet. Open Template Library and click Use Template to link your personal slide copy."}</span></p>
@@ -4497,12 +4499,15 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 </div>
             ` : ""}
 
+            ${isDecompositionTopic ? "" : `
             <div class="task-topic-submission-actions">
                 <button type="submit" class="detail-action">Submit Evidence Link</button>
                 <button type="button" class="detail-action detail-action-secondary" id="task-topic-clear-acknowledgement">Clear Submission</button>
             </div>
+            `}
             <p class="task-topic-submission-status" id="task-topic-submission-status" aria-live="polite"></p>
         </form>
+        ${isDecompositionTopic ? "" : `
         <div class="task-topic-submission-meta">
             <p><strong>Status:</strong> <span id="task-topic-ack-status">${acknowledged ? "Submitted evidence" : "Waiting for submission"}</span></p>
             <p><strong>Submitted At:</strong> <span id="task-topic-last-submitted">${escapeHtml(formatSubmissionTimestamp(acknowledgedAt))}</span></p>
@@ -4544,6 +4549,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 : ""
             }
         </div>
+        `}
     `;
 
     const form = panelHost.querySelector("#task-topic-submission-form");
@@ -8378,6 +8384,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                     ` : ""}
 
                     <section class="proposal-section task-topic-submission-panel">
+                        ${isDecompositionTopic ? "" : `
                         <h2>Submission Tasks</h2>
                         <p class="task-topic-submission-intro">${escapeHtml(submissionIntroText)}</p>
                         <div class="task-topic-submission-evidence-type">
@@ -8385,6 +8392,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                             <p class="task-topic-card-value">${submissionPrimaryEvidenceType}</p>
                         </div>
                         <ul class="list task-topic-submission-list">${renderList(submissionTaskItems)}</ul>
+                        `}
                         <div id="task-topic-submission-live-panel" class="task-topic-submission-live-panel"></div>
                     </section>
 
