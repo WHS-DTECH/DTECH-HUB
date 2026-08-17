@@ -3865,8 +3865,8 @@ function parseDecompositionStepsText(value) {
         .slice(0, 30);
 }
 
-function renderDigitalOutcomeMustDos(host, presentationUrl) {
-    const target = host?.querySelector("#digital-outcome-must-dos");
+function renderDigitalOutcomeMustDos(host, presentationUrl, targetId = "digital-outcome-must-dos") {
+    const target = host?.querySelector(`#${targetId}`);
     if (!target) return;
 
     const linkedPresentationUrl = toSafeExternalUrl(presentationUrl);
@@ -8396,6 +8396,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                                 <h3>${escapeHtml(topicGuideTaskHeading)}</h3>
                                 <ul class="list task-topic-guide-list">${renderList(topicGuideTaskItems)}</ul>
                             </section>
+                            ${isDigitalOutcomeSuccessCriteriaTopic
+                                ? `<div class="digital-outcome-must-dos" id="success-criteria-must-dos" aria-live="polite"><p class="task-topic-submission-note">Loading MUST-DOs from your Digital Outcome Description slideshow...</p></div>`
+                                : ""}
                         `}
 
                         ${isProjectManagementTopic ? `<div id="task-topic-trello-sync-slot"></div>` : ""}
@@ -9990,12 +9993,16 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         // Keep sync controls interactive even if submission panel rendering fails.
     }
 
-    if (!isTeacher && /digital\s+outcome\s+description/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`)) {
+    if (!isTeacher && /digital\s+outcome\s+description|success\s+criteria/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`)) {
         const syncedSlideLink = host.querySelector("#task-topic-google-slides-sync-reference a")?.href
             || host.querySelector("#task-topic-google-slides-url")?.value
             || readStoredTaskTopicSlideSyncLink(projectId, email, selectedTaskTopic, selectedTaskShortName)
+            || readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, "digital-outcome-description").url
             || "";
-        renderDigitalOutcomeMustDos(host, syncedSlideLink);
+        const targetId = /success\s+criteria/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`)
+            ? "success-criteria-must-dos"
+            : "digital-outcome-must-dos";
+        renderDigitalOutcomeMustDos(host, syncedSlideLink, targetId);
     }
 
     // Render tools & techniques panel only on the dedicated Tools and Techniques topic page
