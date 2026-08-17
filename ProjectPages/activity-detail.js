@@ -10054,6 +10054,8 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             || host.querySelector("#task-topic-google-slides-url")?.value
             || readStoredTaskTopicSlideSyncLink(projectId, email, selectedTaskTopic, selectedTaskShortName)
             || readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, "digital-outcome-description").url
+            || readStoredTaskTopicSlideSyncEntryByShortName(projectId, email, "Digital Outcome Description").url
+            || readStoredTaskTopicSlideSyncEntry(projectId, email, "Digital Outcome Description", "Digital Outcome Description").url
             || "";
             const targetId = /success\s+criteria/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`)
                 ? "success-criteria-must-dos"
