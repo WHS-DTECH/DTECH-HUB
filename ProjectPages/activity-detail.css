@@ -879,6 +879,31 @@ h1 {
     padding-top: 12px;
 }
 
+.digital-outcome-must-dos {
+    display: grid;
+    gap: 6px;
+    margin-top: 10px;
+    border: 1px solid #a9c7df;
+    border-left: 4px solid #397cad;
+    border-radius: 8px;
+    background: #eef7fc;
+    padding: 10px 12px;
+}
+
+.digital-outcome-must-dos h3 {
+    margin: 0;
+    color: #17456f;
+    font-size: 0.9rem;
+}
+
+.digital-outcome-must-dos .task-topic-guide-list {
+    margin: 0;
+}
+
+.digital-outcome-must-dos .task-topic-submission-note {
+    margin: 0;
+}
+
 .task-topic-decomp-dashboard-heading {
     display: flex;
     align-items: center;

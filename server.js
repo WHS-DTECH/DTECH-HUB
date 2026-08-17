@@ -5081,6 +5081,56 @@ async function driveApiRequest(pathname, { accessToken, method = "GET", queryPar
   return payload;
 }
 
+async function googleSlidesApiRequest(presentationId, accessToken) {
+  const response = await fetch(`https://slides.googleapis.com/v1/presentations/${encodeURIComponent(presentationId)}`, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(String(payload?.error?.message || `Google Slides API error (${response.status})`));
+    error.status = response.status;
+    throw error;
+  }
+  return payload;
+}
+
+function extractGoogleSlidesMustDos(presentation) {
+  const paragraphs = [];
+  const slides = Array.isArray(presentation?.slides) ? presentation.slides : [];
+
+  slides.forEach((slide) => {
+    const elements = Array.isArray(slide?.pageElements) ? slide.pageElements : [];
+    elements.forEach((element) => {
+      const textElements = element?.shape?.text?.textElements;
+      if (!Array.isArray(textElements)) return;
+
+      let paragraphText = "";
+      let isBullet = false;
+      textElements.forEach((textElement) => {
+        const content = String(textElement?.textRun?.content || "");
+        if (content) paragraphText += content;
+        if (textElement?.paragraphMarker?.bullet) isBullet = true;
+      });
+
+      paragraphText.split(/\r?\n/).forEach((line) => {
+        const text = line.trim().replace(/^[\u2022\u25CF\u25E6\u25AA\u2023\u2043\u00B7\u2219*-]\s*/, "").trim();
+        if (text) paragraphs.push({ text, isBullet });
+      });
+    });
+  });
+
+  const headingIndex = paragraphs.findIndex((row) => /digital outcome\s+must\s+do\s+the\s+following/i.test(row.text));
+  if (headingIndex < 0) return [];
+
+  const result = [];
+  for (let index = headingIndex + 1; index < paragraphs.length; index += 1) {
+    const row = paragraphs[index];
+    if (/^(the client|my outcome|my digital outcome|the digital outcome)\b/i.test(row.text) && result.length) break;
+    if (row.isBullet || result.length === 0) result.push(row.text);
+  }
+  return Array.from(new Set(result)).slice(0, 30);
+}
+
 async function driveFindFolderByName(parentFolderId, folderName, accessToken) {
   const safeName = folderName.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
   const safeParent = parentFolderId.replace(/'/g, "\\'");
@@ -6060,6 +6110,44 @@ app.post("/api/student/drive-setup/list-process-assessment-slides", async (req, 
     });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not list Process Assessment slides." });
+  }
+});
+
+app.post("/api/student/drive-setup/read-digital-outcome-must-dos", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email) {
+    res.status(401).json({ error: "Sign in is required." });
+    return;
+  }
+
+  const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
+  const presentationId = String(req.body?.presentationId || "").trim();
+  if (!driveAccessToken) {
+    res.status(400).json({ error: "driveAccessToken is required." });
+    return;
+  }
+  if (!/^[A-Za-z0-9_-]{10,}$/.test(presentationId)) {
+    res.status(400).json({ error: "A valid Google Slides presentation ID is required." });
+    return;
+  }
+
+  try {
+    const presentation = await googleSlidesApiRequest(presentationId, driveAccessToken);
+    const file = await driveApiRequest(`/files/${encodeURIComponent(presentationId)}`, {
+      accessToken: driveAccessToken,
+      queryParams: { fields: "id,name,modifiedTime,webViewLink" }
+    });
+    res.json({
+      ok: true,
+      presentationId,
+      fileName: String(file?.name || presentation?.title || "Digital Outcome Description").trim(),
+      fileUrl: String(file?.webViewLink || `https://docs.google.com/presentation/d/${presentationId}/edit`).trim(),
+      mustDos: extractGoogleSlidesMustDos(presentation),
+      modifiedTime: String(file?.modifiedTime || "").trim(),
+      syncedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not read the Digital Outcome Description slideshow." });
   }
 });
 

@@ -3865,6 +3865,40 @@ function parseDecompositionStepsText(value) {
         .slice(0, 30);
 }
 
+function renderDigitalOutcomeMustDos(host, presentationUrl) {
+    const target = host?.querySelector("#digital-outcome-must-dos");
+    if (!target) return;
+
+    const presentationId = extractSlidesIdFromValue(presentationUrl);
+    if (!presentationId) {
+        target.innerHTML = `<p class="task-topic-submission-note">Link your Digital Outcome Description slideshow to see the MUST-DOs here.</p>`;
+        return;
+    }
+
+    const driveAccessToken = readStoredHubDriveAccessToken();
+    if (!driveAccessToken) {
+        target.innerHTML = `<p class="task-topic-submission-note">Connect Google Drive to read the MUST-DOs from your slideshow.</p>`;
+        return;
+    }
+
+    target.innerHTML = `<p class="task-topic-submission-note">Reading the MUST-DOs from your slideshow...</p>`;
+    void fetch("/api/student/drive-setup/read-digital-outcome-must-dos", {
+        method: "POST",
+        headers: buildWriteHeaders(),
+        body: JSON.stringify({ driveAccessToken, presentationId })
+    }).then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload?.error || "Could not read your slideshow.");
+
+        const mustDos = Array.isArray(payload?.mustDos) ? payload.mustDos : [];
+        target.innerHTML = mustDos.length
+            ? `<h3>MUST-DOs from your slideshow</h3><ul class="list task-topic-guide-list">${mustDos.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul><p class="task-topic-submission-note">Last read: ${escapeHtml(formatSubmissionTimestamp(payload?.syncedAt || ""))}</p>`
+            : `<p class="task-topic-submission-note">No MUST-DO bullet points were found in the linked slideshow yet.</p>`;
+    }).catch((error) => {
+        target.innerHTML = `<p class="task-topic-submission-note is-error">${escapeHtml(error?.message || "Could not read your slideshow.")}</p>`;
+    });
+}
+
 async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, email, isTeacher, interestData }) {
     const panelHost = host?.querySelector("#task-topic-submission-live-panel");
     if (!panelHost) {
@@ -8340,6 +8374,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                         <section class="task-topic-guide-block">
                             <h3>Instructions</h3>
                             <ul class="list task-topic-guide-list">${renderList(topicGuideInstructions)}</ul>
+                            ${isDigitalOutcomeDescriptionTopic
+                                ? `<div class="digital-outcome-must-dos" id="digital-outcome-must-dos" aria-live="polite"><p class="task-topic-submission-note">Loading MUST-DOs from your slideshow...</p></div>`
+                                : ""}
                         </section>
 
                         <section class="task-topic-guide-block">
@@ -9937,6 +9974,13 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         });
     } catch (_error) {
         // Keep sync controls interactive even if submission panel rendering fails.
+    }
+
+    if (!isTeacher && /digital\s+outcome\s+description/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`)) {
+        const syncedSlideLink = host.querySelector("#task-topic-google-slides-sync-reference a")?.href
+            || host.querySelector("#task-topic-google-slides-url")?.value
+            || "";
+        renderDigitalOutcomeMustDos(host, syncedSlideLink);
     }
 
     // Render tools & techniques panel only on the dedicated Tools and Techniques topic page
