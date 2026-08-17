@@ -34,7 +34,7 @@ const LIB_TEMPLATE_COPY_MAP_GLOBAL_STORAGE_KEY = "hub_template_copy_map_global_v
 const LIB_TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX = "hub_task_topic_slide_sync_v1";
 const TEMPLATE_PREVIEW_FALLBACK_URL = "../images/template-preview-placeholder.svg";
 
-const DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly";
+const DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/presentations";
 const LIB_AUTH_KEY = "hub_google_auth_v1";
 
 const driveState = {
@@ -202,6 +202,35 @@ function persistTaskTopicSlideSyncLink(fileUrl, metadata = {}) {
             templateTitle: String(metadata.templateTitle || "").trim()
         }));
     } catch (_error) {
+    }
+}
+
+function readStoredDigitalOutcomeDescriptionSlideId() {
+    const activityId = String(templateUsageContext.activityId || "").trim();
+    const email = getLibraryEmail();
+    if (!activityId || !email) return "";
+
+    const topicSlug = normalizeStorageSlug("Digital Outcome Description");
+    const shortSlug = normalizeStorageSlug("Digital Outcome Description");
+    try {
+        const exactKey = `${LIB_TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX}:${activityId}:${email}:${topicSlug}:${shortSlug}`;
+        const exact = JSON.parse(localStorage.getItem(exactKey) || "{}");
+        const exactId = extractSlidesFileId(exact?.url || "");
+        if (exactId) return exactId;
+
+        const prefix = `${LIB_TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX}:${activityId}:${email}:`;
+        for (let index = 0; index < localStorage.length; index += 1) {
+            const key = localStorage.key(index) || "";
+            if (!key.startsWith(prefix)) continue;
+            const parsed = JSON.parse(localStorage.getItem(key) || "{}");
+            if (String(parsed?.templateId || "").trim().toLowerCase() !== "digital-outcome-description"
+                && !/digital-outcome-description|digital-outcome/i.test(key)) continue;
+            const slideId = extractSlidesFileId(parsed?.url || "");
+            if (slideId) return slideId;
+        }
+        return "";
+    } catch (_error) {
+        return "";
     }
 }
 
@@ -612,13 +641,13 @@ function initDriveTokenClient() {
 function requestDriveToken(options = {}) {
     const forceConsent = Boolean(options?.forceConsent);
     return new Promise((resolve) => {
-        if (driveState.accessToken && driveState.tokenExpiry > Date.now() + 60000) {
+        if (!forceConsent && driveState.accessToken && driveState.tokenExpiry > Date.now() + 60000) {
             resolve({ access_token: driveState.accessToken });
             return;
         }
 
         const storedToken = getLibraryStoredDriveAccessToken();
-        if (storedToken) {
+        if (storedToken && !forceConsent) {
             driveState.accessToken = storedToken;
             driveState.tokenExpiry = Date.now() + (55 * 60 * 1000);
             resolve({ access_token: storedToken });
@@ -970,7 +999,8 @@ async function handleUseTemplate(templateId) {
     }
 
     // If already copied this session, open existing
-    if (driveState.copyMap[templateId]) {
+    const refreshSuccessCriteriaCopy = templateId === "project-success-criteria";
+    if (driveState.copyMap[templateId] && !refreshSuccessCriteriaCopy) {
         persistTaskTopicSlideSyncLink(driveState.copyMap[templateId].fileUrl, {
             templateId: item.id,
             thumbnailUrl: item.imageUrl,
@@ -998,14 +1028,24 @@ async function handleUseTemplate(templateId) {
         const response = await fetch("/api/student/drive-setup/copy-template", {
             method: "POST",
             headers: withLibraryAuthHeaders({ "Content-Type": "application/json" }),
-            body: JSON.stringify({ driveAccessToken: accessToken, templateId: item.id, templateTitle: item.title, templateFileId: fileId, activityId: templateUsageContext.activityId })
+            body: JSON.stringify({
+                driveAccessToken: accessToken,
+                templateId: item.id,
+                templateTitle: item.title,
+                templateFileId: fileId,
+                activityId: templateUsageContext.activityId,
+                sourcePresentationId: item.id === "project-success-criteria" ? readStoredDigitalOutcomeDescriptionSlideId() : ""
+            })
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(payload.error || `Error ${response.status}`);
+        if (payload?.populationWarning) {
+            console.warn("Success Criteria requirements were not populated:", payload.populationWarning);
+        }
         return payload;
     };
 
-    const tokenResponse = await requestDriveToken();
+    const tokenResponse = await requestDriveToken({ forceConsent: refreshSuccessCriteriaCopy });
     if (tokenResponse.error) {
         if (button) { button.disabled = false; button.textContent = "Use Template"; }
         alert("Drive access was not granted. Please sign in and try again.");
