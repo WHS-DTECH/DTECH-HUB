@@ -337,6 +337,12 @@
         .task-list-sync-drive-btn:hover:not(:disabled) { background: #d0e6f8; }
         .task-list-sync-drive-btn:disabled { opacity: 0.6; cursor: default; }
 
+        .task-list-sync-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
         .task-list-system-list {
             margin: 8px 0 2px;
             border: 1px solid #d6ddef;
@@ -640,7 +646,10 @@
                                 <p class="section-kicker">TASK LIST</p>
                                 <h2>Checklist</h2>
                             </div>
-                            <button type="button" class="task-list-sync-drive-btn" id="task-list-sync-drive">&#x21bb; Sync from Google Drive</button>
+                            <div class="task-list-sync-actions">
+                                <button type="button" class="task-list-sync-drive-btn" id="task-list-sync-trello">&#x21bb; Sync from Trello</button>
+                                <button type="button" class="task-list-sync-drive-btn" id="task-list-sync-drive">&#x21bb; Sync from Google Drive</button>
+                            </div>
                         </div>
                         <div id="task-list-checklist" class="task-list-checklist-grid"></div>
                     </section>

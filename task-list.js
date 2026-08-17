@@ -649,12 +649,80 @@ function getTaskTopicHrefForStep(standard, level, text) {
 
 const DECOMPOSITION_CATEGORY_COVERAGE_STORAGE_PREFIX = "hub_decomp_category_coverage_v1";
 
+// Keyword patterns must stay in step with the Decomposition page in ProjectPages/activity-detail.js.
+const DECOMPOSITION_TASK_CATEGORIES = [
+    {
+        label: "Development Steps",
+        pattern: /develop|build|implement|code|coding|program|script|create|add|feature|functionality|page|layout|design|html|css|javascript|step/i
+    },
+    {
+        label: "Tools & Techniques",
+        pattern: /tool|technique|software|library|framework|template|api|plugin|extension|github|trello|onedrive|google drive|vs code|setup|set up|install|sync|version control/i
+    },
+    {
+        label: "Success Criteria",
+        pattern: /success|criteria|test|testing|trial|evaluat|measure|review|quality|requirement|spec|acceptance|check|debug|fix/i
+    },
+    {
+        label: "Client Interaction",
+        pattern: /client|stakeholder|end.?user|feedback|meeting|interview|survey|consult|brief|present|sign.?off|approval/i
+    }
+];
+
+function getDecompositionCategoryCoverageKey(activityId, email) {
+    return `${DECOMPOSITION_CATEGORY_COVERAGE_STORAGE_PREFIX}:${String(activityId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
+}
+
+function countDecompositionTaskCategories(cards) {
+    const haystacks = (Array.isArray(cards) ? cards : [])
+        .map((card) => String(card?.name || "").trim())
+        .filter(Boolean);
+
+    return DECOMPOSITION_TASK_CATEGORIES.map((category) => ({
+        label: category.label,
+        count: haystacks.filter((text) => category.pattern.test(text)).length
+    }));
+}
+
+function writeDecompositionCategoryCoverage(activityId, email, rows) {
+    try {
+        localStorage.setItem(
+            getDecompositionCategoryCoverageKey(activityId, email),
+            JSON.stringify({ savedAt: new Date().toISOString(), categories: Array.isArray(rows) ? rows : [] })
+        );
+    } catch (_error) {
+    }
+}
+
+function findStudentTrelloBoardUrl(stateMap) {
+    let fallbackUrl = "";
+
+    for (const steps of Object.values(stateMap || {})) {
+        for (const step of (Array.isArray(steps) ? steps : [])) {
+            const text = String(step?.text || "").trim();
+            if (!text) continue;
+
+            if (text.startsWith("TRELLO_CARD_URL|")) {
+                const url = text.slice("TRELLO_CARD_URL|".length).trim();
+                if (/\/b\//i.test(url)) return url;
+                if (!fallbackUrl) fallbackUrl = url;
+            } else if (/https?:\/\/(www\.)?trello\.com\//i.test(text)) {
+                const match = text.match(/https?:\/\/\S*trello\.com\/\S+/i);
+                if (match?.[0]) {
+                    if (/\/b\//i.test(match[0])) return match[0];
+                    if (!fallbackUrl) fallbackUrl = match[0];
+                }
+            }
+        }
+    }
+
+    return fallbackUrl;
+}
+
 // Counts are written by the Decomposition page each time the student's Trello board loads.
 function readDecompositionCategoryCoverage(activityId, email) {
     try {
-        const raw = localStorage.getItem(
-            `${DECOMPOSITION_CATEGORY_COVERAGE_STORAGE_PREFIX}:${String(activityId || "").trim()}:${String(email || "").trim().toLowerCase()}`
-        );
+        const raw = localStorage.getItem(getDecompositionCategoryCoverageKey(activityId, email));
         const parsed = JSON.parse(raw || "{}");
         const rows = Array.isArray(parsed?.categories) ? parsed.categories : [];
         const counts = {};
@@ -1601,6 +1669,55 @@ async function renderTaskListPage() {
         const nextUrl = new URL(window.location.href);
         nextUrl.searchParams.set("id", nextId);
         history.replaceState({}, "", nextUrl.toString());
+    });
+
+    document.addEventListener("click", async (event) => {
+        const trelloBtn = event.target?.closest?.("#task-list-sync-trello");
+        if (!trelloBtn || !taskListState.selectedId) return;
+
+        const email = getTaskListEmail();
+        if (!email) {
+            setStatus("Sign in before syncing from Trello.", true);
+            return;
+        }
+
+        const boardUrl = findStudentTrelloBoardUrl(taskListState.fullEvidenceState)
+            || findStudentTrelloBoardUrl(taskListState.checklistState);
+        if (!boardUrl) {
+            setStatus("Save your Trello board link on the Project Management or Decomposition page first.", true);
+            return;
+        }
+
+        trelloBtn.disabled = true;
+        trelloBtn.textContent = "Syncing Trello\u2026";
+
+        try {
+            const payload = await loadJson(
+                `/api/integrations/trello/list-progress?student_email=${encodeURIComponent(email)}&board_url=${encodeURIComponent(boardUrl)}`,
+                { headers: buildTaskListHeaders({}) }
+            );
+
+            const allCards = [
+                ...(Array.isArray(payload?.todo_cards) ? payload.todo_cards : []),
+                ...(Array.isArray(payload?.doing_cards) ? payload.doing_cards : []),
+                ...(Array.isArray(payload?.done_cards) ? payload.done_cards : [])
+            ];
+            writeDecompositionCategoryCoverage(taskListState.selectedId, email, countDecompositionTaskCategories(allCards));
+
+            setStatus(`Trello sync complete. ${allCards.length} task${allCards.length === 1 ? "" : "s"} checked against the decomposition categories.`);
+            renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);
+        } catch (error) {
+            const message = String(error?.message || "");
+            setStatus(
+                /has not connected trello/i.test(message)
+                    ? "Connect your Trello account on the Decomposition of Tasks page first, then sync again."
+                    : (message || "Could not sync from Trello."),
+                true
+            );
+        } finally {
+            const btn = document.querySelector("#task-list-sync-trello");
+            if (btn) { btn.disabled = false; btn.textContent = "\u21bb Sync from Trello"; }
+        }
     });
 
     document.addEventListener("click", async (event) => {
