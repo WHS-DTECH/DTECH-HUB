@@ -1301,6 +1301,7 @@ function renderChecklistCards(detail, allItems) {
                                     ${isProjectManagementRow ? `
                                         <div class="task-list-decomposition-subtasks task-list-project-management-subtasks">
                                             <p class="task-list-system-title">Project Management Subtasks</p>
+                                            <p class="task-list-achieved-note">Complete Trello + at least one other.</p>
                                             <div class="task-list-decomposition-subtask-list">
                                                 ${projectManagementSubtasks.map((subtask) => `
                                                     <label class="task-list-decomposition-subtask ${subtask.done ? "is-complete" : ""}">
