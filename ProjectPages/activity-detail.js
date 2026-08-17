@@ -10048,16 +10048,19 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         if (/relevant\s+implications/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`)) {
             renderRelevantImplicationsFromSlide(host, readStoredRelevantImplicationsSlideUrl(projectId, email));
         } else {
-            const syncedSlideLink = host.querySelector("#task-topic-google-slides-sync-reference a")?.href
-            || host.querySelector("#task-topic-google-slides-url")?.value
-            || readStoredTaskTopicSlideSyncLink(projectId, email, selectedTaskTopic, selectedTaskShortName)
-            || readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, "digital-outcome-description").url
-            || readStoredTaskTopicSlideSyncEntryByShortName(projectId, email, "Digital Outcome Description").url
-            || readStoredTaskTopicSlideSyncEntry(projectId, email, "Digital Outcome Description", "Digital Outcome Description").url
-            || "";
-            const targetId = /success\s+criteria/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`)
-                ? "success-criteria-must-dos"
-                : "digital-outcome-must-dos";
+            const isSuccessCriteriaPage = /success\s+criteria/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`);
+            const digitalOutcomeSourceUrl = readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, "digital-outcome-description").url
+                || readStoredTaskTopicSlideSyncEntryByShortName(projectId, email, "Digital Outcome Description").url
+                || readStoredTaskTopicSlideSyncEntry(projectId, email, "Digital Outcome Description", "Digital Outcome Description").url
+                || "";
+            const syncedSlideLink = isSuccessCriteriaPage
+                ? digitalOutcomeSourceUrl
+                : (host.querySelector("#task-topic-google-slides-sync-reference a")?.href
+                    || host.querySelector("#task-topic-google-slides-url")?.value
+                    || readStoredTaskTopicSlideSyncLink(projectId, email, selectedTaskTopic, selectedTaskShortName)
+                    || digitalOutcomeSourceUrl
+                    || "");
+            const targetId = isSuccessCriteriaPage ? "success-criteria-must-dos" : "digital-outcome-must-dos";
             renderDigitalOutcomeMustDos(host, syncedSlideLink, targetId);
         }
     }
