@@ -1435,7 +1435,11 @@ function readStoredTrelloCardLibrary(projectId, email) {
 
 function writeStoredTrelloCardLibrary(projectId, email, values) {
     const storageKey = getTrelloCardLibraryStorageKey(projectId, email);
-    const nextValues = normalizeTrelloCardLibrary(values);
+    let nextValues = normalizeTrelloCardLibrary(values);
+    // A student's only saved Trello link becomes their Favourite automatically.
+    if (nextValues.length === 1 && !nextValues[0].favourite) {
+        nextValues = [{ ...nextValues[0], favourite: true }];
+    }
     try {
         if (!nextValues.length) {
             localStorage.removeItem(storageKey);
