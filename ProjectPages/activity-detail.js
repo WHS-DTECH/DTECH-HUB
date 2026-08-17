@@ -8467,7 +8467,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                     </div>
                     ` : ""}
 
-                    <section class="proposal-section task-topic-submission-panel" ${isDecompositionTopic || isDigitalOutcomeDescriptionTopic ? "hidden" : ""}>
+                    <section class="proposal-section task-topic-submission-panel" ${isDigitalOutcomeDescriptionTopic ? "hidden" : ""}>
                         ${isDecompositionTopic ? "" : `
                         <h2>Submission Tasks</h2>
                         <p class="task-topic-submission-intro">${escapeHtml(submissionIntroText)}</p>
