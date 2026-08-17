@@ -4472,7 +4472,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
 
                         <button type="button" class="detail-action detail-action-secondary" id="task-topic-decomp-connect-trello" hidden>Connect Trello Account</button>
                         <div class="task-topic-submission-actions">
-                            <button type="button" class="detail-action detail-action-secondary" id="task-topic-decomp-save-pdf">Save Trello PDF to Drive</button>
+                            <button type="button" class="detail-action task-topic-decomp-pdf-button" id="task-topic-decomp-save-pdf">Save Trello PDF to Drive</button>
                         </div>
                         <p class="task-topic-submission-status" id="task-topic-decomp-pdf-status" aria-live="polite"></p>
                         <p class="task-topic-submission-status" id="task-topic-decomp-connect-status" aria-live="polite"></p>
