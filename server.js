@@ -5221,12 +5221,24 @@ async function driveEnsureFolder(parentFolderId, folderName, accessToken) {
 const PROCESS_ASSESSMENT_DIGITAL_OUTCOME_FOLDER_NAME = "Digital Outcome Details";
 const PROCESS_ASSESSMENT_RELEVANT_IMPLICATIONS_FOLDER_NAME = "Relevant Implications";
 
+const DIGITAL_OUTCOME_DETAILS_TEMPLATE_IDS = new Set([
+  "digital-outcome-description",
+  "target-audience",
+  "development-steps",
+  "tools-and-techniques",
+  "project-success-criteria"
+]);
+
 function resolveProcessAssessmentSubfolderName(templateId, templateTitle) {
   const normalizedTemplateId = String(templateId || "").trim().toLowerCase();
   const normalizedTitle = String(templateTitle || "").trim().toLowerCase();
 
-  const isDigitalOutcomeTemplate = normalizedTemplateId === "digital-outcome-description"
-    || normalizedTitle.includes("digital outcome description");
+  const isDigitalOutcomeTemplate = DIGITAL_OUTCOME_DETAILS_TEMPLATE_IDS.has(normalizedTemplateId)
+    || normalizedTitle.includes("digital outcome description")
+    || normalizedTitle.includes("target audience")
+    || normalizedTitle.includes("development steps")
+    || normalizedTitle.includes("tools and techniques")
+    || normalizedTitle.includes("success criteria");
   if (isDigitalOutcomeTemplate) {
     return PROCESS_ASSESSMENT_DIGITAL_OUTCOME_FOLDER_NAME;
   }
