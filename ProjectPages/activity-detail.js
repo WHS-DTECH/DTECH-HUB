@@ -4495,7 +4495,9 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             );
             const payload = await response.json().catch(() => ({}));
             if (!response.ok) {
-                throw new Error(payload?.error || "Could not load Trello tasks.");
+                const notConnectedError = new Error(payload?.error || "Could not load Trello tasks.");
+                notConnectedError.status = response.status;
+                throw notConnectedError;
             }
 
             decompBoardColumnsHost.innerHTML = [
@@ -4505,6 +4507,12 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             ].join("");
             setDecompBoardStatus(`Trello board updated: ${Number(payload?.todo_count || 0)} to do, ${Number(payload?.doing_count || 0)} doing, ${Number(payload?.done_count || 0)} done.`);
         } catch (error) {
+            // Saving a Trello link and connecting the Trello account (API token) are separate steps; this board needs the account connection.
+            if (Number(error?.status) === 404 && /has not connected trello/i.test(String(error?.message || ""))) {
+                decompBoardColumnsHost.innerHTML = '<p class="task-topic-decomp-board-empty">Your Trello link is saved, but DTECH HUB also needs your Trello account connected to read your cards. Go to <a href="/user-profile.html#trello-integration-card">User Profile &rarr; Trello Integration</a> and click Connect Trello, then refresh this board.</p>';
+                setDecompBoardStatus("Trello account not connected yet.", true);
+                return;
+            }
             decompBoardColumnsHost.innerHTML = '<p class="task-topic-decomp-board-empty">Could not load Trello tasks right now.</p>';
             setDecompBoardStatus(error?.message || "Could not load Trello tasks.", true);
         } finally {
