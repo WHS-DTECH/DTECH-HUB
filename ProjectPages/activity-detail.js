@@ -732,13 +732,16 @@ function installCloudSyncDelegatedFallbackHandlers() {
                     return "";
                 }
                 const isActive = Boolean(activeUrl && activeUrl === url);
+                const isFavourite = Boolean(item?.favourite);
                 return `
-                    <li class="trello-link-library-item${isActive ? " is-active" : ""}" data-trello-link-item="${escapeHtml(url)}">
+                    <li class="trello-link-library-item${isActive ? " is-active" : ""}${isFavourite ? " is-favourite" : ""}" data-trello-link-item="${escapeHtml(url)}">
                         <div class="trello-link-library-link-wrap">
                             <a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(url)}</a>
                             <span class="trello-link-library-savedat">${escapeHtml(formatLibrarySavedAtLabel(item?.savedAt))}</span>
+                            ${isFavourite ? `<span class="trello-link-library-favourite-badge">&#9733; Favourite</span>` : ""}
                         </div>
                         <div class="trello-link-library-actions">
+                            <button type="button" class="trello-link-library-favourite-btn${isFavourite ? " is-favourite" : ""}" data-trello-library-favourite="${escapeHtml(url)}" aria-pressed="${isFavourite ? "true" : "false"}" title="${isFavourite ? "Favourite link used by Decomposition" : "Mark as Favourite"}">${isFavourite ? "&#9733;" : "&#9734;"}</button>
                             <button type="button" class="detail-action detail-action-secondary" data-trello-library-use="${escapeHtml(url)}">Use</button>
                             <button type="button" class="detail-action detail-action-secondary" data-trello-library-open="${escapeHtml(url)}">Open</button>
                             <button type="button" class="detail-action detail-action-danger" data-trello-library-delete="${escapeHtml(url)}">Delete</button>
@@ -881,6 +884,21 @@ function installCloudSyncDelegatedFallbackHandlers() {
     document.addEventListener("click", async (event) => {
         const button = event.target?.closest?.("button");
         if (!button) {
+            return;
+        }
+
+        const favouriteTrelloLibraryBtn = button.closest("[data-trello-library-favourite]");
+        if (favouriteTrelloLibraryBtn) {
+            const selectedUrl = toSafeTrelloCardUrl(favouriteTrelloLibraryBtn.getAttribute("data-trello-library-favourite") || "");
+            if (!selectedUrl) {
+                return;
+            }
+            const ctx = getActiveSyncContext();
+            setFavouriteTrelloCardLibraryLink(ctx.projectId, ctx.email, selectedUrl);
+            setStatus("#trello-sync-status", "Set as Favourite Trello link for Decomposition.");
+            if (ctx.projectId && ctx.email) {
+                refreshTrelloLibraryUi(ctx.projectId, ctx.email);
+            }
             return;
         }
 
@@ -1323,24 +1341,41 @@ function normalizeTrelloCardLibrary(values) {
         }
 
         let savedAt = "";
+        let favourite = false;
         if (typeof value === "object" && value) {
             const parsed = Date.parse(String(value.savedAt || "").trim());
             savedAt = Number.isFinite(parsed) ? new Date(parsed).toISOString() : "";
+            favourite = Boolean(value.favourite);
         }
 
         if (seenIndexByUrl.has(safeUrl)) {
             const existingIndex = Number(seenIndexByUrl.get(safeUrl));
-            const existing = list[existingIndex] || { url: safeUrl, savedAt: "" };
-            if (!existing.savedAt && savedAt) {
-                list[existingIndex] = { url: safeUrl, savedAt };
-            }
+            const existing = list[existingIndex] || { url: safeUrl, savedAt: "", favourite: false };
+            list[existingIndex] = {
+                url: safeUrl,
+                savedAt: existing.savedAt || savedAt,
+                favourite: existing.favourite || favourite
+            };
             return;
         }
 
         seenIndexByUrl.set(safeUrl, list.length);
-        list.push({ url: safeUrl, savedAt });
+        list.push({ url: safeUrl, savedAt, favourite });
     });
-    return list.slice(0, 12);
+
+    const trimmed = list.slice(0, 12);
+    // Only one entry may be the favourite; keep the first marked one if duplicates slipped through.
+    let favouriteClaimed = false;
+    return trimmed.map((item) => {
+        if (!item.favourite) {
+            return item;
+        }
+        if (favouriteClaimed) {
+            return { ...item, favourite: false };
+        }
+        favouriteClaimed = true;
+        return item;
+    });
 }
 
 function mergeTrelloCardLibrarySources(...sources) {
@@ -1430,6 +1465,24 @@ function removeStoredTrelloCardLibraryLink(projectId, email, value) {
     }
 
     const current = readStoredTrelloCardLibrary(projectId, email).filter((item) => toSafeTrelloCardUrl(item?.url || "") !== safeUrl);
+    return writeStoredTrelloCardLibrary(projectId, email, current);
+}
+
+function getFavouriteTrelloCardLibraryLink(projectId, email) {
+    const favourite = readStoredTrelloCardLibrary(projectId, email).find((item) => Boolean(item?.favourite));
+    return toSafeTrelloCardUrl(favourite?.url || "");
+}
+
+function setFavouriteTrelloCardLibraryLink(projectId, email, value) {
+    const safeUrl = toSafeTrelloCardUrl(value);
+    if (!safeUrl) {
+        return readStoredTrelloCardLibrary(projectId, email);
+    }
+
+    const current = readStoredTrelloCardLibrary(projectId, email).map((item) => ({
+        ...item,
+        favourite: toSafeTrelloCardUrl(item?.url || "") === safeUrl
+    }));
     return writeStoredTrelloCardLibrary(projectId, email, current);
 }
 
@@ -3887,9 +3940,12 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     let syncedGoogleSlidesUrl = shouldUseStoredSync ? storedSyncEntry.url : currentGoogleSlidesUrl;
     let syncedGoogleSlidesSavedAt = String(storedSyncEntry.savedAt || "").trim();
     const currentTrelloCardUrl = toSafeTrelloCardUrl(submission.trelloCardUrl);
+    const favouriteTrelloBoardUrl = getFavouriteTrelloCardLibraryLink(projectId, email);
     const storedTrelloBoardUrl = toSafeTrelloCardUrl(readStoredTrelloCardLink(projectId, email))
         || toSafeTrelloCardUrl(readStoredTrelloCardLibrary(projectId, email)[0]?.url || "");
-    let currentDecompositionTrelloUrl = currentTrelloCardUrl
+    // A starred Favourite always wins when multiple Trello links are synced, so the Decomposition board knows which one to show.
+    let currentDecompositionTrelloUrl = favouriteTrelloBoardUrl
+        || currentTrelloCardUrl
         || getFirstTrelloCardUrlFromEvidenceRows(evidenceRows)
         || storedTrelloBoardUrl;
     const currentMediaAssetFolderUrl = toSafeExternalUrl(submission.mediaAssetFolderUrl);
@@ -9085,12 +9141,14 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                             <p class="trello-link-library-title">Saved Trello Links <span class="trello-link-library-count" id="trello-link-library-count">(${mergedTrelloCardLibrary.length})</span></p>
                             <ul class="trello-link-library-list" id="trello-link-library-list">
                                 ${mergedTrelloCardLibrary.map((item) => `
-                                    <li class="trello-link-library-item" data-trello-link-item="${escapeHtml(item.url)}">
+                                    <li class="trello-link-library-item${item.favourite ? " is-favourite" : ""}" data-trello-link-item="${escapeHtml(item.url)}">
                                         <div class="trello-link-library-link-wrap">
                                             <a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.url)}</a>
                                             <span class="trello-link-library-savedat">${escapeHtml(formatLibrarySavedAtLabel(item.savedAt))}</span>
+                                            ${item.favourite ? `<span class="trello-link-library-favourite-badge">&#9733; Favourite</span>` : ""}
                                         </div>
                                         <div class="trello-link-library-actions">
+                                            <button type="button" class="trello-link-library-favourite-btn${item.favourite ? " is-favourite" : ""}" data-trello-library-favourite="${escapeHtml(item.url)}" aria-pressed="${item.favourite ? "true" : "false"}" title="${item.favourite ? "Favourite link used by Decomposition" : "Mark as Favourite"}">${item.favourite ? "&#9733;" : "&#9734;"}</button>
                                             <button type="button" class="detail-action detail-action-secondary" data-trello-library-use="${escapeHtml(item.url)}">Use</button>
                                             <button type="button" class="detail-action detail-action-secondary" data-trello-library-open="${escapeHtml(item.url)}">Open</button>
                                             <button type="button" class="detail-action detail-action-danger" data-trello-library-delete="${escapeHtml(item.url)}">Delete</button>
@@ -9554,13 +9612,16 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                     return "";
                 }
                 const isActive = Boolean(activeUrl && activeUrl === url);
+                const isFavourite = Boolean(item?.favourite);
                 return `
-                    <li class="trello-link-library-item${isActive ? " is-active" : ""}" data-trello-link-item="${escapeHtml(url)}">
+                    <li class="trello-link-library-item${isActive ? " is-active" : ""}${isFavourite ? " is-favourite" : ""}" data-trello-link-item="${escapeHtml(url)}">
                         <div class="trello-link-library-link-wrap">
                             <a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(url)}</a>
                             <span class="trello-link-library-savedat">${escapeHtml(formatLibrarySavedAtLabel(item?.savedAt))}</span>
+                            ${isFavourite ? `<span class="trello-link-library-favourite-badge">&#9733; Favourite</span>` : ""}
                         </div>
                         <div class="trello-link-library-actions">
+                            <button type="button" class="trello-link-library-favourite-btn${isFavourite ? " is-favourite" : ""}" data-trello-library-favourite="${escapeHtml(url)}" aria-pressed="${isFavourite ? "true" : "false"}" title="${isFavourite ? "Favourite link used by Decomposition" : "Mark as Favourite"}">${isFavourite ? "&#9733;" : "&#9734;"}</button>
                             <button type="button" class="detail-action detail-action-secondary" data-trello-library-use="${escapeHtml(url)}">Use</button>
                             <button type="button" class="detail-action detail-action-secondary" data-trello-library-open="${escapeHtml(url)}">Open</button>
                             <button type="button" class="detail-action detail-action-danger" data-trello-library-delete="${escapeHtml(url)}">Delete</button>
@@ -9755,6 +9816,18 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     });
 
     trelloLinkLibraryList?.addEventListener("click", async (event) => {
+        const favouriteButton = event.target.closest("[data-trello-library-favourite]");
+        if (favouriteButton) {
+            const selectedUrl = toSafeTrelloCardUrl(favouriteButton.getAttribute("data-trello-library-favourite") || "");
+            if (!selectedUrl) {
+                return;
+            }
+            trelloCardLibrary = setFavouriteTrelloCardLibraryLink(projectId, email, selectedUrl);
+            setTrelloStatus("Set as Favourite Trello link for Decomposition.", false, true);
+            renderTrelloCardLibrary();
+            return;
+        }
+
         const useButton = event.target.closest("[data-trello-library-use]");
         if (useButton) {
             const selectedUrl = toSafeTrelloCardUrl(useButton.getAttribute("data-trello-library-use") || "");
