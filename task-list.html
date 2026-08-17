@@ -419,6 +419,51 @@
             gap: 6px;
         }
 
+        .task-list-decomposition-category-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 6px;
+        }
+
+        .task-list-decomposition-category {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            border: 1px solid #bed6e8;
+            border-radius: 6px;
+            background: #ffffff;
+            color: #1e5986;
+            font-size: 0.78rem;
+            font-weight: 800;
+            padding: 7px 9px;
+            text-decoration: none;
+        }
+
+        .task-list-decomposition-category:hover {
+            text-decoration: underline;
+        }
+
+        .task-list-decomposition-category.is-covered {
+            border-color: #7fb98f;
+            background: #eef8f0;
+            color: #1f5a33;
+        }
+
+        .task-list-decomposition-category-count {
+            min-width: 22px;
+            border-radius: 999px;
+            background: #17456f;
+            color: #ffffff;
+            padding: 1px 7px;
+            text-align: center;
+            font-size: 0.74rem;
+        }
+
+        .task-list-decomposition-category.is-covered .task-list-decomposition-category-count {
+            background: #2f7a4a;
+        }
+
         .task-list-decomposition-subtask {
             display: flex;
             align-items: center;

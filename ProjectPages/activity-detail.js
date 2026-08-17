@@ -1882,6 +1882,18 @@ function countDecompositionTaskCategories(cards) {
 }
 
 const DECOMPOSITION_TRELLO_SYNC_STORAGE_PREFIX = "hub_decomp_trello_last_sync_v1";
+const DECOMPOSITION_CATEGORY_COVERAGE_STORAGE_PREFIX = "hub_decomp_category_coverage_v1";
+
+// Shared with the Task List page so it can show which decomposition categories still have no Trello tasks.
+function writeDecompositionCategoryCoverage(projectId, email, rows) {
+    try {
+        localStorage.setItem(
+            `${DECOMPOSITION_CATEGORY_COVERAGE_STORAGE_PREFIX}:${String(projectId || "").trim()}:${String(email || "").trim().toLowerCase()}`,
+            JSON.stringify({ savedAt: new Date().toISOString(), categories: Array.isArray(rows) ? rows : [] })
+        );
+    } catch (_error) {
+    }
+}
 
 function getDecompositionTrelloSyncStorageKey(projectId, email) {
     return `${DECOMPOSITION_TRELLO_SYNC_STORAGE_PREFIX}:${String(projectId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
@@ -4761,10 +4773,11 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         `;
     };
 
-    const renderDecompCategoryCoverage = (cards) => {
+    const renderDecompCategoryCoverage = (cards, persist = false) => {
         if (!decompCategoryListHost) return;
         const safeCards = Array.isArray(cards) ? cards : [];
         const rows = countDecompositionTaskCategories(safeCards);
+        if (persist) writeDecompositionCategoryCoverage(projectId, email, rows);
         if (decompCategoryTotalHost) {
             decompCategoryTotalHost.textContent = `(${safeCards.length} Trello task${safeCards.length === 1 ? "" : "s"})`;
         }
@@ -4824,7 +4837,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 ...(Array.isArray(payload?.todo_cards) ? payload.todo_cards : []),
                 ...(Array.isArray(payload?.doing_cards) ? payload.doing_cards : []),
                 ...(Array.isArray(payload?.done_cards) ? payload.done_cards : [])
-            ]);
+            ], true);
             latestDecompBoardSnapshot = payload || null;
             const syncedAtIso = new Date().toISOString();
             writeDecompositionTrelloSyncTime(projectId, email, syncedAtIso);

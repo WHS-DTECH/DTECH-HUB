@@ -647,6 +647,27 @@ function getTaskTopicHrefForStep(standard, level, text) {
     return buildCustomActivityLink(taskListState.selectedId, safeText, derivedShortName);
 }
 
+const DECOMPOSITION_CATEGORY_COVERAGE_STORAGE_PREFIX = "hub_decomp_category_coverage_v1";
+
+// Counts are written by the Decomposition page each time the student's Trello board loads.
+function readDecompositionCategoryCoverage(activityId, email) {
+    try {
+        const raw = localStorage.getItem(
+            `${DECOMPOSITION_CATEGORY_COVERAGE_STORAGE_PREFIX}:${String(activityId || "").trim()}:${String(email || "").trim().toLowerCase()}`
+        );
+        const parsed = JSON.parse(raw || "{}");
+        const rows = Array.isArray(parsed?.categories) ? parsed.categories : [];
+        const counts = {};
+        rows.forEach((row) => {
+            const label = String(row?.label || "").trim();
+            if (label) counts[label] = Number(row?.count || 0);
+        });
+        return { counts, savedAt: String(parsed?.savedAt || "").trim(), hasData: rows.length > 0 };
+    } catch (_error) {
+        return { counts: {}, savedAt: "", hasData: false };
+    }
+}
+
 function getDecompositionSubtasks(stateMap) {
     const activityId = taskListState.selectedId;
     if (!activityId) return [];
@@ -658,27 +679,34 @@ function getDecompositionSubtasks(stateMap) {
         Boolean(step?.done) && matcher.test(String(step?.text || ""))
     );
 
+    const coverage = readDecompositionCategoryCoverage(activityId, getTaskListEmail());
+    const withCoverage = (row) => ({
+        ...row,
+        trelloCount: Number(coverage.counts[row.label] || 0),
+        coverageKnown: coverage.hasData
+    });
+
     return [
-        {
+        withCoverage({
             label: "Development Steps",
             href: buildCustomActivityLink(activityId, "Explain how the outcome will be developed.", "Development Steps", "development-steps"),
             done: isComplete(/explain how the outcome will be developed/i)
-        },
-        {
+        }),
+        withCoverage({
             label: "Tools & Techniques",
             href: buildCustomActivityLink(activityId, "What Tools and Techniques will be used?", "Tools & Techniques", "tools-and-techniques"),
             done: isComplete(/what tools and techniques will be used/i)
-        },
-        {
+        }),
+        withCoverage({
             label: "Success Criteria",
             href: buildCustomActivityLink(activityId, "State how success will be measured or evaluated.", "Success Criteria", "project-success-criteria"),
             done: isComplete(/state how success will be measured or evaluated/i)
-        },
-        {
+        }),
+        withCoverage({
             label: "Client Interaction",
             href: buildCustomActivityLink(activityId, "Client Interaction", "Client Interaction"),
             done: false
-        }
+        })
     ];
 }
 
@@ -1315,14 +1343,18 @@ function renderChecklistCards(detail, allItems) {
                                     ${isDecompositionRow ? `
                                         <div class="task-list-decomposition-subtasks">
                                             <p class="task-list-system-title">Decomposition Subtasks</p>
-                                            <div class="task-list-decomposition-subtask-list">
+                                            <p class="task-list-achieved-note">Complete at least one task in each of the Decomposition Categories.</p>
+                                            <div class="task-list-decomposition-category-list">
                                                 ${decompositionSubtasks.map((subtask) => `
-                                                    <label class="task-list-decomposition-subtask ${subtask.done ? "is-complete" : ""}">
-                                                        <input type="checkbox" disabled ${subtask.done ? "checked" : ""}>
-                                                        <a href="${escapeTaskListHtml(subtask.href)}">${escapeTaskListHtml(subtask.label)}</a>
-                                                    </label>
+                                                    <a class="task-list-decomposition-category ${subtask.trelloCount > 0 ? "is-covered" : ""}" href="${escapeTaskListHtml(subtask.href)}">
+                                                        <span class="task-list-decomposition-category-label">${escapeTaskListHtml(subtask.label)}</span>
+                                                        <span class="task-list-decomposition-category-count">${subtask.coverageKnown ? subtask.trelloCount : "-"}</span>
+                                                    </a>
                                                 `).join("")}
                                             </div>
+                                            ${decompositionSubtasks[0]?.coverageKnown
+                                                ? ""
+                                                : `<p class="task-list-achieved-note">Open the Decomposition of Tasks page and refresh your Trello board to see these counts.</p>`}
                                         </div>
                                     ` : ""}
                                 </div>
