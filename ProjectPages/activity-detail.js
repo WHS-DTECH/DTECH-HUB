@@ -3903,8 +3903,12 @@ function renderDigitalOutcomeMustDos(host, presentationUrl, targetId = "digital-
 }
 
 function readStoredRelevantImplicationsSlideUrl(projectId, email) {
+    return readStoredRelevantImplicationsSlideEntries(projectId, email)[0]?.url || "";
+}
+
+function readStoredRelevantImplicationsSlideEntries(projectId, email) {
     const prefix = `${TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX}:${String(projectId || "").trim()}:${String(email || "").trim().toLowerCase()}:`;
-    let bestUrl = "";
+    const entries = [];
     try {
         for (let index = 0; index < localStorage.length; index += 1) {
             const key = String(localStorage.key(index) || "");
@@ -3912,12 +3916,26 @@ function readStoredRelevantImplicationsSlideUrl(projectId, email) {
             const parsed = JSON.parse(localStorage.getItem(key) || "{}");
             if (!/^relevant-implications(?:-|$)/i.test(String(parsed?.templateId || "").trim())) continue;
             const url = toSafeExternalUrl(parsed?.url || "");
-            if (url) bestUrl = url;
+            if (url && !entries.some((entry) => entry.url === url)) {
+                entries.push({
+                    url,
+                    name: String(parsed?.templateTitle || "Relevant Implications slideshow").trim()
+                });
+            }
         }
     } catch (_error) {
-        return "";
+        return [];
     }
-    return bestUrl;
+    return entries;
+}
+
+function renderRelevantImplicationNames(host, projectId, email) {
+    const target = host?.querySelector("#success-criteria-relevant-implications");
+    if (!target) return;
+    const entries = readStoredRelevantImplicationsSlideEntries(projectId, email);
+    target.innerHTML = entries.length
+        ? `<h3>Relevant Implications slideshows</h3><ul class="list task-topic-guide-list">${entries.map((entry) => `<li><a href="${escapeHtml(entry.url)}" target="_blank" rel="noreferrer">${escapeHtml(entry.name)}</a></li>`).join("")}</ul>`
+        : `<p class="task-topic-submission-note">No Relevant Implications slideshows have been linked yet.</p>`;
 }
 
 function renderRelevantImplicationsFromSlide(host, presentationUrl) {
@@ -8448,7 +8466,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                                 ? `<div class="digital-outcome-must-dos" id="relevant-implications-from-slide" aria-live="polite"><p class="task-topic-submission-note">Loading discussed implications from your slideshow...</p></div>`
                                 : ""}
                             ${isDigitalOutcomeSuccessCriteriaTopic
-                                ? `<div class="digital-outcome-must-dos" id="success-criteria-must-dos" aria-live="polite"><p class="task-topic-submission-note">Loading MUST-DOs from your Digital Outcome Description slideshow...</p></div>`
+                                ? `<div class="digital-outcome-must-dos" id="success-criteria-must-dos" aria-live="polite"><p class="task-topic-submission-note">Loading MUST-DOs from your Digital Outcome Description slideshow...</p></div><div class="digital-outcome-must-dos" id="success-criteria-relevant-implications" aria-live="polite"><p class="task-topic-submission-note">Loading Relevant Implications slideshows...</p></div>`
                                 : ""}
                         `}
 
@@ -10062,6 +10080,9 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                     || "");
             const targetId = isSuccessCriteriaPage ? "success-criteria-must-dos" : "digital-outcome-must-dos";
             renderDigitalOutcomeMustDos(host, syncedSlideLink, targetId);
+            if (isSuccessCriteriaPage) {
+                renderRelevantImplicationNames(host, projectId, email);
+            }
         }
     }
 
