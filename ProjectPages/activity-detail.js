@@ -1846,6 +1846,41 @@ function extractTrelloBoardIdFromUrl(value) {
     return boardMatch?.[1] || "";
 }
 
+// Decomposition subtask categories from the Task List, matched against Trello card names/labels.
+const DECOMPOSITION_TASK_CATEGORIES = [
+    {
+        label: "Development Steps",
+        pattern: /develop|build|implement|code|coding|program|script|create|add|feature|functionality|page|layout|design|html|css|javascript|step/i
+    },
+    {
+        label: "Tools & Techniques",
+        pattern: /tool|technique|software|library|framework|template|api|plugin|extension|github|trello|onedrive|google drive|vs code|setup|set up|install|sync|version control/i
+    },
+    {
+        label: "Success Criteria",
+        pattern: /success|criteria|test|testing|trial|evaluat|measure|review|quality|requirement|spec|acceptance|check|debug|fix/i
+    },
+    {
+        label: "Client Interaction",
+        pattern: /client|stakeholder|end.?user|feedback|meeting|interview|survey|consult|brief|present|sign.?off|approval/i
+    }
+];
+
+function countDecompositionTaskCategories(cards) {
+    const safeCards = Array.isArray(cards) ? cards : [];
+    const haystacks = safeCards.map((card) => {
+        const labels = Array.isArray(card?.labels)
+            ? card.labels.map((label) => String(label?.name || label || "")).join(" ")
+            : "";
+        return `${String(card?.name || "")} ${labels}`.trim();
+    }).filter(Boolean);
+
+    return DECOMPOSITION_TASK_CATEGORIES.map((category) => ({
+        label: category.label,
+        count: haystacks.filter((text) => category.pattern.test(text)).length
+    }));
+}
+
 // Lets a student connect their Trello account inline (task-topic pages) without navigating to User Profile.
 async function openInlineTrelloConnectPopup() {
     // Open the popup synchronously (within the click gesture) first, otherwise browsers silently
@@ -4302,6 +4337,12 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                     <div class="task-topic-decomp-trello-sync" aria-label="Trello account and saved links">
                         <p class="task-topic-decomp-dashboard-kicker">Trello Sync</p>
                         <p class="task-topic-submission-note">Connect your Trello account here so your Decomposition Task Board can load automatically, without needing to visit User Profile.</p>
+
+                        <div class="task-topic-decomp-category-coverage" aria-label="Task category coverage">
+                            <p class="task-topic-decomp-category-title">Task Category Coverage <span class="task-topic-decomp-category-total" id="task-topic-decomp-category-total">(0 Trello tasks)</span></p>
+                            <ul class="task-topic-decomp-category-list" id="task-topic-decomp-category-list"></ul>
+                        </div>
+
                         <button type="button" class="detail-action detail-action-secondary" id="task-topic-decomp-connect-trello" hidden>Connect Trello Account</button>
                         <p class="task-topic-submission-status" id="task-topic-decomp-connect-status" aria-live="polite"></p>
                         <div class="trello-link-library" id="task-topic-decomp-trello-link-library" hidden>
@@ -4405,6 +4446,8 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const decompBoardColumnsHost = panelHost.querySelector("#task-topic-decomp-board-columns");
     const decompConnectTrelloButton = panelHost.querySelector("#task-topic-decomp-connect-trello");
     const decompConnectStatusHost = panelHost.querySelector("#task-topic-decomp-connect-status");
+    const decompCategoryListHost = panelHost.querySelector("#task-topic-decomp-category-list");
+    const decompCategoryTotalHost = panelHost.querySelector("#task-topic-decomp-category-total");
     const decompTrelloLinkLibrary = panelHost.querySelector("#task-topic-decomp-trello-link-library");
     const decompTrelloLinkLibraryList = panelHost.querySelector("#task-topic-decomp-trello-link-library-list");
     const decompTrelloLinkLibraryCount = panelHost.querySelector("#task-topic-decomp-trello-link-library-count");
@@ -4580,11 +4623,29 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         `;
     };
 
+    const renderDecompCategoryCoverage = (cards) => {
+        if (!decompCategoryListHost) return;
+        const safeCards = Array.isArray(cards) ? cards : [];
+        const rows = countDecompositionTaskCategories(safeCards);
+        if (decompCategoryTotalHost) {
+            decompCategoryTotalHost.textContent = `(${safeCards.length} Trello task${safeCards.length === 1 ? "" : "s"})`;
+        }
+        decompCategoryListHost.innerHTML = rows.map((row) => `
+            <li class="task-topic-decomp-category-item${row.count > 0 ? " is-covered" : ""}">
+                <span class="task-topic-decomp-category-label">${escapeHtml(row.label)}</span>
+                <span class="task-topic-decomp-category-count">${row.count}</span>
+            </li>
+        `).join("");
+    };
+
+    renderDecompCategoryCoverage([]);
+
     const loadDecompositionTaskBoard = async () => {
         if (!decompBoardColumnsHost) return "";
         if (!currentDecompositionTrelloUrl) {
             decompBoardColumnsHost.innerHTML = '<p class="task-topic-decomp-board-empty">Add your Trello board or card link in Project Management first, then refresh this board.</p>';
             setDecompBoardStatus("Trello board link needed.", true);
+            renderDecompCategoryCoverage([]);
             return "";
         }
 
@@ -4609,9 +4670,15 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 renderDecompBoardColumn("Doing", payload?.doing_cards, "doing"),
                 renderDecompBoardColumn("Done", payload?.done_cards, "done")
             ].join("");
+            renderDecompCategoryCoverage([
+                ...(Array.isArray(payload?.todo_cards) ? payload.todo_cards : []),
+                ...(Array.isArray(payload?.doing_cards) ? payload.doing_cards : []),
+                ...(Array.isArray(payload?.done_cards) ? payload.done_cards : [])
+            ]);
             setDecompBoardStatus(`Trello board updated: ${Number(payload?.todo_count || 0)} to do, ${Number(payload?.doing_count || 0)} doing, ${Number(payload?.done_count || 0)} done.`);
             return String(payload?.board_id || "").trim();
         } catch (error) {
+            renderDecompCategoryCoverage([]);
             // Saving a Trello link and connecting the Trello account (API token) are separate steps; this board needs the account connection.
             if (Number(error?.status) === 404 && /has not connected trello/i.test(String(error?.message || ""))) {
                 decompBoardColumnsHost.innerHTML = '<p class="task-topic-decomp-board-empty">Your Trello link is saved, but DTECH HUB also needs your Trello account connected to read your cards. Click Connect Trello Account above, then refresh this board.</p>';
