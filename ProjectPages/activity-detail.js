@@ -1848,9 +1848,24 @@ function extractTrelloBoardIdFromUrl(value) {
 
 // Lets a student connect their Trello account inline (task-topic pages) without navigating to User Profile.
 async function openInlineTrelloConnectPopup() {
-    const configResponse = await fetch("/api/integrations/trello/config", { headers: buildWriteHeaders() });
-    const config = await configResponse.json().catch(() => ({}));
+    // Open the popup synchronously (within the click gesture) first, otherwise browsers silently
+    // block it once we `await` a fetch before calling window.open.
+    const popupRef = window.open("", "dtech_hub_trello_connect", "width=650,height=760");
+    if (!popupRef) {
+        throw new Error("Popup blocked. Please allow popups and try again.");
+    }
+
+    let config = null;
+    try {
+        const configResponse = await fetch("/api/integrations/trello/config", { headers: buildWriteHeaders() });
+        config = await configResponse.json().catch(() => ({}));
+    } catch (_error) {
+        popupRef.close();
+        throw new Error("Could not reach the server to start Trello connection.");
+    }
+
     if (!config?.enabled || !config?.api_key) {
+        popupRef.close();
         throw new Error("Trello integration is not configured on the server yet.");
     }
 
@@ -1865,7 +1880,6 @@ async function openInlineTrelloConnectPopup() {
 
     return new Promise((resolve, reject) => {
         let finished = false;
-        let popupRef = null;
         let timeoutHandle = null;
         let closePollHandle = null;
 
@@ -1890,9 +1904,10 @@ async function openInlineTrelloConnectPopup() {
         };
 
         window.addEventListener("message", onMessage);
-        popupRef = window.open(authorizeUrl.toString(), "dtech_hub_trello_connect", "width=650,height=760");
-        if (!popupRef) {
-            finish(new Error("Popup blocked. Please allow popups and try again."));
+        try {
+            popupRef.location.href = authorizeUrl.toString();
+        } catch (_error) {
+            finish(new Error("Could not open the Trello authorization page. Please allow popups and try again."));
             return;
         }
 
