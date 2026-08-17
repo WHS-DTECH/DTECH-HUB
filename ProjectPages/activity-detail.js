@@ -3933,8 +3933,12 @@ function renderRelevantImplicationNames(host, projectId, email) {
     const target = host?.querySelector("#success-criteria-relevant-implications");
     if (!target) return;
     const entries = readStoredRelevantImplicationsSlideEntries(projectId, email);
+    const displayName = (value) => String(value || "Relevant Implication")
+        .replace(/^relevant\s+implications?\s*-\s*/i, "")
+        .replace(/\s*-\s*[a-z][a-z0-9._-]*$/i, "")
+        .trim() || "Relevant Implication";
     target.innerHTML = entries.length
-        ? `<h3>Relevant Implications slideshows</h3><ul class="list task-topic-guide-list">${entries.map((entry) => `<li><a href="${escapeHtml(entry.url)}" target="_blank" rel="noreferrer">${escapeHtml(entry.name)}</a></li>`).join("")}</ul>`
+        ? `<h3>Relevant Implications</h3><ul class="list task-topic-guide-list">${entries.map((entry) => `<li><a href="${escapeHtml(entry.url)}" target="_blank" rel="noreferrer">${escapeHtml(displayName(entry.name))}</a></li>`).join("")}</ul>`
         : `<p class="task-topic-submission-note">No Relevant Implications slideshows have been linked yet.</p>`;
 }
 
