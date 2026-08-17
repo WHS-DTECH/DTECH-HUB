@@ -741,6 +741,7 @@ function installCloudSyncDelegatedFallbackHandlers() {
                         <div class="trello-link-library-actions">
                             <button type="button" class="detail-action detail-action-secondary" data-trello-library-use="${escapeHtml(url)}">Use</button>
                             <button type="button" class="detail-action detail-action-secondary" data-trello-library-open="${escapeHtml(url)}">Open</button>
+                            <button type="button" class="detail-action detail-action-danger" data-trello-library-delete="${escapeHtml(url)}">Delete</button>
                         </div>
                     </li>
                 `;
@@ -783,6 +784,7 @@ function installCloudSyncDelegatedFallbackHandlers() {
                         <div class="trello-link-library-actions">
                             <button type="button" class="detail-action detail-action-secondary" data-onedrive-library-use="${escapeHtml(url)}">Use</button>
                             <button type="button" class="detail-action detail-action-secondary" data-onedrive-library-open="${escapeHtml(url)}">Open</button>
+                            <button type="button" class="detail-action detail-action-danger" data-onedrive-library-delete="${escapeHtml(url)}">Delete</button>
                         </div>
                     </li>
                 `;
@@ -825,6 +827,7 @@ function installCloudSyncDelegatedFallbackHandlers() {
                         <div class="trello-link-library-actions">
                             <button type="button" class="detail-action detail-action-secondary" data-google-drive-library-use="${escapeHtml(url)}">Use</button>
                             <button type="button" class="detail-action detail-action-secondary" data-google-drive-library-open="${escapeHtml(url)}">Open</button>
+                            <button type="button" class="detail-action detail-action-danger" data-google-drive-library-delete="${escapeHtml(url)}">Delete</button>
                         </div>
                     </li>
                 `;
@@ -835,6 +838,84 @@ function installCloudSyncDelegatedFallbackHandlers() {
     document.addEventListener("click", async (event) => {
         const button = event.target?.closest?.("button");
         if (!button) {
+            return;
+        }
+
+        const deleteTrelloLibraryBtn = button.closest("[data-trello-library-delete]");
+        if (deleteTrelloLibraryBtn) {
+            const selectedUrl = toSafeTrelloCardUrl(deleteTrelloLibraryBtn.getAttribute("data-trello-library-delete") || "");
+            if (!selectedUrl || !window.confirm("Delete this saved Trello link?")) {
+                return;
+            }
+            const ctx = getActiveSyncContext();
+            deleteTrelloLibraryBtn.disabled = true;
+            try {
+                await removeUrlFromEvidenceSteps(ctx.projectId, ctx.email, selectedUrl, ["TRELLO_CARD_URL|"]);
+                removeStoredTrelloCardLibraryLink(ctx.projectId, ctx.email, selectedUrl);
+                const input = document.querySelector("#trello-card-url");
+                if (input && toSafeTrelloCardUrl(input.value || "") === selectedUrl) {
+                    input.value = "";
+                }
+                setStatus("#trello-sync-status", "Removed saved Trello link.");
+            } catch (_error) {
+                setStatus("#trello-sync-status", "Could not remove that Trello link.", true);
+            } finally {
+                if (ctx.projectId && ctx.email) {
+                    refreshTrelloLibraryUi(ctx.projectId, ctx.email);
+                }
+            }
+            return;
+        }
+
+        const deleteOneDriveLibraryBtn = button.closest("[data-onedrive-library-delete]");
+        if (deleteOneDriveLibraryBtn) {
+            const selectedUrl = toSafeOneDriveFolderUrl(deleteOneDriveLibraryBtn.getAttribute("data-onedrive-library-delete") || "");
+            if (!selectedUrl || !window.confirm("Delete this saved OneDrive link?")) {
+                return;
+            }
+            const ctx = getActiveSyncContext();
+            deleteOneDriveLibraryBtn.disabled = true;
+            try {
+                await removeUrlFromEvidenceSteps(ctx.projectId, ctx.email, selectedUrl, ["ONEDRIVE_PROJECT_FOLDER_URL|", "MEDIA_ASSET_FOLDER_URL|"]);
+                removeStoredOneDriveLinkLibraryLink(ctx.projectId, ctx.email, selectedUrl);
+                const input = document.querySelector("#onedrive-folder-url");
+                if (input && toSafeOneDriveFolderUrl(input.value || "") === selectedUrl) {
+                    input.value = "";
+                }
+                setStatus("#onedrive-sync-status", "Removed saved OneDrive link.");
+            } catch (_error) {
+                setStatus("#onedrive-sync-status", "Could not remove that OneDrive link.", true);
+            } finally {
+                if (ctx.projectId && ctx.email) {
+                    refreshOneDriveLibraryUi(ctx.projectId, ctx.email);
+                }
+            }
+            return;
+        }
+
+        const deleteGoogleLibraryBtn = button.closest("[data-google-drive-library-delete]");
+        if (deleteGoogleLibraryBtn) {
+            const selectedUrl = toSafeGoogleDriveFolderUrl(deleteGoogleLibraryBtn.getAttribute("data-google-drive-library-delete") || "");
+            if (!selectedUrl || !window.confirm("Delete this saved Google Drive link?")) {
+                return;
+            }
+            const ctx = getActiveSyncContext();
+            deleteGoogleLibraryBtn.disabled = true;
+            try {
+                await removeUrlFromEvidenceSteps(ctx.projectId, ctx.email, selectedUrl, ["GOOGLE_DRIVE_PROJECT_FOLDER_URL|"]);
+                removeStoredGoogleDriveLinkLibraryLink(ctx.projectId, ctx.email, selectedUrl);
+                const input = document.querySelector("#google-drive-folder-url");
+                if (input && toSafeGoogleDriveFolderUrl(input.value || "") === selectedUrl) {
+                    input.value = "";
+                }
+                setStatus("#google-drive-sync-status", "Removed saved Google Drive link.");
+            } catch (_error) {
+                setStatus("#google-drive-sync-status", "Could not remove that Google Drive link.", true);
+            } finally {
+                if (ctx.projectId && ctx.email) {
+                    refreshGoogleDriveLibraryUi(ctx.projectId, ctx.email);
+                }
+            }
             return;
         }
 
@@ -1273,6 +1354,16 @@ function addStoredTrelloCardLibraryLink(projectId, email, value) {
     return writeStoredTrelloCardLibrary(projectId, email, next);
 }
 
+function removeStoredTrelloCardLibraryLink(projectId, email, value) {
+    const safeUrl = toSafeTrelloCardUrl(value);
+    if (!safeUrl) {
+        return readStoredTrelloCardLibrary(projectId, email);
+    }
+
+    const current = readStoredTrelloCardLibrary(projectId, email).filter((item) => toSafeTrelloCardUrl(item?.url || "") !== safeUrl);
+    return writeStoredTrelloCardLibrary(projectId, email, current);
+}
+
 function normalizeGithubRepoLibrary(values) {
     const seenIndexByUrl = new Map();
     const list = [];
@@ -1358,6 +1449,16 @@ function addStoredGithubRepoLibraryLink(projectId, email, value) {
     const current = readStoredGithubRepoLibrary(projectId, email);
     const next = normalizeGithubRepoLibrary([{ url: safeUrl, savedAt: new Date().toISOString() }, ...current]);
     return writeStoredGithubRepoLibrary(projectId, email, next);
+}
+
+function removeStoredGithubRepoLibraryLink(projectId, email, value) {
+    const safeUrl = toSafeGithubRepoUrl(value);
+    if (!safeUrl) {
+        return readStoredGithubRepoLibrary(projectId, email);
+    }
+
+    const current = readStoredGithubRepoLibrary(projectId, email).filter((item) => toSafeGithubRepoUrl(item?.url || "") !== safeUrl);
+    return writeStoredGithubRepoLibrary(projectId, email, current);
 }
 
 function normalizeOneDriveLinkLibrary(values) {
@@ -1447,6 +1548,16 @@ function addStoredOneDriveLinkLibraryLink(projectId, email, value) {
     return writeStoredOneDriveLinkLibrary(projectId, email, next);
 }
 
+function removeStoredOneDriveLinkLibraryLink(projectId, email, value) {
+    const safeUrl = toSafeOneDriveFolderUrl(value);
+    if (!safeUrl) {
+        return readStoredOneDriveLinkLibrary(projectId, email);
+    }
+
+    const current = readStoredOneDriveLinkLibrary(projectId, email).filter((item) => toSafeOneDriveFolderUrl(item?.url || "") !== safeUrl);
+    return writeStoredOneDriveLinkLibrary(projectId, email, current);
+}
+
 function normalizeGoogleDriveLinkLibrary(values) {
     const seenIndexByUrl = new Map();
     const list = [];
@@ -1532,6 +1643,16 @@ function addStoredGoogleDriveLinkLibraryLink(projectId, email, value) {
     const current = readStoredGoogleDriveLinkLibrary(projectId, email);
     const next = normalizeGoogleDriveLinkLibrary([{ url: safeUrl, savedAt: new Date().toISOString() }, ...current]);
     return writeStoredGoogleDriveLinkLibrary(projectId, email, next);
+}
+
+function removeStoredGoogleDriveLinkLibraryLink(projectId, email, value) {
+    const safeUrl = toSafeGoogleDriveFolderUrl(value);
+    if (!safeUrl) {
+        return readStoredGoogleDriveLinkLibrary(projectId, email);
+    }
+
+    const current = readStoredGoogleDriveLinkLibrary(projectId, email).filter((item) => toSafeGoogleDriveFolderUrl(item?.url || "") !== safeUrl);
+    return writeStoredGoogleDriveLinkLibrary(projectId, email, current);
 }
 
 function readStoredTrelloCardLink(projectId, email) {
@@ -2530,6 +2651,38 @@ function upsertEvidenceStandardRow(rows, standardKey, steps) {
     });
 
     return normalizeEvidenceSteps(normalizedRows);
+}
+
+// Strips a saved link from every evidence row that stores it, across all task-topic standards, so a deleted library entry cannot reappear on reload.
+async function removeUrlFromEvidenceSteps(projectId, studentEmail, urlToRemove, prefixes) {
+    const safeUrl = String(urlToRemove || "").trim();
+    if (!projectId || !studentEmail || !safeUrl || !Array.isArray(prefixes) || !prefixes.length) {
+        return false;
+    }
+
+    const rows = await fetchEvidenceRowsEnsuringAllocation(projectId, studentEmail);
+    let changed = false;
+    const nextRows = rows.map((row) => {
+        const steps = Array.isArray(row?.steps) ? row.steps : [];
+        const filteredSteps = steps.filter((step) => {
+            const text = String(step?.text || "").trim();
+            const matchedPrefix = prefixes.find((prefix) => text.startsWith(prefix));
+            if (!matchedPrefix) {
+                return true;
+            }
+            if (text.slice(matchedPrefix.length).trim() === safeUrl) {
+                changed = true;
+                return false;
+            }
+            return true;
+        });
+        return { standard: String(row?.standard || "").trim(), steps: filteredSteps };
+    });
+
+    if (changed) {
+        await saveEvidenceRows(projectId, studentEmail, nextRows);
+    }
+    return changed;
 }
 
 function getFirstOneDriveFolderUrlFromEvidenceRows(evidenceRows) {
@@ -9337,6 +9490,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                         <div class="trello-link-library-actions">
                             <button type="button" class="detail-action detail-action-secondary" data-trello-library-use="${escapeHtml(url)}">Use</button>
                             <button type="button" class="detail-action detail-action-secondary" data-trello-library-open="${escapeHtml(url)}">Open</button>
+                            <button type="button" class="detail-action detail-action-danger" data-trello-library-delete="${escapeHtml(url)}">Delete</button>
                         </div>
                     </li>
                 `;
@@ -9389,6 +9543,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                         <div class="trello-link-library-actions">
                             <button type="button" class="detail-action detail-action-secondary" data-github-library-use="${escapeHtml(url)}">Use</button>
                             <button type="button" class="detail-action detail-action-secondary" data-github-library-open="${escapeHtml(url)}">Open</button>
+                            <button type="button" class="detail-action detail-action-danger" data-github-library-delete="${escapeHtml(url)}">Delete</button>
                         </div>
                     </li>
                 `;
@@ -9431,6 +9586,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                         <div class="trello-link-library-actions">
                             <button type="button" class="detail-action detail-action-secondary" data-onedrive-library-use="${escapeHtml(url)}">Use</button>
                             <button type="button" class="detail-action detail-action-secondary" data-onedrive-library-open="${escapeHtml(url)}">Open</button>
+                            <button type="button" class="detail-action detail-action-danger" data-onedrive-library-delete="${escapeHtml(url)}">Delete</button>
                         </div>
                     </li>
                 `;
@@ -9473,6 +9629,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                         <div class="trello-link-library-actions">
                             <button type="button" class="detail-action detail-action-secondary" data-google-drive-library-use="${escapeHtml(url)}">Use</button>
                             <button type="button" class="detail-action detail-action-secondary" data-google-drive-library-open="${escapeHtml(url)}">Open</button>
+                            <button type="button" class="detail-action detail-action-danger" data-google-drive-library-delete="${escapeHtml(url)}">Delete</button>
                         </div>
                     </li>
                 `;
@@ -9524,7 +9681,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         renderTrelloCardLibrary();
     });
 
-    trelloLinkLibraryList?.addEventListener("click", (event) => {
+    trelloLinkLibraryList?.addEventListener("click", async (event) => {
         const useButton = event.target.closest("[data-trello-library-use]");
         if (useButton) {
             const selectedUrl = toSafeTrelloCardUrl(useButton.getAttribute("data-trello-library-use") || "");
@@ -9548,6 +9705,28 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             }
             window.open(selectedUrl, "_blank", "noopener,noreferrer");
             setTrelloStatus("Opened saved Trello link.", false, true);
+            return;
+        }
+
+        const deleteButton = event.target.closest("[data-trello-library-delete]");
+        if (deleteButton) {
+            const selectedUrl = toSafeTrelloCardUrl(deleteButton.getAttribute("data-trello-library-delete") || "");
+            if (!selectedUrl || !window.confirm("Delete this saved Trello link?")) {
+                return;
+            }
+            deleteButton.disabled = true;
+            try {
+                await removeUrlFromEvidenceSteps(projectId, email, selectedUrl, ["TRELLO_CARD_URL|"]);
+                trelloCardLibrary = removeStoredTrelloCardLibraryLink(projectId, email, selectedUrl);
+                if (trelloCardInput && toSafeTrelloCardUrl(trelloCardInput.value || "") === selectedUrl) {
+                    trelloCardInput.value = "";
+                }
+                setTrelloStatus("Removed saved Trello link.", false, true);
+            } catch (_error) {
+                setTrelloStatus("Could not remove that Trello link right now.", true);
+            } finally {
+                renderTrelloCardLibrary();
+            }
         }
     });
 
@@ -9617,7 +9796,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         renderGithubRepoLibrary();
     });
 
-    githubLinkLibraryList?.addEventListener("click", (event) => {
+    githubLinkLibraryList?.addEventListener("click", async (event) => {
         const useButton = event.target.closest("[data-github-library-use]");
         if (useButton) {
             const selectedUrl = toSafeGithubRepoUrl(useButton.getAttribute("data-github-library-use") || "");
@@ -9640,6 +9819,28 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             }
             window.open(selectedUrl, "_blank", "noopener,noreferrer");
             setGithubStatus("Opened saved GitHub repository.", false, true);
+            return;
+        }
+
+        const deleteButton = event.target.closest("[data-github-library-delete]");
+        if (deleteButton) {
+            const selectedUrl = toSafeGithubRepoUrl(deleteButton.getAttribute("data-github-library-delete") || "");
+            if (!selectedUrl || !window.confirm("Delete this saved GitHub link?")) {
+                return;
+            }
+            deleteButton.disabled = true;
+            try {
+                await removeUrlFromEvidenceSteps(projectId, email, selectedUrl, ["GITHUB_REPO_URL|"]);
+                githubRepoLibrary = removeStoredGithubRepoLibraryLink(projectId, email, selectedUrl);
+                if (githubRepoInput && toSafeGithubRepoUrl(githubRepoInput.value || "") === selectedUrl) {
+                    githubRepoInput.value = "";
+                }
+                setGithubStatus("Removed saved GitHub link.", false, true);
+            } catch (_error) {
+                setGithubStatus("Could not remove that GitHub link right now.", true);
+            } finally {
+                renderGithubRepoLibrary();
+            }
         }
     });
 
@@ -9783,7 +9984,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         renderOneDriveLinkLibrary();
     });
 
-    oneDriveLinkLibraryList?.addEventListener("click", (event) => {
+    oneDriveLinkLibraryList?.addEventListener("click", async (event) => {
         const useButton = event.target.closest("[data-onedrive-library-use]");
         if (useButton) {
             const selectedUrl = toSafeOneDriveFolderUrl(useButton.getAttribute("data-onedrive-library-use") || "");
@@ -9806,6 +10007,28 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             }
             window.open(selectedUrl, "_blank", "noopener,noreferrer");
             setOneDriveStatus("Opened saved OneDrive link.");
+            return;
+        }
+
+        const deleteButton = event.target.closest("[data-onedrive-library-delete]");
+        if (deleteButton) {
+            const selectedUrl = toSafeOneDriveFolderUrl(deleteButton.getAttribute("data-onedrive-library-delete") || "");
+            if (!selectedUrl || !window.confirm("Delete this saved OneDrive link?")) {
+                return;
+            }
+            deleteButton.disabled = true;
+            try {
+                await removeUrlFromEvidenceSteps(projectId, email, selectedUrl, ["ONEDRIVE_PROJECT_FOLDER_URL|", "MEDIA_ASSET_FOLDER_URL|"]);
+                oneDriveLinkLibraryState = removeStoredOneDriveLinkLibraryLink(projectId, email, selectedUrl);
+                if (oneDriveFolderInput && toSafeOneDriveFolderUrl(oneDriveFolderInput.value || "") === selectedUrl) {
+                    oneDriveFolderInput.value = "";
+                }
+                setOneDriveStatus("Removed saved OneDrive link.");
+            } catch (_error) {
+                setOneDriveStatus("Could not remove that OneDrive link right now.", true);
+            } finally {
+                renderOneDriveLinkLibrary();
+            }
         }
     });
 
@@ -9873,7 +10096,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         renderGoogleDriveLinkLibrary();
     });
 
-    googleDriveLinkLibraryList?.addEventListener("click", (event) => {
+    googleDriveLinkLibraryList?.addEventListener("click", async (event) => {
         const useButton = event.target.closest("[data-google-drive-library-use]");
         if (useButton) {
             const selectedUrl = toSafeGoogleDriveFolderUrl(useButton.getAttribute("data-google-drive-library-use") || "");
@@ -9896,6 +10119,28 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             }
             window.open(selectedUrl, "_blank", "noopener,noreferrer");
             setGoogleDriveStatus("Opened saved Google Drive link.");
+            return;
+        }
+
+        const deleteButton = event.target.closest("[data-google-drive-library-delete]");
+        if (deleteButton) {
+            const selectedUrl = toSafeGoogleDriveFolderUrl(deleteButton.getAttribute("data-google-drive-library-delete") || "");
+            if (!selectedUrl || !window.confirm("Delete this saved Google Drive link?")) {
+                return;
+            }
+            deleteButton.disabled = true;
+            try {
+                await removeUrlFromEvidenceSteps(projectId, email, selectedUrl, ["GOOGLE_DRIVE_PROJECT_FOLDER_URL|"]);
+                googleDriveLinkLibraryState = removeStoredGoogleDriveLinkLibraryLink(projectId, email, selectedUrl);
+                if (googleDriveFolderInput && toSafeGoogleDriveFolderUrl(googleDriveFolderInput.value || "") === selectedUrl) {
+                    googleDriveFolderInput.value = "";
+                }
+                setGoogleDriveStatus("Removed saved Google Drive link.");
+            } catch (_error) {
+                setGoogleDriveStatus("Could not remove that Google Drive link right now.", true);
+            } finally {
+                renderGoogleDriveLinkLibrary();
+            }
         }
     });
 
