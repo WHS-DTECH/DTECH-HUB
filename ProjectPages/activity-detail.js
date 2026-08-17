@@ -8377,6 +8377,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                             <section class="task-topic-guide-block">
                                 <h3>DESCRIPTION - GOOGLE SLIDES</h3>
                                 <ul class="list task-topic-guide-list">${renderList(topicGuideTaskItems)}</ul>
+                                <div class="digital-outcome-must-dos" id="digital-outcome-must-dos" aria-live="polite">
+                                    <p class="task-topic-submission-note">Loading MUST-DOs from your slideshow...</p>
+                                </div>
                             </section>
                         ` : `
                             <p class="task-topic-guide-eyebrow">Topic Tasks</p>
