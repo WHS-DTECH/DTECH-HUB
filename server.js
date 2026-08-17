@@ -5158,6 +5158,42 @@ function extractGoogleSlidesMustDosFromPdfText(source) {
   return Array.from(new Set(candidates)).filter((line) => !/^(slide|digital outcome description)\b/i.test(line)).slice(0, 30);
 }
 
+function extractGoogleSlidesRelevantImplications(presentation) {
+  const paragraphs = [];
+  const slides = Array.isArray(presentation?.slides) ? presentation.slides : [];
+  slides.forEach((slide) => {
+    (Array.isArray(slide?.pageElements) ? slide.pageElements : []).forEach((element) => {
+      const textElements = element?.shape?.text?.textElements;
+      if (!Array.isArray(textElements)) return;
+      let text = "";
+      let isBullet = false;
+      textElements.forEach((textElement) => {
+        text += String(textElement?.textRun?.content || "");
+        if (textElement?.paragraphMarker?.bullet) isBullet = true;
+      });
+      text.split(/\r?\n/).forEach((line) => {
+        const cleaned = line.trim().replace(/^[\u2022\u25CF\u25E6\u25AA\u2023\u2043\u00B7\u2219*-]\s*/, "").trim();
+        if (cleaned) paragraphs.push({ text: cleaned, isBullet });
+      });
+    });
+  });
+
+  return Array.from(new Set(paragraphs
+    .filter((row) => row.isBullet)
+    .map((row) => row.text)
+    .filter((text) => !/^(relevant implications|how does|is the|what|can|will|does|this is|the implication)/i.test(text))))
+    .slice(0, 40);
+}
+
+function extractGoogleSlidesRelevantImplicationsFromPdfText(source) {
+  return Array.from(new Set(String(source || "")
+    .replace(/\r/g, "")
+    .split(/\n+/)
+    .map((line) => line.replace(/^[\s\u2022\u25CF\u25E6\u25AA\u2023\u2043\u00B7*-]+/, "").replace(/\s+/g, " ").trim())
+    .filter((line) => line && !/^(relevant implications|how does|is the|what|can|will|does|this is|the implication|slide)\b/i.test(line))))
+    .slice(0, 40);
+}
+
 async function populateSuccessCriteriaRequirements(presentationId, mustDos, accessToken) {
   const requirements = Array.from(new Set((Array.isArray(mustDos) ? mustDos : [])
     .map((value) => String(value || "").replace(/\s+/g, " ").trim())
@@ -6278,6 +6314,47 @@ app.post("/api/student/drive-setup/read-digital-outcome-must-dos", async (req, r
     });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not read the Digital Outcome Description slideshow." });
+  }
+});
+
+app.post("/api/student/drive-setup/read-relevant-implications", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email) { res.status(401).json({ error: "Sign in is required." }); return; }
+  const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
+  const presentationId = String(req.body?.presentationId || "").trim();
+  if (!driveAccessToken) { res.status(400).json({ error: "driveAccessToken is required." }); return; }
+  if (!/^[A-Za-z0-9_-]{10,}$/.test(presentationId)) { res.status(400).json({ error: "A valid Google Slides presentation ID is required." }); return; }
+
+  try {
+    const file = await driveApiRequest(`/files/${encodeURIComponent(presentationId)}`, {
+      accessToken: driveAccessToken,
+      queryParams: { fields: "id,name,modifiedTime,webViewLink" }
+    });
+    let implications = [];
+    let extractionSource = "slides-api";
+    try {
+      const presentation = await googleSlidesApiRequest(presentationId, driveAccessToken);
+      implications = extractGoogleSlidesRelevantImplications(presentation);
+    } catch (slidesApiError) {
+      const pdfBuffer = await driveDownloadExportedFile(presentationId, "application/pdf", driveAccessToken);
+      if (!PDFParse) throw slidesApiError;
+      const parser = new PDFParse({ data: pdfBuffer, verbosity: 0 });
+      const extraction = await parser.getText();
+      implications = extractGoogleSlidesRelevantImplicationsFromPdfText(extraction?.text || "");
+      extractionSource = "drive-pdf-export";
+    }
+    res.json({
+      ok: true,
+      presentationId,
+      fileName: String(file?.name || "Relevant Implications").trim(),
+      fileUrl: String(file?.webViewLink || `https://docs.google.com/presentation/d/${presentationId}/edit`).trim(),
+      implications,
+      extractionSource,
+      modifiedTime: String(file?.modifiedTime || "").trim(),
+      syncedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not read the Relevant Implications slideshow." });
   }
 });
 

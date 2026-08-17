@@ -3902,6 +3902,56 @@ function renderDigitalOutcomeMustDos(host, presentationUrl, targetId = "digital-
     });
 }
 
+function readStoredRelevantImplicationsSlideUrl(projectId, email) {
+    const prefix = `${TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX}:${String(projectId || "").trim()}:${String(email || "").trim().toLowerCase()}:`;
+    let bestUrl = "";
+    try {
+        for (let index = 0; index < localStorage.length; index += 1) {
+            const key = String(localStorage.key(index) || "");
+            if (!key.startsWith(prefix)) continue;
+            const parsed = JSON.parse(localStorage.getItem(key) || "{}");
+            if (!/^relevant-implications(?:-|$)/i.test(String(parsed?.templateId || "").trim())) continue;
+            const url = toSafeExternalUrl(parsed?.url || "");
+            if (url) bestUrl = url;
+        }
+    } catch (_error) {
+        return "";
+    }
+    return bestUrl;
+}
+
+function renderRelevantImplicationsFromSlide(host, presentationUrl) {
+    const target = host?.querySelector("#relevant-implications-from-slide");
+    if (!target) return;
+    const linkedUrl = toSafeExternalUrl(presentationUrl);
+    const presentationId = extractSlidesIdFromValue(linkedUrl);
+    if (!presentationId) {
+        target.innerHTML = `<p class="task-topic-submission-note">Link your Relevant Implications slideshow to see the implications you have discussed.</p>`;
+        return;
+    }
+    const driveAccessToken = readStoredHubDriveAccessToken();
+    const slideshowLink = `<p class="digital-outcome-must-dos-link"><a href="${escapeHtml(linkedUrl)}" target="_blank" rel="noreferrer">Open Relevant Implications slideshow</a></p>`;
+    if (!driveAccessToken) {
+        target.innerHTML = `${slideshowLink}<p class="task-topic-submission-note">Connect Google Drive to read your discussed implications.</p>`;
+        return;
+    }
+    target.innerHTML = `${slideshowLink}<p class="task-topic-submission-note">Reading your discussed implications...</p>`;
+    void fetch("/api/student/drive-setup/read-relevant-implications", {
+        method: "POST",
+        headers: buildWriteHeaders(),
+        body: JSON.stringify({ driveAccessToken, presentationId })
+    }).then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload?.error || "Could not read your Relevant Implications slideshow.");
+        const implications = Array.isArray(payload?.implications) ? payload.implications : [];
+        target.innerHTML = implications.length
+            ? `${slideshowLink}<h3>Relevant Implications from your slideshow</h3><ul class="list task-topic-guide-list">${implications.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul><p class="task-topic-submission-note">Last read: ${escapeHtml(formatSubmissionTimestamp(payload?.syncedAt || ""))}</p>`
+            : `${slideshowLink}<p class="task-topic-submission-note">No discussed implications were found in the linked slideshow yet.</p>`;
+    }).catch((error) => {
+        target.innerHTML = `${slideshowLink}<p class="task-topic-submission-note is-error">${escapeHtml(error?.message || "Could not read your slideshow.")}</p>`;
+    });
+}
+
 async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, email, isTeacher, interestData }) {
     const panelHost = host?.querySelector("#task-topic-submission-live-panel");
     if (!panelHost) {
@@ -8396,6 +8446,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                                 <h3>${escapeHtml(topicGuideTaskHeading)}</h3>
                                 <ul class="list task-topic-guide-list">${renderList(topicGuideTaskItems)}</ul>
                             </section>
+                            ${isRelevantImplicationsTopic
+                                ? `<div class="digital-outcome-must-dos" id="relevant-implications-from-slide" aria-live="polite"><p class="task-topic-submission-note">Loading discussed implications from your slideshow...</p></div>`
+                                : ""}
                             ${isDigitalOutcomeSuccessCriteriaTopic
                                 ? `<div class="digital-outcome-must-dos" id="success-criteria-must-dos" aria-live="polite"><p class="task-topic-submission-note">Loading MUST-DOs from your Digital Outcome Description slideshow...</p></div>`
                                 : ""}
@@ -9993,16 +10046,20 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         // Keep sync controls interactive even if submission panel rendering fails.
     }
 
-    if (!isTeacher && /digital\s+outcome\s+description|success\s+criteria/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`)) {
-        const syncedSlideLink = host.querySelector("#task-topic-google-slides-sync-reference a")?.href
+    if (!isTeacher && /digital\s+outcome\s+description|success\s+criteria|relevant\s+implications/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`)) {
+        if (/relevant\s+implications/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`)) {
+            renderRelevantImplicationsFromSlide(host, readStoredRelevantImplicationsSlideUrl(projectId, email));
+        } else {
+            const syncedSlideLink = host.querySelector("#task-topic-google-slides-sync-reference a")?.href
             || host.querySelector("#task-topic-google-slides-url")?.value
             || readStoredTaskTopicSlideSyncLink(projectId, email, selectedTaskTopic, selectedTaskShortName)
             || readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, "digital-outcome-description").url
             || "";
-        const targetId = /success\s+criteria/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`)
-            ? "success-criteria-must-dos"
-            : "digital-outcome-must-dos";
-        renderDigitalOutcomeMustDos(host, syncedSlideLink, targetId);
+            const targetId = /success\s+criteria/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`)
+                ? "success-criteria-must-dos"
+                : "digital-outcome-must-dos";
+            renderDigitalOutcomeMustDos(host, syncedSlideLink, targetId);
+        }
     }
 
     // Render tools & techniques panel only on the dedicated Tools and Techniques topic page
