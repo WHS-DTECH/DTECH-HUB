@@ -1305,8 +1305,7 @@ function renderChecklistCards(detail, allItems) {
                                                 ${projectManagementSubtasks.map((subtask) => `
                                                     <label class="task-list-decomposition-subtask ${subtask.done ? "is-complete" : ""}">
                                                         <input type="checkbox" disabled ${subtask.done ? "checked" : ""}>
-                                                        ${getProjectManagementSystemLogo(subtask.label)}
-                                                        <a href="${escapeTaskListHtml(subtask.href)}">${escapeTaskListHtml(subtask.label)}</a>
+                                                        <a href="${escapeTaskListHtml(subtask.href)}">${getProjectManagementSystemLogo(subtask.label)}${escapeTaskListHtml(subtask.label)}</a>
                                                     </label>
                                                 `).join("")}
                                             </div>
