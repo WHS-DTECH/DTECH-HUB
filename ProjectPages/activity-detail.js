@@ -8472,6 +8472,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                             ${isDigitalOutcomeSuccessCriteriaTopic
                                 ? `<div class="digital-outcome-must-dos" id="success-criteria-must-dos" aria-live="polite"><p class="task-topic-submission-note">Loading MUST-DOs from your Digital Outcome Description slideshow...</p></div><div class="digital-outcome-must-dos" id="success-criteria-relevant-implications" aria-live="polite"><p class="task-topic-submission-note">Loading Relevant Implications slideshows...</p></div>`
                                 : ""}
+                            ${isDigitalOutcomeDevelopmentToolsTopic
+                                ? `<div class="digital-outcome-must-dos" id="development-steps-must-dos" aria-live="polite"><p class="task-topic-submission-note">Loading MUST-DOs from your Digital Outcome Description slideshow...</p></div>`
+                                : ""}
                         `}
 
                         ${isProjectManagementTopic ? `<div id="task-topic-trello-sync-slot"></div>` : ""}
@@ -8543,7 +8546,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                     </div>
                     ` : ""}
 
-                    <section class="proposal-section task-topic-submission-panel" ${isDigitalOutcomeDescriptionTopic || isDigitalOutcomeSuccessCriteriaTopic ? "hidden" : ""}>
+                    <section class="proposal-section task-topic-submission-panel" ${isDigitalOutcomeDescriptionTopic || isDigitalOutcomeSuccessCriteriaTopic || isDigitalOutcomeDevelopmentToolsTopic ? "hidden" : ""}>
                         ${isDecompositionTopic ? "" : `
                         <h2>Submission Tasks</h2>
                         <p class="task-topic-submission-intro">${escapeHtml(submissionIntroText)}</p>
@@ -10066,7 +10069,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         // Keep sync controls interactive even if submission panel rendering fails.
     }
 
-    if (!isTeacher && /digital\s+outcome\s+description|success\s+criteria|relevant\s+implications/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`)) {
+    if (!isTeacher && /digital\s+outcome\s+description|success\s+criteria|relevant\s+implications|development\s+steps|outcome\s+will\s+be\s+developed/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`)) {
         if (/relevant\s+implications/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`)) {
             renderRelevantImplicationsFromSlide(host, readStoredRelevantImplicationsSlideUrl(projectId, email));
         } else {
@@ -10082,7 +10085,10 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                     || readStoredTaskTopicSlideSyncLink(projectId, email, selectedTaskTopic, selectedTaskShortName)
                     || digitalOutcomeSourceUrl
                     || "");
-            const targetId = isSuccessCriteriaPage ? "success-criteria-must-dos" : "digital-outcome-must-dos";
+            const isDevelopmentStepsPage = /development\s+steps|outcome\s+will\s+be\s+developed/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`);
+            const targetId = isSuccessCriteriaPage
+                ? "success-criteria-must-dos"
+                : (isDevelopmentStepsPage ? "development-steps-must-dos" : "digital-outcome-must-dos");
             renderDigitalOutcomeMustDos(host, syncedSlideLink, targetId);
             if (isSuccessCriteriaPage) {
                 renderRelevantImplicationNames(host, projectId, email);
