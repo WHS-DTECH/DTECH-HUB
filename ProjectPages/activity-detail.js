@@ -4380,6 +4380,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                         : (isRelevantImplicationsTopic ? "relevant-implications" : "digital-outcome-description"))));
         const allowFolderMatchAutoLink = syncTemplateId === "digital-outcome-description"
             || syncTemplateId === "target-audience"
+            || syncTemplateId === "development-steps"
             || syncTemplateId === "project-success-criteria"
             || syncTemplateId === "relevant-implications"
             || syncTemplateId === "tools-and-techniques";
