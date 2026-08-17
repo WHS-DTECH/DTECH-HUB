@@ -3972,6 +3972,57 @@ function renderRelevantImplicationsFromSlide(host, presentationUrl) {
     });
 }
 
+async function renderDevelopmentStepsMustDosTable(host, projectId, email) {
+    const target = host?.querySelector("#development-steps-must-dos");
+    if (!target) return;
+
+    let digitalOutcomeUrl = readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, "digital-outcome-description").url
+        || readStoredTaskTopicSlideSyncEntryByShortName(projectId, email, "Digital Outcome Description").url;
+    let developmentStepsUrl = readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, "development-steps").url
+        || readStoredTaskTopicSlideSyncEntryByShortName(projectId, email, "Development Steps").url;
+    if (!digitalOutcomeUrl) digitalOutcomeUrl = (await findProcessAssessmentSlideMatch("Digital Outcome Description")).fileUrl;
+    if (!developmentStepsUrl) developmentStepsUrl = (await findProcessAssessmentSlideMatch("Development Steps")).fileUrl;
+    const digitalOutcomeId = extractSlidesIdFromValue(digitalOutcomeUrl);
+    const developmentStepsId = extractSlidesIdFromValue(developmentStepsUrl);
+    const driveAccessToken = readStoredHubDriveAccessToken();
+
+    if (!driveAccessToken || !digitalOutcomeId || !developmentStepsId) {
+        target.innerHTML = `<p class="task-topic-submission-note">Link your Digital Outcome Description and Development Steps slideshows to build this table.</p>`;
+        return;
+    }
+
+    target.innerHTML = `<p class="task-topic-submission-note">Reading MUST-DOs and Development Steps components...</p>`;
+    const readJson = (url, presentationId) => fetch(url, {
+        method: "POST",
+        headers: buildWriteHeaders(),
+        body: JSON.stringify({ driveAccessToken, presentationId })
+    }).then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload?.error || "Could not read the slideshow.");
+        return payload;
+    });
+
+    void Promise.all([
+        readJson("/api/student/drive-setup/read-digital-outcome-must-dos", digitalOutcomeId),
+        readJson("/api/student/drive-setup/read-development-components", developmentStepsId)
+    ]).then(([mustDosPayload, componentsPayload]) => {
+        const mustDos = Array.isArray(mustDosPayload?.mustDos) ? mustDosPayload.mustDos : [];
+        const components = Array.isArray(componentsPayload?.components) ? componentsPayload.components : [];
+        const rowCount = Math.max(mustDos.length, components.length);
+        const rows = Array.from({ length: rowCount }, (_item, index) => `
+            <tr>
+                <td>${escapeHtml(mustDos[index] || "")}</td>
+                <td>${escapeHtml(components[index] || "")}</td>
+            </tr>
+        `).join("");
+        target.innerHTML = rowCount
+            ? `<h3>MUST-DOs and Development Steps components</h3><table class="digital-outcome-must-dos-table"><thead><tr><th>MUST-DOs</th><th>Components</th></tr></thead><tbody>${rows}</tbody></table><p class="task-topic-submission-note">Last read: ${escapeHtml(formatSubmissionTimestamp(componentsPayload?.syncedAt || mustDosPayload?.syncedAt || ""))}</p>`
+            : `<p class="task-topic-submission-note">No MUST-DOs or Development Steps components were found yet.</p>`;
+    }).catch((error) => {
+        target.innerHTML = `<p class="task-topic-submission-note is-error">${escapeHtml(error?.message || "Could not read the slideshows.")}</p>`;
+    });
+}
+
 async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, email, isTeacher, interestData }) {
     const panelHost = host?.querySelector("#task-topic-submission-live-panel");
     if (!panelHost) {
@@ -10090,7 +10141,11 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             const targetId = isSuccessCriteriaPage
                 ? "success-criteria-must-dos"
                 : (isDevelopmentStepsPage ? "development-steps-must-dos" : "digital-outcome-must-dos");
-            renderDigitalOutcomeMustDos(host, syncedSlideLink, targetId);
+            if (isDevelopmentStepsPage) {
+                void renderDevelopmentStepsMustDosTable(host, projectId, email);
+            } else {
+                renderDigitalOutcomeMustDos(host, syncedSlideLink, targetId);
+            }
             if (isSuccessCriteriaPage) {
                 renderRelevantImplicationNames(host, projectId, email);
             }

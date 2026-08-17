@@ -5194,6 +5194,40 @@ function extractGoogleSlidesRelevantImplicationsFromPdfText(source) {
     .slice(0, 40);
 }
 
+function extractGoogleSlidesDevelopmentComponents(presentation) {
+  const slides = Array.isArray(presentation?.slides) ? presentation.slides : [];
+  const firstSlide = slides[0];
+  const textShapes = (Array.isArray(firstSlide?.pageElements) ? firstSlide.pageElements : [])
+    .filter((element) => Array.isArray(element?.shape?.text?.textElements))
+    .map((element) => {
+      const text = element.shape.text.textElements
+        .map((textElement) => String(textElement?.textRun?.content || ""))
+        .join("");
+      return { text, left: Number(element?.transform?.translateX || 0) };
+    })
+    .filter((shape) => shape.text.trim())
+    .sort((left, right) => right.left - left.left);
+
+  const sourceText = String(textShapes[0]?.text || "");
+  return Array.from(new Set(sourceText
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\s*(?:\d+\.|[\u2022\u25CF\u25E6*-])\s*/, "").replace(/\s+/g, " ").trim())
+    .filter((line) => line && !/^(starters|timeline\b|what the slide needs to cover|some key steps)/i.test(line))))
+    .slice(0, 30);
+}
+
+function extractGoogleSlidesDevelopmentComponentsFromPdfText(source) {
+  const lines = String(source || "")
+    .replace(/\r/g, "")
+    .split(/\n+/)
+    .map((line) => line.replace(/^\s*(?:\d+\.|[\u2022\u25CF\u25E6*-])\s*/, "").replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  const markerIndex = lines.findIndex((line) => /starters|timeline/i.test(line));
+  return Array.from(new Set((markerIndex >= 0 ? lines.slice(markerIndex + 1) : lines)
+    .filter((line) => !/^(slide|development steps|what the slide needs to cover|some key steps)/i.test(line))))
+    .slice(0, 30);
+}
+
 async function populateSuccessCriteriaRequirements(presentationId, mustDos, accessToken) {
   const requirements = Array.from(new Set((Array.isArray(mustDos) ? mustDos : [])
     .map((value) => String(value || "").replace(/\s+/g, " ").trim())
@@ -6413,6 +6447,47 @@ app.post("/api/student/drive-setup/read-relevant-implications", async (req, res)
     });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not read the Relevant Implications slideshow." });
+  }
+});
+
+app.post("/api/student/drive-setup/read-development-components", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email) { res.status(401).json({ error: "Sign in is required." }); return; }
+  const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
+  const presentationId = String(req.body?.presentationId || "").trim();
+  if (!driveAccessToken) { res.status(400).json({ error: "driveAccessToken is required." }); return; }
+  if (!/^[A-Za-z0-9_-]{10,}$/.test(presentationId)) { res.status(400).json({ error: "A valid Google Slides presentation ID is required." }); return; }
+
+  try {
+    const file = await driveApiRequest(`/files/${encodeURIComponent(presentationId)}`, {
+      accessToken: driveAccessToken,
+      queryParams: { fields: "id,name,modifiedTime,webViewLink" }
+    });
+    let components = [];
+    let extractionSource = "slides-api";
+    try {
+      const presentation = await googleSlidesApiRequest(presentationId, driveAccessToken);
+      components = extractGoogleSlidesDevelopmentComponents(presentation);
+    } catch (slidesApiError) {
+      const pdfBuffer = await driveDownloadExportedFile(presentationId, "application/pdf", driveAccessToken);
+      if (!PDFParse) throw slidesApiError;
+      const parser = new PDFParse({ data: pdfBuffer, verbosity: 0 });
+      const extraction = await parser.getText();
+      components = extractGoogleSlidesDevelopmentComponentsFromPdfText(extraction?.text || "");
+      extractionSource = "drive-pdf-export";
+    }
+    res.json({
+      ok: true,
+      presentationId,
+      fileName: String(file?.name || "Development Steps").trim(),
+      fileUrl: String(file?.webViewLink || `https://docs.google.com/presentation/d/${presentationId}/edit`).trim(),
+      components,
+      extractionSource,
+      modifiedTime: String(file?.modifiedTime || "").trim(),
+      syncedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not read the Development Steps slideshow." });
   }
 });
 
