@@ -1895,6 +1895,21 @@ function writeDecompositionCategoryCoverage(projectId, email, rows) {
     }
 }
 
+async function saveDecompositionCategoryCoverage(projectId, rows, trelloTaskCount) {
+    try {
+        await fetch("/api/students/decomposition-coverage", {
+            method: "POST",
+            headers: buildWriteHeaders(),
+            body: JSON.stringify({
+                activity_id: String(projectId || "").trim(),
+                categories: Array.isArray(rows) ? rows : [],
+                trello_task_count: Number(trelloTaskCount || 0)
+            })
+        });
+    } catch (_error) {
+    }
+}
+
 function getDecompositionTrelloSyncStorageKey(projectId, email) {
     return `${DECOMPOSITION_TRELLO_SYNC_STORAGE_PREFIX}:${String(projectId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
 }
@@ -4777,7 +4792,10 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         if (!decompCategoryListHost) return;
         const safeCards = Array.isArray(cards) ? cards : [];
         const rows = countDecompositionTaskCategories(safeCards);
-        if (persist) writeDecompositionCategoryCoverage(projectId, email, rows);
+        if (persist) {
+            writeDecompositionCategoryCoverage(projectId, email, rows);
+            void saveDecompositionCategoryCoverage(projectId, rows, safeCards.length);
+        }
         if (decompCategoryTotalHost) {
             decompCategoryTotalHost.textContent = `(${safeCards.length} Trello task${safeCards.length === 1 ? "" : "s"})`;
         }

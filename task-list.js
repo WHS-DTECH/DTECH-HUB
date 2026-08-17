@@ -69,7 +69,8 @@ const taskListState = {
     checklistState: {},
     checklistStandards: [],
     taskTopic: "",
-    templateCopies: []
+    templateCopies: [],
+    decompositionCoverage: null
 };
 
 // Minimal Drive OAuth client for task list — only needs read access to list slides
@@ -669,6 +670,20 @@ const DECOMPOSITION_TASK_CATEGORIES = [
     }
 ];
 
+function formatTaskListTimestamp(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "not yet";
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return "not yet";
+    return parsed.toLocaleString("en-NZ", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+    });
+}
+
 function getDecompositionCategoryCoverageKey(activityId, email) {
     return `${DECOMPOSITION_CATEGORY_COVERAGE_STORAGE_PREFIX}:${String(activityId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
 }
@@ -719,20 +734,88 @@ function findStudentTrelloBoardUrl(stateMap) {
     return fallbackUrl;
 }
 
-// Counts are written by the Decomposition page each time the student's Trello board loads.
+// Counts come from the database first; local storage is only a fallback for an offline/not-yet-synced student.
 function readDecompositionCategoryCoverage(activityId, email) {
+    const toCounts = (rows) => {
+        const counts = {};
+        (Array.isArray(rows) ? rows : []).forEach((row) => {
+            const label = String(row?.label || "").trim();
+            if (label) counts[label] = Number(row?.count || 0);
+        });
+        return counts;
+    };
+
+    const serverCoverage = taskListState.decompositionCoverage;
+    if (serverCoverage?.found && String(serverCoverage.activityId || "") === String(activityId || "")) {
+        return {
+            counts: toCounts(serverCoverage.categories),
+            savedAt: String(serverCoverage.syncedAt || serverCoverage.updatedAt || "").trim(),
+            hasData: true
+        };
+    }
+
     try {
         const raw = localStorage.getItem(getDecompositionCategoryCoverageKey(activityId, email));
         const parsed = JSON.parse(raw || "{}");
         const rows = Array.isArray(parsed?.categories) ? parsed.categories : [];
-        const counts = {};
-        rows.forEach((row) => {
-            const label = String(row?.label || "").trim();
-            if (label) counts[label] = Number(row?.count || 0);
-        });
-        return { counts, savedAt: String(parsed?.savedAt || "").trim(), hasData: rows.length > 0 };
+        return { counts: toCounts(rows), savedAt: String(parsed?.savedAt || "").trim(), hasData: rows.length > 0 };
     } catch (_error) {
         return { counts: {}, savedAt: "", hasData: false };
+    }
+}
+
+async function loadDecompositionCoverageFromServer(activityId) {
+    const safeActivityId = String(activityId || "").trim();
+    if (!safeActivityId || !getTaskListEmail()) {
+        taskListState.decompositionCoverage = null;
+        return null;
+    }
+
+    try {
+        const payload = await loadJson(
+            `/api/students/decomposition-coverage?activity_id=${encodeURIComponent(safeActivityId)}`,
+            { headers: buildTaskListHeaders({}) }
+        );
+        taskListState.decompositionCoverage = {
+            activityId: safeActivityId,
+            found: Boolean(payload?.found),
+            categories: Array.isArray(payload?.categories) ? payload.categories : [],
+            trelloTaskCount: Number(payload?.trello_task_count || 0),
+            syncedAt: String(payload?.synced_at || "").trim(),
+            updatedAt: String(payload?.updated_at || "").trim()
+        };
+        return taskListState.decompositionCoverage;
+    } catch (_error) {
+        taskListState.decompositionCoverage = null;
+        return null;
+    }
+}
+
+async function saveDecompositionCoverageToServer(activityId, rows, trelloTaskCount) {
+    const safeActivityId = String(activityId || "").trim();
+    if (!safeActivityId) return null;
+
+    try {
+        const payload = await loadJson("/api/students/decomposition-coverage", {
+            method: "POST",
+            headers: buildTaskListHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({
+                activity_id: safeActivityId,
+                categories: Array.isArray(rows) ? rows : [],
+                trello_task_count: Number(trelloTaskCount || 0)
+            })
+        });
+        taskListState.decompositionCoverage = {
+            activityId: safeActivityId,
+            found: Boolean(payload?.found),
+            categories: Array.isArray(payload?.categories) ? payload.categories : [],
+            trelloTaskCount: Number(payload?.trello_task_count || 0),
+            syncedAt: String(payload?.synced_at || "").trim(),
+            updatedAt: String(payload?.updated_at || "").trim()
+        };
+        return taskListState.decompositionCoverage;
+    } catch (_error) {
+        return null;
     }
 }
 
@@ -751,7 +834,8 @@ function getDecompositionSubtasks(stateMap) {
     const withCoverage = (row) => ({
         ...row,
         trelloCount: Number(coverage.counts[row.label] || 0),
-        coverageKnown: coverage.hasData
+        coverageKnown: coverage.hasData,
+        coverageSavedAt: coverage.savedAt
     });
 
     return [
@@ -1421,8 +1505,8 @@ function renderChecklistCards(detail, allItems) {
                                                 `).join("")}
                                             </div>
                                             ${decompositionSubtasks[0]?.coverageKnown
-                                                ? ""
-                                                : `<p class="task-list-achieved-note">Open the Decomposition of Tasks page and refresh your Trello board to see these counts.</p>`}
+                                                ? `<p class="task-list-achieved-note">Trello last synced: ${escapeTaskListHtml(formatTaskListTimestamp(decompositionSubtasks[0]?.coverageSavedAt))}</p>`
+                                                : `<p class="task-list-achieved-note">Click Sync from Trello above to see these counts.</p>`}
                                         </div>
                                     ` : ""}
                                 </div>
@@ -1594,6 +1678,12 @@ async function loadChecklistForTask(taskId) {
     renderTaskPicker(taskListState.allItems, taskListState.selectedId);
     renderChecklistCards(detail || selected, taskListState.allItems);
 
+    void loadDecompositionCoverageFromServer(taskListState.selectedId).then((coverage) => {
+        if (coverage?.found) {
+            renderChecklistCards(detail || selected, taskListState.allItems);
+        }
+    });
+
     const openLink = document.querySelector("#task-list-open-topic");
     if (openLink) {
         openLink.setAttribute("href", buildCustomActivityLink(taskListState.selectedId, taskListState.taskTopic));
@@ -1702,7 +1792,9 @@ async function renderTaskListPage() {
                 ...(Array.isArray(payload?.doing_cards) ? payload.doing_cards : []),
                 ...(Array.isArray(payload?.done_cards) ? payload.done_cards : [])
             ];
-            writeDecompositionCategoryCoverage(taskListState.selectedId, email, countDecompositionTaskCategories(allCards));
+            const categoryRows = countDecompositionTaskCategories(allCards);
+            writeDecompositionCategoryCoverage(taskListState.selectedId, email, categoryRows);
+            await saveDecompositionCoverageToServer(taskListState.selectedId, categoryRows, allCards.length);
 
             setStatus(`Trello sync complete. ${allCards.length} task${allCards.length === 1 ? "" : "s"} checked against the decomposition categories.`);
             renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);

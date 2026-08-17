@@ -59,6 +59,7 @@ const memoryStudentHaparaFolders = new Map();
 const memoryStudentDriveSetup = new Map();
 const memoryTemplateLibraryEntries = new Map();
 const memoryStudentToolsTechniques = new Map();
+const memoryDecompositionCoverage = new Map();
 const PRACTICAL_SKILLS_LIBRARY_FILE = path.join(__dirname, "practical-skills", "library.json");
 
 const DEFAULT_TEMPLATE_LIBRARY_ENTRIES = [
@@ -4623,8 +4624,102 @@ async function ensureStudentDriveSetupSchema() {
   await pool.query(`ALTER TABLE student_drive_setup ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 }
 
-async function ensureTemplateLibrarySchema() {
+async function ensureDecompositionCoverageSchema() {
   if (!hasDatabase) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS student_decomposition_coverage (
+      student_email TEXT NOT NULL,
+      activity_id TEXT NOT NULL,
+      categories JSONB NOT NULL DEFAULT '[]'::jsonb,
+      trello_task_count INTEGER NOT NULL DEFAULT 0,
+      synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (student_email, activity_id)
+    );
+  `);
+}
+
+function normalizeDecompositionCoverageRows(values) {
+  return (Array.isArray(values) ? values : [])
+    .map((row) => ({
+      label: String(row?.label || "").trim(),
+      count: Math.max(0, Number.parseInt(row?.count, 10) || 0)
+    }))
+    .filter((row) => row.label);
+}
+
+async function saveDecompositionCoverage(email, activityId, categories, trelloTaskCount) {
+  const studentEmail = normalizeEmail(email);
+  const safeActivityId = String(activityId || "").trim();
+  if (!studentEmail || !safeActivityId) return null;
+
+  const rows = normalizeDecompositionCoverageRows(categories);
+  const count = Math.max(0, Number.parseInt(trelloTaskCount, 10) || 0);
+  const nowIso = new Date().toISOString();
+
+  if (!hasDatabase) {
+    const record = {
+      student_email: studentEmail,
+      activity_id: safeActivityId,
+      categories: rows,
+      trello_task_count: count,
+      synced_at: nowIso,
+      updated_at: nowIso
+    };
+    memoryDecompositionCoverage.set(`${studentEmail}:${safeActivityId}`, record);
+    return record;
+  }
+
+  await ensureDecompositionCoverageSchema();
+  const result = await pool.query(
+    `
+      INSERT INTO student_decomposition_coverage (student_email, activity_id, categories, trello_task_count, synced_at, updated_at)
+      VALUES ($1, $2, $3::jsonb, $4, NOW(), NOW())
+      ON CONFLICT (student_email, activity_id) DO UPDATE SET
+        categories = EXCLUDED.categories,
+        trello_task_count = EXCLUDED.trello_task_count,
+        synced_at = NOW(),
+        updated_at = NOW()
+      RETURNING *
+    `,
+    [studentEmail, safeActivityId, JSON.stringify(rows), count]
+  );
+  return result.rows?.[0] || null;
+}
+
+async function getDecompositionCoverage(email, activityId) {
+  const studentEmail = normalizeEmail(email);
+  const safeActivityId = String(activityId || "").trim();
+  if (!studentEmail || !safeActivityId) return null;
+
+  if (!hasDatabase) {
+    return memoryDecompositionCoverage.get(`${studentEmail}:${safeActivityId}`) || null;
+  }
+
+  await ensureDecompositionCoverageSchema();
+  const result = await pool.query(
+    `SELECT * FROM student_decomposition_coverage WHERE student_email = $1 AND activity_id = $2 LIMIT 1`,
+    [studentEmail, safeActivityId]
+  );
+  return result.rows?.[0] || null;
+}
+
+function buildDecompositionCoveragePayload(row) {
+  if (!row) {
+    return { ok: true, found: false, categories: [], trello_task_count: 0, synced_at: null, updated_at: null };
+  }
+
+  return {
+    ok: true,
+    found: true,
+    categories: normalizeDecompositionCoverageRows(row.categories),
+    trello_task_count: Math.max(0, Number.parseInt(row.trello_task_count, 10) || 0),
+    synced_at: row.synced_at || null,
+    updated_at: row.updated_at || null
+  };
+}
+
+async function ensureTemplateLibrarySchema() {  if (!hasDatabase) return;
   await pool.query(`
     CREATE TABLE IF NOT EXISTS template_library_entries (
       template_id TEXT PRIMARY KEY,
@@ -5572,6 +5667,47 @@ app.post("/api/student/drive-setup/confirm", async (req, res) => {
 });
 
 const PROCESS_ASSESSMENT_DECOMPOSITION_FOLDER_NAME = "Decomposition";
+
+app.get("/api/students/decomposition-coverage", async (req, res) => {
+  const requesterEmail = normalizeEmail(getRequestUserEmail(req));
+  if (!requesterEmail) { res.status(401).json({ error: "Sign in is required." }); return; }
+
+  const activityId = String(req.query?.activity_id || req.query?.activityId || "").trim();
+  if (!activityId) { res.status(400).json({ error: "activity_id is required." }); return; }
+
+  const requestedEmail = normalizeEmail(req.query?.student_email || req.query?.studentEmail || "") || requesterEmail;
+  if (requestedEmail !== requesterEmail) {
+    const access = await resolveActivityWriteAccess(requesterEmail);
+    if (!access.allowed) { res.status(403).json({ error: "You can only view your own decomposition coverage." }); return; }
+  }
+
+  try {
+    const row = await getDecompositionCoverage(requestedEmail, activityId);
+    res.json(buildDecompositionCoveragePayload(row));
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not load decomposition coverage." });
+  }
+});
+
+app.post("/api/students/decomposition-coverage", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email) { res.status(401).json({ error: "Sign in is required." }); return; }
+
+  const activityId = String(req.body?.activity_id || req.body?.activityId || "").trim();
+  if (!activityId) { res.status(400).json({ error: "activity_id is required." }); return; }
+
+  try {
+    const row = await saveDecompositionCoverage(
+      email,
+      activityId,
+      req.body?.categories,
+      req.body?.trello_task_count ?? req.body?.trelloTaskCount
+    );
+    res.json(buildDecompositionCoveragePayload(row));
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not save decomposition coverage." });
+  }
+});
 
 app.post("/api/student/drive-setup/upload-decomposition-pdf", async (req, res) => {
   const email = normalizeEmail(getRequestUserEmail(req));
