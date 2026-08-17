@@ -1836,6 +1836,12 @@ function toSafeTrelloCardUrl(value) {
     }
 }
 
+function extractTrelloBoardIdFromUrl(value) {
+    const safeUrl = toSafeTrelloCardUrl(value);
+    const boardMatch = String(safeUrl || "").match(/\/b\/([a-zA-Z0-9]+)/i);
+    return boardMatch?.[1] || "";
+}
+
 function getTrelloBoardHint(value) {
     const safeUrl = toSafeTrelloCardUrl(value);
     const boardMatch = String(safeUrl || "").match(/\/b\/([a-zA-Z0-9]+)(?:\/([^/?#]+))?/i);
@@ -4477,11 +4483,11 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     };
 
     const loadDecompositionTaskBoard = async () => {
-        if (!decompBoardColumnsHost) return;
+        if (!decompBoardColumnsHost) return "";
         if (!currentDecompositionTrelloUrl) {
             decompBoardColumnsHost.innerHTML = '<p class="task-topic-decomp-board-empty">Add your Trello board or card link in Project Management first, then refresh this board.</p>';
             setDecompBoardStatus("Trello board link needed.", true);
-            return;
+            return "";
         }
 
         if (decompBoardRefreshButton) decompBoardRefreshButton.disabled = true;
@@ -4506,15 +4512,17 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 renderDecompBoardColumn("Done", payload?.done_cards, "done")
             ].join("");
             setDecompBoardStatus(`Trello board updated: ${Number(payload?.todo_count || 0)} to do, ${Number(payload?.doing_count || 0)} doing, ${Number(payload?.done_count || 0)} done.`);
+            return String(payload?.board_id || "").trim();
         } catch (error) {
             // Saving a Trello link and connecting the Trello account (API token) are separate steps; this board needs the account connection.
             if (Number(error?.status) === 404 && /has not connected trello/i.test(String(error?.message || ""))) {
                 decompBoardColumnsHost.innerHTML = '<p class="task-topic-decomp-board-empty">Your Trello link is saved, but DTECH HUB also needs your Trello account connected to read your cards. Go to <a href="/user-profile.html#trello-integration-card">User Profile &rarr; Trello Integration</a> and click Connect Trello, then refresh this board.</p>';
                 setDecompBoardStatus("Trello account not connected yet.", true);
-                return;
+                return "";
             }
             decompBoardColumnsHost.innerHTML = '<p class="task-topic-decomp-board-empty">Could not load Trello tasks right now.</p>';
             setDecompBoardStatus(error?.message || "Could not load Trello tasks.", true);
+            return "";
         } finally {
             if (decompBoardRefreshButton?.isConnected) decompBoardRefreshButton.disabled = false;
         }
@@ -4539,8 +4547,9 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                     .map((board) => `<option value="${escapeHtml(board.id)}">${escapeHtml(board.name || board.id)}</option>`)
                     .join("");
                 trelloBoardSelect.innerHTML = `<option value="">Select board</option>${boardOptions}`;
-                projectManagementLinkedBoardId = Array.from(projectManagementBoardUrlById.entries()).find(([, boardUrl]) =>
-                    boardUrl === currentDecompositionTrelloUrl
+                const currentBoardId = extractTrelloBoardIdFromUrl(currentDecompositionTrelloUrl);
+                projectManagementLinkedBoardId = Array.from(projectManagementBoardUrlById.entries()).find(([boardId, boardUrl]) =>
+                    boardUrl === currentDecompositionTrelloUrl || (currentBoardId && boardId === currentBoardId)
                 )?.[0] || "";
             } else {
                 setTrelloCreateStatus("Connect Trello first (Student Work page), then reload.", true);
@@ -4797,7 +4806,6 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         decompBoardRefreshButton?.addEventListener("click", () => {
             void loadDecompositionTaskBoard();
         });
-        void loadDecompositionTaskBoard();
 
         try {
             const boardsResponse = await fetch("/api/integrations/trello/boards", { headers: buildWriteHeaders() });
@@ -4814,14 +4822,22 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                     .map((board) => `<option value="${escapeHtml(board.id)}">${escapeHtml(board.name || board.id)}</option>`)
                     .join("");
                 decompBoardSelect.innerHTML = `<option value="">Select board</option>${boardOptions}`;
-                linkedBoardId = Array.from(boardUrlById.entries()).find(([, boardUrl]) =>
-                    boardUrl === currentDecompositionTrelloUrl
+
+                // A saved card link or a renamed board slug can differ in exact text, so match by Trello board ID as well.
+                const currentBoardId = extractTrelloBoardIdFromUrl(currentDecompositionTrelloUrl);
+                linkedBoardId = Array.from(boardUrlById.entries()).find(([boardId, boardUrl]) =>
+                    boardUrl === currentDecompositionTrelloUrl || (currentBoardId && boardId === currentBoardId)
                 )?.[0] || "";
             } else {
                 setDecompStatus("Connect Trello first (Student Work page), then reload.", true);
             }
         } catch (_error) {
             setDecompStatus("Could not load Trello boards right now.", true);
+        }
+
+        const resolvedBoardId = await loadDecompositionTaskBoard();
+        if (!linkedBoardId && resolvedBoardId && boardUrlById.has(resolvedBoardId)) {
+            linkedBoardId = resolvedBoardId;
         }
 
         decompBoardSelect.addEventListener("change", async () => {
