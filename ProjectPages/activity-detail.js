@@ -3943,10 +3943,8 @@ function renderRelevantImplicationsFromSlide(host, presentationUrl) {
     }).then(async (response) => {
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(payload?.error || "Could not read your Relevant Implications slideshow.");
-        const implications = Array.isArray(payload?.implications) ? payload.implications : [];
-        target.innerHTML = implications.length
-            ? `${slideshowLink}<h3>Relevant Implications from your slideshow</h3><ul class="list task-topic-guide-list">${implications.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul><p class="task-topic-submission-note">Last read: ${escapeHtml(formatSubmissionTimestamp(payload?.syncedAt || ""))}</p>`
-            : `${slideshowLink}<p class="task-topic-submission-note">No discussed implications were found in the linked slideshow yet.</p>`;
+        const fileName = String(payload?.fileName || "Relevant Implications slideshow").trim();
+        target.innerHTML = `${slideshowLink}<h3>Relevant Implications slideshows</h3><ul class="list task-topic-guide-list"><li><a href="${escapeHtml(payload?.fileUrl || linkedUrl)}" target="_blank" rel="noreferrer">${escapeHtml(fileName)}</a></li></ul><p class="task-topic-submission-note">Last read: ${escapeHtml(formatSubmissionTimestamp(payload?.syncedAt || ""))}</p>`;
     }).catch((error) => {
         target.innerHTML = `${slideshowLink}<p class="task-topic-submission-note is-error">${escapeHtml(error?.message || "Could not read your slideshow.")}</p>`;
     });
