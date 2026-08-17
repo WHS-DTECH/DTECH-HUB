@@ -896,6 +896,21 @@ h1 {
     font-size: 0.9rem;
 }
 
+.digital-outcome-must-dos-link {
+    margin: 0;
+    font-weight: 700;
+}
+
+.digital-outcome-must-dos-link a {
+    color: #17456f;
+}
+
+.digital-outcome-must-dos-link span {
+    color: #4a6b8a;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
 .digital-outcome-must-dos .task-topic-guide-list {
     margin: 0;
 }

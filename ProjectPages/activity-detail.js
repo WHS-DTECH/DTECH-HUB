@@ -3869,19 +3869,22 @@ function renderDigitalOutcomeMustDos(host, presentationUrl) {
     const target = host?.querySelector("#digital-outcome-must-dos");
     if (!target) return;
 
-    const presentationId = extractSlidesIdFromValue(presentationUrl);
+    const linkedPresentationUrl = toSafeExternalUrl(presentationUrl);
+    const appropriatePresentationUrl = linkedPresentationUrl || "https://docs.google.com/presentation/d/1brOY70u9aJdsoiEtxVepr82vRhiv9VzpMm8TUv3lcTo/edit?usp=sharing";
+    const presentationId = extractSlidesIdFromValue(linkedPresentationUrl);
+    const slideshowLink = `<p class="digital-outcome-must-dos-link"><a href="${escapeHtml(appropriatePresentationUrl)}" target="_blank" rel="noreferrer">Open Digital Outcome Description slideshow</a>${linkedPresentationUrl ? "" : " <span>(template)</span>"}</p>`;
     if (!presentationId) {
-        target.innerHTML = `<p class="task-topic-submission-note">Link your Digital Outcome Description slideshow to see the MUST-DOs here.</p>`;
+        target.innerHTML = `${slideshowLink}<p class="task-topic-submission-note">Link your personal Digital Outcome Description slideshow to see your MUST-DOs here.</p>`;
         return;
     }
 
     const driveAccessToken = readStoredHubDriveAccessToken();
     if (!driveAccessToken) {
-        target.innerHTML = `<p class="task-topic-submission-note">Connect Google Drive to read the MUST-DOs from your slideshow.</p>`;
+        target.innerHTML = `${slideshowLink}<p class="task-topic-submission-note">Connect Google Drive to read the MUST-DOs from your slideshow.</p>`;
         return;
     }
 
-    target.innerHTML = `<p class="task-topic-submission-note">Reading the MUST-DOs from your slideshow...</p>`;
+    target.innerHTML = `${slideshowLink}<p class="task-topic-submission-note">Reading the MUST-DOs from your slideshow...</p>`;
     void fetch("/api/student/drive-setup/read-digital-outcome-must-dos", {
         method: "POST",
         headers: buildWriteHeaders(),
@@ -3892,10 +3895,10 @@ function renderDigitalOutcomeMustDos(host, presentationUrl) {
 
         const mustDos = Array.isArray(payload?.mustDos) ? payload.mustDos : [];
         target.innerHTML = mustDos.length
-            ? `<h3>MUST-DOs from your slideshow</h3><ul class="list task-topic-guide-list">${mustDos.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul><p class="task-topic-submission-note">Last read: ${escapeHtml(formatSubmissionTimestamp(payload?.syncedAt || ""))}</p>`
-            : `<p class="task-topic-submission-note">No MUST-DO bullet points were found in the linked slideshow yet.</p>`;
+            ? `${slideshowLink}<h3>MUST-DOs from your slideshow</h3><ul class="list task-topic-guide-list">${mustDos.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul><p class="task-topic-submission-note">Last read: ${escapeHtml(formatSubmissionTimestamp(payload?.syncedAt || ""))}</p>`
+            : `${slideshowLink}<p class="task-topic-submission-note">No MUST-DO bullet points were found in the linked slideshow yet.</p>`;
     }).catch((error) => {
-        target.innerHTML = `<p class="task-topic-submission-note is-error">${escapeHtml(error?.message || "Could not read your slideshow.")}</p>`;
+        target.innerHTML = `${slideshowLink}<p class="task-topic-submission-note is-error">${escapeHtml(error?.message || "Could not read your slideshow.")}</p>`;
     });
 }
 
@@ -9979,6 +9982,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     if (!isTeacher && /digital\s+outcome\s+description/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`)) {
         const syncedSlideLink = host.querySelector("#task-topic-google-slides-sync-reference a")?.href
             || host.querySelector("#task-topic-google-slides-url")?.value
+            || readStoredTaskTopicSlideSyncLink(projectId, email, selectedTaskTopic, selectedTaskShortName)
             || "";
         renderDigitalOutcomeMustDos(host, syncedSlideLink);
     }
