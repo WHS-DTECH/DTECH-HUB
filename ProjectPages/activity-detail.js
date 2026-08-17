@@ -3955,6 +3955,10 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         || isToolsAndTechniquesCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
         || isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
         || Boolean(keywordMatchedTopicKey);
+    if (isDigitalOutcomeDescriptionTopic) {
+        panelHost.innerHTML = "";
+        return;
+    }
     const digitalOutcomeSyncTemplateId = keywordMatchedTopicKey === "target-audience"
         ? "target-audience"
         : (keywordMatchedTopicKey === "development-steps"
@@ -8456,7 +8460,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                     </div>
                     ` : ""}
 
-                    <section class="proposal-section task-topic-submission-panel">
+                    <section class="proposal-section task-topic-submission-panel" ${isDecompositionTopic || isDigitalOutcomeDescriptionTopic ? "hidden" : ""}>
                         ${isDecompositionTopic ? "" : `
                         <h2>Submission Tasks</h2>
                         <p class="task-topic-submission-intro">${escapeHtml(submissionIntroText)}</p>
