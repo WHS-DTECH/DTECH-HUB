@@ -5255,6 +5255,45 @@ async function populateSuccessCriteriaRequirements(presentationId, mustDos, acce
   return { updated: true, count: Math.min(requirements.length, rowCount - 1) };
 }
 
+async function populateSuccessCriteriaImplications(presentationId, implicationNames, accessToken) {
+  const names = Array.from(new Set((Array.isArray(implicationNames) ? implicationNames : [])
+    .map((value) => String(value || "").replace(/\s+/g, " ").trim())
+    .filter(Boolean))).slice(0, 12);
+  if (!presentationId || !names.length) return { updated: false, count: 0 };
+
+  const presentation = await googleSlidesApiRequest(presentationId, accessToken);
+  const targetSlide = presentation?.slides?.[2];
+  const tableElement = targetSlide?.pageElements?.find((element) => element?.table);
+  const table = tableElement?.table;
+  const objectId = String(tableElement?.objectId || "").trim();
+  const rowCount = Number(table?.rows || 0);
+  if (!objectId || rowCount < 2) return { updated: false, count: 0 };
+
+  const requests = [];
+  names.slice(0, rowCount - 1).forEach((name, index) => {
+    const cellLocation = { rowIndex: index + 1, columnIndex: 0 };
+    const cell = table?.tableRows?.[index + 1]?.tableCells?.[0];
+    const cellText = (cell?.text?.textElements || []).map((element) => String(element?.textRun?.content || "")).join("").trim();
+    if (cellText) {
+      requests.push({ deleteText: { objectId, cellLocation, textRange: { type: "ALL" } } });
+    }
+    requests.push({ insertText: { objectId, cellLocation, insertionIndex: 0, text: name } });
+  });
+
+  const response = await fetch(`https://slides.googleapis.com/v1/presentations/${encodeURIComponent(presentationId)}:batchUpdate`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ requests })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(String(payload?.error?.message || `Google Slides update error (${response.status})`));
+    error.status = response.status;
+    throw error;
+  }
+  return { updated: true, count: Math.min(names.length, rowCount - 1) };
+}
+
 async function driveFindFolderByName(parentFolderId, folderName, accessToken) {
   const safeName = folderName.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
   const safeParent = parentFolderId.replace(/'/g, "\\'");
@@ -5958,6 +5997,9 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
   const templateFileId = String(req.body?.templateFileId || "").trim();
   const templateId = String(req.body?.templateId || "").trim();
   const sourcePresentationId = String(req.body?.sourcePresentationId || "").trim();
+  const sourceRelevantImplications = Array.isArray(req.body?.sourceRelevantImplications)
+    ? req.body.sourceRelevantImplications
+    : [];
   if (!driveAccessToken || !templateTitle || !templateFileId) {
     res.status(400).json({ error: "driveAccessToken, templateTitle, and templateFileId are required." });
     return;
@@ -5993,7 +6035,13 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
       try {
         const sourcePresentation = await googleSlidesApiRequest(sourcePresentationId, driveAccessToken);
         const mustDos = extractGoogleSlidesMustDos(sourcePresentation);
-        return await populateSuccessCriteriaRequirements(targetFileId, mustDos, driveAccessToken);
+        const requirementsResult = await populateSuccessCriteriaRequirements(targetFileId, mustDos, driveAccessToken);
+        const implicationsResult = await populateSuccessCriteriaImplications(targetFileId, sourceRelevantImplications, driveAccessToken);
+        return {
+          updated: requirementsResult.updated || implicationsResult.updated,
+          count: requirementsResult.count,
+          implicationsCount: implicationsResult.count
+        };
       } catch (error) {
         return { updated: false, count: 0, warning: error.message || "Could not populate Success Criteria requirements." };
       }
@@ -6002,14 +6050,15 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
     if (existing.length > 0) {
       const file = existing[0];
       const populated = await populateCopiedSuccessCriteria(file.id);
-      return res.json({ ok: true, alreadyExists: true, populated: populated.updated, populatedCount: populated.count, populationWarning: populated.warning || "", fileId: file.id, fileUrl: file.webViewLink || `https://docs.google.com/presentation/d/${file.id}/edit`, fileName: file.name, destinationFolderId: folderId, destinationSubfolderName: subfolderName || "" });
+      return res.json({ ok: true, alreadyExists: true, populated: populated.updated, populatedCount: populated.count, populatedImplicationsCount: populated.implicationsCount || 0, populationWarning: populated.warning || "", fileId: file.id, fileUrl: file.webViewLink || `https://docs.google.com/presentation/d/${file.id}/edit`, fileName: file.name, destinationFolderId: folderId, destinationSubfolderName: subfolderName || "" });
     }
 
     if (folderId !== processAssessmentFolderId) {
       const legacyExisting = await driveFindTemplateInFolder(processAssessmentFolderId, templateTitle, driveAccessToken);
       if (legacyExisting.length > 0) {
         const file = legacyExisting[0];
-        return res.json({ ok: true, alreadyExists: true, fileId: file.id, fileUrl: file.webViewLink || `https://docs.google.com/presentation/d/${file.id}/edit`, fileName: file.name, destinationFolderId: processAssessmentFolderId, destinationSubfolderName: "" });
+        const populated = await populateCopiedSuccessCriteria(file.id);
+        return res.json({ ok: true, alreadyExists: true, populated: populated.updated, populatedCount: populated.count, populatedImplicationsCount: populated.implicationsCount || 0, populationWarning: populated.warning || "", fileId: file.id, fileUrl: file.webViewLink || `https://docs.google.com/presentation/d/${file.id}/edit`, fileName: file.name, destinationFolderId: processAssessmentFolderId, destinationSubfolderName: "" });
       }
     }
 
@@ -6033,7 +6082,7 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
       }
     }
 
-    res.json({ ok: true, alreadyExists: false, populated: populated.updated, populatedCount: populated.count, populationWarning: populated.warning || "", fileId: copied.id, fileUrl: copied.webViewLink || `https://docs.google.com/presentation/d/${copied.id}/edit`, fileName: copied.name, destinationFolderId: folderId, destinationSubfolderName: subfolderName || "" });
+    res.json({ ok: true, alreadyExists: false, populated: populated.updated, populatedCount: populated.count, populatedImplicationsCount: populated.implicationsCount || 0, populationWarning: populated.warning || "", fileId: copied.id, fileUrl: copied.webViewLink || `https://docs.google.com/presentation/d/${copied.id}/edit`, fileName: copied.name, destinationFolderId: folderId, destinationSubfolderName: subfolderName || "" });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not copy template." });
   }

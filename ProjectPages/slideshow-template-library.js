@@ -234,6 +234,31 @@ function readStoredDigitalOutcomeDescriptionSlideId() {
     }
 }
 
+function readStoredRelevantImplicationNames() {
+    const activityId = String(templateUsageContext.activityId || "").trim();
+    const email = getLibraryEmail();
+    if (!activityId || !email) return [];
+    const prefix = `${LIB_TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX}:${activityId}:${email}:`;
+    const names = [];
+    const displayName = (value) => String(value || "")
+        .replace(/^relevant\s+implications?\s*-\s*/i, "")
+        .replace(/\s*-\s*[a-z][a-z0-9._-]*$/i, "")
+        .trim();
+    try {
+        for (let index = 0; index < localStorage.length; index += 1) {
+            const key = localStorage.key(index) || "";
+            if (!key.startsWith(prefix)) continue;
+            const parsed = JSON.parse(localStorage.getItem(key) || "{}");
+            if (!/^relevant-implications(?:-|$)/i.test(String(parsed?.templateId || "").trim())) continue;
+            const name = displayName(parsed?.templateTitle || "");
+            if (name && !names.includes(name)) names.push(name);
+        }
+    } catch (_error) {
+        return [];
+    }
+    return names;
+}
+
 function extractSlidesFileId(value) {
     const raw = String(value || "").trim();
     if (!raw) return "";
@@ -1034,7 +1059,8 @@ async function handleUseTemplate(templateId) {
                 templateTitle: item.title,
                 templateFileId: fileId,
                 activityId: templateUsageContext.activityId,
-                sourcePresentationId: item.id === "project-success-criteria" ? readStoredDigitalOutcomeDescriptionSlideId() : ""
+                sourcePresentationId: item.id === "project-success-criteria" ? readStoredDigitalOutcomeDescriptionSlideId() : "",
+                sourceRelevantImplications: item.id === "project-success-criteria" ? readStoredRelevantImplicationNames() : []
             })
         });
         const payload = await response.json().catch(() => ({}));
