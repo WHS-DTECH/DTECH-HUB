@@ -691,6 +691,21 @@ async function fetchTemplateLibraryPreviewByTemplateId(templateId = "") {
     }
 }
 
+async function fetchTeacherTemplateLibraryEntry(templateId = "") {
+    const targetTemplateId = String(templateId || "").trim().toLowerCase();
+    if (!targetTemplateId) return null;
+
+    try {
+        const response = await fetch("/api/template-library", { headers: buildAuthHeaders({}) });
+        if (!response.ok) return null;
+        const payload = await response.json().catch(() => ({}));
+        const entries = Array.isArray(payload?.entries) ? payload.entries : [];
+        return entries.find((entry) => String(entry?.id || "").trim().toLowerCase() === targetTemplateId) || null;
+    } catch (_error) {
+        return null;
+    }
+}
+
 function installCloudSyncDelegatedFallbackHandlers() {
     if (window.__dtechCloudSyncFallbackBound) {
         return;
@@ -8012,6 +8027,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         if (!toSafeExternalUrl(entry?.url || "")) return false;
         // Discard entries whose templateId belongs to a different topic to prevent cross-topic bleed
         const entryTemplateId = String(entry?.templateId || "").trim().toLowerCase();
+        if (preferredTemplateId === "development-steps") return false;
         if (!entryTemplateId || !preferredTemplateId) return true;
         if (preferredTemplateId === "tools-and-techniques") {
             return entryTemplateId === "tools-and-techniques" || entryTemplateId.startsWith("tools-and-techniques-");
@@ -9698,20 +9714,31 @@ async function initDetail() {
     const selectedTaskTopic = resolveRequestedTaskTopic(resolvedData, params);
     const selectedTaskShortName = String(params.get("taskShortName") || "").trim()
         || getTaskTopicShortNameOverride(id, selectedTaskTopic);
+    const isDevelopmentStepsTopic = /^(development\s+steps)$/i.test(String(selectedTaskShortName || selectedTaskTopic || "").trim());
+    const teacherDevelopmentStepsTemplate = isDevelopmentStepsTopic
+        ? await fetchTeacherTemplateLibraryEntry("development-steps")
+        : null;
+    const pageData = teacherDevelopmentStepsTemplate
+        ? {
+            ...resolvedData,
+            slideshowTemplateFileUrl: String(teacherDevelopmentStepsTemplate.templateUrl || "").trim(),
+            slideshowTemplateImage: String(teacherDevelopmentStepsTemplate.imageUrl || "").trim()
+        }
+        : resolvedData;
     const titleOverride = isDigitalOutcomeDescriptionCriterion(selectedTaskTopic, selectedTaskShortName)
         ? DIGITAL_OUTCOME_DESCRIPTION_TITLE
         : "";
     const canEditRole = await canEditDetails();
     const isTeacher = resolveDetailTeacherMode(canEditRole);
 
-    document.title = `${titleOverride || selectedTaskShortName || selectedTaskTopic || resolvedData.title} | Computer Lab`;
+    document.title = `${titleOverride || selectedTaskShortName || selectedTaskTopic || pageData.title} | Computer Lab`;
 
     // In student view mode, teachers should see the same page experience as students.
-    renderDetailView(host, id, resolvedData, isTeacher, selectedTaskTopic, selectedTaskShortName);
+    renderDetailView(host, id, pageData, isTeacher, selectedTaskTopic, selectedTaskShortName);
 
     // Load interest section only for backend-stored items (numeric IDs)
     if (String(id).match(/^\d+$/)) {
-        await loadAndRenderInterestSection(host, id, isTeacher, resolvedData);
+        await loadAndRenderInterestSection(host, id, isTeacher, pageData);
     }
 }
 
