@@ -4521,14 +4521,27 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     };
 
     if (isProjectManagementTopic && trelloBoardSelect && trelloListSelect) {
+        const projectManagementBoardUrlById = new Map();
+        let projectManagementLinkedBoardId = "";
+
         try {
             const boardsResponse = await fetch("/api/integrations/trello/boards", { headers: buildWriteHeaders() });
             if (boardsResponse.ok) {
                 const boards = await boardsResponse.json().catch(() => []);
+                (Array.isArray(boards) ? boards : []).forEach((board) => {
+                    const boardId = String(board?.id || "").trim();
+                    const boardUrl = toSafeTrelloCardUrl(board?.url || "");
+                    if (boardId && boardUrl) {
+                        projectManagementBoardUrlById.set(boardId, boardUrl);
+                    }
+                });
                 const boardOptions = (Array.isArray(boards) ? boards : [])
                     .map((board) => `<option value="${escapeHtml(board.id)}">${escapeHtml(board.name || board.id)}</option>`)
                     .join("");
                 trelloBoardSelect.innerHTML = `<option value="">Select board</option>${boardOptions}`;
+                projectManagementLinkedBoardId = Array.from(projectManagementBoardUrlById.entries()).find(([, boardUrl]) =>
+                    boardUrl === currentDecompositionTrelloUrl
+                )?.[0] || "";
             } else {
                 setTrelloCreateStatus("Connect Trello first (Student Work page), then reload.", true);
             }
@@ -4542,6 +4555,25 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             if (!boardId) {
                 trelloListSelect.innerHTML = `<option value="">Select list</option>`;
                 return;
+            }
+
+            // Syncing the board here also becomes the shared Favourite so the Decomposition board shows the same tasks.
+            const selectedBoardUrl = projectManagementBoardUrlById.get(boardId) || "";
+            if (selectedBoardUrl) {
+                try {
+                    await persistStudentTrelloLinkDirectlyToEvidence(projectId, email, detailData, taskTopicTitle, selectedBoardUrl);
+                    addStoredTrelloCardLibraryLink(projectId, email, selectedBoardUrl);
+                    writeStoredTrelloCardLink(projectId, email, selectedBoardUrl);
+                    setFavouriteTrelloCardLibraryLink(projectId, email, selectedBoardUrl);
+                    currentDecompositionTrelloUrl = selectedBoardUrl;
+                    submission.trelloCardUrl = selectedBoardUrl;
+                    if (trelloCardInput) {
+                        trelloCardInput.value = selectedBoardUrl;
+                    }
+                    setTrelloStatus("Trello board linked with Decomposition.", false, true);
+                } catch (error) {
+                    setTrelloStatus(error?.message || "Could not link this Trello board with Decomposition.", true);
+                }
             }
 
             try {
@@ -4560,6 +4592,11 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 setTrelloCreateStatus("Could not load Trello lists.", true);
             }
         });
+
+        if (projectManagementLinkedBoardId) {
+            trelloBoardSelect.value = projectManagementLinkedBoardId;
+            trelloBoardSelect.dispatchEvent(new Event("change"));
+        }
 
         trelloCreateButton?.addEventListener("click", async () => {
             const listId = String(trelloListSelect.value || "").trim();
@@ -4807,6 +4844,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                     );
                     addStoredTrelloCardLibraryLink(projectId, email, selectedBoardUrl);
                     writeStoredTrelloCardLink(projectId, email, selectedBoardUrl);
+                    setFavouriteTrelloCardLibraryLink(projectId, email, selectedBoardUrl);
                     currentDecompositionTrelloUrl = selectedBoardUrl;
                     submission.trelloCardUrl = selectedBoardUrl;
                     void loadDecompositionTaskBoard();
