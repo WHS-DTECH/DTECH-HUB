@@ -5114,6 +5114,53 @@ async function driveCopyFile(fileId, destinationFolderId, copyName, accessToken)
   });
 }
 
+async function driveFindFileByNameInFolder(folderId, fileName, accessToken) {
+  const safeName = String(fileName || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  const safeFolder = String(folderId || "").replace(/'/g, "\\'");
+  if (!safeName || !safeFolder) return null;
+
+  const q = `name = '${safeName}' and '${safeFolder}' in parents and trashed = false`;
+  const result = await driveApiRequest("/files", {
+    accessToken,
+    queryParams: { q, fields: "files(id,name,webViewLink)", pageSize: 1, includeItemsFromAllDrives: true, supportsAllDrives: true }
+  });
+  return result.files?.[0] || null;
+}
+
+// Multipart upload/replace of a binary file; Drive's upload host is separate from the v3 API host.
+async function driveUploadBinaryFile({ accessToken, folderId, fileName, mimeType, buffer, existingFileId = "" }) {
+  const boundary = `dtechhub${Date.now().toString(16)}`;
+  const metadata = existingFileId
+    ? { name: fileName }
+    : { name: fileName, parents: [folderId] };
+
+  const body = Buffer.concat([
+    Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n`, "utf8"),
+    Buffer.from(`--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`, "utf8"),
+    buffer,
+    Buffer.from(`\r\n--${boundary}--\r\n`, "utf8")
+  ]);
+
+  const targetPath = existingFileId ? `/files/${encodeURIComponent(existingFileId)}` : "/files";
+  const url = `https://www.googleapis.com/upload/drive/v3${targetPath}?uploadType=multipart&fields=id,name,webViewLink&supportsAllDrives=true`;
+  const response = await fetch(url, {
+    method: existingFileId ? "PATCH" : "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": `multipart/related; boundary=${boundary}`
+    },
+    body
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(String(payload?.error?.message || `Drive upload error (${response.status})`));
+    error.status = response.status;
+    throw error;
+  }
+  return payload;
+}
+
 async function driveListSlidesInFolder(folderId, accessToken) {
   const safeFolder = String(folderId || "").trim().replace(/'/g, "\\'");
   if (!safeFolder) return [];
@@ -5521,6 +5568,63 @@ app.post("/api/student/drive-setup/confirm", async (req, res) => {
     });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not confirm drive setup." });
+  }
+});
+
+const PROCESS_ASSESSMENT_DECOMPOSITION_FOLDER_NAME = "Decomposition";
+
+app.post("/api/student/drive-setup/upload-decomposition-pdf", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email) { res.status(401).json({ error: "Sign in is required." }); return; }
+
+  const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
+  if (!driveAccessToken) { res.status(400).json({ error: "driveAccessToken is required." }); return; }
+
+  const requestedName = String(req.body?.fileName || "").trim().replace(/[\\/:*?"<>|]/g, "-");
+  const fileName = requestedName.toLowerCase().endsWith(".pdf") ? requestedName : `${requestedName || "Trello"}.pdf`;
+  const fileBase64 = String(req.body?.fileBase64 || "").trim();
+  if (!fileBase64) { res.status(400).json({ error: "fileBase64 is required." }); return; }
+
+  let buffer = null;
+  try {
+    buffer = Buffer.from(fileBase64, "base64");
+  } catch (_error) {
+    res.status(400).json({ error: "fileBase64 could not be decoded." });
+    return;
+  }
+  if (!buffer?.length) { res.status(400).json({ error: "The PDF was empty." }); return; }
+
+  try {
+    const seniorDtechFolder = await driveEnsureFolder("root", "SeniorDTECH", driveAccessToken);
+    if (!seniorDtechFolder?.id) { res.status(500).json({ error: "Could not find or create the SeniorDTECH folder." }); return; }
+
+    const processAssessmentFolder = await driveEnsureFolder(String(seniorDtechFolder.id), "Process Assessment", driveAccessToken);
+    if (!processAssessmentFolder?.id) { res.status(500).json({ error: "Could not find or create the Process Assessment folder." }); return; }
+
+    const decompositionFolder = await driveEnsureFolder(String(processAssessmentFolder.id), PROCESS_ASSESSMENT_DECOMPOSITION_FOLDER_NAME, driveAccessToken);
+    if (!decompositionFolder?.id) { res.status(500).json({ error: "Could not find or create the Decomposition folder." }); return; }
+
+    const existing = await driveFindFileByNameInFolder(String(decompositionFolder.id), fileName, driveAccessToken);
+    const uploaded = await driveUploadBinaryFile({
+      accessToken: driveAccessToken,
+      folderId: String(decompositionFolder.id),
+      fileName,
+      mimeType: "application/pdf",
+      buffer,
+      existingFileId: String(existing?.id || "")
+    });
+
+    res.json({
+      ok: true,
+      replaced: Boolean(existing?.id),
+      fileId: uploaded?.id || "",
+      fileName: uploaded?.name || fileName,
+      fileUrl: uploaded?.webViewLink || (uploaded?.id ? `https://drive.google.com/file/d/${uploaded.id}/view` : ""),
+      decompositionFolderId: decompositionFolder.id,
+      decompositionFolderUrl: decompositionFolder.webViewLink || `https://drive.google.com/drive/folders/${decompositionFolder.id}`
+    });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not save the PDF to Google Drive." });
   }
 });
 

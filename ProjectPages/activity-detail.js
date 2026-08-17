@@ -1881,6 +1881,130 @@ function countDecompositionTaskCategories(cards) {
     }));
 }
 
+const DECOMPOSITION_TRELLO_SYNC_STORAGE_PREFIX = "hub_decomp_trello_last_sync_v1";
+
+function getDecompositionTrelloSyncStorageKey(projectId, email) {
+    return `${DECOMPOSITION_TRELLO_SYNC_STORAGE_PREFIX}:${String(projectId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
+}
+
+function readDecompositionTrelloSyncTime(projectId, email) {
+    try {
+        return String(localStorage.getItem(getDecompositionTrelloSyncStorageKey(projectId, email)) || "").trim();
+    } catch (_error) {
+        return "";
+    }
+}
+
+function writeDecompositionTrelloSyncTime(projectId, email, isoValue) {
+    try {
+        localStorage.setItem(getDecompositionTrelloSyncStorageKey(projectId, email), String(isoValue || ""));
+    } catch (_error) {
+    }
+}
+
+function buildTrelloPdfFileName(date = new Date()) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `Trello - ${year}-${month}-${day}.pdf`;
+}
+
+// jsPDF is loaded on demand so the task-topic pages do not carry it on every visit.
+function loadJsPdfLibrary() {
+    if (window.jspdf?.jsPDF) {
+        return Promise.resolve(window.jspdf.jsPDF);
+    }
+
+    return new Promise((resolve, reject) => {
+        const existing = document.querySelector("script[data-jspdf-loader]");
+        const onLoaded = () => {
+            if (window.jspdf?.jsPDF) resolve(window.jspdf.jsPDF);
+            else reject(new Error("PDF library did not load correctly."));
+        };
+
+        if (existing) {
+            existing.addEventListener("load", onLoaded, { once: true });
+            existing.addEventListener("error", () => reject(new Error("PDF library could not be downloaded.")), { once: true });
+            return;
+        }
+
+        const script = document.createElement("script");
+        script.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+        script.async = true;
+        script.setAttribute("data-jspdf-loader", "true");
+        script.addEventListener("load", onLoaded, { once: true });
+        script.addEventListener("error", () => reject(new Error("PDF library could not be downloaded.")), { once: true });
+        document.head.appendChild(script);
+    });
+}
+
+async function buildDecompositionTrelloPdfBase64(details) {
+    const JsPdf = await loadJsPdfLibrary();
+    const doc = new JsPdf({ unit: "pt", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const marginX = 48;
+    let cursorY = 56;
+
+    const nextPageIfNeeded = (needed = 18) => {
+        if (cursorY + needed > pageHeight - 48) {
+            doc.addPage();
+            cursorY = 56;
+        }
+    };
+
+    const writeLine = (text, { size = 11, style = "normal", gap = 16, color = [23, 69, 111] } = {}) => {
+        doc.setFont("helvetica", style);
+        doc.setFontSize(size);
+        doc.setTextColor(color[0], color[1], color[2]);
+        const lines = doc.splitTextToSize(String(text || ""), pageWidth - marginX * 2);
+        lines.forEach((line) => {
+            nextPageIfNeeded(gap);
+            doc.text(line, marginX, cursorY);
+            cursorY += gap;
+        });
+    };
+
+    writeLine("Decomposition Tasks - Trello Sync", { size: 18, style: "bold", gap: 24 });
+    writeLine(String(details?.projectTitle || "Project"), { size: 12, style: "bold", gap: 18 });
+    writeLine(`Student: ${details?.email || "Unknown"}`, { size: 10, gap: 14, color: [74, 107, 138] });
+    writeLine(`Generated: ${details?.generatedLabel || ""}`, { size: 10, gap: 14, color: [74, 107, 138] });
+    writeLine(`Last synced: ${details?.lastSyncedLabel || "not yet"}`, { size: 10, gap: 20, color: [74, 107, 138] });
+
+    writeLine("Task Category Coverage", { size: 13, style: "bold", gap: 20 });
+    (Array.isArray(details?.categories) ? details.categories : []).forEach((row) => {
+        writeLine(`${row.label}: ${row.count}`, { size: 11, gap: 16 });
+    });
+    cursorY += 6;
+
+    writeLine("Saved Trello Links", { size: 13, style: "bold", gap: 20 });
+    const links = Array.isArray(details?.links) ? details.links : [];
+    if (!links.length) {
+        writeLine("No saved Trello links.", { size: 11, gap: 16, color: [74, 107, 138] });
+    } else {
+        links.forEach((link) => {
+            writeLine(`${link.favourite ? "* " : "- "}${link.url}`, { size: 10, gap: 14 });
+        });
+    }
+    cursorY += 6;
+
+    writeLine("Decomposition Task Board", { size: 13, style: "bold", gap: 20 });
+    (Array.isArray(details?.columns) ? details.columns : []).forEach((column) => {
+        writeLine(`${column.title} (${column.cards.length})`, { size: 12, style: "bold", gap: 18 });
+        if (!column.cards.length) {
+            writeLine("No tasks in this list.", { size: 10, gap: 14, color: [74, 107, 138] });
+        } else {
+            column.cards.forEach((card) => {
+                writeLine(`- ${card}`, { size: 10, gap: 14 });
+            });
+        }
+        cursorY += 4;
+    });
+
+    const dataUri = doc.output("datauristring");
+    return String(dataUri).split(",")[1] || "";
+}
+
 // Lets a student connect their Trello account inline (task-topic pages) without navigating to User Profile.
 async function openInlineTrelloConnectPopup() {
     // Open the popup synchronously (within the click gesture) first, otherwise browsers silently
@@ -4337,6 +4461,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                     <div class="task-topic-decomp-trello-sync" aria-label="Trello account and saved links">
                         <p class="task-topic-decomp-dashboard-kicker">Trello Sync</p>
                         <p class="task-topic-submission-note">Connect your Trello account here so your Decomposition Task Board can load automatically, without needing to visit User Profile.</p>
+                        <p class="task-topic-decomp-last-synced" id="task-topic-decomp-last-synced">Last synced: not yet</p>
 
                         <div class="task-topic-decomp-category-coverage" aria-label="Task category coverage">
                             <p class="task-topic-decomp-category-title">Task Category Coverage <span class="task-topic-decomp-category-total" id="task-topic-decomp-category-total">(0 Trello tasks)</span></p>
@@ -4344,6 +4469,10 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                         </div>
 
                         <button type="button" class="detail-action detail-action-secondary" id="task-topic-decomp-connect-trello" hidden>Connect Trello Account</button>
+                        <div class="task-topic-submission-actions">
+                            <button type="button" class="detail-action detail-action-secondary" id="task-topic-decomp-save-pdf">Save Trello PDF to Drive</button>
+                        </div>
+                        <p class="task-topic-submission-status" id="task-topic-decomp-pdf-status" aria-live="polite"></p>
                         <p class="task-topic-submission-status" id="task-topic-decomp-connect-status" aria-live="polite"></p>
                         <div class="trello-link-library" id="task-topic-decomp-trello-link-library" hidden>
                             <p class="trello-link-library-title">Saved Trello Links <span class="trello-link-library-count" id="task-topic-decomp-trello-link-library-count">(0)</span></p>
@@ -4448,6 +4577,9 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const decompConnectStatusHost = panelHost.querySelector("#task-topic-decomp-connect-status");
     const decompCategoryListHost = panelHost.querySelector("#task-topic-decomp-category-list");
     const decompCategoryTotalHost = panelHost.querySelector("#task-topic-decomp-category-total");
+    const decompLastSyncedHost = panelHost.querySelector("#task-topic-decomp-last-synced");
+    const decompSavePdfButton = panelHost.querySelector("#task-topic-decomp-save-pdf");
+    const decompPdfStatusHost = panelHost.querySelector("#task-topic-decomp-pdf-status");
     const decompTrelloLinkLibrary = panelHost.querySelector("#task-topic-decomp-trello-link-library");
     const decompTrelloLinkLibraryList = panelHost.querySelector("#task-topic-decomp-trello-link-library-list");
     const decompTrelloLinkLibraryCount = panelHost.querySelector("#task-topic-decomp-trello-link-library-count");
@@ -4640,6 +4772,18 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
 
     renderDecompCategoryCoverage([]);
 
+    let latestDecompBoardSnapshot = null;
+
+    const renderDecompLastSynced = (isoValue) => {
+        if (!decompLastSyncedHost) return;
+        const safeIso = String(isoValue || "").trim();
+        decompLastSyncedHost.textContent = safeIso
+            ? `Last synced: ${formatSubmissionTimestamp(safeIso)}`
+            : "Last synced: not yet";
+    };
+
+    renderDecompLastSynced(readDecompositionTrelloSyncTime(projectId, email));
+
     const loadDecompositionTaskBoard = async () => {
         if (!decompBoardColumnsHost) return "";
         if (!currentDecompositionTrelloUrl) {
@@ -4675,6 +4819,10 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 ...(Array.isArray(payload?.doing_cards) ? payload.doing_cards : []),
                 ...(Array.isArray(payload?.done_cards) ? payload.done_cards : [])
             ]);
+            latestDecompBoardSnapshot = payload || null;
+            const syncedAtIso = new Date().toISOString();
+            writeDecompositionTrelloSyncTime(projectId, email, syncedAtIso);
+            renderDecompLastSynced(syncedAtIso);
             setDecompBoardStatus(`Trello board updated: ${Number(payload?.todo_count || 0)} to do, ${Number(payload?.doing_count || 0)} doing, ${Number(payload?.done_count || 0)} done.`);
             return String(payload?.board_id || "").trim();
         } catch (error) {
@@ -5079,6 +5227,82 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                 setDecompConnectStatus(error?.message || "Could not connect Trello.", true);
             } finally {
                 if (decompConnectTrelloButton?.isConnected) decompConnectTrelloButton.disabled = false;
+            }
+        });
+
+        const setDecompPdfStatus = (message, isError = false) => {
+            if (!decompPdfStatusHost) return;
+            decompPdfStatusHost.textContent = String(message || "");
+            decompPdfStatusHost.classList.toggle("is-error", Boolean(isError));
+        };
+
+        decompSavePdfButton?.addEventListener("click", async () => {
+            if (!latestDecompBoardSnapshot) {
+                setDecompPdfStatus("Load your Trello board first, then save the PDF.", true);
+                return;
+            }
+
+            if (typeof requestHubDriveAccessToken !== "function") {
+                setDecompPdfStatus("Google Drive sign-in is not ready on this page yet.", true);
+                return;
+            }
+
+            decompSavePdfButton.disabled = true;
+            setDecompPdfStatus("Building your Trello PDF...");
+
+            try {
+                const toCardNames = (cards) => (Array.isArray(cards) ? cards : []).map((card) => String(card?.name || "Untitled task").trim());
+                const allCards = [
+                    ...(Array.isArray(latestDecompBoardSnapshot?.todo_cards) ? latestDecompBoardSnapshot.todo_cards : []),
+                    ...(Array.isArray(latestDecompBoardSnapshot?.doing_cards) ? latestDecompBoardSnapshot.doing_cards : []),
+                    ...(Array.isArray(latestDecompBoardSnapshot?.done_cards) ? latestDecompBoardSnapshot.done_cards : [])
+                ];
+                const lastSyncedIso = readDecompositionTrelloSyncTime(projectId, email);
+
+                const fileBase64 = await buildDecompositionTrelloPdfBase64({
+                    projectTitle: taskTopicTitle || "Decomposition Tasks",
+                    email,
+                    generatedLabel: formatSubmissionTimestamp(new Date().toISOString()),
+                    lastSyncedLabel: lastSyncedIso ? formatSubmissionTimestamp(lastSyncedIso) : "not yet",
+                    categories: countDecompositionTaskCategories(allCards),
+                    links: readStoredTrelloCardLibrary(projectId, email),
+                    columns: [
+                        { title: "To Do", cards: toCardNames(latestDecompBoardSnapshot?.todo_cards) },
+                        { title: "Doing", cards: toCardNames(latestDecompBoardSnapshot?.doing_cards) },
+                        { title: "Done", cards: toCardNames(latestDecompBoardSnapshot?.done_cards) }
+                    ]
+                });
+
+                setDecompPdfStatus("Saving to Google Drive...");
+                const tokenResponse = await requestHubDriveAccessToken({ forceConsent: false });
+                const driveAccessToken = String(tokenResponse?.access_token || "").trim();
+                if (!driveAccessToken) {
+                    throw new Error(tokenResponse?.error || "Google Drive access was not granted.");
+                }
+
+                const uploadResponse = await fetch("/api/student/drive-setup/upload-decomposition-pdf", {
+                    method: "POST",
+                    headers: buildWriteHeaders(),
+                    body: JSON.stringify({
+                        driveAccessToken,
+                        fileName: buildTrelloPdfFileName(),
+                        fileBase64
+                    })
+                });
+                const uploadPayload = await uploadResponse.json().catch(() => ({}));
+                if (!uploadResponse.ok) {
+                    throw new Error(uploadPayload?.error || "Could not save the PDF to Google Drive.");
+                }
+
+                const savedName = String(uploadPayload?.fileName || buildTrelloPdfFileName());
+                setDecompPdfStatus(`${uploadPayload?.replaced ? "Updated" : "Saved"} ${savedName} in SeniorDTECH / Process Assessment / Decomposition.`);
+                if (uploadPayload?.fileUrl) {
+                    window.open(uploadPayload.fileUrl, "_blank", "noopener");
+                }
+            } catch (error) {
+                setDecompPdfStatus(error?.message || "Could not save the Trello PDF.", true);
+            } finally {
+                if (decompSavePdfButton?.isConnected) decompSavePdfButton.disabled = false;
             }
         });
 
