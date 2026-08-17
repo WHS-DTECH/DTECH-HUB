@@ -5094,6 +5094,19 @@ async function googleSlidesApiRequest(presentationId, accessToken) {
   return payload;
 }
 
+async function driveDownloadExportedFile(fileId, mimeType, accessToken) {
+  const response = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/export?mimeType=${encodeURIComponent(mimeType)}`, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    const error = new Error(String(payload?.error?.message || `Drive export error (${response.status})`));
+    error.status = response.status;
+    throw error;
+  }
+  return Buffer.from(await response.arrayBuffer());
+}
+
 function extractGoogleSlidesMustDos(presentation) {
   const paragraphs = [];
   const slides = Array.isArray(presentation?.slides) ? presentation.slides : [];
@@ -5129,6 +5142,20 @@ function extractGoogleSlidesMustDos(presentation) {
     if (row.isBullet || result.length === 0) result.push(row.text);
   }
   return Array.from(new Set(result)).slice(0, 30);
+}
+
+function extractGoogleSlidesMustDosFromPdfText(source) {
+  const text = String(source || "").replace(/\r/g, "");
+  const headingMatch = text.match(/digital outcome\s+must\s+do\s+the\s+following\s*:?([\s\S]*)/i);
+  if (!headingMatch?.[1]) return [];
+
+  const remainder = headingMatch[1].split(/\n\s*(?:the client|my outcome|my digital outcome)\b/i)[0];
+  const candidates = remainder
+    .split(/\n+/)
+    .map((line) => line.replace(/^[\s\u2022\u25CF\u25E6\u25AA\u2023\u2043\u00B7*-]+/, "").replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  return Array.from(new Set(candidates)).filter((line) => !/^(slide|digital outcome description)\b/i.test(line)).slice(0, 30);
 }
 
 async function driveFindFolderByName(parentFolderId, folderName, accessToken) {
@@ -6132,17 +6159,30 @@ app.post("/api/student/drive-setup/read-digital-outcome-must-dos", async (req, r
   }
 
   try {
-    const presentation = await googleSlidesApiRequest(presentationId, driveAccessToken);
     const file = await driveApiRequest(`/files/${encodeURIComponent(presentationId)}`, {
       accessToken: driveAccessToken,
       queryParams: { fields: "id,name,modifiedTime,webViewLink" }
     });
+    let mustDos = [];
+    let extractionSource = "slides-api";
+    try {
+      const presentation = await googleSlidesApiRequest(presentationId, driveAccessToken);
+      mustDos = extractGoogleSlidesMustDos(presentation);
+    } catch (slidesApiError) {
+      const pdfBuffer = await driveDownloadExportedFile(presentationId, "application/pdf", driveAccessToken);
+      if (!PDFParse) throw slidesApiError;
+      const parser = new PDFParse({ data: pdfBuffer, verbosity: 0 });
+      const extraction = await parser.getText();
+      mustDos = extractGoogleSlidesMustDosFromPdfText(extraction?.text || "");
+      extractionSource = "drive-pdf-export";
+    }
     res.json({
       ok: true,
       presentationId,
-      fileName: String(file?.name || presentation?.title || "Digital Outcome Description").trim(),
+      fileName: String(file?.name || "Digital Outcome Description").trim(),
       fileUrl: String(file?.webViewLink || `https://docs.google.com/presentation/d/${presentationId}/edit`).trim(),
-      mustDos: extractGoogleSlidesMustDos(presentation),
+      mustDos,
+      extractionSource,
       modifiedTime: String(file?.modifiedTime || "").trim(),
       syncedAt: new Date().toISOString()
     });
