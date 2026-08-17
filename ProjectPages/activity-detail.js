@@ -1846,6 +1846,69 @@ function extractTrelloBoardIdFromUrl(value) {
     return boardMatch?.[1] || "";
 }
 
+// Lets a student connect their Trello account inline (task-topic pages) without navigating to User Profile.
+async function openInlineTrelloConnectPopup() {
+    const configResponse = await fetch("/api/integrations/trello/config", { headers: buildWriteHeaders() });
+    const config = await configResponse.json().catch(() => ({}));
+    if (!config?.enabled || !config?.api_key) {
+        throw new Error("Trello integration is not configured on the server yet.");
+    }
+
+    const returnUrl = `${window.location.origin}/trello-callback.html`;
+    const authorizeUrl = new URL("https://trello.com/1/authorize");
+    authorizeUrl.searchParams.set("expiration", "never");
+    authorizeUrl.searchParams.set("name", "DTECH-HUB");
+    authorizeUrl.searchParams.set("scope", "read,write");
+    authorizeUrl.searchParams.set("response_type", "token");
+    authorizeUrl.searchParams.set("key", String(config.api_key));
+    authorizeUrl.searchParams.set("return_url", returnUrl);
+
+    return new Promise((resolve, reject) => {
+        let finished = false;
+        let popupRef = null;
+        let timeoutHandle = null;
+        let closePollHandle = null;
+
+        const finish = (error, token) => {
+            if (finished) return;
+            finished = true;
+            window.removeEventListener("message", onMessage);
+            if (timeoutHandle) clearTimeout(timeoutHandle);
+            if (closePollHandle) clearInterval(closePollHandle);
+            if (error) {
+                reject(error);
+                return;
+            }
+            resolve(String(token || ""));
+        };
+
+        const onMessage = (event) => {
+            if (event.origin !== window.location.origin) return;
+            const data = event.data || {};
+            if (data.source !== "dtech-hub-trello" || !data.token) return;
+            finish(null, data.token);
+        };
+
+        window.addEventListener("message", onMessage);
+        popupRef = window.open(authorizeUrl.toString(), "dtech_hub_trello_connect", "width=650,height=760");
+        if (!popupRef) {
+            finish(new Error("Popup blocked. Please allow popups and try again."));
+            return;
+        }
+
+        timeoutHandle = setTimeout(() => {
+            finish(new Error("Trello authorization timed out. Please try again."));
+        }, 120000);
+
+        closePollHandle = setInterval(() => {
+            if (finished) return;
+            if (popupRef && popupRef.closed) {
+                finish(new Error("Trello authorization was cancelled."));
+            }
+        }, 350);
+    });
+}
+
 function getTrelloBoardHint(value) {
     const safeUrl = toSafeTrelloCardUrl(value);
     const boardMatch = String(safeUrl || "").match(/\/b\/([a-zA-Z0-9]+)(?:\/([^/?#]+))?/i);
@@ -4221,6 +4284,17 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                     </div>
                     <p class="task-topic-submission-status" id="task-topic-decomp-status" aria-live="polite"></p>
 
+                    <div class="task-topic-decomp-trello-sync" aria-label="Trello account and saved links">
+                        <p class="task-topic-decomp-dashboard-kicker">Trello Sync</p>
+                        <p class="task-topic-submission-note">Connect your Trello account here so your Decomposition Task Board can load automatically, without needing to visit User Profile.</p>
+                        <button type="button" class="detail-action detail-action-secondary" id="task-topic-decomp-connect-trello" hidden>Connect Trello Account</button>
+                        <p class="task-topic-submission-status" id="task-topic-decomp-connect-status" aria-live="polite"></p>
+                        <div class="trello-link-library" id="task-topic-decomp-trello-link-library" hidden>
+                            <p class="trello-link-library-title">Saved Trello Links <span class="trello-link-library-count" id="task-topic-decomp-trello-link-library-count">(0)</span></p>
+                            <ul class="trello-link-library-list" id="task-topic-decomp-trello-link-library-list"></ul>
+                        </div>
+                    </div>
+
                     <section class="task-topic-decomp-dashboard" aria-label="Decomposition task board">
                         <div class="task-topic-decomp-dashboard-heading">
                             <div>
@@ -4314,6 +4388,11 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     const decompBoardRefreshButton = panelHost.querySelector("#task-topic-refresh-decomp-board");
     const decompBoardStatusHost = panelHost.querySelector("#task-topic-decomp-board-status");
     const decompBoardColumnsHost = panelHost.querySelector("#task-topic-decomp-board-columns");
+    const decompConnectTrelloButton = panelHost.querySelector("#task-topic-decomp-connect-trello");
+    const decompConnectStatusHost = panelHost.querySelector("#task-topic-decomp-connect-status");
+    const decompTrelloLinkLibrary = panelHost.querySelector("#task-topic-decomp-trello-link-library");
+    const decompTrelloLinkLibraryList = panelHost.querySelector("#task-topic-decomp-trello-link-library-list");
+    const decompTrelloLinkLibraryCount = panelHost.querySelector("#task-topic-decomp-trello-link-library-count");
     const statusHost = panelHost.querySelector("#task-topic-submission-status");
     const ackStatusHost = panelHost.querySelector("#task-topic-ack-status");
     const lastSubmittedHost = panelHost.querySelector("#task-topic-last-submitted");
@@ -4520,8 +4599,9 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         } catch (error) {
             // Saving a Trello link and connecting the Trello account (API token) are separate steps; this board needs the account connection.
             if (Number(error?.status) === 404 && /has not connected trello/i.test(String(error?.message || ""))) {
-                decompBoardColumnsHost.innerHTML = '<p class="task-topic-decomp-board-empty">Your Trello link is saved, but DTECH HUB also needs your Trello account connected to read your cards. Go to <a href="/user-profile.html#trello-integration-card">User Profile &rarr; Trello Integration</a> and click Connect Trello, then refresh this board.</p>';
+                decompBoardColumnsHost.innerHTML = '<p class="task-topic-decomp-board-empty">Your Trello link is saved, but DTECH HUB also needs your Trello account connected to read your cards. Click Connect Trello Account above, then refresh this board.</p>';
                 setDecompBoardStatus("Trello account not connected yet.", true);
+                if (decompConnectTrelloButton) decompConnectTrelloButton.hidden = false;
                 return "";
             }
             decompBoardColumnsHost.innerHTML = '<p class="task-topic-decomp-board-empty">Could not load Trello tasks right now.</p>';
@@ -4807,6 +4887,129 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         const boardUrlById = new Map();
         let linkedBoardId = "";
 
+        const setDecompConnectStatus = (message, isError = false) => {
+            if (!decompConnectStatusHost) return;
+            decompConnectStatusHost.textContent = String(message || "");
+            decompConnectStatusHost.classList.toggle("is-error", Boolean(isError));
+        };
+
+        const renderDecompTrelloLinkLibrary = () => {
+            if (!decompTrelloLinkLibrary || !decompTrelloLinkLibraryList) return;
+            const items = readStoredTrelloCardLibrary(projectId, email);
+            if (!items.length) {
+                decompTrelloLinkLibrary.hidden = true;
+                if (decompTrelloLinkLibraryCount) decompTrelloLinkLibraryCount.textContent = "(0)";
+                decompTrelloLinkLibraryList.innerHTML = "";
+                return;
+            }
+
+            decompTrelloLinkLibrary.hidden = false;
+            if (decompTrelloLinkLibraryCount) decompTrelloLinkLibraryCount.textContent = `(${items.length})`;
+            decompTrelloLinkLibraryList.innerHTML = items
+                .map((item) => {
+                    const url = toSafeTrelloCardUrl(item?.url || "");
+                    if (!url) return "";
+                    const isFavourite = Boolean(item?.favourite);
+                    return `
+                        <li class="trello-link-library-item${isFavourite ? " is-favourite" : ""}" data-trello-link-item="${escapeHtml(url)}">
+                            <div class="trello-link-library-link-wrap">
+                                <a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(url)}</a>
+                                <span class="trello-link-library-savedat">${escapeHtml(formatLibrarySavedAtLabel(item?.savedAt))}</span>
+                                ${isFavourite ? `<span class="trello-link-library-favourite-badge">&#9733; Favourite</span>` : ""}
+                            </div>
+                            <div class="trello-link-library-actions">
+                                <button type="button" class="trello-link-library-favourite-btn${isFavourite ? " is-favourite" : ""}" data-decomp-trello-favourite="${escapeHtml(url)}" aria-pressed="${isFavourite ? "true" : "false"}" title="${isFavourite ? "Favourite link used by Decomposition" : "Mark as Favourite"}">${isFavourite ? "&#9733;" : "&#9734;"}</button>
+                                <button type="button" class="detail-action detail-action-secondary" data-decomp-trello-use="${escapeHtml(url)}">Use</button>
+                                <button type="button" class="detail-action detail-action-secondary" data-decomp-trello-open="${escapeHtml(url)}">Open</button>
+                                <button type="button" class="detail-action detail-action-danger" data-decomp-trello-delete="${escapeHtml(url)}">Delete</button>
+                            </div>
+                        </li>
+                    `;
+                })
+                .join("");
+        };
+
+        decompTrelloLinkLibraryList?.addEventListener("click", async (event) => {
+            const favouriteBtn = event.target.closest("[data-decomp-trello-favourite]");
+            if (favouriteBtn) {
+                const url = toSafeTrelloCardUrl(favouriteBtn.getAttribute("data-decomp-trello-favourite") || "");
+                if (!url) return;
+                setFavouriteTrelloCardLibraryLink(projectId, email, url);
+                currentDecompositionTrelloUrl = url;
+                renderDecompTrelloLinkLibrary();
+                void loadDecompositionTaskBoard();
+                return;
+            }
+
+            const useBtn = event.target.closest("[data-decomp-trello-use]");
+            if (useBtn) {
+                const url = toSafeTrelloCardUrl(useBtn.getAttribute("data-decomp-trello-use") || "");
+                if (!url) return;
+                currentDecompositionTrelloUrl = url;
+                void loadDecompositionTaskBoard();
+                return;
+            }
+
+            const openBtn = event.target.closest("[data-decomp-trello-open]");
+            if (openBtn) {
+                const url = toSafeTrelloCardUrl(openBtn.getAttribute("data-decomp-trello-open") || "");
+                if (url) window.open(url, "_blank", "noopener,noreferrer");
+                return;
+            }
+
+            const deleteBtn = event.target.closest("[data-decomp-trello-delete]");
+            if (deleteBtn) {
+                const url = toSafeTrelloCardUrl(deleteBtn.getAttribute("data-decomp-trello-delete") || "");
+                if (!url || !window.confirm("Delete this saved Trello link?")) return;
+                deleteBtn.disabled = true;
+                try {
+                    await removeUrlFromEvidenceSteps(projectId, email, url, ["TRELLO_CARD_URL|"]);
+                    removeStoredTrelloCardLibraryLink(projectId, email, url);
+                    setDecompStatus("Removed saved Trello link.");
+                } catch (_error) {
+                    setDecompStatus("Could not remove that Trello link.", true);
+                } finally {
+                    renderDecompTrelloLinkLibrary();
+                }
+            }
+        });
+
+        renderDecompTrelloLinkLibrary();
+
+        decompConnectTrelloButton?.addEventListener("click", async () => {
+            decompConnectTrelloButton.disabled = true;
+            setDecompConnectStatus("Connecting Trello... Authorize DTECH-HUB in the popup window.");
+            try {
+                const token = await openInlineTrelloConnectPopup();
+                const connectResponse = await fetch("/api/integrations/trello/connect", {
+                    method: "POST",
+                    headers: buildWriteHeaders(),
+                    body: JSON.stringify({ token })
+                });
+                const connectPayload = await connectResponse.json().catch(() => ({}));
+                if (!connectResponse.ok) {
+                    throw new Error(connectPayload?.error || "Could not connect Trello.");
+                }
+                setDecompConnectStatus("Trello connected! Loading your board...");
+                decompConnectTrelloButton.hidden = true;
+                void loadDecompositionTaskBoard();
+            } catch (error) {
+                setDecompConnectStatus(error?.message || "Could not connect Trello.", true);
+            } finally {
+                if (decompConnectTrelloButton?.isConnected) decompConnectTrelloButton.disabled = false;
+            }
+        });
+
+        try {
+            const statusResponse = await fetch("/api/integrations/trello/status", { headers: buildWriteHeaders() });
+            const statusPayload = await statusResponse.json().catch(() => ({}));
+            if (decompConnectTrelloButton) {
+                decompConnectTrelloButton.hidden = Boolean(statusPayload?.connected);
+            }
+        } catch (_error) {
+            if (decompConnectTrelloButton) decompConnectTrelloButton.hidden = false;
+        }
+
         decompBoardRefreshButton?.addEventListener("click", () => {
             void loadDecompositionTaskBoard();
         });
@@ -4868,6 +5071,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                     currentDecompositionTrelloUrl = selectedBoardUrl;
                     submission.trelloCardUrl = selectedBoardUrl;
                     void loadDecompositionTaskBoard();
+                    renderDecompTrelloLinkLibrary();
                     setDecompStatus("Trello board linked with Project Management.");
                 } catch (error) {
                     setDecompStatus(error?.message || "Could not link this Trello board with Project Management.", true);

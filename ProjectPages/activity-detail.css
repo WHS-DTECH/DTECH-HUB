@@ -763,6 +763,13 @@ h1 {
     color: #173e63;
 }
 
+.task-topic-decomp-trello-sync {
+    display: grid;
+    gap: 8px;
+    border-top: 1px solid #a7c8e5;
+    padding-top: 12px;
+}
+
 .task-topic-decomp-dashboard {
     display: grid;
     gap: 10px;
