@@ -8373,23 +8373,27 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 <aside class="task-topic-submission-column${isDigitalOutcomeTopic ? " task-topic-submission-column-digital-outcome" : ""}">
                     <div class="task-topic-sync-grid">
                     <section class="proposal-section task-topic-guide-panel">
-                        <p class="task-topic-guide-eyebrow">Topic Tasks</p>
-                        <h2>${escapeHtml(topicGuideTitle)}</h2>
-                        <p class="task-topic-guide-intro">${escapeHtml(topicGuideIntroText)}</p>
-                        ${topicGuideSourceUrl ? `<p class="task-topic-guide-source">Source: <a href="${escapeHtml(topicGuideSourceUrl)}" target="_blank" rel="noreferrer">${escapeHtml(topicGuideSourceUrl)}</a></p>` : ""}
+                        ${isDigitalOutcomeDescriptionTopic ? `
+                            <section class="task-topic-guide-block">
+                                <h3>DESCRIPTION - GOOGLE SLIDES</h3>
+                                <ul class="list task-topic-guide-list">${renderList(topicGuideTaskItems)}</ul>
+                            </section>
+                        ` : `
+                            <p class="task-topic-guide-eyebrow">Topic Tasks</p>
+                            <h2>${escapeHtml(topicGuideTitle)}</h2>
+                            <p class="task-topic-guide-intro">${escapeHtml(topicGuideIntroText)}</p>
+                            ${topicGuideSourceUrl ? `<p class="task-topic-guide-source">Source: <a href="${escapeHtml(topicGuideSourceUrl)}" target="_blank" rel="noreferrer">${escapeHtml(topicGuideSourceUrl)}</a></p>` : ""}
 
-                        <section class="task-topic-guide-block">
-                            <h3>Instructions</h3>
-                            <ul class="list task-topic-guide-list">${renderList(topicGuideInstructions)}</ul>
-                            ${isDigitalOutcomeDescriptionTopic
-                                ? `<div class="digital-outcome-must-dos" id="digital-outcome-must-dos" aria-live="polite"><p class="task-topic-submission-note">Loading MUST-DOs from your slideshow...</p></div>`
-                                : ""}
-                        </section>
+                            <section class="task-topic-guide-block">
+                                <h3>Instructions</h3>
+                                <ul class="list task-topic-guide-list">${renderList(topicGuideInstructions)}</ul>
+                            </section>
 
-                        <section class="task-topic-guide-block">
-                            <h3>${escapeHtml(topicGuideTaskHeading)}</h3>
-                            <ul class="list task-topic-guide-list">${renderList(topicGuideTaskItems)}</ul>
-                        </section>
+                            <section class="task-topic-guide-block">
+                                <h3>${escapeHtml(topicGuideTaskHeading)}</h3>
+                                <ul class="list task-topic-guide-list">${renderList(topicGuideTaskItems)}</ul>
+                            </section>
+                        `}
 
                         ${isProjectManagementTopic ? `<div id="task-topic-trello-sync-slot"></div>` : ""}
                     </section>
