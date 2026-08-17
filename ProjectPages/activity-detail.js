@@ -4467,26 +4467,6 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
 
             ${isDecompositionTopic ? `
                 <div class="task-topic-decomp-box">
-                    <p class="task-topic-submission-note">Plan your decomposition steps here. Save in DTECH first, then push the steps to your Trello To Do list.</p>
-                    <label class="task-topic-submission-label" for="task-topic-decomp-steps">Decomposition Steps (one per line)</label>
-                    <textarea id="task-topic-decomp-steps" class="task-topic-submission-input task-topic-submission-textarea" placeholder="Break the assessment into clear, checkable steps...">${escapeHtml(decompositionTextValue)}</textarea>
-
-                    <label class="task-topic-submission-label" for="task-topic-decomp-board">Trello Board</label>
-                    <select id="task-topic-decomp-board" class="task-topic-submission-input">
-                        <option value="">Select board</option>
-                    </select>
-
-                    <label class="task-topic-submission-label" for="task-topic-decomp-list">Trello To Do List</label>
-                    <select id="task-topic-decomp-list" class="task-topic-submission-input">
-                        <option value="">Select list</option>
-                    </select>
-
-                    <div class="task-topic-submission-actions">
-                        <button type="button" class="detail-action detail-action-secondary" id="task-topic-save-decomp-plan">Save Decomposition Plan</button>
-                        <button type="button" class="detail-action" id="task-topic-push-decomp-trello">Push Steps to Trello To Do</button>
-                    </div>
-                    <p class="task-topic-submission-status" id="task-topic-decomp-status" aria-live="polite"></p>
-
                     <div class="task-topic-decomp-trello-sync" aria-label="Trello account and saved links">
                         <p class="task-topic-decomp-dashboard-kicker">Trello Sync</p>
                         <p class="task-topic-submission-note">Connect your Trello account here so your Decomposition Task Board can load automatically, without needing to visit User Profile.</p>
@@ -4507,6 +4487,28 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                             <p class="trello-link-library-title">Saved Trello Links <span class="trello-link-library-count" id="task-topic-decomp-trello-link-library-count">(0)</span></p>
                             <ul class="trello-link-library-list" id="task-topic-decomp-trello-link-library-list"></ul>
                         </div>
+                    </div>
+
+                    <div class="task-topic-decomp-planner" aria-label="Decomposition planner">
+                        <p class="task-topic-submission-note">Plan your decomposition steps here. Save in DTECH first, then push the steps to your Trello To Do list.</p>
+                        <label class="task-topic-submission-label" for="task-topic-decomp-steps">Decomposition Steps (one per line)</label>
+                        <textarea id="task-topic-decomp-steps" class="task-topic-submission-input task-topic-submission-textarea" placeholder="Break the assessment into clear, checkable steps...">${escapeHtml(decompositionTextValue)}</textarea>
+
+                        <label class="task-topic-submission-label" for="task-topic-decomp-board">Trello Board</label>
+                        <select id="task-topic-decomp-board" class="task-topic-submission-input">
+                            <option value="">Select board</option>
+                        </select>
+
+                        <label class="task-topic-submission-label" for="task-topic-decomp-list">Trello To Do List</label>
+                        <select id="task-topic-decomp-list" class="task-topic-submission-input">
+                            <option value="">Select list</option>
+                        </select>
+
+                        <div class="task-topic-submission-actions">
+                            <button type="button" class="detail-action detail-action-secondary" id="task-topic-save-decomp-plan">Save Decomposition Plan</button>
+                            <button type="button" class="detail-action" id="task-topic-push-decomp-trello">Push Steps to Trello To Do</button>
+                        </div>
+                        <p class="task-topic-submission-status" id="task-topic-decomp-status" aria-live="polite"></p>
                     </div>
 
                     <section class="task-topic-decomp-dashboard" aria-label="Decomposition task board">

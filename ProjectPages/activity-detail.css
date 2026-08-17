@@ -766,6 +766,11 @@ h1 {
 .task-topic-decomp-trello-sync {
     display: grid;
     gap: 8px;
+}
+
+.task-topic-decomp-planner {
+    display: grid;
+    gap: 8px;
     border-top: 1px solid #a7c8e5;
     padding-top: 12px;
 }
