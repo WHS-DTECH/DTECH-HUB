@@ -4539,46 +4539,10 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         }
 
         const canonicalTemplatePreviewUrl = await fetchTemplateLibraryPreviewByTemplateId(syncTemplateId);
-        const topicMatch = await findProcessAssessmentSlideMatch(syncTopicLabel);
-        let matchedTopicThumbnailUrl = "";
-        // For tools-and-techniques, always prefer the Drive folder match over any stale localStorage entry
-        const shouldOverrideWithFolderMatch = isToolsAndTechniquesSyncTopic && topicMatch.fileUrl;
-        if (shouldOverrideWithFolderMatch || (!syncedGoogleSlidesUrl && allowFolderMatchAutoLink)) {
-            if (topicMatch.fileUrl) {
-                syncedGoogleSlidesUrl = topicMatch.fileUrl;
-                matchedTopicThumbnailUrl = toSafeExternalUrl(topicMatch.thumbnailUrl || "");
-                if (!syncedGoogleSlidesSavedAt) {
-                    syncedGoogleSlidesSavedAt = topicMatch.modifiedTime;
-                }
-                writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopicTitle, taskTopicShortName, syncedGoogleSlidesUrl, {
-                    templateId: syncTemplateId,
-                    thumbnailUrl: topicMatch.thumbnailUrl,
-                    syncSource: "folder-match"
-                });
-                writeStoredTaskTopicSlideSyncLink(projectId, email, taskTopicTitle, syncTopicLabel, syncedGoogleSlidesUrl, {
-                    templateId: syncTemplateId,
-                    thumbnailUrl: topicMatch.thumbnailUrl,
-                    syncSource: "folder-match"
-                });
-            }
-        } else {
-            const syncedId = extractSlidesIdFromValue(syncedGoogleSlidesUrl);
-            const matchedId = extractSlidesIdFromValue(topicMatch.fileUrl || "");
-            if (syncedId && matchedId && syncedId === matchedId) {
-                matchedTopicThumbnailUrl = toSafeExternalUrl(topicMatch.thumbnailUrl || "");
-            }
-        }
         if (!syncedGoogleSlidesSavedAt) {
             syncedGoogleSlidesSavedAt = String(submission.haparaSubmittedAt || submission.submittedAt || "").trim();
         }
-        if (syncedGoogleSlidesUrl) {
-            updateTaskTopicTemplateHeroPreview(
-                host,
-                syncedGoogleSlidesUrl,
-                syncTopicLabel,
-                canonicalTemplatePreviewUrl || matchedTopicThumbnailUrl
-            );
-        } else if (canonicalTemplatePreviewUrl) {
+        if (canonicalTemplatePreviewUrl) {
             updateTaskTopicTemplateHeroPreview(host, canonicalTemplatePreviewUrl, syncTopicLabel, canonicalTemplatePreviewUrl);
         } else if (isToolsAndTechniquesSyncTopic && !isTriallingComponentsTopic) {
             // No template available yet — show placeholder text in hero rather than a wrong image
