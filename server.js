@@ -5226,21 +5226,30 @@ function extractGoogleSlidesDevelopmentRows(presentation) {
         const cells = Array.isArray(row?.tableCells) ? row.tableCells : [];
         if (cells.length < 2) return;
 
-        const firstCellText = extractGoogleSlidesTableCellText(cells[0]);
-        const secondCellText = extractGoogleSlidesTableCellText(cells[1]);
+        const cellTexts = cells.map((cell) => extractGoogleSlidesTableCellText(cell));
+        const firstCellText = cellTexts[0] || "";
+        const secondCellText = cellTexts[1] || "";
+        const thirdCellText = cellTexts[2] || "";
         const firstLower = firstCellText.toLowerCase();
         const secondLower = secondCellText.toLowerCase();
+        const thirdLower = thirdCellText.toLowerCase();
 
-        if (!firstCellText && !secondCellText) return;
-        if (/^must[- ]do$/i.test(firstCellText) || /component/i.test(firstLower) || /why this component is needed/i.test(firstLower)) {
+        if (!cellTexts.some(Boolean)) return;
+        if (cellTexts.some((text, index) => /^must[- ]do$/i.test(text)
+          || /^(components?|tools\s*&\s*techniques|why this (?:tool|component)\s*&?\s*technique needed\??)$/i.test(text)
+          || (index === 0 && /why this component is needed/i.test(text)))) {
           return;
         }
-        if (/^must[- ]do$/i.test(secondCellText) || /component/i.test(secondLower) || /why this component is needed/i.test(secondLower)) {
-          return;
-        }
 
-        if (secondCellText) {
-          allTableRows.push({ mustDo: firstCellText, component: secondCellText });
+        if (cells.length >= 3) {
+          allTableRows.push({
+            mustDo: "",
+            component: firstCellText,
+            toolsTechniques: secondCellText,
+            whyNeeded: thirdCellText
+          });
+        } else if (secondCellText) {
+          allTableRows.push({ mustDo: firstCellText, component: secondCellText, toolsTechniques: "", whyNeeded: "" });
         }
       });
     });
@@ -5251,9 +5260,11 @@ function extractGoogleSlidesDevelopmentRows(presentation) {
   allTableRows.forEach((row) => {
     const normalizedRow = {
       mustDo: row.mustDo.replace(/^[\u2022\u25CF\u25E6\u25AA\u2023\u2043\u00B7\u2219*-]\s*/, "").trim(),
-      component: row.component.replace(/^[\u2022\u25CF\u25E6\u25AA\u2023\u2043\u00B7\u2219*-]\s*/, "").trim()
+      component: row.component.replace(/^[\u2022\u25CF\u25E6\u25AA\u2023\u2043\u00B7\u2219*-]\s*/, "").trim(),
+      toolsTechniques: String(row.toolsTechniques || "").replace(/^[\u2022\u25CF\u25E6\u25AA\u2023\u2043\u00B7\u2219*-]\s*/, "").trim(),
+      whyNeeded: String(row.whyNeeded || "").replace(/^[\u2022\u25CF\u25E6\u25AA\u2023\u2043\u00B7\u2219*-]\s*/, "").trim()
     };
-    const key = `${normalizedRow.mustDo}\n${normalizedRow.component}`.toLowerCase();
+    const key = `${normalizedRow.mustDo}\n${normalizedRow.component}\n${normalizedRow.toolsTechniques}\n${normalizedRow.whyNeeded}`.toLowerCase();
     if (!normalizedRow.component || seenRows.has(key)) return;
     seenRows.add(key);
     uniqueRows.push(normalizedRow);

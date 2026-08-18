@@ -4081,11 +4081,18 @@ async function renderTriallingComponentsTable(host, projectId, email) {
 
         const componentRows = Array.isArray(payload?.rows) ? payload.rows : [];
         const components = componentRows.length
-            ? componentRows.map((row) => String(row?.component || "").trim()).filter(Boolean)
+            ? componentRows.map((row) => ({
+                component: String(row?.component || "").trim(),
+                toolsTechniques: String(row?.toolsTechniques || "").trim(),
+                whyNeeded: String(row?.whyNeeded || "").trim()
+            })).filter((row) => row.component || row.toolsTechniques || row.whyNeeded)
             : (Array.isArray(payload?.components) ? payload.components.map((component) => String(component || "").trim()).filter(Boolean) : []);
-        const rows = components.map((component) => `<tr><td>${escapeHtml(component)}</td></tr>`).join("");
-        target.innerHTML = components.length
-            ? `<h3>Components from Development Steps</h3><table class="digital-outcome-must-dos-table"><thead><tr><th>Components</th></tr></thead><tbody>${rows}</tbody></table><p class="task-topic-submission-note">Last read: ${escapeHtml(formatSubmissionTimestamp(payload?.syncedAt || ""))}</p>`
+        const normalizedComponents = components.map((row) => typeof row === "string"
+            ? { component: row, toolsTechniques: "", whyNeeded: "" }
+            : row);
+        const rows = normalizedComponents.map((row) => `<tr><td>${escapeHtml(row.component)}</td><td>${escapeHtml(row.toolsTechniques)}</td><td>${escapeHtml(row.whyNeeded)}</td></tr>`).join("");
+        target.innerHTML = normalizedComponents.length
+            ? `<h3>Components from Development Steps</h3><table class="digital-outcome-must-dos-table"><thead><tr><th>Components</th><th>Tools &amp; Techniques</th><th>Why this Tool &amp; Technique is needed?</th></tr></thead><tbody>${rows}</tbody></table><p class="task-topic-submission-note">Last read: ${escapeHtml(formatSubmissionTimestamp(payload?.syncedAt || ""))}</p>`
             : `<p class="task-topic-submission-note">No components have been listed in the linked Development Steps slideshow yet.</p>`;
     } catch (error) {
         target.innerHTML = `<p class="task-topic-submission-note is-error">${escapeHtml(error?.message || "Could not read the Development Steps slideshow.")}</p>`;
