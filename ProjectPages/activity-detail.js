@@ -4051,6 +4051,47 @@ async function renderDevelopmentStepsMustDosTable(host, projectId, email) {
     });
 }
 
+async function renderTriallingComponentsTable(host, projectId, email) {
+    const target = host?.querySelector("#trialling-components-table");
+    if (!target) return;
+
+    let developmentStepsUrl = readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, "development-steps")?.url
+        || readStoredTaskTopicSlideSyncEntryByShortName(projectId, email, "Development Steps")?.url
+        || "";
+    if (!developmentStepsUrl) {
+        developmentStepsUrl = (await findProcessAssessmentSlideMatch("Development Steps")).fileUrl;
+    }
+
+    const developmentStepsId = extractSlidesIdFromValue(developmentStepsUrl);
+    const driveAccessToken = readStoredHubDriveAccessToken();
+    if (!driveAccessToken || !developmentStepsId) {
+        target.innerHTML = `<p class="task-topic-submission-note">Link your Development Steps slideshow to load the components you have listed.</p>`;
+        return;
+    }
+
+    target.innerHTML = `<p class="task-topic-submission-note">Reading components from your Development Steps slideshow...</p>`;
+    try {
+        const response = await fetch("/api/student/drive-setup/read-development-components", {
+            method: "POST",
+            headers: buildWriteHeaders(),
+            body: JSON.stringify({ driveAccessToken, presentationId: developmentStepsId })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload?.error || "Could not read the Development Steps slideshow.");
+
+        const componentRows = Array.isArray(payload?.rows) ? payload.rows : [];
+        const components = componentRows.length
+            ? componentRows.map((row) => String(row?.component || "").trim()).filter(Boolean)
+            : (Array.isArray(payload?.components) ? payload.components.map((component) => String(component || "").trim()).filter(Boolean) : []);
+        const rows = components.map((component) => `<tr><td>${escapeHtml(component)}</td></tr>`).join("");
+        target.innerHTML = components.length
+            ? `<h3>Components from Development Steps</h3><table class="digital-outcome-must-dos-table"><thead><tr><th>Components</th></tr></thead><tbody>${rows}</tbody></table><p class="task-topic-submission-note">Last read: ${escapeHtml(formatSubmissionTimestamp(payload?.syncedAt || ""))}</p>`
+            : `<p class="task-topic-submission-note">No components have been listed in the linked Development Steps slideshow yet.</p>`;
+    } catch (error) {
+        target.innerHTML = `<p class="task-topic-submission-note is-error">${escapeHtml(error?.message || "Could not read the Development Steps slideshow.")}</p>`;
+    }
+}
+
 async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, email, isTeacher, interestData }) {
     const panelHost = host?.querySelector("#task-topic-submission-live-panel");
     if (!panelHost) {
@@ -8608,6 +8649,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                             ${isDigitalOutcomeDevelopmentToolsTopic
                                 ? `<div class="digital-outcome-must-dos" id="development-steps-must-dos" aria-live="polite"><p class="task-topic-submission-note">Loading MUST-DOs from your Digital Outcome Description slideshow...</p></div>`
                                 : ""}
+                            ${isDigitalOutcomeTriallingComponentsTopic
+                                ? `<div class="digital-outcome-must-dos" id="trialling-components-table" aria-live="polite"><p class="task-topic-submission-note">Loading components from your Development Steps slideshow...</p></div>`
+                                : ""}
                         `}
 
                         ${isProjectManagementTopic ? `<div id="task-topic-trello-sync-slot"></div>` : ""}
@@ -10218,7 +10262,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         // Keep sync controls interactive even if submission panel rendering fails.
     }
 
-    if (!isTeacher && /digital\s+outcome\s+description|success\s+criteria|relevant\s+implications|development\s+steps|outcome\s+will\s+be\s+developed/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`)) {
+    if (!isTeacher && /digital\s+outcome\s+description|success\s+criteria|relevant\s+implications|development\s+steps|outcome\s+will\s+be\s+developed|trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`)) {
         if (/relevant\s+implications/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`)) {
             renderRelevantImplicationsFromSlide(host, readStoredRelevantImplicationsSlideUrl(projectId, email));
         } else {
@@ -10235,11 +10279,14 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                     || digitalOutcomeSourceUrl
                     || "");
             const isDevelopmentStepsPage = /development\s+steps|outcome\s+will\s+be\s+developed/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`);
+            const isTriallingComponentsPage = /trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`);
             const targetId = isSuccessCriteriaPage
                 ? "success-criteria-must-dos"
-                : (isDevelopmentStepsPage ? "development-steps-must-dos" : "digital-outcome-must-dos");
+                : (isDevelopmentStepsPage ? "development-steps-must-dos" : (isTriallingComponentsPage ? "trialling-components-table" : "digital-outcome-must-dos"));
             if (isDevelopmentStepsPage) {
                 void renderDevelopmentStepsMustDosTable(host, projectId, email);
+            } else if (isTriallingComponentsPage) {
+                void renderTriallingComponentsTable(host, projectId, email);
             } else {
                 renderDigitalOutcomeMustDos(host, syncedSlideLink, targetId);
             }
