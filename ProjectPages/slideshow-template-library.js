@@ -431,6 +431,10 @@ function getTemplateStepMatchers(templateId) {
         return [/target\s+audience/i, /end\s+user/i];
     }
 
+    if (id === "trialling-components") {
+        return [/triall?ing\s+(?:the\s+)?components/i, /trailing\s+components/i, /trial\s+multiple\s+components/i];
+    }
+
     // For category-specific relevant implications templates, only match the specific category
     if (id.startsWith("relevant-implications-") && id !== "relevant-implications") {
         const categoryName = extractCategoryFromTemplateId(id);

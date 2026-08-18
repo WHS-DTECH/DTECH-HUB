@@ -4851,6 +4851,14 @@ function inferCanonicalTemplateIdentityFromTitle(title) {
     };
   }
 
+  if (/triall?ing\s+components|trailing\s+components|trailing\s+comonents/.test(normalizedTitle)) {
+    return {
+      id: "trialling-components",
+      title: "Trialling Components",
+      criteriaText: "Trial components of the digital technologies outcome and use evidence to select and improve them."
+    };
+  }
+
   if (/afull\s*-\s*relevant\s*implications\s*template/.test(normalizedTitle)) {
     return {
       id: "relevant-implications",
@@ -5506,6 +5514,7 @@ const DIGITAL_OUTCOME_DETAILS_TEMPLATE_IDS = new Set([
   "digital-outcome-description",
   "target-audience",
   "development-steps",
+  "trialling-components",
   "tools-and-techniques",
   "project-success-criteria"
 ]);
@@ -5518,6 +5527,9 @@ function resolveProcessAssessmentSubfolderName(templateId, templateTitle) {
     || normalizedTitle.includes("digital outcome description")
     || normalizedTitle.includes("target audience")
     || normalizedTitle.includes("development steps")
+    || normalizedTitle.includes("trialling components")
+    || normalizedTitle.includes("trailing components")
+    || normalizedTitle.includes("trailing comonents")
     || normalizedTitle.includes("tools and techniques")
     || normalizedTitle.includes("success criteria");
   if (isDigitalOutcomeTemplate) {
