@@ -3991,10 +3991,12 @@ async function renderDevelopmentStepsMustDosTable(host, projectId, email) {
     const target = host?.querySelector("#development-steps-must-dos");
     if (!target) return;
 
-    let digitalOutcomeUrl = readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, "digital-outcome-description").url
-        || readStoredTaskTopicSlideSyncEntryByShortName(projectId, email, "Digital Outcome Description").url;
-    let developmentStepsUrl = readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, "development-steps").url
-        || readStoredTaskTopicSlideSyncEntryByShortName(projectId, email, "Development Steps").url;
+    let digitalOutcomeUrl = readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, "digital-outcome-description")?.url
+        || readStoredTaskTopicSlideSyncEntryByShortName(projectId, email, "Digital Outcome Description")?.url
+        || "";
+    let developmentStepsUrl = readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, "development-steps")?.url
+        || readStoredTaskTopicSlideSyncEntryByShortName(projectId, email, "Development Steps")?.url
+        || "";
     if (!digitalOutcomeUrl) digitalOutcomeUrl = (await findProcessAssessmentSlideMatch("Digital Outcome Description")).fileUrl;
     if (!developmentStepsUrl) developmentStepsUrl = (await findProcessAssessmentSlideMatch("Development Steps")).fileUrl;
     const digitalOutcomeId = extractSlidesIdFromValue(digitalOutcomeUrl);
@@ -8067,10 +8069,6 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                     <img src="${escapeHtml(heroVisualImage)}" alt="${escapeHtml(heroVisualAlt)}" loading="lazy">
                     <div class="task-topic-template-hero-actions">
                         <a class="detail-action detail-action-secondary" href="${escapeHtml(slideshowTemplateLibraryUrl)}">Open Template Library</a>
-                        ${slideshowTemplateFileUrl
-                            ? `<a class="detail-action" href="${escapeHtml(slideshowTemplateFileUrl)}" target="_blank" rel="noreferrer">Open Slideshow File</a>`
-                            : ""
-                        }
                     </div>
                 </div>
             `
@@ -10153,9 +10151,9 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             renderRelevantImplicationsFromSlide(host, readStoredRelevantImplicationsSlideUrl(projectId, email));
         } else {
             const isSuccessCriteriaPage = /success\s+criteria/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`);
-            const digitalOutcomeSourceUrl = readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, "digital-outcome-description").url
-                || readStoredTaskTopicSlideSyncEntryByShortName(projectId, email, "Digital Outcome Description").url
-                || readStoredTaskTopicSlideSyncEntry(projectId, email, "Digital Outcome Description", "Digital Outcome Description").url
+            const digitalOutcomeSourceUrl = readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, "digital-outcome-description")?.url
+                || readStoredTaskTopicSlideSyncEntryByShortName(projectId, email, "Digital Outcome Description")?.url
+                || readStoredTaskTopicSlideSyncEntry(projectId, email, "Digital Outcome Description", "Digital Outcome Description")?.url
                 || "";
             const syncedSlideLink = isSuccessCriteriaPage
                 ? digitalOutcomeSourceUrl

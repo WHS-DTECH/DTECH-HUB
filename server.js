@@ -6166,11 +6166,11 @@ app.post("/api/student/drive-setup/find-slide", async (req, res) => {
       .map((file) => {
         const name = String(file?.name || "").trim();
         const normalizedName = normalizeText(name);
-        const isExactDevelopmentStepsName = /^development\s+steps(?:\s*-\s*.+)?$/i.test(name);
+        const normalizedNameWithoutStudent = normalizedName.replace(/\s+-\s+[a-z0-9._-]+$/, "").trim();
         let score = 0;
 
         if (wantsDevelopmentStepsExact) {
-          if (isExactDevelopmentStepsName) score += 1000;
+          if (normalizedNameWithoutStudent === "development steps") score += 1000;
           else return { file, score: 0, modifiedTs: Date.parse(String(file?.modifiedTime || "")) || 0 };
         }
 
