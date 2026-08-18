@@ -4101,6 +4101,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         || normalizedDerivedShortName.includes("digital outcome")
         || isDigitalOutcomeTargetAudienceCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
         || isDigitalOutcomeDevelopmentToolsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
+        || isDigitalOutcomeTriallingComponentsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
         || isToolsAndTechniquesCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
         || isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
         || Boolean(keywordMatchedTopicKey);
@@ -4110,9 +4111,11 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
     }
     const digitalOutcomeSyncTemplateId = keywordMatchedTopicKey === "target-audience"
         ? "target-audience"
+        : (keywordMatchedTopicKey === "trialling-components"
+            ? "trialling-components"
         : (keywordMatchedTopicKey === "development-steps"
-            ? "relevant-implications"
-            : (keywordMatchedTopicKey === "success-criteria" ? "project-success-criteria" : "digital-outcome-description"));
+            ? "development-steps"
+            : (keywordMatchedTopicKey === "success-criteria" ? "project-success-criteria" : "digital-outcome-description")));
     const isMediaAssetWorkflowTopic = isAssetVersionControlTopic && !isProjectManagementTopic;
     const isTrackedWorkflowTopic = isProjectManagementTopic || isMediaAssetWorkflowTopic;
 
@@ -8155,13 +8158,15 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         : (isDigitalOutcomeTopic
             ? (digitalOutcomeTopicKey === "target-audience"
                 ? "Target Audience"
-                : (digitalOutcomeTopicKey === "development-steps"
+                : (digitalOutcomeTopicKey === "trialling-components"
+                    ? "Trialling Components"
+                    : (digitalOutcomeTopicKey === "development-steps"
                     ? "Development Steps"
                     : (digitalOutcomeTopicKey === "success-criteria"
                         ? "Success Criteria"
                         : (digitalOutcomeTopicKey === "relevant-implications"
                             ? "Relevant Implications"
-                            : "Digital Outcome Description"))))
+                            : "Digital Outcome Description")))))
             : "Topic Tasks"));
     const topicGuideInstructions = (() => {
         if (isProjectManagementTopic) {
@@ -8336,8 +8341,11 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         if (digitalOutcomeTopicKey === "tools-and-techniques") {
             return "List the tools you plan to use, are currently using, or have used for this task, and describe the techniques you implement with each one.";
         }
-        if (digitalOutcomeTopicKey === "development-steps") {
+        if (digitalOutcomeTopicKey === "trialling-components") {
             return "Use this guide to trial components systematically, compare evidence, and justify the option you select.";
+        }
+        if (digitalOutcomeTopicKey === "development-steps") {
+            return "Use this guide to plan and record a clear development process from idea through implementation.";
         }
         if (digitalOutcomeTopicKey === "success-criteria") {
             return "Use this guide to define measurable success criteria and explain how your outcome will be evaluated.";
