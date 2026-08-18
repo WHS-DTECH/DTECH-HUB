@@ -271,6 +271,27 @@ function readStoredDigitalOutcomeDescriptionSlideId() {
     }
 }
 
+function readStoredTemplateSlideIdByTemplateId(templateId) {
+    const activityId = String(templateUsageContext.activityId || "").trim();
+    const email = getLibraryEmail();
+    const targetId = String(templateId || "").trim().toLowerCase();
+    if (!activityId || !email || !targetId) return "";
+    const prefix = `${LIB_TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX}:${activityId}:${email}:`;
+    try {
+        for (let index = 0; index < localStorage.length; index += 1) {
+            const key = String(localStorage.key(index) || "");
+            if (!key.startsWith(prefix)) continue;
+            const parsed = JSON.parse(localStorage.getItem(key) || "{}");
+            if (String(parsed?.templateId || "").trim().toLowerCase() !== targetId) continue;
+            const slideId = extractSlidesFileId(parsed?.url || "");
+            if (slideId) return slideId;
+        }
+    } catch (_error) {
+        return "";
+    }
+    return "";
+}
+
 function readStoredRelevantImplicationNames() {
     const activityId = String(templateUsageContext.activityId || "").trim();
     const email = getLibraryEmail();
@@ -1100,7 +1121,9 @@ async function handleUseTemplate(templateId) {
                 templateTitle: item.title,
                 templateFileId: fileId,
                 activityId: templateUsageContext.activityId,
-                sourcePresentationId: item.id === "project-success-criteria" ? readStoredDigitalOutcomeDescriptionSlideId() : "",
+                sourcePresentationId: item.id === "project-success-criteria"
+                    ? readStoredDigitalOutcomeDescriptionSlideId()
+                    : (item.id === "trialling-components" ? readStoredTemplateSlideIdByTemplateId("development-steps") : ""),
                 sourceRelevantImplications: item.id === "project-success-criteria" ? readStoredRelevantImplicationNames() : []
             })
         });
