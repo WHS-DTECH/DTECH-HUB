@@ -5539,6 +5539,7 @@ async function driveEnsureFolder(parentFolderId, folderName, accessToken) {
 }
 
 const PROCESS_ASSESSMENT_DIGITAL_OUTCOME_FOLDER_NAME = "Digital Outcome Details";
+const PROCESS_ASSESSMENT_TRIALLING_COMPONENTS_FOLDER_NAME = "Trailing Components";
 const PROCESS_ASSESSMENT_RELEVANT_IMPLICATIONS_FOLDER_NAME = "Relevant Implications";
 
 const DIGITAL_OUTCOME_DETAILS_TEMPLATE_IDS = new Set([
@@ -5553,6 +5554,12 @@ const DIGITAL_OUTCOME_DETAILS_TEMPLATE_IDS = new Set([
 function resolveProcessAssessmentSubfolderName(templateId, templateTitle) {
   const normalizedTemplateId = String(templateId || "").trim().toLowerCase();
   const normalizedTitle = String(templateTitle || "").trim().toLowerCase();
+
+  const isTriallingComponentsTemplate = normalizedTemplateId === "trialling-components"
+    || /triall?ing\s+components|trailing\s+components|trailing\s+comonents/.test(normalizedTitle);
+  if (isTriallingComponentsTemplate) {
+    return PROCESS_ASSESSMENT_TRIALLING_COMPONENTS_FOLDER_NAME;
+  }
 
   const isDigitalOutcomeTemplate = DIGITAL_OUTCOME_DETAILS_TEMPLATE_IDS.has(normalizedTemplateId)
     || normalizedTitle.includes("digital outcome description")
@@ -5583,6 +5590,7 @@ async function driveListSlidesInProcessAssessmentTree(processAssessmentFolderId,
   const rootSlides = await driveListSlidesInFolder(rootFolderId, accessToken);
   const subfolderNames = [
     PROCESS_ASSESSMENT_DIGITAL_OUTCOME_FOLDER_NAME,
+    PROCESS_ASSESSMENT_TRIALLING_COMPONENTS_FOLDER_NAME,
     PROCESS_ASSESSMENT_RELEVANT_IMPLICATIONS_FOLDER_NAME
   ];
 
