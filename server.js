@@ -5222,11 +5222,22 @@ function extractGoogleSlidesDevelopmentRows(presentation) {
       const table = element?.table;
       if (!table || !Array.isArray(table.tableRows)) return;
 
-      table.tableRows.forEach((row) => {
-        const cells = Array.isArray(row?.tableCells) ? row.tableCells : [];
+      const tableRows = table.tableRows.map((row) => (
+        Array.isArray(row?.tableCells)
+          ? row.tableCells.map((cell) => extractGoogleSlidesTableCellText(cell))
+          : []
+      ));
+      const headerRowIndex = tableRows.findIndex((cellTexts) => cellTexts.some((text) => /must[- ]do|components?|tools\s*&\s*techniques|why this/i.test(text)));
+      const headerTexts = headerRowIndex >= 0 ? tableRows[headerRowIndex].map((text) => text.toLowerCase()) : [];
+      const componentIndex = headerTexts.findIndex((text) => /^components?$/.test(text));
+      const toolsIndex = headerTexts.findIndex((text) => /tools\s*&\s*techniques/.test(text));
+      const whyIndex = headerTexts.findIndex((text) => /why this/i.test(text));
+      const mustDoIndex = headerTexts.findIndex((text) => /^must[- ]do/.test(text));
+
+      tableRows.forEach((cellTexts, rowIndex) => {
+        const cells = Array.isArray(table.tableRows[rowIndex]?.tableCells) ? table.tableRows[rowIndex].tableCells : [];
         if (cells.length < 2) return;
 
-        const cellTexts = cells.map((cell) => extractGoogleSlidesTableCellText(cell));
         const firstCellText = cellTexts[0] || "";
         const secondCellText = cellTexts[1] || "";
         const thirdCellText = cellTexts[2] || "";
@@ -5234,20 +5245,29 @@ function extractGoogleSlidesDevelopmentRows(presentation) {
         const secondLower = secondCellText.toLowerCase();
         const thirdLower = thirdCellText.toLowerCase();
 
-        if (!cellTexts.some(Boolean)) return;
+        if (rowIndex === headerRowIndex || !cellTexts.some(Boolean)) return;
         if (cellTexts.some((text, index) => /^must[- ]do$/i.test(text)
           || /^(components?|tools\s*&\s*techniques|why this (?:tool|component)\s*&?\s*technique needed\??)$/i.test(text)
           || (index === 0 && /why this component is needed/i.test(text)))) {
           return;
         }
 
-        if (cells.length >= 3) {
+        if (componentIndex >= 0) {
           allTableRows.push({
-            mustDo: "",
-            component: firstCellText,
-            toolsTechniques: secondCellText,
-            whyNeeded: thirdCellText
+            mustDo: mustDoIndex >= 0 ? cellTexts[mustDoIndex] || "" : "",
+            component: cellTexts[componentIndex] || "",
+            toolsTechniques: toolsIndex >= 0 ? cellTexts[toolsIndex] || "" : "",
+            whyNeeded: whyIndex >= 0 ? cellTexts[whyIndex] || "" : ""
           });
+        } else if (cells.length >= 4) {
+          allTableRows.push({
+            mustDo: firstCellText,
+            component: cellTexts[1] || "",
+            toolsTechniques: cellTexts[2] || "",
+            whyNeeded: cellTexts[3] || ""
+          });
+        } else if (cells.length >= 3) {
+          allTableRows.push({ mustDo: "", component: firstCellText, toolsTechniques: secondCellText, whyNeeded: thirdCellText });
         } else if (secondCellText) {
           allTableRows.push({ mustDo: firstCellText, component: secondCellText, toolsTechniques: "", whyNeeded: "" });
         }
