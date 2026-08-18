@@ -1,4 +1,3 @@
-const NEW_EVENT_WINDOW_STORAGE_KEY = "dtechHub:newEventWindowDays:v1";
 const WINDOW_OPTIONS = new Set([7, 14, 30]);
 
 const form = document.querySelector("#new-event-window-form");
@@ -21,8 +20,15 @@ function setStatus(message, isError = false) {
 }
 
 function getStoredWindowDays() {
+    if (typeof window.getConfiguredNewEventWindowDays === "function") {
+        const configured = Number.parseInt(String(window.getConfiguredNewEventWindowDays() || ""), 10);
+        if (WINDOW_OPTIONS.has(configured)) {
+            return configured;
+        }
+    }
+
     try {
-        const raw = Number.parseInt(String(localStorage.getItem(NEW_EVENT_WINDOW_STORAGE_KEY) || ""), 10);
+        const raw = Number.parseInt(String(localStorage.getItem("dtechHub:newEventWindowDays:v1") || ""), 10);
         if (WINDOW_OPTIONS.has(raw)) {
             return raw;
         }
