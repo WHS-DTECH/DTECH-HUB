@@ -6287,6 +6287,21 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
       return;
     }
     const processAssessmentFolderId = String(setup.processAssessmentFolderId || "").trim();
+    let resolvedSourcePresentationId = sourcePresentationId;
+    const isTriallingComponentsTemplate = templateId.toLowerCase() === "trialling-components"
+      || /triall?ing\s+components|trailing\s+components/i.test(templateTitle);
+    if (isTriallingComponentsTemplate && !resolvedSourcePresentationId) {
+      const studentSlides = await driveListSlidesInProcessAssessmentTree(processAssessmentFolderId, driveAccessToken);
+      const normalizeSlideName = (value) => String(value || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .replace(/\s+-\s+[a-z0-9._-]+$/, "")
+        .trim();
+      const sourceSlide = studentSlides
+        .filter((file) => normalizeSlideName(file?.name) === "development steps")
+        .sort((left, right) => String(right?.modifiedTime || "").localeCompare(String(left?.modifiedTime || "")))[0];
+      resolvedSourcePresentationId = String(sourceSlide?.id || "").trim();
+    }
     const subfolderName = resolveProcessAssessmentSubfolderName(templateId, templateTitle);
     let folderId = processAssessmentFolderId;
     if (subfolderName) {
@@ -6306,14 +6321,14 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
         || /development\s+steps/i.test(templateTitle);
       const isTriallingComponents = templateId.toLowerCase() === "trialling-components"
         || /triall?ing\s+components|trailing\s+components/i.test(templateTitle);
-      if ((!isSuccessCriteria && !isDevelopmentSteps && !isTriallingComponents) || !sourcePresentationId) return { updated: false, count: 0 };
+      if ((!isSuccessCriteria && !isDevelopmentSteps && !isTriallingComponents) || !resolvedSourcePresentationId) return { updated: false, count: 0 };
 
       try {
         if (isTriallingComponents) {
-          const result = await populateTriallingComponents(targetFileId, sourcePresentationId, driveAccessToken);
+          const result = await populateTriallingComponents(targetFileId, resolvedSourcePresentationId, driveAccessToken);
           return { updated: result.updated, count: result.count, implicationsCount: 0 };
         }
-        const sourcePresentation = await googleSlidesApiRequest(sourcePresentationId, driveAccessToken);
+        const sourcePresentation = await googleSlidesApiRequest(resolvedSourcePresentationId, driveAccessToken);
         const mustDos = extractGoogleSlidesMustDos(sourcePresentation);
 
         if (isDevelopmentSteps) {
