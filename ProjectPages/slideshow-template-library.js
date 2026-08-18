@@ -324,6 +324,21 @@ function readStoredTemplateSlideIdByTemplateId(templateId) {
     return "";
 }
 
+async function findStudentTemplateSlideId(taskTopic, accessToken) {
+    try {
+        const response = await fetch("/api/student/drive-setup/find-slide", {
+            method: "POST",
+            headers: withLibraryAuthHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ driveAccessToken: accessToken, taskTopic })
+        });
+        if (!response.ok) return "";
+        const payload = await response.json().catch(() => ({}));
+        return extractSlidesFileId(payload?.fileUrl || payload?.fileId || "");
+    } catch (_error) {
+        return "";
+    }
+}
+
 function readStoredRelevantImplicationNames() {
     const activityId = String(templateUsageContext.activityId || "").trim();
     const email = getLibraryEmail();
@@ -1143,8 +1158,14 @@ async function handleUseTemplate(templateId) {
 
     const button = document.querySelector(`[data-use-template="${CSS.escape(templateId)}"]`);
     if (button) { button.disabled = true; button.textContent = "Copying\u2026"; }
+    let sourcePresentationId = item.id === "project-success-criteria"
+        ? readStoredDigitalOutcomeDescriptionSlideId()
+        : (item.id === "trialling-components" ? readStoredTemplateSlideIdByTemplateId("development-steps") : "");
 
     const copyTemplateWithToken = async (accessToken) => {
+        if (item.id === "trialling-components" && !sourcePresentationId) {
+            sourcePresentationId = await findStudentTemplateSlideId("Development Steps", accessToken);
+        }
         const response = await fetch("/api/student/drive-setup/copy-template", {
             method: "POST",
             headers: withLibraryAuthHeaders({ "Content-Type": "application/json" }),
@@ -1154,9 +1175,7 @@ async function handleUseTemplate(templateId) {
                 templateTitle: item.title,
                 templateFileId: fileId,
                 activityId: templateUsageContext.activityId,
-                sourcePresentationId: item.id === "project-success-criteria"
-                    ? readStoredDigitalOutcomeDescriptionSlideId()
-                    : (item.id === "trialling-components" ? readStoredTemplateSlideIdByTemplateId("development-steps") : ""),
+                sourcePresentationId,
                 sourceRelevantImplications: item.id === "project-success-criteria" ? readStoredRelevantImplicationNames() : []
             })
         });
