@@ -681,12 +681,17 @@ async function fetchTemplateLibraryPreviewByTemplateId(templateId = "") {
 
         const payload = await response.json().catch(() => ({}));
         const entries = Array.isArray(payload?.entries) ? payload.entries : [];
-        const match = entries.find((entry) => String(entry?.id || "").trim().toLowerCase() === targetTemplateId.toLowerCase());
+        const match = entries.find((entry) => String(entry?.id || "").trim().toLowerCase() === targetTemplateId.toLowerCase())
+            || (targetTemplateId === "trialling-components"
+                ? entries.find((entry) => /triall?ing\s+components|trailing\s+components|trailing\s+comonents/i.test(String(entry?.title || "")))
+                : null);
         if (!match) {
             return "";
         }
 
-        return toSafeExternalUrl(match?.imageUrl || "") || toGoogleSlidesThumbnailUrl(match?.templateUrl || "");
+        return toSafeExternalUrl(match?.imageUrl || "")
+            || toGoogleSlidesThumbnailUrl(match?.templateUrl || "")
+            || toGoogleSlidesThumbnailUrl(match?.fileUrl || "");
     } catch (_error) {
         return "";
     }
@@ -4090,9 +4095,9 @@ async function renderTriallingComponentsTable(host, projectId, email) {
         const normalizedComponents = components.map((row) => typeof row === "string"
             ? { component: row, toolsTechniques: "", whyNeeded: "" }
             : row);
-        const rows = normalizedComponents.map((row) => `<tr><td>${escapeHtml(row.component)}</td><td>${escapeHtml(row.toolsTechniques)}</td><td>${escapeHtml(row.whyNeeded)}</td></tr>`).join("");
+        const rows = normalizedComponents.map((row) => `<tr><td>${escapeHtml(row.component)}</td><td>${escapeHtml(row.toolsTechniques)}</td></tr>`).join("");
         target.innerHTML = normalizedComponents.length
-            ? `<h3>Components from Development Steps</h3><table class="digital-outcome-must-dos-table"><thead><tr><th>Components</th><th>Tools &amp; Techniques</th><th>Why this Tool &amp; Technique is needed?</th></tr></thead><tbody>${rows}</tbody></table><p class="task-topic-submission-note">Last read: ${escapeHtml(formatSubmissionTimestamp(payload?.syncedAt || ""))}</p>`
+            ? `<h3>Components from Development Steps</h3><table class="digital-outcome-must-dos-table"><thead><tr><th>Components</th><th>Tools &amp; Techniques</th></tr></thead><tbody>${rows}</tbody></table><p class="task-topic-submission-note">Last read: ${escapeHtml(formatSubmissionTimestamp(payload?.syncedAt || ""))}</p>`
             : `<p class="task-topic-submission-note">No components have been listed in the linked Development Steps slideshow yet.</p>`;
     } catch (error) {
         target.innerHTML = `<p class="task-topic-submission-note is-error">${escapeHtml(error?.message || "Could not read the Development Steps slideshow.")}</p>`;
@@ -4575,7 +4580,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             );
         } else if (canonicalTemplatePreviewUrl) {
             updateTaskTopicTemplateHeroPreview(host, canonicalTemplatePreviewUrl, syncTopicLabel, canonicalTemplatePreviewUrl);
-        } else if (isToolsAndTechniquesSyncTopic) {
+        } else if (isToolsAndTechniquesSyncTopic && !isTriallingComponentsTopic) {
             // No template available yet — show placeholder text in hero rather than a wrong image
             updateTaskTopicTemplateHeroPreviewNoTemplate(host, syncTopicLabel);
         }
