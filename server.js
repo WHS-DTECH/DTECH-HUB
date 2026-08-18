@@ -8068,10 +8068,7 @@ app.get("/api/activities/:id/my-template-copies", async (req, res) => {
       const templateId = String(req.body?.templateId || "").trim().toLowerCase();
       if (!requesterEmail) { res.status(401).json({ error: "Sign in is required." }); return; }
       if (!projectId) { res.status(400).json({ error: "Activity ID is required." }); return; }
-      if (templateId !== "trialling-components") {
-        res.status(400).json({ error: "Only the Trialling Components template can be reset here." });
-        return;
-      }
+      if (!templateId) { res.status(400).json({ error: "Template ID is required." }); return; }
       if (!hasDatabase) {
         res.json({ ok: true, reset: false, reason: "database_unavailable" });
         return;
@@ -8090,7 +8087,21 @@ app.get("/api/activities/:id/my-template-copies", async (req, res) => {
             ...evidenceRow,
             steps: evidenceRow.steps.map((step) => ({
               ...step,
-              done: /trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components/i.test(String(step?.text || ""))
+              done: (() => {
+                const text = String(step?.text || "");
+                const matchers = {
+                  "digital-outcome-description": /description\s*-\s*google\s*slides|describe.*digital\s+outcome/i,
+                  "target-audience": /target\s+audience|end\s+user/i,
+                  "development-steps": /outcome\s+will\s+be\s+developed|development\s+steps/i,
+                  "trialling-components": /trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components/i,
+                  "tools-and-techniques": /what\s+tools\s+and\s+techniques/i,
+                  "project-success-criteria": /success\s+criteria|success\s+will\s+be\s+measured|success\s+will\s+be\s+evaluated/i,
+                  "relevant-implications": /relevant\s+implications/i,
+                  "decomposition-tasks": /decompos/i,
+                  "speaker-notes-criteria-mapping": /speaker\s*notes|criteria\s*mapping/i
+                };
+                return matchers[templateId]?.test(text) ? false : Boolean(step.done);
+              })()
                 ? false
                 : Boolean(step.done)
             }))

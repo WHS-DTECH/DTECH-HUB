@@ -1290,7 +1290,7 @@ function renderTemplateCard(item) {
     const deleteButtonHtml = canManageTemplates()
         ? `<button type="button" class="template-card-delete" data-delete-template="${escapeHtml(item.id)}">Delete</button>`
         : "";
-    const resetButtonHtml = item.id === "trialling-components"
+    const resetButtonHtml = item.id
         ? `<button type="button" class="template-card-delete" data-reset-template-use="${escapeHtml(item.id)}">Reset Use</button>`
         : "";
 
