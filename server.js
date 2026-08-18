@@ -7996,6 +7996,52 @@ app.get("/api/activities/:id/my-template-copies", async (req, res) => {
       `SELECT template_copies FROM project_interests WHERE project_id = $1 AND student_email = $2 LIMIT 1`,
       [projectId, requesterEmail]
     );
+
+    app.post("/api/activities/:id/reset-template-use", async (req, res) => {
+      const requesterEmail = normalizeEmail(getRequestUserEmail(req));
+      const projectId = String(req.params.id || "").trim();
+      const templateId = String(req.body?.templateId || "").trim().toLowerCase();
+      if (!requesterEmail) { res.status(401).json({ error: "Sign in is required." }); return; }
+      if (!projectId) { res.status(400).json({ error: "Activity ID is required." }); return; }
+      if (templateId !== "trialling-components") {
+        res.status(400).json({ error: "Only the Trialling Components template can be reset here." });
+        return;
+      }
+      if (!hasDatabase) {
+        res.json({ ok: true, reset: false, reason: "database_unavailable" });
+        return;
+      }
+
+      try {
+        const current = await pool.query(
+          `SELECT evidence_steps, template_copies FROM project_interests WHERE project_id = $1 AND student_email = $2 LIMIT 1`,
+          [projectId, requesterEmail]
+        );
+        const row = current.rows?.[0];
+        if (!row) { res.json({ ok: true, reset: false }); return; }
+
+        const evidenceSteps = normalizeEvidenceStepsPayload(row.evidence_steps).map((evidenceRow) => ({
+          ...evidenceRow,
+          steps: evidenceRow.steps.map((step) => ({
+            ...step,
+            done: /trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components/i.test(String(step?.text || ""))
+              ? false
+              : Boolean(step.done)
+          }))
+        }));
+        const templateCopies = Array.isArray(row.template_copies)
+          ? row.template_copies.filter((copy) => String(copy?.templateId || "").trim().toLowerCase() !== templateId)
+          : [];
+
+        await pool.query(
+          `UPDATE project_interests SET evidence_steps = $1::jsonb, template_copies = $2::jsonb, updated_at = NOW() WHERE project_id = $3 AND student_email = $4`,
+          [JSON.stringify(evidenceSteps), JSON.stringify(templateCopies), projectId, requesterEmail]
+        );
+        res.json({ ok: true, reset: true });
+      } catch (error) {
+        res.status(500).json({ error: error.message || "Could not reset template use." });
+      }
+    });
     const copies = Array.isArray(result.rows?.[0]?.template_copies) ? result.rows[0].template_copies : [];
     res.json({ student_email: requesterEmail, template_copies: copies });
   } catch (_error) {

@@ -159,6 +159,43 @@ function writeStoredTemplateCopyMap(activityId, email, value) {
     }
 }
 
+function clearStoredTemplateUse(templateId) {
+    const targetId = String(templateId || "").trim().toLowerCase();
+    if (!targetId) return;
+    delete driveState.copyMap[templateId];
+    persistCurrentTemplateCopyMap();
+
+    const activityId = String(templateUsageContext.activityId || "").trim();
+    const email = getLibraryEmail();
+    const prefix = `${LIB_TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX}:${activityId}:${email}:`;
+    try {
+        for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+            const key = String(localStorage.key(index) || "");
+            if (!key.startsWith(prefix)) continue;
+            const parsed = JSON.parse(localStorage.getItem(key) || "{}");
+            if (String(parsed?.templateId || "").trim().toLowerCase() === targetId) {
+                localStorage.removeItem(key);
+            }
+        }
+    } catch (_error) {
+    }
+}
+
+async function resetStudentTemplateUse(templateId) {
+    const activityId = String(templateUsageContext.activityId || "").trim();
+    if (!activityId) {
+        throw new Error("Open this template from the Student View activity page before resetting its use.");
+    }
+    const response = await fetch(`/api/activities/${encodeURIComponent(activityId)}/reset-template-use`, {
+        method: "POST",
+        headers: withLibraryAuthHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ templateId })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload?.error || "Could not reset template use.");
+    clearStoredTemplateUse(templateId);
+}
+
 function persistCurrentTemplateCopyMap() {
     const email = getLibraryEmail();
     const activityId = String(templateUsageContext.activityId || "").trim();
@@ -1229,12 +1266,15 @@ function renderTemplateCard(item) {
     const deleteButtonHtml = canManageTemplates()
         ? `<button type="button" class="template-card-delete" data-delete-template="${escapeHtml(item.id)}">Delete</button>`
         : "";
+    const resetButtonHtml = item.id === "trialling-components" && templateUsageContext.activityId
+        ? `<button type="button" class="template-card-delete" data-reset-template-use="${escapeHtml(item.id)}">Reset Use</button>`
+        : "";
 
     const actionHtml = !canUse
         ? `<button class="template-card-open" aria-disabled="true" disabled>${status === "live" ? "Template Link Needed" : "Template Coming Soon"}</button>`
         : existingCopy
-            ? `<a class="template-card-open template-card-open-existing" href="${escapeHtml(existingCopy.fileUrl)}" target="_blank" rel="noreferrer">Open Your Copy</a>${deleteButtonHtml}<p class="template-card-copy-note">Saved to Process Assessment.</p>`
-            : `<button class="template-card-open" type="button" data-use-template="${escapeHtml(item.id)}">Use Template</button>${deleteButtonHtml}`;
+            ? `<a class="template-card-open template-card-open-existing" href="${escapeHtml(existingCopy.fileUrl)}" target="_blank" rel="noreferrer">Open Your Copy</a>${resetButtonHtml}${deleteButtonHtml}<p class="template-card-copy-note">Saved to Process Assessment.</p>`
+            : `<button class="template-card-open" type="button" data-use-template="${escapeHtml(item.id)}">Use Template</button>${resetButtonHtml}${deleteButtonHtml}`;
 
     const previewClickHtml = canUse && !existingCopy
         ? `<button class="template-card-preview template-card-preview-button" type="button" data-use-template="${escapeHtml(item.id)}" aria-label="Use template: ${escapeHtml(title)}">`
@@ -1448,9 +1488,23 @@ function renderLibrary() {
             }
 
             const deleteButton = event.target.closest("[data-delete-template]");
-            if (!deleteButton) return;
-            const templateId = deleteButton.getAttribute("data-delete-template") || "";
-            if (templateId) void handleDeleteTemplate(templateId, deleteButton);
+            if (deleteButton) {
+                const templateId = deleteButton.getAttribute("data-delete-template") || "";
+                if (templateId) void handleDeleteTemplate(templateId, deleteButton);
+                return;
+            }
+
+            const resetButton = event.target.closest("[data-reset-template-use]");
+            if (!resetButton) return;
+            const templateId = resetButton.getAttribute("data-reset-template-use") || "";
+            if (!templateId) return;
+            resetButton.disabled = true;
+            void resetStudentTemplateUse(templateId)
+                .then(() => renderLibrary())
+                .catch((error) => {
+                    resetButton.disabled = false;
+                    alert(`Could not reset template use: ${error.message || "Unknown error"}`);
+                });
         });
     }
 }
