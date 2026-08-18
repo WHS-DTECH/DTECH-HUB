@@ -5212,6 +5212,17 @@ function extractGoogleSlidesTableCellText(cell) {
     .trim();
 }
 
+function extractGoogleSlidesTableCellLines(cell) {
+  const textElements = Array.isArray(cell?.text?.textElements) ? cell.text.textElements : [];
+  const text = textElements
+    .map((textElement) => String(textElement?.textRun?.content || ""))
+    .join("");
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^[\s\u2022\u25CF\u25E6\u25AA\u25B7\u2043\u00B7\u2219*-]+/, "").replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+}
+
 function extractGoogleSlidesDevelopmentRows(presentation) {
   const slides = Array.isArray(presentation?.slides) ? presentation.slides : [];
   const allTableRows = [];
@@ -5253,11 +5264,17 @@ function extractGoogleSlidesDevelopmentRows(presentation) {
         }
 
         if (componentIndex >= 0) {
-          allTableRows.push({
-            mustDo: mustDoIndex >= 0 ? cellTexts[mustDoIndex] || "" : "",
-            component: cellTexts[componentIndex] || "",
-            toolsTechniques: toolsIndex >= 0 ? cellTexts[toolsIndex] || "" : "",
-            whyNeeded: whyIndex >= 0 ? cellTexts[whyIndex] || "" : ""
+          const componentLines = extractGoogleSlidesTableCellLines(cells[componentIndex]);
+          const toolsLines = toolsIndex >= 0 ? extractGoogleSlidesTableCellLines(cells[toolsIndex]) : [];
+          const whyLines = whyIndex >= 0 ? extractGoogleSlidesTableCellLines(cells[whyIndex]) : [];
+          const components = componentLines.length ? componentLines : [cellTexts[componentIndex] || ""];
+          components.forEach((component, componentRowIndex) => {
+            allTableRows.push({
+              mustDo: mustDoIndex >= 0 ? cellTexts[mustDoIndex] || "" : "",
+              component,
+              toolsTechniques: toolsLines[componentRowIndex] || (componentRowIndex === 0 ? toolsLines.join(" ") : ""),
+              whyNeeded: whyLines[componentRowIndex] || (componentRowIndex === 0 ? whyLines.join(" ") : "")
+            });
           });
         } else if (cells.length >= 4) {
           allTableRows.push({
