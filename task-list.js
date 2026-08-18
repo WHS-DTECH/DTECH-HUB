@@ -7,7 +7,6 @@ const DIGITAL_OUTCOME_DETAILS_TASKS = [
     "Description - Google Slides: Describe the Digital Outcome: What is it, who is it for, and what should it do?",
     "Identify the target audience or end user for this outcome.",
     "Explain how the outcome will be developed.",
-    "Trial the components of the digital technologies outcome.",
     "State how success will be measured or evaluated.",
     "What Tools and Techniques will be used?"
 ];
