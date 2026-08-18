@@ -186,9 +186,6 @@ function clearStoredTemplateUse(templateId) {
 
 async function resetStudentTemplateUse(templateId) {
     const activityId = String(templateUsageContext.activityId || "").trim();
-    if (!activityId) {
-        throw new Error("Open this template from the Student View activity page before resetting its use.");
-    }
     const resetActivityId = activityId || "all";
     const response = await fetch(`/api/activities/${encodeURIComponent(resetActivityId)}/reset-template-use`, {
         method: "POST",
