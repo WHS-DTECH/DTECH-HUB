@@ -5194,10 +5194,53 @@ function extractGoogleSlidesRelevantImplicationsFromPdfText(source) {
     .slice(0, 40);
 }
 
+function extractGoogleSlidesTableCellText(cell) {
+  const textElements = Array.isArray(cell?.text?.textElements) ? cell.text.textElements : [];
+  return textElements
+    .map((textElement) => String(textElement?.textRun?.content || ""))
+    .join("")
+    .replace(/\r?\n/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function extractGoogleSlidesDevelopmentComponents(presentation) {
   const slides = Array.isArray(presentation?.slides) ? presentation.slides : [];
-  const firstSlide = slides[0];
-  const textShapes = (Array.isArray(firstSlide?.pageElements) ? firstSlide.pageElements : [])
+  const allTableValues = [];
+
+  slides.forEach((slide) => {
+    const elements = Array.isArray(slide?.pageElements) ? slide.pageElements : [];
+    elements.forEach((element) => {
+      const table = element?.table;
+      if (!table || !Array.isArray(table.tableRows)) return;
+
+      table.tableRows.forEach((row) => {
+        const cells = Array.isArray(row?.tableCells) ? row.tableCells : [];
+        if (cells.length < 2) return;
+
+        const firstCellText = extractGoogleSlidesTableCellText(cells[0]);
+        const secondCellText = extractGoogleSlidesTableCellText(cells[1]);
+        const firstLower = firstCellText.toLowerCase();
+        const secondLower = secondCellText.toLowerCase();
+
+        if (!secondCellText) return;
+        if (/^must[- ]do$/i.test(firstCellText) || /component/i.test(firstLower) || /why this component is needed/i.test(firstLower)) {
+          return;
+        }
+        if (/^must[- ]do$/i.test(secondCellText) || /component/i.test(secondLower) || /why this component is needed/i.test(secondLower)) {
+          return;
+        }
+
+        allTableValues.push(secondCellText);
+      });
+    });
+  });
+
+  const uniqueValues = Array.from(new Set(allTableValues.map((value) => value.replace(/^[\u2022\u25CF\u25E6\u25AA\u2023\u2043\u00B7\u2219*-]\s*/, "").trim()).filter(Boolean)));
+  if (uniqueValues.length) return uniqueValues.slice(0, 30);
+
+  const fallbackSource = slides[0];
+  const textShapes = (Array.isArray(fallbackSource?.pageElements) ? fallbackSource.pageElements : [])
     .filter((element) => Array.isArray(element?.shape?.text?.textElements))
     .map((element) => {
       const text = element.shape.text.textElements
@@ -5212,20 +5255,21 @@ function extractGoogleSlidesDevelopmentComponents(presentation) {
   return Array.from(new Set(sourceText
     .split(/\r?\n/)
     .map((line) => line.replace(/^\s*(?:\d+\.|[\u2022\u25CF\u25E6*-])\s*/, "").replace(/\s+/g, " ").trim())
-    .filter((line) => line && !/^(starters|timeline\b|what the slide needs to cover|some key steps)/i.test(line))))
+    .filter((line) => line && !/^(starters|timeline\b|what the slide needs to cover|some key steps|my outcome|digital outcome)/i.test(line))))
     .slice(0, 30);
 }
 
 function extractGoogleSlidesDevelopmentComponentsFromPdfText(source) {
-  const lines = String(source || "")
-    .replace(/\r/g, "")
+  const text = String(source || "").replace(/\r/g, "");
+  const componentSection = text.match(/component\s*:?([\s\S]*?)(?:why\s+this\s+component\s+is\s+needed|$)/i)?.[1] || "";
+  const lines = componentSection
     .split(/\n+/)
     .map((line) => line.replace(/^\s*(?:\d+\.|[\u2022\u25CF\u25E6*-])\s*/, "").replace(/\s+/g, " ").trim())
-    .filter(Boolean);
-  const markerIndex = lines.findIndex((line) => /starters|timeline/i.test(line));
-  return Array.from(new Set((markerIndex >= 0 ? lines.slice(markerIndex + 1) : lines)
-    .filter((line) => !/^(slide|development steps|what the slide needs to cover|some key steps)/i.test(line))))
-    .slice(0, 30);
+    .filter(Boolean)
+    .filter((line) => !/^(component|why this component is needed)$/i.test(line));
+
+  const values = Array.from(new Set(lines.filter((line) => line && !/^(the|this|that|they|we|students|google|category)/i.test(line))));
+  return values.slice(0, 30);
 }
 
 async function populateSuccessCriteriaRequirements(presentationId, mustDos, accessToken) {
@@ -5326,6 +5370,55 @@ async function populateSuccessCriteriaImplications(presentationId, implicationNa
     throw error;
   }
   return { updated: true, count: Math.min(names.length, rowCount - 1) };
+}
+
+async function populateDevelopmentStepsMustDos(presentationId, mustDos, accessToken) {
+  const requirements = Array.from(new Set((Array.isArray(mustDos) ? mustDos : [])
+    .map((value) => String(value || "").replace(/\s+/g, " ").trim())
+    .filter((value) => value && !/^(the digital outcome|my outcome|the client)/i.test(value))
+    .filter(Boolean)))
+    .slice(0, 12);
+
+  if (!presentationId || !requirements.length) return { updated: false, count: 0 };
+
+  const presentation = await googleSlidesApiRequest(presentationId, accessToken);
+  const slides = Array.isArray(presentation?.slides) ? presentation.slides : [];
+  const targetSlide = slides.find((slide) => Array.isArray(slide?.pageElements)
+    && slide.pageElements.some((element) => element?.table)) || slides[1] || slides[0];
+  const tableElement = targetSlide?.pageElements?.find((element) => element?.table);
+  const table = tableElement?.table;
+  const objectId = String(tableElement?.objectId || "").trim();
+  const rowCount = Number(table?.rows || 0);
+  const columnCount = Number(table?.columns || 0);
+  if (!objectId || rowCount < 2 || columnCount < 2) return { updated: false, count: 0 };
+
+  const requests = [];
+  requirements.slice(0, rowCount - 1).forEach((requirement, index) => {
+    const cellLocation = { rowIndex: index + 1, columnIndex: 0 };
+    const cell = table?.tableRows?.[index + 1]?.tableCells?.[0];
+    const cellText = (cell?.text?.textElements || [])
+      .map((element) => String(element?.textRun?.content || ""))
+      .join("")
+      .trim();
+    if (cellText) {
+      requests.push({ deleteText: { objectId, cellLocation, textRange: { type: "ALL" } } });
+    }
+    requests.push({ insertText: { objectId, cellLocation, insertionIndex: 0, text: requirement } });
+  });
+
+  const response = await fetch(`https://slides.googleapis.com/v1/presentations/${encodeURIComponent(presentationId)}:batchUpdate`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ requests })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(String(payload?.error?.message || `Google Slides update error (${response.status})`));
+    error.status = response.status;
+    throw error;
+  }
+
+  return { updated: true, count: Math.min(requirements.length, rowCount - 1) };
 }
 
 async function driveFindFolderByName(parentFolderId, folderName, accessToken) {
@@ -6061,14 +6154,26 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
     }
 
     const existing = await driveFindTemplateInFolder(folderId, templateTitle, driveAccessToken);
-    const populateCopiedSuccessCriteria = async (targetFileId) => {
+    const populateCopiedTemplateData = async (targetFileId) => {
       const isSuccessCriteria = templateId.toLowerCase() === "project-success-criteria"
         || /success\s+criteria/i.test(templateTitle);
-      if (!isSuccessCriteria || !sourcePresentationId) return { updated: false, count: 0 };
+      const isDevelopmentSteps = templateId.toLowerCase() === "development-steps"
+        || /development\s+steps/i.test(templateTitle);
+      if ((!isSuccessCriteria && !isDevelopmentSteps) || !sourcePresentationId) return { updated: false, count: 0 };
 
       try {
         const sourcePresentation = await googleSlidesApiRequest(sourcePresentationId, driveAccessToken);
         const mustDos = extractGoogleSlidesMustDos(sourcePresentation);
+
+        if (isDevelopmentSteps) {
+          const result = await populateDevelopmentStepsMustDos(targetFileId, mustDos, driveAccessToken);
+          return {
+            updated: result.updated,
+            count: result.count,
+            implicationsCount: 0
+          };
+        }
+
         const requirementsResult = await populateSuccessCriteriaRequirements(targetFileId, mustDos, driveAccessToken);
         const implicationsResult = await populateSuccessCriteriaImplications(targetFileId, sourceRelevantImplications, driveAccessToken);
         return {
@@ -6077,13 +6182,14 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
           implicationsCount: implicationsResult.count
         };
       } catch (error) {
-        return { updated: false, count: 0, warning: error.message || "Could not populate Success Criteria requirements." };
+        const context = isDevelopmentSteps ? "Development Steps" : "Success Criteria";
+        return { updated: false, count: 0, warning: error.message || `Could not populate ${context} requirements.` };
       }
     };
 
     if (existing.length > 0) {
       const file = existing[0];
-      const populated = await populateCopiedSuccessCriteria(file.id);
+      const populated = await populateCopiedTemplateData(file.id);
       return res.json({ ok: true, alreadyExists: true, populated: populated.updated, populatedCount: populated.count, populatedImplicationsCount: populated.implicationsCount || 0, populationWarning: populated.warning || "", fileId: file.id, fileUrl: file.webViewLink || `https://docs.google.com/presentation/d/${file.id}/edit`, fileName: file.name, destinationFolderId: folderId, destinationSubfolderName: subfolderName || "" });
     }
 
@@ -6091,7 +6197,7 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
       const legacyExisting = await driveFindTemplateInFolder(processAssessmentFolderId, templateTitle, driveAccessToken);
       if (legacyExisting.length > 0) {
         const file = legacyExisting[0];
-        const populated = await populateCopiedSuccessCriteria(file.id);
+        const populated = await populateCopiedTemplateData(file.id);
         return res.json({ ok: true, alreadyExists: true, populated: populated.updated, populatedCount: populated.count, populatedImplicationsCount: populated.implicationsCount || 0, populationWarning: populated.warning || "", fileId: file.id, fileUrl: file.webViewLink || `https://docs.google.com/presentation/d/${file.id}/edit`, fileName: file.name, destinationFolderId: processAssessmentFolderId, destinationSubfolderName: "" });
       }
     }
@@ -6101,7 +6207,7 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
     const formattedFirstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
     const copyName = `${templateTitle} - ${formattedFirstName}`;
     const copied = await driveCopyFile(templateFileId, folderId, copyName, driveAccessToken);
-    const populated = await populateCopiedSuccessCriteria(copied.id);
+    const populated = await populateCopiedTemplateData(copied.id);
 
     // Record template copy in DB so task list can track it reliably across devices
     if (hasDatabase && templateId) {
