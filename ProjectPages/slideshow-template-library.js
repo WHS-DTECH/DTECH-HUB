@@ -171,9 +171,12 @@ function clearStoredTemplateUse(templateId) {
     try {
         for (let index = localStorage.length - 1; index >= 0; index -= 1) {
             const key = String(localStorage.key(index) || "");
-            if (!key.startsWith(prefix)) continue;
+            if (!key.startsWith(LIB_TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX)) continue;
             const parsed = JSON.parse(localStorage.getItem(key) || "{}");
-            if (String(parsed?.templateId || "").trim().toLowerCase() === targetId) {
+            const keyBelongsToEmail = activityId
+                ? key.startsWith(prefix)
+                : key.split(":")[2] === email;
+            if (keyBelongsToEmail && String(parsed?.templateId || "").trim().toLowerCase() === targetId) {
                 localStorage.removeItem(key);
             }
         }
@@ -186,7 +189,8 @@ async function resetStudentTemplateUse(templateId) {
     if (!activityId) {
         throw new Error("Open this template from the Student View activity page before resetting its use.");
     }
-    const response = await fetch(`/api/activities/${encodeURIComponent(activityId)}/reset-template-use`, {
+    const resetActivityId = activityId || "all";
+    const response = await fetch(`/api/activities/${encodeURIComponent(resetActivityId)}/reset-template-use`, {
         method: "POST",
         headers: withLibraryAuthHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ templateId })
@@ -1289,7 +1293,7 @@ function renderTemplateCard(item) {
     const deleteButtonHtml = canManageTemplates()
         ? `<button type="button" class="template-card-delete" data-delete-template="${escapeHtml(item.id)}">Delete</button>`
         : "";
-    const resetButtonHtml = item.id === "trialling-components" && templateUsageContext.activityId
+    const resetButtonHtml = item.id === "trialling-components"
         ? `<button type="button" class="template-card-delete" data-reset-template-use="${escapeHtml(item.id)}">Reset Use</button>`
         : "";
 

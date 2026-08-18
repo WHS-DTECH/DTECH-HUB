@@ -8078,31 +8078,33 @@ app.get("/api/activities/:id/my-template-copies", async (req, res) => {
       }
 
       try {
-        const current = await pool.query(
-          `SELECT evidence_steps, template_copies FROM project_interests WHERE project_id = $1 AND student_email = $2 LIMIT 1`,
-          [projectId, requesterEmail]
-        );
-        const row = current.rows?.[0];
-        if (!row) { res.json({ ok: true, reset: false }); return; }
-
-        const evidenceSteps = normalizeEvidenceStepsPayload(row.evidence_steps).map((evidenceRow) => ({
-          ...evidenceRow,
-          steps: evidenceRow.steps.map((step) => ({
-            ...step,
-            done: /trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components/i.test(String(step?.text || ""))
-              ? false
-              : Boolean(step.done)
-          }))
-        }));
-        const templateCopies = Array.isArray(row.template_copies)
-          ? row.template_copies.filter((copy) => String(copy?.templateId || "").trim().toLowerCase() !== templateId)
-          : [];
-
-        await pool.query(
-          `UPDATE project_interests SET evidence_steps = $1::jsonb, template_copies = $2::jsonb, updated_at = NOW() WHERE project_id = $3 AND student_email = $4`,
-          [JSON.stringify(evidenceSteps), JSON.stringify(templateCopies), projectId, requesterEmail]
-        );
-        res.json({ ok: true, reset: true });
+        const current = projectId.toLowerCase() === "all"
+          ? await pool.query(`SELECT project_id, evidence_steps, template_copies FROM project_interests WHERE student_email = $1`, [requesterEmail])
+          : await pool.query(
+            `SELECT project_id, evidence_steps, template_copies FROM project_interests WHERE project_id = $1 AND student_email = $2 LIMIT 1`,
+            [projectId, requesterEmail]
+          );
+        let resetCount = 0;
+        for (const row of current.rows || []) {
+          const evidenceSteps = normalizeEvidenceStepsPayload(row.evidence_steps).map((evidenceRow) => ({
+            ...evidenceRow,
+            steps: evidenceRow.steps.map((step) => ({
+              ...step,
+              done: /trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components/i.test(String(step?.text || ""))
+                ? false
+                : Boolean(step.done)
+            }))
+          }));
+          const templateCopies = Array.isArray(row.template_copies)
+            ? row.template_copies.filter((copy) => String(copy?.templateId || "").trim().toLowerCase() !== templateId)
+            : [];
+          await pool.query(
+            `UPDATE project_interests SET evidence_steps = $1::jsonb, template_copies = $2::jsonb, updated_at = NOW() WHERE project_id = $3 AND student_email = $4`,
+            [JSON.stringify(evidenceSteps), JSON.stringify(templateCopies), row.project_id, requesterEmail]
+          );
+          resetCount += 1;
+        }
+        res.json({ ok: true, reset: resetCount > 0, resetCount });
       } catch (error) {
         res.status(500).json({ error: error.message || "Could not reset template use." });
       }
