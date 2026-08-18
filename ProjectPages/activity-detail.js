@@ -7355,7 +7355,7 @@ function isDigitalOutcomeDevelopmentToolsCriterion(taskTopicTitle, taskShortName
 function isDigitalOutcomeTriallingComponentsCriterion(taskTopicTitle, taskShortName = "") {
     const topicText = String(taskTopicTitle || "").trim().toLowerCase();
     const shortNameText = String(taskShortName || "").trim().toLowerCase();
-    if (/triall?ing\s+(?:the\s+)?components|trailing\s+components/.test(topicText)) return true;
+    if (/trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components|trailing\s+components/.test(topicText)) return true;
     return shortNameText === DIGITAL_OUTCOME_TRIALLING_COMPONENTS_TITLE.toLowerCase();
 }
 
@@ -7409,7 +7409,7 @@ function inferDigitalOutcomeTopicKeyFromTitle(pageTitle) {
         return "tools-and-techniques";
     }
 
-    if (/triall?ing\s+(?:the\s+)?components|trailing\s+components/.test(normalized)) {
+    if (/trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components|trailing\s+components/.test(normalized)) {
         return "trialling-components";
     }
 

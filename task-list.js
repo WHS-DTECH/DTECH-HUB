@@ -7,6 +7,7 @@ const DIGITAL_OUTCOME_DETAILS_TASKS = [
     "Description - Google Slides: Describe the Digital Outcome: What is it, who is it for, and what should it do?",
     "Identify the target audience or end user for this outcome.",
     "Explain how the outcome will be developed.",
+    "Trial the components of the digital technologies outcome.",
     "State how success will be measured or evaluated.",
     "What Tools and Techniques will be used?"
 ];
@@ -231,7 +232,7 @@ function deriveTaskShortName(taskTopic) {
     if (/project management/i.test(normalized)) return "Project Management";
     if (/describe.*digital outcome|description\s*-\s*google\s*slides/i.test(normalized)) return "Digital Outcome Description";
     if (/identify\s+the\s+target\s+audience|target\s+audience|end\s+user/i.test(normalized)) return "Target Audience";
-    if (/triall?ing\s+(?:the\s+)?components|trailing\s+components/i.test(normalized)) return "Trialling Components";
+    if (/trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components|trailing\s+components/i.test(normalized)) return "Trialling Components";
     if (/what\s+tools\s+and\s+techniques\s+will\s+be\s+used/i.test(normalized)) return "Tools and Techniques";
     if (/explain\s+how\s+the\s+outcome\s+will\s+be\s+developed|tools\/?technologies|development\s+steps|outcome\s+developed/i.test(normalized)) return "Development Steps";
     if (/relevant\s+implications/i.test(normalized)) return "Relevant Implications";
@@ -245,7 +246,7 @@ function inferDigitalOutcomeTaskTemplateId(taskText) {
     if (!normalized) return "";
     if (/describe.*digital outcome|description\s*-\s*google\s*slides/.test(normalized)) return "digital-outcome-description";
     if (/identify\s+the\s+target\s+audience|target\s+audience|end\s+user/.test(normalized)) return "target-audience";
-    if (/triall?ing\s+(?:the\s+)?components|trailing\s+components/.test(normalized)) return "trialling-components";
+    if (/trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components|trailing\s+components/.test(normalized)) return "trialling-components";
     if (/explain\s+how\s+the\s+outcome\s+will\s+be\s+developed|tools\/?technologies|development\s+steps|outcome\s+developed|relevant\s+implications/.test(normalized)) return "relevant-implications";
     if (/state\s+how\s+success\s+will\s+be\s+measured|success\s+will\s+be\s+evaluated|project\s+success\s+criteria|success\s+criteria/.test(normalized)) return "project-success-criteria";
     return "";
@@ -632,7 +633,7 @@ function getTaskTopicHrefForStep(standard, level, text) {
         return buildCustomActivityLink(taskListState.selectedId, safeText, "Relevant Implications", "relevant-implications");
     }
 
-    if (String(standard) === "91897" && /triall?ing\s+(?:the\s+)?components|trailing\s+components/.test(normalized)) {
+    if (String(standard) === "91897" && /trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components|trailing\s+components/.test(normalized)) {
         return buildCustomActivityLink(taskListState.selectedId, safeText, "Trialling Components", "trialling-components");
     }
 
