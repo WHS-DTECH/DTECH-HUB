@@ -5204,9 +5204,9 @@ function extractGoogleSlidesTableCellText(cell) {
     .trim();
 }
 
-function extractGoogleSlidesDevelopmentComponents(presentation) {
+function extractGoogleSlidesDevelopmentRows(presentation) {
   const slides = Array.isArray(presentation?.slides) ? presentation.slides : [];
-  const allTableValues = [];
+  const allTableRows = [];
 
   slides.forEach((slide) => {
     const elements = Array.isArray(slide?.pageElements) ? slide.pageElements : [];
@@ -5223,7 +5223,7 @@ function extractGoogleSlidesDevelopmentComponents(presentation) {
         const firstLower = firstCellText.toLowerCase();
         const secondLower = secondCellText.toLowerCase();
 
-        if (!secondCellText) return;
+        if (!firstCellText && !secondCellText) return;
         if (/^must[- ]do$/i.test(firstCellText) || /component/i.test(firstLower) || /why this component is needed/i.test(firstLower)) {
           return;
         }
@@ -5231,13 +5231,26 @@ function extractGoogleSlidesDevelopmentComponents(presentation) {
           return;
         }
 
-        allTableValues.push(secondCellText);
+        if (secondCellText) {
+          allTableRows.push({ mustDo: firstCellText, component: secondCellText });
+        }
       });
     });
   });
 
-  const uniqueValues = Array.from(new Set(allTableValues.map((value) => value.replace(/^[\u2022\u25CF\u25E6\u25AA\u2023\u2043\u00B7\u2219*-]\s*/, "").trim()).filter(Boolean)));
-  if (uniqueValues.length) return uniqueValues.slice(0, 30);
+  const uniqueRows = [];
+  const seenRows = new Set();
+  allTableRows.forEach((row) => {
+    const normalizedRow = {
+      mustDo: row.mustDo.replace(/^[\u2022\u25CF\u25E6\u25AA\u2023\u2043\u00B7\u2219*-]\s*/, "").trim(),
+      component: row.component.replace(/^[\u2022\u25CF\u25E6\u25AA\u2023\u2043\u00B7\u2219*-]\s*/, "").trim()
+    };
+    const key = `${normalizedRow.mustDo}\n${normalizedRow.component}`.toLowerCase();
+    if (!normalizedRow.component || seenRows.has(key)) return;
+    seenRows.add(key);
+    uniqueRows.push(normalizedRow);
+  });
+  if (uniqueRows.length) return uniqueRows.slice(0, 30);
 
   const fallbackSource = slides[0];
   const textShapes = (Array.isArray(fallbackSource?.pageElements) ? fallbackSource.pageElements : [])
@@ -5256,7 +5269,12 @@ function extractGoogleSlidesDevelopmentComponents(presentation) {
     .split(/\r?\n/)
     .map((line) => line.replace(/^\s*(?:\d+\.|[\u2022\u25CF\u25E6*-])\s*/, "").replace(/\s+/g, " ").trim())
     .filter((line) => line && !/^(starters|timeline\b|what the slide needs to cover|some key steps|my outcome|digital outcome)/i.test(line))))
-    .slice(0, 30);
+    .slice(0, 30)
+    .map((component) => ({ mustDo: "", component }));
+}
+
+function extractGoogleSlidesDevelopmentComponents(presentation) {
+  return extractGoogleSlidesDevelopmentRows(presentation).map((row) => row.component);
 }
 
 function extractGoogleSlidesDevelopmentComponentsFromPdfText(source) {
@@ -6570,16 +6588,20 @@ app.post("/api/student/drive-setup/read-development-components", async (req, res
       queryParams: { fields: "id,name,modifiedTime,webViewLink" }
     });
     let components = [];
+    let developmentRows = [];
     let extractionSource = "slides-api";
     try {
       const presentation = await googleSlidesApiRequest(presentationId, driveAccessToken);
-      components = extractGoogleSlidesDevelopmentComponents(presentation);
+      const rows = extractGoogleSlidesDevelopmentRows(presentation);
+      components = rows.map((row) => row.component);
+      developmentRows = rows;
     } catch (slidesApiError) {
       const pdfBuffer = await driveDownloadExportedFile(presentationId, "application/pdf", driveAccessToken);
       if (!PDFParse) throw slidesApiError;
       const parser = new PDFParse({ data: pdfBuffer, verbosity: 0 });
       const extraction = await parser.getText();
       components = extractGoogleSlidesDevelopmentComponentsFromPdfText(extraction?.text || "");
+      developmentRows = components.map((component) => ({ mustDo: "", component }));
       extractionSource = "drive-pdf-export";
     }
     res.json({
@@ -6588,6 +6610,7 @@ app.post("/api/student/drive-setup/read-development-components", async (req, res
       fileName: String(file?.name || "Development Steps").trim(),
       fileUrl: String(file?.webViewLink || `https://docs.google.com/presentation/d/${presentationId}/edit`).trim(),
       components,
+      rows: developmentRows || [],
       extractionSource,
       modifiedTime: String(file?.modifiedTime || "").trim(),
       syncedAt: new Date().toISOString()

@@ -4003,12 +4003,12 @@ async function renderDevelopmentStepsMustDosTable(host, projectId, email) {
     const developmentStepsId = extractSlidesIdFromValue(developmentStepsUrl);
     const driveAccessToken = readStoredHubDriveAccessToken();
 
-    if (!driveAccessToken || !digitalOutcomeId || !developmentStepsId) {
-        target.innerHTML = `<p class="task-topic-submission-note">Link your Digital Outcome Description and Development Steps slideshows to build this table.</p>`;
+    if (!driveAccessToken || !digitalOutcomeId) {
+        target.innerHTML = `<p class="task-topic-submission-note">Link your Digital Outcome Description slideshow to build this table.</p>`;
         return;
     }
 
-    target.innerHTML = `<p class="task-topic-submission-note">Reading MUST-DOs and Development Steps components...</p>`;
+    target.innerHTML = `<p class="task-topic-submission-note">Reading MUST-DOs${developmentStepsId ? " and Development Steps components" : " from your Digital Outcome Description"}...</p>`;
     const readJson = (url, presentationId) => fetch(url, {
         method: "POST",
         headers: buildWriteHeaders(),
@@ -4019,24 +4019,34 @@ async function renderDevelopmentStepsMustDosTable(host, projectId, email) {
         return payload;
     });
 
-    void Promise.all([
+    const tasks = [
         readJson("/api/student/drive-setup/read-digital-outcome-must-dos", digitalOutcomeId),
-        readJson("/api/student/drive-setup/read-development-components", developmentStepsId)
-    ]).then(([mustDosPayload, componentsPayload]) => {
+        ...(developmentStepsId ? [readJson("/api/student/drive-setup/read-development-components", developmentStepsId)] : [])
+    ];
+
+    void Promise.all(tasks).then(([mustDosPayload, componentsPayload]) => {
         const mustDos = Array.isArray(mustDosPayload?.mustDos) ? mustDosPayload.mustDos : [];
+        const componentRows = Array.isArray(componentsPayload?.rows) ? componentsPayload.rows : [];
         const components = Array.isArray(componentsPayload?.components) ? componentsPayload.components : [];
-        const rowCount = Math.max(mustDos.length, components.length);
-        const rows = Array.from({ length: rowCount }, (_item, index) => `
+        const rowCount = Math.max(mustDos.length, componentRows.length, components.length);
+        const rows = Array.from({ length: rowCount }, (_item, index) => {
+            const componentRow = componentRows[index] || {};
+            const mustDo = String(componentRow.mustDo || mustDos[index] || "");
+            const component = String(componentRow.component || components[index] || "");
+            return `
             <tr>
-                <td>${escapeHtml(mustDos[index] || "")}</td>
-                <td>${escapeHtml(components[index] || "")}</td>
+                <td>${escapeHtml(mustDo)}</td>
+                <td>${escapeHtml(component)}</td>
             </tr>
-        `).join("");
+        `;
+        }).join("");
+        const tableHeading = developmentStepsId ? "MUST-DOs and Development Steps components" : "MUST-DOs from your Digital Outcome Description";
+        const tableColumnHeading = developmentStepsId ? "Components" : "Development Steps";
         target.innerHTML = rowCount
-            ? `<h3>MUST-DOs and Development Steps components</h3><table class="digital-outcome-must-dos-table"><thead><tr><th>MUST-DOs</th><th>Components</th></tr></thead><tbody>${rows}</tbody></table><p class="task-topic-submission-note">Last read: ${escapeHtml(formatSubmissionTimestamp(componentsPayload?.syncedAt || mustDosPayload?.syncedAt || ""))}</p>`
-            : `<p class="task-topic-submission-note">No MUST-DOs or Development Steps components were found yet.</p>`;
+            ? `<h3>${tableHeading}</h3><table class="digital-outcome-must-dos-table"><thead><tr><th>MUST-DOs</th><th>${tableColumnHeading}</th></tr></thead><tbody>${rows}</tbody></table><p class="task-topic-submission-note">Last read: ${escapeHtml(formatSubmissionTimestamp(componentsPayload?.syncedAt || mustDosPayload?.syncedAt || ""))}</p>`
+            : `<p class="task-topic-submission-note">No MUST-DO bullet points were found in the linked Digital Outcome Description slide yet.</p>`;
     }).catch((error) => {
-        target.innerHTML = `<p class="task-topic-submission-note is-error">${escapeHtml(error?.message || "Could not read the slideshows.")}</p>`;
+        target.innerHTML = `<p class="task-topic-submission-note is-error">${escapeHtml(error?.message || "Could not read the slideshow.")}</p>`;
     });
 }
 
