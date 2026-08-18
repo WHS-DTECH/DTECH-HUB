@@ -8106,8 +8106,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         ? DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_FULL_SET_URL
         : "";
     const slideshowTemplateImage = (isDigitalOutcomeTopic || useDigitalOutcomeTemplateHero)
-        ? (taskTopicSyncedSlideThumbnail
-            || toSafeExternalUrl(data?.slideshowTemplateImage || data?.slideTemplateImage || "")
+        ? (toSafeExternalUrl(data?.slideshowTemplateImage || data?.slideTemplateImage || "")
             || digitalOutcomeTemplateFallbackImage)
         : (toSafeExternalUrl(data?.slideshowTemplateImage || data?.slideTemplateImage || "")
             || taskTopicSyncedSlideThumbnail
@@ -9804,15 +9803,20 @@ async function initDetail() {
     const selectedTaskTopic = resolveRequestedTaskTopic(resolvedData, params);
     const selectedTaskShortName = String(params.get("taskShortName") || "").trim()
         || getTaskTopicShortNameOverride(id, selectedTaskTopic);
-    const isDevelopmentStepsTopic = /^(development\s+steps)$/i.test(String(selectedTaskShortName || selectedTaskTopic || "").trim());
-    const teacherDevelopmentStepsTemplate = isDevelopmentStepsTopic
-        ? await fetchTeacherTemplateLibraryEntry("development-steps")
+    const templateTopicText = String(selectedTaskShortName || selectedTaskTopic || "").trim();
+    const teacherTemplateId = /^development\s+steps$/i.test(templateTopicText)
+        ? "development-steps"
+        : (/triall?ing\s+components|trailing\s+components|trailing\s+comonents/i.test(templateTopicText)
+            ? "trialling-components"
+            : "");
+    const teacherTemplate = teacherTemplateId
+        ? await fetchTeacherTemplateLibraryEntry(teacherTemplateId)
         : null;
-    const pageData = teacherDevelopmentStepsTemplate
+    const pageData = teacherTemplate
         ? {
             ...resolvedData,
-            slideshowTemplateFileUrl: String(teacherDevelopmentStepsTemplate.templateUrl || "").trim(),
-            slideshowTemplateImage: String(teacherDevelopmentStepsTemplate.imageUrl || "").trim()
+            slideshowTemplateFileUrl: String(teacherTemplate.templateUrl || "").trim(),
+            slideshowTemplateImage: String(teacherTemplate.imageUrl || "").trim()
         }
         : resolvedData;
     const titleOverride = isDigitalOutcomeDescriptionCriterion(selectedTaskTopic, selectedTaskShortName)
