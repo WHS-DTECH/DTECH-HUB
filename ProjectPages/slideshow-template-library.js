@@ -31,6 +31,7 @@ const SYNC_FOLDER_NAME = "Process Slide Templates";
 const LIB_HUB_VIEW_MODE_STORAGE_KEY = "hub_view_mode_v1";
 const LIB_TEMPLATE_COPY_MAP_STORAGE_PREFIX = "hub_template_copy_map_v1";
 const LIB_TEMPLATE_COPY_MAP_GLOBAL_STORAGE_KEY = "hub_template_copy_map_global_v1";
+const LIB_TEMPLATE_RESET_STORAGE_PREFIX = "hub_template_reset_v1";
 const LIB_TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX = "hub_task_topic_slide_sync_v1";
 const TEMPLATE_PREVIEW_FALLBACK_URL = "../images/template-preview-placeholder.svg";
 
@@ -45,6 +46,7 @@ const driveState = {
     setupState: null,
     setupResolved: false,
     copyMap: {},          // templateId → { fileUrl, fileName }
+    resetTemplateIds: {}, // templateId → true after a student resets use
     processAssessmentFiles: []  // Real-time list of files in Process Assessment folder
 };
 
@@ -159,11 +161,40 @@ function writeStoredTemplateCopyMap(activityId, email, value) {
     }
 }
 
+function getTemplateResetStorageKey(email) {
+    return `${LIB_TEMPLATE_RESET_STORAGE_PREFIX}:${String(email || "").trim().toLowerCase()}`;
+}
+
+function readStoredTemplateResetIds(email) {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(getTemplateResetStorageKey(email)) || "{}");
+        return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (_error) {
+        return {};
+    }
+}
+
+function writeStoredTemplateResetIds(email, value) {
+    try {
+        localStorage.setItem(getTemplateResetStorageKey(email), JSON.stringify(value || {}));
+    } catch (_error) {
+    }
+}
+
+function clearTemplateResetMarker(templateId) {
+    const id = String(templateId || "").trim();
+    if (!id) return;
+    delete driveState.resetTemplateIds[id];
+    writeStoredTemplateResetIds(getLibraryEmail(), driveState.resetTemplateIds);
+}
+
 function clearStoredTemplateUse(templateId) {
     const targetId = String(templateId || "").trim().toLowerCase();
     if (!targetId) return;
     delete driveState.copyMap[templateId];
     persistCurrentTemplateCopyMap();
+    driveState.resetTemplateIds[targetId] = true;
+    writeStoredTemplateResetIds(getLibraryEmail(), driveState.resetTemplateIds);
 
     const activityId = String(templateUsageContext.activityId || "").trim();
     const email = getLibraryEmail();
@@ -1089,6 +1120,7 @@ async function handleUseTemplate(templateId) {
     // If already copied this session, open existing
     const refreshSuccessCriteriaCopy = templateId === "project-success-criteria";
     if (driveState.copyMap[templateId] && !refreshSuccessCriteriaCopy) {
+        clearTemplateResetMarker(templateId);
         persistTaskTopicSlideSyncLink(driveState.copyMap[templateId].fileUrl, {
             templateId: item.id,
             thumbnailUrl: item.imageUrl,
@@ -1146,6 +1178,7 @@ async function handleUseTemplate(templateId) {
     try {
         const payload = await copyTemplateWithToken(tokenResponse.access_token);
 
+        clearTemplateResetMarker(templateId);
         driveState.copyMap[templateId] = { fileUrl: payload.fileUrl, fileName: payload.fileName };
         persistTaskTopicSlideSyncLink(payload.fileUrl, {
             templateId: item.id,
@@ -1178,6 +1211,7 @@ async function handleUseTemplate(templateId) {
 
         try {
             const retryPayload = await copyTemplateWithToken(consentTokenResponse.access_token);
+            clearTemplateResetMarker(templateId);
             driveState.copyMap[templateId] = { fileUrl: retryPayload.fileUrl, fileName: retryPayload.fileName };
             persistTaskTopicSlideSyncLink(retryPayload.fileUrl, {
                 templateId: item.id,
@@ -1269,14 +1303,16 @@ function renderTemplateCard(item) {
         .replace(/\s+/g, " ");
     
     const normalizedTitle = normalizeForMatching(title);
-    const matchingFile = driveState.processAssessmentFiles.find((file) => {
+    const matchingFile = driveState.resetTemplateIds[item.id]
+        ? null
+        : driveState.processAssessmentFiles.find((file) => {
         const normalizedFileName = normalizeForMatching(file?.name || "");
         const isMatch = normalizedFileName.includes(normalizedTitle);
         if (!isMatch) {
             console.debug(`No match for "${title}": file "${file?.name}" normalizes to "${normalizedFileName}", template normalizes to "${normalizedTitle}"`);
         }
         return isMatch;
-    });
+        });
     
     if (matchingFile) {
         console.debug(`Matched "${title}" to file "${matchingFile.name}"`);
@@ -1571,6 +1607,7 @@ async function initLibrary() {
 
     // Load persisted copy state early so cards can show Open Your Copy even before auth hydration settles.
     driveState.copyMap = readStoredTemplateCopyMap(String(templateUsageContext.activityId || "").trim(), getLibraryEmail());
+    driveState.resetTemplateIds = readStoredTemplateResetIds(getLibraryEmail());
     renderLibrary();
 
     // Keep staff-only controls aligned with global auth mode toggles.
@@ -1590,6 +1627,7 @@ async function initLibrary() {
 
     const hydrateSignedInLibraryState = async () => {
         const email = getLibraryEmail();
+        driveState.resetTemplateIds = readStoredTemplateResetIds(email);
         if (!email) {
             driveState.copyMap = readStoredTemplateCopyMap(String(templateUsageContext.activityId || "").trim(), "");
             renderLibrary();
