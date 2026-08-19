@@ -9806,9 +9806,11 @@ async function initDetail() {
     const templateTopicText = String(selectedTaskShortName || selectedTaskTopic || "").trim();
     const teacherTemplateId = /^development\s+steps$/i.test(templateTopicText)
         ? "development-steps"
-        : (/triall?ing\s+components|trailing\s+components|trailing\s+comonents/i.test(templateTopicText)
+        : (/success\s+criteria|project\s+success\s+criteria/i.test(templateTopicText)
+            ? "project-success-criteria"
+            : (/triall?ing\s+components|trailing\s+components|trailing\s+comonents/i.test(templateTopicText)
             ? "trialling-components"
-            : "");
+            : ""));
     const teacherTemplate = teacherTemplateId
         ? await fetchTeacherTemplateLibraryEntry(teacherTemplateId)
         : null;
