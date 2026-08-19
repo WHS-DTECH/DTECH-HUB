@@ -6290,15 +6290,18 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
     let resolvedSourcePresentationId = sourcePresentationId;
     const isTriallingComponentsTemplate = templateId.toLowerCase() === "trialling-components"
       || /triall?ing\s+components|trailing\s+components/i.test(templateTitle);
-    if (isTriallingComponentsTemplate && !resolvedSourcePresentationId) {
+    const isDevelopmentStepsTemplate = templateId.toLowerCase() === "development-steps"
+      || /development\s+steps/i.test(templateTitle);
+    if ((isTriallingComponentsTemplate || isDevelopmentStepsTemplate) && !resolvedSourcePresentationId) {
       const studentSlides = await driveListSlidesInProcessAssessmentTree(processAssessmentFolderId, driveAccessToken);
       const normalizeSlideName = (value) => String(value || "")
         .toLowerCase()
+        .replace(/\s+-\s+[^-]+$/, "")
         .replace(/[^a-z0-9]+/g, " ")
-        .replace(/\s+-\s+[a-z0-9._-]+$/, "")
         .trim();
+      const sourceName = isDevelopmentStepsTemplate ? "digital outcome description" : "development steps";
       const sourceSlide = studentSlides
-        .filter((file) => normalizeSlideName(file?.name) === "development steps")
+        .filter((file) => normalizeSlideName(file?.name) === sourceName)
         .sort((left, right) => String(right?.modifiedTime || "").localeCompare(String(left?.modifiedTime || "")))[0];
       resolvedSourcePresentationId = String(sourceSlide?.id || "").trim();
     }
