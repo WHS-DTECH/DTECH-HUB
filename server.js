@@ -6771,6 +6771,37 @@ app.post("/api/student/drive-setup/read-development-components", async (req, res
   }
 });
 
+app.post("/api/student/drive-setup/read-trialling-components", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email) { res.status(401).json({ error: "Sign in is required." }); return; }
+  const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
+  const presentationId = String(req.body?.presentationId || "").trim();
+  if (!driveAccessToken) { res.status(400).json({ error: "driveAccessToken is required." }); return; }
+  if (!/^[A-Za-z0-9_-]{10,}$/.test(presentationId)) { res.status(400).json({ error: "A valid Google Slides presentation ID is required." }); return; }
+
+  try {
+    const file = await driveApiRequest(`/files/${encodeURIComponent(presentationId)}`, {
+      accessToken: driveAccessToken,
+      queryParams: { fields: "id,name,modifiedTime,webViewLink" }
+    });
+    const presentation = await googleSlidesApiRequest(presentationId, driveAccessToken);
+    const rows = extractGoogleSlidesDevelopmentRows(presentation)
+      .filter((row) => String(row?.component || "").trim());
+    res.json({
+      ok: true,
+      presentationId,
+      fileName: String(file?.name || "Trialling Components").trim(),
+      fileUrl: String(file?.webViewLink || `https://docs.google.com/presentation/d/${presentationId}/edit`).trim(),
+      components: rows.map((row) => String(row.component || "").trim()),
+      rows,
+      modifiedTime: String(file?.modifiedTime || "").trim(),
+      syncedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not read the Trialling Components slideshow." });
+  }
+});
+
 async function resolveActivityWriteAccess(email) {
   const normalizedEmail = normalizeEmail(email);
   if (!normalizedEmail) {

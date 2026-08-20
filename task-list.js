@@ -884,26 +884,29 @@ function getDecompositionSubtasks(stateMap) {
     ];
 }
 
-function getStoredDevelopmentStepsUrl(projectId, email) {
-    return readStoredTaskTopicSlideSyncEntry(projectId, email, "Explain how the outcome will be developed.", "Development Steps").url
-        || readStoredTaskTopicSlideSyncEntry(projectId, email, "Development Steps", "Development Steps").url
-        || "";
+function getStoredTriallingComponentsUrl(projectId, email) {
+    const localUrl = getLatestTemplateSyncUrlById(projectId, email, "trialling-components");
+    if (localUrl) return localUrl;
+
+    const databaseCopy = (Array.isArray(taskListState.templateCopies) ? taskListState.templateCopies : [])
+        .find((copy) => String(copy?.templateId || "").trim().toLowerCase() === "trialling-components");
+    return String(databaseCopy?.fileUrl || "").trim();
 }
 
 async function loadIdentifiedComponentsCount(projectId, email) {
-    const developmentStepsUrl = getStoredDevelopmentStepsUrl(projectId, email);
-    const developmentStepsId = String(developmentStepsUrl || "").match(/presentation\/d\/([A-Za-z0-9_-]+)/)?.[1] || "";
+    const triallingComponentsUrl = getStoredTriallingComponentsUrl(projectId, email);
+    const triallingComponentsId = String(triallingComponentsUrl || "").match(/presentation\/d\/([A-Za-z0-9_-]+)/)?.[1] || "";
     const driveAccessToken = String(taskListDriveState.accessToken || "").trim();
-    if (!developmentStepsId || !driveAccessToken) {
+    if (!triallingComponentsId || !driveAccessToken) {
         taskListState.identifiedComponentsCount = null;
         return null;
     }
 
     try {
-        const payload = await loadJson("/api/student/drive-setup/read-development-components", {
+        const payload = await loadJson("/api/student/drive-setup/read-trialling-components", {
             method: "POST",
             headers: buildTaskListHeaders({ "Content-Type": "application/json" }),
-            body: JSON.stringify({ driveAccessToken, presentationId: developmentStepsId })
+            body: JSON.stringify({ driveAccessToken, presentationId: triallingComponentsId })
         });
         const rows = Array.isArray(payload?.rows) ? payload.rows : [];
         const components = rows.length
