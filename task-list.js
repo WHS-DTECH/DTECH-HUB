@@ -648,7 +648,8 @@ function getTaskTopicHrefForStep(standard, level, text) {
         return buildCustomActivityLink(taskListState.selectedId, safeText, "Relevant Implications", "relevant-implications");
     }
 
-    if (String(standard) === "91897" && /trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components|trailing\s+components/.test(normalized)) {
+    if ((String(standard) === "91897" || String(standard) === "91907")
+        && /trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components|trailing\s+components/.test(normalized)) {
         return buildCustomActivityLink(taskListState.selectedId, safeText, "Trialling Components", "trialling-components");
     }
 
