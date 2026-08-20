@@ -6744,8 +6744,10 @@ async function renderToolsTechniquesPanel({ host, projectId, detailData, taskTop
         </div>
         <div class="tools-actions">
             <button type="button" class="detail-action detail-action-secondary" id="add-tool-row-btn">+ Add Tool</button>
+            <button type="button" class="detail-action detail-action-secondary" id="push-tools-trello-btn">&#x21bb; Push to Trello To Do</button>
         </div>
         <p class="tools-status" id="tools-status" aria-live="polite"></p>
+        <p class="tools-status" id="tools-trello-push-status" aria-live="polite"></p>
     `;
 
     host.appendChild(panel);
@@ -6870,6 +6872,96 @@ async function renderToolsTechniquesPanel({ host, projectId, detailData, taskTop
     // Attach chip listeners (also called by updateSuggestions after re-render)
     panel.querySelectorAll(".tools-suggestion-chip").forEach((chip) => {
         chip.addEventListener("click", () => addToolFromChip(chip.getAttribute("data-tool-name")));
+    });
+
+    const pushTrelloButton = panel.querySelector("#push-tools-trello-btn");
+    const pushTrelloStatusEl = panel.querySelector("#tools-trello-push-status");
+    const setPushStatus = (message, isError = false) => {
+        if (!pushTrelloStatusEl) return;
+        pushTrelloStatusEl.textContent = String(message || "");
+        pushTrelloStatusEl.classList.toggle("is-error", Boolean(isError));
+    };
+
+    // Resolves the student's saved Trello board so tools can be pushed as To Do cards without a separate board picker.
+    const resolveStudentTrelloBoardUrl = async () => {
+        const favourite = getFavouriteTrelloCardLibraryLink(projectId, email);
+        if (favourite) return favourite;
+
+        const storedLink = toSafeTrelloCardUrl(readStoredTrelloCardLink(projectId, email))
+            || toSafeTrelloCardUrl(readStoredTrelloCardLibrary(projectId, email)[0]?.url || "");
+        if (storedLink) return storedLink;
+
+        try {
+            const rows = await fetchMyEvidenceRows(projectId);
+            return getFirstTrelloCardUrlFromEvidenceRows(rows);
+        } catch (_error) {
+            return "";
+        }
+    };
+
+    pushTrelloButton?.addEventListener("click", async () => {
+        const toolRows = toolsData.filter((row) => String(row?.toolName || "").trim());
+        if (!toolRows.length) {
+            setPushStatus("Add at least one tool before pushing to Trello.", true);
+            return;
+        }
+
+        pushTrelloButton.disabled = true;
+        setPushStatus("Finding your Trello board...");
+
+        try {
+            const boardUrl = await resolveStudentTrelloBoardUrl();
+            const boardId = extractTrelloBoardIdFromUrl(boardUrl);
+            if (!boardId) {
+                setPushStatus("Save your Trello board link on the Project Management page first.", true);
+                return;
+            }
+
+            const listsResponse = await fetch(`/api/integrations/trello/boards/${encodeURIComponent(boardId)}/lists`, {
+                headers: buildWriteHeaders()
+            });
+            const lists = await listsResponse.json().catch(() => []);
+            if (!listsResponse.ok || !Array.isArray(lists) || !lists.length) {
+                setPushStatus("Could not load your Trello lists. Make sure Trello is connected in User Profile.", true);
+                return;
+            }
+
+            const todoList = lists.find((list) => /to\s*-?\s*do/i.test(String(list?.name || ""))) || lists[0];
+
+            setPushStatus("Pushing tools to Trello To Do...");
+            let createdCount = 0;
+            const failedTools = [];
+            for (const row of toolRows) {
+                const cardName = `${row.toolName} (${row.status})`;
+                const cardDesc = String(row.techniques || "").trim() || "No techniques described yet.";
+                const createResponse = await fetch("/api/integrations/trello/cards", {
+                    method: "POST",
+                    headers: buildWriteHeaders(),
+                    body: JSON.stringify({
+                        list_id: todoList.id,
+                        name: cardName,
+                        desc: cardDesc,
+                        pos: "top"
+                    })
+                });
+
+                if (!createResponse.ok) {
+                    failedTools.push(row.toolName);
+                    continue;
+                }
+                createdCount += 1;
+            }
+
+            if (failedTools.length) {
+                setPushStatus(`Created ${createdCount} card(s). ${failedTools.length} tool(s) could not be created.`, true);
+            } else {
+                setPushStatus(`Created ${createdCount} Trello To Do card${createdCount === 1 ? "" : "s"} in "${todoList.name}".`);
+            }
+        } catch (_error) {
+            setPushStatus("Could not push tools to Trello right now.", true);
+        } finally {
+            if (pushTrelloButton.isConnected) pushTrelloButton.disabled = false;
+        }
     });
 }
 
