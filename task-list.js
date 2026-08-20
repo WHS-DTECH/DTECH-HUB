@@ -70,7 +70,8 @@ const taskListState = {
     checklistStandards: [],
     taskTopic: "",
     templateCopies: [],
-    decompositionCoverage: null
+    decompositionCoverage: null,
+    identifiedComponentsCount: null
 };
 
 // Minimal Drive OAuth client for task list — only needs read access to list slides
@@ -883,6 +884,39 @@ function getDecompositionSubtasks(stateMap) {
     ];
 }
 
+function getStoredDevelopmentStepsUrl(projectId, email) {
+    return readStoredTaskTopicSlideSyncEntry(projectId, email, "Explain how the outcome will be developed.", "Development Steps").url
+        || readStoredTaskTopicSlideSyncEntry(projectId, email, "Development Steps", "Development Steps").url
+        || "";
+}
+
+async function loadIdentifiedComponentsCount(projectId, email) {
+    const developmentStepsUrl = getStoredDevelopmentStepsUrl(projectId, email);
+    const developmentStepsId = String(developmentStepsUrl || "").match(/presentation\/d\/([A-Za-z0-9_-]+)/)?.[1] || "";
+    const driveAccessToken = String(taskListDriveState.accessToken || "").trim();
+    if (!developmentStepsId || !driveAccessToken) {
+        taskListState.identifiedComponentsCount = null;
+        return null;
+    }
+
+    try {
+        const payload = await loadJson("/api/student/drive-setup/read-development-components", {
+            method: "POST",
+            headers: buildTaskListHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ driveAccessToken, presentationId: developmentStepsId })
+        });
+        const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+        const components = rows.length
+            ? rows.filter((row) => String(row?.component || "").trim())
+            : (Array.isArray(payload?.components) ? payload.components.filter((component) => String(component || "").trim()) : []);
+        taskListState.identifiedComponentsCount = components.length;
+        return taskListState.identifiedComponentsCount;
+    } catch (_error) {
+        taskListState.identifiedComponentsCount = null;
+        return null;
+    }
+}
+
 function getProjectManagementSubtasks(stateMap) {
     const activityId = taskListState.selectedId;
     if (!activityId) return [];
@@ -1467,6 +1501,8 @@ function renderChecklistCards(detail, allItems) {
                                 && stepText.toLowerCase().includes("project management");
                             const isDecompositionRow = String(level) === "Achieved"
                                 && stepText.toLowerCase().includes("decompos");
+                            const isTriallingComponentsRow = String(level) === "Achieved"
+                                && /triall?ing\s+(?:the\s+)?components|trailing\s+components/.test(stepText.toLowerCase());
                             const isSystemComplete = isProjectManagementRow
                                 && systemConnections.trelloConnected
                                 && systemConnections.githubConnected;
@@ -1477,6 +1513,7 @@ function renderChecklistCards(detail, allItems) {
                             const isTickActionDisabled = isAddressRelevantImplicationsRow
                                 || (isExplainRelevantImplicationsRow && relevantCategoryDoneCount < 3);
                             const decompositionSubtasks = isDecompositionRow ? getDecompositionSubtasks(taskListState.checklistState) : [];
+                            const triallingComponentsCount = taskListState.identifiedComponentsCount;
                             const projectManagementSubtasks = isProjectManagementRow ? getProjectManagementSubtasks(taskListState.fullEvidenceState) : [];
 
                             return `
@@ -1524,6 +1561,21 @@ function renderChecklistCards(detail, allItems) {
                                             ${decompositionSubtasks[0]?.coverageKnown
                                                 ? `<p class="task-list-achieved-note">Trello last synced: ${escapeTaskListHtml(formatTaskListTimestamp(decompositionSubtasks[0]?.coverageSavedAt))}</p>`
                                                 : `<p class="task-list-achieved-note">Click Sync from Trello above to see these counts.</p>`}
+                                        </div>
+                                    ` : ""}
+                                    ${isTriallingComponentsRow ? `
+                                        <div class="task-list-decomposition-subtasks">
+                                            <p class="task-list-system-title">SUBTASKS</p>
+                                            <p class="task-list-achieved-note">Components identified for trialling.</p>
+                                            <div class="task-list-decomposition-category-list">
+                                                <a class="task-list-decomposition-category ${Number.isFinite(triallingComponentsCount) && triallingComponentsCount > 0 ? "is-covered" : ""}" href="${escapeTaskListHtml(getTaskTopicHrefForStep(standard, level, stepText) || "#")}">
+                                                    <span class="task-list-decomposition-category-label">COMPONENTS</span>
+                                                    <span class="task-list-decomposition-category-count">${Number.isFinite(triallingComponentsCount) ? triallingComponentsCount : "-"}</span>
+                                                </a>
+                                            </div>
+                                            ${Number.isFinite(triallingComponentsCount)
+                                                ? ""
+                                                : `<p class="task-list-achieved-note">Sync Google Drive above to see the component count.</p>`}
                                         </div>
                                     ` : ""}
                                 </div>
@@ -1695,6 +1747,12 @@ async function loadChecklistForTask(taskId) {
     renderTaskPicker(taskListState.allItems, taskListState.selectedId);
     renderChecklistCards(detail || selected, taskListState.allItems);
 
+    void loadIdentifiedComponentsCount(taskListState.selectedId, signedInEmail).then((count) => {
+        if (count !== null) {
+            renderChecklistCards(detail || selected, taskListState.allItems);
+        }
+    });
+
     void loadDecompositionCoverageFromServer(taskListState.selectedId).then((coverage) => {
         if (coverage?.found) {
             renderChecklistCards(detail || selected, taskListState.allItems);
@@ -1856,6 +1914,8 @@ async function renderTaskListPage() {
             );
 
             taskListState.templateCopies = Array.isArray(payload?.template_copies) ? payload.template_copies : [];
+
+            await loadIdentifiedComponentsCount(taskListState.selectedId, getTaskListEmail());
 
             const repairedChecklist = applyTemplateCopiesAsRelevantImplicationsState(taskListState.checklistState, taskListState.templateCopies);
             const repairedEvidence = applyTemplateCopiesAsRelevantImplicationsState(taskListState.fullEvidenceState, taskListState.templateCopies);
