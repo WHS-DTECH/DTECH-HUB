@@ -684,6 +684,9 @@ async function fetchTemplateLibraryPreviewByTemplateId(templateId = "") {
         const match = entries.find((entry) => String(entry?.id || "").trim().toLowerCase() === targetTemplateId.toLowerCase())
             || (targetTemplateId === "trialling-components"
                 ? entries.find((entry) => /triall?ing\s+components|trailing\s+components|trailing\s+comonents/i.test(String(entry?.title || "")))
+                : null)
+            || (targetTemplateId === "tools-and-techniques"
+                ? entries.find((entry) => /tools\s*(&|and)\s*techniques/i.test(String(entry?.title || "")))
                 : null);
         if (!match) {
             return "";
