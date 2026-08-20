@@ -4952,12 +4952,24 @@ async function listTemplateLibraryEntries() {
 
   // Fill in any default templates (e.g. "tools-and-techniques") that an admin hasn't added to the DB yet,
   // so their hero preview still resolves instead of falling back to "Template Preview Not Available".
+  const defaultsById = new Map(DEFAULT_TEMPLATE_LIBRARY_ENTRIES.map((row) => [String(row?.id || "").trim().toLowerCase(), row]));
+  const mergedEntries = entries.map((entry) => {
+    const key = String(entry?.id || "").trim().toLowerCase();
+    const fallback = defaultsById.get(key);
+    const hasUsableTemplate = Boolean(String(entry?.templateUrl || "").trim()) || Boolean(String(entry?.imageUrl || "").trim());
+    // A DB row with no template/image link is a blank placeholder — back it with the built-in default instead.
+    if (fallback && !hasUsableTemplate) {
+      return toTemplateLibraryEntry({ ...fallback, sortOrder: entry.sortOrder }, 0);
+    }
+    return entry;
+  });
+
   const existingIds = new Set(entries.map((entry) => String(entry?.id || "").trim().toLowerCase()));
   const missingDefaults = DEFAULT_TEMPLATE_LIBRARY_ENTRIES
     .filter((row) => !existingIds.has(String(row?.id || "").trim().toLowerCase()))
     .map((row, index) => toTemplateLibraryEntry(row, entries.length + index));
 
-  return [...entries, ...missingDefaults];
+  return [...mergedEntries, ...missingDefaults];
 }
 
 async function upsertTemplateLibraryEntries(entries, updatedByEmail = "") {
