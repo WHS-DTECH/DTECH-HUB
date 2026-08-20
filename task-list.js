@@ -27,6 +27,29 @@ const RELEVANT_IMPLICATIONS_CATEGORIES = [
     "Health and Safety"
 ];
 
+const RELEVANT_IMPLICATION_ICON_FILES = {
+    "End-User Considerations": "20260820_122519.jpg",
+    "Accessibility": "20260820_122522.jpg",
+    "Usability": "20260820_122524.jpg",
+    "Social": "20260820_122526.jpg",
+    "Privacy": "20260820_122530.jpg",
+    "Cultural": "20260820_122534.jpg",
+    "Legal": "20260820_122538.jpg",
+    "Ethical": "20260820_122540.jpg",
+    "Sustainability and Future Proofing": "20260820_122551.jpg",
+    "Aesthetics": "20260820_122554.jpg",
+    "Functionality": "20260820_122549.jpg",
+    "Health and Safety": "20260820_122557.jpg",
+    "Intellectual Property": "20260820_122543.jpg"
+};
+
+function getRelevantImplicationsIconUrl(category) {
+    const fileName = RELEVANT_IMPLICATION_ICON_FILES[String(category || "").trim()];
+    return fileName
+        ? `/TeacherFiles/Images/Relevant%20Implications/${encodeURIComponent(fileName)}`
+        : "";
+}
+
 const EVIDENCE_STEPS_DEFAULTS = {
     "92005": [
         "Define what the digital outcome needs to do.",
@@ -1415,6 +1438,42 @@ function renderTaskPicker(allItems, selectedId) {
     }).join("");
 }
 
+function renderRelevantImplicationsCategoryGrid(standard, rows) {
+    return `
+        <div class="task-list-relevant-implications-subtasks">
+            <p class="task-list-system-title">RELEVANT IMPLICATIONS</p>
+            <div class="task-list-relevant-implications-grid">
+                ${(Array.isArray(rows) ? rows : []).map((categoryRow) => {
+                    const category = parseRelevantImplicationsCategoryFromStep(categoryRow?.text);
+                    const categoryHref = getLatestTemplateSyncUrlById(
+                        taskListState.selectedId,
+                        getTaskListEmail(),
+                        `relevant-implications-${normalizeTaskTopicStorageSlug(category)}`
+                    ) || buildTemplateLibraryLink(
+                        taskListState.selectedId,
+                        `Relevant Implications - ${category}`,
+                        `Relevant Implications - ${category}`,
+                        `relevant-implications-${normalizeTaskTopicStorageSlug(category)}`,
+                        category
+                    );
+                    const iconUrl = getRelevantImplicationsIconUrl(category);
+                    return `
+                        <label class="task-list-relevant-implication-card ${categoryRow.done ? "is-complete" : ""}">
+                            <input type="checkbox" ${categoryRow.done ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${categoryRow._index}">
+                            <span class="task-list-relevant-implication-icon" aria-hidden="true">
+                                ${iconUrl ? `<img src="${escapeTaskListHtml(iconUrl)}" alt="">` : ""}
+                            </span>
+                            <span class="task-list-relevant-implication-card-copy">
+                                <a class="task-list-step-link" href="${escapeTaskListHtml(categoryHref)}">${escapeTaskListHtml(category)}</a>
+                            </span>
+                        </label>
+                    `;
+                }).join("")}
+            </div>
+        </div>
+    `;
+}
+
 function renderChecklistCards(detail, allItems) {
     const checklistHost = document.querySelector("#task-list-checklist");
     if (!checklistHost) return;
@@ -1464,6 +1523,7 @@ function renderChecklistCards(detail, allItems) {
                 .map((step, index) => ({ ...step, _index: index }))
                 .filter((step) => getStepLevel(step?.text) === level);
             const renderedAchievedSections = new Set();
+            const relevantCategoryRows = levelRows.filter((step) => level === "Achieved" && isRelevantImplicationsCategoryStep(step?.text));
 
             return `
                 <section class="task-list-level-group">
@@ -1500,6 +1560,19 @@ function renderChecklistCards(detail, allItems) {
                             );
                             if (shouldRenderAchievedSectionHeading && achievedSectionMeta) {
                                 renderedAchievedSections.add(achievedSectionMeta.id);
+                            }
+                            if (isRelevantCategoryRow) {
+                                const firstCategoryIndex = relevantCategoryRows[0]?._index;
+                                if (step._index !== firstCategoryIndex) return "";
+                                return `
+                                    ${shouldRenderAchievedSectionHeading && achievedSectionMeta
+                                        ? `<p class="task-list-achieved-subheading">${escapeTaskListHtml(achievedSectionMeta.title)}</p>`
+                                        : ""}
+                                    ${shouldRenderAchievedSectionHeading && achievedSectionMeta?.id === "relevant-implications"
+                                        ? `<p class="task-list-achieved-note">Complete any 3 or more categories to mark Section 4 complete. (${countCompletedRelevantImplicationsCategories(levelRows)}/${RELEVANT_IMPLICATIONS_CATEGORIES.length})</p>`
+                                        : ""}
+                                    ${renderRelevantImplicationsCategoryGrid(standard, relevantCategoryRows)}
+                                `;
                             }
                             const isProjectManagementRow = String(level) === "Achieved"
                                 && stepText.toLowerCase().includes("project management");
