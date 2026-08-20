@@ -545,6 +545,22 @@ function countCompletedRelevantImplicationsCategories(rows) {
     }).length;
 }
 
+function clearAddressRelevantImplicationsTicks(stateMap) {
+    let changed = false;
+    Object.values(stateMap || {}).forEach((rows) => {
+        if (!Array.isArray(rows)) return;
+        rows.forEach((row) => {
+            const text = String(row?.text || "").trim();
+            if (!/address\s+relevant\s+implications\.?$/i.test(stripStepLevel(text))) return;
+            if (Boolean(row.done)) {
+                row.done = false;
+                changed = true;
+            }
+        });
+    });
+    return changed;
+}
+
 // Applies DB-sourced template copy records to fix which categories are actually done
 function applyTemplateCopiesAsRelevantImplicationsState(stateMap, templateCopies) {
     const rows = Array.isArray(stateMap?.["91897"]) ? stateMap["91897"] : [];
@@ -563,10 +579,6 @@ function applyTemplateCopiesAsRelevantImplicationsState(stateMap, templateCopies
 
     if (!usedCategoryKeys.size) return false;
 
-    // Detect if this is a corruption repair (fewer confirmed categories than currently marked done)
-    const currentDoneCount = rows.filter((r) => isRelevantImplicationsCategoryStep(r?.text) && Boolean(r?.done)).length;
-    const isRepair = currentDoneCount > usedCategoryKeys.size;
-
     let changed = false;
     rows.forEach((row) => {
         const text = String(row?.text || "").trim();
@@ -582,8 +594,7 @@ function applyTemplateCopiesAsRelevantImplicationsState(stateMap, templateCopies
             return;
         }
 
-        // Also clear Merit "Address relevant implications." if repairing corrupted data
-        if (isRepair && getStepLevel(text) === "Merit"
+        if (getStepLevel(text) === "Merit"
             && stripStepLevel(text).toLowerCase().includes("address relevant implications")) {
             if (Boolean(row.done)) {
                 row.done = false;
@@ -1080,16 +1091,14 @@ function autoTickDigitalOutcomeRequirements(stateMap, projectId, email) {
 }
 
 function autoTickRelevantImplicationsRequirements(stateMap, projectId, email) {
+    const addressTicksChanged = clearAddressRelevantImplicationsTicks(stateMap);
     const rows = Array.isArray(stateMap?.["91897"]) ? stateMap["91897"] : [];
     if (!rows.length) {
-        return false;
+        return addressTicksChanged;
     }
 
     const completedCategoryCount = countCompletedRelevantImplicationsCategories(rows);
     const shouldMarkSectionComplete = completedCategoryCount >= 3;
-
-    // Determine whether the Achieved step is actually done after auto-tick logic
-    const achievedStepWillBeDone = shouldMarkSectionComplete;
 
     let changed = false;
 
@@ -1111,16 +1120,9 @@ function autoTickRelevantImplicationsRequirements(stateMap, projectId, email) {
             return;
         }
 
-        // Merit "Address relevant implications." must not be ticked when Achieved is not done
-        if (level === "Merit" && stripped === "address relevant implications." && !achievedStepWillBeDone) {
-            if (Boolean(row?.done)) {
-                row.done = false;
-                changed = true;
-            }
-        }
     });
 
-    return changed;
+    return addressTicksChanged || changed;
 }
 
 async function loadJson(url, options = {}) {
@@ -1465,6 +1467,11 @@ function renderChecklistCards(detail, allItems) {
                                 && systemConnections.trelloConnected
                                 && systemConnections.githubConnected;
                             const relevantCategoryDoneCount = countCompletedRelevantImplicationsCategories(levelRows);
+                            const isAddressRelevantImplicationsRow = /address\s+relevant\s+implications\.?$/i.test(stepText);
+                            const isExplainRelevantImplicationsRow = level === "Achieved"
+                                && /explain(?:ing)?\s+relevant\s+implications\.?$/i.test(stepText);
+                            const isTickActionDisabled = isAddressRelevantImplicationsRow
+                                || (isExplainRelevantImplicationsRow && relevantCategoryDoneCount < 3);
                             const decompositionSubtasks = isDecompositionRow ? getDecompositionSubtasks(taskListState.checklistState) : [];
                             const projectManagementSubtasks = isProjectManagementRow ? getProjectManagementSubtasks(taskListState.fullEvidenceState) : [];
 
@@ -1477,7 +1484,7 @@ function renderChecklistCards(detail, allItems) {
                                     : ""}
                                 <div class="task-list-step-row ${isSystemComplete ? "is-system-complete" : ""} ${isRelevantCategoryRow ? "is-relevant-implications-category" : ""}">
                                     <label class="task-list-step-check-wrap">
-                                        <input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${step._index}">
+                                        <input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} ${isTickActionDisabled ? "disabled" : ""} data-step-check="${escapeTaskListHtml(standard)}:${step._index}">
                                         ${isRelevantCategoryRow
                                             ? `<a class="task-list-step-link task-list-step-text-category" href="${escapeTaskListHtml(relevantCategoryHref)}">${escapeTaskListHtml(stepLabel)}</a>`
                                             : (href
@@ -1878,6 +1885,15 @@ async function renderTaskListPage() {
 
         const rows = Array.isArray(taskListState.checklistState[standard]) ? taskListState.checklistState[standard] : [];
         if (!rows[index]) return;
+        const stepText = stripStepLevel(rows[index].text);
+        const isAddressRelevantImplicationsRow = /address\s+relevant\s+implications\.?$/i.test(stepText);
+        const relevantCategoryDoneCount = countCompletedRelevantImplicationsCategories(rows);
+        const isExplainRelevantImplicationsRow = /explain(?:ing)?\s+relevant\s+implications\.?$/i.test(stepText);
+        if (isAddressRelevantImplicationsRow || (isExplainRelevantImplicationsRow && relevantCategoryDoneCount < 3)) {
+            rows[index].done = false;
+            renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);
+            return;
+        }
         rows[index].done = Boolean(checkbox.checked);
         if (!Array.isArray(taskListState.fullEvidenceState[standard])) {
             taskListState.fullEvidenceState[standard] = rows.map((step) => ({ text: String(step?.text || "").trim(), done: Boolean(step?.done) }));
