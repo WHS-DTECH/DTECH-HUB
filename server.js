@@ -4946,7 +4946,18 @@ async function listTemplateLibraryEntries() {
   );
 
   const entries = Array.isArray(result?.rows) ? result.rows.map((row, index) => toTemplateLibraryEntry(row, index)).sort(compareTemplateLibraryEntries) : [];
-  return entries.length ? entries : DEFAULT_TEMPLATE_LIBRARY_ENTRIES.map((row, index) => toTemplateLibraryEntry(row, index));
+  if (!entries.length) {
+    return DEFAULT_TEMPLATE_LIBRARY_ENTRIES.map((row, index) => toTemplateLibraryEntry(row, index));
+  }
+
+  // Fill in any default templates (e.g. "tools-and-techniques") that an admin hasn't added to the DB yet,
+  // so their hero preview still resolves instead of falling back to "Template Preview Not Available".
+  const existingIds = new Set(entries.map((entry) => String(entry?.id || "").trim().toLowerCase()));
+  const missingDefaults = DEFAULT_TEMPLATE_LIBRARY_ENTRIES
+    .filter((row) => !existingIds.has(String(row?.id || "").trim().toLowerCase()))
+    .map((row, index) => toTemplateLibraryEntry(row, entries.length + index));
+
+  return [...entries, ...missingDefaults];
 }
 
 async function upsertTemplateLibraryEntries(entries, updatedByEmail = "") {
