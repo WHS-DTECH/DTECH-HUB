@@ -3846,19 +3846,21 @@ async function recordTemplateCopyInDb(projectId, studentEmail, entry) {
   };
   if (!safeEntry.templateId) return;
 
-  // Append to array, replacing any earlier entry for the same templateId
+  // Upsert so the copy is saved even if the student has no project_interests row yet
+  // (a plain UPDATE would silently affect 0 rows and lose the sync).
   await pool.query(
-    `UPDATE project_interests
+    `INSERT INTO project_interests (project_id, student_email, template_copies, updated_at)
+     VALUES ($1, $2, jsonb_build_array($4::jsonb), NOW())
+     ON CONFLICT (project_id, student_email) DO UPDATE
      SET template_copies = (
-       SELECT jsonb_agg(elem) FROM (
-         SELECT elem FROM jsonb_array_elements(template_copies) AS elem
+       SELECT COALESCE(jsonb_agg(elem), '[]'::jsonb) FROM (
+         SELECT elem FROM jsonb_array_elements(COALESCE(project_interests.template_copies, '[]'::jsonb)) AS elem
          WHERE elem->>'templateId' <> $3
          UNION ALL
          SELECT $4::jsonb
        ) sub
      ),
-     updated_at = NOW()
-     WHERE project_id = $1 AND student_email = $2`,
+     updated_at = NOW()`,
     [projectId, studentEmail, safeEntry.templateId, JSON.stringify(safeEntry)]
   );
 }
