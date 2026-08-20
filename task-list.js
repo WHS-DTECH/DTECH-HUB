@@ -1506,7 +1506,7 @@ function renderChecklistCards(detail, allItems) {
                             const isDecompositionRow = String(level) === "Achieved"
                                 && stepText.toLowerCase().includes("decompos");
                             const isTriallingComponentsRow = String(level) === "Achieved"
-                                && /triall?ing\s+(?:the\s+)?components|trailing\s+components/.test(stepText.toLowerCase());
+                                && /trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components|trailing\s+components/.test(stepText.toLowerCase());
                             const isSystemComplete = isProjectManagementRow
                                 && systemConnections.trelloConnected
                                 && systemConnections.githubConnected;
