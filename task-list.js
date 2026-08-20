@@ -551,7 +551,7 @@ function clearAddressRelevantImplicationsTicks(stateMap) {
         if (!Array.isArray(rows)) return;
         rows.forEach((row) => {
             const text = String(row?.text || "").trim();
-            if (!/address\s+relevant\s+implications\.?$/i.test(stripStepLevel(text))) return;
+            if (!isAddressRelevantImplicationsStep(text)) return;
             if (Boolean(row.done)) {
                 row.done = false;
                 changed = true;
@@ -559,6 +559,10 @@ function clearAddressRelevantImplicationsTicks(stateMap) {
         });
     });
     return changed;
+}
+
+function isAddressRelevantImplicationsStep(text) {
+    return /address(?:ing)?\s+relevant\s+implications\.?$/i.test(stripStepLevel(text));
 }
 
 // Applies DB-sourced template copy records to fix which categories are actually done
@@ -1467,7 +1471,7 @@ function renderChecklistCards(detail, allItems) {
                                 && systemConnections.trelloConnected
                                 && systemConnections.githubConnected;
                             const relevantCategoryDoneCount = countCompletedRelevantImplicationsCategories(levelRows);
-                            const isAddressRelevantImplicationsRow = /address\s+relevant\s+implications\.?$/i.test(stepText);
+                            const isAddressRelevantImplicationsRow = isAddressRelevantImplicationsStep(stepText);
                             const isExplainRelevantImplicationsRow = level === "Achieved"
                                 && /explain(?:ing)?\s+relevant\s+implications\.?$/i.test(stepText);
                             const isTickActionDisabled = isAddressRelevantImplicationsRow
@@ -1484,7 +1488,7 @@ function renderChecklistCards(detail, allItems) {
                                     : ""}
                                 <div class="task-list-step-row ${isSystemComplete ? "is-system-complete" : ""} ${isRelevantCategoryRow ? "is-relevant-implications-category" : ""}">
                                     <label class="task-list-step-check-wrap">
-                                        <input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} ${isTickActionDisabled ? "disabled" : ""} data-step-check="${escapeTaskListHtml(standard)}:${step._index}">
+                                        <input type="checkbox" ${Boolean(step?.done) && !isAddressRelevantImplicationsRow ? "checked" : ""} ${isTickActionDisabled ? "disabled" : ""} data-step-check="${escapeTaskListHtml(standard)}:${step._index}">
                                         ${isRelevantCategoryRow
                                             ? `<a class="task-list-step-link task-list-step-text-category" href="${escapeTaskListHtml(relevantCategoryHref)}">${escapeTaskListHtml(stepLabel)}</a>`
                                             : (href
@@ -1886,7 +1890,7 @@ async function renderTaskListPage() {
         const rows = Array.isArray(taskListState.checklistState[standard]) ? taskListState.checklistState[standard] : [];
         if (!rows[index]) return;
         const stepText = stripStepLevel(rows[index].text);
-        const isAddressRelevantImplicationsRow = /address\s+relevant\s+implications\.?$/i.test(stepText);
+        const isAddressRelevantImplicationsRow = isAddressRelevantImplicationsStep(stepText);
         const relevantCategoryDoneCount = countCompletedRelevantImplicationsCategories(rows);
         const isExplainRelevantImplicationsRow = /explain(?:ing)?\s+relevant\s+implications\.?$/i.test(stepText);
         if (isAddressRelevantImplicationsRow || (isExplainRelevantImplicationsRow && relevantCategoryDoneCount < 3)) {
