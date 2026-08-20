@@ -6513,8 +6513,9 @@ const TEMPLATE_ID_FROM_TITLE_PATTERNS = [
   { pattern: /^digital\s+outcome\s+description(?:\s*-\s*.+)?$/i, id: "digital-outcome-description", title: "Digital Outcome Description" },
   { pattern: /^target\s+audience(?:\s*-\s*.+)?$/i, id: "target-audience", title: "Target Audience" },
   { pattern: /^development\s+steps(?:\s*-\s*.+)?$/i, id: "development-steps", title: "Development Steps" },
-  { pattern: /^project\s+success\s+criteria(?:\s*-\s*.+)?$/i, id: "project-success-criteria", title: "Project Success Criteria" },
   { pattern: /^triall?ing\s+components(?:\s*-\s*.+)?$/i, id: "trialling-components", title: "Trialling Components" },
+  { pattern: /^trailing\s+comp(?:onents|onets|onets)?(?:\s*-\s*.+)?$/i, id: "trialling-components", title: "Trialling Components" },
+  { pattern: /^project\s+success\s+criteria(?:\s*-\s*.+)?$/i, id: "project-success-criteria", title: "Project Success Criteria" },
 ];
 
 function inferTemplateCopyFromFileName(fileName) {
