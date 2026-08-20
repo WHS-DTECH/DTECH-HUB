@@ -917,6 +917,21 @@ function getStoredTriallingComponentsUrl(projectId, email) {
     return String(databaseCopy?.fileUrl || "").trim();
 }
 
+// Surfaces the "digital-outcome" checklist row as a subtask of the Trialling Components box.
+function getDigitalOutcomeToolsTechniquesSubtask() {
+    const rows = Array.isArray(taskListState.checklistState?.["digital-outcome"])
+        ? taskListState.checklistState["digital-outcome"]
+        : [];
+    const index = rows.findIndex((step) => /what tools and techniques will be used/i.test(String(step?.text || "")));
+    if (index < 0) return null;
+
+    return {
+        index,
+        done: Boolean(rows[index]?.done),
+        href: buildCustomActivityLink(taskListState.selectedId, "What Tools and Techniques will be used?", "Tools and Techniques", "tools-and-techniques")
+    };
+}
+
 async function loadIdentifiedComponentsCount(projectId, email) {
     const triallingComponentsUrl = getStoredTriallingComponentsUrl(projectId, email);
     const triallingComponentsId = String(triallingComponentsUrl || "").match(/presentation\/d\/([A-Za-z0-9_-]+)/)?.[1] || "";
@@ -1499,12 +1514,16 @@ function renderChecklistCards(detail, allItems) {
         if (String(standard) !== "91897" && String(standard) !== "91907") {
             return `
                 <div class="task-list-step-list">
-                    ${safeRows.map((step, index) => `
+                    ${safeRows.map((step, index) => {
+                        const stepText = String(step?.text || "");
+                        if (standard === "digital-outcome" && /what tools and techniques will be used/i.test(stepText)) {
+                            return "";
+                        }
+                        return `
                         <div class="task-list-step-row">
                             <label class="task-list-step-check-wrap">
                                 <input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">
                                 ${(() => {
-                                    const stepText = String(step?.text || "");
                                     const href = getTaskTopicHrefForStep(standard, "", stepText);
                                     return href
                                         ? `<a class="task-list-step-link" href="${escapeTaskListHtml(href)}">${escapeTaskListHtml(stepText)}</a>`
@@ -1512,7 +1531,8 @@ function renderChecklistCards(detail, allItems) {
                                 })()}
                             </label>
                         </div>
-                    `).join("")}
+                    `;
+                    }).join("")}
                 </div>
             `;
         }
@@ -1591,6 +1611,7 @@ function renderChecklistCards(detail, allItems) {
                                 || (isExplainRelevantImplicationsRow && relevantCategoryDoneCount < 3);
                             const decompositionSubtasks = isDecompositionRow ? getDecompositionSubtasks(taskListState.checklistState) : [];
                             const triallingComponentsCount = taskListState.identifiedComponentsCount;
+                            const toolsTechniquesSubtask = isTriallingComponentsRow ? getDigitalOutcomeToolsTechniquesSubtask() : null;
                             const projectManagementSubtasks = isProjectManagementRow ? getProjectManagementSubtasks(taskListState.fullEvidenceState) : [];
 
                             return `
@@ -1653,6 +1674,14 @@ function renderChecklistCards(detail, allItems) {
                                             ${Number.isFinite(triallingComponentsCount)
                                                 ? ""
                                                 : `<p class="task-list-achieved-note">Sync Google Drive above to see the component count.</p>`}
+                                            ${toolsTechniquesSubtask ? `
+                                                <div class="task-list-decomposition-subtask-list">
+                                                    <label class="task-list-decomposition-subtask ${toolsTechniquesSubtask.done ? "is-complete" : ""}">
+                                                        <input type="checkbox" ${toolsTechniquesSubtask.done ? "checked" : ""} data-step-check="digital-outcome:${toolsTechniquesSubtask.index}">
+                                                        <a href="${escapeTaskListHtml(toolsTechniquesSubtask.href)}">What Tools and Techniques will be used?</a>
+                                                    </label>
+                                                </div>
+                                            ` : ""}
                                         </div>
                                     ` : ""}
                                 </div>
