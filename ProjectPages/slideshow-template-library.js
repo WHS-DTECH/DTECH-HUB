@@ -847,7 +847,8 @@ function normalizeTemplateLibraryEntries(items) {
                 imageUrl: String(row?.imageUrl || "").trim(),
                 templateUrl,
                 status: String(row?.status || "live").trim().toLowerCase() === "coming-soon" ? "coming-soon" : "live",
-                sortOrder: Number(row?.sortOrder ?? index + 1) || (index + 1)
+                sortOrder: Number(row?.sortOrder ?? index + 1) || (index + 1),
+                sectionName: String(row?.sectionName || "").trim()
             };
         })
         .filter(Boolean)
@@ -1298,6 +1299,36 @@ async function handleDeleteTemplate(templateId, clickedButton) {
     }
 }
 
+async function handleMoveTemplateSection(templateId, clickedButton) {
+    if (!canManageTemplates()) return;
+
+    const id = String(templateId || "").trim();
+    if (!id) return;
+    const entry = templateLibraryData.find((item) => String(item?.id || "") === id);
+    const currentSection = extractTemplateSectionName(entry);
+    const nextSection = window.prompt(`Move "${entry?.title || "this template"}" to which section?`, currentSection || "");
+    if (nextSection === null) return;
+
+    const sectionName = String(nextSection || "").trim();
+    if (clickedButton) clickedButton.disabled = true;
+    try {
+        const response = await fetch(`/api/template-library/${encodeURIComponent(id)}/section`, {
+            method: "PATCH",
+            headers: withLibraryAuthHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ sectionName })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || `Error ${response.status}`);
+
+        templateLibraryData = normalizeTemplateLibraryEntries(payload?.entries);
+        renderLibrary();
+    } catch (error) {
+        alert(`Could not move template: ${error.message || "Unknown error"}`);
+    } finally {
+        if (clickedButton?.isConnected) clickedButton.disabled = false;
+    }
+}
+
 function renderTemplateCard(item) {
     const title = String(item?.title || "Untitled Template").trim();
     const criteriaText = String(item?.criteriaText || "").trim();
@@ -1345,15 +1376,18 @@ function renderTemplateCard(item) {
     const deleteButtonHtml = canManageTemplates()
         ? `<button type="button" class="template-card-delete" data-delete-template="${escapeHtml(item.id)}">Delete</button>`
         : "";
+    const moveButtonHtml = canManageTemplates()
+        ? `<button type="button" class="template-card-delete" data-move-template="${escapeHtml(item.id)}">Move to Section</button>`
+        : "";
     const resetButtonHtml = item.id
         ? `<button type="button" class="template-card-delete" data-reset-template-use="${escapeHtml(item.id)}">Reset Use</button>`
         : "";
 
     const actionHtml = !canUse
-        ? `<button class="template-card-open" aria-disabled="true" disabled>${status === "live" ? "Template Link Needed" : "Template Coming Soon"}</button>`
+        ? `<button class="template-card-open" aria-disabled="true" disabled>${status === "live" ? "Template Link Needed" : "Template Coming Soon"}</button>${moveButtonHtml}`
         : existingCopy
-            ? `<a class="template-card-open template-card-open-existing" href="${escapeHtml(existingCopy.fileUrl)}" target="_blank" rel="noreferrer">Open Your Copy</a>${resetButtonHtml}${deleteButtonHtml}<p class="template-card-copy-note">Saved to Process Assessment.</p>`
-            : `<button class="template-card-open" type="button" data-use-template="${escapeHtml(item.id)}">Use Template</button>${resetButtonHtml}${deleteButtonHtml}`;
+            ? `<a class="template-card-open template-card-open-existing" href="${escapeHtml(existingCopy.fileUrl)}" target="_blank" rel="noreferrer">Open Your Copy</a>${resetButtonHtml}${moveButtonHtml}${deleteButtonHtml}<p class="template-card-copy-note">Saved to Process Assessment.</p>`
+            : `<button class="template-card-open" type="button" data-use-template="${escapeHtml(item.id)}">Use Template</button>${resetButtonHtml}${moveButtonHtml}${deleteButtonHtml}`;
 
     const previewClickHtml = canUse && !existingCopy
         ? `<button class="template-card-preview template-card-preview-button" type="button" data-use-template="${escapeHtml(item.id)}" aria-label="Use template: ${escapeHtml(title)}">`
@@ -1388,6 +1422,11 @@ function renderTemplateCard(item) {
 
 function extractTemplateSectionName(item) {
     const templateId = String(item?.id || "").trim().toLowerCase();
+    // An explicit admin override always wins so a moved template stops showing under its old section.
+    const sectionOverride = String(item?.sectionName || "").trim();
+    if (sectionOverride) {
+        return sectionOverride;
+    }
     if (templateId === "decomposition-tasks") {
         return "Project Management";
     }
@@ -1570,6 +1609,13 @@ function renderLibrary() {
             if (deleteButton) {
                 const templateId = deleteButton.getAttribute("data-delete-template") || "";
                 if (templateId) void handleDeleteTemplate(templateId, deleteButton);
+                return;
+            }
+
+            const moveButton = event.target.closest("[data-move-template]");
+            if (moveButton) {
+                const templateId = moveButton.getAttribute("data-move-template") || "";
+                if (templateId) void handleMoveTemplateSection(templateId, moveButton);
                 return;
             }
 

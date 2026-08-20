@@ -4734,6 +4734,7 @@ async function ensureTemplateLibrarySchema() {  if (!hasDatabase) return;
       status TEXT NOT NULL DEFAULT 'live',
       sort_order INTEGER NOT NULL DEFAULT 0,
       source_folder_id TEXT,
+      section_name TEXT,
       updated_by_email TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -4747,6 +4748,7 @@ async function ensureTemplateLibrarySchema() {  if (!hasDatabase) return;
   await pool.query(`ALTER TABLE template_library_entries ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'live'`);
   await pool.query(`ALTER TABLE template_library_entries ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0`);
   await pool.query(`ALTER TABLE template_library_entries ADD COLUMN IF NOT EXISTS source_folder_id TEXT`);
+  await pool.query(`ALTER TABLE template_library_entries ADD COLUMN IF NOT EXISTS section_name TEXT`);
   await pool.query(`ALTER TABLE template_library_entries ADD COLUMN IF NOT EXISTS updated_by_email TEXT`);
   await pool.query(`ALTER TABLE template_library_entries ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`ALTER TABLE template_library_entries ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
@@ -4792,7 +4794,8 @@ function toTemplateLibraryEntry(row, fallbackIndex = 0) {
     templateUrl: safeTemplateUrl,
     status: String(row?.status || "live").trim().toLowerCase() === "coming-soon" ? "coming-soon" : "live",
     sortOrder: Number(row?.sort_order ?? row?.sortOrder ?? fallbackIndex + 1) || fallbackIndex + 1,
-    sourceFolderId: String(row?.source_folder_id || row?.sourceFolderId || "").trim()
+    sourceFolderId: String(row?.source_folder_id || row?.sourceFolderId || "").trim(),
+    sectionName: String(row?.section_name || row?.sectionName || "").trim()
   };
 }
 
@@ -4858,6 +4861,14 @@ function inferCanonicalTemplateIdentityFromTitle(title) {
       id: "trialling-components",
       title: "Trialling Components",
       criteriaText: "Trial components of the digital technologies outcome and use evidence to select and improve them."
+    };
+  }
+
+  if (/tools\s*(&|and)\s*techniques/.test(normalizedTitle)) {
+    return {
+      id: "tools-and-techniques",
+      title: "Tools & Techniques",
+      criteriaText: "List the tools you use and describe the techniques you implement with each one."
     };
   }
 
@@ -4939,7 +4950,7 @@ async function listTemplateLibraryEntries() {
   await ensureTemplateLibrarySchema();
   const result = await pool.query(
     `
-      SELECT template_id, title, standard_codes, criteria_text, summary, image_url, template_url, status, sort_order, source_folder_id
+      SELECT template_id, title, standard_codes, criteria_text, summary, image_url, template_url, status, sort_order, source_folder_id, section_name
       FROM template_library_entries
       ORDER BY CASE WHEN lower(title) = 'process slide templates' THEN 0 ELSE 1 END ASC, sort_order ASC, lower(title) ASC
     `
@@ -5004,9 +5015,9 @@ async function upsertTemplateLibraryEntries(entries, updatedByEmail = "") {
         `
           INSERT INTO template_library_entries (
             template_id, title, standard_codes, criteria_text, summary, image_url, template_url,
-            status, sort_order, source_folder_id, updated_by_email, created_at, updated_at
+            status, sort_order, source_folder_id, section_name, updated_by_email, created_at, updated_at
           )
-          VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+          VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
           ON CONFLICT (template_id)
           DO UPDATE SET
             title = EXCLUDED.title,
@@ -5018,6 +5029,7 @@ async function upsertTemplateLibraryEntries(entries, updatedByEmail = "") {
             status = EXCLUDED.status,
             sort_order = EXCLUDED.sort_order,
             source_folder_id = EXCLUDED.source_folder_id,
+            section_name = EXCLUDED.section_name,
             updated_by_email = EXCLUDED.updated_by_email,
             updated_at = NOW()
         `,
@@ -5032,6 +5044,7 @@ async function upsertTemplateLibraryEntries(entries, updatedByEmail = "") {
           entry.status || "live",
           Number(entry.sortOrder || 0),
           entry.sourceFolderId || null,
+          entry.sectionName || null,
           normalizeEmail(updatedByEmail) || null
         ]
       );
@@ -6087,6 +6100,44 @@ app.delete("/api/template-library/:templateId", async (req, res) => {
     res.json({ ok: true, deleted, entries });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not delete template." });
+  }
+});
+
+// Lets an admin/teacher move a template card to a different Section (folder grouping) in the
+// Template Library without needing a full Drive re-sync, so stale duplicate sections can be cleared.
+app.patch("/api/template-library/:templateId/section", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email) {
+    res.status(401).json({ error: "Sign in is required." });
+    return;
+  }
+
+  const access = await resolveActivityWriteAccess(email);
+  if (!access.allowed) {
+    res.status(403).json({ error: "Teacher/Admin access is required." });
+    return;
+  }
+
+  const templateId = String(req.params?.templateId || "").trim();
+  const sectionName = String(req.body?.sectionName || "").trim();
+  if (!templateId) {
+    res.status(400).json({ error: "templateId is required." });
+    return;
+  }
+
+  try {
+    const entries = await listTemplateLibraryEntries();
+    const existing = entries.find((entry) => String(entry?.id || "").trim().toLowerCase() === templateId.toLowerCase());
+    if (!existing || !existing.templateUrl) {
+      res.status(404).json({ error: "Template not found." });
+      return;
+    }
+
+    await upsertTemplateLibraryEntries([{ ...existing, sectionName }], access.email);
+    const nextEntries = await listTemplateLibraryEntries();
+    res.json({ ok: true, entries: nextEntries });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not move template." });
   }
 });
 
