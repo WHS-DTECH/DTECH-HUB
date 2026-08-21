@@ -8194,11 +8194,13 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         || toGoogleSlidesThumbnailUrl(syncedTaskTopicEntry?.url || "");
     const digitalOutcomeTemplateFallbackImage = digitalOutcomeTopicKey === "target-audience"
         ? DIGITAL_OUTCOME_TARGET_AUDIENCE_TEMPLATE_PREVIEW_URL
+        : (digitalOutcomeTopicKey === "tools-and-techniques"
+            ? DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TEMPLATE_PREVIEW_URL
         : (digitalOutcomeTopicKey === "relevant-implications"
             ? DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TEMPLATE_PREVIEW_URL
         : (digitalOutcomeTopicKey === "description"
             ? DIGITAL_OUTCOME_DESCRIPTION_TEMPLATE_PREVIEW_URL
-            : DIGITAL_OUTCOME_GENERIC_TEMPLATE_PREVIEW_URL));
+            : DIGITAL_OUTCOME_GENERIC_TEMPLATE_PREVIEW_URL)));
     const defaultDigitalOutcomeTemplateFileUrl = digitalOutcomeTopicKey === "relevant-implications"
         ? DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_FULL_SET_URL
         : "";
