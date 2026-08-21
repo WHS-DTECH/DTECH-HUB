@@ -109,6 +109,7 @@ const DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE = "Tools & Techniques";
 const DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE = "Success Criteria";
 const DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE = "Relevant Implications";
 const DIGITAL_OUTCOME_DESCRIPTION_TEMPLATE_PREVIEW_URL = "https://drive.google.com/thumbnail?id=1brOY70u9aJdsoiEtxVepr82vRhiv9VzpMm8TUv3lcTo&sz=w1400";
+const DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TEMPLATE_PREVIEW_URL = "https://drive.google.com/thumbnail?id=1f3Ff0KG2JCFQ-x41q6TEK15Yjcx8imjRCGUZ6d254wg&sz=w1400";
 const DIGITAL_OUTCOME_TARGET_AUDIENCE_TEMPLATE_PREVIEW_URL = "../images/target-audience-template-preview.svg";
 const DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_FULL_SET_URL = "https://docs.google.com/presentation/d/1l2bRgY8o4FnVstB3QGq4sh4Yg5IRRijH4EmtHtwvP2Q/edit?usp=sharing";
 const DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TEMPLATE_PREVIEW_URL = "https://drive.google.com/thumbnail?id=1l2bRgY8o4FnVstB3QGq4sh4Yg5IRRijH4EmtHtwvP2Q&sz=w1400";
@@ -4541,7 +4542,8 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             }
         }
 
-        const canonicalTemplatePreviewUrl = await fetchTemplateLibraryPreviewByTemplateId(syncTemplateId);
+        const canonicalTemplatePreviewUrl = await fetchTemplateLibraryPreviewByTemplateId(syncTemplateId)
+            || (isToolsAndTechniquesSyncTopic ? DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TEMPLATE_PREVIEW_URL : "");
         if (!syncedGoogleSlidesSavedAt) {
             syncedGoogleSlidesSavedAt = String(submission.haparaSubmittedAt || submission.submittedAt || "").trim();
         }
