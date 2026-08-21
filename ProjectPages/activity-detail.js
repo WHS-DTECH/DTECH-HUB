@@ -6767,6 +6767,7 @@ async function renderToolsTechniquesPanel({ host, projectId, detailData, taskTop
 
     const tbody = panel.querySelector("#tools-tbody");
     const statusEl = panel.querySelector("#tools-status");
+    let saveTimer = null;
 
     const renderTable = () => {
         tbody.innerHTML = toolsData.map((item, index) => `
@@ -6815,7 +6816,23 @@ async function renderToolsTechniquesPanel({ host, projectId, detailData, taskTop
         }
     };
 
+    const scheduleSave = () => {
+        if (saveTimer) clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => {
+            saveTimer = null;
+            void saveData();
+        }, 600);
+    };
+
     renderTable();
+
+    // Delegated listeners also cover rows added after the panel first renders.
+    tbody.addEventListener("input", scheduleSave);
+    tbody.addEventListener("change", () => {
+        if (saveTimer) clearTimeout(saveTimer);
+        saveTimer = null;
+        void saveData();
+    });
 
     // Event listeners
     panel.querySelector("#add-tool-row-btn").addEventListener("click", () => {
@@ -6828,6 +6845,7 @@ async function renderToolsTechniquesPanel({ host, projectId, detailData, taskTop
         };
         toolsData.push(newRow);
         renderTable();
+        attachListeners();
         // Focus on the new tool name input
         setTimeout(() => {
             const lastInput = tbody.querySelector(".tools-tool-name:last-of-type");
@@ -6835,13 +6853,7 @@ async function renderToolsTechniquesPanel({ host, projectId, detailData, taskTop
         }, 0);
     });
 
-    // Attach change listeners to all inputs
     const attachListeners = () => {
-        tbody.querySelectorAll(".tools-input, .tools-select").forEach((el) => {
-            el.removeEventListener("change", saveData);
-            el.addEventListener("change", saveData);
-        });
-
         tbody.querySelectorAll(".tools-delete-btn").forEach((btn) => {
             btn.removeEventListener("click", () => {});
             btn.addEventListener("click", async (e) => {
@@ -6870,6 +6882,7 @@ async function renderToolsTechniquesPanel({ host, projectId, detailData, taskTop
         }
         renderTable();
         attachListeners();
+        void saveData();
     };
 
     attachListeners();
