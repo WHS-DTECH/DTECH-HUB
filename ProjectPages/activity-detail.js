@@ -159,6 +159,25 @@ const SUGGESTED_TOOLS_BY_CONTEXT = {
     "general": ["Google Workspace", "Microsoft Office", "Trello", "GitHub", "Google Drive", "OneDrive", "Slack", "Zoom", "Figma", "Notion"]
 };
 
+const SUGGESTED_TECHNIQUES_BY_TOOL = {
+    "html/css": ["Semantic HTML structure", "Responsive CSS layouts", "Accessible form labels", "Flexbox or CSS Grid", "Media queries"],
+    "html": ["Semantic page structure", "Accessible headings", "Form validation", "Image alt text"],
+    "css": ["Responsive layouts", "Flexbox or CSS Grid", "Reusable CSS classes", "Media queries"],
+    "javascript": ["DOM event handling", "Form validation", "Fetch API requests", "Local storage", "Async functions"],
+    "python": ["Functions and modules", "Lists and dictionaries", "Input validation", "File handling", "Debugging with tracebacks"],
+    "java": ["Classes and methods", "Conditional logic", "Collections", "Exception handling"],
+    "c#": ["Classes and methods", "Event handling", "Conditional logic", "Debugging"],
+    "react": ["Reusable components", "State management", "Props", "Conditional rendering", "API data loading"],
+    "github": ["Repository setup", "Feature branches", "Meaningful commits", "Pull requests", "Issue tracking"],
+    "git": ["Version control commits", "Branching", "Merging changes", "Remote push and pull"],
+    "vs code": ["Extensions", "Integrated terminal", "Debugging tools", "Source control panel"],
+    "sql": ["SELECT queries", "Filtering with WHERE", "Table joins", "Parameterized queries"],
+    "figma": ["Wireframes", "Reusable components", "Auto layout", "Prototype links", "User-interface design"],
+    "trello": ["To Do task cards", "Kanban workflow", "Checklists", "Due dates", "Progress tracking"],
+    "google drive": ["Folder organisation", "Shared permissions", "Version history", "File naming conventions"],
+    "onedrive": ["Folder organisation", "Shared permissions", "Version history", "File naming conventions"]
+};
+
 const detailAllowedDomain =
     (document.querySelector('meta[name="hub-google-allowed-domain"]')?.content || "")
         .trim()
@@ -6733,6 +6752,7 @@ async function renderToolsTechniquesPanel({ host, projectId, detailData, taskTop
         <h2>Tools & Techniques</h2>
         <p class="tools-instructions">List the tools you intend to use, are currently using, or have used for this task. For each tool, describe the techniques or methods you implemented with it.</p>
         ${buildSuggestionsHtml(activeTopicType)}
+        <div class="tools-technique-suggestions" id="tools-technique-suggestions" hidden aria-live="polite"></div>
         <div class="tools-table-wrapper">
             <table class="tools-table" id="tools-table">
                 <thead>
@@ -6767,6 +6787,7 @@ async function renderToolsTechniquesPanel({ host, projectId, detailData, taskTop
 
     const tbody = panel.querySelector("#tools-tbody");
     const statusEl = panel.querySelector("#tools-status");
+    const techniqueSuggestionsHost = panel.querySelector("#tools-technique-suggestions");
     let saveTimer = null;
 
     const renderTable = () => {
@@ -6824,6 +6845,33 @@ async function renderToolsTechniquesPanel({ host, projectId, detailData, taskTop
         }, 600);
     };
 
+    const normalizeToolName = (value) => String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/visual studio code/g, "vs code")
+        .replace(/[^a-z0-9+#/]+/g, " ")
+        .trim();
+
+    const getSuggestedTechniques = (toolName) => {
+        const key = normalizeToolName(toolName);
+        return SUGGESTED_TECHNIQUES_BY_TOOL[key]
+            || ["Plan the workflow", "Use relevant features", "Test the result", "Record improvements"];
+    };
+
+    const renderTechniqueSuggestions = (toolName, rowId) => {
+        if (!techniqueSuggestionsHost || !rowId) return;
+        const techniques = getSuggestedTechniques(toolName);
+        techniqueSuggestionsHost.hidden = false;
+        techniqueSuggestionsHost.innerHTML = `
+            <p class="tools-technique-suggestions-title">Suggested techniques for <strong>${escapeHtml(toolName)}</strong></p>
+            <div class="tools-technique-suggestions-list">
+                ${techniques.map((technique) => `
+                    <button type="button" class="tools-technique-chip" data-technique-row-id="${escapeHtml(rowId)}" data-technique-value="${escapeHtml(technique)}">${escapeHtml(technique)}</button>
+                `).join("")}
+            </div>
+        `;
+    };
+
     renderTable();
 
     // Delegated listeners also cover rows added after the panel first renders.
@@ -6869,23 +6917,42 @@ async function renderToolsTechniquesPanel({ host, projectId, detailData, taskTop
     const addToolFromChip = (toolName) => {
         if (!toolName) return;
         const lastRow = toolsData[toolsData.length - 1];
+        let targetRow;
         if (lastRow && !lastRow.toolName) {
             lastRow.toolName = toolName;
+            targetRow = lastRow;
         } else {
-            toolsData.push({
+            targetRow = {
                 id: `tool-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                 toolName,
                 status: "Intend to Use",
                 techniques: "",
                 createdAt: new Date().toISOString()
-            });
+            };
+            toolsData.push(targetRow);
         }
         renderTable();
         attachListeners();
+        renderTechniqueSuggestions(toolName, targetRow.id);
         void saveData();
     };
 
     attachListeners();
+
+    techniqueSuggestionsHost?.addEventListener("click", (event) => {
+        const chip = event.target.closest("[data-technique-row-id]");
+        if (!chip) return;
+        const rowId = String(chip.getAttribute("data-technique-row-id") || "");
+        const row = tbody.querySelector(`[data-row-id="${CSS.escape(rowId)}"]`);
+        const textarea = row?.querySelector(".tools-techniques");
+        const technique = String(chip.getAttribute("data-technique-value") || "").trim();
+        if (!textarea || !technique) return;
+        const existing = String(textarea.value || "").trim();
+        if (!existing.toLowerCase().includes(technique.toLowerCase())) {
+            textarea.value = existing ? `${existing}; ${technique}` : technique;
+            void saveData();
+        }
+    });
 
     // Attach chip listeners (also called by updateSuggestions after re-render)
     panel.querySelectorAll(".tools-suggestion-chip").forEach((chip) => {

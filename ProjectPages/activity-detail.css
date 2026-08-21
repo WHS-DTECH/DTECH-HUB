@@ -2528,6 +2528,41 @@ h1 {
     box-shadow: 0 2px 4px rgba(99, 102, 241, 0.2);
 }
 
+.tools-technique-suggestions {
+    margin: -8px 0 16px;
+    padding: 12px 14px;
+    border: 1px solid #b8d6eb;
+    border-radius: 6px;
+    background: #edf8ff;
+}
+
+.tools-technique-suggestions-title {
+    margin: 0 0 8px;
+    color: #174e76;
+    font-size: 0.84rem;
+}
+
+.tools-technique-suggestions-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+}
+
+.tools-technique-chip {
+    border: 1px solid #78b4db;
+    border-radius: 5px;
+    background: #ffffff;
+    color: #174e76;
+    padding: 5px 8px;
+    font: inherit;
+    font-size: 0.78rem;
+    cursor: pointer;
+}
+
+.tools-technique-chip:hover {
+    background: #d6efff;
+}
+
 .tools-table-wrapper {
     overflow-x: auto;
     margin: 16px 0;
