@@ -945,11 +945,12 @@ async function loadIdentifiedComponentsCount(projectId, email) {
     }
 
     const triallingComponentsUrl = getStoredTriallingComponentsUrl(projectId, email);
-    const triallingComponentsId = String(triallingComponentsUrl || "").match(/presentation\/d\/([A-Za-z0-9_-]+)/)?.[1] || "";
+        const triallingComponentsId = String(triallingComponentsUrl || "").match(/presentation\/d\/([A-Za-z0-9_-]+)/)?.[1] || "";
     const driveAccessToken = String(taskListDriveState.accessToken || "").trim();
     if (!triallingComponentsId || !driveAccessToken) {
-        taskListState.identifiedComponentsCount = null;
-        return null;
+            return Number.isFinite(taskListState.identifiedComponentsCount)
+                ? taskListState.identifiedComponentsCount
+                : null;
     }
 
     try {
