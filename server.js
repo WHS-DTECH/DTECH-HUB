@@ -60,6 +60,7 @@ const memoryStudentDriveSetup = new Map();
 const memoryTemplateLibraryEntries = new Map();
 const memoryStudentToolsTechniques = new Map();
 const memoryDecompositionCoverage = new Map();
+const memoryTriallingComponents = new Map();
 const PRACTICAL_SKILLS_LIBRARY_FILE = path.join(__dirname, "practical-skills", "library.json");
 
 const DEFAULT_TEMPLATE_LIBRARY_ENTRIES = [
@@ -3727,6 +3728,7 @@ async function ensureSchema() {
   await ensureTrelloConnectionsSchema();
   await ensureStudentHaparaFoldersSchema();
   await ensureStudentDriveSetupSchema();
+  await ensureTriallingComponentsSchema();
   await ensureUnitPlanSchema();
   await ensureAssessmentStandardCardsSchema();
   await ensureCourseOutlinesSchema();
@@ -4639,6 +4641,104 @@ async function ensureDecompositionCoverageSchema() {
       PRIMARY KEY (student_email, activity_id)
     );
   `);
+}
+
+async function ensureTriallingComponentsSchema() {
+  if (!hasDatabase) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS student_trialling_components (
+      student_email TEXT NOT NULL,
+      activity_id TEXT NOT NULL,
+      presentation_id TEXT,
+      components JSONB NOT NULL DEFAULT '[]'::jsonb,
+      component_count INTEGER NOT NULL DEFAULT 0,
+      modified_time TEXT,
+      synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (student_email, activity_id)
+    );
+  `);
+}
+
+function normalizeTriallingComponents(values) {
+  return Array.from(new Set((Array.isArray(values) ? values : [])
+    .map((value) => String(value || "").replace(/\s+/g, " ").trim())
+    .filter(Boolean))).slice(0, 30);
+}
+
+async function saveTriallingComponents(email, activityId, presentationId, components, modifiedTime) {
+  const studentEmail = normalizeEmail(email);
+  const safeActivityId = String(activityId || "").trim();
+  const safePresentationId = String(presentationId || "").trim();
+  const normalizedComponents = normalizeTriallingComponents(components);
+  if (!studentEmail || !safeActivityId) return null;
+
+  const record = {
+    student_email: studentEmail,
+    activity_id: safeActivityId,
+    presentation_id: safePresentationId,
+    components: normalizedComponents,
+    component_count: normalizedComponents.length,
+    modified_time: String(modifiedTime || "").trim(),
+    synced_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+
+  if (!hasDatabase) {
+    memoryTriallingComponents.set(`${studentEmail}:${safeActivityId}`, record);
+    return record;
+  }
+
+  await ensureTriallingComponentsSchema();
+  const result = await pool.query(
+    `
+      INSERT INTO student_trialling_components
+        (student_email, activity_id, presentation_id, components, component_count, modified_time, synced_at, updated_at)
+      VALUES ($1, $2, $3, $4::jsonb, $5, $6, NOW(), NOW())
+      ON CONFLICT (student_email, activity_id) DO UPDATE SET
+        presentation_id = EXCLUDED.presentation_id,
+        components = EXCLUDED.components,
+        component_count = EXCLUDED.component_count,
+        modified_time = EXCLUDED.modified_time,
+        synced_at = NOW(),
+        updated_at = NOW()
+      RETURNING *
+    `,
+    [studentEmail, safeActivityId, safePresentationId, JSON.stringify(normalizedComponents), normalizedComponents.length, record.modified_time]
+  );
+  return result.rows?.[0] || null;
+}
+
+async function getTriallingComponents(email, activityId) {
+  const studentEmail = normalizeEmail(email);
+  const safeActivityId = String(activityId || "").trim();
+  if (!studentEmail || !safeActivityId) return null;
+
+  if (!hasDatabase) {
+    return memoryTriallingComponents.get(`${studentEmail}:${safeActivityId}`) || null;
+  }
+
+  await ensureTriallingComponentsSchema();
+  const result = await pool.query(
+    `SELECT * FROM student_trialling_components WHERE student_email = $1 AND activity_id = $2 LIMIT 1`,
+    [studentEmail, safeActivityId]
+  );
+  return result.rows?.[0] || null;
+}
+
+function buildTriallingComponentsPayload(row) {
+  if (!row) return { ok: true, found: false, components: [], component_count: 0, synced_at: null, updated_at: null };
+  const components = normalizeTriallingComponents(row.components);
+  return {
+    ok: true,
+    found: true,
+    components,
+    component_count: Math.max(0, Number.parseInt(row.component_count, 10) || components.length),
+    presentation_id: String(row.presentation_id || "").trim(),
+    modified_time: String(row.modified_time || "").trim(),
+    synced_at: row.synced_at || null,
+    updated_at: row.updated_at || null
+  };
 }
 
 function normalizeDecompositionCoverageRows(values) {
@@ -6854,6 +6954,7 @@ app.post("/api/student/drive-setup/read-trialling-components", async (req, res) 
   if (!email) { res.status(401).json({ error: "Sign in is required." }); return; }
   const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
   const presentationId = String(req.body?.presentationId || "").trim();
+  const activityId = String(req.body?.activityId || req.body?.activity_id || "").trim();
   if (!driveAccessToken) { res.status(400).json({ error: "driveAccessToken is required." }); return; }
   if (!/^[A-Za-z0-9_-]{10,}$/.test(presentationId)) { res.status(400).json({ error: "A valid Google Slides presentation ID is required." }); return; }
 
@@ -6865,18 +6966,38 @@ app.post("/api/student/drive-setup/read-trialling-components", async (req, res) 
     const presentation = await googleSlidesApiRequest(presentationId, driveAccessToken);
     const rows = extractGoogleSlidesDevelopmentRows(presentation)
       .filter((row) => String(row?.component || "").trim());
+    const components = rows.map((row) => String(row.component || "").trim());
+    const saved = activityId
+      ? await saveTriallingComponents(email, activityId, presentationId, components, file?.modifiedTime)
+      : null;
     res.json({
       ok: true,
       presentationId,
       fileName: String(file?.name || "Trialling Components").trim(),
       fileUrl: String(file?.webViewLink || `https://docs.google.com/presentation/d/${presentationId}/edit`).trim(),
-      components: rows.map((row) => String(row.component || "").trim()),
+      components,
       rows,
       modifiedTime: String(file?.modifiedTime || "").trim(),
-      syncedAt: new Date().toISOString()
+      syncedAt: new Date().toISOString(),
+      ...(saved ? { component_count: saved.component_count } : {})
     });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not read the Trialling Components slideshow." });
+  }
+});
+
+app.get("/api/students/trialling-components", async (req, res) => {
+  const requesterEmail = normalizeEmail(getRequestUserEmail(req));
+  if (!requesterEmail) { res.status(401).json({ error: "Sign in is required." }); return; }
+
+  const activityId = String(req.query?.activity_id || req.query?.activityId || "").trim();
+  if (!activityId) { res.status(400).json({ error: "activity_id is required." }); return; }
+
+  try {
+    const row = await getTriallingComponents(requesterEmail, activityId);
+    res.json(buildTriallingComponentsPayload(row));
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not load Trialling Components data." });
   }
 });
 

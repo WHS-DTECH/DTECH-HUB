@@ -933,6 +933,17 @@ function getDigitalOutcomeToolsTechniquesSubtask() {
 }
 
 async function loadIdentifiedComponentsCount(projectId, email) {
+    try {
+        const stored = await loadJson(
+            `/api/students/trialling-components?activity_id=${encodeURIComponent(projectId)}`,
+            { headers: buildTaskListHeaders({}) }
+        );
+        if (stored?.found) {
+            taskListState.identifiedComponentsCount = Math.max(0, Number.parseInt(stored.component_count, 10) || 0);
+        }
+    } catch (_error) {
+    }
+
     const triallingComponentsUrl = getStoredTriallingComponentsUrl(projectId, email);
     const triallingComponentsId = String(triallingComponentsUrl || "").match(/presentation\/d\/([A-Za-z0-9_-]+)/)?.[1] || "";
     const driveAccessToken = String(taskListDriveState.accessToken || "").trim();
@@ -945,17 +956,18 @@ async function loadIdentifiedComponentsCount(projectId, email) {
         const payload = await loadJson("/api/student/drive-setup/read-trialling-components", {
             method: "POST",
             headers: buildTaskListHeaders({ "Content-Type": "application/json" }),
-            body: JSON.stringify({ driveAccessToken, presentationId: triallingComponentsId })
+            body: JSON.stringify({ driveAccessToken, presentationId: triallingComponentsId, activityId: projectId })
         });
         const rows = Array.isArray(payload?.rows) ? payload.rows : [];
         const components = rows.length
             ? rows.filter((row) => String(row?.component || "").trim())
             : (Array.isArray(payload?.components) ? payload.components.filter((component) => String(component || "").trim()) : []);
-        taskListState.identifiedComponentsCount = components.length;
+        taskListState.identifiedComponentsCount = Math.max(0, Number.parseInt(payload?.component_count, 10) || components.length);
         return taskListState.identifiedComponentsCount;
     } catch (_error) {
-        taskListState.identifiedComponentsCount = null;
-        return null;
+        return Number.isFinite(taskListState.identifiedComponentsCount)
+            ? taskListState.identifiedComponentsCount
+            : null;
     }
 }
 
