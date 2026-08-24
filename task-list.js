@@ -28,25 +28,25 @@ const RELEVANT_IMPLICATIONS_CATEGORIES = [
 ];
 
 const RELEVANT_IMPLICATION_ICON_FILES = {
-    "End-User Considerations": "20260820_122519.jpg",
-    "Accessibility": "20260820_122522.jpg",
-    "Usability": "20260820_122524.jpg",
-    "Social": "20260820_122526.jpg",
-    "Privacy": "20260820_122530.jpg",
-    "Cultural": "20260820_122534.jpg",
-    "Legal": "20260820_122538.jpg",
-    "Ethical": "20260820_122540.jpg",
-    "Sustainability and Future Proofing": "20260820_122551.jpg",
-    "Aesthetics": "20260820_122554.jpg",
-    "Functionality": "20260820_122549.jpg",
-    "Health and Safety": "20260820_122557.jpg",
-    "Intellectual Property": "20260820_122543.jpg"
+    "End-User Considerations": "End User.png",
+    "Accessibility": "Accessibility.png",
+    "Usability": "Usability.png",
+    "Social": "Social.png",
+    "Privacy": "Privacy.png",
+    "Cultural": "Cultural.png",
+    "Legal": "Legal.png",
+    "Ethical": "Ethical.png",
+    "Sustainability and Future Proofing": "Futureproofing.png",
+    "Aesthetics": "Aesthetics.png",
+    "Functionality": "Functionality.png",
+    "Health and Safety": "Health & Safety.png",
+    "Intellectual Property": "Intellectual Property.png"
 };
 
 function getRelevantImplicationsIconUrl(category) {
     const fileName = RELEVANT_IMPLICATION_ICON_FILES[String(category || "").trim()];
     return fileName
-        ? `/TeacherFiles/Images/Relevant%20Implications/${encodeURIComponent(fileName)}`
+        ? `/images/Relevant%20Implications/${encodeURIComponent(fileName)}`
         : "";
 }
 
