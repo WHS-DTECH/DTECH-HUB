@@ -82,6 +82,11 @@ const EVIDENCE_STEPS_DEFAULTS = {
         "Merit: Effectively use information from testing and trialling to improve the functionality of the digital technologies outcome.",
         "Excellence: Synthesise information gained from the planning, testing and trialling of components.",
         "Excellence: Discuss how this information led to the development of a high-quality digital technologies outcome."
+    ],
+    "91893": [
+        "Achieved: Use advanced techniques to develop a digital media outcome.",
+        "Merit: Use advanced techniques to develop a digital media outcome that is fit for purpose.",
+        "Excellence: Use advanced techniques to develop a digital media outcome that is of a high quality."
     ]
 };
 
@@ -246,6 +251,10 @@ function buildTemplateLibraryLink(id, taskTopic = "", taskShortName = "", templa
 function getTopicTypeLabel(detail) {
     const type = String(detail?.type || detail?.topicType || detail?.topic_type || "").trim();
     return type || "Not set";
+}
+
+function isDigitalMediaTopicType(detail) {
+    return getTopicTypeLabel(detail).trim().toLowerCase() === "digital media";
 }
 
 function deriveTaskShortName(taskTopic) {
@@ -1845,11 +1854,15 @@ function getStandardCodes(detail) {
         ? detail.standardDetails.map((line) => String(line || "").match(/\b(\d{5})\b/)?.[1]).filter(Boolean)
         : [];
 
-    if (!fromDetails.length) {
-        return ["digital-outcome", "91897", "91907"];
+    const codes = fromDetails.length
+        ? fromDetails.filter((code, index, arr) => arr.indexOf(code) === index)
+        : ["91897", "91907"];
+    if (isDigitalMediaTopicType(detail)) {
+        const withoutDigitalMediaStandard = codes.filter((code) => code !== "91893");
+        withoutDigitalMediaStandard.unshift("91893");
+        return ["digital-outcome", ...withoutDigitalMediaStandard];
     }
-
-    return ["digital-outcome", ...fromDetails.filter((code, index, arr) => arr.indexOf(code) === index)];
+    return ["digital-outcome", ...codes];
 }
 
 function buildChecklistState(standardCodes, evidenceMap) {
