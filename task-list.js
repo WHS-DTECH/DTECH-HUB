@@ -85,7 +85,8 @@ const EVIDENCE_STEPS_DEFAULTS = {
     ],
     "91893": [
         "Achieved: Applying appropriate data integrity and testing procedures.",
-        "Achieved: Using relevant conventions for the media type."
+        "Achieved: Using relevant conventions for the media type.",
+        "Achieved: Using appropriate tools and techniques for the purpose and end users."
     ]
 };
 
@@ -1612,6 +1613,25 @@ function renderChecklistCards(detail, allItems) {
 
     const renderRowsForStandard = (standard, rows) => {
         const safeRows = Array.isArray(rows) ? rows : [];
+
+        if (String(standard) === "91893") {
+            return `
+                <section class="task-list-level-group">
+                    <h4>Achieved</h4>
+                    <p class="task-list-achieved-subheading">Section 1: Digital Media</p>
+                    <div class="task-list-step-list">
+                        ${safeRows.map((step, index) => `
+                            <div class="task-list-step-row">
+                                <label class="task-list-step-check-wrap">
+                                    <input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">
+                                    <span class="task-list-step-text">${escapeTaskListHtml(stripStepLevel(step?.text || ""))}</span>
+                                </label>
+                            </div>
+                        `).join("")}
+                    </div>
+                </section>
+            `;
+        }
 
         if (String(standard) !== "91897" && String(standard) !== "91907") {
             return `
