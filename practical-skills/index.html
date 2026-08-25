@@ -57,6 +57,42 @@
                         <h2>Practical skill cards</h2>
                     </div>
                     <p id="practical-skills-results-meta" class="results-meta" aria-live="polite"></p>
+                    <p class="section-copy">
+                        Search by title, year level, or keywords, then sort to quickly find the right practical skill.
+                    </p>
+                </div>
+
+                <div class="controls-panel" role="search">
+                    <div class="search-field-large">
+                        <label for="practical-skills-search" class="search-label">Search by title or keyword</label>
+                        <input id="practical-skills-search" type="search" placeholder="e.g., checklist, safety, workshop...">
+                    </div>
+
+                    <div class="filters-section">
+                        <div class="filter-group">
+                            <span class="filter-group-label">Year Level</span>
+                            <div id="practical-skills-year-pills" class="filter-pills" role="group" aria-label="Filter by year level"></div>
+                        </div>
+
+                        <div class="filter-group">
+                            <span class="filter-group-label">Status</span>
+                            <div id="practical-skills-status-pills" class="filter-pills" role="group" aria-label="Filter by status"></div>
+                        </div>
+
+                        <div class="filter-group">
+                            <span class="filter-group-label">Category</span>
+                            <div id="practical-skills-category-pills" class="filter-pills" role="group" aria-label="Filter by category"></div>
+                        </div>
+
+                        <div class="filter-group sort-group">
+                            <span class="filter-group-label">Sort by</span>
+                            <select id="practical-skills-sort" aria-label="Sort results">
+                                <option value="name-asc">Name (A-Z)</option>
+                                <option value="name-desc">Name (Z-A)</option>
+                                <option value="status">Status</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
 
                 <div id="practical-skills-grid" class="project-grid" aria-live="polite"></div>
