@@ -1048,6 +1048,24 @@ function getProjectManagementSystemLogo(systemName) {
     return `<svg class="task-list-system-logo task-list-system-logo-drive" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.3 3h5.1l6.3 10.9h-5.1L9.3 3Z" fill="#0f9d58"/><path d="m3.4 13.9 2.5-4.4h12.5l-2.5 4.4H3.4Z" fill="#4285f4"/><path d="m6.3 18.8-2.9-4.9L9.3 3l2.6 4.4-5.6 11.4Z" fill="#f4b400"/></svg>`;
 }
 
+function isInformationalCriteriaRow(standard, level, text) {
+    if (standard !== "91897" && standard !== "91907") {
+        return false;
+    }
+
+    const normalized = stripStepLevel(text).toLowerCase();
+    if (level === "Merit") {
+        return /^(?:effectively\s+)?use information appropriately from testing and trialling to improve the functionality of the digital technologies outcome\.?$/.test(normalized)
+            || /^use information from testing and trialling to improve the functionality of the digital technologies outcome\.?$/.test(normalized);
+    }
+
+    if (level === "Excellence") {
+        return /^(?:discuss(?:ing)?\s+how\s+the information (?:from planning, testing and trialling of components (?:assisted the development of a high-quality outcome|led to the development of a high-quality digital technologies outcome)|led to the development of a high-quality digital technologies outcome)|synthesise information gained from the planning, testing and trialling of components)\.?$/i.test(normalized);
+    }
+
+    return false;
+}
+
 function normalize91907ChecklistRows(rows) {
     const sourceRows = Array.isArray(rows)
         ? rows.map((step) => ({ text: String(step?.text || "").trim(), done: Boolean(step?.done) })).filter((step) => step.text)
@@ -1673,6 +1691,7 @@ function renderChecklistCards(detail, allItems) {
                                 && /testing\s+functions|test(?:ing)?\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/i.test(stepText);
                             const isMultipleComponentsRow = String(level) === "Merit"
                                 && /^(?:effectively\s+)?trial(?:l?ing)?\s+multiple\s+components\s+and\/or\s+techniques\b/i.test(stepText);
+                            const isInformationalRow = isInformationalCriteriaRow(String(standard), level, stepText);
                             const isSystemComplete = isProjectManagementRow
                                 && systemConnections.trelloConnected
                                 && systemConnections.githubConnected;
@@ -1696,14 +1715,16 @@ function renderChecklistCards(detail, allItems) {
                                 ${shouldRenderAchievedSectionHeading && achievedSectionMeta?.id === "relevant-implications"
                                     ? `<p class="task-list-achieved-note">Complete any 3 or more categories to mark Section 4 complete. (${relevantCategoryDoneCount}/${RELEVANT_IMPLICATIONS_CATEGORIES.length})</p>`
                                     : ""}
-                                <div class="task-list-step-row ${isSystemComplete ? "is-system-complete" : ""} ${isRelevantCategoryRow ? "is-relevant-implications-category" : ""}">
+                                <div class="task-list-step-row ${isSystemComplete ? "is-system-complete" : ""} ${isRelevantCategoryRow ? "is-relevant-implications-category" : ""} ${isInformationalRow ? "is-informational" : ""}">
                                     <label class="task-list-step-check-wrap">
-                                        <input type="checkbox" ${Boolean(step?.done) && !isAddressRelevantImplicationsRow ? "checked" : ""} ${isTickActionDisabled ? "disabled" : ""} data-step-check="${escapeTaskListHtml(standard)}:${step._index}">
+                                        ${isInformationalRow ? "" : `<input type="checkbox" ${Boolean(step?.done) && !isAddressRelevantImplicationsRow ? "checked" : ""} ${isTickActionDisabled ? "disabled" : ""} data-step-check="${escapeTaskListHtml(standard)}:${step._index}">`}
                                         ${isRelevantCategoryRow
                                             ? `<a class="task-list-step-link task-list-step-text-category" href="${escapeTaskListHtml(relevantCategoryHref)}">${escapeTaskListHtml(stepLabel)}</a>`
-                                            : (href
+                                            : (isInformationalRow
+                                                ? `<span class="task-list-step-text">${escapeTaskListHtml(stepLabel)}</span>`
+                                                : (href
                                                 ? `<a class="task-list-step-link" href="${escapeTaskListHtml(href)}">${escapeTaskListHtml(stepLabel)}</a>`
-                                                : `<span class="task-list-step-text">${escapeTaskListHtml(stepLabel)}</span>`) }
+                                                : `<span class="task-list-step-text">${escapeTaskListHtml(stepLabel)}</span>`)) }
                                     </label>
                                     ${isProjectManagementRow ? `
                                         <div class="task-list-decomposition-subtasks task-list-project-management-subtasks">
