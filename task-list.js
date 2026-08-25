@@ -1668,6 +1668,7 @@ function renderChecklistCards(detail, allItems) {
 
         if (String(standard) === "91893") {
             const levels = ["Achieved", "Merit", "Excellence"];
+            const decompositionCoverage = readDecompositionCategoryCoverage(taskListState.selectedId, getTaskListEmail());
             return `
                 ${levels.map((level) => `
                     <section class="task-list-level-group">
@@ -1680,6 +1681,7 @@ function renderChecklistCards(detail, allItems) {
                                 const href = getTaskTopicHrefForStep(standard, level, stepText);
                                 const isInformationalRow = isInformationalCriteriaRow(standard, level, stepText);
                                 const isLinkedRelevantImplicationsRow = /^(?:explain(?:ing)?|address(?:ing)?) relevant implications\.?$/i.test(stepText);
+                                const is91893ToolsAndTechniquesRow = /using appropriate tools and techniques for the purpose and end users/i.test(stepText);
                                 const rowText = isInformationalRow
                                     ? `<span class="task-list-step-text">${escapeTaskListHtml(stepText)}</span>`
                                     : (href
@@ -1691,6 +1693,22 @@ function renderChecklistCards(detail, allItems) {
                                         ${isInformationalRow ? "" : `<input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">`}
                                         ${rowText}
                                     </label>
+                                    ${is91893ToolsAndTechniquesRow ? `
+                                        <div class="task-list-decomposition-subtasks">
+                                            <p class="task-list-system-title">SUBTASKS</p>
+                                            <p class="task-list-achieved-note">Components and tools identified for the outcome.</p>
+                                            <div class="task-list-decomposition-category-list">
+                                                <a class="task-list-decomposition-category ${Number.isFinite(taskListState.identifiedComponentsCount) && taskListState.identifiedComponentsCount > 0 ? "is-covered" : ""}" href="${escapeTaskListHtml(buildCustomActivityLink(taskListState.selectedId, "Trial the components of the digital technologies outcome.", "Trialling Components", "trialling-components"))}">
+                                                    <span class="task-list-decomposition-category-label">COMPONENTS</span>
+                                                    <span class="task-list-decomposition-category-count">${Number.isFinite(taskListState.identifiedComponentsCount) ? taskListState.identifiedComponentsCount : "-"}</span>
+                                                </a>
+                                                <a class="task-list-decomposition-category ${decompositionCoverage.hasData && decompositionCoverage.counts["Tools & Techniques"] > 0 ? "is-covered" : ""}" href="${escapeTaskListHtml(buildCustomActivityLink(taskListState.selectedId, "What Tools and Techniques will be used?", "Tools & Techniques", "tools-and-techniques"))}">
+                                                    <span class="task-list-decomposition-category-label">Tools &amp; Techniques</span>
+                                                    <span class="task-list-decomposition-category-count">${decompositionCoverage.hasData ? Number(decompositionCoverage.counts["Tools & Techniques"] || 0) : "-"}</span>
+                                                </a>
+                                            </div>
+                                        </div>
+                                    ` : ""}
                                 </div>
                             `;
                             }).join("")}
