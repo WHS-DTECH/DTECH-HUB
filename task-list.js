@@ -1190,6 +1190,31 @@ function autoTickDigitalOutcomeRequirements(stateMap, projectId, email) {
     return changed;
 }
 
+function autoTickMultipleComponentsRequirement(stateMap, componentCount) {
+    if (!Number.isFinite(componentCount)) {
+        return false;
+    }
+
+    const rows = Array.isArray(stateMap?.["91897"]) ? stateMap["91897"] : [];
+    if (!rows.length) {
+        return false;
+    }
+
+    const shouldBeDone = componentCount > 1;
+    let changed = false;
+    rows.forEach((row) => {
+        const text = stripStepLevel(row?.text || "").toLowerCase();
+        if (!/^effectively\s+trial\s+multiple\s+components\s+and\/or\s+techniques\.?$/.test(text)) {
+            return;
+        }
+        if (Boolean(row?.done) !== shouldBeDone) {
+            row.done = shouldBeDone;
+            changed = true;
+        }
+    });
+    return changed;
+}
+
 function autoTickRelevantImplicationsRequirements(stateMap, projectId, email) {
     const addressTicksChanged = clearAddressRelevantImplicationsTicks(stateMap);
     const rows = Array.isArray(stateMap?.["91897"]) ? stateMap["91897"] : [];
@@ -1620,6 +1645,8 @@ function renderChecklistCards(detail, allItems) {
                                 && stepText.toLowerCase().includes("decompos");
                             const isTriallingComponentsRow = String(level) === "Achieved"
                                 && /trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components|trailing\s+components/.test(stepText.toLowerCase());
+                            const isMultipleComponentsRow = String(level) === "Merit"
+                                && /^effectively\s+trial\s+multiple\s+components\s+and\/or\s+techniques\.?$/i.test(stepText);
                             const isSystemComplete = isProjectManagementRow
                                 && systemConnections.trelloConnected
                                 && systemConnections.githubConnected;
@@ -1632,6 +1659,7 @@ function renderChecklistCards(detail, allItems) {
                             const decompositionSubtasks = isDecompositionRow ? getDecompositionSubtasks(taskListState.checklistState) : [];
                             const triallingComponentsCount = taskListState.identifiedComponentsCount;
                             const toolsTechniquesSubtask = isTriallingComponentsRow ? getDigitalOutcomeToolsTechniquesSubtask() : null;
+                            const componentsSubtaskHref = buildCustomActivityLink(taskListState.selectedId, "Trial the components of the digital technologies outcome.", "Trialling Components", "trialling-components");
                             const projectManagementSubtasks = isProjectManagementRow ? getProjectManagementSubtasks(taskListState.fullEvidenceState) : [];
 
                             return `
@@ -1702,6 +1730,21 @@ function renderChecklistCards(detail, allItems) {
                                                     </label>
                                                 </div>
                                             ` : ""}
+                                        </div>
+                                    ` : ""}
+                                    ${isMultipleComponentsRow ? `
+                                        <div class="task-list-decomposition-subtasks">
+                                            <p class="task-list-system-title">SUBTASKS</p>
+                                            <p class="task-list-achieved-note">Components identified for trialling.</p>
+                                            <div class="task-list-decomposition-category-list">
+                                                <a class="task-list-decomposition-category ${Number.isFinite(triallingComponentsCount) && triallingComponentsCount > 1 ? "is-covered" : ""}" href="${escapeTaskListHtml(componentsSubtaskHref)}">
+                                                    <span class="task-list-decomposition-category-label">COMPONENTS</span>
+                                                    <span class="task-list-decomposition-category-count">${Number.isFinite(triallingComponentsCount) ? triallingComponentsCount : "-"}</span>
+                                                </a>
+                                            </div>
+                                            ${Number.isFinite(triallingComponentsCount)
+                                                ? ""
+                                                : `<p class="task-list-achieved-note">Sync Google Drive above to see the component count.</p>`}
                                         </div>
                                     ` : ""}
                                 </div>
@@ -1875,6 +1918,12 @@ async function loadChecklistForTask(taskId) {
 
     void loadIdentifiedComponentsCount(taskListState.selectedId, signedInEmail).then((count) => {
         if (count !== null) {
+            const checklistChanged = autoTickMultipleComponentsRequirement(taskListState.checklistState, count);
+            const evidenceChanged = autoTickMultipleComponentsRequirement(taskListState.fullEvidenceState, count);
+            if (checklistChanged || evidenceChanged) {
+                const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
+                void saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});
+            }
             renderChecklistCards(detail || selected, taskListState.allItems);
         }
     });
@@ -2041,7 +2090,9 @@ async function renderTaskListPage() {
 
             taskListState.templateCopies = Array.isArray(payload?.template_copies) ? payload.template_copies : [];
 
-            await loadIdentifiedComponentsCount(taskListState.selectedId, getTaskListEmail());
+            const componentCount = await loadIdentifiedComponentsCount(taskListState.selectedId, getTaskListEmail());
+            const checklistMultipleComponentsChanged = autoTickMultipleComponentsRequirement(taskListState.checklistState, componentCount);
+            const evidenceMultipleComponentsChanged = autoTickMultipleComponentsRequirement(taskListState.fullEvidenceState, componentCount);
 
             const repairedChecklist = applyTemplateCopiesAsRelevantImplicationsState(taskListState.checklistState, taskListState.templateCopies);
             const repairedEvidence = applyTemplateCopiesAsRelevantImplicationsState(taskListState.fullEvidenceState, taskListState.templateCopies);
@@ -2049,7 +2100,7 @@ async function renderTaskListPage() {
             autoTickRelevantImplicationsRequirements(taskListState.checklistState, taskListState.selectedId, getTaskListEmail());
             autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, taskListState.selectedId, getTaskListEmail());
 
-            if (repairedChecklist || repairedEvidence) {
+            if (repairedChecklist || repairedEvidence || checklistMultipleComponentsChanged || evidenceMultipleComponentsChanged) {
                 const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
                 await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});
             }
