@@ -1195,22 +1195,20 @@ function autoTickMultipleComponentsRequirement(stateMap, componentCount) {
         return false;
     }
 
-    const rows = Array.isArray(stateMap?.["91897"]) ? stateMap["91897"] : [];
-    if (!rows.length) {
-        return false;
-    }
-
     const shouldBeDone = componentCount > 1;
     let changed = false;
-    rows.forEach((row) => {
-        const text = stripStepLevel(row?.text || "").toLowerCase();
-        if (!/^effectively\s+trial\s+multiple\s+components\s+and\/or\s+techniques\.?$/.test(text)) {
-            return;
-        }
-        if (Boolean(row?.done) !== shouldBeDone) {
-            row.done = shouldBeDone;
-            changed = true;
-        }
+    ["91897", "91907"].forEach((standard) => {
+        const rows = Array.isArray(stateMap?.[standard]) ? stateMap[standard] : [];
+        rows.forEach((row) => {
+            const text = stripStepLevel(row?.text || "").toLowerCase();
+            if (!/^(?:effectively\s+)?trial(?:l?ing)?\s+multiple\s+components\s+and\/or\s+techniques\b/.test(text)) {
+                return;
+            }
+            if (Boolean(row?.done) !== shouldBeDone) {
+                row.done = shouldBeDone;
+                changed = true;
+            }
+        });
     });
     return changed;
 }
@@ -1646,7 +1644,7 @@ function renderChecklistCards(detail, allItems) {
                             const isTriallingComponentsRow = String(level) === "Achieved"
                                 && /trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components|trailing\s+components/.test(stepText.toLowerCase());
                             const isMultipleComponentsRow = String(level) === "Merit"
-                                && /^effectively\s+trial\s+multiple\s+components\s+and\/or\s+techniques\.?$/i.test(stepText);
+                                && /^(?:effectively\s+)?trial(?:l?ing)?\s+multiple\s+components\s+and\/or\s+techniques\b/i.test(stepText);
                             const isSystemComplete = isProjectManagementRow
                                 && systemConnections.trelloConnected
                                 && systemConnections.githubConnected;
