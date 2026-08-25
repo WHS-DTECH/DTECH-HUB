@@ -1073,7 +1073,7 @@ function isInformationalCriteriaRow(standard, level, text) {
 
     if (level === "Excellence") {
         return /^synthesise information gained from the planning, testing and trialling of components\.?$/.test(normalized)
-            || /^discuss(?:ing)? how (?:the|this) information from planning, testing and trialling of components (?:assisted|led to) the development of a high-quality (?:digital technologies )?outcome\.?$/.test(normalized)
+            || /^discuss(?:ing)? how (?:the|this) information from planning, testing and trialling of components (?:assisted(?: in)?|led to) the development of a high-quality (?:digital technologies )?outcome\.?$/.test(normalized)
             || /^discussing how the information from planning, testing and trialling of components assisted the development of a high-quality outcome\.?$/.test(normalized);
     }
 
