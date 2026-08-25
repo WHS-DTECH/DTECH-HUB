@@ -1073,12 +1073,14 @@ function isInformationalCriteriaRow(standard, level, text) {
 
     const normalized = stripStepLevel(text).toLowerCase();
     if (level === "Merit") {
-        return /^(?:effectively\s+)?use information (?:appropriately )?from testing and trialling to improve the functionality of the digital technologies outcome\.?$/.test(normalized);
+        return /^(?:effectively\s+)?use(?:r|s|d|ing)? information appropriately from testing and trialling to improve the functionality of the digital technologies outcome\.?$/.test(normalized)
+            || /^using information appropriately from testing and trialling to improve the functionality of the digital technologies outcome\.?$/.test(normalized);
     }
 
     if (level === "Excellence") {
         return /^synthesise information gained from the planning, testing and trialling of components\.?$/.test(normalized)
-            || /^discuss(?:ing)? how (?:the|this) information (?:from planning, testing and trialling of components )?(?:assisted|led to) the development of a high-quality (?:digital technologies )?outcome\.?$/.test(normalized);
+            || /^discuss(?:ing)? how (?:the|this) information from planning, testing and trialling of components (?:assisted|led to) the development of a high-quality (?:digital technologies )?outcome\.?$/.test(normalized)
+            || /^discussing how the information from planning, testing and trialling of components assisted the development of a high-quality outcome\.?$/.test(normalized);
     }
 
     return false;
