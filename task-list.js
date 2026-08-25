@@ -1077,11 +1077,15 @@ function getProjectManagementSystemLogo(systemName) {
 }
 
 function isInformationalCriteriaRow(standard, level, text) {
-    if (standard !== "91897" && standard !== "91907") {
+    if (standard !== "91893" && standard !== "91897" && standard !== "91907") {
         return false;
     }
 
     const normalized = stripStepLevel(text).toLowerCase();
+    if (standard === "91893" && level === "Excellence") {
+        return /^iterative improvement throughout the design, development and testing process to produce a high-quality outcome\.?$/.test(normalized);
+    }
+
     if (level === "Merit") {
         return /^(?:effectively\s+)?(?:use|using) information (?:appropriately )?from testing and trialling to improve the functionality of the digital technologies outcome\.?$/.test(normalized);
     }
