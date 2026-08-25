@@ -10013,7 +10013,9 @@ async function initDetail() {
             ? "project-success-criteria"
             : (/triall?ing\s+components|trailing\s+components|trailing\s+comonents/i.test(templateTopicText)
             ? "trialling-components"
-            : ""));
+            : (/testing\s+functions|test(?:ing)?\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/i.test(templateTopicText)
+            ? "testing-functions"
+            : "")));
     const teacherTemplate = teacherTemplateId
         ? await fetchTeacherTemplateLibraryEntry(teacherTemplateId)
         : null;
@@ -10022,6 +10024,7 @@ async function initDetail() {
             ...resolvedData,
             slideshowTemplateFileUrl: String(teacherTemplate.templateUrl || "").trim(),
             slideshowTemplateImage: String(teacherTemplate.imageUrl || "").trim()
+                || toGoogleSlidesThumbnailUrl(teacherTemplate.templateUrl || "")
         }
         : resolvedData;
     const titleOverride = isDigitalOutcomeDescriptionCriterion(selectedTaskTopic, selectedTaskShortName)
