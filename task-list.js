@@ -1073,8 +1073,7 @@ function isInformationalCriteriaRow(standard, level, text) {
 
     const normalized = stripStepLevel(text).toLowerCase();
     if (level === "Merit") {
-        return /^(?:effectively\s+)?use(?:r|s|d|ing)? information appropriately from testing and trialling to improve the functionality of the digital technologies outcome\.?$/.test(normalized)
-            || /^using information appropriately from testing and trialling to improve the functionality of the digital technologies outcome\.?$/.test(normalized);
+        return /^(?:effectively\s+)?(?:use|using) information appropriately from testing and trialling to improve the functionality of the digital technologies outcome\.?$/.test(normalized);
     }
 
     if (level === "Excellence") {
