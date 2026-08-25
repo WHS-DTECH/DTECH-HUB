@@ -5641,6 +5641,96 @@ async function populateDevelopmentStepsMustDos(presentationId, mustDos, accessTo
   return { updated: true, count: Math.min(requirements.length, rowCount - 1) };
 }
 
+async function populateTestingFunctionsMustDos(presentationId, mustDos, accessToken) {
+  const requirements = Array.from(new Set((Array.isArray(mustDos) ? mustDos : [])
+    .map((value) => String(value || "").replace(/\s+/g, " ").trim())
+    .filter((value) => value && !/^(the digital outcome|my outcome|the client)/i.test(value))))
+    .slice(0, 12);
+
+  if (!presentationId || !requirements.length) return { updated: false, count: 0 };
+
+  const presentation = await googleSlidesApiRequest(presentationId, accessToken);
+  const slides = Array.isArray(presentation?.slides) ? presentation.slides : [];
+  const tableTargets = [];
+
+  slides.forEach((slide) => {
+    (Array.isArray(slide?.pageElements) ? slide.pageElements : []).forEach((element) => {
+      const table = element?.table;
+      if (!table || !Array.isArray(table.tableRows)) return;
+
+      const rows = table.tableRows.map((row) => (
+        Array.isArray(row?.tableCells)
+          ? row.tableCells.map((cell) => extractGoogleSlidesTableCellText(cell))
+          : []
+      ));
+      const headerRowIndex = rows.findIndex((row) => row.some((text) => /must[- ]do/i.test(text)));
+      if (headerRowIndex < 0) return;
+
+      const headerRow = rows[headerRowIndex] || [];
+      const mustDoColumnIndex = headerRow.findIndex((text) => /must[- ]do/i.test(text));
+      if (mustDoColumnIndex < 0) return;
+
+      tableTargets.push({
+        objectId: String(element?.objectId || "").trim(),
+        table,
+        headerRowIndex,
+        mustDoColumnIndex
+      });
+    });
+  });
+
+  if (!tableTargets.length) return { updated: false, count: 0 };
+
+  const requests = [];
+  let populatedCount = 0;
+  tableTargets.forEach(({ objectId, table, headerRowIndex, mustDoColumnIndex }) => {
+    const rowCount = Number(table?.rows || table?.tableRows?.length || 0);
+    if (!objectId || rowCount <= headerRowIndex + 1) return;
+
+    const count = Math.min(requirements.length, rowCount - headerRowIndex - 1);
+    for (let index = 0; index < count; index += 1) {
+      const rowIndex = headerRowIndex + index + 1;
+      const cellLocation = { rowIndex, columnIndex: mustDoColumnIndex };
+      const cell = table?.tableRows?.[rowIndex]?.tableCells?.[mustDoColumnIndex];
+      const cellText = (cell?.text?.textElements || [])
+        .map((element) => String(element?.textRun?.content || ""))
+        .join("")
+        .trim();
+      if (cellText) {
+        requests.push({ deleteText: { objectId, cellLocation, textRange: { type: "ALL" } } });
+      }
+      requests.push({
+        insertText: {
+          objectId,
+          cellLocation,
+          insertionIndex: 0,
+          text: requirements[index]
+        }
+      });
+    }
+    populatedCount = Math.max(populatedCount, count);
+  });
+
+  if (!requests.length) return { updated: false, count: 0 };
+
+  const response = await fetch(`https://slides.googleapis.com/v1/presentations/${encodeURIComponent(presentationId)}:batchUpdate`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ requests })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(String(payload?.error?.message || `Google Slides update error (${response.status})`));
+    error.status = response.status;
+    throw error;
+  }
+
+  return { updated: true, count: populatedCount, tableCount: tableTargets.length };
+}
+
 async function populateTriallingComponents(presentationId, sourcePresentationId, accessToken) {
   if (!presentationId || !sourcePresentationId) return { updated: false, count: 0 };
 
@@ -6476,14 +6566,16 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
       || /triall?ing\s+components|trailing\s+components/i.test(templateTitle);
     const isDevelopmentStepsTemplate = templateId.toLowerCase() === "development-steps"
       || /development\s+steps/i.test(templateTitle);
-    if ((isTriallingComponentsTemplate || isDevelopmentStepsTemplate) && !resolvedSourcePresentationId) {
+    const isTestingFunctionsTemplate = templateId.toLowerCase() === "testing-functions"
+      || /testing\s+functions/i.test(templateTitle);
+    if ((isTriallingComponentsTemplate || isDevelopmentStepsTemplate || isTestingFunctionsTemplate) && !resolvedSourcePresentationId) {
       const studentSlides = await driveListSlidesInProcessAssessmentTree(processAssessmentFolderId, driveAccessToken);
       const normalizeSlideName = (value) => String(value || "")
         .toLowerCase()
         .replace(/\s+-\s+[^-]+$/, "")
         .replace(/[^a-z0-9]+/g, " ")
         .trim();
-      const sourceName = isDevelopmentStepsTemplate ? "digital outcome description" : "development steps";
+      const sourceName = isDevelopmentStepsTemplate || isTestingFunctionsTemplate ? "digital outcome description" : "development steps";
       const sourceSlide = studentSlides
         .filter((file) => normalizeSlideName(file?.name) === sourceName)
         .sort((left, right) => String(right?.modifiedTime || "").localeCompare(String(left?.modifiedTime || "")))[0];
@@ -6508,9 +6600,18 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
         || /development\s+steps/i.test(templateTitle);
       const isTriallingComponents = templateId.toLowerCase() === "trialling-components"
         || /triall?ing\s+components|trailing\s+components/i.test(templateTitle);
-      if ((!isSuccessCriteria && !isDevelopmentSteps && !isTriallingComponents) || !resolvedSourcePresentationId) return { updated: false, count: 0 };
+      const isTestingFunctions = templateId.toLowerCase() === "testing-functions"
+        || /testing\s+functions/i.test(templateTitle);
+      if ((!isSuccessCriteria && !isDevelopmentSteps && !isTriallingComponents && !isTestingFunctions) || !resolvedSourcePresentationId) return { updated: false, count: 0 };
 
       try {
+        if (isTestingFunctions) {
+          const sourcePresentation = await googleSlidesApiRequest(resolvedSourcePresentationId, driveAccessToken);
+          const mustDos = extractGoogleSlidesMustDos(sourcePresentation);
+          const result = await populateTestingFunctionsMustDos(targetFileId, mustDos, driveAccessToken);
+          return { updated: result.updated, count: result.count, tableCount: result.tableCount || 0 };
+        }
+
         if (isTriallingComponents) {
           const result = await populateTriallingComponents(targetFileId, resolvedSourcePresentationId, driveAccessToken);
           return { updated: result.updated, count: result.count, implicationsCount: 0 };

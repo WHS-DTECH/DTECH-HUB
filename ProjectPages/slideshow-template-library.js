@@ -1163,13 +1163,16 @@ async function handleUseTemplate(templateId) {
 
     const button = document.querySelector(`[data-use-template="${CSS.escape(templateId)}"]`);
     if (button) { button.disabled = true; button.textContent = "Copying\u2026"; }
-    let sourcePresentationId = item.id === "project-success-criteria"
+    let sourcePresentationId = item.id === "project-success-criteria" || item.id === "testing-functions"
         ? readStoredDigitalOutcomeDescriptionSlideId()
         : (item.id === "trialling-components" ? readStoredTemplateSlideIdByTemplateId("development-steps") : "");
 
     const copyTemplateWithToken = async (accessToken) => {
         if (item.id === "trialling-components" && !sourcePresentationId) {
             sourcePresentationId = await findStudentTemplateSlideId("Development Steps", accessToken);
+        }
+        if (item.id === "testing-functions" && !sourcePresentationId) {
+            sourcePresentationId = await findStudentTemplateSlideId("Digital Outcome Description", accessToken);
         }
         const response = await fetch("/api/student/drive-setup/copy-template", {
             method: "POST",
