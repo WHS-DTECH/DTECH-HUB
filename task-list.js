@@ -1696,12 +1696,8 @@ function renderChecklistCards(detail, allItems) {
                                     ${is91893ToolsAndTechniquesRow ? `
                                         <div class="task-list-decomposition-subtasks">
                                             <p class="task-list-system-title">SUBTASKS</p>
-                                            <p class="task-list-achieved-note">Components and tools identified for the outcome.</p>
+                                            <p class="task-list-achieved-note">Tools identified for the outcome.</p>
                                             <div class="task-list-decomposition-category-list">
-                                                <a class="task-list-decomposition-category ${Number.isFinite(taskListState.identifiedComponentsCount) && taskListState.identifiedComponentsCount > 0 ? "is-covered" : ""}" href="${escapeTaskListHtml(buildCustomActivityLink(taskListState.selectedId, "Trial the components of the digital technologies outcome.", "Trialling Components", "trialling-components"))}">
-                                                    <span class="task-list-decomposition-category-label">COMPONENTS</span>
-                                                    <span class="task-list-decomposition-category-count">${Number.isFinite(taskListState.identifiedComponentsCount) ? taskListState.identifiedComponentsCount : "-"}</span>
-                                                </a>
                                                 <a class="task-list-decomposition-category ${decompositionCoverage.hasData && decompositionCoverage.counts["Tools & Techniques"] > 0 ? "is-covered" : ""}" href="${escapeTaskListHtml(buildCustomActivityLink(taskListState.selectedId, "What Tools and Techniques will be used?", "Tools & Techniques", "tools-and-techniques"))}">
                                                     <span class="task-list-decomposition-category-label">Tools &amp; Techniques</span>
                                                     <span class="task-list-decomposition-category-count">${decompositionCoverage.hasData ? Number(decompositionCoverage.counts["Tools & Techniques"] || 0) : "-"}</span>
