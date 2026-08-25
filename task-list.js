@@ -1287,6 +1287,36 @@ function autoTickMultipleComponentsRequirement(stateMap, componentCount) {
     return changed;
 }
 
+function sync91893RelevantImplicationsState(stateMap) {
+    const sourceRows = Array.isArray(stateMap?.["91897"]) ? stateMap["91897"] : [];
+    const targetRows = Array.isArray(stateMap?.["91893"]) ? stateMap["91893"] : [];
+    if (!sourceRows.length || !targetRows.length) {
+        return false;
+    }
+
+    const sourceExplainingDone = sourceRows.some((row) => {
+        const text = stripStepLevel(row?.text || "").toLowerCase();
+        return /^explain(?:ing)? relevant implications\.?$/.test(text) && Boolean(row?.done);
+    });
+    const sourceAddressingDone = sourceRows.some((row) => {
+        const text = stripStepLevel(row?.text || "").toLowerCase();
+        return /^address(?:ing)? relevant implications\.?$/.test(text) && Boolean(row?.done);
+    });
+
+    let changed = false;
+    targetRows.forEach((row) => {
+        const text = stripStepLevel(row?.text || "").toLowerCase();
+        const shouldBeDone = /^(?:explain(?:ing)?) relevant implications\.?$/.test(text)
+            ? sourceExplainingDone
+            : (/^address(?:ing)? relevant implications\.?$/.test(text) ? sourceAddressingDone : null);
+        if (shouldBeDone !== null && Boolean(row?.done) !== shouldBeDone) {
+            row.done = shouldBeDone;
+            changed = true;
+        }
+    });
+    return changed;
+}
+
 function autoTickRelevantImplicationsRequirements(stateMap, projectId, email) {
     const addressTicksChanged = clearAddressRelevantImplicationsTicks(stateMap);
     const rows = Array.isArray(stateMap?.["91897"]) ? stateMap["91897"] : [];
@@ -2028,12 +2058,14 @@ async function loadChecklistForTask(taskId) {
     const autoChangedChecklistDO = autoTickDigitalOutcomeRequirements(taskListState.checklistState, taskListState.selectedId, signedInEmail);
     const autoRepairedChecklistRI = applyTemplateCopiesAsRelevantImplicationsState(taskListState.checklistState, taskListState.templateCopies);
     const autoChangedChecklistRI = autoTickRelevantImplicationsRequirements(taskListState.checklistState, taskListState.selectedId, signedInEmail);
-    const autoChangedChecklist = autoChangedChecklistPM || autoChangedChecklistDO || autoChangedChecklistRI || autoRepairedChecklistRI;
+    const autoSyncedChecklist91893RI = sync91893RelevantImplicationsState(taskListState.checklistState);
+    const autoChangedChecklist = autoChangedChecklistPM || autoChangedChecklistDO || autoChangedChecklistRI || autoRepairedChecklistRI || autoSyncedChecklist91893RI;
     const autoChangedEvidencePM = autoTickProjectManagementRequirement(taskListState.fullEvidenceState);
     const autoChangedEvidenceDO = autoTickDigitalOutcomeRequirements(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
     const autoRepairedEvidenceRI = applyTemplateCopiesAsRelevantImplicationsState(taskListState.fullEvidenceState, taskListState.templateCopies);
     const autoChangedEvidenceRI = autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
-    const autoChangedEvidence = autoChangedEvidencePM || autoChangedEvidenceDO || autoChangedEvidenceRI || autoRepairedEvidenceRI;
+    const autoSyncedEvidence91893RI = sync91893RelevantImplicationsState(taskListState.fullEvidenceState);
+    const autoChangedEvidence = autoChangedEvidencePM || autoChangedEvidenceDO || autoChangedEvidenceRI || autoRepairedEvidenceRI || autoSyncedEvidence91893RI;
     if (migratedDigitalOutcomeRows || migrated91897Rows || migrated91907Rows || migrated91893Rows || autoChangedChecklist || autoChangedEvidence) {
         const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
         await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});
@@ -2288,8 +2320,10 @@ async function renderTaskListPage() {
 
         const relevantImplicationsChecklistChanged = autoTickRelevantImplicationsRequirements(taskListState.checklistState, taskListState.selectedId, getTaskListEmail());
         const relevantImplicationsEvidenceChanged = autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, taskListState.selectedId, getTaskListEmail());
+        const synced91893ChecklistChanged = sync91893RelevantImplicationsState(taskListState.checklistState);
+        const synced91893EvidenceChanged = sync91893RelevantImplicationsState(taskListState.fullEvidenceState);
 
-        if (relevantImplicationsChecklistChanged || relevantImplicationsEvidenceChanged) {
+        if (relevantImplicationsChecklistChanged || relevantImplicationsEvidenceChanged || synced91893ChecklistChanged || synced91893EvidenceChanged) {
             renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);
         }
 
