@@ -1864,12 +1864,14 @@ function renderChecklistCards(detail, allItems) {
 
     const cardsHtml = taskListState.checklistStandards.map((standard) => {
         const title = standard === "digital-outcome" ? "Digital Outcome Description" : `Standard ${escapeTaskListHtml(standard)}`;
+        const summaryTitle = standard === "digital-outcome" ? "Digital Outcome Topic" : title;
         const rows = Array.isArray(taskListState.checklistState[standard]) ? taskListState.checklistState[standard] : [];
 
         return `
-            <article class="task-list-checklist-card">
+            <details class="task-list-checklist-card" open>
+                <summary class="task-list-checklist-summary">${summaryTitle}</summary>
+                <div class="task-list-checklist-card-content">
                 ${standard === "digital-outcome" ? `
-                    <h3>Digital Outcome Topic</h3>
                     <div class="task-list-do-chip-list">
                         ${(allTopicTypes.length ? allTopicTypes : ["Not set"]).map((topicType) => `
                             <span class="task-list-do-chip">${escapeTaskListHtml(topicType)}</span>
@@ -1877,7 +1879,8 @@ function renderChecklistCards(detail, allItems) {
                     </div>
                 ` : `<h3>${title}</h3>`}
                 ${renderRowsForStandard(standard, rows)}
-            </article>
+                </div>
+            </details>
         `;
     }).join("");
 
