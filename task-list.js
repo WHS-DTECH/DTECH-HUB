@@ -86,7 +86,8 @@ const EVIDENCE_STEPS_DEFAULTS = {
     "91893": [
         "Achieved: Applying appropriate data integrity and testing procedures.",
         "Achieved: Using relevant conventions for the media type.",
-        "Achieved: Using appropriate tools and techniques for the purpose and end users."
+        "Achieved: Using appropriate tools and techniques for the purpose and end users.",
+        "Achieved: What Tools and Techniques will be used?"
     ]
 };
 
@@ -1620,14 +1621,29 @@ function renderChecklistCards(detail, allItems) {
                     <h4>Achieved</h4>
                     <p class="task-list-achieved-subheading">Section 1: Digital Media</p>
                     <div class="task-list-step-list">
-                        ${safeRows.map((step, index) => `
+                        ${safeRows.map((step, index) => {
+                            const stepText = stripStepLevel(step?.text || "");
+                            const isToolsAndTechniquesRow = /what tools and techniques will be used/i.test(stepText);
+                            return `
                             <div class="task-list-step-row">
                                 <label class="task-list-step-check-wrap">
                                     <input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">
-                                    <span class="task-list-step-text">${escapeTaskListHtml(stripStepLevel(step?.text || ""))}</span>
+                                    <span class="task-list-step-text">${escapeTaskListHtml(stepText)}</span>
                                 </label>
+                                ${isToolsAndTechniquesRow ? `
+                                    <div class="task-list-decomposition-subtasks">
+                                        <p class="task-list-system-title">SUBTASKS</p>
+                                        <div class="task-list-decomposition-subtask-list">
+                                            <label class="task-list-decomposition-subtask">
+                                                <input type="checkbox" disabled ${Boolean(safeRows.find((row) => /using appropriate tools and techniques for the purpose and end users/i.test(stripStepLevel(row?.text || "")))?.done) ? "checked" : ""}>
+                                                <span>${escapeTaskListHtml("Using appropriate tools and techniques for the purpose and end users.")}</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                ` : ""}
                             </div>
-                        `).join("")}
+                            `;
+                        }).join("")}
                     </div>
                 </section>
             `;
@@ -1891,6 +1907,17 @@ function getStandardCodes(detail, allItems = []) {
     return ["digital-outcome", ...codes];
 }
 
+function normalize91893ChecklistRows(rows) {
+    const sourceRows = Array.isArray(rows)
+        ? rows.map((step) => ({ text: String(step?.text || "").trim(), done: Boolean(step?.done) })).filter((step) => step.text)
+        : [];
+    const defaults = EVIDENCE_STEPS_DEFAULTS["91893"];
+    return defaults.map((text) => {
+        const existing = sourceRows.find((step) => stripStepLevel(step.text).toLowerCase() === stripStepLevel(text).toLowerCase());
+        return { text, done: Boolean(existing?.done) };
+    });
+}
+
 function buildChecklistState(standardCodes, evidenceMap) {
     const next = {};
     standardCodes.forEach((standard) => {
@@ -1908,6 +1935,11 @@ function buildChecklistState(standardCodes, evidenceMap) {
 
             if (standard === "91907") {
                 next[standard] = normalize91907ChecklistRows(existing);
+                return;
+            }
+
+            if (standard === "91893") {
+                next[standard] = normalize91893ChecklistRows(existing);
                 return;
             }
 
@@ -1962,6 +1994,12 @@ async function loadChecklistForTask(taskId) {
         taskListState.fullEvidenceState["91907"] = normalize91907ChecklistRows(taskListState.fullEvidenceState["91907"]);
         migrated91907Rows = before91907Migration !== JSON.stringify(taskListState.fullEvidenceState["91907"]);
     }
+    let migrated91893Rows = false;
+    if (Array.isArray(taskListState.fullEvidenceState["91893"])) {
+        const before91893Migration = JSON.stringify(taskListState.fullEvidenceState["91893"]);
+        taskListState.fullEvidenceState["91893"] = normalize91893ChecklistRows(taskListState.fullEvidenceState["91893"]);
+        migrated91893Rows = before91893Migration !== JSON.stringify(taskListState.fullEvidenceState["91893"]);
+    }
     taskListState.checklistStandards = getStandardCodes(detail || selected, taskListState.allItems);
     taskListState.checklistState = buildChecklistState(taskListState.checklistStandards, evidenceMap);
     taskListState.checklistStandards.forEach((standard) => {
@@ -1992,7 +2030,7 @@ async function loadChecklistForTask(taskId) {
     const autoRepairedEvidenceRI = applyTemplateCopiesAsRelevantImplicationsState(taskListState.fullEvidenceState, taskListState.templateCopies);
     const autoChangedEvidenceRI = autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
     const autoChangedEvidence = autoChangedEvidencePM || autoChangedEvidenceDO || autoChangedEvidenceRI || autoRepairedEvidenceRI;
-    if (migratedDigitalOutcomeRows || migrated91897Rows || migrated91907Rows || autoChangedChecklist || autoChangedEvidence) {
+    if (migratedDigitalOutcomeRows || migrated91897Rows || migrated91907Rows || migrated91893Rows || autoChangedChecklist || autoChangedEvidence) {
         const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
         await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});
     }
