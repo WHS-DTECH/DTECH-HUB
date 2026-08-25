@@ -87,6 +87,10 @@ const EVIDENCE_STEPS_DEFAULTS = {
         "Achieved: Use advanced techniques to develop a digital media outcome.",
         "Merit: Use advanced techniques to develop a digital media outcome that is fit for purpose.",
         "Excellence: Use advanced techniques to develop a digital media outcome that is of a high quality."
+    ],
+    "91895": [
+        "Achieved: Applying appropriate data integrity and testing procedures.",
+        "Achieved: Using relevant conventions for the media type."
     ]
 };
 
@@ -255,6 +259,11 @@ function getTopicTypeLabel(detail) {
 
 function isDigitalMediaTopicType(detail) {
     return getTopicTypeLabel(detail).trim().toLowerCase() === "digital media";
+}
+
+function hasDigitalMediaTopicType(detail, allItems = []) {
+    return isDigitalMediaTopicType(detail)
+        || (Array.isArray(allItems) && allItems.some((item) => isDigitalMediaTopicType(item)));
 }
 
 function deriveTaskShortName(taskTopic) {
@@ -1849,7 +1858,7 @@ function renderChecklistCards(detail, allItems) {
     checklistHost.innerHTML = cardsHtml;
 }
 
-function getStandardCodes(detail) {
+function getStandardCodes(detail, allItems = []) {
     const fromDetails = Array.isArray(detail?.standardDetails)
         ? detail.standardDetails.map((line) => String(line || "").match(/\b(\d{5})\b/)?.[1]).filter(Boolean)
         : [];
@@ -1857,10 +1866,10 @@ function getStandardCodes(detail) {
     const codes = fromDetails.length
         ? fromDetails.filter((code, index, arr) => arr.indexOf(code) === index)
         : ["91897", "91907"];
-    if (isDigitalMediaTopicType(detail)) {
-        const withoutDigitalMediaStandard = codes.filter((code) => code !== "91893");
-        withoutDigitalMediaStandard.unshift("91893");
-        return ["digital-outcome", ...withoutDigitalMediaStandard];
+    if (hasDigitalMediaTopicType(detail, allItems)) {
+        const withoutDigitalMediaStandards = codes.filter((code) => code !== "91893" && code !== "91895");
+        withoutDigitalMediaStandards.unshift("91895");
+        return ["digital-outcome", ...withoutDigitalMediaStandards];
     }
     return ["digital-outcome", ...codes];
 }
@@ -1936,7 +1945,7 @@ async function loadChecklistForTask(taskId) {
         taskListState.fullEvidenceState["91907"] = normalize91907ChecklistRows(taskListState.fullEvidenceState["91907"]);
         migrated91907Rows = before91907Migration !== JSON.stringify(taskListState.fullEvidenceState["91907"]);
     }
-    taskListState.checklistStandards = getStandardCodes(detail || selected);
+    taskListState.checklistStandards = getStandardCodes(detail || selected, taskListState.allItems);
     taskListState.checklistState = buildChecklistState(taskListState.checklistStandards, evidenceMap);
     taskListState.checklistStandards.forEach((standard) => {
         if (!Array.isArray(taskListState.fullEvidenceState[standard])) {
