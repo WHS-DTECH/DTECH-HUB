@@ -540,6 +540,10 @@ function getTemplateStepMatchers(templateId) {
         return [/triall?ing\s+(?:the\s+)?components/i, /trailing\s+components/i, /trial\s+multiple\s+components/i];
     }
 
+    if (id === "testing-functions") {
+        return [/testing\s+functions/i, /test(?:ing)?\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/i];
+    }
+
     // For category-specific relevant implications templates, only match the specific category
     if (id.startsWith("relevant-implications-") && id !== "relevant-implications") {
         const categoryName = extractCategoryFromTemplateId(id);

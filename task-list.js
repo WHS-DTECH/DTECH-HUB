@@ -256,6 +256,7 @@ function deriveTaskShortName(taskTopic) {
     if (/describe.*digital outcome|description\s*-\s*google\s*slides/i.test(normalized)) return "Digital Outcome Description";
     if (/identify\s+the\s+target\s+audience|target\s+audience|end\s+user/i.test(normalized)) return "Target Audience";
     if (/trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components|trailing\s+components/i.test(normalized)) return "Trialling Components";
+    if (/testing\s+functions|test(?:ing)?\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/i.test(normalized)) return "Testing Functions";
     if (/what\s+tools\s+and\s+techniques\s+will\s+be\s+used/i.test(normalized)) return "Tools and Techniques";
     if (/explain\s+how\s+the\s+outcome\s+will\s+be\s+developed|tools\/?technologies|development\s+steps|outcome\s+developed/i.test(normalized)) return "Development Steps";
     if (/relevant\s+implications/i.test(normalized)) return "Relevant Implications";
@@ -270,6 +271,7 @@ function inferDigitalOutcomeTaskTemplateId(taskText) {
     if (/describe.*digital outcome|description\s*-\s*google\s*slides/.test(normalized)) return "digital-outcome-description";
     if (/identify\s+the\s+target\s+audience|target\s+audience|end\s+user/.test(normalized)) return "target-audience";
     if (/trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components|trailing\s+components/.test(normalized)) return "trialling-components";
+    if (/testing\s+functions|test(?:ing)?\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/.test(normalized)) return "testing-functions";
     if (/explain\s+how\s+the\s+outcome\s+will\s+be\s+developed|tools\/?technologies|development\s+steps|outcome\s+developed|relevant\s+implications/.test(normalized)) return "relevant-implications";
     if (/state\s+how\s+success\s+will\s+be\s+measured|success\s+will\s+be\s+evaluated|project\s+success\s+criteria|success\s+criteria/.test(normalized)) return "project-success-criteria";
     return "";
@@ -674,6 +676,11 @@ function getTaskTopicHrefForStep(standard, level, text) {
     if ((String(standard) === "91897" || String(standard) === "91907")
         && /trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components|trailing\s+components/.test(normalized)) {
         return buildCustomActivityLink(taskListState.selectedId, safeText, "Trialling Components", "trialling-components");
+    }
+
+    if ((String(standard) === "91897" || String(standard) === "91907")
+        && /testing\s+functions|test(?:ing)?\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/.test(normalized)) {
+        return buildCustomActivityLink(taskListState.selectedId, safeText, "Testing Functions", "testing-functions");
     }
 
     if (String(standard) === "91897" && normalized.includes("what tools and techniques")) {

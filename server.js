@@ -4972,6 +4972,14 @@ function inferCanonicalTemplateIdentityFromTitle(title) {
     };
   }
 
+  if (/testing\s+functions|test(?:ing)?\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/.test(normalizedTitle)) {
+    return {
+      id: "testing-functions",
+      title: "Testing Functions",
+      criteriaText: "Test that the digital technologies outcome functions as intended."
+    };
+  }
+
   if (/afull\s*-\s*relevant\s*implications\s*template/.test(normalizedTitle)) {
     return {
       id: "relevant-implications",
@@ -6691,6 +6699,7 @@ const TEMPLATE_ID_FROM_TITLE_PATTERNS = [
   { pattern: /^development\s+steps(?:\s*-\s*.+)?$/i, id: "development-steps", title: "Development Steps" },
   { pattern: /^triall?ing\s+components(?:\s*-\s*.+)?$/i, id: "trialling-components", title: "Trialling Components" },
   { pattern: /^trailing\s+comp(?:onents|onets|onets)?(?:\s*-\s*.+)?$/i, id: "trialling-components", title: "Trialling Components" },
+  { pattern: /^testing\s+functions(?:\s*-\s*.+)?$/i, id: "testing-functions", title: "Testing Functions" },
   { pattern: /^project\s+success\s+criteria(?:\s*-\s*.+)?$/i, id: "project-success-criteria", title: "Project Success Criteria" },
 ];
 

@@ -106,6 +106,7 @@ const DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE = "Target Audience";
 const DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE = "Development Steps";
 const DIGITAL_OUTCOME_TRIALLING_COMPONENTS_TITLE = "Trialling Components";
 const DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE = "Tools & Techniques";
+const DIGITAL_OUTCOME_TESTING_FUNCTIONS_TITLE = "Testing Functions";
 const DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE = "Success Criteria";
 const DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE = "Relevant Implications";
 const DIGITAL_OUTCOME_DESCRIPTION_TEMPLATE_PREVIEW_URL = "https://drive.google.com/thumbnail?id=1brOY70u9aJdsoiEtxVepr82vRhiv9VzpMm8TUv3lcTo&sz=w1400";
@@ -4178,6 +4179,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         || isDigitalOutcomeTargetAudienceCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
         || isDigitalOutcomeDevelopmentToolsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
         || isDigitalOutcomeTriallingComponentsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
+        || isDigitalOutcomeTestingFunctionsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
         || isToolsAndTechniquesCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
         || isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
         || Boolean(keywordMatchedTopicKey);
@@ -4516,6 +4518,8 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             || keywordMatchedTopicKey === "development-steps");
         const isTriallingComponentsTopic = isDigitalOutcomeTriallingComponentsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
             || keywordMatchedTopicKey === "trialling-components";
+        const isTestingFunctionsTopic = isDigitalOutcomeTestingFunctionsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
+            || keywordMatchedTopicKey === "testing-functions";
         const isSuccessCriteriaTopic = isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
             || keywordMatchedTopicKey === "success-criteria";
         const isRelevantImplicationsTopic = isDigitalOutcomeRelevantImplicationsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
@@ -4539,9 +4543,11 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                     ? "development-steps"
                     : (isTriallingComponentsTopic
                         ? "trialling-components"
-                    : (isSuccessCriteriaTopic
+                        : (isTestingFunctionsTopic
+                            ? "testing-functions"
+                            : (isSuccessCriteriaTopic
                         ? "project-success-criteria"
-                        : (isRelevantImplicationsTopic ? "relevant-implications" : "digital-outcome-description")))));
+                            : (isRelevantImplicationsTopic ? "relevant-implications" : "digital-outcome-description"))))));
         const allowFolderMatchAutoLink = syncTemplateId === "digital-outcome-description"
             || syncTemplateId === "target-audience"
             || syncTemplateId === "development-steps"
@@ -7556,6 +7562,13 @@ function isDigitalOutcomeTriallingComponentsCriterion(taskTopicTitle, taskShortN
     return shortNameText === DIGITAL_OUTCOME_TRIALLING_COMPONENTS_TITLE.toLowerCase();
 }
 
+function isDigitalOutcomeTestingFunctionsCriterion(taskTopicTitle, taskShortName = "") {
+    const topicText = String(taskTopicTitle || "").trim().toLowerCase();
+    const shortNameText = String(taskShortName || "").trim().toLowerCase();
+    if (/testing\s+functions|test(?:ing)?\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/.test(topicText)) return true;
+    return shortNameText === DIGITAL_OUTCOME_TESTING_FUNCTIONS_TITLE.toLowerCase();
+}
+
 function isToolsAndTechniquesCriterion(taskTopicTitle, taskShortName = "") {
     const topicText = String(taskTopicTitle || "").trim().toLowerCase();
     const shortNameText = String(taskShortName || "").trim().toLowerCase();
@@ -7608,6 +7621,10 @@ function inferDigitalOutcomeTopicKeyFromTitle(pageTitle) {
 
     if (/trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components|trailing\s+components/.test(normalized)) {
         return "trialling-components";
+    }
+
+    if (/testing\s+functions|test(?:ing)?\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/.test(normalized)) {
+        return "testing-functions";
     }
 
     if (/developed|development|tools\/?technologies|tools|technologies/.test(normalized)) {
@@ -8148,6 +8165,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         || keywordMatchedTopicKey === "development-steps";
     const isDigitalOutcomeTriallingComponentsTopic = isDigitalOutcomeTriallingComponentsCriterion(taskTopicTitle, resolvedTaskShortName)
         || keywordMatchedTopicKey === "trialling-components";
+    const isDigitalOutcomeTestingFunctionsTopic = isDigitalOutcomeTestingFunctionsCriterion(taskTopicTitle, resolvedTaskShortName)
+        || keywordMatchedTopicKey === "testing-functions";
     const isToolsAndTechniquesTopic = isToolsAndTechniquesCriterion(taskTopicTitle, resolvedTaskShortName);
     const isDigitalOutcomeSuccessCriteriaTopic = isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, resolvedTaskShortName)
         || keywordMatchedTopicKey === "success-criteria";
@@ -8165,7 +8184,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 ? "success-criteria"
                 : (isDigitalOutcomeRelevantImplicationsTopic
                     ? "relevant-implications"
-                    : (isDigitalOutcomeDescriptionTopic ? "description" : keywordMatchedTopicKey))))));
+                    : (isDigitalOutcomeTestingFunctionsTopic
+                        ? "testing-functions"
+                        : (isDigitalOutcomeDescriptionTopic ? "description" : keywordMatchedTopicKey)))))));
     const useDigitalOutcomeTemplateHero = Boolean(digitalOutcomeTopicKey);
     const mergedTaskTopicLinks = isTaskTopicView
         ? collectMergedTaskTopicLinks(data, id, taskTopicTitle, resolvedTaskShortName)
@@ -8175,6 +8196,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         description: DIGITAL_OUTCOME_DESCRIPTION_TITLE,
         "target-audience": DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE,
         "trialling-components": DIGITAL_OUTCOME_TRIALLING_COMPONENTS_TITLE,
+        "testing-functions": DIGITAL_OUTCOME_TESTING_FUNCTIONS_TITLE,
         "tools-and-techniques": DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE,
         "development-steps": DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE,
         "success-criteria": DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE,
@@ -8228,6 +8250,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     const preferredTemplateIds = {
         "target-audience": "target-audience",
         "trialling-components": "trialling-components",
+        "testing-functions": "testing-functions",
         "tools-and-techniques": "tools-and-techniques",
         "development-steps": "development-steps",
         "success-criteria": "project-success-criteria",
@@ -8241,6 +8264,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         const topicDisplayNames = {
             "target-audience": DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE,
             "trialling-components": DIGITAL_OUTCOME_TRIALLING_COMPONENTS_TITLE,
+            "testing-functions": DIGITAL_OUTCOME_TESTING_FUNCTIONS_TITLE,
             "tools-and-techniques": DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE,
             "development-steps": DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE,
             "project-success-criteria": DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE,
