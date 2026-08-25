@@ -84,10 +84,15 @@ const EVIDENCE_STEPS_DEFAULTS = {
         "Excellence: Discuss how this information led to the development of a high-quality digital technologies outcome."
     ],
     "91893": [
+        "Achieved: Using appropriate tools and techniques for the purpose and end users.",
         "Achieved: Applying appropriate data integrity and testing procedures.",
         "Achieved: Using relevant conventions for the media type.",
-        "Achieved: Using appropriate tools and techniques for the purpose and end users.",
-        "Achieved: What Tools and Techniques will be used?"
+        "Achieved: Explaining relevant implications.",
+        "Merit: Using information from testing procedures to improve the quality of the outcome.",
+        "Merit: Applying relevant conventions to improve the quality of the outcome.",
+        "Merit: Addressing relevant implications.",
+        "Excellence: Iterative improvement throughout the design, development and testing process to produce a high-quality outcome.",
+        "Excellence: Using efficient tools and techniques in the outcome's production."
     ]
 };
 
@@ -1616,36 +1621,24 @@ function renderChecklistCards(detail, allItems) {
         const safeRows = Array.isArray(rows) ? rows : [];
 
         if (String(standard) === "91893") {
+            const levels = ["Achieved", "Merit", "Excellence"];
             return `
-                <section class="task-list-level-group">
-                    <h4>Achieved</h4>
-                    <p class="task-list-achieved-subheading">Section 1: Digital Media</p>
-                    <div class="task-list-step-list">
-                        ${safeRows.map((step, index) => {
-                            const stepText = stripStepLevel(step?.text || "");
-                            const isToolsAndTechniquesRow = /what tools and techniques will be used/i.test(stepText);
-                            return `
-                            <div class="task-list-step-row">
-                                <label class="task-list-step-check-wrap">
-                                    <input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">
-                                    <span class="task-list-step-text">${escapeTaskListHtml(stepText)}</span>
-                                </label>
-                                ${isToolsAndTechniquesRow ? `
-                                    <div class="task-list-decomposition-subtasks">
-                                        <p class="task-list-system-title">SUBTASKS</p>
-                                        <div class="task-list-decomposition-subtask-list">
-                                            <label class="task-list-decomposition-subtask">
-                                                <input type="checkbox" disabled ${Boolean(safeRows.find((row) => /using appropriate tools and techniques for the purpose and end users/i.test(stripStepLevel(row?.text || "")))?.done) ? "checked" : ""}>
-                                                <span>${escapeTaskListHtml("Using appropriate tools and techniques for the purpose and end users.")}</span>
-                                            </label>
-                                        </div>
-                                    </div>
-                                ` : ""}
-                            </div>
-                            `;
-                        }).join("")}
-                    </div>
-                </section>
+                ${levels.map((level) => `
+                    <section class="task-list-level-group">
+                        <h4>${level}</h4>
+                        ${level === "Achieved" ? `<p class="task-list-achieved-subheading">Section 1: Digital Media</p>` : ""}
+                        <div class="task-list-step-list">
+                            ${safeRows.map((step, index) => getStepLevel(step?.text) === level ? `
+                                <div class="task-list-step-row">
+                                    <label class="task-list-step-check-wrap">
+                                        <input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">
+                                        <span class="task-list-step-text">${escapeTaskListHtml(stripStepLevel(step?.text || ""))}</span>
+                                    </label>
+                                </div>
+                            ` : "").join("")}
+                        </div>
+                    </section>
+                `).join("")}
             `;
         }
 
