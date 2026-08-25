@@ -701,6 +701,11 @@ function getTaskTopicHrefForStep(standard, level, text) {
         return buildCustomActivityLink(taskListState.selectedId, "Addressing relevant implications.", "Relevant Implications", "relevant-implications");
     }
 
+    if (String(standard) === "91893"
+        && /(?:using appropriate tools and techniques for the purpose and end users|using efficient tools and techniques in the outcome.?s production)/i.test(normalized)) {
+        return buildCustomActivityLink(taskListState.selectedId, "What Tools and Techniques will be used?", "Tools & Techniques", "tools-and-techniques");
+    }
+
     if ((String(standard) === "91897" || String(standard) === "91907")
         && /trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components|trailing\s+components/.test(normalized)) {
         return buildCustomActivityLink(taskListState.selectedId, safeText, "Trialling Components", "trialling-components");
