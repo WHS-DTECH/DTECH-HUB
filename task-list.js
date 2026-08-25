@@ -1086,6 +1086,10 @@ function isInformationalCriteriaRow(standard, level, text) {
         return /^iterative improvement throughout the design, development and testing process to produce a high-quality outcome\.?$/.test(normalized);
     }
 
+    if (standard === "91893" && level === "Merit") {
+        return /^using information from testing procedures to improve the quality of the outcome\.?$/.test(normalized);
+    }
+
     if (level === "Merit") {
         return /^(?:effectively\s+)?(?:use|using) information (?:appropriately )?from testing and trialling to improve the functionality of the digital technologies outcome\.?$/.test(normalized);
     }
