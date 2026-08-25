@@ -1674,14 +1674,25 @@ function renderChecklistCards(detail, allItems) {
                         <h4>${level}</h4>
                         ${level === "Achieved" ? `<p class="task-list-achieved-subheading">Section 1: Digital Media</p>` : ""}
                         <div class="task-list-step-list">
-                            ${safeRows.map((step, index) => getStepLevel(step?.text) === level ? `
-                                <div class="task-list-step-row">
+                            ${safeRows.map((step, index) => {
+                                if (getStepLevel(step?.text) !== level) return "";
+                                const stepText = stripStepLevel(step?.text || "");
+                                const href = getTaskTopicHrefForStep(standard, level, stepText);
+                                const isInformationalRow = isInformationalCriteriaRow(standard, level, stepText);
+                                const rowText = isInformationalRow
+                                    ? `<span class="task-list-step-text">${escapeTaskListHtml(stepText)}</span>`
+                                    : (href
+                                        ? `<a class="task-list-step-link" href="${escapeTaskListHtml(href)}">${escapeTaskListHtml(stepText)}</a>`
+                                        : `<span class="task-list-step-text">${escapeTaskListHtml(stepText)}</span>`);
+                                return `
+                                <div class="task-list-step-row ${isInformationalRow ? "is-informational" : ""}">
                                     <label class="task-list-step-check-wrap">
-                                        <input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">
-                                        <span class="task-list-step-text">${escapeTaskListHtml(stripStepLevel(step?.text || ""))}</span>
+                                        ${isInformationalRow ? "" : `<input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">`}
+                                        ${rowText}
                                     </label>
                                 </div>
-                            ` : "").join("")}
+                            `;
+                            }).join("")}
                         </div>
                     </section>
                 `).join("")}
