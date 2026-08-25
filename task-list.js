@@ -84,11 +84,6 @@ const EVIDENCE_STEPS_DEFAULTS = {
         "Excellence: Discuss how this information led to the development of a high-quality digital technologies outcome."
     ],
     "91893": [
-        "Achieved: Use advanced techniques to develop a digital media outcome.",
-        "Merit: Use advanced techniques to develop a digital media outcome that is fit for purpose.",
-        "Excellence: Use advanced techniques to develop a digital media outcome that is of a high quality."
-    ],
-    "91895": [
         "Achieved: Applying appropriate data integrity and testing procedures.",
         "Achieved: Using relevant conventions for the media type."
     ]
@@ -1869,7 +1864,7 @@ function getStandardCodes(detail, allItems = []) {
         : ["91897", "91907"];
     if (hasDigitalMediaTopicType(detail, allItems)) {
         const withoutDigitalMediaStandards = codes.filter((code) => code !== "91893" && code !== "91895");
-        withoutDigitalMediaStandards.unshift("91895");
+        withoutDigitalMediaStandards.unshift("91893");
         return ["digital-outcome", ...withoutDigitalMediaStandards];
     }
     return ["digital-outcome", ...codes];
