@@ -245,6 +245,19 @@ function toSafeGoogleDriveFolderUrl(value) {
     return /(drive\.google\.com)/i.test(safeUrl) ? safeUrl : "";
 }
 
+function toSafeGoogleFormUrl(value) {
+    const safeUrl = toSafeExternalUrl(value);
+    if (!safeUrl) return "";
+    try {
+        const host = String(new URL(safeUrl).hostname || "").toLowerCase();
+        return host === "forms.gle" || host === "docs.google.com" && new URL(safeUrl).pathname.startsWith("/forms/")
+            ? safeUrl
+            : "";
+    } catch (_error) {
+        return "";
+    }
+}
+
 function parseDurationMinutes(raw) {
     const source = String(raw || "").trim().toLowerCase();
     const parsed = Number.parseInt(source.replace(/[^0-9]/g, ""), 10);
@@ -2546,6 +2559,7 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
         trelloLastLogAt: "",
         trelloLastLogNote: "",
         googleSlidesUrl: "",
+        googleFormUrl: "",
         mediaAssetFolderUrl: "",
         googleDriveProjectFolderUrl: "",
         mediaReviewUrl: "",
@@ -2643,6 +2657,11 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
             return;
         }
 
+        if (text.startsWith("GOOGLE_FORM_URL|")) {
+            result.googleFormUrl = toSafeGoogleFormUrl(text.slice("GOOGLE_FORM_URL|".length).trim());
+            return;
+        }
+
         if (text.startsWith("MEDIA_ASSET_FOLDER_URL|")) {
             result.mediaAssetFolderUrl = toSafeExternalUrl(text.slice("MEDIA_ASSET_FOLDER_URL|".length).trim());
             return;
@@ -2717,6 +2736,20 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
     return result;
 }
 
+function getFirstGoogleFormUrlFromEvidenceRows(evidenceRows) {
+    const rows = normalizeEvidenceSteps(evidenceRows);
+    for (const row of rows) {
+        for (const step of (Array.isArray(row?.steps) ? row.steps : [])) {
+            const text = String(step?.text || "").trim();
+            if (text.startsWith("GOOGLE_FORM_URL|")) {
+                const url = toSafeGoogleFormUrl(text.slice("GOOGLE_FORM_URL|".length).trim());
+                if (url) return url;
+            }
+        }
+    }
+    return "";
+}
+
 function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     const existingSubmission = parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey);
     const sourceRows = normalizeEvidenceSteps(rows).filter(
@@ -2748,6 +2781,9 @@ function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     const googleSlidesUrl = payload?.googleSlidesUrl !== undefined
         ? toSafeExternalUrl(payload?.googleSlidesUrl)
         : toSafeExternalUrl(existingSubmission.googleSlidesUrl || existingSubmission.evidenceLink);
+    const googleFormUrl = payload?.googleFormUrl !== undefined
+        ? toSafeGoogleFormUrl(payload?.googleFormUrl)
+        : toSafeGoogleFormUrl(existingSubmission.googleFormUrl);
     const mediaAssetFolderUrl = payload?.mediaAssetFolderUrl !== undefined
         ? toSafeExternalUrl(payload?.mediaAssetFolderUrl)
         : toSafeExternalUrl(existingSubmission.mediaAssetFolderUrl);
@@ -2826,6 +2862,10 @@ function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     if (googleSlidesUrl) {
         steps.push({ text: `GOOGLE_SLIDES_URL|${googleSlidesUrl}`, done: true });
         steps.push({ text: `LINK|${googleSlidesUrl}`, done: true });
+    }
+    if (googleFormUrl) {
+        steps.push({ text: `GOOGLE_FORM_URL|${googleFormUrl}`, done: true });
+        steps.push({ text: `LINK|${googleFormUrl}`, done: true });
     }
     if (mediaAssetFolderUrl) {
         steps.push({ text: `MEDIA_ASSET_FOLDER_URL|${mediaAssetFolderUrl}`, done: true });
@@ -3508,6 +3548,24 @@ async function persistStudentGoogleDriveFolderLink(projectId, studentEmail, deta
     const nextRows = upsertTaskTopicSubmissionEvidenceRows(evidenceRows, standardKey, {
         googleDriveProjectFolderUrl: safeUrl
     });
+    await saveEvidenceRows(projectId, studentEmail, nextRows);
+}
+
+async function persistStudentGoogleFormLink(projectId, studentEmail, detailData, taskTopicTitle, googleFormUrl) {
+    const safeUrl = toSafeGoogleFormUrl(googleFormUrl);
+    if (!safeUrl) {
+        throw new Error("Enter a valid Google Forms link first.");
+    }
+
+    const safeTaskTopic = String(taskTopicTitle || "").trim();
+    if (!safeTaskTopic) {
+        throw new Error("Open the Testing Functions task-topic page before saving the form link.");
+    }
+
+    const standardNumber = extractPrimaryStandardNumberFromRows(coerceArray(detailData?.standardDetails));
+    const standardKey = buildTaskTopicSubmissionStandardKey(safeTaskTopic, standardNumber);
+    const evidenceRows = await fetchEvidenceRowsEnsuringAllocation(projectId, studentEmail);
+    const nextRows = upsertTaskTopicSubmissionEvidenceRows(evidenceRows, standardKey, { googleFormUrl: safeUrl });
     await saveEvidenceRows(projectId, studentEmail, nextRows);
 }
 
@@ -8830,6 +8888,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                             ${isDigitalOutcomeTriallingComponentsTopic
                                 ? `<div class="digital-outcome-must-dos" id="trialling-components-table" aria-live="polite"><p class="task-topic-submission-note">Loading components from your Development Steps slideshow...</p></div>`
                                 : ""}
+                            ${isDigitalOutcomeTestingFunctionsTopic
+                                ? `<div id="task-topic-google-form-sync-slot"></div>`
+                                : ""}
                         `}
 
                         ${isProjectManagementTopic ? `<div id="task-topic-trello-sync-slot"></div>` : ""}
@@ -10084,6 +10145,8 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     const isTaskTopicPage = Boolean(selectedTaskTopic);
     const isProjectManagementTaskTopicPage = isTaskTopicPage
         && selectedTaskTopic.toLowerCase().includes("project management");
+    const isTestingFunctionsTaskTopicPage = isTaskTopicPage
+        && /testing\s+functions|test(?:ing)?\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`);
     const taskTopicContextSignals = [
         selectedTaskTopic,
         String(detailData?.subjectStream || detailData?.subject_stream || detailData?.subject || ""),
@@ -11483,6 +11546,79 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
 
         window.open(folderUrl, "_blank", "noopener,noreferrer");
         setGoogleDriveStatus("Opened Google Drive folder.");
+    });
+
+    const googleFormSlot = host.querySelector("#task-topic-google-form-sync-slot");
+    if (googleFormSlot && isTestingFunctionsTaskTopicPage) {
+        const currentGoogleFormUrl = getFirstGoogleFormUrlFromEvidenceRows(myAllocation?.evidence_steps);
+        googleFormSlot.innerHTML = `
+            <div class="trello-sync-panel" id="google-form-sync-panel">
+                <h3>Client Google Feedback Form</h3>
+                <p>Link the Google Form you will use to collect client or user feedback.</p>
+                <label for="google-form-url" class="trello-sync-label">Google Form link</label>
+                <input id="google-form-url" class="trello-sync-input" type="url" placeholder="https://forms.google.com/... or https://forms.gle/..." value="${escapeHtml(currentGoogleFormUrl)}">
+                <div class="trello-sync-actions">
+                    <button type="button" class="detail-action detail-action-secondary" id="google-form-save-link-btn">Save Google Form Link</button>
+                    <button type="button" class="detail-action detail-action-secondary" id="google-form-open-link-btn">Open Google Form</button>
+                </div>
+                <p class="trello-sync-status" id="google-form-sync-status" aria-live="polite"></p>
+            </div>
+        `;
+    }
+
+    const googleFormInput = section.querySelector("#google-form-url");
+    const googleFormSaveLinkBtn = section.querySelector("#google-form-save-link-btn");
+    const googleFormOpenLinkBtn = section.querySelector("#google-form-open-link-btn");
+    const googleFormStatus = section.querySelector("#google-form-sync-status");
+    const setGoogleFormStatus = (message, isError = false) => {
+        if (!googleFormStatus) return;
+        googleFormStatus.textContent = String(message || "");
+        googleFormStatus.classList.toggle("is-error", Boolean(isError));
+    };
+    const readGoogleFormUrl = () => toSafeGoogleFormUrl(googleFormInput?.value || "");
+
+    googleFormInput?.addEventListener("change", () => {
+        const raw = String(googleFormInput.value || "").trim();
+        if (!raw) {
+            setGoogleFormStatus("");
+            return;
+        }
+        const safe = readGoogleFormUrl();
+        if (!safe) {
+            setGoogleFormStatus("Use a Google Forms link from forms.gle or docs.google.com/forms.", true);
+            return;
+        }
+        googleFormInput.value = safe;
+        setGoogleFormStatus("Link looks valid. Click Save Google Form Link.");
+    });
+
+    googleFormSaveLinkBtn?.addEventListener("click", async () => {
+        const formUrl = readGoogleFormUrl();
+        if (!formUrl) {
+            setGoogleFormStatus("Enter a valid Google Forms link first.", true);
+            return;
+        }
+        googleFormSaveLinkBtn.disabled = true;
+        setGoogleFormStatus("Saving Google Form link...");
+        try {
+            await persistStudentGoogleFormLink(projectId, email, detailData, taskTopicValue, formUrl);
+            googleFormInput.value = formUrl;
+            setGoogleFormStatus("Google Form link saved and shared with teacher view.");
+        } catch (error) {
+            setGoogleFormStatus(`${error?.message || "Could not save Google Form link right now."}${formatApiDebugSuffix(error)}`, true);
+        } finally {
+            if (googleFormSaveLinkBtn.isConnected) googleFormSaveLinkBtn.disabled = false;
+        }
+    });
+
+    googleFormOpenLinkBtn?.addEventListener("click", () => {
+        const formUrl = readGoogleFormUrl();
+        if (!formUrl) {
+            setGoogleFormStatus("Enter a valid Google Forms link first.", true);
+            return;
+        }
+        window.open(formUrl, "_blank", "noopener,noreferrer");
+        setGoogleFormStatus("Opened Google Form.");
     });
 
     // Toggle interest button handler

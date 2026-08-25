@@ -1008,6 +1008,29 @@ function getProjectManagementSubtasks(stateMap) {
     ];
 }
 
+function getFirstGoogleFormUrlFromEvidenceRows(stateMap) {
+    for (const steps of Object.values(stateMap || {})) {
+        for (const step of (Array.isArray(steps) ? steps : [])) {
+            const text = String(step?.text || "").trim();
+            if (!text.startsWith("GOOGLE_FORM_URL|")) continue;
+            const url = text.slice("GOOGLE_FORM_URL|".length).trim();
+            if (/^https:\/\/(?:forms\.gle\/|docs\.google\.com\/forms\/)/i.test(url)) return url;
+        }
+    }
+    return "";
+}
+
+function getTestingFunctionsSubtasks(stateMap) {
+    const activityId = taskListState.selectedId;
+    const formUrl = getFirstGoogleFormUrlFromEvidenceRows(stateMap);
+    return [{
+        label: "Google Form",
+        href: buildCustomActivityLink(activityId, "Test that the digital technologies outcome functions as intended.", "Testing Functions", "testing-functions"),
+        done: Boolean(formUrl),
+        url: formUrl
+    }];
+}
+
 function getProjectManagementSystemLogo(systemName) {
     const system = String(systemName || "").trim().toLowerCase();
     if (system === "trello") {
@@ -1015,6 +1038,9 @@ function getProjectManagementSystemLogo(systemName) {
     }
     if (system === "github") {
         return `<svg class="task-list-system-logo task-list-system-logo-github" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.084-.729.084-.729 1.205.084 1.84 1.237 1.84 1.237 1.07 1.835 2.809 1.305 3.495.998.108-.776.418-1.305.762-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.292-1.552 3.295-1.23 3.295-1.23.647 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.43.372.823 1.102.823 2.222 0 1.606-.015 2.896-.015 3.286 0 .315.216.69.825.575C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>`;
+    }
+    if (system === "google form") {
+        return `<svg class="task-list-system-logo task-list-system-logo-google-form" viewBox="0 0 24 24" aria-hidden="true"><path fill="#673ab7" d="M6 2h9l3 3v17H6z"/><path fill="#ffffff" d="M14 2v4h4z"/><path fill="#ffffff" d="M9 10h6v1.5H9zm0 3h6v1.5H9zm0 3h4v1.5H9z"/></svg>`;
     }
     if (system === "onedrive") {
         return `<svg class="task-list-system-logo task-list-system-logo-onedrive" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.3 17.7h9.1a3.6 3.6 0 0 0 .5-7.1A6.1 6.1 0 0 0 6.4 9.4a4.2 4.2 0 0 0 1.9 8.3Z" fill="currentColor"/><path d="M7.1 16.6h9.6" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"/></svg>`;
@@ -1643,6 +1669,8 @@ function renderChecklistCards(detail, allItems) {
                                 && stepText.toLowerCase().includes("decompos");
                             const isTriallingComponentsRow = String(level) === "Achieved"
                                 && /trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components|trailing\s+components/.test(stepText.toLowerCase());
+                            const isTestingFunctionsRow = String(level) === "Achieved"
+                                && /testing\s+functions|test(?:ing)?\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/i.test(stepText);
                             const isMultipleComponentsRow = String(level) === "Merit"
                                 && /^(?:effectively\s+)?trial(?:l?ing)?\s+multiple\s+components\s+and\/or\s+techniques\b/i.test(stepText);
                             const isSystemComplete = isProjectManagementRow
@@ -1659,6 +1687,7 @@ function renderChecklistCards(detail, allItems) {
                             const toolsTechniquesSubtask = isTriallingComponentsRow ? getDigitalOutcomeToolsTechniquesSubtask() : null;
                             const componentsSubtaskHref = buildCustomActivityLink(taskListState.selectedId, "Trial the components of the digital technologies outcome.", "Trialling Components", "trialling-components");
                             const projectManagementSubtasks = isProjectManagementRow ? getProjectManagementSubtasks(taskListState.fullEvidenceState) : [];
+                            const testingFunctionsSubtasks = isTestingFunctionsRow ? getTestingFunctionsSubtasks(taskListState.fullEvidenceState) : [];
 
                             return `
                                 ${shouldRenderAchievedSectionHeading && achievedSectionMeta
@@ -1743,6 +1772,20 @@ function renderChecklistCards(detail, allItems) {
                                             ${Number.isFinite(triallingComponentsCount)
                                                 ? ""
                                                 : `<p class="task-list-achieved-note">Sync Google Drive above to see the component count.</p>`}
+                                        </div>
+                                    ` : ""}
+                                    ${isTestingFunctionsRow ? `
+                                        <div class="task-list-decomposition-subtasks">
+                                            <p class="task-list-system-title">SUBTASKS</p>
+                                            <p class="task-list-achieved-note">Client feedback form for user testing.</p>
+                                            <div class="task-list-decomposition-subtask-list">
+                                                ${testingFunctionsSubtasks.map((subtask) => `
+                                                    <label class="task-list-decomposition-subtask ${subtask.done ? "is-complete" : ""}">
+                                                        <input type="checkbox" disabled ${subtask.done ? "checked" : ""}>
+                                                        <a href="${escapeTaskListHtml(subtask.href)}">${getProjectManagementSystemLogo(subtask.label)}${escapeTaskListHtml(subtask.label)}</a>
+                                                    </label>
+                                                `).join("")}
+                                            </div>
                                         </div>
                                     ` : ""}
                                 </div>
