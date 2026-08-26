@@ -3,6 +3,17 @@ const TASK_LIST_TRELLO_CARD_LINK_STORAGE_PREFIX = "hub_trello_card_link_v1";
 const TASK_LIST_TRELLO_CARD_LIBRARY_STORAGE_PREFIX = "hub_trello_card_library_v1";
 const TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX = "hub_task_topic_slide_sync_v1";
 const DIGIMED_CONVENTIONS_ACK_STORAGE_PREFIX = "hub_digimed_conventions_ack_v1";
+const DIGIMED_EFFICIENT_TOOLS_STORAGE_PREFIX = "hub_digimed_efficient_tools_v1";
+const DIGIMED_EFFICIENT_TOOLS_SUBTASKS = [
+    "Management of assets",
+    "Using stylesheets",
+    "Master pages or student developed templates",
+    "Commenting",
+    "Character formatting controls",
+    "Reusing objects, styles and/or frames",
+    "HTML/CSS validation procedures",
+    "Optimisation of media assets"
+];
 
 const DIGITAL_OUTCOME_DETAILS_TASKS = [
     "Description - Google Slides: Describe the Digital Outcome: What is it, who is it for, and what should it do?",
@@ -49,6 +60,26 @@ function getRelevantImplicationsIconUrl(category) {
     return fileName
         ? `/images/Relevant%20Implications/${encodeURIComponent(fileName)}`
         : "";
+}
+
+function getDigiMedEfficientToolsKey(activityId, email) {
+    return `${DIGIMED_EFFICIENT_TOOLS_STORAGE_PREFIX}:${String(activityId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
+}
+
+function readDigiMedEfficientToolsState(activityId, email) {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(getDigiMedEfficientToolsKey(activityId, email)) || "{}");
+        return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (_error) {
+        return {};
+    }
+}
+
+function writeDigiMedEfficientToolsState(activityId, email, value) {
+    try {
+        localStorage.setItem(getDigiMedEfficientToolsKey(activityId, email), JSON.stringify(value || {}));
+    } catch (_error) {
+    }
 }
 
 const EVIDENCE_STEPS_DEFAULTS = {
@@ -250,6 +281,23 @@ function installTaskListSectionAnchorHandler() {
         if (parentDetails) parentDetails.open = true;
         window.history.replaceState({}, "", `#${targetId}`);
         window.setTimeout(() => target.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+    });
+}
+
+function installDigiMedEfficientToolsHandler() {
+    if (window.__dtechDigiMedEfficientToolsHandlerBound) return;
+    window.__dtechDigiMedEfficientToolsHandlerBound = true;
+    document.addEventListener("change", (event) => {
+        const checkbox = event.target?.closest?.("[data-digimed-efficient-tool]");
+        if (!checkbox) return;
+        const subtask = String(checkbox.getAttribute("data-digimed-efficient-tool") || "").trim();
+        if (!subtask) return;
+        const activityId = taskListState.selectedId;
+        const email = getTaskListEmail();
+        const state = readDigiMedEfficientToolsState(activityId, email);
+        state[subtask] = Boolean(checkbox.checked);
+        writeDigiMedEfficientToolsState(activityId, email, state);
+        renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);
     });
 }
 
@@ -1696,6 +1744,7 @@ function renderChecklistCards(detail, allItems) {
     const checklistHost = document.querySelector("#task-list-checklist");
     if (!checklistHost) return;
     installTaskListSectionAnchorHandler();
+    installDigiMedEfficientToolsHandler();
 
     const taskTitle = String(detail?.name || "Task List").trim();
     const taskTopic = taskListState.taskTopic || taskTitle;
@@ -1718,6 +1767,7 @@ function renderChecklistCards(detail, allItems) {
         if (String(standard) === "91893") {
             const levels = ["Achieved", "Merit", "Excellence"];
             const decompositionCoverage = readDecompositionCategoryCoverage(taskListState.selectedId, getTaskListEmail());
+            const efficientToolsState = readDigiMedEfficientToolsState(taskListState.selectedId, getTaskListEmail());
             return `
                 ${levels.map((level) => `
                     <section class="task-list-level-group">
@@ -1734,6 +1784,7 @@ function renderChecklistCards(detail, allItems) {
                                 const isInformationalRow = isInformationalCriteriaRow(standard, level, stepText);
                                 const is91893ToolsAndTechniquesRow = /using appropriate tools and techniques for the purpose and end users/i.test(stepText);
                                 const is91893ConventionsRow = /using relevant conventions for the media type/i.test(stepText);
+                                const is91893EfficientToolsRow = /using efficient tools and techniques in the outcome.?s production/i.test(stepText);
                                 const conventionsSubtask = is91893ConventionsRow ? getDigiMedConventionsSubtask() : null;
                                 const rowText = isInformationalRow
                                     ? `<span class="task-list-step-text">${escapeTaskListHtml(stepText)}</span>`
@@ -1755,6 +1806,20 @@ function renderChecklistCards(detail, allItems) {
                                                     <span class="task-list-decomposition-category-label">Tools &amp; Techniques</span>
                                                     <span class="task-list-decomposition-category-count">${decompositionCoverage.hasData ? Number(decompositionCoverage.counts["Tools & Techniques"] || 0) : "-"}</span>
                                                 </a>
+                                            </div>
+                                        </div>
+                                    ` : ""}
+                                    ${is91893EfficientToolsRow ? `
+                                        <div class="task-list-decomposition-subtasks">
+                                            <p class="task-list-system-title">SUBTASKS</p>
+                                            <p class="task-list-achieved-note">Examples of efficient tools and techniques.</p>
+                                            <div class="task-list-decomposition-subtask-list">
+                                                ${DIGIMED_EFFICIENT_TOOLS_SUBTASKS.map((subtask) => `
+                                                    <label class="task-list-decomposition-subtask ${efficientToolsState[subtask] ? "is-complete" : ""}">
+                                                        <input type="checkbox" data-digimed-efficient-tool="${escapeTaskListHtml(subtask)}" ${efficientToolsState[subtask] ? "checked" : ""}>
+                                                        <span>${escapeTaskListHtml(subtask)}</span>
+                                                    </label>
+                                                `).join("")}
                                             </div>
                                         </div>
                                     ` : ""}
