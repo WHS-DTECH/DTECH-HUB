@@ -92,6 +92,7 @@ const GITHUB_REPO_LIBRARY_STORAGE_PREFIX = "hub_github_repo_library_v1";
 const ONEDRIVE_LINK_LIBRARY_STORAGE_PREFIX = "hub_onedrive_link_library_v1";
 const GOOGLE_DRIVE_LINK_LIBRARY_STORAGE_PREFIX = "hub_google_drive_link_library_v1";
 const TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX = "hub_task_topic_slide_sync_v1";
+const DIGIMED_CONVENTIONS_ACK_STORAGE_PREFIX = "hub_digimed_conventions_ack_v1";
 const EVIDENCE_STEPS_TARGET_STANDARDS = new Set(["92005", "91897", "91907"]);
 
 const DIGITAL_OUTCOME_DETAILS_TASKS = [
@@ -256,6 +257,26 @@ function toSafeGoogleFormUrl(value) {
             : "";
     } catch (_error) {
         return "";
+    }
+}
+
+function getDigiMedConventionsAcknowledgementKey(activityId, email) {
+    return `${DIGIMED_CONVENTIONS_ACK_STORAGE_PREFIX}:${String(activityId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
+}
+
+function readDigiMedConventionsAcknowledgements(activityId, email) {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(getDigiMedConventionsAcknowledgementKey(activityId, email)) || "{}");
+        return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (_error) {
+        return {};
+    }
+}
+
+function writeDigiMedConventionsAcknowledgements(activityId, email, value) {
+    try {
+        localStorage.setItem(getDigiMedConventionsAcknowledgementKey(activityId, email), JSON.stringify(value || {}));
+    } catch (_error) {
     }
 }
 
@@ -8662,20 +8683,26 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         ? "https://trello.com/"
         : (isDigitalOutcomeTopic ? slideshowTemplateLibraryUrl : "");
     const relevantDigiMedConventionsTableHtml = digitalOutcomeTopicKey === "relevant-digimed-conventions"
-        ? `<section class="task-topic-guide-block"><h3>Relevant DigiMed Conventions</h3><table class="digital-outcome-must-dos-table"><thead><tr><th>Convention area</th><th>Possible website conventions</th></tr></thead><tbody>
-            <tr><td>Navigation</td><td>Consistent navigation, recognisable menu, logo/home link, descriptive links</td></tr>
-            <tr><td>Layout</td><td>Consistent page structure, alignment, grids, appropriate whitespace</td></tr>
-            <tr><td>Typography</td><td>Heading hierarchy, readable body text, consistent fonts</td></tr>
-            <tr><td>Links</td><td>Clearly identifiable and descriptive</td></tr>
-            <tr><td>Buttons/Controls</td><td>Consistent appearance, clear labels, predictable behaviour</td></tr>
-            <tr><td>Forms</td><td>Labels associated with inputs, logical order, feedback/error messages</td></tr>
-            <tr><td>Visual hierarchy</td><td>Important information visually prominent</td></tr>
-            <tr><td>Images/Media</td><td>Appropriate sizing, quality, placement and captions where relevant</td></tr>
-            <tr><td>Consistency</td><td>Repeated elements behave and appear consistently</td></tr>
-            <tr><td>Responsive design</td><td>Content/layout adapts appropriately to different screen sizes</td></tr>
-            <tr><td>Feedback</td><td>Users receive appropriate feedback when interacting</td></tr>
-            <tr><td>Content organisation</td><td>Headings, sections and grouping make information understandable</td></tr>
-        </tbody></table></section>`
+        ? (() => {
+            const acknowledgements = readDigiMedConventionsAcknowledgements(id, readStoredHubEmail());
+            const rows = [
+                ["Navigation", "Consistent navigation, recognisable menu, logo/home link, descriptive links"],
+                ["Layout", "Consistent page structure, alignment, grids, appropriate whitespace"],
+                ["Typography", "Heading hierarchy, readable body text, consistent fonts"],
+                ["Links", "Clearly identifiable and descriptive"],
+                ["Buttons/Controls", "Consistent appearance, clear labels, predictable behaviour"],
+                ["Forms", "Labels associated with inputs, logical order, feedback/error messages"],
+                ["Visual hierarchy", "Important information visually prominent"],
+                ["Images/Media", "Appropriate sizing, quality, placement and captions where relevant"],
+                ["Consistency", "Repeated elements behave and appear consistently"],
+                ["Responsive design", "Content/layout adapts appropriately to different screen sizes"],
+                ["Feedback", "Users receive appropriate feedback when interacting"],
+                ["Content organisation", "Headings, sections and grouping make information understandable"]
+            ];
+            return `<section class="task-topic-guide-block"><h3>Relevant DigiMed Conventions</h3><table class="digital-outcome-must-dos-table digital-outcome-conventions-table"><thead><tr><th>Convention area</th><th>Possible website conventions</th><th>Discussed</th></tr></thead><tbody>
+                ${rows.map(([area, description]) => `<tr><td>${escapeHtml(area)}</td><td>${escapeHtml(description)}</td><td class="digital-outcome-conventions-ack-cell"><label><input type="checkbox" data-digimed-convention-ack="${escapeHtml(area)}" ${acknowledgements[area] ? "checked" : ""}><span class="sr-only">Acknowledged ${escapeHtml(area)}</span></label></td></tr>`).join("")}
+            </tbody></table></section>`;
+        })()
         : "";
     const topicGuideIntroText = (() => {
         if (!isDigitalOutcomeTopic) {
@@ -9173,6 +9200,18 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             ` : ""
         }
     `;
+
+    if (digitalOutcomeTopicKey === "relevant-digimed-conventions") {
+        const acknowledgements = readDigiMedConventionsAcknowledgements(id, readStoredHubEmail());
+        host.querySelectorAll("[data-digimed-convention-ack]").forEach((checkbox) => {
+            checkbox.addEventListener("change", () => {
+                const area = String(checkbox.getAttribute("data-digimed-convention-ack") || "").trim();
+                if (!area) return;
+                acknowledgements[area] = Boolean(checkbox.checked);
+                writeDigiMedConventionsAcknowledgements(id, readStoredHubEmail(), acknowledgements);
+            });
+        });
+    }
 
     const editButton = host.querySelector("#detail-edit-button");
     const deleteButton = host.querySelector("#detail-delete-button");
