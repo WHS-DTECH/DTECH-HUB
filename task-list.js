@@ -1846,6 +1846,7 @@ function renderChecklistCards(detail, allItems) {
                                 const is91893ToolsAndTechniquesRow = /using appropriate tools and techniques for the purpose and end users/i.test(stepText);
                                 const is91893ConventionsRow = /using relevant conventions for the media type/i.test(stepText);
                                 const is91893EfficientToolsRow = /using efficient tools and techniques in the outcome.?s production/i.test(stepText);
+                                const is91893IntegrityTestingRow = /applying appropriate data integrity and testing procedures/i.test(stepText);
                                 const conventionsSubtask = is91893ConventionsRow ? getDigiMedConventionsSubtask(taskListState.fullEvidenceState) : null;
                                 const rowText = isInformationalRow
                                     ? `<span class="task-list-step-text">${escapeTaskListHtml(stepText)}</span>`
@@ -1889,6 +1890,17 @@ function renderChecklistCards(detail, allItems) {
                                                         <span>${escapeTaskListHtml(subtask)}</span>
                                                     </label>
                                                 `).join("")}
+                                            </div>
+                                        </div>
+                                    ` : ""}
+                                    ${is91893IntegrityTestingRow ? `
+                                        <div class="task-list-decomposition-subtasks">
+                                            <p class="task-list-system-title">SUBTASKS</p>
+                                            <p class="task-list-achieved-note">Files identified for validation.</p>
+                                            <div class="task-list-decomposition-category-list">
+                                                <a class="task-list-decomposition-category" href="${escapeTaskListHtml(buildCustomActivityLink(taskListState.selectedId, "Markup Validation", "Code Validation", "code-validation"))}">
+                                                    <span class="task-list-decomposition-category-label">Markup Validation</span>
+                                                </a>
                                             </div>
                                         </div>
                                     ` : ""}

@@ -90,6 +90,8 @@ const TRELLO_CARD_LINK_STORAGE_PREFIX = "hub_trello_card_link_v1";
 const TRELLO_CARD_LIBRARY_STORAGE_PREFIX = "hub_trello_card_library_v1";
 const GITHUB_REPO_LIBRARY_STORAGE_PREFIX = "hub_github_repo_library_v1";
 const ONEDRIVE_LINK_LIBRARY_STORAGE_PREFIX = "hub_onedrive_link_library_v1";
+const HTML_FILE_LINK_LIBRARY_STORAGE_PREFIX = "hub_html_file_link_library_v1";
+const CSS_FILE_LINK_LIBRARY_STORAGE_PREFIX = "hub_css_file_link_library_v1";
 const GOOGLE_DRIVE_LINK_LIBRARY_STORAGE_PREFIX = "hub_google_drive_link_library_v1";
 const TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX = "hub_task_topic_slide_sync_v1";
 const DIGIMED_CONVENTIONS_ACK_STORAGE_PREFIX = "hub_digimed_conventions_ack_v1";
@@ -112,6 +114,7 @@ const DIGITAL_OUTCOME_TESTING_FUNCTIONS_TITLE = "Testing Functions";
 const DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE = "Relevant DigiMed Conventions";
 const DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE = "Success Criteria";
 const DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE = "Relevant Implications";
+const DIGITAL_OUTCOME_CODE_VALIDATION_TITLE = "Code Validation";
 const DIGITAL_OUTCOME_DESCRIPTION_TEMPLATE_PREVIEW_URL = "https://drive.google.com/thumbnail?id=1brOY70u9aJdsoiEtxVepr82vRhiv9VzpMm8TUv3lcTo&sz=w1400";
 const DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TEMPLATE_PREVIEW_URL = "https://drive.google.com/thumbnail?id=1f3Ff0KG2JCFQ-x41q6TEK15Yjcx8imjRCGUZ6d254wg&sz=w1400";
 const DIGITAL_OUTCOME_TARGET_AUDIENCE_TEMPLATE_PREVIEW_URL = "../images/target-audience-template-preview.svg";
@@ -1773,6 +1776,185 @@ function removeStoredOneDriveLinkLibraryLink(projectId, email, value) {
 
     const current = readStoredOneDriveLinkLibrary(projectId, email).filter((item) => toSafeOneDriveFolderUrl(item?.url || "") !== safeUrl);
     return writeStoredOneDriveLinkLibrary(projectId, email, current);
+}
+
+function getCodeFileLinkLibraryStorageKey(prefix, projectId, email) {
+    return `${prefix}:${String(projectId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
+}
+
+function readStoredCodeFileLinkLibrary(prefix, projectId, email) {
+    const storageKey = getCodeFileLinkLibraryStorageKey(prefix, projectId, email);
+    try {
+        const parsed = JSON.parse(localStorage.getItem(storageKey) || "[]");
+        if (!Array.isArray(parsed)) return [];
+        return parsed
+            .map((item) => ({ url: toSafeExternalUrl(item?.url || ""), savedAt: String(item?.savedAt || "").trim() }))
+            .filter((item) => item.url);
+    } catch (_error) {
+        return [];
+    }
+}
+
+function writeStoredCodeFileLinkLibrary(prefix, projectId, email, values) {
+    const storageKey = getCodeFileLinkLibraryStorageKey(prefix, projectId, email);
+    const seen = new Set();
+    const deduped = (Array.isArray(values) ? values : []).reduce((accumulator, item) => {
+        const url = toSafeExternalUrl(item?.url || "");
+        if (!url || seen.has(url)) return accumulator;
+        seen.add(url);
+        accumulator.push({ url, savedAt: String(item?.savedAt || "").trim() });
+        return accumulator;
+    }, []);
+    try {
+        if (!deduped.length) {
+            localStorage.removeItem(storageKey);
+        } else {
+            localStorage.setItem(storageKey, JSON.stringify(deduped));
+        }
+    } catch (_error) {
+    }
+    return deduped;
+}
+
+function addStoredCodeFileLinkLibraryLink(prefix, projectId, email, value) {
+    const safeUrl = toSafeExternalUrl(value);
+    if (!safeUrl) {
+        return readStoredCodeFileLinkLibrary(prefix, projectId, email);
+    }
+    const current = readStoredCodeFileLinkLibrary(prefix, projectId, email).filter((item) => item.url !== safeUrl);
+    return writeStoredCodeFileLinkLibrary(prefix, projectId, email, [{ url: safeUrl, savedAt: new Date().toISOString() }, ...current]);
+}
+
+function removeStoredCodeFileLinkLibraryLink(prefix, projectId, email, value) {
+    const safeUrl = toSafeExternalUrl(value);
+    if (!safeUrl) {
+        return readStoredCodeFileLinkLibrary(prefix, projectId, email);
+    }
+    const current = readStoredCodeFileLinkLibrary(prefix, projectId, email).filter((item) => item.url !== safeUrl);
+    return writeStoredCodeFileLinkLibrary(prefix, projectId, email, current);
+}
+
+function renderCodeValidationSyncPanel(host, projectId, email, kind) {
+    const prefix = kind === "html" ? HTML_FILE_LINK_LIBRARY_STORAGE_PREFIX : CSS_FILE_LINK_LIBRARY_STORAGE_PREFIX;
+    const slot = host.querySelector(`#task-topic-${kind}-file-sync-slot`);
+    if (!slot) return;
+
+    const idPrefix = `code-validation-${kind}`;
+    const label = kind === "html" ? "HTML" : "CSS";
+    const validatorUrl = kind === "html" ? "https://validator.w3.org/" : "https://jigsaw.w3.org/css-validator/";
+
+    const renderList = () => {
+        const items = readStoredCodeFileLinkLibrary(prefix, projectId, email);
+        const listEl = slot.querySelector(`#${idPrefix}-link-library-list`);
+        const libraryEl = slot.querySelector(`#${idPrefix}-link-library`);
+        const countEl = slot.querySelector(`#${idPrefix}-link-library-count`);
+        if (!listEl || !libraryEl) return;
+        if (!items.length) {
+            libraryEl.hidden = true;
+            if (countEl) countEl.textContent = "(0)";
+            listEl.innerHTML = "";
+            return;
+        }
+        libraryEl.hidden = false;
+        if (countEl) countEl.textContent = `(${items.length})`;
+        listEl.innerHTML = items.map((item) => `
+            <li class="trello-link-library-item" data-code-validation-link-item="${escapeHtml(item.url)}">
+                <div class="trello-link-library-link-wrap">
+                    <a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.url)}</a>
+                    <span class="trello-link-library-savedat">${escapeHtml(formatLibrarySavedAtLabel(item.savedAt))}</span>
+                </div>
+                <div class="trello-link-library-actions">
+                    <button type="button" class="detail-action detail-action-secondary" data-code-validation-use="${escapeHtml(item.url)}">Use</button>
+                    <button type="button" class="detail-action detail-action-secondary" data-code-validation-open="${escapeHtml(item.url)}">Open</button>
+                    <button type="button" class="detail-action detail-action-danger" data-code-validation-delete="${escapeHtml(item.url)}">Delete</button>
+                </div>
+            </li>
+        `).join("");
+    };
+
+    const initialItems = readStoredCodeFileLinkLibrary(prefix, projectId, email);
+    slot.innerHTML = `
+        <div class="trello-sync-panel" id="${idPrefix}-sync-panel">
+            <h3>${label} File Sync</h3>
+            <p>Save the link to the ${label} file you intend to validate at <a href="${escapeHtml(validatorUrl)}" target="_blank" rel="noreferrer">${escapeHtml(validatorUrl)}</a>.</p>
+            <label for="${idPrefix}-file-url" class="trello-sync-label">${label} file link</label>
+            <input id="${idPrefix}-file-url" class="trello-sync-input" type="url" placeholder="https://... (link to your .${kind} file)" value="${escapeHtml(initialItems[0]?.url || "")}">
+            <div class="trello-sync-actions">
+                <button type="button" class="detail-action detail-action-secondary" data-code-validation-save>Save ${label} Link</button>
+                <button type="button" class="detail-action detail-action-secondary" data-code-validation-openfile>Open ${label} File</button>
+            </div>
+            <p class="trello-sync-status" id="${idPrefix}-sync-status" aria-live="polite"></p>
+            <div class="trello-link-library" id="${idPrefix}-link-library" ${initialItems.length ? "" : "hidden"}>
+                <p class="trello-link-library-title">Saved ${label} Links <span class="trello-link-library-count" id="${idPrefix}-link-library-count">(${initialItems.length})</span></p>
+                <ul class="trello-link-library-list" id="${idPrefix}-link-library-list"></ul>
+            </div>
+        </div>
+    `;
+    renderList();
+
+    const setStatusLocal = (message, isError = false) => {
+        const statusEl = slot.querySelector(`#${idPrefix}-sync-status`);
+        if (!statusEl) return;
+        statusEl.textContent = String(message || "");
+        statusEl.classList.toggle("is-error", Boolean(isError));
+    };
+
+    slot.addEventListener("click", (event) => {
+        const button = event.target?.closest?.("button");
+        if (!button) return;
+
+        const input = slot.querySelector(`#${idPrefix}-file-url`);
+
+        if (button.hasAttribute("data-code-validation-save")) {
+            const url = toSafeExternalUrl(input?.value || "");
+            if (!url) {
+                setStatusLocal(`Enter a valid link to your ${label} file first.`, true);
+                return;
+            }
+            addStoredCodeFileLinkLibraryLink(prefix, projectId, email, url);
+            renderList();
+            setStatusLocal(`${label} file link saved.`);
+            return;
+        }
+
+        if (button.hasAttribute("data-code-validation-openfile")) {
+            const url = toSafeExternalUrl(input?.value || "");
+            if (!url) {
+                setStatusLocal(`Enter a valid link to your ${label} file first.`, true);
+                return;
+            }
+            window.open(url, "_blank", "noopener,noreferrer");
+            return;
+        }
+
+        const useUrl = button.getAttribute("data-code-validation-use");
+        if (useUrl) {
+            const safeUrl = toSafeExternalUrl(useUrl);
+            if (safeUrl && input) {
+                input.value = safeUrl;
+                setStatusLocal("Selected saved link.");
+            }
+            return;
+        }
+
+        const openUrl = button.getAttribute("data-code-validation-open");
+        if (openUrl) {
+            const safeUrl = toSafeExternalUrl(openUrl);
+            if (safeUrl) window.open(safeUrl, "_blank", "noopener,noreferrer");
+            return;
+        }
+
+        const deleteUrl = button.getAttribute("data-code-validation-delete");
+        if (deleteUrl) {
+            const safeUrl = toSafeExternalUrl(deleteUrl);
+            if (!safeUrl || !window.confirm(`Delete this saved ${label} link?`)) return;
+            removeStoredCodeFileLinkLibraryLink(prefix, projectId, email, safeUrl);
+            renderList();
+            if (input && input.value === safeUrl) input.value = "";
+            setStatusLocal(`Removed saved ${label} link.`);
+            return;
+        }
+    });
 }
 
 function normalizeGoogleDriveLinkLibrary(values) {
@@ -7736,6 +7918,14 @@ function isToolsAndTechniquesCriterion(taskTopicTitle, taskShortName = "") {
     return shortNameText === DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE.toLowerCase();
 }
 
+function isCodeValidationCriterion(taskTopicTitle, taskShortName = "") {
+    const topicText = String(taskTopicTitle || "").trim().toLowerCase();
+    const shortNameText = String(taskShortName || "").trim().toLowerCase();
+    if (/markup\s+validation|code\s+validation|html\/?css\s+validation/.test(topicText)) return true;
+    if (/markup\s+validation|code\s+validation/.test(shortNameText)) return true;
+    return shortNameText === DIGITAL_OUTCOME_CODE_VALIDATION_TITLE.toLowerCase();
+}
+
 function isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, taskShortName = "") {
     const topicText = String(taskTopicTitle || "").trim().toLowerCase();
     const shortNameText = String(taskShortName || "").trim().toLowerCase();
@@ -8334,6 +8524,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     const isDigitalOutcomeRelevantDigiMedConventionsTopic = isDigitalOutcomeRelevantDigiMedConventionsCriterion(taskTopicTitle, resolvedTaskShortName)
         || keywordMatchedTopicKey === "relevant-digimed-conventions";
     const isToolsAndTechniquesTopic = isToolsAndTechniquesCriterion(taskTopicTitle, resolvedTaskShortName);
+    const isCodeValidationTopic = isCodeValidationCriterion(taskTopicTitle, resolvedTaskShortName)
+        || keywordMatchedTopicKey === "code-validation";
     const isDigitalOutcomeSuccessCriteriaTopic = isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, resolvedTaskShortName)
         || keywordMatchedTopicKey === "success-criteria";
     const isDigitalOutcomeRelevantImplicationsTopic = isDigitalOutcomeRelevantImplicationsCriterion(taskTopicTitle, resolvedTaskShortName)
@@ -8344,19 +8536,21 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             ? "trialling-components"
             : isToolsAndTechniquesTopic
                 ? "tools-and-techniques"
-                : isDigitalOutcomeDevelopmentToolsTopic
-                    ? "development-steps"
-                    : isDigitalOutcomeSuccessCriteriaTopic
-                        ? "success-criteria"
-                        : isDigitalOutcomeRelevantImplicationsTopic
-                            ? "relevant-implications"
-                            : isDigitalOutcomeTestingFunctionsTopic
-                                ? "testing-functions"
-                                : isDigitalOutcomeRelevantDigiMedConventionsTopic
-                                    ? "relevant-digimed-conventions"
-                                    : isDigitalOutcomeDescriptionTopic
-                                        ? "description"
-                                        : keywordMatchedTopicKey;
+                : isCodeValidationTopic
+                    ? "code-validation"
+                    : isDigitalOutcomeDevelopmentToolsTopic
+                        ? "development-steps"
+                        : isDigitalOutcomeSuccessCriteriaTopic
+                            ? "success-criteria"
+                            : isDigitalOutcomeRelevantImplicationsTopic
+                                ? "relevant-implications"
+                                : isDigitalOutcomeTestingFunctionsTopic
+                                    ? "testing-functions"
+                                    : isDigitalOutcomeRelevantDigiMedConventionsTopic
+                                        ? "relevant-digimed-conventions"
+                                        : isDigitalOutcomeDescriptionTopic
+                                            ? "description"
+                                            : keywordMatchedTopicKey;
     const useDigitalOutcomeTemplateHero = Boolean(digitalOutcomeTopicKey);
     const mergedTaskTopicLinks = isTaskTopicView
         ? collectMergedTaskTopicLinks(data, id, taskTopicTitle, resolvedTaskShortName)
@@ -8369,6 +8563,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         "testing-functions": DIGITAL_OUTCOME_TESTING_FUNCTIONS_TITLE,
         "relevant-digimed-conventions": DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE,
         "tools-and-techniques": DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE,
+        "code-validation": DIGITAL_OUTCOME_CODE_VALIDATION_TITLE,
         "development-steps": DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE,
         "success-criteria": DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE,
         "relevant-implications": DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE
@@ -8409,6 +8604,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         || isDigitalOutcomeTriallingComponentsTopic
         || isDigitalOutcomeRelevantDigiMedConventionsTopic
         || isToolsAndTechniquesTopic
+        || isCodeValidationTopic
         || isDigitalOutcomeSuccessCriteriaTopic
         || isDigitalOutcomeRelevantImplicationsTopic;
     const templateLibraryParams = new URLSearchParams();
@@ -8425,6 +8621,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         "testing-functions": "testing-functions",
         "relevant-digimed-conventions": "relevant-digimed-conventions",
         "tools-and-techniques": "tools-and-techniques",
+        "code-validation": "code-validation",
         "development-steps": "development-steps",
         "success-criteria": "project-success-criteria",
         "relevant-implications": "relevant-implications",
@@ -8440,6 +8637,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             "testing-functions": DIGITAL_OUTCOME_TESTING_FUNCTIONS_TITLE,
             "relevant-digimed-conventions": DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE,
             "tools-and-techniques": DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE,
+            "code-validation": DIGITAL_OUTCOME_CODE_VALIDATION_TITLE,
             "development-steps": DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE,
             "project-success-criteria": DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE,
             "relevant-implications": DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE,
@@ -8518,6 +8716,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     const showGithubGuide = isProjectManagementTopic;
     const snowGithubGuide = showGithubGuide;
     const showOneDriveGuide = isProjectManagementTopic;
+    const showCodeValidationGuide = isCodeValidationTopic;
     const submissionTaskItems = Array.from(new Set([
         ...(isDecompositionTopic
             ? [
@@ -8561,7 +8760,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                             ? "Relevant DigiMed Conventions"
                         : (digitalOutcomeTopicKey === "relevant-implications"
                             ? "Relevant Implications"
-                            : "Digital Outcome Description"))))))
+                            : (digitalOutcomeTopicKey === "code-validation"
+                                ? "Code Validation"
+                                : "Digital Outcome Description")))))))
             : "Topic Tasks"));
     const topicGuideInstructions = (() => {
         if (isProjectManagementTopic) {
@@ -8638,6 +8839,16 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                     "Explain legal, ethical, social, and accessibility considerations that apply.",
                     "Describe risks and how you will address or mitigate each implication.",
                     "Use specific evidence from your design decisions to justify your responses."
+                ];
+            }
+
+            if (digitalOutcomeTopicKey === "code-validation") {
+                return [
+                    "Open the W3C Markup Validation Service at https://validator.w3.org/.",
+                    "Paste your HTML file link (or upload the file) and run the check.",
+                    "Fix any reported HTML errors, then re-validate until the file passes.",
+                    "Switch to the CSS validator (https://jigsaw.w3.org/css-validator/) and repeat the process for your CSS file.",
+                    "Record the validation results as evidence, noting any errors found and how you fixed them."
                 ];
             }
 
@@ -8729,6 +8940,15 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 ];
             }
 
+            if (digitalOutcomeTopicKey === "code-validation") {
+                return [
+                    "Save the link to the HTML file you intend to validate in the HTML File Sync box.",
+                    "Save the link to the CSS file you intend to validate in the CSS File Sync box.",
+                    "Run both files through validator.w3.org and note any errors reported.",
+                    "Fix the errors and re-run validation until both files pass with no errors."
+                ];
+            }
+
             return [
                 "Description - Google Slides: Describe the Digital Outcome: what it is, who it is for, and what it must do.",
                 "Identify the target audience or end user for this outcome.",
@@ -8786,6 +9006,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         if (digitalOutcomeTopicKey === "relevant-implications") {
             return "Use this guide to identify relevant implications and justify how your project addresses them.";
         }
+        if (digitalOutcomeTopicKey === "code-validation") {
+            return "Use this guide to check your HTML and CSS files for errors using the W3C validators before submitting evidence.";
+        }
         return "Use this guide to write and record a clear description of your digital outcome before starting development.";
     })();
     const topicGuideTaskHeading = (() => {
@@ -8812,6 +9035,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         }
         if (digitalOutcomeTopicKey === "relevant-implications") {
             return "Relevant Implications - Google Slides";
+        }
+        if (digitalOutcomeTopicKey === "code-validation") {
+            return "Code Validation Checklist";
         }
         return "Description - Google Slides";
     })();
@@ -9115,6 +9341,24 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                         </section>
 
                         <div id="task-topic-google-drive-sync-slot"></div>
+                    </section>
+                    </div>
+                    ` : ""}
+
+                    ${showCodeValidationGuide ? `
+                    <div class="task-topic-sync-grid">
+                    <section class="proposal-section task-topic-guide-panel">
+                        <p class="task-topic-guide-eyebrow">Topic Tasks</p>
+                        <h2>HTML File Sync</h2>
+                        <p class="task-topic-guide-intro">Save the link to the HTML file you intend to validate.</p>
+                        <div id="task-topic-html-file-sync-slot"></div>
+                    </section>
+
+                    <section class="proposal-section task-topic-guide-panel">
+                        <p class="task-topic-guide-eyebrow">Topic Tasks</p>
+                        <h2>CSS File Sync</h2>
+                        <p class="task-topic-guide-intro">Save the link to the CSS file you intend to validate.</p>
+                        <div id="task-topic-css-file-sync-slot"></div>
                     </section>
                     </div>
                     ` : ""}
@@ -10335,6 +10579,8 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         && selectedTaskTopic.toLowerCase().includes("project management");
     const isTestingFunctionsTaskTopicPage = isTaskTopicPage
         && /testing\s+functions|test(?:ing)?\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`);
+    const isCodeValidationTaskTopicPage = isTaskTopicPage
+        && isCodeValidationCriterion(selectedTaskTopic, selectedTaskShortName);
     const taskTopicContextSignals = [
         selectedTaskTopic,
         String(detailData?.subjectStream || detailData?.subject_stream || detailData?.subject || ""),
@@ -11808,6 +12054,11 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         window.open(formUrl, "_blank", "noopener,noreferrer");
         setGoogleFormStatus("Opened Google Form.");
     });
+
+    if (isCodeValidationTaskTopicPage && email) {
+        renderCodeValidationSyncPanel(host, projectId, email, "html");
+        renderCodeValidationSyncPanel(host, projectId, email, "css");
+    }
 
     // Toggle interest button handler
     const toggleBtn = section.querySelector("#interest-toggle-btn");
