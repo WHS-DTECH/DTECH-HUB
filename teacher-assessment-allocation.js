@@ -288,7 +288,7 @@ function buildStudentRows(project) {
         `;
     }
 
-    return project.students.map((student) => buildStudentRow(student)).join("");
+    return project.students.map((student) => buildStudentRow(student, project)).join("");
 }
 
 function buildProjectBlock(project, email) {
@@ -343,7 +343,19 @@ function buildProjectBlock(project, email) {
     return block;
 }
 
-function buildStudentRow(student) {
+function getSuggestedStandardsForAllocation(project, student) {
+    const projectName = String(project?.project_name || "").trim().toLowerCase();
+    if (!projectName.includes("client projects")) {
+        return [];
+    }
+
+    const year = Number.parseInt(String(student?.year_group || "").replace(/[^0-9]/g, ""), 10);
+    if (year === 11) return ["91897"];
+    if (year === 12 || year === 13) return ["91907"];
+    return [];
+}
+
+function buildStudentRow(student, project) {
     const isConfirmed = Boolean(student.confirmed);
     const dateStr = formatDate(student.created_at);
     const statusBadge = isConfirmed
@@ -356,6 +368,11 @@ function buildStudentRow(student) {
     const standard1 = normalizeStandardValue(student.standard_1);
     const standard2 = normalizeStandardValue(student.standard_2);
     const courseGuidance = resolveStudentCourseGuidance(student);
+    const suggestedStandards = getSuggestedStandardsForAllocation(project, student);
+    const selectedStandard1 = standard1 || suggestedStandards[0] || "";
+    const allowedStandards = courseGuidance.standards.length
+        ? Array.from(new Set([...courseGuidance.standards, ...suggestedStandards]))
+        : suggestedStandards;
 
     return `
         <tr data-student="${escapeHtml(student.email)}">
@@ -365,8 +382,8 @@ function buildStudentRow(student) {
             <td class="alloc-date">${escapeHtml(dateStr)}</td>
             <td>
                 <div class="alloc-standards-cell">
-                    ${renderStandardSelect("1", standard1, courseGuidance.standards)}
-                    ${renderStandardSelect("2", standard2, courseGuidance.standards)}
+                    ${renderStandardSelect("1", selectedStandard1, allowedStandards)}
+                    ${renderStandardSelect("2", standard2, allowedStandards)}
                     <button type="button" class="alloc-btn alloc-btn-unconfirm" data-action="save-standards">Save</button>
                 </div>
             </td>
