@@ -2179,7 +2179,11 @@ async function loadChecklistForTask(taskId) {
         openLink.setAttribute("href", buildCustomActivityLink(taskListState.selectedId, taskListState.taskTopic));
     }
 
-    setStatus(`Loaded checklist for ${selected.name || "task"}.`);
+    const processStandard = String(selected?.standard_1 || "").trim() || "Not set";
+    const projectTaskStandard = String(selected?.standard_2 || "").trim() || "Not set";
+    const yearGroup = String(selected?.year_group || "").trim() || "Not set";
+    const courseType = String(selected?.course_type || "").trim() || "Not set";
+    setStatus(`Year Group: ${yearGroup} | Course Type: ${courseType} | Process Std No: ${processStandard} | Project/Task Std No: ${projectTaskStandard}`);
 }
 
 async function renderTaskListPage() {

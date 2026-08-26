@@ -8788,8 +8788,18 @@ app.get("/api/my-allocations", async (req, res) => {
   }
 
   try {
+    const studentDirectoryRows = await getStudentDirectoryRows();
+    const studentByEmail = new Map();
+    studentDirectoryRows.forEach((row) => {
+      const normalized = buildStudentClassManagementRow(row);
+      const linkedEmails = Array.isArray(normalized?.linked_emails) ? normalized.linked_emails : [];
+      linkedEmails.forEach((linkedEmail) => {
+        studentByEmail.set(normalizeEmail(linkedEmail), normalized);
+      });
+    });
+
     const result = await pool.query(
-      `SELECT a.id, a.name, a.activity_category, a.type
+      `SELECT a.id, a.name, a.activity_category, a.type, pi.student_email, pi.standard_1, pi.standard_2
        FROM project_interests pi
        JOIN activities a ON a.id::text = pi.project_id::text
        WHERE pi.student_email = $1
@@ -8805,8 +8815,15 @@ app.get("/api/my-allocations", async (req, res) => {
         id: String(row.id),
         name: String(row.name || "Untitled"),
         topic_type: String(row.type || "").trim(),
-        activity_category: String(row.activity_category || "").trim()
+        activity_category: String(row.activity_category || "").trim(),
+        standard_1: String(row.standard_1 || "").trim(),
+        standard_2: String(row.standard_2 || "").trim()
       };
+      const studentRecord = studentByEmail.get(normalizeEmail(row.student_email));
+      item.year_group = String(studentRecord?.year_level || "").trim();
+      item.course_type = Array.isArray(studentRecord?.programs)
+        ? studentRecord.programs.find((program) => ["DTECH", "COMP"].includes(String(program || "").trim().toUpperCase())) || ""
+        : "";
       if (cat.includes("assessment")) {
         assessmentTasks.push(item);
       } else {
