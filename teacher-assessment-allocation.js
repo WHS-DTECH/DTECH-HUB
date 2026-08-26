@@ -337,7 +337,12 @@ function buildProjectBlock(project, email) {
                         <th>Year Group</th>
                         <th>Subject Strand</th>
                         <th>Registered</th>
-                        <th>Standards</th>
+                        <th>
+                            <div class="alloc-standard-headings">
+                                <span>Process std</span>
+                                <span>Project/Task std</span>
+                            </div>
+                        </th>
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
