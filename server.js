@@ -4980,6 +4980,14 @@ function inferCanonicalTemplateIdentityFromTitle(title) {
     };
   }
 
+  if (/relevant\s+(?:digimed\s+)?conventions|relevant\s+conventions\s+template/.test(normalizedTitle)) {
+    return {
+      id: "relevant-digimed-conventions",
+      title: "Relevant DigiMed Conventions",
+      criteriaText: "Use relevant conventions for the media type."
+    };
+  }
+
   if (/afull\s*-\s*relevant\s*implications\s*template/.test(normalizedTitle)) {
     return {
       id: "relevant-implications",
@@ -6810,6 +6818,7 @@ const TEMPLATE_ID_FROM_TITLE_PATTERNS = [
   { pattern: /^triall?ing\s+components(?:\s*-\s*.+)?$/i, id: "trialling-components", title: "Trialling Components" },
   { pattern: /^trailing\s+comp(?:onents|onets|onets)?(?:\s*-\s*.+)?$/i, id: "trialling-components", title: "Trialling Components" },
   { pattern: /^testing\s+functions(?:\s*-\s*.+)?$/i, id: "testing-functions", title: "Testing Functions" },
+  { pattern: /^(?:afull\s*-\s*)?relevant\s+(?:digimed\s+)?conventions(?:\s+template)?(?:\s*-\s*.+)?$/i, id: "relevant-digimed-conventions", title: "Relevant DigiMed Conventions" },
   { pattern: /^project\s+success\s+criteria(?:\s*-\s*.+)?$/i, id: "project-success-criteria", title: "Project Success Criteria" },
 ];
 

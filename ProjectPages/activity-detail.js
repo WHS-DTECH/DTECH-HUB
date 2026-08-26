@@ -107,6 +107,7 @@ const DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE = "Development Steps";
 const DIGITAL_OUTCOME_TRIALLING_COMPONENTS_TITLE = "Trialling Components";
 const DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE = "Tools & Techniques";
 const DIGITAL_OUTCOME_TESTING_FUNCTIONS_TITLE = "Testing Functions";
+const DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE = "Relevant DigiMed Conventions";
 const DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE = "Success Criteria";
 const DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE = "Relevant Implications";
 const DIGITAL_OUTCOME_DESCRIPTION_TEMPLATE_PREVIEW_URL = "https://drive.google.com/thumbnail?id=1brOY70u9aJdsoiEtxVepr82vRhiv9VzpMm8TUv3lcTo&sz=w1400";
@@ -4238,6 +4239,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         || isDigitalOutcomeDevelopmentToolsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
         || isDigitalOutcomeTriallingComponentsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
         || isDigitalOutcomeTestingFunctionsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
+        || isDigitalOutcomeRelevantDigiMedConventionsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
         || isToolsAndTechniquesCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
         || isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
         || Boolean(keywordMatchedTopicKey);
@@ -4578,6 +4580,8 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             || keywordMatchedTopicKey === "trialling-components";
         const isTestingFunctionsTopic = isDigitalOutcomeTestingFunctionsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
             || keywordMatchedTopicKey === "testing-functions";
+        const isRelevantDigiMedConventionsTopic = isDigitalOutcomeRelevantDigiMedConventionsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
+            || keywordMatchedTopicKey === "relevant-digimed-conventions";
         const isSuccessCriteriaTopic = isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
             || keywordMatchedTopicKey === "success-criteria";
         const isRelevantImplicationsTopic = isDigitalOutcomeRelevantImplicationsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
@@ -4590,9 +4594,11 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                     ? DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE
                     : (isTriallingComponentsTopic
                         ? DIGITAL_OUTCOME_TRIALLING_COMPONENTS_TITLE
+                    : (isRelevantDigiMedConventionsTopic
+                        ? DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE
                     : (isSuccessCriteriaTopic
                         ? DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE
-                        : (isRelevantImplicationsTopic ? DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE : "Digital Outcome: Description")))));
+                        : (isRelevantImplicationsTopic ? DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE : "Digital Outcome: Description"))))));
         const syncTemplateId = isTargetAudienceTopic
             ? "target-audience"
             : (isToolsAndTechniquesSyncTopic
@@ -4603,9 +4609,11 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                         ? "trialling-components"
                         : (isTestingFunctionsTopic
                             ? "testing-functions"
-                            : (isSuccessCriteriaTopic
+                            : (isRelevantDigiMedConventionsTopic
+                                ? "relevant-digimed-conventions"
+                                : (isSuccessCriteriaTopic
                         ? "project-success-criteria"
-                            : (isRelevantImplicationsTopic ? "relevant-implications" : "digital-outcome-description"))))));
+                                : (isRelevantImplicationsTopic ? "relevant-implications" : "digital-outcome-description")))))));
         const allowFolderMatchAutoLink = syncTemplateId === "digital-outcome-description"
             || syncTemplateId === "target-audience"
             || syncTemplateId === "development-steps"
@@ -7627,6 +7635,13 @@ function isDigitalOutcomeTestingFunctionsCriterion(taskTopicTitle, taskShortName
     return shortNameText === DIGITAL_OUTCOME_TESTING_FUNCTIONS_TITLE.toLowerCase();
 }
 
+function isDigitalOutcomeRelevantDigiMedConventionsCriterion(taskTopicTitle, taskShortName = "") {
+    const topicText = String(taskTopicTitle || "").trim().toLowerCase();
+    const shortNameText = String(taskShortName || "").trim().toLowerCase();
+    if (/relevant\s+(?:digimed\s+)?conventions|relevant\s+conventions\s+for\s+the\s+media\s+type/.test(topicText)) return true;
+    return shortNameText === DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE.toLowerCase();
+}
+
 function isToolsAndTechniquesCriterion(taskTopicTitle, taskShortName = "") {
     const topicText = String(taskTopicTitle || "").trim().toLowerCase();
     const shortNameText = String(taskShortName || "").trim().toLowerCase();
@@ -7683,6 +7698,10 @@ function inferDigitalOutcomeTopicKeyFromTitle(pageTitle) {
 
     if (/testing\s+functions|test(?:ing)?\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/.test(normalized)) {
         return "testing-functions";
+    }
+
+    if (/relevant\s+(?:digimed\s+)?conventions|relevant\s+conventions\s+for\s+the\s+media\s+type/.test(normalized)) {
+        return "relevant-digimed-conventions";
     }
 
     if (/developed|development|tools\/?technologies|tools|technologies/.test(normalized)) {
@@ -8225,6 +8244,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         || keywordMatchedTopicKey === "trialling-components";
     const isDigitalOutcomeTestingFunctionsTopic = isDigitalOutcomeTestingFunctionsCriterion(taskTopicTitle, resolvedTaskShortName)
         || keywordMatchedTopicKey === "testing-functions";
+    const isDigitalOutcomeRelevantDigiMedConventionsTopic = isDigitalOutcomeRelevantDigiMedConventionsCriterion(taskTopicTitle, resolvedTaskShortName)
+        || keywordMatchedTopicKey === "relevant-digimed-conventions";
     const isToolsAndTechniquesTopic = isToolsAndTechniquesCriterion(taskTopicTitle, resolvedTaskShortName);
     const isDigitalOutcomeSuccessCriteriaTopic = isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, resolvedTaskShortName)
         || keywordMatchedTopicKey === "success-criteria";
@@ -8232,19 +8253,23 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         || keywordMatchedTopicKey === "relevant-implications";
     const digitalOutcomeTopicKey = isDigitalOutcomeTargetAudienceTopic
         ? "target-audience"
-        : (isDigitalOutcomeTriallingComponentsTopic
+        : isDigitalOutcomeTriallingComponentsTopic
             ? "trialling-components"
-            : (isToolsAndTechniquesTopic
-            ? "tools-and-techniques"
-            : (isDigitalOutcomeDevelopmentToolsTopic
-            ? "development-steps"
-            : (isDigitalOutcomeSuccessCriteriaTopic
-                ? "success-criteria"
-                : (isDigitalOutcomeRelevantImplicationsTopic
-                    ? "relevant-implications"
-                    : (isDigitalOutcomeTestingFunctionsTopic
-                        ? "testing-functions"
-                        : (isDigitalOutcomeDescriptionTopic ? "description" : keywordMatchedTopicKey)))))));
+            : isToolsAndTechniquesTopic
+                ? "tools-and-techniques"
+                : isDigitalOutcomeDevelopmentToolsTopic
+                    ? "development-steps"
+                    : isDigitalOutcomeSuccessCriteriaTopic
+                        ? "success-criteria"
+                        : isDigitalOutcomeRelevantImplicationsTopic
+                            ? "relevant-implications"
+                            : isDigitalOutcomeTestingFunctionsTopic
+                                ? "testing-functions"
+                                : isDigitalOutcomeRelevantDigiMedConventionsTopic
+                                    ? "relevant-digimed-conventions"
+                                    : isDigitalOutcomeDescriptionTopic
+                                        ? "description"
+                                        : keywordMatchedTopicKey;
     const useDigitalOutcomeTemplateHero = Boolean(digitalOutcomeTopicKey);
     const mergedTaskTopicLinks = isTaskTopicView
         ? collectMergedTaskTopicLinks(data, id, taskTopicTitle, resolvedTaskShortName)
@@ -8255,6 +8280,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         "target-audience": DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE,
         "trialling-components": DIGITAL_OUTCOME_TRIALLING_COMPONENTS_TITLE,
         "testing-functions": DIGITAL_OUTCOME_TESTING_FUNCTIONS_TITLE,
+        "relevant-digimed-conventions": DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE,
         "tools-and-techniques": DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE,
         "development-steps": DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE,
         "success-criteria": DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE,
@@ -8294,6 +8320,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         || isDigitalOutcomeTargetAudienceTopic
         || isDigitalOutcomeDevelopmentToolsTopic
         || isDigitalOutcomeTriallingComponentsTopic
+        || isDigitalOutcomeRelevantDigiMedConventionsTopic
         || isToolsAndTechniquesTopic
         || isDigitalOutcomeSuccessCriteriaTopic
         || isDigitalOutcomeRelevantImplicationsTopic;
@@ -8309,6 +8336,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         "target-audience": "target-audience",
         "trialling-components": "trialling-components",
         "testing-functions": "testing-functions",
+        "relevant-digimed-conventions": "relevant-digimed-conventions",
         "tools-and-techniques": "tools-and-techniques",
         "development-steps": "development-steps",
         "success-criteria": "project-success-criteria",
@@ -8323,6 +8351,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             "target-audience": DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE,
             "trialling-components": DIGITAL_OUTCOME_TRIALLING_COMPONENTS_TITLE,
             "testing-functions": DIGITAL_OUTCOME_TESTING_FUNCTIONS_TITLE,
+            "relevant-digimed-conventions": DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE,
             "tools-and-techniques": DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE,
             "development-steps": DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE,
             "project-success-criteria": DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE,
@@ -10074,9 +10103,11 @@ async function initDetail() {
             ? "project-success-criteria"
             : (/triall?ing\s+components|trailing\s+components|trailing\s+comonents/i.test(templateTopicText)
             ? "trialling-components"
+            : (/relevant\s+(?:digimed\s+)?conventions|relevant\s+conventions\s+for\s+the\s+media\s+type/i.test(templateTopicText)
+            ? "relevant-digimed-conventions"
             : (/testing\s+functions|test(?:ing)?\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/i.test(templateTopicText)
             ? "testing-functions"
-            : "")));
+            : ""))));
     const teacherTemplate = teacherTemplateId
         ? await fetchTeacherTemplateLibraryEntry(teacherTemplateId)
         : null;

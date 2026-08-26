@@ -544,6 +544,10 @@ function getTemplateStepMatchers(templateId) {
         return [/testing\s+functions/i, /test(?:ing)?\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/i];
     }
 
+    if (id === "relevant-digimed-conventions") {
+        return [/relevant\s+(?:digimed\s+)?conventions/i, /relevant\s+conventions\s+for\s+the\s+media\s+type/i];
+    }
+
     // For category-specific relevant implications templates, only match the specific category
     if (id.startsWith("relevant-implications-") && id !== "relevant-implications") {
         const categoryName = extractCategoryFromTemplateId(id);
