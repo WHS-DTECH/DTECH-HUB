@@ -8494,6 +8494,14 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         }
 
         if (isDigitalOutcomeTopic) {
+            if (digitalOutcomeTopicKey === "relevant-digimed-conventions") {
+                return [
+                    "Create a Google Slideshow for this topic.",
+                    "Use the conventions table below to check your digital media outcome.",
+                    "Record which conventions apply and how your outcome follows them."
+                ];
+            }
+
             if (digitalOutcomeTopicKey === "target-audience") {
                 return [
                     "Create a Google Slideshow for this topic.",
@@ -8579,6 +8587,14 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         }
 
         if (isDigitalOutcomeTopic) {
+            if (digitalOutcomeTopicKey === "relevant-digimed-conventions") {
+                return [
+                    "Relevant DigiMed Conventions - Google Slides: Use the table to review conventions for your media type.",
+                    "Explain which conventions are most important for your outcome.",
+                    "Record evidence of how your design and development follow the selected conventions."
+                ];
+            }
+
             if (digitalOutcomeTopicKey === "target-audience") {
                 return [
                     "Target Audience - Google Slides: Identify who your project is for and describe them clearly.",
@@ -8637,6 +8653,22 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     const topicGuideSourceUrl = (isProjectManagementTopic || isDecompositionTopic)
         ? "https://trello.com/"
         : (isDigitalOutcomeTopic ? slideshowTemplateLibraryUrl : "");
+    const relevantDigiMedConventionsTableHtml = digitalOutcomeTopicKey === "relevant-digimed-conventions"
+        ? `<section class="task-topic-guide-block"><h3>Relevant DigiMed Conventions</h3><table class="digital-outcome-must-dos-table"><thead><tr><th>Convention area</th><th>Possible website conventions</th></tr></thead><tbody>
+            <tr><td>Navigation</td><td>Consistent navigation, recognisable menu, logo/home link, descriptive links</td></tr>
+            <tr><td>Layout</td><td>Consistent page structure, alignment, grids, appropriate whitespace</td></tr>
+            <tr><td>Typography</td><td>Heading hierarchy, readable body text, consistent fonts</td></tr>
+            <tr><td>Links</td><td>Clearly identifiable and descriptive</td></tr>
+            <tr><td>Buttons/Controls</td><td>Consistent appearance, clear labels, predictable behaviour</td></tr>
+            <tr><td>Forms</td><td>Labels associated with inputs, logical order, feedback/error messages</td></tr>
+            <tr><td>Visual hierarchy</td><td>Important information visually prominent</td></tr>
+            <tr><td>Images/Media</td><td>Appropriate sizing, quality, placement and captions where relevant</td></tr>
+            <tr><td>Consistency</td><td>Repeated elements behave and appear consistently</td></tr>
+            <tr><td>Responsive design</td><td>Content/layout adapts appropriately to different screen sizes</td></tr>
+            <tr><td>Feedback</td><td>Users receive appropriate feedback when interacting</td></tr>
+            <tr><td>Content organisation</td><td>Headings, sections and grouping make information understandable</td></tr>
+        </tbody></table></section>`
+        : "";
     const topicGuideIntroText = (() => {
         if (!isDigitalOutcomeTopic) {
             return "Use this guide to complete the Submission Tasks correctly.";
@@ -8905,6 +8937,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                                 <h3>${escapeHtml(topicGuideTaskHeading)}</h3>
                                 <ul class="list task-topic-guide-list">${renderList(topicGuideTaskItems)}</ul>
                             </section>
+                            ${relevantDigiMedConventionsTableHtml}
                             ${isRelevantImplicationsTopic
                                 ? `<div class="digital-outcome-must-dos" id="relevant-implications-from-slide" aria-live="polite"><p class="task-topic-submission-note">Loading discussed implications from your slideshow...</p></div>`
                                 : ""}
@@ -8991,7 +9024,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                     </div>
                     ` : ""}
 
-                    <section class="proposal-section task-topic-submission-panel" ${isDigitalOutcomeDescriptionTopic || isDigitalOutcomeSuccessCriteriaTopic || isDigitalOutcomeDevelopmentToolsTopic ? "hidden" : ""}>
+                    <section class="proposal-section task-topic-submission-panel" ${isDigitalOutcomeDescriptionTopic || isDigitalOutcomeSuccessCriteriaTopic || isDigitalOutcomeDevelopmentToolsTopic || isDigitalOutcomeRelevantDigiMedConventionsTopic ? "hidden" : ""}>
                         ${isDecompositionTopic ? "" : `
                         <h2>Submission Tasks</h2>
                         <p class="task-topic-submission-intro">${escapeHtml(submissionIntroText)}</p>
