@@ -892,6 +892,10 @@ a {
     gap: 8px;
 }
 
+.new-week-item-process-assessment {
+    display: block;
+}
+
 .new-week-dot {
     width: 7px;
     height: 7px;
@@ -907,6 +911,29 @@ a {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.new-week-link-process-assessment {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 12px;
+    border: 1px solid #85d6aa;
+    border-radius: 7px;
+    background: #20864f;
+    color: #ffffff;
+    font-size: 0.82rem;
+    font-weight: 800;
+    text-align: center;
+    text-decoration: none;
+    white-space: normal;
+    box-shadow: 0 2px 5px rgba(10, 62, 35, 0.22);
+}
+
+.new-week-link-process-assessment:hover,
+.new-week-link-process-assessment:focus-visible {
+    background: #176b3e;
+    color: #ffffff;
 }
 
 .new-week-pill {

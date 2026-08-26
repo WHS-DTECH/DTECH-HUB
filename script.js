@@ -3753,13 +3753,14 @@ function renderStats() {
 
     items.forEach((item) => {
         const row = document.createElement("li");
-        row.className = "new-week-item";
+        const isProcessAssessment = String(item?.id || "").trim() === "49";
+        row.className = `new-week-item${isProcessAssessment ? " new-week-item-process-assessment" : ""}`;
         const typeLabel = inferSourceTypeFromRecord(item) === "project" ? "Project" : "Assessment";
         const href = String(item?.href || "").trim() || "#project-library";
         row.innerHTML = `
-            <span class="new-week-dot" aria-hidden="true"></span>
-            <a class="new-week-link" href="${escapeHtml(href)}">${escapeHtml(String(item?.title || "Untitled").trim())}</a>
-            <span class="new-week-pill">${escapeHtml(typeLabel)}</span>
+            ${isProcessAssessment ? "" : `<span class="new-week-dot" aria-hidden="true"></span>`}
+            <a class="new-week-link${isProcessAssessment ? " new-week-link-process-assessment" : ""}" href="${escapeHtml(href)}">${escapeHtml(String(item?.title || "Untitled").trim())}</a>
+            ${isProcessAssessment ? "" : `<span class="new-week-pill">${escapeHtml(typeLabel)}</span>`}
         `;
         newWeekList.appendChild(row);
     });
