@@ -151,6 +151,16 @@ const EVIDENCE_STEPS_DEFAULTS = {
         "Merit: Addressing relevant implications.",
         "Excellence: Iterative improvement throughout the design, development and testing process to produce a high-quality outcome.",
         "Excellence: Using efficient tools and techniques in the outcome's production."
+    ],
+    "91903": [
+        "Achieved: Applying appropriate tools and techniques to meet the purpose and end-user requirements.",
+        "Achieved: Applying appropriate data integrity and testing procedures.",
+        "Achieved: Applying user experience principles relevant to the purpose of the outcome.",
+        "Achieved: Addressing relevant implications.",
+        "Merit: Using information from testing procedures to improve the quality of the digital media outcome.",
+        "Merit: Applying user experience principles to improve the quality of the digital media outcome.",
+        "Excellence: Iterative improvement throughout the design, development and testing process to produce a high-quality outcome.",
+        "Excellence: Using efficient tools and techniques in the outcome's production."
     ]
 };
 
@@ -806,22 +816,22 @@ function getTaskTopicHrefForStep(standard, level, text) {
         return buildCustomActivityLink(taskListState.selectedId, safeText, "Relevant Implications", "relevant-implications");
     }
 
-    if (String(standard) === "91893" && normalized.includes("explaining relevant implications")) {
+    if ((String(standard) === "91893" || String(standard) === "91903") && normalized.includes("explaining relevant implications")) {
         return buildCustomActivityLink(taskListState.selectedId, "Explaining relevant implications.", "Relevant Implications", "relevant-implications");
     }
 
-    if (String(standard) === "91893" && normalized.includes("addressing relevant implications")) {
+    if ((String(standard) === "91893" || String(standard) === "91903") && normalized.includes("addressing relevant implications")) {
         return buildCustomActivityLink(taskListState.selectedId, "Addressing relevant implications.", "Relevant Implications", "relevant-implications");
     }
 
-    if (String(standard) === "91893"
-        && /(?:using appropriate tools and techniques for the purpose and end users|using efficient tools and techniques in the outcome.?s production)/i.test(normalized)) {
+    if ((String(standard) === "91893" || String(standard) === "91903")
+        && /(?:using appropriate tools and techniques for the purpose and end users|applying appropriate tools and techniques to meet the purpose and end-user requirements|using efficient tools and techniques in the outcome.?s production)/i.test(normalized)) {
         return buildCustomActivityLink(taskListState.selectedId, "What Tools and Techniques will be used?", "Tools & Techniques", "tools-and-techniques");
     }
 
-    if (String(standard) === "91893"
+    if ((String(standard) === "91893" || String(standard) === "91903")
         && /applying appropriate data integrity and testing procedures/i.test(normalized)) {
-        return buildTaskListStandardSectionAnchor("91897", "testing-trialing");
+        return buildTaskListStandardSectionAnchor(String(standard) === "91903" ? "91907" : "91897", "testing-trialing");
     }
 
     if ((String(standard) === "91897" || String(standard) === "91907")
@@ -1232,17 +1242,17 @@ function getProjectManagementSystemLogo(systemName) {
 }
 
 function isInformationalCriteriaRow(standard, level, text) {
-    if (standard !== "91893" && standard !== "91897" && standard !== "91907") {
+    if (standard !== "91893" && standard !== "91903" && standard !== "91897" && standard !== "91907") {
         return false;
     }
 
     const normalized = stripStepLevel(text).toLowerCase();
-    if (standard === "91893" && level === "Excellence") {
+    if ((standard === "91893" || standard === "91903") && level === "Excellence") {
         return /^iterative improvement throughout the design, development and testing process to produce a high-quality outcome\.?$/.test(normalized);
     }
 
-    if (standard === "91893" && level === "Merit") {
-        return /^using information from testing procedures to improve the quality of the outcome\.?$/.test(normalized);
+    if ((standard === "91893" || standard === "91903") && level === "Merit") {
+        return /^using information from testing procedures to improve the quality of the (?:digital media )?outcome\.?$/.test(normalized);
     }
 
     if (level === "Merit") {
@@ -1451,31 +1461,39 @@ function autoTickMultipleComponentsRequirement(stateMap, componentCount) {
 }
 
 function sync91893RelevantImplicationsState(stateMap) {
-    const sourceRows = Array.isArray(stateMap?.["91897"]) ? stateMap["91897"] : [];
-    const targetRows = Array.isArray(stateMap?.["91893"]) ? stateMap["91893"] : [];
-    if (!sourceRows.length || !targetRows.length) {
-        return false;
-    }
-
-    const sourceExplainingDone = sourceRows.some((row) => {
-        const text = stripStepLevel(row?.text || "").toLowerCase();
-        return /^explain(?:ing)? relevant implications\.?$/.test(text) && Boolean(row?.done);
-    });
-    const sourceAddressingDone = sourceRows.some((row) => {
-        const text = stripStepLevel(row?.text || "").toLowerCase();
-        return /^address(?:ing)? relevant implications\.?$/.test(text) && Boolean(row?.done);
-    });
+    // 91893 pairs with the Level 2 process standard (91897); 91903 pairs with the Level 3 one (91907).
+    const pairs = [
+        { source: "91897", target: "91893" },
+        { source: "91907", target: "91903" }
+    ];
 
     let changed = false;
-    targetRows.forEach((row) => {
-        const text = stripStepLevel(row?.text || "").toLowerCase();
-        const shouldBeDone = /^(?:explain(?:ing)?) relevant implications\.?$/.test(text)
-            ? sourceExplainingDone
-            : (/^address(?:ing)? relevant implications\.?$/.test(text) ? sourceAddressingDone : null);
-        if (shouldBeDone !== null && Boolean(row?.done) !== shouldBeDone) {
-            row.done = shouldBeDone;
-            changed = true;
+    pairs.forEach(({ source, target }) => {
+        const sourceRows = Array.isArray(stateMap?.[source]) ? stateMap[source] : [];
+        const targetRows = Array.isArray(stateMap?.[target]) ? stateMap[target] : [];
+        if (!sourceRows.length || !targetRows.length) {
+            return;
         }
+
+        const sourceExplainingDone = sourceRows.some((row) => {
+            const text = stripStepLevel(row?.text || "").toLowerCase();
+            return /^explain(?:ing)? relevant implications\.?$/.test(text) && Boolean(row?.done);
+        });
+        const sourceAddressingDone = sourceRows.some((row) => {
+            const text = stripStepLevel(row?.text || "").toLowerCase();
+            return /^address(?:ing)? relevant implications\.?$/.test(text) && Boolean(row?.done);
+        });
+
+        targetRows.forEach((row) => {
+            const text = stripStepLevel(row?.text || "").toLowerCase();
+            const shouldBeDone = /^(?:explain(?:ing)?) relevant implications\.?$/.test(text)
+                ? sourceExplainingDone
+                : (/^address(?:ing)? relevant implications\.?$/.test(text) ? sourceAddressingDone : null);
+            if (shouldBeDone !== null && Boolean(row?.done) !== shouldBeDone) {
+                row.done = shouldBeDone;
+                changed = true;
+            }
+        });
     });
     return changed;
 }
@@ -1824,7 +1842,7 @@ function renderChecklistCards(detail, allItems) {
     const renderRowsForStandard = (standard, rows) => {
         const safeRows = Array.isArray(rows) ? rows : [];
 
-        if (String(standard) === "91893") {
+        if (String(standard) === "91893" || String(standard) === "91903") {
             const levels = ["Achieved", "Merit", "Excellence"];
             const decompositionCoverage = readDecompositionCategoryCoverage(taskListState.selectedId, getTaskListEmail());
             const efficientToolsState = readDigiMedEfficientToolsState(taskListState.selectedId, getTaskListEmail());
@@ -1840,10 +1858,10 @@ function renderChecklistCards(detail, allItems) {
                                 const stepText = stripStepLevel(step?.text || "");
                                 const isLinkedRelevantImplicationsRow = /^(?:explain(?:ing)?|address(?:ing)?) relevant implications\.?$/i.test(stepText);
                                 const href = isLinkedRelevantImplicationsRow
-                                    ? buildTaskListStandardSectionAnchor("91897", "relevant-implications")
+                                    ? buildTaskListStandardSectionAnchor(String(standard) === "91903" ? "91907" : "91897", "relevant-implications")
                                     : getTaskTopicHrefForStep(standard, level, stepText);
                                 const isInformationalRow = isInformationalCriteriaRow(standard, level, stepText);
-                                const is91893ToolsAndTechniquesRow = /using appropriate tools and techniques for the purpose and end users/i.test(stepText);
+                                const is91893ToolsAndTechniquesRow = /using appropriate tools and techniques for the purpose and end users|applying appropriate tools and techniques to meet the purpose and end-user requirements/i.test(stepText);
                                 const is91893ConventionsRow = /using relevant conventions for the media type|applying relevant conventions to improve the quality of the outcome/i.test(stepText);
                                 const is91893EfficientToolsRow = /using efficient tools and techniques in the outcome.?s production/i.test(stepText);
                                 const is91893IntegrityTestingRow = /applying appropriate data integrity and testing procedures/i.test(stepText);
@@ -1925,7 +1943,7 @@ function renderChecklistCards(detail, allItems) {
             `;
         }
 
-        if (String(standard) !== "91897" && String(standard) !== "91907") {
+        if (String(standard) !== "91897" && String(standard) !== "91907" && String(standard) !== "91893" && String(standard) !== "91903") {
             return `
                 <div class="task-list-step-list">
                     ${safeRows.map((step, index) => {
@@ -2197,9 +2215,9 @@ function getStandardCodes(detail, allItems = [], processStandard = "") {
         ? fromDetails.filter((code, index, arr) => arr.indexOf(code) === index)
         : ["91897", "91907"];
     if (hasDigitalMediaTopicType(detail, allItems)) {
-        const withoutDigitalMediaStandards = codes.filter((code) => code !== "91893" && code !== "91895");
-        withoutDigitalMediaStandards.push("91893");
+        const withoutDigitalMediaStandards = codes.filter((code) => code !== "91893" && code !== "91895" && code !== "91903");
         const normalizedProcessStandard = String(processStandard || "").trim().match(/\b(91897|91907)\b/)?.[1] || "";
+        withoutDigitalMediaStandards.push(normalizedProcessStandard === "91907" ? "91903" : "91893");
         const visibleCodes = normalizedProcessStandard === "91897"
             ? withoutDigitalMediaStandards.filter((code) => code !== "91907")
             : normalizedProcessStandard === "91907"
@@ -2216,11 +2234,11 @@ function getStandardCodes(detail, allItems = [], processStandard = "") {
     return ["digital-outcome", ...visibleCodes];
 }
 
-function normalize91893ChecklistRows(rows) {
+function normalize91893ChecklistRows(rows, standardCode = "91893") {
     const sourceRows = Array.isArray(rows)
         ? rows.map((step) => ({ text: String(step?.text || "").trim(), done: Boolean(step?.done) })).filter((step) => step.text)
         : [];
-    const defaults = EVIDENCE_STEPS_DEFAULTS["91893"];
+    const defaults = EVIDENCE_STEPS_DEFAULTS[standardCode] || EVIDENCE_STEPS_DEFAULTS["91893"];
     return defaults.map((text) => {
         const existing = sourceRows.find((step) => stripStepLevel(step.text).toLowerCase() === stripStepLevel(text).toLowerCase());
         return { text, done: Boolean(existing?.done) };
@@ -2247,8 +2265,8 @@ function buildChecklistState(standardCodes, evidenceMap) {
                 return;
             }
 
-            if (standard === "91893") {
-                next[standard] = normalize91893ChecklistRows(existing);
+            if (standard === "91893" || standard === "91903") {
+                next[standard] = normalize91893ChecklistRows(existing, standard);
                 return;
             }
 
@@ -2309,6 +2327,12 @@ async function loadChecklistForTask(taskId) {
         taskListState.fullEvidenceState["91893"] = normalize91893ChecklistRows(taskListState.fullEvidenceState["91893"]);
         migrated91893Rows = before91893Migration !== JSON.stringify(taskListState.fullEvidenceState["91893"]);
     }
+    let migrated91903Rows = false;
+    if (Array.isArray(taskListState.fullEvidenceState["91903"])) {
+        const before91903Migration = JSON.stringify(taskListState.fullEvidenceState["91903"]);
+        taskListState.fullEvidenceState["91903"] = normalize91893ChecklistRows(taskListState.fullEvidenceState["91903"], "91903");
+        migrated91903Rows = before91903Migration !== JSON.stringify(taskListState.fullEvidenceState["91903"]);
+    }
     taskListState.checklistStandards = getStandardCodes(
         detail || selected,
         taskListState.allItems,
@@ -2345,7 +2369,7 @@ async function loadChecklistForTask(taskId) {
     const autoChangedEvidenceRI = autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
     const autoSyncedEvidence91893RI = sync91893RelevantImplicationsState(taskListState.fullEvidenceState);
     const autoChangedEvidence = autoChangedEvidencePM || autoChangedEvidenceDO || autoChangedEvidenceRI || autoRepairedEvidenceRI || autoSyncedEvidence91893RI;
-    if (migratedDigitalOutcomeRows || migrated91897Rows || migrated91907Rows || migrated91893Rows || autoChangedChecklist || autoChangedEvidence) {
+    if (migratedDigitalOutcomeRows || migrated91897Rows || migrated91907Rows || migrated91893Rows || migrated91903Rows || autoChangedChecklist || autoChangedEvidence) {
         const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
         await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});
     }
