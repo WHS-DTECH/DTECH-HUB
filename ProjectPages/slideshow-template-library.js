@@ -1364,9 +1364,12 @@ function renderTemplateCard(item) {
         .replace(/\s+/g, " ");
     
     const normalizedTitle = normalizeForMatching(title);
-    const matchingFile = driveState.resetTemplateIds[item.id]
-        ? null
-        : driveState.processAssessmentFiles.find((file) => {
+    // Process Assessment files are listed alphabetically, not by recency, so when a student has
+    // re-copied a template (e.g. after Reset Use) multiple matching files can share the same name.
+    // Always prefer the most recently modified match so students open their latest copy, not a stale one.
+    const matchingFiles = driveState.resetTemplateIds[item.id]
+        ? []
+        : driveState.processAssessmentFiles.filter((file) => {
         const normalizedFileName = normalizeForMatching(file?.name || "");
         const isMatch = normalizedFileName.includes(normalizedTitle);
         if (!isMatch) {
@@ -1374,6 +1377,13 @@ function renderTemplateCard(item) {
         }
         return isMatch;
         });
+    const matchingFile = matchingFiles.length > 1
+        ? matchingFiles.reduce((latest, file) => {
+            const latestTime = Date.parse(latest?.modifiedTime || "") || 0;
+            const fileTime = Date.parse(file?.modifiedTime || "") || 0;
+            return fileTime > latestTime ? file : latest;
+        })
+        : matchingFiles[0] || null;
     
     if (matchingFile) {
         console.debug(`Matched "${title}" to file "${matchingFile.name}"`);
