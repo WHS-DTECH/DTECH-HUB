@@ -5861,6 +5861,7 @@ async function driveEnsureFolder(parentFolderId, folderName, accessToken) {
 const PROCESS_ASSESSMENT_DIGITAL_OUTCOME_FOLDER_NAME = "Digital Outcome Details";
 const PROCESS_ASSESSMENT_TRIALLING_COMPONENTS_FOLDER_NAME = "Trailing Components";
 const PROCESS_ASSESSMENT_TESTING_FUNCTIONS_FOLDER_NAME = "Testing Functions";
+const PROCESS_ASSESSMENT_RELEVANT_DIGIMED_CONVENTIONS_FOLDER_NAME = "Relevant DigiMed Conventions";
 const PROCESS_ASSESSMENT_RELEVANT_IMPLICATIONS_FOLDER_NAME = "Relevant Implications";
 
 const DIGITAL_OUTCOME_DETAILS_TEMPLATE_IDS = new Set([
@@ -5886,6 +5887,12 @@ function resolveProcessAssessmentSubfolderName(templateId, templateTitle) {
     || /testing\s+functions/.test(normalizedTitle);
   if (isTestingFunctionsTemplate) {
     return PROCESS_ASSESSMENT_TESTING_FUNCTIONS_FOLDER_NAME;
+  }
+
+  const isRelevantDigiMedConventionsTemplate = normalizedTemplateId === "relevant-digimed-conventions"
+    || /relevant\s+(?:digimed\s+)?conventions/.test(normalizedTitle);
+  if (isRelevantDigiMedConventionsTemplate) {
+    return PROCESS_ASSESSMENT_RELEVANT_DIGIMED_CONVENTIONS_FOLDER_NAME;
   }
 
   const isDigitalOutcomeTemplate = DIGITAL_OUTCOME_DETAILS_TEMPLATE_IDS.has(normalizedTemplateId)
@@ -5920,6 +5927,7 @@ async function driveListSlidesInProcessAssessmentTree(processAssessmentFolderId,
     PROCESS_ASSESSMENT_DIGITAL_OUTCOME_FOLDER_NAME,
     PROCESS_ASSESSMENT_TRIALLING_COMPONENTS_FOLDER_NAME,
     PROCESS_ASSESSMENT_TESTING_FUNCTIONS_FOLDER_NAME,
+    PROCESS_ASSESSMENT_RELEVANT_DIGIMED_CONVENTIONS_FOLDER_NAME,
     PROCESS_ASSESSMENT_RELEVANT_IMPLICATIONS_FOLDER_NAME
   ];
 
