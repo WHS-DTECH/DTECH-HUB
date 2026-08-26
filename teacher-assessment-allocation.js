@@ -3,6 +3,11 @@ const STRAND_CODES = ["DTECH", "COMP", "TEXT", "DTONLINE"];
 const COURSE_STANDARDS_GUIDANCE = {
     "11DTECH": ["29777", "92004", "91893", "91897", "92006", "92005"]
 };
+const CLIENT_PROJECT_STANDARD_GUIDANCE = {
+    "11DTECH": "91897",
+    "12DTECH": "91897",
+    "13DTECH": "91907"
+};
 let allocStandardsOptions = [];
 
 function allocGetStoredEmail() {
@@ -131,6 +136,14 @@ function resolveStudentCourseGuidance(row) {
         courseKey,
         standards: Array.isArray(COURSE_STANDARDS_GUIDANCE[courseKey]) ? COURSE_STANDARDS_GUIDANCE[courseKey] : []
     };
+}
+
+function resolveClientProjectStandard(projectName, student) {
+    if (!/client projects/i.test(String(projectName || ""))) {
+        return "";
+    }
+    const guidance = resolveStudentCourseGuidance(student);
+    return CLIENT_PROJECT_STANDARD_GUIDANCE[guidance.courseKey] || "";
 }
 
 function normalizeStandardValue(value) {
@@ -288,7 +301,7 @@ function buildStudentRows(project) {
         `;
     }
 
-    return project.students.map((student) => buildStudentRow(student, project)).join("");
+    return project.students.map((student) => buildStudentRow(student, project.project_name)).join("");
 }
 
 function buildProjectBlock(project, email) {
@@ -343,19 +356,7 @@ function buildProjectBlock(project, email) {
     return block;
 }
 
-function getSuggestedStandardsForAllocation(project, student) {
-    const projectName = String(project?.project_name || "").trim().toLowerCase();
-    if (!projectName.includes("client projects")) {
-        return [];
-    }
-
-    const year = Number.parseInt(String(student?.year_group || "").replace(/[^0-9]/g, ""), 10);
-    if (year === 11) return ["91897"];
-    if (year === 12 || year === 13) return ["91907"];
-    return [];
-}
-
-function buildStudentRow(student, project) {
+function buildStudentRow(student, projectName = "") {
     const isConfirmed = Boolean(student.confirmed);
     const dateStr = formatDate(student.created_at);
     const statusBadge = isConfirmed
@@ -365,14 +366,9 @@ function buildStudentRow(student, project) {
     const confirmBtnText = isConfirmed ? "Unconfirm" : "Confirm";
     const yearGroup = String(student.year_group || "").trim() || "Unspecified";
     const subjectStrand = formatStudentStrand(student.subject_strands);
-    const standard1 = normalizeStandardValue(student.standard_1);
+    const standard1 = normalizeStandardValue(student.standard_1) || resolveClientProjectStandard(projectName, student);
     const standard2 = normalizeStandardValue(student.standard_2);
     const courseGuidance = resolveStudentCourseGuidance(student);
-    const suggestedStandards = getSuggestedStandardsForAllocation(project, student);
-    const selectedStandard1 = standard1 || suggestedStandards[0] || "";
-    const allowedStandards = courseGuidance.standards.length
-        ? Array.from(new Set([...courseGuidance.standards, ...suggestedStandards]))
-        : suggestedStandards;
 
     return `
         <tr data-student="${escapeHtml(student.email)}">
@@ -382,8 +378,8 @@ function buildStudentRow(student, project) {
             <td class="alloc-date">${escapeHtml(dateStr)}</td>
             <td>
                 <div class="alloc-standards-cell">
-                    ${renderStandardSelect("1", selectedStandard1, allowedStandards)}
-                    ${renderStandardSelect("2", standard2, allowedStandards)}
+                    ${renderStandardSelect("1", standard1, courseGuidance.standards)}
+                    ${renderStandardSelect("2", standard2, courseGuidance.standards)}
                     <button type="button" class="alloc-btn alloc-btn-unconfirm" data-action="save-standards">Save</button>
                 </div>
             </td>
@@ -649,6 +645,25 @@ async function loadAllocations() {
                 }
                 return left.project_name.localeCompare(right.project_name);
             });
+
+        await Promise.all(projects.flatMap((project) => project.students.map(async (student) => {
+            const guidedStandard = resolveClientProjectStandard(project.project_name, student);
+            if (!guidedStandard || normalizeStandardValue(student.standard_1)) {
+                return;
+            }
+
+            const response = await fetch(
+                `/api/activities/${encodeURIComponent(project.project_id)}/interests/${encodeURIComponent(student.email)}/standards`,
+                {
+                    method: "PATCH",
+                    headers: allocWithAuthHeaders({ "Content-Type": "application/json" }, email),
+                    body: JSON.stringify({ standard_1: guidedStandard, standard_2: normalizeStandardValue(student.standard_2) })
+                }
+            );
+            if (response.ok) {
+                student.standard_1 = guidedStandard;
+            }
+        })));
 
         setAllocStatus("");
 
