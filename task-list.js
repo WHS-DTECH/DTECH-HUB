@@ -2,6 +2,7 @@ const TASK_LIST_AUTH_KEY = "hub_google_auth_v1";
 const TASK_LIST_TRELLO_CARD_LINK_STORAGE_PREFIX = "hub_trello_card_link_v1";
 const TASK_LIST_TRELLO_CARD_LIBRARY_STORAGE_PREFIX = "hub_trello_card_library_v1";
 const TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX = "hub_task_topic_slide_sync_v1";
+const DIGIMED_CONVENTIONS_ACK_STORAGE_PREFIX = "hub_digimed_conventions_ack_v1";
 
 const DIGITAL_OUTCOME_DETAILS_TASKS = [
     "Description - Google Slides: Describe the Digital Outcome: What is it, who is it for, and what should it do?",
@@ -1087,6 +1088,25 @@ function getTestingFunctionsSubtasks(stateMap) {
     }];
 }
 
+function getDigiMedConventionsAcknowledgementCount(activityId, email) {
+    try {
+        const key = `${DIGIMED_CONVENTIONS_ACK_STORAGE_PREFIX}:${String(activityId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
+        const saved = JSON.parse(localStorage.getItem(key) || "{}");
+        return Object.values(saved || {}).filter(Boolean).length;
+    } catch (_error) {
+        return 0;
+    }
+}
+
+function getDigiMedConventionsSubtask() {
+    const activityId = taskListState.selectedId;
+    return {
+        label: "Conventions",
+        href: buildCustomActivityLink(activityId, "Using relevant conventions for the media type.", "Relevant DigiMed Conventions", "relevant-digimed-conventions"),
+        count: getDigiMedConventionsAcknowledgementCount(activityId, getTaskListEmail())
+    };
+}
+
 function getProjectManagementSystemLogo(systemName) {
     const system = String(systemName || "").trim().toLowerCase();
     if (system === "trello") {
@@ -1836,6 +1856,8 @@ function renderChecklistCards(detail, allItems) {
                                 && /trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components|trailing\s+components/.test(stepText.toLowerCase());
                             const isTestingFunctionsRow = String(level) === "Achieved"
                                 && /testing\s+functions|test(?:ing)?\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/i.test(stepText);
+                            const isDigiMedConventionsRow = String(level) === "Achieved"
+                                && /using relevant conventions for the media type/i.test(stepText);
                             const isMultipleComponentsRow = String(level) === "Merit"
                                 && /^(?:effectively\s+)?trial(?:l?ing)?\s+multiple\s+components\s+and\/or\s+techniques\b/i.test(stepText);
                             const isInformationalRow = isInformationalCriteriaRow(String(standard), level, stepText);
@@ -1854,6 +1876,7 @@ function renderChecklistCards(detail, allItems) {
                             const componentsSubtaskHref = buildCustomActivityLink(taskListState.selectedId, "Trial the components of the digital technologies outcome.", "Trialling Components", "trialling-components");
                             const projectManagementSubtasks = isProjectManagementRow ? getProjectManagementSubtasks(taskListState.fullEvidenceState) : [];
                             const testingFunctionsSubtasks = isTestingFunctionsRow ? getTestingFunctionsSubtasks(taskListState.fullEvidenceState) : [];
+                            const digiMedConventionsSubtask = isDigiMedConventionsRow ? getDigiMedConventionsSubtask() : null;
 
                             return `
                                 ${shouldRenderAchievedSectionHeading && achievedSectionMeta
@@ -1953,6 +1976,18 @@ function renderChecklistCards(detail, allItems) {
                                                         <a href="${escapeTaskListHtml(subtask.href)}">${getProjectManagementSystemLogo(subtask.label)}${escapeTaskListHtml(subtask.label)}</a>
                                                     </label>
                                                 `).join("")}
+                                            </div>
+                                        </div>
+                                    ` : ""}
+                                    ${digiMedConventionsSubtask ? `
+                                        <div class="task-list-decomposition-subtasks">
+                                            <p class="task-list-system-title">SUBTASKS</p>
+                                            <p class="task-list-achieved-note">Convention areas acknowledged in your Conventions slide.</p>
+                                            <div class="task-list-decomposition-category-list">
+                                                <a class="task-list-decomposition-category ${digiMedConventionsSubtask.count > 0 ? "is-covered" : ""}" href="${escapeTaskListHtml(digiMedConventionsSubtask.href)}">
+                                                    <span class="task-list-decomposition-category-label">CONVENTIONS</span>
+                                                    <span class="task-list-decomposition-category-count">${digiMedConventionsSubtask.count}</span>
+                                                </a>
                                             </div>
                                         </div>
                                     ` : ""}
