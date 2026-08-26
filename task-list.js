@@ -1990,7 +1990,7 @@ function renderChecklistCards(detail, allItems) {
     checklistHost.innerHTML = cardsHtml;
 }
 
-function getStandardCodes(detail, allItems = []) {
+function getStandardCodes(detail, allItems = [], processStandard = "") {
     const fromDetails = Array.isArray(detail?.standardDetails)
         ? detail.standardDetails.map((line) => String(line || "").match(/\b(\d{5})\b/)?.[1]).filter(Boolean)
         : [];
@@ -2001,9 +2001,21 @@ function getStandardCodes(detail, allItems = []) {
     if (hasDigitalMediaTopicType(detail, allItems)) {
         const withoutDigitalMediaStandards = codes.filter((code) => code !== "91893" && code !== "91895");
         withoutDigitalMediaStandards.push("91893");
-        return ["digital-outcome", ...withoutDigitalMediaStandards];
+        const normalizedProcessStandard = String(processStandard || "").trim().match(/\b(91897|91907)\b/)?.[1] || "";
+        const visibleCodes = normalizedProcessStandard === "91897"
+            ? withoutDigitalMediaStandards.filter((code) => code !== "91907")
+            : normalizedProcessStandard === "91907"
+                ? withoutDigitalMediaStandards.filter((code) => code !== "91897")
+                : withoutDigitalMediaStandards;
+        return ["digital-outcome", ...visibleCodes];
     }
-    return ["digital-outcome", ...codes];
+    const normalizedProcessStandard = String(processStandard || "").trim().match(/\b(91897|91907)\b/)?.[1] || "";
+    const visibleCodes = normalizedProcessStandard === "91897"
+        ? codes.filter((code) => code !== "91907")
+        : normalizedProcessStandard === "91907"
+            ? codes.filter((code) => code !== "91897")
+            : codes;
+    return ["digital-outcome", ...visibleCodes];
 }
 
 function normalize91893ChecklistRows(rows) {
@@ -2099,7 +2111,11 @@ async function loadChecklistForTask(taskId) {
         taskListState.fullEvidenceState["91893"] = normalize91893ChecklistRows(taskListState.fullEvidenceState["91893"]);
         migrated91893Rows = before91893Migration !== JSON.stringify(taskListState.fullEvidenceState["91893"]);
     }
-    taskListState.checklistStandards = getStandardCodes(detail || selected, taskListState.allItems);
+    taskListState.checklistStandards = getStandardCodes(
+        detail || selected,
+        taskListState.allItems,
+        selected?.standard_1
+    );
     taskListState.checklistState = buildChecklistState(taskListState.checklistStandards, evidenceMap);
     taskListState.checklistStandards.forEach((standard) => {
         if (!Array.isArray(taskListState.fullEvidenceState[standard])) {
