@@ -1,5 +1,8 @@
 const ALLOC_AUTH_KEY = "hub_google_auth_v1";
 const STRAND_CODES = ["DTECH", "COMP", "TEXT", "DTONLINE"];
+const COURSE_STANDARDS_GUIDANCE = {
+    "11DTECH": ["29777", "92004", "91893", "91897", "92006", "92005"]
+};
 let allocStandardsOptions = [];
 
 function allocGetStoredEmail() {
@@ -116,6 +119,20 @@ function extractStudentYearGroup(row) {
     return "";
 }
 
+function resolveStudentCourseGuidance(row) {
+    const year = extractStudentYearGroup(row).replace(/^year\s*/i, "").trim();
+    const programValues = Array.isArray(row?.programs) ? row.programs : row?.subject_strands;
+    const programs = Array.isArray(programValues)
+        ? programValues.map((value) => String(value || "").trim().toUpperCase())
+        : [];
+    const course = programs.find((value) => value === "DTECH" || value === "COMP") || "";
+    const courseKey = year && course ? `${year}${course}` : "";
+    return {
+        courseKey,
+        standards: Array.isArray(COURSE_STANDARDS_GUIDANCE[courseKey]) ? COURSE_STANDARDS_GUIDANCE[courseKey] : []
+    };
+}
+
 function normalizeStandardValue(value) {
     return String(value || "").trim().slice(0, 120);
 }
@@ -136,9 +153,13 @@ function buildStandardOptionLabel(option) {
     return number || shortName || "Unknown standard";
 }
 
-function renderStandardSelect(slot, currentValue) {
+function renderStandardSelect(slot, currentValue, allowedStandards = []) {
     const selectedValue = extractStandardNumber(currentValue);
-    const options = Array.isArray(allocStandardsOptions) ? allocStandardsOptions : [];
+    const allowed = new Set(Array.isArray(allowedStandards) ? allowedStandards.map((value) => String(value || "").trim()) : []);
+    const allOptions = Array.isArray(allocStandardsOptions) ? allocStandardsOptions : [];
+    const options = allowed.size
+        ? allOptions.filter((option) => allowed.has(String(option?.standard_number || "").trim()))
+        : allOptions;
     const hasSelectedValue = selectedValue && options.some((option) => String(option.standard_number) === selectedValue);
 
     const customOption = (!hasSelectedValue && String(currentValue || "").trim())
@@ -334,6 +355,7 @@ function buildStudentRow(student) {
     const subjectStrand = formatStudentStrand(student.subject_strands);
     const standard1 = normalizeStandardValue(student.standard_1);
     const standard2 = normalizeStandardValue(student.standard_2);
+    const courseGuidance = resolveStudentCourseGuidance(student);
 
     return `
         <tr data-student="${escapeHtml(student.email)}">
@@ -343,8 +365,8 @@ function buildStudentRow(student) {
             <td class="alloc-date">${escapeHtml(dateStr)}</td>
             <td>
                 <div class="alloc-standards-cell">
-                    ${renderStandardSelect("1", standard1)}
-                    ${renderStandardSelect("2", standard2)}
+                    ${renderStandardSelect("1", standard1, courseGuidance.standards)}
+                    ${renderStandardSelect("2", standard2, courseGuidance.standards)}
                     <button type="button" class="alloc-btn alloc-btn-unconfirm" data-action="save-standards">Save</button>
                 </div>
             </td>
@@ -589,6 +611,11 @@ async function loadAllocations() {
                                 return studentYearByEmail.get(studentEmail) || studentYearByLocal.get(local) || "";
                             })(),
                             subject_strands: (() => {
+                                const studentEmail = String(student.email || student.student_email || "").trim().toLowerCase();
+                                const local = getEmailLocalPart(studentEmail);
+                                return studentStrandsByEmail.get(studentEmail) || studentStrandsByLocal.get(local) || [];
+                            })(),
+                            programs: (() => {
                                 const studentEmail = String(student.email || student.student_email || "").trim().toLowerCase();
                                 const local = getEmailLocalPart(studentEmail);
                                 return studentStrandsByEmail.get(studentEmail) || studentStrandsByLocal.get(local) || [];

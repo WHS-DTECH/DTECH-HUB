@@ -23,6 +23,7 @@
     const timetableEl = document.querySelector("#profile-timetable");
     const timetableCardEl = timetableEl ? timetableEl.closest(".profile-card") : null;
     const overviewSubtextEl = document.querySelector("#profile-overview-subtext");
+    const courseStandardsEl = document.querySelector("#profile-course-standards");
     const timetableSubtextEl = document.querySelector("#profile-timetable-subtext");
     const csvLinksEl = document.querySelector("#profile-csv-links");
     const uploadHistoryEl = document.querySelector("#profile-upload-history");
@@ -70,6 +71,45 @@
 
     function normalizeEmail(value) {
         return String(value || "").trim().toLowerCase();
+    }
+
+    const COURSE_STANDARDS_GUIDANCE = {
+        "11DTECH": ["29777", "92004", "91893", "91897", "92006", "92005"]
+    };
+
+    function resolveCourseGuidance(row) {
+        const year = String(row?.year_level || row?.yearlevel || "").trim().replace(/^year\s*/i, "");
+        const programs = Array.isArray(row?.programs) ? row.programs.map((value) => String(value || "").trim().toUpperCase()) : [];
+        const courseToken = programs.find((value) => /^(?:DTECH|COMP)$/.test(value)) || "";
+        const courseKey = year && courseToken ? `${year}${courseToken}` : "";
+        return {
+            year,
+            course: courseToken,
+            courseKey,
+            standards: Array.isArray(COURSE_STANDARDS_GUIDANCE[courseKey]) ? COURSE_STANDARDS_GUIDANCE[courseKey] : [],
+            url: courseKey
+                ? `https://tech-learningsites.onrender.com/${courseToken}/${encodeURIComponent(courseKey)}/`
+                : ""
+        };
+    }
+
+    function renderCourseStandardsGuidance(row) {
+        if (!courseStandardsEl) return;
+        const guidance = resolveCourseGuidance(row);
+        if (!guidance.year && !guidance.course) {
+            setInfoStack(courseStandardsEl, [{ text: "No timetable year/course combination found yet.", variant: "warn" }]);
+            return;
+        }
+
+        const courseLabel = guidance.courseKey || [guidance.year && `Year ${guidance.year}`, guidance.course].filter(Boolean).join(" ");
+        const linkHtml = guidance.url
+            ? `<a href="${guidance.url}" target="_blank" rel="noreferrer">Open ${courseLabel} Learning Site page</a>`
+            : "Learning Site page unavailable for this course combination.";
+        courseStandardsEl.innerHTML = `
+            <div class="info-line"><strong>Course:</strong> ${courseLabel}</div>
+            <div class="info-line"><strong>Learning Site:</strong> ${linkHtml}</div>
+            <div class="info-line ${guidance.standards.length ? "" : "is-warn"}"><strong>Available standards:</strong> ${guidance.standards.length ? guidance.standards.join(", ") : "Not configured yet"}</div>
+        `;
     }
 
     function normalizePersonName(value) {
@@ -1069,6 +1109,7 @@
             setInfoStack(csvLinksEl, [{ text: "Sign in to check linked staff CSV records.", variant: "warn" }]);
             setInfoStack(uploadHistoryEl, [{ text: "Sign in to view your staff upload history.", variant: "warn" }]);
             setInfoStack(classesEl, [{ text: "Sign in to view linked classes and students.", variant: "warn" }]);
+            setInfoStack(courseStandardsEl, [{ text: "Sign in to view course standards guidance.", variant: "warn" }]);
             wireTrelloActions("");
             await refreshTrelloStatus("");
             return;
@@ -1150,6 +1191,7 @@
         if (avatarEl) {
             avatarEl.textContent = getInitials(resolvedName, email || "user");
         }
+        renderCourseStandardsGuidance(matchedStudentRows[0]);
 
         const resolvedRole = pickFirstNonEmpty([
             roleFromRolePage && roleFromRolePage.additional_role,
