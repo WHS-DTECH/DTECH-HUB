@@ -1898,7 +1898,7 @@ function renderChecklistCards(detail, allItems) {
                                             <p class="task-list-system-title">SUBTASKS</p>
                                             <p class="task-list-achieved-note">Files identified for validation.</p>
                                             <div class="task-list-decomposition-category-list">
-                                                <a class="task-list-decomposition-category" href="${escapeTaskListHtml(buildCustomActivityLink(taskListState.selectedId, "Markup Validation", "Code Validation", "code-validation"))}">
+                                                <a class="task-list-decomposition-category is-covered" href="${escapeTaskListHtml(buildCustomActivityLink(taskListState.selectedId, "Markup Validation", "Code Validation", "code-validation"))}">
                                                     <span class="task-list-decomposition-category-label">Markup Validation</span>
                                                 </a>
                                             </div>
