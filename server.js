@@ -4973,6 +4973,22 @@ function inferCanonicalTemplateIdentityFromTitle(title) {
   }
 
   if (/testing\s+functions|test(?:ing)?\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/.test(normalizedTitle)) {
+    const testingFunctionsSubtopicMatch = String(title || "").trim().match(/^testing\s+functions\s*-\s*(.+)$/i);
+    if (testingFunctionsSubtopicMatch?.[1]) {
+      const subtopicRaw = String(testingFunctionsSubtopicMatch[1] || "").trim();
+      const subtopicSlug = subtopicRaw
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 80);
+      const fallbackSlug = subtopicSlug || "topic";
+      return {
+        id: `testing-functions-${fallbackSlug}`,
+        title: `Testing Functions - ${subtopicRaw}`,
+        criteriaText: "Test that the digital technologies outcome functions as intended."
+      };
+    }
+
     return {
       id: "testing-functions",
       title: "Testing Functions",
@@ -6842,6 +6858,7 @@ app.post("/api/student/drive-setup/find-slide", async (req, res) => {
 
 const TEMPLATE_ID_FROM_TITLE_PATTERNS = [
   { pattern: /^relevant\s+implications\s*-\s*(.+?)(?:\s*-\s*.+)?$/i, prefix: "relevant-implications-" },
+  { pattern: /^testing\s+functions\s*-\s*(.+?)(?:\s*-\s*.+)?$/i, prefix: "testing-functions-" },
   { pattern: /^digital\s+outcome\s+description(?:\s*-\s*.+)?$/i, id: "digital-outcome-description", title: "Digital Outcome Description" },
   { pattern: /^target\s+audience(?:\s*-\s*.+)?$/i, id: "target-audience", title: "Target Audience" },
   { pattern: /^development\s+steps(?:\s*-\s*.+)?$/i, id: "development-steps", title: "Development Steps" },
@@ -6864,9 +6881,14 @@ function inferTemplateCopyFromFileName(fileName) {
       // Variable template — category is the first capture group
       const subtopic = String(match[1] || "").trim();
       const slug = subtopic.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+      const prefixLabel = entry.prefix
+        .replace(/-+$/, "")
+        .split("-")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
       return {
         templateId: `${entry.prefix}${slug}`,
-        templateTitle: `Relevant Implications - ${subtopic}`,
+        templateTitle: `${prefixLabel} - ${subtopic}`,
         fileUrl: "",
         fileName: name
       };
