@@ -1177,7 +1177,20 @@ function getTestingFunctionsSubtasks(stateMap) {
     }];
 }
 
-function getDigiMedConventionsAcknowledgementCount(activityId, email) {
+function getDigiMedConventionsAcknowledgementCount(activityId, email, stateMap = {}) {
+    const databaseAreas = new Set();
+    Object.values(stateMap || {}).forEach((steps) => {
+        (Array.isArray(steps) ? steps : []).forEach((step) => {
+            const text = String(step?.text || "").trim();
+            if (!text.startsWith("CONVENTION_ACK|")) return;
+            const [, area, value] = text.split("|");
+            if (area && String(value || "").trim().toLowerCase() === "true") {
+                databaseAreas.add(area.trim());
+            }
+        });
+    });
+    if (databaseAreas.size) return databaseAreas.size;
+
     try {
         const key = `${DIGIMED_CONVENTIONS_ACK_STORAGE_PREFIX}:${String(activityId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
         const saved = JSON.parse(localStorage.getItem(key) || "{}");
@@ -1187,12 +1200,12 @@ function getDigiMedConventionsAcknowledgementCount(activityId, email) {
     }
 }
 
-function getDigiMedConventionsSubtask() {
+function getDigiMedConventionsSubtask(stateMap = {}) {
     const activityId = taskListState.selectedId;
     return {
         label: "Conventions",
         href: buildCustomActivityLink(activityId, "Using relevant conventions for the media type.", "Relevant DigiMed Conventions", "relevant-digimed-conventions"),
-        count: getDigiMedConventionsAcknowledgementCount(activityId, getTaskListEmail())
+        count: getDigiMedConventionsAcknowledgementCount(activityId, getTaskListEmail(), stateMap)
     };
 }
 
@@ -1828,7 +1841,7 @@ function renderChecklistCards(detail, allItems) {
                                 const is91893ToolsAndTechniquesRow = /using appropriate tools and techniques for the purpose and end users/i.test(stepText);
                                 const is91893ConventionsRow = /using relevant conventions for the media type/i.test(stepText);
                                 const is91893EfficientToolsRow = /using efficient tools and techniques in the outcome.?s production/i.test(stepText);
-                                const conventionsSubtask = is91893ConventionsRow ? getDigiMedConventionsSubtask() : null;
+                                const conventionsSubtask = is91893ConventionsRow ? getDigiMedConventionsSubtask(taskListState.fullEvidenceState) : null;
                                 const rowText = isInformationalRow
                                     ? `<span class="task-list-step-text">${escapeTaskListHtml(stepText)}</span>`
                                     : (href
@@ -2006,7 +2019,7 @@ function renderChecklistCards(detail, allItems) {
                             const componentsSubtaskHref = buildCustomActivityLink(taskListState.selectedId, "Trial the components of the digital technologies outcome.", "Trialling Components", "trialling-components");
                             const projectManagementSubtasks = isProjectManagementRow ? getProjectManagementSubtasks(taskListState.fullEvidenceState) : [];
                             const testingFunctionsSubtasks = isTestingFunctionsRow ? getTestingFunctionsSubtasks(taskListState.fullEvidenceState) : [];
-                            const digiMedConventionsSubtask = isDigiMedConventionsRow ? getDigiMedConventionsSubtask() : null;
+                            const digiMedConventionsSubtask = isDigiMedConventionsRow ? getDigiMedConventionsSubtask(taskListState.fullEvidenceState) : null;
 
                             return `
                                 ${shouldRenderAchievedSectionHeading && achievedSectionMeta
