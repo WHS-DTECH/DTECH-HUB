@@ -313,11 +313,15 @@ function buildProjectBlock(project, email) {
     const totalCount = project.interest_count || 0;
     const clientName = project.client_name || "Not specified";
     const startDate = project.start_date ? formatDate(project.start_date) : "Not specified";
+    // "Client Projects" is the underlying task name used for standard-guidance matching; only the heading is renamed.
+    const displayName = /^client projects$/i.test(String(project.project_name || "").trim())
+        ? "Process Assessment"
+        : project.project_name;
 
     block.innerHTML = `
         <header class="alloc-project-header">
             <div>
-                <h2 class="alloc-project-title">${escapeHtml(project.project_name)}</h2>
+                <h2 class="alloc-project-title">${escapeHtml(displayName)}</h2>
                 <a class="alloc-project-link" href="${escapeHtml(project.detail_url)}">View Task &rarr;</a>
                 <div class="alloc-project-details">
                     <span><strong>Client:</strong> ${escapeHtml(clientName)}</span>
@@ -643,6 +647,11 @@ async function loadAllocations() {
                 };
             })
             .sort((left, right) => {
+                const leftIsClientProjects = /^client projects$/i.test(String(left.project_name || "").trim());
+                const rightIsClientProjects = /^client projects$/i.test(String(right.project_name || "").trim());
+                if (leftIsClientProjects !== rightIsClientProjects) {
+                    return leftIsClientProjects ? -1 : 1;
+                }
                 const leftDate = left.start_date || "9999-12-31";
                 const rightDate = right.start_date || "9999-12-31";
                 if (leftDate !== rightDate) {
