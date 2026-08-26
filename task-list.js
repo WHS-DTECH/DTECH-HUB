@@ -663,7 +663,7 @@ function isMainRelevantImplicationsStep(text) {
     if (getStepLevel(text) !== "Achieved") {
         return false;
     }
-    return /explain(?:ing)?\s+relevant\s+implications\.?$/i.test(stripStepLevel(text));
+    return /(?:explain(?:ing)?|address(?:ing)?)\s+relevant\s+implications\.?$/i.test(stripStepLevel(text));
 }
 
 function normalize91897ChecklistRows(rows) {
@@ -745,7 +745,16 @@ function isAddressRelevantImplicationsStep(text) {
 
 // Applies DB-sourced template copy records to fix which categories are actually done
 function applyTemplateCopiesAsRelevantImplicationsState(stateMap, templateCopies) {
-    const rows = Array.isArray(stateMap?.["91897"]) ? stateMap["91897"] : [];
+    const standardsWithCategories = ["91897", "91907"];
+    let changed = false;
+    standardsWithCategories.forEach((standard) => {
+        changed = applyTemplateCopiesToStandardRelevantImplications(stateMap, standard, templateCopies) || changed;
+    });
+    return changed;
+}
+
+function applyTemplateCopiesToStandardRelevantImplications(stateMap, standard, templateCopies) {
+    const rows = Array.isArray(stateMap?.[standard]) ? stateMap[standard] : [];
     if (!rows.length || !Array.isArray(templateCopies) || !templateCopies.length) return false;
 
     // Build set of categories confirmed by DB records
@@ -2265,13 +2274,9 @@ function buildChecklistState(standardCodes, evidenceMap) {
                 return;
             }
 
-            if (standard === "91897") {
-                next[standard] = normalize91897ChecklistRows(existing);
-                return;
-            }
-
-            if (standard === "91907") {
-                next[standard] = normalize91907ChecklistRows(existing);
+            if (standard === "91897" || standard === "91907") {
+                const legacyMigrated = standard === "91907" ? normalize91907ChecklistRows(existing) : existing;
+                next[standard] = normalize91897ChecklistRows(legacyMigrated);
                 return;
             }
 
@@ -2294,7 +2299,7 @@ function buildChecklistState(standardCodes, evidenceMap) {
         next[standard] = standard === "91897"
             ? normalize91897ChecklistRows(defaultRows)
             : standard === "91907"
-                ? normalize91907ChecklistRows(defaultRows)
+                ? normalize91897ChecklistRows(normalize91907ChecklistRows(defaultRows))
                 : defaultRows;
     });
     return next;
@@ -2328,7 +2333,7 @@ async function loadChecklistForTask(taskId) {
     let migrated91907Rows = false;
     if (Array.isArray(taskListState.fullEvidenceState["91907"])) {
         const before91907Migration = JSON.stringify(taskListState.fullEvidenceState["91907"]);
-        taskListState.fullEvidenceState["91907"] = normalize91907ChecklistRows(taskListState.fullEvidenceState["91907"]);
+        taskListState.fullEvidenceState["91907"] = normalize91897ChecklistRows(normalize91907ChecklistRows(taskListState.fullEvidenceState["91907"]));
         migrated91907Rows = before91907Migration !== JSON.stringify(taskListState.fullEvidenceState["91907"]);
     }
     let migrated91893Rows = false;
