@@ -1763,7 +1763,7 @@ function renderChecklistCards(detail, allItems) {
                                             <p class="task-list-system-title">SUBTASKS</p>
                                             <p class="task-list-achieved-note">Convention areas acknowledged in your Conventions slide.</p>
                                             <div class="task-list-decomposition-category-list">
-                                                <a class="task-list-decomposition-category ${conventionsSubtask.count > 0 ? "is-covered" : ""}" href="${escapeTaskListHtml(conventionsSubtask.href)}">
+                                                <a class="task-list-decomposition-category is-covered" href="${escapeTaskListHtml(conventionsSubtask.href)}">
                                                     <span class="task-list-decomposition-category-label">CONVENTIONS</span>
                                                     <span class="task-list-decomposition-category-count">${conventionsSubtask.count}</span>
                                                 </a>
