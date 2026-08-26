@@ -2000,7 +2000,7 @@ function getStandardCodes(detail, allItems = []) {
         : ["91897", "91907"];
     if (hasDigitalMediaTopicType(detail, allItems)) {
         const withoutDigitalMediaStandards = codes.filter((code) => code !== "91893" && code !== "91895");
-        withoutDigitalMediaStandards.unshift("91893");
+        withoutDigitalMediaStandards.push("91893");
         return ["digital-outcome", ...withoutDigitalMediaStandards];
     }
     return ["digital-outcome", ...codes];
