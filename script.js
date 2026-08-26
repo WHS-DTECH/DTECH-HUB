@@ -817,7 +817,10 @@ async function loadSharedProjects() {
 
         return parsed
             .map((item) => {
-                const title = String(item.name || "").trim();
+                const rawTitle = String(item.name || "").trim();
+                const isClientProjectsAssessment = String(item.id || "").trim() === "49"
+                    || /^client\s+projects$/i.test(rawTitle);
+                const title = isClientProjectsAssessment ? "Process Assessment" : rawTitle;
                 if (!title) return null;
 
                 const id = String(item.id || slugify(title) || `activity-${Date.now()}`);
@@ -828,7 +831,8 @@ async function loadSharedProjects() {
                 const created = String(item.created_at || new Date().toISOString()).slice(0, 10);
                 const rawImageUrl = String(item.outcome_image_url || item.image_url || "").trim();
                 const imageUrl = isGeneratedUploadedActivityImageUrl(rawImageUrl) ? "" : rawImageUrl;
-                const showInThisWeek = Boolean(item.show_in_this_week ?? item.show_this_week ?? item.is_pinned ?? item.is_this_week);
+                const showInThisWeek = isClientProjectsAssessment
+                    || Boolean(item.show_in_this_week ?? item.show_this_week ?? item.is_pinned ?? item.is_this_week);
                 const sourceType = inferSourceTypeFromRecord(item);
                 const defaultCardColor = getDefaultCardColorForCategory(category, sourceType);
                 const resolvedCardColor = sourceType === "project"
