@@ -14,6 +14,12 @@ const DIGIMED_EFFICIENT_TOOLS_SUBTASKS = [
     "HTML/CSS validation procedures",
     "Optimisation of media assets"
 ];
+const DIGIMED_TOOLS_TECHNIQUES_SUBTASKS = [
+    "Creating or customising scripts, code or presets",
+    "Using a combination of steps to manipulate or enhance elements",
+    "Using a third-party library",
+    "Using composite effects"
+];
 
 const DIGITAL_OUTCOME_DETAILS_TASKS = [
     "Description - Google Slides: Describe the Digital Outcome: What is it, who is it for, and what should it do?",
@@ -78,6 +84,26 @@ function readDigiMedEfficientToolsState(activityId, email) {
 function writeDigiMedEfficientToolsState(activityId, email, value) {
     try {
         localStorage.setItem(getDigiMedEfficientToolsKey(activityId, email), JSON.stringify(value || {}));
+    } catch (_error) {
+    }
+}
+
+function getDigiMedToolsTechniquesKey(activityId, email) {
+    return `hub_digimed_tools_techniques_v1:${String(activityId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
+}
+
+function readDigiMedToolsTechniquesState(activityId, email) {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(getDigiMedToolsTechniquesKey(activityId, email)) || "{}");
+        return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (_error) {
+        return {};
+    }
+}
+
+function writeDigiMedToolsTechniquesState(activityId, email, value) {
+    try {
+        localStorage.setItem(getDigiMedToolsTechniquesKey(activityId, email), JSON.stringify(value || {}));
     } catch (_error) {
     }
 }
@@ -297,6 +323,21 @@ function installDigiMedEfficientToolsHandler() {
         const state = readDigiMedEfficientToolsState(activityId, email);
         state[subtask] = Boolean(checkbox.checked);
         writeDigiMedEfficientToolsState(activityId, email, state);
+        renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);
+    });
+}
+
+function installDigiMedToolsTechniquesHandler() {
+    if (window.__dtechDigiMedToolsTechniquesHandlerBound) return;
+    window.__dtechDigiMedToolsTechniquesHandlerBound = true;
+    document.addEventListener("change", (event) => {
+        const checkbox = event.target?.closest?.("[data-digimed-tools-technique]");
+        if (!checkbox) return;
+        const subtask = String(checkbox.getAttribute("data-digimed-tools-technique") || "").trim();
+        if (!subtask) return;
+        const state = readDigiMedToolsTechniquesState(taskListState.selectedId, getTaskListEmail());
+        state[subtask] = Boolean(checkbox.checked);
+        writeDigiMedToolsTechniquesState(taskListState.selectedId, getTaskListEmail(), state);
         renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);
     });
 }
@@ -1745,6 +1786,7 @@ function renderChecklistCards(detail, allItems) {
     if (!checklistHost) return;
     installTaskListSectionAnchorHandler();
     installDigiMedEfficientToolsHandler();
+    installDigiMedToolsTechniquesHandler();
 
     const taskTitle = String(detail?.name || "Task List").trim();
     const taskTopic = taskListState.taskTopic || taskTitle;
@@ -1768,6 +1810,7 @@ function renderChecklistCards(detail, allItems) {
             const levels = ["Achieved", "Merit", "Excellence"];
             const decompositionCoverage = readDecompositionCategoryCoverage(taskListState.selectedId, getTaskListEmail());
             const efficientToolsState = readDigiMedEfficientToolsState(taskListState.selectedId, getTaskListEmail());
+            const toolsTechniquesState = readDigiMedToolsTechniquesState(taskListState.selectedId, getTaskListEmail());
             return `
                 ${levels.map((level) => `
                     <section class="task-list-level-group">
@@ -1806,6 +1849,14 @@ function renderChecklistCards(detail, allItems) {
                                                     <span class="task-list-decomposition-category-label">Tools &amp; Techniques</span>
                                                     <span class="task-list-decomposition-category-count">${decompositionCoverage.hasData ? Number(decompositionCoverage.counts["Tools & Techniques"] || 0) : "-"}</span>
                                                 </a>
+                                            </div>
+                                            <div class="task-list-decomposition-subtask-list">
+                                                ${DIGIMED_TOOLS_TECHNIQUES_SUBTASKS.map((subtask) => `
+                                                    <label class="task-list-decomposition-subtask ${toolsTechniquesState[subtask] ? "is-complete" : ""}">
+                                                        <input type="checkbox" data-digimed-tools-technique="${escapeTaskListHtml(subtask)}" ${toolsTechniquesState[subtask] ? "checked" : ""}>
+                                                        <span>${escapeTaskListHtml(subtask)}</span>
+                                                    </label>
+                                                `).join("")}
                                             </div>
                                         </div>
                                     ` : ""}
