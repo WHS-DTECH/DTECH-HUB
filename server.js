@@ -7039,6 +7039,25 @@ app.post("/api/student/drive-setup/read-relevant-implications", async (req, res)
   }
 });
 
+app.post("/api/student/drive-setup/read-relevant-conventions", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email) { res.status(401).json({ error: "Sign in is required." }); return; }
+  const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
+  const presentationId = String(req.body?.presentationId || "").trim();
+  if (!driveAccessToken) { res.status(400).json({ error: "driveAccessToken is required." }); return; }
+  if (!/^[A-Za-z0-9_-]{10,}$/.test(presentationId)) { res.status(400).json({ error: "A valid Google Slides presentation ID is required." }); return; }
+
+  try {
+    const presentation = await googleSlidesApiRequest(presentationId, driveAccessToken);
+    const text = JSON.stringify(presentation).toLowerCase();
+    const areas = ["Navigation", "Layout", "Typography", "Links", "Buttons/Controls", "Forms", "Visual hierarchy", "Images/Media", "Consistency", "Responsive design", "Feedback", "Content organisation"]
+      .filter((area) => text.includes(area.toLowerCase()));
+    res.json({ ok: true, presentationId, areas, syncedAt: new Date().toISOString() });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not read the Relevant DigiMed Conventions slideshow." });
+  }
+});
+
 app.post("/api/student/drive-setup/read-development-components", async (req, res) => {
   const email = normalizeEmail(getRequestUserEmail(req));
   if (!email) { res.status(401).json({ error: "Sign in is required." }); return; }

@@ -93,6 +93,7 @@ const ONEDRIVE_LINK_LIBRARY_STORAGE_PREFIX = "hub_onedrive_link_library_v1";
 const GOOGLE_DRIVE_LINK_LIBRARY_STORAGE_PREFIX = "hub_google_drive_link_library_v1";
 const TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX = "hub_task_topic_slide_sync_v1";
 const DIGIMED_CONVENTIONS_ACK_STORAGE_PREFIX = "hub_digimed_conventions_ack_v1";
+const DIGIMED_CONVENTION_AREAS = ["Navigation", "Layout", "Typography", "Links", "Buttons/Controls", "Forms", "Visual hierarchy", "Images/Media", "Consistency", "Responsive design", "Feedback", "Content organisation"];
 const EVIDENCE_STEPS_TARGET_STANDARDS = new Set(["92005", "91897", "91907"]);
 
 const DIGITAL_OUTCOME_DETAILS_TASKS = [
@@ -278,6 +279,10 @@ function writeDigiMedConventionsAcknowledgements(activityId, email, value) {
         localStorage.setItem(getDigiMedConventionsAcknowledgementKey(activityId, email), JSON.stringify(value || {}));
     } catch (_error) {
     }
+}
+
+function countDigiMedConventionsAcknowledgements(value) {
+    return DIGIMED_CONVENTION_AREAS.filter((area) => Boolean(value?.[area])).length;
 }
 
 function parseDurationMinutes(raw) {
@@ -2588,6 +2593,8 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
         trelloLastLogNote: "",
         googleSlidesUrl: "",
         googleFormUrl: "",
+        conventionAcknowledgements: {},
+        conventionsLastSyncAt: "",
         mediaAssetFolderUrl: "",
         googleDriveProjectFolderUrl: "",
         mediaReviewUrl: "",
@@ -2690,6 +2697,17 @@ function parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey) {
             return;
         }
 
+        if (text.startsWith("CONVENTION_ACK|")) {
+            const [, area, value] = text.split("|");
+            if (area && value) result.conventionAcknowledgements[area.trim()] = value.trim().toLowerCase() === "true";
+            return;
+        }
+
+        if (text.startsWith("CONVENTIONS_LAST_SYNC|")) {
+            result.conventionsLastSyncAt = text.slice("CONVENTIONS_LAST_SYNC|".length).trim();
+            return;
+        }
+
         if (text.startsWith("MEDIA_ASSET_FOLDER_URL|")) {
             result.mediaAssetFolderUrl = toSafeExternalUrl(text.slice("MEDIA_ASSET_FOLDER_URL|".length).trim());
             return;
@@ -2778,6 +2796,35 @@ function getFirstGoogleFormUrlFromEvidenceRows(evidenceRows) {
     return "";
 }
 
+async function syncDigiMedConventionsFromSlide(projectId, email, taskTopicTitle) {
+    const slideUrl = readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, "relevant-digimed-conventions")?.url;
+    const presentationId = extractSlidesIdFromValue(slideUrl);
+    const driveAccessToken = readStoredHubDriveAccessToken();
+    if (!presentationId || !driveAccessToken) return null;
+
+    const response = await fetch("/api/student/drive-setup/read-relevant-conventions", {
+        method: "POST",
+        headers: buildWriteHeaders(),
+        body: JSON.stringify({ driveAccessToken, presentationId })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload?.error || "Could not read the conventions slideshow.");
+
+    const standardKey = buildTaskTopicSubmissionStandardKey(taskTopicTitle, "91897");
+    const evidenceRows = await fetchEvidenceRowsEnsuringAllocation(projectId, email);
+    const existing = parseTaskTopicSubmissionFromEvidenceRows(evidenceRows, standardKey);
+    const detected = { ...(existing.conventionAcknowledgements || {}) };
+    (Array.isArray(payload?.areas) ? payload.areas : []).forEach((area) => {
+        if (DIGIMED_CONVENTION_AREAS.includes(area)) detected[area] = true;
+    });
+    const nextRows = upsertTaskTopicSubmissionEvidenceRows(evidenceRows, standardKey, {
+        conventionAcknowledgements: detected,
+        conventionsLastSyncAt: String(payload?.syncedAt || "").trim()
+    });
+    await saveEvidenceRows(projectId, email, nextRows);
+    return { acknowledgements: detected, syncedAt: String(payload?.syncedAt || "").trim() };
+}
+
 function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     const existingSubmission = parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey);
     const sourceRows = normalizeEvidenceSteps(rows).filter(
@@ -2812,6 +2859,12 @@ function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     const googleFormUrl = payload?.googleFormUrl !== undefined
         ? toSafeGoogleFormUrl(payload?.googleFormUrl)
         : toSafeGoogleFormUrl(existingSubmission.googleFormUrl);
+    const conventionAcknowledgements = payload?.conventionAcknowledgements !== undefined
+        ? (payload.conventionAcknowledgements && typeof payload.conventionAcknowledgements === "object" ? payload.conventionAcknowledgements : {})
+        : existingSubmission.conventionAcknowledgements;
+    const conventionsLastSyncAt = payload?.conventionsLastSyncAt !== undefined
+        ? String(payload?.conventionsLastSyncAt || "").trim()
+        : String(existingSubmission.conventionsLastSyncAt || "").trim();
     const mediaAssetFolderUrl = payload?.mediaAssetFolderUrl !== undefined
         ? toSafeExternalUrl(payload?.mediaAssetFolderUrl)
         : toSafeExternalUrl(existingSubmission.mediaAssetFolderUrl);
@@ -2894,6 +2947,14 @@ function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     if (googleFormUrl) {
         steps.push({ text: `GOOGLE_FORM_URL|${googleFormUrl}`, done: true });
         steps.push({ text: `LINK|${googleFormUrl}`, done: true });
+    }
+    Object.entries(conventionAcknowledgements || {}).forEach(([area, acknowledged]) => {
+        if (DIGIMED_CONVENTION_AREAS.includes(area)) {
+            steps.push({ text: `CONVENTION_ACK|${area}|${Boolean(acknowledged)}`, done: Boolean(acknowledged) });
+        }
+    });
+    if (conventionsLastSyncAt) {
+        steps.push({ text: `CONVENTIONS_LAST_SYNC|${conventionsLastSyncAt}`, done: true });
     }
     if (mediaAssetFolderUrl) {
         steps.push({ text: `MEDIA_ASSET_FOLDER_URL|${mediaAssetFolderUrl}`, done: true });
@@ -8699,7 +8760,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 ["Feedback", "Users receive appropriate feedback when interacting"],
                 ["Content organisation", "Headings, sections and grouping make information understandable"]
             ];
-            return `<section class="task-topic-guide-block"><h3>Relevant DigiMed Conventions</h3><table class="digital-outcome-must-dos-table digital-outcome-conventions-table"><thead><tr><th>Convention area</th><th>Possible website conventions</th><th>Discussed</th></tr></thead><tbody>
+            return `<section class="task-topic-guide-block"><h3>Relevant DigiMed Conventions</h3><p class="task-topic-submission-note" id="digimed-conventions-last-sync">Last Sync: ${escapeHtml(String(readStoredTaskTopicSlideSyncEntryByTemplateId(id, readStoredHubEmail(), "relevant-digimed-conventions")?.savedAt || "Not yet"))}</p><table class="digital-outcome-must-dos-table digital-outcome-conventions-table"><thead><tr><th>Convention area</th><th>Possible website conventions</th><th>Discussed</th></tr></thead><tbody>
                 ${rows.map(([area, description]) => `<tr><td>${escapeHtml(area)}</td><td>${escapeHtml(description)}</td><td class="digital-outcome-conventions-ack-cell"><label><input type="checkbox" data-digimed-convention-ack="${escapeHtml(area)}" ${acknowledgements[area] ? "checked" : ""}><span class="sr-only">Acknowledged ${escapeHtml(area)}</span></label></td></tr>`).join("")}
             </tbody></table></section>`;
         })()
@@ -9211,6 +9272,18 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 writeDigiMedConventionsAcknowledgements(id, readStoredHubEmail(), acknowledgements);
             });
         });
+        if (!canEdit && readStoredHubEmail()) {
+            void syncDigiMedConventionsFromSlide(id, readStoredHubEmail(), taskTopicTitle)
+                .then((result) => {
+                    if (!result) return;
+                    host.querySelectorAll("[data-digimed-convention-ack]").forEach((checkbox) => {
+                        checkbox.checked = Boolean(result.acknowledgements[checkbox.getAttribute("data-digimed-convention-ack") || ""]);
+                    });
+                    const lastSync = host.querySelector("#digimed-conventions-last-sync");
+                    if (lastSync && result.syncedAt) lastSync.textContent = `Last Sync: ${formatSyncCreatedDate(result.syncedAt)}`;
+                })
+                .catch((error) => console.warn("Could not sync Relevant DigiMed Conventions.", error));
+        }
     }
 
     const editButton = host.querySelector("#detail-edit-button");
