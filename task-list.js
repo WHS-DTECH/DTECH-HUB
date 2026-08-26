@@ -229,6 +229,10 @@ function buildCustomActivityLink(id, taskTopic = "", taskShortName = "", templat
     return `/ProjectPages/custom-activity.html?${params.toString()}`;
 }
 
+function buildTaskListStandardSectionAnchor(standard, sectionId) {
+    return `#task-list-standard-${String(standard || "").trim()}-${String(sectionId || "").trim()}`;
+}
+
 function buildTemplateLibraryLink(id, taskTopic = "", taskShortName = "", templateId = "", preFilterTopic = "") {
     const params = new URLSearchParams();
     params.set("activityId", String(id || "").trim());
@@ -1683,9 +1687,11 @@ function renderChecklistCards(detail, allItems) {
                             ${safeRows.map((step, index) => {
                                 if (getStepLevel(step?.text) !== level) return "";
                                 const stepText = stripStepLevel(step?.text || "");
-                                const href = getTaskTopicHrefForStep(standard, level, stepText);
-                                const isInformationalRow = isInformationalCriteriaRow(standard, level, stepText);
                                 const isLinkedRelevantImplicationsRow = /^(?:explain(?:ing)?|address(?:ing)?) relevant implications\.?$/i.test(stepText);
+                                const href = isLinkedRelevantImplicationsRow
+                                    ? buildTaskListStandardSectionAnchor("91897", "relevant-implications")
+                                    : getTaskTopicHrefForStep(standard, level, stepText);
+                                const isInformationalRow = isInformationalCriteriaRow(standard, level, stepText);
                                 const is91893ToolsAndTechniquesRow = /using appropriate tools and techniques for the purpose and end users/i.test(stepText);
                                 const rowText = isInformationalRow
                                     ? `<span class="task-list-step-text">${escapeTaskListHtml(stepText)}</span>`
@@ -1794,7 +1800,7 @@ function renderChecklistCards(detail, allItems) {
                                 if (step._index !== firstCategoryIndex) return "";
                                 return `
                                     ${shouldRenderAchievedSectionHeading && achievedSectionMeta
-                                        ? `<p class="task-list-achieved-subheading">${escapeTaskListHtml(achievedSectionMeta.title)}</p>`
+                                    ? `<p id="${escapeTaskListHtml(buildTaskListStandardSectionAnchor(standard, achievedSectionMeta.id).slice(1))}" class="task-list-achieved-subheading">${escapeTaskListHtml(achievedSectionMeta.title)}</p>`
                                         : ""}
                                     ${shouldRenderAchievedSectionHeading && achievedSectionMeta?.id === "relevant-implications"
                                         ? `<p class="task-list-achieved-note">Complete any 3 or more categories to mark Section 4 complete. (${countCompletedRelevantImplicationsCategories(levelRows)}/${RELEVANT_IMPLICATIONS_CATEGORIES.length})</p>`
