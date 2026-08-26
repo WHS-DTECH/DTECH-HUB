@@ -115,6 +115,8 @@ const DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE = "Relevant DigiMed Con
 const DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE = "Success Criteria";
 const DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE = "Relevant Implications";
 const DIGITAL_OUTCOME_CODE_VALIDATION_TITLE = "Code Validation";
+// The synced template library lists this task's slides under "Markup Validation", not "Code Validation".
+const DIGITAL_OUTCOME_CODE_VALIDATION_TEMPLATE_SEARCH_TITLE = "Markup Validation";
 const DIGITAL_OUTCOME_DESCRIPTION_TEMPLATE_PREVIEW_URL = "https://drive.google.com/thumbnail?id=1brOY70u9aJdsoiEtxVepr82vRhiv9VzpMm8TUv3lcTo&sz=w1400";
 const DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TEMPLATE_PREVIEW_URL = "https://drive.google.com/thumbnail?id=1f3Ff0KG2JCFQ-x41q6TEK15Yjcx8imjRCGUZ6d254wg&sz=w1400";
 const DIGITAL_OUTCOME_TARGET_AUDIENCE_TEMPLATE_PREVIEW_URL = "../images/target-audience-template-preview.svg";
@@ -8637,7 +8639,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             "testing-functions": DIGITAL_OUTCOME_TESTING_FUNCTIONS_TITLE,
             "relevant-digimed-conventions": DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE,
             "tools-and-techniques": DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE,
-            "code-validation": DIGITAL_OUTCOME_CODE_VALIDATION_TITLE,
+            "code-validation": DIGITAL_OUTCOME_CODE_VALIDATION_TEMPLATE_SEARCH_TITLE,
             "development-steps": DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE,
             "project-success-criteria": DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE,
             "relevant-implications": DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE,
