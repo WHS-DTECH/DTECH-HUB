@@ -819,6 +819,11 @@ function getTaskTopicHrefForStep(standard, level, text) {
         return buildCustomActivityLink(taskListState.selectedId, "What Tools and Techniques will be used?", "Tools & Techniques", "tools-and-techniques");
     }
 
+    if (String(standard) === "91893"
+        && /applying appropriate data integrity and testing procedures/i.test(normalized)) {
+        return buildTaskListStandardSectionAnchor("91897", "testing-trialing");
+    }
+
     if ((String(standard) === "91897" || String(standard) === "91907")
         && /trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components|trailing\s+components/.test(normalized)) {
         return buildCustomActivityLink(taskListState.selectedId, safeText, "Trialling Components", "trialling-components");
