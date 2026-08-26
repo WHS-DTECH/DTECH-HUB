@@ -3494,7 +3494,8 @@ function renderCurrentWeek() {
 
     currentWeekGrid.innerHTML = "";
 
-    const activeActivities = sortProjects(projects.filter((project) => project.showThisWeek));
+    const activeActivities = sortProjects(projects.filter((project) => project.showThisWeek
+        && String(project?.id || "").trim() !== "49"));
     const activeLabProjects = sortLabProjects(labProjects.filter((project) => project.showThisWeek));
 
     const allCards = [
@@ -3710,7 +3711,7 @@ function renderLabProjectLibrary() {
 }
 
 function renderStats() {
-    const items = getUnifiedLibraryItems()
+    const recentItems = getUnifiedLibraryItems()
         .filter((item) => isRecentEvent(item))
         .sort((left, right) => {
             const leftDate = parseDateSafe(left?.created_at || left?.createdAt || left?.updated)?.getTime() || 0;
@@ -3718,6 +3719,11 @@ function renderStats() {
             return rightDate - leftDate;
         })
         .slice(0, 6);
+    const processAssessment = getUnifiedLibraryItems()
+        .find((item) => String(item?.id || "").trim() === "49");
+    const items = processAssessment && !recentItems.some((item) => String(item?.id || "").trim() === "49")
+        ? [processAssessment, ...recentItems].slice(0, 6)
+        : recentItems;
 
     const activeWindowDays = getConfiguredNewEventWindowDays();
 
