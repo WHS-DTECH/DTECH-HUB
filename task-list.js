@@ -233,6 +233,25 @@ function buildTaskListStandardSectionAnchor(standard, sectionId) {
     return `#task-list-standard-${String(standard || "").trim()}-${String(sectionId || "").trim()}`;
 }
 
+function installTaskListSectionAnchorHandler() {
+    if (window.__dtechTaskListSectionAnchorHandlerBound) return;
+    window.__dtechTaskListSectionAnchorHandlerBound = true;
+    document.addEventListener("click", (event) => {
+        const link = event.target?.closest?.('a[href^="#task-list-standard-"]');
+        if (!link) return;
+
+        const targetId = String(link.getAttribute("href") || "").slice(1);
+        const target = document.getElementById(targetId);
+        if (!target) return;
+
+        event.preventDefault();
+        const parentDetails = target.closest("details");
+        if (parentDetails) parentDetails.open = true;
+        window.history.replaceState({}, "", `#${targetId}`);
+        window.setTimeout(() => target.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+    });
+}
+
 function buildTemplateLibraryLink(id, taskTopic = "", taskShortName = "", templateId = "", preFilterTopic = "") {
     const params = new URLSearchParams();
     params.set("activityId", String(id || "").trim());
@@ -1656,6 +1675,7 @@ function renderRelevantImplicationsCategoryGrid(standard, rows) {
 function renderChecklistCards(detail, allItems) {
     const checklistHost = document.querySelector("#task-list-checklist");
     if (!checklistHost) return;
+    installTaskListSectionAnchorHandler();
 
     const taskTitle = String(detail?.name || "Task List").trim();
     const taskTopic = taskListState.taskTopic || taskTitle;
