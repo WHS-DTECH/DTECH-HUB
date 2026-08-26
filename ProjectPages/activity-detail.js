@@ -10503,9 +10503,11 @@ async function initDetail() {
             ? "trialling-components"
             : (/relevant.*conventions/i.test(templateTopicText)
             ? "relevant-digimed-conventions"
+            : (/markup\s+validation|code\s+validation/i.test(templateTopicText)
+            ? "testing-functions-markup-validation"
             : (/testing\s+functions|test(?:ing)?\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/i.test(templateTopicText)
             ? "testing-functions"
-            : ""))));
+            : "")))));
     const teacherTemplate = teacherTemplateId
         ? await fetchTeacherTemplateLibraryEntry(teacherTemplateId)
         : null;
