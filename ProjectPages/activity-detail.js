@@ -745,7 +745,7 @@ async function fetchTemplateLibraryPreviewByTemplateId(templateId = "") {
                 ? entries.find((entry) => /tools\s*(&|and)\s*techniques/i.test(String(entry?.title || "")))
                 : null)
             || (targetTemplateId === "relevant-digimed-conventions"
-                ? entries.find((entry) => /relevant\s+(?:digimed\s+)?conventions|relevant\s+conventions\s+template/i.test(String(entry?.title || "")))
+                ? entries.find((entry) => /relevant.*conventions/i.test(String(entry?.title || "")))
                 : null);
         if (!match) {
             return "";
@@ -770,7 +770,7 @@ async function fetchTeacherTemplateLibraryEntry(templateId = "") {
         const entries = Array.isArray(payload?.entries) ? payload.entries : [];
         return entries.find((entry) => String(entry?.id || "").trim().toLowerCase() === targetTemplateId)
             || (targetTemplateId === "relevant-digimed-conventions"
-                ? entries.find((entry) => /relevant\s+(?:digimed\s+)?conventions|relevant\s+conventions\s+template/i.test(String(entry?.title || "")))
+                ? entries.find((entry) => /relevant.*conventions/i.test(String(entry?.title || "")))
                 : null);
     } catch (_error) {
         return null;
@@ -10183,7 +10183,7 @@ async function initDetail() {
             ? "project-success-criteria"
             : (/triall?ing\s+components|trailing\s+components|trailing\s+comonents/i.test(templateTopicText)
             ? "trialling-components"
-            : (/relevant\s+(?:digimed\s+)?conventions|relevant\s+conventions\s+for\s+the\s+media\s+type/i.test(templateTopicText)
+            : (/relevant.*conventions/i.test(templateTopicText)
             ? "relevant-digimed-conventions"
             : (/testing\s+functions|test(?:ing)?\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/i.test(templateTopicText)
             ? "testing-functions"
@@ -10191,6 +10191,9 @@ async function initDetail() {
     const teacherTemplate = teacherTemplateId
         ? await fetchTeacherTemplateLibraryEntry(teacherTemplateId)
         : null;
+    const teacherTemplatePreview = !teacherTemplate && teacherTemplateId
+        ? await fetchTemplateLibraryPreviewByTemplateId(teacherTemplateId)
+        : "";
     const pageData = teacherTemplate
         ? {
             ...resolvedData,
@@ -10198,7 +10201,9 @@ async function initDetail() {
             slideshowTemplateImage: String(teacherTemplate.imageUrl || "").trim()
                 || toGoogleSlidesThumbnailUrl(teacherTemplate.templateUrl || "")
         }
-        : resolvedData;
+        : teacherTemplatePreview
+            ? { ...resolvedData, slideshowTemplateImage: teacherTemplatePreview }
+            : resolvedData;
     const titleOverride = isDigitalOutcomeDescriptionCriterion(selectedTaskTopic, selectedTaskShortName)
         ? DIGITAL_OUTCOME_DESCRIPTION_TITLE
         : "";
