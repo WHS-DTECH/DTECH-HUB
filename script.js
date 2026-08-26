@@ -3584,7 +3584,8 @@ function renderCurrentWeek() {
 
 function renderLibrary() {
     libraryGrid.innerHTML = "";
-    const visibleProjects = sortProjects(filterProjects(getUnifiedLibraryItems()));
+    const visibleProjects = sortProjects(filterProjects(getUnifiedLibraryItems())
+        .filter((item) => String(item?.id || "").trim() !== "49"));
     const activeWindowDays = getConfiguredNewEventWindowDays();
 
     const newEventCount = visibleProjects.reduce((count, item) => {
