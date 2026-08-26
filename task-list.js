@@ -20,6 +20,15 @@ const DIGIMED_TOOLS_TECHNIQUES_SUBTASKS = [
     "Using a third-party library",
     "Using composite effects"
 ];
+const DIGIMED_L3_TOOLS_TECHNIQUES_SUBTASKS = [
+    "Non-core functionality",
+    "Sophisticated digital effects",
+    "Applying industry standards or guidelines",
+    "Responsive design for use on multiple devices",
+    "Integration of original media assets",
+    "Dynamic data handling and interactivity",
+    "Automation through scripts"
+];
 
 const DIGITAL_OUTCOME_DETAILS_TASKS = [
     "Description - Google Slides: Describe the Digital Outcome: What is it, who is it for, and what should it do?",
@@ -1847,6 +1856,7 @@ function renderChecklistCards(detail, allItems) {
             const decompositionCoverage = readDecompositionCategoryCoverage(taskListState.selectedId, getTaskListEmail());
             const efficientToolsState = readDigiMedEfficientToolsState(taskListState.selectedId, getTaskListEmail());
             const toolsTechniquesState = readDigiMedToolsTechniquesState(taskListState.selectedId, getTaskListEmail());
+            const toolsTechniquesSubtasksList = String(standard) === "91903" ? DIGIMED_L3_TOOLS_TECHNIQUES_SUBTASKS : DIGIMED_TOOLS_TECHNIQUES_SUBTASKS;
             return `
                 ${levels.map((level) => `
                     <section class="task-list-level-group">
@@ -1888,7 +1898,7 @@ function renderChecklistCards(detail, allItems) {
                                                 </a>
                                             </div>
                                             <div class="task-list-decomposition-subtask-list">
-                                                ${DIGIMED_TOOLS_TECHNIQUES_SUBTASKS.map((subtask) => `
+                                                ${toolsTechniquesSubtasksList.map((subtask) => `
                                                     <label class="task-list-decomposition-subtask ${toolsTechniquesState[subtask] ? "is-complete" : ""}">
                                                         <input type="checkbox" data-digimed-tools-technique="${escapeTaskListHtml(subtask)}" ${toolsTechniquesState[subtask] ? "checked" : ""}>
                                                         <span>${escapeTaskListHtml(subtask)}</span>
