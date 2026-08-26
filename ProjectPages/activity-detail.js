@@ -2812,8 +2812,7 @@ async function syncDigiMedConventionsFromSlide(projectId, email, taskTopicTitle)
 
     const standardKey = buildTaskTopicSubmissionStandardKey(taskTopicTitle, "91897");
     const evidenceRows = await fetchEvidenceRowsEnsuringAllocation(projectId, email);
-    const existing = parseTaskTopicSubmissionFromEvidenceRows(evidenceRows, standardKey);
-    const detected = { ...(existing.conventionAcknowledgements || {}) };
+    const detected = {};
     (Array.isArray(payload?.areas) ? payload.areas : []).forEach((area) => {
         if (DIGIMED_CONVENTION_AREAS.includes(area)) detected[area] = true;
     });

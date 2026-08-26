@@ -5377,6 +5377,28 @@ function extractGoogleSlidesTableCellLines(cell) {
     .filter(Boolean);
 }
 
+function extractGoogleSlidesConventionAreas(presentation) {
+  const knownAreas = ["Navigation", "Layout", "Typography", "Links", "Buttons/Controls", "Forms", "Visual hierarchy", "Images/Media", "Consistency", "Responsive design", "Feedback", "Content organisation"];
+  const found = [];
+  const slides = Array.isArray(presentation?.slides) ? presentation.slides : [];
+
+  slides.forEach((slide) => {
+    (Array.isArray(slide?.pageElements) ? slide.pageElements : []).forEach((element) => {
+      const table = element?.table;
+      if (!table || !Array.isArray(table.tableRows)) return;
+      table.tableRows.forEach((row) => {
+        const firstCell = Array.isArray(row?.tableCells) ? row.tableCells[0] : null;
+        const value = extractGoogleSlidesTableCellText(firstCell);
+        if (!value || /^(?:relevant\s+)?convention\s+area$/i.test(value)) return;
+        const area = knownAreas.find((candidate) => candidate.toLowerCase() === value.toLowerCase());
+        if (area && !found.includes(area)) found.push(area);
+      });
+    });
+  });
+
+  return found;
+}
+
 function extractGoogleSlidesDevelopmentRows(presentation) {
   const slides = Array.isArray(presentation?.slides) ? presentation.slides : [];
   const allTableRows = [];
@@ -7049,9 +7071,7 @@ app.post("/api/student/drive-setup/read-relevant-conventions", async (req, res) 
 
   try {
     const presentation = await googleSlidesApiRequest(presentationId, driveAccessToken);
-    const text = JSON.stringify(presentation).toLowerCase();
-    const areas = ["Navigation", "Layout", "Typography", "Links", "Buttons/Controls", "Forms", "Visual hierarchy", "Images/Media", "Consistency", "Responsive design", "Feedback", "Content organisation"]
-      .filter((area) => text.includes(area.toLowerCase()));
+    const areas = extractGoogleSlidesConventionAreas(presentation);
     res.json({ ok: true, presentationId, areas, syncedAt: new Date().toISOString() });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not read the Relevant DigiMed Conventions slideshow." });
