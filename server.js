@@ -3692,7 +3692,7 @@ async function ensureCourseOutlinesSchema() {
   await pool.query(`CREATE INDEX IF NOT EXISTS course_outlines_active_idx ON course_outlines (is_active)`);
 }
 
-async function backfillClientProjectsAllocations() {
+async function backfillProcessAssessmentAllocations() {
   if (!hasDatabase) {
     return 0;
   }
@@ -3712,7 +3712,7 @@ async function backfillClientProjectsAllocations() {
       FROM project_interests pi
       JOIN activities a ON a.id::text = pi.project_id::text
       WHERE pi.project_id::text <> $1
-        AND LOWER(TRIM(COALESCE(a.activity_category, to_jsonb(a)->>'category', ''))) NOT LIKE '%assessment%'
+        AND LOWER(TRIM(COALESCE(a.activity_category, to_jsonb(a)->>'category', ''))) LIKE ANY (ARRAY['%assessment%', '%project%'])
       GROUP BY pi.student_email
       ON CONFLICT (project_id, student_email) DO NOTHING
     `,
@@ -3732,9 +3732,9 @@ async function ensureSchema() {
   await ensureUnitPlanSchema();
   await ensureAssessmentStandardCardsSchema();
   await ensureCourseOutlinesSchema();
-  const seededClientProjectAllocations = await backfillClientProjectsAllocations();
-  if (seededClientProjectAllocations > 0) {
-    console.log(`[startup] Backfilled ${seededClientProjectAllocations} student allocation(s) into Client Projects (${CLIENT_PROJECTS_TASK_ID}).`);
+  const seededProcessAssessmentAllocations = await backfillProcessAssessmentAllocations();
+  if (seededProcessAssessmentAllocations > 0) {
+    console.log(`[startup] Backfilled ${seededProcessAssessmentAllocations} student allocation(s) into Process Assessment (${CLIENT_PROJECTS_TASK_ID}).`);
   }
 }
 
@@ -7790,8 +7790,7 @@ app.post("/api/activities/:id/interest", async (req, res) => {
       );
       interested = true;
 
-      // Keep Client Projects assessment in sync when a student self-registers
-      // interest in a non-assessment project.
+      // Keep Process Assessment in sync when a student self-registers interest.
       const clientProjectsTaskId = String(CLIENT_PROJECTS_TASK_ID || "").trim();
       if (clientProjectsTaskId && clientProjectsTaskId !== projectId) {
         try {
@@ -7802,8 +7801,9 @@ app.post("/api/activities/:id/interest", async (req, res) => {
           const rawCat = String(activityRow.rows?.[0]?.activity_category || activityRow.rows?.[0]?.legacy_category || "")
             .toLowerCase()
             .trim();
-          const isProjectCategory = !rawCat.includes("assessment");
-          if (isProjectCategory) {
+          const isAssessmentCategory = rawCat.includes("assessment");
+          const isProjectCategory = rawCat.includes("project") || !rawCat;
+          if (isAssessmentCategory || isProjectCategory) {
             await pool.query(
               "INSERT INTO project_interests (project_id, student_email) VALUES ($1, $2) ON CONFLICT DO NOTHING",
               [clientProjectsTaskId, email]
@@ -7859,7 +7859,7 @@ app.post("/api/activities/:id/interests", requireActivityWriteAccess, async (req
       [projectId]
     );
 
-    // Auto-allocate to Client Projects assessment when assigning to a Project category item
+    // Auto-allocate to Process Assessment when assigning any activity.
     const clientProjectsTaskId = String(CLIENT_PROJECTS_TASK_ID || "").trim();
     if (clientProjectsTaskId && clientProjectsTaskId !== projectId) {
       try {
@@ -7870,8 +7870,9 @@ app.post("/api/activities/:id/interests", requireActivityWriteAccess, async (req
         const rawCat = String(activityRow.rows?.[0]?.activity_category || activityRow.rows?.[0]?.legacy_category || "")
           .toLowerCase()
           .trim();
-        const isProjectCategory = !rawCat.includes("assessment");
-        if (isProjectCategory) {
+        const isAssessmentCategory = rawCat.includes("assessment");
+        const isProjectCategory = rawCat.includes("project") || !rawCat;
+        if (isAssessmentCategory || isProjectCategory) {
           await pool.query(
             "INSERT INTO project_interests (project_id, student_email) VALUES ($1, $2) ON CONFLICT DO NOTHING",
             [clientProjectsTaskId, studentEmail]
@@ -8828,7 +8829,7 @@ app.post("/api/client-projects/backfill", requireActivityWriteAccess, async (_re
   }
 
   try {
-    const inserted = await backfillClientProjectsAllocations();
+    const inserted = await backfillProcessAssessmentAllocations();
     res.json({
       ok: true,
       inserted,
