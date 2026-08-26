@@ -1733,6 +1733,8 @@ function renderChecklistCards(detail, allItems) {
                                     : getTaskTopicHrefForStep(standard, level, stepText);
                                 const isInformationalRow = isInformationalCriteriaRow(standard, level, stepText);
                                 const is91893ToolsAndTechniquesRow = /using appropriate tools and techniques for the purpose and end users/i.test(stepText);
+                                const is91893ConventionsRow = /using relevant conventions for the media type/i.test(stepText);
+                                const conventionsSubtask = is91893ConventionsRow ? getDigiMedConventionsSubtask() : null;
                                 const rowText = isInformationalRow
                                     ? `<span class="task-list-step-text">${escapeTaskListHtml(stepText)}</span>`
                                     : (href
@@ -1752,6 +1754,18 @@ function renderChecklistCards(detail, allItems) {
                                                 <a class="task-list-decomposition-category ${decompositionCoverage.hasData && decompositionCoverage.counts["Tools & Techniques"] > 0 ? "is-covered" : ""}" href="${escapeTaskListHtml(buildCustomActivityLink(taskListState.selectedId, "What Tools and Techniques will be used?", "Tools & Techniques", "tools-and-techniques"))}">
                                                     <span class="task-list-decomposition-category-label">Tools &amp; Techniques</span>
                                                     <span class="task-list-decomposition-category-count">${decompositionCoverage.hasData ? Number(decompositionCoverage.counts["Tools & Techniques"] || 0) : "-"}</span>
+                                                </a>
+                                            </div>
+                                        </div>
+                                    ` : ""}
+                                    ${conventionsSubtask ? `
+                                        <div class="task-list-decomposition-subtasks">
+                                            <p class="task-list-system-title">SUBTASKS</p>
+                                            <p class="task-list-achieved-note">Convention areas acknowledged in your Conventions slide.</p>
+                                            <div class="task-list-decomposition-category-list">
+                                                <a class="task-list-decomposition-category ${conventionsSubtask.count > 0 ? "is-covered" : ""}" href="${escapeTaskListHtml(conventionsSubtask.href)}">
+                                                    <span class="task-list-decomposition-category-label">CONVENTIONS</span>
+                                                    <span class="task-list-decomposition-category-count">${conventionsSubtask.count}</span>
                                                 </a>
                                             </div>
                                         </div>
