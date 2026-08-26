@@ -2008,8 +2008,11 @@ function renderChecklistCards(detail, allItems) {
                                     ${renderRelevantImplicationsCategoryGrid(standard, relevantCategoryRows)}
                                 `;
                             }
-                            const isProjectManagementRow = String(level) === "Achieved"
-                                && stepText.toLowerCase().includes("project management");
+                            const isProjectManagementRow = (String(level) === "Achieved"
+                                && stepText.toLowerCase().includes("project management"))
+                                || (String(level) === "Merit"
+                                    && stepText.toLowerCase().includes("project management")
+                                    && stepText.toLowerCase().includes("version control"));
                             const isDecompositionRow = String(level) === "Achieved"
                                 && stepText.toLowerCase().includes("decompos");
                             const isTriallingComponentsRow = String(level) === "Achieved"
