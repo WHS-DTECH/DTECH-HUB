@@ -722,6 +722,9 @@ async function fetchTemplateLibraryPreviewByTemplateId(templateId = "") {
                 : null)
             || (targetTemplateId === "tools-and-techniques"
                 ? entries.find((entry) => /tools\s*(&|and)\s*techniques/i.test(String(entry?.title || "")))
+                : null)
+            || (targetTemplateId === "relevant-digimed-conventions"
+                ? entries.find((entry) => /relevant\s+(?:digimed\s+)?conventions|relevant\s+conventions\s+template/i.test(String(entry?.title || "")))
                 : null);
         if (!match) {
             return "";
@@ -744,7 +747,10 @@ async function fetchTeacherTemplateLibraryEntry(templateId = "") {
         if (!response.ok) return null;
         const payload = await response.json().catch(() => ({}));
         const entries = Array.isArray(payload?.entries) ? payload.entries : [];
-        return entries.find((entry) => String(entry?.id || "").trim().toLowerCase() === targetTemplateId) || null;
+        return entries.find((entry) => String(entry?.id || "").trim().toLowerCase() === targetTemplateId)
+            || (targetTemplateId === "relevant-digimed-conventions"
+                ? entries.find((entry) => /relevant\s+(?:digimed\s+)?conventions|relevant\s+conventions\s+template/i.test(String(entry?.title || "")))
+                : null);
     } catch (_error) {
         return null;
     }
@@ -8470,9 +8476,11 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                     ? "Development Steps"
                     : (digitalOutcomeTopicKey === "success-criteria"
                         ? "Success Criteria"
+                        : (digitalOutcomeTopicKey === "relevant-digimed-conventions"
+                            ? "Relevant DigiMed Conventions"
                         : (digitalOutcomeTopicKey === "relevant-implications"
                             ? "Relevant Implications"
-                            : "Digital Outcome Description")))))
+                            : "Digital Outcome Description"))))))
             : "Topic Tasks"));
     const topicGuideInstructions = (() => {
         if (isProjectManagementTopic) {
