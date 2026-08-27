@@ -2053,10 +2053,17 @@ function renderCodeValidationTechnicalHealthTracker(host, repoUrl) {
     const load = async () => {
         slot.innerHTML = `<p class="task-topic-submission-note">Checking validation and technical health from GitHub...</p>`;
         try {
-            const [repoAnalysis, assetHealth] = await Promise.all([
-                loadJson(`/api/integrations/github/repo-analysis?repo_url=${encodeURIComponent(safeRepoUrl)}`, { headers: buildWriteHeaders() }),
-                loadJson(`/api/integrations/github/asset-health?repo_url=${encodeURIComponent(safeRepoUrl)}`, { headers: buildWriteHeaders() })
+            const [repoResponse, assetResponse] = await Promise.all([
+                fetch(`/api/integrations/github/repo-analysis?repo_url=${encodeURIComponent(safeRepoUrl)}`, { headers: buildWriteHeaders() }),
+                fetch(`/api/integrations/github/asset-health?repo_url=${encodeURIComponent(safeRepoUrl)}`, { headers: buildWriteHeaders() })
             ]);
+            const [repoAnalysis, assetHealth] = await Promise.all([
+                repoResponse.json().catch(() => ({})),
+                assetResponse.json().catch(() => ({}))
+            ]);
+            if (!repoResponse.ok || !assetResponse.ok) {
+                throw new Error(repoAnalysis?.error || assetHealth?.error || "Could not load technical health from GitHub.");
+            }
             render(repoAnalysis, assetHealth);
         } catch (error) {
             slot.innerHTML = `<p class="task-topic-submission-note is-error">${escapeHtml(error?.message || "Could not load technical health from GitHub.")}</p>`;
@@ -2078,10 +2085,14 @@ function renderGithubProjectManagementTracker(slot, repoUrl) {
     const load = async () => {
         slot.innerHTML = `<p class="trello-sync-status">Loading GitHub tracker...</p>`;
         try {
-            const payload = await loadJson(
+            const response = await fetch(
                 `/api/integrations/github/repo-analysis?repo_url=${encodeURIComponent(safeRepoUrl)}`,
                 { headers: buildWriteHeaders() }
             );
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(payload?.error || "Could not load GitHub tracker.");
+            }
             const lastCommit = payload?.last_commit || {};
             const lastCommitText = String(lastCommit?.message || "No commit history available.").trim();
             const lastCommitDate = String(lastCommit?.date || "").trim();
