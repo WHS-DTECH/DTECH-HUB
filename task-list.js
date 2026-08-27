@@ -2389,6 +2389,9 @@ function renderChecklistCards(detail, allItems) {
         const title = standard === "digital-outcome" ? "Digital Outcome Description" : `Standard ${escapeTaskListHtml(standard)}`;
         const summaryTitle = standard === "digital-outcome" ? "Digital Outcome Topic" : title;
         const rows = Array.isArray(taskListState.checklistState[standard]) ? taskListState.checklistState[standard] : [];
+        const digitalMediaType = (standard === "91893" || standard === "91903")
+            ? String(taskListState.allItems.find((item) => String(item.id) === String(taskListState.selectedId))?.digital_media_type || "").trim()
+            : "";
 
         return `
             <details class="task-list-checklist-card" open>
@@ -2400,7 +2403,7 @@ function renderChecklistCards(detail, allItems) {
                             <span class="task-list-do-chip">${escapeTaskListHtml(topicType)}</span>
                         `).join("")}
                     </div>
-                ` : `<h3>${title}</h3>`}
+                ` : `<h3>${title}</h3>${digitalMediaType ? `<p class="task-list-digital-media-type">Digital Media Type: ${escapeTaskListHtml(digitalMediaType)}</p>` : ""}`}
                 ${renderRowsForStandard(standard, rows)}
                 </div>
             </details>

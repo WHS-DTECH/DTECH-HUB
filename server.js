@@ -8899,7 +8899,7 @@ app.get("/api/my-allocations", async (req, res) => {
     });
 
     const result = await pool.query(
-      `SELECT a.id, a.name, a.activity_category, a.type, pi.student_email, pi.standard_1, pi.standard_2
+      `SELECT a.id, a.name, a.activity_category, a.type, pi.student_email, pi.standard_1, pi.standard_2, pi.digital_media_type
        FROM project_interests pi
        JOIN activities a ON a.id::text = pi.project_id::text
        WHERE pi.student_email = $1
@@ -8917,7 +8917,8 @@ app.get("/api/my-allocations", async (req, res) => {
         topic_type: String(row.type || "").trim(),
         activity_category: String(row.activity_category || "").trim(),
         standard_1: String(row.standard_1 || "").trim(),
-        standard_2: String(row.standard_2 || "").trim()
+        standard_2: String(row.standard_2 || "").trim(),
+        digital_media_type: String(row.digital_media_type || "").trim()
       };
       const studentRecord = studentByEmail.get(normalizeEmail(row.student_email));
       item.year_group = String(studentRecord?.year_level || "").trim();
