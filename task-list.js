@@ -2339,7 +2339,7 @@ function renderChecklistCards(detail, allItems) {
     checklistHost.innerHTML = cardsHtml;
 }
 
-function getStandardCodes(detail, allItems = [], processStandard = "") {
+function getStandardCodes(detail, allItems = [], processStandard = "", projectTaskStandard = "") {
     const fromDetails = Array.isArray(detail?.standardDetails)
         ? detail.standardDetails.map((line) => String(line || "").match(/\b(\d{5})\b/)?.[1]).filter(Boolean)
         : [];
@@ -2347,10 +2347,18 @@ function getStandardCodes(detail, allItems = [], processStandard = "") {
     const codes = fromDetails.length
         ? fromDetails.filter((code, index, arr) => arr.indexOf(code) === index)
         : ["91897", "91907"];
-    if (hasDigitalMediaTopicType(detail, allItems)) {
+    // The Assessment Allocation Manager's Project/Task std is the source of truth per student:
+    // an explicit 91893/91903 allocation always shows Digital Media; any other explicit allocation hides it.
+    const normalizedProjectTaskStandard = String(projectTaskStandard || "").trim().match(/\b(91893|91903)\b/)?.[1] || "";
+    const hasOtherExplicitProjectTaskStandard = Boolean(String(projectTaskStandard || "").trim()) && !normalizedProjectTaskStandard;
+    const showDigitalMedia = normalizedProjectTaskStandard
+        ? true
+        : (!hasOtherExplicitProjectTaskStandard && hasDigitalMediaTopicType(detail, allItems));
+    if (showDigitalMedia) {
         const withoutDigitalMediaStandards = codes.filter((code) => code !== "91893" && code !== "91895" && code !== "91903");
         const normalizedProcessStandard = String(processStandard || "").trim().match(/\b(91897|91907)\b/)?.[1] || "";
-        withoutDigitalMediaStandards.push(normalizedProcessStandard === "91907" ? "91903" : "91893");
+        const digitalMediaStandard = normalizedProjectTaskStandard || (normalizedProcessStandard === "91907" ? "91903" : "91893");
+        withoutDigitalMediaStandards.push(digitalMediaStandard);
         const visibleCodes = normalizedProcessStandard === "91897"
             ? withoutDigitalMediaStandards.filter((code) => code !== "91907")
             : normalizedProcessStandard === "91907"
@@ -2465,7 +2473,8 @@ async function loadChecklistForTask(taskId) {
     taskListState.checklistStandards = getStandardCodes(
         detail || selected,
         taskListState.allItems,
-        selected?.standard_1
+        selected?.standard_1,
+        selected?.standard_2
     );
     taskListState.checklistState = buildChecklistState(taskListState.checklistStandards, evidenceMap);
     taskListState.checklistStandards.forEach((standard) => {
