@@ -29,6 +29,7 @@ const DIGIMED_L3_TOOLS_TECHNIQUES_SUBTASKS = [
     "Dynamic data handling and interactivity",
     "Automation through scripts"
 ];
+const TASK_LIST_MERIT_TRELLO_NOTE = "From this point, you are expected to use your Trello project-management system to record evidence of your development decisions, testing/trialling information, improvements, and actions. You are responsible for ensuring that your Trello evidence clearly demonstrates the assessment criteria.";
 
 const DIGITAL_OUTCOME_DETAILS_TASKS = [
     "Description - Google Slides: Describe the Digital Outcome: What is it, who is it for, and what should it do?",
@@ -1871,6 +1872,7 @@ function renderChecklistCards(detail, allItems) {
                     <section class="task-list-level-group">
                         <h4>${level}</h4>
                         ${level === "Achieved" ? `<p class="task-list-achieved-subheading">Section 1: Digital Media</p>` : ""}
+                        ${level === "Merit" ? `<p class="task-list-merit-trello-note">${escapeTaskListHtml(TASK_LIST_MERIT_TRELLO_NOTE)}</p>` : ""}
                         <div class="task-list-step-list">
                             ${safeRows.map((step, index) => {
                                 if (getStepLevel(step?.text) !== level) return "";
@@ -1999,6 +2001,7 @@ function renderChecklistCards(detail, allItems) {
             return `
                 <section class="task-list-level-group">
                     <h4>${escapeTaskListHtml(level)}</h4>
+                    ${level === "Merit" ? `<p class="task-list-merit-trello-note">${escapeTaskListHtml(TASK_LIST_MERIT_TRELLO_NOTE)}</p>` : ""}
                     <div class="task-list-step-list">
                         ${levelRows.map((step) => {
                             const stepText = stripStepLevel(step?.text);
