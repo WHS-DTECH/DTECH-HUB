@@ -129,7 +129,7 @@ const DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE = "Tools & Techniques";
 const DIGITAL_OUTCOME_TESTING_FUNCTIONS_TITLE = "Testing Functions";
 const DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE = "Relevant DigiMed Conventions";
 const DIGITAL_OUTCOME_UX_PRINCIPLES_TITLE = "UX Principles (Web)";
-const DIGITAL_OUTCOME_VIDEO_INTEGRITY_TITLE = "Video Integrity & Testing";
+const DIGITAL_OUTCOME_VIDEO_INTEGRITY_TITLE = "Integrity & Validation (VIDEO)";
 const DIGITAL_OUTCOME_VIDEO_UX_PRINCIPLES_TITLE = "UX Principles (Video)";
 const DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE = "Success Criteria";
 const DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE = "Relevant Implications";
@@ -8262,7 +8262,7 @@ function isDigitalOutcomeUXPrinciplesCriterion(taskTopicTitle, taskShortName = "
 function isDigitalOutcomeVideoIntegrityCriterion(taskTopicTitle, taskShortName = "") {
     const topicText = String(taskTopicTitle || "").trim().toLowerCase();
     const shortNameText = String(taskShortName || "").trim().toLowerCase();
-    if (/video\s+integrity|video\s+testing/.test(topicText)) return true;
+    if (/video\s+integrity|video\s+testing|integrity\s*&?\s*validation\s*\(video\)/.test(topicText)) return true;
     return shortNameText === DIGITAL_OUTCOME_VIDEO_INTEGRITY_TITLE.toLowerCase();
 }
 
@@ -8343,7 +8343,7 @@ function inferDigitalOutcomeTopicKeyFromTitle(pageTitle) {
         return "relevant-digimed-conventions";
     }
 
-    if (/video\s+integrity|video\s+testing/.test(normalized)) {
+    if (/video\s+integrity|video\s+testing|integrity\s*&?\s*validation\s*\(video\)/.test(normalized)) {
         return "video-integrity-testing";
     }
 
@@ -9421,7 +9421,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     const videoIntegrityTestingChecklistHtml = digitalOutcomeTopicKey === "video-integrity-testing"
         ? (() => {
             const checks = readDigiMedVideoIntegrityChecks(id, readStoredHubEmail());
-            return `<section class="task-topic-guide-block"><h3>Video Integrity &amp; Testing</h3><p class="task-topic-submission-note">Check each area before exporting and submitting your final video outcome.</p><div class="task-list-decomposition-subtask-list">
+            return `<section class="task-topic-guide-block"><h3>Integrity &amp; Validation (VIDEO)</h3><p class="task-topic-submission-note">Check each area before exporting and submitting your final video outcome.</p><div class="task-list-decomposition-subtask-list">
                 ${DIGIMED_VIDEO_INTEGRITY_CHECKS.map((check) => `<label class="task-list-decomposition-subtask ${checks[check] ? "is-complete" : ""}"><input type="checkbox" data-digimed-video-integrity-check="${escapeHtml(check)}" ${checks[check] ? "checked" : ""}><span>${escapeHtml(check)}</span></label>`).join("")}
             </div></section>`;
         })()

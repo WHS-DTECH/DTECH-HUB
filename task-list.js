@@ -2039,9 +2039,9 @@ function renderChecklistCards(detail, allItems) {
                                 const digitalMediaType = getAllocatedDigitalMediaType(standard).toLowerCase();
                                 const uxPrinciplesSubtask = is91903UXPrinciplesRow ? getDigiMedUXPrinciplesSubtask(taskListState.fullEvidenceState, digitalMediaType) : null;
                                 const integrityTestingIsVideo = is91893IntegrityTestingRow && digitalMediaType === "video";
-                                const integrityTestingTitle = integrityTestingIsVideo ? "Video Integrity & Testing" : "Markup Validation";
+                                const integrityTestingTitle = integrityTestingIsVideo ? "Integrity & Validation (VIDEO)" : "Markup Validation";
                                 const integrityTestingHref = integrityTestingIsVideo
-                                    ? buildCustomActivityLink(taskListState.selectedId, "Video Integrity & Testing", "Video Integrity & Testing", "video-integrity-testing")
+                                    ? buildCustomActivityLink(taskListState.selectedId, "Integrity & Validation (VIDEO)", "Integrity & Validation (VIDEO)", "video-integrity-testing")
                                     : buildCustomActivityLink(taskListState.selectedId, "Markup Validation", "Code Validation", "code-validation");
                                 const rowText = isInformationalRow
                                     ? `<span class="task-list-step-text">${escapeTaskListHtml(stepText)}</span>`
