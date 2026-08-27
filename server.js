@@ -11386,6 +11386,7 @@ app.get("/api/integrations/github/repo-analysis", async (req, res) => {
 
     let commitDays = new Set();
     let commitCount = 0;
+    let latestCommit = null;
     try {
       const commits = await githubApiRequest(
         `/repos/${encodeURIComponent(identifier.owner)}/${encodeURIComponent(identifier.repo)}/commits`,
@@ -11393,6 +11394,7 @@ app.get("/api/integrations/github/repo-analysis", async (req, res) => {
       );
       const commitRows = Array.isArray(commits) ? commits : [];
       commitCount = commitRows.length;
+      latestCommit = commitRows[0] || null;
       commitRows.forEach((commit) => {
         const dateStr = String(commit?.commit?.author?.date || commit?.commit?.committer?.date || "").trim();
         const day = dateStr.slice(0, 10);
@@ -11400,6 +11402,24 @@ app.get("/api/integrations/github/repo-analysis", async (req, res) => {
       });
     } catch (_commitsError) {
       // Commit history is a bonus signal only; do not fail the whole sync if it can't be read.
+    }
+
+    let branchesCount = 0;
+    let releasesTagsCount = 0;
+    let filesChanged = 0;
+    try {
+      const [branches, tags, latestCommitDetails] = await Promise.all([
+        githubApiRequest(`/repos/${encodeURIComponent(identifier.owner)}/${encodeURIComponent(identifier.repo)}/branches`, { per_page: "100" }),
+        githubApiRequest(`/repos/${encodeURIComponent(identifier.owner)}/${encodeURIComponent(identifier.repo)}/tags`, { per_page: "100" }),
+        latestCommit?.sha
+          ? githubApiRequest(`/repos/${encodeURIComponent(identifier.owner)}/${encodeURIComponent(identifier.repo)}/commits/${encodeURIComponent(latestCommit.sha)}`)
+          : Promise.resolve(null)
+      ]);
+      branchesCount = Array.isArray(branches) ? branches.length : 0;
+      releasesTagsCount = Array.isArray(tags) ? tags.length : 0;
+      filesChanged = Array.isArray(latestCommitDetails?.files) ? latestCommitDetails.files.length : 0;
+    } catch (_repositoryDetailsError) {
+      // Supplemental project-management metrics must not prevent the main repo scan.
     }
 
     const imageStats = extractImageStatsFromTree(treeItems);
@@ -11430,6 +11450,13 @@ app.get("/api/integrations/github/repo-analysis", async (req, res) => {
       image_count: imageStats.count,
       commit_count: commitCount,
       commit_day_count: commitDays.size,
+      files_changed: filesChanged,
+      last_commit: latestCommit ? {
+        message: String(latestCommit?.commit?.message || "").split("\n")[0].trim(),
+        date: String(latestCommit?.commit?.author?.date || latestCommit?.commit?.committer?.date || "").trim()
+      } : null,
+      branches_count: branchesCount,
+      releases_tags_count: releasesTagsCount,
       categories,
       validation: validationResults
     });

@@ -2066,6 +2066,51 @@ function renderCodeValidationTechnicalHealthTracker(host, repoUrl) {
     void load();
 }
 
+function renderGithubProjectManagementTracker(slot, repoUrl) {
+    const safeRepoUrl = toSafeGithubRepoUrl(repoUrl);
+    if (!slot) return;
+
+    if (!safeRepoUrl) {
+        slot.innerHTML = "";
+        return;
+    }
+
+    const load = async () => {
+        slot.innerHTML = `<p class="trello-sync-status">Loading GitHub tracker...</p>`;
+        try {
+            const payload = await loadJson(
+                `/api/integrations/github/repo-analysis?repo_url=${encodeURIComponent(safeRepoUrl)}`,
+                { headers: buildWriteHeaders() }
+            );
+            const lastCommit = payload?.last_commit || {};
+            const lastCommitText = String(lastCommit?.message || "No commit history available.").trim();
+            const lastCommitDate = String(lastCommit?.date || "").trim();
+            slot.innerHTML = `
+                <div class="task-topic-guide-block">
+                    <h3>GitHub Tracker</h3>
+                    <ul class="list task-topic-guide-list">
+                        <li>Commits: ${Number(payload?.commit_count || 0)}</li>
+                        <li>Days with development activity: ${Number(payload?.commit_day_count || 0)}</li>
+                        <li>Files changed in latest commit: ${Number(payload?.files_changed || 0)}</li>
+                        <li>Last commit: ${escapeHtml(lastCommitText)}${lastCommitDate ? ` (${escapeHtml(formatSyncCreatedDate(lastCommitDate))})` : ""}</li>
+                        <li>Commit history: ${Number(payload?.commit_count || 0) > 0 ? "available" : "not available"}</li>
+                        <li>Branches: ${Number(payload?.branches_count || 0)}</li>
+                        <li>Releases/tags: ${Number(payload?.releases_tags_count || 0)}</li>
+                    </ul>
+                    <button type="button" class="detail-action detail-action-secondary" id="github-tracker-refresh">Refresh GitHub Tracker</button>
+                </div>
+            `;
+            slot.querySelector("#github-tracker-refresh")?.addEventListener("click", () => {
+                void load();
+            });
+        } catch (error) {
+            slot.innerHTML = `<p class="trello-sync-status is-error">${escapeHtml(error?.message || "Could not load GitHub tracker.")}</p>`;
+        }
+    };
+
+    void load();
+}
+
 function normalizeGoogleDriveLinkLibrary(values) {
     const seenIndexByUrl = new Map();
     const list = [];
@@ -11049,8 +11094,10 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                                 `).join("")}
                             </ul>
                         </div>
+                        <div id="github-tracker-slot"></div>
                     </div>
                 `;
+                renderGithubProjectManagementTracker(githubSlot.querySelector("#github-tracker-slot"), sharedGithubLink || mergedGithubRepoLibrary[0]?.url || "");
             }
         }
 
