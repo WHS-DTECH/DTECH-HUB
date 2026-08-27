@@ -8980,6 +8980,7 @@ app.get("/api/project-interests", requireActivityWriteAccess, async (_req, res) 
             'confirmed', pi.confirmed,
             'standard_1', pi.standard_1,
             'standard_2', pi.standard_2,
+            'digital_media_type', pi.digital_media_type,
             'created_at', pi.created_at
           )
         ) FILTER (WHERE pi.student_email IS NOT NULL) AS students
