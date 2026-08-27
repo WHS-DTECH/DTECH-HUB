@@ -100,6 +100,18 @@ const DIGIMED_UX_PRINCIPLES_ACK_STORAGE_PREFIX = "hub_digimed_ux_principles_ack_
 const DIGIMED_UX_PRINCIPLE_AREAS = ["Visibility of system status", "Match between system and the real world", "User control and freedom", "Consistency and standards", "Error prevention", "Recognition rather than recall", "Flexibility and efficiency of use", "Aesthetic and minimalist design", "Help users recognise and recover from errors", "Accessibility"];
 const DIGIMED_VIDEO_INTEGRITY_ACK_STORAGE_PREFIX = "hub_digimed_video_integrity_ack_v1";
 const DIGIMED_VIDEO_INTEGRITY_CHECKS = ["Resolution", "Aspect ratio", "Frame rate", "Audio levels/quality", "Missing/offline media", "Export format/codec", "Playback testing", "Titles/credits/text accuracy", "Media/source accuracy", "Final file integrity"];
+const DIGIMED_VIDEO_UX_ACK_STORAGE_PREFIX = "hub_digimed_video_ux_ack_v1";
+const DIGIMED_VIDEO_UX_CHECKS = [
+    ["Clarity", "Can viewers understand what is happening?"],
+    ["Pacing", "Does the content move at an appropriate rate?"],
+    ["Visual hierarchy/attention", "Does the viewer know where to look?"],
+    ["Consistency", "Are titles, graphics, audio and visual treatment coherent?"],
+    ["Accessibility", "Captions/subtitles, readable text, sufficient contrast, and not relying solely on audio where inappropriate."],
+    ["Cognitive load", "Is too much information presented simultaneously?"],
+    ["Audio intelligibility", "Can users clearly hear speech and important information?"],
+    ["Feedback/orientation", "For instructional video, does the viewer understand where they are in the sequence?"],
+    ["End-user control", "Where relevant, chapters/timestamps/platform controls."]
+];
 const EVIDENCE_STEPS_TARGET_STANDARDS = new Set(["92005", "91897", "91907"]);
 
 const DIGITAL_OUTCOME_DETAILS_TASKS = [
@@ -116,8 +128,9 @@ const DIGITAL_OUTCOME_TRIALLING_COMPONENTS_TITLE = "Trialling Components";
 const DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE = "Tools & Techniques";
 const DIGITAL_OUTCOME_TESTING_FUNCTIONS_TITLE = "Testing Functions";
 const DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE = "Relevant DigiMed Conventions";
-const DIGITAL_OUTCOME_UX_PRINCIPLES_TITLE = "User Experience (UX) Principles";
+const DIGITAL_OUTCOME_UX_PRINCIPLES_TITLE = "UX Principles (Web)";
 const DIGITAL_OUTCOME_VIDEO_INTEGRITY_TITLE = "Video Integrity & Testing";
+const DIGITAL_OUTCOME_VIDEO_UX_PRINCIPLES_TITLE = "UX Principles (Video)";
 const DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE = "Success Criteria";
 const DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE = "Relevant Implications";
 const DIGITAL_OUTCOME_CODE_VALIDATION_TITLE = "Code Validation";
@@ -407,6 +420,26 @@ function readDigiMedVideoIntegrityChecks(activityId, email) {
 function writeDigiMedVideoIntegrityChecks(activityId, email, value) {
     try {
         localStorage.setItem(getDigiMedVideoIntegrityKey(activityId, email), JSON.stringify(value || {}));
+    } catch (_error) {
+    }
+}
+
+function getDigiMedVideoUXKey(activityId, email) {
+    return `${DIGIMED_VIDEO_UX_ACK_STORAGE_PREFIX}:${String(activityId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
+}
+
+function readDigiMedVideoUXChecks(activityId, email) {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(getDigiMedVideoUXKey(activityId, email)) || "{}");
+        return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (_error) {
+        return {};
+    }
+}
+
+function writeDigiMedVideoUXChecks(activityId, email, value) {
+    try {
+        localStorage.setItem(getDigiMedVideoUXKey(activityId, email), JSON.stringify(value || {}));
     } catch (_error) {
     }
 }
@@ -8233,6 +8266,13 @@ function isDigitalOutcomeVideoIntegrityCriterion(taskTopicTitle, taskShortName =
     return shortNameText === DIGITAL_OUTCOME_VIDEO_INTEGRITY_TITLE.toLowerCase();
 }
 
+function isDigitalOutcomeVideoUXPrinciplesCriterion(taskTopicTitle, taskShortName = "") {
+    const topicText = String(taskTopicTitle || "").trim().toLowerCase();
+    const shortNameText = String(taskShortName || "").trim().toLowerCase();
+    if (/video\s+ux\s+principles|ux\s+principles\s*\(video\)/.test(topicText)) return true;
+    return shortNameText === DIGITAL_OUTCOME_VIDEO_UX_PRINCIPLES_TITLE.toLowerCase();
+}
+
 function isToolsAndTechniquesCriterion(taskTopicTitle, taskShortName = "") {
     const topicText = String(taskTopicTitle || "").trim().toLowerCase();
     const shortNameText = String(taskShortName || "").trim().toLowerCase();
@@ -8305,6 +8345,10 @@ function inferDigitalOutcomeTopicKeyFromTitle(pageTitle) {
 
     if (/video\s+integrity|video\s+testing/.test(normalized)) {
         return "video-integrity-testing";
+    }
+
+    if (/video\s+ux\s+principles|ux\s+principles\s*\(video\)/.test(normalized)) {
+        return "video-ux-principles";
     }
 
     if (/user\s+experience\s+principles|ux\s+principles/.test(normalized)) {
@@ -8857,6 +8901,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         || keywordMatchedTopicKey === "user-experience-principles";
     const isDigitalOutcomeVideoIntegrityTopic = isDigitalOutcomeVideoIntegrityCriterion(taskTopicTitle, resolvedTaskShortName)
         || keywordMatchedTopicKey === "video-integrity-testing";
+    const isDigitalOutcomeVideoUXPrinciplesTopic = isDigitalOutcomeVideoUXPrinciplesCriterion(taskTopicTitle, resolvedTaskShortName)
+        || keywordMatchedTopicKey === "video-ux-principles";
     const isToolsAndTechniquesTopic = isToolsAndTechniquesCriterion(taskTopicTitle, resolvedTaskShortName);
     const isCodeValidationTopic = isCodeValidationCriterion(taskTopicTitle, resolvedTaskShortName)
         || keywordMatchedTopicKey === "code-validation";
@@ -8886,6 +8932,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                                             ? "user-experience-principles"
                                             : isDigitalOutcomeVideoIntegrityTopic
                                                 ? "video-integrity-testing"
+                                                : isDigitalOutcomeVideoUXPrinciplesTopic
+                                                    ? "video-ux-principles"
                                             : isDigitalOutcomeDescriptionTopic
                                             ? "description"
                                             : keywordMatchedTopicKey;
@@ -8902,6 +8950,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         "relevant-digimed-conventions": DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE,
         "user-experience-principles": DIGITAL_OUTCOME_UX_PRINCIPLES_TITLE,
         "video-integrity-testing": DIGITAL_OUTCOME_VIDEO_INTEGRITY_TITLE,
+        "video-ux-principles": DIGITAL_OUTCOME_VIDEO_UX_PRINCIPLES_TITLE,
         "tools-and-techniques": DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE,
         "code-validation": DIGITAL_OUTCOME_CODE_VALIDATION_TITLE,
         "development-steps": DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE,
@@ -8945,6 +8994,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         || isDigitalOutcomeRelevantDigiMedConventionsTopic
         || isDigitalOutcomeUXPrinciplesTopic
         || isDigitalOutcomeVideoIntegrityTopic
+        || isDigitalOutcomeVideoUXPrinciplesTopic
         || isToolsAndTechniquesTopic
         || isCodeValidationTopic
         || isDigitalOutcomeSuccessCriteriaTopic
@@ -8964,6 +9014,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         "relevant-digimed-conventions": "relevant-digimed-conventions",
         "user-experience-principles": "user-experience-principles",
         "video-integrity-testing": "video-integrity-testing",
+        "video-ux-principles": "video-ux-principles",
         "tools-and-techniques": "tools-and-techniques",
         "code-validation": "code-validation",
         "development-steps": "development-steps",
@@ -9375,6 +9426,14 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             </div></section>`;
         })()
         : "";
+    const videoUXPrinciplesChecklistHtml = digitalOutcomeTopicKey === "video-ux-principles"
+        ? (() => {
+            const checks = readDigiMedVideoUXChecks(id, readStoredHubEmail());
+            return `<section class="task-topic-guide-block"><h3>UX Principles (Video)</h3><p class="task-topic-submission-note">Review how your video outcome works for its intended audience and tick each principle you have addressed.</p><div class="task-list-decomposition-subtask-list">
+                ${DIGIMED_VIDEO_UX_CHECKS.map(([principle, prompt]) => `<label class="task-list-decomposition-subtask ${checks[principle] ? "is-complete" : ""}"><input type="checkbox" data-digimed-video-ux-check="${escapeHtml(principle)}" ${checks[principle] ? "checked" : ""}><span><strong>${escapeHtml(principle)}</strong> - ${escapeHtml(prompt)}</span></label>`).join("")}
+            </div></section>`;
+        })()
+        : "";
     const topicGuideIntroText = (() => {
         if (!isDigitalOutcomeTopic) {
             return "Use this guide to complete the Submission Tasks correctly.";
@@ -9652,6 +9711,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                             ${relevantDigiMedConventionsTableHtml}
                             ${uxPrinciplesTableHtml}
                             ${videoIntegrityTestingChecklistHtml}
+                            ${videoUXPrinciplesChecklistHtml}
                             ${isRelevantImplicationsTopic
                                 ? `<div class="digital-outcome-must-dos" id="relevant-implications-from-slide" aria-live="polite"><p class="task-topic-submission-note">Loading discussed implications from your slideshow...</p></div>`
                                 : ""}
@@ -9947,6 +10007,19 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 if (!check) return;
                 checks[check] = Boolean(checkbox.checked);
                 writeDigiMedVideoIntegrityChecks(id, readStoredHubEmail(), checks);
+                checkbox.closest(".task-list-decomposition-subtask")?.classList.toggle("is-complete", Boolean(checkbox.checked));
+            });
+        });
+    }
+
+    if (digitalOutcomeTopicKey === "video-ux-principles") {
+        const checks = readDigiMedVideoUXChecks(id, readStoredHubEmail());
+        host.querySelectorAll("[data-digimed-video-ux-check]").forEach((checkbox) => {
+            checkbox.addEventListener("change", () => {
+                const principle = String(checkbox.getAttribute("data-digimed-video-ux-check") || "").trim();
+                if (!principle) return;
+                checks[principle] = Boolean(checkbox.checked);
+                writeDigiMedVideoUXChecks(id, readStoredHubEmail(), checks);
                 checkbox.closest(".task-list-decomposition-subtask")?.classList.toggle("is-complete", Boolean(checkbox.checked));
             });
         });

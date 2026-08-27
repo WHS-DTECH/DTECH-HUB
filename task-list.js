@@ -4,6 +4,7 @@ const TASK_LIST_TRELLO_CARD_LIBRARY_STORAGE_PREFIX = "hub_trello_card_library_v1
 const TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX = "hub_task_topic_slide_sync_v1";
 const DIGIMED_CONVENTIONS_ACK_STORAGE_PREFIX = "hub_digimed_conventions_ack_v1";
 const DIGIMED_UX_PRINCIPLES_ACK_STORAGE_PREFIX = "hub_digimed_ux_principles_ack_v1";
+const DIGIMED_VIDEO_UX_PRINCIPLES_ACK_STORAGE_PREFIX = "hub_digimed_video_ux_principles_ack_v1";
 const DIGIMED_EFFICIENT_TOOLS_STORAGE_PREFIX = "hub_digimed_efficient_tools_v1";
 const DIGIMED_EFFICIENT_TOOLS_SUBTASKS = [
     "Management of assets",
@@ -1376,11 +1377,14 @@ function getDigiMedUXPrinciplesAcknowledgementCount(activityId, email, stateMap 
     }
 }
 
-function getDigiMedUXPrinciplesSubtask(stateMap = {}) {
+function getDigiMedUXPrinciplesSubtask(stateMap = {}, digitalMediaType = "") {
     const activityId = taskListState.selectedId;
+    const isVideo = String(digitalMediaType || "").trim().toLowerCase() === "video";
     return {
-        label: "UX Principles",
-        href: buildCustomActivityLink(activityId, "Applying user experience principles relevant to the purpose of the outcome.", "User Experience (UX) Principles", "user-experience-principles"),
+        label: isVideo ? "UX Principles (Video)" : "UX Principles (Web)",
+        href: isVideo
+            ? buildCustomActivityLink(activityId, "Video UX Principles", "UX Principles (Video)", "video-ux-principles")
+            : buildCustomActivityLink(activityId, "Applying user experience principles relevant to the purpose of the outcome.", "UX Principles (Web)", "user-experience-principles"),
         count: getDigiMedUXPrinciplesAcknowledgementCount(activityId, getTaskListEmail(), stateMap)
     };
 }
@@ -2032,8 +2036,8 @@ function renderChecklistCards(detail, allItems) {
                                 const is91893EfficientToolsRow = /using efficient tools and techniques in the outcome.?s production/i.test(stepText);
                                 const is91893IntegrityTestingRow = /applying appropriate data integrity and testing procedures/i.test(stepText);
                                 const conventionsSubtask = is91893ConventionsRow ? getDigiMedConventionsSubtask(taskListState.fullEvidenceState) : null;
-                                const uxPrinciplesSubtask = is91903UXPrinciplesRow ? getDigiMedUXPrinciplesSubtask(taskListState.fullEvidenceState) : null;
                                 const digitalMediaType = getAllocatedDigitalMediaType(standard).toLowerCase();
+                                const uxPrinciplesSubtask = is91903UXPrinciplesRow ? getDigiMedUXPrinciplesSubtask(taskListState.fullEvidenceState, digitalMediaType) : null;
                                 const integrityTestingIsVideo = is91893IntegrityTestingRow && digitalMediaType === "video";
                                 const integrityTestingTitle = integrityTestingIsVideo ? "Video Integrity & Testing" : "Markup Validation";
                                 const integrityTestingHref = integrityTestingIsVideo
@@ -2113,10 +2117,10 @@ function renderChecklistCards(detail, allItems) {
                                     ${uxPrinciplesSubtask ? `
                                         <div class="task-list-decomposition-subtasks">
                                             <p class="task-list-system-title">SUBTASKS</p>
-                                            <p class="task-list-achieved-note">UX principle areas acknowledged on your UX Principles page.</p>
+                                            <p class="task-list-achieved-note">UX principle areas acknowledged on your ${escapeTaskListHtml(uxPrinciplesSubtask.label)} page.</p>
                                             <div class="task-list-decomposition-category-list">
                                                 <a class="task-list-decomposition-category is-covered" href="${escapeTaskListHtml(uxPrinciplesSubtask.href)}">
-                                                    <span class="task-list-decomposition-category-label">UX PRINCIPLES</span>
+                                                    <span class="task-list-decomposition-category-label">${escapeTaskListHtml(uxPrinciplesSubtask.label).toUpperCase()}</span>
                                                     <span class="task-list-decomposition-category-count">${uxPrinciplesSubtask.count}</span>
                                                 </a>
                                             </div>
