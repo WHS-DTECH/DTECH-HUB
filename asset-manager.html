@@ -137,9 +137,7 @@
         }
 
         .asset-manager-detail-panel {
-            margin-top: 14px;
             border: 1px solid #d9e3f5;
-            border-radius: 12px;
             padding: 14px;
             background: #f5f8ff;
         }
@@ -175,6 +173,57 @@
             margin: 3px 0 0;
             font-weight: 800;
             color: #1a1f36;
+        }
+
+        .asset-manager-result-section {
+            border: 1px solid #d9e3f5;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #fff;
+        }
+
+        .asset-manager-result-section + .asset-manager-result-section {
+            margin-top: 10px;
+        }
+
+        .asset-manager-result-summary {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 12px;
+            cursor: pointer;
+            font-weight: 800;
+            color: #1a1f36;
+            list-style: none;
+        }
+
+        .asset-manager-result-summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .asset-manager-result-summary::before {
+            content: "+";
+            color: #1a5fa8;
+            font-size: 1.1rem;
+        }
+
+        .asset-manager-result-section[open] > .asset-manager-result-summary::before {
+            content: "-";
+        }
+
+        .asset-manager-result-section.is-warning > .asset-manager-result-summary {
+            background: #fff9ec;
+            color: #6b5218;
+        }
+
+        .asset-manager-result-section.is-ok > .asset-manager-result-summary {
+            background: #f2fbf4;
+            color: #1f5b34;
+        }
+
+        .asset-manager-result-body {
+            padding: 0 12px 12px;
         }
     </style>
 </head>
