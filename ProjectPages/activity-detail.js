@@ -133,7 +133,7 @@ const DIGITAL_OUTCOME_VIDEO_INTEGRITY_TITLE = "Integrity & Validation (VIDEO)";
 const DIGITAL_OUTCOME_VIDEO_UX_PRINCIPLES_TITLE = "UX Principles (Video)";
 const DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE = "Success Criteria";
 const DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE = "Relevant Implications";
-const DIGITAL_OUTCOME_CODE_VALIDATION_TITLE = "Code Validation";
+const DIGITAL_OUTCOME_CODE_VALIDATION_TITLE = "Integrity & Validation (WEB)";
 // The synced template library lists this task's slides under "Markup Validation", not "Code Validation".
 const DIGITAL_OUTCOME_CODE_VALIDATION_TEMPLATE_SEARCH_TITLE = "Markup Validation";
 const DIGITAL_OUTCOME_DESCRIPTION_TEMPLATE_PREVIEW_URL = "https://drive.google.com/thumbnail?id=1brOY70u9aJdsoiEtxVepr82vRhiv9VzpMm8TUv3lcTo&sz=w1400";
@@ -8283,8 +8283,8 @@ function isToolsAndTechniquesCriterion(taskTopicTitle, taskShortName = "") {
 function isCodeValidationCriterion(taskTopicTitle, taskShortName = "") {
     const topicText = String(taskTopicTitle || "").trim().toLowerCase();
     const shortNameText = String(taskShortName || "").trim().toLowerCase();
-    if (/markup\s+validation|code\s+validation|html\/?css\s+validation/.test(topicText)) return true;
-    if (/markup\s+validation|code\s+validation/.test(shortNameText)) return true;
+    if (/markup\s+validation|code\s+validation|html\/?css\s+validation|integrity\s*&?\s*validation\s*\(web\)/.test(topicText)) return true;
+    if (/markup\s+validation|code\s+validation|integrity\s*&?\s*validation\s*\(web\)/.test(shortNameText)) return true;
     return shortNameText === DIGITAL_OUTCOME_CODE_VALIDATION_TITLE.toLowerCase();
 }
 
