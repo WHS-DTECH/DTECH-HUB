@@ -2033,6 +2033,12 @@ function renderChecklistCards(detail, allItems) {
                                 const is91893IntegrityTestingRow = /applying appropriate data integrity and testing procedures/i.test(stepText);
                                 const conventionsSubtask = is91893ConventionsRow ? getDigiMedConventionsSubtask(taskListState.fullEvidenceState) : null;
                                 const uxPrinciplesSubtask = is91903UXPrinciplesRow ? getDigiMedUXPrinciplesSubtask(taskListState.fullEvidenceState) : null;
+                                const digitalMediaType = getAllocatedDigitalMediaType(standard).toLowerCase();
+                                const integrityTestingIsVideo = is91893IntegrityTestingRow && digitalMediaType === "video";
+                                const integrityTestingTitle = integrityTestingIsVideo ? "Video Integrity & Testing" : "Markup Validation";
+                                const integrityTestingHref = integrityTestingIsVideo
+                                    ? buildCustomActivityLink(taskListState.selectedId, "Video Integrity & Testing", "Video Integrity & Testing", "video-integrity-testing")
+                                    : buildCustomActivityLink(taskListState.selectedId, "Markup Validation", "Code Validation", "code-validation");
                                 const rowText = isInformationalRow
                                     ? `<span class="task-list-step-text">${escapeTaskListHtml(stepText)}</span>`
                                     : (href
@@ -2086,8 +2092,8 @@ function renderChecklistCards(detail, allItems) {
                                             <p class="task-list-system-title">SUBTASKS</p>
                                             <p class="task-list-achieved-note">Files identified for validation.</p>
                                             <div class="task-list-decomposition-category-list">
-                                                <a class="task-list-decomposition-category is-covered" href="${escapeTaskListHtml(buildCustomActivityLink(taskListState.selectedId, "Markup Validation", "Code Validation", "code-validation"))}">
-                                                    <span class="task-list-decomposition-category-label">Markup Validation</span>
+                                                <a class="task-list-decomposition-category is-covered" href="${escapeTaskListHtml(integrityTestingHref)}">
+                                                    <span class="task-list-decomposition-category-label">${escapeTaskListHtml(integrityTestingTitle)}</span>
                                                 </a>
                                             </div>
                                         </div>
