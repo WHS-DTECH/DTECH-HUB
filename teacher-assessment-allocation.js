@@ -297,6 +297,11 @@ function isAssessmentTaskRecord(record) {
     return category.includes("assessment");
 }
 
+function isAllocationRecord(record) {
+    const category = String(record?.activity_category || record?.activityCategory || "").trim().toLowerCase();
+    return category.includes("assessment") || category.includes("project");
+}
+
 function normalizeAssessmentRecord(record) {
     return {
         project_id: String(record?.id || "").trim(),
@@ -728,7 +733,7 @@ async function loadAllocations() {
         );
 
         const projects = (Array.isArray(activities) ? activities : [])
-            .filter((record) => isAssessmentTaskRecord(record))
+            .filter((record) => isAllocationRecord(record))
             .map((record) => {
                 const normalized = normalizeAssessmentRecord(record);
                 const interest = interestByProjectId.get(normalized.project_id) || {};
@@ -867,7 +872,7 @@ async function loadAllocations() {
         setAllocStatus("");
 
         if (!Array.isArray(projects) || projects.length === 0) {
-            content.innerHTML = `<p class="alloc-empty">No assessment task records were found.</p>`;
+            content.innerHTML = `<p class="alloc-empty">No assessment task or project records were found.</p>`;
             return;
         }
 
