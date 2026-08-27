@@ -167,6 +167,9 @@ const SUGGESTED_TOOLS_BY_CONTEXT = {
     "web": ["HTML", "CSS", "JavaScript", "React", "Vue.js", "Figma", "GitHub", "npm", "Visual Studio Code", "Bootstrap"],
     "design": ["Figma", "Adobe Photoshop", "Adobe Illustrator", "Canva", "Sketch", "Adobe XD", "Protopie", "InVision", "Pen and Paper", "Wireframing Tools"],
     "digital-media": ["Adobe Premiere Pro", "Adobe After Effects", "DaVinci Resolve", "Final Cut Pro", "Adobe Audition", "Blender", "OBS Studio", "Figma", "Adobe Photoshop", "Audacity"],
+    "image": ["Adobe Photoshop", "Adobe Illustrator", "Canva", "Figma", "GIMP", "Lightroom", "Photopea", "Adobe Express", "Google Drive", "GitHub"],
+    "video": ["DaVinci Resolve", "Adobe Premiere Pro", "Adobe After Effects", "Final Cut Pro", "CapCut", "OBS Studio", "Audacity", "Canva", "Google Drive", "GitHub"],
+    "audio": ["Audacity", "Adobe Audition", "GarageBand", "BandLab", "Soundtrap", "OBS Studio", "DaVinci Resolve", "Google Drive", "GitHub", "Trello"],
     "data": ["Excel", "Google Sheets", "Python (Pandas)", "Power BI", "Tableau", "SQL", "Google Data Studio", "R", "Jupyter Notebook", "CSV"],
     "general": ["Google Workspace", "Microsoft Office", "Trello", "GitHub", "Google Drive", "OneDrive", "Slack", "Zoom", "Figma", "Notion"]
 };
@@ -7255,9 +7258,14 @@ async function renderToolsTechniquesPanel({ host, projectId, detailData, taskTop
     panel.className = "tools-techniques-panel proposal-section";
 
     const buildSuggestionsHtml = (topicTypeOverride) => {
-        const category = topicTypeOverride
+        const activeAlloc = allAllocations.find((allocation) => String(allocation.id) === activeAllocId) || null;
+        const digitalMediaType = String(activeAlloc?.digital_media_type || "").trim().toLowerCase();
+        const mediaCategory = ["image", "video", "audio", "web"].includes(digitalMediaType)
+            ? digitalMediaType
+            : (digitalMediaType === "mixed" ? "digital-media" : "");
+        const category = mediaCategory || (topicTypeOverride
             ? getToolsCategoryForTopicType(topicTypeOverride)
-            : null;
+            : "");
         const tools = category
             ? (SUGGESTED_TOOLS_BY_CONTEXT[category] || SUGGESTED_TOOLS_BY_CONTEXT.general)
             : getSuggestedToolsForContext(detailData, taskTopic);
