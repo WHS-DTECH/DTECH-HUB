@@ -451,6 +451,49 @@ async function propagateProcessStandardToOtherProjects(studentEmail, processStan
     }
 }
 
+// Fills the empty Project/Task std cell for the same student in the Process Assessment table
+// once it has been set in any other project block; an existing value is left untouched.
+async function propagateProjectTaskStandardToProcessAssessment(studentEmail, projectTaskStandard, sourceProjectId, email) {
+    if (!studentEmail || !projectTaskStandard) return;
+
+    const headers = allocWithAuthHeaders({ "Content-Type": "application/json" }, email);
+    const blocks = document.querySelectorAll(".alloc-project-block");
+    for (const block of blocks) {
+        const targetProjectId = block.dataset.projectId;
+        if (!targetProjectId || targetProjectId === sourceProjectId || !isProcessAssessmentProjectName(block.dataset.projectName)) continue;
+
+        const targetRow = block.querySelector(`tr[data-student="${CSS.escape(studentEmail)}"]`);
+        if (!targetRow) continue;
+
+        const select = targetRow.querySelector('[data-standard-slot="2"]');
+        if (!select || normalizeStandardValue(select.value)) continue;
+
+        if (![...select.options].some((option) => option.value === projectTaskStandard)) {
+            const option = document.createElement("option");
+            option.value = projectTaskStandard;
+            option.textContent = `${projectTaskStandard} (custom)`;
+            select.appendChild(option);
+        }
+        select.value = projectTaskStandard;
+
+        try {
+            await fetch(
+                `/api/activities/${encodeURIComponent(targetProjectId)}/interests/${encodeURIComponent(studentEmail)}/standards`,
+                {
+                    method: "PATCH",
+                    headers,
+                    body: JSON.stringify({
+                        standard_1: normalizeStandardValue(targetRow.querySelector('[data-standard-slot="1"]')?.value || ""),
+                        standard_2: projectTaskStandard
+                    })
+                }
+            );
+        } catch (_error) {
+            // Best-effort; will be retried on next page load.
+        }
+    }
+}
+
 async function handleAllocationAction(btn, projectId, email) {
     const row = btn.closest("tr[data-student]");
     if (!row) return;
@@ -495,8 +538,12 @@ async function handleAllocationAction(btn, projectId, email) {
             if (resp.ok) {
                 setAllocStatus(`Saved standards for ${studentEmail}.`);
                 const projectBlock = btn.closest(".alloc-project-block");
-                if (standard1 && isProcessAssessmentProjectName(projectBlock?.dataset.projectName)) {
+                const isProcessAssessmentBlock = isProcessAssessmentProjectName(projectBlock?.dataset.projectName);
+                if (standard1 && isProcessAssessmentBlock) {
                     await propagateProcessStandardToOtherProjects(studentEmail, standard1, projectId, email);
+                }
+                if (standard2 && !isProcessAssessmentBlock) {
+                    await propagateProjectTaskStandardToProcessAssessment(studentEmail, standard2, projectId, email);
                 }
             } else {
                 setAllocStatus(`Could not save standards for ${studentEmail}.`, true);
@@ -760,6 +807,42 @@ async function loadAllocations() {
                             student.standard_1 = processStandard;
                         }
                     })));
+            }
+
+            // Reverse direction: pull the first identified Project/Task std for each student
+            // from the other project blocks into the Process Assessment table when it is empty.
+            const projectTaskStandardByEmail = new Map();
+            projects
+                .filter((project) => project !== processAssessmentProject)
+                .forEach((project) => {
+                    project.students.forEach((student) => {
+                        const emailKey = String(student.email || "").trim().toLowerCase();
+                        const value = normalizeStandardValue(student.standard_2);
+                        if (value && !projectTaskStandardByEmail.has(emailKey)) {
+                            projectTaskStandardByEmail.set(emailKey, value);
+                        }
+                    });
+                });
+
+            if (projectTaskStandardByEmail.size) {
+                await Promise.all(processAssessmentProject.students.map(async (student) => {
+                    const projectTaskStandard = projectTaskStandardByEmail.get(String(student.email || "").trim().toLowerCase());
+                    if (!projectTaskStandard || normalizeStandardValue(student.standard_2)) {
+                        return;
+                    }
+
+                    const response = await fetch(
+                        `/api/activities/${encodeURIComponent(processAssessmentProject.project_id)}/interests/${encodeURIComponent(student.email)}/standards`,
+                        {
+                            method: "PATCH",
+                            headers: allocWithAuthHeaders({ "Content-Type": "application/json" }, email),
+                            body: JSON.stringify({ standard_1: normalizeStandardValue(student.standard_1), standard_2: projectTaskStandard })
+                        }
+                    );
+                    if (response.ok) {
+                        student.standard_2 = projectTaskStandard;
+                    }
+                }));
             }
         }
 
