@@ -63,6 +63,24 @@
             background: #f5f8ff;
         }
 
+        .asset-manager-count-card-button {
+            width: 100%;
+            text-align: left;
+            cursor: pointer;
+            font: inherit;
+        }
+
+        .asset-manager-count-card-button:hover,
+        .asset-manager-count-card-button:focus-visible {
+            border-color: #3f89cf;
+            background: #eaf4ff;
+        }
+
+        .asset-manager-count-card-button:focus-visible {
+            outline: 2px solid #1a5fa8;
+            outline-offset: 2px;
+        }
+
         .asset-manager-count-label {
             display: block;
             font-size: 0.72rem;
@@ -116,6 +134,47 @@
         .asset-manager-empty-note {
             font-size: 0.9rem;
             color: #345778;
+        }
+
+        .asset-manager-detail-panel {
+            margin-top: 14px;
+            border: 1px solid #d9e3f5;
+            border-radius: 12px;
+            padding: 14px;
+            background: #f5f8ff;
+        }
+
+        .asset-manager-detail-panel h3 {
+            margin: 0 0 10px;
+            color: #1a1f36;
+        }
+
+        .asset-manager-detail-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 8px;
+            margin: 0;
+        }
+
+        .asset-manager-detail-list div {
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: #fff;
+            border: 1px solid #d9e3f5;
+        }
+
+        .asset-manager-detail-list dt {
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #345778;
+        }
+
+        .asset-manager-detail-list dd {
+            margin: 3px 0 0;
+            font-weight: 800;
+            color: #1a1f36;
         }
     </style>
 </head>

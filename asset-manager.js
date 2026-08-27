@@ -66,6 +66,24 @@ function formatAssetManagerBytes(bytes) {
     return `${Math.round(value / 1024)} KB`;
 }
 
+function renderCssDetails(details) {
+    const values = details || {};
+    return `
+        <section class="asset-manager-detail-panel" id="asset-manager-css-details" hidden>
+            <h3>CSS Details</h3>
+            <dl class="asset-manager-detail-list">
+                <div><dt>Stylesheets</dt><dd>${Number(values.stylesheets || 0)}</dd></div>
+                <div><dt>CSS rules</dt><dd>${Number(values.rules || 0)}</dd></div>
+                <div><dt>CSS variables</dt><dd>${Number(values.variables || 0)}</dd></div>
+                <div><dt>Repeated colour values</dt><dd>${Number(values.repeated_colour_values || 0)}</dd></div>
+                <div><dt>Inline styles</dt><dd>${Number(values.inline_styles || 0)}</dd></div>
+                <div><dt>!important uses</dt><dd>${Number(values.important_uses || 0)}</dd></div>
+                <div><dt>Media queries</dt><dd>${Number(values.media_queries || 0)}</dd></div>
+            </dl>
+        </section>
+    `;
+}
+
 function renderAssetManagerContent(payload) {
     const host = document.querySelector("#asset-manager-content");
     if (!host) return;
@@ -78,7 +96,7 @@ function renderAssetManagerContent(payload) {
     host.innerHTML = `
         <div class="asset-manager-counts-grid">
             <div class="asset-manager-count-card"><span class="asset-manager-count-label">HTML</span><span class="asset-manager-count-value">${Number(counts.html || 0)}</span></div>
-            <div class="asset-manager-count-card"><span class="asset-manager-count-label">CSS</span><span class="asset-manager-count-value">${Number(counts.css || 0)}</span></div>
+            <button type="button" class="asset-manager-count-card asset-manager-count-card-button" id="asset-manager-css-details-toggle" aria-expanded="false" aria-controls="asset-manager-css-details"><span class="asset-manager-count-label">CSS</span><span class="asset-manager-count-value">${Number(counts.css || 0)}</span></button>
             <div class="asset-manager-count-card"><span class="asset-manager-count-label">JavaScript</span><span class="asset-manager-count-value">${Number(counts.javascript || 0)}</span></div>
             <div class="asset-manager-count-card"><span class="asset-manager-count-label">Images</span><span class="asset-manager-count-value">${Number(counts.images || 0)}</span></div>
             <div class="asset-manager-count-card"><span class="asset-manager-count-label">Media</span><span class="asset-manager-count-value">${Number(counts.media || 0)}</span></div>
@@ -95,7 +113,16 @@ function renderAssetManagerContent(payload) {
                 ${brokenCount > 0 ? `<ul class="asset-manager-check-list">${(payload?.broken_references || []).map((row) => `<li>${escapeAssetManagerHtml(row.from)} &rarr; ${escapeAssetManagerHtml(row.reference)}</li>`).join("")}</ul>` : ""}
             </div>
         </div>
+        ${renderCssDetails({ ...payload?.css_details, stylesheets: counts.css })}
     `;
+
+    const cssToggle = host.querySelector("#asset-manager-css-details-toggle");
+    const cssDetails = host.querySelector("#asset-manager-css-details");
+    cssToggle?.addEventListener("click", () => {
+        const isOpen = !cssDetails.hidden;
+        cssDetails.hidden = isOpen;
+        cssToggle.setAttribute("aria-expanded", String(!isOpen));
+    });
 }
 
 async function runAssetManagerSync(repoUrl) {

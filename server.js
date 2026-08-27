@@ -11477,6 +11477,31 @@ function resolveGithubRelativePath(basePath, ref) {
   return stack.join("/");
 }
 
+function countCssRules(content) {
+  return (String(content || "").match(/(^|})\s*[^@{}][^{]*\{/gm) || []).length;
+}
+
+function extractCssColourValues(content) {
+  return String(content || "").match(/#[0-9a-f]{3,8}\b|rgba?\([^)]*\)|\b(?:white|black|transparent)\b/gi) || [];
+}
+
+function buildCssHealthDetails(cssContents, htmlContents) {
+  const cssText = cssContents.join("\n");
+  const htmlText = htmlContents.join("\n");
+  const colours = extractCssColourValues(cssText).map((value) => value.toLowerCase());
+  const colourCounts = new Map();
+  colours.forEach((colour) => colourCounts.set(colour, (colourCounts.get(colour) || 0) + 1));
+
+  return {
+    rules: countCssRules(cssText),
+    variables: (cssText.match(/--[a-z0-9_-]+\s*:/gi) || []).length,
+    repeated_colour_values: Array.from(colourCounts.values()).filter((count) => count > 1).length,
+    inline_styles: (htmlText.match(/\sstyle\s*=\s*["']/gi) || []).length,
+    important_uses: (cssText.match(/!important\b/gi) || []).length,
+    media_queries: (cssText.match(/@media\b/gi) || []).length
+  };
+}
+
 // Public-repo-only: counts files by type, flags oversized images, and cross-references
 // HTML/CSS/JS files against the tree to find unused images and broken local links.
 app.get("/api/integrations/github/asset-health", async (req, res) => {
@@ -11514,12 +11539,16 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
 
     const referencedPaths = new Set();
     const brokenReferences = [];
+    const cssContents = [];
+    const htmlContents = [];
     await Promise.all(filesToScan.map(async (filePath) => {
       try {
         const rawUrl = `${GITHUB_RAW_CONTENT_BASE}/${identifier.owner}/${identifier.repo}/${defaultBranch}/${filePath}`;
         const response = await fetch(rawUrl, { headers: { "User-Agent": "DTECH-HUB" } });
         if (!response.ok) return;
         const content = await response.text();
+        if (/\.css$/i.test(filePath)) cssContents.push(content);
+        if (/\.html?$/i.test(filePath)) htmlContents.push(content);
         extractLocalReferencesFromContent(content).forEach((ref) => {
           const resolved = resolveGithubRelativePath(filePath, ref);
           if (!resolved) return;
@@ -11560,6 +11589,7 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
       unused_images: unusedImages.slice(0, 50),
       broken_reference_count: brokenReferences.length,
       broken_references: brokenReferences.slice(0, 50),
+      css_details: buildCssHealthDetails(cssContents, htmlContents),
       scanned_file_count: filesToScan.length
     });
   } catch (error) {
