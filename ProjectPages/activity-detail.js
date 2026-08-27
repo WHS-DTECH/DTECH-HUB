@@ -7161,6 +7161,26 @@ async function renderToolsTechniquesPanel({ host, projectId, detailData, taskTop
     let activeAllocId = currentAlloc ? String(currentAlloc.id) : "";
     let activeTopicType = initialType;
 
+    const digitalMediaContextCard = document.createElement("section");
+    digitalMediaContextCard.id = "tools-digital-media-context-card";
+    digitalMediaContextCard.className = "tools-project-context-card proposal-section";
+
+    const renderDigitalMediaContextCard = () => {
+        const activeAlloc = allAllocations.find((allocation) => String(allocation.id) === activeAllocId) || null;
+        const projectTaskStandard = String(activeAlloc?.standard_2 || "").match(/\b(91893|91903)\b/)?.[1] || "";
+        const digitalMediaType = String(activeAlloc?.digital_media_type || "").trim();
+        const isDigitalMedia = Boolean(projectTaskStandard || digitalMediaType);
+        digitalMediaContextCard.hidden = !isDigitalMedia;
+        digitalMediaContextCard.innerHTML = isDigitalMedia ? `
+            <h2>Student Details</h2>
+            <div class="tools-context-type-chips">
+                <span class="tools-context-type-label">Digital Media:</span>
+                ${projectTaskStandard ? `<span class="tools-context-type-chip is-active">Standard ${escapeHtml(projectTaskStandard)}</span>` : ""}
+                ${digitalMediaType ? `<span class="tools-context-type-chip is-active">${escapeHtml(digitalMediaType)}</span>` : ""}
+            </div>
+        ` : "";
+    };
+
     // --- Project Context Card ---
     const contextCard = document.createElement("section");
     contextCard.id = "tools-project-context-card";
@@ -7209,6 +7229,8 @@ async function renderToolsTechniquesPanel({ host, projectId, detailData, taskTop
 
     renderContextCard();
     host.appendChild(contextCard);
+    renderDigitalMediaContextCard();
+    host.appendChild(digitalMediaContextCard);
 
     // Event delegation for context card interactions
     contextCard.addEventListener("click", (e) => {
@@ -7219,6 +7241,7 @@ async function renderToolsTechniquesPanel({ host, projectId, detailData, taskTop
             const newTypes = getTopicTypes(allAllocations.find((a) => String(a.id) === activeAllocId));
             activeTopicType = newTypes[0] || "";
             renderContextCard();
+            renderDigitalMediaContextCard();
             updateSuggestions();
         } else if (typeBtn) {
             activeTopicType = typeBtn.getAttribute("data-context-type") || "";
@@ -9598,7 +9621,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                     </section>
                     ` : ""}
 
-                    <section class="proposal-section task-topic-submission-panel" ${isDigitalOutcomeDescriptionTopic || isDigitalOutcomeSuccessCriteriaTopic || isDigitalOutcomeDevelopmentToolsTopic || isDigitalOutcomeRelevantDigiMedConventionsTopic || isDigitalOutcomeUXPrinciplesTopic ? "hidden" : ""}>
+                    <section class="proposal-section task-topic-submission-panel" ${isDigitalOutcomeDescriptionTopic || isDigitalOutcomeSuccessCriteriaTopic || isDigitalOutcomeDevelopmentToolsTopic || isDigitalOutcomeRelevantDigiMedConventionsTopic || isDigitalOutcomeUXPrinciplesTopic || isToolsAndTechniquesTopic ? "hidden" : ""}>
                         ${isDecompositionTopic ? "" : `
                         <h2>Submission Tasks</h2>
                         <p class="task-topic-submission-intro">${escapeHtml(submissionIntroText)}</p>
