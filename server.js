@@ -3581,6 +3581,7 @@ async function ensureProjectInterestsSchema() {
       confirmed BOOLEAN NOT NULL DEFAULT FALSE,
       standard_1 TEXT,
       standard_2 TEXT,
+      digital_media_type TEXT,
       evidence_steps JSONB NOT NULL DEFAULT '[]'::jsonb,
       tools_techniques JSONB NOT NULL DEFAULT '[]'::jsonb,
       template_copies JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -3593,6 +3594,7 @@ async function ensureProjectInterestsSchema() {
   await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS confirmed BOOLEAN NOT NULL DEFAULT FALSE`);
   await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS standard_1 TEXT`);
   await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS standard_2 TEXT`);
+  await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS digital_media_type TEXT`);
   await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS evidence_steps JSONB NOT NULL DEFAULT '[]'::jsonb`);
   await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS tools_techniques JSONB NOT NULL DEFAULT '[]'::jsonb`);
   await pool.query(`ALTER TABLE project_interests ADD COLUMN IF NOT EXISTS template_copies JSONB NOT NULL DEFAULT '[]'::jsonb`);
@@ -8006,7 +8008,7 @@ app.get("/api/activities/:id/interests", async (req, res) => {
 
   try {
     const result = await pool.query(
-      "SELECT student_email, confirmed, standard_1, standard_2, evidence_steps FROM project_interests WHERE project_id = $1 ORDER BY created_at ASC",
+      "SELECT student_email, confirmed, standard_1, standard_2, digital_media_type, evidence_steps FROM project_interests WHERE project_id = $1 ORDER BY created_at ASC",
       [projectId]
     );
 
@@ -8065,6 +8067,7 @@ app.get("/api/activities/:id/interests", async (req, res) => {
           confirmed: Boolean(myAllocationRow.confirmed),
           standard_1: String(myAllocationRow.standard_1 || "").trim(),
           standard_2: String(myAllocationRow.standard_2 || "").trim(),
+          digital_media_type: String(myAllocationRow.digital_media_type || "").trim(),
           evidence_steps: normalizeEvidenceStepsPayload(myAllocationRow.evidence_steps)
         }
         : null,
@@ -8076,6 +8079,7 @@ app.get("/api/activities/:id/interests", async (req, res) => {
           confirmed: Boolean(r.confirmed),
           standard_1: String(r.standard_1 || "").trim(),
           standard_2: String(r.standard_2 || "").trim(),
+          digital_media_type: String(r.digital_media_type || "").trim(),
           evidence_steps: normalizeEvidenceStepsPayload(r.evidence_steps),
           source_projects: sourceProjectsByEmail.get(normalizeEmail(r.student_email || "")) || []
         }))
@@ -8157,6 +8161,7 @@ app.patch("/api/activities/:id/interests/:studentEmail/standards", requireActivi
   const studentEmail = normalizeEmail(req.params.studentEmail || "");
   const standard1 = String(req.body?.standard_1 || req.body?.standard1 || "").trim();
   const standard2 = String(req.body?.standard_2 || req.body?.standard2 || "").trim();
+  const digitalMediaType = String(req.body?.digital_media_type || req.body?.digitalMediaType || "").trim().slice(0, 80);
 
   if (!projectId || !studentEmail) {
     res.status(400).json({ error: "Project ID and student email are required" });
@@ -8164,16 +8169,16 @@ app.patch("/api/activities/:id/interests/:studentEmail/standards", requireActivi
   }
 
   if (!hasDatabase) {
-    res.json({ standard_1: standard1, standard_2: standard2 });
+    res.json({ standard_1: standard1, standard_2: standard2, digital_media_type: digitalMediaType });
     return;
   }
 
   try {
     await pool.query(
-      "UPDATE project_interests SET standard_1 = $1, standard_2 = $2 WHERE project_id = $3 AND student_email = $4",
-      [standard1 || null, standard2 || null, projectId, studentEmail]
+      "UPDATE project_interests SET standard_1 = $1, standard_2 = $2, digital_media_type = $3 WHERE project_id = $4 AND student_email = $5",
+      [standard1 || null, standard2 || null, digitalMediaType || null, projectId, studentEmail]
     );
-    res.json({ standard_1: standard1, standard_2: standard2 });
+    res.json({ standard_1: standard1, standard_2: standard2, digital_media_type: digitalMediaType });
   } catch (error) {
     res.status(500).json({ error: "Could not update standards" });
   }

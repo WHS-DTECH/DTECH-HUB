@@ -202,6 +202,17 @@ function renderStandardSelect(slot, currentValue, allowedStandards = []) {
     `;
 }
 
+function renderDigitalMediaTypeSelect(currentValue) {
+    const selectedValue = String(currentValue || "").trim();
+    const types = ["Image", "Video", "Audio", "Web", "Mixed"];
+    return `
+        <select class="alloc-standard-select" data-digital-media-type aria-label="Digital Media type">
+            <option value="">Digital Media type</option>
+            ${types.map((type) => `<option value="${escapeHtml(type)}"${type === selectedValue ? " selected" : ""}>${escapeHtml(type)}</option>`).join("")}
+        </select>
+    `;
+}
+
 function parseStudentName(studentName) {
     const raw = String(studentName || "").trim();
     if (!raw) {
@@ -350,6 +361,7 @@ function buildProjectBlock(project, email) {
                             <div class="alloc-standard-headings">
                                 <span>Process std</span>
                                 <span>Project/Task std</span>
+                                <span>Digital Media</span>
                             </div>
                         </th>
                         <th>Status</th>
@@ -382,6 +394,7 @@ function buildStudentRow(student, projectName = "") {
     const subjectStrand = formatStudentStrand(student.subject_strands);
     const standard1 = normalizeStandardValue(student.standard_1) || resolveClientProjectStandard(projectName, student);
     const standard2 = normalizeStandardValue(student.standard_2);
+    const digitalMediaType = String(student.digital_media_type || "").trim();
     const courseGuidance = resolveStudentCourseGuidance(student);
 
     return `
@@ -394,6 +407,7 @@ function buildStudentRow(student, projectName = "") {
                 <div class="alloc-standards-cell">
                     ${renderStandardSelect("1", standard1, courseGuidance.standards)}
                     ${renderStandardSelect("2", standard2, courseGuidance.standards)}
+                    ${renderDigitalMediaTypeSelect(digitalMediaType)}
                     <button type="button" class="alloc-btn alloc-btn-unconfirm" data-action="save-standards">Save</button>
                 </div>
             </td>
@@ -441,7 +455,8 @@ async function propagateProcessStandardToOtherProjects(studentEmail, processStan
                     headers,
                     body: JSON.stringify({
                         standard_1: processStandard,
-                        standard_2: normalizeStandardValue(targetRow.querySelector('[data-standard-slot="2"]')?.value || "")
+                        standard_2: normalizeStandardValue(targetRow.querySelector('[data-standard-slot="2"]')?.value || ""),
+                        digital_media_type: String(targetRow.querySelector("[data-digital-media-type]")?.value || "").trim()
                     })
                 }
             );
@@ -484,7 +499,8 @@ async function propagateProjectTaskStandardToProcessAssessment(studentEmail, pro
                     headers,
                     body: JSON.stringify({
                         standard_1: normalizeStandardValue(targetRow.querySelector('[data-standard-slot="1"]')?.value || ""),
-                        standard_2: projectTaskStandard
+                        standard_2: projectTaskStandard,
+                        digital_media_type: String(targetRow.querySelector("[data-digital-media-type]")?.value || "").trim()
                     })
                 }
             );
@@ -525,13 +541,14 @@ async function handleAllocationAction(btn, projectId, email) {
         } else if (action === "save-standards") {
             const standard1 = normalizeStandardValue(row.querySelector('[data-standard-slot="1"]')?.value || "");
             const standard2 = normalizeStandardValue(row.querySelector('[data-standard-slot="2"]')?.value || "");
+            const digitalMediaType = String(row.querySelector("[data-digital-media-type]")?.value || "").trim();
 
             const resp = await fetch(
                 `/api/activities/${encodeURIComponent(projectId)}/interests/${encodeURIComponent(studentEmail)}/standards`,
                 {
                     method: "PATCH",
                     headers,
-                    body: JSON.stringify({ standard_1: standard1, standard_2: standard2 })
+                    body: JSON.stringify({ standard_1: standard1, standard_2: standard2, digital_media_type: digitalMediaType })
                 }
             );
 
@@ -726,6 +743,7 @@ async function loadAllocations() {
                             created_at: student.created_at || "",
                             standard_1: normalizeStandardValue(student.standard_1),
                             standard_2: normalizeStandardValue(student.standard_2),
+                            digital_media_type: String(student.digital_media_type || "").trim(),
                             year_group: (() => {
                                 const studentEmail = String(student.email || student.student_email || "").trim().toLowerCase();
                                 const local = getEmailLocalPart(studentEmail);
@@ -770,7 +788,7 @@ async function loadAllocations() {
                 {
                     method: "PATCH",
                     headers: allocWithAuthHeaders({ "Content-Type": "application/json" }, email),
-                    body: JSON.stringify({ standard_1: guidedStandard, standard_2: normalizeStandardValue(student.standard_2) })
+                    body: JSON.stringify({ standard_1: guidedStandard, standard_2: normalizeStandardValue(student.standard_2), digital_media_type: String(student.digital_media_type || "").trim() })
                 }
             );
             if (response.ok) {
@@ -800,7 +818,7 @@ async function loadAllocations() {
                             {
                                 method: "PATCH",
                                 headers: allocWithAuthHeaders({ "Content-Type": "application/json" }, email),
-                                body: JSON.stringify({ standard_1: processStandard, standard_2: normalizeStandardValue(student.standard_2) })
+                                body: JSON.stringify({ standard_1: processStandard, standard_2: normalizeStandardValue(student.standard_2), digital_media_type: String(student.digital_media_type || "").trim() })
                             }
                         );
                         if (response.ok) {
@@ -836,7 +854,7 @@ async function loadAllocations() {
                         {
                             method: "PATCH",
                             headers: allocWithAuthHeaders({ "Content-Type": "application/json" }, email),
-                            body: JSON.stringify({ standard_1: normalizeStandardValue(student.standard_1), standard_2: projectTaskStandard })
+                            body: JSON.stringify({ standard_1: normalizeStandardValue(student.standard_1), standard_2: projectTaskStandard, digital_media_type: String(student.digital_media_type || "").trim() })
                         }
                     );
                     if (response.ok) {
