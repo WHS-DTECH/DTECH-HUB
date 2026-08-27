@@ -4880,6 +4880,8 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             || keywordMatchedTopicKey === "testing-functions";
         const isRelevantDigiMedConventionsTopic = isDigitalOutcomeRelevantDigiMedConventionsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
             || keywordMatchedTopicKey === "relevant-digimed-conventions";
+        const isUXPrinciplesTopic = isDigitalOutcomeUXPrinciplesCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
+            || keywordMatchedTopicKey === "user-experience-principles";
         const isSuccessCriteriaTopic = isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
             || keywordMatchedTopicKey === "success-criteria";
         const isRelevantImplicationsTopic = isDigitalOutcomeRelevantImplicationsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
@@ -4894,9 +4896,11 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                         ? DIGITAL_OUTCOME_TRIALLING_COMPONENTS_TITLE
                     : (isRelevantDigiMedConventionsTopic
                         ? DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE
+                    : (isUXPrinciplesTopic
+                        ? DIGITAL_OUTCOME_UX_PRINCIPLES_TITLE
                     : (isSuccessCriteriaTopic
                         ? DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE
-                        : (isRelevantImplicationsTopic ? DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE : "Digital Outcome: Description"))))));
+                        : (isRelevantImplicationsTopic ? DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE : "Digital Outcome: Description")))))));
         const syncTemplateId = isTargetAudienceTopic
             ? "target-audience"
             : (isToolsAndTechniquesSyncTopic
@@ -4909,9 +4913,11 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                             ? "testing-functions"
                             : (isRelevantDigiMedConventionsTopic
                                 ? "relevant-digimed-conventions"
-                                : (isSuccessCriteriaTopic
+                                : (isUXPrinciplesTopic
+                                    ? "user-experience-principles"
+                                    : (isSuccessCriteriaTopic
                         ? "project-success-criteria"
-                                : (isRelevantImplicationsTopic ? "relevant-implications" : "digital-outcome-description")))))));
+                                : (isRelevantImplicationsTopic ? "relevant-implications" : "digital-outcome-description"))))))));
         const allowFolderMatchAutoLink = syncTemplateId === "digital-outcome-description"
             || syncTemplateId === "target-audience"
             || syncTemplateId === "development-steps"
