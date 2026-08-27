@@ -72,6 +72,27 @@
       padding: 12px 16px;
       background: #eef3fa;
       border-bottom: 1px solid #ccd6e5;
+      cursor: pointer;
+      list-style: none;
+    }
+
+    .alloc-project-header::-webkit-details-marker {
+      display: none;
+    }
+
+    .alloc-project-header::before {
+      content: "+";
+      color: #2f74b9;
+      font-size: 1.1rem;
+      font-weight: 800;
+    }
+
+    .alloc-project-block[open] > .alloc-project-header::before {
+      content: "-";
+    }
+
+    .alloc-project-block:not([open]) > .alloc-project-header {
+      border-bottom: 0;
     }
 
     .alloc-project-title {

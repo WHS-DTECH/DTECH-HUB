@@ -325,7 +325,7 @@ function buildStudentRows(project) {
 }
 
 function buildProjectBlock(project, email) {
-    const block = document.createElement("div");
+    const block = document.createElement("details");
     block.className = "alloc-project-block";
     block.dataset.projectId = project.project_id;
     block.dataset.projectName = project.project_name;
@@ -340,7 +340,7 @@ function buildProjectBlock(project, email) {
         : project.project_name;
 
     block.innerHTML = `
-        <header class="alloc-project-header">
+        <summary class="alloc-project-header">
             <div>
                 <h2 class="alloc-project-title">${escapeHtml(displayName)}</h2>
                 <a class="alloc-project-link" href="${escapeHtml(project.detail_url)}">View Task &rarr;</a>
@@ -353,7 +353,7 @@ function buildProjectBlock(project, email) {
                 <span><strong>${totalCount}</strong> interested</span>
                 <span><strong>${confirmedCount}</strong> confirmed</span>
             </div>
-        </header>
+        </summary>
         <div class="alloc-table-wrap">
             <table class="alloc-table">
                 <thead>
