@@ -881,10 +881,60 @@ async function loadAllocations() {
     }
 }
 
+async function saveAllAllocations() {
+    const button = document.querySelector("#alloc-save-all");
+    const email = allocGetStoredEmail();
+    const rows = Array.from(document.querySelectorAll(".alloc-project-block tr[data-student]"));
+    if (!email || !rows.length) return;
+
+    button.disabled = true;
+    button.textContent = "Saving...";
+    setAllocStatus(`Saving ${rows.length} allocation${rows.length === 1 ? "" : "s"}...`);
+
+    const headers = allocWithAuthHeaders({ "Content-Type": "application/json" }, email);
+    const results = await Promise.all(rows.map(async (row) => {
+        const projectId = String(row.closest(".alloc-project-block")?.dataset.projectId || "").trim();
+        const studentEmail = String(row.getAttribute("data-student") || "").trim();
+        if (!projectId || !studentEmail) return false;
+
+        try {
+            const response = await fetch(
+                `/api/activities/${encodeURIComponent(projectId)}/interests/${encodeURIComponent(studentEmail)}/standards`,
+                {
+                    method: "PATCH",
+                    headers,
+                    body: JSON.stringify({
+                        standard_1: normalizeStandardValue(row.querySelector('[data-standard-slot="1"]')?.value || ""),
+                        standard_2: normalizeStandardValue(row.querySelector('[data-standard-slot="2"]')?.value || ""),
+                        digital_media_type: String(row.querySelector("[data-digital-media-type]")?.value || "").trim()
+                    })
+                }
+            );
+            return response.ok;
+        } catch (_error) {
+            return false;
+        }
+    }));
+
+    const savedCount = results.filter(Boolean).length;
+    if (savedCount === rows.length) {
+        setAllocStatus(`Saved all ${savedCount} allocations.`);
+        await loadAllocations();
+    } else {
+        setAllocStatus(`Saved ${savedCount} of ${rows.length} allocations. Please try Save All again for the remaining rows.`, true);
+    }
+
+    button.disabled = false;
+    button.textContent = "Save All";
+}
+
 async function init() {
     const allowed = await allocEnforceAccess();
     if (!allowed) return;
     await loadAllocations();
+    document.querySelector("#alloc-save-all")?.addEventListener("click", () => {
+        void saveAllAllocations();
+    });
 }
 
 init();
