@@ -1010,6 +1010,73 @@ function findStudentTrelloBoardUrl(stateMap) {
     return fallbackUrl;
 }
 
+function findStudentGithubRepoUrl(stateMap) {
+    for (const steps of Object.values(stateMap || {})) {
+        for (const step of (Array.isArray(steps) ? steps : [])) {
+            const text = String(step?.text || "").trim();
+            if (!text) continue;
+
+            if (text.startsWith("GITHUB_REPO_URL|")) {
+                const url = text.slice("GITHUB_REPO_URL|".length).trim();
+                if (url) return url;
+            } else {
+                const match = text.match(/https?:\/\/(?:www\.)?github\.com\/[^\s/]+\/[^\s/]+/i);
+                if (match?.[0]) return match[0];
+            }
+        }
+    }
+
+    return "";
+}
+
+function getGithubRepoAnalysisKey(activityId, email) {
+    return `hub_github_repo_analysis_v1:${String(activityId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
+}
+
+function readGithubRepoAnalysis(activityId, email) {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(getGithubRepoAnalysisKey(activityId, email)) || "{}");
+        return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (_error) {
+        return {};
+    }
+}
+
+function writeGithubRepoAnalysis(activityId, email, value) {
+    try {
+        localStorage.setItem(getGithubRepoAnalysisKey(activityId, email), JSON.stringify(value || {}));
+    } catch (_error) {
+    }
+}
+
+async function runGithubEfficientToolsSync(activityId, email, repoUrl) {
+    const payload = await loadJson(
+        `/api/integrations/github/repo-analysis?repo_url=${encodeURIComponent(repoUrl)}`,
+        { headers: buildTaskListHeaders({}) }
+    );
+
+    const efficientToolsState = readDigiMedEfficientToolsState(activityId, email);
+    (Array.isArray(payload?.categories) ? payload.categories : []).forEach((category) => {
+        const label = String(category?.label || "").trim();
+        if (!label) return;
+        if (category.done) {
+            efficientToolsState[label] = true;
+        }
+    });
+    writeDigiMedEfficientToolsState(activityId, email, efficientToolsState);
+
+    writeGithubRepoAnalysis(activityId, email, {
+        repoUrl,
+        commitCount: Number(payload?.commit_count || 0),
+        commitDayCount: Number(payload?.commit_day_count || 0),
+        fileCount: Number(payload?.file_count || 0),
+        syncedAt: new Date().toISOString()
+    });
+
+    return payload;
+}
+
+
 // Counts come from the database first; local storage is only a fallback for an offline/not-yet-synced student.
 function readDecompositionCategoryCoverage(activityId, email) {
     const toCounts = (rows) => {
@@ -1940,6 +2007,7 @@ function renderChecklistCards(detail, allItems) {
             const levels = ["Achieved", "Merit", "Excellence"];
             const decompositionCoverage = readDecompositionCategoryCoverage(taskListState.selectedId, getTaskListEmail());
             const efficientToolsState = readDigiMedEfficientToolsState(taskListState.selectedId, getTaskListEmail());
+            const githubRepoAnalysis = readGithubRepoAnalysis(taskListState.selectedId, getTaskListEmail());
             const toolsTechniquesState = readDigiMedToolsTechniquesState(taskListState.selectedId, getTaskListEmail());
             const toolsTechniquesSubtasksList = String(standard) === "91903" ? DIGIMED_L3_TOOLS_TECHNIQUES_SUBTASKS : DIGIMED_TOOLS_TECHNIQUES_SUBTASKS;
             return `
@@ -2008,6 +2076,9 @@ function renderChecklistCards(detail, allItems) {
                                                     </label>
                                                 `).join("")}
                                             </div>
+                                            ${githubRepoAnalysis?.syncedAt
+                                                ? `<p class="task-list-achieved-note">GitHub last synced: ${escapeTaskListHtml(formatTaskListTimestamp(githubRepoAnalysis.syncedAt))} (${Number(githubRepoAnalysis.commitCount || 0)} commits across ${Number(githubRepoAnalysis.commitDayCount || 0)} day${Number(githubRepoAnalysis.commitDayCount || 0) === 1 ? "" : "s"})</p>`
+                                                : `<p class="task-list-achieved-note">Click Sync from GitHub above to auto-check these boxes from your public repo.</p>`}
                                         </div>
                                     ` : ""}
                                     ${is91893IntegrityTestingRow ? `
@@ -2550,6 +2621,18 @@ async function loadChecklistForTask(taskId) {
         }
     });
 
+    const githubRepoUrlForAutoSync = findStudentGithubRepoUrl(taskListState.fullEvidenceState)
+        || findStudentGithubRepoUrl(taskListState.checklistState);
+    if (githubRepoUrlForAutoSync && signedInEmail) {
+        void runGithubEfficientToolsSync(taskListState.selectedId, signedInEmail, githubRepoUrlForAutoSync)
+            .then(() => {
+                renderChecklistCards(detail || selected, taskListState.allItems);
+            })
+            .catch(() => {
+                // Silent on auto-sync; the manual "Sync from GitHub" button will surface the error.
+            });
+    }
+
     const openLink = document.querySelector("#task-list-open-topic");
     if (openLink) {
         openLink.setAttribute("href", buildCustomActivityLink(taskListState.selectedId, taskListState.taskTopic));
@@ -2682,6 +2765,38 @@ async function renderTaskListPage() {
         } finally {
             const btn = document.querySelector("#task-list-sync-trello");
             if (btn) { btn.disabled = false; btn.textContent = "\u21bb Sync from Trello"; }
+        }
+    });
+
+    document.addEventListener("click", async (event) => {
+        const githubBtn = event.target?.closest?.("#task-list-sync-github");
+        if (!githubBtn || !taskListState.selectedId) return;
+
+        const email = getTaskListEmail();
+        if (!email) {
+            setStatus("Sign in before syncing from GitHub.", true);
+            return;
+        }
+
+        const repoUrl = findStudentGithubRepoUrl(taskListState.fullEvidenceState)
+            || findStudentGithubRepoUrl(taskListState.checklistState);
+        if (!repoUrl) {
+            setStatus("Save your public GitHub repository link on the Version Control: GitHub page first.", true);
+            return;
+        }
+
+        githubBtn.disabled = true;
+        githubBtn.textContent = "Syncing GitHub\u2026";
+
+        try {
+            const payload = await runGithubEfficientToolsSync(taskListState.selectedId, email, repoUrl);
+            setStatus(`GitHub sync complete. Checked ${Number(payload?.file_count || 0)} file(s) across ${Number(payload?.commit_count || 0)} commit(s).`);
+            renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);
+        } catch (error) {
+            setStatus(error?.message || "Could not sync from GitHub.", true);
+        } finally {
+            const btn = document.querySelector("#task-list-sync-github");
+            if (btn) { btn.disabled = false; btn.textContent = "\u21bb Sync from GitHub"; }
         }
     });
 

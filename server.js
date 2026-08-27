@@ -11249,6 +11249,198 @@ app.post("/api/integrations/trello/work-log", async (req, res) => {
   }
 });
 
+const GITHUB_TOKEN = String(process.env.GITHUB_TOKEN || "").trim();
+const GITHUB_RAW_CONTENT_BASE = "https://raw.githubusercontent.com";
+const GITHUB_EFFICIENT_TOOLS_MAX_VALIDATED_FILES = 3;
+const GITHUB_ASSET_FOLDER_NAMES = new Set(["images", "img", "assets", "css", "styles", "js", "scripts", "media"]);
+const GITHUB_IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"]);
+const GITHUB_OPTIMISED_IMAGE_MAX_BYTES = 500 * 1024;
+
+function parseGithubRepoIdentifier(repoUrl) {
+  const raw = String(repoUrl || "").trim();
+  if (!raw) return null;
+  const match = raw.match(/github\.com\/([^/\s]+)\/([^/\s#?]+)/i);
+  if (!match) return null;
+  return {
+    owner: String(match[1] || "").trim(),
+    repo: String(match[2] || "").trim().replace(/\.git$/i, "")
+  };
+}
+
+async function githubApiRequest(pathname, query = {}) {
+  const params = new URLSearchParams(query || {});
+  const suffix = params.toString();
+  const url = `https://api.github.com${pathname}${suffix ? `?${suffix}` : ""}`;
+  const headers = {
+    Accept: "application/vnd.github+json",
+    "User-Agent": "DTECH-HUB"
+  };
+  if (GITHUB_TOKEN) {
+    headers.Authorization = `Bearer ${GITHUB_TOKEN}`;
+  }
+
+  const response = await fetch(url, { headers });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = String(payload?.message || `GitHub request failed (${response.status}).`);
+    const error = new Error(message);
+    error.status = response.status === 404 ? 404 : (response.status === 403 ? 429 : response.status);
+    throw error;
+  }
+  return payload;
+}
+
+function computeGithubEfficientToolsCategories(treeItems, imageStats) {
+  const paths = (Array.isArray(treeItems) ? treeItems : [])
+    .filter((item) => item?.type === "blob")
+    .map((item) => String(item?.path || "").trim())
+    .filter(Boolean);
+
+  const topLevelFolders = new Set(
+    paths
+      .filter((filePath) => filePath.includes("/"))
+      .map((filePath) => filePath.split("/")[0].toLowerCase())
+  );
+  const hasOrganisedAssetFolders = Array.from(topLevelFolders).some((folder) => GITHUB_ASSET_FOLDER_NAMES.has(folder));
+
+  const cssFiles = paths.filter((filePath) => /\.css$/i.test(filePath));
+  const htmlFiles = paths.filter((filePath) => /\.html?$/i.test(filePath));
+
+  return {
+    htmlFiles,
+    cssFiles,
+    categories: [
+      { label: "Management of assets", done: hasOrganisedAssetFolders },
+      { label: "Using stylesheets", done: cssFiles.length > 0 },
+      { label: "Master pages or student developed templates", done: htmlFiles.length >= 2 && cssFiles.length > 0 },
+      { label: "Reusing objects, styles and/or frames", done: cssFiles.length > 0 && htmlFiles.length >= 2 },
+      {
+        label: "Optimisation of media assets",
+        done: imageStats.count > 0 && imageStats.maxBytes > 0 && imageStats.maxBytes <= GITHUB_OPTIMISED_IMAGE_MAX_BYTES
+      }
+    ]
+  };
+}
+
+function extractImageStatsFromTree(treeItems) {
+  let count = 0;
+  let maxBytes = 0;
+  (Array.isArray(treeItems) ? treeItems : []).forEach((item) => {
+    if (item?.type !== "blob") return;
+    const filePath = String(item?.path || "").toLowerCase();
+    const extMatch = filePath.match(/\.[a-z0-9]+$/);
+    if (!extMatch || !GITHUB_IMAGE_EXTENSIONS.has(extMatch[0])) return;
+    count += 1;
+    const size = Number(item?.size || 0);
+    if (Number.isFinite(size) && size > maxBytes) {
+      maxBytes = size;
+    }
+  });
+  return { count, maxBytes };
+}
+
+async function validateRawFileViaW3C(rawUrl, type) {
+  try {
+    const validatorUrl = type === "css"
+      ? `https://jigsaw.w3.org/css-validator/validator?uri=${encodeURIComponent(rawUrl)}&output=json`
+      : `https://validator.w3.org/nu/?doc=${encodeURIComponent(rawUrl)}&out=json`;
+    const response = await fetch(validatorUrl, { headers: { "User-Agent": "DTECH-HUB" } });
+    if (!response.ok) return { checked: false, passed: false, errorCount: 0 };
+
+    const payload = await response.json().catch(() => null);
+    if (!payload) return { checked: false, passed: false, errorCount: 0 };
+
+    if (type === "css") {
+      const errorCount = Number(payload?.cssvalidation?.errors?.length || 0);
+      return { checked: true, passed: errorCount === 0, errorCount };
+    }
+
+    const messages = Array.isArray(payload?.messages) ? payload.messages : [];
+    const errorCount = messages.filter((message) => String(message?.type || "").toLowerCase() === "error").length;
+    return { checked: true, passed: errorCount === 0, errorCount };
+  } catch (_error) {
+    return { checked: false, passed: false, errorCount: 0 };
+  }
+}
+
+// Public-repo-only analysis: no OAuth required, just the repo's public tree/commit/file data.
+app.get("/api/integrations/github/repo-analysis", async (req, res) => {
+  const repoUrl = String(req.query?.repo_url || req.query?.repoUrl || "").trim();
+  const identifier = parseGithubRepoIdentifier(repoUrl);
+  if (!identifier?.owner || !identifier?.repo) {
+    res.status(400).json({ error: "A valid public GitHub repository URL is required." });
+    return;
+  }
+
+  try {
+    const repoInfo = await githubApiRequest(`/repos/${encodeURIComponent(identifier.owner)}/${encodeURIComponent(identifier.repo)}`);
+    const defaultBranch = String(repoInfo?.default_branch || "main").trim();
+
+    const treePayload = await githubApiRequest(
+      `/repos/${encodeURIComponent(identifier.owner)}/${encodeURIComponent(identifier.repo)}/git/trees/${encodeURIComponent(defaultBranch)}`,
+      { recursive: "1" }
+    );
+    const treeItems = Array.isArray(treePayload?.tree) ? treePayload.tree : [];
+
+    let commitDays = new Set();
+    let commitCount = 0;
+    try {
+      const commits = await githubApiRequest(
+        `/repos/${encodeURIComponent(identifier.owner)}/${encodeURIComponent(identifier.repo)}/commits`,
+        { per_page: "100" }
+      );
+      const commitRows = Array.isArray(commits) ? commits : [];
+      commitCount = commitRows.length;
+      commitRows.forEach((commit) => {
+        const dateStr = String(commit?.commit?.author?.date || commit?.commit?.committer?.date || "").trim();
+        const day = dateStr.slice(0, 10);
+        if (day) commitDays.add(day);
+      });
+    } catch (_commitsError) {
+      // Commit history is a bonus signal only; do not fail the whole sync if it can't be read.
+    }
+
+    const imageStats = extractImageStatsFromTree(treeItems);
+    const { htmlFiles, cssFiles, categories } = computeGithubEfficientToolsCategories(treeItems, imageStats);
+
+    const filesToValidate = [
+      ...htmlFiles.slice(0, GITHUB_EFFICIENT_TOOLS_MAX_VALIDATED_FILES).map((filePath) => ({ filePath, type: "html" })),
+      ...cssFiles.slice(0, GITHUB_EFFICIENT_TOOLS_MAX_VALIDATED_FILES).map((filePath) => ({ filePath, type: "css" }))
+    ];
+
+    const validationResults = await Promise.all(filesToValidate.map(async ({ filePath, type }) => {
+      const rawUrl = `${GITHUB_RAW_CONTENT_BASE}/${identifier.owner}/${identifier.repo}/${defaultBranch}/${filePath}`;
+      const result = await validateRawFileViaW3C(rawUrl, type);
+      return { filePath, type, ...result };
+    }));
+
+    const anyValidationPassed = validationResults.some((row) => row.checked && row.passed);
+    categories.push({ label: "HTML/CSS validation procedures", done: anyValidationPassed });
+
+    res.json({
+      ok: true,
+      owner: identifier.owner,
+      repo: identifier.repo,
+      default_branch: defaultBranch,
+      file_count: treeItems.filter((item) => item?.type === "blob").length,
+      html_count: htmlFiles.length,
+      css_count: cssFiles.length,
+      image_count: imageStats.count,
+      commit_count: commitCount,
+      commit_day_count: commitDays.size,
+      categories,
+      validation: validationResults
+    });
+  } catch (error) {
+    const status = Number(error?.status) || 500;
+    res.status(status).json({
+      error: status === 404
+        ? "Could not find that GitHub repository. Make sure it is public and the link is correct."
+        : (error.message || "Could not analyse the GitHub repository.")
+    });
+  }
+});
+
 app.get("/api/admin/user-roles", async (_req, res) => {
   if (!hasDatabase) {
     res.json(Array.from(memoryUserRoles.values()));
