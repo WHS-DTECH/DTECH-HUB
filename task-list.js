@@ -2640,12 +2640,27 @@ async function renderTaskListPage() {
             taskListState.fullEvidenceState[standard][index].done = Boolean(checkbox.checked);
         }
 
+        // Ticking "Applying appropriate data integrity and testing procedures" (Markup Validation) auto-ticks the
+        // "HTML/CSS validation procedures" Efficient Tools subtask, shared across 91893 and 91903.
+        let autoTickedHtmlCssValidation = false;
+        const isDataIntegrityTestingRow = /applying appropriate data integrity and testing procedures/i.test(stepText);
+        if (isDataIntegrityTestingRow && checkbox.checked && (standard === "91893" || standard === "91903")) {
+            const activityId = taskListState.selectedId;
+            const email = getTaskListEmail();
+            const efficientToolsState = readDigiMedEfficientToolsState(activityId, email);
+            if (!efficientToolsState["HTML/CSS validation procedures"]) {
+                efficientToolsState["HTML/CSS validation procedures"] = true;
+                writeDigiMedEfficientToolsState(activityId, email, efficientToolsState);
+                autoTickedHtmlCssValidation = true;
+            }
+        }
+
         const relevantImplicationsChecklistChanged = autoTickRelevantImplicationsRequirements(taskListState.checklistState, taskListState.selectedId, getTaskListEmail());
         const relevantImplicationsEvidenceChanged = autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, taskListState.selectedId, getTaskListEmail());
         const synced91893ChecklistChanged = sync91893RelevantImplicationsState(taskListState.checklistState);
         const synced91893EvidenceChanged = sync91893RelevantImplicationsState(taskListState.fullEvidenceState);
 
-        if (relevantImplicationsChecklistChanged || relevantImplicationsEvidenceChanged || synced91893ChecklistChanged || synced91893EvidenceChanged) {
+        if (relevantImplicationsChecklistChanged || relevantImplicationsEvidenceChanged || synced91893ChecklistChanged || synced91893EvidenceChanged || autoTickedHtmlCssValidation) {
             renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);
         }
 
