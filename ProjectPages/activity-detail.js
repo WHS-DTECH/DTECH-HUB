@@ -9678,6 +9678,21 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         });
     }
 
+    // Topics without a dedicated static hero image (e.g. teacher-managed templates like Conventions/UX Principles)
+    // fetch their live Template Library thumbnail here, so both teacher and student views show the real synced slide.
+    if (useDigitalOutcomeTemplateHero) {
+        const topicsWithDedicatedHeroImage = new Set(["target-audience", "tools-and-techniques", "relevant-implications", "description"]);
+        if (!topicsWithDedicatedHeroImage.has(digitalOutcomeTopicKey)) {
+            fetchTemplateLibraryPreviewByTemplateId(preferredTemplateId)
+                .then((canonicalPreviewUrl) => {
+                    if (canonicalPreviewUrl) {
+                        updateTaskTopicTemplateHeroPreview(host, canonicalPreviewUrl, displayTitle, canonicalPreviewUrl);
+                    }
+                })
+                .catch(() => {});
+        }
+    }
+
     const syncSlidesBtn = host.querySelector("#task-topic-sync-slides-btn");
     if (syncSlidesBtn && isTaskTopicView && useDigitalOutcomeTemplateHero) {
         syncSlidesBtn.addEventListener("click", async () => {
@@ -9697,6 +9712,10 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 || keywordMatchedTopicKey === "success-criteria";
             const isRelevantImplicationsTopic = isDigitalOutcomeRelevantImplicationsCriterion(taskTopicTitle, resolvedTaskShortName)
                 || keywordMatchedTopicKey === "relevant-implications";
+            const isRelevantDigiMedConventionsTopic = isDigitalOutcomeRelevantDigiMedConventionsCriterion(taskTopicTitle, resolvedTaskShortName)
+                || keywordMatchedTopicKey === "relevant-digimed-conventions";
+            const isUXPrinciplesTopic = isDigitalOutcomeUXPrinciplesCriterion(taskTopicTitle, resolvedTaskShortName)
+                || keywordMatchedTopicKey === "user-experience-principles";
 
             const syncTemplateId = isTargetAudienceTopic
                 ? "target-audience"
@@ -9706,13 +9725,19 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                         ? "development-steps"
                         : (isSuccessCriteriaTopic
                             ? "project-success-criteria"
-                            : (isRelevantImplicationsTopic ? "relevant-implications" : "digital-outcome-description"))));
+                            : (isRelevantImplicationsTopic
+                                ? "relevant-implications"
+                                : (isRelevantDigiMedConventionsTopic
+                                    ? "relevant-digimed-conventions"
+                                    : (isUXPrinciplesTopic ? "user-experience-principles" : "digital-outcome-description"))))));
             const syncTopicLabels = {
                 "target-audience": DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE,
                 "trialling-components": DIGITAL_OUTCOME_TRIALLING_COMPONENTS_TITLE,
                 "development-steps": DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE,
                 "project-success-criteria": DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE,
                 "relevant-implications": DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE,
+                "relevant-digimed-conventions": DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE,
+                "user-experience-principles": DIGITAL_OUTCOME_UX_PRINCIPLES_TITLE,
                 "digital-outcome-description": "Digital Outcome: Description"
             };
             const syncTopicLabel = syncTopicLabels[syncTemplateId] || "Digital Outcome: Description";
