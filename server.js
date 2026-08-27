@@ -11502,6 +11502,49 @@ function buildCssHealthDetails(cssContents, htmlContents) {
   };
 }
 
+function extractHtmlAssetPaths(content, extensionPattern) {
+  const paths = new Set();
+  const pattern = /(?:src|href)\s*=\s*["']([^"'#?]+)["']/gi;
+  let match;
+  while ((match = pattern.exec(String(content || ""))) !== null) {
+    const filePath = String(match[1] || "").trim();
+    if (extensionPattern.test(filePath)) paths.add(filePath);
+  }
+  return paths;
+}
+
+function buildHtmlHealthDetails(htmlContents) {
+  const stylesheetCounts = new Map();
+  const scriptCounts = new Map();
+  const semanticElements = ["header", "nav", "main", "section", "footer"];
+  const usedSemanticElements = new Set();
+  let repeatedNavigationPages = 0;
+  let inlineStyles = 0;
+
+  htmlContents.forEach((content) => {
+    extractHtmlAssetPaths(content, /\.css$/i).forEach((filePath) => {
+      stylesheetCounts.set(filePath, (stylesheetCounts.get(filePath) || 0) + 1);
+    });
+    extractHtmlAssetPaths(content, /\.js$/i).forEach((filePath) => {
+      scriptCounts.set(filePath, (scriptCounts.get(filePath) || 0) + 1);
+    });
+    if (/<nav\b/i.test(content)) repeatedNavigationPages += 1;
+    inlineStyles += (String(content || "").match(/\sstyle\s*=\s*["']/gi) || []).length;
+    semanticElements.forEach((element) => {
+      if (new RegExp(`<${element}\\b`, "i").test(content)) usedSemanticElements.add(element);
+    });
+  });
+
+  return {
+    pages: htmlContents.length,
+    common_stylesheet: Array.from(stylesheetCounts.values()).some((count) => count >= 2),
+    common_javascript: Array.from(scriptCounts.values()).some((count) => count >= 2),
+    repeated_navigation_pages: repeatedNavigationPages,
+    semantic_elements: semanticElements.filter((element) => usedSemanticElements.has(element)),
+    inline_styles: inlineStyles
+  };
+}
+
 // Public-repo-only: counts files by type, flags oversized images, and cross-references
 // HTML/CSS/JS files against the tree to find unused images and broken local links.
 app.get("/api/integrations/github/asset-health", async (req, res) => {
@@ -11590,6 +11633,7 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
       broken_reference_count: brokenReferences.length,
       broken_references: brokenReferences.slice(0, 50),
       css_details: buildCssHealthDetails(cssContents, htmlContents),
+      html_details: buildHtmlHealthDetails(htmlContents),
       scanned_file_count: filesToScan.length
     });
   } catch (error) {

@@ -84,6 +84,26 @@ function renderCssDetails(details) {
     `;
 }
 
+function renderHtmlDetails(details) {
+    const values = details || {};
+    const semanticElements = Array.isArray(values.semantic_elements) && values.semantic_elements.length
+        ? values.semantic_elements.join(" / ")
+        : "None detected";
+    return `
+        <section class="asset-manager-detail-panel" id="asset-manager-html-details" hidden>
+            <h3>HTML Details</h3>
+            <dl class="asset-manager-detail-list">
+                <div><dt>HTML pages</dt><dd>${Number(values.pages || 0)}</dd></div>
+                <div><dt>Common stylesheet</dt><dd>${values.common_stylesheet ? "Yes" : "No"}</dd></div>
+                <div><dt>Common JavaScript</dt><dd>${values.common_javascript ? "Yes" : "No"}</dd></div>
+                <div><dt>Repeated navigation detected</dt><dd>${Number(values.repeated_navigation_pages || 0)} pages</dd></div>
+                <div><dt>Semantic elements used</dt><dd>${escapeAssetManagerHtml(semanticElements)}</dd></div>
+                <div><dt>Inline CSS</dt><dd>${Number(values.inline_styles || 0)}</dd></div>
+            </dl>
+        </section>
+    `;
+}
+
 function renderAssetManagerContent(payload) {
     const host = document.querySelector("#asset-manager-content");
     if (!host) return;
@@ -95,7 +115,7 @@ function renderAssetManagerContent(payload) {
 
     host.innerHTML = `
         <div class="asset-manager-counts-grid">
-            <div class="asset-manager-count-card"><span class="asset-manager-count-label">HTML</span><span class="asset-manager-count-value">${Number(counts.html || 0)}</span></div>
+            <button type="button" class="asset-manager-count-card asset-manager-count-card-button" id="asset-manager-html-details-toggle" aria-expanded="false" aria-controls="asset-manager-html-details"><span class="asset-manager-count-label">HTML</span><span class="asset-manager-count-value">${Number(counts.html || 0)}</span></button>
             <button type="button" class="asset-manager-count-card asset-manager-count-card-button" id="asset-manager-css-details-toggle" aria-expanded="false" aria-controls="asset-manager-css-details"><span class="asset-manager-count-label">CSS</span><span class="asset-manager-count-value">${Number(counts.css || 0)}</span></button>
             <div class="asset-manager-count-card"><span class="asset-manager-count-label">JavaScript</span><span class="asset-manager-count-value">${Number(counts.javascript || 0)}</span></div>
             <div class="asset-manager-count-card"><span class="asset-manager-count-label">Images</span><span class="asset-manager-count-value">${Number(counts.images || 0)}</span></div>
@@ -113,8 +133,17 @@ function renderAssetManagerContent(payload) {
                 ${brokenCount > 0 ? `<ul class="asset-manager-check-list">${(payload?.broken_references || []).map((row) => `<li>${escapeAssetManagerHtml(row.from)} &rarr; ${escapeAssetManagerHtml(row.reference)}</li>`).join("")}</ul>` : ""}
             </div>
         </div>
+        ${renderHtmlDetails(payload?.html_details)}
         ${renderCssDetails({ ...payload?.css_details, stylesheets: counts.css })}
     `;
+
+    const htmlToggle = host.querySelector("#asset-manager-html-details-toggle");
+    const htmlDetails = host.querySelector("#asset-manager-html-details");
+    htmlToggle?.addEventListener("click", () => {
+        const isOpen = !htmlDetails.hidden;
+        htmlDetails.hidden = isOpen;
+        htmlToggle.setAttribute("aria-expanded", String(!isOpen));
+    });
 
     const cssToggle = host.querySelector("#asset-manager-css-details-toggle");
     const cssDetails = host.querySelector("#asset-manager-css-details");
