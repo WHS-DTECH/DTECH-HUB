@@ -93,7 +93,8 @@ function renderHtmlDetails(details) {
         <div class="asset-manager-detail-panel">
             <h3>HTML Details</h3>
             <dl class="asset-manager-detail-list">
-                <div><dt>HTML pages</dt><dd>${Number(values.pages || 0)}</dd></div>
+                <div><dt>Total HTML pages</dt><dd>${Number(values.total_pages || 0)}</dd></div>
+                <div><dt>HTML pages scanned</dt><dd>${Number(values.pages || 0)}</dd></div>
                 <div><dt>Common stylesheet</dt><dd>${values.common_stylesheet ? "Yes" : "No"}</dd></div>
                 <div><dt>Common JavaScript</dt><dd>${values.common_javascript ? "Yes" : "No"}</dd></div>
                 <div><dt>Repeated navigation detected</dt><dd>${Number(values.repeated_navigation_pages || 0)} pages</dd></div>
@@ -110,7 +111,8 @@ function renderJavascriptDetails(details) {
         <div class="asset-manager-detail-panel">
             <h3>JavaScript Details</h3>
             <dl class="asset-manager-detail-list">
-                <div><dt>JS files</dt><dd>${Number(values.files || 0)}</dd></div>
+                <div><dt>Total JS files</dt><dd>${Number(values.total_files || 0)}</dd></div>
+                <div><dt>JS files scanned</dt><dd>${Number(values.files || 0)}</dd></div>
                 <div><dt>Functions</dt><dd>${Number(values.functions || 0)}</dd></div>
                 <div><dt>Event listeners</dt><dd>${Number(values.event_listeners || 0)}</dd></div>
                 <div><dt>DOM access</dt><dd>${Number(values.dom_accesses || 0)}</dd></div>
@@ -152,9 +154,9 @@ function renderAssetManagerContent(payload) {
             <summary class="asset-manager-result-summary">${brokenCount > 0 ? `Broken Asset References: ${brokenCount}` : "No broken asset references"}</summary>
             ${brokenCount > 0 ? `<div class="asset-manager-result-body"><ul class="asset-manager-check-list">${(payload?.broken_references || []).map((row) => `<li>${escapeAssetManagerHtml(row.from)} &rarr; ${escapeAssetManagerHtml(row.reference)}</li>`).join("")}</ul></div>` : ""}
         </details>
-        <details class="asset-manager-result-section"><summary class="asset-manager-result-summary">HTML Details</summary><div class="asset-manager-result-body">${renderHtmlDetails(payload?.html_details)}</div></details>
+        <details class="asset-manager-result-section"><summary class="asset-manager-result-summary">HTML Details</summary><div class="asset-manager-result-body">${renderHtmlDetails({ ...payload?.html_details, total_pages: counts.html })}</div></details>
         <details class="asset-manager-result-section"><summary class="asset-manager-result-summary">CSS Details</summary><div class="asset-manager-result-body">${renderCssDetails({ ...payload?.css_details, stylesheets: counts.css })}</div></details>
-        <details class="asset-manager-result-section"><summary class="asset-manager-result-summary">JavaScript Details</summary><div class="asset-manager-result-body">${renderJavascriptDetails(payload?.javascript_details)}</div></details>
+        <details class="asset-manager-result-section"><summary class="asset-manager-result-summary">JavaScript Details</summary><div class="asset-manager-result-body">${renderJavascriptDetails({ ...payload?.javascript_details, total_files: counts.javascript })}</div></details>
     `;
 }
 
