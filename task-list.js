@@ -904,6 +904,47 @@ const DECOMPOSITION_TASK_CATEGORIES = [
     }
 ];
 
+// Keyword patterns must stay in step with the Decomposition page in ProjectPages/activity-detail.js.
+const PROJECT_MANAGEMENT_PROCESS_CATEGORIES = [
+    {
+        label: "Development",
+        pattern: /develop|build|implement|code|coding|program|script|create|add|feature|functionality|page|layout|design|html|css|javascript|step/i
+    },
+    {
+        label: "Feedback",
+        pattern: /feedback|review|comment|critique|suggestion|improve|iterat|revise|revision/i
+    },
+    {
+        label: "Collaborative (Client, Peer etc)",
+        pattern: /client|stakeholder|peer|collaborat|team|meeting|pair|group|end.?user|consult|interview|survey|brief|present|sign.?off|approval/i
+    }
+];
+
+function countProjectManagementProcessCategories(cards) {
+    const haystacks = (Array.isArray(cards) ? cards : [])
+        .map((card) => String(card?.name || "").trim())
+        .filter(Boolean);
+
+    return PROJECT_MANAGEMENT_PROCESS_CATEGORIES.map((category) => ({
+        label: category.label,
+        count: haystacks.filter((text) => category.pattern.test(text)).length
+    }));
+}
+
+function getProjectManagementProcessSubtasks() {
+    const activityId = taskListState.selectedId;
+    if (!activityId) return [];
+
+    const coverage = readDecompositionCategoryCoverage(activityId, getTaskListEmail());
+    return PROJECT_MANAGEMENT_PROCESS_CATEGORIES.map((category) => ({
+        label: category.label,
+        href: buildCustomActivityLink(activityId, "Project Management"),
+        trelloCount: Number(coverage.counts[category.label] || 0),
+        coverageKnown: coverage.hasData,
+        coverageSavedAt: coverage.savedAt
+    }));
+}
+
 function formatTaskListTimestamp(value) {
     const raw = String(value || "").trim();
     if (!raw) return "not yet";
@@ -2066,6 +2107,8 @@ function renderChecklistCards(detail, allItems) {
                                 && /using relevant conventions for the media type/i.test(stepText);
                             const isMultipleComponentsRow = String(level) === "Merit"
                                 && /^(?:effectively\s+)?trial(?:l?ing)?\s+multiple\s+components\s+and\/or\s+techniques\b/i.test(stepText);
+                            const isMeritDevFeedbackCollabRow = String(level) === "Merit"
+                                && /development,\s*feedback\s+and\/or\s+collaborative\s+processes/i.test(stepText);
                             const isInformationalRow = isInformationalCriteriaRow(String(standard), level, stepText);
                             const isSystemComplete = isProjectManagementRow
                                 && systemConnections.trelloConnected
@@ -2083,6 +2126,7 @@ function renderChecklistCards(detail, allItems) {
                             const projectManagementSubtasks = isProjectManagementRow ? getProjectManagementSubtasks(taskListState.fullEvidenceState) : [];
                             const testingFunctionsSubtasks = isTestingFunctionsRow ? getTestingFunctionsSubtasks(taskListState.fullEvidenceState) : [];
                             const digiMedConventionsSubtask = isDigiMedConventionsRow ? getDigiMedConventionsSubtask(taskListState.fullEvidenceState) : null;
+                            const devFeedbackCollabSubtasks = isMeritDevFeedbackCollabRow ? getProjectManagementProcessSubtasks() : [];
 
                             return `
                                 ${shouldRenderAchievedSectionHeading && achievedSectionMeta
@@ -2195,6 +2239,23 @@ function renderChecklistCards(detail, allItems) {
                                                     <span class="task-list-decomposition-category-count">${digiMedConventionsSubtask.count}</span>
                                                 </a>
                                             </div>
+                                        </div>
+                                    ` : ""}
+                                    ${isMeritDevFeedbackCollabRow ? `
+                                        <div class="task-list-decomposition-subtasks">
+                                            <p class="task-list-system-title">SUBTASKS</p>
+                                            <p class="task-list-achieved-note">Complete at least one task in each of the Development, Feedback and Collaborative categories.</p>
+                                            <div class="task-list-decomposition-category-list">
+                                                ${devFeedbackCollabSubtasks.map((subtask) => `
+                                                    <a class="task-list-decomposition-category ${subtask.trelloCount > 0 ? "is-covered" : ""}" href="${escapeTaskListHtml(subtask.href)}">
+                                                        <span class="task-list-decomposition-category-label">${escapeTaskListHtml(subtask.label)}</span>
+                                                        <span class="task-list-decomposition-category-count">${subtask.coverageKnown ? subtask.trelloCount : "-"}</span>
+                                                    </a>
+                                                `).join("")}
+                                            </div>
+                                            ${devFeedbackCollabSubtasks[0]?.coverageKnown
+                                                ? `<p class="task-list-achieved-note">Trello last synced: ${escapeTaskListHtml(formatTaskListTimestamp(devFeedbackCollabSubtasks[0]?.coverageSavedAt))}</p>`
+                                                : `<p class="task-list-achieved-note">Click Sync from Trello above to see these counts.</p>`}
                                         </div>
                                     ` : ""}
                                 </div>
@@ -2545,7 +2606,10 @@ async function renderTaskListPage() {
                 ...(Array.isArray(payload?.doing_cards) ? payload.doing_cards : []),
                 ...(Array.isArray(payload?.done_cards) ? payload.done_cards : [])
             ];
-            const categoryRows = countDecompositionTaskCategories(allCards);
+            const categoryRows = [
+                ...countDecompositionTaskCategories(allCards),
+                ...countProjectManagementProcessCategories(allCards)
+            ];
             writeDecompositionCategoryCoverage(taskListState.selectedId, email, categoryRows);
             await saveDecompositionCoverageToServer(taskListState.selectedId, categoryRows, allCards.length);
 
