@@ -7142,7 +7142,7 @@ async function renderToolsTechniquesPanel({ host, projectId, detailData, taskTop
         allAllocations = [
             ...(Array.isArray(allocPayload?.assessment_tasks) ? allocPayload.assessment_tasks : []),
             ...(Array.isArray(allocPayload?.projects) ? allocPayload.projects : [])
-        ].filter((a) => String(a?.id || "").trim());
+        ].filter((a) => String(a?.id || "").trim() && !/^client projects$/i.test(String(a?.name || a?.title || "").trim()));
     } catch (_error) {
         // Continue without project context if fetch fails
     }
