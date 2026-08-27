@@ -4730,6 +4730,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                                 ? `<a class="task-topic-teacher-status-trello" href="${escapeHtml(row.mediaReviewUrl)}" target="_blank" rel="noreferrer">Open Review Link</a>`
                                 : ""
                             }
+                            <a class="task-topic-teacher-status-trello" href="${escapeHtml(`../asset-manager.html?id=${encodeURIComponent(projectId)}&studentEmail=${encodeURIComponent(row.email)}`)}" target="_blank" rel="noreferrer">Asset Manager</a>
                             ${isTrackedWorkflowTopic
                                 ? `<span class="task-topic-teacher-status-log ${(isProjectManagementTopic ? row.lastLogDate : row.mediaLastVersionLogDate) === todayNz ? "is-complete" : "is-missing"}">${(isProjectManagementTopic ? row.lastLogDate : row.mediaLastVersionLogDate) === todayNz ? logCompleteText : logMissingText}</span>`
                                 : ""

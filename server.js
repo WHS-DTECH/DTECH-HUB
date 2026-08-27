@@ -11441,6 +11441,137 @@ app.get("/api/integrations/github/repo-analysis", async (req, res) => {
   }
 });
 
+const GITHUB_MEDIA_EXTENSIONS = new Set([".mp4", ".mov", ".webm", ".mp3", ".wav", ".ogg"]);
+const GITHUB_JS_EXTENSION = /\.js$/i;
+const GITHUB_ASSET_HEALTH_MAX_SCANNED_FILES = 40;
+
+function extractLocalReferencesFromContent(content) {
+  const refs = new Set();
+  const patterns = [
+    /(?:src|href)\s*=\s*["']([^"'#?]+)["']/gi,
+    /url\(\s*["']?([^"')#?]+)["']?\s*\)/gi
+  ];
+  patterns.forEach((pattern) => {
+    let match;
+    while ((match = pattern.exec(content)) !== null) {
+      const ref = String(match[1] || "").trim();
+      if (!ref) continue;
+      if (/^(?:https?:)?\/\//i.test(ref) || ref.startsWith("data:") || ref.startsWith("mailto:") || ref.startsWith("#")) continue;
+      refs.add(ref);
+    }
+  });
+  return Array.from(refs);
+}
+
+function resolveGithubRelativePath(basePath, ref) {
+  const cleanRef = String(ref || "").split("?")[0].split("#")[0];
+  if (!cleanRef) return "";
+  const baseDir = String(basePath || "").includes("/") ? basePath.slice(0, basePath.lastIndexOf("/")) : "";
+  const combined = cleanRef.startsWith("/") ? cleanRef.replace(/^\/+/, "") : (baseDir ? `${baseDir}/${cleanRef}` : cleanRef);
+  const stack = [];
+  combined.split("/").forEach((part) => {
+    if (!part || part === ".") return;
+    if (part === "..") { stack.pop(); return; }
+    stack.push(part);
+  });
+  return stack.join("/");
+}
+
+// Public-repo-only: counts files by type, flags oversized images, and cross-references
+// HTML/CSS/JS files against the tree to find unused images and broken local links.
+app.get("/api/integrations/github/asset-health", async (req, res) => {
+  const repoUrl = String(req.query?.repo_url || req.query?.repoUrl || "").trim();
+  const identifier = parseGithubRepoIdentifier(repoUrl);
+  if (!identifier?.owner || !identifier?.repo) {
+    res.status(400).json({ error: "A valid public GitHub repository URL is required." });
+    return;
+  }
+
+  try {
+    const repoInfo = await githubApiRequest(`/repos/${encodeURIComponent(identifier.owner)}/${encodeURIComponent(identifier.repo)}`);
+    const defaultBranch = String(repoInfo?.default_branch || "main").trim();
+
+    const treePayload = await githubApiRequest(
+      `/repos/${encodeURIComponent(identifier.owner)}/${encodeURIComponent(identifier.repo)}/git/trees/${encodeURIComponent(defaultBranch)}`,
+      { recursive: "1" }
+    );
+    const blobs = (Array.isArray(treePayload?.tree) ? treePayload.tree : []).filter((item) => item?.type === "blob");
+    const blobPaths = new Set(blobs.map((item) => String(item?.path || "").trim()).filter(Boolean));
+
+    const countByExt = (pattern) => blobs.filter((item) => pattern.test(String(item?.path || ""))).length;
+    const totalSizeBytes = blobs.reduce((sum, item) => sum + (Number(item?.size || 0) || 0), 0);
+    const imageStats = extractImageStatsFromTree(blobs);
+    const oversizedImageCount = blobs.filter((item) => {
+      const filePath = String(item?.path || "").toLowerCase();
+      const extMatch = filePath.match(/\.[a-z0-9]+$/);
+      if (!extMatch || !GITHUB_IMAGE_EXTENSIONS.has(extMatch[0])) return false;
+      return Number(item?.size || 0) > GITHUB_OPTIMISED_IMAGE_MAX_BYTES;
+    }).length;
+
+    const filesToScan = Array.from(blobPaths)
+      .filter((filePath) => /\.(?:html?|css|js)$/i.test(filePath))
+      .slice(0, GITHUB_ASSET_HEALTH_MAX_SCANNED_FILES);
+
+    const referencedPaths = new Set();
+    const brokenReferences = [];
+    await Promise.all(filesToScan.map(async (filePath) => {
+      try {
+        const rawUrl = `${GITHUB_RAW_CONTENT_BASE}/${identifier.owner}/${identifier.repo}/${defaultBranch}/${filePath}`;
+        const response = await fetch(rawUrl, { headers: { "User-Agent": "DTECH-HUB" } });
+        if (!response.ok) return;
+        const content = await response.text();
+        extractLocalReferencesFromContent(content).forEach((ref) => {
+          const resolved = resolveGithubRelativePath(filePath, ref);
+          if (!resolved) return;
+          referencedPaths.add(resolved);
+          if (!blobPaths.has(resolved)) {
+            brokenReferences.push({ from: filePath, reference: ref });
+          }
+        });
+      } catch (_scanError) {
+        // Best-effort: skip files that fail to fetch rather than failing the whole scan.
+      }
+    }));
+
+    const imagePaths = Array.from(blobPaths).filter((filePath) => {
+      const extMatch = filePath.toLowerCase().match(/\.[a-z0-9]+$/);
+      return extMatch && GITHUB_IMAGE_EXTENSIONS.has(extMatch[0]);
+    });
+    const unusedImages = imagePaths.filter((filePath) => !referencedPaths.has(filePath));
+
+    res.json({
+      ok: true,
+      owner: identifier.owner,
+      repo: identifier.repo,
+      default_branch: defaultBranch,
+      counts: {
+        html: countByExt(/\.html?$/i),
+        css: countByExt(/\.css$/i),
+        javascript: countByExt(GITHUB_JS_EXTENSION),
+        images: imageStats.count,
+        media: blobs.filter((item) => {
+          const extMatch = String(item?.path || "").toLowerCase().match(/\.[a-z0-9]+$/);
+          return extMatch && GITHUB_MEDIA_EXTENSIONS.has(extMatch[0]);
+        }).length
+      },
+      total_size_bytes: totalSizeBytes,
+      oversized_image_count: oversizedImageCount,
+      unused_image_count: unusedImages.length,
+      unused_images: unusedImages.slice(0, 50),
+      broken_reference_count: brokenReferences.length,
+      broken_references: brokenReferences.slice(0, 50),
+      scanned_file_count: filesToScan.length
+    });
+  } catch (error) {
+    const status = Number(error?.status) || 500;
+    res.status(status).json({
+      error: status === 404
+        ? "Could not find that GitHub repository. Make sure it is public and the link is correct."
+        : (error.message || "Could not analyse the GitHub repository.")
+    });
+  }
+});
+
 app.get("/api/admin/user-roles", async (_req, res) => {
   if (!hasDatabase) {
     res.json(Array.from(memoryUserRoles.values()));

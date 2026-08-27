@@ -2800,6 +2800,12 @@ async function renderTaskListPage() {
         }
     });
 
+    document.addEventListener("click", (event) => {
+        const assetManagerBtn = event.target?.closest?.("#task-list-open-asset-manager");
+        if (!assetManagerBtn || !taskListState.selectedId) return;
+        window.open(`asset-manager.html?id=${encodeURIComponent(taskListState.selectedId)}`, "_blank", "noopener");
+    });
+
     document.addEventListener("click", async (event) => {
         const syncBtn = event.target?.closest?.("#task-list-sync-drive");
         if (!syncBtn || !taskListState.selectedId) return;
