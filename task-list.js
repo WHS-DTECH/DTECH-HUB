@@ -3,6 +3,7 @@ const TASK_LIST_TRELLO_CARD_LINK_STORAGE_PREFIX = "hub_trello_card_link_v1";
 const TASK_LIST_TRELLO_CARD_LIBRARY_STORAGE_PREFIX = "hub_trello_card_library_v1";
 const TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX = "hub_task_topic_slide_sync_v1";
 const DIGIMED_CONVENTIONS_ACK_STORAGE_PREFIX = "hub_digimed_conventions_ack_v1";
+const DIGIMED_UX_PRINCIPLES_ACK_STORAGE_PREFIX = "hub_digimed_ux_principles_ack_v1";
 const DIGIMED_EFFICIENT_TOOLS_STORAGE_PREFIX = "hub_digimed_efficient_tools_v1";
 const DIGIMED_EFFICIENT_TOOLS_SUBTASKS = [
     "Management of assets",
@@ -1285,6 +1286,38 @@ function getDigiMedConventionsSubtask(stateMap = {}) {
     };
 }
 
+function getDigiMedUXPrinciplesAcknowledgementCount(activityId, email, stateMap = {}) {
+    const databaseAreas = new Set();
+    Object.values(stateMap || {}).forEach((steps) => {
+        (Array.isArray(steps) ? steps : []).forEach((step) => {
+            const text = String(step?.text || "").trim();
+            if (!text.startsWith("UX_PRINCIPLE_ACK|")) return;
+            const [, area, value] = text.split("|");
+            if (area && String(value || "").trim().toLowerCase() === "true") {
+                databaseAreas.add(area.trim());
+            }
+        });
+    });
+    if (databaseAreas.size) return databaseAreas.size;
+
+    try {
+        const key = `${DIGIMED_UX_PRINCIPLES_ACK_STORAGE_PREFIX}:${String(activityId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
+        const saved = JSON.parse(localStorage.getItem(key) || "{}");
+        return Object.values(saved || {}).filter(Boolean).length;
+    } catch (_error) {
+        return 0;
+    }
+}
+
+function getDigiMedUXPrinciplesSubtask(stateMap = {}) {
+    const activityId = taskListState.selectedId;
+    return {
+        label: "UX Principles",
+        href: buildCustomActivityLink(activityId, "Applying user experience principles relevant to the purpose of the outcome.", "User Experience (UX) Principles", "user-experience-principles"),
+        count: getDigiMedUXPrinciplesAcknowledgementCount(activityId, getTaskListEmail(), stateMap)
+    };
+}
+
 function getProjectManagementSystemLogo(systemName) {
     const system = String(systemName || "").trim().toLowerCase();
     if (system === "trello") {
@@ -1927,9 +1960,11 @@ function renderChecklistCards(detail, allItems) {
                                 const isInformationalRow = isInformationalCriteriaRow(standard, level, stepText);
                                 const is91893ToolsAndTechniquesRow = /using appropriate tools and techniques for the purpose and end users|applying appropriate tools and techniques to meet the purpose and end-user requirements/i.test(stepText);
                                 const is91893ConventionsRow = /using relevant conventions for the media type|applying relevant conventions to improve the quality of the outcome/i.test(stepText);
+                                const is91903UXPrinciplesRow = /applying user experience principles relevant to the purpose of the outcome|applying user experience principles to improve the quality of the digital media outcome/i.test(stepText);
                                 const is91893EfficientToolsRow = /using efficient tools and techniques in the outcome.?s production/i.test(stepText);
                                 const is91893IntegrityTestingRow = /applying appropriate data integrity and testing procedures/i.test(stepText);
                                 const conventionsSubtask = is91893ConventionsRow ? getDigiMedConventionsSubtask(taskListState.fullEvidenceState) : null;
+                                const uxPrinciplesSubtask = is91903UXPrinciplesRow ? getDigiMedUXPrinciplesSubtask(taskListState.fullEvidenceState) : null;
                                 const rowText = isInformationalRow
                                     ? `<span class="task-list-step-text">${escapeTaskListHtml(stepText)}</span>`
                                     : (href
@@ -1994,6 +2029,18 @@ function renderChecklistCards(detail, allItems) {
                                                 <a class="task-list-decomposition-category is-covered" href="${escapeTaskListHtml(conventionsSubtask.href)}">
                                                     <span class="task-list-decomposition-category-label">CONVENTIONS</span>
                                                     <span class="task-list-decomposition-category-count">${conventionsSubtask.count}</span>
+                                                </a>
+                                            </div>
+                                        </div>
+                                    ` : ""}
+                                    ${uxPrinciplesSubtask ? `
+                                        <div class="task-list-decomposition-subtasks">
+                                            <p class="task-list-system-title">SUBTASKS</p>
+                                            <p class="task-list-achieved-note">UX principle areas acknowledged on your UX Principles page.</p>
+                                            <div class="task-list-decomposition-category-list">
+                                                <a class="task-list-decomposition-category is-covered" href="${escapeTaskListHtml(uxPrinciplesSubtask.href)}">
+                                                    <span class="task-list-decomposition-category-label">UX PRINCIPLES</span>
+                                                    <span class="task-list-decomposition-category-count">${uxPrinciplesSubtask.count}</span>
                                                 </a>
                                             </div>
                                         </div>

@@ -96,6 +96,8 @@ const GOOGLE_DRIVE_LINK_LIBRARY_STORAGE_PREFIX = "hub_google_drive_link_library_
 const TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX = "hub_task_topic_slide_sync_v1";
 const DIGIMED_CONVENTIONS_ACK_STORAGE_PREFIX = "hub_digimed_conventions_ack_v1";
 const DIGIMED_CONVENTION_AREAS = ["Navigation", "Layout", "Typography", "Links", "Buttons/Controls", "Forms", "Visual hierarchy", "Images/Media", "Consistency", "Responsive design", "Feedback", "Content organisation"];
+const DIGIMED_UX_PRINCIPLES_ACK_STORAGE_PREFIX = "hub_digimed_ux_principles_ack_v1";
+const DIGIMED_UX_PRINCIPLE_AREAS = ["Visibility of system status", "Match between system and the real world", "User control and freedom", "Consistency and standards", "Error prevention", "Recognition rather than recall", "Flexibility and efficiency of use", "Aesthetic and minimalist design", "Help users recognise and recover from errors", "Accessibility"];
 const EVIDENCE_STEPS_TARGET_STANDARDS = new Set(["92005", "91897", "91907"]);
 
 const DIGITAL_OUTCOME_DETAILS_TASKS = [
@@ -112,6 +114,7 @@ const DIGITAL_OUTCOME_TRIALLING_COMPONENTS_TITLE = "Trialling Components";
 const DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE = "Tools & Techniques";
 const DIGITAL_OUTCOME_TESTING_FUNCTIONS_TITLE = "Testing Functions";
 const DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE = "Relevant DigiMed Conventions";
+const DIGITAL_OUTCOME_UX_PRINCIPLES_TITLE = "User Experience (UX) Principles";
 const DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE = "Success Criteria";
 const DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE = "Relevant Implications";
 const DIGITAL_OUTCOME_CODE_VALIDATION_TITLE = "Code Validation";
@@ -288,6 +291,30 @@ function writeDigiMedConventionsAcknowledgements(activityId, email, value) {
 
 function countDigiMedConventionsAcknowledgements(value) {
     return DIGIMED_CONVENTION_AREAS.filter((area) => Boolean(value?.[area])).length;
+}
+
+function getDigiMedUXPrinciplesAcknowledgementKey(activityId, email) {
+    return `${DIGIMED_UX_PRINCIPLES_ACK_STORAGE_PREFIX}:${String(activityId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
+}
+
+function readDigiMedUXPrinciplesAcknowledgements(activityId, email) {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(getDigiMedUXPrinciplesAcknowledgementKey(activityId, email)) || "{}");
+        return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (_error) {
+        return {};
+    }
+}
+
+function writeDigiMedUXPrinciplesAcknowledgements(activityId, email, value) {
+    try {
+        localStorage.setItem(getDigiMedUXPrinciplesAcknowledgementKey(activityId, email), JSON.stringify(value || {}));
+    } catch (_error) {
+    }
+}
+
+function countDigiMedUXPrinciplesAcknowledgements(value) {
+    return DIGIMED_UX_PRINCIPLE_AREAS.filter((area) => Boolean(value?.[area])).length;
 }
 
 function parseDurationMinutes(raw) {
@@ -7913,6 +7940,13 @@ function isDigitalOutcomeRelevantDigiMedConventionsCriterion(taskTopicTitle, tas
     return shortNameText === DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE.toLowerCase();
 }
 
+function isDigitalOutcomeUXPrinciplesCriterion(taskTopicTitle, taskShortName = "") {
+    const topicText = String(taskTopicTitle || "").trim().toLowerCase();
+    const shortNameText = String(taskShortName || "").trim().toLowerCase();
+    if (/user\s+experience\s+principles|ux\s+principles/.test(topicText)) return true;
+    return shortNameText === DIGITAL_OUTCOME_UX_PRINCIPLES_TITLE.toLowerCase();
+}
+
 function isToolsAndTechniquesCriterion(taskTopicTitle, taskShortName = "") {
     const topicText = String(taskTopicTitle || "").trim().toLowerCase();
     const shortNameText = String(taskShortName || "").trim().toLowerCase();
@@ -7981,6 +8015,10 @@ function inferDigitalOutcomeTopicKeyFromTitle(pageTitle) {
 
     if (/relevant\s+(?:digimed\s+)?conventions|relevant\s+conventions\s+for\s+the\s+media\s+type/.test(normalized)) {
         return "relevant-digimed-conventions";
+    }
+
+    if (/user\s+experience\s+principles|ux\s+principles/.test(normalized)) {
+        return "user-experience-principles";
     }
 
     if (/developed|development|tools\/?technologies|tools|technologies/.test(normalized)) {
@@ -8525,6 +8563,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         || keywordMatchedTopicKey === "testing-functions";
     const isDigitalOutcomeRelevantDigiMedConventionsTopic = isDigitalOutcomeRelevantDigiMedConventionsCriterion(taskTopicTitle, resolvedTaskShortName)
         || keywordMatchedTopicKey === "relevant-digimed-conventions";
+    const isDigitalOutcomeUXPrinciplesTopic = isDigitalOutcomeUXPrinciplesCriterion(taskTopicTitle, resolvedTaskShortName)
+        || keywordMatchedTopicKey === "user-experience-principles";
     const isToolsAndTechniquesTopic = isToolsAndTechniquesCriterion(taskTopicTitle, resolvedTaskShortName);
     const isCodeValidationTopic = isCodeValidationCriterion(taskTopicTitle, resolvedTaskShortName)
         || keywordMatchedTopicKey === "code-validation";
@@ -8550,7 +8590,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                                     ? "testing-functions"
                                     : isDigitalOutcomeRelevantDigiMedConventionsTopic
                                         ? "relevant-digimed-conventions"
-                                        : isDigitalOutcomeDescriptionTopic
+                                        : isDigitalOutcomeUXPrinciplesTopic
+                                            ? "user-experience-principles"
+                                            : isDigitalOutcomeDescriptionTopic
                                             ? "description"
                                             : keywordMatchedTopicKey;
     const useDigitalOutcomeTemplateHero = Boolean(digitalOutcomeTopicKey);
@@ -8564,6 +8606,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         "trialling-components": DIGITAL_OUTCOME_TRIALLING_COMPONENTS_TITLE,
         "testing-functions": DIGITAL_OUTCOME_TESTING_FUNCTIONS_TITLE,
         "relevant-digimed-conventions": DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE,
+        "user-experience-principles": DIGITAL_OUTCOME_UX_PRINCIPLES_TITLE,
         "tools-and-techniques": DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE,
         "code-validation": DIGITAL_OUTCOME_CODE_VALIDATION_TITLE,
         "development-steps": DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE,
@@ -8605,6 +8648,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         || isDigitalOutcomeDevelopmentToolsTopic
         || isDigitalOutcomeTriallingComponentsTopic
         || isDigitalOutcomeRelevantDigiMedConventionsTopic
+        || isDigitalOutcomeUXPrinciplesTopic
         || isToolsAndTechniquesTopic
         || isCodeValidationTopic
         || isDigitalOutcomeSuccessCriteriaTopic
@@ -8622,6 +8666,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         "trialling-components": "trialling-components",
         "testing-functions": "testing-functions",
         "relevant-digimed-conventions": "relevant-digimed-conventions",
+        "user-experience-principles": "user-experience-principles",
         "tools-and-techniques": "tools-and-techniques",
         "code-validation": "code-validation",
         "development-steps": "development-steps",
@@ -8638,6 +8683,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             "trialling-components": DIGITAL_OUTCOME_TRIALLING_COMPONENTS_TITLE,
             "testing-functions": DIGITAL_OUTCOME_TESTING_FUNCTIONS_TITLE,
             "relevant-digimed-conventions": DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE,
+            "user-experience-principles": DIGITAL_OUTCOME_UX_PRINCIPLES_TITLE,
             "tools-and-techniques": DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE,
             "code-validation": DIGITAL_OUTCOME_CODE_VALIDATION_TEMPLATE_SEARCH_TITLE,
             "development-steps": DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE,
@@ -8760,11 +8806,13 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                         ? "Success Criteria"
                         : (digitalOutcomeTopicKey === "relevant-digimed-conventions"
                             ? "Relevant DigiMed Conventions"
+                        : (digitalOutcomeTopicKey === "user-experience-principles"
+                            ? "User Experience (UX) Principles"
                         : (digitalOutcomeTopicKey === "relevant-implications"
                             ? "Relevant Implications"
                             : (digitalOutcomeTopicKey === "code-validation"
                                 ? "Code Validation"
-                                : "Digital Outcome Description")))))))
+                                : "Digital Outcome Description"))))))))
             : "Topic Tasks"));
     const topicGuideInstructions = (() => {
         if (isProjectManagementTopic) {
@@ -8791,6 +8839,14 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                     "Create a Google Slideshow for this topic.",
                     "Use the conventions table below to check your digital media outcome.",
                     "Record which conventions apply and how your outcome follows them."
+                ];
+            }
+
+            if (digitalOutcomeTopicKey === "user-experience-principles") {
+                return [
+                    "Create a Google Slideshow for this topic.",
+                    "Use the UX principles table below to check your digital media outcome.",
+                    "Record which UX principles apply and how your outcome follows them."
                 ];
             }
 
@@ -8897,6 +8953,14 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 ];
             }
 
+            if (digitalOutcomeTopicKey === "user-experience-principles") {
+                return [
+                    "User Experience (UX) Principles - Google Slides: Use the table to review UX principles for your outcome.",
+                    "Explain which UX principles are most important for your outcome.",
+                    "Record evidence of how your design and development follow the selected UX principles."
+                ];
+            }
+
             if (digitalOutcomeTopicKey === "target-audience") {
                 return [
                     "Target Audience - Google Slides: Identify who your project is for and describe them clearly.",
@@ -8983,6 +9047,26 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             ];
             return `<section class="task-topic-guide-block"><h3>Relevant DigiMed Conventions</h3><p class="task-topic-submission-note" id="digimed-conventions-last-sync">Last Sync: ${escapeHtml(String(readStoredTaskTopicSlideSyncEntryByTemplateId(id, readStoredHubEmail(), "relevant-digimed-conventions")?.savedAt || "Not yet"))}</p><table class="digital-outcome-must-dos-table digital-outcome-conventions-table"><thead><tr><th>Convention area</th><th>Possible website conventions</th><th>Discussed</th></tr></thead><tbody>
                 ${rows.map(([area, description]) => `<tr><td>${escapeHtml(area)}</td><td>${escapeHtml(description)}</td><td class="digital-outcome-conventions-ack-cell"><label><input type="checkbox" data-digimed-convention-ack="${escapeHtml(area)}" ${acknowledgements[area] ? "checked" : ""}><span class="sr-only">Acknowledged ${escapeHtml(area)}</span></label></td></tr>`).join("")}
+            </tbody></table></section>`;
+        })()
+        : "";
+    const uxPrinciplesTableHtml = digitalOutcomeTopicKey === "user-experience-principles"
+        ? (() => {
+            const acknowledgements = readDigiMedUXPrinciplesAcknowledgements(id, readStoredHubEmail());
+            const rows = [
+                ["Visibility of system status", "The outcome keeps users informed with timely, appropriate feedback"],
+                ["Match between system and the real world", "Familiar words, concepts and conventions from the real world"],
+                ["User control and freedom", "Clear exits, undo/redo, and ways to leave unwanted actions"],
+                ["Consistency and standards", "Consistent wording, layout and behaviour throughout the outcome"],
+                ["Error prevention", "Design that prevents problems before they occur or confirms risky actions"],
+                ["Recognition rather than recall", "Options, actions and instructions are visible or easily retrievable"],
+                ["Flexibility and efficiency of use", "Shortcuts or options that suit both novice and experienced users"],
+                ["Aesthetic and minimalist design", "Only relevant information is shown; no unnecessary clutter"],
+                ["Help users recognise and recover from errors", "Clear error messages that explain the problem and a solution"],
+                ["Accessibility", "Outcome is usable by people with a range of abilities and devices"]
+            ];
+            return `<section class="task-topic-guide-block"><h3>User Experience (UX) Principles</h3><p class="task-topic-submission-note" id="digimed-ux-principles-last-sync">Last Sync: ${escapeHtml(String(readStoredTaskTopicSlideSyncEntryByTemplateId(id, readStoredHubEmail(), "user-experience-principles")?.savedAt || "Not yet"))}</p><table class="digital-outcome-must-dos-table digital-outcome-conventions-table"><thead><tr><th>UX principle</th><th>What to look for</th><th>Discussed</th></tr></thead><tbody>
+                ${rows.map(([area, description]) => `<tr><td>${escapeHtml(area)}</td><td>${escapeHtml(description)}</td><td class="digital-outcome-conventions-ack-cell"><label><input type="checkbox" data-digimed-ux-principle-ack="${escapeHtml(area)}" ${acknowledgements[area] ? "checked" : ""}><span class="sr-only">Acknowledged ${escapeHtml(area)}</span></label></td></tr>`).join("")}
             </tbody></table></section>`;
         })()
         : "";
@@ -9261,6 +9345,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                                 <ul class="list task-topic-guide-list">${renderList(topicGuideTaskItems)}</ul>
                             </section>
                             ${relevantDigiMedConventionsTableHtml}
+                            ${uxPrinciplesTableHtml}
                             ${isRelevantImplicationsTopic
                                 ? `<div class="digital-outcome-must-dos" id="relevant-implications-from-slide" aria-live="polite"><p class="task-topic-submission-note">Loading discussed implications from your slideshow...</p></div>`
                                 : ""}
@@ -9365,7 +9450,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                     </div>
                     ` : ""}
 
-                    <section class="proposal-section task-topic-submission-panel" ${isDigitalOutcomeDescriptionTopic || isDigitalOutcomeSuccessCriteriaTopic || isDigitalOutcomeDevelopmentToolsTopic || isDigitalOutcomeRelevantDigiMedConventionsTopic ? "hidden" : ""}>
+                    <section class="proposal-section task-topic-submission-panel" ${isDigitalOutcomeDescriptionTopic || isDigitalOutcomeSuccessCriteriaTopic || isDigitalOutcomeDevelopmentToolsTopic || isDigitalOutcomeRelevantDigiMedConventionsTopic || isDigitalOutcomeUXPrinciplesTopic ? "hidden" : ""}>
                         ${isDecompositionTopic ? "" : `
                         <h2>Submission Tasks</h2>
                         <p class="task-topic-submission-intro">${escapeHtml(submissionIntroText)}</p>
@@ -9529,6 +9614,18 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 })
                 .catch((error) => console.warn("Could not sync Relevant DigiMed Conventions.", error));
         }
+    }
+
+    if (digitalOutcomeTopicKey === "user-experience-principles") {
+        const acknowledgements = readDigiMedUXPrinciplesAcknowledgements(id, readStoredHubEmail());
+        host.querySelectorAll("[data-digimed-ux-principle-ack]").forEach((checkbox) => {
+            checkbox.addEventListener("change", () => {
+                const area = String(checkbox.getAttribute("data-digimed-ux-principle-ack") || "").trim();
+                if (!area) return;
+                acknowledgements[area] = Boolean(checkbox.checked);
+                writeDigiMedUXPrinciplesAcknowledgements(id, readStoredHubEmail(), acknowledgements);
+            });
+        });
     }
 
     const editButton = host.querySelector("#detail-edit-button");

@@ -5004,6 +5004,14 @@ function inferCanonicalTemplateIdentityFromTitle(title) {
     };
   }
 
+  if (/user\s+experience\s+(?:\(ux\)\s+)?principles|ux\s+principles/.test(normalizedTitle)) {
+    return {
+      id: "user-experience-principles",
+      title: "User Experience (UX) Principles",
+      criteriaText: "Apply user experience principles relevant to the purpose of the outcome."
+    };
+  }
+
   if (/afull\s*-\s*relevant\s*implications\s*template/.test(normalizedTitle)) {
     return {
       id: "relevant-implications",
@@ -5900,6 +5908,7 @@ const PROCESS_ASSESSMENT_DIGITAL_OUTCOME_FOLDER_NAME = "Digital Outcome Details"
 const PROCESS_ASSESSMENT_TRIALLING_COMPONENTS_FOLDER_NAME = "Trailing Components";
 const PROCESS_ASSESSMENT_TESTING_FUNCTIONS_FOLDER_NAME = "Testing Functions";
 const PROCESS_ASSESSMENT_RELEVANT_DIGIMED_CONVENTIONS_FOLDER_NAME = "Relevant DigiMed Conventions";
+const PROCESS_ASSESSMENT_UX_PRINCIPLES_FOLDER_NAME = "User Experience (UX) Principles";
 const PROCESS_ASSESSMENT_RELEVANT_IMPLICATIONS_FOLDER_NAME = "Relevant Implications";
 
 const DIGITAL_OUTCOME_DETAILS_TEMPLATE_IDS = new Set([
@@ -5931,6 +5940,12 @@ function resolveProcessAssessmentSubfolderName(templateId, templateTitle) {
     || /relevant\s+(?:digimed\s+)?conventions/.test(normalizedTitle);
   if (isRelevantDigiMedConventionsTemplate) {
     return PROCESS_ASSESSMENT_RELEVANT_DIGIMED_CONVENTIONS_FOLDER_NAME;
+  }
+
+  const isUXPrinciplesTemplate = normalizedTemplateId === "user-experience-principles"
+    || /user\s+experience\s+(?:\(ux\)\s+)?principles|ux\s+principles/.test(normalizedTitle);
+  if (isUXPrinciplesTemplate) {
+    return PROCESS_ASSESSMENT_UX_PRINCIPLES_FOLDER_NAME;
   }
 
   const isDigitalOutcomeTemplate = DIGITAL_OUTCOME_DETAILS_TEMPLATE_IDS.has(normalizedTemplateId)
@@ -5966,6 +5981,7 @@ async function driveListSlidesInProcessAssessmentTree(processAssessmentFolderId,
     PROCESS_ASSESSMENT_TRIALLING_COMPONENTS_FOLDER_NAME,
     PROCESS_ASSESSMENT_TESTING_FUNCTIONS_FOLDER_NAME,
     PROCESS_ASSESSMENT_RELEVANT_DIGIMED_CONVENTIONS_FOLDER_NAME,
+    PROCESS_ASSESSMENT_UX_PRINCIPLES_FOLDER_NAME,
     PROCESS_ASSESSMENT_RELEVANT_IMPLICATIONS_FOLDER_NAME
   ];
 
@@ -6866,6 +6882,7 @@ const TEMPLATE_ID_FROM_TITLE_PATTERNS = [
   { pattern: /^trailing\s+comp(?:onents|onets|onets)?(?:\s*-\s*.+)?$/i, id: "trialling-components", title: "Trialling Components" },
   { pattern: /^testing\s+functions(?:\s*-\s*.+)?$/i, id: "testing-functions", title: "Testing Functions" },
   { pattern: /^(?:afull\s*-\s*)?relevant\s+(?:digimed\s+)?conventions(?:\s+template)?(?:\s*-\s*.+)?$/i, id: "relevant-digimed-conventions", title: "Relevant DigiMed Conventions" },
+  { pattern: /^user\s+experience\s+(?:\(ux\)\s+)?principles(?:\s*-\s*.+)?$/i, id: "user-experience-principles", title: "User Experience (UX) Principles" },
   { pattern: /^project\s+success\s+criteria(?:\s*-\s*.+)?$/i, id: "project-success-criteria", title: "Project Success Criteria" },
 ];
 
