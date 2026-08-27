@@ -1986,6 +1986,86 @@ function renderCodeValidationSyncPanel(host, projectId, email, kind) {
     });
 }
 
+function renderCodeValidationTechnicalHealthTracker(host, repoUrl) {
+    const slot = host.querySelector("#task-topic-technical-health-slot");
+    const safeRepoUrl = toSafeGithubRepoUrl(repoUrl);
+    if (!slot) return;
+
+    if (!safeRepoUrl) {
+        slot.innerHTML = `<p class="task-topic-submission-note">Save a public GitHub repository on the Version Control: GitHub page to view automated validation and technical health.</p>`;
+        return;
+    }
+
+    const render = (repoAnalysis, assetHealth) => {
+        const validationRows = Array.isArray(repoAnalysis?.validation) ? repoAnalysis.validation : [];
+        const validationSummary = (type) => {
+            const rows = validationRows.filter((row) => row.type === type && row.checked);
+            return {
+                checked: rows.length,
+                errors: rows.reduce((total, row) => total + Number(row.errorCount || 0), 0),
+                warnings: rows.reduce((total, row) => total + Number(row.warningCount || 0), 0)
+            };
+        };
+        const html = validationSummary("html");
+        const css = validationSummary("css");
+        const links = assetHealth?.link_details || {};
+        const broken = Number(assetHealth?.broken_reference_count || 0);
+        slot.innerHTML = `
+            <div class="trello-sync-panel">
+                <p class="task-topic-submission-note">Repository: <a href="${escapeHtml(safeRepoUrl)}" target="_blank" rel="noreferrer">${escapeHtml(safeRepoUrl)}</a></p>
+                <div class="task-topic-guide-block">
+                    <h3>HTML</h3>
+                    <ul class="list task-topic-guide-list">
+                        <li>${html.checked} page${html.checked === 1 ? "" : "s"} checked</li>
+                        <li>${html.errors} error${html.errors === 1 ? "" : "s"}</li>
+                        <li>${html.warnings} warning${html.warnings === 1 ? "" : "s"}</li>
+                    </ul>
+                </div>
+                <div class="task-topic-guide-block">
+                    <h3>CSS</h3>
+                    <ul class="list task-topic-guide-list">
+                        <li>${css.checked} stylesheet${css.checked === 1 ? "" : "s"} checked</li>
+                        <li>${css.errors} error${css.errors === 1 ? "" : "s"}</li>
+                        <li>${css.warnings} warning${css.warnings === 1 ? "" : "s"}</li>
+                    </ul>
+                </div>
+                <div class="task-topic-guide-block">
+                    <h3>Links</h3>
+                    <ul class="list task-topic-guide-list">
+                        <li>${Number(links.internal_links || 0)} internal link${Number(links.internal_links || 0) === 1 ? "" : "s"}</li>
+                        <li>${Number(links.external_links || 0)} external link${Number(links.external_links || 0) === 1 ? "" : "s"}</li>
+                        <li>${broken} broken reference${broken === 1 ? "" : "s"}</li>
+                    </ul>
+                </div>
+                <div class="task-topic-guide-block">
+                    <h3>Assets</h3>
+                    <ul class="list task-topic-guide-list"><li>${broken} missing asset reference${broken === 1 ? "" : "s"}</li></ul>
+                </div>
+                <button type="button" class="detail-action detail-action-secondary" id="code-validation-health-refresh">Refresh Technical Health</button>
+                <p class="trello-sync-status" id="code-validation-health-status" aria-live="polite"></p>
+            </div>
+        `;
+        slot.querySelector("#code-validation-health-refresh")?.addEventListener("click", () => {
+            void load();
+        });
+    };
+
+    const load = async () => {
+        slot.innerHTML = `<p class="task-topic-submission-note">Checking validation and technical health from GitHub...</p>`;
+        try {
+            const [repoAnalysis, assetHealth] = await Promise.all([
+                loadJson(`/api/integrations/github/repo-analysis?repo_url=${encodeURIComponent(safeRepoUrl)}`, { headers: buildWriteHeaders() }),
+                loadJson(`/api/integrations/github/asset-health?repo_url=${encodeURIComponent(safeRepoUrl)}`, { headers: buildWriteHeaders() })
+            ]);
+            render(repoAnalysis, assetHealth);
+        } catch (error) {
+            slot.innerHTML = `<p class="task-topic-submission-note is-error">${escapeHtml(error?.message || "Could not load technical health from GitHub.")}</p>`;
+        }
+    };
+
+    void load();
+}
+
 function normalizeGoogleDriveLinkLibrary(values) {
     const seenIndexByUrl = new Map();
     const list = [];
@@ -9455,6 +9535,11 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                         <div id="task-topic-css-file-sync-slot"></div>
                     </section>
                     </div>
+                    <section class="proposal-section task-topic-guide-panel">
+                        <p class="task-topic-guide-eyebrow">Topic Tasks</p>
+                        <h2>Validation &amp; Technical Health Tracker</h2>
+                        <div id="task-topic-technical-health-slot"></div>
+                    </section>
                     ` : ""}
 
                     <section class="proposal-section task-topic-submission-panel" ${isDigitalOutcomeDescriptionTopic || isDigitalOutcomeSuccessCriteriaTopic || isDigitalOutcomeDevelopmentToolsTopic || isDigitalOutcomeRelevantDigiMedConventionsTopic || isDigitalOutcomeUXPrinciplesTopic ? "hidden" : ""}>
@@ -12191,6 +12276,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     if (isCodeValidationTaskTopicPage && email) {
         renderCodeValidationSyncPanel(host, projectId, email, "html");
         renderCodeValidationSyncPanel(host, projectId, email, "css");
+        renderCodeValidationTechnicalHealthTracker(host, backendGithubRepoLink || githubRepoLibrary[0]?.url || "");
     }
 
     // Toggle interest button handler

@@ -11345,21 +11345,23 @@ async function validateRawFileViaW3C(rawUrl, type) {
       ? `https://jigsaw.w3.org/css-validator/validator?uri=${encodeURIComponent(rawUrl)}&output=json`
       : `https://validator.w3.org/nu/?doc=${encodeURIComponent(rawUrl)}&out=json`;
     const response = await fetch(validatorUrl, { headers: { "User-Agent": "DTECH-HUB" } });
-    if (!response.ok) return { checked: false, passed: false, errorCount: 0 };
+    if (!response.ok) return { checked: false, passed: false, errorCount: 0, warningCount: 0 };
 
     const payload = await response.json().catch(() => null);
-    if (!payload) return { checked: false, passed: false, errorCount: 0 };
+    if (!payload) return { checked: false, passed: false, errorCount: 0, warningCount: 0 };
 
     if (type === "css") {
       const errorCount = Number(payload?.cssvalidation?.errors?.length || 0);
-      return { checked: true, passed: errorCount === 0, errorCount };
+      const warningCount = Number(payload?.cssvalidation?.warnings?.length || 0);
+      return { checked: true, passed: errorCount === 0, errorCount, warningCount };
     }
 
     const messages = Array.isArray(payload?.messages) ? payload.messages : [];
     const errorCount = messages.filter((message) => String(message?.type || "").toLowerCase() === "error").length;
-    return { checked: true, passed: errorCount === 0, errorCount };
+    const warningCount = messages.filter((message) => String(message?.type || "").toLowerCase() === "info" && /warning/i.test(String(message?.message || ""))).length;
+    return { checked: true, passed: errorCount === 0, errorCount, warningCount };
   } catch (_error) {
-    return { checked: false, passed: false, errorCount: 0 };
+    return { checked: false, passed: false, errorCount: 0, warningCount: 0 };
   }
 }
 
@@ -11545,6 +11547,27 @@ function buildHtmlHealthDetails(htmlContents) {
   };
 }
 
+function buildLinkHealthDetails(htmlContents) {
+  let internalLinks = 0;
+  let externalLinks = 0;
+  const linkPattern = /<a\b[^>]*\bhref\s*=\s*["']([^"'#]+)["']/gi;
+
+  htmlContents.forEach((content) => {
+    let match;
+    while ((match = linkPattern.exec(String(content || ""))) !== null) {
+      const href = String(match[1] || "").trim();
+      if (!href || href.startsWith("mailto:") || href.startsWith("tel:")) continue;
+      if (/^(?:https?:)?\/\//i.test(href)) {
+        externalLinks += 1;
+      } else {
+        internalLinks += 1;
+      }
+    }
+  });
+
+  return { internal_links: internalLinks, external_links: externalLinks };
+}
+
 function buildJavascriptHealthDetails(javascriptContents) {
   const jsText = javascriptContents.join("\n");
   const functionMatches = jsText.match(/\b(?:async\s+)?function\s+[a-z_$][\w$]*\s*\(|(?:\([^)]*\)|[a-z_$][\w$]*)\s*=>/gi) || [];
@@ -11663,6 +11686,7 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
       broken_references: brokenReferences.slice(0, 50),
       css_details: buildCssHealthDetails(cssContents, htmlContents),
       html_details: buildHtmlHealthDetails(htmlContents),
+      link_details: buildLinkHealthDetails(htmlContents),
       javascript_details: buildJavascriptHealthDetails(javascriptContents),
       scanned_file_count: filesToScan.length
     });
