@@ -174,6 +174,74 @@ const SUGGESTED_TOOLS_BY_CONTEXT = {
     "general": ["Google Workspace", "Microsoft Office", "Trello", "GitHub", "Google Drive", "OneDrive", "Slack", "Zoom", "Figma", "Notion"]
 };
 
+const DIGITAL_MEDIA_91903_GUIDANCE = {
+    "web": {
+        heading: "Tools & Techniques - 91903 Web-based Outcome",
+        examplesHeading: "Web-based examples students could identify",
+        rows: [
+            ["Non-core functionality", "Search/filter systems, form processing and validation, user authentication, local/session storage, API integration, database interaction"],
+            ["Sophisticated digital effects", "CSS animations, transitions, transforms, interactive visual effects, JavaScript-driven effects, animated interface elements"],
+            ["Applying industry standards or guidelines", "Semantic HTML, accessibility/WCAG practices, HTML/CSS standards, appropriate web conventions, web performance practices"],
+            ["Responsive design for use on multiple devices", "Media queries, CSS Grid/Flexbox, responsive navigation, fluid layouts, responsive images, relative units and breakpoints"],
+            ["Integration of original media assets", "Original photography, graphics, icons, illustrations, animation, video or audio created/edited by the student and incorporated into the website"],
+            ["Dynamic data handling and interactivity", "DOM manipulation, dynamic filtering/searching, interactive forms, dynamically generated content, fetching/displaying data, storing/retrieving data"],
+            ["Automation through scripts", "JavaScript automation, automated generation/manipulation of content, scripts for repetitive processes, build/processing scripts where appropriate"]
+        ]
+    },
+    "video": {
+        heading: "Tools & Techniques - 91903 Video/Film Outcome",
+        examplesHeading: "Video/Film examples students could identify",
+        rows: [
+            ["Non-core functionality", "Advanced editing features, motion tracking, keyframing, multicam editing"],
+            ["Sophisticated digital effects", "Compositing, masking, chroma key, colour grading, motion graphics, visual effects"],
+            ["Applying industry standards or guidelines", "Frame rate, resolution, aspect ratio, safe audio levels, codecs/export standards"],
+            ["Responsive design for use on multiple devices", "Usually not relevant to a conventional video outcome"],
+            ["Integration of original media assets", "Original footage, voice-over, photography, graphics, animation, recorded audio"],
+            ["Dynamic data handling and interactivity", "Usually not relevant unless producing interactive video/media"],
+            ["Automation through scripts", "Batch processing, automated workflows, expressions/scripts where appropriate"]
+        ]
+    },
+    "image": {
+        heading: "Tools & Techniques - 91903 Image Outcome",
+        examplesHeading: "Image examples students could identify",
+        rows: [
+            ["Non-core functionality", "Non-destructive editing, layer masks, adjustment layers, smart objects"],
+            ["Sophisticated digital effects", "Advanced compositing, retouching, colour grading, vector effects, photo manipulation"],
+            ["Applying industry standards or guidelines", "Resolution, colour profiles, file formats, print/web export standards, copyright attribution"],
+            ["Responsive design for use on multiple devices", "Exporting appropriate image sizes and formats for different display contexts"],
+            ["Integration of original media assets", "Original photography, illustrations, icons, textures, typography or scanned work"],
+            ["Dynamic data handling and interactivity", "Usually not relevant unless producing an interactive image-based outcome"],
+            ["Automation through scripts", "Batch export, actions, presets, automated resizing or processing workflows"]
+        ]
+    },
+    "audio": {
+        heading: "Tools & Techniques - 91903 Audio Outcome",
+        examplesHeading: "Audio examples students could identify",
+        rows: [
+            ["Non-core functionality", "Multi-track editing, automation, MIDI sequencing, podcast production workflows"],
+            ["Sophisticated digital effects", "Equalisation, compression, reverb, noise reduction, mixing and mastering effects"],
+            ["Applying industry standards or guidelines", "Sample rate, bit depth, loudness levels, file formats, copyright and attribution"],
+            ["Responsive design for use on multiple devices", "Exporting accessible audio formats and appropriate playback compatibility"],
+            ["Integration of original media assets", "Original recordings, voice-over, sound effects, music, interviews or field audio"],
+            ["Dynamic data handling and interactivity", "Usually not relevant unless producing interactive audio media"],
+            ["Automation through scripts", "Batch processing, automated fades/levels, presets and repeatable export workflows"]
+        ]
+    },
+    "mixed": {
+        heading: "Tools & Techniques - 91903 Digital Media Outcome",
+        examplesHeading: "Digital Media examples students could identify",
+        rows: [
+            ["Non-core functionality", "Advanced functions appropriate to the chosen media combination"],
+            ["Sophisticated digital effects", "Compositing, animation, audio effects or interactive media effects"],
+            ["Applying industry standards or guidelines", "Appropriate technical, accessibility, export and copyright standards"],
+            ["Responsive design for use on multiple devices", "Adaptation for the devices and contexts where the outcome will be used"],
+            ["Integration of original media assets", "Original media created and combined by the student"],
+            ["Dynamic data handling and interactivity", "Interactive elements or dynamic content where appropriate"],
+            ["Automation through scripts", "Automated workflows, scripts, presets or batch processing where appropriate"]
+        ]
+    }
+};
+
 const SUGGESTED_TECHNIQUES_BY_TOOL = {
     "html/css": ["Semantic HTML structure", "Responsive CSS layouts", "Accessible form labels", "Flexbox or CSS Grid", "Media queries"],
     "html": ["Semantic page structure", "Accessible headings", "Form validation", "Image alt text"],
@@ -7173,6 +7241,9 @@ async function renderToolsTechniquesPanel({ host, projectId, detailData, taskTop
         const projectTaskStandard = String(activeAlloc?.standard_2 || "").match(/\b(91893|91903)\b/)?.[1] || "";
         const digitalMediaType = String(activeAlloc?.digital_media_type || "").trim();
         const isDigitalMedia = Boolean(projectTaskStandard || digitalMediaType);
+        const guidance = projectTaskStandard === "91903"
+            ? DIGITAL_MEDIA_91903_GUIDANCE[digitalMediaType.toLowerCase()]
+            : null;
         digitalMediaContextCard.hidden = !isDigitalMedia;
         digitalMediaContextCard.innerHTML = isDigitalMedia ? `
             <h2>Student Details</h2>
@@ -7181,6 +7252,17 @@ async function renderToolsTechniquesPanel({ host, projectId, detailData, taskTop
                 ${projectTaskStandard ? `<span class="tools-context-type-chip is-active">Standard ${escapeHtml(projectTaskStandard)}</span>` : ""}
                 ${digitalMediaType ? `<span class="tools-context-type-chip is-active">${escapeHtml(digitalMediaType)}</span>` : ""}
             </div>
+            ${guidance ? `
+                <section class="tools-media-guidance">
+                    <h3>${escapeHtml(guidance.heading)}</h3>
+                    <div class="tools-media-guidance-table-wrap">
+                        <table class="tools-media-guidance-table">
+                            <thead><tr><th>Current NZQA category</th><th>${escapeHtml(guidance.examplesHeading)}</th></tr></thead>
+                            <tbody>${guidance.rows.map(([category, examples]) => `<tr><td>${escapeHtml(category)}</td><td>${escapeHtml(examples)}</td></tr>`).join("")}</tbody>
+                        </table>
+                    </div>
+                </section>
+            ` : ""}
         ` : "";
     };
 

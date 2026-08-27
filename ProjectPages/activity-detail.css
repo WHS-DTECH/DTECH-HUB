@@ -2476,6 +2476,47 @@ h1 {
 }
 .tools-context-type-chip:hover { background: #e0e7ff; border-color: #818cf8; }
 .tools-context-type-chip.is-active { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+.tools-media-guidance {
+    margin-top: 14px;
+}
+.tools-media-guidance h3 {
+    margin: 0 0 8px;
+    font-size: 0.98rem;
+    color: #1e293b;
+}
+.tools-media-guidance-table-wrap {
+    overflow-x: auto;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+}
+.tools-media-guidance-table {
+    width: 100%;
+    min-width: 560px;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+}
+.tools-media-guidance-table th,
+.tools-media-guidance-table td {
+    padding: 9px 10px;
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 1px solid #e2e8f0;
+}
+.tools-media-guidance-table th {
+    background: #eef2ff;
+    color: #3730a3;
+    font-size: 0.74rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+.tools-media-guidance-table tr:last-child td {
+    border-bottom: 0;
+}
+.tools-media-guidance-table td:first-child {
+    width: 30%;
+    font-weight: 700;
+    color: #1e293b;
+}
 
 /* Tools & Techniques Panel */
 .tools-techniques-panel {
