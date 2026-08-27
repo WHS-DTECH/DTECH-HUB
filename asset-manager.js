@@ -104,6 +104,25 @@ function renderHtmlDetails(details) {
     `;
 }
 
+function renderJavascriptDetails(details) {
+    const values = details || {};
+    return `
+        <section class="asset-manager-detail-panel" id="asset-manager-javascript-details" hidden>
+            <h3>JavaScript Details</h3>
+            <dl class="asset-manager-detail-list">
+                <div><dt>JS files</dt><dd>${Number(values.files || 0)}</dd></div>
+                <div><dt>Functions</dt><dd>${Number(values.functions || 0)}</dd></div>
+                <div><dt>Event listeners</dt><dd>${Number(values.event_listeners || 0)}</dd></div>
+                <div><dt>DOM access</dt><dd>${Number(values.dom_accesses || 0)}</dd></div>
+                <div><dt>Fetch/API calls</dt><dd>${Number(values.fetch_api_calls || 0)}</dd></div>
+                <div><dt>Local/session storage</dt><dd>${values.storage_detected ? "Detected" : "Not detected"}</dd></div>
+                <div><dt>Imported libraries</dt><dd>${Number(values.imported_libraries || 0)}</dd></div>
+                <div><dt>Repeated code blocks</dt><dd>${values.repeated_code_blocks ? "Potential duplication" : "None detected"}</dd></div>
+            </dl>
+        </section>
+    `;
+}
+
 function renderAssetManagerContent(payload) {
     const host = document.querySelector("#asset-manager-content");
     if (!host) return;
@@ -117,7 +136,7 @@ function renderAssetManagerContent(payload) {
         <div class="asset-manager-counts-grid">
             <button type="button" class="asset-manager-count-card asset-manager-count-card-button" id="asset-manager-html-details-toggle" aria-expanded="false" aria-controls="asset-manager-html-details"><span class="asset-manager-count-label">HTML</span><span class="asset-manager-count-value">${Number(counts.html || 0)}</span></button>
             <button type="button" class="asset-manager-count-card asset-manager-count-card-button" id="asset-manager-css-details-toggle" aria-expanded="false" aria-controls="asset-manager-css-details"><span class="asset-manager-count-label">CSS</span><span class="asset-manager-count-value">${Number(counts.css || 0)}</span></button>
-            <div class="asset-manager-count-card"><span class="asset-manager-count-label">JavaScript</span><span class="asset-manager-count-value">${Number(counts.javascript || 0)}</span></div>
+            <button type="button" class="asset-manager-count-card asset-manager-count-card-button" id="asset-manager-javascript-details-toggle" aria-expanded="false" aria-controls="asset-manager-javascript-details"><span class="asset-manager-count-label">JavaScript</span><span class="asset-manager-count-value">${Number(counts.javascript || 0)}</span></button>
             <div class="asset-manager-count-card"><span class="asset-manager-count-label">Images</span><span class="asset-manager-count-value">${Number(counts.images || 0)}</span></div>
             <div class="asset-manager-count-card"><span class="asset-manager-count-label">Media</span><span class="asset-manager-count-value">${Number(counts.media || 0)}</span></div>
             <div class="asset-manager-count-card"><span class="asset-manager-count-label">Total</span><span class="asset-manager-count-value">${escapeAssetManagerHtml(formatAssetManagerBytes(payload?.total_size_bytes))}</span></div>
@@ -135,6 +154,7 @@ function renderAssetManagerContent(payload) {
         </div>
         ${renderHtmlDetails(payload?.html_details)}
         ${renderCssDetails({ ...payload?.css_details, stylesheets: counts.css })}
+        ${renderJavascriptDetails(payload?.javascript_details)}
     `;
 
     const htmlToggle = host.querySelector("#asset-manager-html-details-toggle");
@@ -151,6 +171,14 @@ function renderAssetManagerContent(payload) {
         const isOpen = !cssDetails.hidden;
         cssDetails.hidden = isOpen;
         cssToggle.setAttribute("aria-expanded", String(!isOpen));
+    });
+
+    const javascriptToggle = host.querySelector("#asset-manager-javascript-details-toggle");
+    const javascriptDetails = host.querySelector("#asset-manager-javascript-details");
+    javascriptToggle?.addEventListener("click", () => {
+        const isOpen = !javascriptDetails.hidden;
+        javascriptDetails.hidden = isOpen;
+        javascriptToggle.setAttribute("aria-expanded", String(!isOpen));
     });
 }
 

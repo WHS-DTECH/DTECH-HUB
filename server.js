@@ -11545,6 +11545,33 @@ function buildHtmlHealthDetails(htmlContents) {
   };
 }
 
+function buildJavascriptHealthDetails(javascriptContents) {
+  const jsText = javascriptContents.join("\n");
+  const functionMatches = jsText.match(/\b(?:async\s+)?function\s+[a-z_$][\w$]*\s*\(|(?:\([^)]*\)|[a-z_$][\w$]*)\s*=>/gi) || [];
+  const eventListenerMatches = jsText.match(/\.addEventListener\s*\(/gi) || [];
+  const domMatches = jsText.match(/\b(?:document|window)\.(?:querySelector(?:All)?|getElementById|createElement|appendChild|removeChild|innerHTML|textContent|classList)\b/gi) || [];
+  const fetchMatches = jsText.match(/\b(?:fetch|axios\.[a-z]+)\s*\(/gi) || [];
+  const storageMatches = jsText.match(/\b(?:localStorage|sessionStorage)\b/g) || [];
+  const importedLibraries = new Set();
+  const importPattern = /(?:import\s+(?:.+?\s+from\s+)?|require\()\s*["']([^"']+)["']/gi;
+  let importMatch;
+  while ((importMatch = importPattern.exec(jsText)) !== null) {
+    const library = String(importMatch[1] || "").trim();
+    if (library && !library.startsWith(".") && !library.startsWith("/")) importedLibraries.add(library);
+  }
+
+  return {
+    files: javascriptContents.length,
+    functions: functionMatches.length,
+    event_listeners: eventListenerMatches.length,
+    dom_accesses: domMatches.length,
+    fetch_api_calls: fetchMatches.length,
+    storage_detected: storageMatches.length > 0,
+    imported_libraries: importedLibraries.size,
+    repeated_code_blocks: false
+  };
+}
+
 // Public-repo-only: counts files by type, flags oversized images, and cross-references
 // HTML/CSS/JS files against the tree to find unused images and broken local links.
 app.get("/api/integrations/github/asset-health", async (req, res) => {
@@ -11584,6 +11611,7 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
     const brokenReferences = [];
     const cssContents = [];
     const htmlContents = [];
+    const javascriptContents = [];
     await Promise.all(filesToScan.map(async (filePath) => {
       try {
         const rawUrl = `${GITHUB_RAW_CONTENT_BASE}/${identifier.owner}/${identifier.repo}/${defaultBranch}/${filePath}`;
@@ -11592,6 +11620,7 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
         const content = await response.text();
         if (/\.css$/i.test(filePath)) cssContents.push(content);
         if (/\.html?$/i.test(filePath)) htmlContents.push(content);
+        if (/\.js$/i.test(filePath)) javascriptContents.push(content);
         extractLocalReferencesFromContent(content).forEach((ref) => {
           const resolved = resolveGithubRelativePath(filePath, ref);
           if (!resolved) return;
@@ -11634,6 +11663,7 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
       broken_references: brokenReferences.slice(0, 50),
       css_details: buildCssHealthDetails(cssContents, htmlContents),
       html_details: buildHtmlHealthDetails(htmlContents),
+      javascript_details: buildJavascriptHealthDetails(javascriptContents),
       scanned_file_count: filesToScan.length
     });
   } catch (error) {
