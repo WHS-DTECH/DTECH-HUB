@@ -2389,9 +2389,7 @@ function renderChecklistCards(detail, allItems) {
         const title = standard === "digital-outcome" ? "Digital Outcome Description" : `Standard ${escapeTaskListHtml(standard)}`;
         const summaryTitle = standard === "digital-outcome" ? "Digital Outcome Topic" : title;
         const rows = Array.isArray(taskListState.checklistState[standard]) ? taskListState.checklistState[standard] : [];
-        const digitalMediaType = (standard === "91893" || standard === "91903")
-            ? String(taskListState.allItems.find((item) => String(item.id) === String(taskListState.selectedId))?.digital_media_type || "").trim()
-            : "";
+        const digitalMediaType = getAllocatedDigitalMediaType(standard);
 
         return `
             <details class="task-list-checklist-card" open>
@@ -2411,6 +2409,21 @@ function renderChecklistCards(detail, allItems) {
     }).join("");
 
     checklistHost.innerHTML = cardsHtml;
+}
+
+function getAllocatedDigitalMediaType(standard) {
+    const standardCode = String(standard || "").trim();
+    if (standardCode !== "91893" && standardCode !== "91903") return "";
+
+    const selectedItem = taskListState.allItems.find((item) => String(item.id) === String(taskListState.selectedId));
+    const selectedType = String(selectedItem?.digital_media_type || "").trim();
+    if (selectedType) return selectedType;
+
+    const matchingAllocation = taskListState.allItems.find((item) => {
+        const projectTaskStandard = String(item?.standard_2 || "").match(/\b(91893|91903)\b/)?.[1] || "";
+        return projectTaskStandard === standardCode && String(item?.digital_media_type || "").trim();
+    });
+    return String(matchingAllocation?.digital_media_type || "").trim();
 }
 
 function getStandardCodes(detail, allItems = [], processStandard = "", projectTaskStandard = "") {
