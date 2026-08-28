@@ -66,6 +66,27 @@ function formatAssetManagerBytes(bytes) {
     return `${Math.round(value / 1024)} KB`;
 }
 
+function renderAssetManagerStudentDetails(allocation) {
+    const title = document.querySelector("#asset-manager-title");
+    if (!title) return;
+    document.querySelector("#asset-manager-student-details")?.remove();
+
+    const processStandard = String(allocation?.standard_1 || "").trim() || "Not set";
+    const projectTaskStandard = String(allocation?.standard_2 || "").trim() || "Not set";
+    const strand = String(allocation?.strand || "").trim() || "Not set";
+    const digitalMediaType = String(allocation?.digital_media_type || "").trim();
+    const detail = document.createElement("div");
+    detail.id = "asset-manager-student-details";
+    detail.className = "asset-manager-student-details";
+    detail.innerHTML = `
+        <span><strong>Process Std:</strong> ${escapeAssetManagerHtml(processStandard)}</span>
+        <span><strong>Project/Task Std:</strong> ${escapeAssetManagerHtml(projectTaskStandard)}</span>
+        <span><strong>Strand:</strong> ${escapeAssetManagerHtml(strand)}</span>
+        ${digitalMediaType ? `<span><strong>Digital Media:</strong> ${escapeAssetManagerHtml(digitalMediaType)}</span>` : ""}
+    `;
+    title.insertAdjacentElement("afterend", detail);
+}
+
 function renderCssDetails(details) {
     const values = details || {};
     return `
@@ -200,6 +221,7 @@ async function initAssetManagerPage() {
             `/api/activities/${encodeURIComponent(activityId)}/interests/${encodeURIComponent(studentEmail)}/evidence`,
             { headers: assetManagerHeaders({}) }
         );
+        renderAssetManagerStudentDetails(evidencePayload);
         repoUrl = findGithubRepoUrlFromEvidenceSteps(evidencePayload?.evidence_steps);
     } catch (error) {
         setAssetManagerStatus(error?.message || "Could not load this student's evidence.", true);

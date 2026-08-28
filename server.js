@@ -8224,7 +8224,7 @@ app.get("/api/activities/:id/interests/:studentEmail/evidence", async (req, res)
 
   try {
     const result = await pool.query(
-      "SELECT standard_1, standard_2, evidence_steps FROM project_interests WHERE project_id = $1 AND student_email = $2 LIMIT 1",
+      "SELECT standard_1, standard_2, digital_media_type, evidence_steps FROM project_interests WHERE project_id = $1 AND student_email = $2 LIMIT 1",
       [projectId, studentEmail]
     );
 
@@ -8234,10 +8234,18 @@ app.get("/api/activities/:id/interests/:studentEmail/evidence", async (req, res)
     }
 
     const row = result.rows[0] || {};
+    const studentDirectoryRows = await getStudentDirectoryRows();
+    const directoryStudent = studentDirectoryRows
+      .map((entry) => buildStudentClassManagementRow(entry))
+      .find((entry) => (Array.isArray(entry?.linked_emails) ? entry.linked_emails : [])
+        .map((linkedEmail) => normalizeEmail(linkedEmail))
+        .includes(studentEmail));
     res.json({
       student_email: studentEmail,
       standard_1: String(row.standard_1 || "").trim(),
       standard_2: String(row.standard_2 || "").trim(),
+      digital_media_type: String(row.digital_media_type || "").trim(),
+      strand: Array.isArray(directoryStudent?.programs) ? directoryStudent.programs.join(", ") : "",
       evidence_steps: normalizeEvidenceStepsPayload(row.evidence_steps)
     });
   } catch (_error) {
