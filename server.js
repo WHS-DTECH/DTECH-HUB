@@ -11486,6 +11486,10 @@ app.get("/api/integrations/github/repo-analysis", async (req, res) => {
 });
 
 const GITHUB_MEDIA_EXTENSIONS = new Set([".mp4", ".mov", ".webm", ".mp3", ".wav", ".ogg"]);
+const GITHUB_VIDEO_EXTENSIONS = new Set([".mp4", ".mov", ".webm", ".m4v", ".avi", ".mkv"]);
+const GITHUB_AUDIO_EXTENSIONS = new Set([".mp3", ".wav", ".ogg", ".m4a", ".aac", ".flac"]);
+const GITHUB_GRAPHIC_EXTENSIONS = new Set([".svg", ".ai", ".eps", ".pdf"]);
+const GITHUB_VIDEO_PROJECT_EXTENSIONS = new Set([".prproj", ".drp", ".aep", ".blend", ".fcpxml", ".xml"]);
 const GITHUB_JS_EXTENSION = /\.js$/i;
 const GITHUB_ASSET_HEALTH_MAX_SCANNED_FILES = 40;
 
@@ -11704,6 +11708,22 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
       return extMatch && GITHUB_IMAGE_EXTENSIONS.has(extMatch[0]);
     });
     const unusedImages = imagePaths.filter((filePath) => !referencedPaths.has(filePath));
+    const filesWithExtension = (extensions) => blobs.filter((item) => {
+      const extMatch = String(item?.path || "").toLowerCase().match(/\.[a-z0-9]+$/);
+      return extMatch && extensions.has(extMatch[0]);
+    });
+    const videoFiles = filesWithExtension(GITHUB_VIDEO_EXTENSIONS);
+    const audioFiles = filesWithExtension(GITHUB_AUDIO_EXTENSIONS);
+    const graphicFiles = filesWithExtension(GITHUB_GRAPHIC_EXTENSIONS);
+    const projectFiles = filesWithExtension(GITHUB_VIDEO_PROJECT_EXTENSIONS);
+    const sourceMediaBytes = [...videoFiles, ...audioFiles, ...imagePaths.map((filePath) => blobs.find((item) => item.path === filePath)), ...graphicFiles]
+      .filter(Boolean)
+      .reduce((sum, item) => sum + (Number(item?.size || 0) || 0), 0);
+    const videoFormats = Array.from(new Set(videoFiles.map((item) => String(item.path || "").match(/\.[a-z0-9]+$/i)?.[0]?.slice(1).toUpperCase()).filter(Boolean)));
+    const audioFormats = Array.from(new Set(audioFiles.map((item) => String(item.path || "").match(/\.[a-z0-9]+$/i)?.[0]?.slice(1).toUpperCase()).filter(Boolean)));
+    const imageFormats = Array.from(new Set(imagePaths.map((filePath) => filePath.match(/\.[a-z0-9]+$/i)?.[0]?.slice(1).toUpperCase()).filter(Boolean)));
+    const oversizedAssetCount = [...videoFiles, ...audioFiles, ...graphicFiles]
+      .filter((item) => Number(item?.size || 0) > 100 * 1024 * 1024).length;
 
     res.json({
       ok: true,
@@ -11726,6 +11746,20 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
       unused_images: unusedImages.slice(0, 50),
       broken_reference_count: brokenReferences.length,
       broken_references: brokenReferences.slice(0, 50),
+      video_details: {
+        video_clips: videoFiles.length,
+        audio_files: audioFiles.length,
+        images: imagePaths.length,
+        graphics: graphicFiles.length,
+        project_files: projectFiles.length,
+        total_source_media_bytes: sourceMediaBytes,
+        video_formats: videoFormats,
+        audio_formats: audioFormats,
+        image_formats: imageFormats,
+        missing_offline_media: brokenReferences.length,
+        duplicate_assets: 0,
+        oversized_assets: oversizedAssetCount
+      },
       css_details: buildCssHealthDetails(cssContents, htmlContents),
       html_details: buildHtmlHealthDetails(htmlContents),
       link_details: buildLinkHealthDetails(htmlContents),

@@ -1,4 +1,5 @@
 const ASSET_MANAGER_AUTH_KEY = "hub_google_auth_v1";
+let assetManagerAllocation = {};
 
 function assetManagerReadAuth() {
     try {
@@ -146,6 +147,44 @@ function renderJavascriptDetails(details) {
     `;
 }
 
+function formatAssetManagerFormats(values) {
+    return Array.isArray(values) && values.length ? values.join(" / ") : "None found";
+}
+
+function renderVideoDetails(payload) {
+    const details = payload?.video_details || {};
+    return `
+        <details class="asset-manager-result-section" open>
+            <summary class="asset-manager-result-summary">Media Inventory</summary>
+            <div class="asset-manager-result-body">${renderAssetManagerDetailList([
+                ["Video clips", Number(details.video_clips || 0)],
+                ["Audio files", Number(details.audio_files || 0)],
+                ["Images", Number(details.images || 0)],
+                ["Graphics", Number(details.graphics || 0)],
+                ["Project files", Number(details.project_files || 0)],
+                ["Total source media", formatAssetManagerBytes(details.total_source_media_bytes)]
+            ])}</div>
+        </details>
+        <details class="asset-manager-result-section">
+            <summary class="asset-manager-result-summary">Video Technical Health</summary>
+            <div class="asset-manager-result-body">${renderAssetManagerDetailList([
+                ["Resolution(s)", "Not available from GitHub file metadata"],
+                ["Frame rates", "Not available from GitHub file metadata"],
+                ["Audio", formatAssetManagerFormats(details.audio_formats)],
+                ["Images", formatAssetManagerFormats(details.image_formats)],
+                ["Video formats", formatAssetManagerFormats(details.video_formats)],
+                ["Missing/offline media", Number(details.missing_offline_media || 0)],
+                ["Duplicate assets", Number(details.duplicate_assets || 0)],
+                ["Oversized assets", Number(details.oversized_assets || 0)]
+            ])}</div>
+        </details>
+    `;
+}
+
+function renderAssetManagerDetailList(items) {
+    return `<div class="asset-manager-detail-panel"><dl class="asset-manager-detail-list">${items.map(([label, value]) => `<div><dt>${escapeAssetManagerHtml(label)}</dt><dd>${escapeAssetManagerHtml(value)}</dd></div>`).join("")}</dl></div>`;
+}
+
 function renderAssetManagerContent(payload) {
     const host = document.querySelector("#asset-manager-content");
     if (!host) return;
@@ -154,11 +193,13 @@ function renderAssetManagerContent(payload) {
     const oversizedCount = Number(payload?.oversized_image_count || 0);
     const unusedCount = Number(payload?.unused_image_count || 0);
     const brokenCount = Number(payload?.broken_reference_count || 0);
+    const isVideo = String(assetManagerAllocation?.digital_media_type || "").trim().toLowerCase() === "video";
 
     host.innerHTML = `
         <details class="asset-manager-web-details" open>
-            <summary class="asset-manager-web-details-summary">WEB Details</summary>
+            <summary class="asset-manager-web-details-summary">${isVideo ? "VIDEO Details" : "WEB Details"}</summary>
             <div class="asset-manager-web-details-body">
+            ${isVideo ? renderVideoDetails(payload) : `
         <div class="asset-manager-counts-grid">
             <div class="asset-manager-count-card"><span class="asset-manager-count-label">HTML</span><span class="asset-manager-count-value">${Number(counts.html || 0)}</span></div>
             <div class="asset-manager-count-card"><span class="asset-manager-count-label">CSS</span><span class="asset-manager-count-value">${Number(counts.css || 0)}</span></div>
@@ -181,6 +222,7 @@ function renderAssetManagerContent(payload) {
         <details class="asset-manager-result-section"><summary class="asset-manager-result-summary">HTML Details</summary><div class="asset-manager-result-body">${renderHtmlDetails({ ...payload?.html_details, total_pages: counts.html })}</div></details>
         <details class="asset-manager-result-section"><summary class="asset-manager-result-summary">CSS Details</summary><div class="asset-manager-result-body">${renderCssDetails({ ...payload?.css_details, stylesheets: counts.css })}</div></details>
         <details class="asset-manager-result-section"><summary class="asset-manager-result-summary">JavaScript Details</summary><div class="asset-manager-result-body">${renderJavascriptDetails({ ...payload?.javascript_details, total_files: counts.javascript })}</div></details>
+            `}
             </div>
         </details>
     `;
@@ -226,6 +268,7 @@ async function initAssetManagerPage() {
             `/api/activities/${encodeURIComponent(activityId)}/interests/${encodeURIComponent(studentEmail)}/evidence`,
             { headers: assetManagerHeaders({}) }
         );
+        assetManagerAllocation = evidencePayload || {};
         renderAssetManagerStudentDetails(evidencePayload);
         repoUrl = findGithubRepoUrlFromEvidenceSteps(evidencePayload?.evidence_steps);
     } catch (error) {
