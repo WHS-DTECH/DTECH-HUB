@@ -5,6 +5,7 @@ const TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX = "hub_task_topic_slide_sync_v1";
 const DIGIMED_CONVENTIONS_ACK_STORAGE_PREFIX = "hub_digimed_conventions_ack_v1";
 const DIGIMED_UX_PRINCIPLES_ACK_STORAGE_PREFIX = "hub_digimed_ux_principles_ack_v1";
 const DIGIMED_VIDEO_UX_PRINCIPLES_ACK_STORAGE_PREFIX = "hub_digimed_video_ux_principles_ack_v1";
+const DIGIMED_VIDEO_CONVENTIONS_ACK_STORAGE_PREFIX = "hub_digimed_video_conventions_ack_v1";
 const DIGIMED_EFFICIENT_TOOLS_STORAGE_PREFIX = "hub_digimed_efficient_tools_v1";
 const DIGIMED_EFFICIENT_TOOLS_SUBTASKS = [
     "Management of assets",
@@ -1345,11 +1346,14 @@ function getDigiMedConventionsAcknowledgementCount(activityId, email, stateMap =
     }
 }
 
-function getDigiMedConventionsSubtask(stateMap = {}) {
+function getDigiMedConventionsSubtask(stateMap = {}, digitalMediaType = "") {
     const activityId = taskListState.selectedId;
+    const isVideo = String(digitalMediaType || "").trim().toLowerCase() === "video";
     return {
-        label: "Conventions (WEB)",
-        href: buildCustomActivityLink(activityId, "Using relevant conventions for the media type.", "Conventions (WEB)", "relevant-digimed-conventions"),
+        label: isVideo ? "Conventions (VIDEO)" : "Conventions (WEB)",
+        href: isVideo
+            ? buildCustomActivityLink(activityId, "Video Conventions", "Conventions (VIDEO)", "video-conventions")
+            : buildCustomActivityLink(activityId, "Using relevant conventions for the media type.", "Conventions (WEB)", "relevant-digimed-conventions"),
         count: getDigiMedConventionsAcknowledgementCount(activityId, getTaskListEmail(), stateMap)
     };
 }
@@ -2035,8 +2039,8 @@ function renderChecklistCards(detail, allItems) {
                                 const is91903UXPrinciplesRow = /applying user experience principles relevant to the purpose of the outcome|applying user experience principles to improve the quality of the digital media outcome/i.test(stepText);
                                 const is91893EfficientToolsRow = /using efficient tools and techniques in the outcome.?s production/i.test(stepText);
                                 const is91893IntegrityTestingRow = /applying appropriate data integrity and testing procedures/i.test(stepText);
-                                const conventionsSubtask = is91893ConventionsRow ? getDigiMedConventionsSubtask(taskListState.fullEvidenceState) : null;
                                 const digitalMediaType = getAllocatedDigitalMediaType(standard).toLowerCase();
+                                const conventionsSubtask = is91893ConventionsRow ? getDigiMedConventionsSubtask(taskListState.fullEvidenceState, digitalMediaType) : null;
                                 const uxPrinciplesSubtask = is91903UXPrinciplesRow ? getDigiMedUXPrinciplesSubtask(taskListState.fullEvidenceState, digitalMediaType) : null;
                                 const integrityTestingIsVideo = is91893IntegrityTestingRow && digitalMediaType === "video";
                                 const integrityTestingTitle = integrityTestingIsVideo ? "Integrity & Validation (VIDEO)" : "Integrity & Validation (WEB)";
@@ -2105,10 +2109,10 @@ function renderChecklistCards(detail, allItems) {
                                     ${conventionsSubtask ? `
                                         <div class="task-list-decomposition-subtasks">
                                             <p class="task-list-system-title">SUBTASKS</p>
-                                            <p class="task-list-achieved-note">Convention areas acknowledged on your Conventions (WEB) page.</p>
+                                            <p class="task-list-achieved-note">Convention areas acknowledged on your ${escapeTaskListHtml(conventionsSubtask.label)} page.</p>
                                             <div class="task-list-decomposition-category-list">
                                                 <a class="task-list-decomposition-category is-covered" href="${escapeTaskListHtml(conventionsSubtask.href)}">
-                                                    <span class="task-list-decomposition-category-label">CONVENTIONS (WEB)</span>
+                                                    <span class="task-list-decomposition-category-label">${escapeTaskListHtml(conventionsSubtask.label).toUpperCase()}</span>
                                                     <span class="task-list-decomposition-category-count">${conventionsSubtask.count}</span>
                                                 </a>
                                             </div>
