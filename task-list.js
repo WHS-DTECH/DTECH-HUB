@@ -2080,7 +2080,7 @@ function renderChecklistCards(detail, allItems) {
                                     ` : ""}
                                     ${is91893EfficientToolsRow ? `
                                         <div class="task-list-decomposition-subtasks">
-                                            <p class="task-list-system-title">SUBTASKS</p>
+                                            <p class="task-list-system-title">${digitalMediaType === "web" ? "SUBTASKS (WEB)" : "SUBTASKS"}</p>
                                             <p class="task-list-achieved-note">Examples of efficient tools and techniques.</p>
                                             <div class="task-list-decomposition-subtask-list">
                                                 ${DIGIMED_EFFICIENT_TOOLS_SUBTASKS.map((subtask) => `
