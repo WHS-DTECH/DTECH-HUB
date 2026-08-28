@@ -17,6 +17,21 @@ const DIGIMED_EFFICIENT_TOOLS_SUBTASKS = [
     "HTML/CSS validation procedures",
     "Optimisation of media assets"
 ];
+const DIGIMED_VIDEO_EFFICIENT_TOOLS_SUBTASKS = [
+    "Management of media assets",
+    "Appropriate folder/bin organisation",
+    "Appropriate file naming",
+    "Storyboards / shot lists / run-sheets",
+    "Reusing titles, presets, effects or templates",
+    "Adjustment layers / nested sequences where appropriate",
+    "Proxy media / optimised editing workflow",
+    "Keyboard shortcuts / efficient editing workflow",
+    "Non-destructive editing",
+    "Appropriate sequence/project settings",
+    "Optimisation/compression of media assets",
+    "Appropriate export settings",
+    "Version control / project backups"
+];
 const DIGIMED_TOOLS_TECHNIQUES_SUBTASKS = [
     "Creating or customising scripts, code or presets",
     "Using a combination of steps to manipulate or enhance elements",
@@ -2043,6 +2058,9 @@ function renderChecklistCards(detail, allItems) {
                                 const conventionsSubtask = is91893ConventionsRow ? getDigiMedConventionsSubtask(taskListState.fullEvidenceState, digitalMediaType) : null;
                                 const uxPrinciplesSubtask = is91903UXPrinciplesRow ? getDigiMedUXPrinciplesSubtask(taskListState.fullEvidenceState, digitalMediaType) : null;
                                 const integrityTestingIsVideo = is91893IntegrityTestingRow && digitalMediaType === "video";
+                                const efficientToolsSubtasks = digitalMediaType === "video"
+                                    ? DIGIMED_VIDEO_EFFICIENT_TOOLS_SUBTASKS
+                                    : DIGIMED_EFFICIENT_TOOLS_SUBTASKS;
                                 const integrityTestingTitle = integrityTestingIsVideo ? "Integrity & Validation (VIDEO)" : "Integrity & Validation (WEB)";
                                 const integrityTestingHref = integrityTestingIsVideo
                                     ? buildCustomActivityLink(taskListState.selectedId, "Integrity & Validation (VIDEO)", "Integrity & Validation (VIDEO)", "video-integrity-testing")
@@ -2080,19 +2098,21 @@ function renderChecklistCards(detail, allItems) {
                                     ` : ""}
                                     ${is91893EfficientToolsRow ? `
                                         <div class="task-list-decomposition-subtasks">
-                                            <p class="task-list-system-title">${digitalMediaType === "web" ? "SUBTASKS (WEB)" : "SUBTASKS"}</p>
+                                            <p class="task-list-system-title">${digitalMediaType === "video" ? "SUBTASKS (VIDEO)" : digitalMediaType === "web" ? "SUBTASKS (WEB)" : "SUBTASKS"}</p>
                                             <p class="task-list-achieved-note">Examples of efficient tools and techniques.</p>
                                             <div class="task-list-decomposition-subtask-list">
-                                                ${DIGIMED_EFFICIENT_TOOLS_SUBTASKS.map((subtask) => `
+                                                ${efficientToolsSubtasks.map((subtask) => `
                                                     <label class="task-list-decomposition-subtask ${efficientToolsState[subtask] ? "is-complete" : ""}">
                                                         <input type="checkbox" data-digimed-efficient-tool="${escapeTaskListHtml(subtask)}" ${efficientToolsState[subtask] ? "checked" : ""}>
                                                         <span>${escapeTaskListHtml(subtask)}</span>
                                                     </label>
                                                 `).join("")}
                                             </div>
-                                            ${githubRepoAnalysis?.syncedAt
+                                            ${digitalMediaType === "video"
+                                                ? `<p class="task-list-achieved-note">Tick the media-production practices you have used and can demonstrate in your project evidence.</p>`
+                                                : (githubRepoAnalysis?.syncedAt
                                                 ? `<p class="task-list-achieved-note">GitHub last synced: ${escapeTaskListHtml(formatTaskListTimestamp(githubRepoAnalysis.syncedAt))} (${Number(githubRepoAnalysis.commitCount || 0)} commits across ${Number(githubRepoAnalysis.commitDayCount || 0)} day${Number(githubRepoAnalysis.commitDayCount || 0) === 1 ? "" : "s"})</p>`
-                                                : `<p class="task-list-achieved-note">Click Sync from GitHub above to auto-check these boxes from your public repo.</p>`}
+                                                : `<p class="task-list-achieved-note">Click Sync from GitHub above to auto-check these boxes from your public repo.</p>`) }
                                         </div>
                                     ` : ""}
                                     ${is91893IntegrityTestingRow ? `
