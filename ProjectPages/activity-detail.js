@@ -11409,14 +11409,10 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                 ...(Array.isArray(allocationPayload?.projects) ? allocationPayload.projects : [])
             ];
             const processAllocation = allocations.find((allocation) => String(allocation?.id || "") === String(projectId)) || interestData?.my_allocation || {};
-            const mediaAllocation = allocations.find((allocation) => {
-                const standard = String(allocation?.standard_2 || "").match(/\b(91893|91903)\b/)?.[1] || "";
-                return Boolean(standard && String(allocation?.digital_media_type || "").trim());
-            }) || processAllocation;
-            const digitalMediaType = String(mediaAllocation?.digital_media_type || "").trim();
+            const digitalMediaType = String(processAllocation?.digital_media_type || "").trim();
             const processStandard = String(processAllocation?.standard_1 || "").trim() || "Not set";
-            const projectTaskStandard = String(mediaAllocation?.standard_2 || processAllocation?.standard_2 || "").trim() || "Not set";
-            const strand = String(mediaAllocation?.course_type || processAllocation?.course_type || "").trim() || "Not set";
+            const projectTaskStandard = String(processAllocation?.standard_2 || "").trim() || "Not set";
+            const strand = String(processAllocation?.course_type || "").trim() || "Not set";
             const detailsSection = document.createElement("section");
             detailsSection.className = "proposal-section interest-section";
             detailsSection.id = "development-steps-student-details";
