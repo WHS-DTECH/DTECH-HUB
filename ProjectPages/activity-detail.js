@@ -126,6 +126,12 @@ const DIGIMED_VIDEO_CONVENTION_CHECKS = [
     ["Narrative structure", "Beginning/development/conclusion where appropriate"],
     ["Genre conventions", "Conventions appropriate to documentary, tutorial, advertisement, narrative film, etc."]
 ];
+const DIGIMED_VIDEO_PRODUCTION_PROGRESS_STORAGE_PREFIX = "hub_digimed_video_production_progress_v1";
+const DIGIMED_VIDEO_PRODUCTION_PROGRESS = {
+    "Pre-production": ["Storyboard", "Shot list", "Asset planning"],
+    "Production": ["Footage captured", "Audio captured", "Original assets created"],
+    "Post-production": ["Rough cut", "Fine cut", "Audio mix", "Colour correction/grading", "Titles/graphics", "Captions", "Final export"]
+};
 const EVIDENCE_STEPS_TARGET_STANDARDS = new Set(["92005", "91897", "91907"]);
 
 const DIGITAL_OUTCOME_DETAILS_TASKS = [
@@ -498,6 +504,26 @@ function readDigiMedVideoConventionsChecks(activityId, email) {
 function writeDigiMedVideoConventionsChecks(activityId, email, value) {
     try {
         localStorage.setItem(getDigiMedVideoConventionsKey(activityId, email), JSON.stringify(value || {}));
+    } catch (_error) {
+    }
+}
+
+function getDigiMedVideoProductionProgressKey(activityId, email) {
+    return `${DIGIMED_VIDEO_PRODUCTION_PROGRESS_STORAGE_PREFIX}:${String(activityId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
+}
+
+function readDigiMedVideoProductionProgress(activityId, email) {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(getDigiMedVideoProductionProgressKey(activityId, email)) || "{}");
+        return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (_error) {
+        return {};
+    }
+}
+
+function writeDigiMedVideoProductionProgress(activityId, email, value) {
+    try {
+        localStorage.setItem(getDigiMedVideoProductionProgressKey(activityId, email), JSON.stringify(value || {}));
     } catch (_error) {
     }
 }
@@ -11210,6 +11236,8 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         && selectedTaskTopic.toLowerCase().includes("project management");
     const isTestingFunctionsTaskTopicPage = isTaskTopicPage
         && /testing\s+functions|test(?:ing)?\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`);
+    const isDevelopmentStepsTaskTopicPage = isTaskTopicPage
+        && isDigitalOutcomeDevelopmentToolsCriterion(selectedTaskTopic, selectedTaskShortName);
     const isCodeValidationTaskTopicPage = isTaskTopicPage
         && isCodeValidationCriterion(selectedTaskTopic, selectedTaskShortName);
     const taskTopicContextSignals = [
@@ -11344,6 +11372,64 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
 
     section.innerHTML = html;
     host.appendChild(section);
+
+    if (email && !isTeacher && isDevelopmentStepsTaskTopicPage) {
+        try {
+            const allocationResponse = await fetch("/api/my-allocations", { headers: buildWriteHeaders() });
+            const allocationPayload = allocationResponse.ok ? await allocationResponse.json() : {};
+            const allocations = [
+                ...(Array.isArray(allocationPayload?.assessment_tasks) ? allocationPayload.assessment_tasks : []),
+                ...(Array.isArray(allocationPayload?.projects) ? allocationPayload.projects : [])
+            ];
+            const processAllocation = allocations.find((allocation) => String(allocation?.id || "") === String(projectId)) || interestData?.my_allocation || {};
+            const mediaAllocation = allocations.find((allocation) => {
+                const standard = String(allocation?.standard_2 || "").match(/\b(91893|91903)\b/)?.[1] || "";
+                return Boolean(standard && String(allocation?.digital_media_type || "").trim());
+            }) || processAllocation;
+            const digitalMediaType = String(mediaAllocation?.digital_media_type || "").trim();
+            const processStandard = String(processAllocation?.standard_1 || "").trim() || "Not set";
+            const projectTaskStandard = String(mediaAllocation?.standard_2 || processAllocation?.standard_2 || "").trim() || "Not set";
+            const strand = String(mediaAllocation?.course_type || processAllocation?.course_type || "").trim() || "Not set";
+            const detailsSection = document.createElement("section");
+            detailsSection.className = "proposal-section interest-section";
+            detailsSection.id = "development-steps-student-details";
+            detailsSection.innerHTML = `
+                <h2>Student Details</h2>
+                <p class="interest-count"><strong>Process Std:</strong> ${escapeHtml(processStandard)} &nbsp; <strong>Project/Task Std:</strong> ${escapeHtml(projectTaskStandard)} &nbsp; <strong>Strand:</strong> ${escapeHtml(strand)}${digitalMediaType ? ` &nbsp; <strong>Digital Media:</strong> ${escapeHtml(digitalMediaType)}` : ""}</p>
+            `;
+            section.insertAdjacentElement("afterend", detailsSection);
+
+            if (digitalMediaType.toLowerCase() === "video") {
+                const checks = readDigiMedVideoProductionProgress(projectId, email);
+                const trackerSection = document.createElement("section");
+                trackerSection.className = "proposal-section interest-section";
+                trackerSection.id = "development-steps-video-tracker";
+                trackerSection.innerHTML = `
+                    <h2>Tracker (VIDEO)</h2>
+                    ${Object.entries(DIGIMED_VIDEO_PRODUCTION_PROGRESS).map(([stage, items]) => `
+                        <section class="task-topic-guide-block">
+                            <h3>${escapeHtml(stage)}</h3>
+                            <div class="task-list-decomposition-subtask-list">
+                                ${items.map((item) => `<label class="task-list-decomposition-subtask ${checks[item] ? "is-complete" : ""}"><input type="checkbox" data-video-production-progress="${escapeHtml(item)}" ${checks[item] ? "checked" : ""}><span>${escapeHtml(item)}</span></label>`).join("")}
+                            </div>
+                        </section>
+                    `).join("")}
+                `;
+                detailsSection.insertAdjacentElement("afterend", trackerSection);
+                trackerSection.querySelectorAll("[data-video-production-progress]").forEach((checkbox) => {
+                    checkbox.addEventListener("change", () => {
+                        const item = String(checkbox.getAttribute("data-video-production-progress") || "").trim();
+                        if (!item) return;
+                        checks[item] = Boolean(checkbox.checked);
+                        writeDigiMedVideoProductionProgress(projectId, email, checks);
+                        checkbox.closest(".task-list-decomposition-subtask")?.classList.toggle("is-complete", Boolean(checkbox.checked));
+                    });
+                });
+            }
+        } catch (_error) {
+            // The existing Student Interest section remains available if allocation details cannot be loaded.
+        }
+    }
 
     const taskTopicValue = String(selectedTaskTopic || "").trim();
     if (email && !isTeacher && isTaskTopicPage) {
