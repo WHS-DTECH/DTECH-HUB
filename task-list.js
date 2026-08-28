@@ -1348,8 +1348,8 @@ function getDigiMedConventionsAcknowledgementCount(activityId, email, stateMap =
 function getDigiMedConventionsSubtask(stateMap = {}) {
     const activityId = taskListState.selectedId;
     return {
-        label: "Conventions",
-        href: buildCustomActivityLink(activityId, "Using relevant conventions for the media type.", "Relevant DigiMed Conventions", "relevant-digimed-conventions"),
+        label: "Conventions (WEB)",
+        href: buildCustomActivityLink(activityId, "Using relevant conventions for the media type.", "Conventions (WEB)", "relevant-digimed-conventions"),
         count: getDigiMedConventionsAcknowledgementCount(activityId, getTaskListEmail(), stateMap)
     };
 }
@@ -2105,10 +2105,10 @@ function renderChecklistCards(detail, allItems) {
                                     ${conventionsSubtask ? `
                                         <div class="task-list-decomposition-subtasks">
                                             <p class="task-list-system-title">SUBTASKS</p>
-                                            <p class="task-list-achieved-note">Convention areas acknowledged in your Conventions slide.</p>
+                                            <p class="task-list-achieved-note">Convention areas acknowledged on your Conventions (WEB) page.</p>
                                             <div class="task-list-decomposition-category-list">
                                                 <a class="task-list-decomposition-category is-covered" href="${escapeTaskListHtml(conventionsSubtask.href)}">
-                                                    <span class="task-list-decomposition-category-label">CONVENTIONS</span>
+                                                    <span class="task-list-decomposition-category-label">CONVENTIONS (WEB)</span>
                                                     <span class="task-list-decomposition-category-count">${conventionsSubtask.count}</span>
                                                 </a>
                                             </div>

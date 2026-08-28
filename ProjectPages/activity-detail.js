@@ -127,7 +127,7 @@ const DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE = "Development Steps";
 const DIGITAL_OUTCOME_TRIALLING_COMPONENTS_TITLE = "Trialling Components";
 const DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE = "Tools & Techniques";
 const DIGITAL_OUTCOME_TESTING_FUNCTIONS_TITLE = "Testing Functions";
-const DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE = "Relevant DigiMed Conventions";
+const DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE = "Conventions (WEB)";
 const DIGITAL_OUTCOME_UX_PRINCIPLES_TITLE = "UX Principles (Web)";
 const DIGITAL_OUTCOME_VIDEO_INTEGRITY_TITLE = "Integrity & Validation (VIDEO)";
 const DIGITAL_OUTCOME_VIDEO_UX_PRINCIPLES_TITLE = "UX Principles (Video)";
@@ -9419,7 +9419,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 ["Feedback", "Users receive appropriate feedback when interacting"],
                 ["Content organisation", "Headings, sections and grouping make information understandable"]
             ];
-            return `<section class="task-topic-guide-block"><h3>Relevant DigiMed Conventions</h3><p class="task-topic-submission-note" id="digimed-conventions-last-sync">Last Sync: ${escapeHtml(String(readStoredTaskTopicSlideSyncEntryByTemplateId(id, readStoredHubEmail(), "relevant-digimed-conventions")?.savedAt || "Not yet"))}</p><table class="digital-outcome-must-dos-table digital-outcome-conventions-table"><thead><tr><th>Convention area</th><th>Possible website conventions</th><th>Discussed</th></tr></thead><tbody>
+            return `<section class="task-topic-guide-block"><h3>Conventions (WEB)</h3><p class="task-topic-submission-note" id="digimed-conventions-last-sync">Last Sync: ${escapeHtml(String(readStoredTaskTopicSlideSyncEntryByTemplateId(id, readStoredHubEmail(), "relevant-digimed-conventions")?.savedAt || "Not yet"))}</p><table class="digital-outcome-must-dos-table digital-outcome-conventions-table"><thead><tr><th>Convention area</th><th>Possible website conventions</th><th>Discussed</th></tr></thead><tbody>
                 ${rows.map(([area, description]) => `<tr><td>${escapeHtml(area)}</td><td>${escapeHtml(description)}</td><td class="digital-outcome-conventions-ack-cell"><label><input type="checkbox" data-digimed-convention-ack="${escapeHtml(area)}" ${acknowledgements[area] ? "checked" : ""}><span class="sr-only">Acknowledged ${escapeHtml(area)}</span></label></td></tr>`).join("")}
             </tbody></table></section>`;
         })()
