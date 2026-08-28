@@ -968,6 +968,9 @@ async function fetchTemplateLibraryPreviewByTemplateId(templateId = "") {
                 : null)
             || (targetTemplateId === "relevant-digimed-conventions"
                 ? entries.find((entry) => /relevant.*conventions/i.test(String(entry?.title || "")))
+                : null)
+            || (targetTemplateId === "project-management"
+                ? entries.find((entry) => /project\s+management/i.test(String(entry?.title || "")))
                 : null);
         if (!match) {
             return "";
@@ -9013,7 +9016,6 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                                             : isDigitalOutcomeDescriptionTopic
                                             ? "description"
                                             : keywordMatchedTopicKey;
-    const useDigitalOutcomeTemplateHero = Boolean(digitalOutcomeTopicKey);
     const mergedTaskTopicLinks = isTaskTopicView
         ? collectMergedTaskTopicLinks(data, id, taskTopicTitle, resolvedTaskShortName)
         : [];
@@ -9063,6 +9065,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         || resolvedTaskShortName.toLowerCase().includes("project management");
     const isDecompositionTopic = taskTopicTitle.toLowerCase().includes("decompos")
         || resolvedTaskShortName.toLowerCase().includes("decompos");
+    const useProjectManagementTemplateHero = isProjectManagementTopic;
+    const useDigitalOutcomeTemplateHero = Boolean(digitalOutcomeTopicKey) || useProjectManagementTemplateHero;
     const isDigitalOutcomeTopic = taskTopicTitle.toLowerCase().includes("digital outcome")
         || resolvedTaskShortName.toLowerCase().includes("digital outcome")
         || isDigitalOutcomeTargetAudienceTopic
@@ -9101,7 +9105,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         "relevant-implications": "relevant-implications",
         description: "digital-outcome-description"
     };
-    const preferredTemplateId = preferredTemplateIds[digitalOutcomeTopicKey] || "digital-outcome-description";
+    const preferredTemplateId = useProjectManagementTemplateHero
+        ? "project-management"
+        : (preferredTemplateIds[digitalOutcomeTopicKey] || "digital-outcome-description");
     if (useDigitalOutcomeTemplateHero) {
         templateLibraryParams.set("templateId", preferredTemplateId);
         // Add pre-filter topic name for template library search
@@ -9116,6 +9122,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             "development-steps": DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE,
             "project-success-criteria": DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE,
             "relevant-implications": DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE,
+            "project-management": "Project Management",
             "digital-outcome-description": DIGITAL_OUTCOME_DESCRIPTION_TITLE
         };
         const topicDisplayName = topicDisplayNames[preferredTemplateId] || DIGITAL_OUTCOME_DESCRIPTION_TITLE;

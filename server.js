@@ -4958,6 +4958,14 @@ function inferCanonicalTemplateIdentityFromTitle(title) {
     };
   }
 
+  if (/project\s+management/.test(normalizedTitle)) {
+    return {
+      id: "project-management",
+      title: "Project Management",
+      criteriaText: "Use recognised and appropriate project management techniques to plan the development of a digital technologies outcome."
+    };
+  }
+
   if (/triall?ing\s+components|trailing\s+components|trailing\s+comonents/.test(normalizedTitle)) {
     return {
       id: "trialling-components",
