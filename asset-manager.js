@@ -156,6 +156,9 @@ function renderAssetManagerContent(payload) {
     const brokenCount = Number(payload?.broken_reference_count || 0);
 
     host.innerHTML = `
+        <details class="asset-manager-web-details" open>
+            <summary class="asset-manager-web-details-summary">WEB Details</summary>
+            <div class="asset-manager-web-details-body">
         <div class="asset-manager-counts-grid">
             <div class="asset-manager-count-card"><span class="asset-manager-count-label">HTML</span><span class="asset-manager-count-value">${Number(counts.html || 0)}</span></div>
             <div class="asset-manager-count-card"><span class="asset-manager-count-label">CSS</span><span class="asset-manager-count-value">${Number(counts.css || 0)}</span></div>
@@ -178,6 +181,8 @@ function renderAssetManagerContent(payload) {
         <details class="asset-manager-result-section"><summary class="asset-manager-result-summary">HTML Details</summary><div class="asset-manager-result-body">${renderHtmlDetails({ ...payload?.html_details, total_pages: counts.html })}</div></details>
         <details class="asset-manager-result-section"><summary class="asset-manager-result-summary">CSS Details</summary><div class="asset-manager-result-body">${renderCssDetails({ ...payload?.css_details, stylesheets: counts.css })}</div></details>
         <details class="asset-manager-result-section"><summary class="asset-manager-result-summary">JavaScript Details</summary><div class="asset-manager-result-body">${renderJavascriptDetails({ ...payload?.javascript_details, total_files: counts.javascript })}</div></details>
+            </div>
+        </details>
     `;
 }
 

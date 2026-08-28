@@ -206,6 +206,43 @@
             margin-top: 10px;
         }
 
+        .asset-manager-web-details {
+            border: 1px solid #c8d8ec;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #edf4fd;
+        }
+
+        .asset-manager-web-details-summary {
+            padding: 11px 13px;
+            cursor: pointer;
+            list-style: none;
+            color: #1a3651;
+            font-size: 0.9rem;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .asset-manager-web-details-summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .asset-manager-web-details-summary::before {
+            content: "+";
+            margin-right: 9px;
+            color: #1a5fa8;
+            font-size: 1.1rem;
+        }
+
+        .asset-manager-web-details[open] > .asset-manager-web-details-summary::before {
+            content: "-";
+        }
+
+        .asset-manager-web-details-body {
+            padding: 0 10px 10px;
+        }
+
         .asset-manager-result-summary {
             display: flex;
             align-items: center;
