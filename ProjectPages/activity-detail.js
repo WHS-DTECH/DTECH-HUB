@@ -132,6 +132,13 @@ const DIGIMED_VIDEO_PRODUCTION_PROGRESS = {
     "Production": ["Footage captured", "Audio captured", "Original assets created"],
     "Post-production": ["Rough cut", "Fine cut", "Audio mix", "Colour correction/grading", "Titles/graphics", "Captions", "Final export"]
 };
+const DIGIMED_WEB_PRODUCTION_PROGRESS_STORAGE_PREFIX = "hub_digimed_web_production_progress_v1";
+const DIGIMED_WEB_PRODUCTION_PROGRESS = {
+    "Pre-production / Planning": ["Digital outcome and purpose defined", "MUST-DOs identified", "End-user requirements identified", "Sitemap / site structure planned", "Wireframes / page layouts developed", "Asset requirements identified", "Tools & techniques identified", "Relevant implications considered"],
+    "Development": ["Folder/file structure established", "HTML structure developed", "Navigation developed", "CSS styling developed", "Media/assets integrated", "Responsive layout developed", "Interactive functionality developed", "Advanced/complex techniques implemented", "Components trialled and refined", "GitHub/version control used throughout"],
+    "Testing & Refinement": ["MUST-DO/functionality testing", "HTML validation", "CSS validation", "Links/navigation tested", "Responsive/device testing", "End-user testing", "Accessibility checks", "Asset optimisation", "Testing/trialling information acted upon", "Changes retested"],
+    "Final Production": ["Final content checked", "Unused/duplicate assets removed", "Final HTML/CSS validation", "Final functionality test", "Final responsive/device check", "Final asset optimisation", "Final version committed", "Final outcome published/deployed"]
+};
 const EVIDENCE_STEPS_TARGET_STANDARDS = new Set(["92005", "91897", "91907"]);
 
 const DIGITAL_OUTCOME_DETAILS_TASKS = [
@@ -524,6 +531,26 @@ function readDigiMedVideoProductionProgress(activityId, email) {
 function writeDigiMedVideoProductionProgress(activityId, email, value) {
     try {
         localStorage.setItem(getDigiMedVideoProductionProgressKey(activityId, email), JSON.stringify(value || {}));
+    } catch (_error) {
+    }
+}
+
+function getDigiMedWebProductionProgressKey(activityId, email) {
+    return `${DIGIMED_WEB_PRODUCTION_PROGRESS_STORAGE_PREFIX}:${String(activityId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
+}
+
+function readDigiMedWebProductionProgress(activityId, email) {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(getDigiMedWebProductionProgressKey(activityId, email)) || "{}");
+        return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (_error) {
+        return {};
+    }
+}
+
+function writeDigiMedWebProductionProgress(activityId, email, value) {
+    try {
+        localStorage.setItem(getDigiMedWebProductionProgressKey(activityId, email), JSON.stringify(value || {}));
     } catch (_error) {
     }
 }
@@ -11422,6 +11449,32 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                         if (!item) return;
                         checks[item] = Boolean(checkbox.checked);
                         writeDigiMedVideoProductionProgress(projectId, email, checks);
+                        checkbox.closest(".task-list-decomposition-subtask")?.classList.toggle("is-complete", Boolean(checkbox.checked));
+                    });
+                });
+            } else if (digitalMediaType.toLowerCase() === "web") {
+                const checks = readDigiMedWebProductionProgress(projectId, email);
+                const trackerSection = document.createElement("section");
+                trackerSection.className = "proposal-section interest-section";
+                trackerSection.id = "development-steps-web-tracker";
+                trackerSection.innerHTML = `
+                    <h2>Tracker (WEB)</h2>
+                    ${Object.entries(DIGIMED_WEB_PRODUCTION_PROGRESS).map(([stage, items]) => `
+                        <section class="task-topic-guide-block">
+                            <h3>${escapeHtml(stage)}</h3>
+                            <div class="task-list-decomposition-subtask-list">
+                                ${items.map((item) => `<label class="task-list-decomposition-subtask ${checks[item] ? "is-complete" : ""}"><input type="checkbox" data-web-production-progress="${escapeHtml(item)}" ${checks[item] ? "checked" : ""}><span>${escapeHtml(item)}</span></label>`).join("")}
+                            </div>
+                        </section>
+                    `).join("")}
+                `;
+                detailsSection.insertAdjacentElement("afterend", trackerSection);
+                trackerSection.querySelectorAll("[data-web-production-progress]").forEach((checkbox) => {
+                    checkbox.addEventListener("change", () => {
+                        const item = String(checkbox.getAttribute("data-web-production-progress") || "").trim();
+                        if (!item) return;
+                        checks[item] = Boolean(checkbox.checked);
+                        writeDigiMedWebProductionProgress(projectId, email, checks);
                         checkbox.closest(".task-list-decomposition-subtask")?.classList.toggle("is-complete", Boolean(checkbox.checked));
                     });
                 });
