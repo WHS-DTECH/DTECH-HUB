@@ -842,7 +842,7 @@ function getTaskTopicHrefForStep(standard, level, text) {
     const normalized = safeText.toLowerCase();
     const normalizedLevel = String(level || "").toLowerCase();
 
-    if (String(standard) === "91897" && normalized.includes("project management")) {
+    if ((String(standard) === "91897" || String(standard) === "91907") && normalized.includes("project management")) {
         return buildCustomActivityLink(taskListState.selectedId, "Project Management");
     }
 
