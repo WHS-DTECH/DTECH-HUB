@@ -258,6 +258,29 @@ const DIGITAL_MEDIA_91903_GUIDANCE = {
     }
 };
 
+const DIGITAL_MEDIA_91893_GUIDANCE = {
+    "web": {
+        heading: "Tools & Techniques - 91893 Web-based Outcome",
+        examplesHeading: "Web-based examples students could identify",
+        rows: [
+            ["Creating or customising scripts, code or presets", "Creating/customising JavaScript, CSS animations, reusable code, templates or configuration/preset files"],
+            ["Using a combination of steps to manipulate or enhance elements", "Editing/optimising images, combining CSS properties/effects, manipulating media assets, or using multiple processes to prepare assets for the website"],
+            ["Using a third-party library", "Using and appropriately integrating a JavaScript/CSS library, framework, icon library or other external code resource"],
+            ["Using composite effects", "Combining layers, transparency, gradients, filters, masks, blending, animation or multiple CSS/media effects to produce a composed visual result"]
+        ]
+    },
+    "video": {
+        heading: "Tools & Techniques - 91893 Video/Film Outcome",
+        examplesHeading: "Video/Film examples students could identify",
+        rows: [
+            ["Creating or customising scripts, code or presets", "Creating/customising title templates, transition presets, colour-grading presets, motion-graphics templates, animation presets, effect settings, or reusable editing presets"],
+            ["Using a combination of steps to manipulate or enhance elements", "Colour correction and grading, audio enhancement, speed adjustment, masking, keyframing, stabilisation, layering effects, removing backgrounds, or combining multiple editing processes to improve footage"],
+            ["Using a third-party library", "Using an appropriate external library of sound effects, music, fonts, graphics, LUTs, transitions, effects, stock footage, or other media resources within licensing requirements"],
+            ["Using composite effects", "Combining multiple video, image, text, graphic or effect layers; green-screen/chroma key; masking; overlays; blending; picture-in-picture; motion graphics; or combining visual effects to create the final composition"]
+        ]
+    }
+};
+
 const SUGGESTED_TECHNIQUES_BY_TOOL = {
     "html/css": ["Semantic HTML structure", "Responsive CSS layouts", "Accessible form labels", "Flexbox or CSS Grid", "Media queries"],
     "html": ["Semantic page structure", "Accessible headings", "Form validation", "Image alt text"],
@@ -7297,9 +7320,12 @@ async function renderToolsTechniquesPanel({ host, projectId, detailData, taskTop
         const projectTaskStandard = String(activeAlloc?.standard_2 || "").match(/\b(91893|91903)\b/)?.[1] || "";
         const digitalMediaType = String(activeAlloc?.digital_media_type || "").trim();
         const isDigitalMedia = Boolean(projectTaskStandard || digitalMediaType);
-        const guidance = projectTaskStandard === "91903"
-            ? DIGITAL_MEDIA_91903_GUIDANCE[digitalMediaType.toLowerCase()]
-            : null;
+        const guidanceByStandard = projectTaskStandard === "91903"
+            ? DIGITAL_MEDIA_91903_GUIDANCE
+            : projectTaskStandard === "91893"
+                ? DIGITAL_MEDIA_91893_GUIDANCE
+                : null;
+        const guidance = guidanceByStandard?.[digitalMediaType.toLowerCase()] || null;
         digitalMediaContextCard.hidden = !isDigitalMedia;
         digitalMediaContextCard.innerHTML = isDigitalMedia ? `
             <h2>Student Details</h2>
