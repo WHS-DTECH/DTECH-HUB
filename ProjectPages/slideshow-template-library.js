@@ -544,6 +544,10 @@ function getTemplateStepMatchers(templateId) {
         return [/testing\s+functions/i, /test(?:ing)?\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/i];
     }
 
+    if (id === "tools-and-techniques") {
+        return [/what\s+tools\s+and\s+techniques\s+will\s+be\s+used/i, /tools\/?technologies/i];
+    }
+
     if (id === "relevant-digimed-conventions") {
         return [/relevant\s+(?:digimed\s+)?conventions/i, /relevant\s+conventions\s+for\s+the\s+media\s+type/i];
     }
@@ -560,14 +564,16 @@ function getTemplateStepMatchers(templateId) {
         }
     }
 
-    if (id === "relevant-implications" || id.startsWith("relevant-implications-") || id === "development-steps" || id === "development-steps") {
+    if (id === "development-steps") {
         return [
             /explain\s+how\s+the\s+outcome\s+will\s+be\s+developed/i,
-            /tools\/?technologies/i,
             /development\s+steps/i,
-            /outcome\s+developed/i,
-            /relevant\s+implications/i
+            /outcome\s+developed/i
         ];
+    }
+
+    if (id === "relevant-implications") {
+        return [/relevant\s+implications/i];
     }
 
     if (id === "project-success-criteria") {
@@ -586,13 +592,15 @@ function getTemplateStepMatchers(templateId) {
         return [/target\s+audience/i, /end\s+user/i];
     }
 
-    if (contextText.includes("development") || contextText.includes("tools") || contextText.includes("technologies")) {
+    if (contextText.includes("tools") || contextText.includes("technologies")) {
+        return [/what\s+tools\s+and\s+techniques\s+will\s+be\s+used/i, /tools\/?technologies/i];
+    }
+
+    if (contextText.includes("development")) {
         return [
             /explain\s+how\s+the\s+outcome\s+will\s+be\s+developed/i,
-            /tools\/?technologies/i,
             /development\s+steps/i,
-            /outcome\s+developed/i,
-            /relevant\s+implications/i
+            /outcome\s+developed/i
         ];
     }
 

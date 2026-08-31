@@ -9193,12 +9193,12 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         if (!toSafeExternalUrl(entry?.url || "")) return false;
         // Discard entries whose templateId belongs to a different topic to prevent cross-topic bleed
         const entryTemplateId = String(entry?.templateId || "").trim().toLowerCase();
-        if (preferredTemplateId === "development-steps") return false;
         if (!entryTemplateId || !preferredTemplateId) return true;
-        if (preferredTemplateId === "tools-and-techniques") {
-            return entryTemplateId === "tools-and-techniques" || entryTemplateId.startsWith("tools-and-techniques-");
-        }
-        return true;
+        return entryTemplateId === preferredTemplateId
+            || ((preferredTemplateId === "tools-and-techniques"
+                || preferredTemplateId === "testing-functions"
+                || preferredTemplateId === "relevant-implications")
+                && entryTemplateId.startsWith(`${preferredTemplateId}-`));
     });
     const syncedTaskTopicEntry = syncedTaskTopicEntryCandidates.find((entry) => toSafeExternalUrl(entry?.url || ""));
     const taskTopicSyncedSlideThumbnail = toSafeExternalUrl(syncedTaskTopicEntry?.thumbnailUrl || "")

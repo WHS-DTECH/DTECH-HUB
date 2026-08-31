@@ -2,8 +2,9 @@ const WORK_AUTH_KEY = "hub_google_auth_v1";
 const DIGITAL_OUTCOME_DESCRIPTION_TASKS = [
     "Description - Google Slides: Describe the Digital Outcome: What is it, who is it for, and what should it do?",
     "Identify the target audience or end user for this outcome.",
-    "Explain how the outcome will be developed and what tools/technologies will be used.",
-    "State how success will be measured or evaluated."
+    "Explain how the outcome will be developed.",
+    "State how success will be measured or evaluated.",
+    "What Tools and Techniques will be used?"
 ];
 
 const workState = {
@@ -269,7 +270,7 @@ function getTaskTopicGroup(topic) {
     if (!text) return "other";
 
     if (
-        /describe\s+the\s+digital\s+outcome|description\s*-\s*google\s+slides|target\s+audience|success\s+will\s+be\s+measured|outcome\s+will\s+be\s+developed/.test(text)
+        /describe\s+the\s+digital\s+outcome|description\s*-\s*google\s+slides|target\s+audience|success\s+will\s+be\s+measured|outcome\s+will\s+be\s+developed|what\s+tools\s+and\s+techniques\s+will\s+be\s+used/.test(text)
     ) {
         return "digital_outcome";
     }
@@ -301,7 +302,8 @@ function getTaskTopicSubRank(topic, group) {
             /description\s*-\s*google\s+slides|describe\s+the\s+digital\s+outcome/,
             /identify\s+the\s+target\s+audience/,
             /explain\s+how\s+the\s+outcome\s+will\s+be\s+developed/,
-            /state\s+how\s+success\s+will\s+be\s+measured/
+            /state\s+how\s+success\s+will\s+be\s+measured/,
+            /what\s+tools\s+and\s+techniques\s+will\s+be\s+used/
         ],
         achieved: [
             /using\s+appropriate\s+project\s+management/,
