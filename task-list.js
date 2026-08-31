@@ -202,7 +202,9 @@ const taskListState = {
     taskTopic: "",
     templateCopies: [],
     decompositionCoverage: null,
-    identifiedComponentsCount: null
+    identifiedComponentsCount: null,
+    // Planning ticks for criteria with no automatic evidence source. In-memory only, never sent to the server.
+    sessionTicks: {}
 };
 
 // Minimal Drive OAuth client for task list — only needs read access to list slides
@@ -1565,6 +1567,58 @@ function inferStudentSystemConnections(currentState) {
     return { trelloConnected, githubConnected, googleSlidesConnected, oneDriveConnected, googleDriveConnected };
 }
 
+// Rows whose tick state is derived from connected evidence (Trello/GitHub, synced templates, component counts,
+// completed implication categories). Everything else has no automatic source and must not persist a manual tick.
+function getStepAutoManagementKind(standard, text) {
+    const std = String(standard || "").trim();
+    const level = getStepLevel(text);
+    const stripped = stripStepLevel(text || "").toLowerCase();
+
+    if ((std === "91897" || std === "91907") && level === "Achieved" && stripped.includes("project management")) {
+        return "auto";
+    }
+    if (std === "digital-outcome" && Boolean(inferDigitalOutcomeTaskTemplateId(stripped))) {
+        return "auto";
+    }
+    if ((std === "91897" || std === "91907") && level === "Merit"
+        && /^(?:effectively\s+)?trial(?:l?ing)?\s+multiple\s+components\s+and\/or\s+techniques\b/.test(stripped)) {
+        return "auto";
+    }
+    if (std === "91897" && level === "Achieved" && stripped === "explain relevant implications.") {
+        return "auto";
+    }
+    if ((std === "91893" || std === "91903")
+        && /^(?:explain(?:ing)?|address(?:ing)?) relevant implications\.?$/.test(stripped)) {
+        return "auto";
+    }
+    if (std === "91897" && /^address(?:ing)? relevant implications\.?$/.test(stripped)) {
+        return "locked";
+    }
+    return "manual";
+}
+
+function getSessionTickKey(standard, index) {
+    return `${String(standard || "").trim()}:${Number(index)}`;
+}
+
+// Criteria with no automatic evidence source must never keep a saved tick — clear any legacy true value on load.
+function clearUnverifiedManualTicks(stateMap) {
+    let changed = false;
+    Object.keys(stateMap || {}).forEach((standard) => {
+        const rows = Array.isArray(stateMap[standard]) ? stateMap[standard] : [];
+        rows.forEach((row) => {
+            const text = String(row?.text || "").trim();
+            if (!text || isRelevantImplicationsCategoryStep(text)) return;
+            if (getStepAutoManagementKind(standard, text) !== "manual") return;
+            if (Boolean(row?.done)) {
+                row.done = false;
+                changed = true;
+            }
+        });
+    });
+    return changed;
+}
+
 function autoTickProjectManagementRequirement(stateMap) {
     const rows = Array.isArray(stateMap?.["91897"]) ? stateMap["91897"] : [];
     if (!rows.length) {
@@ -2051,6 +2105,11 @@ function renderChecklistCards(detail, allItems) {
                                     ? buildTaskListStandardSectionAnchor(String(standard) === "91903" ? "91907" : "91897", "relevant-implications")
                                     : getTaskTopicHrefForStep(standard, level, stepText);
                                 const isInformationalRow = isInformationalCriteriaRow(standard, level, stepText);
+                                const managementKind = getStepAutoManagementKind(standard, step?.text || "");
+                                const needsEvidence = !isInformationalRow && managementKind === "manual";
+                                const isRowChecked = managementKind === "auto"
+                                    ? Boolean(step?.done)
+                                    : Boolean(taskListState.sessionTicks[getSessionTickKey(standard, index)]);
                                 const is91893ToolsAndTechniquesRow = /using appropriate tools and techniques for the purpose and end users|applying appropriate tools and techniques to meet the purpose and end-user requirements/i.test(stepText);
                                 const is91893ConventionsRow = /using relevant conventions for the media type|applying relevant conventions to improve the quality of the outcome/i.test(stepText);
                                 const is91903UXPrinciplesRow = /applying user experience principles relevant to the purpose of the outcome|applying user experience principles to improve the quality of the digital media outcome/i.test(stepText);
@@ -2073,9 +2132,9 @@ function renderChecklistCards(detail, allItems) {
                                         ? `<a class="task-list-step-link" href="${escapeTaskListHtml(href)}">${escapeTaskListHtml(stepText)}</a>`
                                         : `<span class="task-list-step-text">${escapeTaskListHtml(stepText)}</span>`);
                                 return `
-                                <div class="task-list-step-row ${isInformationalRow ? "is-informational" : ""} ${isLinkedRelevantImplicationsRow ? "is-linked-relevant-implications" : ""}">
+                                <div class="task-list-step-row ${isInformationalRow ? "is-informational" : ""} ${isLinkedRelevantImplicationsRow ? "is-linked-relevant-implications" : ""} ${needsEvidence ? "is-needs-evidence" : ""}">
                                     <label class="task-list-step-check-wrap">
-                                        ${isInformationalRow ? "" : `<input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">`}
+                                        ${isInformationalRow ? "" : `<input type="checkbox" ${isRowChecked ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">`}
                                         ${rowText}
                                     </label>
                                     ${is91893ToolsAndTechniquesRow ? `
@@ -2169,10 +2228,15 @@ function renderChecklistCards(detail, allItems) {
                         if (standard === "digital-outcome" && /what tools and techniques will be used/i.test(stepText)) {
                             return "";
                         }
+                        const managementKind = getStepAutoManagementKind(standard, stepText);
+                        const needsEvidence = managementKind === "manual";
+                        const isRowChecked = managementKind === "auto"
+                            ? Boolean(step?.done)
+                            : Boolean(taskListState.sessionTicks[getSessionTickKey(standard, index)]);
                         return `
-                        <div class="task-list-step-row">
+                        <div class="task-list-step-row ${needsEvidence ? "is-needs-evidence" : ""}">
                             <label class="task-list-step-check-wrap">
-                                <input type="checkbox" ${Boolean(step?.done) ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">
+                                <input type="checkbox" ${isRowChecked ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">
                                 ${(() => {
                                     const href = getTaskTopicHrefForStep(standard, "", stepText);
                                     return href
@@ -2273,6 +2337,11 @@ function renderChecklistCards(detail, allItems) {
                                 && /explain(?:ing)?\s+relevant\s+implications\.?$/i.test(stepText);
                             const isTickActionDisabled = isAddressRelevantImplicationsRow
                                 || (isExplainRelevantImplicationsRow && relevantCategoryDoneCount < 3);
+                            const managementKind = getStepAutoManagementKind(standard, step?.text || "");
+                            const needsEvidence = !isInformationalRow && !isRelevantCategoryRow && managementKind === "manual";
+                            const isRowChecked = managementKind === "auto"
+                                ? (Boolean(step?.done) && !isAddressRelevantImplicationsRow)
+                                : Boolean(taskListState.sessionTicks[getSessionTickKey(standard, step._index)]);
                             const decompositionSubtasks = isDecompositionRow ? getDecompositionSubtasks(taskListState.checklistState) : [];
                             const triallingComponentsCount = taskListState.identifiedComponentsCount;
                             const toolsTechniquesSubtask = isTriallingComponentsRow ? getDigitalOutcomeToolsTechniquesSubtask() : null;
@@ -2289,9 +2358,9 @@ function renderChecklistCards(detail, allItems) {
                                 ${shouldRenderAchievedSectionHeading && achievedSectionMeta?.id === "relevant-implications"
                                     ? `<p class="task-list-achieved-note">Complete any 3 or more categories to mark Section 4 complete. (${relevantCategoryDoneCount}/${RELEVANT_IMPLICATIONS_CATEGORIES.length})</p>`
                                     : ""}
-                                <div class="task-list-step-row ${isSystemComplete ? "is-system-complete" : ""} ${isRelevantCategoryRow ? "is-relevant-implications-category" : ""} ${isInformationalRow ? "is-informational" : ""}">
+                                <div class="task-list-step-row ${isSystemComplete ? "is-system-complete" : ""} ${isRelevantCategoryRow ? "is-relevant-implications-category" : ""} ${isInformationalRow ? "is-informational" : ""} ${needsEvidence ? "is-needs-evidence" : ""}">
                                     <label class="task-list-step-check-wrap">
-                                        ${isInformationalRow ? "" : `<input type="checkbox" ${Boolean(step?.done) && !isAddressRelevantImplicationsRow ? "checked" : ""} ${isTickActionDisabled ? "disabled" : ""} data-step-check="${escapeTaskListHtml(standard)}:${step._index}">`}
+                                        ${isInformationalRow ? "" : `<input type="checkbox" ${isRowChecked ? "checked" : ""} ${isTickActionDisabled ? "disabled" : ""} data-step-check="${escapeTaskListHtml(standard)}:${step._index}">`}
                                         ${isRelevantCategoryRow
                                             ? `<a class="task-list-step-link task-list-step-text-category" href="${escapeTaskListHtml(relevantCategoryHref)}">${escapeTaskListHtml(stepLabel)}</a>`
                                             : (isInformationalRow
@@ -2623,13 +2692,15 @@ async function loadChecklistForTask(taskId) {
     const autoRepairedChecklistRI = applyTemplateCopiesAsRelevantImplicationsState(taskListState.checklistState, taskListState.templateCopies);
     const autoChangedChecklistRI = autoTickRelevantImplicationsRequirements(taskListState.checklistState, taskListState.selectedId, signedInEmail);
     const autoSyncedChecklist91893RI = sync91893RelevantImplicationsState(taskListState.checklistState);
-    const autoChangedChecklist = autoChangedChecklistPM || autoChangedChecklistDO || autoChangedChecklistRI || autoRepairedChecklistRI || autoSyncedChecklist91893RI;
+    const clearedChecklistManualTicks = clearUnverifiedManualTicks(taskListState.checklistState);
+    const autoChangedChecklist = autoChangedChecklistPM || autoChangedChecklistDO || autoChangedChecklistRI || autoRepairedChecklistRI || autoSyncedChecklist91893RI || clearedChecklistManualTicks;
     const autoChangedEvidencePM = autoTickProjectManagementRequirement(taskListState.fullEvidenceState);
     const autoChangedEvidenceDO = autoTickDigitalOutcomeRequirements(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
     const autoRepairedEvidenceRI = applyTemplateCopiesAsRelevantImplicationsState(taskListState.fullEvidenceState, taskListState.templateCopies);
     const autoChangedEvidenceRI = autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
     const autoSyncedEvidence91893RI = sync91893RelevantImplicationsState(taskListState.fullEvidenceState);
-    const autoChangedEvidence = autoChangedEvidencePM || autoChangedEvidenceDO || autoChangedEvidenceRI || autoRepairedEvidenceRI || autoSyncedEvidence91893RI;
+    const clearedEvidenceManualTicks = clearUnverifiedManualTicks(taskListState.fullEvidenceState);
+    const autoChangedEvidence = autoChangedEvidencePM || autoChangedEvidenceDO || autoChangedEvidenceRI || autoRepairedEvidenceRI || autoSyncedEvidence91893RI || clearedEvidenceManualTicks;
     if (migratedDigitalOutcomeRows || migrated91897Rows || migrated91907Rows || migrated91893Rows || migrated91903Rows || autoChangedChecklist || autoChangedEvidence) {
         const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
         await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});
@@ -2931,6 +3002,34 @@ async function renderTaskListPage() {
             renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);
             return;
         }
+
+        const managementKind = getStepAutoManagementKind(standard, rows[index].text);
+        if (managementKind !== "auto") {
+            // No automatic evidence source: this is a planning tick for the current session only, never saved.
+            const sessionKey = getSessionTickKey(standard, index);
+            if (checkbox.checked) {
+                taskListState.sessionTicks[sessionKey] = true;
+            } else {
+                delete taskListState.sessionTicks[sessionKey];
+            }
+
+            const isDataIntegrityTestingRow = /applying appropriate data integrity and testing procedures/i.test(stepText);
+            if (isDataIntegrityTestingRow && checkbox.checked && (standard === "91893" || standard === "91903")) {
+                const activityId = taskListState.selectedId;
+                const email = getTaskListEmail();
+                const efficientToolsState = readDigiMedEfficientToolsState(activityId, email);
+                if (!efficientToolsState["HTML/CSS validation procedures"]) {
+                    efficientToolsState["HTML/CSS validation procedures"] = true;
+                    writeDigiMedEfficientToolsState(activityId, email, efficientToolsState);
+                    renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);
+                    return;
+                }
+            }
+
+            setStatus("Planning tick noted for this session only \u2014 attach evidence to make it count.");
+            return;
+        }
+
         rows[index].done = Boolean(checkbox.checked);
         if (!Array.isArray(taskListState.fullEvidenceState[standard])) {
             taskListState.fullEvidenceState[standard] = rows.map((step) => ({ text: String(step?.text || "").trim(), done: Boolean(step?.done) }));
@@ -2939,27 +3038,12 @@ async function renderTaskListPage() {
             taskListState.fullEvidenceState[standard][index].done = Boolean(checkbox.checked);
         }
 
-        // Ticking "Applying appropriate data integrity and testing procedures" (Markup Validation) auto-ticks the
-        // "HTML/CSS validation procedures" Efficient Tools subtask, shared across 91893 and 91903.
-        let autoTickedHtmlCssValidation = false;
-        const isDataIntegrityTestingRow = /applying appropriate data integrity and testing procedures/i.test(stepText);
-        if (isDataIntegrityTestingRow && checkbox.checked && (standard === "91893" || standard === "91903")) {
-            const activityId = taskListState.selectedId;
-            const email = getTaskListEmail();
-            const efficientToolsState = readDigiMedEfficientToolsState(activityId, email);
-            if (!efficientToolsState["HTML/CSS validation procedures"]) {
-                efficientToolsState["HTML/CSS validation procedures"] = true;
-                writeDigiMedEfficientToolsState(activityId, email, efficientToolsState);
-                autoTickedHtmlCssValidation = true;
-            }
-        }
-
         const relevantImplicationsChecklistChanged = autoTickRelevantImplicationsRequirements(taskListState.checklistState, taskListState.selectedId, getTaskListEmail());
         const relevantImplicationsEvidenceChanged = autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, taskListState.selectedId, getTaskListEmail());
         const synced91893ChecklistChanged = sync91893RelevantImplicationsState(taskListState.checklistState);
         const synced91893EvidenceChanged = sync91893RelevantImplicationsState(taskListState.fullEvidenceState);
 
-        if (relevantImplicationsChecklistChanged || relevantImplicationsEvidenceChanged || synced91893ChecklistChanged || synced91893EvidenceChanged || autoTickedHtmlCssValidation) {
+        if (relevantImplicationsChecklistChanged || relevantImplicationsEvidenceChanged || synced91893ChecklistChanged || synced91893EvidenceChanged) {
             renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);
         }
 

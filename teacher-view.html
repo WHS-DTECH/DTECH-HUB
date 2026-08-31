@@ -131,6 +131,38 @@
             font-size: 0.82rem;
             color: #2f4e73;
         }
+
+        .teacher-view-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 14px;
+            border-bottom: 1px solid #d7e3f1;
+        }
+
+        .teacher-view-tab-btn {
+            font: inherit;
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: #3e5f81;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            padding: 8px 4px 10px;
+            cursor: pointer;
+        }
+
+        .teacher-view-tab-btn:hover {
+            color: #173f63;
+        }
+
+        .teacher-view-tab-btn.is-active {
+            color: #173f63;
+            border-bottom-color: #2f74b9;
+        }
+
+        .teacher-view-tab-panel[hidden] {
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -140,11 +172,12 @@
                 <a class="brand" href="index.html">Computer Lab</a>
                 <div class="topbar-right">
                     <div class="topbar-links">
-                        <a href="upload-menu.html">Upload Menu</a>
+                        <a href="teacher-view.html" aria-current="page">Teacher View</a>
                         <a href="class-management.html">Class Management</a>
                         <a href="teacher-student-work.html">Student Work Tracker</a>
                         <a href="teacher-project-allocation.html">Project Allocations</a>
                         <a href="teacher-assessment-allocation.html">Assessment Allocations</a>
+                        <a href="upload-menu.html">Upload Menu</a>
                     </div>
                     <div class="utility-actions" aria-label="Utility actions">
                         <a id="hub-staff-link" href="teacher-view.html" hidden>Teacher View</a>
@@ -193,6 +226,12 @@
         <main>
             <div class="home-grid single-column">
                 <div class="hub-column activities-column">
+                    <div class="teacher-view-tabs" role="tablist" aria-label="Teacher view sections">
+                        <button type="button" class="teacher-view-tab-btn is-active" id="teacher-view-tab-btn-overview" role="tab" aria-selected="true" aria-controls="teacher-view-panel-overview" data-teacher-view-tab="overview">Overview</button>
+                        <button type="button" class="teacher-view-tab-btn" id="teacher-view-tab-btn-library" role="tab" aria-selected="false" aria-controls="teacher-view-panel-library" data-teacher-view-tab="library">Activity &amp; Project Library</button>
+                    </div>
+
+                    <div id="teacher-view-panel-overview" class="teacher-view-tab-panel" role="tabpanel" aria-labelledby="teacher-view-tab-btn-overview">
                     <section class="template-sync-panel" aria-label="Template library sync">
                         <div class="template-sync-row">
                             <label class="template-sync-field" for="teacher-template-folder-name">
@@ -234,7 +273,9 @@
 
                         <div id="current-week-grid" class="project-grid" aria-live="polite"></div>
                     </section>
+                    </div>
 
+                    <div id="teacher-view-panel-library" class="teacher-view-tab-panel" role="tabpanel" aria-labelledby="teacher-view-tab-btn-library" hidden>
                     <section id="project-library" class="panel-section library-section">
                         <div class="section-heading library-heading">
                             <div>
@@ -286,6 +327,7 @@
                         </div>
                         <div id="project-library-grid" class="project-grid" aria-live="polite"></div>
                     </section>
+                    </div>
                 </div>
             </div>
 

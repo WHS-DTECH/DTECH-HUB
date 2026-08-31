@@ -353,6 +353,35 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        .students-subtab-strip {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 0 0 16px;
+        }
+
+        .students-subtab-link {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 999px;
+            border: 1px solid #c3d2e6;
+            background: #edf4fc;
+            color: #173f63;
+            font-weight: 700;
+            font-size: 0.82rem;
+            text-decoration: none;
+        }
+
+        .students-subtab-link:hover {
+            background: #d9e9fa;
+        }
+
+        .students-subtab-link[aria-current="page"] {
+            background: #173f63;
+            border-color: #173f63;
+            color: #ffffff;
+        }
     </style>
 </head>
 <body>
@@ -363,8 +392,11 @@
                 <div class="topbar-right">
                     <div class="topbar-links">
                         <a href="teacher-view.html">Teacher View</a>
+                        <a href="class-management.html" aria-current="page">Class Management</a>
+                        <a href="teacher-student-work.html">Student Work Tracker</a>
                         <a href="teacher-project-allocation.html">Project Allocations</a>
                         <a href="teacher-assessment-allocation.html">Assessment Allocations</a>
+                        <a href="upload-menu.html">Upload Menu</a>
                     </div>
                     <div class="utility-actions" aria-label="Utility actions">
                         <a id="hub-staff-link" href="teacher-view.html" hidden>Teacher View</a>
@@ -387,6 +419,11 @@
         </header>
 
         <main class="class-page">
+            <div class="students-subtab-strip" role="tablist" aria-label="Students section">
+                <a class="students-subtab-link" href="class-management.html" aria-current="page">Class Management</a>
+                <a class="students-subtab-link" href="teacher-project-allocation.html">Project Allocations</a>
+                <a class="students-subtab-link" href="teacher-assessment-allocation.html">Assessment Allocations</a>
+            </div>
             <section class="class-header">
                 <h1>Class Management</h1>
                 <p>Review student timetable data from the uploaded student timetable list, filter down to DTECH learners, and check which student profiles can be linked to timetable records.</p>

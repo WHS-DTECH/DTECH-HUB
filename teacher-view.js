@@ -573,4 +573,28 @@ async function initTeacherView() {
     await renderNzqaStandardsSnapshot();
 }
 
+// Overview vs Library are just a visibility toggle; underlying grids/filters keep working unchanged.
+function wireTeacherViewTabs() {
+    const tabButtons = document.querySelectorAll("[data-teacher-view-tab]");
+    if (!tabButtons.length) return;
+
+    tabButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            const targetTab = String(button.getAttribute("data-teacher-view-tab") || "").trim();
+            if (!targetTab) return;
+
+            tabButtons.forEach((btn) => {
+                const isActive = btn === button;
+                btn.classList.toggle("is-active", isActive);
+                btn.setAttribute("aria-selected", isActive ? "true" : "false");
+            });
+
+            document.querySelectorAll(".teacher-view-tab-panel").forEach((panel) => {
+                panel.hidden = panel.id !== `teacher-view-panel-${targetTab}`;
+            });
+        });
+    });
+}
+
+wireTeacherViewTabs();
 initTeacherView();

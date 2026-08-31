@@ -748,6 +748,95 @@ function getOrderedTaskTopics() {
     return topics.sort((a, b) => compareTaskTopics(a, b));
 }
 
+const STUDENT_SUMMARY_GROUPS = [
+    { key: "digital_outcome", label: "Digital Outcome" },
+    { key: "achieved", label: "Achieved" },
+    { key: "merit", label: "Merit" },
+    { key: "excellence", label: "Excellence" }
+];
+
+// One row per student, one column per criteria group, sourced entirely from the records already built for the task cards.
+function buildStudentSummaryRows() {
+    const byStudent = new Map();
+
+    workState.records.forEach((record) => {
+        const email = record.studentEmail;
+        if (!email) return;
+        if (!byStudent.has(email)) {
+            byStudent.set(email, {
+                studentEmail: email,
+                studentName: record.studentName,
+                groups: new Map()
+            });
+        }
+
+        const student = byStudent.get(email);
+        const group = getTaskTopicGroup(record.taskTopic);
+        if (!student.groups.has(group)) {
+            student.groups.set(group, { total: 0, evidenceCount: 0, submittedCount: 0, firstTaskTopic: record.taskTopic });
+        }
+
+        const bucket = student.groups.get(group);
+        bucket.total += 1;
+        if (record.googleSlidesUrl || (Array.isArray(record.links) && record.links.length)) {
+            bucket.evidenceCount += 1;
+        }
+        if (record.submitted) {
+            bucket.submittedCount += 1;
+        }
+    });
+
+    return Array.from(byStudent.values()).sort((a, b) => a.studentName.localeCompare(b.studentName));
+}
+
+function getStudentSummaryChipClass(bucket) {
+    if (!bucket || !bucket.total) return "is-none";
+    if (bucket.submittedCount >= bucket.total) return "is-all";
+    if (bucket.evidenceCount > 0 || bucket.submittedCount > 0) return "is-partial";
+    return "is-none";
+}
+
+function renderStudentSummaryGrid() {
+    const host = document.querySelector("#student-summary-grid");
+    if (!host) return;
+
+    const rows = buildStudentSummaryRows();
+    if (!rows.length) {
+        host.innerHTML = `<div class="work-empty">No students found yet.</div>`;
+        return;
+    }
+
+    host.innerHTML = `
+        <div class="work-table-wrap">
+            <table class="student-summary-table">
+                <thead>
+                    <tr>
+                        <th>Student</th>
+                        ${STUDENT_SUMMARY_GROUPS.map((group) => `<th>${escapeHtml(group.label)}</th>`).join("")}
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows.map((student) => `
+                        <tr>
+                            <td>${escapeHtml(student.studentName)}</td>
+                            ${STUDENT_SUMMARY_GROUPS.map((group) => {
+                                const bucket = student.groups.get(group.key);
+                                if (!bucket) {
+                                    return `<td><span class="student-summary-chip is-none">-</span></td>`;
+                                }
+                                const href = `teacher-student-work-task.html?task=${encodeURIComponent(bucket.firstTaskTopic)}`;
+                                const chipClass = getStudentSummaryChipClass(bucket);
+                                const title = `${student.studentName} \u2014 ${group.label}`;
+                                return `<td><a class="student-summary-chip ${chipClass}" href="${escapeHtml(href)}" title="${escapeHtml(title)}">${bucket.submittedCount}/${bucket.total}</a></td>`;
+                            }).join("")}
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
 function findCanonicalTaskTopic(topic) {
     const selectedKey = normalizeTaskTopicText(topic).toLowerCase();
     if (!selectedKey) return "";
@@ -1119,6 +1208,7 @@ async function init() {
 
         wireTaskNavigationEvents();
 
+        renderStudentSummaryGrid();
         renderTaskLinks();
         renderSelectedTaskPage();
         setStatus("Student work task pages ready.");

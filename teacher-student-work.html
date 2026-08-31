@@ -219,6 +219,53 @@
       padding: 2px 8px;
       font-weight: 700;
     }
+
+    .student-summary-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    .student-summary-table th {
+      text-align: left;
+      padding: 7px 10px;
+      background: #e6eef8;
+      color: #153e64;
+      border-bottom: 2px solid #c5d6ea;
+    }
+
+    .student-summary-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #dbe5f1;
+    }
+
+    .student-summary-chip {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-decoration: none;
+      border: 1px solid;
+    }
+
+    .student-summary-chip.is-none {
+      background: #f3f7fc;
+      color: #4b6784;
+      border-color: #c7d6e9;
+    }
+
+    .student-summary-chip.is-partial {
+      background: #fff8e7;
+      color: #6e5730;
+      border-color: #d7c9a6;
+    }
+
+    .student-summary-chip.is-all {
+      background: #dff4e7;
+      color: #1f663d;
+      border-color: #add7bc;
+    }
   </style>
 </head>
 <body>
@@ -229,9 +276,11 @@
         <div class="topbar-right">
           <div class="topbar-links">
             <a href="teacher-view.html">Teacher View</a>
-            <a href="teacher-assessment-allocation.html">Assessment Allocations</a>
-            <a href="teacher-project-allocation.html">Project Allocations</a>
+            <a href="class-management.html">Class Management</a>
             <a href="teacher-student-work.html" aria-current="page">Student Work Tracker</a>
+            <a href="teacher-project-allocation.html">Project Allocations</a>
+            <a href="teacher-assessment-allocation.html">Assessment Allocations</a>
+            <a href="upload-menu.html">Upload Menu</a>
           </div>
           <div class="utility-actions" aria-label="Utility actions">
             <a id="hub-staff-link" href="teacher-view.html" hidden>Teacher View</a>
@@ -250,6 +299,12 @@
         <h1>Student Work Tracker By Task Item</h1>
         <p>Open a task item page to see all students across assessment tasks and who has connected required evidence (for example Google Slides).</p>
         <p id="work-status" class="work-status" aria-live="polite"></p>
+      </section>
+
+      <section class="panel-section">
+        <h2>My Students</h2>
+        <p class="section-copy">Each row is one student; each column summarises submitted/total criteria for that group. Click a cell to open the matching task item.</p>
+        <div id="student-summary-grid" aria-live="polite"></div>
       </section>
 
       <section class="panel-section">
