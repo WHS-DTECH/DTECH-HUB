@@ -58,7 +58,7 @@ body.kit-worksheet-page {
 #hub-user-badge {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     border: 1px solid #d8c8a0;
     background: #ffffff;
     border-radius: 999px;
@@ -68,6 +68,10 @@ body.kit-worksheet-page {
     font-size: 0.82rem;
     cursor: pointer;
     color: #3a3226;
+}
+
+#hub-google-signin .google-logo {
+    flex: 0 0 auto;
 }
 
 #hub-user-badge {

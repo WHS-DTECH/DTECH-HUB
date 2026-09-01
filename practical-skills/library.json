@@ -12,5 +12,19 @@
       "icon": "PS",
       "palette": "linear-gradient(135deg, #2f8f61 0%, #3ca873 54%, #65c494 100%)"
     }
+  },
+  {
+    "id": "kit-login",
+    "title": "Login Kit",
+    "summary": "Show what you know about signing in and getting ready to work in a worksheet-style activity.",
+    "yearLevel": "All Years",
+    "area": "Practical Skills",
+    "status": "active",
+    "href": "/practical-skills/kit-worksheet.html?kit=kit-login",
+    "imageUrl": "",
+    "visual": {
+      "icon": "\ud83d\udd10",
+      "palette": "linear-gradient(135deg, #2f8f61 0%, #3ca873 54%, #65c494 100%)"
+    }
   }
 ]
