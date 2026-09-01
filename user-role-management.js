@@ -7,13 +7,9 @@ const studentList = document.querySelector("#student-list");
 const studentSearch = document.querySelector("#student-search");
 const hubAuthSummary = document.querySelector("#hub-auth-summary");
 const hubRoleAuthNote = document.querySelector("#hub-role-auth-note");
-const hubSignOutButton = document.querySelector("#hub-google-signout");
-const hubUserBadge = document.querySelector("#hub-user-badge");
-
-const HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
-const hubAllowedDomain = String(document.querySelector('meta[name="hub-google-allowed-domain"]')?.content || "")
-  .trim()
-  .toLowerCase();
+// hubSignOutButton, hubUserBadge, HUB_AUTH_STORAGE_KEY and hubAllowedDomain are already declared
+// as globals by script.js (loaded before this file) - redeclaring them here throws a SyntaxError
+// that silently stops this entire script from running.
 
 function getHubStoredAuthRaw() {
   let localValue = null;
