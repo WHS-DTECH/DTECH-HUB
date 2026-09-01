@@ -78,6 +78,14 @@ body.kit-worksheet-page {
     background: #fff8e1;
 }
 
+/* Un-hiding these via ID selectors above overrides the browser's default [hidden] behaviour, so
+   restore it explicitly \u2014 otherwise script.js toggling .hidden has no visual effect. */
+#hub-google-signin[hidden],
+#hub-google-signout[hidden],
+#hub-user-badge[hidden] {
+    display: none;
+}
+
 .worksheet-shell {
     max-width: 900px;
     margin: 0 auto;
