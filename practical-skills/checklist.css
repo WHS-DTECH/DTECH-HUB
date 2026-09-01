@@ -86,6 +86,55 @@
     min-height: 34px;
 }
 
+.ps-signin-note {
+    margin: 0;
+    padding: 12px;
+    border: 1px dashed #b9d0c1;
+    border-radius: 10px;
+    background: #f4fcf8;
+    color: #2f6450;
+    font-weight: 600;
+}
+
+.checklist-badges {
+    max-width: 1040px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.ps-badge-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.ps-badge-empty {
+    margin: 0;
+    color: #4b6a5c;
+    font-size: 0.86rem;
+}
+
+.ps-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid #c9d9cf;
+    background: linear-gradient(180deg, #f4fcf8 0%, #edf8f1 100%);
+}
+
+.ps-badge-icon {
+    font-size: 1.1rem;
+    line-height: 1;
+}
+
+.ps-badge-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #1c4f3b;
+}
+
 @media (max-width: 900px) {
     .scoreboard-grid {
         grid-template-columns: 1fr;

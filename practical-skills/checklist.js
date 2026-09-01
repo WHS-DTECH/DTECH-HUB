@@ -1,49 +1,83 @@
 (() => {
     "use strict";
 
-    const STORAGE_KEY = "practical_skills_checklist_v1";
+    const AUTH_STORAGE_KEY = "hub_google_auth_v1";
     const STATUS_ID = "ps-status";
 
+    // Titles/descriptions only; points/timeframe scoring and badges are computed server-side from saved progress
+    // (see PRACTICAL_SKILLS_KIT_DEFINITIONS in server.js) so completion can't be spoofed from this page.
     const kitDefinitions = [
         {
             id: "kit-login",
             title: "Login",
             description: "Sign in correctly, open your workspace, and confirm you can access required learning tools.",
-            points: 100,
             timeframeHours: 24
         },
         {
             id: "kit-google-search",
             title: "Google Search",
             description: "Use advanced search techniques to find reliable answers and cite one quality source.",
-            points: 100,
             timeframeHours: 24
         },
         {
             id: "kit-minecraft",
             title: "Minecraft",
             description: "Complete the Minecraft practical task and demonstrate the required build or design outcome.",
-            points: 100,
             timeframeHours: 24
         }
     ];
 
-    function loadState() {
+    const state = {
+        email: "",
+        snapshot: null,
+        signInWatcherId: 0
+    };
+
+    function normalizeEmail(value) {
+        return String(value || "").trim().toLowerCase();
+    }
+
+    function getStoredAuthRaw() {
+        let localValue = null;
+        let sessionValue = null;
         try {
-            const raw = localStorage.getItem(STORAGE_KEY);
-            if (!raw) return {};
-            const parsed = JSON.parse(raw);
-            return parsed && typeof parsed === "object" ? parsed : {};
+            localValue = localStorage.getItem(AUTH_STORAGE_KEY);
         } catch (_error) {
-            return {};
+            localValue = null;
+        }
+        try {
+            sessionValue = sessionStorage.getItem(AUTH_STORAGE_KEY);
+        } catch (_error) {
+            sessionValue = null;
+        }
+        return localValue || sessionValue;
+    }
+
+    function getSignedInEmail() {
+        const raw = getStoredAuthRaw();
+        if (!raw) return "";
+        try {
+            const parsed = JSON.parse(raw);
+            if (!parsed?.expiresAt || Number(parsed.expiresAt) <= Date.now()) {
+                return "";
+            }
+            return normalizeEmail(parsed?.profile?.email || "");
+        } catch (_error) {
+            return "";
         }
     }
 
-    function saveState(state) {
-        try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-        } catch (_error) {
-        }
+    function withAuthHeaders(headers = {}) {
+        return state.email ? { ...headers, "x-user-email": state.email } : headers;
+    }
+
+    function escapeHtml(value) {
+        return String(value || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
     }
 
     function showStatus(message, isError = false) {
@@ -62,61 +96,87 @@
         status.classList.add(isError ? "is-error" : "is-success");
     }
 
-    function resolveKitProgress(state, kit) {
-        const progress = state[kit.id] || {};
-        const startedAt = Number(progress.startedAt || Date.now());
-        const completedAt = Number(progress.completedAt || 0);
-        const isComplete = Boolean(progress.completed === true);
-
-        const elapsedHours = (Date.now() - startedAt) / 36e5;
-        const onTime = isComplete && elapsedHours <= kit.timeframeHours;
-        const bonus = onTime ? 25 : 0;
-
-        return {
-            startedAt,
-            completedAt,
-            isComplete,
-            onTime,
-            score: isComplete ? kit.points + bonus : 0
-        };
+    async function loadJson(url, options = {}) {
+        const response = await fetch(url, options);
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(payload?.error || `Request failed (${response.status})`);
+        }
+        return payload;
     }
 
-    function getTier(points) {
-        if (points >= 250) return "Gold";
-        if (points >= 150) return "Silver";
-        if (points > 0) return "Bronze";
-        return "Starter";
+    function fetchSnapshot() {
+        return loadJson("/api/practical-skills/my-progress", { headers: withAuthHeaders() });
+    }
+
+    function completeKit(kitId) {
+        return loadJson(`/api/practical-skills/progress/${encodeURIComponent(kitId)}/complete`, {
+            method: "POST",
+            headers: withAuthHeaders()
+        });
+    }
+
+    function resetKit(kitId) {
+        return loadJson(`/api/practical-skills/progress/${encodeURIComponent(kitId)}/reset`, {
+            method: "POST",
+            headers: withAuthHeaders()
+        });
+    }
+
+    function renderBadges(badges) {
+        const host = document.getElementById("ps-badge-list");
+        if (!host) return;
+
+        const rows = Array.isArray(badges) ? badges : [];
+        if (!rows.length) {
+            host.innerHTML = `<p class="ps-badge-empty">No badges earned yet \u2014 complete a kit to get started.</p>`;
+            return;
+        }
+
+        host.innerHTML = rows.map((badge) => `
+            <article class="ps-badge" title="${escapeHtml(badge.description || "")}">
+                <span class="ps-badge-icon" aria-hidden="true">${escapeHtml(badge.icon || "\u2b50")}</span>
+                <span class="ps-badge-title">${escapeHtml(badge.title || "Badge")}</span>
+            </article>
+        `).join("");
     }
 
     function render() {
         const list = document.getElementById("ps-kit-list");
         if (!list) return;
 
-        const state = loadState();
+        if (!state.email) {
+            list.innerHTML = `<p class="ps-signin-note">Sign in with your school Google account (top right) to track kit progress and earn badges.</p>`;
+            renderBadges([]);
+            return;
+        }
+
+        const snapshot = state.snapshot;
+        if (!snapshot) {
+            list.innerHTML = `<p class="ps-signin-note">Loading your progress\u2026</p>`;
+            return;
+        }
+
+        const kitsById = new Map((snapshot.kits || []).map((kit) => [kit.id, kit]));
         list.innerHTML = "";
 
-        let totalPoints = 0;
-        let completedCount = 0;
-
         kitDefinitions.forEach((kit) => {
-            const progress = resolveKitProgress(state, kit);
-            totalPoints += progress.score;
-            if (progress.isComplete) {
-                completedCount += 1;
-            }
+            const progress = kitsById.get(kit.id) || { isComplete: false, onTime: false, score: 0 };
 
             const item = document.createElement("article");
             item.className = "ps-kit-item";
 
             const statusLabel = progress.isComplete ? "Completed" : "Not Started";
-            const timeLabel = progress.onTime ? "On-time bonus applied" : `Target window: ${kit.timeframeHours}h`;
+            const timeLabel = progress.isComplete
+                ? (progress.onTime ? "On-time bonus applied" : "Completed outside target window")
+                : `Target window: ${kit.timeframeHours}h`;
 
             item.innerHTML = `
-                <h3>${kit.title}</h3>
-                <p>${kit.description}</p>
+                <h3>${escapeHtml(kit.title)}</h3>
+                <p>${escapeHtml(kit.description)}</p>
                 <div class="ps-kit-meta">
                     <span class="ps-kit-pill">${statusLabel}</span>
-                    <span class="ps-kit-pill">Points: ${progress.score}</span>
+                    <span class="ps-kit-pill">Points: ${Number(progress.score || 0)}</span>
                     <span class="ps-kit-pill">${timeLabel}</span>
                 </div>
                 <div class="ps-kit-actions">
@@ -131,61 +191,82 @@
         const completedNode = document.getElementById("ps-completed-kits");
         const tierNode = document.getElementById("ps-current-tier");
 
-        if (pointsNode) pointsNode.textContent = String(totalPoints);
-        if (completedNode) completedNode.textContent = `${completedCount} / ${kitDefinitions.length}`;
-        if (tierNode) tierNode.textContent = getTier(totalPoints);
+        if (pointsNode) pointsNode.textContent = String(snapshot.totalPoints || 0);
+        if (completedNode) completedNode.textContent = `${snapshot.completedCount || 0} / ${snapshot.totalKits || kitDefinitions.length}`;
+        if (tierNode) tierNode.textContent = snapshot.tier || "Starter";
+
+        renderBadges(snapshot.badges);
 
         list.querySelectorAll(".ps-complete-btn").forEach((button) => {
-            button.addEventListener("click", () => {
+            button.addEventListener("click", async () => {
                 const kitId = String(button.getAttribute("data-kit") || "");
-                const existing = state[kitId] || {};
-                state[kitId] = {
-                    startedAt: Number(existing.startedAt || Date.now()),
-                    completed: true,
-                    completedAt: Date.now()
-                };
-                saveState(state);
-                render();
-                showStatus("Kit marked complete.");
+                button.disabled = true;
+                try {
+                    state.snapshot = await completeKit(kitId);
+                    render();
+                    showStatus("Kit marked complete.");
+                } catch (error) {
+                    button.disabled = false;
+                    showStatus(error?.message || "Could not save progress.", true);
+                }
             });
         });
 
         list.querySelectorAll(".ps-reset-btn").forEach((button) => {
-            button.addEventListener("click", () => {
+            button.addEventListener("click", async () => {
                 const kitId = String(button.getAttribute("data-kit") || "");
-                state[kitId] = {
-                    startedAt: Date.now(),
-                    completed: false,
-                    completedAt: 0
-                };
-                saveState(state);
-                render();
-                showStatus("Kit progress reset.");
+                button.disabled = true;
+                try {
+                    state.snapshot = await resetKit(kitId);
+                    render();
+                    showStatus("Kit progress reset.");
+                } catch (error) {
+                    showStatus(error?.message || "Could not reset progress.", true);
+                } finally {
+                    button.disabled = false;
+                }
             });
         });
     }
 
-    function init() {
-        const state = loadState();
-        let changed = false;
-
-        kitDefinitions.forEach((kit) => {
-            if (!state[kit.id]) {
-                state[kit.id] = {
-                    startedAt: Date.now(),
-                    completed: false,
-                    completedAt: 0
-                };
-                changed = true;
+    // Sign-in happens asynchronously via Google Identity Services after this script runs, so
+    // poll briefly for a session rather than requiring a manual page refresh.
+    function startSignInWatcher() {
+        if (state.signInWatcherId || state.email) return;
+        let attemptsLeft = 30;
+        state.signInWatcherId = window.setInterval(() => {
+            attemptsLeft -= 1;
+            const email = getSignedInEmail();
+            if (email) {
+                window.clearInterval(state.signInWatcherId);
+                state.signInWatcherId = 0;
+                void init();
+                return;
             }
-        });
+            if (attemptsLeft <= 0) {
+                window.clearInterval(state.signInWatcherId);
+                state.signInWatcherId = 0;
+            }
+        }, 1000);
+    }
 
-        if (changed) {
-            saveState(state);
+    async function init() {
+        state.email = getSignedInEmail();
+        if (!state.email) {
+            render();
+            startSignInWatcher();
+            return;
         }
 
         render();
+        try {
+            state.snapshot = await fetchSnapshot();
+            render();
+        } catch (error) {
+            showStatus(error?.message || "Could not load Practical Skills progress.", true);
+        }
     }
 
     init();
 })();
+

@@ -61,7 +61,185 @@ const memoryTemplateLibraryEntries = new Map();
 const memoryStudentToolsTechniques = new Map();
 const memoryDecompositionCoverage = new Map();
 const memoryTriallingComponents = new Map();
+const memoryPracticalSkillsProgress = new Map();
 const PRACTICAL_SKILLS_LIBRARY_FILE = path.join(__dirname, "practical-skills", "library.json");
+
+// Server-authoritative catalog so scoring/badges can't be spoofed from the client.
+// Keep ids/points/timeframeHours in sync with practical-skills/checklist.js kitDefinitions until the kit catalog is server-driven.
+const PRACTICAL_SKILLS_KIT_DEFINITIONS = [
+  { id: "kit-login", points: 100, timeframeHours: 24 },
+  { id: "kit-google-search", points: 100, timeframeHours: 24 },
+  { id: "kit-minecraft", points: 100, timeframeHours: 24 }
+];
+
+const PRACTICAL_SKILLS_TIER_THRESHOLDS = { Bronze: 1, Silver: 150, Gold: 250 };
+
+const PRACTICAL_SKILLS_BADGE_DEFINITIONS = [
+  { id: "first-kit", title: "First Steps", description: "Complete your first kit.", icon: "\ud83e\udd49", rule: { type: "completed_count", threshold: 1 } },
+  { id: "two-kits", title: "Building Momentum", description: "Complete 2 kits.", icon: "\ud83e\udd48", rule: { type: "completed_count", threshold: 2 } },
+  { id: "all-kits", title: "Full House", description: "Complete every kit in the library.", icon: "\ud83c\udfc6", rule: { type: "all_complete" } },
+  { id: "on-time-1", title: "On Track", description: "Finish a kit within its target window.", icon: "\u23f1\ufe0f", rule: { type: "on_time_count", threshold: 1 } },
+  { id: "on-time-all", title: "Speed Runner", description: "Finish every completed kit within its target window.", icon: "\ud83d\ude80", rule: { type: "all_on_time" } },
+  { id: "tier-silver", title: "Silver Tier", description: "Reach Silver tier total points.", icon: "\ud83e\udd48", rule: { type: "tier", value: "Silver" } },
+  { id: "tier-gold", title: "Gold Tier", description: "Reach Gold tier total points.", icon: "\ud83e\udd47", rule: { type: "tier", value: "Gold" } }
+];
+
+function getPracticalSkillsKitDefinition(kitId) {
+  const safeKitId = String(kitId || "").trim();
+  return PRACTICAL_SKILLS_KIT_DEFINITIONS.find((kit) => kit.id === safeKitId) || null;
+}
+
+function getPracticalSkillsTier(totalPoints) {
+  if (totalPoints >= PRACTICAL_SKILLS_TIER_THRESHOLDS.Gold) return "Gold";
+  if (totalPoints >= PRACTICAL_SKILLS_TIER_THRESHOLDS.Silver) return "Silver";
+  if (totalPoints >= PRACTICAL_SKILLS_TIER_THRESHOLDS.Bronze) return "Bronze";
+  return "Starter";
+}
+
+// Pure function: takes saved progress rows, returns per-kit scoring plus the badges earned from it.
+function computePracticalSkillsSnapshot(progressRows) {
+  const rowsByKitId = new Map(
+    (Array.isArray(progressRows) ? progressRows : []).map((row) => [String(row?.kit_id || "").trim(), row])
+  );
+
+  let totalPoints = 0;
+  let completedCount = 0;
+  let onTimeCompletedCount = 0;
+
+  const kits = PRACTICAL_SKILLS_KIT_DEFINITIONS.map((kit) => {
+    const row = rowsByKitId.get(kit.id);
+    const isComplete = Boolean(row?.completed);
+    const startedAtMs = row?.started_at ? new Date(row.started_at).getTime() : Date.now();
+    const completedAtMs = row?.completed_at ? new Date(row.completed_at).getTime() : 0;
+    const elapsedHours = (isComplete && completedAtMs ? completedAtMs - startedAtMs : Date.now() - startedAtMs) / 36e5;
+    const onTime = isComplete && elapsedHours <= kit.timeframeHours;
+    const score = isComplete ? kit.points + (onTime ? 25 : 0) : 0;
+
+    totalPoints += score;
+    if (isComplete) {
+      completedCount += 1;
+      if (onTime) onTimeCompletedCount += 1;
+    }
+
+    return {
+      id: kit.id,
+      isComplete,
+      onTime,
+      score,
+      startedAt: row?.started_at || null,
+      completedAt: row?.completed_at || null
+    };
+  });
+
+  const totalKits = PRACTICAL_SKILLS_KIT_DEFINITIONS.length;
+  const tier = getPracticalSkillsTier(totalPoints);
+  const allComplete = totalKits > 0 && completedCount === totalKits;
+  const allOnTime = completedCount > 0 && onTimeCompletedCount === completedCount;
+
+  const badges = PRACTICAL_SKILLS_BADGE_DEFINITIONS
+    .filter((badge) => {
+      const rule = badge.rule || {};
+      if (rule.type === "completed_count") return completedCount >= Number(rule.threshold || 0);
+      if (rule.type === "all_complete") return allComplete;
+      if (rule.type === "on_time_count") return onTimeCompletedCount >= Number(rule.threshold || 0);
+      if (rule.type === "all_on_time") return allOnTime;
+      if (rule.type === "tier") return totalPoints >= (PRACTICAL_SKILLS_TIER_THRESHOLDS[rule.value] || Infinity);
+      return false;
+    })
+    .map((badge) => ({ id: badge.id, title: badge.title, description: badge.description, icon: badge.icon }));
+
+  return { kits, totalPoints, completedCount, totalKits, tier, badges };
+}
+
+async function ensurePracticalSkillsProgressRow(studentEmail, kitId) {
+  const email = normalizeEmail(studentEmail);
+  const safeKitId = String(kitId || "").trim();
+  if (!email || !safeKitId) return null;
+
+  if (!hasDatabase) {
+    const key = `${email}:${safeKitId}`;
+    if (!memoryPracticalSkillsProgress.has(key)) {
+      const nowIso = new Date().toISOString();
+      memoryPracticalSkillsProgress.set(key, {
+        student_email: email,
+        kit_id: safeKitId,
+        started_at: nowIso,
+        completed: false,
+        completed_at: null,
+        updated_at: nowIso
+      });
+    }
+    return memoryPracticalSkillsProgress.get(key);
+  }
+
+  await ensurePracticalSkillsProgressSchema();
+  const inserted = await pool.query(
+    `INSERT INTO practical_skills_progress (student_email, kit_id) VALUES ($1, $2)
+     ON CONFLICT (student_email, kit_id) DO NOTHING RETURNING *`,
+    [email, safeKitId]
+  );
+  if (inserted.rows?.[0]) return inserted.rows[0];
+
+  const existing = await pool.query(
+    `SELECT * FROM practical_skills_progress WHERE student_email = $1 AND kit_id = $2 LIMIT 1`,
+    [email, safeKitId]
+  );
+  return existing.rows?.[0] || null;
+}
+
+async function getAllPracticalSkillsProgressRows(studentEmail) {
+  const email = normalizeEmail(studentEmail);
+  if (!email) return [];
+
+  if (!hasDatabase) {
+    return PRACTICAL_SKILLS_KIT_DEFINITIONS
+      .map((kit) => memoryPracticalSkillsProgress.get(`${email}:${kit.id}`))
+      .filter(Boolean);
+  }
+
+  await ensurePracticalSkillsProgressSchema();
+  const result = await pool.query(`SELECT * FROM practical_skills_progress WHERE student_email = $1`, [email]);
+  return result.rows || [];
+}
+
+async function setPracticalSkillsKitCompletion(studentEmail, kitId, completed) {
+  const email = normalizeEmail(studentEmail);
+  const safeKitId = String(kitId || "").trim();
+  if (!email || !safeKitId) return null;
+
+  await ensurePracticalSkillsProgressRow(email, safeKitId);
+  const nowIso = new Date().toISOString();
+
+  if (!hasDatabase) {
+    const key = `${email}:${safeKitId}`;
+    const existing = memoryPracticalSkillsProgress.get(key) || {};
+    const next = {
+      ...existing,
+      student_email: email,
+      kit_id: safeKitId,
+      completed: Boolean(completed),
+      completed_at: completed ? nowIso : null,
+      started_at: completed ? existing.started_at : nowIso,
+      updated_at: nowIso
+    };
+    memoryPracticalSkillsProgress.set(key, next);
+    return next;
+  }
+
+  await ensurePracticalSkillsProgressSchema();
+  const result = completed
+    ? await pool.query(
+        `UPDATE practical_skills_progress SET completed = TRUE, completed_at = NOW(), updated_at = NOW()
+         WHERE student_email = $1 AND kit_id = $2 RETURNING *`,
+        [email, safeKitId]
+      )
+    : await pool.query(
+        `UPDATE practical_skills_progress SET completed = FALSE, completed_at = NULL, started_at = NOW(), updated_at = NOW()
+         WHERE student_email = $1 AND kit_id = $2 RETURNING *`,
+        [email, safeKitId]
+      );
+  return result.rows?.[0] || null;
+}
 
 const DEFAULT_TEMPLATE_LIBRARY_ENTRIES = [
   {
@@ -3627,6 +3805,29 @@ async function ensureTrelloConnectionsSchema() {
   await pool.query(`ALTER TABLE student_trello_connections ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 }
 
+async function ensurePracticalSkillsProgressSchema() {
+  if (!hasDatabase) {
+    return;
+  }
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS practical_skills_progress (
+      student_email TEXT NOT NULL,
+      kit_id TEXT NOT NULL,
+      started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      completed BOOLEAN NOT NULL DEFAULT FALSE,
+      completed_at TIMESTAMPTZ,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (student_email, kit_id)
+    );
+  `);
+
+  await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS completed BOOLEAN NOT NULL DEFAULT FALSE`);
+  await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+}
+
 async function ensureStudentHaparaFoldersSchema() {
   if (!hasDatabase) {
     return;
@@ -3734,6 +3935,7 @@ async function ensureSchema() {
   await ensureUnitPlanSchema();
   await ensureAssessmentStandardCardsSchema();
   await ensureCourseOutlinesSchema();
+  await ensurePracticalSkillsProgressSchema();
   const seededProcessAssessmentAllocations = await backfillProcessAssessmentAllocations();
   if (seededProcessAssessmentAllocations > 0) {
     console.log(`[startup] Backfilled ${seededProcessAssessmentAllocations} student allocation(s) into Process Assessment (${CLIENT_PROJECTS_TASK_ID}).`);
@@ -10212,6 +10414,64 @@ app.put("/api/admin/practical-skills/library", requireAdminAccess, async (req, r
     res.status(200).json({ ok: true, cards: saved, count: saved.length });
   } catch (_error) {
     res.status(500).json({ error: "Could not save Practical Skills library" });
+  }
+});
+
+app.get("/api/practical-skills/my-progress", async (req, res) => {
+  const studentEmail = normalizeEmail(getRequestUserEmail(req));
+  if (!studentEmail || !studentEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required." });
+    return;
+  }
+
+  try {
+    await Promise.all(PRACTICAL_SKILLS_KIT_DEFINITIONS.map((kit) => ensurePracticalSkillsProgressRow(studentEmail, kit.id)));
+    const rows = await getAllPracticalSkillsProgressRows(studentEmail);
+    res.json(computePracticalSkillsSnapshot(rows));
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not load Practical Skills progress." });
+  }
+});
+
+app.post("/api/practical-skills/progress/:kitId/complete", async (req, res) => {
+  const studentEmail = normalizeEmail(getRequestUserEmail(req));
+  const kitId = String(req.params.kitId || "").trim();
+  if (!studentEmail || !studentEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required." });
+    return;
+  }
+  if (!getPracticalSkillsKitDefinition(kitId)) {
+    res.status(404).json({ error: "Unknown kit." });
+    return;
+  }
+
+  try {
+    await setPracticalSkillsKitCompletion(studentEmail, kitId, true);
+    const rows = await getAllPracticalSkillsProgressRows(studentEmail);
+    res.json(computePracticalSkillsSnapshot(rows));
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not save Practical Skills progress." });
+  }
+});
+
+app.post("/api/practical-skills/progress/:kitId/reset", async (req, res) => {
+  const studentEmail = normalizeEmail(getRequestUserEmail(req));
+  const kitId = String(req.params.kitId || "").trim();
+  if (!studentEmail || !studentEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required." });
+    return;
+  }
+  if (!getPracticalSkillsKitDefinition(kitId)) {
+    res.status(404).json({ error: "Unknown kit." });
+    return;
+  }
+
+  try {
+    await setPracticalSkillsKitCompletion(studentEmail, kitId, false);
+    const rows = await getAllPracticalSkillsProgressRows(studentEmail);
+    res.json(computePracticalSkillsSnapshot(rows));
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not reset Practical Skills progress." });
   }
 });
 
