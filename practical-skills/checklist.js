@@ -180,7 +180,8 @@
                     <span class="ps-kit-pill">${timeLabel}</span>
                 </div>
                 <div class="ps-kit-actions">
-                    <button type="button" class="button button-primary ps-complete-btn" data-kit="${kit.id}" ${progress.isComplete ? "disabled" : ""}>Mark Complete</button>
+                    <a class="button button-primary" href="./kit-worksheet.html?kit=${encodeURIComponent(kit.id)}">Open Worksheet</a>
+                    <button type="button" class="button button-secondary ps-complete-btn" data-kit="${kit.id}" ${progress.isComplete ? "disabled" : ""}>Mark Complete</button>
                     <button type="button" class="button button-secondary ps-reset-btn" data-kit="${kit.id}">Reset</button>
                 </div>
             `;

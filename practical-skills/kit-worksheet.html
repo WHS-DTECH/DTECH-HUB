@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kit Worksheet | Practical Skills</title>
+    <meta name="description" content="Worksheet-style practical skills kit activity.">
+    <meta name="hub-google-client-id" content="239433605438-ur2omagmkluhhn7i319g0i82l4l5l1j8.apps.googleusercontent.com">
+    <meta name="hub-google-allowed-domain" content="westlandhigh.school.nz">
+    <link rel="icon" type="image/x-icon" href="../images/favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./kit-worksheet.css">
+</head>
+<body class="kit-worksheet-page">
+    <nav class="kit-worksheet-topbar" aria-label="Primary">
+        <a class="brand" href="/practical-skills/checklist.html">&larr; Back to Checklist</a>
+        <div class="kit-worksheet-topbar-links" aria-label="Utility actions">
+            <span id="hub-access-badge" hidden aria-live="polite"></span>
+            <button id="hub-google-signin" type="button">Sign in with Google</button>
+            <button id="hub-google-signout" type="button" hidden>Sign out</button>
+            <button id="hub-user-badge" type="button" hidden aria-label="Open profile" aria-haspopup="true" aria-expanded="false"></button>
+        </div>
+    </nav>
+
+    <main class="worksheet-shell">
+        <div id="worksheet-host"></div>
+
+        <div id="worksheet-complete-bar" class="worksheet-complete-bar" hidden>
+            <span id="worksheet-status-pill" class="worksheet-status-pill">Not Started</span>
+            <div class="worksheet-actions">
+                <button type="button" id="worksheet-complete-btn" class="worksheet-btn worksheet-btn-primary">Mark Complete</button>
+                <button type="button" id="worksheet-reset-btn" class="worksheet-btn worksheet-btn-secondary">Reset</button>
+            </div>
+        </div>
+
+        <p id="worksheet-status-message" class="worksheet-status-message" aria-live="polite" hidden></p>
+    </main>
+
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="../script.js"></script>
+    <script src="./kit-worksheet-render.js"></script>
+    <script src="./kit-worksheet.js"></script>
+</body>
+</html>

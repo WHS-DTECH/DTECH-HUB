@@ -62,6 +62,7 @@ const memoryStudentToolsTechniques = new Map();
 const memoryDecompositionCoverage = new Map();
 const memoryTriallingComponents = new Map();
 const memoryPracticalSkillsProgress = new Map();
+const memoryPracticalSkillsKitContent = new Map();
 const PRACTICAL_SKILLS_LIBRARY_FILE = path.join(__dirname, "practical-skills", "library.json");
 
 // Server-authoritative catalog so scoring/badges can't be spoofed from the client.
@@ -3826,6 +3827,140 @@ async function ensurePracticalSkillsProgressSchema() {
   await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS completed BOOLEAN NOT NULL DEFAULT FALSE`);
   await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ`);
   await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS responses JSONB NOT NULL DEFAULT '{}'::jsonb`);
+}
+
+// Starter drafts only — teachers edit the real content via the Kit Content Builder admin page.
+const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
+  "kit-login": {
+    kitId: "kit-login",
+    theme: { color: "#2f8f61", accent: "#ffd166", icon: "\ud83d\udd10" },
+    bannerTitle: "Login Kit",
+    bannerSubtitle: "Show what you know about signing in and getting ready to work.",
+    instructions: "Read each question and write or tick your answer. Ask your teacher if you get stuck!",
+    questions: [
+      { id: "q1", type: "short-answer", prompt: "What is your school username?", lines: 1 },
+      {
+        id: "q2",
+        type: "checklist",
+        prompt: "Tick each step once you have done it:",
+        options: [
+          "Signed in to your school Google account",
+          "Opened your DTECH-HUB workspace",
+          "Confirmed you can open Google Drive",
+          "Confirmed you can open Google Slides"
+        ]
+      },
+      {
+        id: "q3",
+        type: "multiple-choice",
+        prompt: "What should you do if you forget your password?",
+        options: [
+          "Ask a friend for theirs",
+          "Ask a teacher or IT for a reset",
+          "Leave the computer and go home",
+          "Guess until it works"
+        ]
+      }
+    ],
+    images: []
+  }
+};
+
+function getDefaultPracticalSkillsKitContent(kitId) {
+  const safeKitId = String(kitId || "").trim();
+  return DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT[safeKitId] || {
+    kitId: safeKitId,
+    theme: { color: "#2f8f61", accent: "#ffd166", icon: "\ud83d\udcdd" },
+    bannerTitle: "",
+    bannerSubtitle: "",
+    instructions: "",
+    questions: [],
+    images: []
+  };
+}
+
+async function ensurePracticalSkillsKitContentSchema() {
+  if (!hasDatabase) {
+    return;
+  }
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS practical_skills_kit_content (
+      kit_id TEXT PRIMARY KEY,
+      content JSONB NOT NULL DEFAULT '{}'::jsonb,
+      updated_by_email TEXT,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`ALTER TABLE practical_skills_kit_content ADD COLUMN IF NOT EXISTS content JSONB NOT NULL DEFAULT '{}'::jsonb`);
+  await pool.query(`ALTER TABLE practical_skills_kit_content ADD COLUMN IF NOT EXISTS updated_by_email TEXT`);
+  await pool.query(`ALTER TABLE practical_skills_kit_content ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+}
+
+async function getPracticalSkillsKitContent(kitId) {
+  const safeKitId = String(kitId || "").trim();
+  if (!safeKitId) return null;
+
+  if (!hasDatabase) {
+    const stored = memoryPracticalSkillsKitContent.get(safeKitId);
+    return stored || getDefaultPracticalSkillsKitContent(safeKitId);
+  }
+
+  await ensurePracticalSkillsKitContentSchema();
+  const result = await pool.query(`SELECT content FROM practical_skills_kit_content WHERE kit_id = $1 LIMIT 1`, [safeKitId]);
+  const stored = result.rows?.[0]?.content;
+  return stored && Object.keys(stored).length ? stored : getDefaultPracticalSkillsKitContent(safeKitId);
+}
+
+async function savePracticalSkillsKitContent(kitId, content, updatedByEmail) {
+  const safeKitId = String(kitId || "").trim();
+  if (!safeKitId) return null;
+
+  const safeContent = { ...content, kitId: safeKitId };
+
+  if (!hasDatabase) {
+    memoryPracticalSkillsKitContent.set(safeKitId, safeContent);
+    return safeContent;
+  }
+
+  await ensurePracticalSkillsKitContentSchema();
+  await pool.query(
+    `INSERT INTO practical_skills_kit_content (kit_id, content, updated_by_email, updated_at)
+     VALUES ($1, $2::jsonb, $3, NOW())
+     ON CONFLICT (kit_id) DO UPDATE SET
+       content = EXCLUDED.content,
+       updated_by_email = EXCLUDED.updated_by_email,
+       updated_at = NOW()`,
+    [safeKitId, JSON.stringify(safeContent), normalizeEmail(updatedByEmail)]
+  );
+  return safeContent;
+}
+
+async function savePracticalSkillsKitResponses(studentEmail, kitId, responses) {
+  const email = normalizeEmail(studentEmail);
+  const safeKitId = String(kitId || "").trim();
+  if (!email || !safeKitId) return null;
+
+  const safeResponses = responses && typeof responses === "object" ? responses : {};
+  await ensurePracticalSkillsProgressRow(email, safeKitId);
+
+  if (!hasDatabase) {
+    const key = `${email}:${safeKitId}`;
+    const existing = memoryPracticalSkillsProgress.get(key) || {};
+    const next = { ...existing, responses: safeResponses, updated_at: new Date().toISOString() };
+    memoryPracticalSkillsProgress.set(key, next);
+    return next;
+  }
+
+  await ensurePracticalSkillsProgressSchema();
+  const result = await pool.query(
+    `UPDATE practical_skills_progress SET responses = $1::jsonb, updated_at = NOW()
+     WHERE student_email = $2 AND kit_id = $3 RETURNING *`,
+    [JSON.stringify(safeResponses), email, safeKitId]
+  );
+  return result.rows?.[0] || null;
 }
 
 async function ensureStudentHaparaFoldersSchema() {
@@ -3936,6 +4071,7 @@ async function ensureSchema() {
   await ensureAssessmentStandardCardsSchema();
   await ensureCourseOutlinesSchema();
   await ensurePracticalSkillsProgressSchema();
+  await ensurePracticalSkillsKitContentSchema();
   const seededProcessAssessmentAllocations = await backfillProcessAssessmentAllocations();
   if (seededProcessAssessmentAllocations > 0) {
     console.log(`[startup] Backfilled ${seededProcessAssessmentAllocations} student allocation(s) into Process Assessment (${CLIENT_PROJECTS_TASK_ID}).`);
@@ -10472,6 +10608,104 @@ app.post("/api/practical-skills/progress/:kitId/reset", async (req, res) => {
     res.json(computePracticalSkillsSnapshot(rows));
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not reset Practical Skills progress." });
+  }
+});
+
+app.get("/api/practical-skills/progress/:kitId", async (req, res) => {
+  const studentEmail = normalizeEmail(getRequestUserEmail(req));
+  const kitId = String(req.params.kitId || "").trim();
+  if (!studentEmail || !studentEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required." });
+    return;
+  }
+  if (!getPracticalSkillsKitDefinition(kitId)) {
+    res.status(404).json({ error: "Unknown kit." });
+    return;
+  }
+
+  try {
+    await ensurePracticalSkillsProgressRow(studentEmail, kitId);
+    const rows = await getAllPracticalSkillsProgressRows(studentEmail);
+    const snapshot = computePracticalSkillsSnapshot(rows);
+    const row = rows.find((entry) => String(entry?.kit_id || "").trim() === kitId);
+    res.json({
+      kit: snapshot.kits.find((entry) => entry.id === kitId) || null,
+      badges: snapshot.badges,
+      responses: row?.responses && typeof row.responses === "object" ? row.responses : {}
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not load kit progress." });
+  }
+});
+
+app.post("/api/practical-skills/progress/:kitId/responses", async (req, res) => {
+  const studentEmail = normalizeEmail(getRequestUserEmail(req));
+  const kitId = String(req.params.kitId || "").trim();
+  if (!studentEmail || !studentEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required." });
+    return;
+  }
+  if (!getPracticalSkillsKitDefinition(kitId)) {
+    res.status(404).json({ error: "Unknown kit." });
+    return;
+  }
+
+  try {
+    const saved = await savePracticalSkillsKitResponses(studentEmail, kitId, req.body?.responses);
+    res.json({ ok: true, responses: saved?.responses || {} });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not save responses." });
+  }
+});
+
+app.get("/api/practical-skills/kit-content/:kitId", async (req, res) => {
+  const kitId = String(req.params.kitId || "").trim();
+  if (!getPracticalSkillsKitDefinition(kitId)) {
+    res.status(404).json({ error: "Unknown kit." });
+    return;
+  }
+
+  try {
+    const content = await getPracticalSkillsKitContent(kitId);
+    res.json({ content });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not load kit content." });
+  }
+});
+
+app.get("/api/admin/practical-skills/kit-content/:kitId", requireAdminAccess, async (req, res) => {
+  const kitId = String(req.params.kitId || "").trim();
+  if (!getPracticalSkillsKitDefinition(kitId)) {
+    res.status(404).json({ error: "Unknown kit." });
+    return;
+  }
+
+  try {
+    const content = await getPracticalSkillsKitContent(kitId);
+    res.json({ content });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not load kit content." });
+  }
+});
+
+app.put("/api/admin/practical-skills/kit-content/:kitId", requireAdminAccess, async (req, res) => {
+  const kitId = String(req.params.kitId || "").trim();
+  const requesterEmail = normalizeEmail(getRequestUserEmail(req));
+  if (!getPracticalSkillsKitDefinition(kitId)) {
+    res.status(404).json({ error: "Unknown kit." });
+    return;
+  }
+  const content = req.body?.content && typeof req.body.content === "object" ? req.body.content : null;
+  if (!content) {
+    res.status(400).json({ error: "content object is required" });
+    return;
+  }
+
+  try {
+    const saved = await savePracticalSkillsKitContent(kitId, content, requesterEmail);
+    res.json({ ok: true, content: saved });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not save kit content." });
   }
 });
 
