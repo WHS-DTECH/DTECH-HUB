@@ -2448,7 +2448,10 @@ function renderHubAuthUi() {
     }
     if (hubUserBadge) {
         hubUserBadge.hidden = !signedIn;
-        hubUserBadge.textContent = signedIn ? getHubUserInitials(hubAuthState.profile) : "";
+        const initials = signedIn ? getHubUserInitials(hubAuthState.profile) : "";
+        // Lead Teacher counts as Teacher here; canTeacherView already reflects that from /api/auth/user-access.
+        const roleSuffix = signedIn ? (canTeacherView ? "Teacher" : "Student") : "";
+        hubUserBadge.textContent = roleSuffix ? `${initials} - ${roleSuffix}` : initials;
         hubUserBadge.title = signedIn ? getHubDisplayName(hubAuthState.profile) : "";
     }
     if (hubStaffLink) {
