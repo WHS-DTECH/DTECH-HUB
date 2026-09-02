@@ -3985,7 +3985,15 @@ async function getStoredPracticalSkillsKitContent(kitId) {
   const result = await pool.query(`SELECT content FROM practical_skills_kit_content WHERE kit_id = $1 LIMIT 1`, [safeKitId]);
   const stored = result.rows?.[0]?.content;
   const defaults = getDefaultPracticalSkillsKitContent(safeKitId);
-  return stored && Object.keys(stored).length ? { ...defaults, ...stored } : defaults;
+  if (!stored || !Object.keys(stored).length) {
+    return defaults;
+  }
+
+  const merged = { ...defaults, ...stored };
+  if (safeKitId === "kit-login" && (!Array.isArray(stored.worksheets) || !stored.worksheets.length)) {
+    merged.worksheets = defaults.worksheets;
+  }
+  return merged;
 }
 
 async function savePracticalSkillsKitContent(kitId, content, updatedByEmail) {
