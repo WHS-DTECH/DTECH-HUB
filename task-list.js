@@ -873,7 +873,7 @@ function getTaskTopicHrefForStep(standard, level, text) {
 
     if ((String(standard) === "91893" || String(standard) === "91903")
         && /applying appropriate data integrity and testing procedures/i.test(normalized)) {
-        return buildTaskListStandardSectionAnchor(String(standard) === "91903" ? "91907" : "91897", "testing-trialing");
+        return buildTaskListStandardSectionAnchor(String(standard) === "91903" ? "91907" : "91897", "testing-functions");
     }
 
     if ((String(standard) === "91897" || String(standard) === "91907")
@@ -2358,7 +2358,7 @@ function renderChecklistCards(detail, allItems) {
                                 ${shouldRenderAchievedSectionHeading && achievedSectionMeta?.id === "relevant-implications"
                                     ? `<p class="task-list-achieved-note">Complete any 3 or more categories to mark Section 4 complete. (${relevantCategoryDoneCount}/${RELEVANT_IMPLICATIONS_CATEGORIES.length})</p>`
                                     : ""}
-                                <div class="task-list-step-row ${isSystemComplete ? "is-system-complete" : ""} ${isRelevantCategoryRow ? "is-relevant-implications-category" : ""} ${isInformationalRow ? "is-informational" : ""} ${needsEvidence ? "is-needs-evidence" : ""}">
+                                <div ${isTestingFunctionsRow ? `id="task-list-standard-${escapeTaskListHtml(standard)}-testing-functions"` : ""} class="task-list-step-row ${isSystemComplete ? "is-system-complete" : ""} ${isRelevantCategoryRow ? "is-relevant-implications-category" : ""} ${isInformationalRow ? "is-informational" : ""} ${needsEvidence ? "is-needs-evidence" : ""}">
                                     <label class="task-list-step-check-wrap">
                                         ${isInformationalRow ? "" : `<input type="checkbox" ${isRowChecked ? "checked" : ""} ${isTickActionDisabled ? "disabled" : ""} data-step-check="${escapeTaskListHtml(standard)}:${step._index}">`}
                                         ${isRelevantCategoryRow
