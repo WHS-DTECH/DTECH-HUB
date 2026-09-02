@@ -23,6 +23,7 @@
     const bannerTitleInput = document.querySelector("#kit-banner-title");
     const bannerSubtitleInput = document.querySelector("#kit-banner-subtitle");
     const instructionsInput = document.querySelector("#kit-instructions");
+    const teacherNotesInput = document.querySelector("#kit-teacher-notes");
     const iconInput = document.querySelector("#kit-icon");
     const themeColorInput = document.querySelector("#kit-theme-color");
     const accentColorInput = document.querySelector("#kit-accent-color");
@@ -232,6 +233,7 @@
             bannerTitle: bannerTitleInput.value,
             bannerSubtitle: bannerSubtitleInput.value,
             instructions: instructionsInput.value,
+            teacherNotes: teacherNotesInput.value,
             questions,
             images
         };
@@ -256,6 +258,7 @@
         bannerTitleInput.value = content.bannerTitle || "";
         bannerSubtitleInput.value = content.bannerSubtitle || "";
         instructionsInput.value = content.instructions || "";
+        teacherNotesInput.value = content.teacherNotes || "";
         iconInput.value = content.theme?.icon || "";
         themeColorInput.value = content.theme?.color || "#2f8f61";
         accentColorInput.value = content.theme?.accent || "#ffd166";
@@ -307,7 +310,7 @@
     }
 
     function wireFormEvents() {
-        [bannerTitleInput, bannerSubtitleInput, instructionsInput, iconInput, themeColorInput, accentColorInput].forEach((input) => {
+        [bannerTitleInput, bannerSubtitleInput, instructionsInput, teacherNotesInput, iconInput, themeColorInput, accentColorInput].forEach((input) => {
             input.addEventListener("input", queuePreviewUpdate);
         });
 

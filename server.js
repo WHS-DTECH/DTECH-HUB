@@ -3850,6 +3850,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
     bannerTitle: "Login Kit",
     bannerSubtitle: "",
     instructions: "",
+    teacherNotes: "New students may not have had their Google account provisioned yet.\n\nContact IT if login fails after password reset.\n\nComplete during first DTECH lesson.\n\nEvidence is self-certified; teacher verification not required.",
     questions: [
       { id: "q1", type: "short-answer", prompt: "What is your school username?", lines: 1 },
       {
@@ -3879,7 +3880,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
   }
 };
 
-function normalizePracticalSkillsKitContentForDisplay(kitId, content) {
+function normalizePracticalSkillsKitContentForStorage(kitId, content) {
   const safeContent = content && typeof content === "object" ? content : {};
   if (String(kitId || "").trim() !== "kit-login") {
     return safeContent;
@@ -3890,6 +3891,12 @@ function normalizePracticalSkillsKitContentForDisplay(kitId, content) {
     bannerSubtitle: "",
     instructions: ""
   };
+}
+
+function normalizePracticalSkillsKitContentForDisplay(kitId, content) {
+  const safeContent = normalizePracticalSkillsKitContentForStorage(kitId, content);
+  const { teacherNotes: _teacherNotes, ...studentContent } = safeContent;
+  return studentContent;
 }
 
 function getDefaultPracticalSkillsKitContent(kitId) {
@@ -3925,26 +3932,32 @@ async function ensurePracticalSkillsKitContentSchema() {
 }
 
 async function getPracticalSkillsKitContent(kitId) {
+  const content = await getStoredPracticalSkillsKitContent(kitId);
+  if (!content) return null;
+  return normalizePracticalSkillsKitContentForDisplay(kitId, content);
+}
+
+async function getStoredPracticalSkillsKitContent(kitId) {
   const safeKitId = String(kitId || "").trim();
   if (!safeKitId) return null;
 
   if (!hasDatabase) {
     const stored = memoryPracticalSkillsKitContent.get(safeKitId);
-    return normalizePracticalSkillsKitContentForDisplay(safeKitId, stored || getDefaultPracticalSkillsKitContent(safeKitId));
+    return stored || getDefaultPracticalSkillsKitContent(safeKitId);
   }
 
   await ensurePracticalSkillsKitContentSchema();
   const result = await pool.query(`SELECT content FROM practical_skills_kit_content WHERE kit_id = $1 LIMIT 1`, [safeKitId]);
   const stored = result.rows?.[0]?.content;
-  const candidate = stored && Object.keys(stored).length ? stored : getDefaultPracticalSkillsKitContent(safeKitId);
-  return normalizePracticalSkillsKitContentForDisplay(safeKitId, candidate);
+  const defaults = getDefaultPracticalSkillsKitContent(safeKitId);
+  return stored && Object.keys(stored).length ? { ...defaults, ...stored } : defaults;
 }
 
 async function savePracticalSkillsKitContent(kitId, content, updatedByEmail) {
   const safeKitId = String(kitId || "").trim();
   if (!safeKitId) return null;
 
-  const safeContent = normalizePracticalSkillsKitContentForDisplay(safeKitId, { ...content, kitId: safeKitId });
+  const safeContent = normalizePracticalSkillsKitContentForStorage(safeKitId, { ...content, kitId: safeKitId });
 
   if (!hasDatabase) {
     memoryPracticalSkillsKitContent.set(safeKitId, safeContent);
@@ -10708,7 +10721,7 @@ app.get("/api/admin/practical-skills/kit-content/:kitId", requireAdminAccess, as
   }
 
   try {
-    const content = await getPracticalSkillsKitContent(kitId);
+    const content = await getStoredPracticalSkillsKitContent(kitId);
     res.json({ content });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not load kit content." });
