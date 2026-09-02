@@ -2,6 +2,7 @@
     "use strict";
 
     const dataPath = "/practical-skills/library.json";
+    const featuredChecklistId = "practical-skills-checklist";
     const grid = document.getElementById("practical-skills-grid");
     const meta = document.getElementById("practical-skills-results-meta");
     const searchInput = document.getElementById("practical-skills-search");
@@ -216,7 +217,9 @@
             }
 
             const payload = await response.json();
-            library = Array.isArray(payload) ? payload : [];
+            library = Array.isArray(payload)
+                ? payload.filter((item) => String(item?.id || "") !== featuredChecklistId)
+                : [];
         } catch (_error) {
             library = [];
         }
