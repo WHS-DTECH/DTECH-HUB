@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Activity Details | Practical Skills Admin</title>
+  <meta name="hub-google-client-id" content="239433605438-ur2omagmkluhhn7i319g0i82l4l5l1j8.apps.googleusercontent.com">
+  <meta name="hub-google-allowed-domain" content="westlandhigh.school.nz">
+  <link rel="stylesheet" href="../styles.css">
+  <style>
+    .activity-editor { width: min(920px, calc(100% - 28px)); margin: 24px auto 60px; }
+    .activity-editor-field { display: grid; gap: 6px; margin-bottom: 14px; }
+    .activity-editor-field label { font-weight: 700; font-size: .85rem; color: #173858; }
+    .activity-editor-field input, .activity-editor-field textarea, .activity-editor-field select { border: 1px solid #c9d4e2; border-radius: 8px; padding: 8px 10px; font: inherit; }
+    .activity-question-card, .activity-image-card { border: 1px solid #d7e1ee; border-radius: 8px; padding: 12px; margin-bottom: 12px; background: #f8fbff; }
+    .activity-card-head, .activity-editor-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+    .activity-card-head { margin-bottom: 10px; font-weight: 700; color: #173858; }
+    .activity-editor-actions { margin-top: 18px; justify-content: flex-start; }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <main class="activity-editor">
+      <section class="admin-page-header">
+        <p class="section-kicker">Kit Activity</p>
+        <h1 id="activity-page-title">Activity Details</h1>
+        <p id="activity-page-summary">Configure the student tasks and supporting images for this worksheet.</p>
+        <a id="activity-back-link" class="button button-secondary" href="./admin-kits.html">Back to Kit Details</a>
+      </section>
+      <section class="admin-panel">
+        <p id="activity-status" class="upload-status" aria-live="polite" hidden></p>
+        <div class="activity-editor-field">
+          <label for="activity-title">Activity</label>
+          <input id="activity-title" type="text" maxlength="120">
+        </div>
+        <div class="activity-editor-field">
+          <label for="activity-establishes">What it establishes</label>
+          <textarea id="activity-establishes" rows="3" maxlength="240"></textarea>
+        </div>
+        <h2>Questions</h2>
+        <div id="activity-question-list"></div>
+        <button id="activity-add-question" class="button button-secondary" type="button">Add Question</button>
+        <h2>Images</h2>
+        <div id="activity-image-list"></div>
+        <button id="activity-add-image" class="button button-secondary" type="button">Add Image</button>
+        <div class="activity-editor-actions">
+          <button id="activity-save" class="button button-primary" type="button">Save Activity Details</button>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="../script.js"></script>
+  <script src="./admin-kit-activity.js"></script>
+</body>
+</html>

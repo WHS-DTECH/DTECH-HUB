@@ -3929,6 +3929,7 @@ function normalizePracticalSkillsKitContentForDisplay(kitId, content) {
     identity: _identity,
     learning: _learning,
     completion: _completion,
+    activities: _activities,
     ...studentContent
   } = safeContent;
   return studentContent;

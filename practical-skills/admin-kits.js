@@ -38,10 +38,6 @@
     const iconInput = document.querySelector("#kit-icon");
     const themeColorInput = document.querySelector("#kit-theme-color");
     const accentColorInput = document.querySelector("#kit-accent-color");
-    const questionListHost = document.querySelector("#kit-question-list");
-    const imageListHost = document.querySelector("#kit-image-list");
-    const addQuestionBtn = document.querySelector("#kit-add-question");
-    const addImageBtn = document.querySelector("#kit-add-image");
     const addWorksheetBtn = document.querySelector("#kit-add-worksheet");
     const saveBtn = document.querySelector("#kit-save-content");
     const reloadBtn = document.querySelector("#kit-reload-content");
@@ -146,14 +142,6 @@
         return payload;
     }
 
-    function createDefaultQuestion() {
-        return { id: `q${Date.now()}`, type: "short-answer", prompt: "", lines: 1, options: [] };
-    }
-
-    function createDefaultImage() {
-        return { url: "", alt: "", caption: "" };
-    }
-
     function createDefaultWorksheet(number) {
         return { number, activity: "", establishes: "" };
     }
@@ -166,93 +154,14 @@
                 <td><input type="number" class="kit-worksheet-number" data-index="${index}" min="1" value="${Number(worksheet.number) || index + 1}"></td>
                 <td><input type="text" class="kit-worksheet-activity" data-index="${index}" maxlength="120" value="${worksheet.activity || ""}"></td>
                 <td><input type="text" class="kit-worksheet-establishes" data-index="${index}" maxlength="240" value="${worksheet.establishes || ""}"></td>
+                <td><a class="button button-primary" href="/practical-skills/admin-kit-activity.html?kit=${encodeURIComponent(state.kitId)}&activity=${index}">Activity Details</a></td>
                 <td><button type="button" class="button button-secondary kit-remove-worksheet" data-index="${index}">Remove</button></td>
             `;
             worksheetListHost.appendChild(row);
         });
     }
 
-    function renderQuestionCard(question, index) {
-        const card = document.createElement("div");
-        card.className = "kit-question-card";
-        card.innerHTML = `
-            <div class="kit-question-card-head">
-                <span>Question ${index + 1}</span>
-                <button type="button" class="button button-secondary kit-remove-question" data-index="${index}">Remove</button>
-            </div>
-            <div class="kit-builder-field">
-                <label>Type</label>
-                <select class="kit-question-type" data-index="${index}">
-                    <option value="short-answer" ${question.type === "short-answer" ? "selected" : ""}>Short Answer</option>
-                    <option value="checklist" ${question.type === "checklist" ? "selected" : ""}>Checklist</option>
-                    <option value="multiple-choice" ${question.type === "multiple-choice" ? "selected" : ""}>Multiple Choice</option>
-                </select>
-            </div>
-            <div class="kit-builder-field">
-                <label>Prompt</label>
-                <textarea class="kit-question-prompt" data-index="${index}" rows="2">${question.prompt || ""}</textarea>
-            </div>
-            ${question.type === "short-answer" ? `
-                <div class="kit-builder-field">
-                    <label>Answer lines</label>
-                    <input type="text" class="kit-question-lines" data-index="${index}" value="${Number(question.lines) || 1}" inputmode="numeric">
-                </div>
-            ` : `
-                <div class="kit-builder-field">
-                    <label>Options (one per line)</label>
-                    <textarea class="kit-question-options" data-index="${index}" rows="3">${(question.options || []).join("\n")}</textarea>
-                </div>
-            `}
-        `;
-        return card;
-    }
-
-    function renderImageCard(image, index) {
-        const card = document.createElement("div");
-        card.className = "kit-image-card";
-        card.innerHTML = `
-            <div class="kit-image-card-head">
-                <span>Image ${index + 1}</span>
-                <button type="button" class="button button-secondary kit-remove-image" data-index="${index}">Remove</button>
-            </div>
-            <div class="kit-builder-field">
-                <label>Image URL</label>
-                <input type="text" class="kit-image-url" data-index="${index}" value="${image.url || ""}" placeholder="https://...">
-            </div>
-            <div class="kit-builder-field">
-                <label>Alt text</label>
-                <input type="text" class="kit-image-alt" data-index="${index}" value="${image.alt || ""}">
-            </div>
-            <div class="kit-builder-field">
-                <label>Caption</label>
-                <input type="text" class="kit-image-caption" data-index="${index}" value="${image.caption || ""}">
-            </div>
-        `;
-        return card;
-    }
-
     function readFormIntoContent() {
-        const questions = Array.from(questionListHost.querySelectorAll(".kit-question-card")).map((card, index) => {
-            const type = card.querySelector(".kit-question-type")?.value || "short-answer";
-            const prompt = card.querySelector(".kit-question-prompt")?.value || "";
-            const existing = state.content?.questions?.[index] || {};
-            if (type === "short-answer") {
-                const lines = Math.max(1, Number.parseInt(card.querySelector(".kit-question-lines")?.value, 10) || 1);
-                return { id: existing.id || `q${index}`, type, prompt, lines };
-            }
-            const options = String(card.querySelector(".kit-question-options")?.value || "")
-                .split("\n")
-                .map((line) => line.trim())
-                .filter(Boolean);
-            return { id: existing.id || `q${index}`, type, prompt, options };
-        });
-
-        const images = Array.from(imageListHost.querySelectorAll(".kit-image-card")).map((card) => ({
-            url: card.querySelector(".kit-image-url")?.value || "",
-            alt: card.querySelector(".kit-image-alt")?.value || "",
-            caption: card.querySelector(".kit-image-caption")?.value || ""
-        }));
-
         const worksheets = Array.from(worksheetListHost.querySelectorAll("tr")).map((row, index) => ({
             number: Math.max(1, Number.parseInt(row.querySelector(".kit-worksheet-number")?.value, 10) || index + 1),
             activity: row.querySelector(".kit-worksheet-activity")?.value || "",
@@ -282,28 +191,15 @@
                 keyVocabulary: keyVocabularyInput.value
             },
             worksheets,
-            questions,
-            images,
+            activities: state.content?.activities || [],
+            questions: state.content?.questions || [],
+            images: state.content?.images || [],
             completion: {
                 evidenceRequired: evidenceRequiredInput.value,
                 successCriteria: successCriteriaInput.value,
                 extensionChallenge: extensionChallengeInput.value
             }
         };
-    }
-
-    function renderQuestionList() {
-        questionListHost.innerHTML = "";
-        (state.content?.questions || []).forEach((question, index) => {
-            questionListHost.appendChild(renderQuestionCard(question, index));
-        });
-    }
-
-    function renderImageList() {
-        imageListHost.innerHTML = "";
-        (state.content?.images || []).forEach((image, index) => {
-            imageListHost.appendChild(renderImageCard(image, index));
-        });
     }
 
     function renderForm() {
@@ -325,8 +221,6 @@
         iconInput.value = content.theme?.icon || "";
         themeColorInput.value = content.theme?.color || "#2f8f61";
         accentColorInput.value = content.theme?.accent || "#ffd166";
-        renderQuestionList();
-        renderImageList();
         renderWorksheetList();
         queuePreviewUpdate();
     }
@@ -378,47 +272,6 @@
             input.addEventListener("input", queuePreviewUpdate);
         });
 
-        questionListHost.addEventListener("input", queuePreviewUpdate);
-        questionListHost.addEventListener("change", (event) => {
-            if (event.target.classList.contains("kit-question-type")) {
-                const index = Number(event.target.getAttribute("data-index"));
-                const questions = readFormIntoContent().questions;
-                const current = questions[index] || createDefaultQuestion();
-                current.type = event.target.value;
-                if (current.type === "short-answer" && !current.lines) current.lines = 1;
-                if (current.type !== "short-answer" && !current.options) current.options = [];
-                state.content.questions = questions;
-                state.content.questions[index] = current;
-                renderQuestionList();
-                queuePreviewUpdate();
-                return;
-            }
-            queuePreviewUpdate();
-        });
-
-        questionListHost.addEventListener("click", (event) => {
-            const button = event.target.closest(".kit-remove-question");
-            if (!button) return;
-            const index = Number(button.getAttribute("data-index"));
-            const questions = readFormIntoContent().questions;
-            questions.splice(index, 1);
-            state.content.questions = questions;
-            renderQuestionList();
-            queuePreviewUpdate();
-        });
-
-        imageListHost.addEventListener("input", queuePreviewUpdate);
-        imageListHost.addEventListener("click", (event) => {
-            const button = event.target.closest(".kit-remove-image");
-            if (!button) return;
-            const index = Number(button.getAttribute("data-index"));
-            const images = readFormIntoContent().images;
-            images.splice(index, 1);
-            state.content.images = images;
-            renderImageList();
-            queuePreviewUpdate();
-        });
-
         worksheetListHost.addEventListener("click", (event) => {
             const button = event.target.closest(".kit-remove-worksheet");
             if (!button) return;
@@ -433,22 +286,6 @@
             state.content.worksheets = readFormIntoContent().worksheets;
             state.content.worksheets.push(createDefaultWorksheet(state.content.worksheets.length + 1));
             renderWorksheetList();
-        });
-
-        addQuestionBtn.addEventListener("click", () => {
-            state.content = state.content || {};
-            state.content.questions = readFormIntoContent().questions;
-            state.content.questions.push(createDefaultQuestion());
-            renderQuestionList();
-            queuePreviewUpdate();
-        });
-
-        addImageBtn.addEventListener("click", () => {
-            state.content = state.content || {};
-            state.content.images = readFormIntoContent().images;
-            state.content.images.push(createDefaultImage());
-            renderImageList();
-            queuePreviewUpdate();
         });
 
         saveBtn.addEventListener("click", () => {
