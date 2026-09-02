@@ -11283,6 +11283,7 @@ app.get("/api/auth/user-access", async (req, res) => {
 
   const userRole = await getUserRoleByEmail(email);
   const assignedRole = canonicalizeRoleName(userRole?.additional_role || userRole?.role_name || "");
+  const userTypeRole = canonicalizeRoleName(userRole?.user_type || "");
   const allPermissions = await getMergedRolePermissions();
   const rolePermission = allPermissions.find(
     (row) => canonicalizeRoleName(row.role_name) === assignedRole
@@ -11294,7 +11295,8 @@ app.get("/api/auth/user-access", async (req, res) => {
   const isStaff = staffEmailSet.has(email) || (canonicalEmail ? canonicalStaffEmailSet.has(canonicalEmail) : false);
   const isStudent = studentEmailSet.has(email) || (canonicalEmail ? canonicalStudentEmailSet.has(canonicalEmail) : false);
   const roleGrantsTeacherView = ["Admin", "Lead Teacher", "Teacher", "Technician"].includes(assignedRole);
-  const canAdmin = Boolean(rolePermission?.admin);
+  const principalLikeAdmin = ["Admin", "VP", "Principal"].includes(assignedRole) || ["VP", "Principal"].includes(userTypeRole);
+  const canAdmin = Boolean(rolePermission?.admin || principalLikeAdmin);
 
   let canTeacherView = Boolean(isStaff || roleGrantsTeacherView || canAdmin);
   if (isStudent && !isStaff && !roleGrantsTeacherView && !canAdmin) {
