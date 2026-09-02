@@ -2101,9 +2101,7 @@ function renderChecklistCards(detail, allItems) {
                                 if (getStepLevel(step?.text) !== level) return "";
                                 const stepText = stripStepLevel(step?.text || "");
                                 const isLinkedRelevantImplicationsRow = /^(?:explain(?:ing)?|address(?:ing)?) relevant implications\.?$/i.test(stepText);
-                                const href = isLinkedRelevantImplicationsRow
-                                    ? buildTaskListStandardSectionAnchor(String(standard) === "91903" ? "91907" : "91897", "relevant-implications")
-                                    : getTaskTopicHrefForStep(standard, level, stepText);
+                                const href = getTaskTopicHrefForStep(standard, level, stepText);
                                 const isInformationalRow = isInformationalCriteriaRow(standard, level, stepText);
                                 const managementKind = getStepAutoManagementKind(standard, step?.text || "");
                                 const needsEvidence = !isInformationalRow && managementKind === "manual";
