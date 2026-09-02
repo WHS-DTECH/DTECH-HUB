@@ -3851,6 +3851,18 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
     bannerSubtitle: "",
     instructions: "",
     teacherNotes: "New students may not have had their Google account provisioned yet.\n\nContact IT if login fails after password reset.\n\nComplete during first DTECH lesson.\n\nEvidence is self-certified; teacher verification not required.",
+    worksheets: [
+      { number: 1, activity: "Know Your Username", establishes: "Student knows their school username/email" },
+      { number: 2, activity: "Sign In", establishes: "Can independently sign in to their school account" },
+      { number: 3, activity: "Password Problems", establishes: "Knows the correct procedure if their password fails" },
+      { number: 4, activity: "Open DTECH-HUB", establishes: "Can access your central DTECH environment" },
+      { number: 5, activity: "Open Google Drive", establishes: "School Google account is working correctly" },
+      { number: 6, activity: "Find Your Files", establishes: "Can locate their Drive/My Drive area" },
+      { number: 7, activity: "Open Google Classroom", establishes: "Can reach the appropriate learning environment, if used" },
+      { number: 8, activity: "Open a Google App", establishes: "Can successfully access Docs/Slides/etc." },
+      { number: 9, activity: "Account Check", establishes: "Can identify which Google account they are currently using" },
+      { number: 10, activity: "Sign Out Safely", establishes: "Understands when and how to sign out, especially on shared devices" }
+    ],
     questions: [
       { id: "q1", type: "short-answer", prompt: "What is your school username?", lines: 1 },
       {
@@ -3895,7 +3907,7 @@ function normalizePracticalSkillsKitContentForStorage(kitId, content) {
 
 function normalizePracticalSkillsKitContentForDisplay(kitId, content) {
   const safeContent = normalizePracticalSkillsKitContentForStorage(kitId, content);
-  const { teacherNotes: _teacherNotes, ...studentContent } = safeContent;
+  const { teacherNotes: _teacherNotes, worksheets: _worksheets, ...studentContent } = safeContent;
   return studentContent;
 }
 

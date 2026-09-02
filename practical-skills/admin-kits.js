@@ -24,6 +24,7 @@
     const bannerSubtitleInput = document.querySelector("#kit-banner-subtitle");
     const instructionsInput = document.querySelector("#kit-instructions");
     const teacherNotesInput = document.querySelector("#kit-teacher-notes");
+    const worksheetListHost = document.querySelector("#kit-worksheet-list");
     const iconInput = document.querySelector("#kit-icon");
     const themeColorInput = document.querySelector("#kit-theme-color");
     const accentColorInput = document.querySelector("#kit-accent-color");
@@ -31,6 +32,7 @@
     const imageListHost = document.querySelector("#kit-image-list");
     const addQuestionBtn = document.querySelector("#kit-add-question");
     const addImageBtn = document.querySelector("#kit-add-image");
+    const addWorksheetBtn = document.querySelector("#kit-add-worksheet");
     const saveBtn = document.querySelector("#kit-save-content");
     const reloadBtn = document.querySelector("#kit-reload-content");
     const previewHost = document.querySelector("#kit-preview-host");
@@ -142,6 +144,24 @@
         return { url: "", alt: "", caption: "" };
     }
 
+    function createDefaultWorksheet(number) {
+        return { number, activity: "", establishes: "" };
+    }
+
+    function renderWorksheetList() {
+        worksheetListHost.innerHTML = "";
+        (state.content?.worksheets || []).forEach((worksheet, index) => {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                <td><input type="number" class="kit-worksheet-number" data-index="${index}" min="1" value="${Number(worksheet.number) || index + 1}"></td>
+                <td><input type="text" class="kit-worksheet-activity" data-index="${index}" maxlength="120" value="${worksheet.activity || ""}"></td>
+                <td><input type="text" class="kit-worksheet-establishes" data-index="${index}" maxlength="240" value="${worksheet.establishes || ""}"></td>
+                <td><button type="button" class="button button-secondary kit-remove-worksheet" data-index="${index}">Remove</button></td>
+            `;
+            worksheetListHost.appendChild(row);
+        });
+    }
+
     function renderQuestionCard(question, index) {
         const card = document.createElement("div");
         card.className = "kit-question-card";
@@ -223,6 +243,12 @@
             caption: card.querySelector(".kit-image-caption")?.value || ""
         }));
 
+        const worksheets = Array.from(worksheetListHost.querySelectorAll("tr")).map((row, index) => ({
+            number: Math.max(1, Number.parseInt(row.querySelector(".kit-worksheet-number")?.value, 10) || index + 1),
+            activity: row.querySelector(".kit-worksheet-activity")?.value || "",
+            establishes: row.querySelector(".kit-worksheet-establishes")?.value || ""
+        }));
+
         return {
             kitId: state.kitId,
             theme: {
@@ -234,6 +260,7 @@
             bannerSubtitle: bannerSubtitleInput.value,
             instructions: instructionsInput.value,
             teacherNotes: teacherNotesInput.value,
+            worksheets,
             questions,
             images
         };
@@ -264,6 +291,7 @@
         accentColorInput.value = content.theme?.accent || "#ffd166";
         renderQuestionList();
         renderImageList();
+        renderWorksheetList();
         queuePreviewUpdate();
     }
 
@@ -353,6 +381,22 @@
             state.content.images = images;
             renderImageList();
             queuePreviewUpdate();
+        });
+
+        worksheetListHost.addEventListener("click", (event) => {
+            const button = event.target.closest(".kit-remove-worksheet");
+            if (!button) return;
+            const worksheets = readFormIntoContent().worksheets;
+            worksheets.splice(Number(button.getAttribute("data-index")), 1);
+            state.content.worksheets = worksheets;
+            renderWorksheetList();
+        });
+
+        addWorksheetBtn.addEventListener("click", () => {
+            state.content = state.content || {};
+            state.content.worksheets = readFormIntoContent().worksheets;
+            state.content.worksheets.push(createDefaultWorksheet(state.content.worksheets.length + 1));
+            renderWorksheetList();
         });
 
         addQuestionBtn.addEventListener("click", () => {

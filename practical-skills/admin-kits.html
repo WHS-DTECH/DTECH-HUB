@@ -91,6 +91,50 @@
       flex-wrap: wrap;
       margin-top: 8px;
     }
+
+    .kit-worksheet-table-wrap {
+      overflow-x: auto;
+      margin-bottom: 10px;
+      border: 1px solid #d7e1ee;
+      border-radius: 8px;
+    }
+
+    .kit-worksheet-table {
+      width: 100%;
+      min-width: 640px;
+      border-collapse: collapse;
+    }
+
+    .kit-worksheet-table th,
+    .kit-worksheet-table td {
+      padding: 8px;
+      border-bottom: 1px solid #e4ebf3;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .kit-worksheet-table th {
+      background: #f3f7fb;
+      color: #173858;
+      font-size: 0.75rem;
+    }
+
+    .kit-worksheet-table tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .kit-worksheet-table input {
+      width: 100%;
+      min-width: 0;
+      border: 1px solid #c9d4e2;
+      border-radius: 5px;
+      padding: 7px 8px;
+      font: inherit;
+    }
+
+    .kit-worksheet-table .kit-worksheet-number {
+      width: 54px;
+    }
   </style>
 </head>
 <body>
@@ -153,6 +197,21 @@
               <label for="kit-teacher-notes">Teacher Notes - not visible to students</label>
               <textarea id="kit-teacher-notes" rows="5" maxlength="1200" placeholder="Add teacher-only delivery notes, support guidance, or evidence expectations."></textarea>
             </div>
+            <h2>Kit Worksheets</h2>
+            <div class="kit-worksheet-table-wrap">
+              <table class="kit-worksheet-table">
+                <thead>
+                  <tr>
+                    <th scope="col">#</th>
+                    <th scope="col">Activity</th>
+                    <th scope="col">What it establishes</th>
+                    <th scope="col"><span class="visually-hidden">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody id="kit-worksheet-list"></tbody>
+              </table>
+            </div>
+            <button type="button" id="kit-add-worksheet" class="button button-secondary">Add Worksheet</button>
             <div class="kit-builder-field">
               <label for="kit-icon">Banner Icon (emoji or short text)</label>
               <input id="kit-icon" type="text" maxlength="4" placeholder="\ud83d\udd10">
