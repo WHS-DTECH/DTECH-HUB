@@ -2178,6 +2178,10 @@ function getTaskListPageUrl() {
 }
 
 function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {
+    if (document.body.classList.contains("kit-worksheet-page")) {
+        return;
+    }
+
     const { toggle, panel, setOpen } = ensureGlobalHubSidebar();
 
     if (!signedIn) {

@@ -3879,6 +3879,19 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
   }
 };
 
+function normalizePracticalSkillsKitContentForDisplay(kitId, content) {
+  const safeContent = content && typeof content === "object" ? content : {};
+  if (String(kitId || "").trim() !== "kit-login") {
+    return safeContent;
+  }
+
+  return {
+    ...safeContent,
+    bannerSubtitle: "",
+    instructions: ""
+  };
+}
+
 function getDefaultPracticalSkillsKitContent(kitId) {
   const safeKitId = String(kitId || "").trim();
   return DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT[safeKitId] || {
@@ -3917,20 +3930,21 @@ async function getPracticalSkillsKitContent(kitId) {
 
   if (!hasDatabase) {
     const stored = memoryPracticalSkillsKitContent.get(safeKitId);
-    return stored || getDefaultPracticalSkillsKitContent(safeKitId);
+    return normalizePracticalSkillsKitContentForDisplay(safeKitId, stored || getDefaultPracticalSkillsKitContent(safeKitId));
   }
 
   await ensurePracticalSkillsKitContentSchema();
   const result = await pool.query(`SELECT content FROM practical_skills_kit_content WHERE kit_id = $1 LIMIT 1`, [safeKitId]);
   const stored = result.rows?.[0]?.content;
-  return stored && Object.keys(stored).length ? stored : getDefaultPracticalSkillsKitContent(safeKitId);
+  const candidate = stored && Object.keys(stored).length ? stored : getDefaultPracticalSkillsKitContent(safeKitId);
+  return normalizePracticalSkillsKitContentForDisplay(safeKitId, candidate);
 }
 
 async function savePracticalSkillsKitContent(kitId, content, updatedByEmail) {
   const safeKitId = String(kitId || "").trim();
   if (!safeKitId) return null;
 
-  const safeContent = { ...content, kitId: safeKitId };
+  const safeContent = normalizePracticalSkillsKitContentForDisplay(safeKitId, { ...content, kitId: safeKitId });
 
   if (!hasDatabase) {
     memoryPracticalSkillsKitContent.set(safeKitId, safeContent);
