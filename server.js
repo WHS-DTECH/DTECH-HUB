@@ -7734,6 +7734,16 @@ async function requireAdminAccess(req, res, next) {
     return;
   }
 
+  if (isDeveloperAdminEmail(email)) {
+    if (effectiveAuthMode === "strict" && !req?.auth_identity?.verified) {
+      res.status(401).json({ error: "Verified Google identity is required for admin access.", auth_mode: effectiveAuthMode });
+      return;
+    }
+    req.user_email = email;
+    next();
+    return;
+  }
+
   const roleHint = String(
     req?.headers?.["x-user-role"] ||
     req?.query?.role ||
