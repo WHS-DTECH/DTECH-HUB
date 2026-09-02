@@ -55,7 +55,8 @@ body.kit-worksheet-page {
 
 #hub-google-signin,
 #hub-google-signout,
-#hub-user-badge {
+#hub-user-badge,
+.kit-worksheet-dashboard-link {
     display: inline-flex;
     align-items: center;
     gap: 8px;
@@ -70,6 +71,10 @@ body.kit-worksheet-page {
     color: #3a3226;
 }
 
+.kit-worksheet-dashboard-link {
+    text-decoration: none;
+}
+
 #hub-google-signin .google-logo {
     flex: 0 0 auto;
 }
@@ -82,7 +87,8 @@ body.kit-worksheet-page {
    restore it explicitly \u2014 otherwise script.js toggling .hidden has no visual effect. */
 #hub-google-signin[hidden],
 #hub-google-signout[hidden],
-#hub-user-badge[hidden] {
+#hub-user-badge[hidden],
+.kit-worksheet-dashboard-link[hidden] {
     display: none;
 }
 

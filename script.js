@@ -1489,6 +1489,7 @@ const hubStaffLink = document.querySelector("#hub-staff-link");
 const hubAdminLink = document.querySelector("#hub-admin-link");
 const hubSettingsLink = document.querySelector("#hub-settings-link");
 const hubAccessBadge = document.querySelector("#hub-access-badge");
+const hubTeacherDashboardLink = document.querySelector("#hub-teacher-dashboard-link");
 const hubDriveSyncButton = document.querySelector("#hub-drive-sync");
 const hubSignInButton = document.querySelector("#hub-google-signin");
 const hubSignOutButton = document.querySelector("#hub-google-signout");
@@ -2464,6 +2465,9 @@ function renderHubAuthUi() {
             hubStaffLink.textContent = inTeacherMode ? "Switch to Student View" : "Switch to Teacher View";
             hubStaffLink.href = inTeacherMode ? "/index.html" : "/teacher-view.html";
         }
+    }
+    if (hubTeacherDashboardLink) {
+        hubTeacherDashboardLink.hidden = !canToggleView;
     }
     if (hubAdminLink) {
         hubAdminLink.hidden = !canAdmin;
