@@ -180,6 +180,28 @@
       <section class="admin-panel">
         <div class="kit-builder-layout">
           <div>
+            <h2>Kit Identity</h2>
+            <div class="kit-builder-field">
+              <label for="kit-name">Kit Name</label>
+              <input id="kit-name" type="text" maxlength="80" placeholder="e.g. Login Kit">
+            </div>
+            <div class="kit-builder-field">
+              <label for="kit-skill-area">Skill Area</label>
+              <input id="kit-skill-area" type="text" maxlength="80" placeholder="e.g. Practical Skills">
+            </div>
+            <div class="kit-builder-field">
+              <label for="kit-status">Status</label>
+              <select id="kit-status">
+                <option value="active">Active</option>
+                <option value="planning">Planning</option>
+                <option value="archive">Archive</option>
+              </select>
+            </div>
+            <div class="kit-builder-field">
+              <label for="kit-year-level">Year Level</label>
+              <input id="kit-year-level" type="text" maxlength="60" placeholder="e.g. All Years">
+            </div>
+
             <h2>Kit Theme</h2>
             <div class="kit-builder-field">
               <label for="kit-banner-title">Banner Title</label>
@@ -197,6 +219,21 @@
               <label for="kit-teacher-notes">Teacher Notes - not visible to students</label>
               <textarea id="kit-teacher-notes" rows="5" maxlength="1200" placeholder="Add teacher-only delivery notes, support guidance, or evidence expectations."></textarea>
             </div>
+
+            <h2>Learning</h2>
+            <div class="kit-builder-field">
+              <label for="kit-what-students-learn">What students will learn</label>
+              <textarea id="kit-what-students-learn" rows="3" maxlength="400"></textarea>
+            </div>
+            <div class="kit-builder-field">
+              <label for="kit-why-this-matters">Why this matters</label>
+              <textarea id="kit-why-this-matters" rows="3" maxlength="400"></textarea>
+            </div>
+            <div class="kit-builder-field">
+              <label for="kit-key-vocabulary">Key vocabulary</label>
+              <input id="kit-key-vocabulary" type="text" maxlength="400" placeholder="Separate terms with commas">
+            </div>
+
             <h2>Kit Worksheets</h2>
             <div class="kit-worksheet-table-wrap">
               <table class="kit-worksheet-table">
@@ -227,13 +264,27 @@
               </div>
             </div>
 
-            <h2>Questions</h2>
+            <h2>Activities</h2>
             <div id="kit-question-list"></div>
             <button type="button" id="kit-add-question" class="button button-secondary">Add Question</button>
 
             <h2>Images</h2>
             <div id="kit-image-list"></div>
             <button type="button" id="kit-add-image" class="button button-secondary">Add Image</button>
+
+            <h2>Completion</h2>
+            <div class="kit-builder-field">
+              <label for="kit-evidence-required">Evidence required</label>
+              <textarea id="kit-evidence-required" rows="3" maxlength="500"></textarea>
+            </div>
+            <div class="kit-builder-field">
+              <label for="kit-success-criteria">Success criteria</label>
+              <textarea id="kit-success-criteria" rows="3" maxlength="500"></textarea>
+            </div>
+            <div class="kit-builder-field">
+              <label for="kit-extension-challenge">Extension or challenge</label>
+              <textarea id="kit-extension-challenge" rows="3" maxlength="500"></textarea>
+            </div>
 
             <div class="kit-builder-actions">
               <button type="button" id="kit-save-content" class="button button-primary">Save Kit Content</button>

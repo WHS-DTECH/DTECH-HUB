@@ -20,10 +20,20 @@
 
     const kitSelect = document.querySelector("#kit-select");
     const statusHost = document.querySelector("#kit-builder-status");
+    const nameInput = document.querySelector("#kit-name");
+    const skillAreaInput = document.querySelector("#kit-skill-area");
+    const kitStatusInput = document.querySelector("#kit-status");
+    const yearLevelInput = document.querySelector("#kit-year-level");
     const bannerTitleInput = document.querySelector("#kit-banner-title");
     const bannerSubtitleInput = document.querySelector("#kit-banner-subtitle");
     const instructionsInput = document.querySelector("#kit-instructions");
     const teacherNotesInput = document.querySelector("#kit-teacher-notes");
+    const whatStudentsWillLearnInput = document.querySelector("#kit-what-students-learn");
+    const whyThisMattersInput = document.querySelector("#kit-why-this-matters");
+    const keyVocabularyInput = document.querySelector("#kit-key-vocabulary");
+    const evidenceRequiredInput = document.querySelector("#kit-evidence-required");
+    const successCriteriaInput = document.querySelector("#kit-success-criteria");
+    const extensionChallengeInput = document.querySelector("#kit-extension-challenge");
     const worksheetListHost = document.querySelector("#kit-worksheet-list");
     const iconInput = document.querySelector("#kit-icon");
     const themeColorInput = document.querySelector("#kit-theme-color");
@@ -251,6 +261,12 @@
 
         return {
             kitId: state.kitId,
+            identity: {
+                name: nameInput.value,
+                skillArea: skillAreaInput.value,
+                status: kitStatusInput.value,
+                yearLevel: yearLevelInput.value
+            },
             theme: {
                 color: themeColorInput.value,
                 accent: accentColorInput.value,
@@ -260,9 +276,19 @@
             bannerSubtitle: bannerSubtitleInput.value,
             instructions: instructionsInput.value,
             teacherNotes: teacherNotesInput.value,
+            learning: {
+                whatStudentsWillLearn: whatStudentsWillLearnInput.value,
+                whyThisMatters: whyThisMattersInput.value,
+                keyVocabulary: keyVocabularyInput.value
+            },
             worksheets,
             questions,
-            images
+            images,
+            completion: {
+                evidenceRequired: evidenceRequiredInput.value,
+                successCriteria: successCriteriaInput.value,
+                extensionChallenge: extensionChallengeInput.value
+            }
         };
     }
 
@@ -282,10 +308,20 @@
 
     function renderForm() {
         const content = state.content || {};
+        nameInput.value = content.identity?.name || content.bannerTitle || "";
+        skillAreaInput.value = content.identity?.skillArea || "";
+        kitStatusInput.value = content.identity?.status || "active";
+        yearLevelInput.value = content.identity?.yearLevel || "";
         bannerTitleInput.value = content.bannerTitle || "";
         bannerSubtitleInput.value = content.bannerSubtitle || "";
         instructionsInput.value = content.instructions || "";
         teacherNotesInput.value = content.teacherNotes || "";
+        whatStudentsWillLearnInput.value = content.learning?.whatStudentsWillLearn || "";
+        whyThisMattersInput.value = content.learning?.whyThisMatters || "";
+        keyVocabularyInput.value = content.learning?.keyVocabulary || "";
+        evidenceRequiredInput.value = content.completion?.evidenceRequired || "";
+        successCriteriaInput.value = content.completion?.successCriteria || "";
+        extensionChallengeInput.value = content.completion?.extensionChallenge || "";
         iconInput.value = content.theme?.icon || "";
         themeColorInput.value = content.theme?.color || "#2f8f61";
         accentColorInput.value = content.theme?.accent || "#ffd166";
@@ -338,7 +374,7 @@
     }
 
     function wireFormEvents() {
-        [bannerTitleInput, bannerSubtitleInput, instructionsInput, teacherNotesInput, iconInput, themeColorInput, accentColorInput].forEach((input) => {
+        [nameInput, skillAreaInput, kitStatusInput, yearLevelInput, bannerTitleInput, bannerSubtitleInput, instructionsInput, teacherNotesInput, whatStudentsWillLearnInput, whyThisMattersInput, keyVocabularyInput, evidenceRequiredInput, successCriteriaInput, extensionChallengeInput, iconInput, themeColorInput, accentColorInput].forEach((input) => {
             input.addEventListener("input", queuePreviewUpdate);
         });
 

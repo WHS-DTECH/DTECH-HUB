@@ -3846,11 +3846,27 @@ async function ensurePracticalSkillsProgressSchema() {
 const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
   "kit-login": {
     kitId: "kit-login",
+    identity: {
+      name: "Login Kit",
+      skillArea: "Practical Skills",
+      status: "active",
+      yearLevel: "All Years"
+    },
     theme: { color: "#2f8f61", accent: "#ffd166", icon: "\ud83d\udd10" },
     bannerTitle: "Login Kit",
     bannerSubtitle: "",
     instructions: "",
     teacherNotes: "New students may not have had their Google account provisioned yet.\n\nContact IT if login fails after password reset.\n\nComplete during first DTECH lesson.\n\nEvidence is self-certified; teacher verification not required.",
+    learning: {
+      whatStudentsWillLearn: "Sign in safely with a school Google account and access the core DTECH tools.",
+      whyThisMatters: "Students need reliable access to their DTECH learning environment before starting practical work.",
+      keyVocabulary: "username, password, Google account, Google Drive, DTECH-HUB"
+    },
+    completion: {
+      evidenceRequired: "Student completes the checklist and selects the correct password support response.",
+      successCriteria: "Student can access DTECH-HUB and Google Drive using their school account.",
+      extensionChallenge: "Locate a class file in Google Drive and open it in the appropriate Google app."
+    },
     worksheets: [
       { number: 1, activity: "Know Your Username", establishes: "Student knows their school username/email" },
       { number: 2, activity: "Sign In", establishes: "Can independently sign in to their school account" },
@@ -3907,7 +3923,14 @@ function normalizePracticalSkillsKitContentForStorage(kitId, content) {
 
 function normalizePracticalSkillsKitContentForDisplay(kitId, content) {
   const safeContent = normalizePracticalSkillsKitContentForStorage(kitId, content);
-  const { teacherNotes: _teacherNotes, worksheets: _worksheets, ...studentContent } = safeContent;
+  const {
+    teacherNotes: _teacherNotes,
+    worksheets: _worksheets,
+    identity: _identity,
+    learning: _learning,
+    completion: _completion,
+    ...studentContent
+  } = safeContent;
   return studentContent;
 }
 
