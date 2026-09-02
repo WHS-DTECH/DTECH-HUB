@@ -3848,8 +3848,8 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
     kitId: "kit-login",
     theme: { color: "#2f8f61", accent: "#ffd166", icon: "\ud83d\udd10" },
     bannerTitle: "Login Kit",
-    bannerSubtitle: "Show what you know about signing in and getting ready to work.",
-    instructions: "Read each question and write or tick your answer. Ask your teacher if you get stuck!",
+    bannerSubtitle: "",
+    instructions: "",
     questions: [
       { id: "q1", type: "short-answer", prompt: "What is your school username?", lines: 1 },
       {
