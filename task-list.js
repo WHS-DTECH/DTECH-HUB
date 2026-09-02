@@ -873,7 +873,7 @@ function getTaskTopicHrefForStep(standard, level, text) {
 
     if ((String(standard) === "91893" || String(standard) === "91903")
         && /applying appropriate data integrity and testing procedures/i.test(normalized)) {
-        return buildTaskListStandardSectionAnchor(String(standard) === "91903" ? "91907" : "91897", "testing-functions");
+        return buildCustomActivityLink(taskListState.selectedId, "Testing that the digital technologies outcome functions as intended.", "Testing Functions", "testing-functions");
     }
 
     if ((String(standard) === "91897" || String(standard) === "91907")
