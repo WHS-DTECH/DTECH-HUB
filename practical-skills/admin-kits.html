@@ -212,6 +212,20 @@
               <input id="kit-banner-subtitle" type="text" maxlength="160" placeholder="One friendly sentence about the kit">
             </div>
             <div class="kit-builder-field">
+              <label for="kit-icon">Banner Icon (emoji or short text)</label>
+              <input id="kit-icon" type="text" maxlength="4" placeholder="\ud83d\udd10">
+            </div>
+            <div class="kit-builder-color-row">
+              <div class="kit-builder-field">
+                <label for="kit-theme-color">Theme Colour</label>
+                <input id="kit-theme-color" type="color" value="#2f8f61">
+              </div>
+              <div class="kit-builder-field">
+                <label for="kit-accent-color">Accent Colour</label>
+                <input id="kit-accent-color" type="color" value="#ffd166">
+              </div>
+            </div>
+            <div class="kit-builder-field">
               <label for="kit-instructions">Instructions</label>
               <textarea id="kit-instructions" rows="3" maxlength="400" placeholder="What should students do on this page?"></textarea>
             </div>
@@ -249,20 +263,6 @@
               </table>
             </div>
             <button type="button" id="kit-add-worksheet" class="button button-secondary">Add Worksheet</button>
-            <div class="kit-builder-field">
-              <label for="kit-icon">Banner Icon (emoji or short text)</label>
-              <input id="kit-icon" type="text" maxlength="4" placeholder="\ud83d\udd10">
-            </div>
-            <div class="kit-builder-color-row">
-              <div class="kit-builder-field">
-                <label for="kit-theme-color">Theme Colour</label>
-                <input id="kit-theme-color" type="color" value="#2f8f61">
-              </div>
-              <div class="kit-builder-field">
-                <label for="kit-accent-color">Accent Colour</label>
-                <input id="kit-accent-color" type="color" value="#ffd166">
-              </div>
-            </div>
 
             <h2>Activities</h2>
             <div id="kit-question-list"></div>
