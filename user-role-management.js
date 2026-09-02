@@ -231,8 +231,12 @@ function getStaffType(row) {
     return "Lead Teacher";
   }
 
-  if (normalizedType.includes("teacher") || normalizedType === "vp" || normalizedType === "principal") {
+  if (normalizedType.includes("teacher")) {
     return "Teacher";
+  }
+
+  if (normalizedType.includes("principal") || normalizedType === "vp") {
+    return "Staff";
   }
 
   return "Staff";

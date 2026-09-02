@@ -1310,7 +1310,19 @@ const DEFAULT_ROLE_PERMISSIONS = [
   { role_name: "Technician", home_page: true, upload_activity: false, browse_activities: true, planning: false, admin: false }
 ];
 
+const DEV_ADMIN_EMAILS = new Set(
+  String(process.env.HUB_DEVELOPER_ADMIN_EMAILS || "")
+    .split(",")
+    .map((value) => normalizeEmail(value))
+    .filter(Boolean)
+);
+
 let memoryRolePermissions = DEFAULT_ROLE_PERMISSIONS.map((row) => ({ ...row }));
+
+function isDeveloperAdminEmail(email) {
+  const normalized = normalizeEmail(email);
+  return Boolean(normalized && DEV_ADMIN_EMAILS.has(normalized));
+}
 
 const ROLE_NAME_ALIASES = new Map([
   ["admin", "Admin"],
@@ -4230,7 +4242,8 @@ async function canManagePracticalSchedule(email) {
   ) || null;
 
   const roleGrantsTeacherView = ["Admin", "Lead Teacher", "Teacher", "Technician"].includes(assignedRole);
-  const canAdmin = Boolean(rolePermission?.admin);
+  const isDeveloperAdmin = isDeveloperAdminEmail(normalizedEmail);
+  const canAdmin = Boolean(rolePermission?.admin || isDeveloperAdmin);
   return Boolean(staffEmailSet.has(normalizedEmail) || roleGrantsTeacherView || canAdmin);
 }
 
@@ -11295,8 +11308,8 @@ app.get("/api/auth/user-access", async (req, res) => {
   const isStaff = staffEmailSet.has(email) || (canonicalEmail ? canonicalStaffEmailSet.has(canonicalEmail) : false);
   const isStudent = studentEmailSet.has(email) || (canonicalEmail ? canonicalStudentEmailSet.has(canonicalEmail) : false);
   const roleGrantsTeacherView = ["Admin", "Lead Teacher", "Teacher", "Technician"].includes(assignedRole);
-  const principalLikeAdmin = ["Admin", "VP", "Principal"].includes(assignedRole) || ["VP", "Principal"].includes(userTypeRole);
-  const canAdmin = Boolean(rolePermission?.admin || principalLikeAdmin);
+  const isDeveloperAdmin = isDeveloperAdminEmail(email);
+  const canAdmin = Boolean(rolePermission?.admin || isDeveloperAdmin);
 
   let canTeacherView = Boolean(isStaff || roleGrantsTeacherView || canAdmin);
   if (isStudent && !isStaff && !roleGrantsTeacherView && !canAdmin) {

@@ -21,6 +21,8 @@ services:
         sync: false
       - key: GOOGLE_ID_TOKEN_AUDIENCES
         sync: false
+      - key: HUB_DEVELOPER_ADMIN_EMAILS
+        sync: false
       - key: TRELLO_API_KEY
         sync: false
       - key: STAFF_DIRECTORY_API_URL
