@@ -2467,7 +2467,7 @@ function renderHubAuthUi() {
         }
     }
     if (hubTeacherDashboardLink) {
-        hubTeacherDashboardLink.hidden = !canToggleView;
+        hubTeacherDashboardLink.hidden = !canAdmin;
     }
     if (hubAdminLink) {
         hubAdminLink.hidden = !canAdmin;
