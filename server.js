@@ -5978,6 +5978,81 @@ function extractGoogleSlidesDevelopmentComponentsFromPdfText(source) {
   return values.slice(0, 30);
 }
 
+function extractGoogleSlidesTestingFunctionLists(presentation) {
+  const slides = Array.isArray(presentation?.slides) ? presentation.slides : [];
+  const functionalTesting = [];
+  const userTesting = [];
+  let currentSection = "functional";
+
+  const pushItem = (section, value) => {
+    const text = String(value || "")
+      .replace(/^[\u2022\u25CF\u25E6\u25AA\u2023\u2043\u00B7\u2219*-]\s*/, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!text) return;
+    if (/^(what\s+(function|will|is|was|happened)|how\s+will|expected\s+result|actual\s+result|if\s+it\s+failed|slide\s*\d*|testing\s+functions|functional\s+testing|user\s+testing)\b/i.test(text)) return;
+    const target = section === "user" ? userTesting : functionalTesting;
+    if (!target.includes(text)) target.push(text);
+  };
+
+  slides.forEach((slide) => {
+    const elements = Array.isArray(slide?.pageElements) ? slide.pageElements : [];
+    const slideText = elements
+      .map((element) => (Array.isArray(element?.shape?.text?.textElements) ? element.shape.text.textElements : [])
+        .map((textElement) => String(textElement?.textRun?.content || ""))
+        .join(""))
+      .join("\n");
+    if (/user\s+testing/i.test(slideText)) {
+      currentSection = "user";
+    } else if (/functional\s+testing/i.test(slideText)) {
+      currentSection = "functional";
+    }
+
+    elements.forEach((element) => {
+      const table = element?.table;
+      if (!table || !Array.isArray(table.tableRows)) return;
+      const rows = table.tableRows.map((row) => (
+        Array.isArray(row?.tableCells) ? row.tableCells.map((cell) => extractGoogleSlidesTableCellText(cell)) : []
+      ));
+      const headerRowIndex = rows.findIndex((row) => row.some((text) => /must[- ]do|what\s+.*test/i.test(text)));
+      const headerTexts = headerRowIndex >= 0 ? rows[headerRowIndex].map((text) => text.toLowerCase()) : [];
+      const testColumnIndex = headerTexts.length
+        ? headerTexts.findIndex((text) => /must[- ]do|function|what\s+.*test/i.test(text))
+        : -1;
+      const columnIndex = testColumnIndex >= 0 ? testColumnIndex : 0;
+
+      table.tableRows.forEach((row, rowIndex) => {
+        if (headerRowIndex >= 0 && rowIndex <= headerRowIndex) return;
+        if (headerRowIndex < 0 && rowIndex === 0 && (rows[0] || []).some((text) => /test/i.test(text))) return;
+        const cell = Array.isArray(row?.tableCells) ? row.tableCells[columnIndex] : null;
+        const lines = extractGoogleSlidesTableCellLines(cell);
+        (lines.length ? lines : [rows[rowIndex]?.[columnIndex] || ""]).forEach((line) => pushItem(currentSection, line));
+      });
+    });
+  });
+
+  return { functionalTesting: functionalTesting.slice(0, 40), userTesting: userTesting.slice(0, 40) };
+}
+
+function extractGoogleSlidesTestingFunctionListsFromPdfText(source) {
+  const functionalTesting = [];
+  const userTesting = [];
+  let currentSection = "functional";
+  String(source || "")
+    .replace(/\r/g, "")
+    .split(/\n+/)
+    .map((line) => line.replace(/^[\s\u2022\u25CF\u25E6\u25AA\u2023\u2043\u00B7*-]+/, "").replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .forEach((line) => {
+      if (/^user\s+testing\b/i.test(line)) { currentSection = "user"; return; }
+      if (/^functional\s+testing\b/i.test(line)) { currentSection = "functional"; return; }
+      if (/^(what\s+(function|will|is|was|happened)|how\s+will|expected\s+result|actual\s+result|if\s+it\s+failed|slide\s*\d*|testing\s+functions)\b/i.test(line)) return;
+      const target = currentSection === "user" ? userTesting : functionalTesting;
+      if (!target.includes(line)) target.push(line);
+    });
+  return { functionalTesting: functionalTesting.slice(0, 40), userTesting: userTesting.slice(0, 40) };
+}
+
 async function populateSuccessCriteriaRequirements(presentationId, mustDos, accessToken) {
   const requirements = Array.from(new Set((Array.isArray(mustDos) ? mustDos : [])
     .map((value) => String(value || "").replace(/\s+/g, " ").trim())
@@ -7630,6 +7705,48 @@ app.post("/api/student/drive-setup/read-trialling-components", async (req, res) 
     });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not read the Trialling Components slideshow." });
+  }
+});
+
+app.post("/api/student/drive-setup/read-testing-functions", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email) { res.status(401).json({ error: "Sign in is required." }); return; }
+  const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
+  const presentationId = String(req.body?.presentationId || "").trim();
+  if (!driveAccessToken) { res.status(400).json({ error: "driveAccessToken is required." }); return; }
+  if (!/^[A-Za-z0-9_-]{10,}$/.test(presentationId)) { res.status(400).json({ error: "A valid Google Slides presentation ID is required." }); return; }
+
+  try {
+    const file = await driveApiRequest(`/files/${encodeURIComponent(presentationId)}`, {
+      accessToken: driveAccessToken,
+      queryParams: { fields: "id,name,modifiedTime,webViewLink" }
+    });
+    let lists = { functionalTesting: [], userTesting: [] };
+    let extractionSource = "slides-api";
+    try {
+      const presentation = await googleSlidesApiRequest(presentationId, driveAccessToken);
+      lists = extractGoogleSlidesTestingFunctionLists(presentation);
+    } catch (slidesApiError) {
+      const pdfBuffer = await driveDownloadExportedFile(presentationId, "application/pdf", driveAccessToken);
+      if (!PDFParse) throw slidesApiError;
+      const parser = new PDFParse({ data: pdfBuffer, verbosity: 0 });
+      const extraction = await parser.getText();
+      lists = extractGoogleSlidesTestingFunctionListsFromPdfText(extraction?.text || "");
+      extractionSource = "drive-pdf-export";
+    }
+    res.json({
+      ok: true,
+      presentationId,
+      fileName: String(file?.name || "Testing Functions").trim(),
+      fileUrl: String(file?.webViewLink || `https://docs.google.com/presentation/d/${presentationId}/edit`).trim(),
+      functionalTesting: lists.functionalTesting,
+      userTesting: lists.userTesting,
+      extractionSource,
+      modifiedTime: String(file?.modifiedTime || "").trim(),
+      syncedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not read the Testing Functions slideshow." });
   }
 });
 

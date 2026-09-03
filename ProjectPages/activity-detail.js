@@ -4862,6 +4862,49 @@ async function renderTriallingComponentsTable(host, projectId, email) {
     }
 }
 
+async function renderTestingFunctionsLists(host, projectId, email) {
+    const target = host?.querySelector("#testing-functions-lists");
+    if (!target) return;
+
+    let testingFunctionsUrl = readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, "testing-functions")?.url
+        || readStoredTaskTopicSlideSyncEntryByShortName(projectId, email, "Testing Functions")?.url
+        || "";
+    if (!testingFunctionsUrl) {
+        testingFunctionsUrl = (await findProcessAssessmentSlideMatch("Testing Functions")).fileUrl;
+    }
+    const presentationId = extractSlidesIdFromValue(testingFunctionsUrl);
+    const driveAccessToken = readStoredHubDriveAccessToken();
+    const slideshowLink = testingFunctionsUrl
+        ? `<p class="digital-outcome-must-dos-link"><a href="${escapeHtml(testingFunctionsUrl)}" target="_blank" rel="noreferrer">Open Testing Functions slideshow</a></p>`
+        : "";
+    if (!driveAccessToken || !presentationId) {
+        target.innerHTML = `<p class="task-topic-submission-note">Link your Testing Functions slideshow to load the tests you have recorded.</p>`;
+        return;
+    }
+
+    target.innerHTML = `${slideshowLink}<p class="task-topic-submission-note">Reading your Functional Testing and User Testing lists...</p>`;
+    try {
+        const response = await fetch("/api/student/drive-setup/read-testing-functions", {
+            method: "POST",
+            headers: buildWriteHeaders(),
+            body: JSON.stringify({ driveAccessToken, presentationId })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload?.error || "Could not read the Testing Functions slideshow.");
+
+        const functionalItems = (Array.isArray(payload?.functionalTesting) ? payload.functionalTesting : [])
+            .map((value) => String(value || "").trim()).filter(Boolean);
+        const userItems = (Array.isArray(payload?.userTesting) ? payload.userTesting : [])
+            .map((value) => String(value || "").trim()).filter(Boolean);
+        const renderListTable = (title, items) => items.length
+            ? `<h3>${title}</h3><table class="digital-outcome-must-dos-table"><thead><tr><th>What I will test</th></tr></thead><tbody>${items.map((item) => `<tr><td>${escapeHtml(item)}</td></tr>`).join("")}</tbody></table>`
+            : `<h3>${title}</h3><p class="task-topic-submission-note">No ${title.toLowerCase()} items have been recorded in your slideshow yet.</p>`;
+        target.innerHTML = `${slideshowLink}${renderListTable("Functional Testing", functionalItems)}${renderListTable("User Testing", userItems)}<p class="task-topic-submission-note">Last read: ${escapeHtml(formatSubmissionTimestamp(payload?.syncedAt || ""))}</p>`;
+    } catch (error) {
+        target.innerHTML = `${slideshowLink}<p class="task-topic-submission-note is-error">${escapeHtml(error?.message || "Could not read the Testing Functions slideshow.")}</p>`;
+    }
+}
+
 async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, email, isTeacher, interestData }) {
     const panelHost = host?.querySelector("#task-topic-submission-live-panel");
     if (!panelHost) {
@@ -9873,7 +9916,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                                 ? `<div class="digital-outcome-must-dos" id="trialling-components-table" aria-live="polite"><p class="task-topic-submission-note">Loading components from your Development Steps slideshow...</p></div>`
                                 : ""}
                             ${isDigitalOutcomeTestingFunctionsTopic
-                                ? `<div id="task-topic-google-form-sync-slot"></div>`
+                                ? `<div class="digital-outcome-must-dos" id="testing-functions-lists" aria-live="polite"><p class="task-topic-submission-note">Loading your Functional Testing and User Testing lists...</p></div><div id="task-topic-google-form-sync-slot"></div>`
                                 : ""}
                         `}
 
@@ -11747,6 +11790,10 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                 renderRelevantImplicationNames(host, projectId, email);
             }
         }
+    }
+
+    if (!isTeacher && email && /testing\s+functions|test(?:ing)?\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`)) {
+        void renderTestingFunctionsLists(host, projectId, email);
     }
 
     // Render tools & techniques panel only on the dedicated Tools and Techniques topic page
