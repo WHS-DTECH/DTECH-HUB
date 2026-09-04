@@ -2,6 +2,7 @@ const TASK_LIST_AUTH_KEY = "hub_google_auth_v1";
 const TASK_LIST_TRELLO_CARD_LINK_STORAGE_PREFIX = "hub_trello_card_link_v1";
 const TASK_LIST_TRELLO_CARD_LIBRARY_STORAGE_PREFIX = "hub_trello_card_library_v1";
 const TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX = "hub_task_topic_slide_sync_v1";
+const TESTING_FUNCTIONS_LIST_COUNT_STORAGE_PREFIX = "hub_testing_functions_list_counts_v1";
 const DIGIMED_CONVENTIONS_ACK_STORAGE_PREFIX = "hub_digimed_conventions_ack_v1";
 const DIGIMED_UX_PRINCIPLES_ACK_STORAGE_PREFIX = "hub_digimed_ux_principles_ack_v1";
 const DIGIMED_VIDEO_UX_PRINCIPLES_ACK_STORAGE_PREFIX = "hub_digimed_video_ux_principles_ack_v1";
@@ -1331,15 +1332,36 @@ function getFirstGoogleFormUrlFromEvidenceRows(stateMap) {
     return "";
 }
 
+function readTestingFunctionsListCounts(activityId, email) {
+    try {
+        const key = `${TESTING_FUNCTIONS_LIST_COUNT_STORAGE_PREFIX}:${String(activityId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
+        const parsed = JSON.parse(localStorage.getItem(key) || "{}");
+        return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (_error) {
+        return {};
+    }
+}
+
 function getTestingFunctionsSubtasks(stateMap) {
     const activityId = taskListState.selectedId;
+    const counts = readTestingFunctionsListCounts(activityId, getTaskListEmail());
+    const functionalCount = Number(counts.functionalCount || 0);
+    const userCount = Number(counts.userCount || 0);
     const formUrl = getFirstGoogleFormUrlFromEvidenceRows(stateMap);
-    return [{
+    return [
+        {
+            label: "FUNCTIONS",
+            href: buildCustomActivityLink(activityId, "Testing that the digital technologies outcome functions as intended.", "Testing Functions", "testing-functions"),
+            done: functionalCount > 0 || userCount > 0,
+            countText: `${functionalCount} functional / ${userCount} user`
+        },
+        {
         label: "Google Form",
         href: buildCustomActivityLink(activityId, "Test that the digital technologies outcome functions as intended.", "Testing Functions", "testing-functions"),
         done: Boolean(formUrl),
         url: formUrl
-    }];
+        }
+    ];
 }
 
 function getDigiMedConventionsAcknowledgementCount(activityId, email, stateMap = {}) {
@@ -2376,7 +2398,7 @@ function renderChecklistCards(detail, allItems) {
                                                 ${projectManagementSubtasks.map((subtask) => `
                                                     <label class="task-list-decomposition-subtask ${subtask.done ? "is-complete" : ""}">
                                                         <input type="checkbox" disabled ${subtask.done ? "checked" : ""}>
-                                                        <a href="${escapeTaskListHtml(subtask.href)}">${getProjectManagementSystemLogo(subtask.label)}${escapeTaskListHtml(subtask.label)}</a>
+                                                        <a href="${escapeTaskListHtml(subtask.href)}">${getProjectManagementSystemLogo(subtask.label)}${escapeTaskListHtml(subtask.label)}${subtask.countText ? ` - ${escapeTaskListHtml(subtask.countText)}` : ""}</a>
                                                     </label>
                                                 `).join("")}
                                             </div>

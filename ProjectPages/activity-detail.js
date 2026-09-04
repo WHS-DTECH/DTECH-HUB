@@ -94,6 +94,7 @@ const HTML_FILE_LINK_LIBRARY_STORAGE_PREFIX = "hub_html_file_link_library_v1";
 const CSS_FILE_LINK_LIBRARY_STORAGE_PREFIX = "hub_css_file_link_library_v1";
 const GOOGLE_DRIVE_LINK_LIBRARY_STORAGE_PREFIX = "hub_google_drive_link_library_v1";
 const TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX = "hub_task_topic_slide_sync_v1";
+const TESTING_FUNCTIONS_LIST_COUNT_STORAGE_PREFIX = "hub_testing_functions_list_counts_v1";
 const DIGIMED_CONVENTIONS_ACK_STORAGE_PREFIX = "hub_digimed_conventions_ack_v1";
 const DIGIMED_CONVENTION_AREAS = ["Navigation", "Layout", "Typography", "Links", "Buttons/Controls", "Forms", "Visual hierarchy", "Images/Media", "Consistency", "Responsive design", "Feedback", "Content organisation"];
 const DIGIMED_UX_PRINCIPLES_ACK_STORAGE_PREFIX = "hub_digimed_ux_principles_ack_v1";
@@ -4896,12 +4897,29 @@ async function renderTestingFunctionsLists(host, projectId, email) {
             .map((value) => String(value || "").trim()).filter(Boolean);
         const userItems = (Array.isArray(payload?.userTesting) ? payload.userTesting : [])
             .map((value) => String(value || "").trim()).filter(Boolean);
+        writeStoredTestingFunctionsListCounts(projectId, email, {
+            functionalCount: functionalItems.length,
+            userCount: userItems.length,
+            savedAt: payload?.syncedAt || new Date().toISOString()
+        });
         const renderListTable = (title, items) => items.length
             ? `<h3>${title}</h3><table class="digital-outcome-must-dos-table"><thead><tr><th>What I will test</th></tr></thead><tbody>${items.map((item) => `<tr><td>${escapeHtml(item)}</td></tr>`).join("")}</tbody></table>`
             : `<h3>${title}</h3><p class="task-topic-submission-note">No ${title.toLowerCase()} items have been recorded in your slideshow yet.</p>`;
         target.innerHTML = `${slideshowLink}${renderListTable("Functional Testing", functionalItems)}${renderListTable("User Testing", userItems)}<p class="task-topic-submission-note">Last read: ${escapeHtml(formatSubmissionTimestamp(payload?.syncedAt || ""))}</p>`;
     } catch (error) {
         target.innerHTML = `${slideshowLink}<p class="task-topic-submission-note is-error">${escapeHtml(error?.message || "Could not read the Testing Functions slideshow.")}</p>`;
+    }
+}
+
+function getTestingFunctionsListCountStorageKey(projectId, email) {
+    return `${TESTING_FUNCTIONS_LIST_COUNT_STORAGE_PREFIX}:${String(projectId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
+}
+
+function writeStoredTestingFunctionsListCounts(projectId, email, counts) {
+    if (!projectId || !email) return;
+    try {
+        localStorage.setItem(getTestingFunctionsListCountStorageKey(projectId, email), JSON.stringify(counts || {}));
+    } catch (_error) {
     }
 }
 
