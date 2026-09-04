@@ -8309,6 +8309,23 @@ function normalizeTaskTopicText(value) {
         .trim();
 }
 
+function inferDriveSyncType(taskTopicTitle = "", taskShortName = "") {
+    const combinedText = `${taskTopicTitle || ""} ${taskShortName || ""}`
+        .toLowerCase()
+        .replace(/[_-]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    const hasExplicitOneDrive = /(microsoft\s+onedrive|onedrive|one\s*drive|sharepoint)/i.test(combinedText);
+    const hasExplicitGoogleDrive = /(google\s+drive|drive\.google\.com)/i.test(combinedText);
+
+    if (hasExplicitOneDrive && !hasExplicitGoogleDrive) return "onedrive";
+    if (hasExplicitGoogleDrive && !hasExplicitOneDrive) return "google-drive";
+    if (hasExplicitOneDrive) return "onedrive";
+    if (hasExplicitGoogleDrive) return "google-drive";
+    return "unknown";
+}
+
 function deriveTaskShortName(value) {
     const raw = normalizeTaskTopicText(value);
     if (!raw) {
@@ -9177,7 +9194,10 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     const isRelevantImplicationsTopic = taskTopicTitle.toLowerCase().includes("relevant implication");
     const isProjectManagementTopic = taskTopicTitle.toLowerCase().includes("project management")
         || resolvedTaskShortName.toLowerCase().includes("project management");
-    const isGithubTopic = /github|version\s+control/i.test(`${taskTopicTitle} ${resolvedTaskShortName}`);
+    const resolvedDriveSyncType = inferDriveSyncType(taskTopicTitle, resolvedTaskShortName);
+    const isOneDriveTopic = resolvedDriveSyncType === "onedrive";
+    const isGoogleDriveTopic = resolvedDriveSyncType === "google-drive";
+    const isGithubTopic = /(?:^|\s)github(?:\s|$)|github\.com|git\s*hub/i.test(`${taskTopicTitle} ${resolvedTaskShortName}`);
     const isDecompositionTopic = taskTopicTitle.toLowerCase().includes("decompos")
         || resolvedTaskShortName.toLowerCase().includes("decompos");
     const useProjectManagementTemplateHero = isProjectManagementTopic;
@@ -9312,7 +9332,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     const isProgrammingContext = /(DTECH|PROGRAMM|CODING|COMPUT|SOFTWARE|WEB|APP|PYTHON|JAVASCRIPT|ROBOTIC)/i.test(contextSignals);
     const showGithubGuide = isProjectManagementTopic || isGithubTopic;
     const snowGithubGuide = showGithubGuide;
-    const showOneDriveGuide = isProjectManagementTopic;
+    const showOneDriveGuide = isOneDriveTopic;
+    const showGoogleDriveGuide = isGoogleDriveTopic;
     const showCodeValidationGuide = isCodeValidationTopic;
     const submissionTaskItems = Array.from(new Set([
         ...(isDecompositionTopic
@@ -9985,7 +10006,11 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
 
                         <div id="task-topic-onedrive-sync-slot"></div>
                     </section>
+                    </div>
+                    ` : ""}
 
+                    ${showGoogleDriveGuide ? `
+                    <div class="task-topic-sync-grid">
                     <section class="proposal-section task-topic-guide-panel">
                         <p class="task-topic-guide-eyebrow">Topic Tasks</p>
                         <h2>${escapeHtml(googleDriveGuideTitle)}</h2>
