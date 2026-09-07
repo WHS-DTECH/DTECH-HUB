@@ -1185,7 +1185,8 @@ function buildVideoAutoProgressNote(activityId, email) {
         "Version control / project backups",
         "Appropriate folder/bin organisation",
         "Appropriate file naming",
-        "Optimisation/compression of media assets"
+        "Optimisation/compression of media assets",
+        "Appropriate export settings"
     ];
     const detectedCount = DIGIMED_VIDEO_EFFICIENT_TOOLS_SUBTASKS.filter((subtask) => {
         if (!efficientToolsState[subtask]) return false;

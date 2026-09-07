@@ -12301,13 +12301,22 @@ function computeGithubVideoEfficientToolsCategories(treeItems, commitDayCount) {
   const maxMediaBytes = sourceMediaBlobs.reduce((max, item) => Math.max(max, Number(item?.size || 0) || 0), 0);
   const optimisationDone = sourceMediaBlobs.length > 0 && maxMediaBytes > 0 && maxMediaBytes <= GITHUB_VIDEO_OVERSIZED_ASSET_MAX_BYTES;
 
+  // Appropriate export settings: exported render files (.mov, .mp4, .webm, etc.) exist, are non-empty, and fit within GitHub's 100MB file size limit.
+  const exportVideoBlobs = blobs.filter((item) => {
+    const ext = String(item?.path || "").toLowerCase().match(/\.[a-z0-9]+$/)?.[0] || "";
+    return GITHUB_VIDEO_EXTENSIONS.has(ext);
+  });
+  const maxExportBytes = exportVideoBlobs.reduce((max, item) => Math.max(max, Number(item?.size || 0) || 0), 0);
+  const exportSettingsDone = exportVideoBlobs.length > 0 && maxExportBytes > 0 && maxExportBytes <= GITHUB_VIDEO_OVERSIZED_ASSET_MAX_BYTES;
+
   return {
     projectFileCount,
     categories: [
       { label: "Version control / project backups", done: versionControlDone },
       { label: "Appropriate folder/bin organisation", done: folderOrgDone },
       { label: "Appropriate file naming", done: fileNamingDone },
-      { label: "Optimisation/compression of media assets", done: optimisationDone }
+      { label: "Optimisation/compression of media assets", done: optimisationDone },
+      { label: "Appropriate export settings", done: exportSettingsDone }
     ]
   };
 }
@@ -12338,6 +12347,10 @@ function parseFcpxmlVideoTools(content) {
   // Sequence / project settings: an explicit timeline format with frame rate / resolution defined.
   if (/<format\b[^>]*\b(?:frameDuration|width|height)\s*=/i.test(text)) {
     found.push("Appropriate sequence/project settings");
+  }
+  // Appropriate export settings: explicit render output format or media-rep src referencing web-export formats (.mov, .mp4, .webm).
+  if (/<format\b[^>]*\b(?:frameDuration|width|height)\s*=/i.test(text) && (/<media-rep\b[^>]*\b(?:src|kind)\s*=/i.test(text) || /\.mov|\.mp4|\.webm/i.test(text))) {
+    found.push("Appropriate export settings");
   }
   return found;
 }
