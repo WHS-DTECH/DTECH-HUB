@@ -12286,10 +12286,11 @@ function computeGithubVideoEfficientToolsCategories(treeItems, commitDayCount) {
   const mediaInFolders = mediaPaths.filter((filePath) => filePath.includes("/") && folderPattern.test(filePath)).length;
   const folderOrgDone = mediaPaths.length > 0 && mediaInFolders >= Math.ceil(mediaPaths.length * 0.6);
 
-  // Appropriate file naming: media files avoid camera-default / messy names (spaces, IMG_####, Untitled, etc.).
-  const badNamePattern = /(?:^|\/)(?:untitled|image|video|clip|new\s|screenshot)|\s|img_\d+|vid_\d+|dsc_?\d+|mov_\d+|copy/i;
+  // Appropriate file naming: media files avoid camera-default / messy names (spaces, IMG_####, Untitled, Timeline 1, etc.).
+  // Camera stock clips (like A001_C002_... or b004_SFO_...) and descriptive titles are clean names; default "Timeline 1" / "Untitled" / spaces are untidy.
+  const badNamePattern = /(?:^|\/)(?:untitled|timeline\s*\d+|image|video|clip|new\s|screenshot|copy)|\s|img_\d+|vid_\d+|dsc_?\d+|mov_\d+/i;
   const namedFiles = mediaPaths.filter((filePath) => !badNamePattern.test(filePath));
-  const fileNamingDone = mediaPaths.length > 0 && namedFiles.length >= Math.ceil(mediaPaths.length * 0.8);
+  const fileNamingDone = mediaPaths.length > 0 && namedFiles.length >= Math.ceil(mediaPaths.length * 0.5);
 
   // Optimisation/compression of media assets: no single source media file over the oversized threshold.
   const sourceMediaBlobs = blobs.filter((item) => {
