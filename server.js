@@ -12301,6 +12301,10 @@ function computeGithubVideoEfficientToolsCategories(treeItems, commitDayCount) {
   const maxMediaBytes = sourceMediaBlobs.reduce((max, item) => Math.max(max, Number(item?.size || 0) || 0), 0);
   const optimisationDone = sourceMediaBlobs.length > 0 && maxMediaBytes > 0 && maxMediaBytes <= GITHUB_VIDEO_OVERSIZED_ASSET_MAX_BYTES;
 
+  // Management of media assets: source media files exist in the repository and are tracked alongside NLE project files / timelines.
+  const mediaAssetCount = sourceMediaBlobs.length;
+  const mediaManagementDone = mediaAssetCount > 0 && projectFileCount > 0;
+
   // Appropriate export settings: exported render files (.mov, .mp4, .webm, etc.) exist, are non-empty, and fit within GitHub's 100MB file size limit.
   const exportVideoBlobs = blobs.filter((item) => {
     const ext = String(item?.path || "").toLowerCase().match(/\.[a-z0-9]+$/)?.[0] || "";
@@ -12316,6 +12320,7 @@ function computeGithubVideoEfficientToolsCategories(treeItems, commitDayCount) {
       { label: "Appropriate folder/bin organisation", done: folderOrgDone },
       { label: "Appropriate file naming", done: fileNamingDone },
       { label: "Optimisation/compression of media assets", done: optimisationDone },
+      { label: "Management of media assets", done: mediaManagementDone },
       { label: "Appropriate export settings", done: exportSettingsDone }
     ]
   };
@@ -12331,6 +12336,10 @@ function parseFcpxmlVideoTools(content) {
   // Non-destructive editing: any timeline sequence in NLE format (FCPXML timeline export with sequence/spine).
   if (/<fcpxml[\s>]/i.test(text) && /<sequence[\s>]/i.test(text) && /<spine[\s>]/i.test(text)) {
     found.push("Non-destructive editing");
+  }
+  // Management of media assets: FCPXML timeline explicitly defines and tracks cataloged media asset resources (<asset> tags).
+  if (/<asset\b[^>]*\b(?:src|id|name)\s*=/i.test(text)) {
+    found.push("Management of media assets");
   }
   // Proxies / optimised workflow: proxy or optimised media or camera RAW (.braw) referenced in the timeline resources.
   if (/<(?:proxy|asset)[^>]*(?:proxy|optimized|optimised)/i.test(text) || /\bproxied\b|\bproxyMedia\b|hasProxy\s*=\s*["']1/i.test(text) || /\.braw\b/i.test(text)) {
