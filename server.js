@@ -12764,14 +12764,21 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
     const oversizedAssetCount = [...videoFiles, ...audioFiles, ...graphicFiles]
       .filter((item) => Number(item?.size || 0) > 100 * 1024 * 1024).length;
 
-    // Deeper detection: read a committed FCPXML timeline export (Resolve 'Export Timeline').
-    const fcpxmlPath = Array.from(blobPaths)
-      .filter((filePath) => /\.(?:fcpxml)$/i.test(filePath) || (/\.xml$/i.test(filePath) && !/\b(?:project|archive)\b/i.test(filePath)))
-      .sort((a, b) => (a.endsWith(".fcpxml") ? -1 : 0) - (b.endsWith(".fcpxml") ? -1 : 0))[0] || "";
+    // Deeper detection: inspect all committed FCPXML timeline exports (Resolve 'Export Timeline')
+    // and use the richest timeline; alphabetical filenames should not decide the assessment result.
+    const fcpxmlCandidates = blobs
+      .filter((item) => /\.(?:fcpxml)$/i.test(String(item?.path || "")) || (/\.xml$/i.test(String(item?.path || "")) && !/\b(?:project|archive)\b/i.test(String(item?.path || ""))))
+      .sort((left, right) => Number(right?.size || 0) - Number(left?.size || 0));
+    let fcpxmlPath = "";
     let fcpxmlLabels = [];
-    if (fcpxmlPath) {
-      const fcpxmlContent = await fetchGithubRepoRawFile(identifier.owner, identifier.repo, defaultBranch, fcpxmlPath);
-      fcpxmlLabels = parseFcpxmlVideoTools(fcpxmlContent);
+    for (const candidate of fcpxmlCandidates) {
+      const candidatePath = String(candidate?.path || "").trim();
+      const content = await fetchGithubRepoRawFile(identifier.owner, identifier.repo, defaultBranch, candidatePath);
+      const labels = parseFcpxmlVideoTools(content);
+      if (!fcpxmlPath || labels.length > fcpxmlLabels.length) {
+        fcpxmlPath = candidatePath;
+        fcpxmlLabels = labels;
+      }
     }
     const assetVideoToolsCategories = mergeVideoToolsCategories(
       computeGithubVideoEfficientToolsCategories(blobs, 0).categories,
