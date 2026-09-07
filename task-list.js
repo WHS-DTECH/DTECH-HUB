@@ -1666,6 +1666,15 @@ function autoTickProjectManagementRequirement(stateMap) {
     return changed;
 }
 
+// DB-backed evidence: a template copy recorded by "Sync from Google Drive" is an explicit
+// student action, so it counts for all Digital Outcome template rows (all-match rollout).
+function hasTemplateCopyForDigitalOutcomeTask(taskText) {
+    const templateId = inferDigitalOutcomeTaskTemplateId(taskText);
+    if (!templateId) return false;
+    return (Array.isArray(taskListState.templateCopies) ? taskListState.templateCopies : [])
+        .some((copy) => String(copy?.templateId || "").trim().toLowerCase() === templateId);
+}
+
 function autoTickDigitalOutcomeRequirements(stateMap, projectId, email) {
     const rows = Array.isArray(stateMap?.["digital-outcome"]) ? stateMap["digital-outcome"] : [];
     if (!rows.length || !projectId || !email) {
@@ -1683,7 +1692,8 @@ function autoTickDigitalOutcomeRequirements(stateMap, projectId, email) {
             return;
         }
 
-        const hasEligibleSync = hasSyncedSlideForTaskTopic(projectId, email, text);
+        const hasEligibleSync = hasSyncedSlideForTaskTopic(projectId, email, text)
+            || hasTemplateCopyForDigitalOutcomeTask(text);
         if (hasEligibleSync && !Boolean(row?.done)) {
             row.done = true;
             changed = true;
@@ -2986,10 +2996,13 @@ async function renderTaskListPage() {
             const repairedChecklist = applyTemplateCopiesAsRelevantImplicationsState(taskListState.checklistState, taskListState.templateCopies);
             const repairedEvidence = applyTemplateCopiesAsRelevantImplicationsState(taskListState.fullEvidenceState, taskListState.templateCopies);
 
+            const digitalOutcomeChecklistChanged = autoTickDigitalOutcomeRequirements(taskListState.checklistState, taskListState.selectedId, getTaskListEmail());
+            const digitalOutcomeEvidenceChanged = autoTickDigitalOutcomeRequirements(taskListState.fullEvidenceState, taskListState.selectedId, getTaskListEmail());
+
             autoTickRelevantImplicationsRequirements(taskListState.checklistState, taskListState.selectedId, getTaskListEmail());
             autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, taskListState.selectedId, getTaskListEmail());
 
-            if (repairedChecklist || repairedEvidence || checklistMultipleComponentsChanged || evidenceMultipleComponentsChanged) {
+            if (repairedChecklist || repairedEvidence || checklistMultipleComponentsChanged || evidenceMultipleComponentsChanged || digitalOutcomeChecklistChanged || digitalOutcomeEvidenceChanged) {
                 const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
                 await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});
             }
