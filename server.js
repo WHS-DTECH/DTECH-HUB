@@ -12223,6 +12223,52 @@ function computeGithubVideoEfficientToolsCategories(treeItems, commitDayCount) {
   };
 }
 
+// Parse a committed FCPXML timeline export for the practices provable from timeline data.
+// Only FCPXML (Resolve 'Export Timeline') is readable text; a .drp stays binary/unreadable.
+function parseFcpxmlVideoTools(content) {
+  const text = String(content || "");
+  if (!/<fcpxml[\s>]/i.test(text)) return [];
+
+  const found = [];
+  // Proxies / optimised workflow: proxy or optimised media referenced in the timeline resources.
+  if (/<(?:proxy|asset)[^>]*(?:proxy|optimized|optimised)/i.test(text) || /\bproxied\b|\bproxyMedia\b|hasProxy\s*=\s*["']1/i.test(text)) {
+    found.push("Proxy media / optimised editing workflow");
+  }
+  // Adjustment layers / nested sequences: a sequence used as a clip (nested) or an adjustment asset.
+  if (/<(?:asset-clip|clip)[^>]*\bref\s*=\s*["'][^"']*sequence/i.test(text) || /<sequence\b[^>]*>\s*<spine>/i.test(text) && /<asset-clip/i.test(text)) {
+    found.push("Adjustment layers / nested sequences where appropriate");
+  }
+  // Reusing titles / presets / effects / templates: effect or title resources referenced on the timeline.
+  if (/<(?:effect|title)\b[^>]*\b(?:uid|ref)\s*=|<video[^>]*\bref\s*=\s*["'][^"']*(?:title|effect)/i.test(text) || /<(?:filter-video|filter-audio|title)\b/i.test(text)) {
+    found.push("Reusing titles, presets, effects or templates");
+  }
+  // Sequence / project settings: an explicit timeline format with frame rate / resolution defined.
+  if (/<format\b[^>]*\b(?:frameDuration|width|height)\s*=/i.test(text)) {
+    found.push("Appropriate sequence/project settings");
+  }
+  return found;
+}
+
+async function fetchGithubRepoRawFile(owner, repo, branch, filePath) {
+  try {
+    const rawUrl = `${GITHUB_RAW_CONTENT_BASE}/${owner}/${repo}/${branch}/${filePath}`;
+    const response = await fetch(rawUrl, { headers: { "User-Agent": "DTECH-HUB" } });
+    if (!response.ok) return "";
+    return await response.text();
+  } catch (_error) {
+    return "";
+  }
+}
+
+// Merge fcpxml-derived practices into the tree-level categories (done wins; never untick).
+function mergeVideoToolsCategories(baseCategories, fcpxmlLabels) {
+  const extra = new Set((Array.isArray(fcpxmlLabels) ? fcpxmlLabels : []).map((label) => String(label || "").trim().toLowerCase()));
+  return (Array.isArray(baseCategories) ? baseCategories : []).map((category) => {
+    const label = String(category?.label || "").trim();
+    return extra.has(label.toLowerCase()) ? { ...category, done: true } : category;
+  });
+}
+
 function extractImageStatsFromTree(treeItems) {
   let count = 0;
   let maxBytes = 0;
@@ -12345,6 +12391,18 @@ app.get("/api/integrations/github/repo-analysis", async (req, res) => {
     // OR more than one project file exists (an explicit backup copy).
     const videoEfficientTools = computeGithubVideoEfficientToolsCategories(treeItems, commitDays.size);
 
+    // Deeper detection: read a committed FCPXML timeline export (Resolve 'Export Timeline').
+    const fcpxmlPath = treeItems
+      .map((item) => String(item?.path || "").trim())
+      .filter((filePath) => /\.(?:fcpxml)$/i.test(filePath) || (/\.xml$/i.test(filePath) && !/\b(?:project|archive)\b/i.test(filePath)))
+      .sort((a, b) => (a.endsWith(".fcpxml") ? -1 : 0) - (b.endsWith(".fcpxml") ? -1 : 0))[0] || "";
+    let fcpxmlLabels = [];
+    if (fcpxmlPath) {
+      const fcpxmlContent = await fetchGithubRepoRawFile(identifier.owner, identifier.repo, defaultBranch, fcpxmlPath);
+      fcpxmlLabels = parseFcpxmlVideoTools(fcpxmlContent);
+    }
+    const videoToolsCategories = mergeVideoToolsCategories(videoEfficientTools.categories, fcpxmlLabels);
+
     res.json({
       ok: true,
       owner: identifier.owner,
@@ -12364,7 +12422,7 @@ app.get("/api/integrations/github/repo-analysis", async (req, res) => {
       branches_count: branchesCount,
       releases_tags_count: releasesTagsCount,
       categories,
-      video_tools_categories: videoEfficientTools.categories,
+      video_tools_categories: videoToolsCategories,
       validation: validationResults
     });
   } catch (error) {
@@ -12618,6 +12676,20 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
     const oversizedAssetCount = [...videoFiles, ...audioFiles, ...graphicFiles]
       .filter((item) => Number(item?.size || 0) > 100 * 1024 * 1024).length;
 
+    // Deeper detection: read a committed FCPXML timeline export (Resolve 'Export Timeline').
+    const fcpxmlPath = Array.from(blobPaths)
+      .filter((filePath) => /\.(?:fcpxml)$/i.test(filePath) || (/\.xml$/i.test(filePath) && !/\b(?:project|archive)\b/i.test(filePath)))
+      .sort((a, b) => (a.endsWith(".fcpxml") ? -1 : 0) - (b.endsWith(".fcpxml") ? -1 : 0))[0] || "";
+    let fcpxmlLabels = [];
+    if (fcpxmlPath) {
+      const fcpxmlContent = await fetchGithubRepoRawFile(identifier.owner, identifier.repo, defaultBranch, fcpxmlPath);
+      fcpxmlLabels = parseFcpxmlVideoTools(fcpxmlContent);
+    }
+    const assetVideoToolsCategories = mergeVideoToolsCategories(
+      computeGithubVideoEfficientToolsCategories(blobs, 0).categories,
+      fcpxmlLabels
+    );
+
     res.json({
       ok: true,
       owner: identifier.owner,
@@ -12653,7 +12725,7 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
         duplicate_assets: 0,
         oversized_assets: oversizedAssetCount
       },
-      video_tools_categories: computeGithubVideoEfficientToolsCategories(blobs, 0).categories,
+      video_tools_categories: assetVideoToolsCategories,
       css_details: buildCssHealthDetails(cssContents, htmlContents),
       html_details: buildHtmlHealthDetails(htmlContents),
       link_details: buildLinkHealthDetails(htmlContents),
