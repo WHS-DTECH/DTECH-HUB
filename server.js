@@ -12172,6 +12172,57 @@ function computeGithubEfficientToolsCategories(treeItems, imageStats) {
   };
 }
 
+// Reliable repo-hygiene signals for the video efficient-tools practices (the 4 that
+// can be proven from the repo tree/metadata alone, without opening a binary .drp).
+function computeGithubVideoEfficientToolsCategories(treeItems, commitDayCount) {
+  const blobs = (Array.isArray(treeItems) ? treeItems : []).filter((item) => item?.type === "blob");
+  const paths = blobs.map((item) => String(item?.path || "").trim()).filter(Boolean);
+  const lowerPaths = paths.map((filePath) => filePath.toLowerCase());
+
+  const projectFiles = paths.filter((filePath) => {
+    const ext = filePath.toLowerCase().match(/\.[a-z0-9]+$/)?.[0] || "";
+    return GITHUB_VIDEO_PROJECT_EXTENSIONS.has(ext);
+  });
+  const projectFileCount = projectFiles.length;
+  const multiCommitDay = Number(commitDayCount || 0) > 1;
+
+  // Version control / project backups: a Resolve/Premiere project file committed, ideally with
+  // saves across multiple days or an explicit backup project file present.
+  const versionControlDone = projectFileCount > 0 && (multiCommitDay || projectFileCount > 1);
+
+  // Appropriate folder/bin organisation: media files sorted into named subfolders rather than dumped at root.
+  const mediaPaths = lowerPaths.filter((filePath) => {
+    const ext = filePath.match(/\.[a-z0-9]+$/)?.[0] || "";
+    return GITHUB_MEDIA_EXTENSIONS.has(ext);
+  });
+  const folderPattern = /(?:^|\/)(?:assets?|media|footage|clips?|video|audio|images?|graphics?|exports?|project)(?:\/|$)/;
+  const mediaInFolders = mediaPaths.filter((filePath) => filePath.includes("/") && folderPattern.test(filePath)).length;
+  const folderOrgDone = mediaPaths.length > 0 && mediaInFolders >= Math.ceil(mediaPaths.length * 0.6);
+
+  // Appropriate file naming: media files avoid camera-default / messy names (spaces, IMG_####, Untitled, etc.).
+  const badNamePattern = /(?:^|\/)(?:untitled|image|video|clip|new\s|screenshot)|\s|img_\d+|vid_\d+|dsc_?\d+|mov_\d+|copy/i;
+  const namedFiles = mediaPaths.filter((filePath) => !badNamePattern.test(filePath));
+  const fileNamingDone = mediaPaths.length > 0 && namedFiles.length >= Math.ceil(mediaPaths.length * 0.8);
+
+  // Optimisation/compression of media assets: no single source media file over the oversized threshold.
+  const sourceMediaBlobs = blobs.filter((item) => {
+    const ext = String(item?.path || "").toLowerCase().match(/\.[a-z0-9]+$/)?.[0] || "";
+    return GITHUB_MEDIA_EXTENSIONS.has(ext);
+  });
+  const maxMediaBytes = sourceMediaBlobs.reduce((max, item) => Math.max(max, Number(item?.size || 0) || 0), 0);
+  const optimisationDone = sourceMediaBlobs.length > 0 && maxMediaBytes > 0 && maxMediaBytes <= GITHUB_VIDEO_OVERSIZED_ASSET_MAX_BYTES;
+
+  return {
+    projectFileCount,
+    categories: [
+      { label: "Version control / project backups", done: versionControlDone },
+      { label: "Appropriate folder/bin organisation", done: folderOrgDone },
+      { label: "Appropriate file naming", done: fileNamingDone },
+      { label: "Optimisation/compression of media assets", done: optimisationDone }
+    ]
+  };
+}
+
 function extractImageStatsFromTree(treeItems) {
   let count = 0;
   let maxBytes = 0;
@@ -12289,6 +12340,11 @@ app.get("/api/integrations/github/repo-analysis", async (req, res) => {
     const anyValidationPassed = validationResults.some((row) => row.checked && row.passed);
     categories.push({ label: "HTML/CSS validation procedures", done: anyValidationPassed });
 
+    // Video efficient-tools auto-detection (the 4 reliably provable from the repo tree/metadata).
+    // Backups signal: a project file is committed AND the student committed on more than one day,
+    // OR more than one project file exists (an explicit backup copy).
+    const videoEfficientTools = computeGithubVideoEfficientToolsCategories(treeItems, commitDays.size);
+
     res.json({
       ok: true,
       owner: identifier.owner,
@@ -12308,6 +12364,7 @@ app.get("/api/integrations/github/repo-analysis", async (req, res) => {
       branches_count: branchesCount,
       releases_tags_count: releasesTagsCount,
       categories,
+      video_tools_categories: videoEfficientTools.categories,
       validation: validationResults
     });
   } catch (error) {
@@ -12325,6 +12382,7 @@ const GITHUB_VIDEO_EXTENSIONS = new Set([".mp4", ".mov", ".webm", ".m4v", ".avi"
 const GITHUB_AUDIO_EXTENSIONS = new Set([".mp3", ".wav", ".ogg", ".m4a", ".aac", ".flac"]);
 const GITHUB_GRAPHIC_EXTENSIONS = new Set([".svg", ".ai", ".eps", ".pdf"]);
 const GITHUB_VIDEO_PROJECT_EXTENSIONS = new Set([".prproj", ".drp", ".aep", ".blend", ".fcpxml", ".xml"]);
+const GITHUB_VIDEO_OVERSIZED_ASSET_MAX_BYTES = 100 * 1024 * 1024;
 const GITHUB_JS_EXTENSION = /\.js$/i;
 const GITHUB_ASSET_HEALTH_MAX_SCANNED_FILES = 40;
 
@@ -12595,6 +12653,7 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
         duplicate_assets: 0,
         oversized_assets: oversizedAssetCount
       },
+      video_tools_categories: computeGithubVideoEfficientToolsCategories(blobs, 0).categories,
       css_details: buildCssHealthDetails(cssContents, htmlContents),
       html_details: buildHtmlHealthDetails(htmlContents),
       link_details: buildLinkHealthDetails(htmlContents),

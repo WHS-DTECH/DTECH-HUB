@@ -368,7 +368,7 @@ function installDigiMedEfficientToolsHandler() {
         writeDigiMedEfficientToolsState(activityId, email, state);
         renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);
         if (isDigiMedVideoEfficientToolSubtask(subtask)) {
-            void persistVideoEfficientToolsToServer(activityId, subtask, Boolean(checkbox.checked));
+            void persistVideoEfficientToolsToServer(activityId);
         }
     });
 }
@@ -402,9 +402,9 @@ async function loadVideoEfficientToolsFromServer(activityId, email) {
     }
 }
 
-async function persistVideoEfficientToolsToServer(activityId, subtask, isTicked) {
+async function persistVideoEfficientToolsToServer(activityId) {
     const safeActivityId = String(activityId || "").trim();
-    if (!safeActivityId || !isDigiMedVideoEfficientToolSubtask(subtask)) return;
+    if (!safeActivityId) return;
     const tools = readVideoEfficientToolsFromLocalCache(safeActivityId, getTaskListEmail());
     try {
         await loadJson("/api/students/digimed-efficient-tools", {
@@ -1125,14 +1125,36 @@ async function runGithubEfficientToolsSync(activityId, email, repoUrl) {
     );
 
     const efficientToolsState = readDigiMedEfficientToolsState(activityId, email);
+    let changed = false;
     (Array.isArray(payload?.categories) ? payload.categories : []).forEach((category) => {
         const label = String(category?.label || "").trim();
         if (!label) return;
-        if (category.done) {
+        if (category.done && !efficientToolsState[label]) {
             efficientToolsState[label] = true;
+            changed = true;
         }
     });
-    writeDigiMedEfficientToolsState(activityId, email, efficientToolsState);
+
+    // Auto-tick the reliably-detectable video practices (version control, folder/bin
+    // organisation, file naming, media optimisation) straight from the repo scan.
+    const videoTicks = [];
+    (Array.isArray(payload?.video_tools_categories) ? payload.video_tools_categories : []).forEach((category) => {
+        const label = String(category?.label || "").trim();
+        if (!label || !category.done) return;
+        if (isDigiMedVideoEfficientToolSubtask(label)) {
+            videoTicks.push(label);
+            if (!efficientToolsState[label]) {
+                efficientToolsState[label] = true;
+                changed = true;
+            }
+        }
+    });
+    if (changed) {
+        writeDigiMedEfficientToolsState(activityId, email, efficientToolsState);
+    }
+    if (videoTicks.length) {
+        void persistVideoEfficientToolsToServer(activityId);
+    }
 
     writeGithubRepoAnalysis(activityId, email, {
         repoUrl,
