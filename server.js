@@ -4133,30 +4133,91 @@ async function backfillProcessAssessmentAllocations() {
     `,
     [clientProjectsTaskId]
   );
-  const confirmedByStudent = new Map();
 
+  const confirmedByStudent = new Set();
   for (const row of sourceResult.rows || []) {
     const activity = normalizeActivityCategoryForResponse(row);
-    const category = String(activity.activity_category || "").trim().toLowerCase();
     const studentEmail = normalizeEmail(row.student_email || "");
-    if (!studentEmail || (!category.includes("assessment") && !category.includes("project"))) {
+    const category = String(activity.activity_category || "").trim().toLowerCase();
+    if (!studentEmail || !row.confirmed || (!category.includes("assessment") && !category.includes("project"))) {
       continue;
     }
-    confirmedByStudent.set(studentEmail, Boolean(confirmedByStudent.get(studentEmail)) || Boolean(row.confirmed));
+    confirmedByStudent.add(studentEmail);
   }
 
   let inserted = 0;
-  for (const [studentEmail, confirmed] of confirmedByStudent) {
+  for (const studentEmail of confirmedByStudent) {
     const result = await pool.query(
       `INSERT INTO project_interests (project_id, student_email, confirmed)
        VALUES ($1, $2, $3)
-       ON CONFLICT (project_id, student_email) DO NOTHING`,
-      [clientProjectsTaskId, studentEmail, confirmed]
+       ON CONFLICT (project_id, student_email) DO UPDATE SET confirmed = TRUE`,
+      [clientProjectsTaskId, studentEmail, true]
     );
     inserted += Number(result.rowCount || 0);
   }
 
   return inserted;
+}
+
+async function syncProcessAssessmentAllocation(studentEmail) {
+  const clientProjectsTaskId = String(CLIENT_PROJECTS_TASK_ID || "").trim();
+  if (!hasDatabase || !clientProjectsTaskId || !studentEmail) {
+    return false;
+  }
+
+  const sourceResult = await pool.query(
+    `SELECT pi.confirmed, a.*
+     FROM project_interests pi
+     JOIN activities a ON a.id::text = pi.project_id::text
+     WHERE pi.student_email = $1 AND pi.project_id::text <> $2`,
+    [studentEmail, clientProjectsTaskId]
+  );
+  const hasConfirmedEligibleSource = (sourceResult.rows || []).some((row) => {
+    const activity = normalizeActivityCategoryForResponse(row);
+    const category = String(activity.activity_category || "").trim().toLowerCase();
+    return Boolean(row.confirmed) && (category.includes("assessment") || category.includes("project"));
+  });
+
+  if (!hasConfirmedEligibleSource) {
+    return false;
+  }
+
+  await pool.query(
+    `INSERT INTO project_interests (project_id, student_email, confirmed)
+     VALUES ($1, $2, TRUE)
+     ON CONFLICT (project_id, student_email) DO UPDATE SET confirmed = TRUE`,
+    [clientProjectsTaskId, studentEmail]
+  );
+  return true;
+}
+
+async function propagateProcessAssessmentDetails(studentEmail, standard1, standard2, digitalMediaType) {
+  const clientProjectsTaskId = String(CLIENT_PROJECTS_TASK_ID || "").trim();
+  if (!hasDatabase || !clientProjectsTaskId || !studentEmail) {
+    return;
+  }
+
+  const sourceResult = await pool.query(
+    `SELECT pi.project_id, a.*
+     FROM project_interests pi
+     JOIN activities a ON a.id::text = pi.project_id::text
+     WHERE pi.student_email = $1 AND pi.project_id::text <> $2`,
+    [studentEmail, clientProjectsTaskId]
+  );
+
+  for (const row of sourceResult.rows || []) {
+    const activity = normalizeActivityCategoryForResponse(row);
+    const category = String(activity.activity_category || "").trim().toLowerCase();
+    if (!category.includes("assessment") && !category.includes("project")) {
+      continue;
+    }
+    await pool.query(
+      `UPDATE project_interests
+       SET standard_1 = $1, standard_2 = $2, digital_media_type = $3
+       WHERE project_id = $4 AND student_email = $5`,
+      [standard1 || null, standard2 || null, digitalMediaType || null, String(row.project_id), studentEmail]
+    );
+  }
 }
 
 async function ensureSchema() {
@@ -8817,6 +8878,10 @@ app.patch("/api/activities/:id/interests/:studentEmail/confirm", requireActivity
       [confirmed, projectId, studentEmail]
     );
 
+    if (confirmed && String(projectId) !== String(CLIENT_PROJECTS_TASK_ID)) {
+      await syncProcessAssessmentAllocation(studentEmail);
+    }
+
     let emailNotification = "not_sent";
     if (confirmed && !previousConfirmed) {
       try {
@@ -8870,6 +8935,9 @@ app.patch("/api/activities/:id/interests/:studentEmail/standards", requireActivi
       "UPDATE project_interests SET standard_1 = $1, standard_2 = $2, digital_media_type = $3 WHERE project_id = $4 AND student_email = $5",
       [standard1 || null, standard2 || null, digitalMediaType || null, projectId, studentEmail]
     );
+    if (String(projectId) === String(CLIENT_PROJECTS_TASK_ID)) {
+      await propagateProcessAssessmentDetails(studentEmail, standard1, standard2, digitalMediaType);
+    }
     res.json({ standard_1: standard1, standard_2: standard2, digital_media_type: digitalMediaType });
   } catch (error) {
     res.status(500).json({ error: "Could not update standards" });
