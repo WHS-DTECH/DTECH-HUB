@@ -27,7 +27,6 @@ const DIGIMED_VIDEO_EFFICIENT_TOOLS_SUBTASKS = [
     "Reusing titles, presets, effects or templates",
     "Adjustment layers / nested sequences where appropriate",
     "Proxy media / optimised editing workflow",
-    "Keyboard shortcuts / efficient editing workflow",
     "Non-destructive editing",
     "Appropriate sequence/project settings",
     "Optimisation/compression of media assets",

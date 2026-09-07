@@ -13,7 +13,6 @@ const ASSET_MANAGER_VIDEO_TOOLS_TECHNIQUES = [
     "Reusing titles, presets, effects or templates",
     "Adjustment layers / nested sequences where appropriate",
     "Proxy media / optimised editing workflow",
-    "Keyboard shortcuts / efficient editing workflow",
     "Non-destructive editing",
     "Appropriate sequence/project settings",
     "Optimisation/compression of media assets",
