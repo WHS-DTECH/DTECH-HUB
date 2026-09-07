@@ -1161,10 +1161,48 @@ async function runGithubEfficientToolsSync(activityId, email, repoUrl) {
         commitCount: Number(payload?.commit_count || 0),
         commitDayCount: Number(payload?.commit_day_count || 0),
         fileCount: Number(payload?.file_count || 0),
-        syncedAt: new Date().toISOString()
+        syncedAt: new Date().toISOString(),
+        lastCommitDate: String(payload?.last_commit?.date || "").trim(),
+        fcpxmlFile: String(payload?.fcpxml_detected?.file || "").trim(),
+        fcpxmlLabels: Array.isArray(payload?.fcpxml_detected?.labels) ? payload.fcpxml_detected.labels : []
     });
 
     return payload;
+}
+
+// Read-only auto-progress signal for video students: how many practices were detected
+// from the repo/FCPXML without them ticking, and whether the timeline export is stale.
+function buildVideoAutoProgressNote(activityId, email) {
+    const analysis = readGithubRepoAnalysis(activityId, email);
+    if (!analysis?.syncedAt) {
+        return `<p class="task-list-achieved-note">Link your GitHub repo and it will auto-check these practices each time you open this page.</p>`;
+    }
+
+    const efficientToolsState = readDigiMedEfficientToolsState(activityId, email);
+    const autoLabels = Array.isArray(analysis.fcpxmlLabels) ? analysis.fcpxmlLabels : [];
+    const treeDetected = [
+        "Version control / project backups",
+        "Appropriate folder/bin organisation",
+        "Appropriate file naming",
+        "Optimisation/compression of media assets"
+    ];
+    const detectedCount = DIGIMED_VIDEO_EFFICIENT_TOOLS_SUBTASKS.filter((subtask) => {
+        if (!efficientToolsState[subtask]) return false;
+        return treeDetected.includes(subtask) || autoLabels.includes(subtask);
+    }).length;
+
+    const fcpxmlFile = String(analysis.fcpxmlFile || "").trim();
+    const lastCommitTs = Date.parse(String(analysis.lastCommitDate || "")) || 0;
+    const ageDays = lastCommitTs ? Math.floor((Date.now() - lastCommitTs) / (1000 * 60 * 60 * 24)) : null;
+    const isStale = ageDays === null || ageDays > 14;
+
+    const summaryLine = `<p class="task-list-achieved-note">Auto-detected from your project: ${detectedCount} of ${DIGIMED_VIDEO_EFFICIENT_TOOLS_SUBTASKS.length} practices${fcpxmlFile ? ` (timeline: ${escapeTaskListHtml(fcpxmlFile)})` : ""}. Last commit ${escapeTaskListHtml(formatTaskListTimestamp(analysis.lastCommitDate))}.</p>`;
+    const nudgeLine = !fcpxmlFile
+        ? `<p class="task-list-achieved-note">No timeline export found \u2014 in DaVinci Resolve use File \u2192 Export \u2192 Timeline \u2192 FCPXML and commit it to keep your progress up to date.</p>`
+        : (isStale
+            ? `<p class="task-list-achieved-note">Your timeline export is ${ageDays === null ? "out of date" : `${ageDays} days old`} \u2014 re-export FCPXML from Resolve and commit to refresh your progress.</p>`
+            : "");
+    return `${summaryLine}${nudgeLine}`;
 }
 
 
@@ -2271,7 +2309,7 @@ function renderChecklistCards(detail, allItems) {
                                                 `).join("")}
                                             </div>
                                             ${digitalMediaType === "video"
-                                                ? `<p class="task-list-achieved-note">Tick the media-production practices you have used and can demonstrate in your project evidence.</p>`
+                                                ? `<p class="task-list-achieved-note">Tick the media-production practices you have used and can demonstrate in your project evidence.</p>${buildVideoAutoProgressNote(taskListState.selectedId, getTaskListEmail())}`
                                                 : (githubRepoAnalysis?.syncedAt
                                                 ? `<p class="task-list-achieved-note">GitHub last synced: ${escapeTaskListHtml(formatTaskListTimestamp(githubRepoAnalysis.syncedAt))} (${Number(githubRepoAnalysis.commitCount || 0)} commits across ${Number(githubRepoAnalysis.commitDayCount || 0)} day${Number(githubRepoAnalysis.commitDayCount || 0) === 1 ? "" : "s"})</p>`
                                                 : `<p class="task-list-achieved-note">Click Sync from GitHub above to auto-check these boxes from your public repo.</p>`) }
