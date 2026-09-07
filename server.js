@@ -9652,6 +9652,10 @@ app.get("/api/project-interests", requireActivityWriteAccess, async (_req, res) 
   }
 
   try {
+    // Reconcile any self-service interest that was saved while its matching Process
+    // Assessment allocation could not be created (for example, a transient DB failure).
+    await backfillProcessAssessmentAllocations();
+
     const result = await pool.query(`
       SELECT
         pi.project_id,
