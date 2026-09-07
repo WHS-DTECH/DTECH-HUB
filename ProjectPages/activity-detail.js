@@ -4645,6 +4645,35 @@ function parseDecompositionStepsText(value) {
         .slice(0, 30);
 }
 
+// DB-backed record of template copies written by Task List "Sync from Google Drive".
+// Works across devices/browsers, unlike the localStorage sync entries.
+const dbTemplateCopiesCache = new Map();
+async function fetchDbTemplateCopies(projectId) {
+    const safeProjectId = String(projectId || "").trim();
+    if (!safeProjectId) return [];
+    if (dbTemplateCopiesCache.has(safeProjectId)) {
+        return dbTemplateCopiesCache.get(safeProjectId);
+    }
+    try {
+        const response = await fetch(`/api/activities/${encodeURIComponent(safeProjectId)}/my-template-copies`, { headers: buildAuthHeaders({}) });
+        if (!response.ok) return [];
+        const payload = await response.json().catch(() => ({}));
+        const copies = Array.isArray(payload?.template_copies) ? payload.template_copies : [];
+        dbTemplateCopiesCache.set(safeProjectId, copies);
+        return copies;
+    } catch (_error) {
+        return [];
+    }
+}
+
+function getDbTemplateCopyUrlById(copies, templateId) {
+    const target = String(templateId || "").trim().toLowerCase();
+    if (!target) return "";
+    const match = (Array.isArray(copies) ? copies : [])
+        .find((copy) => String(copy?.templateId || "").trim().toLowerCase() === target);
+    return toSafeExternalUrl(match?.fileUrl || "");
+}
+
 function renderDigitalOutcomeMustDos(host, presentationUrl, targetId = "digital-outcome-must-dos") {
     const target = host?.querySelector(`#${targetId}`);
     if (!target) return;
@@ -4709,10 +4738,22 @@ function readStoredRelevantImplicationsSlideEntries(projectId, email) {
     return entries;
 }
 
-function renderRelevantImplicationNames(host, projectId, email) {
+async function renderRelevantImplicationNames(host, projectId, email) {
     const target = host?.querySelector("#success-criteria-relevant-implications");
     if (!target) return;
     const entries = readStoredRelevantImplicationsSlideEntries(projectId, email);
+    // Merge in DB records from Task List "Sync from Google Drive"
+    const dbCopies = await fetchDbTemplateCopies(projectId);
+    dbCopies.forEach((copy) => {
+        if (!/^relevant-implications(?:-|$)/i.test(String(copy?.templateId || "").trim())) return;
+        const url = toSafeExternalUrl(copy?.fileUrl || "");
+        if (url && !entries.some((entry) => entry.url === url)) {
+            entries.push({
+                url,
+                name: String(copy?.templateTitle || "Relevant Implications slideshow").trim()
+            });
+        }
+    });
     const displayName = (value) => String(value || "Relevant Implication")
         .replace(/^relevant\s+implications?\s*-\s*/i, "")
         .replace(/\s*-\s*[a-z][a-z0-9._-]*$/i, "")
@@ -11809,10 +11850,14 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             renderRelevantImplicationsFromSlide(host, readStoredRelevantImplicationsSlideUrl(projectId, email));
         } else {
             const isSuccessCriteriaPage = /success\s+criteria/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`);
-            const digitalOutcomeSourceUrl = readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, "digital-outcome-description")?.url
+            let digitalOutcomeSourceUrl = readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, "digital-outcome-description")?.url
                 || readStoredTaskTopicSlideSyncEntryByShortName(projectId, email, "Digital Outcome Description")?.url
                 || readStoredTaskTopicSlideSyncEntry(projectId, email, "Digital Outcome Description", "Digital Outcome Description")?.url
                 || "";
+            if (!digitalOutcomeSourceUrl) {
+                // Fall back to the DB record written by Task List "Sync from Google Drive"
+                digitalOutcomeSourceUrl = getDbTemplateCopyUrlById(await fetchDbTemplateCopies(projectId), "digital-outcome-description");
+            }
             const syncedSlideLink = isSuccessCriteriaPage
                 ? digitalOutcomeSourceUrl
                 : (host.querySelector("#task-topic-google-slides-sync-reference a")?.href
@@ -11833,7 +11878,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                 renderDigitalOutcomeMustDos(host, syncedSlideLink, targetId);
             }
             if (isSuccessCriteriaPage) {
-                renderRelevantImplicationNames(host, projectId, email);
+                void renderRelevantImplicationNames(host, projectId, email);
             }
         }
     }
