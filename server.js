@@ -12423,6 +12423,7 @@ app.get("/api/integrations/github/repo-analysis", async (req, res) => {
       releases_tags_count: releasesTagsCount,
       categories,
       video_tools_categories: videoToolsCategories,
+      fcpxml_detected: { file: fcpxmlPath, labels: fcpxmlLabels },
       validation: validationResults
     });
   } catch (error) {
@@ -12689,6 +12690,7 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
       computeGithubVideoEfficientToolsCategories(blobs, 0).categories,
       fcpxmlLabels
     );
+    const fcpxmlDetected = { file: fcpxmlPath, labels: fcpxmlLabels };
 
     res.json({
       ok: true,
@@ -12726,6 +12728,7 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
         oversized_assets: oversizedAssetCount
       },
       video_tools_categories: assetVideoToolsCategories,
+      fcpxml_detected: fcpxmlDetected,
       css_details: buildCssHealthDetails(cssContents, htmlContents),
       html_details: buildHtmlHealthDetails(htmlContents),
       link_details: buildLinkHealthDetails(htmlContents),
