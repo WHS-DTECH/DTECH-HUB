@@ -177,11 +177,13 @@ function renderVideoDetails(payload) {
         <details class="asset-manager-result-section" open>
             <summary class="asset-manager-result-summary">Media Inventory</summary>
             <div class="asset-manager-result-body">${renderAssetManagerDetailList([
+                ["Total repository files", Number(details.total_files || 0)],
+                ["Total media assets", Number(details.total_media_files || 0)],
                 ["Video clips", Number(details.video_clips || 0)],
                 ["Audio files", Number(details.audio_files || 0)],
                 ["Images", Number(details.images || 0)],
                 ["Graphics", Number(details.graphics || 0)],
-                ["Project files", Number(details.project_files || 0)],
+                ["Editor/timeline project files", Number(details.project_files || 0)],
                 ["Total source media", formatAssetManagerBytes(details.total_source_media_bytes)]
             ])}</div>
         </details>

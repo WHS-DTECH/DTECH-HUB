@@ -12801,11 +12801,13 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
       broken_reference_count: brokenReferences.length,
       broken_references: brokenReferences.slice(0, 50),
       video_details: {
+        total_files: blobs.length,
         video_clips: videoFiles.length,
         audio_files: audioFiles.length,
         images: imagePaths.length,
         graphics: graphicFiles.length,
         project_files: projectFiles.length,
+        total_media_files: videoFiles.length + audioFiles.length + imagePaths.length + graphicFiles.length,
         total_source_media_bytes: sourceMediaBytes,
         video_formats: videoFormats,
         audio_formats: audioFormats,
