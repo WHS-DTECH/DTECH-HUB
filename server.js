@@ -4124,24 +4124,39 @@ async function backfillProcessAssessmentAllocations() {
     return 0;
   }
 
-  const result = await pool.query(
+  const sourceResult = await pool.query(
     `
-      INSERT INTO project_interests (project_id, student_email, confirmed)
-      SELECT
-        $1 AS project_id,
-        pi.student_email,
-        BOOL_OR(COALESCE(pi.confirmed, FALSE)) AS confirmed
+      SELECT pi.student_email, pi.confirmed, a.*
       FROM project_interests pi
       JOIN activities a ON a.id::text = pi.project_id::text
       WHERE pi.project_id::text <> $1
-        AND LOWER(TRIM(COALESCE(a.activity_category, to_jsonb(a)->>'category', ''))) LIKE ANY (ARRAY['%assessment%', '%project%'])
-      GROUP BY pi.student_email
-      ON CONFLICT (project_id, student_email) DO NOTHING
     `,
     [clientProjectsTaskId]
   );
+  const confirmedByStudent = new Map();
 
-  return Number(result.rowCount || 0);
+  for (const row of sourceResult.rows || []) {
+    const activity = normalizeActivityCategoryForResponse(row);
+    const category = String(activity.activity_category || "").trim().toLowerCase();
+    const studentEmail = normalizeEmail(row.student_email || "");
+    if (!studentEmail || (!category.includes("assessment") && !category.includes("project"))) {
+      continue;
+    }
+    confirmedByStudent.set(studentEmail, Boolean(confirmedByStudent.get(studentEmail)) || Boolean(row.confirmed));
+  }
+
+  let inserted = 0;
+  for (const [studentEmail, confirmed] of confirmedByStudent) {
+    const result = await pool.query(
+      `INSERT INTO project_interests (project_id, student_email, confirmed)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (project_id, student_email) DO NOTHING`,
+      [clientProjectsTaskId, studentEmail, confirmed]
+    );
+    inserted += Number(result.rowCount || 0);
+  }
+
+  return inserted;
 }
 
 async function ensureSchema() {

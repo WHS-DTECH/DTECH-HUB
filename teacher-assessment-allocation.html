@@ -45,6 +45,37 @@
       color: #b23a3a;
     }
 
+    .alloc-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: end;
+      margin: 14px 0 4px;
+    }
+
+    .alloc-control {
+      display: grid;
+      gap: 4px;
+      color: #3a5470;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    .alloc-control input,
+    .alloc-control select {
+      min-height: 34px;
+      border: 1px solid #bfd0e2;
+      border-radius: 6px;
+      padding: 6px 8px;
+      color: #1a3651;
+      background: #fff;
+      font: inherit;
+    }
+
+    .alloc-control input {
+      min-width: min(320px, 80vw);
+    }
+
     .alloc-empty {
       padding: 32px;
       text-align: center;
@@ -370,6 +401,21 @@
         <h1>Assessment Task Allocations</h1>
         <p>Overview of all assessment tasks with student interest. Confirm allocations and assign up to two standards per student (including mixed levels).</p>
         <button type="button" class="alloc-btn alloc-btn-unconfirm" id="alloc-save-all">Save All</button>
+        <div class="alloc-controls" aria-label="Allocation table controls">
+          <label class="alloc-control" for="alloc-email-search">
+            Student email
+            <input id="alloc-email-search" type="search" placeholder="Search student email" autocomplete="off">
+          </label>
+          <label class="alloc-control" for="alloc-row-sort">
+            Sort rows
+            <select id="alloc-row-sort">
+              <option value="email-asc">Student email: A to Z</option>
+              <option value="email-desc">Student email: Z to A</option>
+              <option value="year-asc">Year group: low to high</option>
+              <option value="year-desc">Year group: high to low</option>
+            </select>
+          </label>
+        </div>
         <p class="alloc-status" id="alloc-status" aria-live="polite"></p>
       </header>
 

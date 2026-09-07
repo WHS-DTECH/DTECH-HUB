@@ -604,6 +604,32 @@ function updateProjectBlockCounts(block) {
     }
 }
 
+function getAllocationRowYear(row) {
+    return Number.parseInt(String(row.cells[1]?.textContent || ""), 10) || 0;
+}
+
+function applyAllocationTableControls() {
+    const query = String(document.querySelector("#alloc-email-search")?.value || "").trim().toLowerCase();
+    const sortValue = String(document.querySelector("#alloc-row-sort")?.value || "email-asc");
+    const [sortField, sortDirection] = sortValue.split("-");
+    const direction = sortDirection === "desc" ? -1 : 1;
+
+    document.querySelectorAll(".alloc-project-block tbody").forEach((body) => {
+        const rows = Array.from(body.querySelectorAll("tr[data-student]"));
+        rows.sort((left, right) => {
+            if (sortField === "year") {
+                const yearDifference = getAllocationRowYear(left) - getAllocationRowYear(right);
+                if (yearDifference) return yearDifference * direction;
+            }
+            return String(left.dataset.student || "").localeCompare(String(right.dataset.student || "")) * direction;
+        });
+        rows.forEach((row) => {
+            row.hidden = query !== "" && !String(row.dataset.student || "").toLowerCase().includes(query);
+            body.appendChild(row);
+        });
+    });
+}
+
 async function fetchStudentsForAllocation(email) {
     const headers = allocWithAuthHeaders({}, email);
 
@@ -880,6 +906,7 @@ async function loadAllocations() {
         for (const project of projects) {
             content.appendChild(buildProjectBlock(project, email));
         }
+        applyAllocationTableControls();
     } catch (error) {
         setAllocStatus(error.message || "Could not load allocations.", true);
         content.innerHTML = `<p class="alloc-empty">Could not load assessment task allocations. Please refresh.</p>`;
@@ -940,6 +967,8 @@ async function init() {
     document.querySelector("#alloc-save-all")?.addEventListener("click", () => {
         void saveAllAllocations();
     });
+    document.querySelector("#alloc-email-search")?.addEventListener("input", applyAllocationTableControls);
+    document.querySelector("#alloc-row-sort")?.addEventListener("change", applyAllocationTableControls);
 }
 
 init();
