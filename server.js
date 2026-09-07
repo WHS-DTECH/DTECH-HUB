@@ -61,6 +61,7 @@ const memoryTemplateLibraryEntries = new Map();
 const memoryStudentToolsTechniques = new Map();
 const memoryDecompositionCoverage = new Map();
 const memoryTriallingComponents = new Map();
+const memoryDigiMedEfficientTools = new Map();
 const memoryPracticalSkillsProgress = new Map();
 const memoryPracticalSkillsKitContent = new Map();
 const PRACTICAL_SKILLS_LIBRARY_FILE = path.join(__dirname, "practical-skills", "library.json");
@@ -4150,6 +4151,7 @@ async function ensureSchema() {
   await ensureStudentHaparaFoldersSchema();
   await ensureStudentDriveSetupSchema();
   await ensureTriallingComponentsSchema();
+  await ensureDigiMedEfficientToolsSchema();
   await ensureUnitPlanSchema();
   await ensureAssessmentStandardCardsSchema();
   await ensureCourseOutlinesSchema();
@@ -5161,6 +5163,86 @@ function buildTriallingComponentsPayload(row) {
     presentation_id: String(row.presentation_id || "").trim(),
     modified_time: String(row.modified_time || "").trim(),
     synced_at: row.synced_at || null,
+    updated_at: row.updated_at || null
+  };
+}
+
+async function ensureDigiMedEfficientToolsSchema() {
+  if (!hasDatabase) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS student_digimed_efficient_tools (
+      student_email TEXT NOT NULL,
+      activity_id TEXT NOT NULL,
+      tools JSONB NOT NULL DEFAULT '[]'::jsonb,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (student_email, activity_id)
+    );
+  `);
+}
+
+function normalizeDigiMedEfficientTools(values) {
+  return Array.from(new Set((Array.isArray(values) ? values : [])
+    .map((value) => String(value || "").replace(/\s+/g, " ").trim())
+    .filter(Boolean))).slice(0, 30);
+}
+
+async function saveDigiMedEfficientTools(email, activityId, tools) {
+  const studentEmail = normalizeEmail(email);
+  const safeActivityId = String(activityId || "").trim();
+  const normalizedTools = normalizeDigiMedEfficientTools(tools);
+  if (!studentEmail || !safeActivityId) return null;
+
+  const record = {
+    student_email: studentEmail,
+    activity_id: safeActivityId,
+    tools: normalizedTools,
+    updated_at: new Date().toISOString()
+  };
+
+  if (!hasDatabase) {
+    memoryDigiMedEfficientTools.set(`${studentEmail}:${safeActivityId}`, record);
+    return record;
+  }
+
+  await ensureDigiMedEfficientToolsSchema();
+  const result = await pool.query(
+    `
+      INSERT INTO student_digimed_efficient_tools
+        (student_email, activity_id, tools, updated_at)
+      VALUES ($1, $2, $3::jsonb, NOW())
+      ON CONFLICT (student_email, activity_id) DO UPDATE SET
+        tools = EXCLUDED.tools,
+        updated_at = NOW()
+      RETURNING *
+    `,
+    [studentEmail, safeActivityId, JSON.stringify(normalizedTools)]
+  );
+  return result.rows?.[0] || null;
+}
+
+async function getDigiMedEfficientTools(email, activityId) {
+  const studentEmail = normalizeEmail(email);
+  const safeActivityId = String(activityId || "").trim();
+  if (!studentEmail || !safeActivityId) return null;
+
+  if (!hasDatabase) {
+    return memoryDigiMedEfficientTools.get(`${studentEmail}:${safeActivityId}`) || null;
+  }
+
+  await ensureDigiMedEfficientToolsSchema();
+  const result = await pool.query(
+    `SELECT * FROM student_digimed_efficient_tools WHERE student_email = $1 AND activity_id = $2 LIMIT 1`,
+    [studentEmail, safeActivityId]
+  );
+  return result.rows?.[0] || null;
+}
+
+function buildDigiMedEfficientToolsPayload(row) {
+  if (!row) return { ok: true, found: false, tools: [], updated_at: null };
+  return {
+    ok: true,
+    found: true,
+    tools: normalizeDigiMedEfficientTools(row.tools),
     updated_at: row.updated_at || null
   };
 }
@@ -7762,6 +7844,43 @@ app.get("/api/students/trialling-components", async (req, res) => {
     res.json(buildTriallingComponentsPayload(row));
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not load Trialling Components data." });
+  }
+});
+
+app.get("/api/students/digimed-efficient-tools", async (req, res) => {
+  const requesterEmail = normalizeEmail(getRequestUserEmail(req));
+  if (!requesterEmail) { res.status(401).json({ error: "Sign in is required." }); return; }
+
+  const activityId = String(req.query?.activity_id || req.query?.activityId || "").trim();
+  if (!activityId) { res.status(400).json({ error: "activity_id is required." }); return; }
+
+  // Students read their own record; teachers/admins may read a specific student's (read-only).
+  const requestedEmail = normalizeEmail(req.query?.student_email || req.query?.studentEmail || "") || requesterEmail;
+  if (requestedEmail !== requesterEmail) {
+    const access = await resolveActivityWriteAccess(requesterEmail);
+    if (!access.allowed) { res.status(403).json({ error: "You can only view your own tools and techniques." }); return; }
+  }
+
+  try {
+    const row = await getDigiMedEfficientTools(requestedEmail, activityId);
+    res.json(buildDigiMedEfficientToolsPayload(row));
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not load efficient tools and techniques." });
+  }
+});
+
+app.post("/api/students/digimed-efficient-tools", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email) { res.status(401).json({ error: "Sign in is required." }); return; }
+
+  const activityId = String(req.body?.activity_id || req.body?.activityId || "").trim();
+  if (!activityId) { res.status(400).json({ error: "activity_id is required." }); return; }
+
+  try {
+    const row = await saveDigiMedEfficientTools(email, activityId, req.body?.tools);
+    res.json(buildDigiMedEfficientToolsPayload(row));
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not save efficient tools and techniques." });
   }
 });
 

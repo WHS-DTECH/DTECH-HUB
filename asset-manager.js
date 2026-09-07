@@ -1,5 +1,23 @@
 const ASSET_MANAGER_AUTH_KEY = "hub_google_auth_v1";
 let assetManagerAllocation = {};
+const assetManagerPageContext = { activityId: "", studentEmail: "", canEditTools: false };
+const assetManagerVideoToolsState = { tools: [], updatedAt: "" };
+
+const ASSET_MANAGER_VIDEO_TOOLS_TECHNIQUES = [
+    "Management of media assets",
+    "Appropriate folder/bin organisation",
+    "Appropriate file naming",
+    "Storyboards / shot lists / run-sheets",
+    "Reusing titles, presets, effects or templates",
+    "Adjustment layers / nested sequences where appropriate",
+    "Proxy media / optimised editing workflow",
+    "Keyboard shortcuts / efficient editing workflow",
+    "Non-destructive editing",
+    "Appropriate sequence/project settings",
+    "Optimisation/compression of media assets",
+    "Appropriate export settings",
+    "Version control / project backups"
+];
 
 function assetManagerReadAuth() {
     try {
@@ -185,6 +203,73 @@ function renderAssetManagerDetailList(items) {
     return `<div class="asset-manager-detail-panel"><dl class="asset-manager-detail-list">${items.map(([label, value]) => `<div><dt>${escapeAssetManagerHtml(label)}</dt><dd>${escapeAssetManagerHtml(value)}</dd></div>`).join("")}</dl></div>`;
 }
 
+function isAssetManagerVideoProject() {
+    return String(assetManagerAllocation?.digital_media_type || "").trim().toLowerCase() === "video";
+}
+
+function renderAssetManagerVideoToolsPanel() {
+    const tickedSet = new Set(assetManagerVideoToolsState.tools.map((tool) => String(tool || "").trim().toLowerCase()));
+    const readOnly = !assetManagerPageContext.canEditTools;
+    return `
+        <details class="asset-manager-result-section" open>
+            <summary class="asset-manager-result-summary">Video Assessment Tools &amp; Techniques</summary>
+            <div class="asset-manager-result-body">
+                <p class="task-list-achieved-note">Tick the media-production practices you have used and can demonstrate in your project evidence.</p>
+                <div class="task-list-decomposition-subtask-list">
+                    ${ASSET_MANAGER_VIDEO_TOOLS_TECHNIQUES.map((tool) => {
+                        const isTicked = tickedSet.has(tool.toLowerCase());
+                        return `
+                            <label class="task-list-decomposition-subtask ${isTicked ? "is-complete" : ""}">
+                                <input type="checkbox" data-asset-manager-video-tool="${escapeAssetManagerHtml(tool)}" ${isTicked ? "checked" : ""} ${readOnly ? "disabled" : ""}>
+                                <span>${escapeAssetManagerHtml(tool)}</span>
+                            </label>
+                        `;
+                    }).join("")}
+                </div>
+                <p class="task-list-achieved-note">${readOnly ? "Read-only: the student manages these from their Asset Manager or Task List." : "Saved to the hub database \u2014 shared with your Task List."}</p>
+            </div>
+        </details>
+    `;
+}
+
+async function loadAssetManagerVideoTools() {
+    if (!assetManagerPageContext.activityId || !assetManagerPageContext.studentEmail) return;
+    try {
+        const payload = await assetManagerLoadJson(
+            `/api/students/digimed-efficient-tools?activity_id=${encodeURIComponent(assetManagerPageContext.activityId)}&student_email=${encodeURIComponent(assetManagerPageContext.studentEmail)}`,
+            { headers: assetManagerHeaders({}) }
+        );
+        assetManagerVideoToolsState.tools = Array.isArray(payload?.tools) ? payload.tools : [];
+        assetManagerVideoToolsState.updatedAt = String(payload?.updated_at || "").trim();
+    } catch (_error) {
+        assetManagerVideoToolsState.tools = [];
+        assetManagerVideoToolsState.updatedAt = "";
+    }
+}
+
+async function saveAssetManagerVideoTool(tool, isTicked) {
+    const safeTool = String(tool || "").trim();
+    if (!safeTool || !assetManagerPageContext.canEditTools) return;
+    const next = new Set(assetManagerVideoToolsState.tools.map((value) => String(value || "").trim()).filter(Boolean));
+    if (isTicked) {
+        next.add(safeTool);
+    } else {
+        next.delete(safeTool);
+    }
+    assetManagerVideoToolsState.tools = Array.from(next);
+    try {
+        const payload = await assetManagerLoadJson("/api/students/digimed-efficient-tools", {
+            method: "POST",
+            headers: assetManagerHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ activity_id: assetManagerPageContext.activityId, tools: assetManagerVideoToolsState.tools })
+        });
+        assetManagerVideoToolsState.tools = Array.isArray(payload?.tools) ? payload.tools : assetManagerVideoToolsState.tools;
+        assetManagerVideoToolsState.updatedAt = String(payload?.updated_at || "").trim();
+    } catch (error) {
+        setAssetManagerStatus(error?.message || "Could not save tools and techniques.", true);
+    }
+}
+
 function renderAssetManagerContent(payload) {
     const host = document.querySelector("#asset-manager-content");
     if (!host) return;
@@ -193,7 +278,7 @@ function renderAssetManagerContent(payload) {
     const oversizedCount = Number(payload?.oversized_image_count || 0);
     const unusedCount = Number(payload?.unused_image_count || 0);
     const brokenCount = Number(payload?.broken_reference_count || 0);
-    const isVideo = String(assetManagerAllocation?.digital_media_type || "").trim().toLowerCase() === "video";
+    const isVideo = isAssetManagerVideoProject();
 
     host.innerHTML = `
         <details class="asset-manager-web-details" open>
@@ -223,6 +308,7 @@ function renderAssetManagerContent(payload) {
         <details class="asset-manager-result-section"><summary class="asset-manager-result-summary">CSS Details</summary><div class="asset-manager-result-body">${renderCssDetails({ ...payload?.css_details, stylesheets: counts.css })}</div></details>
         <details class="asset-manager-result-section"><summary class="asset-manager-result-summary">JavaScript Details</summary><div class="asset-manager-result-body">${renderJavascriptDetails({ ...payload?.javascript_details, total_files: counts.javascript })}</div></details>
             `}
+            ${isVideo ? renderAssetManagerVideoToolsPanel() : ""}
             </div>
         </details>
     `;
@@ -249,6 +335,9 @@ async function initAssetManagerPage() {
     const params = new URLSearchParams(window.location.search);
     const activityId = String(params.get("id") || "").trim();
     const studentEmail = String(params.get("studentEmail") || "").trim().toLowerCase() || email;
+    assetManagerPageContext.activityId = activityId;
+    assetManagerPageContext.studentEmail = studentEmail;
+    assetManagerPageContext.canEditTools = studentEmail === email;
 
     if (!activityId) {
         setAssetManagerStatus("No task was specified. Open Asset Manager from a Task List or Student Work page.", true);
@@ -271,6 +360,9 @@ async function initAssetManagerPage() {
         assetManagerAllocation = evidencePayload || {};
         renderAssetManagerStudentDetails(evidencePayload);
         repoUrl = findGithubRepoUrlFromEvidenceSteps(evidencePayload?.evidence_steps);
+        if (isAssetManagerVideoProject()) {
+            await loadAssetManagerVideoTools();
+        }
     } catch (error) {
         setAssetManagerStatus(error?.message || "Could not load this student's evidence.", true);
         return;
@@ -301,6 +393,15 @@ async function initAssetManagerPage() {
         } finally {
             if (btn) { btn.disabled = false; btn.textContent = "\u21bb Sync from GitHub"; }
         }
+    });
+
+    document.addEventListener("change", (event) => {
+        const checkbox = event.target?.closest?.("[data-asset-manager-video-tool]");
+        if (!checkbox) return;
+        const tool = String(checkbox.getAttribute("data-asset-manager-video-tool") || "").trim();
+        if (!tool || !assetManagerPageContext.canEditTools) return;
+        checkbox.closest(".task-list-decomposition-subtask")?.classList.toggle("is-complete", Boolean(checkbox.checked));
+        void saveAssetManagerVideoTool(tool, Boolean(checkbox.checked));
     });
 }
 

@@ -8,6 +8,7 @@ const DIGIMED_UX_PRINCIPLES_ACK_STORAGE_PREFIX = "hub_digimed_ux_principles_ack_
 const DIGIMED_VIDEO_UX_PRINCIPLES_ACK_STORAGE_PREFIX = "hub_digimed_video_ux_principles_ack_v1";
 const DIGIMED_VIDEO_CONVENTIONS_ACK_STORAGE_PREFIX = "hub_digimed_video_conventions_ack_v1";
 const DIGIMED_EFFICIENT_TOOLS_STORAGE_PREFIX = "hub_digimed_efficient_tools_v1";
+const DIGIMED_VIDEO_EFFICIENT_TOOLS_DB_PREFIX = "video:";
 const DIGIMED_EFFICIENT_TOOLS_SUBTASKS = [
     "Management of assets",
     "Using stylesheets",
@@ -366,7 +367,53 @@ function installDigiMedEfficientToolsHandler() {
         state[subtask] = Boolean(checkbox.checked);
         writeDigiMedEfficientToolsState(activityId, email, state);
         renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);
+        if (isDigiMedVideoEfficientToolSubtask(subtask)) {
+            void persistVideoEfficientToolsToServer(activityId, subtask, Boolean(checkbox.checked));
+        }
     });
+}
+
+function isDigiMedVideoEfficientToolSubtask(subtask) {
+    return DIGIMED_VIDEO_EFFICIENT_TOOLS_SUBTASKS.includes(String(subtask || "").trim());
+}
+
+function readVideoEfficientToolsFromLocalCache(activityId, email) {
+    const state = readDigiMedEfficientToolsState(activityId, email);
+    return DIGIMED_VIDEO_EFFICIENT_TOOLS_SUBTASKS.filter((subtask) => Boolean(state[subtask]));
+}
+
+async function loadVideoEfficientToolsFromServer(activityId, email) {
+    const safeActivityId = String(activityId || "").trim();
+    if (!safeActivityId || !email) return null;
+    try {
+        const payload = await loadJson(
+            `/api/students/digimed-efficient-tools?activity_id=${encodeURIComponent(safeActivityId)}`,
+            { headers: buildTaskListHeaders({}) }
+        );
+        const tools = Array.isArray(payload?.tools) ? payload.tools : [];
+        const state = readDigiMedEfficientToolsState(safeActivityId, email);
+        DIGIMED_VIDEO_EFFICIENT_TOOLS_SUBTASKS.forEach((subtask) => {
+            state[subtask] = tools.some((tool) => String(tool || "").trim().toLowerCase() === subtask.toLowerCase());
+        });
+        writeDigiMedEfficientToolsState(safeActivityId, email, state);
+        return tools;
+    } catch (_error) {
+        return null;
+    }
+}
+
+async function persistVideoEfficientToolsToServer(activityId, subtask, isTicked) {
+    const safeActivityId = String(activityId || "").trim();
+    if (!safeActivityId || !isDigiMedVideoEfficientToolSubtask(subtask)) return;
+    const tools = readVideoEfficientToolsFromLocalCache(safeActivityId, getTaskListEmail());
+    try {
+        await loadJson("/api/students/digimed-efficient-tools", {
+            method: "POST",
+            headers: buildTaskListHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ activity_id: safeActivityId, tools })
+        });
+    } catch (_error) {
+    }
 }
 
 function installDigiMedToolsTechniquesHandler() {
@@ -2710,6 +2757,8 @@ async function loadChecklistForTask(taskId) {
     });
 
     const signedInEmail = getTaskListEmail();
+
+    await loadVideoEfficientToolsFromServer(taskListState.selectedId, signedInEmail);
 
     // Fetch which templates the student has copied (DB-backed, reliable across devices)
     const templateCopiesPayload = await loadJson(
