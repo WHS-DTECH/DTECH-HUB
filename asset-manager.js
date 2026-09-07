@@ -3,7 +3,7 @@ let assetManagerAllocation = {};
 const assetManagerPageContext = { activityId: "", studentEmail: "", canEditTools: false };
 const assetManagerVideoToolsState = { tools: [], updatedAt: "" };
 const assetManagerDetectedVideoTools = new Set();
-const assetManagerFcpxmlInfo = { file: "", labels: [] };
+const assetManagerFcpxmlInfo = { file: "", labels: [], files: [] };
 
 const ASSET_MANAGER_VIDEO_TOOLS_TECHNIQUES = [
     "Management of media assets",
@@ -214,6 +214,23 @@ function isAssetManagerVideoProject() {
 function renderAssetManagerVideoToolsPanel() {
     const tickedSet = new Set(assetManagerVideoToolsState.tools.map((tool) => String(tool || "").trim().toLowerCase()));
     const readOnly = !assetManagerPageContext.canEditTools;
+    let fcpxmlSummaryLines = "";
+    if (assetManagerFcpxmlInfo.files && assetManagerFcpxmlInfo.files.length) {
+        fcpxmlSummaryLines = assetManagerFcpxmlInfo.files.map((item) => {
+            const fileStr = escapeAssetManagerHtml(item.file);
+            const labelsStr = Array.isArray(item.labels) && item.labels.length
+                ? ` \u2014 detected: ${escapeAssetManagerHtml(item.labels.join(", "))}`
+                : " \u2014 no timeline practices detected in this export.";
+            return `<p class="task-list-achieved-note">Timeline parsed: ${fileStr}${labelsStr}</p>`;
+        }).join("");
+    } else if (assetManagerFcpxmlInfo.file) {
+        const fileStr = escapeAssetManagerHtml(assetManagerFcpxmlInfo.file);
+        const labelsStr = assetManagerFcpxmlInfo.labels.length
+            ? ` \u2014 detected: ${escapeAssetManagerHtml(assetManagerFcpxmlInfo.labels.join(", "))}`
+            : " \u2014 no timeline practices detected in this export.";
+        fcpxmlSummaryLines = `<p class="task-list-achieved-note">Timeline parsed: ${fileStr}${labelsStr}</p>`;
+    }
+
     return `
         <details class="asset-manager-result-section" open>
             <summary class="asset-manager-result-summary">Video Assessment Tools &amp; Techniques</summary>
@@ -232,7 +249,7 @@ function renderAssetManagerVideoToolsPanel() {
                     }).join("")}
                 </div>
                 <p class="task-list-achieved-note">${readOnly ? "Read-only: the student manages these from their Asset Manager or Task List." : "Saved to the hub database \u2014 shared with your Task List."}</p>
-                ${assetManagerFcpxmlInfo.file ? `<p class="task-list-achieved-note">Timeline parsed: ${escapeAssetManagerHtml(assetManagerFcpxmlInfo.file)}${assetManagerFcpxmlInfo.labels.length ? ` \u2014 detected: ${escapeAssetManagerHtml(assetManagerFcpxmlInfo.labels.join(", "))}` : " \u2014 no timeline practices detected in this export."}</p>` : ""}
+                ${fcpxmlSummaryLines}
             </div>
         </details>
     `;
@@ -338,6 +355,7 @@ async function applyDetectedVideoToolsFromAssetHealth(payload) {
     assetManagerDetectedVideoTools.clear();
     assetManagerFcpxmlInfo.file = String(payload?.fcpxml_detected?.file || "").trim();
     assetManagerFcpxmlInfo.labels = Array.isArray(payload?.fcpxml_detected?.labels) ? payload.fcpxml_detected.labels : [];
+    assetManagerFcpxmlInfo.files = Array.isArray(payload?.fcpxml_detected?.files) ? payload.fcpxml_detected.files : [];
     if (!isAssetManagerVideoProject()) return;
     const detected = (Array.isArray(payload?.video_tools_categories) ? payload.video_tools_categories : [])
         .filter((category) => category?.done)

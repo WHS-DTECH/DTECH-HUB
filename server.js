@@ -12317,12 +12317,16 @@ function parseFcpxmlVideoTools(content) {
   if (!/<fcpxml[\s>]/i.test(text)) return [];
 
   const found = [];
-  // Proxies / optimised workflow: proxy or optimised media referenced in the timeline resources.
-  if (/<(?:proxy|asset)[^>]*(?:proxy|optimized|optimised)/i.test(text) || /\bproxied\b|\bproxyMedia\b|hasProxy\s*=\s*["']1/i.test(text)) {
+  // Non-destructive editing: any timeline sequence in NLE format (FCPXML timeline export with sequence/spine).
+  if (/<fcpxml[\s>]/i.test(text) && /<sequence[\s>]/i.test(text) && /<spine[\s>]/i.test(text)) {
+    found.push("Non-destructive editing");
+  }
+  // Proxies / optimised workflow: proxy or optimised media or camera RAW (.braw) referenced in the timeline resources.
+  if (/<(?:proxy|asset)[^>]*(?:proxy|optimized|optimised)/i.test(text) || /\bproxied\b|\bproxyMedia\b|hasProxy\s*=\s*["']1/i.test(text) || /\.braw\b/i.test(text)) {
     found.push("Proxy media / optimised editing workflow");
   }
-  // Adjustment layers / nested sequences: a sequence used as a clip (nested) or an adjustment asset.
-  if (/<(?:asset-clip|clip)[^>]*\bref\s*=\s*["'][^"']*sequence/i.test(text) || /<sequence\b[^>]*>\s*<spine>/i.test(text) && /<asset-clip/i.test(text)) {
+  // Adjustment layers / nested sequences: a sequence used as a clip (nested), an adjustment asset, or transform adjustments.
+  if (/<(?:asset-clip|clip)[^>]*\bref\s*=\s*["'][^"']*sequence/i.test(text) || (/<sequence\b[^>]*>\s*<spine>/i.test(text) && /<asset-clip/i.test(text)) || /<adjust-transform\b/i.test(text)) {
     found.push("Adjustment layers / nested sequences where appropriate");
   }
   // Reusing titles / presets / effects / templates: effect or title resources referenced on the timeline.
@@ -12491,22 +12495,24 @@ app.get("/api/integrations/github/repo-analysis", async (req, res) => {
     const videoEfficientTools = computeGithubVideoEfficientToolsCategories(treeItems, commitDays.size);
 
     // Deeper detection: inspect all committed FCPXML timeline exports (Resolve 'Export Timeline')
-    // and use the richest timeline; alphabetical filenames should not decide the assessment result.
+    // and cumulatively aggregate detected practices across all exported timelines.
     const fcpxmlCandidates = treeItems
       .filter((item) => /\.(?:fcpxml)$/i.test(String(item?.path || "")) || (/\.xml$/i.test(String(item?.path || "")) && !/\b(?:project|archive)\b/i.test(String(item?.path || ""))))
       .sort((left, right) => Number(right?.size || 0) - Number(left?.size || 0));
-    let fcpxmlPath = "";
-    let fcpxmlLabels = [];
+    const fcpxmlFiles = [];
+    const allFcpxmlLabelsSet = new Set();
     for (const candidate of fcpxmlCandidates) {
       const candidatePath = String(candidate?.path || "").trim();
       const content = await fetchGithubRepoRawFile(identifier.owner, identifier.repo, defaultBranch, candidatePath);
       const labels = parseFcpxmlVideoTools(content);
-      if (!fcpxmlPath || labels.length > fcpxmlLabels.length) {
-        fcpxmlPath = candidatePath;
-        fcpxmlLabels = labels;
+      if (labels.length > 0 || candidatePath.endsWith(".fcpxml")) {
+        fcpxmlFiles.push({ file: candidatePath, labels });
+        labels.forEach((label) => allFcpxmlLabelsSet.add(label));
       }
     }
-    const videoToolsCategories = mergeVideoToolsCategories(videoEfficientTools.categories, fcpxmlLabels);
+    const allFcpxmlLabels = Array.from(allFcpxmlLabelsSet);
+    const primaryFcpxmlPath = fcpxmlFiles[0]?.file || "";
+    const videoToolsCategories = mergeVideoToolsCategories(videoEfficientTools.categories, allFcpxmlLabels);
 
     res.json({
       ok: true,
@@ -12528,7 +12534,7 @@ app.get("/api/integrations/github/repo-analysis", async (req, res) => {
       releases_tags_count: releasesTagsCount,
       categories,
       video_tools_categories: videoToolsCategories,
-      fcpxml_detected: { file: fcpxmlPath, labels: fcpxmlLabels },
+      fcpxml_detected: { file: primaryFcpxmlPath, labels: allFcpxmlLabels, files: fcpxmlFiles },
       validation: validationResults
     });
   } catch (error) {
@@ -12783,26 +12789,28 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
       .filter((item) => Number(item?.size || 0) > 100 * 1024 * 1024).length;
 
     // Deeper detection: inspect all committed FCPXML timeline exports (Resolve 'Export Timeline')
-    // and use the richest timeline; alphabetical filenames should not decide the assessment result.
+    // and cumulatively aggregate detected practices across all exported timelines.
     const fcpxmlCandidates = blobs
       .filter((item) => /\.(?:fcpxml)$/i.test(String(item?.path || "")) || (/\.xml$/i.test(String(item?.path || "")) && !/\b(?:project|archive)\b/i.test(String(item?.path || ""))))
       .sort((left, right) => Number(right?.size || 0) - Number(left?.size || 0));
-    let fcpxmlPath = "";
-    let fcpxmlLabels = [];
+    const fcpxmlFiles = [];
+    const allFcpxmlLabelsSet = new Set();
     for (const candidate of fcpxmlCandidates) {
       const candidatePath = String(candidate?.path || "").trim();
       const content = await fetchGithubRepoRawFile(identifier.owner, identifier.repo, defaultBranch, candidatePath);
       const labels = parseFcpxmlVideoTools(content);
-      if (!fcpxmlPath || labels.length > fcpxmlLabels.length) {
-        fcpxmlPath = candidatePath;
-        fcpxmlLabels = labels;
+      if (labels.length > 0 || candidatePath.endsWith(".fcpxml")) {
+        fcpxmlFiles.push({ file: candidatePath, labels });
+        labels.forEach((label) => allFcpxmlLabelsSet.add(label));
       }
     }
+    const allFcpxmlLabels = Array.from(allFcpxmlLabelsSet);
+    const primaryFcpxmlPath = fcpxmlFiles[0]?.file || "";
     const assetVideoToolsCategories = mergeVideoToolsCategories(
       computeGithubVideoEfficientToolsCategories(blobs, 0).categories,
-      fcpxmlLabels
+      allFcpxmlLabels
     );
-    const fcpxmlDetected = { file: fcpxmlPath, labels: fcpxmlLabels };
+    const fcpxmlDetected = { file: primaryFcpxmlPath, labels: allFcpxmlLabels, files: fcpxmlFiles };
 
     res.json({
       ok: true,

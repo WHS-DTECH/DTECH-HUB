@@ -1164,7 +1164,8 @@ async function runGithubEfficientToolsSync(activityId, email, repoUrl) {
         syncedAt: new Date().toISOString(),
         lastCommitDate: String(payload?.last_commit?.date || "").trim(),
         fcpxmlFile: String(payload?.fcpxml_detected?.file || "").trim(),
-        fcpxmlLabels: Array.isArray(payload?.fcpxml_detected?.labels) ? payload.fcpxml_detected.labels : []
+        fcpxmlLabels: Array.isArray(payload?.fcpxml_detected?.labels) ? payload.fcpxml_detected.labels : [],
+        fcpxmlFiles: Array.isArray(payload?.fcpxml_detected?.files) ? payload.fcpxml_detected.files : []
     });
 
     return payload;
@@ -1191,12 +1192,16 @@ function buildVideoAutoProgressNote(activityId, email) {
         return treeDetected.includes(subtask) || autoLabels.includes(subtask);
     }).length;
 
+    const fcpxmlFiles = Array.isArray(analysis.fcpxmlFiles) ? analysis.fcpxmlFiles : [];
     const fcpxmlFile = String(analysis.fcpxmlFile || "").trim();
+    const fcpxmlFileLabel = fcpxmlFiles.length > 1
+        ? `${fcpxmlFiles.length} timelines parsed`
+        : fcpxmlFile;
     const lastCommitTs = Date.parse(String(analysis.lastCommitDate || "")) || 0;
     const ageDays = lastCommitTs ? Math.floor((Date.now() - lastCommitTs) / (1000 * 60 * 60 * 24)) : null;
     const isStale = ageDays === null || ageDays > 14;
 
-    const summaryLine = `<p class="task-list-achieved-note">Auto-detected from your project: ${detectedCount} of ${DIGIMED_VIDEO_EFFICIENT_TOOLS_SUBTASKS.length} practices${fcpxmlFile ? ` (timeline: ${escapeTaskListHtml(fcpxmlFile)})` : ""}. Last commit ${escapeTaskListHtml(formatTaskListTimestamp(analysis.lastCommitDate))}.</p>`;
+    const summaryLine = `<p class="task-list-achieved-note">Auto-detected from your project: ${detectedCount} of ${DIGIMED_VIDEO_EFFICIENT_TOOLS_SUBTASKS.length} practices${fcpxmlFileLabel ? ` (timeline: ${escapeTaskListHtml(fcpxmlFileLabel)})` : ""}. Last commit ${escapeTaskListHtml(formatTaskListTimestamp(analysis.lastCommitDate))}.</p>`;
     const nudgeLine = !fcpxmlFile
         ? `<p class="task-list-achieved-note">No timeline export found \u2014 in DaVinci Resolve use File \u2192 Export \u2192 Timeline \u2192 FCPXML and commit it to keep your progress up to date.</p>`
         : (isStale
