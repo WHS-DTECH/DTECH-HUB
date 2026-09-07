@@ -12349,11 +12349,23 @@ async function fetchGithubRepoRawFile(owner, repo, branch, filePath) {
 
 // Merge fcpxml-derived practices into the tree-level categories (done wins; never untick).
 function mergeVideoToolsCategories(baseCategories, fcpxmlLabels) {
-  const extra = new Set((Array.isArray(fcpxmlLabels) ? fcpxmlLabels : []).map((label) => String(label || "").trim().toLowerCase()));
-  return (Array.isArray(baseCategories) ? baseCategories : []).map((category) => {
-    const label = String(category?.label || "").trim();
-    return extra.has(label.toLowerCase()) ? { ...category, done: true } : category;
+  const extraSet = new Set((Array.isArray(fcpxmlLabels) ? fcpxmlLabels : []).map((label) => String(label || "").trim().toLowerCase()));
+  const categories = (Array.isArray(baseCategories) ? baseCategories : []).map((cat) => {
+    const label = String(cat?.label || "").trim();
+    const isDone = Boolean(cat?.done) || extraSet.has(label.toLowerCase());
+    return { ...cat, done: isDone };
   });
+
+  (Array.isArray(fcpxmlLabels) ? fcpxmlLabels : []).forEach((label) => {
+    const cleanLabel = String(label || "").trim();
+    if (!cleanLabel) return;
+    const exists = categories.some((cat) => String(cat?.label || "").trim().toLowerCase() === cleanLabel.toLowerCase());
+    if (!exists) {
+      categories.push({ label: cleanLabel, done: true });
+    }
+  });
+
+  return categories;
 }
 
 function extractImageStatsFromTree(treeItems) {
@@ -12478,15 +12490,21 @@ app.get("/api/integrations/github/repo-analysis", async (req, res) => {
     // OR more than one project file exists (an explicit backup copy).
     const videoEfficientTools = computeGithubVideoEfficientToolsCategories(treeItems, commitDays.size);
 
-    // Deeper detection: read a committed FCPXML timeline export (Resolve 'Export Timeline').
-    const fcpxmlPath = treeItems
-      .map((item) => String(item?.path || "").trim())
-      .filter((filePath) => /\.(?:fcpxml)$/i.test(filePath) || (/\.xml$/i.test(filePath) && !/\b(?:project|archive)\b/i.test(filePath)))
-      .sort((a, b) => (a.endsWith(".fcpxml") ? -1 : 0) - (b.endsWith(".fcpxml") ? -1 : 0))[0] || "";
+    // Deeper detection: inspect all committed FCPXML timeline exports (Resolve 'Export Timeline')
+    // and use the richest timeline; alphabetical filenames should not decide the assessment result.
+    const fcpxmlCandidates = treeItems
+      .filter((item) => /\.(?:fcpxml)$/i.test(String(item?.path || "")) || (/\.xml$/i.test(String(item?.path || "")) && !/\b(?:project|archive)\b/i.test(String(item?.path || ""))))
+      .sort((left, right) => Number(right?.size || 0) - Number(left?.size || 0));
+    let fcpxmlPath = "";
     let fcpxmlLabels = [];
-    if (fcpxmlPath) {
-      const fcpxmlContent = await fetchGithubRepoRawFile(identifier.owner, identifier.repo, defaultBranch, fcpxmlPath);
-      fcpxmlLabels = parseFcpxmlVideoTools(fcpxmlContent);
+    for (const candidate of fcpxmlCandidates) {
+      const candidatePath = String(candidate?.path || "").trim();
+      const content = await fetchGithubRepoRawFile(identifier.owner, identifier.repo, defaultBranch, candidatePath);
+      const labels = parseFcpxmlVideoTools(content);
+      if (!fcpxmlPath || labels.length > fcpxmlLabels.length) {
+        fcpxmlPath = candidatePath;
+        fcpxmlLabels = labels;
+      }
     }
     const videoToolsCategories = mergeVideoToolsCategories(videoEfficientTools.categories, fcpxmlLabels);
 
