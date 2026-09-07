@@ -220,14 +220,14 @@ function renderAssetManagerVideoToolsPanel() {
             const labelsStr = Array.isArray(item.labels) && item.labels.length
                 ? ` \u2014 detected: ${escapeAssetManagerHtml(item.labels.join(", "))}`
                 : " \u2014 no timeline practices detected in this export.";
-            return `<p class="task-list-achieved-note">Timeline parsed: ${fileStr}${labelsStr}</p>`;
+            return `<p class="task-list-achieved-note"><strong>Timeline parsed: ${fileStr}</strong>${labelsStr}</p>`;
         }).join("");
     } else if (assetManagerFcpxmlInfo.file) {
         const fileStr = escapeAssetManagerHtml(assetManagerFcpxmlInfo.file);
         const labelsStr = assetManagerFcpxmlInfo.labels.length
             ? ` \u2014 detected: ${escapeAssetManagerHtml(assetManagerFcpxmlInfo.labels.join(", "))}`
             : " \u2014 no timeline practices detected in this export.";
-        fcpxmlSummaryLines = `<p class="task-list-achieved-note">Timeline parsed: ${fileStr}${labelsStr}</p>`;
+        fcpxmlSummaryLines = `<p class="task-list-achieved-note"><strong>Timeline parsed: ${fileStr}</strong>${labelsStr}</p>`;
     }
 
     return `
