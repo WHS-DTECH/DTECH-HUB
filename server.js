@@ -12286,11 +12286,12 @@ function computeGithubVideoEfficientToolsCategories(treeItems, commitDayCount) {
   const mediaInFolders = mediaPaths.filter((filePath) => filePath.includes("/") && folderPattern.test(filePath)).length;
   const folderOrgDone = mediaPaths.length > 0 && mediaInFolders >= Math.ceil(mediaPaths.length * 0.6);
 
-  // Appropriate file naming: media files avoid camera-default / messy names (spaces, IMG_####, Untitled, Timeline 1, etc.).
-  // Camera stock clips (like A001_C002_... or b004_SFO_...) and descriptive titles are clean names; default "Timeline 1" / "Untitled" / spaces are untidy.
-  const badNamePattern = /(?:^|\/)(?:untitled|timeline\s*\d+|image|video|clip|new\s|screenshot|copy)|\s|img_\d+|vid_\d+|dsc_?\d+|mov_\d+/i;
-  const namedFiles = mediaPaths.filter((filePath) => !badNamePattern.test(filePath));
-  const fileNamingDone = mediaPaths.length > 0 && namedFiles.length >= Math.ceil(mediaPaths.length * 0.5);
+  // Appropriate file naming: media files avoid default/temp names ("Untitled", "New Folder", "copy", "temp", "draft", "test project").
+  // Stock/camera reel IDs (e.g. b004_SFO_LIGHTS_04.mov, A003_08071846_C029.braw), descriptive names (Color Page Timeline 2.mov),
+  // and clean snake/camel/space names are all valid media asset naming conventions.
+  const defaultTempPattern = /(?:^|\/)(?:untitled|new\s*folder|draft|temp|test\s*project|copy|\.tmp)(?:\/|\.|$)/i;
+  const namedFiles = mediaPaths.filter((filePath) => !defaultTempPattern.test(filePath));
+  const fileNamingDone = mediaPaths.length > 0 && namedFiles.length === mediaPaths.length;
 
   // Optimisation/compression of media assets: no single source media file over the oversized threshold.
   const sourceMediaBlobs = blobs.filter((item) => {
