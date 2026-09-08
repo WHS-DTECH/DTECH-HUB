@@ -4,6 +4,7 @@ const TASK_LIST_TRELLO_CARD_LIBRARY_STORAGE_PREFIX = "hub_trello_card_library_v1
 const TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX = "hub_task_topic_slide_sync_v1";
 const TESTING_FUNCTIONS_LIST_COUNT_STORAGE_PREFIX = "hub_testing_functions_list_counts_v1";
 const DIGIMED_CONVENTIONS_ACK_STORAGE_PREFIX = "hub_digimed_conventions_ack_v1";
+const DIGIMED_IMAGE_CONVENTIONS_ACK_STORAGE_PREFIX = "hub_digimed_image_conventions_ack_v1";
 const DIGIMED_UX_PRINCIPLES_ACK_STORAGE_PREFIX = "hub_digimed_ux_principles_ack_v1";
 const DIGIMED_VIDEO_UX_PRINCIPLES_ACK_STORAGE_PREFIX = "hub_digimed_video_ux_principles_ack_v1";
 const DIGIMED_VIDEO_CONVENTIONS_ACK_STORAGE_PREFIX = "hub_digimed_video_conventions_ack_v1";
@@ -1512,13 +1513,25 @@ function getDigiMedConventionsAcknowledgementCount(activityId, email, stateMap =
 
 function getDigiMedConventionsSubtask(stateMap = {}, digitalMediaType = "") {
     const activityId = taskListState.selectedId;
-    const isVideo = String(digitalMediaType || "").trim().toLowerCase() === "video";
+    const mediaType = String(digitalMediaType || "").trim().toLowerCase();
+    const isVideo = mediaType === "video";
+    const isImage = mediaType === "image";
+    const imageCount = (() => {
+        if (!isImage) return 0;
+        try {
+            const key = `${DIGIMED_IMAGE_CONVENTIONS_ACK_STORAGE_PREFIX}:${String(activityId || "").trim()}:${String(getTaskListEmail() || "").trim().toLowerCase()}`;
+            const saved = JSON.parse(localStorage.getItem(key) || "{}");
+            return Object.values(saved || {}).filter(Boolean).length;
+        } catch (_error) {
+            return 0;
+        }
+    })();
     return {
-        label: isVideo ? "Conventions (VIDEO)" : "Conventions (WEB)",
+        label: isVideo ? "Conventions (VIDEO)" : isImage ? "Conventions (IMAGE)" : "Conventions (WEB)",
         href: isVideo
             ? buildCustomActivityLink(activityId, "Video Conventions", "Conventions (VIDEO)", "video-conventions")
             : buildCustomActivityLink(activityId, "Using relevant conventions for the media type.", "Conventions (WEB)", "relevant-digimed-conventions"),
-        count: getDigiMedConventionsAcknowledgementCount(activityId, getTaskListEmail(), stateMap)
+        count: isImage ? imageCount : getDigiMedConventionsAcknowledgementCount(activityId, getTaskListEmail(), stateMap)
     };
 }
 

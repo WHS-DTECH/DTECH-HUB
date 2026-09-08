@@ -97,6 +97,23 @@ const TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX = "hub_task_topic_slide_sync_v1";
 const TESTING_FUNCTIONS_LIST_COUNT_STORAGE_PREFIX = "hub_testing_functions_list_counts_v1";
 const DIGIMED_CONVENTIONS_ACK_STORAGE_PREFIX = "hub_digimed_conventions_ack_v1";
 const DIGIMED_CONVENTION_AREAS = ["Navigation", "Layout", "Typography", "Links", "Buttons/Controls", "Forms", "Visual hierarchy", "Images/Media", "Consistency", "Responsive design", "Feedback", "Content organisation"];
+const DIGIMED_IMAGE_CONVENTIONS_ACK_STORAGE_PREFIX = "hub_digimed_image_conventions_ack_v1";
+const DIGIMED_IMAGE_CONVENTION_CHECKS = [
+    ["Composition & Layout", "Are elements deliberately positioned and arranged? Is the composition balanced and appropriate for the purpose?"],
+    ["Visual Hierarchy", "Is it clear what the viewer should notice first, second and next? Are size, position, contrast and emphasis used deliberately?"],
+    ["Alignment & Proximity", "Are related elements visually grouped? Are elements aligned consistently rather than appearing randomly positioned?"],
+    ["Colour", "Is the colour palette appropriate for the purpose, audience and intended mood? Is colour used consistently and with sufficient contrast?"],
+    ["Typography", "Are fonts, sizes, weights, spacing and text placement appropriate, readable and consistent?"],
+    ["Contrast", "Is sufficient difference created between important elements, text and backgrounds so information can be distinguished clearly?"],
+    ["Consistency", "Are repeated colours, fonts, styles, shapes, spacing and visual treatments used consistently across the outcome or series?"],
+    ["Image Quality & Resolution", "Are images appropriately sharp, correctly sized and of sufficient resolution for their intended screen or print output?"],
+    ["Cropping & Framing", "Are images cropped deliberately? Does framing support the subject and purpose without accidentally removing important information?"],
+    ["Scale & Proportion", "Are elements appropriately sized in relation to one another? Is scale deliberately used to establish importance or emphasis?"],
+    ["Whitespace / Negative Space", "Is empty space used deliberately to separate, organise and emphasise content rather than filling every available area?"],
+    ["Legibility & Readability", "Can textual information be read easily at the intended viewing size and distance?"],
+    ["Appropriate File Format", "Is the image saved or exported in a format appropriate to its intended use, such as PNG, JPEG, SVG or another suitable format?"],
+    ["Purpose & Audience Appropriateness", "Do the visual style, imagery, language and presentation suit the intended purpose and users or viewers?"]
+];
 const DIGIMED_UX_PRINCIPLES_ACK_STORAGE_PREFIX = "hub_digimed_ux_principles_ack_v1";
 const DIGIMED_UX_PRINCIPLE_AREAS = ["Visibility of system status", "Match between system and the real world", "User control and freedom", "Consistency and standards", "Error prevention", "Recognition rather than recall", "Flexibility and efficiency of use", "Aesthetic and minimalist design", "Help users recognise and recover from errors", "Accessibility"];
 const DIGIMED_VIDEO_INTEGRITY_ACK_STORAGE_PREFIX = "hub_digimed_video_integrity_ack_v1";
@@ -430,6 +447,45 @@ function writeDigiMedConventionsAcknowledgements(activityId, email, value) {
 
 function countDigiMedConventionsAcknowledgements(value) {
     return DIGIMED_CONVENTION_AREAS.filter((area) => Boolean(value?.[area])).length;
+}
+
+function getDigiMedImageConventionsAcknowledgementKey(activityId, email) {
+    return `${DIGIMED_IMAGE_CONVENTIONS_ACK_STORAGE_PREFIX}:${String(activityId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
+}
+
+function readDigiMedImageConventionsAcknowledgements(activityId, email) {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(getDigiMedImageConventionsAcknowledgementKey(activityId, email)) || "{}");
+        return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (_error) {
+        return {};
+    }
+}
+
+function writeDigiMedImageConventionsAcknowledgements(activityId, email, value) {
+    try {
+        localStorage.setItem(getDigiMedImageConventionsAcknowledgementKey(activityId, email), JSON.stringify(value || {}));
+    } catch (_error) {
+    }
+}
+
+function buildDigiMedImageConventionsTable(activityId, email) {
+    const acknowledgements = readDigiMedImageConventionsAcknowledgements(activityId, email);
+    return `<section class="task-topic-guide-block" id="digimed-conventions-table"><h3>Conventions (IMAGE)</h3><p class="task-topic-submission-note">Review each image-production convention that applies to your outcome.</p><table class="digital-outcome-must-dos-table digital-outcome-conventions-table"><thead><tr><th>Convention area</th><th>What students should consider</th><th>Discussed</th></tr></thead><tbody>
+        ${DIGIMED_IMAGE_CONVENTION_CHECKS.map(([area, description]) => `<tr><td>${escapeHtml(area)}</td><td>${escapeHtml(description)}</td><td class="digital-outcome-conventions-ack-cell"><label><input type="checkbox" data-digimed-image-convention-ack="${escapeHtml(area)}" ${acknowledgements[area] ? "checked" : ""}><span class="sr-only">Acknowledged ${escapeHtml(area)}</span></label></td></tr>`).join("")}
+    </tbody></table></section>`;
+}
+
+function bindDigiMedImageConventionAcknowledgements(host, activityId, email) {
+    const acknowledgements = readDigiMedImageConventionsAcknowledgements(activityId, email);
+    host.querySelectorAll("[data-digimed-image-convention-ack]").forEach((checkbox) => {
+        checkbox.addEventListener("change", () => {
+            const area = String(checkbox.getAttribute("data-digimed-image-convention-ack") || "").trim();
+            if (!area) return;
+            acknowledgements[area] = Boolean(checkbox.checked);
+            writeDigiMedImageConventionsAcknowledgements(activityId, email, acknowledgements);
+        });
+    });
 }
 
 function getDigiMedUXPrinciplesAcknowledgementKey(activityId, email) {
@@ -9656,7 +9712,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 ["Feedback", "Users receive appropriate feedback when interacting"],
                 ["Content organisation", "Headings, sections and grouping make information understandable"]
             ];
-            return `<section class="task-topic-guide-block"><h3>Conventions (WEB)</h3><p class="task-topic-submission-note" id="digimed-conventions-last-sync">Last Sync: ${escapeHtml(String(readStoredTaskTopicSlideSyncEntryByTemplateId(id, readStoredHubEmail(), "relevant-digimed-conventions")?.savedAt || "Not yet"))}</p><table class="digital-outcome-must-dos-table digital-outcome-conventions-table"><thead><tr><th>Convention area</th><th>Possible website conventions</th><th>Discussed</th></tr></thead><tbody>
+            return `<section class="task-topic-guide-block" id="digimed-conventions-table"><h3>Conventions (WEB)</h3><p class="task-topic-submission-note" id="digimed-conventions-last-sync">Last Sync: ${escapeHtml(String(readStoredTaskTopicSlideSyncEntryByTemplateId(id, readStoredHubEmail(), "relevant-digimed-conventions")?.savedAt || "Not yet"))}</p><table class="digital-outcome-must-dos-table digital-outcome-conventions-table"><thead><tr><th>Convention area</th><th>Possible website conventions</th><th>Discussed</th></tr></thead><tbody>
                 ${rows.map(([area, description]) => `<tr><td>${escapeHtml(area)}</td><td>${escapeHtml(description)}</td><td class="digital-outcome-conventions-ack-cell"><label><input type="checkbox" data-digimed-convention-ack="${escapeHtml(area)}" ${acknowledgements[area] ? "checked" : ""}><span class="sr-only">Acknowledged ${escapeHtml(area)}</span></label></td></tr>`).join("")}
             </tbody></table></section>`;
         })()
@@ -11371,6 +11427,15 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         const resp = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interests`, { headers: fetchHeaders });
         if (resp.ok) interestData = await resp.json();
     } catch (_err) {}
+
+    const currentMediaType = String(interestData?.my_allocation?.digital_media_type || "").trim().toLowerCase();
+    if (currentMediaType === "image") {
+        const conventionsTable = host.querySelector("#digimed-conventions-table");
+        if (conventionsTable) {
+            conventionsTable.outerHTML = buildDigiMedImageConventionsTable(projectId, email);
+            bindDigiMedImageConventionAcknowledgements(host, projectId, email);
+        }
+    }
 
     const section = document.createElement("section");
     section.className = "proposal-section interest-section";
