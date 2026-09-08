@@ -19,6 +19,16 @@ const DIGIMED_EFFICIENT_TOOLS_SUBTASKS = [
     "HTML/CSS validation procedures",
     "Optimisation of media assets"
 ];
+const DIGIMED_IMAGE_EFFICIENT_TOOLS_SUBTASKS = [
+    "Management of assets",
+    "Using layers effectively",
+    "Using non-destructive editing techniques",
+    "Reusing styles, objects and/or presets",
+    "Using templates, guides and/or grids",
+    "Using efficient selection and masking techniques",
+    "Using appropriate colour and typography controls",
+    "Optimisation and efficient export of image assets"
+];
 const DIGIMED_VIDEO_EFFICIENT_TOOLS_SUBTASKS = [
     "Management of media assets",
     "Appropriate folder/bin organisation",
@@ -376,7 +386,7 @@ function isDigiMedVideoEfficientToolSubtask(subtask) {
 
 function readVideoEfficientToolsFromLocalCache(activityId, email) {
     const state = readDigiMedEfficientToolsState(activityId, email);
-    const allSubtasks = [...DIGIMED_VIDEO_EFFICIENT_TOOLS_SUBTASKS, ...DIGIMED_EFFICIENT_TOOLS_SUBTASKS];
+    const allSubtasks = [...DIGIMED_VIDEO_EFFICIENT_TOOLS_SUBTASKS, ...DIGIMED_IMAGE_EFFICIENT_TOOLS_SUBTASKS, ...DIGIMED_EFFICIENT_TOOLS_SUBTASKS];
     return Array.from(new Set(allSubtasks.filter((subtask) => Boolean(state[subtask]))));
 }
 
@@ -390,7 +400,7 @@ async function loadVideoEfficientToolsFromServer(activityId, email) {
         );
         const tools = Array.isArray(payload?.tools) ? payload.tools : [];
         const state = readDigiMedEfficientToolsState(safeActivityId, email);
-        const allSubtasks = [...DIGIMED_VIDEO_EFFICIENT_TOOLS_SUBTASKS, ...DIGIMED_EFFICIENT_TOOLS_SUBTASKS];
+        const allSubtasks = [...DIGIMED_VIDEO_EFFICIENT_TOOLS_SUBTASKS, ...DIGIMED_IMAGE_EFFICIENT_TOOLS_SUBTASKS, ...DIGIMED_EFFICIENT_TOOLS_SUBTASKS];
         allSubtasks.forEach((subtask) => {
             state[subtask] = tools.some((tool) => String(tool || "").trim().toLowerCase() === subtask.toLowerCase());
         });
@@ -2261,12 +2271,17 @@ function renderChecklistCards(detail, allItems) {
                                 const isLinkedIntegrityTestingRow = String(standard) === "91893" && is91893IntegrityTestingRow;
                                 const isLinkedTestingImprovementRow = String(standard) === "91893" && /using information from testing procedures to improve the quality of the outcome/i.test(stepText);
                                 const digitalMediaType = getAllocatedDigitalMediaType(standard).toLowerCase();
+                                const isVideoMedia = digitalMediaType === "video";
+                                const isImageMedia = digitalMediaType === "image" || digitalMediaType === "graphics" || digitalMediaType === "vector";
                                 const conventionsSubtask = is91893ConventionsRow ? getDigiMedConventionsSubtask(taskListState.fullEvidenceState, digitalMediaType) : null;
                                 const uxPrinciplesSubtask = is91903UXPrinciplesRow ? getDigiMedUXPrinciplesSubtask(taskListState.fullEvidenceState, digitalMediaType) : null;
-                                const integrityTestingIsVideo = is91893IntegrityTestingRow && digitalMediaType === "video";
-                                const efficientToolsSubtasks = digitalMediaType === "video"
+                                const integrityTestingIsVideo = is91893IntegrityTestingRow && isVideoMedia;
+                                const efficientToolsSubtasks = isVideoMedia
                                     ? DIGIMED_VIDEO_EFFICIENT_TOOLS_SUBTASKS
-                                    : DIGIMED_EFFICIENT_TOOLS_SUBTASKS;
+                                    : isImageMedia
+                                        ? DIGIMED_IMAGE_EFFICIENT_TOOLS_SUBTASKS
+                                        : DIGIMED_EFFICIENT_TOOLS_SUBTASKS;
+                                const subtasksTitle = isVideoMedia ? "SUBTASKS (VIDEO)" : isImageMedia ? "SUBTASKS (IMAGE)" : "SUBTASKS (WEB)";
                                 const integrityTestingTitle = integrityTestingIsVideo ? "Integrity & Validation (VIDEO)" : "Integrity & Validation (WEB)";
                                 const integrityTestingHref = integrityTestingIsVideo
                                     ? buildCustomActivityLink(taskListState.selectedId, "Integrity & Validation (VIDEO)", "Integrity & Validation (VIDEO)", "video-integrity-testing")
@@ -2304,7 +2319,7 @@ function renderChecklistCards(detail, allItems) {
                                     ` : ""}
                                     ${is91893EfficientToolsRow ? `
                                         <div class="task-list-decomposition-subtasks">
-                                            <p class="task-list-system-title">${digitalMediaType === "video" ? "SUBTASKS (VIDEO)" : digitalMediaType === "web" ? "SUBTASKS (WEB)" : "SUBTASKS"}</p>
+                                            <p class="task-list-system-title">${subtasksTitle}</p>
                                             <p class="task-list-achieved-note">Examples of efficient tools and techniques.</p>
                                             <div class="task-list-decomposition-subtask-list">
                                                 ${efficientToolsSubtasks.map((subtask) => `
