@@ -12259,6 +12259,43 @@ function computeGithubEfficientToolsCategories(treeItems, imageStats) {
   };
 }
 
+// Reliable repo-hygiene signals for the image efficient-tools practices (the 4 that
+// can be proven from the repo tree/metadata alone, without opening a binary .psd/.ai).
+function computeGithubImageEfficientToolsCategories(treeItems, imageStats) {
+  const paths = (Array.isArray(treeItems) ? treeItems : [])
+    .filter((item) => item?.type === "blob")
+    .map((item) => String(item?.path || "").trim())
+    .filter(Boolean);
+
+  const topLevelFolders = new Set(
+    paths
+      .filter((filePath) => filePath.includes("/"))
+      .map((filePath) => filePath.split("/")[0].toLowerCase())
+  );
+  const hasOrganisedAssetFolders = Array.from(topLevelFolders).some((folder) => GITHUB_ASSET_FOLDER_NAMES.has(folder));
+
+  // Using layers effectively / Using non-destructive editing techniques: a native layered
+  // source file (.psd, .ai, .xcf, .clip, .procreate, .kra, .sketch, .fig) is committed.
+  const layeredSourceFiles = paths.filter((filePath) => {
+    const ext = filePath.toLowerCase().match(/\.[a-z0-9]+$/)?.[0] || "";
+    return GITHUB_IMAGE_PROJECT_EXTENSIONS.has(ext);
+  });
+  const layeredEditingDone = layeredSourceFiles.length > 0;
+
+  return {
+    projectFileCount: layeredSourceFiles.length,
+    categories: [
+      { label: "Management of assets", done: hasOrganisedAssetFolders },
+      { label: "Using layers effectively", done: layeredEditingDone },
+      { label: "Using non-destructive editing techniques", done: layeredEditingDone },
+      {
+        label: "Optimisation and efficient export of image assets",
+        done: imageStats.count > 0 && imageStats.maxBytes > 0 && imageStats.maxBytes <= GITHUB_OPTIMISED_IMAGE_MAX_BYTES
+      }
+    ]
+  };
+}
+
 // Reliable repo-hygiene signals for the video efficient-tools practices (the 4 that
 // can be proven from the repo tree/metadata alone, without opening a binary .drp).
 function computeGithubVideoEfficientToolsCategories(treeItems, commitDayCount) {
@@ -12557,6 +12594,7 @@ app.get("/api/integrations/github/repo-analysis", async (req, res) => {
       branches_count: branchesCount,
       releases_tags_count: releasesTagsCount,
       categories,
+      image_tools_categories: computeGithubImageEfficientToolsCategories(treeItems, imageStats).categories,
       video_tools_categories: videoToolsCategories,
       fcpxml_detected: { file: primaryFcpxmlPath, labels: allFcpxmlLabels, files: fcpxmlFiles },
       validation: validationResults
@@ -12576,6 +12614,7 @@ const GITHUB_VIDEO_EXTENSIONS = new Set([".mp4", ".mov", ".webm", ".m4v", ".avi"
 const GITHUB_AUDIO_EXTENSIONS = new Set([".mp3", ".wav", ".ogg", ".m4a", ".aac", ".flac"]);
 const GITHUB_GRAPHIC_EXTENSIONS = new Set([".svg", ".ai", ".eps", ".pdf"]);
 const GITHUB_VIDEO_PROJECT_EXTENSIONS = new Set([".prproj", ".drp", ".aep", ".blend", ".fcpxml", ".xml"]);
+const GITHUB_IMAGE_PROJECT_EXTENSIONS = new Set([".psd", ".ai", ".xcf", ".clip", ".procreate", ".kra", ".sketch", ".fig", ".afphoto", ".afdesign"]);
 const GITHUB_VIDEO_OVERSIZED_ASSET_MAX_BYTES = 100 * 1024 * 1024;
 const GITHUB_JS_EXTENSION = /\.js$/i;
 const GITHUB_ASSET_HEALTH_MAX_SCANNED_FILES = 40;
@@ -12891,6 +12930,7 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
         oversized_assets: oversizedAssetCount
       },
       web_tools_categories: webToolsCategories,
+      image_tools_categories: computeGithubImageEfficientToolsCategories(blobs, imageStats).categories,
       video_tools_categories: assetVideoToolsCategories,
       fcpxml_detected: fcpxmlDetected,
       css_details: buildCssHealthDetails(cssContents, htmlContents),

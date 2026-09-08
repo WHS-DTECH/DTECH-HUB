@@ -385,6 +385,10 @@ function isDigiMedVideoEfficientToolSubtask(subtask) {
     return DIGIMED_VIDEO_EFFICIENT_TOOLS_SUBTASKS.includes(String(subtask || "").trim());
 }
 
+function isDigiMedImageEfficientToolSubtask(subtask) {
+    return DIGIMED_IMAGE_EFFICIENT_TOOLS_SUBTASKS.includes(String(subtask || "").trim());
+}
+
 function readVideoEfficientToolsFromLocalCache(activityId, email) {
     const state = readDigiMedEfficientToolsState(activityId, email);
     const allSubtasks = [...DIGIMED_VIDEO_EFFICIENT_TOOLS_SUBTASKS, ...DIGIMED_IMAGE_EFFICIENT_TOOLS_SUBTASKS, ...DIGIMED_EFFICIENT_TOOLS_SUBTASKS];
@@ -1159,10 +1163,25 @@ async function runGithubEfficientToolsSync(activityId, email, repoUrl) {
             }
         }
     });
+
+    // Auto-tick the reliably-detectable image practices (organised asset folders, layered
+    // source files, non-destructive editing, optimised exports) straight from the repo scan.
+    const imageTicks = [];
+    (Array.isArray(payload?.image_tools_categories) ? payload.image_tools_categories : []).forEach((category) => {
+        const label = String(category?.label || "").trim();
+        if (!label || !category.done) return;
+        if (isDigiMedImageEfficientToolSubtask(label)) {
+            imageTicks.push(label);
+            if (!efficientToolsState[label]) {
+                efficientToolsState[label] = true;
+                changed = true;
+            }
+        }
+    });
     if (changed) {
         writeDigiMedEfficientToolsState(activityId, email, efficientToolsState);
     }
-    if (videoTicks.length) {
+    if (videoTicks.length || imageTicks.length) {
         void persistVideoEfficientToolsToServer(activityId);
     }
 
@@ -1220,6 +1239,29 @@ function buildVideoAutoProgressNote(activityId, email) {
             ? `<p class="task-list-achieved-note">Your timeline export is ${ageDays === null ? "out of date" : `${ageDays} days old`} \u2014 re-export FCPXML from Resolve and commit to refresh your progress.</p>`
             : "");
     return `${summaryLine}${nudgeLine}`;
+}
+
+// Read-only auto-progress signal for image students: how many practices were detected
+// from the repo (organised folders, layered source files, optimised exports) without them ticking.
+function buildImageAutoProgressNote(activityId, email) {
+    const analysis = readGithubRepoAnalysis(activityId, email);
+    if (!analysis?.syncedAt) {
+        return `<p class="task-list-achieved-note">Link your GitHub repo and it will auto-check these practices each time you open this page.</p>`;
+    }
+
+    const efficientToolsState = readDigiMedEfficientToolsState(activityId, email);
+    const treeDetected = [
+        "Management of assets",
+        "Using layers effectively",
+        "Using non-destructive editing techniques",
+        "Optimisation and efficient export of image assets"
+    ];
+    const detectedCount = DIGIMED_IMAGE_EFFICIENT_TOOLS_SUBTASKS.filter((subtask) => {
+        if (!efficientToolsState[subtask]) return false;
+        return treeDetected.includes(subtask);
+    }).length;
+
+    return `<p class="task-list-achieved-note">Auto-detected from your project: ${detectedCount} of ${DIGIMED_IMAGE_EFFICIENT_TOOLS_SUBTASKS.length} practices. Last commit ${escapeTaskListHtml(formatTaskListTimestamp(analysis.lastCommitDate))}.</p>`;
 }
 
 
@@ -2350,9 +2392,11 @@ function renderChecklistCards(detail, allItems) {
                                                     </label>
                                                 `).join("")}
                                             </div>
-                                            ${digitalMediaType === "video"
+                                            ${isVideoMedia
                                                 ? `<p class="task-list-achieved-note">Tick the media-production practices you have used and can demonstrate in your project evidence.</p>${buildVideoAutoProgressNote(taskListState.selectedId, getTaskListEmail())}`
-                                                : (githubRepoAnalysis?.syncedAt
+                                                : isImageMedia
+                                                    ? `<p class="task-list-achieved-note">Tick the image-production practices you have used and can demonstrate in your project evidence.</p>${buildImageAutoProgressNote(taskListState.selectedId, getTaskListEmail())}`
+                                                    : (githubRepoAnalysis?.syncedAt
                                                 ? `<p class="task-list-achieved-note">GitHub last synced: ${escapeTaskListHtml(formatTaskListTimestamp(githubRepoAnalysis.syncedAt))} (${Number(githubRepoAnalysis.commitCount || 0)} commits across ${Number(githubRepoAnalysis.commitDayCount || 0)} day${Number(githubRepoAnalysis.commitDayCount || 0) === 1 ? "" : "s"})</p>`
                                                 : `<p class="task-list-achieved-note">Click Sync from GitHub above to auto-check these boxes from your public repo.</p>`) }
                                         </div>
