@@ -12190,7 +12190,7 @@ const GITHUB_TOKEN = String(process.env.GITHUB_TOKEN || "").trim();
 const GITHUB_RAW_CONTENT_BASE = "https://raw.githubusercontent.com";
 const GITHUB_EFFICIENT_TOOLS_MAX_VALIDATED_FILES = 3;
 const GITHUB_ASSET_FOLDER_NAMES = new Set(["images", "img", "assets", "css", "styles", "js", "scripts", "media"]);
-const GITHUB_IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"]);
+const GITHUB_IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".tif", ".tiff", ".bmp", ".heic", ".heif"]);
 const GITHUB_OPTIMISED_IMAGE_MAX_BYTES = 500 * 1024;
 
 function parseGithubRepoIdentifier(repoUrl) {
@@ -12851,6 +12851,15 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
     const oversizedAssetCount = [...videoFiles, ...audioFiles, ...graphicFiles]
       .filter((item) => Number(item?.size || 0) > 100 * 1024 * 1024).length;
 
+    // Image production breakdown: raster photos/exports, vector graphics, and layered
+    // source files (.psd/.ai/.xcf etc.) tracked separately since none share a single "media" bucket.
+    const layeredSourceFiles = filesWithExtension(GITHUB_IMAGE_PROJECT_EXTENSIONS);
+    const vectorFormats = Array.from(new Set(graphicFiles.map((item) => String(item.path || "").match(/\.[a-z0-9]+$/i)?.[0]?.slice(1).toUpperCase()).filter(Boolean)));
+    const sourceFileFormats = Array.from(new Set(layeredSourceFiles.map((item) => String(item.path || "").match(/\.[a-z0-9]+$/i)?.[0]?.slice(1).toUpperCase()).filter(Boolean)));
+    const rasterImageBlobs = imagePaths.map((filePath) => blobs.find((item) => item.path === filePath)).filter(Boolean);
+    const totalImageAssetBytes = [...rasterImageBlobs, ...graphicFiles, ...layeredSourceFiles]
+      .reduce((sum, item) => sum + (Number(item?.size || 0) || 0), 0);
+
     // Deeper detection: inspect all committed FCPXML timeline exports (Resolve 'Export Timeline')
     // and cumulatively aggregate detected practices across all exported timelines.
     const fcpxmlCandidates = blobs
@@ -12932,6 +12941,18 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
       web_tools_categories: webToolsCategories,
       image_tools_categories: computeGithubImageEfficientToolsCategories(blobs, imageStats).categories,
       video_tools_categories: assetVideoToolsCategories,
+      image_details: {
+        total_files: blobs.length,
+        raster_images: imagePaths.length,
+        vector_graphics: graphicFiles.length,
+        layered_source_files: layeredSourceFiles.length,
+        total_image_assets: imagePaths.length + graphicFiles.length + layeredSourceFiles.length,
+        total_source_bytes: totalImageAssetBytes,
+        image_formats: imageFormats,
+        vector_formats: vectorFormats,
+        source_file_formats: sourceFileFormats,
+        oversized_images: oversizedImageCount
+      },
       fcpxml_detected: fcpxmlDetected,
       css_details: buildCssHealthDetails(cssContents, htmlContents),
       html_details: buildHtmlHealthDetails(htmlContents),

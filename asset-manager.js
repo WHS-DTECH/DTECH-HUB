@@ -226,6 +226,33 @@ function renderVideoDetails(payload) {
     `;
 }
 
+function renderImageDetails(payload) {
+    const details = payload?.image_details || {};
+    const oversizedCount = Number(payload?.oversized_image_count || 0);
+    return `
+        <details class="asset-manager-result-section" open>
+            <summary class="asset-manager-result-summary">Image Inventory</summary>
+            <div class="asset-manager-result-body">${renderAssetManagerDetailList([
+                ["Total repository files", Number(details.total_files || 0)],
+                ["Total image assets", Number(details.total_image_assets || 0)],
+                ["Raster images", Number(details.raster_images || 0)],
+                ["Vector graphics", Number(details.vector_graphics || 0)],
+                ["Layered source files (PSD/AI/etc.)", Number(details.layered_source_files || 0)],
+                ["Total source size", formatAssetManagerBytes(details.total_source_bytes)]
+            ])}</div>
+        </details>
+        <details class="asset-manager-result-section">
+            <summary class="asset-manager-result-summary">Image Technical Health</summary>
+            <div class="asset-manager-result-body">${renderAssetManagerDetailList([
+                ["Raster formats", formatAssetManagerFormats(details.image_formats)],
+                ["Vector formats", formatAssetManagerFormats(details.vector_formats)],
+                ["Source file formats", formatAssetManagerFormats(details.source_file_formats)],
+                ["Oversized raster images (>500 KB)", oversizedCount]
+            ])}</div>
+        </details>
+    `;
+}
+
 function renderAssetManagerDetailList(items) {
     return `<div class="asset-manager-detail-panel"><dl class="asset-manager-detail-list">${items.map(([label, value]) => `<div><dt>${escapeAssetManagerHtml(label)}</dt><dd>${escapeAssetManagerHtml(value)}</dd></div>`).join("")}</dl></div>`;
 }
@@ -388,7 +415,7 @@ function renderAssetManagerContent(payload) {
         <details class="asset-manager-web-details" open>
             <summary class="asset-manager-web-details-summary">${isVideo ? "VIDEO Details" : isImage ? "IMAGE Details" : "WEB Details"}</summary>
             <div class="asset-manager-web-details-body">
-            ${isVideo ? renderVideoDetails(payload) : `
+            ${isVideo ? renderVideoDetails(payload) : isImage ? renderImageDetails(payload) : `
         <div class="asset-manager-counts-grid">
             <div class="asset-manager-count-card"><span class="asset-manager-count-label">HTML</span><span class="asset-manager-count-value">${Number(counts.html || 0)}</span></div>
             <div class="asset-manager-count-card"><span class="asset-manager-count-label">CSS</span><span class="asset-manager-count-value">${Number(counts.css || 0)}</span></div>
@@ -408,11 +435,9 @@ function renderAssetManagerContent(payload) {
             <summary class="asset-manager-result-summary">${brokenCount > 0 ? `Broken Asset References: ${brokenCount}` : "No broken asset references"}</summary>
             ${brokenCount > 0 ? `<div class="asset-manager-result-body"><ul class="asset-manager-check-list">${(payload?.broken_references || []).map((row) => `<li>${escapeAssetManagerHtml(row.from)} &rarr; ${escapeAssetManagerHtml(row.reference)}</li>`).join("")}</ul></div>` : ""}
         </details>
-        ${isImage ? "" : `
         <details class="asset-manager-result-section"><summary class="asset-manager-result-summary">HTML Details</summary><div class="asset-manager-result-body">${renderHtmlDetails({ ...payload?.html_details, total_pages: counts.html })}</div></details>
         <details class="asset-manager-result-section"><summary class="asset-manager-result-summary">CSS Details</summary><div class="asset-manager-result-body">${renderCssDetails({ ...payload?.css_details, stylesheets: counts.css })}</div></details>
         <details class="asset-manager-result-section"><summary class="asset-manager-result-summary">JavaScript Details</summary><div class="asset-manager-result-body">${renderJavascriptDetails({ ...payload?.javascript_details, total_files: counts.javascript })}</div></details>
-        `}
             `}
             ${isVideo ? renderAssetManagerVideoToolsPanel() : isImage ? renderAssetManagerImageToolsPanel() : renderAssetManagerWebToolsPanel()}
             </div>
