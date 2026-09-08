@@ -2286,6 +2286,7 @@ function renderChecklistCards(detail, allItems) {
                                 const digitalMediaType = getAllocatedDigitalMediaType(standard).toLowerCase();
                                 const isVideoMedia = digitalMediaType === "video";
                                 const isImageMedia = digitalMediaType === "image" || digitalMediaType === "graphics" || digitalMediaType === "vector";
+                                const toolsAndTechniquesLabel = isVideoMedia ? "Tools & Techniques (VIDEO)" : isImageMedia ? "Tools & Techniques (IMAGE)" : "Tools & Techniques (WEB)";
                                 const conventionsSubtask = is91893ConventionsRow ? getDigiMedConventionsSubtask(taskListState.fullEvidenceState, digitalMediaType) : null;
                                 const uxPrinciplesSubtask = is91903UXPrinciplesRow ? getDigiMedUXPrinciplesSubtask(taskListState.fullEvidenceState, digitalMediaType) : null;
                                 const integrityTestingIsVideo = is91893IntegrityTestingRow && isVideoMedia;
@@ -2322,8 +2323,8 @@ function renderChecklistCards(detail, allItems) {
                                             <p class="task-list-system-title">SUBTASKS</p>
                                             <p class="task-list-achieved-note">Tools identified for the outcome.</p>
                                             <div class="task-list-decomposition-category-list">
-                                                <a class="task-list-decomposition-category ${decompositionCoverage.hasData && decompositionCoverage.counts["Tools & Techniques"] > 0 ? "is-covered" : ""}" href="${escapeTaskListHtml(buildCustomActivityLink(taskListState.selectedId, "What Tools and Techniques will be used?", "Tools & Techniques", "tools-and-techniques"))}">
-                                                    <span class="task-list-decomposition-category-label">Tools &amp; Techniques</span>
+                                                <a class="task-list-decomposition-category ${decompositionCoverage.hasData && decompositionCoverage.counts["Tools & Techniques"] > 0 ? "is-covered" : ""}" href="${escapeTaskListHtml(buildCustomActivityLink(taskListState.selectedId, "What Tools and Techniques will be used?", toolsAndTechniquesLabel, "tools-and-techniques"))}">
+                                                    <span class="task-list-decomposition-category-label">${escapeTaskListHtml(toolsAndTechniquesLabel)}</span>
                                                     <span class="task-list-decomposition-category-count">${decompositionCoverage.hasData ? Number(decompositionCoverage.counts["Tools & Techniques"] || 0) : "-"}</span>
                                                 </a>
                                             </div>
