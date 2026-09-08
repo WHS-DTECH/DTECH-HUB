@@ -338,6 +338,29 @@ const DIGITAL_MEDIA_91893_GUIDANCE = {
             ["Using a third-party library", "Using an appropriate external library of sound effects, music, fonts, graphics, LUTs, transitions, effects, stock footage, or other media resources within licensing requirements"],
             ["Using composite effects", "Combining multiple video, image, text, graphic or effect layers; green-screen/chroma key; masking; overlays; blending; picture-in-picture; motion graphics; or combining visual effects to create the final composition"]
         ]
+    },
+    "image": {
+        heading: "Tools & Techniques - 91893 Image Outcome",
+        categoryHeading: "Tool / Technique",
+        examplesHeading: "Examples in Photoshop / Illustrator",
+        rows: [
+            ["Layers & Layer Organisation", "Layers, groups, naming, ordering, locking and organising complex artwork"],
+            ["Selection Techniques", "Object Selection, Quick Selection, Select Subject, Pen Tool, paths, selecting by colour or properties"],
+            ["Masks & Clipping", "Layer masks, clipping masks, vector masks, opacity masks; isolating or combining imagery non-destructively"],
+            ["Adjustment & Colour Techniques", "Adjustment layers, Levels, Curves, Hue/Saturation, colour balance, recolouring artwork, gradients and swatches"],
+            ["Blending & Transparency", "Blending modes, opacity, transparency, blend options and combining elements"],
+            ["Vector Drawing & Shape Construction", "Pen Tool, Bezier paths, Shape Builder, Pathfinder, compound paths and custom vector shapes"],
+            ["Typography Techniques", "Character/paragraph controls, text styles, text on paths, kerning/tracking/leading and typographic hierarchy"],
+            ["Transform & Manipulation", "Scale, rotate, distort, warp, perspective, Puppet Warp, Free Transform and Illustrator transformation tools"],
+            ["Retouching & Image Correction", "Healing, Clone Stamp, Content-Aware tools, removal/replacement, sharpening and image correction"],
+            ["Filters & Effects", "Smart Filters, blur/sharpen effects, Illustrator appearances, shadows, glows, distortions and other purposeful effects"],
+            ["Smart Objects / Linked Assets", "Smart Objects, linked Smart Objects, placed Illustrator/Photoshop assets and updating linked artwork"],
+            ["Reusable Styles & Assets", "Graphic styles, layer styles, swatches, brushes, symbols, libraries, presets and reusable components"],
+            ["Composition & Layout Tools", "Artboards, guides, grids, alignment/distribution tools, rulers and snapping"],
+            ["Image Compositing", "Combining photographs, vectors, text, masks, effects, lighting and colour into a unified composition"],
+            ["Asset Optimisation & Export", "Resolution, image dimensions, compression, PNG/JPEG/PDF/SVG selection and export settings"],
+            ["Automation / Batch Processing", "Photoshop Actions, batch processing, Illustrator Actions, scripts or automated export processes"]
+        ]
     }
 };
 
@@ -7622,7 +7645,7 @@ async function renderToolsTechniquesPanel({ host, projectId, detailData, taskTop
                     <h3>${escapeHtml(guidance.heading)}</h3>
                     <div class="tools-media-guidance-table-wrap">
                         <table class="tools-media-guidance-table">
-                            <thead><tr><th>Current NZQA category</th><th>${escapeHtml(guidance.examplesHeading)}</th></tr></thead>
+                            <thead><tr><th>${escapeHtml(guidance.categoryHeading || "Current NZQA category")}</th><th>${escapeHtml(guidance.examplesHeading)}</th></tr></thead>
                             <tbody>${guidance.rows.map(([category, examples]) => `<tr><td>${escapeHtml(category)}</td><td>${escapeHtml(examples)}</td></tr>`).join("")}</tbody>
                         </table>
                     </div>
