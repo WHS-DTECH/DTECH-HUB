@@ -366,9 +366,7 @@ function installDigiMedEfficientToolsHandler() {
         state[subtask] = Boolean(checkbox.checked);
         writeDigiMedEfficientToolsState(activityId, email, state);
         renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);
-        if (isDigiMedVideoEfficientToolSubtask(subtask)) {
-            void persistVideoEfficientToolsToServer(activityId);
-        }
+        void persistVideoEfficientToolsToServer(activityId);
     });
 }
 
@@ -378,7 +376,8 @@ function isDigiMedVideoEfficientToolSubtask(subtask) {
 
 function readVideoEfficientToolsFromLocalCache(activityId, email) {
     const state = readDigiMedEfficientToolsState(activityId, email);
-    return DIGIMED_VIDEO_EFFICIENT_TOOLS_SUBTASKS.filter((subtask) => Boolean(state[subtask]));
+    const allSubtasks = [...DIGIMED_VIDEO_EFFICIENT_TOOLS_SUBTASKS, ...DIGIMED_EFFICIENT_TOOLS_SUBTASKS];
+    return Array.from(new Set(allSubtasks.filter((subtask) => Boolean(state[subtask]))));
 }
 
 async function loadVideoEfficientToolsFromServer(activityId, email) {
@@ -391,7 +390,8 @@ async function loadVideoEfficientToolsFromServer(activityId, email) {
         );
         const tools = Array.isArray(payload?.tools) ? payload.tools : [];
         const state = readDigiMedEfficientToolsState(safeActivityId, email);
-        DIGIMED_VIDEO_EFFICIENT_TOOLS_SUBTASKS.forEach((subtask) => {
+        const allSubtasks = [...DIGIMED_VIDEO_EFFICIENT_TOOLS_SUBTASKS, ...DIGIMED_EFFICIENT_TOOLS_SUBTASKS];
+        allSubtasks.forEach((subtask) => {
             state[subtask] = tools.some((tool) => String(tool || "").trim().toLowerCase() === subtask.toLowerCase());
         });
         writeDigiMedEfficientToolsState(safeActivityId, email, state);

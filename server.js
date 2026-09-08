@@ -12836,6 +12836,23 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
     );
     const fcpxmlDetected = { file: primaryFcpxmlPath, labels: allFcpxmlLabels, files: fcpxmlFiles };
 
+    const topLevelFolders = new Set(
+      Array.from(blobPaths)
+        .filter((filePath) => filePath.includes("/"))
+        .map((filePath) => filePath.split("/")[0].toLowerCase())
+    );
+    const hasOrganisedAssetFolders = Array.from(topLevelFolders).some((folder) => GITHUB_ASSET_FOLDER_NAMES.has(folder));
+    const htmlFileCount = countByExt(/\.html?$/i);
+    const cssFileCount = countByExt(/\.css$/i);
+    const webToolsCategories = [
+      { label: "Management of assets", done: hasOrganisedAssetFolders },
+      { label: "Using stylesheets", done: cssFileCount > 0 },
+      { label: "Master pages or student developed templates", done: htmlFileCount >= 2 && cssFileCount > 0 },
+      { label: "Reusing objects, styles and/or frames", done: cssFileCount > 0 && htmlFileCount >= 2 },
+      { label: "HTML/CSS validation procedures", done: htmlFileCount > 0 && cssFileCount > 0 && brokenReferences.length === 0 },
+      { label: "Optimisation of media assets", done: imageStats.count > 0 && imageStats.maxBytes > 0 && imageStats.maxBytes <= GITHUB_OPTIMISED_IMAGE_MAX_BYTES }
+    ];
+
     res.json({
       ok: true,
       owner: identifier.owner,
@@ -12873,6 +12890,7 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
         duplicate_assets: 0,
         oversized_assets: oversizedAssetCount
       },
+      web_tools_categories: webToolsCategories,
       video_tools_categories: assetVideoToolsCategories,
       fcpxml_detected: fcpxmlDetected,
       css_details: buildCssHealthDetails(cssContents, htmlContents),
