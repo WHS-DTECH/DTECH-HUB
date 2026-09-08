@@ -4,6 +4,7 @@ const assetManagerPageContext = { activityId: "", studentEmail: "", canEditTools
 const assetManagerVideoToolsState = { tools: [], updatedAt: "" };
 const assetManagerDetectedVideoTools = new Set();
 const assetManagerDetectedWebTools = new Set();
+const assetManagerDetectedImageTools = new Set();
 const assetManagerFcpxmlInfo = { file: "", labels: [], files: [] };
 
 const ASSET_MANAGER_WEB_TOOLS_TECHNIQUES = [
@@ -15,6 +16,17 @@ const ASSET_MANAGER_WEB_TOOLS_TECHNIQUES = [
     "Reusing objects, styles and/or frames",
     "HTML/CSS validation procedures",
     "Optimisation of media assets"
+];
+
+const ASSET_MANAGER_IMAGE_TOOLS_TECHNIQUES = [
+    "Management of assets",
+    "Using layers effectively",
+    "Using non-destructive editing techniques",
+    "Reusing styles, objects and/or presets",
+    "Using templates, guides and/or grids",
+    "Using efficient selection and masking techniques",
+    "Using appropriate colour and typography controls",
+    "Optimisation and efficient export of image assets"
 ];
 
 const ASSET_MANAGER_VIDEO_TOOLS_TECHNIQUES = [
@@ -222,6 +234,11 @@ function isAssetManagerVideoProject() {
     return String(assetManagerAllocation?.digital_media_type || "").trim().toLowerCase() === "video";
 }
 
+function isAssetManagerImageProject() {
+    const type = String(assetManagerAllocation?.digital_media_type || "").trim().toLowerCase();
+    return type === "image" || type === "graphics" || type === "vector";
+}
+
 function renderAssetManagerVideoToolsPanel() {
     const tickedSet = new Set(assetManagerVideoToolsState.tools.map((tool) => String(tool || "").trim().toLowerCase()));
     const readOnly = !assetManagerPageContext.canEditTools;
@@ -292,6 +309,32 @@ function renderAssetManagerWebToolsPanel() {
     `;
 }
 
+function renderAssetManagerImageToolsPanel() {
+    const tickedSet = new Set(assetManagerVideoToolsState.tools.map((tool) => String(tool || "").trim().toLowerCase()));
+    const readOnly = !assetManagerPageContext.canEditTools;
+    return `
+        <details class="asset-manager-result-section" open>
+            <summary class="asset-manager-result-summary">Image Assessment Tools &amp; Techniques</summary>
+            <div class="asset-manager-result-body">
+                <p class="task-list-achieved-note">Tick the image-production practices you have used and can demonstrate in your project evidence. Some are auto-detected from your GitHub repo.</p>
+                <div class="task-list-decomposition-subtask-list">
+                    ${ASSET_MANAGER_IMAGE_TOOLS_TECHNIQUES.map((tool) => {
+                        const isTicked = tickedSet.has(tool.toLowerCase());
+                        const isDetected = assetManagerDetectedImageTools.has(tool.toLowerCase());
+                        return `
+                            <label class="task-list-decomposition-subtask ${isTicked ? "is-complete" : ""}">
+                                <input type="checkbox" data-asset-manager-image-tool="${escapeAssetManagerHtml(tool)}" ${isTicked ? "checked" : ""} ${readOnly ? "disabled" : ""}>
+                                <span>${escapeAssetManagerHtml(tool)}${isDetected ? " \u2713 auto" : ""}</span>
+                            </label>
+                        `;
+                    }).join("")}
+                </div>
+                <p class="task-list-achieved-note">${readOnly ? "Read-only: the student manages these from their Asset Manager or Task List." : "Saved to the hub database \u2014 shared with your Task List."}</p>
+            </div>
+        </details>
+    `;
+}
+
 async function loadAssetManagerVideoTools() {
     if (!assetManagerPageContext.activityId || !assetManagerPageContext.studentEmail) return;
     try {
@@ -339,10 +382,11 @@ function renderAssetManagerContent(payload) {
     const unusedCount = Number(payload?.unused_image_count || 0);
     const brokenCount = Number(payload?.broken_reference_count || 0);
     const isVideo = isAssetManagerVideoProject();
+    const isImage = isAssetManagerImageProject();
 
     host.innerHTML = `
         <details class="asset-manager-web-details" open>
-            <summary class="asset-manager-web-details-summary">${isVideo ? "VIDEO Details" : "WEB Details"}</summary>
+            <summary class="asset-manager-web-details-summary">${isVideo ? "VIDEO Details" : isImage ? "IMAGE Details" : "WEB Details"}</summary>
             <div class="asset-manager-web-details-body">
             ${isVideo ? renderVideoDetails(payload) : `
         <div class="asset-manager-counts-grid">
@@ -364,11 +408,13 @@ function renderAssetManagerContent(payload) {
             <summary class="asset-manager-result-summary">${brokenCount > 0 ? `Broken Asset References: ${brokenCount}` : "No broken asset references"}</summary>
             ${brokenCount > 0 ? `<div class="asset-manager-result-body"><ul class="asset-manager-check-list">${(payload?.broken_references || []).map((row) => `<li>${escapeAssetManagerHtml(row.from)} &rarr; ${escapeAssetManagerHtml(row.reference)}</li>`).join("")}</ul></div>` : ""}
         </details>
+        ${isImage ? "" : `
         <details class="asset-manager-result-section"><summary class="asset-manager-result-summary">HTML Details</summary><div class="asset-manager-result-body">${renderHtmlDetails({ ...payload?.html_details, total_pages: counts.html })}</div></details>
         <details class="asset-manager-result-section"><summary class="asset-manager-result-summary">CSS Details</summary><div class="asset-manager-result-body">${renderCssDetails({ ...payload?.css_details, stylesheets: counts.css })}</div></details>
         <details class="asset-manager-result-section"><summary class="asset-manager-result-summary">JavaScript Details</summary><div class="asset-manager-result-body">${renderJavascriptDetails({ ...payload?.javascript_details, total_files: counts.javascript })}</div></details>
+        `}
             `}
-            ${isVideo ? renderAssetManagerVideoToolsPanel() : renderAssetManagerWebToolsPanel()}
+            ${isVideo ? renderAssetManagerVideoToolsPanel() : isImage ? renderAssetManagerImageToolsPanel() : renderAssetManagerWebToolsPanel()}
             </div>
         </details>
     `;
@@ -391,16 +437,28 @@ async function runAssetManagerSync(repoUrl) {
 async function applyDetectedVideoToolsFromAssetHealth(payload) {
     assetManagerDetectedVideoTools.clear();
     assetManagerDetectedWebTools.clear();
+    assetManagerDetectedImageTools.clear();
     assetManagerFcpxmlInfo.file = String(payload?.fcpxml_detected?.file || "").trim();
     assetManagerFcpxmlInfo.labels = Array.isArray(payload?.fcpxml_detected?.labels) ? payload.fcpxml_detected.labels : [];
     assetManagerFcpxmlInfo.files = Array.isArray(payload?.fcpxml_detected?.files) ? payload.fcpxml_detected.files : [];
 
     const isVideo = isAssetManagerVideoProject();
+    const isImage = isAssetManagerImageProject();
     const categoriesSource = isVideo
         ? (Array.isArray(payload?.video_tools_categories) ? payload.video_tools_categories : [])
-        : (Array.isArray(payload?.web_tools_categories) ? payload.web_tools_categories : (Array.isArray(payload?.categories) ? payload.categories : []));
-    const toolsList = isVideo ? ASSET_MANAGER_VIDEO_TOOLS_TECHNIQUES : ASSET_MANAGER_WEB_TOOLS_TECHNIQUES;
-    const targetDetectedSet = isVideo ? assetManagerDetectedVideoTools : assetManagerDetectedWebTools;
+        : isImage
+            ? (Array.isArray(payload?.image_tools_categories) ? payload.image_tools_categories : [])
+            : (Array.isArray(payload?.web_tools_categories) ? payload.web_tools_categories : (Array.isArray(payload?.categories) ? payload.categories : []));
+    const toolsList = isVideo
+        ? ASSET_MANAGER_VIDEO_TOOLS_TECHNIQUES
+        : isImage
+            ? ASSET_MANAGER_IMAGE_TOOLS_TECHNIQUES
+            : ASSET_MANAGER_WEB_TOOLS_TECHNIQUES;
+    const targetDetectedSet = isVideo
+        ? assetManagerDetectedVideoTools
+        : isImage
+            ? assetManagerDetectedImageTools
+            : assetManagerDetectedWebTools;
 
     const detected = categoriesSource
         .filter((category) => category?.done)
@@ -501,9 +559,9 @@ async function initAssetManagerPage() {
     });
 
     document.addEventListener("change", (event) => {
-        const checkbox = event.target?.closest?.("[data-asset-manager-video-tool], [data-asset-manager-web-tool]");
+        const checkbox = event.target?.closest?.("[data-asset-manager-video-tool], [data-asset-manager-web-tool], [data-asset-manager-image-tool]");
         if (!checkbox) return;
-        const tool = String(checkbox.getAttribute("data-asset-manager-video-tool") || checkbox.getAttribute("data-asset-manager-web-tool") || "").trim();
+        const tool = String(checkbox.getAttribute("data-asset-manager-video-tool") || checkbox.getAttribute("data-asset-manager-web-tool") || checkbox.getAttribute("data-asset-manager-image-tool") || "").trim();
         if (!tool || !assetManagerPageContext.canEditTools) return;
         checkbox.closest(".task-list-decomposition-subtask")?.classList.toggle("is-complete", Boolean(checkbox.checked));
         void saveAssetManagerVideoTool(tool, Boolean(checkbox.checked));
