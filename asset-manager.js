@@ -467,9 +467,7 @@ async function initAssetManagerPage() {
         assetManagerAllocation = evidencePayload || {};
         renderAssetManagerStudentDetails(evidencePayload);
         repoUrl = findGithubRepoUrlFromEvidenceSteps(evidencePayload?.evidence_steps);
-        if (isAssetManagerVideoProject()) {
-            await loadAssetManagerVideoTools();
-        }
+        await loadAssetManagerVideoTools();
     } catch (error) {
         setAssetManagerStatus(error?.message || "Could not load this student's evidence.", true);
         return;
