@@ -6,6 +6,7 @@ const assetManagerDetectedVideoTools = new Set();
 const assetManagerDetectedWebTools = new Set();
 const assetManagerDetectedImageTools = new Set();
 const assetManagerFcpxmlInfo = { file: "", labels: [], files: [] };
+const assetManagerPsdInfo = { file: "", labels: [], files: [] };
 
 const ASSET_MANAGER_WEB_TOOLS_TECHNIQUES = [
     "Management of assets",
@@ -339,6 +340,16 @@ function renderAssetManagerWebToolsPanel() {
 function renderAssetManagerImageToolsPanel() {
     const tickedSet = new Set(assetManagerVideoToolsState.tools.map((tool) => String(tool || "").trim().toLowerCase()));
     const readOnly = !assetManagerPageContext.canEditTools;
+    const psdSummaryLines = assetManagerPsdInfo.files && assetManagerPsdInfo.files.length
+        ? assetManagerPsdInfo.files.map((item) => {
+            const fileStr = escapeAssetManagerHtml(item.file);
+            const layerCount = Number(item.layer_count || 0);
+            const labelsStr = Array.isArray(item.labels) && item.labels.length
+                ? ` \u2014 detected: ${escapeAssetManagerHtml(item.labels.join(", "))}`
+                : " \u2014 no additional practices detected in this file.";
+            return `<p class="task-list-achieved-note"><strong>Layers parsed: ${fileStr}</strong> (${layerCount} layer${layerCount === 1 ? "" : "s"})${labelsStr}</p>`;
+        }).join("")
+        : "";
     return `
         <details class="asset-manager-result-section" open>
             <summary class="asset-manager-result-summary">Image Assessment Tools &amp; Techniques</summary>
@@ -357,6 +368,7 @@ function renderAssetManagerImageToolsPanel() {
                     }).join("")}
                 </div>
                 <p class="task-list-achieved-note">${readOnly ? "Read-only: the student manages these from their Asset Manager or Task List." : "Saved to the hub database \u2014 shared with your Task List."}</p>
+                ${psdSummaryLines}
             </div>
         </details>
     `;
@@ -466,6 +478,9 @@ async function applyDetectedVideoToolsFromAssetHealth(payload) {
     assetManagerFcpxmlInfo.file = String(payload?.fcpxml_detected?.file || "").trim();
     assetManagerFcpxmlInfo.labels = Array.isArray(payload?.fcpxml_detected?.labels) ? payload.fcpxml_detected.labels : [];
     assetManagerFcpxmlInfo.files = Array.isArray(payload?.fcpxml_detected?.files) ? payload.fcpxml_detected.files : [];
+    assetManagerPsdInfo.file = String(payload?.psd_detected?.file || "").trim();
+    assetManagerPsdInfo.labels = Array.isArray(payload?.psd_detected?.labels) ? payload.psd_detected.labels : [];
+    assetManagerPsdInfo.files = Array.isArray(payload?.psd_detected?.files) ? payload.psd_detected.files : [];
 
     const isVideo = isAssetManagerVideoProject();
     const isImage = isAssetManagerImageProject();

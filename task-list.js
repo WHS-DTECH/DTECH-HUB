@@ -1194,7 +1194,10 @@ async function runGithubEfficientToolsSync(activityId, email, repoUrl) {
         lastCommitDate: String(payload?.last_commit?.date || "").trim(),
         fcpxmlFile: String(payload?.fcpxml_detected?.file || "").trim(),
         fcpxmlLabels: Array.isArray(payload?.fcpxml_detected?.labels) ? payload.fcpxml_detected.labels : [],
-        fcpxmlFiles: Array.isArray(payload?.fcpxml_detected?.files) ? payload.fcpxml_detected.files : []
+        fcpxmlFiles: Array.isArray(payload?.fcpxml_detected?.files) ? payload.fcpxml_detected.files : [],
+        psdFile: String(payload?.psd_detected?.file || "").trim(),
+        psdLabels: Array.isArray(payload?.psd_detected?.labels) ? payload.psd_detected.labels : [],
+        psdFiles: Array.isArray(payload?.psd_detected?.files) ? payload.psd_detected.files : []
     });
 
     return payload;
@@ -1250,6 +1253,7 @@ function buildImageAutoProgressNote(activityId, email) {
     }
 
     const efficientToolsState = readDigiMedEfficientToolsState(activityId, email);
+    const psdLabels = Array.isArray(analysis.psdLabels) ? analysis.psdLabels : [];
     const treeDetected = [
         "Management of assets",
         "Using layers effectively",
@@ -1258,10 +1262,14 @@ function buildImageAutoProgressNote(activityId, email) {
     ];
     const detectedCount = DIGIMED_IMAGE_EFFICIENT_TOOLS_SUBTASKS.filter((subtask) => {
         if (!efficientToolsState[subtask]) return false;
-        return treeDetected.includes(subtask);
+        return treeDetected.includes(subtask) || psdLabels.includes(subtask);
     }).length;
 
-    return `<p class="task-list-achieved-note">Auto-detected from your project: ${detectedCount} of ${DIGIMED_IMAGE_EFFICIENT_TOOLS_SUBTASKS.length} practices. Last commit ${escapeTaskListHtml(formatTaskListTimestamp(analysis.lastCommitDate))}.</p>`;
+    const psdFiles = Array.isArray(analysis.psdFiles) ? analysis.psdFiles : [];
+    const psdFile = String(analysis.psdFile || "").trim();
+    const psdFileLabel = psdFiles.length > 1 ? `${psdFiles.length} PSD files parsed` : psdFile;
+
+    return `<p class="task-list-achieved-note">Auto-detected from your project: ${detectedCount} of ${DIGIMED_IMAGE_EFFICIENT_TOOLS_SUBTASKS.length} practices${psdFileLabel ? ` (layers: ${escapeTaskListHtml(psdFileLabel)})` : ""}. Last commit ${escapeTaskListHtml(formatTaskListTimestamp(analysis.lastCommitDate))}.</p>`;
 }
 
 

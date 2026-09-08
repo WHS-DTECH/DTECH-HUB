@@ -12412,6 +12412,185 @@ async function fetchGithubRepoRawFile(owner, repo, branch, filePath) {
   }
 }
 
+const GITHUB_PSD_PARSE_MAX_BYTES = 6 * 1024 * 1024;
+const GITHUB_PSD_HARD_SIZE_CAP_BYTES = 40 * 1024 * 1024;
+const GITHUB_PSD_ADJUSTMENT_TAGS = new Set(["brit", "levl", "curv", "expA", "blwh", "hue2", "blnc", "selc", "mixr", "phfl", "nvrt", "post", "thrs", "vibA", "grdm"]);
+const GITHUB_PSD_SMART_OBJECT_TAGS = new Set(["SoLd", "SoLE", "PlLd"]);
+const GITHUB_PSD_STYLE_TAGS = new Set(["lrFX", "lfx2", "Patt", "PtFl"]);
+const GITHUB_PSD_TYPE_TAGS = new Set(["TySh"]);
+const GITHUB_PSD_VECTOR_MASK_TAGS = new Set(["vmsk", "vsms"]);
+
+// Fetches only the first N bytes of a raw GitHub file (Range request) so we can read
+// binary headers/metadata (e.g. a PSD's layer structure) without downloading huge assets.
+async function fetchGithubRepoRawFileBuffer(owner, repo, branch, filePath, maxBytes) {
+  try {
+    const rawUrl = `${GITHUB_RAW_CONTENT_BASE}/${owner}/${repo}/${branch}/${filePath}`;
+    const response = await fetch(rawUrl, {
+      headers: { "User-Agent": "DTECH-HUB", Range: `bytes=0-${Math.max(0, maxBytes - 1)}` }
+    });
+    if (!response.ok && response.status !== 206) return null;
+    if (response.status !== 206) {
+      const contentLength = Number(response.headers.get("content-length") || 0);
+      if (contentLength > GITHUB_PSD_HARD_SIZE_CAP_BYTES) return null;
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  } catch (_error) {
+    return null;
+  }
+}
+
+// Best-effort PSD binary parser: reads the header, the Image Resources section (for
+// guides/grids), and walks the Layer Info records (metadata only, never pixel data) to
+// detect real evidence of layers, masks, adjustment layers, smart objects and type layers.
+// Never throws; returns whatever was safely parsed before any bounds/format issue.
+function parsePsdBuffer(buffer) {
+  const labels = new Set();
+  let layerCount = 0;
+  let colorMode = "";
+  try {
+    if (!buffer || buffer.length < 30 || buffer.toString("ascii", 0, 4) !== "8BPS") {
+      return { layerCount: 0, colorMode: "", labels: [] };
+    }
+    if (buffer.readUInt16BE(4) !== 1) {
+      return { layerCount: 0, colorMode: "", labels: [] };
+    }
+    const colorModeNames = { 0: "Bitmap", 1: "Grayscale", 2: "Indexed", 3: "RGB", 4: "CMYK", 7: "Multichannel", 8: "Duotone", 9: "Lab" };
+    colorMode = colorModeNames[buffer.readUInt16BE(24)] || "";
+
+    let offset = 26;
+    if (offset + 4 > buffer.length) return { layerCount, colorMode, labels: Array.from(labels) };
+    offset += 4 + buffer.readUInt32BE(offset);
+    if (offset + 4 > buffer.length) return { layerCount, colorMode, labels: Array.from(labels) };
+
+    // Image Resources: look for resource ID 1032 (Grid and Guides Info).
+    const imageResourcesLength = buffer.readUInt32BE(offset);
+    offset += 4;
+    const imageResourcesEnd = Math.min(offset + imageResourcesLength, buffer.length);
+    let resourceOffset = offset;
+    let resourceGuard = 0;
+    while (resourceOffset + 12 <= imageResourcesEnd && resourceGuard < 2000) {
+      resourceGuard += 1;
+      if (buffer.toString("ascii", resourceOffset, resourceOffset + 4) !== "8BIM") break;
+      const resourceId = buffer.readUInt16BE(resourceOffset + 4);
+      const nameLen = buffer.readUInt8(resourceOffset + 6);
+      const sizeOffset = resourceOffset + 6 + Math.ceil((1 + nameLen) / 2) * 2;
+      if (sizeOffset + 4 > imageResourcesEnd) break;
+      const resourceSize = buffer.readUInt32BE(sizeOffset);
+      if (resourceId === 1032 && resourceSize > 0) {
+        labels.add("Using templates, guides and/or grids");
+      }
+      resourceOffset = sizeOffset + 4 + Math.ceil(resourceSize / 2) * 2;
+    }
+    offset = imageResourcesEnd;
+
+    if (offset + 4 > buffer.length) return { layerCount, colorMode, labels: Array.from(labels) };
+    const layerMaskInfoLength = buffer.readUInt32BE(offset);
+    offset += 4;
+    const layerMaskInfoEnd = Math.min(offset + layerMaskInfoLength, buffer.length);
+
+    if (offset + 4 > layerMaskInfoEnd) return { layerCount, colorMode, labels: Array.from(labels) };
+    const layerInfoLength = buffer.readUInt32BE(offset);
+    offset += 4;
+    const layerInfoEnd = Math.min(offset + layerInfoLength, buffer.length);
+
+    if (offset + 2 > layerInfoEnd) return { layerCount, colorMode, labels: Array.from(labels) };
+    layerCount = Math.abs(buffer.readInt16BE(offset));
+    offset += 2;
+    if (layerCount > 1) labels.add("Using layers effectively");
+
+    const maxLayersToWalk = Math.min(layerCount, 300);
+    for (let i = 0; i < maxLayersToWalk; i += 1) {
+      if (offset + 18 > layerInfoEnd) break;
+      offset += 16; // bounding rectangle
+      const numChannels = buffer.readUInt16BE(offset);
+      offset += 2;
+      if (offset + numChannels * 6 > layerInfoEnd) break;
+      offset += numChannels * 6;
+      if (offset + 12 > layerInfoEnd || buffer.toString("ascii", offset, offset + 4) !== "8BIM") break;
+      offset += 8; // blend signature + blend key
+      offset += 1; // opacity
+      const clipping = buffer.readUInt8(offset);
+      offset += 1;
+      offset += 2; // flags + filler
+      if (offset + 4 > layerInfoEnd) break;
+      const extraDataLength = buffer.readUInt32BE(offset);
+      offset += 4;
+      const extraDataEnd = Math.min(offset + extraDataLength, layerInfoEnd);
+
+      if (clipping === 1) labels.add("Using efficient selection and masking techniques");
+
+      let cursor = offset;
+      if (cursor + 4 <= extraDataEnd) {
+        const maskDataLength = buffer.readUInt32BE(cursor);
+        cursor += 4 + maskDataLength;
+        if (maskDataLength > 0) labels.add("Using efficient selection and masking techniques");
+      }
+      if (cursor + 4 <= extraDataEnd) {
+        cursor += 4 + buffer.readUInt32BE(cursor);
+      }
+      if (cursor < extraDataEnd) {
+        const nameLen = buffer.readUInt8(cursor);
+        cursor += Math.ceil((1 + nameLen) / 4) * 4;
+      }
+
+      let blockGuard = 0;
+      while (cursor + 12 <= extraDataEnd && blockGuard < 200) {
+        blockGuard += 1;
+        const sig = buffer.toString("ascii", cursor, cursor + 4);
+        if (sig !== "8BIM" && sig !== "8B64") break;
+        const key = buffer.toString("ascii", cursor + 4, cursor + 8);
+        const blockLength = buffer.readUInt32BE(cursor + 8);
+        cursor += 12;
+        if (cursor + blockLength > extraDataEnd) break;
+
+        if (GITHUB_PSD_VECTOR_MASK_TAGS.has(key)) labels.add("Using efficient selection and masking techniques");
+        if (GITHUB_PSD_ADJUSTMENT_TAGS.has(key)) {
+          labels.add("Using non-destructive editing techniques");
+          labels.add("Using appropriate colour and typography controls");
+        }
+        if (GITHUB_PSD_TYPE_TAGS.has(key)) labels.add("Using appropriate colour and typography controls");
+        if (GITHUB_PSD_SMART_OBJECT_TAGS.has(key)) {
+          labels.add("Using non-destructive editing techniques");
+          labels.add("Reusing styles, objects and/or presets");
+        }
+        if (GITHUB_PSD_STYLE_TAGS.has(key)) labels.add("Reusing styles, objects and/or presets");
+
+        cursor += blockLength + (blockLength % 2);
+      }
+
+      offset = extraDataEnd;
+    }
+
+    return { layerCount, colorMode, labels: Array.from(labels) };
+  } catch (_error) {
+    return { layerCount, colorMode, labels: Array.from(labels) };
+  }
+}
+
+// Cumulatively parses every committed .psd file (bounded to the 5 largest) and merges
+// the real layer/mask/adjustment/smart-object evidence found across all of them.
+async function computeGithubPsdSignals(owner, repo, branch, treeItems) {
+  const candidates = (Array.isArray(treeItems) ? treeItems : [])
+    .filter((item) => item?.type === "blob" && /\.psd$/i.test(String(item?.path || "")))
+    .sort((left, right) => Number(right?.size || 0) - Number(left?.size || 0))
+    .slice(0, 5);
+
+  const files = [];
+  const allLabelsSet = new Set();
+  for (const candidate of candidates) {
+    const candidatePath = String(candidate?.path || "").trim();
+    const buffer = await fetchGithubRepoRawFileBuffer(owner, repo, branch, candidatePath, GITHUB_PSD_PARSE_MAX_BYTES);
+    if (!buffer) continue;
+    const parsed = parsePsdBuffer(buffer);
+    files.push({ file: candidatePath, layer_count: parsed.layerCount, color_mode: parsed.colorMode, labels: parsed.labels });
+    parsed.labels.forEach((label) => allLabelsSet.add(label));
+  }
+
+  return { files, labels: Array.from(allLabelsSet) };
+}
+
+
 // Merge fcpxml-derived practices into the tree-level categories (done wins; never untick).
 function mergeVideoToolsCategories(baseCategories, fcpxmlLabels) {
   const extraSet = new Set((Array.isArray(fcpxmlLabels) ? fcpxmlLabels : []).map((label) => String(label || "").trim().toLowerCase()));
@@ -12575,6 +12754,14 @@ app.get("/api/integrations/github/repo-analysis", async (req, res) => {
     const primaryFcpxmlPath = fcpxmlFiles[0]?.file || "";
     const videoToolsCategories = mergeVideoToolsCategories(videoEfficientTools.categories, allFcpxmlLabels);
 
+    // Deeper detection: parse committed PSD layer structure (real layers, masks, adjustment
+    // layers, smart objects, type layers, guides) rather than only inferring from the extension.
+    const psdSignals = await computeGithubPsdSignals(identifier.owner, identifier.repo, defaultBranch, treeItems);
+    const imageToolsCategories = mergeVideoToolsCategories(
+      computeGithubImageEfficientToolsCategories(treeItems, imageStats).categories,
+      psdSignals.labels
+    );
+
     res.json({
       ok: true,
       owner: identifier.owner,
@@ -12594,9 +12781,10 @@ app.get("/api/integrations/github/repo-analysis", async (req, res) => {
       branches_count: branchesCount,
       releases_tags_count: releasesTagsCount,
       categories,
-      image_tools_categories: computeGithubImageEfficientToolsCategories(treeItems, imageStats).categories,
+      image_tools_categories: imageToolsCategories,
       video_tools_categories: videoToolsCategories,
       fcpxml_detected: { file: primaryFcpxmlPath, labels: allFcpxmlLabels, files: fcpxmlFiles },
+      psd_detected: { file: psdSignals.files[0]?.file || "", labels: psdSignals.labels, files: psdSignals.files },
       validation: validationResults
     });
   } catch (error) {
@@ -12884,6 +13072,10 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
     );
     const fcpxmlDetected = { file: primaryFcpxmlPath, labels: allFcpxmlLabels, files: fcpxmlFiles };
 
+    // Deeper detection: parse committed PSD layer structure (real layers, masks, adjustment
+    // layers, smart objects, type layers, guides) rather than only inferring from the extension.
+    const psdSignals = await computeGithubPsdSignals(identifier.owner, identifier.repo, defaultBranch, blobs);
+
     const topLevelFolders = new Set(
       Array.from(blobPaths)
         .filter((filePath) => filePath.includes("/"))
@@ -12939,7 +13131,10 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
         oversized_assets: oversizedAssetCount
       },
       web_tools_categories: webToolsCategories,
-      image_tools_categories: computeGithubImageEfficientToolsCategories(blobs, imageStats).categories,
+      image_tools_categories: mergeVideoToolsCategories(
+        computeGithubImageEfficientToolsCategories(blobs, imageStats).categories,
+        psdSignals.labels
+      ),
       video_tools_categories: assetVideoToolsCategories,
       image_details: {
         total_files: blobs.length,
@@ -12954,6 +13149,7 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
         oversized_images: oversizedImageCount
       },
       fcpxml_detected: fcpxmlDetected,
+      psd_detected: { file: psdSignals.files[0]?.file || "", labels: psdSignals.labels, files: psdSignals.files },
       css_details: buildCssHealthDetails(cssContents, htmlContents),
       html_details: buildHtmlHealthDetails(htmlContents),
       link_details: buildLinkHealthDetails(htmlContents),
