@@ -2289,16 +2289,23 @@ function renderChecklistCards(detail, allItems) {
                                 const conventionsSubtask = is91893ConventionsRow ? getDigiMedConventionsSubtask(taskListState.fullEvidenceState, digitalMediaType) : null;
                                 const uxPrinciplesSubtask = is91903UXPrinciplesRow ? getDigiMedUXPrinciplesSubtask(taskListState.fullEvidenceState, digitalMediaType) : null;
                                 const integrityTestingIsVideo = is91893IntegrityTestingRow && isVideoMedia;
+                                const integrityTestingIsImage = is91893IntegrityTestingRow && isImageMedia;
                                 const efficientToolsSubtasks = isVideoMedia
                                     ? DIGIMED_VIDEO_EFFICIENT_TOOLS_SUBTASKS
                                     : isImageMedia
                                         ? DIGIMED_IMAGE_EFFICIENT_TOOLS_SUBTASKS
                                         : DIGIMED_EFFICIENT_TOOLS_SUBTASKS;
                                 const subtasksTitle = isVideoMedia ? "SUBTASKS (VIDEO)" : isImageMedia ? "SUBTASKS (IMAGE)" : "SUBTASKS (WEB)";
-                                const integrityTestingTitle = integrityTestingIsVideo ? "Integrity & Validation (VIDEO)" : "Integrity & Validation (WEB)";
+                                const integrityTestingTitle = integrityTestingIsVideo
+                                    ? "Integrity & Validation (VIDEO)"
+                                    : integrityTestingIsImage
+                                        ? "Integrity & Validation (IMAGE)"
+                                        : "Integrity & Validation (WEB)";
                                 const integrityTestingHref = integrityTestingIsVideo
                                     ? buildCustomActivityLink(taskListState.selectedId, "Integrity & Validation (VIDEO)", "Integrity & Validation (VIDEO)", "video-integrity-testing")
-                                    : buildCustomActivityLink(taskListState.selectedId, "Integrity & Validation (WEB)", "Integrity & Validation (WEB)", "code-validation");
+                                    : integrityTestingIsImage
+                                        ? buildCustomActivityLink(taskListState.selectedId, "Integrity & Validation (IMAGE)", "Integrity & Validation (IMAGE)", "image-integrity-testing")
+                                        : buildCustomActivityLink(taskListState.selectedId, "Integrity & Validation (WEB)", "Integrity & Validation (WEB)", "code-validation");
                                 const rowText = isInformationalRow
                                     ? `<span class="task-list-step-text">${escapeTaskListHtml(stepText)}</span>`
                                     : (href

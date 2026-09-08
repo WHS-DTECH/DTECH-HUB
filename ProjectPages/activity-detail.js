@@ -118,6 +118,19 @@ const DIGIMED_UX_PRINCIPLES_ACK_STORAGE_PREFIX = "hub_digimed_ux_principles_ack_
 const DIGIMED_UX_PRINCIPLE_AREAS = ["Visibility of system status", "Match between system and the real world", "User control and freedom", "Consistency and standards", "Error prevention", "Recognition rather than recall", "Flexibility and efficiency of use", "Aesthetic and minimalist design", "Help users recognise and recover from errors", "Accessibility"];
 const DIGIMED_VIDEO_INTEGRITY_ACK_STORAGE_PREFIX = "hub_digimed_video_integrity_ack_v1";
 const DIGIMED_VIDEO_INTEGRITY_CHECKS = ["Resolution", "Aspect ratio", "Frame rate", "Audio levels/quality", "Missing/offline media", "Export format/codec", "Playback testing", "Titles/credits/text accuracy", "Media/source accuracy", "Final file integrity"];
+const DIGIMED_IMAGE_INTEGRITY_ACK_STORAGE_PREFIX = "hub_digimed_image_integrity_ack_v1";
+const DIGIMED_IMAGE_INTEGRITY_CHECKS = [
+    ["Document Setup Check", "Correct dimensions, orientation, resolution, colour mode and artboard/canvas setup for the intended output"],
+    ["Image Resolution & Quality Check", "Placed/raster images have sufficient resolution and are not unintentionally pixelated, stretched or distorted"],
+    ["Linked / Embedded Asset Check", "Illustrator links and Photoshop linked/Smart Objects are available, current and correctly referenced; no missing assets"],
+    ["Colour Mode & Colour Check", "Appropriate RGB/CMYK mode, consistent colour use, and colours reproduce appropriately for the intended screen/print output"],
+    ["Typography & Font Check", "Fonts are available, text displays correctly, spelling/content is accurate and there are no missing/substituted fonts"],
+    ["Layer / Object Integrity Check", "Required layers, masks, objects and effects are present and working; no accidental hidden/locked objects or unwanted content"],
+    ["Transparency / Effects Check", "Masks, blending modes, opacity, clipping masks, effects and transparency render as intended"],
+    ["Crop / Bleed / Safe Area Check", "Important content is not accidentally cropped; bleed and safe margins are correct where required for print"],
+    ["File Format / Export Validation", "PNG, JPEG, PDF, SVG etc. is appropriate for purpose and export settings preserve required quality/transparency"],
+    ["Final Output Check", "Exported outcome is opened independently and checked at its intended size/device/medium to confirm it displays or prints as intended"]
+];
 const DIGIMED_VIDEO_UX_ACK_STORAGE_PREFIX = "hub_digimed_video_ux_ack_v1";
 const DIGIMED_VIDEO_CONVENTIONS_ACK_STORAGE_PREFIX = "hub_digimed_video_conventions_ack_v1";
 const DIGIMED_VIDEO_UX_CHECKS = [
@@ -175,6 +188,7 @@ const DIGITAL_OUTCOME_TESTING_FUNCTIONS_TITLE = "Testing Functions";
 const DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE = "Conventions (WEB)";
 const DIGITAL_OUTCOME_UX_PRINCIPLES_TITLE = "UX Principles (Web)";
 const DIGITAL_OUTCOME_VIDEO_INTEGRITY_TITLE = "Integrity & Validation (VIDEO)";
+const DIGITAL_OUTCOME_IMAGE_INTEGRITY_TITLE = "Integrity & Validation (IMAGE)";
 const DIGITAL_OUTCOME_VIDEO_UX_PRINCIPLES_TITLE = "UX Principles (Video)";
 const DIGITAL_OUTCOME_VIDEO_CONVENTIONS_TITLE = "Conventions (VIDEO)";
 const DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE = "Success Criteria";
@@ -528,6 +542,26 @@ function readDigiMedVideoIntegrityChecks(activityId, email) {
 function writeDigiMedVideoIntegrityChecks(activityId, email, value) {
     try {
         localStorage.setItem(getDigiMedVideoIntegrityKey(activityId, email), JSON.stringify(value || {}));
+    } catch (_error) {
+    }
+}
+
+function getDigiMedImageIntegrityKey(activityId, email) {
+    return `${DIGIMED_IMAGE_INTEGRITY_ACK_STORAGE_PREFIX}:${String(activityId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
+}
+
+function readDigiMedImageIntegrityChecks(activityId, email) {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(getDigiMedImageIntegrityKey(activityId, email)) || "{}");
+        return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (_error) {
+        return {};
+    }
+}
+
+function writeDigiMedImageIntegrityChecks(activityId, email, value) {
+    try {
+        localStorage.setItem(getDigiMedImageIntegrityKey(activityId, email), JSON.stringify(value || {}));
     } catch (_error) {
     }
 }
@@ -8558,6 +8592,13 @@ function isDigitalOutcomeVideoIntegrityCriterion(taskTopicTitle, taskShortName =
     return shortNameText === DIGITAL_OUTCOME_VIDEO_INTEGRITY_TITLE.toLowerCase();
 }
 
+function isDigitalOutcomeImageIntegrityCriterion(taskTopicTitle, taskShortName = "") {
+    const topicText = String(taskTopicTitle || "").trim().toLowerCase();
+    const shortNameText = String(taskShortName || "").trim().toLowerCase();
+    if (/image\s+integrity|image\s+testing|integrity\s*&?\s*validation\s*\(image\)/.test(topicText)) return true;
+    return shortNameText === DIGITAL_OUTCOME_IMAGE_INTEGRITY_TITLE.toLowerCase();
+}
+
 function isDigitalOutcomeVideoUXPrinciplesCriterion(taskTopicTitle, taskShortName = "") {
     const topicText = String(taskTopicTitle || "").trim().toLowerCase();
     const shortNameText = String(taskShortName || "").trim().toLowerCase();
@@ -8644,6 +8685,10 @@ function inferDigitalOutcomeTopicKeyFromTitle(pageTitle) {
 
     if (/video\s+integrity|video\s+testing|integrity\s*&?\s*validation\s*\(video\)/.test(normalized)) {
         return "video-integrity-testing";
+    }
+
+    if (/image\s+integrity|image\s+testing|integrity\s*&?\s*validation\s*\(image\)/.test(normalized)) {
+        return "image-integrity-testing";
     }
 
     if (/video\s+ux\s+principles|ux\s+principles\s*\(video\)/.test(normalized)) {
@@ -9204,6 +9249,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         || keywordMatchedTopicKey === "user-experience-principles";
     const isDigitalOutcomeVideoIntegrityTopic = isDigitalOutcomeVideoIntegrityCriterion(taskTopicTitle, resolvedTaskShortName)
         || keywordMatchedTopicKey === "video-integrity-testing";
+    const isDigitalOutcomeImageIntegrityTopic = isDigitalOutcomeImageIntegrityCriterion(taskTopicTitle, resolvedTaskShortName)
+        || keywordMatchedTopicKey === "image-integrity-testing";
     const isDigitalOutcomeVideoUXPrinciplesTopic = isDigitalOutcomeVideoUXPrinciplesCriterion(taskTopicTitle, resolvedTaskShortName)
         || keywordMatchedTopicKey === "video-ux-principles";
     const isDigitalOutcomeVideoConventionsTopic = isDigitalOutcomeVideoConventionsCriterion(taskTopicTitle, resolvedTaskShortName)
@@ -9237,6 +9284,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                                             ? "user-experience-principles"
                                             : isDigitalOutcomeVideoIntegrityTopic
                                                 ? "video-integrity-testing"
+                                                : isDigitalOutcomeImageIntegrityTopic
+                                                    ? "image-integrity-testing"
                                                 : isDigitalOutcomeVideoUXPrinciplesTopic
                                                     ? "video-ux-principles"
                                                     : isDigitalOutcomeVideoConventionsTopic
@@ -9256,6 +9305,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         "relevant-digimed-conventions": DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE,
         "user-experience-principles": DIGITAL_OUTCOME_UX_PRINCIPLES_TITLE,
         "video-integrity-testing": DIGITAL_OUTCOME_VIDEO_INTEGRITY_TITLE,
+        "image-integrity-testing": DIGITAL_OUTCOME_IMAGE_INTEGRITY_TITLE,
         "video-ux-principles": DIGITAL_OUTCOME_VIDEO_UX_PRINCIPLES_TITLE,
         "video-conventions": DIGITAL_OUTCOME_VIDEO_CONVENTIONS_TITLE,
         "tools-and-techniques": DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE,
@@ -9307,6 +9357,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         || isDigitalOutcomeRelevantDigiMedConventionsTopic
         || isDigitalOutcomeUXPrinciplesTopic
         || isDigitalOutcomeVideoIntegrityTopic
+        || isDigitalOutcomeImageIntegrityTopic
         || isDigitalOutcomeVideoUXPrinciplesTopic
         || isDigitalOutcomeVideoConventionsTopic
         || isToolsAndTechniquesTopic
@@ -9328,6 +9379,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         "relevant-digimed-conventions": "relevant-digimed-conventions",
         "user-experience-principles": "user-experience-principles",
         "video-integrity-testing": "video-integrity-testing",
+        "image-integrity-testing": "image-integrity-testing",
         "video-ux-principles": "video-ux-principles",
         "video-conventions": "video-conventions",
         "tools-and-techniques": "tools-and-techniques",
@@ -9745,6 +9797,14 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             </div></section>`;
         })()
         : "";
+    const imageIntegrityTestingChecklistHtml = digitalOutcomeTopicKey === "image-integrity-testing"
+        ? (() => {
+            const checks = readDigiMedImageIntegrityChecks(id, readStoredHubEmail());
+            return `<section class="task-topic-guide-block"><h3>Integrity &amp; Validation (IMAGE)</h3><p class="task-topic-submission-note">Check each area before exporting and submitting your final image outcome.</p><div class="task-list-decomposition-subtask-list">
+                ${DIGIMED_IMAGE_INTEGRITY_CHECKS.map(([check, description]) => `<label class="task-list-decomposition-subtask ${checks[check] ? "is-complete" : ""}"><input type="checkbox" data-digimed-image-integrity-check="${escapeHtml(check)}" ${checks[check] ? "checked" : ""}><span><strong>${escapeHtml(check)}</strong> - ${escapeHtml(description)}</span></label>`).join("")}
+            </div></section>`;
+        })()
+        : "";
     const videoUXPrinciplesChecklistHtml = digitalOutcomeTopicKey === "video-ux-principles"
         ? (() => {
             const checks = readDigiMedVideoUXChecks(id, readStoredHubEmail());
@@ -10038,6 +10098,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                             ${relevantDigiMedConventionsTableHtml}
                             ${uxPrinciplesTableHtml}
                             ${videoIntegrityTestingChecklistHtml}
+                            ${imageIntegrityTestingChecklistHtml}
                             ${videoUXPrinciplesChecklistHtml}
                             ${videoConventionsChecklistHtml}
                             ${isRelevantImplicationsTopic
@@ -10339,6 +10400,19 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 if (!check) return;
                 checks[check] = Boolean(checkbox.checked);
                 writeDigiMedVideoIntegrityChecks(id, readStoredHubEmail(), checks);
+                checkbox.closest(".task-list-decomposition-subtask")?.classList.toggle("is-complete", Boolean(checkbox.checked));
+            });
+        });
+    }
+
+    if (digitalOutcomeTopicKey === "image-integrity-testing") {
+        const checks = readDigiMedImageIntegrityChecks(id, readStoredHubEmail());
+        host.querySelectorAll("[data-digimed-image-integrity-check]").forEach((checkbox) => {
+            checkbox.addEventListener("change", () => {
+                const check = String(checkbox.getAttribute("data-digimed-image-integrity-check") || "").trim();
+                if (!check) return;
+                checks[check] = Boolean(checkbox.checked);
+                writeDigiMedImageIntegrityChecks(id, readStoredHubEmail(), checks);
                 checkbox.closest(".task-list-decomposition-subtask")?.classList.toggle("is-complete", Boolean(checkbox.checked));
             });
         });
