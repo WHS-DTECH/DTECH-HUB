@@ -13,7 +13,8 @@ const workState = {
     interestRows: [],
     studentNameByEmail: new Map(),
     records: [],
-    selectedTask: ""
+    selectedTask: "",
+    studentSearch: ""
 };
 
 const statusHost = document.querySelector("#work-status");
@@ -21,6 +22,7 @@ const taskLinkGrid = document.querySelector("#task-link-grid");
 const trackerTitle = document.querySelector("#tracker-title");
 const trackerSummary = document.querySelector("#tracker-summary");
 const tableHost = document.querySelector("#work-table-host");
+const studentSearchInput = document.querySelector("#student-search-input");
 const taskPageNav = document.querySelector("#task-page-nav");
 const taskPrevButton = document.querySelector("#task-prev-button");
 const taskNextButton = document.querySelector("#task-next-button");
@@ -806,6 +808,16 @@ function renderStudentSummaryGrid() {
         return;
     }
 
+    const searchText = String(workState.studentSearch || "").trim().toLowerCase();
+    const visibleRows = searchText
+        ? rows.filter((student) => `${student.studentName} ${student.studentEmail}`.toLowerCase().includes(searchText))
+        : rows;
+
+    if (!visibleRows.length) {
+        host.innerHTML = `<div class="work-empty">No students match that search.</div>`;
+        return;
+    }
+
     host.innerHTML = `
         <div class="work-table-wrap">
             <table class="student-summary-table">
@@ -816,7 +828,7 @@ function renderStudentSummaryGrid() {
                     </tr>
                 </thead>
                 <tbody>
-                    ${rows.map((student) => `
+                    ${visibleRows.map((student) => `
                         <tr>
                             <td>${escapeHtml(student.studentName)}</td>
                             ${STUDENT_SUMMARY_GROUPS.map((group) => {
@@ -1158,6 +1170,14 @@ function wireTaskNavigationEvents() {
     taskNextButton.addEventListener("click", () => navigateTaskByDelta(1));
 }
 
+function wireStudentSearchEvents() {
+    if (!studentSearchInput) return;
+    studentSearchInput.addEventListener("input", () => {
+        workState.studentSearch = String(studentSearchInput.value || "");
+        renderStudentSummaryGrid();
+    });
+}
+
 async function init() {
     try {
         setStatus("Checking access...");
@@ -1207,6 +1227,7 @@ async function init() {
         }
 
         wireTaskNavigationEvents();
+        wireStudentSearchEvents();
 
         renderStudentSummaryGrid();
         renderTaskLinks();
