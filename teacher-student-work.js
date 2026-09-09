@@ -14,7 +14,9 @@ const workState = {
     studentNameByEmail: new Map(),
     records: [],
     selectedTask: "",
-    studentSearch: ""
+    studentSearch: "",
+    expandedSummaryStudent: "",
+    expandedSummaryGroup: ""
 };
 
 const statusHost = document.querySelector("#work-status");
@@ -903,12 +905,16 @@ function buildStudentSummaryDetailGroups(records) {
         });
 }
 
-function renderStudentSummaryDetailPanel(student, bucket) {
+function renderStudentSummaryDetailPanel(student, group, bucket) {
     const detailGroups = buildStudentSummaryDetailGroups(bucket?.records || []);
     if (!detailGroups.length) return "";
 
     return `
         <div class="student-summary-detail-panel">
+            <div class="student-summary-detail-heading">
+                <strong>${escapeHtml(student.studentName)}</strong>
+                <span>${escapeHtml(group.label)}: ${bucket.submittedCount}/${bucket.total} acknowledged</span>
+            </div>
             ${detailGroups.map((group) => `
                 <div class="student-summary-detail-group">
                     <h4>${escapeHtml(group.standard)} &middot; ${escapeHtml(group.section)} &middot; ${group.records.filter((record) => record.acknowledged).length}/${group.records.length}</h4>
@@ -940,15 +946,27 @@ function renderStudentSummaryCell(student, group, bucket) {
 
     const chipClass = getStudentSummaryChipClass(bucket);
     const title = `${student.studentName} - ${group.label}`;
+    const isExpanded = workState.expandedSummaryStudent === student.studentEmail && workState.expandedSummaryGroup === group.key;
     return `
         <td>
-            <details class="student-summary-details">
-                <summary title="${escapeHtml(title)}">
-                    <span class="student-summary-chip ${chipClass}">${bucket.submittedCount}/${bucket.total}</span>
-                </summary>
-                ${renderStudentSummaryDetailPanel(student, bucket)}
-            </details>
+            <button class="student-summary-chip ${chipClass} ${isExpanded ? "is-expanded" : ""}" type="button" data-student-summary-email="${escapeHtml(student.studentEmail)}" data-student-summary-group="${escapeHtml(group.key)}" title="${escapeHtml(title)}" aria-expanded="${isExpanded ? "true" : "false"}">${bucket.submittedCount}/${bucket.total}</button>
         </td>
+    `;
+}
+
+function renderStudentSummaryDetailRow(student) {
+    const group = STUDENT_SUMMARY_GROUPS.find((item) => item.key === workState.expandedSummaryGroup);
+    if (!group || workState.expandedSummaryStudent !== student.studentEmail) return "";
+
+    const bucket = student.groups.get(group.key);
+    if (!bucket) return "";
+
+    return `
+        <tr class="student-summary-expanded-row">
+            <td colspan="${STUDENT_SUMMARY_GROUPS.length + 1}">
+                ${renderStudentSummaryDetailPanel(student, group, bucket)}
+            </td>
+        </tr>
     `;
 }
 
@@ -987,6 +1005,7 @@ function renderStudentSummaryGrid() {
                             <td>${escapeHtml(student.studentName)}</td>
                             ${STUDENT_SUMMARY_GROUPS.map((group) => renderStudentSummaryCell(student, group, student.groups.get(group.key))).join("")}
                         </tr>
+                        ${renderStudentSummaryDetailRow(student)}
                     `).join("")}
                 </tbody>
             </table>
@@ -1323,6 +1342,22 @@ function wireStudentSearchEvents() {
     });
 }
 
+function wireStudentSummaryEvents() {
+    const host = document.querySelector("#student-summary-grid");
+    if (!host || window.__dtechStudentSummaryEventsBound) return;
+    window.__dtechStudentSummaryEventsBound = true;
+    host.addEventListener("click", (event) => {
+        const button = event.target?.closest?.("[data-student-summary-email][data-student-summary-group]");
+        if (!button) return;
+        const email = String(button.getAttribute("data-student-summary-email") || "").trim().toLowerCase();
+        const group = String(button.getAttribute("data-student-summary-group") || "").trim();
+        const alreadyOpen = workState.expandedSummaryStudent === email && workState.expandedSummaryGroup === group;
+        workState.expandedSummaryStudent = alreadyOpen ? "" : email;
+        workState.expandedSummaryGroup = alreadyOpen ? "" : group;
+        renderStudentSummaryGrid();
+    });
+}
+
 async function init() {
     try {
         setStatus("Checking access...");
@@ -1373,6 +1408,7 @@ async function init() {
 
         wireTaskNavigationEvents();
         wireStudentSearchEvents();
+        wireStudentSummaryEvents();
 
         renderStudentSummaryGrid();
         renderTaskLinks();
