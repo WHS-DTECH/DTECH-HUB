@@ -248,6 +248,7 @@
       width: 100%;
       border-collapse: collapse;
       font-size: 0.85rem;
+      min-width: 1120px;
     }
 
     .student-summary-table th {
@@ -261,6 +262,34 @@
     .student-summary-table td {
       padding: 8px 10px;
       border-bottom: 1px solid #dbe5f1;
+      vertical-align: top;
+    }
+
+    .student-summary-details {
+      position: relative;
+    }
+
+    .student-summary-details summary {
+      list-style: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .student-summary-details summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .student-summary-details summary::after {
+      content: "+";
+      color: #315a82;
+      font-size: 0.72rem;
+      font-weight: 800;
+    }
+
+    .student-summary-details[open] summary::after {
+      content: "-";
     }
 
     .student-summary-chip {
@@ -289,6 +318,94 @@
       background: #dff4e7;
       color: #1f663d;
       border-color: #add7bc;
+    }
+
+    .student-summary-detail-panel {
+      width: min(520px, 72vw);
+      margin-top: 8px;
+      border: 1px solid #bfd3eb;
+      border-radius: 8px;
+      background: #f8fbff;
+      box-shadow: 0 12px 24px rgba(26, 52, 80, 0.14);
+      padding: 8px;
+      position: absolute;
+      z-index: 10;
+    }
+
+    .student-summary-detail-group + .student-summary-detail-group {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #d8e4f2;
+    }
+
+    .student-summary-detail-group h4 {
+      margin: 0 0 6px;
+      color: #173f63;
+      font-size: 0.78rem;
+      font-weight: 800;
+    }
+
+    .student-summary-detail-group ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 4px;
+    }
+
+    .student-summary-detail-group li {
+      display: grid;
+      grid-template-columns: 18px minmax(0, 1fr) auto;
+      gap: 6px;
+      align-items: center;
+      border: 1px solid #d6e3f1;
+      border-radius: 6px;
+      background: #fff;
+      padding: 5px 6px;
+    }
+
+    .student-summary-detail-group li.is-complete {
+      background: #eef8f1;
+      border-color: #b7dbc3;
+    }
+
+    .student-summary-detail-group li.is-partial {
+      background: #fff9ea;
+      border-color: #ddcca5;
+    }
+
+    .student-summary-detail-status {
+      font-weight: 900;
+      color: #245b86;
+      text-align: center;
+    }
+
+    .student-summary-detail-group a {
+      color: #1f5688;
+      font-weight: 700;
+      text-decoration: none;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .student-summary-detail-group a:hover {
+      text-decoration: underline;
+    }
+
+    .student-summary-detail-group li span:last-child {
+      color: #516b86;
+      font-size: 0.72rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 720px) {
+      .student-summary-detail-panel {
+        position: static;
+        width: 100%;
+        box-shadow: none;
+      }
     }
   </style>
 </head>

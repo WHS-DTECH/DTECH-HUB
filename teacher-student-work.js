@@ -751,11 +751,57 @@ function getOrderedTaskTopics() {
 }
 
 const STUDENT_SUMMARY_GROUPS = [
+    { key: "overall", label: "Overall" },
     { key: "digital_outcome", label: "Digital Outcome" },
     { key: "achieved", label: "Achieved" },
     { key: "merit", label: "Merit" },
     { key: "excellence", label: "Excellence" }
 ];
+
+function getStudentSummaryStandardNumber(record) {
+    const keyMatch = String(record?.standardKey || "").match(/task-topic:(\d{4,6})/i);
+    if (keyMatch?.[1]) return keyMatch[1];
+
+    const activity = workState.activitiesById.get(String(record?.activityId || "").trim());
+    const primary = extractPrimaryStandardNumber(activity || {});
+    return /^\d{4,6}$/.test(primary) ? primary : "Digital Outcome";
+}
+
+function getStudentSummarySectionLabel(record) {
+    const standard = getStudentSummaryStandardNumber(record);
+    const group = getTaskTopicGroup(record?.taskTopic);
+    const topic = normalizeTaskTopicText(record?.taskTopic).toLowerCase();
+
+    if (group === "digital_outcome") return "Digital Outcome Topic";
+
+    if (standard === "91897" || standard === "91907") {
+        if (group === "achieved") {
+            if (/project\s+management|decompos|key\s+features|requirements/.test(topic)) {
+                return "Section 1: Project Management & Decomposition";
+            }
+            if (/trial|test/.test(topic)) {
+                return "Section 2: Testing & Trialing";
+            }
+            if (/relevant\s+implications/.test(topic)) {
+                return "Section 3: Relevant Implications";
+            }
+        }
+        if (group === "merit") return "Merit";
+        if (group === "excellence") return "Excellence";
+    }
+
+    if (standard === "91893" || standard === "91903") {
+        if (group === "achieved") return "Section 1: Digital Media";
+        if (group === "merit") return "Merit";
+        if (group === "excellence") return "Excellence";
+    }
+
+    return STUDENT_SUMMARY_GROUPS.find((item) => item.key === group)?.label || "Other";
+}
+
+function createStudentSummaryBucket() {
+    return { total: 0, evidenceCount: 0, submittedCount: 0, firstTaskTopic: "", records: [] };
+}
 
 // One row per student, one column per criteria group, sourced entirely from the records already built for the task cards.
 function buildStudentSummaryRows() {
@@ -774,18 +820,22 @@ function buildStudentSummaryRows() {
 
         const student = byStudent.get(email);
         const group = getTaskTopicGroup(record.taskTopic);
-        if (!student.groups.has(group)) {
-            student.groups.set(group, { total: 0, evidenceCount: 0, submittedCount: 0, firstTaskTopic: record.taskTopic });
-        }
+        ["overall", group].forEach((bucketKey) => {
+            if (!student.groups.has(bucketKey)) {
+                student.groups.set(bucketKey, createStudentSummaryBucket());
+            }
 
-        const bucket = student.groups.get(group);
-        bucket.total += 1;
-        if (record.googleSlidesUrl || (Array.isArray(record.links) && record.links.length)) {
-            bucket.evidenceCount += 1;
-        }
-        if (record.submitted) {
-            bucket.submittedCount += 1;
-        }
+            const bucket = student.groups.get(bucketKey);
+            if (!bucket.firstTaskTopic) bucket.firstTaskTopic = record.taskTopic;
+            bucket.records.push(record);
+            bucket.total += 1;
+            if (record.googleSlidesUrl || (Array.isArray(record.links) && record.links.length)) {
+                bucket.evidenceCount += 1;
+            }
+            if (record.submitted) {
+                bucket.submittedCount += 1;
+            }
+        });
     });
 
     return Array.from(byStudent.values()).sort((a, b) => a.studentName.localeCompare(b.studentName));
@@ -796,6 +846,79 @@ function getStudentSummaryChipClass(bucket) {
     if (bucket.submittedCount >= bucket.total) return "is-all";
     if (bucket.evidenceCount > 0 || bucket.submittedCount > 0) return "is-partial";
     return "is-none";
+}
+
+function buildStudentSummaryDetailGroups(records) {
+    const groups = new Map();
+    (Array.isArray(records) ? records : []).forEach((record) => {
+        const standard = getStudentSummaryStandardNumber(record);
+        const section = getStudentSummarySectionLabel(record);
+        const key = `${standard}||${section}`;
+        if (!groups.has(key)) {
+            groups.set(key, { standard, section, records: [] });
+        }
+        groups.get(key).records.push(record);
+    });
+
+    return Array.from(groups.values())
+        .map((group) => ({
+            ...group,
+            records: group.records.sort((a, b) => compareTaskTopics(a.taskTopic, b.taskTopic))
+        }))
+        .sort((a, b) => {
+            const standardCompare = String(a.standard).localeCompare(String(b.standard), undefined, { numeric: true });
+            if (standardCompare) return standardCompare;
+            return String(a.section).localeCompare(String(b.section));
+        });
+}
+
+function renderStudentSummaryDetailPanel(student, bucket) {
+    const detailGroups = buildStudentSummaryDetailGroups(bucket?.records || []);
+    if (!detailGroups.length) return "";
+
+    return `
+        <div class="student-summary-detail-panel">
+            ${detailGroups.map((group) => `
+                <div class="student-summary-detail-group">
+                    <h4>${escapeHtml(group.standard)} &middot; ${escapeHtml(group.section)} &middot; ${group.records.filter((record) => record.submitted).length}/${group.records.length}</h4>
+                    <ul>
+                        ${group.records.map((record) => {
+                            const complete = Boolean(record.submitted);
+                            const hasEvidence = Boolean(record.googleSlidesUrl || (Array.isArray(record.links) && record.links.length));
+                            const href = String(record.taskUrl || "").trim() || `teacher-student-work-task.html?task=${encodeURIComponent(record.taskTopic || "")}`;
+                            const status = complete ? "Submitted" : (hasEvidence ? "Evidence linked" : "Missing");
+                            return `
+                                <li class="${complete ? "is-complete" : (hasEvidence ? "is-partial" : "is-missing")}">
+                                    <span class="student-summary-detail-status">${complete ? "&#10003;" : (hasEvidence ? "~" : "-")}</span>
+                                    <a href="${escapeHtml(href)}">${escapeHtml(record.taskTopic)}</a>
+                                    <span>${escapeHtml(status)}</span>
+                                </li>
+                            `;
+                        }).join("")}
+                    </ul>
+                </div>
+            `).join("")}
+        </div>
+    `;
+}
+
+function renderStudentSummaryCell(student, group, bucket) {
+    if (!bucket) {
+        return `<td><span class="student-summary-chip is-none">-</span></td>`;
+    }
+
+    const chipClass = getStudentSummaryChipClass(bucket);
+    const title = `${student.studentName} - ${group.label}`;
+    return `
+        <td>
+            <details class="student-summary-details">
+                <summary title="${escapeHtml(title)}">
+                    <span class="student-summary-chip ${chipClass}">${bucket.submittedCount}/${bucket.total}</span>
+                </summary>
+                ${renderStudentSummaryDetailPanel(student, bucket)}
+            </details>
+        </td>
+    `;
 }
 
 function renderStudentSummaryGrid() {
@@ -831,16 +954,7 @@ function renderStudentSummaryGrid() {
                     ${visibleRows.map((student) => `
                         <tr>
                             <td>${escapeHtml(student.studentName)}</td>
-                            ${STUDENT_SUMMARY_GROUPS.map((group) => {
-                                const bucket = student.groups.get(group.key);
-                                if (!bucket) {
-                                    return `<td><span class="student-summary-chip is-none">-</span></td>`;
-                                }
-                                const href = `teacher-student-work-task.html?task=${encodeURIComponent(bucket.firstTaskTopic)}`;
-                                const chipClass = getStudentSummaryChipClass(bucket);
-                                const title = `${student.studentName} \u2014 ${group.label}`;
-                                return `<td><a class="student-summary-chip ${chipClass}" href="${escapeHtml(href)}" title="${escapeHtml(title)}">${bucket.submittedCount}/${bucket.total}</a></td>`;
-                            }).join("")}
+                            ${STUDENT_SUMMARY_GROUPS.map((group) => renderStudentSummaryCell(student, group, student.groups.get(group.key))).join("")}
                         </tr>
                     `).join("")}
                 </tbody>
