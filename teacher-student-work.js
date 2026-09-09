@@ -266,6 +266,31 @@ function normalizeTaskTopicText(value) {
         .trim();
 }
 
+function stripTaskTopicLevel(value) {
+    return normalizeTaskTopicText(value).replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim();
+}
+
+function findAcknowledgedChecklistStep(evidenceRows, taskTopic, standardNumbers) {
+    const rows = Array.isArray(evidenceRows) ? evidenceRows : [];
+    const topicKey = stripTaskTopicLevel(taskTopic).toLowerCase();
+    if (!topicKey) return null;
+
+    const candidateStandards = ["digital-outcome", ...(Array.isArray(standardNumbers) ? standardNumbers : [])]
+        .map((standard) => String(standard || "").trim())
+        .filter(Boolean);
+
+    for (const standard of candidateStandards) {
+        const row = rows.find((item) => String(item?.standard || "").trim() === standard);
+        const steps = Array.isArray(row?.steps) ? row.steps : [];
+        const step = steps.find((item) => stripTaskTopicLevel(item?.text).toLowerCase() === topicKey);
+        if (step) {
+            return { done: Boolean(step.done), standardKey: standard };
+        }
+    }
+
+    return null;
+}
+
 function getTaskTopicGroup(topic) {
     const text = normalizeTaskTopicText(topic).toLowerCase();
 
@@ -697,6 +722,7 @@ function buildAllRecords() {
                 const topicKey = normalizeTaskTopicText(taskTopic).toLowerCase();
                 const resolved = parseTaskTopicEvidenceForActivity(evidenceRows, taskTopic, standardNumbers);
                 const evidence = resolved.evidence;
+                const checklistStep = findAcknowledgedChecklistStep(evidenceRows, taskTopic, standardNumbers);
                 const isProjectManagementTopic = topicKey.includes("project management");
                 const isVersionControlTopic = topicKey.includes("version control") || topicKey.includes("asset management");
 
@@ -722,10 +748,11 @@ function buildAllRecords() {
                     activityName: String(activity?.name || "Assessment Task").trim(),
                     studentEmail,
                     studentName: String(workState.studentNameByEmail.get(studentEmail) || formatNameFromEmail(studentEmail) || studentEmail).trim(),
-                    standardKey: String(resolved.matchedStandardKey || "").trim(),
+                    standardKey: String(checklistStep?.standardKey || resolved.matchedStandardKey || "").trim(),
                     googleSlidesUrl: evidence.googleSlidesUrl,
                     links: mergedLinks,
                     submitted: Boolean(evidence.submitted),
+                    acknowledged: Boolean(checklistStep?.done || evidence.submitted),
                     submittedAt: evidence.submittedAt,
                     taskUrl: `ProjectPages/activity-detail.html?id=${encodeURIComponent(activityId)}&taskTopic=${encodeURIComponent(taskTopic)}`
                 });
@@ -759,6 +786,10 @@ const STUDENT_SUMMARY_GROUPS = [
 ];
 
 function getStudentSummaryStandardNumber(record) {
+    const directStandard = String(record?.standardKey || "").trim();
+    if (/^\d{4,6}$/.test(directStandard)) return directStandard;
+    if (directStandard === "digital-outcome") return "Digital Outcome";
+
     const keyMatch = String(record?.standardKey || "").match(/task-topic:(\d{4,6})/i);
     if (keyMatch?.[1]) return keyMatch[1];
 
@@ -832,7 +863,7 @@ function buildStudentSummaryRows() {
             if (record.googleSlidesUrl || (Array.isArray(record.links) && record.links.length)) {
                 bucket.evidenceCount += 1;
             }
-            if (record.submitted) {
+            if (record.acknowledged) {
                 bucket.submittedCount += 1;
             }
         });
@@ -880,13 +911,13 @@ function renderStudentSummaryDetailPanel(student, bucket) {
         <div class="student-summary-detail-panel">
             ${detailGroups.map((group) => `
                 <div class="student-summary-detail-group">
-                    <h4>${escapeHtml(group.standard)} &middot; ${escapeHtml(group.section)} &middot; ${group.records.filter((record) => record.submitted).length}/${group.records.length}</h4>
+                    <h4>${escapeHtml(group.standard)} &middot; ${escapeHtml(group.section)} &middot; ${group.records.filter((record) => record.acknowledged).length}/${group.records.length}</h4>
                     <ul>
                         ${group.records.map((record) => {
-                            const complete = Boolean(record.submitted);
+                            const complete = Boolean(record.acknowledged);
                             const hasEvidence = Boolean(record.googleSlidesUrl || (Array.isArray(record.links) && record.links.length));
                             const href = String(record.taskUrl || "").trim() || `teacher-student-work-task.html?task=${encodeURIComponent(record.taskTopic || "")}`;
-                            const status = complete ? "Submitted" : (hasEvidence ? "Evidence linked" : "Missing");
+                            const status = complete ? (record.submitted ? "Submitted" : "Acknowledged") : (hasEvidence ? "Evidence linked" : "Missing");
                             return `
                                 <li class="${complete ? "is-complete" : (hasEvidence ? "is-partial" : "is-missing")}">
                                     <span class="student-summary-detail-status">${complete ? "&#10003;" : (hasEvidence ? "~" : "-")}</span>
