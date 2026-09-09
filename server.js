@@ -12595,6 +12595,39 @@ async function computeGithubPsdSignals(owner, repo, branch, treeItems) {
   return { files, labels: Array.from(allLabelsSet) };
 }
 
+// AS91893 "Advanced Tools & Techniques" auto-detection (the 4 shared categories), reusing
+// the same tree/FCPXML/PSD evidence already gathered rather than re-scanning the repo.
+function computeGithubToolsTechniquesCategories(mediaType, signals) {
+  const type = String(mediaType || "").trim().toLowerCase();
+
+  if (type === "video") {
+    const labelSet = new Set(Array.isArray(signals?.fcpxmlLabels) ? signals.fcpxmlLabels : []);
+    return [
+      { label: "Creating or customising scripts, code or presets", done: labelSet.has("Reusing titles, presets, effects or templates") },
+      { label: "Using a combination of steps to manipulate or enhance elements", done: labelSet.has("Adjustment layers / nested sequences where appropriate") },
+      { label: "Using a third-party library", done: labelSet.has("Proxy media / optimised editing workflow") },
+      { label: "Using composite effects", done: labelSet.has("Reusing titles, presets, effects or templates") && labelSet.has("Adjustment layers / nested sequences where appropriate") }
+    ];
+  }
+
+  if (type === "image") {
+    const labelSet = new Set(Array.isArray(signals?.psdLabels) ? signals.psdLabels : []);
+    return [
+      { label: "Creating or customising scripts, code or presets", done: labelSet.has("Reusing styles, objects and/or presets") },
+      { label: "Using a combination of steps to manipulate or enhance elements", done: labelSet.has("Using non-destructive editing techniques") },
+      { label: "Using a third-party library", done: labelSet.has("Reusing styles, objects and/or presets") },
+      { label: "Using composite effects", done: Number(signals?.primaryLayerCount || 0) > 1 }
+    ];
+  }
+
+  return [
+    { label: "Creating or customising scripts, code or presets", done: Number(signals?.jsFileCount || 0) > 0 },
+    { label: "Using a combination of steps to manipulate or enhance elements", done: Number(signals?.jsFileCount || 0) > 0 && Number(signals?.cssFileCount || 0) > 0 },
+    { label: "Using a third-party library", done: Boolean(signals?.hasThirdPartyImport) },
+    { label: "Using composite effects", done: Boolean(signals?.hasCompositeCss) }
+  ];
+}
+
 
 // Merge fcpxml-derived practices into the tree-level categories (done wins; never untick).
 function mergeVideoToolsCategories(baseCategories, fcpxmlLabels) {
@@ -12767,6 +12800,39 @@ app.get("/api/integrations/github/repo-analysis", async (req, res) => {
       psdSignals.labels
     );
 
+    // AS91893 Advanced Tools & Techniques: sample a few committed CSS/JS files (bounded,
+    // best-effort) for composite-effect properties and third-party library imports.
+    const jsFilePaths = treeItems
+      .filter((item) => item?.type === "blob" && GITHUB_JS_EXTENSION.test(String(item?.path || "")))
+      .map((item) => String(item?.path || "").trim());
+    const toolsTechniquesSampleFiles = [...cssFiles.slice(0, 3), ...jsFilePaths.slice(0, 3)];
+    let hasCompositeCss = false;
+    let hasThirdPartyImport = false;
+    await Promise.all(toolsTechniquesSampleFiles.map(async (filePath) => {
+      const content = await fetchGithubRepoRawFile(identifier.owner, identifier.repo, defaultBranch, filePath);
+      if (!content) return;
+      if (/mix-blend-mode|backdrop-filter|filter\s*:|linear-gradient|radial-gradient|animation\s*:|transform\s*:|clip-path/i.test(content)) {
+        hasCompositeCss = true;
+      }
+      if (/@import\s+url\(|cdn\.|unpkg\.com|jsdelivr|googleapis\.com\/ajax|import\s+.+\s+from\s+["'][^."'][^"']*["']|require\(["'][^."'][^"']*["']\)/i.test(content)) {
+        hasThirdPartyImport = true;
+      }
+    }));
+
+    const toolsTechniquesCategories = {
+      web: computeGithubToolsTechniquesCategories("web", {
+        jsFileCount: jsFilePaths.length,
+        cssFileCount: cssFiles.length,
+        hasCompositeCss,
+        hasThirdPartyImport
+      }),
+      video: computeGithubToolsTechniquesCategories("video", { fcpxmlLabels: allFcpxmlLabels }),
+      image: computeGithubToolsTechniquesCategories("image", {
+        psdLabels: psdSignals.labels,
+        primaryLayerCount: Number(psdSignals.files?.[0]?.layer_count || 0)
+      })
+    };
+
     res.json({
       ok: true,
       owner: identifier.owner,
@@ -12788,6 +12854,7 @@ app.get("/api/integrations/github/repo-analysis", async (req, res) => {
       categories,
       image_tools_categories: imageToolsCategories,
       video_tools_categories: videoToolsCategories,
+      tools_techniques_categories: toolsTechniquesCategories,
       fcpxml_detected: { file: primaryFcpxmlPath, labels: allFcpxmlLabels, files: fcpxmlFiles },
       psd_detected: { file: psdSignals.files[0]?.file || "", labels: psdSignals.labels, files: psdSignals.files },
       validation: validationResults

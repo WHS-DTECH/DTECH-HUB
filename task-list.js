@@ -1193,6 +1193,25 @@ async function runGithubEfficientToolsSync(activityId, email, repoUrl) {
         void persistVideoEfficientToolsToServer(activityId);
     }
 
+    // Auto-tick the AS91893 Advanced Tools & Techniques categories (Web/Video/Image share the
+    // same 4 labels; only the media type with real repo evidence will ever report done: true).
+    const toolsTechniquesGroups = payload?.tools_techniques_categories || {};
+    const toolsTechniquesState = readDigiMedToolsTechniquesState(activityId, email);
+    let toolsTechniquesChanged = false;
+    ["web", "video", "image"].forEach((mediaKey) => {
+        (Array.isArray(toolsTechniquesGroups[mediaKey]) ? toolsTechniquesGroups[mediaKey] : []).forEach((category) => {
+            const label = String(category?.label || "").trim();
+            if (!label || !category.done || !DIGIMED_TOOLS_TECHNIQUES_SUBTASKS.includes(label)) return;
+            if (!toolsTechniquesState[label]) {
+                toolsTechniquesState[label] = true;
+                toolsTechniquesChanged = true;
+            }
+        });
+    });
+    if (toolsTechniquesChanged) {
+        writeDigiMedToolsTechniquesState(activityId, email, toolsTechniquesState);
+    }
+
     writeGithubRepoAnalysis(activityId, email, {
         repoUrl,
         commitCount: Number(payload?.commit_count || 0),
@@ -2404,6 +2423,7 @@ function renderChecklistCards(detail, allItems) {
                                                     </label>
                                                 `).join("")}
                                             </div>
+                                            ${String(standard) === "91893" ? `<p class="task-list-achieved-note">Auto-detected from your GitHub repo where possible \u2014 click Sync from GitHub above to check these boxes.</p>` : ""}
                                         </div>
                                     ` : ""}
                                     ${is91893EfficientToolsRow ? `
