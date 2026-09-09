@@ -2410,6 +2410,7 @@ function renderChecklistCards(detail, allItems) {
                                         <div class="task-list-decomposition-subtasks">
                                             <p class="task-list-system-title">${subtasksTitle}</p>
                                             <p class="task-list-achieved-note">Examples of efficient tools and techniques.</p>
+                                            <p class="task-list-achieved-note">Complete any 3 or more categories. (${efficientToolsSubtasks.filter((subtask) => efficientToolsState[subtask]).length}/${efficientToolsSubtasks.length})</p>
                                             <div class="task-list-decomposition-subtask-list">
                                                 ${efficientToolsSubtasks.map((subtask) => `
                                                     <label class="task-list-decomposition-subtask ${efficientToolsState[subtask] ? "is-complete" : ""}">
