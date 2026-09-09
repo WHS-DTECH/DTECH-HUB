@@ -979,8 +979,16 @@ const DECOMPOSITION_TASK_CATEGORIES = [
         pattern: /tool|technique|software|library|framework|template|api|plugin|extension|github|trello|onedrive|google drive|vs code|setup|set up|install|sync|version control/i
     },
     {
+        label: "Trialling",
+        pattern: /trial|trialling|trialing|prototype|experiment|iterat|mock.?up|wireframe|draft/i
+    },
+    {
+        label: "Testing",
+        pattern: /test|testing|debug|bug|verify|validat|check|fix/i
+    },
+    {
         label: "Success Criteria",
-        pattern: /success|criteria|test|testing|trial|evaluat|measure|review|quality|requirement|spec|acceptance|check|debug|fix/i
+        pattern: /success|criteria|evaluat|measure|review|quality|requirement|spec|acceptance/i
     },
     {
         label: "Client Interaction",
@@ -1387,6 +1395,16 @@ function getDecompositionSubtasks(stateMap) {
             label: "Tools & Techniques",
             href: buildCustomActivityLink(activityId, "What Tools and Techniques will be used?", "Tools & Techniques", "tools-and-techniques"),
             done: isComplete(/what tools and techniques will be used/i)
+        }),
+        withCoverage({
+            label: "Trialling",
+            href: buildCustomActivityLink(activityId, "Trial the components of the digital technologies outcome.", "Trialling Components", "trialling-components"),
+            done: false
+        }),
+        withCoverage({
+            label: "Testing",
+            href: buildCustomActivityLink(activityId, "Testing that the digital technologies outcome functions as intended.", "Testing Functions", "testing-functions"),
+            done: false
         }),
         withCoverage({
             label: "Success Criteria",
@@ -2619,7 +2637,7 @@ function renderChecklistCards(detail, allItems) {
                                     ${isDecompositionRow ? `
                                         <div class="task-list-decomposition-subtasks">
                                             <p class="task-list-system-title">Decomposition Subtasks</p>
-                                            <p class="task-list-achieved-note">Complete at least one task in each of the Decomposition Categories.</p>
+                                            <p class="task-list-achieved-note">Complete at least one task in each of the Decomposition Categories. Counts are pulled directly from your Trello board.</p>
                                             <div class="task-list-decomposition-category-list">
                                                 ${decompositionSubtasks.map((subtask) => `
                                                     <a class="task-list-decomposition-category ${subtask.trelloCount > 0 ? "is-covered" : ""}" href="${escapeTaskListHtml(subtask.href)}">
