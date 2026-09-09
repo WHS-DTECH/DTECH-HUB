@@ -1568,11 +1568,18 @@ function renderLibrary() {
     }
 
     templateLibraryData = Array.isArray(templateLibraryData) ? [...templateLibraryData].sort(compareTemplateEntries) : [];
-    const normalizedQuery = String(templateSearchQuery || "").trim().toLowerCase();
+    // Task topic titles like "Conventions (WEB)"/"(VIDEO)"/"(IMAGE)" are UI-only media-type
+    // labels; the underlying template title/criteria never include that suffix, so strip it
+    // before matching, and also match against the assessment criteria text, not just the title.
+    const normalizedQuery = String(templateSearchQuery || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s*\((?:web|video|image)\)\s*$/i, "");
     const filteredTemplates = normalizedQuery
         ? templateLibraryData.filter((item) => {
             const title = String(item?.title || "").toLowerCase();
-            return title.includes(normalizedQuery);
+            const criteriaText = String(item?.criteriaText || "").toLowerCase();
+            return title.includes(normalizedQuery) || criteriaText.includes(normalizedQuery);
         })
         : templateLibraryData;
 
