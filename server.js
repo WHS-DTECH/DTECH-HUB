@@ -12628,6 +12628,23 @@ function computeGithubToolsTechniquesCategories(mediaType, signals) {
   ];
 }
 
+function computeGithubComplexTechniquesCategories(mediaType, signals) {
+  if (String(mediaType || "").trim().toLowerCase() !== "image") return [];
+
+  const labelSet = new Set(Array.isArray(signals?.psdLabels) ? signals.psdLabels : []);
+  const hasLayeredSource = Number(signals?.primaryLayerCount || 0) > 1;
+  const hasImageAssets = Number(signals?.imageCount || 0) > 0;
+  return [
+    { label: "Non-core functionality", done: labelSet.has("Using non-destructive editing techniques") },
+    { label: "Sophisticated digital effects", done: labelSet.has("Reusing styles, objects and/or presets") && hasLayeredSource },
+    { label: "Applying industry standards or guidelines", done: labelSet.has("Using templates, guides and/or grids") || labelSet.has("Using appropriate colour and typography controls") },
+    { label: "Responsive design for use on multiple devices", done: false },
+    { label: "Integration of original media assets", done: hasImageAssets },
+    { label: "Dynamic data handling and interactivity", done: false },
+    { label: "Automation through scripts", done: false }
+  ];
+}
+
 
 // Merge fcpxml-derived practices into the tree-level categories (done wins; never untick).
 function mergeVideoToolsCategories(baseCategories, fcpxmlLabels) {
@@ -12832,6 +12849,13 @@ app.get("/api/integrations/github/repo-analysis", async (req, res) => {
         primaryLayerCount: Number(psdSignals.files?.[0]?.layer_count || 0)
       })
     };
+    const complexTechniquesCategories = {
+      image: computeGithubComplexTechniquesCategories("image", {
+        psdLabels: psdSignals.labels,
+        primaryLayerCount: Number(psdSignals.files?.[0]?.layer_count || 0),
+        imageCount: imageStats.count
+      })
+    };
 
     res.json({
       ok: true,
@@ -12855,6 +12879,7 @@ app.get("/api/integrations/github/repo-analysis", async (req, res) => {
       image_tools_categories: imageToolsCategories,
       video_tools_categories: videoToolsCategories,
       tools_techniques_categories: toolsTechniquesCategories,
+      complex_techniques_categories: complexTechniquesCategories,
       fcpxml_detected: { file: primaryFcpxmlPath, labels: allFcpxmlLabels, files: fcpxmlFiles },
       psd_detected: { file: psdSignals.files[0]?.file || "", labels: psdSignals.labels, files: psdSignals.files },
       validation: validationResults
