@@ -2423,7 +2423,7 @@ function renderChecklistCards(detail, allItems) {
                                                     </label>
                                                 `).join("")}
                                             </div>
-                                            ${String(standard) === "91893" ? `<p class="task-list-achieved-note">Auto-detected from your GitHub repo where possible \u2014 click Sync from GitHub above to check these boxes.</p>` : ""}
+                                            ${String(standard) === "91893" ? `<p class="task-list-achieved-note">Complete any 3 or more categories.</p><p class="task-list-achieved-note">Auto-detected from your GitHub repo where possible \u2014 click Sync from GitHub above to check these boxes.</p>` : ""}
                                         </div>
                                     ` : ""}
                                     ${is91893EfficientToolsRow ? `
