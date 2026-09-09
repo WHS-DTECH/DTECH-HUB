@@ -6001,11 +6001,16 @@ function extractGoogleSlidesConventionAreas(presentation) {
       const table = element?.table;
       if (!table || !Array.isArray(table.tableRows)) return;
       table.tableRows.forEach((row) => {
-        const firstCell = Array.isArray(row?.tableCells) ? row.tableCells[0] : null;
-        const value = extractGoogleSlidesTableCellText(firstCell);
+        const cells = Array.isArray(row?.tableCells) ? row.tableCells : [];
+        const value = extractGoogleSlidesTableCellText(cells[0] || null);
         if (!value || /^(?:relevant\s+)?convention\s+area$/i.test(value)) return;
         const area = knownAreas.find((candidate) => candidate.toLowerCase() === value.toLowerCase());
-        if (area && !found.includes(area)) found.push(area);
+        if (!area || found.includes(area)) return;
+        // Only count a convention as discussed once the student has actually written
+        // something in one of the other columns (why it's relevant, how it was applied, etc.);
+        // the row/label alone is just the template and proves nothing was listed yet.
+        const hasListedContent = cells.slice(1).some((cell) => Boolean(extractGoogleSlidesTableCellText(cell)));
+        if (hasListedContent) found.push(area);
       });
     });
   });
