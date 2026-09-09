@@ -3522,7 +3522,10 @@ async function syncDigiMedConventionsFromSlide(projectId, email, taskTopicTitle)
 
     const standardKey = buildTaskTopicSubmissionStandardKey(taskTopicTitle, "91897");
     const evidenceRows = await fetchEvidenceRowsEnsuringAllocation(projectId, email);
-    const detected = {};
+    // Merge with previously acknowledged areas (manual ticks or earlier syncs) so a fresh
+    // sync only adds newly-listed conventions and never silently unticks/loses existing ones.
+    const existingSubmission = parseTaskTopicSubmissionFromEvidenceRows(evidenceRows, standardKey);
+    const detected = { ...(existingSubmission.conventionAcknowledgements || {}) };
     (Array.isArray(payload?.areas) ? payload.areas : []).forEach((area) => {
         if (DIGIMED_CONVENTION_AREAS.includes(area)) detected[area] = true;
     });
