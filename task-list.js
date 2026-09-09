@@ -1430,11 +1430,13 @@ function getDecompositionSubtasks(stateMap) {
         }),
         withCoverage({
             label: "Trialling",
+            displayLabel: "Trialling - COMPONENTS",
             href: buildCustomActivityLink(activityId, "Trial the components of the digital technologies outcome.", "Trialling Components", "trialling-components"),
             done: false
         }),
         withCoverage({
             label: "Testing",
+            displayLabel: "Testing - FUNCTIONS",
             href: buildCustomActivityLink(activityId, "Testing that the digital technologies outcome functions as intended.", "Testing Functions", "testing-functions"),
             done: false
         }),
@@ -1574,7 +1576,7 @@ function getTestingFunctionsSubtasks(stateMap) {
     const formUrl = getFirstGoogleFormUrlFromEvidenceRows(stateMap);
     return [
         {
-            label: "FUNCTIONS",
+            label: "Testing - FUNCTIONS",
             href: buildCustomActivityLink(activityId, "Testing that the digital technologies outcome functions as intended.", "Testing Functions", "testing-functions"),
             done: functionalCount > 0 || userCount > 0,
             countText: `${functionalCount} functional / ${userCount} user`
@@ -2675,7 +2677,7 @@ function renderChecklistCards(detail, allItems) {
                                             <div class="task-list-decomposition-category-list">
                                                 ${decompositionSubtasks.map((subtask) => `
                                                     <a class="task-list-decomposition-category ${subtask.trelloCount > 0 ? "is-covered" : ""}" href="${escapeTaskListHtml(subtask.href)}">
-                                                        <span class="task-list-decomposition-category-label">${escapeTaskListHtml(subtask.label)}</span>
+                                                        <span class="task-list-decomposition-category-label">${escapeTaskListHtml(subtask.displayLabel || subtask.label)}</span>
                                                         <span class="task-list-decomposition-category-count">${subtask.coverageKnown ? subtask.trelloCount : "-"}</span>
                                                     </a>
                                                 `).join("")}
@@ -2691,7 +2693,7 @@ function renderChecklistCards(detail, allItems) {
                                             <p class="task-list-achieved-note">Components identified for trialling.</p>
                                             <div class="task-list-decomposition-category-list">
                                                 <a class="task-list-decomposition-category ${Number.isFinite(triallingComponentsCount) && triallingComponentsCount > 0 ? "is-covered" : ""}" href="${escapeTaskListHtml(getTaskTopicHrefForStep(standard, level, stepText) || "#")}">
-                                                    <span class="task-list-decomposition-category-label">COMPONENTS</span>
+                                                    <span class="task-list-decomposition-category-label">Trialling - COMPONENTS</span>
                                                     <span class="task-list-decomposition-category-count">${Number.isFinite(triallingComponentsCount) ? triallingComponentsCount : "-"}</span>
                                                 </a>
                                             </div>
@@ -2731,7 +2733,7 @@ function renderChecklistCards(detail, allItems) {
                                                 ${testingFunctionsSubtasks.map((subtask) => `
                                                     <label class="task-list-decomposition-subtask ${subtask.done ? "is-complete" : ""}">
                                                         <input type="checkbox" disabled ${subtask.done ? "checked" : ""}>
-                                                        <a href="${escapeTaskListHtml(subtask.href)}">${getProjectManagementSystemLogo(subtask.label)}${escapeTaskListHtml(subtask.label)}</a>
+                                                        <a href="${escapeTaskListHtml(subtask.href)}">${getProjectManagementSystemLogo(subtask.label)}${escapeTaskListHtml(subtask.label)}${subtask.countText ? ` - ${escapeTaskListHtml(subtask.countText)}` : ""}</a>
                                                     </label>
                                                 `).join("")}
                                             </div>
