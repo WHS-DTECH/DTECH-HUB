@@ -836,6 +836,56 @@ function createStudentSummaryBucket() {
     return { total: 0, evidenceCount: 0, submittedCount: 0, firstTaskTopic: "", records: [] };
 }
 
+function hasStudentSummaryEvidence(record) {
+    return Boolean(record?.googleSlidesUrl || (Array.isArray(record?.links) && record.links.length));
+}
+
+function getStudentSummaryRecordIdentity(record) {
+    const standard = getStudentSummaryStandardNumber(record);
+    const section = getStudentSummarySectionLabel(record);
+    const topic = stripTaskTopicLevel(record?.taskTopic).toLowerCase();
+    return `${standard}||${section}||${topic}`;
+}
+
+function mergeStudentSummaryRecords(existing, incoming) {
+    if (!existing) return incoming;
+
+    const links = [];
+    const seenUrls = new Set();
+    [...(Array.isArray(existing.links) ? existing.links : []), ...(Array.isArray(incoming.links) ? incoming.links : [])].forEach((link) => {
+        const url = toSafeExternalUrl(link?.url);
+        if (!url || seenUrls.has(url)) return;
+        seenUrls.add(url);
+        links.push({ label: String(link?.label || "Link").trim() || "Link", url });
+    });
+
+    return {
+        ...existing,
+        ...incoming,
+        googleSlidesUrl: existing.googleSlidesUrl || incoming.googleSlidesUrl,
+        links,
+        submitted: Boolean(existing.submitted || incoming.submitted),
+        acknowledged: Boolean(existing.acknowledged || incoming.acknowledged),
+        submittedAt: existing.submittedAt || incoming.submittedAt,
+        taskUrl: existing.taskUrl || incoming.taskUrl
+    };
+}
+
+function finalizeStudentSummaryBucket(bucket) {
+    const byIdentity = new Map();
+    (Array.isArray(bucket?.records) ? bucket.records : []).forEach((record) => {
+        const key = getStudentSummaryRecordIdentity(record);
+        if (!key) return;
+        byIdentity.set(key, mergeStudentSummaryRecords(byIdentity.get(key), record));
+    });
+
+    bucket.records = Array.from(byIdentity.values());
+    bucket.total = bucket.records.length;
+    bucket.evidenceCount = bucket.records.filter(hasStudentSummaryEvidence).length;
+    bucket.submittedCount = bucket.records.filter((record) => record.acknowledged).length;
+    bucket.firstTaskTopic = bucket.records[0]?.taskTopic || "";
+}
+
 // One row per student, one column per criteria group, sourced entirely from the records already built for the task cards.
 function buildStudentSummaryRows() {
     const byStudent = new Map();
@@ -869,6 +919,10 @@ function buildStudentSummaryRows() {
                 bucket.submittedCount += 1;
             }
         });
+    });
+
+    byStudent.forEach((student) => {
+        student.groups.forEach((bucket) => finalizeStudentSummaryBucket(bucket));
     });
 
     return Array.from(byStudent.values()).sort((a, b) => a.studentName.localeCompare(b.studentName));
@@ -921,7 +975,7 @@ function renderStudentSummaryDetailPanel(student, group, bucket) {
                     <ul>
                         ${group.records.map((record) => {
                             const complete = Boolean(record.acknowledged);
-                            const hasEvidence = Boolean(record.googleSlidesUrl || (Array.isArray(record.links) && record.links.length));
+                            const hasEvidence = hasStudentSummaryEvidence(record);
                             const href = String(record.taskUrl || "").trim() || `teacher-student-work-task.html?task=${encodeURIComponent(record.taskTopic || "")}`;
                             const status = complete ? (record.submitted ? "Submitted" : "Acknowledged") : (hasEvidence ? "Evidence linked" : "Missing");
                             return `
