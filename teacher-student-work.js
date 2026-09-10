@@ -15,6 +15,7 @@ const workState = {
     records: [],
     selectedTask: "",
     studentSearch: "",
+    standardSearch: "",
     expandedSummaryStudent: "",
     expandedSummaryGroup: ""
 };
@@ -25,6 +26,7 @@ const trackerTitle = document.querySelector("#tracker-title");
 const trackerSummary = document.querySelector("#tracker-summary");
 const tableHost = document.querySelector("#work-table-host");
 const studentSearchInput = document.querySelector("#student-search-input");
+const standardSearchInput = document.querySelector("#standard-search-input");
 const taskPageNav = document.querySelector("#task-page-nav");
 const taskPrevButton = document.querySelector("#task-prev-button");
 const taskNextButton = document.querySelector("#task-next-button");
@@ -258,6 +260,23 @@ function extractStandardNumbers(activity) {
         output.unshift(primary);
     }
 
+    return output;
+}
+
+function normalizeTrackerStandardValue(value) {
+    const match = String(value || "").match(/\b\d{4,6}\b/);
+    return match?.[0] || "";
+}
+
+function mergeTrackerStandardNumbers(...sources) {
+    const seen = new Set();
+    const output = [];
+    sources.flat().forEach((value) => {
+        const standard = normalizeTrackerStandardValue(value);
+        if (!standard || seen.has(standard)) return;
+        seen.add(standard);
+        output.push(standard);
+    });
     return output;
 }
 
@@ -712,12 +731,16 @@ function buildAllRecords() {
 
         if (!uniqueTopics.length) return;
 
-        const standardNumbers = extractStandardNumbers(activity);
+        const activityStandardNumbers = extractStandardNumbers(activity);
         const students = Array.isArray(interest?.students) ? interest.students : [];
 
         students.forEach((student) => {
             const studentEmail = normalizeEmail(student?.email || student?.student_email || "");
             if (!studentEmail) return;
+
+            const processStandard = normalizeTrackerStandardValue(student?.standard_1);
+            const projectTaskStandard = normalizeTrackerStandardValue(student?.standard_2);
+            const standardNumbers = mergeTrackerStandardNumbers(processStandard, projectTaskStandard, activityStandardNumbers);
 
             const evidenceRows = Array.isArray(student?.evidence_steps) ? student.evidence_steps : [];
             uniqueTopics.forEach((taskTopic) => {
@@ -751,6 +774,8 @@ function buildAllRecords() {
                     studentEmail,
                     studentName: String(workState.studentNameByEmail.get(studentEmail) || formatNameFromEmail(studentEmail) || studentEmail).trim(),
                     standardKey: String(checklistStep?.standardKey || resolved.matchedStandardKey || "").trim(),
+                    processStandard,
+                    projectTaskStandard,
                     googleSlidesUrl: evidence.googleSlidesUrl,
                     links: mergedLinks,
                     submitted: Boolean(evidence.submitted),
@@ -834,6 +859,23 @@ function getStudentSummarySectionLabel(record) {
 
 function createStudentSummaryBucket() {
     return { total: 0, evidenceCount: 0, submittedCount: 0, firstTaskTopic: "", records: [] };
+}
+
+function getStudentProcessStandards(student) {
+    const standards = new Set();
+    student?.groups?.forEach?.((bucket) => {
+        (Array.isArray(bucket?.records) ? bucket.records : []).forEach((record) => {
+            const standard = normalizeTrackerStandardValue(record?.processStandard);
+            if (standard) standards.add(standard);
+        });
+    });
+    return Array.from(standards).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+}
+
+function studentMatchesStandardSearch(student, searchText) {
+    const query = String(searchText || "").trim().toLowerCase();
+    if (!query) return true;
+    return getStudentProcessStandards(student).some((standard) => standard.toLowerCase().includes(query));
 }
 
 function hasStudentSummaryEvidence(record) {
@@ -923,6 +965,7 @@ function buildStudentSummaryRows() {
 
     byStudent.forEach((student) => {
         student.groups.forEach((bucket) => finalizeStudentSummaryBucket(bucket));
+        student.processStandards = getStudentProcessStandards(student);
     });
 
     return Array.from(byStudent.values()).sort((a, b) => a.studentName.localeCompare(b.studentName));
@@ -1017,7 +1060,7 @@ function renderStudentSummaryDetailRow(student) {
 
     return `
         <tr class="student-summary-expanded-row">
-            <td colspan="${STUDENT_SUMMARY_GROUPS.length + 1}">
+            <td colspan="${STUDENT_SUMMARY_GROUPS.length + 2}">
                 ${renderStudentSummaryDetailPanel(student, group, bucket)}
             </td>
         </tr>
@@ -1035,11 +1078,13 @@ function renderStudentSummaryGrid() {
     }
 
     const searchText = String(workState.studentSearch || "").trim().toLowerCase();
+    const standardSearchText = String(workState.standardSearch || "").trim().toLowerCase();
     const visibleRows = searchText
         ? rows.filter((student) => `${student.studentName} ${student.studentEmail}`.toLowerCase().includes(searchText))
         : rows;
+    const filteredRows = visibleRows.filter((student) => studentMatchesStandardSearch(student, standardSearchText));
 
-    if (!visibleRows.length) {
+    if (!filteredRows.length) {
         host.innerHTML = `<div class="work-empty">No students match that search.</div>`;
         return;
     }
@@ -1050,13 +1095,15 @@ function renderStudentSummaryGrid() {
                 <thead>
                     <tr>
                         <th>Student</th>
+                        <th>Process Standard</th>
                         ${STUDENT_SUMMARY_GROUPS.map((group) => `<th>${escapeHtml(group.label)}</th>`).join("")}
                     </tr>
                 </thead>
                 <tbody>
-                    ${visibleRows.map((student) => `
+                    ${filteredRows.map((student) => `
                         <tr>
                             <td>${escapeHtml(student.studentName)}</td>
+                            <td>${(Array.isArray(student.processStandards) && student.processStandards.length) ? student.processStandards.map((standard) => `<a class="student-standard-chip" href="teacher-assessment-allocation.html?standard=${encodeURIComponent(standard)}" title="Open assessment allocation data">${escapeHtml(standard)}</a>`).join(" ") : `<span class="student-standard-chip is-empty">-</span>`}</td>
                             ${STUDENT_SUMMARY_GROUPS.map((group) => renderStudentSummaryCell(student, group, student.groups.get(group.key))).join("")}
                         </tr>
                         ${renderStudentSummaryDetailRow(student)}
@@ -1389,11 +1436,18 @@ function wireTaskNavigationEvents() {
 }
 
 function wireStudentSearchEvents() {
-    if (!studentSearchInput) return;
-    studentSearchInput.addEventListener("input", () => {
-        workState.studentSearch = String(studentSearchInput.value || "");
-        renderStudentSummaryGrid();
-    });
+    if (studentSearchInput) {
+        studentSearchInput.addEventListener("input", () => {
+            workState.studentSearch = String(studentSearchInput.value || "");
+            renderStudentSummaryGrid();
+        });
+    }
+    if (standardSearchInput) {
+        standardSearchInput.addEventListener("input", () => {
+            workState.standardSearch = String(standardSearchInput.value || "");
+            renderStudentSummaryGrid();
+        });
+    }
 }
 
 function wireStudentSummaryEvents() {
