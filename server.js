@@ -6633,6 +6633,44 @@ async function driveCreateFolder(parentFolderId, folderName, accessToken) {
   });
 }
 
+async function driveEnsureAnyoneEditorPermission(fileId, accessToken) {
+  const safeFileId = String(fileId || "").trim();
+  if (!safeFileId || !accessToken) return { applied: false, reason: "missing_parameters" };
+
+  const permissions = await driveApiRequest(`/files/${encodeURIComponent(safeFileId)}/permissions`, {
+    accessToken,
+    queryParams: {
+      fields: "permissions(id,type,role,emailAddress)",
+      supportsAllDrives: true,
+      pageSize: 100
+    }
+  });
+  const existing = (Array.isArray(permissions?.permissions) ? permissions.permissions : [])
+    .find((permission) => String(permission?.type || "").toLowerCase() === "anyone");
+
+  if (existing?.id && String(existing?.role || "").toLowerCase() === "writer") {
+    return { applied: true, permissionId: existing.id, alreadyConfigured: true };
+  }
+
+  if (existing?.id) {
+    const updated = await driveApiRequest(`/files/${encodeURIComponent(safeFileId)}/permissions/${encodeURIComponent(existing.id)}`, {
+      accessToken,
+      method: "PATCH",
+      queryParams: { supportsAllDrives: true, fields: "id,type,role" },
+      body: { role: "writer" }
+    });
+    return { applied: true, permissionId: updated?.id || existing.id, alreadyConfigured: false };
+  }
+
+  const created = await driveApiRequest(`/files/${encodeURIComponent(safeFileId)}/permissions`, {
+    accessToken,
+    method: "POST",
+    queryParams: { supportsAllDrives: true, sendNotificationEmail: false, fields: "id,type,role" },
+    body: { type: "anyone", role: "writer" }
+  });
+  return { applied: true, permissionId: created?.id || "", alreadyConfigured: false };
+}
+
 async function driveEnsureProcessAssessmentFolder(haparaFolderId, accessToken) {
   const existing = await driveFindFolderByName(haparaFolderId, "Process Assessment", accessToken);
   if (existing?.id) return existing;
@@ -7195,7 +7233,17 @@ app.post("/api/student/drive-setup/status", async (req, res) => {
       return;
     }
 
-    res.json(setup);
+    const sharing = { applied: false };
+    const sharingWarnings = [];
+    if (setup.processAssessmentFolderId) {
+      try {
+        Object.assign(sharing, await driveEnsureAnyoneEditorPermission(setup.processAssessmentFolderId, driveAccessToken));
+      } catch (sharingError) {
+        sharingWarnings.push(`Could not set Process Assessment folder sharing to anyone with the link as Editor (${String(sharingError?.message || "Drive permission error")}).`);
+      }
+    }
+
+    res.json({ ...setup, sharing, warnings: sharingWarnings });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not check Google Drive setup." });
   }
@@ -7214,6 +7262,12 @@ app.post("/api/student/drive-setup/confirm", async (req, res) => {
     if (!folder?.id) { res.status(500).json({ error: "Could not find or create the Process Assessment folder." }); return; }
 
     const setupWarnings = [];
+    let sharing = { applied: false };
+    try {
+      sharing = await driveEnsureAnyoneEditorPermission(folder.id, driveAccessToken);
+    } catch (sharingError) {
+      setupWarnings.push(`Could not set Process Assessment folder sharing to anyone with the link as Editor (${String(sharingError?.message || "Drive permission error")}).`);
+    }
     let digitalOutcomeFolder = null;
     let relevantImplicationsFolder = null;
 
@@ -7250,6 +7304,7 @@ app.post("/api/student/drive-setup/confirm", async (req, res) => {
       relevantImplicationsFolderUrl: relevantImplicationsFolder?.id
         ? (relevantImplicationsFolder.webViewLink || `https://drive.google.com/drive/folders/${relevantImplicationsFolder.id}`)
         : null,
+      sharing,
       warnings: setupWarnings
     });
   } catch (error) {
@@ -7383,6 +7438,7 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
     const processAssessmentFolderId = String(setup.processAssessmentFolderId || "").trim();
     const processAssessmentFolderUrl = buildDriveFolderUrlFromId(processAssessmentFolderId);
     const activityId = String(req.body?.activityId || "").trim();
+    await driveEnsureAnyoneEditorPermission(processAssessmentFolderId, driveAccessToken).catch(() => {});
     let resolvedSourcePresentationId = sourcePresentationId;
     const isTriallingComponentsTemplate = templateId.toLowerCase() === "trialling-components"
       || /triall?ing\s+components|trailing\s+components/i.test(templateTitle);
