@@ -1203,11 +1203,14 @@ function buildProgressSummaryReportHtml(student, standard) {
         .sort((a, b) => compareTaskTopics(a.taskTopic, b.taskTopic));
     const acknowledgedCount = records.filter((record) => record.acknowledged).length;
     const generatedDate = new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
-    const detailGroups = buildStudentSummaryDetailGroups(records);
-    const reportRows = detailGroups.map((group) => `
-        <section class="report-section">
-            <h2>${escapeHtml(group.section)} <span>${group.records.filter((record) => record.acknowledged).length}/${group.records.length} acknowledged</span></h2>
-            ${group.records.map((record) => {
+    const reportLevelOrder = ["digital_outcome", "achieved", "merit", "excellence"];
+    const reportLevelLabels = {
+        digital_outcome: "Digital Outcome",
+        achieved: "Achieved",
+        merit: "Merit",
+        excellence: "Excellence"
+    };
+    const renderReportRecord = (record) => {
                 const acknowledged = Boolean(record.acknowledged);
                 const evidence = [];
                 if (record.googleSlidesUrl) evidence.push({ label: "Google Slides", url: record.googleSlidesUrl });
@@ -1225,9 +1228,24 @@ function buildProgressSummaryReportHtml(student, standard) {
                         </div>
                     </article>
                 `;
-            }).join("")}
-        </section>
-    `).join("");
+    };
+    const reportRows = reportLevelOrder.map((level) => {
+        const levelRecords = records.filter((record) => getTaskTopicGroup(record.taskTopic) === level);
+        if (!levelRecords.length) return "";
+        const detailGroups = buildStudentSummaryDetailGroups(levelRecords);
+        const levelAcknowledged = levelRecords.filter((record) => record.acknowledged).length;
+        return `
+            <div class="report-level">
+                <h2 class="report-level-heading">${escapeHtml(reportLevelLabels[level])} <span>${levelAcknowledged}/${levelRecords.length} acknowledged</span></h2>
+                ${detailGroups.map((group) => `
+                    <section class="report-section">
+                        <h3>${escapeHtml(group.section)} <span>${group.records.filter((record) => record.acknowledged).length}/${group.records.length} acknowledged</span></h3>
+                        ${group.records.map(renderReportRecord).join("")}
+                    </section>
+                `).join("")}
+            </div>
+        `;
+    }).join("");
 
     return `
         <article class="progress-report">
@@ -1272,15 +1290,19 @@ function openProgressSummaryPrintWindow(students, standard) {
         .report-kicker { margin: 0 0 5px; color: #315f87; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
         h1 { margin: 0 0 12px; color: #173f63; font: 700 24px Georgia, serif; }
         h2 { margin: 0; color: #173f63; font-size: 14px; }
+        h3 { margin: 0; color: #173f63; font-size: 12px; }
         .report-header dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 0; }
         dt { color: #5a7188; font-size: 9px; font-weight: 700; text-transform: uppercase; }
         dd { margin: 3px 0 0; font-weight: 700; }
         .report-progress { margin: 14px 0; padding: 10px 12px; border: 1px solid #c5d7e8; border-left: 4px solid #2f74b9; background: #f2f8fc; }
         .report-progress strong { display: block; margin-top: 5px; color: #1f663d; font-size: 17px; }
         .report-progress p { margin: 4px 0 0; }
-        .report-section { margin: 12px 0; page-break-inside: avoid; }
-        .report-section h2 { display: flex; justify-content: space-between; gap: 10px; padding: 7px 9px; border: 1px solid #c5d7e8; background: #eaf3fa; }
-        .report-section h2 span { font-size: 11px; }
+        .report-level { margin: 14px 0; page-break-inside: avoid; }
+        .report-level-heading { display: flex; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 1px solid #a8c5dd; border-left: 4px solid #2f74b9; background: #eaf3fa; text-transform: uppercase; letter-spacing: .04em; }
+        .report-level-heading span { font-size: 11px; text-transform: none; letter-spacing: 0; }
+        .report-section { margin: 8px 0 0; page-break-inside: avoid; }
+        .report-section h3 { display: flex; justify-content: space-between; gap: 10px; padding: 7px 9px; border: 1px solid #c5d7e8; background: #f4f8fc; }
+        .report-section h3 span { font-size: 10px; }
         .report-item { margin-top: 5px; padding: 7px 9px; border: 1px solid #d7e2ed; }
         .report-item.complete { background: #eef8f1; border-color: #b7dbc3; }
         .report-item.linked { background: #fff9ea; border-color: #ddcca5; }
