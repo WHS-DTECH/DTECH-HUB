@@ -854,6 +854,9 @@ const STUDENT_SUMMARY_GROUPS = [
 ];
 
 function getStudentSummaryStandardNumber(record) {
+    const allocatedStandard = normalizeTrackerStandardValue(record?.processStandard);
+    if (allocatedStandard) return allocatedStandard;
+
     const directStandard = String(record?.standardKey || "").trim();
     if (/^\d{4,6}$/.test(directStandard)) return directStandard;
     if (directStandard === "digital-outcome") return "Digital Outcome";
