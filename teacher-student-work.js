@@ -1253,13 +1253,16 @@ function buildProgressSummaryReportHtml(student, standard) {
 
 function openProgressSummaryPrintWindow(students, standard) {
     const reports = students.map((student) => buildProgressSummaryReportHtml(student, standard)).join("");
+    const reportTitle = students.length === 1
+        ? `${normalizeTrackerStandardValue(standard) || "Standard"} - Progress Summary - ${students[0].studentName}`
+        : `${normalizeTrackerStandardValue(standard) || "Standard"} - Progress Summaries`;
     const reportWindow = window.open("", "_blank", "width=1000,height=800");
     if (!reportWindow) {
         setStatus("Allow pop-ups to generate the progress summary PDF.", true);
         return;
     }
 
-    reportWindow.document.write(`<!doctype html><html><head><title>${escapeHtml(standard)} - Progress Summaries</title><style>
+    reportWindow.document.write(`<!doctype html><html><head><title>${escapeHtml(reportTitle)}</title><style>
         @page { size: A4; margin: 14mm; }
         * { box-sizing: border-box; }
         body { margin: 0; color: #17314d; font: 11px Arial, sans-serif; background: #fff; }
