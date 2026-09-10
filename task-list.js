@@ -2627,6 +2627,8 @@ function renderChecklistCards(detail, allItems) {
                                 && /trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components|trailing\s+components/.test(stepText.toLowerCase());
                             const isTestingFunctionsRow = String(level) === "Achieved"
                                 && /testing\s+functions|test(?:ing)?\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/i.test(stepText);
+                            const isLinkedTestingImprovementRow = (String(standard) === "91893" || String(standard) === "91903")
+                                && /using information from testing procedures to improve the quality of the (?:digital media )?outcome/i.test(stepText);
                             const isDigiMedConventionsRow = String(level) === "Achieved"
                                 && /using relevant conventions for the media type/i.test(stepText);
                             const isMultipleComponentsRow = String(level) === "Merit"
