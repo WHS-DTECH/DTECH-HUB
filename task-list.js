@@ -2404,6 +2404,9 @@ function renderChecklistCards(detail, allItems) {
                                 const isLinkedIntegrityTestingRow = String(standard) === "91893" && is91893IntegrityTestingRow;
                                 const isLinkedTestingImprovementRow = (String(standard) === "91893" || String(standard) === "91903")
                                     && /using information from testing procedures to improve the quality of the (?:digital media )?outcome/i.test(stepText);
+                                const isDigitalMediaIterativeImprovementRow = (String(standard) === "91893" || String(standard) === "91903")
+                                    && String(level) === "Excellence"
+                                    && /iterative improvement throughout the design, development and testing process/i.test(stepText);
                                 const digitalMediaType = getAllocatedDigitalMediaType(standard).toLowerCase();
                                 const isVideoMedia = digitalMediaType === "video";
                                 const isImageMedia = digitalMediaType === "image" || digitalMediaType === "graphics" || digitalMediaType === "vector";
@@ -2490,6 +2493,24 @@ function renderChecklistCards(detail, allItems) {
                                                 <a class="task-list-decomposition-category is-covered" href="${escapeTaskListHtml(integrityTestingHref)}">
                                                     <span class="task-list-decomposition-category-label">${escapeTaskListHtml(integrityTestingTitle)}</span>
                                                 </a>
+                                            </div>
+                                        </div>
+                                    ` : ""}
+                                    ${isDigitalMediaIterativeImprovementRow ? `
+                                        <div class="task-list-decomposition-subtasks task-list-iterative-improvement-subtasks">
+                                            <p class="task-list-system-title">ITERATIVE IMPROVEMENT EVIDENCE</p>
+                                            <p class="task-list-achieved-note">Use these evidence sources to show how decisions, testing and trialling led to improvements.</p>
+                                            <div class="task-list-iterative-improvement-table" role="table" aria-label="Iterative improvement evidence sources">
+                                                <div class="task-list-iterative-improvement-row is-header" role="row">
+                                                    <strong role="columnheader">Evidence source</strong>
+                                                    <strong role="columnheader">What it can demonstrate</strong>
+                                                </div>
+                                                ${ITERATIVE_IMPROVEMENT_EVIDENCE_SUBTASKS.map((subtask) => `
+                                                    <div class="task-list-iterative-improvement-row" role="row">
+                                                        <strong role="cell">${escapeTaskListHtml(subtask.evidenceSource)}</strong>
+                                                        <span role="cell">${escapeTaskListHtml(subtask.demonstrates)}</span>
+                                                    </div>
+                                                `).join("")}
                                             </div>
                                         </div>
                                     ` : ""}
