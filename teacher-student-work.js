@@ -787,6 +787,7 @@ function buildAllRecords() {
 
             const processStandard = normalizeTrackerStandardValue(student?.standard_1);
             const projectTaskStandard = normalizeTrackerStandardValue(student?.standard_2);
+            const digitalMediaType = String(student?.digital_media_type || student?.digitalMediaType || "").trim();
             const standardNumbers = mergeTrackerStandardNumbers(processStandard, projectTaskStandard, activityStandardNumbers);
 
             const evidenceRows = Array.isArray(student?.evidence_steps) ? student.evidence_steps : [];
@@ -826,6 +827,7 @@ function buildAllRecords() {
                     standardKey: String(checklistStep?.standardKey || resolved.matchedStandardKey || "").trim(),
                     processStandard,
                     projectTaskStandard,
+                    digitalMediaType,
                     processFolderUrl,
                     googleSlidesUrl: evidence.googleSlidesUrl,
                     links: mergedLinks,
@@ -943,6 +945,17 @@ function getStudentProcessFolderUrl(student) {
     return url;
 }
 
+function getStudentDigitalMediaType(student) {
+    const types = new Set();
+    student?.groups?.forEach?.((bucket) => {
+        (Array.isArray(bucket?.records) ? bucket.records : []).forEach((record) => {
+            const type = String(record?.digitalMediaType || "").trim();
+            if (type) types.add(type);
+        });
+    });
+    return Array.from(types).join(", ");
+}
+
 function studentMatchesStandardSearch(student, searchText) {
     const query = String(searchText || "").trim().toLowerCase();
     if (!query) return true;
@@ -1048,6 +1061,7 @@ function buildStudentSummaryRows(sourceRecords = workState.records) {
         });
         student.processStandards = getStudentProcessStandards(student);
         student.processFolderUrl = getStudentProcessFolderUrl(student);
+        student.digitalMediaType = getStudentDigitalMediaType(student);
     });
 
     return Array.from(byStudent.values()).sort((a, b) => a.studentName.localeCompare(b.studentName));
@@ -1201,11 +1215,12 @@ function renderDigitalMediaSummaryGrid() {
     host.innerHTML = `
         <div class="work-table-wrap">
             <table class="student-summary-table">
-                <thead><tr><th>Student</th><th>Digital Media Standard</th>${STUDENT_SUMMARY_GROUPS.map((group) => `<th>${escapeHtml(group.label)}</th>`).join("")}</tr></thead>
+                <thead><tr><th>Student</th><th>Digital Media Standard</th><th>Digital Media Type</th>${STUDENT_SUMMARY_GROUPS.map((group) => `<th>${escapeHtml(group.label)}</th>`).join("")}</tr></thead>
                 <tbody>${filteredRows.map((student) => `
                     <tr>
                         <td>${escapeHtml(student.studentName)}</td>
                         <td>${student.processStandards.map((standard) => `<a class="student-standard-chip" href="teacher-assessment-allocation.html?standard=${encodeURIComponent(standard)}" title="Open assessment allocation data">${escapeHtml(standard)}</a>`).join(" ")}</td>
+                        <td>${student.digitalMediaType ? `<span class="student-media-type-chip">${escapeHtml(student.digitalMediaType)}</span>` : `<span class="student-media-type-chip is-empty">-</span>`}</td>
                         ${STUDENT_SUMMARY_GROUPS.map((group) => renderStudentSummaryCell(student, group, student.groups.get(group.key), "digital-media")).join("")}
                     </tr>
                     ${renderStudentSummaryDetailRow(student, "digital-media")}
