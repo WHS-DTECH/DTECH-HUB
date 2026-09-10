@@ -1784,10 +1784,18 @@ function wireTaskNavigationEvents() {
 }
 
 function wireStudentSearchEvents() {
+    const syncStudentNameSearch = (value) => {
+        const nextValue = String(value || "");
+        workState.studentSearch = nextValue;
+        workState.digitalMediaStudentSearch = nextValue;
+        if (studentSearchInput && studentSearchInput.value !== nextValue) studentSearchInput.value = nextValue;
+        if (digitalMediaStudentSearchInput && digitalMediaStudentSearchInput.value !== nextValue) digitalMediaStudentSearchInput.value = nextValue;
+        renderStudentSummaryGrid();
+        renderDigitalMediaSummaryGrid();
+    };
     if (studentSearchInput) {
         studentSearchInput.addEventListener("input", () => {
-            workState.studentSearch = String(studentSearchInput.value || "");
-            renderStudentSummaryGrid();
+            syncStudentNameSearch(studentSearchInput.value);
         });
     }
     if (standardSearchInput) {
@@ -1798,8 +1806,7 @@ function wireStudentSearchEvents() {
     }
     if (digitalMediaStudentSearchInput) {
         digitalMediaStudentSearchInput.addEventListener("input", () => {
-            workState.digitalMediaStudentSearch = String(digitalMediaStudentSearchInput.value || "");
-            renderDigitalMediaSummaryGrid();
+            syncStudentNameSearch(digitalMediaStudentSearchInput.value);
         });
     }
     if (digitalMediaStandardSearchInput) {
