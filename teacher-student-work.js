@@ -17,7 +17,11 @@ const workState = {
     studentSearch: "",
     standardSearch: "",
     expandedSummaryStudent: "",
-    expandedSummaryGroup: ""
+    expandedSummaryGroup: "",
+    digitalMediaStudentSearch: "",
+    digitalMediaStandardSearch: "",
+    expandedDigitalMediaStudent: "",
+    expandedDigitalMediaGroup: ""
 };
 
 const statusHost = document.querySelector("#work-status");
@@ -29,6 +33,10 @@ const studentSearchInput = document.querySelector("#student-search-input");
 const standardSearchInput = document.querySelector("#standard-search-input");
 const generateIndividualSummaryButton = document.querySelector("#generate-individual-summary-button");
 const generateStandardSummariesButton = document.querySelector("#generate-standard-summaries-button");
+const digitalMediaStudentSearchInput = document.querySelector("#digital-media-student-search-input");
+const digitalMediaStandardSearchInput = document.querySelector("#digital-media-standard-search-input");
+const generateDigitalMediaIndividualButton = document.querySelector("#generate-digital-media-individual-button");
+const generateDigitalMediaStandardButton = document.querySelector("#generate-digital-media-standard-button");
 const taskPageNav = document.querySelector("#task-page-nav");
 const taskPrevButton = document.querySelector("#task-prev-button");
 const taskNextButton = document.querySelector("#task-next-button");
@@ -992,10 +1000,10 @@ function finalizeStudentSummaryBucket(bucket) {
 }
 
 // One row per student, one column per criteria group, sourced entirely from the records already built for the task cards.
-function buildStudentSummaryRows() {
+function buildStudentSummaryRows(sourceRecords = workState.records) {
     const byStudent = new Map();
 
-    workState.records.forEach((record) => {
+    (Array.isArray(sourceRecords) ? sourceRecords : []).forEach((record) => {
         const email = record.studentEmail;
         if (!email) return;
         if (!byStudent.has(email)) {
@@ -1133,24 +1141,29 @@ function renderStudentSummaryDetailPanel(student, group, bucket) {
     `;
 }
 
-function renderStudentSummaryCell(student, group, bucket) {
+function renderStudentSummaryCell(student, group, bucket, summaryKind = "process") {
     if (!bucket) {
         return `<td><span class="student-summary-chip is-none">-</span></td>`;
     }
 
     const chipClass = getStudentSummaryChipClass(bucket);
     const title = `${student.studentName} - ${group.label}`;
-    const isExpanded = workState.expandedSummaryStudent === student.studentEmail && workState.expandedSummaryGroup === group.key;
+    const isDigitalMedia = summaryKind === "digital-media";
+    const isExpanded = (isDigitalMedia ? workState.expandedDigitalMediaStudent : workState.expandedSummaryStudent) === student.studentEmail
+        && (isDigitalMedia ? workState.expandedDigitalMediaGroup : workState.expandedSummaryGroup) === group.key;
     return `
         <td>
-            <button class="student-summary-chip ${chipClass} ${isExpanded ? "is-expanded" : ""}" type="button" data-student-summary-email="${escapeHtml(student.studentEmail)}" data-student-summary-group="${escapeHtml(group.key)}" title="${escapeHtml(title)}" aria-expanded="${isExpanded ? "true" : "false"}">${bucket.submittedCount}/${bucket.total}</button>
+            <button class="student-summary-chip ${chipClass} ${isExpanded ? "is-expanded" : ""}" type="button" data-student-summary-email="${escapeHtml(student.studentEmail)}" data-student-summary-group="${escapeHtml(group.key)}" data-student-summary-kind="${summaryKind}" title="${escapeHtml(title)}" aria-expanded="${isExpanded ? "true" : "false"}">${bucket.submittedCount}/${bucket.total}</button>
         </td>
     `;
 }
 
-function renderStudentSummaryDetailRow(student) {
-    const group = STUDENT_SUMMARY_GROUPS.find((item) => item.key === workState.expandedSummaryGroup);
-    if (!group || workState.expandedSummaryStudent !== student.studentEmail) return "";
+function renderStudentSummaryDetailRow(student, summaryKind = "process") {
+    const isDigitalMedia = summaryKind === "digital-media";
+    const expandedGroup = isDigitalMedia ? workState.expandedDigitalMediaGroup : workState.expandedSummaryGroup;
+    const expandedStudent = isDigitalMedia ? workState.expandedDigitalMediaStudent : workState.expandedSummaryStudent;
+    const group = STUDENT_SUMMARY_GROUPS.find((item) => item.key === expandedGroup);
+    if (!group || expandedStudent !== student.studentEmail) return "";
 
     const bucket = student.groups.get(group.key);
     if (!bucket) return "";
@@ -1161,6 +1174,44 @@ function renderStudentSummaryDetailRow(student) {
                 ${renderStudentSummaryDetailPanel(student, group, bucket)}
             </td>
         </tr>
+    `;
+}
+
+function buildDigitalMediaSummaryRows() {
+    const mediaRecords = workState.records
+        .filter((record) => /^(91893|91903)$/.test(normalizeTrackerStandardValue(record?.projectTaskStandard)))
+        .map((record) => ({ ...record, processStandard: record.projectTaskStandard }));
+    return buildStudentSummaryRows(mediaRecords);
+}
+
+function renderDigitalMediaSummaryGrid() {
+    const host = document.querySelector("#digital-media-summary-grid");
+    if (!host) return;
+    const rows = buildDigitalMediaSummaryRows();
+    const nameQuery = String(workState.digitalMediaStudentSearch || "").trim().toLowerCase();
+    const standardQuery = String(workState.digitalMediaStandardSearch || "").trim().toLowerCase();
+    const filteredRows = rows.filter((student) => {
+        const nameMatches = !nameQuery || `${student.studentName} ${student.studentEmail}`.toLowerCase().includes(nameQuery);
+        return nameMatches && studentMatchesStandardSearch(student, standardQuery);
+    });
+    if (!filteredRows.length) {
+        host.innerHTML = `<div class="work-empty">No Digital Media students match that search.</div>`;
+        return;
+    }
+    host.innerHTML = `
+        <div class="work-table-wrap">
+            <table class="student-summary-table">
+                <thead><tr><th>Student</th><th>Digital Media Standard</th>${STUDENT_SUMMARY_GROUPS.map((group) => `<th>${escapeHtml(group.label)}</th>`).join("")}</tr></thead>
+                <tbody>${filteredRows.map((student) => `
+                    <tr>
+                        <td>${escapeHtml(student.studentName)}</td>
+                        <td>${student.processStandards.map((standard) => `<a class="student-standard-chip" href="teacher-assessment-allocation.html?standard=${encodeURIComponent(standard)}" title="Open assessment allocation data">${escapeHtml(standard)}</a>`).join(" ")}</td>
+                        ${STUDENT_SUMMARY_GROUPS.map((group) => renderStudentSummaryCell(student, group, student.groups.get(group.key), "digital-media")).join("")}
+                    </tr>
+                    ${renderStudentSummaryDetailRow(student, "digital-media")}
+                `).join("")}</tbody>
+            </table>
+        </div>
     `;
 }
 
@@ -1222,6 +1273,7 @@ function getStudentSummaryRecordsForStandard(student, standard) {
 
 function buildProgressSummaryReportHtml(student, standard) {
     const targetStandard = normalizeTrackerStandardValue(standard) || getAuthoritativeStudentProcessStandard(student) || "Standard not specified";
+    const assessmentLabel = /^(91893|91903)$/.test(targetStandard) ? "Digital Media Assessment" : "Process Assessment";
     const records = getStudentSummaryRecordsForStandard(student, targetStandard)
         .sort((a, b) => compareTaskTopics(a.taskTopic, b.taskTopic));
     const acknowledgedCount = records.filter((record) => record.acknowledged).length;
@@ -1301,7 +1353,7 @@ function buildProgressSummaryReportHtml(student, standard) {
     return `
         <article class="progress-report">
             <header class="report-header">
-                <p class="report-kicker">DTECH Hub · Process Assessment Summary</p>
+                <p class="report-kicker">DTECH Hub · ${escapeHtml(assessmentLabel)} Summary</p>
                 <h1>${escapeHtml(targetStandard)} - Progress Summary</h1>
                 <dl>
                     <div><dt>Student</dt><dd>${escapeHtml(student.studentName)}</dd></div>
@@ -1744,26 +1796,68 @@ function wireStudentSearchEvents() {
             renderStudentSummaryGrid();
         });
     }
+    if (digitalMediaStudentSearchInput) {
+        digitalMediaStudentSearchInput.addEventListener("input", () => {
+            workState.digitalMediaStudentSearch = String(digitalMediaStudentSearchInput.value || "");
+            renderDigitalMediaSummaryGrid();
+        });
+    }
+    if (digitalMediaStandardSearchInput) {
+        digitalMediaStandardSearchInput.addEventListener("input", () => {
+            workState.digitalMediaStandardSearch = String(digitalMediaStandardSearchInput.value || "");
+            renderDigitalMediaSummaryGrid();
+        });
+    }
 }
 
 function wireProgressSummaryEvents() {
     generateIndividualSummaryButton?.addEventListener("click", generateIndividualProgressSummary);
     generateStandardSummariesButton?.addEventListener("click", generateStandardProgressSummaries);
+    generateDigitalMediaIndividualButton?.addEventListener("click", () => {
+        const query = String(workState.digitalMediaStudentSearch || "").trim().toLowerCase();
+        const standard = normalizeTrackerStandardValue(workState.digitalMediaStandardSearch);
+        const matches = buildDigitalMediaSummaryRows().filter((student) => !query || `${student.studentName} ${student.studentEmail}`.toLowerCase().includes(query));
+        if (matches.length !== 1) {
+            setStatus("Filter to exactly one Digital Media student before generating an individual summary.", true);
+            return;
+        }
+        openProgressSummaryPrintWindow(matches, standard || getAuthoritativeStudentProcessStandard(matches[0]));
+    });
+    generateDigitalMediaStandardButton?.addEventListener("click", () => {
+        const standard = normalizeTrackerStandardValue(workState.digitalMediaStandardSearch);
+        if (!/^(91893|91903)$/.test(standard)) {
+            setStatus("Enter Digital Media standard 91893 or 91903 before generating all summaries.", true);
+            return;
+        }
+        const matches = buildDigitalMediaSummaryRows().filter((student) => studentMatchesStandardSearch(student, standard));
+        if (!matches.length) {
+            setStatus(`No students are allocated to ${standard}.`, true);
+            return;
+        }
+        openProgressSummaryPrintWindow(matches, standard);
+    });
 }
 
 function wireStudentSummaryEvents() {
-    const host = document.querySelector("#student-summary-grid");
-    if (!host || window.__dtechStudentSummaryEventsBound) return;
+    if (window.__dtechStudentSummaryEventsBound) return;
     window.__dtechStudentSummaryEventsBound = true;
-    host.addEventListener("click", (event) => {
+    document.addEventListener("click", (event) => {
         const button = event.target?.closest?.("[data-student-summary-email][data-student-summary-group]");
         if (!button) return;
         const email = String(button.getAttribute("data-student-summary-email") || "").trim().toLowerCase();
         const group = String(button.getAttribute("data-student-summary-group") || "").trim();
-        const alreadyOpen = workState.expandedSummaryStudent === email && workState.expandedSummaryGroup === group;
-        workState.expandedSummaryStudent = alreadyOpen ? "" : email;
-        workState.expandedSummaryGroup = alreadyOpen ? "" : group;
-        renderStudentSummaryGrid();
+        const isDigitalMedia = button.getAttribute("data-student-summary-kind") === "digital-media";
+        const alreadyOpen = (isDigitalMedia ? workState.expandedDigitalMediaStudent : workState.expandedSummaryStudent) === email
+            && (isDigitalMedia ? workState.expandedDigitalMediaGroup : workState.expandedSummaryGroup) === group;
+        if (isDigitalMedia) {
+            workState.expandedDigitalMediaStudent = alreadyOpen ? "" : email;
+            workState.expandedDigitalMediaGroup = alreadyOpen ? "" : group;
+            renderDigitalMediaSummaryGrid();
+        } else {
+            workState.expandedSummaryStudent = alreadyOpen ? "" : email;
+            workState.expandedSummaryGroup = alreadyOpen ? "" : group;
+            renderStudentSummaryGrid();
+        }
     });
 }
 
@@ -1821,6 +1915,7 @@ async function init() {
         wireProgressSummaryEvents();
 
         renderStudentSummaryGrid();
+        renderDigitalMediaSummaryGrid();
         renderTaskLinks();
         renderSelectedTaskPage();
         setStatus("Student work task pages ready.");
