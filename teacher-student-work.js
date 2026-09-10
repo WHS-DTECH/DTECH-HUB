@@ -1210,6 +1210,33 @@ function buildProgressSummaryReportHtml(student, standard) {
         merit: "Merit",
         excellence: "Excellence"
     };
+    const incompleteAchievedRecords = records.filter((record) => getTaskTopicGroup(record.taskTopic) === "achieved" && !record.acknowledged);
+    const nextStepGroups = buildStudentSummaryDetailGroups(incompleteAchievedRecords);
+    const nextStepsHtml = nextStepGroups.length
+        ? `
+            <section class="report-next-steps">
+                <h2>WHAT YOU NEED TO DO NEXT</h2>
+                <p class="report-next-step-intro">1. Complete the following Achieved requirements</p>
+                ${nextStepGroups.map((group) => `
+                    <div class="report-next-step-group">
+                        <h3>${escapeHtml(group.section)}</h3>
+                        ${group.records.map((record) => `
+                            <div class="report-next-step-item">
+                                <strong>○ ${escapeHtml(record.taskTopic)}</strong>
+                                <span>${hasStudentSummaryEvidence(record) ? "Evidence linked - acknowledgement still required" : "Evidence required"}</span>
+                                <a href="${escapeHtml(record.taskUrl)}" target="_blank" rel="noreferrer">Open task page to add evidence</a>
+                            </div>
+                        `).join("")}
+                    </div>
+                `).join("")}
+            </section>
+        `
+        : `
+            <section class="report-next-steps is-complete">
+                <h2>WHAT YOU NEED TO DO NEXT</h2>
+                <p>All Achieved requirements are acknowledged.</p>
+            </section>
+        `;
     const renderReportRecord = (record) => {
                 const acknowledged = Boolean(record.acknowledged);
                 const evidence = [];
@@ -1263,6 +1290,7 @@ function buildProgressSummaryReportHtml(student, standard) {
                 <strong>${acknowledgedCount}/${records.length} acknowledged</strong>
                 <p>${records.length - acknowledgedCount} requirement${records.length - acknowledgedCount === 1 ? "" : "s"} still need evidence or acknowledgement.</p>
             </section>
+            ${nextStepsHtml}
             ${reportRows || `<p class="report-empty">No criteria were found for this student and standard.</p>`}
             <footer class="report-footer">Evidence remains in its original location. This report contains links only and does not embed evidence files.</footer>
         </article>
@@ -1297,6 +1325,17 @@ function openProgressSummaryPrintWindow(students, standard) {
         .report-progress { margin: 14px 0; padding: 10px 12px; border: 1px solid #c5d7e8; border-left: 4px solid #2f74b9; background: #f2f8fc; }
         .report-progress strong { display: block; margin-top: 5px; color: #1f663d; font-size: 17px; }
         .report-progress p { margin: 4px 0 0; }
+        .report-next-steps { margin: 14px 0; padding: 10px 12px; border: 1px solid #d7c18e; border-left: 4px solid #b38424; background: #fffaf0; page-break-inside: avoid; }
+        .report-next-steps.is-complete { border-color: #b7dbc3; border-left-color: #2f8b57; background: #eef8f1; }
+        .report-next-steps h2 { color: #6b5218; font-size: 14px; letter-spacing: .06em; }
+        .report-next-steps.is-complete h2 { color: #1f663d; }
+        .report-next-step-intro { margin: 8px 0; font-weight: 700; }
+        .report-next-step-group { margin-top: 9px; }
+        .report-next-step-group h3 { margin: 0 0 4px; color: #6b5218; font-size: 11px; }
+        .report-next-step-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; margin-top: 4px; padding: 6px 8px; border: 1px solid #ddcca5; background: #fff; }
+        .report-next-step-item strong { grid-column: 1 / -1; }
+        .report-next-step-item span { color: #6b5218; font-size: 10px; font-weight: 700; }
+        .report-next-step-item a { grid-column: 1 / -1; color: #1f5688; font-size: 10px; font-weight: 700; }
         .report-level { margin: 14px 0; page-break-inside: avoid; }
         .report-level-heading { display: flex; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 1px solid #a8c5dd; border-left: 4px solid #2f74b9; background: #eaf3fa; text-transform: uppercase; letter-spacing: .04em; }
         .report-level-heading span { font-size: 11px; text-transform: none; letter-spacing: 0; }
