@@ -1322,7 +1322,7 @@ function openProgressSummaryPrintWindow(students, standard) {
         h3 { margin: 0; color: #173f63; font-size: 12px; }
         .report-header dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 0; }
         .report-date-meta { display: flex; flex-direction: column; align-items: flex-start; }
-        .report-date-meta img { width: 34px; height: 34px; object-fit: contain; margin-bottom: 5px; }
+        .report-date-meta img { width: 52px; height: 52px; object-fit: contain; margin-bottom: 5px; }
         dt { color: #5a7188; font-size: 9px; font-weight: 700; text-transform: uppercase; }
         dd { margin: 3px 0 0; font-weight: 700; }
         .report-progress { margin: 14px 0; padding: 10px 12px; border: 1px solid #c5d7e8; border-left: 4px solid #2f74b9; background: #f2f8fc; }
