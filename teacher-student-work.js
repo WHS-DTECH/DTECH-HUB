@@ -632,6 +632,18 @@ function getFirstGoogleDriveFolderUrlFromEvidenceRows(evidenceRows) {
     return "";
 }
 
+function getProcessFolderUrlFromTemplateCopies(templateCopies) {
+    const copies = Array.isArray(templateCopies) ? templateCopies : [];
+    for (const copy of copies) {
+        const candidate = toSafeExternalUrl(copy?.processAssessmentFolderUrl || copy?.process_assessment_folder_url || "")
+            || toSafeExternalUrl(copy?.destinationFolderUrl || copy?.destination_folder_url || "");
+        if (candidate && /drive\.google\.com/i.test(candidate)) {
+            return candidate;
+        }
+    }
+    return "";
+}
+
 function hasTaskTopicEvidence(result) {
     if (!result || typeof result !== "object") return false;
     return Boolean(
@@ -768,7 +780,9 @@ function buildAllRecords() {
             const standardNumbers = mergeTrackerStandardNumbers(processStandard, projectTaskStandard, activityStandardNumbers);
 
             const evidenceRows = Array.isArray(student?.evidence_steps) ? student.evidence_steps : [];
-            const processFolderUrl = getFirstGoogleDriveFolderUrlFromEvidenceRows(evidenceRows);
+            const processFolderUrl = toSafeExternalUrl(student?.process_assessment_folder_url || student?.processAssessmentFolderUrl || "")
+                || getProcessFolderUrlFromTemplateCopies(student?.template_copies || student?.templateCopies)
+                || getFirstGoogleDriveFolderUrlFromEvidenceRows(evidenceRows);
             uniqueTopics.forEach((taskTopic) => {
                 const topicKey = normalizeTaskTopicText(taskTopic).toLowerCase();
                 const resolved = parseTaskTopicEvidenceForActivity(evidenceRows, taskTopic, standardNumbers);

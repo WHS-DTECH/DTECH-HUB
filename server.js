@@ -4338,6 +4338,74 @@ function upsertEvidenceRow(rows, standardKey, nextSteps) {
   return normalizeEvidenceStepsPayload(normalizedRows);
 }
 
+function buildDriveFolderUrlFromId(folderId) {
+  const safeId = String(folderId || "").trim();
+  return safeId ? `https://drive.google.com/drive/folders/${encodeURIComponent(safeId)}` : "";
+}
+
+function normalizeEvidenceStandardSlug(value) {
+  return String(value || "task-topic")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "task-topic";
+}
+
+function ensureGoogleDriveFolderEvidence(rows, standardNumber, folderUrl) {
+  const safeUrl = String(folderUrl || "").trim();
+  if (!safeUrl || !/drive\.google\.com/i.test(safeUrl)) {
+    return { rows: normalizeEvidenceStepsPayload(rows), changed: false };
+  }
+
+  const normalizedRows = normalizeEvidenceStepsPayload(rows);
+  const hasExisting = normalizedRows.some((row) => (Array.isArray(row?.steps) ? row.steps : []).some((step) => {
+    const text = String(step?.text || "").trim();
+    return text === `GOOGLE_DRIVE_PROJECT_FOLDER_URL|${safeUrl}` || (/drive\.google\.com/i.test(text) && text.includes(safeUrl));
+  }));
+  if (hasExisting) {
+    return { rows: normalizedRows, changed: false };
+  }
+
+  const standardSlug = normalizeEvidenceStandardSlug(standardNumber);
+  const standardKey = `task-topic:${standardSlug}:version-control-google-drive`;
+  const targetRow = normalizedRows.find((row) => String(row?.standard || "").trim() === standardKey);
+  if (targetRow) {
+    targetRow.steps.push({ text: `GOOGLE_DRIVE_PROJECT_FOLDER_URL|${safeUrl}`, done: true });
+  } else {
+    normalizedRows.push({
+      standard: standardKey,
+      steps: [{ text: `GOOGLE_DRIVE_PROJECT_FOLDER_URL|${safeUrl}`, done: true }]
+    });
+  }
+
+  return { rows: normalizeEvidenceStepsPayload(normalizedRows), changed: true };
+}
+
+async function ensureProjectInterestGoogleDriveFolderEvidence(projectId, studentEmail, folderUrl) {
+  if (!hasDatabase) return;
+  const safeProjectId = String(projectId || "").trim();
+  const safeEmail = normalizeEmail(studentEmail || "");
+  const safeUrl = String(folderUrl || "").trim();
+  if (!safeProjectId || !safeEmail || !safeUrl) return;
+
+  const current = await pool.query(
+    `SELECT standard_1, evidence_steps FROM project_interests WHERE project_id = $1 AND student_email = $2 LIMIT 1`,
+    [safeProjectId, safeEmail]
+  );
+  const currentRow = current.rows?.[0] || {};
+  const repair = ensureGoogleDriveFolderEvidence(currentRow.evidence_steps || [], currentRow.standard_1 || "", safeUrl);
+  if (!repair.changed) return;
+
+  await pool.query(
+    `INSERT INTO project_interests (project_id, student_email, evidence_steps, updated_at)
+     VALUES ($1, $2, $3::jsonb, NOW())
+     ON CONFLICT (project_id, student_email) DO UPDATE
+     SET evidence_steps = $3::jsonb,
+         updated_at = NOW()`,
+    [safeProjectId, safeEmail, JSON.stringify(repair.rows)]
+  );
+}
+
 async function recordTemplateCopyInDb(projectId, studentEmail, entry) {
   if (!hasDatabase) return;
   const safeEntry = {
@@ -4345,6 +4413,9 @@ async function recordTemplateCopyInDb(projectId, studentEmail, entry) {
     templateTitle: String(entry?.templateTitle || "").trim(),
     fileUrl: String(entry?.fileUrl || "").trim(),
     fileName: String(entry?.fileName || "").trim(),
+    processAssessmentFolderUrl: String(entry?.processAssessmentFolderUrl || "").trim(),
+    destinationFolderUrl: String(entry?.destinationFolderUrl || "").trim(),
+    destinationFolderId: String(entry?.destinationFolderId || "").trim(),
     copiedAt: new Date().toISOString()
   };
   if (!safeEntry.templateId) return;
@@ -7310,6 +7381,8 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
       return;
     }
     const processAssessmentFolderId = String(setup.processAssessmentFolderId || "").trim();
+    const processAssessmentFolderUrl = buildDriveFolderUrlFromId(processAssessmentFolderId);
+    const activityId = String(req.body?.activityId || "").trim();
     let resolvedSourcePresentationId = sourcePresentationId;
     const isTriallingComponentsTemplate = templateId.toLowerCase() === "trialling-components"
       || /triall?ing\s+components|trailing\s+components/i.test(templateTitle);
@@ -7393,6 +7466,20 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
     if (existing.length > 0) {
       const file = existing[0];
       const populated = await populateCopiedTemplateData(file.id);
+      if (activityId) {
+        await ensureProjectInterestGoogleDriveFolderEvidence(activityId, email, processAssessmentFolderUrl).catch(() => {});
+        if (templateId) {
+          await recordTemplateCopyInDb(activityId, email, {
+            templateId,
+            templateTitle,
+            fileUrl: file.webViewLink || `https://docs.google.com/presentation/d/${file.id}/edit`,
+            fileName: file.name,
+            processAssessmentFolderUrl,
+            destinationFolderUrl: buildDriveFolderUrlFromId(folderId),
+            destinationFolderId: folderId
+          }).catch(() => {});
+        }
+      }
       return res.json({ ok: true, alreadyExists: true, populated: populated.updated, populatedCount: populated.count, populatedImplicationsCount: populated.implicationsCount || 0, populationWarning: populated.warning || "", fileId: file.id, fileUrl: file.webViewLink || `https://docs.google.com/presentation/d/${file.id}/edit`, fileName: file.name, destinationFolderId: folderId, destinationSubfolderName: subfolderName || "" });
     }
 
@@ -7401,6 +7488,20 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
       if (legacyExisting.length > 0) {
         const file = legacyExisting[0];
         const populated = await populateCopiedTemplateData(file.id);
+        if (activityId) {
+          await ensureProjectInterestGoogleDriveFolderEvidence(activityId, email, processAssessmentFolderUrl).catch(() => {});
+          if (templateId) {
+            await recordTemplateCopyInDb(activityId, email, {
+              templateId,
+              templateTitle,
+              fileUrl: file.webViewLink || `https://docs.google.com/presentation/d/${file.id}/edit`,
+              fileName: file.name,
+              processAssessmentFolderUrl,
+              destinationFolderUrl: processAssessmentFolderUrl,
+              destinationFolderId: processAssessmentFolderId
+            }).catch(() => {});
+          }
+        }
         return res.json({ ok: true, alreadyExists: true, populated: populated.updated, populatedCount: populated.count, populatedImplicationsCount: populated.implicationsCount || 0, populationWarning: populated.warning || "", fileId: file.id, fileUrl: file.webViewLink || `https://docs.google.com/presentation/d/${file.id}/edit`, fileName: file.name, destinationFolderId: processAssessmentFolderId, destinationSubfolderName: "" });
       }
     }
@@ -7414,13 +7515,16 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
 
     // Record template copy in DB so task list can track it reliably across devices
     if (hasDatabase && templateId) {
-      const activityId = String(req.body?.activityId || "").trim();
       if (activityId) {
+        await ensureProjectInterestGoogleDriveFolderEvidence(activityId, email, processAssessmentFolderUrl).catch(() => {});
         await recordTemplateCopyInDb(activityId, email, {
           templateId,
           templateTitle,
           fileUrl: copied.webViewLink || `https://docs.google.com/presentation/d/${copied.id}/edit`,
-          fileName: copied.name
+          fileName: copied.name,
+          processAssessmentFolderUrl,
+          destinationFolderUrl: buildDriveFolderUrlFromId(folderId),
+          destinationFolderId: folderId
         }).catch(() => {});
       }
     }
@@ -8766,9 +8870,28 @@ app.get("/api/activities/:id/interests", async (req, res) => {
 
   try {
     const result = await pool.query(
-      "SELECT student_email, confirmed, standard_1, standard_2, digital_media_type, evidence_steps FROM project_interests WHERE project_id = $1 ORDER BY created_at ASC",
+      "SELECT student_email, confirmed, standard_1, standard_2, digital_media_type, evidence_steps, template_copies FROM project_interests WHERE project_id = $1 ORDER BY created_at ASC",
       [projectId]
     );
+
+    const studentEmailsForSetup = result.rows
+      .map((row) => normalizeEmail(row?.student_email || ""))
+      .filter(Boolean);
+    const driveSetupByEmail = new Map();
+    if (studentEmailsForSetup.length) {
+      await ensureStudentDriveSetupSchema();
+      const setupResult = await pool.query(
+        `SELECT student_email, process_assessment_folder_id FROM student_drive_setup WHERE student_email = ANY($1::text[])`,
+        [studentEmailsForSetup]
+      );
+      for (const setupRow of setupResult.rows || []) {
+        const setupEmail = normalizeEmail(setupRow?.student_email || "");
+        const folderUrl = buildDriveFolderUrlFromId(setupRow?.process_assessment_folder_id || "");
+        if (setupEmail && folderUrl) {
+          driveSetupByEmail.set(setupEmail, folderUrl);
+        }
+      }
+    }
 
     let isTeacher = false;
     if (email) {
@@ -8777,6 +8900,23 @@ app.get("/api/activities/:id/interests", async (req, res) => {
         isTeacher = Boolean(access.allowed);
       } catch (_err) {}
     }
+
+    await Promise.all(result.rows.map(async (row) => {
+      const studentEmail = normalizeEmail(row?.student_email || "");
+      if (!isTeacher && studentEmail !== email) return;
+      const folderUrl = driveSetupByEmail.get(studentEmail) || "";
+      if (!studentEmail || !folderUrl) return;
+      const repair = ensureGoogleDriveFolderEvidence(row.evidence_steps, row.standard_1, folderUrl);
+      if (!repair.changed) {
+        row.evidence_steps = repair.rows;
+        return;
+      }
+      row.evidence_steps = repair.rows;
+      await pool.query(
+        `UPDATE project_interests SET evidence_steps = $1::jsonb, updated_at = NOW() WHERE project_id = $2 AND student_email = $3`,
+        [JSON.stringify(repair.rows), projectId, studentEmail]
+      );
+    }));
 
     const sourceProjectsByEmail = new Map();
     const isClientProjectsTask = String(projectId) === String(CLIENT_PROJECTS_TASK_ID);
@@ -8826,7 +8966,9 @@ app.get("/api/activities/:id/interests", async (req, res) => {
           standard_1: String(myAllocationRow.standard_1 || "").trim(),
           standard_2: String(myAllocationRow.standard_2 || "").trim(),
           digital_media_type: String(myAllocationRow.digital_media_type || "").trim(),
-          evidence_steps: normalizeEvidenceStepsPayload(myAllocationRow.evidence_steps)
+          evidence_steps: normalizeEvidenceStepsPayload(myAllocationRow.evidence_steps),
+          template_copies: Array.isArray(myAllocationRow.template_copies) ? myAllocationRow.template_copies : [],
+          process_assessment_folder_url: driveSetupByEmail.get(normalizeEmail(myAllocationRow.student_email || email)) || ""
         }
         : null,
       emails: isTeacher ? result.rows.map((r) => r.student_email) : [],
@@ -8839,6 +8981,8 @@ app.get("/api/activities/:id/interests", async (req, res) => {
           standard_2: String(r.standard_2 || "").trim(),
           digital_media_type: String(r.digital_media_type || "").trim(),
           evidence_steps: normalizeEvidenceStepsPayload(r.evidence_steps),
+          template_copies: Array.isArray(r.template_copies) ? r.template_copies : [],
+          process_assessment_folder_url: driveSetupByEmail.get(normalizeEmail(r.student_email || "")) || "",
           source_projects: sourceProjectsByEmail.get(normalizeEmail(r.student_email || "")) || []
         }))
         : []
