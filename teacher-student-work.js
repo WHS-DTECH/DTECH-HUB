@@ -1253,7 +1253,7 @@ function buildProgressSummaryReportHtml(student, standard) {
 
 function openProgressSummaryPrintWindow(students, standard) {
     const reports = students.map((student) => buildProgressSummaryReportHtml(student, standard)).join("");
-    const reportWindow = window.open("", "_blank", "noopener,noreferrer,width=1000,height=800");
+    const reportWindow = window.open("", "_blank", "width=1000,height=800");
     if (!reportWindow) {
         setStatus("Allow pop-ups to generate the progress summary PDF.", true);
         return;
