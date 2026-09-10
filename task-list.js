@@ -2402,7 +2402,8 @@ function renderChecklistCards(detail, allItems) {
                                 const is91893EfficientToolsRow = /using efficient tools and techniques in the outcome.?s production/i.test(stepText);
                                 const is91893IntegrityTestingRow = /applying appropriate data integrity and testing procedures/i.test(stepText);
                                 const isLinkedIntegrityTestingRow = String(standard) === "91893" && is91893IntegrityTestingRow;
-                                const isLinkedTestingImprovementRow = String(standard) === "91893" && /using information from testing procedures to improve the quality of the outcome/i.test(stepText);
+                                const isLinkedTestingImprovementRow = (String(standard) === "91893" || String(standard) === "91903")
+                                    && /using information from testing procedures to improve the quality of the (?:digital media )?outcome/i.test(stepText);
                                 const digitalMediaType = getAllocatedDigitalMediaType(standard).toLowerCase();
                                 const isVideoMedia = digitalMediaType === "video";
                                 const isImageMedia = digitalMediaType === "image" || digitalMediaType === "graphics" || digitalMediaType === "vector";
@@ -2655,7 +2656,9 @@ function renderChecklistCards(detail, allItems) {
                             const toolsTechniquesSubtask = isTriallingComponentsRow ? getDigitalOutcomeToolsTechniquesSubtask() : null;
                             const componentsSubtaskHref = buildCustomActivityLink(taskListState.selectedId, "Trial the components of the digital technologies outcome.", "Trialling Components", "trialling-components");
                             const projectManagementSubtasks = isProjectManagementRow ? getProjectManagementSubtasks(taskListState.fullEvidenceState) : [];
-                            const testingFunctionsSubtasks = isTestingFunctionsRow ? getTestingFunctionsSubtasks(taskListState.fullEvidenceState) : [];
+                            const testingFunctionsSubtasks = (isTestingFunctionsRow || isLinkedTestingImprovementRow)
+                                ? getTestingFunctionsSubtasks(taskListState.fullEvidenceState)
+                                : [];
                             const digiMedConventionsSubtask = isDigiMedConventionsRow ? getDigiMedConventionsSubtask(taskListState.fullEvidenceState) : null;
                             const devFeedbackCollabSubtasks = isMeritDevFeedbackCollabRow ? getProjectManagementProcessSubtasks() : [];
 
@@ -2746,10 +2749,10 @@ function renderChecklistCards(detail, allItems) {
                                                 : `<p class="task-list-achieved-note">Sync Google Drive above to see the component count.</p>`}
                                         </div>
                                     ` : ""}
-                                    ${isTestingFunctionsRow ? `
+                                    ${isTestingFunctionsRow || isLinkedTestingImprovementRow ? `
                                         <div class="task-list-decomposition-subtasks">
                                             <p class="task-list-system-title">SUBTASKS</p>
-                                            <p class="task-list-achieved-note">Client feedback form for user testing.</p>
+                                            <p class="task-list-achieved-note">Testing evidence: client feedback form and functions testing results.</p>
                                             <div class="task-list-decomposition-subtask-list">
                                                 ${testingFunctionsSubtasks.map((subtask) => `
                                                     <label class="task-list-decomposition-subtask ${subtask.done ? "is-complete" : ""}">
