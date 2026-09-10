@@ -27,6 +27,8 @@ const trackerSummary = document.querySelector("#tracker-summary");
 const tableHost = document.querySelector("#work-table-host");
 const studentSearchInput = document.querySelector("#student-search-input");
 const standardSearchInput = document.querySelector("#standard-search-input");
+const generateIndividualSummaryButton = document.querySelector("#generate-individual-summary-button");
+const generateStandardSummariesButton = document.querySelector("#generate-standard-summaries-button");
 const taskPageNav = document.querySelector("#task-page-nav");
 const taskPrevButton = document.querySelector("#task-prev-button");
 const taskNextButton = document.querySelector("#task-next-button");
@@ -1188,6 +1190,136 @@ function renderStudentSummaryGrid() {
     `;
 }
 
+function getStudentSummaryRecordsForStandard(student, standard) {
+    const targetStandard = normalizeTrackerStandardValue(standard);
+    const overall = student?.groups?.get("overall");
+    return (Array.isArray(overall?.records) ? overall.records : [])
+        .filter((record) => !targetStandard || normalizeTrackerStandardValue(record?.processStandard) === targetStandard);
+}
+
+function buildProgressSummaryReportHtml(student, standard) {
+    const targetStandard = normalizeTrackerStandardValue(standard) || getAuthoritativeStudentProcessStandard(student) || "Standard not specified";
+    const records = getStudentSummaryRecordsForStandard(student, targetStandard)
+        .sort((a, b) => compareTaskTopics(a.taskTopic, b.taskTopic));
+    const acknowledgedCount = records.filter((record) => record.acknowledged).length;
+    const generatedDate = new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+    const detailGroups = buildStudentSummaryDetailGroups(records);
+    const reportRows = detailGroups.map((group) => `
+        <section class="report-section">
+            <h2>${escapeHtml(group.section)} <span>${group.records.filter((record) => record.acknowledged).length}/${group.records.length} acknowledged</span></h2>
+            ${group.records.map((record) => {
+                const acknowledged = Boolean(record.acknowledged);
+                const evidence = [];
+                if (record.googleSlidesUrl) evidence.push({ label: "Google Slides", url: record.googleSlidesUrl });
+                (Array.isArray(record.links) ? record.links : []).forEach((link) => evidence.push(link));
+                const uniqueEvidence = evidence.filter((link, index, links) => links.findIndex((item) => item.url === link.url) === index);
+                const status = acknowledged ? "Acknowledged" : (uniqueEvidence.length ? "Evidence linked" : "Evidence required");
+                const statusClass = acknowledged ? "complete" : (uniqueEvidence.length ? "linked" : "required");
+                return `
+                    <article class="report-item ${statusClass}">
+                        <div class="report-item-heading"><strong>${acknowledged ? "&#10003;" : "-"} ${escapeHtml(record.taskTopic)}</strong><span>${status}</span></div>
+                        <div class="report-links">
+                            ${uniqueEvidence.length
+                                ? uniqueEvidence.map((link) => `<a href="${escapeHtml(link.url)}" target="_blank" rel="noreferrer">${escapeHtml(link.label || "Evidence link")}</a>`).join("")
+                                : `<a href="${escapeHtml(record.taskUrl)}" target="_blank" rel="noreferrer">Open task page to add evidence</a>`}
+                        </div>
+                    </article>
+                `;
+            }).join("")}
+        </section>
+    `).join("");
+
+    return `
+        <article class="progress-report">
+            <header class="report-header">
+                <p class="report-kicker">DTECH Hub · Process Assessment Summary</p>
+                <h1>${escapeHtml(targetStandard)} - Progress Summary</h1>
+                <dl>
+                    <div><dt>Student</dt><dd>${escapeHtml(student.studentName)}</dd></div>
+                    <div><dt>Standard</dt><dd>${escapeHtml(targetStandard)}</dd></div>
+                    <div><dt>Report date</dt><dd>${escapeHtml(generatedDate)}</dd></div>
+                </dl>
+            </header>
+            <section class="report-progress">
+                <h2>Achieved requirements</h2>
+                <strong>${acknowledgedCount}/${records.length} acknowledged</strong>
+                <p>${records.length - acknowledgedCount} requirement${records.length - acknowledgedCount === 1 ? "" : "s"} still need evidence or acknowledgement.</p>
+            </section>
+            ${reportRows || `<p class="report-empty">No criteria were found for this student and standard.</p>`}
+            <footer class="report-footer">Evidence remains in its original location. This report contains links only and does not embed evidence files.</footer>
+        </article>
+    `;
+}
+
+function openProgressSummaryPrintWindow(students, standard) {
+    const reports = students.map((student) => buildProgressSummaryReportHtml(student, standard)).join("");
+    const reportWindow = window.open("", "_blank", "noopener,noreferrer,width=1000,height=800");
+    if (!reportWindow) {
+        setStatus("Allow pop-ups to generate the progress summary PDF.", true);
+        return;
+    }
+
+    reportWindow.document.write(`<!doctype html><html><head><title>${escapeHtml(standard)} - Progress Summaries</title><style>
+        @page { size: A4; margin: 14mm; }
+        * { box-sizing: border-box; }
+        body { margin: 0; color: #17314d; font: 11px Arial, sans-serif; background: #fff; }
+        .progress-report { page-break-after: always; }
+        .progress-report:last-child { page-break-after: auto; }
+        .report-header { border-bottom: 3px solid #2f74b9; padding-bottom: 12px; }
+        .report-kicker { margin: 0 0 5px; color: #315f87; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+        h1 { margin: 0 0 12px; color: #173f63; font: 700 24px Georgia, serif; }
+        h2 { margin: 0; color: #173f63; font-size: 14px; }
+        .report-header dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 0; }
+        dt { color: #5a7188; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+        dd { margin: 3px 0 0; font-weight: 700; }
+        .report-progress { margin: 14px 0; padding: 10px 12px; border: 1px solid #c5d7e8; border-left: 4px solid #2f74b9; background: #f2f8fc; }
+        .report-progress strong { display: block; margin-top: 5px; color: #1f663d; font-size: 17px; }
+        .report-progress p { margin: 4px 0 0; }
+        .report-section { margin: 12px 0; page-break-inside: avoid; }
+        .report-section h2 { display: flex; justify-content: space-between; gap: 10px; padding: 7px 9px; border: 1px solid #c5d7e8; background: #eaf3fa; }
+        .report-section h2 span { font-size: 11px; }
+        .report-item { margin-top: 5px; padding: 7px 9px; border: 1px solid #d7e2ed; }
+        .report-item.complete { background: #eef8f1; border-color: #b7dbc3; }
+        .report-item.linked { background: #fff9ea; border-color: #ddcca5; }
+        .report-item.required { background: #f8fbff; }
+        .report-item-heading { display: flex; justify-content: space-between; gap: 10px; }
+        .report-item-heading span { white-space: nowrap; font-size: 10px; font-weight: 700; }
+        .report-links { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 5px; }
+        .report-links a { color: #1f5688; font-weight: 700; }
+        .report-footer { margin-top: 16px; color: #5a7188; font-size: 9px; }
+        .report-empty { padding: 12px; border: 1px dashed #b9cce3; }
+    </style></head><body>${reports}</body></html>`);
+    reportWindow.document.close();
+    reportWindow.focus();
+    window.setTimeout(() => reportWindow.print(), 250);
+}
+
+function generateIndividualProgressSummary() {
+    const rows = buildStudentSummaryRows();
+    const searchText = String(workState.studentSearch || "").trim().toLowerCase();
+    const standard = normalizeTrackerStandardValue(workState.standardSearch);
+    const matches = rows.filter((student) => !searchText || `${student.studentName} ${student.studentEmail}`.toLowerCase().includes(searchText));
+    if (matches.length !== 1) {
+        setStatus("Filter to exactly one student name before generating an individual summary.", true);
+        return;
+    }
+    openProgressSummaryPrintWindow(matches, standard || getAuthoritativeStudentProcessStandard(matches[0]));
+}
+
+function generateStandardProgressSummaries() {
+    const standard = normalizeTrackerStandardValue(workState.standardSearch);
+    if (!standard) {
+        setStatus("Enter a process standard number before generating all summaries for a standard.", true);
+        return;
+    }
+    const students = buildStudentSummaryRows().filter((student) => studentMatchesStandardSearch(student, standard));
+    if (!students.length) {
+        setStatus(`No students are allocated to ${standard}.`, true);
+        return;
+    }
+    openProgressSummaryPrintWindow(students, standard);
+}
+
 function findCanonicalTaskTopic(topic) {
     const selectedKey = normalizeTaskTopicText(topic).toLowerCase();
     if (!selectedKey) return "";
@@ -1524,6 +1656,11 @@ function wireStudentSearchEvents() {
     }
 }
 
+function wireProgressSummaryEvents() {
+    generateIndividualSummaryButton?.addEventListener("click", generateIndividualProgressSummary);
+    generateStandardSummariesButton?.addEventListener("click", generateStandardProgressSummaries);
+}
+
 function wireStudentSummaryEvents() {
     const host = document.querySelector("#student-summary-grid");
     if (!host || window.__dtechStudentSummaryEventsBound) return;
@@ -1591,6 +1728,7 @@ async function init() {
         wireTaskNavigationEvents();
         wireStudentSearchEvents();
         wireStudentSummaryEvents();
+        wireProgressSummaryEvents();
 
         renderStudentSummaryGrid();
         renderTaskLinks();

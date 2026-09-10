@@ -141,6 +141,29 @@
       margin: 10px 0 8px;
     }
 
+    .student-summary-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      width: 100%;
+    }
+
+    .student-summary-action {
+      border: 1px solid #4a81b2;
+      border-radius: 7px;
+      background: #edf5fc;
+      color: #1f5688;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.78rem;
+      font-weight: 800;
+      padding: 7px 10px;
+    }
+
+    .student-summary-action:hover {
+      background: #dcecf9;
+    }
+
     .student-summary-search {
       width: min(360px, 100%);
       border: 1px solid #b9cce3;
@@ -523,6 +546,10 @@
         <div class="student-summary-toolbar">
           <input id="student-search-input" class="student-summary-search" type="search" placeholder="Filter by student name" autocomplete="off" aria-label="Filter students by name">
           <input id="standard-search-input" class="student-summary-search" type="search" placeholder="Filter by process standard" autocomplete="off" aria-label="Filter students by process standard number">
+          <div class="student-summary-actions" aria-label="Progress summary actions">
+            <button id="generate-individual-summary-button" class="student-summary-action" type="button">Generate Individual PDF</button>
+            <button id="generate-standard-summaries-button" class="student-summary-action" type="button">Generate All for Standard</button>
+          </div>
         </div>
         <h3 class="student-summary-heading">Process Assessment</h3>
         <div id="student-summary-grid" aria-live="polite"></div>
