@@ -607,6 +607,31 @@ function inferGlobalWorkLinksFromEvidenceRows(evidenceRows) {
     return links;
 }
 
+function getFirstGoogleDriveFolderUrlFromEvidenceRows(evidenceRows) {
+    const rows = Array.isArray(evidenceRows) ? evidenceRows : [];
+    for (const row of rows) {
+        const steps = Array.isArray(row?.steps) ? row.steps : [];
+        for (const step of steps) {
+            const text = String(step?.text || "").trim();
+            if (!text) continue;
+
+            let candidate = "";
+            if (text.startsWith("GOOGLE_DRIVE_PROJECT_FOLDER_URL|")) {
+                candidate = text.slice("GOOGLE_DRIVE_PROJECT_FOLDER_URL|".length).trim();
+            } else if (text.startsWith("LINK|") && /drive\.google\.com/i.test(text)) {
+                candidate = text.slice("LINK|".length).trim();
+            }
+
+            const safeUrl = toSafeExternalUrl(candidate);
+            if (safeUrl && /drive\.google\.com/i.test(safeUrl)) {
+                return safeUrl;
+            }
+        }
+    }
+
+    return "";
+}
+
 function hasTaskTopicEvidence(result) {
     if (!result || typeof result !== "object") return false;
     return Boolean(
@@ -743,6 +768,7 @@ function buildAllRecords() {
             const standardNumbers = mergeTrackerStandardNumbers(processStandard, projectTaskStandard, activityStandardNumbers);
 
             const evidenceRows = Array.isArray(student?.evidence_steps) ? student.evidence_steps : [];
+            const processFolderUrl = getFirstGoogleDriveFolderUrlFromEvidenceRows(evidenceRows);
             uniqueTopics.forEach((taskTopic) => {
                 const topicKey = normalizeTaskTopicText(taskTopic).toLowerCase();
                 const resolved = parseTaskTopicEvidenceForActivity(evidenceRows, taskTopic, standardNumbers);
@@ -776,6 +802,7 @@ function buildAllRecords() {
                     standardKey: String(checklistStep?.standardKey || resolved.matchedStandardKey || "").trim(),
                     processStandard,
                     projectTaskStandard,
+                    processFolderUrl,
                     googleSlidesUrl: evidence.googleSlidesUrl,
                     links: mergedLinks,
                     submitted: Boolean(evidence.submitted),
@@ -872,6 +899,18 @@ function getStudentProcessStandards(student) {
     return Array.from(standards).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 }
 
+function getStudentProcessFolderUrl(student) {
+    let url = "";
+    student?.groups?.forEach?.((bucket) => {
+        if (url) return;
+        const record = (Array.isArray(bucket?.records) ? bucket.records : []).find((item) => String(item?.processFolderUrl || "").trim());
+        if (record?.processFolderUrl) {
+            url = String(record.processFolderUrl).trim();
+        }
+    });
+    return url;
+}
+
 function studentMatchesStandardSearch(student, searchText) {
     const query = String(searchText || "").trim().toLowerCase();
     if (!query) return true;
@@ -966,6 +1005,7 @@ function buildStudentSummaryRows() {
     byStudent.forEach((student) => {
         student.groups.forEach((bucket) => finalizeStudentSummaryBucket(bucket));
         student.processStandards = getStudentProcessStandards(student);
+        student.processFolderUrl = getStudentProcessFolderUrl(student);
     });
 
     return Array.from(byStudent.values()).sort((a, b) => a.studentName.localeCompare(b.studentName));
@@ -1060,7 +1100,7 @@ function renderStudentSummaryDetailRow(student) {
 
     return `
         <tr class="student-summary-expanded-row">
-            <td colspan="${STUDENT_SUMMARY_GROUPS.length + 2}">
+            <td colspan="${STUDENT_SUMMARY_GROUPS.length + 3}">
                 ${renderStudentSummaryDetailPanel(student, group, bucket)}
             </td>
         </tr>
@@ -1096,6 +1136,7 @@ function renderStudentSummaryGrid() {
                     <tr>
                         <th>Student</th>
                         <th>Process Standard</th>
+                        <th>Process Folder</th>
                         ${STUDENT_SUMMARY_GROUPS.map((group) => `<th>${escapeHtml(group.label)}</th>`).join("")}
                     </tr>
                 </thead>
@@ -1104,6 +1145,7 @@ function renderStudentSummaryGrid() {
                         <tr>
                             <td>${escapeHtml(student.studentName)}</td>
                             <td>${(Array.isArray(student.processStandards) && student.processStandards.length) ? student.processStandards.map((standard) => `<a class="student-standard-chip" href="teacher-assessment-allocation.html?standard=${encodeURIComponent(standard)}" title="Open assessment allocation data">${escapeHtml(standard)}</a>`).join(" ") : `<span class="student-standard-chip is-empty">-</span>`}</td>
+                            <td>${student.processFolderUrl ? `<a class="student-drive-chip" href="${escapeHtml(student.processFolderUrl)}" target="_blank" rel="noreferrer" title="Open Process Assessment folder in Google Drive">Google Drive</a>` : `<span class="student-drive-chip is-empty">-</span>`}</td>
                             ${STUDENT_SUMMARY_GROUPS.map((group) => renderStudentSummaryCell(student, group, student.groups.get(group.key))).join("")}
                         </tr>
                         ${renderStudentSummaryDetailRow(student)}
