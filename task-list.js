@@ -59,6 +59,24 @@ const DIGIMED_L3_TOOLS_TECHNIQUES_SUBTASKS = [
     "Dynamic data handling and interactivity",
     "Automation through scripts"
 ];
+const ITERATIVE_IMPROVEMENT_EVIDENCE_SUBTASKS = [
+    {
+        evidenceSource: "Trello",
+        demonstrates: "The development history over time: decisions, feedback, changes, actions, problems encountered, refinements and why changes were made"
+    },
+    {
+        evidenceSource: "Trialling Component write-ups",
+        demonstrates: "Alternative techniques/approaches were explored, information was gathered, a suitable approach was selected, and that decision influenced development"
+    },
+    {
+        evidenceSource: "Testing Functions tables",
+        demonstrates: "Features were tested, results were considered, problems or opportunities identified, changes made and the outcome improved"
+    },
+    {
+        evidenceSource: "Outcome / versions",
+        demonstrates: "The actual result of those decisions: visible progression towards a high-quality final outcome"
+    }
+];
 const TASK_LIST_MERIT_TRELLO_NOTE = "From this point, you are expected to use your Trello project-management system to record evidence of your development decisions, testing/trialling information, improvements, and actions. You are responsible for ensuring that your Trello evidence clearly demonstrates the assessment criteria.";
 const TASK_LIST_EXCELLENCE_TRELLO_NOTE = "Excellence evidence should emerge from your ongoing development process. Your Trello history, versions, testing, trialling, development decisions and outcome should demonstrate how you iteratively developed a high-quality outcome.";
 
@@ -2614,6 +2632,9 @@ function renderChecklistCards(detail, allItems) {
                                 && /^(?:effectively\s+)?trial(?:l?ing)?\s+multiple\s+components\s+and\/or\s+techniques\b/i.test(stepText);
                             const isMeritDevFeedbackCollabRow = String(level) === "Merit"
                                 && /development,\s*feedback\s+and\/or\s+collaborative\s+processes/i.test(stepText);
+                            const isIterativeImprovementRow = (String(standard) === "91897" || String(standard) === "91907")
+                                && String(level) === "Excellence"
+                                && /iterative improvement throughout the design, development and testing process/i.test(stepText);
                             const isInformationalRow = isInformationalCriteriaRow(String(standard), level, stepText);
                             const isSystemComplete = isProjectManagementRow
                                 && systemConnections.trelloConnected
@@ -2766,6 +2787,24 @@ function renderChecklistCards(detail, allItems) {
                                             ${devFeedbackCollabSubtasks[0]?.coverageKnown
                                                 ? `<p class="task-list-achieved-note">Trello last synced: ${escapeTaskListHtml(formatTaskListTimestamp(devFeedbackCollabSubtasks[0]?.coverageSavedAt))}</p>`
                                                 : `<p class="task-list-achieved-note">Click Sync from Trello above to see these counts.</p>`}
+                                        </div>
+                                    ` : ""}
+                                    ${isIterativeImprovementRow ? `
+                                        <div class="task-list-decomposition-subtasks task-list-iterative-improvement-subtasks">
+                                            <p class="task-list-system-title">ITERATIVE IMPROVEMENT EVIDENCE</p>
+                                            <p class="task-list-achieved-note">Use these evidence sources to show how decisions, testing and trialling led to improvements.</p>
+                                            <div class="task-list-iterative-improvement-table" role="table" aria-label="Iterative improvement evidence sources">
+                                                <div class="task-list-iterative-improvement-row is-header" role="row">
+                                                    <strong role="columnheader">Evidence source</strong>
+                                                    <strong role="columnheader">What it can demonstrate</strong>
+                                                </div>
+                                                ${ITERATIVE_IMPROVEMENT_EVIDENCE_SUBTASKS.map((subtask) => `
+                                                    <div class="task-list-iterative-improvement-row" role="row">
+                                                        <strong role="cell">${escapeTaskListHtml(subtask.evidenceSource)}</strong>
+                                                        <span role="cell">${escapeTaskListHtml(subtask.demonstrates)}</span>
+                                                    </div>
+                                                `).join("")}
+                                            </div>
                                         </div>
                                     ` : ""}
                                 </div>
