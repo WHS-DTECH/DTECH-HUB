@@ -1193,6 +1193,11 @@ function renderStudentSummaryDetailRow(student, summaryKind = "process") {
 
 function buildDigitalMediaSummaryRows() {
     const mediaRecords = workState.records
+        .filter((record) => {
+            const activity = workState.activitiesById.get(String(record?.activityId || "").trim());
+            const activityStandards = extractStandardNumbers(activity || {});
+            return activityStandards.some((standard) => /^(91893|91903)$/.test(normalizeTrackerStandardValue(standard)));
+        })
         .filter((record) => /^(91893|91903)$/.test(normalizeTrackerStandardValue(record?.projectTaskStandard)))
         .map((record) => ({ ...record, processStandard: record.projectTaskStandard }));
     return buildStudentSummaryRows(mediaRecords);
