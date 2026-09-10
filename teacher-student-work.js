@@ -1069,16 +1069,34 @@ function buildStudentSummaryDetailGroups(records) {
             ...group,
             records: group.records.sort((a, b) => compareTaskTopics(a.taskTopic, b.taskTopic))
         }))
-        .sort((a, b) => {
-            const standardCompare = String(a.standard).localeCompare(String(b.standard), undefined, { numeric: true });
-            if (standardCompare) return standardCompare;
-            return String(a.section).localeCompare(String(b.section));
-        });
+        .sort((a, b) => String(a.section).localeCompare(String(b.section)));
+}
+
+const STUDENT_SUMMARY_GRADE_CATEGORY_ORDER = ["digital_outcome", "achieved", "merit", "excellence"];
+const STUDENT_SUMMARY_GRADE_CATEGORY_LABELS = {
+    digital_outcome: "Digital Outcome Topic",
+    achieved: "ACHIEVED",
+    merit: "MERIT",
+    excellence: "EXCELLENCE"
+};
+
+function buildStudentSummaryGradeCategories(records) {
+    const sourceRecords = Array.isArray(records) ? records : [];
+    return STUDENT_SUMMARY_GRADE_CATEGORY_ORDER.map((category) => {
+        const categoryRecords = sourceRecords.filter((record) => getTaskTopicGroup(record?.taskTopic) === category);
+        return {
+            category,
+            label: STUDENT_SUMMARY_GRADE_CATEGORY_LABELS[category],
+            groups: buildStudentSummaryDetailGroups(categoryRecords),
+            acknowledgedCount: categoryRecords.filter((record) => record.acknowledged).length,
+            total: categoryRecords.length
+        };
+    }).filter((category) => category.total > 0);
 }
 
 function renderStudentSummaryDetailPanel(student, group, bucket) {
-    const detailGroups = buildStudentSummaryDetailGroups(bucket?.records || []);
-    if (!detailGroups.length) return "";
+    const gradeCategories = buildStudentSummaryGradeCategories(bucket?.records || []);
+    if (!gradeCategories.length) return "";
 
     return `
         <div class="student-summary-detail-panel">
@@ -1086,25 +1104,30 @@ function renderStudentSummaryDetailPanel(student, group, bucket) {
                 <strong>${escapeHtml(student.studentName)}</strong>
                 <span>${escapeHtml(group.label)}: ${bucket.submittedCount}/${bucket.total} acknowledged</span>
             </div>
-            ${detailGroups.map((group) => `
-                <div class="student-summary-detail-group">
-                    <h4>${escapeHtml(group.standard)} &middot; ${escapeHtml(group.section)} &middot; ${group.records.filter((record) => record.acknowledged).length}/${group.records.length}</h4>
-                    <ul>
-                        ${group.records.map((record) => {
-                            const complete = Boolean(record.acknowledged);
-                            const hasEvidence = hasStudentSummaryEvidence(record);
-                            const href = String(record.taskUrl || "").trim() || `teacher-student-work-task.html?task=${encodeURIComponent(record.taskTopic || "")}`;
-                            const status = complete ? (record.submitted ? "Submitted" : "Acknowledged") : (hasEvidence ? "Evidence linked" : "Missing");
-                            return `
-                                <li class="${complete ? "is-complete" : (hasEvidence ? "is-partial" : "is-missing")}">
-                                    <span class="student-summary-detail-status">${complete ? "&#10003;" : (hasEvidence ? "~" : "-")}</span>
-                                    <a href="${escapeHtml(href)}">${escapeHtml(record.taskTopic)}</a>
-                                    <span>${escapeHtml(status)}</span>
-                                </li>
-                            `;
-                        }).join("")}
-                    </ul>
-                </div>
+            ${gradeCategories.map((category) => `
+                <section class="student-summary-grade-category">
+                    <h3>${escapeHtml(category.label)} <span>${category.acknowledgedCount}/${category.total} acknowledged</span></h3>
+                    ${category.groups.map((sectionGroup) => `
+                        <div class="student-summary-detail-group">
+                            <h4>${escapeHtml(sectionGroup.standard)} &middot; ${escapeHtml(sectionGroup.section)} &middot; ${sectionGroup.records.filter((record) => record.acknowledged).length}/${sectionGroup.records.length}</h4>
+                            <ul>
+                                ${sectionGroup.records.map((record) => {
+                                    const complete = Boolean(record.acknowledged);
+                                    const hasEvidence = hasStudentSummaryEvidence(record);
+                                    const href = String(record.taskUrl || "").trim() || `teacher-student-work-task.html?task=${encodeURIComponent(record.taskTopic || "")}`;
+                                    const status = complete ? (record.submitted ? "Submitted" : "Acknowledged") : (hasEvidence ? "Evidence linked" : "Missing");
+                                    return `
+                                        <li class="${complete ? "is-complete" : (hasEvidence ? "is-partial" : "is-missing")}">
+                                            <span class="student-summary-detail-status">${complete ? "&#10003;" : (hasEvidence ? "~" : "-")}</span>
+                                            <a href="${escapeHtml(href)}">${escapeHtml(record.taskTopic)}</a>
+                                            <span>${escapeHtml(status)}</span>
+                                        </li>
+                                    `;
+                                }).join("")}
+                            </ul>
+                        </div>
+                    `).join("")}
+                </section>
             `).join("")}
         </div>
     `;
