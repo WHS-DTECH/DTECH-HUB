@@ -1203,6 +1203,7 @@ function buildProgressSummaryReportHtml(student, standard) {
         .sort((a, b) => compareTaskTopics(a.taskTopic, b.taskTopic));
     const acknowledgedCount = records.filter((record) => record.acknowledged).length;
     const generatedDate = new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+    const schoolLogoUrl = `${window.location.origin}/images/${encodeURIComponent("whs logo circular reo .png")}`;
     const reportLevelOrder = ["digital_outcome", "achieved", "merit", "excellence"];
     const reportLevelLabels = {
         digital_outcome: "Digital Outcome",
@@ -1282,7 +1283,7 @@ function buildProgressSummaryReportHtml(student, standard) {
                 <dl>
                     <div><dt>Student</dt><dd>${escapeHtml(student.studentName)}</dd></div>
                     <div><dt>Standard</dt><dd>${escapeHtml(targetStandard)}</dd></div>
-                    <div><dt>Report date</dt><dd>${escapeHtml(generatedDate)}</dd></div>
+                    <div class="report-date-meta"><img src="${escapeHtml(schoolLogoUrl)}" alt="Westland High School logo"><dt>Report date</dt><dd>${escapeHtml(generatedDate)}</dd></div>
                 </dl>
             </header>
             <section class="report-progress">
@@ -1320,6 +1321,8 @@ function openProgressSummaryPrintWindow(students, standard) {
         h2 { margin: 0; color: #173f63; font-size: 14px; }
         h3 { margin: 0; color: #173f63; font-size: 12px; }
         .report-header dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 0; }
+        .report-date-meta { display: flex; flex-direction: column; align-items: flex-start; }
+        .report-date-meta img { width: 34px; height: 34px; object-fit: contain; margin-bottom: 5px; }
         dt { color: #5a7188; font-size: 9px; font-weight: 700; text-transform: uppercase; }
         dd { margin: 3px 0 0; font-weight: 700; }
         .report-progress { margin: 14px 0; padding: 10px 12px; border: 1px solid #c5d7e8; border-left: 4px solid #2f74b9; background: #f2f8fc; }
