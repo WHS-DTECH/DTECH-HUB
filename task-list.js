@@ -2431,6 +2431,9 @@ function renderChecklistCards(detail, allItems) {
                                     : integrityTestingIsImage
                                         ? buildCustomActivityLink(taskListState.selectedId, "Integrity & Validation (IMAGE)", "Integrity & Validation (IMAGE)", "image-integrity-testing")
                                         : buildCustomActivityLink(taskListState.selectedId, "Integrity & Validation (WEB)", "Integrity & Validation (WEB)", "code-validation");
+                                const testingFunctionsSubtasks = isLinkedTestingImprovementRow
+                                    ? getTestingFunctionsSubtasks(taskListState.fullEvidenceState)
+                                    : [];
                                 const rowText = isInformationalRow
                                     ? `<span class="task-list-step-text">${escapeTaskListHtml(stepText)}</span>`
                                     : (href
@@ -2510,6 +2513,20 @@ function renderChecklistCards(detail, allItems) {
                                                         <strong role="cell">${escapeTaskListHtml(subtask.evidenceSource)}</strong>
                                                         <span role="cell">${escapeTaskListHtml(subtask.demonstrates)}</span>
                                                     </div>
+                                                `).join("")}
+                                            </div>
+                                        </div>
+                                    ` : ""}
+                                    ${isLinkedTestingImprovementRow ? `
+                                        <div class="task-list-decomposition-subtasks">
+                                            <p class="task-list-system-title">SUBTASKS</p>
+                                            <p class="task-list-achieved-note">Testing evidence: client feedback form and functions testing results.</p>
+                                            <div class="task-list-decomposition-subtask-list">
+                                                ${testingFunctionsSubtasks.map((subtask) => `
+                                                    <label class="task-list-decomposition-subtask ${subtask.done ? "is-complete" : ""}">
+                                                        <input type="checkbox" disabled ${subtask.done ? "checked" : ""}>
+                                                        <a href="${escapeTaskListHtml(subtask.href)}">${getProjectManagementSystemLogo(subtask.label)}${escapeTaskListHtml(subtask.label)}${subtask.countText ? ` - ${escapeTaskListHtml(subtask.countText)}` : ""}</a>
+                                                    </label>
                                                 `).join("")}
                                             </div>
                                         </div>
