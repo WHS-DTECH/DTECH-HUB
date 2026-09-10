@@ -913,6 +913,11 @@ function getStudentProcessStandards(student) {
     return Array.from(standards).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 }
 
+function getAuthoritativeStudentProcessStandard(student) {
+    const standards = getStudentProcessStandards(student);
+    return standards.sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))[0] || "";
+}
+
 function getStudentProcessFolderUrl(student) {
     let url = "";
     student?.groups?.forEach?.((bucket) => {
@@ -1017,7 +1022,17 @@ function buildStudentSummaryRows() {
     });
 
     byStudent.forEach((student) => {
-        student.groups.forEach((bucket) => finalizeStudentSummaryBucket(bucket));
+        const authoritativeStandard = getAuthoritativeStudentProcessStandard(student);
+        student.authoritativeProcessStandard = authoritativeStandard;
+        student.groups.forEach((bucket) => {
+            if (authoritativeStandard) {
+                bucket.records = bucket.records.filter((record) => {
+                    const recordStandard = normalizeTrackerStandardValue(record?.processStandard);
+                    return !recordStandard || recordStandard === authoritativeStandard;
+                });
+            }
+            finalizeStudentSummaryBucket(bucket);
+        });
         student.processStandards = getStudentProcessStandards(student);
         student.processFolderUrl = getStudentProcessFolderUrl(student);
     });
