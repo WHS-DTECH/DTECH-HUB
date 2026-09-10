@@ -1217,7 +1217,7 @@ function buildProgressSummaryReportHtml(student, standard) {
         ? `
             <section class="report-next-steps">
                 <h2>WHAT YOU NEED TO DO NEXT</h2>
-                <p class="report-next-step-intro">1. Complete the following Achieved requirements</p>
+                <p class="report-next-step-intro">1. Complete the following ACHIEVED requirements</p>
                 ${nextStepGroups.map((group) => `
                     <div class="report-next-step-group">
                         <h3>${escapeHtml(group.section)}</h3>
@@ -1287,7 +1287,7 @@ function buildProgressSummaryReportHtml(student, standard) {
                 </dl>
             </header>
             <section class="report-progress">
-                <h2>Achieved requirements</h2>
+                <h2>ACHIEVED requirements</h2>
                 <strong>${acknowledgedCount}/${records.length} acknowledged</strong>
                 <p>${records.length - acknowledgedCount} requirement${records.length - acknowledgedCount === 1 ? "" : "s"} still need evidence or acknowledgement.</p>
             </section>
