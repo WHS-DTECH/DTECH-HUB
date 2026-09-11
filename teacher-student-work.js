@@ -6,6 +6,29 @@ const DIGITAL_OUTCOME_DESCRIPTION_TASKS = [
     "State how success will be measured or evaluated.",
     "What Tools and Techniques will be used?"
 ];
+const DIGITAL_MEDIA_TRACKER_CRITERIA = {
+    "91893": [
+        "Achieved: Using appropriate tools and techniques for the purpose and end users.",
+        "Achieved: Applying appropriate data integrity and testing procedures.",
+        "Achieved: Using relevant conventions for the media type.",
+        "Achieved: Explaining relevant implications.",
+        "Merit: Using information from testing procedures to improve the quality of the outcome.",
+        "Merit: Applying relevant conventions to improve the quality of the outcome.",
+        "Merit: Addressing relevant implications.",
+        "Excellence: Iterative improvement throughout the design, development and testing process to produce a high-quality outcome.",
+        "Excellence: Using efficient tools and techniques in the outcome's production."
+    ],
+    "91903": [
+        "Achieved: Applying appropriate tools and techniques to meet the purpose and end-user requirements.",
+        "Achieved: Applying appropriate data integrity and testing procedures.",
+        "Achieved: Applying user experience principles relevant to the purpose of the outcome.",
+        "Achieved: Addressing relevant implications.",
+        "Merit: Using information from testing procedures to improve the quality of the digital media outcome.",
+        "Merit: Applying user experience principles to improve the quality of the digital media outcome.",
+        "Excellence: Iterative improvement throughout the design, development and testing process to produce a high-quality outcome.",
+        "Excellence: Using efficient tools and techniques in the outcome's production."
+    ]
+};
 
 const workState = {
     email: "",
@@ -326,6 +349,10 @@ function getTaskTopicGroup(topic) {
     const text = normalizeTaskTopicText(topic).toLowerCase();
 
     if (!text) return "other";
+
+    if (text.startsWith("achieved:")) return "achieved";
+    if (text.startsWith("merit:")) return "merit";
+    if (text.startsWith("excellence:")) return "excellence";
 
     if (
         /describe\s+the\s+digital\s+outcome|description\s*-\s*google\s+slides|target\s+audience|success\s+will\s+be\s+measured|outcome\s+will\s+be\s+developed|what\s+tools\s+and\s+techniques\s+will\s+be\s+used/.test(text)
@@ -836,12 +863,19 @@ function buildAllRecords() {
             const projectTaskStandard = normalizeTrackerStandardValue(student?.standard_2);
             const digitalMediaType = String(student?.digital_media_type || student?.digitalMediaType || "").trim();
             const standardNumbers = mergeTrackerStandardNumbers(processStandard, projectTaskStandard, activityStandardNumbers);
+            const standardCriteria = Array.isArray(DIGITAL_MEDIA_TRACKER_CRITERIA[projectTaskStandard])
+                ? DIGITAL_MEDIA_TRACKER_CRITERIA[projectTaskStandard]
+                : [];
+            const studentTaskTopics = Array.from(new Map(
+                [...uniqueTopics, ...standardCriteria]
+                    .map((topic) => [stripTaskTopicLevel(topic).toLowerCase(), topic])
+            ).values());
 
             const evidenceRows = Array.isArray(student?.evidence_steps) ? student.evidence_steps : [];
             const processFolderUrl = toSafeExternalUrl(student?.process_assessment_folder_url || student?.processAssessmentFolderUrl || "")
                 || getProcessFolderUrlFromTemplateCopies(student?.template_copies || student?.templateCopies)
                 || getFirstGoogleDriveFolderUrlFromEvidenceRows(evidenceRows);
-            uniqueTopics.forEach((taskTopic) => {
+            studentTaskTopics.forEach((taskTopic) => {
                 const topicKey = normalizeTaskTopicText(taskTopic).toLowerCase();
                 const resolved = parseTaskTopicEvidenceForActivity(evidenceRows, taskTopic, standardNumbers);
                 const evidence = resolved.evidence;
