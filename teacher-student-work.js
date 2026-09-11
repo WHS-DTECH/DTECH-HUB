@@ -1241,6 +1241,13 @@ function renderStudentSummaryDetailRow(student, summaryKind = "process") {
     `;
 }
 
+function isDigitalMediaAssessmentTopic(taskTopic) {
+    const text = stripTaskTopicLevel(taskTopic).toLowerCase();
+    if (getTaskTopicGroup(taskTopic) === "digital_outcome") return true;
+
+    return /using appropriate tools and techniques for the purpose and end users|applying appropriate tools and techniques to meet the purpose and end-user requirements|applying appropriate data integrity and testing procedures|using relevant conventions for the media type|applying user experience principles relevant to the purpose of the outcome|explaining relevant implications|using information from testing procedures to improve the quality of the (?:digital media )?outcome|applying relevant conventions to improve the quality of the outcome|applying user experience principles to improve the quality of the digital media outcome|addressing relevant implications|iterative improvement throughout the design, development and testing process|using efficient tools and techniques in the outcome.?s production/i.test(text);
+}
+
 function buildDigitalMediaSummaryRows() {
     const mediaRecords = workState.records
         .filter((record) => {
@@ -1250,6 +1257,7 @@ function buildDigitalMediaSummaryRows() {
             return !isProcessAssessmentActivity || getTaskTopicGroup(record?.taskTopic) === "digital_outcome";
         })
         .filter((record) => /^(91893|91903)$/.test(normalizeTrackerStandardValue(record?.projectTaskStandard)))
+        .filter((record) => isDigitalMediaAssessmentTopic(record?.taskTopic))
         .map((record) => ({ ...record, processStandard: record.projectTaskStandard }));
     return buildStudentSummaryRows(mediaRecords);
 }
