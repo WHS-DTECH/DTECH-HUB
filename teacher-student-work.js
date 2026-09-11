@@ -1228,7 +1228,7 @@ function buildDigitalMediaSummaryRows() {
             const activity = workState.activitiesById.get(String(record?.activityId || "").trim());
             const activityName = String(activity?.name || record?.activityName || "").trim();
             const isProcessAssessmentActivity = /process\s+assessment/i.test(activityName);
-            return !isProcessAssessmentActivity;
+            return !isProcessAssessmentActivity || getTaskTopicGroup(record?.taskTopic) === "digital_outcome";
         })
         .filter((record) => /^(91893|91903)$/.test(normalizeTrackerStandardValue(record?.projectTaskStandard)))
         .map((record) => ({ ...record, processStandard: record.projectTaskStandard }));
