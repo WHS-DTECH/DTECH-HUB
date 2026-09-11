@@ -8930,6 +8930,18 @@ app.get("/api/activities/:id/interests", async (req, res) => {
       [projectId]
     );
 
+    await ensureDigiMedEfficientToolsSchema();
+    const efficientToolsByEmail = new Map();
+    if (result.rows.length) {
+      const efficientToolsResult = await pool.query(
+        `SELECT student_email, tools FROM student_digimed_efficient_tools WHERE activity_id = $1 AND student_email = ANY($2::text[])`,
+        [projectId, result.rows.map((row) => normalizeEmail(row?.student_email || "")).filter(Boolean)]
+      );
+      for (const efficientToolsRow of efficientToolsResult.rows || []) {
+        efficientToolsByEmail.set(normalizeEmail(efficientToolsRow?.student_email || ""), normalizeDigiMedEfficientTools(efficientToolsRow?.tools));
+      }
+    }
+
     const studentEmailsForSetup = result.rows
       .map((row) => normalizeEmail(row?.student_email || ""))
       .filter(Boolean);
@@ -9024,6 +9036,7 @@ app.get("/api/activities/:id/interests", async (req, res) => {
           digital_media_type: String(myAllocationRow.digital_media_type || "").trim(),
           evidence_steps: normalizeEvidenceStepsPayload(myAllocationRow.evidence_steps),
           template_copies: Array.isArray(myAllocationRow.template_copies) ? myAllocationRow.template_copies : [],
+          efficient_tools: efficientToolsByEmail.get(normalizeEmail(myAllocationRow.student_email || email)) || [],
           process_assessment_folder_url: driveSetupByEmail.get(normalizeEmail(myAllocationRow.student_email || email)) || ""
         }
         : null,
@@ -9038,6 +9051,7 @@ app.get("/api/activities/:id/interests", async (req, res) => {
           digital_media_type: String(r.digital_media_type || "").trim(),
           evidence_steps: normalizeEvidenceStepsPayload(r.evidence_steps),
           template_copies: Array.isArray(r.template_copies) ? r.template_copies : [],
+          efficient_tools: efficientToolsByEmail.get(normalizeEmail(r.student_email || "")) || [],
           process_assessment_folder_url: driveSetupByEmail.get(normalizeEmail(r.student_email || "")) || "",
           source_projects: sourceProjectsByEmail.get(normalizeEmail(r.student_email || "")) || []
         }))

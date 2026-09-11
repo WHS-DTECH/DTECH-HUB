@@ -167,6 +167,37 @@ function writeDigiMedToolsTechniquesState(activityId, email, value) {
     }
 }
 
+const DIGIMED_TOOLS_TECHNIQUES_EVIDENCE_STANDARD = "digimed-tools-techniques";
+
+function getDigiMedToolsTechniquesStateFromEvidence(rows) {
+    const state = {};
+    (Array.isArray(rows) ? rows : []).forEach((row) => {
+        if (String(row?.standard || "").trim() !== DIGIMED_TOOLS_TECHNIQUES_EVIDENCE_STANDARD) return;
+        (Array.isArray(row?.steps) ? row.steps : []).forEach((step) => {
+            const match = String(step?.text || "").match(/^DIGIMED_TOOLS_TECHNIQUES_ACK\|(.+)\|true$/i);
+            if (match?.[1]) state[match[1].trim()] = true;
+        });
+    });
+    return state;
+}
+
+async function persistDigiMedToolsTechniquesState(activityId, state) {
+    const safeActivityId = String(activityId || "").trim();
+    if (!safeActivityId || !getTaskListEmail()) return;
+    try {
+        const rows = await fetchMyEvidence(safeActivityId);
+        const withoutTools = rows.filter((row) => String(row?.standard || "").trim() !== DIGIMED_TOOLS_TECHNIQUES_EVIDENCE_STANDARD);
+        const steps = Object.entries(state || {})
+            .filter(([, done]) => Boolean(done))
+            .map(([label]) => ({ text: `DIGIMED_TOOLS_TECHNIQUES_ACK|${label}|true`, done: true }));
+        if (steps.length) {
+            withoutTools.push({ standard: DIGIMED_TOOLS_TECHNIQUES_EVIDENCE_STANDARD, steps });
+        }
+        await saveMyEvidence(safeActivityId, withoutTools);
+    } catch (_error) {
+    }
+}
+
 const EVIDENCE_STEPS_DEFAULTS = {
     "92005": [
         "Define what the digital outcome needs to do.",
@@ -459,6 +490,7 @@ function installDigiMedToolsTechniquesHandler() {
         const state = readDigiMedToolsTechniquesState(taskListState.selectedId, getTaskListEmail());
         state[subtask] = Boolean(checkbox.checked);
         writeDigiMedToolsTechniquesState(taskListState.selectedId, getTaskListEmail(), state);
+        void persistDigiMedToolsTechniquesState(taskListState.selectedId, state);
         renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);
     });
 }
@@ -1241,6 +1273,7 @@ async function runGithubEfficientToolsSync(activityId, email, repoUrl) {
     });
     if (toolsTechniquesChanged) {
         writeDigiMedToolsTechniquesState(activityId, email, toolsTechniquesState);
+        void persistDigiMedToolsTechniquesState(activityId, toolsTechniquesState);
     }
 
     writeGithubRepoAnalysis(activityId, email, {
@@ -2998,6 +3031,14 @@ async function loadChecklistForTask(taskId) {
 
     const evidenceRows = await fetchMyEvidence(taskListState.selectedId).catch(() => []);
     const evidenceMap = evidenceRowsToMap(evidenceRows);
+    const persistedToolsTechniquesState = getDigiMedToolsTechniquesStateFromEvidence(evidenceRows);
+    if (Object.keys(persistedToolsTechniquesState).length) {
+        const cachedToolsTechniquesState = readDigiMedToolsTechniquesState(taskListState.selectedId, getTaskListEmail());
+        writeDigiMedToolsTechniquesState(taskListState.selectedId, getTaskListEmail(), {
+            ...cachedToolsTechniquesState,
+            ...persistedToolsTechniquesState
+        });
+    }
     taskListState.fullEvidenceState = { ...evidenceMap };
     let migratedDigitalOutcomeRows = false;
     if (Array.isArray(taskListState.fullEvidenceState["digital-outcome"])) {

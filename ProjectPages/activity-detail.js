@@ -480,6 +480,7 @@ function writeDigiMedConventionsAcknowledgements(activityId, email, value) {
         localStorage.setItem(getDigiMedConventionsAcknowledgementKey(activityId, email), JSON.stringify(value || {}));
     } catch (_error) {
     }
+    void persistDigiMedLocalState(activityId, email, "conventions", value);
 }
 
 function countDigiMedConventionsAcknowledgements(value) {
@@ -504,6 +505,7 @@ function writeDigiMedImageConventionsAcknowledgements(activityId, email, value) 
         localStorage.setItem(getDigiMedImageConventionsAcknowledgementKey(activityId, email), JSON.stringify(value || {}));
     } catch (_error) {
     }
+    void persistDigiMedLocalState(activityId, email, "image-conventions", value);
 }
 
 function buildDigiMedImageConventionsTable(activityId, email) {
@@ -543,6 +545,7 @@ function writeDigiMedUXPrinciplesAcknowledgements(activityId, email, value) {
         localStorage.setItem(getDigiMedUXPrinciplesAcknowledgementKey(activityId, email), JSON.stringify(value || {}));
     } catch (_error) {
     }
+    void persistDigiMedLocalState(activityId, email, "ux-principles", value);
 }
 
 function countDigiMedUXPrinciplesAcknowledgements(value) {
@@ -567,6 +570,7 @@ function writeDigiMedVideoIntegrityChecks(activityId, email, value) {
         localStorage.setItem(getDigiMedVideoIntegrityKey(activityId, email), JSON.stringify(value || {}));
     } catch (_error) {
     }
+    void persistDigiMedLocalState(activityId, email, "video-integrity", value);
 }
 
 function getDigiMedImageIntegrityKey(activityId, email) {
@@ -587,6 +591,7 @@ function writeDigiMedImageIntegrityChecks(activityId, email, value) {
         localStorage.setItem(getDigiMedImageIntegrityKey(activityId, email), JSON.stringify(value || {}));
     } catch (_error) {
     }
+    void persistDigiMedLocalState(activityId, email, "image-integrity", value);
 }
 
 function getDigiMedVideoUXKey(activityId, email) {
@@ -607,6 +612,7 @@ function writeDigiMedVideoUXChecks(activityId, email, value) {
         localStorage.setItem(getDigiMedVideoUXKey(activityId, email), JSON.stringify(value || {}));
     } catch (_error) {
     }
+    void persistDigiMedLocalState(activityId, email, "video-ux", value);
 }
 
 function getDigiMedVideoConventionsKey(activityId, email) {
@@ -627,6 +633,7 @@ function writeDigiMedVideoConventionsChecks(activityId, email, value) {
         localStorage.setItem(getDigiMedVideoConventionsKey(activityId, email), JSON.stringify(value || {}));
     } catch (_error) {
     }
+    void persistDigiMedLocalState(activityId, email, "video-conventions", value);
 }
 
 function getDigiMedVideoProductionProgressKey(activityId, email) {
@@ -647,6 +654,7 @@ function writeDigiMedVideoProductionProgress(activityId, email, value) {
         localStorage.setItem(getDigiMedVideoProductionProgressKey(activityId, email), JSON.stringify(value || {}));
     } catch (_error) {
     }
+    void persistDigiMedLocalState(activityId, email, "video-production", value);
 }
 
 function getDigiMedWebProductionProgressKey(activityId, email) {
@@ -667,6 +675,7 @@ function writeDigiMedWebProductionProgress(activityId, email, value) {
         localStorage.setItem(getDigiMedWebProductionProgressKey(activityId, email), JSON.stringify(value || {}));
     } catch (_error) {
     }
+    void persistDigiMedLocalState(activityId, email, "web-production", value);
 }
 
 function parseDurationMinutes(raw) {
@@ -3134,6 +3143,25 @@ async function saveEvidenceRows(projectId, studentEmail, rows) {
     }
 }
 
+async function persistDigiMedLocalState(projectId, studentEmail, stateKind, state) {
+    const safeProjectId = String(projectId || "").trim();
+    const safeEmail = String(studentEmail || "").trim().toLowerCase();
+    const safeKind = String(stateKind || "").trim().toLowerCase();
+    if (!safeProjectId || !safeEmail || !safeKind) return;
+
+    try {
+        const rows = await fetchEvidenceRowsEnsuringAllocation(safeProjectId, safeEmail);
+        const standard = `digimed-local-state:${safeKind}`;
+        const nextRows = rows.filter((row) => String(row?.standard || "").trim() !== standard);
+        const steps = Object.entries(state || {})
+            .filter(([, done]) => Boolean(done))
+            .map(([label]) => ({ text: `DIGIMED_STATE|${safeKind}|${label}|true`, done: true }));
+        if (steps.length) nextRows.push({ standard, steps });
+        await saveEvidenceRows(safeProjectId, safeEmail, nextRows);
+    } catch (_error) {
+    }
+}
+
 async function fetchMyEvidenceRows(projectId) {
     const endpoint = `/api/activities/${encodeURIComponent(projectId)}/my-evidence`;
     const response = await fetch(endpoint, {
@@ -5084,6 +5112,24 @@ function writeStoredTestingFunctionsListCounts(projectId, email, counts) {
     if (!projectId || !email) return;
     try {
         localStorage.setItem(getTestingFunctionsListCountStorageKey(projectId, email), JSON.stringify(counts || {}));
+    } catch (_error) {
+    }
+    void persistTestingFunctionsCounts(projectId, email, counts);
+}
+
+async function persistTestingFunctionsCounts(projectId, studentEmail, counts) {
+    const functionalCount = Math.max(0, Number.parseInt(counts?.functionalCount, 10) || 0);
+    const userCount = Math.max(0, Number.parseInt(counts?.userCount, 10) || 0);
+    if (!projectId || !studentEmail) return;
+    try {
+        const rows = await fetchEvidenceRowsEnsuringAllocation(projectId, studentEmail);
+        const standard = "testing-functions-counts";
+        const nextRows = rows.filter((row) => String(row?.standard || "").trim() !== standard);
+        nextRows.push({
+            standard,
+            steps: [{ text: `TESTING_FUNCTIONS_COUNT|${functionalCount}|${userCount}`, done: functionalCount + userCount > 0 }]
+        });
+        await saveEvidenceRows(projectId, studentEmail, nextRows);
     } catch (_error) {
     }
 }

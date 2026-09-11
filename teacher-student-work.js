@@ -6,6 +6,7 @@ const DIGITAL_OUTCOME_DESCRIPTION_TASKS = [
     "State how success will be measured or evaluated.",
     "What Tools and Techniques will be used?"
 ];
+const PROCESS_ASSESSMENT_ACTIVITY_ID = "49";
 const DIGITAL_MEDIA_TRACKER_CRITERIA = {
     "91893": [
         "Achieved: Using appropriate tools and techniques for the purpose and end users.",
@@ -680,15 +681,42 @@ function hasEvidenceStepMatching(evidenceRows, pattern) {
     );
 }
 
+function hasPersistedDigiMedState(evidenceRows, stateKinds) {
+    const kinds = Array.isArray(stateKinds) ? stateKinds : [stateKinds];
+    const kindPattern = kinds.map((kind) => String(kind || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).filter(Boolean).join("|");
+    return Boolean(kindPattern) && hasEvidenceStepMatching(evidenceRows, new RegExp(`^DIGIMED_STATE\\|(?:${kindPattern})\\|.+\\|true$`, "i"));
+}
+
 function hasDigitalMediaCriterionEvidence(taskTopic, evidenceRows) {
     const text = stripTaskTopicLevel(taskTopic).toLowerCase();
+    if (/tools and techniques/.test(text) && !/efficient/.test(text)) {
+        return getDigiMedToolsTechniquesEvidenceCount(evidenceRows) > 0;
+    }
     if (/conventions/.test(text)) {
-        return hasEvidenceStepMatching(evidenceRows, /^CONVENTION_ACK\|.+\|true$/i);
+        return hasEvidenceStepMatching(evidenceRows, /^CONVENTION_ACK\|.+\|true$/i)
+            || hasPersistedDigiMedState(evidenceRows, ["conventions", "image-conventions", "video-conventions"]);
     }
     if (/user experience principles/.test(text)) {
-        return hasEvidenceStepMatching(evidenceRows, /^UX_PRINCIPLE_ACK\|.+\|true$/i);
+        return hasEvidenceStepMatching(evidenceRows, /^UX_PRINCIPLE_ACK\|.+\|true$/i)
+            || hasPersistedDigiMedState(evidenceRows, ["ux-principles", "video-ux"]);
+    }
+    if (/data integrity and testing/.test(text)) return hasPersistedDigiMedState(evidenceRows, ["image-integrity", "video-integrity"]);
+    if (/using information from testing procedures/.test(text)) {
+        return hasEvidenceStepMatching(evidenceRows, /^TESTING_FUNCTIONS_COUNT\|(?:[1-9]\d*)\|\d+$/)
+            || hasEvidenceStepMatching(evidenceRows, /^TESTING_FUNCTIONS_COUNT\|\d+\|(?:[1-9]\d*)$/);
     }
     return false;
+}
+
+function getDigiMedToolsTechniquesEvidenceCount(evidenceRows) {
+    const labels = new Set();
+    (Array.isArray(evidenceRows) ? evidenceRows : []).forEach((row) => {
+        (Array.isArray(row?.steps) ? row.steps : []).forEach((step) => {
+            const match = String(step?.text || "").match(/^DIGIMED_TOOLS_TECHNIQUES_ACK\|(.+)\|true$/i);
+            if (match?.[1]) labels.add(match[1].trim());
+        });
+    });
+    return labels.size;
 }
 
 function getFirstGoogleDriveFolderUrlFromEvidenceRows(evidenceRows) {
@@ -904,6 +932,12 @@ function buildAllRecords() {
                 const digitalOutcomeTemplateComplete = getTaskTopicGroup(taskTopic) === "digital_outcome"
                     && hasTemplateCopyForDigitalOutcomeTask(student?.template_copies || student?.templateCopies, taskTopic);
                 const digitalMediaEvidenceLinked = hasDigitalMediaCriterionEvidence(taskTopic, evidenceRows);
+                const advancedToolsCount = getDigiMedToolsTechniquesEvidenceCount(evidenceRows);
+                const efficientTools = Array.isArray(student?.efficient_tools) ? student.efficient_tools : [];
+                const isAdvancedToolsCriterion = /(?:using|applying) appropriate tools and techniques/.test(stripTaskTopicLevel(taskTopic).toLowerCase());
+                const isEfficientToolsCriterion = /using efficient tools and techniques/.test(stripTaskTopicLevel(taskTopic).toLowerCase());
+                const digitalMediaSubtaskComplete = (isAdvancedToolsCriterion && advancedToolsCount >= 3)
+                    || (isEfficientToolsCriterion && efficientTools.length >= 3);
 
                 const mergedLinks = [];
                 const seenMergedLink = new Set();
@@ -934,9 +968,9 @@ function buildAllRecords() {
                     processFolderUrl,
                     googleSlidesUrl: evidence.googleSlidesUrl,
                     links: mergedLinks,
-                    evidenceLinked: Boolean(evidence.googleSlidesUrl || mergedLinks.length || digitalMediaEvidenceLinked),
+                    evidenceLinked: Boolean(evidence.googleSlidesUrl || mergedLinks.length || digitalMediaEvidenceLinked || (isEfficientToolsCriterion && efficientTools.length)),
                     submitted: Boolean(evidence.submitted),
-                    acknowledged: Boolean(checklistStep?.done || evidence.submitted || projectManagementComplete || digitalOutcomeTemplateComplete),
+                    acknowledged: Boolean(checklistStep?.done || evidence.submitted || projectManagementComplete || digitalOutcomeTemplateComplete || digitalMediaSubtaskComplete),
                     submittedAt: evidence.submittedAt,
                     taskUrl: new URL(`ProjectPages/custom-activity.html?id=${encodeURIComponent(activityId)}&taskTopic=${encodeURIComponent(taskTopic)}`, window.location.origin).toString()
                 });
@@ -1300,13 +1334,24 @@ function renderStudentSummaryDetailRow(student, summaryKind = "process") {
 }
 
 function isProcessAssessmentRecord(record) {
+    if (String(record?.activityId || "").trim() === PROCESS_ASSESSMENT_ACTIVITY_ID) return true;
     const activity = workState.activitiesById.get(String(record?.activityId || "").trim());
     const activityName = String(activity?.name || record?.activityName || "").trim();
     return /process\s+assessment/i.test(activityName);
 }
 
+function isProcessAssessmentTopic(taskTopic) {
+    const text = stripTaskTopicLevel(taskTopic).toLowerCase();
+    if (getTaskTopicGroup(taskTopic) === "digital_outcome") return true;
+    return /project management|decompos|key features or requirements|trial(?:ling)? (?:the )?components|test(?:ing)? that the digital technologies outcome functions|relevant implications|using information appropriately from testing and trialling|effectively using project management and version control|trialling multiple components and\/or techniques|discussing how the information from planning, testing and trialling/.test(text);
+}
+
 function buildProcessSummaryRows() {
-    return buildStudentSummaryRows(workState.records.filter(isProcessAssessmentRecord));
+    return buildStudentSummaryRows(workState.records.filter((record) => {
+        const processStandard = normalizeTrackerStandardValue(record?.processStandard);
+        return /^(91897|91907)$/.test(processStandard)
+            && (isProcessAssessmentRecord(record) || isProcessAssessmentTopic(record?.taskTopic));
+    }));
 }
 
 function isDigitalMediaAssessmentTopic(taskTopic) {
