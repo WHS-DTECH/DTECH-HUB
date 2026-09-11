@@ -452,7 +452,7 @@
                                     <p class="hapara-item-meta">Submitted at: ${escapeHtml(formatSubmissionTimestamp(item.submittedAt))}</p>
                                     ${item.docRef ? `<p class="hapara-item-meta">Evidence note: ${escapeHtml(item.docRef)}</p>` : ""}
                                     <div class="hapara-item-actions">
-                                        <a class="detail-action detail-action-secondary" href="ProjectPages/activity-detail.html?id=${encodeURIComponent(item.activityId)}&taskTopic=${encodeURIComponent(item.taskTopic || "")}" target="_blank" rel="noreferrer">Open Task Item</a>
+                                        <a class="detail-action detail-action-secondary" href="ProjectPages/custom-activity.html?id=${encodeURIComponent(item.activityId)}&taskTopic=${encodeURIComponent(item.taskTopic || "")}" target="_blank" rel="noreferrer">Open Task Item</a>
                                         <button type="button" class="detail-action" data-action="submit-hapara" ${item.hasLink ? "" : "disabled"}>Submit to Hapara</button>
                                     </div>
                                 </div>
