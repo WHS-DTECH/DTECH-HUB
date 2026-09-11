@@ -1347,7 +1347,9 @@ function isProcessAssessmentTopic(taskTopic) {
 }
 
 function buildProcessSummaryRows() {
-    return buildStudentSummaryRows(workState.records.filter(isProcessAssessmentRecord));
+    return buildStudentSummaryRows(workState.records.filter((record) =>
+        isProcessAssessmentRecord(record) && isProcessAssessmentTopic(record?.taskTopic)
+    ));
 }
 
 function isDigitalMediaAssessmentTopic(taskTopic) {
