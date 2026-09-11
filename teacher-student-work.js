@@ -568,6 +568,16 @@ function inferGlobalWorkLinksFromEvidenceRows(evidenceRows) {
                 return;
             }
 
+            if (text.startsWith("GOOGLE_DRIVE_PROJECT_FOLDER_URL|")) {
+                pushLink("Google Drive", text.slice("GOOGLE_DRIVE_PROJECT_FOLDER_URL|".length).trim());
+                return;
+            }
+
+            if (text.startsWith("GITHUB_REPO_URL|")) {
+                pushLink("GitHub", text.slice("GITHUB_REPO_URL|".length).trim());
+                return;
+            }
+
             if (text.startsWith("MEDIA_ASSET_FOLDER_URL|")) {
                 pushLink("Asset Folder", text.slice("MEDIA_ASSET_FOLDER_URL|".length).trim());
                 return;
@@ -585,6 +595,10 @@ function inferGlobalWorkLinksFromEvidenceRows(evidenceRows) {
                 }
                 if (/drive\.google\.com/i.test(rawLink)) {
                     pushLink("Google Drive", rawLink);
+                    return;
+                }
+                if (/(github\.com|gist\.github\.com|raw\.githubusercontent\.com)/i.test(rawLink)) {
+                    pushLink("GitHub", rawLink);
                     return;
                 }
             }
@@ -609,6 +623,14 @@ function inferGlobalWorkLinksFromEvidenceRows(evidenceRows) {
                 const match = text.match(/https?:\/\/[^\s)]+/i);
                 if (match?.[0]) {
                     pushLink("Google Drive", match[0]);
+                }
+                return;
+            }
+
+            if (/(github\.com|gist\.github\.com|raw\.githubusercontent\.com)/i.test(text)) {
+                const match = text.match(/https?:\/\/[^\s)]+/i);
+                if (match?.[0]) {
+                    pushLink("GitHub", match[0]);
                 }
             }
         });
