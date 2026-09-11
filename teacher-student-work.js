@@ -1320,8 +1320,10 @@ function buildProgressSummaryReportHtml(student, standard) {
                         ${group.records.map((record) => `
                             <div class="report-next-step-item">
                                 <strong>○ ${escapeHtml(record.taskTopic)}</strong>
-                                <span>${hasStudentSummaryEvidence(record) ? "Evidence linked - acknowledgement still required" : "Evidence required"}</span>
-                                <a href="${escapeHtml(record.taskUrl)}" target="_blank" rel="noreferrer">Open task page to add evidence</a>
+                                <span>${hasStudentSummaryEvidence(record) ? "Evidence is linked - review it and complete the acknowledgement" : "Evidence required"}</span>
+                                ${hasStudentSummaryEvidence(record)
+                                    ? `<a href="${escapeHtml(record.taskUrl)}" target="_blank" rel="noreferrer">Open task page to review evidence</a>`
+                                    : `<a href="${escapeHtml(record.taskUrl)}" target="_blank" rel="noreferrer">Open task page to add evidence</a>`}
                             </div>
                         `).join("")}
                     </div>
