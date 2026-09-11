@@ -639,6 +639,14 @@ function inferGlobalWorkLinksFromEvidenceRows(evidenceRows) {
     return links;
 }
 
+function hasProjectManagementEvidenceCompletion(evidenceRows) {
+    const links = inferGlobalWorkLinksFromEvidenceRows(evidenceRows);
+    const systems = new Set(links.map((link) => String(link?.label || "").trim().toLowerCase()));
+    const hasTrello = systems.has("trello");
+    const hasOtherSystem = systems.has("github") || systems.has("onedrive") || systems.has("google drive");
+    return hasTrello && hasOtherSystem;
+}
+
 function getFirstGoogleDriveFolderUrlFromEvidenceRows(evidenceRows) {
     const rows = Array.isArray(evidenceRows) ? evidenceRows : [];
     for (const row of rows) {
@@ -823,6 +831,7 @@ function buildAllRecords() {
                 const checklistStep = findAcknowledgedChecklistStep(evidenceRows, taskTopic, standardNumbers);
                 const isProjectManagementTopic = topicKey.includes("project management");
                 const isVersionControlTopic = topicKey.includes("version control") || topicKey.includes("asset management");
+                const projectManagementComplete = isProjectManagementTopic && hasProjectManagementEvidenceCompletion(evidenceRows);
 
                 const mergedLinks = [];
                 const seenMergedLink = new Set();
@@ -854,7 +863,7 @@ function buildAllRecords() {
                     googleSlidesUrl: evidence.googleSlidesUrl,
                     links: mergedLinks,
                     submitted: Boolean(evidence.submitted),
-                    acknowledged: Boolean(checklistStep?.done || evidence.submitted),
+                    acknowledged: Boolean(checklistStep?.done || evidence.submitted || projectManagementComplete),
                     submittedAt: evidence.submittedAt,
                     taskUrl: new URL(`ProjectPages/custom-activity.html?id=${encodeURIComponent(activityId)}&taskTopic=${encodeURIComponent(taskTopic)}`, window.location.origin).toString()
                 });

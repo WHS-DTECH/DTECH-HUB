@@ -1904,7 +1904,8 @@ function autoTickProjectManagementRequirement(stateMap) {
     }
 
     const systems = inferStudentSystemConnections(stateMap || {});
-    if (!systems.trelloConnected || !systems.githubConnected) {
+    const hasOtherSystem = systems.githubConnected || systems.oneDriveConnected || systems.googleDriveConnected;
+    if (!systems.trelloConnected || !hasOtherSystem) {
         return false;
     }
 
@@ -2679,7 +2680,7 @@ function renderChecklistCards(detail, allItems) {
                             const isInformationalRow = isInformationalCriteriaRow(String(standard), level, stepText);
                             const isSystemComplete = isProjectManagementRow
                                 && systemConnections.trelloConnected
-                                && systemConnections.githubConnected;
+                                && (systemConnections.githubConnected || systemConnections.oneDriveConnected || systemConnections.googleDriveConnected);
                             const relevantCategoryDoneCount = countCompletedRelevantImplicationsCategories(levelRows);
                             const isAddressRelevantImplicationsRow = isAddressRelevantImplicationsStep(stepText);
                             const isExplainRelevantImplicationsRow = level === "Achieved"
