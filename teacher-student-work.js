@@ -870,6 +870,7 @@ function buildAllRecords() {
         if (!uniqueTopics.length) return;
 
         const activityStandardNumbers = extractStandardNumbers(activity);
+        const isProcessAssessmentActivity = /process\s+assessment/i.test(String(activity?.name || ""));
         const students = Array.isArray(interest?.students) ? interest.students : [];
 
         students.forEach((student) => {
@@ -880,7 +881,7 @@ function buildAllRecords() {
             const projectTaskStandard = normalizeTrackerStandardValue(student?.standard_2);
             const digitalMediaType = String(student?.digital_media_type || student?.digitalMediaType || "").trim();
             const standardNumbers = mergeTrackerStandardNumbers(processStandard, projectTaskStandard, activityStandardNumbers);
-            const standardCriteria = Array.isArray(DIGITAL_MEDIA_TRACKER_CRITERIA[projectTaskStandard])
+            const standardCriteria = !isProcessAssessmentActivity && Array.isArray(DIGITAL_MEDIA_TRACKER_CRITERIA[projectTaskStandard])
                 ? DIGITAL_MEDIA_TRACKER_CRITERIA[projectTaskStandard]
                 : [];
             const studentTaskTopics = Array.from(new Map(
