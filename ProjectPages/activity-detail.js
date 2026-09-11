@@ -5266,15 +5266,15 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         const logMissingText = isProjectManagementTopic ? "Missing today's log" : "Missing today's version log";
 
         if (!rows.length) {
-            panelHost.innerHTML = `<p class="task-topic-submission-note">No student records are ready for evidence submission tracking yet.</p>`;
+            panelHost.innerHTML = `<p class="task-topic-submission-note">No student records are ready for evidence progress tracking yet.</p>`;
             return;
         }
 
         panelHost.innerHTML = `
             <div class="task-topic-submission-teacher-panel">
-                <p class="task-topic-submission-note">Students submit evidence for this task topic. This panel tracks who has submitted evidence and linked their work.</p>
+                <p class="task-topic-submission-note">Students connect evidence for this task topic. This panel tracks completed evidence and linked work.</p>
                 <div class="task-topic-submission-meta">
-                    <p><strong>Submitted:</strong> ${rows.filter((row) => row.acknowledged).length} of ${rows.length}</p>
+                    <p><strong>Complete:</strong> ${rows.filter((row) => row.acknowledged).length} of ${rows.length}</p>
                     ${isTrackedWorkflowTopic ? `<p><strong>Logged today:</strong> ${loggedTodayCount} of ${rows.length}</p>` : ""}
                 </div>
                 ${isTrackedWorkflowTopic ? `
@@ -5304,7 +5304,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                         <div class="task-topic-teacher-status-item">
                             <span class="task-topic-teacher-status-email">${escapeHtml(row.name)}</span>
                             <span class="task-topic-teacher-status-email">${escapeHtml(row.email)}</span>
-                            <span class="task-topic-teacher-status-pill ${row.acknowledged ? "is-acknowledged" : "is-pending"}">${row.acknowledged ? "Submitted evidence" : "Not submitted"}</span>
+                            <span class="task-topic-teacher-status-pill ${row.acknowledged ? "is-acknowledged" : "is-pending"}">${row.acknowledged ? "Evidence complete" : "Evidence required"}</span>
                             <span class="task-topic-teacher-status-doc">${escapeHtml(row.docRef || "No document reference")}</span>
                             ${isDigitalOutcomeTopic
                                 ? (row.googleSlidesUrl
@@ -5338,7 +5338,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                                 ? `<span class="task-topic-teacher-status-log ${(isProjectManagementTopic ? row.lastLogDate : row.mediaLastVersionLogDate) === todayNz ? "is-complete" : "is-missing"}">${(isProjectManagementTopic ? row.lastLogDate : row.mediaLastVersionLogDate) === todayNz ? logCompleteText : logMissingText}</span>`
                                 : ""
                             }
-                            <span class="task-topic-teacher-status-time">Submitted: ${escapeHtml(formatSubmissionTimestamp(row.submittedAt))}</span>
+                            <span class="task-topic-teacher-status-time">Evidence recorded: ${escapeHtml(formatSubmissionTimestamp(row.submittedAt))}</span>
                         </div>
                     `).join("")}
                 </div>
@@ -11598,10 +11598,10 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
 
         html += `
             <div class="task-topic-submission-teacher-panel assessment-submission-summary-panel">
-                <h3>Submission Tasks</h3>
-                <p class="task-topic-submission-note">Students submit evidence links (for example Google Slides) through DTECH HUB. This panel tracks who has submitted.</p>
+                <h3>Evidence Progress</h3>
+                <p class="task-topic-submission-note">Students connect evidence links (for example Google Slides) through DTECH HUB. This panel tracks connected evidence progress.</p>
                 <div class="task-topic-submission-meta">
-                    <p><strong>Submitted:</strong> ${acknowledgedCount} of ${students.length}</p>
+                    <p><strong>Evidence recorded:</strong> ${acknowledgedCount} of ${students.length}</p>
                     <p><strong>Logged today:</strong> ${loggedTodayCount} of ${students.length}</p>
                     ${hasProjectManagementTopic ? `<p><strong>Trello linked:</strong> ${trelloLinkedCount} of ${students.length}</p>` : ""}
                 </div>

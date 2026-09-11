@@ -1898,11 +1898,6 @@ function clearUnverifiedManualTicks(stateMap) {
 }
 
 function autoTickProjectManagementRequirement(stateMap) {
-    const rows = Array.isArray(stateMap?.["91897"]) ? stateMap["91897"] : [];
-    if (!rows.length) {
-        return false;
-    }
-
     const systems = inferStudentSystemConnections(stateMap || {});
     const hasOtherSystem = systems.githubConnected || systems.oneDriveConnected || systems.googleDriveConnected;
     if (!systems.trelloConnected || !hasOtherSystem) {
@@ -1910,15 +1905,17 @@ function autoTickProjectManagementRequirement(stateMap) {
     }
 
     let changed = false;
-    rows.forEach((row) => {
-        const text = String(row?.text || "").trim();
-        if (!text) return;
-        if (getStepLevel(text) !== "Achieved") return;
-        if (!stripStepLevel(text).toLowerCase().includes("project management")) return;
-        if (!Boolean(row?.done)) {
-            row.done = true;
-            changed = true;
-        }
+    ["91897", "91907"].forEach((standard) => {
+        const rows = Array.isArray(stateMap?.[standard]) ? stateMap[standard] : [];
+        rows.forEach((row) => {
+            const text = String(row?.text || "").trim();
+            if (!text || getStepLevel(text) !== "Achieved") return;
+            if (!stripStepLevel(text).toLowerCase().includes("project management")) return;
+            if (!Boolean(row?.done)) {
+                row.done = true;
+                changed = true;
+            }
+        });
     });
     return changed;
 }

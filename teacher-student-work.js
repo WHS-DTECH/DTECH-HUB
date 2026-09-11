@@ -1174,11 +1174,11 @@ function renderStudentSummaryDetailPanel(student, group, bucket) {
         <div class="student-summary-detail-panel">
             <div class="student-summary-detail-heading">
                 <strong>${escapeHtml(student.studentName)}</strong>
-                <span>${escapeHtml(group.label)}: ${bucket.submittedCount}/${bucket.total} acknowledged</span>
+                <span>${escapeHtml(group.label)}: ${bucket.submittedCount}/${bucket.total} complete</span>
             </div>
             ${gradeCategories.map((category) => `
                 <section class="student-summary-grade-category">
-                    <h3>${escapeHtml(category.label)} <span>${category.acknowledgedCount}/${category.total} acknowledged</span></h3>
+                    <h3>${escapeHtml(category.label)} <span>${category.acknowledgedCount}/${category.total} complete</span></h3>
                     ${category.groups.map((sectionGroup) => `
                         <div class="student-summary-detail-group">
                             <h4>${escapeHtml(sectionGroup.standard)} &middot; ${escapeHtml(sectionGroup.section)} &middot; ${sectionGroup.records.filter((record) => record.acknowledged).length}/${sectionGroup.records.length}</h4>
@@ -1186,8 +1186,8 @@ function renderStudentSummaryDetailPanel(student, group, bucket) {
                                 ${sectionGroup.records.map((record) => {
                                     const complete = Boolean(record.acknowledged);
                                     const hasEvidence = hasStudentSummaryEvidence(record);
-                                    const href = String(record.taskUrl || "").trim() || `teacher-student-work-task.html?task=${encodeURIComponent(record.taskTopic || "")}`;
-                                    const status = complete ? (record.submitted ? "Submitted" : "Acknowledged") : (hasEvidence ? "Evidence linked" : "Missing");
+                                    const href = String(record.taskUrl || "").trim() || new URL(`teacher-student-work-task.html?task=${encodeURIComponent(record.taskTopic || "")}`, window.location.origin).toString();
+                                    const status = complete ? "Complete" : (hasEvidence ? "Evidence linked" : "Evidence required");
                                     return `
                                         <li class="${complete ? "is-complete" : (hasEvidence ? "is-partial" : "is-missing")}">
                                             <span class="student-summary-detail-status">${complete ? "&#10003;" : (hasEvidence ? "~" : "-")}</span>
@@ -1355,7 +1355,8 @@ function buildProgressSummaryReportHtml(student, standard) {
     const assessmentLabel = /^(91893|91903)$/.test(targetStandard) ? "Digital Media Assessment" : "Process Assessment";
     const records = getStudentSummaryRecordsForStandard(student, targetStandard)
         .sort((a, b) => compareTaskTopics(a.taskTopic, b.taskTopic));
-    const acknowledgedCount = records.filter((record) => record.acknowledged).length;
+    const achievedRecords = records.filter((record) => getTaskTopicGroup(record.taskTopic) === "achieved");
+    const achievedCompleteCount = achievedRecords.filter((record) => record.acknowledged).length;
     const generatedDate = new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
     const schoolLogoUrl = `${window.location.origin}/images/${encodeURIComponent("whs logo circular reo .png")}`;
     const reportLevelOrder = ["digital_outcome", "achieved", "merit", "excellence"];
@@ -1444,8 +1445,8 @@ function buildProgressSummaryReportHtml(student, standard) {
             </header>
             <section class="report-progress">
                 <h2>ACHIEVED requirements</h2>
-                <strong>${acknowledgedCount}/${records.length} complete</strong>
-                <p>${records.length - acknowledgedCount} requirement${records.length - acknowledgedCount === 1 ? "" : "s"} still need evidence or completion.</p>
+                <strong>${achievedCompleteCount}/${achievedRecords.length} complete</strong>
+                <p>${achievedRecords.length - achievedCompleteCount} requirement${achievedRecords.length - achievedCompleteCount === 1 ? "" : "s"} still need evidence or completion.</p>
             </section>
             ${nextStepsHtml}
             ${reportRows || `<p class="report-empty">No criteria were found for this student and standard.</p>`}
