@@ -834,7 +834,7 @@ function buildAllRecords() {
                     submitted: Boolean(evidence.submitted),
                     acknowledged: Boolean(checklistStep?.done || evidence.submitted),
                     submittedAt: evidence.submittedAt,
-                    taskUrl: `ProjectPages/activity-detail.html?id=${encodeURIComponent(activityId)}&taskTopic=${encodeURIComponent(taskTopic)}`
+                    taskUrl: new URL(`ProjectPages/activity-detail.html?id=${encodeURIComponent(activityId)}&taskTopic=${encodeURIComponent(taskTopic)}`, window.location.origin).toString()
                 });
             });
         });
