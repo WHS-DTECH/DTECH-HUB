@@ -1347,11 +1347,7 @@ function isProcessAssessmentTopic(taskTopic) {
 }
 
 function buildProcessSummaryRows() {
-    return buildStudentSummaryRows(workState.records.filter((record) => {
-        const processStandard = normalizeTrackerStandardValue(record?.processStandard);
-        return /^(91897|91907)$/.test(processStandard)
-            && (isProcessAssessmentRecord(record) || isProcessAssessmentTopic(record?.taskTopic));
-    }));
+    return buildStudentSummaryRows(workState.records.filter(isProcessAssessmentRecord));
 }
 
 function isDigitalMediaAssessmentTopic(taskTopic) {
