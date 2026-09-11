@@ -1299,6 +1299,16 @@ function renderStudentSummaryDetailRow(student, summaryKind = "process") {
     `;
 }
 
+function isProcessAssessmentRecord(record) {
+    const activity = workState.activitiesById.get(String(record?.activityId || "").trim());
+    const activityName = String(activity?.name || record?.activityName || "").trim();
+    return /process\s+assessment/i.test(activityName);
+}
+
+function buildProcessSummaryRows() {
+    return buildStudentSummaryRows(workState.records.filter(isProcessAssessmentRecord));
+}
+
 function isDigitalMediaAssessmentTopic(taskTopic) {
     const text = stripTaskTopicLevel(taskTopic).toLowerCase();
     if (getTaskTopicGroup(taskTopic) === "digital_outcome") return true;
@@ -1356,7 +1366,7 @@ function renderStudentSummaryGrid() {
     const host = document.querySelector("#student-summary-grid");
     if (!host) return;
 
-    const rows = buildStudentSummaryRows();
+    const rows = buildProcessSummaryRows();
     if (!rows.length) {
         host.innerHTML = `<div class="work-empty">No students found yet.</div>`;
         return;
@@ -1577,7 +1587,7 @@ function openProgressSummaryPrintWindow(students, standard) {
 }
 
 function generateIndividualProgressSummary() {
-    const rows = buildStudentSummaryRows();
+    const rows = buildProcessSummaryRows();
     const searchText = String(workState.studentSearch || "").trim().toLowerCase();
     const standard = normalizeTrackerStandardValue(workState.standardSearch);
     const matches = rows.filter((student) => !searchText || `${student.studentName} ${student.studentEmail}`.toLowerCase().includes(searchText));
@@ -1594,7 +1604,7 @@ function generateStandardProgressSummaries() {
         setStatus("Enter a process standard number before generating all summaries for a standard.", true);
         return;
     }
-    const students = buildStudentSummaryRows().filter((student) => studentMatchesStandardSearch(student, standard));
+    const students = buildProcessSummaryRows().filter((student) => studentMatchesStandardSearch(student, standard));
     if (!students.length) {
         setStatus(`No students are allocated to ${standard}.`, true);
         return;
