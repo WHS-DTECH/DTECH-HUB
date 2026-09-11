@@ -684,6 +684,23 @@ function getProcessFolderUrlFromTemplateCopies(templateCopies) {
     return "";
 }
 
+function getDigitalOutcomeTemplateId(taskTopic) {
+    const text = normalizeTaskTopicText(taskTopic).toLowerCase();
+    if (/description\s*-\s*google\s*slides|describe\s+the\s+digital\s+outcome/.test(text)) return "digital-outcome-description";
+    if (/identify\s+the\s+target\s+audience|target\s+audience|end\s+user/.test(text)) return "target-audience";
+    if (/explain\s+how\s+the\s+outcome\s+will\s+be\s+developed|development\s+steps/.test(text)) return "development-steps";
+    if (/success\s+criteria|success\s+will\s+be\s+measured|success\s+will\s+be\s+evaluated/.test(text)) return "project-success-criteria";
+    if (/what\s+tools\s+and\s+techniques\s+will\s+be\s+used/.test(text)) return "tools-and-techniques";
+    return "";
+}
+
+function hasTemplateCopyForDigitalOutcomeTask(templateCopies, taskTopic) {
+    const templateId = getDigitalOutcomeTemplateId(taskTopic);
+    if (!templateId) return false;
+    return (Array.isArray(templateCopies) ? templateCopies : [])
+        .some((copy) => String(copy?.templateId || copy?.template_id || "").trim().toLowerCase() === templateId);
+}
+
 function hasTaskTopicEvidence(result) {
     if (!result || typeof result !== "object") return false;
     return Boolean(
@@ -832,6 +849,8 @@ function buildAllRecords() {
                 const isProjectManagementTopic = topicKey.includes("project management");
                 const isVersionControlTopic = topicKey.includes("version control") || topicKey.includes("asset management");
                 const projectManagementComplete = isProjectManagementTopic && hasProjectManagementEvidenceCompletion(evidenceRows);
+                const digitalOutcomeTemplateComplete = getTaskTopicGroup(taskTopic) === "digital_outcome"
+                    && hasTemplateCopyForDigitalOutcomeTask(student?.template_copies || student?.templateCopies, taskTopic);
 
                 const mergedLinks = [];
                 const seenMergedLink = new Set();
@@ -863,7 +882,7 @@ function buildAllRecords() {
                     googleSlidesUrl: evidence.googleSlidesUrl,
                     links: mergedLinks,
                     submitted: Boolean(evidence.submitted),
-                    acknowledged: Boolean(checklistStep?.done || evidence.submitted || projectManagementComplete),
+                    acknowledged: Boolean(checklistStep?.done || evidence.submitted || projectManagementComplete || digitalOutcomeTemplateComplete),
                     submittedAt: evidence.submittedAt,
                     taskUrl: new URL(`ProjectPages/custom-activity.html?id=${encodeURIComponent(activityId)}&taskTopic=${encodeURIComponent(taskTopic)}`, window.location.origin).toString()
                 });
