@@ -1307,7 +1307,9 @@ function buildProgressSummaryReportHtml(student, standard) {
         merit: "Merit",
         excellence: "Excellence"
     };
-    const incompleteAchievedRecords = records.filter((record) => getTaskTopicGroup(record.taskTopic) === "achieved" && !record.acknowledged);
+    const incompleteAchievedRecords = records.filter((record) => getTaskTopicGroup(record.taskTopic) === "achieved"
+        && !record.acknowledged
+        && !hasStudentSummaryEvidence(record));
     const nextStepGroups = buildStudentSummaryDetailGroups(incompleteAchievedRecords);
     const nextStepsHtml = nextStepGroups.length
         ? `
@@ -1320,10 +1322,8 @@ function buildProgressSummaryReportHtml(student, standard) {
                         ${group.records.map((record) => `
                             <div class="report-next-step-item">
                                 <strong>○ ${escapeHtml(record.taskTopic)}</strong>
-                                <span>${hasStudentSummaryEvidence(record) ? "Evidence is linked - review it and complete the acknowledgement" : "Evidence required"}</span>
-                                ${hasStudentSummaryEvidence(record)
-                                    ? `<a href="${escapeHtml(record.taskUrl)}" target="_blank" rel="noreferrer">Open task page to review evidence</a>`
-                                    : `<a href="${escapeHtml(record.taskUrl)}" target="_blank" rel="noreferrer">Open task page to add evidence</a>`}
+                                <span>Evidence required</span>
+                                <a href="${escapeHtml(record.taskUrl)}" target="_blank" rel="noreferrer">Open task page to add evidence</a>
                             </div>
                         `).join("")}
                     </div>
@@ -1333,7 +1333,7 @@ function buildProgressSummaryReportHtml(student, standard) {
         : `
             <section class="report-next-steps is-complete">
                 <h2>WHAT YOU NEED TO DO NEXT</h2>
-                <p>All Achieved requirements are acknowledged.</p>
+                <p>All ACHIEVED requirements have evidence linked or are complete.</p>
             </section>
         `;
     const renderReportRecord = (record) => {
@@ -1342,7 +1342,7 @@ function buildProgressSummaryReportHtml(student, standard) {
                 if (record.googleSlidesUrl) evidence.push({ label: "Google Slides", url: record.googleSlidesUrl });
                 (Array.isArray(record.links) ? record.links : []).forEach((link) => evidence.push(link));
                 const uniqueEvidence = evidence.filter((link, index, links) => links.findIndex((item) => item.url === link.url) === index);
-                const status = acknowledged ? "Acknowledged" : (uniqueEvidence.length ? "Evidence linked" : "Evidence required");
+                const status = uniqueEvidence.length ? "Evidence linked" : (acknowledged ? "Complete" : "Evidence required");
                 const statusClass = acknowledged ? "complete" : (uniqueEvidence.length ? "linked" : "required");
                 return `
                     <article class="report-item ${statusClass}">
@@ -1362,10 +1362,10 @@ function buildProgressSummaryReportHtml(student, standard) {
         const levelAcknowledged = levelRecords.filter((record) => record.acknowledged).length;
         return `
             <div class="report-level">
-                <h2 class="report-level-heading">${escapeHtml(reportLevelLabels[level])} <span>${levelAcknowledged}/${levelRecords.length} acknowledged</span></h2>
+                <h2 class="report-level-heading">${escapeHtml(reportLevelLabels[level])} <span>${levelAcknowledged}/${levelRecords.length} complete</span></h2>
                 ${detailGroups.map((group) => `
                     <section class="report-section">
-                        <h3>${escapeHtml(group.section)} <span>${group.records.filter((record) => record.acknowledged).length}/${group.records.length} acknowledged</span></h3>
+                        <h3>${escapeHtml(group.section)} <span>${group.records.filter((record) => record.acknowledged).length}/${group.records.length} complete</span></h3>
                         ${group.records.map(renderReportRecord).join("")}
                     </section>
                 `).join("")}
@@ -1386,8 +1386,8 @@ function buildProgressSummaryReportHtml(student, standard) {
             </header>
             <section class="report-progress">
                 <h2>ACHIEVED requirements</h2>
-                <strong>${acknowledgedCount}/${records.length} acknowledged</strong>
-                <p>${records.length - acknowledgedCount} requirement${records.length - acknowledgedCount === 1 ? "" : "s"} still need evidence or acknowledgement.</p>
+                <strong>${acknowledgedCount}/${records.length} complete</strong>
+                <p>${records.length - acknowledgedCount} requirement${records.length - acknowledgedCount === 1 ? "" : "s"} still need evidence or completion.</p>
             </section>
             ${nextStepsHtml}
             ${reportRows || `<p class="report-empty">No criteria were found for this student and standard.</p>`}
