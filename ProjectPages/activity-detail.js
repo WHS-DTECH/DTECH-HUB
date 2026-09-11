@@ -10152,7 +10152,12 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                                 : ""}
                         `}
 
-                        ${isProjectManagementTopic ? `<div id="task-topic-trello-sync-slot"></div>` : ""}
+                        ${isProjectManagementTopic ? `
+                            <div id="task-topic-trello-sync-slot"></div>
+                            <div id="task-topic-github-sync-slot"></div>
+                            <div id="task-topic-onedrive-sync-slot"></div>
+                            <div id="task-topic-google-drive-sync-slot"></div>
+                        ` : ""}
                     </section>
 
                     ${showGithubGuide ? `
@@ -11856,7 +11861,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             }
 
             const githubSlot = host.querySelector("#task-topic-github-sync-slot");
-            if (githubSlot && showGithubGuide) {
+            if (githubSlot && (showGithubGuide || isProjectManagementTaskTopicPage)) {
                 const sharedGithubLink = getFirstGithubRepoUrlFromEvidenceRows(myAllocation?.evidence_steps);
                 const sharedGithubLinks = getAllGithubRepoUrlsFromEvidenceRows(myAllocation?.evidence_steps);
                 const localGithubRepoLibrary = readStoredGithubRepoLibrary(projectId, email);
