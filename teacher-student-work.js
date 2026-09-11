@@ -674,6 +674,23 @@ function hasProjectManagementEvidenceCompletion(evidenceRows) {
     return hasTrello && hasOtherSystem;
 }
 
+function hasEvidenceStepMatching(evidenceRows, pattern) {
+    return (Array.isArray(evidenceRows) ? evidenceRows : []).some((row) =>
+        (Array.isArray(row?.steps) ? row.steps : []).some((step) => pattern.test(String(step?.text || "")))
+    );
+}
+
+function hasDigitalMediaCriterionEvidence(taskTopic, evidenceRows) {
+    const text = stripTaskTopicLevel(taskTopic).toLowerCase();
+    if (/conventions/.test(text)) {
+        return hasEvidenceStepMatching(evidenceRows, /^CONVENTION_ACK\|.+\|true$/i);
+    }
+    if (/user experience principles/.test(text)) {
+        return hasEvidenceStepMatching(evidenceRows, /^UX_PRINCIPLE_ACK\|.+\|true$/i);
+    }
+    return false;
+}
+
 function getFirstGoogleDriveFolderUrlFromEvidenceRows(evidenceRows) {
     const rows = Array.isArray(evidenceRows) ? evidenceRows : [];
     for (const row of rows) {
@@ -885,6 +902,7 @@ function buildAllRecords() {
                 const projectManagementComplete = isProjectManagementTopic && hasProjectManagementEvidenceCompletion(evidenceRows);
                 const digitalOutcomeTemplateComplete = getTaskTopicGroup(taskTopic) === "digital_outcome"
                     && hasTemplateCopyForDigitalOutcomeTask(student?.template_copies || student?.templateCopies, taskTopic);
+                const digitalMediaEvidenceLinked = hasDigitalMediaCriterionEvidence(taskTopic, evidenceRows);
 
                 const mergedLinks = [];
                 const seenMergedLink = new Set();
@@ -915,6 +933,7 @@ function buildAllRecords() {
                     processFolderUrl,
                     googleSlidesUrl: evidence.googleSlidesUrl,
                     links: mergedLinks,
+                    evidenceLinked: Boolean(evidence.googleSlidesUrl || mergedLinks.length || digitalMediaEvidenceLinked),
                     submitted: Boolean(evidence.submitted),
                     acknowledged: Boolean(checklistStep?.done || evidence.submitted || projectManagementComplete || digitalOutcomeTemplateComplete),
                     submittedAt: evidence.submittedAt,
@@ -1047,7 +1066,11 @@ function studentMatchesStandardSearch(student, searchText) {
 }
 
 function hasStudentSummaryEvidence(record) {
-    return Boolean(record?.googleSlidesUrl || (Array.isArray(record?.links) && record.links.length));
+    return Boolean(record?.evidenceLinked || record?.googleSlidesUrl || (Array.isArray(record?.links) && record.links.length));
+}
+
+function getTrackerTaskDisplayLabel(taskTopic) {
+    return stripTaskTopicLevel(taskTopic);
 }
 
 function getStudentSummaryRecordIdentity(record) {
@@ -1225,7 +1248,7 @@ function renderStudentSummaryDetailPanel(student, group, bucket) {
                                     return `
                                         <li class="${complete ? "is-complete" : (hasEvidence ? "is-partial" : "is-missing")}">
                                             <span class="student-summary-detail-status">${complete ? "&#10003;" : (hasEvidence ? "~" : "-")}</span>
-                                            <a href="${escapeHtml(href)}">${escapeHtml(record.taskTopic)}</a>
+                                            <a href="${escapeHtml(href)}">${escapeHtml(getTrackerTaskDisplayLabel(record.taskTopic))}</a>
                                             <span>${escapeHtml(status)}</span>
                                         </li>
                                     `;
@@ -1414,7 +1437,7 @@ function buildProgressSummaryReportHtml(student, standard) {
                         <h3>${escapeHtml(group.section)}</h3>
                         ${group.records.map((record) => `
                             <div class="report-next-step-item">
-                                <strong>○ ${escapeHtml(record.taskTopic)}</strong>
+                                <strong>○ ${escapeHtml(getTrackerTaskDisplayLabel(record.taskTopic))}</strong>
                                 <span>Evidence required</span>
                                 <a href="${escapeHtml(record.taskUrl)}" target="_blank" rel="noreferrer">Open task page to add evidence</a>
                             </div>
@@ -1439,7 +1462,7 @@ function buildProgressSummaryReportHtml(student, standard) {
                 const statusClass = acknowledged ? "complete" : (uniqueEvidence.length ? "linked" : "required");
                 return `
                     <article class="report-item ${statusClass}">
-                        <div class="report-item-heading"><strong>${acknowledged ? "&#10003;" : "-"} ${escapeHtml(record.taskTopic)}</strong><span>${status}</span></div>
+                        <div class="report-item-heading"><strong>${acknowledged ? "&#10003;" : "-"} ${escapeHtml(getTrackerTaskDisplayLabel(record.taskTopic))}</strong><span>${status}</span></div>
                         <div class="report-links">
                             ${uniqueEvidence.length
                                 ? uniqueEvidence.map((link) => `<a href="${escapeHtml(link.url)}" target="_blank" rel="noreferrer">${escapeHtml(link.label || "Evidence link")}</a>`).join("")
