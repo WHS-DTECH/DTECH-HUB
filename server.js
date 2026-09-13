@@ -9940,9 +9940,14 @@ app.get("/api/my-allocations", async (req, res) => {
         courseName: profileRow.course_type,
         yearVersion: new Date().getFullYear()
       });
+      const fallbackStandard = NZQA_STANDARDS_FALLBACK.find((standard) =>
+        standard.stream === "digital" && standard.standard_number === standardNumber
+      );
       return {
         standard_number: standardNumber,
-        credits: Number.isInteger(card?.credits) ? card.credits : null
+        credits: Number.isInteger(card?.credits)
+          ? card.credits
+          : Number.isInteger(fallbackStandard?.credits) ? fallbackStandard.credits : null
       };
     });
 

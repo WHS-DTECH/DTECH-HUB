@@ -1517,6 +1517,7 @@ const HUB_GLOBAL_SIDEBAR_SESSION_KEY = "hub_global_sidebar_seen_v1";
 const HUB_AUTO_LOGIN_PROMPT_SESSION_KEY = "hub_auto_login_prompted_v1";
 
 let hubGlobalSidebarNodes = null;
+let hubStudentAllocatedStandards = [];
 
 function readStoredHubViewMode() {
     try {
@@ -2278,9 +2279,11 @@ async function loadAndRenderSidebarAllocations(panel) {
         const projects = Array.isArray(data.projects) ? data.projects : [];
 
         const profileDetails = computeHubSidebarProfileDetails([...assessments, ...projects]);
+        hubStudentAllocatedStandards = Array.isArray(data.allocated_standards) ? data.allocated_standards : [];
         renderHubSidebarProfileCard(panel, profileDetails);
-        renderHubSidebarStandardsCard(panel, profileDetails.yearGroup, data.allocated_standards);
+        renderHubSidebarStandardsCard(panel, profileDetails.yearGroup, hubStudentAllocatedStandards);
         renderHubPracticalSkillsMenu(profileDetails.yearGroup);
+        renderStats();
 
         if (assessmentList) {
             assessmentList.innerHTML = assessments.map((item) =>
@@ -3903,11 +3906,40 @@ function renderStats() {
         row.className = `new-week-item${isProcessAssessment ? " new-week-item-process-assessment" : ""}`;
         const typeLabel = inferSourceTypeFromRecord(item) === "project" ? "Project" : "Assessment";
         const href = String(item?.href || "").trim() || "#project-library";
-        row.innerHTML = `
-            ${isProcessAssessment ? "" : `<span class="new-week-dot" aria-hidden="true"></span>`}
-            <a class="new-week-link${isProcessAssessment ? " new-week-link-process-assessment" : ""}" href="${escapeHtml(href)}">${escapeHtml(String(item?.title || "Untitled").trim())}</a>
-            ${isProcessAssessment ? "" : `<span class="new-week-pill">${escapeHtml(typeLabel)}</span>`}
-        `;
+        if (isProcessAssessment) {
+            const standardLabels = {
+                "91897": "Process & Outcome",
+                "91907": "Process & Outcome",
+                "91893": "Digital Media",
+                "91903": "Digital Media"
+            };
+            const relevantStandards = hubStudentAllocatedStandards.filter((standard) =>
+                Object.hasOwn(standardLabels, String(standard?.standard_number || "").trim())
+            );
+            const standardsHtml = relevantStandards.map((standard) => {
+                const standardNumber = String(standard.standard_number || "").trim();
+                const credits = Number.parseInt(standard.credits, 10);
+                const creditsText = Number.isInteger(credits) ? `${credits} credits` : "Credits not set";
+                return `
+                    <span class="new-week-process-standard">
+                        <span><strong>${escapeHtml(standardNumber)}</strong> ${escapeHtml(standardLabels[standardNumber])}</span>
+                        <small>${escapeHtml(creditsText)}</small>
+                    </span>
+                `;
+            }).join("");
+            row.innerHTML = `
+                <a class="new-week-process-card" href="${escapeHtml(href)}">
+                    <span class="new-week-process-title">Process Assessment</span>
+                    ${standardsHtml || `<span class="new-week-process-open">Open assessment</span>`}
+                </a>
+            `;
+        } else {
+            row.innerHTML = `
+                <span class="new-week-dot" aria-hidden="true"></span>
+                <a class="new-week-link" href="${escapeHtml(href)}">${escapeHtml(String(item?.title || "Untitled").trim())}</a>
+                <span class="new-week-pill">${escapeHtml(typeLabel)}</span>
+            `;
+        }
         newWeekList.appendChild(row);
     });
 }

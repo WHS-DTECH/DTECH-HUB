@@ -1032,27 +1032,50 @@ a {
     white-space: nowrap;
 }
 
-.new-week-link-process-assessment {
-    display: block;
+.new-week-process-card {
+    display: grid;
+    gap: 6px;
     width: 100%;
     box-sizing: border-box;
-    padding: 8px 12px;
+    padding: 10px;
     border: 1px solid #85d6aa;
     border-radius: 7px;
-    background: #20864f;
+    background: #16623e;
     color: #ffffff;
-    font-size: 0.82rem;
-    font-weight: 800;
-    text-align: center;
     text-decoration: none;
-    white-space: normal;
     box-shadow: 0 2px 5px rgba(10, 62, 35, 0.22);
 }
 
-.new-week-link-process-assessment:hover,
-.new-week-link-process-assessment:focus-visible {
+.new-week-process-card:hover,
+.new-week-process-card:focus-visible {
     background: #176b3e;
     color: #ffffff;
+}
+
+.new-week-process-title {
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.new-week-process-standard {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    font-size: 0.72rem;
+}
+
+.new-week-process-standard small,
+.new-week-process-open {
+    color: #b9f2d3;
+    font-size: 0.66rem;
+    font-weight: 700;
 }
 
 .new-week-pill {
