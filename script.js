@@ -693,7 +693,7 @@ function resolveTaskTopicMergeDecision(project, shortName, topics) {
 
 function inferSourceTypeFromRecord(record) {
     const explicitType = String(record?.sourceType || "").toLowerCase();
-    if (explicitType === "project" || explicitType === "activity" || explicitType === "assessment" || explicitType === "lesson" || explicitType === "task-topic") {
+    if (explicitType === "project" || explicitType === "activity" || explicitType === "assessment" || explicitType === "standard" || explicitType === "lesson" || explicitType === "task-topic") {
         return explicitType;
     }
 
@@ -705,6 +705,9 @@ function inferSourceTypeFromRecord(record) {
     const category = String(record?.activityCategory || record?.activity_category || record?.category || "").toLowerCase();
     if (category.includes("assessment")) {
         return "assessment";
+    }
+    if (category.includes("standard")) {
+        return "standard";
     }
     if (category.includes("lesson")) {
         return "lesson";
