@@ -1102,6 +1102,13 @@ a {
     box-shadow: 0 2px 5px rgba(10, 62, 35, 0.22);
 }
 
+.new-week-external-card {
+    margin-top: 7px;
+    border-color: #8ec5ee;
+    background: #174f78;
+    box-shadow: 0 2px 5px rgba(14, 52, 82, 0.28);
+}
+
 .new-week-process-title {
     color: #ffffff;
     font-size: 0.78rem;
@@ -1136,6 +1143,15 @@ a {
     border-color: rgba(255, 255, 255, 0.55);
     background: rgba(255, 255, 255, 0.2);
     color: #ffffff;
+}
+
+.new-week-external-standard {
+    border-color: rgba(183, 222, 250, 0.4);
+    background: rgba(199, 229, 250, 0.12);
+}
+
+.new-week-external-standard small {
+    color: #c7e8ff;
 }
 
 .new-week-process-standard small,

@@ -1521,6 +1521,7 @@ const HUB_AUTO_LOGIN_PROMPT_SESSION_KEY = "hub_auto_login_prompted_v1";
 
 let hubGlobalSidebarNodes = null;
 let hubStudentAllocatedStandards = [];
+let hubStudentExternalStandards = [];
 
 function readStoredHubViewMode() {
     try {
@@ -2296,6 +2297,7 @@ async function loadAndRenderSidebarAllocations(panel) {
 
         const profileDetails = computeHubSidebarProfileDetails([...assessments, ...projects]);
         hubStudentAllocatedStandards = Array.isArray(data.allocated_standards) ? data.allocated_standards : [];
+        hubStudentExternalStandards = Array.isArray(data.external_standards) ? data.external_standards : [];
         renderHubSidebarProfileCard(panel, profileDetails);
         renderHubSidebarStandardsCard(panel, profileDetails.yearGroup, hubStudentAllocatedStandards);
         renderHubPracticalSkillsMenu(profileDetails.yearGroup);
@@ -3977,11 +3979,34 @@ function renderStats() {
                     </a>
                 `;
             }).join("");
+            const externalLabels = {
+                "91898": "Computer Science",
+                "91899": "Digital Outcome",
+                "91908": "Computer Science",
+                "91909": "Digital Outcome"
+            };
+            const externalStandardsHtml = hubStudentExternalStandards.map((standard) => {
+                const standardNumber = String(standard?.standard_number || "").trim();
+                const credits = Number.parseInt(standard?.credits, 10);
+                const creditsText = Number.isInteger(credits) ? `${credits} credits` : "Credits not set";
+                return `
+                    <span class="new-week-process-standard new-week-external-standard">
+                        <span><strong>${escapeHtml(standardNumber)}</strong> ${escapeHtml(externalLabels[standardNumber] || standard.standard_name || "External")}</span>
+                        <small>${escapeHtml(creditsText)}</small>
+                    </span>
+                `;
+            }).join("");
             row.innerHTML = `
                 <div class="new-week-process-card">
                     <a class="new-week-process-title" href="${escapeHtml(href)}">Internal Assessment Summary</a>
                     ${standardsHtml || `<span class="new-week-process-open">Open assessment</span>`}
                 </div>
+                ${externalStandardsHtml ? `
+                    <div class="new-week-process-card new-week-external-card">
+                        <span class="new-week-process-title">External Assessment Summary</span>
+                        ${externalStandardsHtml}
+                    </div>
+                ` : ""}
             `;
         } else {
             row.innerHTML = `

@@ -10067,8 +10067,28 @@ app.get("/api/my-allocations", async (req, res) => {
           : Number.isInteger(fallbackStandard?.credits) ? fallbackStandard.credits : null
       };
     });
+    const externalStandardNumbers = standardNumbers.includes("91907")
+      ? ["91908", "91909"]
+      : standardNumbers.includes("91897")
+        ? ["91898", "91899"]
+        : [];
+    const externalStandards = externalStandardNumbers.map((standardNumber) => {
+      const standard = NZQA_STANDARDS_FALLBACK.find((row) =>
+        row.stream === "digital" && row.standard_number === standardNumber
+      );
+      return {
+        standard_number: standardNumber,
+        standard_name: String(standard?.standard_name || "").trim(),
+        credits: Number.isInteger(standard?.credits) ? standard.credits : null
+      };
+    });
 
-    res.json({ assessment_tasks: assessmentTasks, projects, allocated_standards: allocatedStandards });
+    res.json({
+      assessment_tasks: assessmentTasks,
+      projects,
+      allocated_standards: allocatedStandards,
+      external_standards: externalStandards
+    });
   } catch (error) {
     console.error("[my-allocations] Query failed:", error.message);
     res.status(500).json({ error: "Could not load allocations" });
