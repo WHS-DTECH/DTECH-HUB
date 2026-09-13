@@ -2,6 +2,8 @@ const WORK_AUTH_KEY = "hub_google_auth_v1";
 const trackerViewParams = new URLSearchParams(window.location.search || "");
 if (trackerViewParams.get("embed") === "process") {
     document.body.classList.add("process-tracker-embed");
+} else if (trackerViewParams.get("embed") === "digital-media") {
+    document.body.classList.add("digital-media-tracker-embed");
 }
 const DIGITAL_OUTCOME_DESCRIPTION_TASKS = [
     "Description - Google Slides: Describe the Digital Outcome: What is it, who is it for, and what should it do?",
@@ -1979,6 +1981,9 @@ function readTrackerViewFromUrl() {
     if (/^(91897|91907)$/.test(standard)) {
         workState.standardSearch = standard;
         if (standardSearchInput) standardSearchInput.value = standard;
+    } else if (/^(91893|91903)$/.test(standard)) {
+        workState.digitalMediaStandardSearch = standard;
+        if (digitalMediaStandardSearchInput) digitalMediaStandardSearchInput.value = standard;
     }
 }
 

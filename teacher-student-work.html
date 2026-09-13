@@ -153,17 +153,32 @@
       display: none !important;
     }
 
-    body.process-tracker-embed .page-shell {
+    body.digital-media-tracker-embed .hero,
+    body.digital-media-tracker-embed .work-header,
+    body.digital-media-tracker-embed #process-summary-toolbar,
+    body.digital-media-tracker-embed #process-summary-heading,
+    body.digital-media-tracker-embed #student-summary-grid,
+    body.digital-media-tracker-embed #criteria-library-section,
+    body.digital-media-tracker-embed .hub-global-sidebar-toggle,
+    body.digital-media-tracker-embed .hub-global-sidebar-backdrop,
+    body.digital-media-tracker-embed .hub-global-sidebar {
+      display: none !important;
+    }
+
+    body.process-tracker-embed .page-shell,
+    body.digital-media-tracker-embed .page-shell {
       min-height: 0;
     }
 
-    body.process-tracker-embed .work-page {
+    body.process-tracker-embed .work-page,
+    body.digital-media-tracker-embed .work-page {
       width: 100%;
       margin: 0;
       padding: 0;
     }
 
-    body.process-tracker-embed .work-page > .panel-section {
+    body.process-tracker-embed .work-page > .panel-section,
+    body.digital-media-tracker-embed .work-page > .panel-section {
       width: 100%;
       margin: 0;
       border: 0;
@@ -615,7 +630,7 @@
       <section class="panel-section">
         <h2>My Students</h2>
         <p class="section-copy">Each row is one student; each column summarises acknowledged/total criteria for that group. Expand a count to see what is complete and what still needs evidence.</p>
-        <div class="student-summary-toolbar">
+        <div class="student-summary-toolbar" id="process-summary-toolbar">
           <input id="student-search-input" class="student-summary-search" type="search" placeholder="Filter by student name" autocomplete="off" aria-label="Filter students by name">
           <input id="standard-search-input" class="student-summary-search" type="search" placeholder="Filter by process standard" autocomplete="off" aria-label="Filter students by process standard number">
           <div class="student-summary-actions" aria-label="Progress summary actions">
@@ -623,7 +638,7 @@
             <button id="generate-standard-summaries-button" class="student-summary-action" type="button">Generate All for Standard</button>
           </div>
         </div>
-        <h3 class="student-summary-heading">Process Assessment</h3>
+        <h3 class="student-summary-heading" id="process-summary-heading">Process Assessment</h3>
         <div id="student-summary-grid" aria-live="polite"></div>
         <h3 class="student-summary-heading" id="digital-media-summary-heading">Digital Media Assessment</h3>
         <div class="student-summary-toolbar" id="digital-media-summary-toolbar">
