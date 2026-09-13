@@ -7014,19 +7014,9 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
         existingBackdrop.remove();
     }
 
-    const section = host.querySelector("#interest-section");
-    const triggerRow = host.querySelector("#detail-under-hero-actions") || section;
     const existingTriggerButton = host.querySelector("#evidence-sidebar-open");
     if (existingTriggerButton) {
         existingTriggerButton.remove();
-    }
-    if (triggerRow) {
-        const triggerButton = document.createElement("button");
-        triggerButton.type = "button";
-        triggerButton.id = "evidence-sidebar-open";
-        triggerButton.className = "detail-action evidence-sidebar-open-btn";
-        triggerButton.textContent = "Open Task List";
-        triggerRow.appendChild(triggerButton);
     }
 
     const backdrop = document.createElement("div");
