@@ -2134,6 +2134,13 @@ function ensureGlobalHubSidebar() {
                 <span class="hub-sidebar-profile-strand" id="hub-sidebar-profile-strand" hidden></span>
             </div>
         </div>
+        <section class="hub-sidebar-standards-card" id="hub-sidebar-standards-card" hidden>
+            <div class="hub-sidebar-standards-header">
+                <h3>My Standards</h3>
+                <span id="hub-sidebar-standards-total"></span>
+            </div>
+            <ul class="hub-sidebar-standards-list" id="hub-sidebar-standards-list"></ul>
+        </section>
         <p class="hub-global-sidebar-copy" id="hub-global-sidebar-copy">Quick access while signed in.</p>
         <nav class="hub-global-sidebar-links" aria-label="Sidebar links" id="hub-global-sidebar-nav">
             <a href="/teacher-view.html" id="hub-global-sidebar-teacher-link" hidden>Teacher View</a>
@@ -2272,6 +2279,7 @@ async function loadAndRenderSidebarAllocations(panel) {
 
         const profileDetails = computeHubSidebarProfileDetails([...assessments, ...projects]);
         renderHubSidebarProfileCard(panel, profileDetails);
+        renderHubSidebarStandardsCard(panel, profileDetails.yearGroup, data.allocated_standards);
         renderHubPracticalSkillsMenu(profileDetails.yearGroup);
 
         if (assessmentList) {
@@ -2309,6 +2317,42 @@ function renderHubPracticalSkillsMenu(yearGroup) {
         link.textContent = showTaskList ? "Open Task List" : "Practical Skills Home";
         link.href = showTaskList ? "/task-list.html" : "/practical-skills/";
     }
+}
+
+function renderHubSidebarStandardsCard(panel, yearGroup, standards) {
+    const card = panel.querySelector("#hub-sidebar-standards-card");
+    const list = panel.querySelector("#hub-sidebar-standards-list");
+    const total = panel.querySelector("#hub-sidebar-standards-total");
+    if (!card || !list || !total) return;
+
+    const normalizedYear = String(yearGroup || "").trim().replace(/^year\s*/i, "");
+    const rows = (Array.isArray(standards) ? standards : [])
+        .filter((item) => String(item?.standard_number || "").trim())
+        .sort((left, right) => String(left.standard_number).localeCompare(String(right.standard_number), undefined, { numeric: true }));
+    const showCard = ["11", "12", "13"].includes(normalizedYear) && rows.length > 0;
+
+    if (!showCard) {
+        card.hidden = true;
+        list.innerHTML = "";
+        total.textContent = "";
+        return;
+    }
+
+    list.innerHTML = rows.map((item) => {
+        const standardNumber = String(item.standard_number || "").trim();
+        const credits = Number.parseInt(item.credits, 10);
+        const creditLabel = Number.isInteger(credits) ? `${credits} ${credits === 1 ? "credit" : "credits"}` : "Credits not set";
+        return `<li><strong>${escapeHtml(standardNumber)}</strong><span>${escapeHtml(creditLabel)}</span></li>`;
+    }).join("");
+
+    const knownCredits = rows
+        .map((item) => Number.parseInt(item.credits, 10))
+        .filter((credits) => Number.isInteger(credits));
+    const totalCredits = knownCredits.reduce((sum, credits) => sum + credits, 0);
+    total.textContent = knownCredits.length === rows.length
+        ? `${totalCredits} credits total`
+        : `${rows.length} allocated`;
+    card.hidden = false;
 }
 
 // Reads year group/class/digital-media strand from the student's own allocation rows (each already

@@ -9919,7 +9919,34 @@ app.get("/api/my-allocations", async (req, res) => {
       }
     }
 
-    res.json({ assessment_tasks: assessmentTasks, projects });
+    await ensureAssessmentStandardCardsSchema();
+    const standardCardsResult = await pool.query(
+      `SELECT * FROM assessment_standard_cards WHERE is_active = TRUE ORDER BY updated_at DESC`
+    );
+    const allocationRows = [...assessmentTasks, ...projects];
+    const standardNumbers = Array.from(new Set(
+      allocationRows
+        .flatMap((item) => [item.standard_1, item.standard_2])
+        .map((standard) => String(standard || "").trim())
+        .filter(Boolean)
+    ));
+    const profileRow = allocationRows.find((item) => item.year_group || item.course_type) || {};
+    const studentYear = Number.parseInt(String(profileRow.year_group || "").replace(/[^0-9]/g, ""), 10);
+    const standardLevel = [11, 12, 13].includes(studentYear) ? `Level ${studentYear - 10}` : "";
+    const allocatedStandards = standardNumbers.map((standardNumber) => {
+      const card = pickBestAssessmentStandardCardMatch(standardCardsResult.rows, {
+        standardCode: standardNumber,
+        yearLevel: standardLevel,
+        courseName: profileRow.course_type,
+        yearVersion: new Date().getFullYear()
+      });
+      return {
+        standard_number: standardNumber,
+        credits: Number.isInteger(card?.credits) ? card.credits : null
+      };
+    });
+
+    res.json({ assessment_tasks: assessmentTasks, projects, allocated_standards: allocatedStandards });
   } catch (error) {
     console.error("[my-allocations] Query failed:", error.message);
     res.status(500).json({ error: "Could not load allocations" });
