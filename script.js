@@ -3979,7 +3979,7 @@ function renderStats() {
             }).join("");
             row.innerHTML = `
                 <div class="new-week-process-card">
-                    <a class="new-week-process-title" href="${escapeHtml(href)}">Assessment Summary</a>
+                    <a class="new-week-process-title" href="${escapeHtml(href)}">Internal Assessment Summary</a>
                     ${standardsHtml || `<span class="new-week-process-open">Open assessment</span>`}
                 </div>
             `;
