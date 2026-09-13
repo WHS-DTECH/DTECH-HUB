@@ -3813,3 +3813,24 @@ body.public-home-access .controls-panel {
         aspect-ratio: 3 / 4;
     }
 }
+
+.library-card-set-heading {
+    flex: 0 0 100%;
+    width: 100%;
+    margin-top: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #d9d3eb;
+}
+
+.library-card-set-heading h3 {
+    margin: 0;
+    color: #25174f;
+    font-size: 0.9rem;
+    font-weight: 800;
+    letter-spacing: 0;
+}
+
+.library-card-set-heading span {
+    color: #6e6488;
+    font-size: 0.72rem;
+}

@@ -3391,6 +3391,8 @@ function createProjectCard(project, options = {}) {
         && String(project?.taskTopicText || "").trim();
     const contentTypeLabel = sourceType === "project"
         ? "PROJECT"
+        : sourceType === "standard"
+            ? "STANDARD"
         : sourceType === "assessment" && String(project?.activityCategory || "").toLowerCase().includes("standard")
             ? "STANDARD"
             : sourceType === "assessment"
@@ -3759,8 +3761,28 @@ function renderLibrary() {
 
     renderTaskTopicMergeToolbar(visibleProjects);
 
-    visibleProjects.forEach((project) => {
-        libraryGrid.appendChild(createProjectCard(project, { context: "library" }));
+    const standardProjects = visibleProjects.filter((project) => inferSourceTypeFromRecord(project) === "standard");
+    const otherProjects = visibleProjects.filter((project) => inferSourceTypeFromRecord(project) !== "standard");
+    const cardSets = standardProjects.length
+        ? [
+            { label: "Activities and Projects", projects: otherProjects },
+            { label: "Assessment Standards", projects: standardProjects }
+        ]
+        : [{ label: "", projects: otherProjects }];
+
+    cardSets.forEach((cardSet) => {
+        if (!cardSet.projects.length) return;
+
+        if (cardSet.label) {
+            const heading = document.createElement("div");
+            heading.className = "library-card-set-heading";
+            heading.innerHTML = `<h3>${escapeHtml(cardSet.label)} <span>(${cardSet.projects.length})</span></h3>`;
+            libraryGrid.appendChild(heading);
+        }
+
+        cardSet.projects.forEach((project) => {
+            libraryGrid.appendChild(createProjectCard(project, { context: "library" }));
+        });
     });
 }
 

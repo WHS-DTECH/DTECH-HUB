@@ -8168,6 +8168,17 @@ async function requireActivityWriteAccess(req, res, next) {
   next();
 }
 
+function requireSchoolAccountAccess(req, res, next) {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!isSchoolEmail(email)) {
+    res.status(401).json({ error: "School sign-in required" });
+    return;
+  }
+
+  req.user_email = email;
+  next();
+}
+
 async function requireTrelloBoardReadAccess(req, res, next) {
   const requesterEmail = normalizeEmail(getRequestUserEmail(req));
   const studentEmail = normalizeEmail(req.query?.student_email || req.query?.studentEmail || "");
@@ -10318,7 +10329,7 @@ app.delete("/api/admin/hapara-folders/:email", requireAdminAccess, async (req, r
   }
 });
 
-app.get("/api/assessment-standard-cards", requireActivityWriteAccess, async (_req, res) => {
+app.get("/api/assessment-standard-cards", requireSchoolAccountAccess, async (_req, res) => {
   if (!hasDatabase) {
     const cards = Array.from(memoryAssessmentStandardCards.values())
       .map((row) => normalizeAssessmentStandardCardRow(row))
