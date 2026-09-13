@@ -3951,7 +3951,7 @@ function renderStats() {
             }).join("");
             row.innerHTML = `
                 <a class="new-week-process-card" href="${escapeHtml(href)}">
-                    <span class="new-week-process-title">Process Assessment</span>
+                    <span class="new-week-process-title">Assessment Summary</span>
                     ${standardsHtml || `<span class="new-week-process-open">Open assessment</span>`}
                 </a>
             `;
