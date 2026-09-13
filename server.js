@@ -9910,7 +9910,7 @@ app.get("/api/my-allocations", async (req, res) => {
       const studentRecord = studentByEmail.get(normalizeEmail(row.student_email));
       item.year_group = String(studentRecord?.year_level || "").trim();
       item.course_type = Array.isArray(studentRecord?.programs)
-        ? studentRecord.programs.find((program) => ["DTECH", "COMP"].includes(String(program || "").trim().toUpperCase())) || ""
+        ? studentRecord.programs.find((program) => ["DTECH", "COMP", "MDTECH"].includes(String(program || "").trim().toUpperCase())) || ""
         : "";
       if (cat.includes("assessment")) {
         assessmentTasks.push(item);

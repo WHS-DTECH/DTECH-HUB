@@ -2125,6 +2125,15 @@ function ensureGlobalHubSidebar() {
             <h2>DTECH Sidebar</h2>
             <button type="button" class="hub-global-sidebar-close" id="hub-global-sidebar-close">Close</button>
         </header>
+        <div class="hub-sidebar-profile-card" id="hub-sidebar-profile-card" hidden>
+            <div class="hub-sidebar-profile-avatar" id="hub-sidebar-profile-avatar">--</div>
+            <div class="hub-sidebar-profile-info">
+                <p class="hub-sidebar-profile-name" id="hub-sidebar-profile-name">-</p>
+                <p class="hub-sidebar-profile-meta" id="hub-sidebar-profile-year" hidden></p>
+                <p class="hub-sidebar-profile-meta" id="hub-sidebar-profile-class" hidden></p>
+                <span class="hub-sidebar-profile-strand" id="hub-sidebar-profile-strand" hidden></span>
+            </div>
+        </div>
         <p class="hub-global-sidebar-copy" id="hub-global-sidebar-copy">Quick access while signed in.</p>
         <nav class="hub-global-sidebar-links" aria-label="Sidebar links" id="hub-global-sidebar-nav">
             <a href="/teacher-view.html" id="hub-global-sidebar-teacher-link" hidden>Teacher View</a>
@@ -2192,6 +2201,7 @@ function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {
     }
 
     toggle.hidden = false;
+    renderHubSidebarProfileCard(panel);
 
     const teacherLink = panel.querySelector("#hub-global-sidebar-teacher-link");
     const adminLink = panel.querySelector("#hub-global-sidebar-admin-link");
@@ -2260,6 +2270,8 @@ async function loadAndRenderSidebarAllocations(panel) {
         const assessments = Array.isArray(data.assessment_tasks) ? data.assessment_tasks : [];
         const projects = Array.isArray(data.projects) ? data.projects : [];
 
+        renderHubSidebarProfileCard(panel, computeHubSidebarProfileDetails([...assessments, ...projects]));
+
         if (assessmentList) {
             assessmentList.innerHTML = assessments.map((item) =>
                 `<li class="hub-sidebar-alloc-item"><a href="/ProjectPages/custom-activity.html?id=${encodeURIComponent(item.id)}">${escapeHtml(item.name)}</a></li>`
@@ -2282,6 +2294,70 @@ async function loadAndRenderSidebarAllocations(panel) {
     } catch (_err) {
         // Silent fail — sidebar is non-critical
     }
+}
+
+// Reads year group/class/digital-media strand from the student's own allocation rows (each already
+// carries year_group/course_type resolved server-side from the class-management timetable data).
+function computeHubSidebarProfileDetails(items) {
+    const rows = Array.isArray(items) ? items : [];
+    let yearGroup = "";
+    let classLabel = "";
+    let digitalMediaStrand = "";
+
+    rows.forEach((item) => {
+        const itemYear = String(item?.year_group || "").trim().replace(/^year\s*/i, "");
+        const itemCourse = String(item?.course_type || "").trim().toUpperCase();
+
+        if (!yearGroup && itemYear) yearGroup = itemYear;
+        if (!classLabel && itemCourse) classLabel = itemYear ? `${itemYear}${itemCourse}` : itemCourse;
+
+        if (!digitalMediaStrand) {
+            const standard1 = String(item?.standard_1 || "").trim();
+            const standard2 = String(item?.standard_2 || "").trim();
+            const isDigitalMediaStandard = ["91893", "91903"].includes(standard1) || ["91893", "91903"].includes(standard2);
+            const isSeniorDtechOrComp = itemCourse === "DTECH" || itemCourse === "COMP";
+            const mediaType = String(item?.digital_media_type || "").trim();
+            if (isDigitalMediaStandard && isSeniorDtechOrComp && mediaType) {
+                digitalMediaStrand = mediaType;
+            }
+        }
+    });
+
+    return { yearGroup, classLabel, digitalMediaStrand };
+}
+
+function renderHubSidebarProfileCard(panel, details = {}) {
+    const card = panel.querySelector("#hub-sidebar-profile-card");
+    if (!card) return;
+
+    const avatarEl = panel.querySelector("#hub-sidebar-profile-avatar");
+    const nameEl = panel.querySelector("#hub-sidebar-profile-name");
+    const yearEl = panel.querySelector("#hub-sidebar-profile-year");
+    const classEl = panel.querySelector("#hub-sidebar-profile-class");
+    const strandEl = panel.querySelector("#hub-sidebar-profile-strand");
+
+    if (avatarEl) avatarEl.textContent = getHubUserInitials(hubAuthState.profile);
+    if (nameEl) nameEl.textContent = getHubDisplayName(hubAuthState.profile) || "Student";
+
+    const yearText = String(details?.yearGroup || "").trim();
+    if (yearEl) {
+        yearEl.textContent = yearText ? `Year ${yearText}` : "";
+        yearEl.hidden = !yearText;
+    }
+
+    const classText = String(details?.classLabel || "").trim();
+    if (classEl) {
+        classEl.textContent = classText ? `Class: ${classText}` : "";
+        classEl.hidden = !classText;
+    }
+
+    const strandText = String(details?.digitalMediaStrand || "").trim();
+    if (strandEl) {
+        strandEl.textContent = strandText ? `Digital Media: ${strandText}` : "";
+        strandEl.hidden = !strandText;
+    }
+
+    card.hidden = false;
 }
 
 function saveHubAuthState() {
