@@ -1,4 +1,8 @@
 const WORK_AUTH_KEY = "hub_google_auth_v1";
+const trackerViewParams = new URLSearchParams(window.location.search || "");
+if (trackerViewParams.get("embed") === "process") {
+    document.body.classList.add("process-tracker-embed");
+}
 const DIGITAL_OUTCOME_DESCRIPTION_TASKS = [
     "Description - Google Slides: Describe the Digital Outcome: What is it, who is it for, and what should it do?",
     "Identify the target audience or end user for this outcome.",
@@ -1970,6 +1974,14 @@ function readSelectedTaskFromUrl() {
     workState.selectedTask = String(params.get("task") || "").trim();
 }
 
+function readTrackerViewFromUrl() {
+    const standard = normalizeTrackerStandardValue(trackerViewParams.get("standard"));
+    if (/^(91897|91907)$/.test(standard)) {
+        workState.standardSearch = standard;
+        if (standardSearchInput) standardSearchInput.value = standard;
+    }
+}
+
 function wireTaskNavigationEvents() {
     if (!taskPrevButton || !taskNextButton) return;
     taskPrevButton.addEventListener("click", () => navigateTaskByDelta(-1));
@@ -2096,6 +2108,7 @@ async function init() {
         workState.interestRows = interestRows.filter(Boolean);
         workState.records = buildAllRecords();
         readSelectedTaskFromUrl();
+        readTrackerViewFromUrl();
 
         const canonicalSelectedTask = findCanonicalTaskTopic(workState.selectedTask);
         if (canonicalSelectedTask) {

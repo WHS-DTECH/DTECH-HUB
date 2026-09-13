@@ -115,6 +115,30 @@ function findCard(cards, cardId, standardCode) {
     return null;
 }
 
+async function renderProcessTracker(standardNumber, email) {
+    if (!/^(91897|91907)$/.test(standardNumber)) return;
+
+    try {
+        const response = await fetch(`/api/auth/user-access?email=${encodeURIComponent(email)}`, {
+            headers: withSignedInAuthHeaders({}, email)
+        });
+        const access = await response.json().catch(() => ({}));
+        if (!response.ok || (!access.can_teacher_view && !access.can_admin)) return;
+
+        const trackerSection = document.getElementById("sc-process-tracker");
+        const trackerFrame = document.getElementById("sc-process-tracker-frame");
+        const trackerLink = document.getElementById("sc-process-tracker-link");
+        const trackerTitle = document.getElementById("sc-process-tracker-title");
+        const trackerUrl = `/teacher-student-work.html?standard=${encodeURIComponent(standardNumber)}&embed=process`;
+
+        if (trackerTitle) trackerTitle.textContent = `${standardNumber} Process Assessment Student Tracker`;
+        if (trackerLink) trackerLink.href = `/teacher-student-work.html?standard=${encodeURIComponent(standardNumber)}`;
+        if (trackerFrame) trackerFrame.src = trackerUrl;
+        if (trackerSection) trackerSection.hidden = false;
+    } catch (_error) {
+    }
+}
+
 async function loadStandardCard() {
     const email = getSignedInEmail();
     if (!email) {
@@ -165,6 +189,8 @@ async function loadStandardCard() {
 
         const content = document.getElementById("sc-content");
         if (content) content.hidden = false;
+
+        void renderProcessTracker(number, email);
 
         setStatus(`Loaded saved Assessment Standard Card for ${number || "this standard"}.`);
     } catch (error) {

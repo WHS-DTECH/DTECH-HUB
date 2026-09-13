@@ -100,6 +100,43 @@
             text-decoration: none;
         }
 
+        .standard-tracker-shell {
+            margin-top: 20px;
+            padding: 16px;
+            border: 1px solid #b7ddcf;
+            border-radius: 12px;
+            background: #f5faf8;
+        }
+
+        .standard-tracker-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .standard-tracker-header h2 {
+            margin: 0;
+            color: #165f44;
+            font-size: 1.05rem;
+        }
+
+        .standard-tracker-header a {
+            color: #165f44;
+            font-size: 0.78rem;
+            font-weight: 700;
+        }
+
+        .standard-tracker-frame {
+            display: block;
+            width: 100%;
+            min-height: 760px;
+            border: 1px solid #c9d9d3;
+            border-radius: 8px;
+            background: #ffffff;
+        }
+
         @media (max-width: 920px) {
             .standard-card-grid {
                 grid-template-columns: repeat(2, minmax(140px, 1fr));
@@ -182,6 +219,14 @@
                     <a class="button button-primary" href="index.html#project-library">Back To Library</a>
                     <a class="button" href="admin-assessment-information.html">Open Standards Manager</a>
                 </div>
+            </section>
+
+            <section class="standard-tracker-shell" id="sc-process-tracker" aria-label="Process Assessment student tracker" hidden>
+                <div class="standard-tracker-header">
+                    <h2 id="sc-process-tracker-title">Process Assessment Student Tracker</h2>
+                    <a id="sc-process-tracker-link" href="teacher-student-work.html">Open Full Tracker</a>
+                </div>
+                <iframe id="sc-process-tracker-frame" class="standard-tracker-frame" title="Process Assessment student tracker"></iframe>
             </section>
         </main>
     </div>
