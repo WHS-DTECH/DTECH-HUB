@@ -1325,9 +1325,9 @@ function renderGlobalNavbar() {
     `;
     const practicalSkillsMenu = `
         <details class="nav-dropdown nav-dropdown-practical-skills" id="hub-practical-skills-menu" data-nav-dropdown hidden>
-            <summary>Practical Skills</summary>
+            <summary id="hub-practical-skills-summary">Practical Skills</summary>
             <div class="nav-drawer" role="menu">
-                <a role="menuitem" href="/practical-skills/">Practical Skills Home</a>
+                <a id="hub-practical-skills-link" role="menuitem" href="/practical-skills/">Practical Skills Home</a>
             </div>
         </details>
     `;
@@ -2270,7 +2270,9 @@ async function loadAndRenderSidebarAllocations(panel) {
         const assessments = Array.isArray(data.assessment_tasks) ? data.assessment_tasks : [];
         const projects = Array.isArray(data.projects) ? data.projects : [];
 
-        renderHubSidebarProfileCard(panel, computeHubSidebarProfileDetails([...assessments, ...projects]));
+        const profileDetails = computeHubSidebarProfileDetails([...assessments, ...projects]);
+        renderHubSidebarProfileCard(panel, profileDetails);
+        renderHubPracticalSkillsMenu(profileDetails.yearGroup);
 
         if (assessmentList) {
             assessmentList.innerHTML = assessments.map((item) =>
@@ -2293,6 +2295,19 @@ async function loadAndRenderSidebarAllocations(panel) {
         if (emptyNote) emptyNote.hidden = assessments.length > 0 || projects.length > 0;
     } catch (_err) {
         // Silent fail — sidebar is non-critical
+    }
+}
+
+function renderHubPracticalSkillsMenu(yearGroup) {
+    const summary = document.querySelector("#hub-practical-skills-summary");
+    const link = document.querySelector("#hub-practical-skills-link");
+    const normalizedYear = String(yearGroup || "").trim().replace(/^year\s*/i, "");
+    const showTaskList = ["11", "12", "13"].includes(normalizedYear);
+
+    if (summary) summary.textContent = showTaskList ? "Task List" : "Practical Skills";
+    if (link) {
+        link.textContent = showTaskList ? "Open Task List" : "Practical Skills Home";
+        link.href = showTaskList ? "/task-list.html" : "/practical-skills/";
     }
 }
 
