@@ -343,6 +343,74 @@ const NZQA_STANDARDS_FALLBACK = [
   { standard_number: "91912", standard_name: "Use complex programming techniques to develop a complex computer program", version: "1", level: 3, credits: 6, stream: "computing" },
   { standard_number: "91913", standard_name: "Demonstrate understanding of complex concepts of computer science", version: "1", level: 3, credits: 3, stream: "computing" }
 ];
+const DEFAULT_ASSESSMENT_STANDARD_CARDS = [
+  {
+    standardNumber: "91907",
+    standardName: "Use complex processes to develop a digital technologies outcome",
+    level: "Level 3",
+    version: 2024,
+    credits: 6,
+    achievedChecklist: [
+      "Use recognised and appropriate project management techniques to plan the development of a digital technologies outcome.",
+      "Decompose the digital technologies outcome into smaller components.",
+      "Trial components of the outcome.",
+      "Test that the digital technologies outcome functions as intended.",
+      "Address relevant implications."
+    ],
+    meritChecklist: [
+      "Effectively use project management techniques to manage development, feedback and/or collaborative processes.",
+      "Effectively trial multiple components and/or techniques.",
+      "Effectively use information from testing and trialling to improve the functionality of the digital technologies outcome."
+    ],
+    excellenceChecklist: [
+      "Synthesise information gained from the planning, testing and trialling of components.",
+      "Discuss how this information led to the development of a high-quality digital technologies outcome."
+    ]
+  },
+  {
+    standardNumber: "91893",
+    standardName: "Use advanced techniques to develop a digital media outcome",
+    level: "Level 2",
+    version: 2019,
+    credits: 4,
+    achievedChecklist: [
+      "Use appropriate tools and techniques for the purpose and end users.",
+      "Apply appropriate data integrity and testing procedures.",
+      "Use relevant conventions for the media type.",
+      "Explain relevant implications."
+    ],
+    meritChecklist: [
+      "Use information from testing procedures to improve the quality of the outcome.",
+      "Apply relevant conventions to improve the quality of the outcome.",
+      "Address relevant implications."
+    ],
+    excellenceChecklist: [
+      "Iteratively improve the outcome throughout the design, development and testing process.",
+      "Use efficient tools and techniques in the outcome's production."
+    ]
+  },
+  {
+    standardNumber: "91903",
+    standardName: "Use complex techniques to develop a digital media outcome",
+    level: "Level 3",
+    version: 2019,
+    credits: 4,
+    achievedChecklist: [
+      "Apply appropriate tools and techniques to meet the purpose and end-user requirements.",
+      "Apply appropriate data integrity and testing procedures.",
+      "Apply user experience principles relevant to the purpose of the outcome.",
+      "Address relevant implications."
+    ],
+    meritChecklist: [
+      "Use information from testing procedures to improve the quality of the digital media outcome.",
+      "Apply user experience principles to improve the quality of the digital media outcome."
+    ],
+    excellenceChecklist: [
+      "Iteratively improve the outcome throughout the design, development and testing process.",
+      "Use efficient tools and techniques in the outcome's production."
+    ]
+  }
+];
 const DEFAULT_CLASS_DATA_AGING_DAYS = 3;
 const DEFAULT_CLASS_DATA_STALE_DAYS = 7;
 
@@ -1958,6 +2026,43 @@ async function ensureAssessmentStandardCardsSchema() {
   await pool.query(`ALTER TABLE assessment_standard_cards ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`CREATE INDEX IF NOT EXISTS assessment_standard_cards_year_idx ON assessment_standard_cards (year_version)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS assessment_standard_cards_active_idx ON assessment_standard_cards (is_active)`);
+}
+
+async function seedDefaultAssessmentStandardCards() {
+  if (!hasDatabase) return;
+
+  for (const card of DEFAULT_ASSESSMENT_STANDARD_CARDS) {
+    await pool.query(
+      `
+        INSERT INTO assessment_standard_cards (
+          id, course_name, year_level, year_version, credits, standard_codes,
+          achieved_text, merit_text, excellence_text,
+          achieved_checklist, merit_checklist, excellence_checklist,
+          card_color, is_active, created_by_email, updated_by_email, created_at, updated_at
+        )
+        SELECT $1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10::jsonb,$11::jsonb,$12::jsonb,'Teal',TRUE,'system','system',NOW(),NOW()
+        WHERE NOT EXISTS (
+          SELECT 1 FROM assessment_standard_cards WHERE standard_codes ? $13
+        )
+        ON CONFLICT (id) DO NOTHING
+      `,
+      [
+        `default-standard-${card.standardNumber}`,
+        card.standardNumber,
+        card.level,
+        card.version,
+        card.credits,
+        JSON.stringify([card.standardNumber, card.standardName]),
+        card.standardName,
+        card.standardName,
+        card.standardName,
+        JSON.stringify(card.achievedChecklist),
+        JSON.stringify(card.meritChecklist),
+        JSON.stringify(card.excellenceChecklist),
+        card.standardNumber
+      ]
+    );
+  }
 }
 
 async function ensureActivityHubVisibilitySchema() {
@@ -4230,6 +4335,7 @@ async function ensureSchema() {
   await ensureDigiMedEfficientToolsSchema();
   await ensureUnitPlanSchema();
   await ensureAssessmentStandardCardsSchema();
+  await seedDefaultAssessmentStandardCards();
   await ensureCourseOutlinesSchema();
   await ensurePracticalSkillsProgressSchema();
   await ensurePracticalSkillsKitContentSchema();
