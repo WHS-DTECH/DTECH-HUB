@@ -3648,6 +3648,7 @@ function renderCurrentWeek() {
     const activeActivities = sortProjects(projects.filter((project) => project.showThisWeek
         && String(project?.id || "").trim() !== "49"));
     const activeLabProjects = sortLabProjects(labProjects.filter((project) => project.showThisWeek));
+    const activeStandards = sortProjects(standardCards);
 
     const allCards = [
         ...activeActivities.map((project) => ({
@@ -3659,6 +3660,11 @@ function renderCurrentWeek() {
             title: String(project.title || "").toLowerCase(),
             element: createLabProjectCard(project),
             record: project
+        })),
+        ...activeStandards.map((standard) => ({
+            title: String(standard.title || "").toLowerCase(),
+            element: createProjectCard(standard),
+            record: standard
         }))
     ].sort((left, right) => left.title.localeCompare(right.title));
 
@@ -3678,6 +3684,7 @@ function renderCurrentWeek() {
     const grouped = {
         activity: [],
         assessment: [],
+        standard: [],
         project: []
     };
 
@@ -3685,6 +3692,8 @@ function renderCurrentWeek() {
         const sourceType = inferSourceTypeFromRecord(card.record);
         if (sourceType === "assessment") {
             grouped.assessment.push(card);
+        } else if (sourceType === "standard") {
+            grouped.standard.push(card);
         } else if (sourceType === "project") {
             grouped.project.push(card);
         } else {
@@ -3696,6 +3705,7 @@ function renderCurrentWeek() {
     const sectionOrder = [
         { key: "activity", label: "Activities" },
         { key: "assessment", label: "Assessment Tasks" },
+        { key: "standard", label: "Standards" },
         { key: "project", label: "Projects" }
     ];
 
