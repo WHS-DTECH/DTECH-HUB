@@ -2162,6 +2162,19 @@ function ensureGlobalHubSidebar() {
             </section>
             <p class="hub-sidebar-alloc-empty" id="hub-sidebar-alloc-empty" hidden>No tasks or projects allocated yet.</p>
         </div>
+        <aside class="hub-sidebar-learning-sites" aria-label="Learning sites">
+            <h3>Learning Sites</h3>
+            <div class="hub-sidebar-learning-links">
+                <a href="https://sites.google.com/westlandhigh.school.nz/dtec/home" target="_blank" rel="noopener noreferrer">
+                    <span>DTECH Learning Site</span>
+                    <span aria-hidden="true">&#8599;</span>
+                </a>
+                <a href="https://tech-learningsites.onrender.com/" target="_blank" rel="noopener noreferrer">
+                    <span>TECH Learning Sites</span>
+                    <span aria-hidden="true">&#8599;</span>
+                </a>
+            </div>
+        </aside>
     `;
 
     const setOpen = (isOpen) => {
