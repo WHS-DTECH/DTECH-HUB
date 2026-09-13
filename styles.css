@@ -1046,17 +1046,19 @@ a {
     box-shadow: 0 2px 5px rgba(10, 62, 35, 0.22);
 }
 
-.new-week-process-card:hover,
-.new-week-process-card:focus-visible {
-    background: #176b3e;
-    color: #ffffff;
-}
-
 .new-week-process-title {
+    color: #ffffff;
     font-size: 0.78rem;
     font-weight: 800;
     letter-spacing: 0.04em;
+    text-decoration: none;
     text-transform: uppercase;
+}
+
+.new-week-process-title:hover,
+.new-week-process-title:focus-visible {
+    color: #b9f2d3;
+    text-decoration: underline;
 }
 
 .new-week-process-standard {
@@ -1068,7 +1070,16 @@ a {
     border: 1px solid rgba(255, 255, 255, 0.22);
     border-radius: 6px;
     background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
     font-size: 0.72rem;
+    text-decoration: none;
+}
+
+.new-week-process-standard:hover,
+.new-week-process-standard:focus-visible {
+    border-color: rgba(255, 255, 255, 0.55);
+    background: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
 }
 
 .new-week-process-standard small,

@@ -3955,18 +3955,20 @@ function renderStats() {
                 const standardNumber = String(standard.standard_number || "").trim();
                 const credits = Number.parseInt(standard.credits, 10);
                 const creditsText = Number.isInteger(credits) ? `${credits} credits` : "Credits not set";
+                const standardCard = standardCards.find((card) => String(card?.standardNumber || "").trim() === standardNumber);
+                const standardHref = String(standardCard?.href || `/assessment-standard-card.html?standard=${encodeURIComponent(standardNumber)}`);
                 return `
-                    <span class="new-week-process-standard">
+                    <a class="new-week-process-standard" href="${escapeHtml(standardHref)}" aria-label="Open standard ${escapeHtml(standardNumber)}">
                         <span><strong>${escapeHtml(standardNumber)}</strong> ${escapeHtml(standardLabels[standardNumber])}</span>
                         <small>${escapeHtml(creditsText)}</small>
-                    </span>
+                    </a>
                 `;
             }).join("");
             row.innerHTML = `
-                <a class="new-week-process-card" href="${escapeHtml(href)}">
-                    <span class="new-week-process-title">Assessment Summary</span>
+                <div class="new-week-process-card">
+                    <a class="new-week-process-title" href="${escapeHtml(href)}">Assessment Summary</a>
                     ${standardsHtml || `<span class="new-week-process-open">Open assessment</span>`}
-                </a>
+                </div>
             `;
         } else {
             row.innerHTML = `
