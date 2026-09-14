@@ -146,6 +146,7 @@
     body.process-tracker-embed #digital-media-summary-heading,
     body.process-tracker-embed #digital-media-summary-toolbar,
     body.process-tracker-embed #digital-media-summary-grid,
+    body.process-tracker-embed #external-assessment-section,
     body.process-tracker-embed #criteria-library-section,
     body.process-tracker-embed .hub-global-sidebar-toggle,
     body.process-tracker-embed .hub-global-sidebar-backdrop,
@@ -183,6 +184,42 @@
       margin: 0;
       border: 0;
       box-shadow: none;
+    }
+
+    .external-assessment-select {
+      width: 100%;
+      min-width: 150px;
+      min-height: 32px;
+      padding: 5px 8px;
+      border: 1px solid #b9cde3;
+      border-radius: 7px;
+      background: #ffffff;
+      color: #173f68;
+      font: inherit;
+      font-size: 0.76rem;
+      font-weight: 700;
+    }
+
+    .external-assessment-select:focus {
+      outline: 2px solid #5c91c2;
+      outline-offset: 1px;
+    }
+
+    .external-assessment-select:disabled {
+      opacity: 0.65;
+      cursor: wait;
+    }
+
+    .external-assessment-status {
+      min-height: 18px;
+      margin: 4px 0 8px;
+      color: #2c658d;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .external-assessment-status.is-error {
+      color: #9f2f2f;
     }
 
     .student-summary-actions {
@@ -650,6 +687,12 @@
           </div>
         </div>
         <div id="digital-media-summary-grid" aria-live="polite"></div>
+        <section id="external-assessment-section" aria-labelledby="external-assessment-heading">
+          <h3 class="student-summary-heading" id="external-assessment-heading">External Assessment</h3>
+          <p class="section-copy">Allocate each student's Project Exam and Computer Science Exam standards.</p>
+          <p class="external-assessment-status" id="external-assessment-status" aria-live="polite"></p>
+          <div id="external-assessment-grid" aria-live="polite"></div>
+        </section>
       </section>
 
       <section class="panel-section" id="criteria-library-section">

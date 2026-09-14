@@ -50,6 +50,8 @@ const workState = {
     expandedSummaryGroup: "",
     digitalMediaStudentSearch: "",
     digitalMediaStandardSearch: "",
+    externalAssessmentAllocations: new Map(),
+    externalAssessmentStudents: [],
     expandedDigitalMediaStudent: "",
     expandedDigitalMediaGroup: ""
 };
@@ -67,6 +69,8 @@ const digitalMediaStudentSearchInput = document.querySelector("#digital-media-st
 const digitalMediaStandardSearchInput = document.querySelector("#digital-media-standard-search-input");
 const generateDigitalMediaIndividualButton = document.querySelector("#generate-digital-media-individual-button");
 const generateDigitalMediaStandardButton = document.querySelector("#generate-digital-media-standard-button");
+const externalAssessmentGrid = document.querySelector("#external-assessment-grid");
+const externalAssessmentStatus = document.querySelector("#external-assessment-status");
 const taskPageNav = document.querySelector("#task-page-nav");
 const taskPrevButton = document.querySelector("#task-prev-button");
 const taskNextButton = document.querySelector("#task-next-button");
@@ -1411,6 +1415,110 @@ function renderDigitalMediaSummaryGrid() {
     `;
 }
 
+function renderExternalAssessmentGrid() {
+    if (!externalAssessmentGrid) return;
+
+    const studentsByEmail = new Map();
+    workState.externalAssessmentStudents.forEach((student) => {
+        studentsByEmail.set(normalizeEmail(student.studentEmail), student);
+    });
+    buildDigitalMediaSummaryRows().forEach((student) => {
+        studentsByEmail.set(normalizeEmail(student.studentEmail), student);
+    });
+    const students = Array.from(studentsByEmail.values())
+        .sort((left, right) => String(left.studentName || "").localeCompare(String(right.studentName || "")));
+    if (!students.length) {
+        externalAssessmentGrid.innerHTML = `<div class="work-empty">No Digital Media students are available for external assessment allocation.</div>`;
+        return;
+    }
+
+    const renderOptions = (options, selectedValue) => [
+        `<option value="">Not allocated</option>`,
+        ...options.map((standard) => `<option value="${standard}"${selectedValue === standard ? " selected" : ""}>${standard}</option>`)
+    ].join("");
+
+    externalAssessmentGrid.innerHTML = `
+        <div class="work-table-wrap">
+            <table class="student-summary-table">
+                <thead><tr><th>Student Name (Lastname, First name)</th><th>Project Exam</th><th>Computer Science Exam</th></tr></thead>
+                <tbody>${students.map((student) => {
+                    const allocation = workState.externalAssessmentAllocations.get(normalizeEmail(student.studentEmail)) || {};
+                    const projectStandard = String(allocation.project_exam_standard || "").trim();
+                    const computerScienceStandard = String(allocation.computer_science_exam_standard || "").trim();
+                    return `
+                        <tr data-external-student-email="${escapeHtml(student.studentEmail)}">
+                            <td>${escapeHtml(student.studentName)}</td>
+                            <td><select class="external-assessment-select" data-external-field="project_exam_standard" aria-label="Project Exam standard for ${escapeHtml(student.studentName)}">${renderOptions(["92007", "91899", "91909"], projectStandard)}</select></td>
+                            <td><select class="external-assessment-select" data-external-field="computer_science_exam_standard" aria-label="Computer Science Exam standard for ${escapeHtml(student.studentName)}">${renderOptions(["92006", "91898", "91908"], computerScienceStandard)}</select></td>
+                        </tr>
+                    `;
+                }).join("")}</tbody>
+            </table>
+        </div>
+    `;
+}
+
+function setExternalAssessmentStatus(message, isError = false) {
+    if (!externalAssessmentStatus) return;
+    externalAssessmentStatus.textContent = String(message || "");
+    externalAssessmentStatus.classList.toggle("is-error", Boolean(isError));
+}
+
+function buildExternalAssessmentStudents(students) {
+    return (Array.isArray(students) ? students : []).flatMap((student) => {
+        const year = String(student?.year_level || "").replace(/^year\s*/i, "").trim();
+        const programs = Array.isArray(student?.programs)
+            ? student.programs.map((program) => String(program || "").trim().toUpperCase())
+            : [];
+        const isEligible = ["11", "12", "13"].includes(year)
+            && programs.some((program) => ["DTECH", "COMP", "MDTECH"].includes(program));
+        if (!isEligible) return [];
+
+        const email = (Array.isArray(student?.linked_emails) ? student.linked_emails : [])
+            .map((value) => normalizeEmail(value))
+            .find(Boolean);
+        if (!email) return [];
+
+        return [{
+            studentEmail: email,
+            studentName: String(student?.student_name || "").trim() || formatNameFromEmail(email)
+        }];
+    });
+}
+
+async function saveExternalAssessmentAllocation(row) {
+    const studentEmail = normalizeEmail(row?.getAttribute("data-external-student-email") || "");
+    if (!studentEmail) return;
+
+    const selects = Array.from(row.querySelectorAll("[data-external-field]"));
+    const payload = Object.fromEntries(selects.map((select) => [select.dataset.externalField, String(select.value || "").trim()]));
+    selects.forEach((select) => { select.disabled = true; });
+    setExternalAssessmentStatus(`Saving external assessment allocation for ${studentEmail}...`);
+
+    try {
+        const response = await fetchJson(`/api/external-assessment-allocations/${encodeURIComponent(studentEmail)}`, {
+            method: "PUT",
+            headers: withAuthHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify(payload)
+        });
+        workState.externalAssessmentAllocations.set(studentEmail, response.allocation || { student_email: studentEmail, ...payload });
+        setExternalAssessmentStatus(`Saved external assessment allocation for ${studentEmail}.`);
+    } catch (error) {
+        setExternalAssessmentStatus(error?.message || "Could not save external assessment allocation.", true);
+        renderExternalAssessmentGrid();
+    } finally {
+        selects.forEach((select) => { select.disabled = false; });
+    }
+}
+
+function wireExternalAssessmentEvents() {
+    externalAssessmentGrid?.addEventListener("change", (event) => {
+        const select = event.target?.closest?.("[data-external-field]");
+        const row = select?.closest?.("[data-external-student-email]");
+        if (row) void saveExternalAssessmentAllocation(row);
+    });
+}
+
 function renderStudentSummaryGrid() {
     const host = document.querySelector("#student-summary-grid");
     if (!host) return;
@@ -2086,10 +2194,14 @@ async function init() {
 
         setStatus("Loading assessment tasks and student evidence...");
         const activities = await fetchJson("/api/activities", { headers: withAuthHeaders() });
-        const classManagementPayload = await fetchJson("/api/class-management/students?current_only=false&dtech_only=false", { headers: withAuthHeaders() }).catch(() => ({}));
+        const [classManagementPayload, externalAssessmentPayload] = await Promise.all([
+            fetchJson("/api/class-management/students?current_only=false&dtech_only=false", { headers: withAuthHeaders() }).catch(() => ({})),
+            fetchJson("/api/external-assessment-allocations", { headers: withAuthHeaders() }).catch(() => ({ allocations: [] }))
+        ]);
 
         const activityRows = Array.isArray(activities) ? activities : [];
         workState.studentNameByEmail = buildStudentNameMap(classManagementPayload?.students);
+        workState.externalAssessmentStudents = buildExternalAssessmentStudents(classManagementPayload?.students);
         const assessmentActivities = activityRows.filter((activity) => String(activity?.activity_category || activity?.category || "").toLowerCase().includes("assessment"));
         const interestRows = await Promise.all(
             assessmentActivities.map(async (activity) => {
@@ -2112,6 +2224,11 @@ async function init() {
         workState.activitiesById = new Map(activityRows.map((row) => [String(row?.id || "").trim(), row]));
         workState.interestRows = interestRows.filter(Boolean);
         workState.records = buildAllRecords();
+        workState.externalAssessmentAllocations = new Map(
+            (Array.isArray(externalAssessmentPayload?.allocations) ? externalAssessmentPayload.allocations : [])
+                .map((allocation) => [normalizeEmail(allocation?.student_email), allocation])
+                .filter(([studentEmail]) => studentEmail)
+        );
         readSelectedTaskFromUrl();
         readTrackerViewFromUrl();
 
@@ -2131,9 +2248,11 @@ async function init() {
         wireStudentSearchEvents();
         wireStudentSummaryEvents();
         wireProgressSummaryEvents();
+        wireExternalAssessmentEvents();
 
         renderStudentSummaryGrid();
         renderDigitalMediaSummaryGrid();
+        renderExternalAssessmentGrid();
         renderTaskLinks();
         renderSelectedTaskPage();
         setStatus("Student work task pages ready.");

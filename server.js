@@ -62,6 +62,7 @@ const memoryStudentToolsTechniques = new Map();
 const memoryDecompositionCoverage = new Map();
 const memoryTriallingComponents = new Map();
 const memoryDigiMedEfficientTools = new Map();
+const memoryExternalAssessmentAllocations = new Map();
 const memoryPracticalSkillsProgress = new Map();
 const memoryPracticalSkillsKitContent = new Map();
 const PRACTICAL_SKILLS_LIBRARY_FILE = path.join(__dirname, "practical-skills", "library.json");
@@ -5307,6 +5308,23 @@ async function ensureStudentDriveSetupSchema() {
   await pool.query(`ALTER TABLE student_drive_setup ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 }
 
+async function ensureExternalAssessmentAllocationsSchema() {
+  if (!hasDatabase) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS student_external_assessment_allocations (
+      student_email TEXT PRIMARY KEY,
+      project_exam_standard TEXT,
+      computer_science_exam_standard TEXT,
+      updated_by_email TEXT,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  await pool.query(`ALTER TABLE student_external_assessment_allocations ADD COLUMN IF NOT EXISTS project_exam_standard TEXT`);
+  await pool.query(`ALTER TABLE student_external_assessment_allocations ADD COLUMN IF NOT EXISTS computer_science_exam_standard TEXT`);
+  await pool.query(`ALTER TABLE student_external_assessment_allocations ADD COLUMN IF NOT EXISTS updated_by_email TEXT`);
+  await pool.query(`ALTER TABLE student_external_assessment_allocations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+}
+
 async function ensureDecompositionCoverageSchema() {
   if (!hasDatabase) return;
   await pool.query(`
@@ -7140,6 +7158,7 @@ async function saveStudentDriveSetup(email, processAssessmentFolderId) {
   }
 
   await ensureStudentDriveSetupSchema();
+  await ensureExternalAssessmentAllocationsSchema();
   const r = await pool.query(
     `
       INSERT INTO student_drive_setup (student_email, process_assessment_folder_id, confirmed_at, updated_at)
@@ -9972,6 +9991,74 @@ app.patch("/api/activities/:id/my-tools-techniques", async (req, res) => {
 });
 
 // GET /api/my-allocations — returns all projects and assessment tasks the signed-in student is allocated to
+app.get("/api/external-assessment-allocations", requireActivityWriteAccess, async (_req, res) => {
+  if (!hasDatabase) {
+    res.json({ allocations: Array.from(memoryExternalAssessmentAllocations.values()) });
+    return;
+  }
+
+  try {
+    await ensureExternalAssessmentAllocationsSchema();
+    const result = await pool.query(
+      `SELECT student_email, project_exam_standard, computer_science_exam_standard, updated_at
+       FROM student_external_assessment_allocations
+       ORDER BY student_email ASC`
+    );
+    res.json({ allocations: result.rows });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not load external assessment allocations" });
+  }
+});
+
+app.put("/api/external-assessment-allocations/:studentEmail", requireActivityWriteAccess, async (req, res) => {
+  const studentEmail = normalizeEmail(req.params.studentEmail || "");
+  const projectExamStandard = String(req.body?.project_exam_standard || "").trim();
+  const computerScienceExamStandard = String(req.body?.computer_science_exam_standard || "").trim();
+  const projectOptions = new Set(["", "92007", "91899", "91909"]);
+  const computerScienceOptions = new Set(["", "92006", "91898", "91908"]);
+
+  if (!isSchoolEmail(studentEmail)) {
+    res.status(400).json({ error: "A valid school student email is required" });
+    return;
+  }
+  if (!projectOptions.has(projectExamStandard) || !computerScienceOptions.has(computerScienceExamStandard)) {
+    res.status(400).json({ error: "Invalid external assessment standard" });
+    return;
+  }
+
+  const allocation = {
+    student_email: studentEmail,
+    project_exam_standard: projectExamStandard,
+    computer_science_exam_standard: computerScienceExamStandard,
+    updated_at: new Date().toISOString()
+  };
+
+  if (!hasDatabase) {
+    memoryExternalAssessmentAllocations.set(studentEmail, allocation);
+    res.json({ ok: true, allocation });
+    return;
+  }
+
+  try {
+    await ensureExternalAssessmentAllocationsSchema();
+    const result = await pool.query(
+      `INSERT INTO student_external_assessment_allocations (
+         student_email, project_exam_standard, computer_science_exam_standard, updated_by_email, updated_at
+       ) VALUES ($1, $2, $3, $4, NOW())
+       ON CONFLICT (student_email) DO UPDATE SET
+         project_exam_standard = EXCLUDED.project_exam_standard,
+         computer_science_exam_standard = EXCLUDED.computer_science_exam_standard,
+         updated_by_email = EXCLUDED.updated_by_email,
+         updated_at = NOW()
+       RETURNING student_email, project_exam_standard, computer_science_exam_standard, updated_at`,
+      [studentEmail, projectExamStandard || null, computerScienceExamStandard || null, req.user_email]
+    );
+    res.json({ ok: true, allocation: result.rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not save external assessment allocation" });
+  }
+});
+
 app.get("/api/my-allocations", async (req, res) => {
   const email = normalizeEmail(
     req?.authenticated_email ||
@@ -10067,11 +10154,25 @@ app.get("/api/my-allocations", async (req, res) => {
           : Number.isInteger(fallbackStandard?.credits) ? fallbackStandard.credits : null
       };
     });
-    const externalStandardNumbers = standardNumbers.includes("91907")
+    await ensureExternalAssessmentAllocationsSchema();
+    const savedExternalResult = await pool.query(
+      `SELECT project_exam_standard, computer_science_exam_standard
+       FROM student_external_assessment_allocations
+       WHERE student_email = $1
+       LIMIT 1`,
+      [email]
+    );
+    const savedExternal = savedExternalResult.rows[0] || null;
+    const inferredExternalStandardNumbers = standardNumbers.includes("91907")
       ? ["91908", "91909"]
       : standardNumbers.includes("91897")
         ? ["91898", "91899"]
         : [];
+    const externalStandardNumbers = savedExternal
+      ? [savedExternal.project_exam_standard, savedExternal.computer_science_exam_standard]
+          .map((standard) => String(standard || "").trim())
+          .filter(Boolean)
+      : inferredExternalStandardNumbers;
     const externalStandards = externalStandardNumbers.map((standardNumber) => {
       const standard = NZQA_STANDARDS_FALLBACK.find((row) =>
         row.stream === "digital" && row.standard_number === standardNumber
