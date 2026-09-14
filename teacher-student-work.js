@@ -1435,6 +1435,9 @@ function renderExternalAssessmentGrid() {
         });
     };
 
+    if (workState.email) {
+        addStudent(workState.email);
+    }
     buildProcessSummaryRows().forEach((s) => addStudent(s.studentEmail, s.studentName));
     buildDigitalMediaSummaryRows().forEach((s) => addStudent(s.studentEmail, s.studentName));
     (workState.externalAssessmentStudents || []).forEach((s) => addStudent(s.studentEmail, s.studentName));
