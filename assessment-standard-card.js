@@ -115,17 +115,36 @@ function findCard(cards, cardId, standardCode) {
     return null;
 }
 
-async function renderAssessmentTracker(standardNumber, email) {
+function getLearningSiteUrlForStandard(standardNumber, yearLevel) {
+    const num = String(standardNumber || "").trim();
+    const levelStr = String(yearLevel || "").trim();
+
+    let level = "";
+    if (levelStr.includes("3") || ["91903", "91907", "91906", "91902", "91904", "91905", "91908", "91909"].includes(num)) {
+        level = "13";
+    } else if (levelStr.includes("2") || ["91893", "91897", "91896", "91892", "91894", "91895", "91898", "91899"].includes(num)) {
+        level = "12";
+    } else {
+        level = "11";
+    }
+
+    const isComp = ["91896", "91898", "91906", "91908"].includes(num);
+    const domain = isComp ? "COMP" : "DTECH";
+    const courseCode = `${level}${domain}`;
+
+    return `https://tech-learningsites.onrender.com/${domain}/${courseCode}/#${num}`;
+}
+
+async function renderAssessmentTracker(standardNumber, email, isTeacher) {
+    const trackerSection = document.getElementById("sc-process-tracker");
+    if (!isTeacher) {
+        if (trackerSection) trackerSection.hidden = true;
+        return;
+    }
+
     if (!/^(91897|91907|91893|91903|92006|91898|91908|92007|91899|91909)$/.test(standardNumber)) return;
 
     try {
-        const response = await fetch(`/api/auth/user-access?email=${encodeURIComponent(email)}`, {
-            headers: withSignedInAuthHeaders({}, email)
-        });
-        const access = await response.json().catch(() => ({}));
-        if (!response.ok || (!access.can_teacher_view && !access.can_admin)) return;
-
-        const trackerSection = document.getElementById("sc-process-tracker");
         const trackerFrame = document.getElementById("sc-process-tracker-frame");
         const trackerLink = document.getElementById("sc-process-tracker-link");
         const trackerTitle = document.getElementById("sc-process-tracker-title");
@@ -412,10 +431,37 @@ async function loadStandardCard() {
         setChecklist("sc-merit-checklist", meritChecklist);
         setChecklist("sc-excellence-checklist", excellenceChecklist);
 
+        let isTeacher = false;
+        try {
+            const accessResp = await fetch(`/api/auth/user-access?email=${encodeURIComponent(email)}`, {
+                headers: withSignedInAuthHeaders({}, email)
+            });
+            if (accessResp.ok) {
+                const access = await accessResp.json().catch(() => ({}));
+                isTeacher = Boolean(access?.can_teacher_view || access?.can_admin);
+            }
+        } catch (_err) {
+        }
+
+        const actionLink = document.getElementById("sc-action-link");
+        if (actionLink) {
+            if (isTeacher) {
+                actionLink.textContent = "Open Standards Manager";
+                actionLink.href = "admin-assessment-information.html";
+                actionLink.target = "_self";
+                actionLink.removeAttribute("rel");
+            } else {
+                actionLink.textContent = "Open DTECH Learning Site";
+                actionLink.href = getLearningSiteUrlForStandard(number, card?.year_level);
+                actionLink.target = "_blank";
+                actionLink.rel = "noopener noreferrer";
+            }
+        }
+
         const content = document.getElementById("sc-content");
         if (content) content.hidden = false;
 
-        void renderAssessmentTracker(number, email);
+        void renderAssessmentTracker(number, email, isTeacher);
 
         setStatus(`Loaded saved Assessment Standard Card for ${number || "this standard"}.`);
     } catch (error) {
