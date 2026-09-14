@@ -151,6 +151,203 @@ async function renderAssessmentTracker(standardNumber, email) {
     }
 }
 
+const DEFAULT_STANDARD_CRITERIA = {
+    "91897": {
+        achievedText: "Use advanced processes to develop a digital technologies outcome.",
+        meritText: "Use advanced processes to develop a refined digital technologies outcome.",
+        excellenceText: "Use advanced processes to develop a quality digital technologies outcome.",
+        achievedChecklist: [
+            "Use appropriate project management tools and techniques to plan the development of a digital technologies outcome.",
+            "Decompose the outcome into smaller components.",
+            "List the key features or requirements the outcome must include.",
+            "Trial the components of the digital technologies outcome.",
+            "Test that the digital technologies outcome functions as intended.",
+            "Explain relevant implications."
+        ],
+        meritChecklist: [
+            "Effectively use project management and version control tools and techniques to manage development of a digital technologies outcome.",
+            "Trial multiple components and/or techniques and select those that are most suitable.",
+            "Use information from testing and trialling to improve the functionality of the digital technologies outcome.",
+            "Address relevant implications."
+        ],
+        excellenceChecklist: [
+            "Discuss how planning, testing, and trialling information assisted the development of a high-quality outcome."
+        ]
+    },
+    "91907": {
+        achievedText: "Use complex processes to develop a digital technologies outcome.",
+        meritText: "Use complex processes to develop a refined digital technologies outcome.",
+        excellenceText: "Use complex processes to develop a quality digital technologies outcome.",
+        achievedChecklist: [
+            "Use recognised and appropriate project management techniques to plan the development of a digital technologies outcome.",
+            "Decompose the digital technologies outcome into smaller components.",
+            "Trial components of the outcome.",
+            "Test that the digital technologies outcome functions as intended.",
+            "Address relevant implications."
+        ],
+        meritChecklist: [
+            "Effectively use project management techniques to manage development, feedback and/or collaborative processes.",
+            "Effectively trial multiple components and/or techniques.",
+            "Effectively use information from testing and trialling to improve the functionality of the digital technologies outcome."
+        ],
+        excellenceChecklist: [
+            "Synthesise information gained from the planning, testing and trialling of components.",
+            "Discuss how this information led to the development of a high-quality digital technologies outcome."
+        ]
+    },
+    "91893": {
+        achievedText: "Use advanced techniques to develop a digital media outcome.",
+        meritText: "Use advanced techniques to develop a refined digital media outcome.",
+        excellenceText: "Use advanced techniques to develop a quality digital media outcome.",
+        achievedChecklist: [
+            "Use appropriate tools and techniques for the purpose and end users.",
+            "Apply appropriate data integrity and testing procedures.",
+            "Use relevant conventions for the media type.",
+            "Explain relevant implications."
+        ],
+        meritChecklist: [
+            "Use information from testing procedures to improve the quality of the outcome.",
+            "Apply relevant conventions to improve the quality of the outcome.",
+            "Address relevant implications."
+        ],
+        excellenceChecklist: [
+            "Iteratively improve the outcome throughout the design, development and testing process.",
+            "Use efficient tools and techniques in the outcome's production."
+        ]
+    },
+    "91903": {
+        achievedText: "Use complex techniques to develop a digital media outcome.",
+        meritText: "Use complex techniques to develop a refined digital media outcome.",
+        excellenceText: "Use complex techniques to develop a quality digital media outcome.",
+        achievedChecklist: [
+            "Apply appropriate tools and techniques to meet the purpose and end-user requirements.",
+            "Apply appropriate data integrity and testing procedures.",
+            "Apply user experience principles relevant to the purpose of the outcome.",
+            "Address relevant implications."
+        ],
+        meritChecklist: [
+            "Use information from testing procedures to improve the quality of the digital media outcome.",
+            "Apply user experience principles to improve the quality of the digital media outcome."
+        ],
+        excellenceChecklist: [
+            "Iteratively improve the outcome throughout the design, development and testing process.",
+            "Use efficient tools and techniques in the outcome's production."
+        ]
+    },
+    "92006": {
+        achievedText: "Demonstrate understanding of usability in human-computer interfaces.",
+        meritText: "Demonstrate in-depth understanding of usability in human-computer interfaces.",
+        excellenceText: "Demonstrate comprehensive understanding of usability in human-computer interfaces.",
+        achievedChecklist: [
+            "Describe usability principles relevant to human-computer interfaces (e.g. accessibility, navigation, visual clarity).",
+            "Identify how usability principles are applied or violated in given interfaces.",
+            "Explain how usability impacts user experience."
+        ],
+        meritChecklist: [
+            "Explain in detail how usability principles improve human-computer interface design.",
+            "Suggest specific improvements to interface designs based on usability principles."
+        ],
+        excellenceChecklist: [
+            "Evaluate interface designs against usability principles and user needs.",
+            "Justify design improvements with clear reasoning referencing usability heuristics."
+        ]
+    },
+    "92007": {
+        achievedText: "Design a digital technologies outcome.",
+        meritText: "Develop an in-depth design for a digital technologies outcome.",
+        excellenceText: "Develop a refined design for a digital technologies outcome.",
+        achievedChecklist: [
+            "Describe the purpose and end-user requirements of the proposed digital outcome.",
+            "Generate design ideas and select a suitable design.",
+            "Describe key features and components of the design.",
+            "Explain relevant implications for the design."
+        ],
+        meritChecklist: [
+            "Explain in detail how user feedback, trialling, and testing informed design refinements.",
+            "Explain how relevant implications influenced design choices."
+        ],
+        excellenceChecklist: [
+            "Justify design choices through synthesis of user needs, trialling, and testing.",
+            "Evaluate how the final design addresses relevant implications and user requirements."
+        ]
+    },
+    "91898": {
+        achievedText: "Demonstrate understanding of a computer science concept.",
+        meritText: "Demonstrate in-depth understanding of a computer science concept.",
+        excellenceText: "Demonstrate comprehensive understanding of a computer science concept.",
+        achievedChecklist: [
+            "Describe key aspects of a computer science concept.",
+            "Explain how the computer science concept is implemented in software, algorithms, or hardware.",
+            "Provide examples showing how the concept is applied."
+        ],
+        meritChecklist: [
+            "Explain in detail how a computer science concept operates and why it is used.",
+            "Provide detailed examples showing clear understanding of technical mechanisms and trade-offs."
+        ],
+        excellenceChecklist: [
+            "Evaluate key algorithms, mechanisms, or trade-offs associated with the computer science concept.",
+            "Discuss implications, limitations, or future developments related to the concept."
+        ]
+    },
+    "91899": {
+        achievedText: "Present a summary of developing a digital outcome.",
+        meritText: "Present an in-depth summary of developing a digital outcome.",
+        excellenceText: "Present a comprehensive summary of developing a digital outcome.",
+        achievedChecklist: [
+            "Describe the digital outcome developed and its intended purpose and end users.",
+            "Describe key decisions made during design, development, and testing.",
+            "Explain how testing and trialling influenced the outcome.",
+            "Explain how relevant implications were addressed during development."
+        ],
+        meritChecklist: [
+            "Explain in detail how key decisions, testing, and feedback improved the digital outcome.",
+            "Explain how relevant implications influenced design and development choices."
+        ],
+        excellenceChecklist: [
+            "Discuss how synthesis of planning, testing, trialling, and feedback led to a high-quality outcome.",
+            "Evaluate the overall success of the outcome against user requirements and relevant implications."
+        ]
+    },
+    "91908": {
+        achievedText: "Analyse an area of computer science.",
+        meritText: "Analyse, in depth, an area of computer science.",
+        excellenceText: "Critically analyse an area of computer science.",
+        achievedChecklist: [
+            "Explain key aspects of the computer science area.",
+            "Explain relevant algorithms or mechanisms behind the area.",
+            "Explain how the area is used, implemented, or occurs, giving examples.",
+            "Explain key problems or issues related to the area and how these may be addressed."
+        ],
+        meritChecklist: [
+            "Provide a detailed explanation of how technical capabilities and limitations relate to humans, giving examples.",
+            "Compare and contrast different perspectives on the area."
+        ],
+        excellenceChecklist: [
+            "Draw insightful conclusions about the computer science area.",
+            "Evaluate innovative connections, less obvious implications, or future developments."
+        ]
+    },
+    "91909": {
+        achievedText: "Present a reflective analysis of developing a digital outcome.",
+        meritText: "Present an in-depth reflective analysis of developing a digital outcome.",
+        excellenceText: "Present a critical reflective analysis of developing a digital outcome.",
+        achievedChecklist: [
+            "Describe the digital outcome, its purpose, and end-user requirements.",
+            "Explain key design and development decisions made throughout the project.",
+            "Explain how testing, trialling, and feedback informed development.",
+            "Explain how relevant implications were addressed."
+        ],
+        meritChecklist: [
+            "Analyze in detail how key decisions, testing, trialling, and feedback influenced outcome quality.",
+            "Analyze how relevant implications shaped the final digital outcome."
+        ],
+        excellenceChecklist: [
+            "Critically evaluate how synthesis of planning, testing, trialling, and feedback contributed to a high-quality outcome.",
+            "Reflect insightfully on trade-offs, limitations, and future developments for the outcome."
+        ]
+    }
+};
+
 async function loadStandardCard() {
     const email = getSignedInEmail();
     if (!email) {
@@ -182,6 +379,7 @@ async function loadStandardCard() {
         }
 
         const number = standardCodeFromCard(card);
+        const fallback = DEFAULT_STANDARD_CRITERIA[number] || {};
         const nameCandidates = Array.isArray(card?.standard_codes)
             ? card.standard_codes.map((value) => safeText(value)).filter(Boolean)
             : [];
@@ -192,12 +390,27 @@ async function loadStandardCard() {
         setText("sc-standard-version", Number.isInteger(Number.parseInt(card?.year_version, 10)) ? String(Number.parseInt(card.year_version, 10)) : "");
         setText("sc-credits", Number.isInteger(Number.parseInt(card?.credits, 10)) ? String(Number.parseInt(card.credits, 10)) : "");
         setText("sc-standard-name", standardName);
-        setText("sc-achieved-text", safeText(card?.achieved_text));
-        setText("sc-merit-text", safeText(card?.merit_text));
-        setText("sc-excellence-text", safeText(card?.excellence_text));
-        setChecklist("sc-achieved-checklist", card?.achieved_checklist);
-        setChecklist("sc-merit-checklist", card?.merit_checklist);
-        setChecklist("sc-excellence-checklist", card?.excellence_checklist);
+
+        const achievedText = safeText(card?.achieved_text) || fallback.achievedText || standardName;
+        const meritText = safeText(card?.merit_text) || fallback.meritText || "-";
+        const excellenceText = safeText(card?.excellence_text) || fallback.excellenceText || "-";
+
+        const achievedChecklist = (Array.isArray(card?.achieved_checklist) && card.achieved_checklist.length)
+            ? card.achieved_checklist
+            : (fallback.achievedChecklist || []);
+        const meritChecklist = (Array.isArray(card?.merit_checklist) && card.merit_checklist.length)
+            ? card.merit_checklist
+            : (fallback.meritChecklist || []);
+        const excellenceChecklist = (Array.isArray(card?.excellence_checklist) && card.excellence_checklist.length)
+            ? card.excellence_checklist
+            : (fallback.excellenceChecklist || []);
+
+        setText("sc-achieved-text", achievedText);
+        setText("sc-merit-text", meritText);
+        setText("sc-excellence-text", excellenceText);
+        setChecklist("sc-achieved-checklist", achievedChecklist);
+        setChecklist("sc-merit-checklist", meritChecklist);
+        setChecklist("sc-excellence-checklist", excellenceChecklist);
 
         const content = document.getElementById("sc-content");
         if (content) content.hidden = false;

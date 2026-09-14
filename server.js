@@ -346,11 +346,41 @@ const NZQA_STANDARDS_FALLBACK = [
 ];
 const DEFAULT_ASSESSMENT_STANDARD_CARDS = [
   {
+    standardNumber: "91897",
+    standardName: "Use advanced processes to develop a digital technologies outcome",
+    level: "Level 2",
+    version: 2019,
+    credits: 6,
+    achievedText: "Use advanced processes to develop a digital technologies outcome.",
+    meritText: "Use advanced processes to develop a refined digital technologies outcome.",
+    excellenceText: "Use advanced processes to develop a quality digital technologies outcome.",
+    achievedChecklist: [
+      "Use appropriate project management tools and techniques to plan the development of a digital technologies outcome.",
+      "Decompose the outcome into smaller components.",
+      "List the key features or requirements the outcome must include.",
+      "Trial the components of the digital technologies outcome.",
+      "Test that the digital technologies outcome functions as intended.",
+      "Explain relevant implications."
+    ],
+    meritChecklist: [
+      "Effectively use project management and version control tools and techniques to manage development of a digital technologies outcome.",
+      "Trial multiple components and/or techniques and select those that are most suitable.",
+      "Use information from testing and trialling to improve the functionality of the digital technologies outcome.",
+      "Address relevant implications."
+    ],
+    excellenceChecklist: [
+      "Discuss how planning, testing, and trialling information assisted the development of a high-quality outcome."
+    ]
+  },
+  {
     standardNumber: "91907",
     standardName: "Use complex processes to develop a digital technologies outcome",
     level: "Level 3",
     version: 2024,
     credits: 6,
+    achievedText: "Use complex processes to develop a digital technologies outcome.",
+    meritText: "Use complex processes to develop a refined digital technologies outcome.",
+    excellenceText: "Use complex processes to develop a quality digital technologies outcome.",
     achievedChecklist: [
       "Use recognised and appropriate project management techniques to plan the development of a digital technologies outcome.",
       "Decompose the digital technologies outcome into smaller components.",
@@ -374,6 +404,9 @@ const DEFAULT_ASSESSMENT_STANDARD_CARDS = [
     level: "Level 2",
     version: 2019,
     credits: 4,
+    achievedText: "Use advanced techniques to develop a digital media outcome.",
+    meritText: "Use advanced techniques to develop a refined digital media outcome.",
+    excellenceText: "Use advanced techniques to develop a quality digital media outcome.",
     achievedChecklist: [
       "Use appropriate tools and techniques for the purpose and end users.",
       "Apply appropriate data integrity and testing procedures.",
@@ -396,6 +429,9 @@ const DEFAULT_ASSESSMENT_STANDARD_CARDS = [
     level: "Level 3",
     version: 2019,
     credits: 4,
+    achievedText: "Use complex techniques to develop a digital media outcome.",
+    meritText: "Use complex techniques to develop a refined digital media outcome.",
+    excellenceText: "Use complex techniques to develop a quality digital media outcome.",
     achievedChecklist: [
       "Apply appropriate tools and techniques to meet the purpose and end-user requirements.",
       "Apply appropriate data integrity and testing procedures.",
@@ -411,24 +447,148 @@ const DEFAULT_ASSESSMENT_STANDARD_CARDS = [
       "Use efficient tools and techniques in the outcome's production."
     ]
   },
-  ...["92006", "91898", "91908", "92007", "91899", "91909"].map((standardNumber) => {
-    const standard = NZQA_STANDARDS_FALLBACK.find((row) =>
-      row.stream === "digital" && row.standard_number === standardNumber
-    );
-    return {
-      standardNumber,
-      standardName: String(standard?.standard_name || "External assessment standard"),
-      level: `Level ${Number.parseInt(standard?.level, 10) || ""}`.trim(),
-      version: Number.parseInt(standard?.version, 10) || new Date().getFullYear(),
-      credits: Number.parseInt(standard?.credits, 10) || 0,
-      achievedText: String(standard?.standard_name || "External assessment standard"),
-      meritText: "",
-      excellenceText: "",
-      achievedChecklist: [],
-      meritChecklist: [],
-      excellenceChecklist: []
-    };
-  })
+  {
+    standardNumber: "92006",
+    standardName: "Demonstrate understanding of usability in human-computer interfaces",
+    level: "Level 1",
+    version: 2024,
+    credits: 5,
+    achievedText: "Demonstrate understanding of usability in human-computer interfaces.",
+    meritText: "Demonstrate in-depth understanding of usability in human-computer interfaces.",
+    excellenceText: "Demonstrate comprehensive understanding of usability in human-computer interfaces.",
+    achievedChecklist: [
+      "Describe usability principles relevant to human-computer interfaces (e.g. accessibility, navigation, visual clarity).",
+      "Identify how usability principles are applied or violated in given interfaces.",
+      "Explain how usability impacts user experience."
+    ],
+    meritChecklist: [
+      "Explain in detail how usability principles improve human-computer interface design.",
+      "Suggest specific improvements to interface designs based on usability principles."
+    ],
+    excellenceChecklist: [
+      "Evaluate interface designs against usability principles and user needs.",
+      "Justify design improvements with clear reasoning referencing usability heuristics."
+    ]
+  },
+  {
+    standardNumber: "92007",
+    standardName: "Design a digital technologies outcome",
+    level: "Level 1",
+    version: 2025,
+    credits: 5,
+    achievedText: "Design a digital technologies outcome.",
+    meritText: "Develop an in-depth design for a digital technologies outcome.",
+    excellenceText: "Develop a refined design for a digital technologies outcome.",
+    achievedChecklist: [
+      "Describe the purpose and end-user requirements of the proposed digital outcome.",
+      "Generate design ideas and select a suitable design.",
+      "Describe key features and components of the design.",
+      "Explain relevant implications for the design."
+    ],
+    meritChecklist: [
+      "Explain in detail how user feedback, trialling, and testing informed design refinements.",
+      "Explain how relevant implications influenced design choices."
+    ],
+    excellenceChecklist: [
+      "Justify design choices through synthesis of user needs, trialling, and testing.",
+      "Evaluate how the final design addresses relevant implications and user requirements."
+    ]
+  },
+  {
+    standardNumber: "91898",
+    standardName: "Demonstrate understanding of a computer science concept",
+    level: "Level 2",
+    version: 2019,
+    credits: 3,
+    achievedText: "Demonstrate understanding of a computer science concept.",
+    meritText: "Demonstrate in-depth understanding of a computer science concept.",
+    excellenceText: "Demonstrate comprehensive understanding of a computer science concept.",
+    achievedChecklist: [
+      "Describe key aspects of a computer science concept.",
+      "Explain how the computer science concept is implemented in software, algorithms, or hardware.",
+      "Provide examples showing how the concept is applied."
+    ],
+    meritChecklist: [
+      "Explain in detail how a computer science concept operates and why it is used.",
+      "Provide detailed examples showing clear understanding of technical mechanisms and trade-offs."
+    ],
+    excellenceChecklist: [
+      "Evaluate key algorithms, mechanisms, or trade-offs associated with the computer science concept.",
+      "Discuss implications, limitations, or future developments related to the concept."
+    ]
+  },
+  {
+    standardNumber: "91899",
+    standardName: "Present a summary of developing a digital outcome",
+    level: "Level 2",
+    version: 2019,
+    credits: 3,
+    achievedText: "Present a summary of developing a digital outcome.",
+    meritText: "Present an in-depth summary of developing a digital outcome.",
+    excellenceText: "Present a comprehensive summary of developing a digital outcome.",
+    achievedChecklist: [
+      "Describe the digital outcome developed and its intended purpose and end users.",
+      "Describe key decisions made during design, development, and testing.",
+      "Explain how testing and trialling influenced the outcome.",
+      "Explain how relevant implications were addressed during development."
+    ],
+    meritChecklist: [
+      "Explain in detail how key decisions, testing, and feedback improved the digital outcome.",
+      "Explain how relevant implications influenced design and development choices."
+    ],
+    excellenceChecklist: [
+      "Discuss how synthesis of planning, testing, trialling, and feedback led to a high-quality outcome.",
+      "Evaluate the overall success of the outcome against user requirements and relevant implications."
+    ]
+  },
+  {
+    standardNumber: "91908",
+    standardName: "Analyse an area of computer science",
+    level: "Level 3",
+    version: 2019,
+    credits: 3,
+    achievedText: "Analyse an area of computer science.",
+    meritText: "Analyse, in depth, an area of computer science.",
+    excellenceText: "Critically analyse an area of computer science.",
+    achievedChecklist: [
+      "Explain key aspects of the computer science area.",
+      "Explain relevant algorithms or mechanisms behind the area.",
+      "Explain how the area is used, implemented, or occurs, giving examples.",
+      "Explain key problems or issues related to the area and how these may be addressed."
+    ],
+    meritChecklist: [
+      "Provide a detailed explanation of how technical capabilities and limitations relate to humans, giving examples.",
+      "Compare and contrast different perspectives on the area."
+    ],
+    excellenceChecklist: [
+      "Draw insightful conclusions about the computer science area.",
+      "Evaluate innovative connections, less obvious implications, or future developments."
+    ]
+  },
+  {
+    standardNumber: "91909",
+    standardName: "Present a reflective analysis of developing a digital outcome",
+    level: "Level 3",
+    version: 2019,
+    credits: 3,
+    achievedText: "Present a reflective analysis of developing a digital outcome.",
+    meritText: "Present an in-depth reflective analysis of developing a digital outcome.",
+    excellenceText: "Present a critical reflective analysis of developing a digital outcome.",
+    achievedChecklist: [
+      "Describe the digital outcome, its purpose, and end-user requirements.",
+      "Explain key design and development decisions made throughout the project.",
+      "Explain how testing, trialling, and feedback informed development.",
+      "Explain how relevant implications were addressed."
+    ],
+    meritChecklist: [
+      "Analyze in detail how key decisions, testing, trialling, and feedback influenced outcome quality.",
+      "Analyze how relevant implications shaped the final digital outcome."
+    ],
+    excellenceChecklist: [
+      "Critically evaluate how synthesis of planning, testing, trialling, and feedback contributed to a high-quality outcome.",
+      "Reflect insightfully on trade-offs, limitations, and future developments for the outcome."
+    ]
+  }
 ];
 const DEFAULT_CLASS_DATA_AGING_DAYS = 3;
 const DEFAULT_CLASS_DATA_STALE_DAYS = 7;
@@ -2051,6 +2211,15 @@ async function seedDefaultAssessmentStandardCards() {
   if (!hasDatabase) return;
 
   for (const card of DEFAULT_ASSESSMENT_STANDARD_CARDS) {
+    const cardId = `default-standard-${card.standardNumber}`;
+    const standardCodesJson = JSON.stringify([card.standardNumber, card.standardName]);
+    const achievedText = card.achievedText || card.standardName;
+    const meritText = card.meritText || "";
+    const excellenceText = card.excellenceText || "";
+    const achievedChecklistJson = JSON.stringify(card.achievedChecklist || []);
+    const meritChecklistJson = JSON.stringify(card.meritChecklist || []);
+    const excellenceChecklistJson = JSON.stringify(card.excellenceChecklist || []);
+
     await pool.query(
       `
         INSERT INTO assessment_standard_cards (
@@ -2059,25 +2228,60 @@ async function seedDefaultAssessmentStandardCards() {
           achieved_checklist, merit_checklist, excellence_checklist,
           card_color, is_active, created_by_email, updated_by_email, created_at, updated_at
         )
-        SELECT $1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10::jsonb,$11::jsonb,$12::jsonb,'Teal',TRUE,'system','system',NOW(),NOW()
-        WHERE NOT EXISTS (
-          SELECT 1 FROM assessment_standard_cards WHERE standard_codes ? $13
+        VALUES (
+          $1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10::jsonb,$11::jsonb,$12::jsonb,'Teal',TRUE,'system','system',NOW(),NOW()
         )
-        ON CONFLICT (id) DO NOTHING
+        ON CONFLICT (id) DO UPDATE SET
+          course_name = EXCLUDED.course_name,
+          year_level = EXCLUDED.year_level,
+          year_version = EXCLUDED.year_version,
+          credits = EXCLUDED.credits,
+          standard_codes = EXCLUDED.standard_codes,
+          achieved_text = EXCLUDED.achieved_text,
+          merit_text = EXCLUDED.merit_text,
+          excellence_text = EXCLUDED.excellence_text,
+          achieved_checklist = EXCLUDED.achieved_checklist,
+          merit_checklist = EXCLUDED.merit_checklist,
+          excellence_checklist = EXCLUDED.excellence_checklist,
+          card_color = 'Teal',
+          updated_at = NOW()
       `,
       [
-        `default-standard-${card.standardNumber}`,
+        cardId,
         card.standardNumber,
         card.level,
         card.version,
         card.credits,
-        JSON.stringify([card.standardNumber, card.standardName]),
-        card.achievedText ?? card.standardName,
-        card.meritText ?? "",
-        card.excellenceText ?? "",
-        JSON.stringify(card.achievedChecklist),
-        JSON.stringify(card.meritChecklist),
-        JSON.stringify(card.excellenceChecklist),
+        standardCodesJson,
+        achievedText,
+        meritText,
+        excellenceText,
+        achievedChecklistJson,
+        meritChecklistJson,
+        excellenceChecklistJson
+      ]
+    );
+
+    // Also update any pre-existing rows for this standard code if their checklists/texts were empty
+    await pool.query(
+      `
+        UPDATE assessment_standard_cards
+        SET achieved_text = CASE WHEN TRIM(achieved_text) = '' THEN $1 ELSE achieved_text END,
+            merit_text = CASE WHEN TRIM(merit_text) = '' THEN $2 ELSE merit_text END,
+            excellence_text = CASE WHEN TRIM(excellence_text) = '' THEN $3 ELSE excellence_text END,
+            achieved_checklist = CASE WHEN achieved_checklist = '[]'::jsonb THEN $4::jsonb ELSE achieved_checklist END,
+            merit_checklist = CASE WHEN merit_checklist = '[]'::jsonb THEN $5::jsonb ELSE merit_checklist END,
+            excellence_checklist = CASE WHEN excellence_checklist = '[]'::jsonb THEN $6::jsonb ELSE excellence_checklist END,
+            updated_at = NOW()
+        WHERE standard_codes ? $7
+      `,
+      [
+        achievedText,
+        meritText,
+        excellenceText,
+        achievedChecklistJson,
+        meritChecklistJson,
+        excellenceChecklistJson,
         card.standardNumber
       ]
     );
