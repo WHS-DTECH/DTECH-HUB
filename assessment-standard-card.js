@@ -438,7 +438,11 @@ async function loadStandardCard() {
             });
             if (accessResp.ok) {
                 const access = await accessResp.json().catch(() => ({}));
-                isTeacher = Boolean(access?.can_teacher_view || access?.can_admin);
+                const canTeacherView = Boolean(access?.can_teacher_view || access?.can_admin);
+                const inTeacherMode = typeof window.getEffectiveHubViewMode === "function"
+                    ? window.getEffectiveHubViewMode() === "teacher"
+                    : (localStorage.getItem("hub_view_mode_v1") !== "student");
+                isTeacher = canTeacherView && inTeacherMode;
             }
         } catch (_err) {
         }
