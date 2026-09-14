@@ -4005,12 +4005,10 @@ function renderStats() {
                     <a class="new-week-process-title" href="${escapeHtml(href)}">Internal Assessment Summary</a>
                     ${standardsHtml || `<span class="new-week-process-open">Open assessment</span>`}
                 </div>
-                ${externalStandardsHtml ? `
-                    <div class="new-week-process-card new-week-external-card">
-                        <span class="new-week-process-title">External Assessment Summary</span>
-                        ${externalStandardsHtml}
-                    </div>
-                ` : ""}
+                <div class="new-week-process-card new-week-external-card">
+                    <span class="new-week-process-title">External Assessment Summary</span>
+                    ${externalStandardsHtml || `<span class="new-week-external-empty">You ARE NOT enrolled to sit any External DTECH exams</span>`}
+                </div>
             `;
         } else {
             row.innerHTML = `

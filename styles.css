@@ -1154,6 +1154,17 @@ a {
     color: #c7e8ff;
 }
 
+.new-week-external-empty {
+    padding: 7px 8px;
+    border: 1px solid rgba(199, 232, 255, 0.38);
+    border-radius: 6px;
+    background: rgba(199, 232, 255, 0.1);
+    color: #e5f5ff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
 .new-week-process-standard small,
 .new-week-process-open {
     color: #b9f2d3;

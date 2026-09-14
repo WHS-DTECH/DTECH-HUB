@@ -10181,16 +10181,11 @@ app.get("/api/my-allocations", async (req, res) => {
       [email]
     );
     const savedExternal = savedExternalResult.rows[0] || null;
-    const inferredExternalStandardNumbers = standardNumbers.includes("91907")
-      ? ["91908", "91909"]
-      : standardNumbers.includes("91897")
-        ? ["91898", "91899"]
-        : [];
     const externalStandardNumbers = savedExternal
       ? [savedExternal.project_exam_standard, savedExternal.computer_science_exam_standard]
           .map((standard) => String(standard || "").trim())
           .filter(Boolean)
-      : inferredExternalStandardNumbers;
+      : [];
     const externalStandards = externalStandardNumbers.map((standardNumber) => {
       const standard = NZQA_STANDARDS_FALLBACK.find((row) =>
         row.stream === "digital" && row.standard_number === standardNumber
