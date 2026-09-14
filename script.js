@@ -2139,13 +2139,6 @@ function ensureGlobalHubSidebar() {
                 <span class="hub-sidebar-profile-strand" id="hub-sidebar-profile-strand" hidden></span>
             </div>
         </div>
-        <section class="hub-sidebar-standards-card" id="hub-sidebar-standards-card" hidden>
-            <div class="hub-sidebar-standards-header">
-                <h3>My Standards</h3>
-                <span id="hub-sidebar-standards-total"></span>
-            </div>
-            <ul class="hub-sidebar-standards-list" id="hub-sidebar-standards-list"></ul>
-        </section>
         <p class="hub-global-sidebar-copy" id="hub-global-sidebar-copy">Quick access while signed in.</p>
         <nav class="hub-global-sidebar-links" aria-label="Sidebar links" id="hub-global-sidebar-nav">
             <a href="/teacher-view.html" id="hub-global-sidebar-teacher-link" hidden>Teacher View</a>
@@ -2162,6 +2155,16 @@ function ensureGlobalHubSidebar() {
                 <ul class="hub-sidebar-alloc-list" id="hub-sidebar-projects-list"></ul>
             </section>
             <p class="hub-sidebar-alloc-empty" id="hub-sidebar-alloc-empty" hidden>No tasks or projects allocated yet.</p>
+        </div>
+        <div class="hub-sidebar-summary-cards" id="hub-sidebar-summary-cards" hidden>
+            <div class="hub-sidebar-summary-card hub-sidebar-internal-card" id="hub-sidebar-internal-card" hidden>
+                <div class="hub-sidebar-summary-title">Internal Assessment Summary</div>
+                <div class="hub-sidebar-summary-list" id="hub-sidebar-internal-list"></div>
+            </div>
+            <div class="hub-sidebar-summary-card hub-sidebar-external-card" id="hub-sidebar-external-card" hidden>
+                <div class="hub-sidebar-summary-title">External Assessment Summary</div>
+                <div class="hub-sidebar-summary-list" id="hub-sidebar-external-list"></div>
+            </div>
         </div>
         <aside class="hub-sidebar-learning-sites" aria-label="Learning sites">
             <h3>Quick Links</h3>
@@ -2299,7 +2302,7 @@ async function loadAndRenderSidebarAllocations(panel) {
         hubStudentAllocatedStandards = Array.isArray(data.allocated_standards) ? data.allocated_standards : [];
         hubStudentExternalStandards = Array.isArray(data.external_standards) ? data.external_standards : [];
         renderHubSidebarProfileCard(panel, profileDetails);
-        renderHubSidebarStandardsCard(panel, profileDetails.yearGroup, hubStudentAllocatedStandards);
+        renderHubSidebarStandardsCard(panel, profileDetails.yearGroup, hubStudentAllocatedStandards, hubStudentExternalStandards);
         renderHubPracticalSkillsMenu(profileDetails.yearGroup);
         renderStats();
 
@@ -2340,40 +2343,100 @@ function renderHubPracticalSkillsMenu(yearGroup) {
     }
 }
 
-function renderHubSidebarStandardsCard(panel, yearGroup, standards) {
-    const card = panel.querySelector("#hub-sidebar-standards-card");
-    const list = panel.querySelector("#hub-sidebar-standards-list");
-    const total = panel.querySelector("#hub-sidebar-standards-total");
-    if (!card || !list || !total) return;
+function renderHubSidebarStandardsCard(panel, yearGroup, internalStandards, externalStandards) {
+    const summaryCardsContainer = panel.querySelector("#hub-sidebar-summary-cards");
+    const internalCard = panel.querySelector("#hub-sidebar-internal-card");
+    const internalList = panel.querySelector("#hub-sidebar-internal-list");
+    const externalCard = panel.querySelector("#hub-sidebar-external-card");
+    const externalList = panel.querySelector("#hub-sidebar-external-list");
+
+    if (!summaryCardsContainer || !internalCard || !internalList || !externalCard || !externalList) return;
 
     const normalizedYear = String(yearGroup || "").trim().replace(/^year\s*/i, "");
-    const rows = (Array.isArray(standards) ? standards : [])
+    const isSenior = ["11", "12", "13"].includes(normalizedYear);
+
+    const internalRows = (Array.isArray(internalStandards) ? internalStandards : [])
         .filter((item) => String(item?.standard_number || "").trim())
         .sort((left, right) => String(left.standard_number).localeCompare(String(right.standard_number), undefined, { numeric: true }));
-    const showCard = ["11", "12", "13"].includes(normalizedYear) && rows.length > 0;
 
-    if (!showCard) {
-        card.hidden = true;
-        list.innerHTML = "";
-        total.textContent = "";
+    const externalRows = (Array.isArray(externalStandards) ? externalStandards : [])
+        .filter((item) => String(item?.standard_number || "").trim())
+        .sort((left, right) => String(left.standard_number).localeCompare(String(right.standard_number), undefined, { numeric: true }));
+
+    const showSummarySection = isSenior || internalRows.length > 0 || externalRows.length > 0;
+
+    if (!showSummarySection) {
+        summaryCardsContainer.hidden = true;
+        internalCard.hidden = true;
+        externalCard.hidden = true;
+        internalList.innerHTML = "";
+        externalList.innerHTML = "";
         return;
     }
 
-    list.innerHTML = rows.map((item) => {
-        const standardNumber = String(item.standard_number || "").trim();
-        const credits = Number.parseInt(item.credits, 10);
-        const creditLabel = Number.isInteger(credits) ? `${credits} ${credits === 1 ? "credit" : "credits"}` : "Credits not set";
-        return `<li><strong>${escapeHtml(standardNumber)}</strong><span>${escapeHtml(creditLabel)}</span></li>`;
-    }).join("");
+    const internalLabels = {
+        "91897": "Process & Outcome",
+        "91907": "Process & Outcome",
+        "91893": "Digital Media",
+        "91903": "Digital Media"
+    };
 
-    const knownCredits = rows
-        .map((item) => Number.parseInt(item.credits, 10))
-        .filter((credits) => Number.isInteger(credits));
-    const totalCredits = knownCredits.reduce((sum, credits) => sum + credits, 0);
-    total.textContent = knownCredits.length === rows.length
-        ? `${totalCredits} credits total`
-        : `${rows.length} allocated`;
-    card.hidden = false;
+    const externalLabels = {
+        "92006": "Computer Science",
+        "92007": "Digital Outcome",
+        "91898": "Computer Science",
+        "91899": "Digital Outcome",
+        "91908": "Computer Science",
+        "91909": "Digital Outcome"
+    };
+
+    if (internalRows.length > 0) {
+        internalList.innerHTML = internalRows.map((item) => {
+            const standardNumber = String(item.standard_number || "").trim();
+            const credits = Number.parseInt(item.credits, 10);
+            const creditText = Number.isInteger(credits) ? `${credits} credits` : "Credits not set";
+            const label = internalLabels[standardNumber] || "Internal Assessment";
+            const standardHref = `/assessment-standard-card.html?standard=${encodeURIComponent(standardNumber)}`;
+            return `
+                <a class="hub-sidebar-summary-row hub-sidebar-internal-row" href="${escapeHtml(standardHref)}" aria-label="Open standard ${escapeHtml(standardNumber)}">
+                    <span class="hub-sidebar-summary-left">
+                        <strong>${escapeHtml(standardNumber)}</strong>
+                        <small>${escapeHtml(label)}</small>
+                    </span>
+                    <span class="hub-sidebar-summary-credits">${escapeHtml(creditText)}</span>
+                </a>
+            `;
+        }).join("");
+        internalCard.hidden = false;
+    } else {
+        internalCard.hidden = true;
+        internalList.innerHTML = "";
+    }
+
+    if (externalRows.length > 0) {
+        externalList.innerHTML = externalRows.map((item) => {
+            const standardNumber = String(item.standard_number || "").trim();
+            const credits = Number.parseInt(item.credits, 10);
+            const creditText = Number.isInteger(credits) ? `${credits} credits` : "Credits not set";
+            const label = externalLabels[standardNumber] || item.standard_name || "External Assessment";
+            const standardHref = `/assessment-standard-card.html?standard=${encodeURIComponent(standardNumber)}`;
+            return `
+                <a class="hub-sidebar-summary-row hub-sidebar-external-row" href="${escapeHtml(standardHref)}" aria-label="Open standard ${escapeHtml(standardNumber)}">
+                    <span class="hub-sidebar-summary-left">
+                        <strong>${escapeHtml(standardNumber)}</strong>
+                        <small>${escapeHtml(label)}</small>
+                    </span>
+                    <span class="hub-sidebar-summary-credits">${escapeHtml(creditText)}</span>
+                </a>
+            `;
+        }).join("");
+        externalCard.hidden = false;
+    } else {
+        externalList.innerHTML = `<div class="hub-sidebar-summary-empty hub-sidebar-external-empty">You ARE NOT enrolled to sit any External DTECH exams</div>`;
+        externalCard.hidden = false;
+    }
+
+    summaryCardsContainer.hidden = false;
 }
 
 // Reads year group/class/digital-media strand from the student's own allocation rows (each already
