@@ -1497,7 +1497,14 @@ function setExternalAssessmentStatus(message, isError = false) {
 }
 
 function buildExternalAssessmentStudents(students) {
+    const ALLOWED_PROGRAMS = new Set(["DTECH", "COMP", "DTONLINE", "DT ONLINE", "MDTECH", "MPROG"]);
     return (Array.isArray(students) ? students : []).flatMap((student) => {
+        const programs = Array.isArray(student?.programs)
+            ? student.programs.map((program) => String(program || "").trim().toUpperCase())
+            : [];
+        const isEligible = Boolean(student?.has_dtech) || programs.some((program) => ALLOWED_PROGRAMS.has(program));
+        if (!isEligible) return [];
+
         const email = (Array.isArray(student?.linked_emails) ? student.linked_emails : [])
             .map((value) => normalizeEmail(value))
             .find(Boolean);
