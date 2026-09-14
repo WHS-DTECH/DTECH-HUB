@@ -222,6 +222,23 @@
       color: #9f2f2f;
     }
 
+    .external-assessment-filter {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      margin: 4px 0 8px;
+      color: #244f73;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .external-assessment-filter input {
+      width: 16px;
+      height: 16px;
+      accent-color: #235f91;
+    }
+
     .student-summary-actions {
       display: flex;
       gap: 8px;
@@ -690,6 +707,10 @@
         <section id="external-assessment-section" aria-labelledby="external-assessment-heading">
           <h3 class="student-summary-heading" id="external-assessment-heading">External Assessment</h3>
           <p class="section-copy">Allocate each student's Project Exam and Computer Science Exam standards.</p>
+          <label class="external-assessment-filter">
+            <input id="external-assigned-only-filter" type="checkbox" checked>
+            <span>Show only students assigned to an exam</span>
+          </label>
           <p class="external-assessment-status" id="external-assessment-status" aria-live="polite"></p>
           <div id="external-assessment-grid" aria-live="polite"></div>
         </section>

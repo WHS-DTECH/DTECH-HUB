@@ -52,6 +52,7 @@ const workState = {
     digitalMediaStandardSearch: "",
     externalAssessmentAllocations: new Map(),
     externalAssessmentStudents: [],
+    externalAssignedOnly: true,
     expandedDigitalMediaStudent: "",
     expandedDigitalMediaGroup: ""
 };
@@ -71,6 +72,7 @@ const generateDigitalMediaIndividualButton = document.querySelector("#generate-d
 const generateDigitalMediaStandardButton = document.querySelector("#generate-digital-media-standard-button");
 const externalAssessmentGrid = document.querySelector("#external-assessment-grid");
 const externalAssessmentStatus = document.querySelector("#external-assessment-status");
+const externalAssignedOnlyFilter = document.querySelector("#external-assigned-only-filter");
 const taskPageNav = document.querySelector("#task-page-nav");
 const taskPrevButton = document.querySelector("#task-prev-button");
 const taskNextButton = document.querySelector("#task-next-button");
@@ -1425,10 +1427,16 @@ function renderExternalAssessmentGrid() {
     buildDigitalMediaSummaryRows().forEach((student) => {
         studentsByEmail.set(normalizeEmail(student.studentEmail), student);
     });
-    const students = Array.from(studentsByEmail.values())
+    const allStudents = Array.from(studentsByEmail.values())
         .sort((left, right) => String(left.studentName || "").localeCompare(String(right.studentName || "")));
+    const students = workState.externalAssignedOnly
+        ? allStudents.filter((student) => {
+            const allocation = workState.externalAssessmentAllocations.get(normalizeEmail(student.studentEmail)) || {};
+            return Boolean(String(allocation.project_exam_standard || "").trim() || String(allocation.computer_science_exam_standard || "").trim());
+        })
+        : allStudents;
     if (!students.length) {
-        externalAssessmentGrid.innerHTML = `<div class="work-empty">No Digital Media students are available for external assessment allocation.</div>`;
+        externalAssessmentGrid.innerHTML = `<div class="work-empty">${workState.externalAssignedOnly ? "No students are currently assigned to an external exam. Clear the filter to make allocations." : "No eligible students are available for external assessment allocation."}</div>`;
         return;
     }
 
@@ -1503,6 +1511,7 @@ async function saveExternalAssessmentAllocation(row) {
         });
         workState.externalAssessmentAllocations.set(studentEmail, response.allocation || { student_email: studentEmail, ...payload });
         setExternalAssessmentStatus(`Saved external assessment allocation for ${studentEmail}.`);
+        renderExternalAssessmentGrid();
     } catch (error) {
         setExternalAssessmentStatus(error?.message || "Could not save external assessment allocation.", true);
         renderExternalAssessmentGrid();
@@ -1512,6 +1521,10 @@ async function saveExternalAssessmentAllocation(row) {
 }
 
 function wireExternalAssessmentEvents() {
+    externalAssignedOnlyFilter?.addEventListener("change", () => {
+        workState.externalAssignedOnly = Boolean(externalAssignedOnlyFilter.checked);
+        renderExternalAssessmentGrid();
+    });
     externalAssessmentGrid?.addEventListener("change", (event) => {
         const select = event.target?.closest?.("[data-external-field]");
         const row = select?.closest?.("[data-external-student-email]");
