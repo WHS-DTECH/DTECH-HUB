@@ -166,20 +166,38 @@
       display: none !important;
     }
 
+    body.external-tracker-embed .hero,
+    body.external-tracker-embed .work-header,
+    body.external-tracker-embed #process-summary-toolbar,
+    body.external-tracker-embed #process-summary-heading,
+    body.external-tracker-embed #student-summary-grid,
+    body.external-tracker-embed #digital-media-summary-heading,
+    body.external-tracker-embed #digital-media-summary-toolbar,
+    body.external-tracker-embed #digital-media-summary-grid,
+    body.external-tracker-embed #criteria-library-section,
+    body.external-tracker-embed .hub-global-sidebar-toggle,
+    body.external-tracker-embed .hub-global-sidebar-backdrop,
+    body.external-tracker-embed .hub-global-sidebar {
+      display: none !important;
+    }
+
     body.process-tracker-embed .page-shell,
-    body.digital-media-tracker-embed .page-shell {
+    body.digital-media-tracker-embed .page-shell,
+    body.external-tracker-embed .page-shell {
       min-height: 0;
     }
 
     body.process-tracker-embed .work-page,
-    body.digital-media-tracker-embed .work-page {
+    body.digital-media-tracker-embed .work-page,
+    body.external-tracker-embed .work-page {
       width: 100%;
       margin: 0;
       padding: 0;
     }
 
     body.process-tracker-embed .work-page > .panel-section,
-    body.digital-media-tracker-embed .work-page > .panel-section {
+    body.digital-media-tracker-embed .work-page > .panel-section,
+    body.external-tracker-embed .work-page > .panel-section {
       width: 100%;
       margin: 0;
       border: 0;
@@ -707,6 +725,18 @@
         <section id="external-assessment-section" aria-labelledby="external-assessment-heading">
           <h3 class="student-summary-heading" id="external-assessment-heading">External Assessment</h3>
           <p class="section-copy">Allocate each student's Project Exam and Computer Science Exam standards.</p>
+          <label class="external-assessment-filter" for="external-standard-filter">
+            <span>External standard</span>
+            <select id="external-standard-filter" class="external-assessment-select">
+              <option value="">All external standards</option>
+              <option value="92007">92007 - Project Exam</option>
+              <option value="91899">91899 - Project Exam</option>
+              <option value="91909">91909 - Project Exam</option>
+              <option value="92006">92006 - Computer Science Exam</option>
+              <option value="91898">91898 - Computer Science Exam</option>
+              <option value="91908">91908 - Computer Science Exam</option>
+            </select>
+          </label>
           <label class="external-assessment-filter">
             <input id="external-assigned-only-filter" type="checkbox" checked>
             <span>Show only students assigned to an exam</span>

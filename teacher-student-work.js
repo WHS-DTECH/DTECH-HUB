@@ -4,6 +4,8 @@ if (trackerViewParams.get("embed") === "process") {
     document.body.classList.add("process-tracker-embed");
 } else if (trackerViewParams.get("embed") === "digital-media") {
     document.body.classList.add("digital-media-tracker-embed");
+} else if (trackerViewParams.get("embed") === "external") {
+    document.body.classList.add("external-tracker-embed");
 }
 const DIGITAL_OUTCOME_DESCRIPTION_TASKS = [
     "Description - Google Slides: Describe the Digital Outcome: What is it, who is it for, and what should it do?",
@@ -53,6 +55,7 @@ const workState = {
     externalAssessmentAllocations: new Map(),
     externalAssessmentStudents: [],
     externalAssignedOnly: true,
+    externalStandardFilter: "",
     expandedDigitalMediaStudent: "",
     expandedDigitalMediaGroup: ""
 };
@@ -73,6 +76,7 @@ const generateDigitalMediaStandardButton = document.querySelector("#generate-dig
 const externalAssessmentGrid = document.querySelector("#external-assessment-grid");
 const externalAssessmentStatus = document.querySelector("#external-assessment-status");
 const externalAssignedOnlyFilter = document.querySelector("#external-assigned-only-filter");
+const externalStandardFilter = document.querySelector("#external-standard-filter");
 const taskPageNav = document.querySelector("#task-page-nav");
 const taskPrevButton = document.querySelector("#task-prev-button");
 const taskNextButton = document.querySelector("#task-next-button");
@@ -1429,14 +1433,22 @@ function renderExternalAssessmentGrid() {
     });
     const allStudents = Array.from(studentsByEmail.values())
         .sort((left, right) => String(left.studentName || "").localeCompare(String(right.studentName || "")));
-    const students = workState.externalAssignedOnly
+    let students = workState.externalAssignedOnly
         ? allStudents.filter((student) => {
             const allocation = workState.externalAssessmentAllocations.get(normalizeEmail(student.studentEmail)) || {};
             return Boolean(String(allocation.project_exam_standard || "").trim() || String(allocation.computer_science_exam_standard || "").trim());
         })
         : allStudents;
+    if (workState.externalStandardFilter) {
+        students = students.filter((student) => {
+            const allocation = workState.externalAssessmentAllocations.get(normalizeEmail(student.studentEmail)) || {};
+            return [allocation.project_exam_standard, allocation.computer_science_exam_standard]
+                .map((standard) => String(standard || "").trim())
+                .includes(workState.externalStandardFilter);
+        });
+    }
     if (!students.length) {
-        externalAssessmentGrid.innerHTML = `<div class="work-empty">${workState.externalAssignedOnly ? "No students are currently assigned to an external exam. Clear the filter to make allocations." : "No eligible students are available for external assessment allocation."}</div>`;
+        externalAssessmentGrid.innerHTML = `<div class="work-empty">${workState.externalStandardFilter ? `No students are currently assigned to ${escapeHtml(workState.externalStandardFilter)}.` : workState.externalAssignedOnly ? "No students are currently assigned to an external exam. Clear the filter to make allocations." : "No eligible students are available for external assessment allocation."}</div>`;
         return;
     }
 
@@ -1521,6 +1533,10 @@ async function saveExternalAssessmentAllocation(row) {
 }
 
 function wireExternalAssessmentEvents() {
+    externalStandardFilter?.addEventListener("change", () => {
+        workState.externalStandardFilter = String(externalStandardFilter.value || "").trim();
+        renderExternalAssessmentGrid();
+    });
     externalAssignedOnlyFilter?.addEventListener("change", () => {
         workState.externalAssignedOnly = Boolean(externalAssignedOnlyFilter.checked);
         renderExternalAssessmentGrid();
@@ -2105,6 +2121,9 @@ function readTrackerViewFromUrl() {
     } else if (/^(91893|91903)$/.test(standard)) {
         workState.digitalMediaStandardSearch = standard;
         if (digitalMediaStandardSearchInput) digitalMediaStandardSearchInput.value = standard;
+    } else if (/^(92006|91898|91908|92007|91899|91909)$/.test(standard)) {
+        workState.externalStandardFilter = standard;
+        if (externalStandardFilter) externalStandardFilter.value = standard;
     }
 }
 

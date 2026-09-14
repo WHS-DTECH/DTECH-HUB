@@ -116,7 +116,7 @@ function findCard(cards, cardId, standardCode) {
 }
 
 async function renderAssessmentTracker(standardNumber, email) {
-    if (!/^(91897|91907|91893|91903)$/.test(standardNumber)) return;
+    if (!/^(91897|91907|91893|91903|92006|91898|91908|92007|91899|91909)$/.test(standardNumber)) return;
 
     try {
         const response = await fetch(`/api/auth/user-access?email=${encodeURIComponent(email)}`, {
@@ -130,8 +130,11 @@ async function renderAssessmentTracker(standardNumber, email) {
         const trackerLink = document.getElementById("sc-process-tracker-link");
         const trackerTitle = document.getElementById("sc-process-tracker-title");
         const isDigitalMedia = /^(91893|91903)$/.test(standardNumber);
-        const assessmentLabel = isDigitalMedia ? "Digital Media Assessment" : "Process Assessment";
-        const embedMode = isDigitalMedia ? "digital-media" : "process";
+        const isExternal = /^(92006|91898|91908|92007|91899|91909)$/.test(standardNumber);
+        const assessmentLabel = isExternal
+            ? "External Assessment"
+            : isDigitalMedia ? "Digital Media Assessment" : "Process Assessment";
+        const embedMode = isExternal ? "external" : isDigitalMedia ? "digital-media" : "process";
         const trackerUrl = `/teacher-student-work.html?standard=${encodeURIComponent(standardNumber)}&embed=${embedMode}`;
 
         if (trackerTitle) trackerTitle.textContent = `${standardNumber} ${assessmentLabel} Student Tracker`;
