@@ -410,7 +410,25 @@ const DEFAULT_ASSESSMENT_STANDARD_CARDS = [
       "Iteratively improve the outcome throughout the design, development and testing process.",
       "Use efficient tools and techniques in the outcome's production."
     ]
-  }
+  },
+  ...["92006", "91898", "91908", "92007", "91899", "91909"].map((standardNumber) => {
+    const standard = NZQA_STANDARDS_FALLBACK.find((row) =>
+      row.stream === "digital" && row.standard_number === standardNumber
+    );
+    return {
+      standardNumber,
+      standardName: String(standard?.standard_name || "External assessment standard"),
+      level: `Level ${Number.parseInt(standard?.level, 10) || ""}`.trim(),
+      version: Number.parseInt(standard?.version, 10) || new Date().getFullYear(),
+      credits: Number.parseInt(standard?.credits, 10) || 0,
+      achievedText: String(standard?.standard_name || "External assessment standard"),
+      meritText: "",
+      excellenceText: "",
+      achievedChecklist: [],
+      meritChecklist: [],
+      excellenceChecklist: []
+    };
+  })
 ];
 const DEFAULT_CLASS_DATA_AGING_DAYS = 3;
 const DEFAULT_CLASS_DATA_STALE_DAYS = 7;
@@ -2054,9 +2072,9 @@ async function seedDefaultAssessmentStandardCards() {
         card.version,
         card.credits,
         JSON.stringify([card.standardNumber, card.standardName]),
-        card.standardName,
-        card.standardName,
-        card.standardName,
+        card.achievedText ?? card.standardName,
+        card.meritText ?? "",
+        card.excellenceText ?? "",
         JSON.stringify(card.achievedChecklist),
         JSON.stringify(card.meritChecklist),
         JSON.stringify(card.excellenceChecklist),
