@@ -2197,12 +2197,31 @@ function ensureGlobalHubSidebar() {
     });
 
     const teacherLink = panel.querySelector("#hub-global-sidebar-teacher-link");
-    teacherLink?.addEventListener("click", () => {
-        const href = String(teacherLink.getAttribute("href") || "");
-        if (href.includes("teacher-view")) {
-            writeStoredHubViewMode("teacher");
-        } else if (href.includes("index")) {
-            writeStoredHubViewMode("student");
+    teacherLink?.addEventListener("click", (event) => {
+        const signedIn = hasAllowedSignedInHubAccount();
+        const canToggleView = signedIn && (hubAccessState.canTeacherView || hubAccessState.canAdmin);
+        if (!canToggleView) return;
+
+        const currentMode = getEffectiveHubViewMode();
+        const nextMode = currentMode === "teacher" ? "student" : "teacher";
+        writeStoredHubViewMode(nextMode);
+
+        if (nextMode === "teacher") {
+            event.preventDefault();
+            setOpen(false);
+            window.location.href = "/teacher-view.html";
+            return;
+        }
+
+        if (nextMode === "student") {
+            event.preventDefault();
+            setOpen(false);
+            if (isTeacherWorkspacePath()) {
+                window.location.href = "/index.html";
+            } else {
+                renderHubAuthUi();
+                if (typeof renderLibrary === "function") renderLibrary();
+            }
         }
     });
 
@@ -2241,8 +2260,7 @@ function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {
     const isStudentView = getEffectiveHubViewMode() !== "teacher";
     const canToggleView = Boolean(canTeacherView || canAdmin);
 
-    // In student view, show allocation lists only (hide menu links).
-    if (nav) nav.hidden = isStudentView;
+    if (nav) nav.hidden = false;
     if (teacherLink) {
         teacherLink.hidden = !canToggleView;
         if (canToggleView) {
@@ -2251,7 +2269,7 @@ function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {
             teacherLink.href = inTeacherMode ? "/index.html" : "/teacher-view.html";
         }
     }
-    if (adminLink) adminLink.hidden = !canAdmin;
+    if (adminLink) adminLink.hidden = !canAdmin || isStudentView;
     if (taskListButton) {
         taskListButton.hidden = false;
     }
@@ -2649,10 +2667,10 @@ function renderHubAuthUi() {
     let badgeLabel = "";
     let badgeClass = "";
     if (signedIn) {
-        if (canTeacherView && !canAdmin) {
+        if (canTeacherView && inTeacherMode && !canAdmin) {
             badgeLabel = "Staff";
             badgeClass = "badge-staff";
-        } else if (!canAdmin) {
+        } else if (!canAdmin || !inTeacherMode) {
             badgeLabel = "Student";
             badgeClass = "badge-student";
         }
@@ -2673,8 +2691,9 @@ function renderHubAuthUi() {
     if (hubUserBadge) {
         hubUserBadge.hidden = !signedIn;
         const initials = signedIn ? getHubUserInitials(hubAuthState.profile) : "";
-        // Lead Teacher counts as Teacher here; canTeacherView already reflects that from /api/auth/user-access.
-        const roleSuffix = signedIn ? (canTeacherView ? "Teacher" : "Student") : "";
+        const roleSuffix = signedIn
+            ? (canToggleView ? (inTeacherMode ? "Teacher" : (hubAccessState.resolved ? "Student" : "")) : (canTeacherView ? "Teacher" : "Student"))
+            : "";
         hubUserBadge.textContent = roleSuffix ? `${initials} - ${roleSuffix}` : initials;
         hubUserBadge.title = signedIn ? getHubDisplayName(hubAuthState.profile) : "";
     }
@@ -2746,7 +2765,7 @@ function renderHubAuthUi() {
     setPublicHomepageUiState(signedIn);
 
     if (isHomepagePath() && libraryGrid) {
-        if (signedIn && (hubAccessState.canTeacherView || hubAccessState.canAdmin)) {
+        if (signedIn && inTeacherMode) {
             loadProjectAssignmentSummaries();
         } else {
             clearProjectAssignmentSummaries();
@@ -2910,10 +2929,20 @@ function bindHubAuthControls() {
             const nextMode = currentMode === "teacher" ? "student" : "teacher";
             writeStoredHubViewMode(nextMode);
 
-            const targetHref = nextMode === "teacher" ? "/teacher-view.html" : "/index.html";
-            if (isTeacherWorkspacePath()) {
+            if (nextMode === "teacher") {
                 event.preventDefault();
-                window.location.href = targetHref;
+                window.location.href = "/teacher-view.html";
+                return;
+            }
+
+            if (nextMode === "student") {
+                event.preventDefault();
+                if (isTeacherWorkspacePath()) {
+                    window.location.href = "/index.html";
+                } else {
+                    renderHubAuthUi();
+                    if (typeof renderLibrary === "function") renderLibrary();
+                }
             }
         });
     }
