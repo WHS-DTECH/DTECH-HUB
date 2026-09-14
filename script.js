@@ -3980,6 +3980,8 @@ function renderStats() {
                 `;
             }).join("");
             const externalLabels = {
+                "92006": "Computer Science",
+                "92007": "Digital Outcome",
                 "91898": "Computer Science",
                 "91899": "Digital Outcome",
                 "91908": "Computer Science",
@@ -3989,11 +3991,13 @@ function renderStats() {
                 const standardNumber = String(standard?.standard_number || "").trim();
                 const credits = Number.parseInt(standard?.credits, 10);
                 const creditsText = Number.isInteger(credits) ? `${credits} credits` : "Credits not set";
+                const standardCard = standardCards.find((card) => String(card?.standardNumber || "").trim() === standardNumber);
+                const standardHref = String(standardCard?.href || `/assessment-standard-card.html?standard=${encodeURIComponent(standardNumber)}`);
                 return `
-                    <span class="new-week-process-standard new-week-external-standard">
+                    <a class="new-week-process-standard new-week-external-standard" href="${escapeHtml(standardHref)}" aria-label="Open standard ${escapeHtml(standardNumber)}">
                         <span><strong>${escapeHtml(standardNumber)}</strong> ${escapeHtml(externalLabels[standardNumber] || standard.standard_name || "External")}</span>
                         <small>${escapeHtml(creditsText)}</small>
-                    </span>
+                    </a>
                 `;
             }).join("");
             row.innerHTML = `
