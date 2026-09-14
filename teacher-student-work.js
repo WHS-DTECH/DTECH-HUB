@@ -1425,12 +1425,24 @@ function renderExternalAssessmentGrid() {
     if (!externalAssessmentGrid) return;
 
     const studentsByEmail = new Map();
-    workState.externalAssessmentStudents.forEach((student) => {
-        studentsByEmail.set(normalizeEmail(student.studentEmail), student);
-    });
-    buildDigitalMediaSummaryRows().forEach((student) => {
-        studentsByEmail.set(normalizeEmail(student.studentEmail), student);
-    });
+    const addStudent = (email, nameFallback = "") => {
+        const normalized = normalizeEmail(email);
+        if (!normalized || studentsByEmail.has(normalized)) return;
+        const name = String(nameFallback || workState.studentNameByEmail.get(normalized) || formatNameFromEmail(normalized)).trim();
+        studentsByEmail.set(normalized, {
+            studentEmail: normalized,
+            studentName: name
+        });
+    };
+
+    buildProcessSummaryRows().forEach((s) => addStudent(s.studentEmail, s.studentName));
+    buildDigitalMediaSummaryRows().forEach((s) => addStudent(s.studentEmail, s.studentName));
+    (workState.externalAssessmentStudents || []).forEach((s) => addStudent(s.studentEmail, s.studentName));
+
+    for (const email of workState.externalAssessmentAllocations.keys()) {
+        addStudent(email);
+    }
+
     const allStudents = Array.from(studentsByEmail.values())
         .sort((left, right) => String(left.studentName || "").localeCompare(String(right.studentName || "")));
     let students = workState.externalAssignedOnly
@@ -1486,14 +1498,6 @@ function setExternalAssessmentStatus(message, isError = false) {
 
 function buildExternalAssessmentStudents(students) {
     return (Array.isArray(students) ? students : []).flatMap((student) => {
-        const year = String(student?.year_level || "").replace(/^year\s*/i, "").trim();
-        const programs = Array.isArray(student?.programs)
-            ? student.programs.map((program) => String(program || "").trim().toUpperCase())
-            : [];
-        const isEligible = ["11", "12", "13"].includes(year)
-            && programs.some((program) => ["DTECH", "COMP", "MDTECH"].includes(program));
-        if (!isEligible) return [];
-
         const email = (Array.isArray(student?.linked_emails) ? student.linked_emails : [])
             .map((value) => normalizeEmail(value))
             .find(Boolean);
