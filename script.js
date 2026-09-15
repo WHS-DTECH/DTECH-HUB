@@ -255,6 +255,7 @@ async function refreshActivitiesLibrary() {
     projects = mergeProjects(sharedProjects);
     lessons = sharedLessons;
     standardCards = sharedStandardCards;
+    renderCurrentWeek();
     renderLibrary();
 }
 
@@ -1017,7 +1018,7 @@ async function loadSharedLessons() {
                     className: "All Computer Lab",
                     area: "Relief Plan",
                     activityCategory: "Relief Lesson",
-                    showThisWeek: false,
+                    showThisWeek: isReliefEventToday(startDate, endDate),
                     status: "active",
                     term: "Relief Plan",
                     updated: startDate,
@@ -1038,6 +1039,29 @@ async function loadSharedLessons() {
     } catch (_error) {
         return [];
     }
+}
+
+function parseReliefEventDate(value) {
+    const raw = String(value || "").trim();
+    const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (isoMatch) {
+        return new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]));
+    }
+
+    const csvMatch = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+    if (!csvMatch) return null;
+    return new Date(Number(csvMatch[3]), Number(csvMatch[1]) - 1, Number(csvMatch[2]));
+}
+
+function isReliefEventToday(startValue, endValue) {
+    const start = parseReliefEventDate(startValue);
+    const end = parseReliefEventDate(endValue || startValue);
+    if (!start || !end) return false;
+
+    const today = new Date();
+    const todayKey = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+    return new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime() <= todayKey
+        && new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime() >= todayKey;
 }
 
 async function loadAssessmentStandardCardsForLibrary() {
