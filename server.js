@@ -4691,7 +4691,21 @@ async function seedOzoneLayerReliefLesson() {
   await pool.query(
     `INSERT INTO lessons (id, lesson_title, lesson_week, lesson_date, lesson_duration_minutes, lesson_type, lesson_card_color, activity_name, lesson_year_level, lesson_link_url, lesson_focus, lesson_notes, relief_course_code, lesson_plan, publish_activity, add_to_calendar, created_by_email)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15, $16, $17)
-     ON CONFLICT (id) DO NOTHING`,
+     ON CONFLICT (id) DO UPDATE SET
+       lesson_title = EXCLUDED.lesson_title,
+       lesson_week = EXCLUDED.lesson_week,
+       lesson_date = EXCLUDED.lesson_date,
+       lesson_duration_minutes = EXCLUDED.lesson_duration_minutes,
+       lesson_type = EXCLUDED.lesson_type,
+       lesson_card_color = EXCLUDED.lesson_card_color,
+       activity_name = EXCLUDED.activity_name,
+       lesson_year_level = EXCLUDED.lesson_year_level,
+       lesson_focus = EXCLUDED.lesson_focus,
+       lesson_notes = EXCLUDED.lesson_notes,
+       relief_course_code = EXCLUDED.relief_course_code,
+       lesson_plan = EXCLUDED.lesson_plan,
+       publish_activity = EXCLUDED.publish_activity,
+       updated_at = NOW()`,
     [seniorDtechPayload.id, seniorDtechPayload.lesson_title, seniorDtechPayload.lesson_week, seniorDtechPayload.lesson_date, seniorDtechPayload.lesson_duration_minutes, seniorDtechPayload.lesson_type, seniorDtechPayload.lesson_card_color, seniorDtechPayload.activity_name, seniorDtechPayload.lesson_year_level, seniorDtechPayload.lesson_link_url, seniorDtechPayload.lesson_focus, seniorDtechPayload.lesson_notes, seniorDtechPayload.relief_course_code, JSON.stringify(seniorDtechPayload.lesson_plan), seniorDtechPayload.publish_activity, seniorDtechPayload.add_to_calendar, seniorDtechPayload.created_by_email]
   );
 }
