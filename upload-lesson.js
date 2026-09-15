@@ -198,8 +198,12 @@ function collectLessonPayload() {
     const lessonLinkUrl = String(form.querySelector('[name="lessonLinkUrl"]')?.value || "").trim();
     const lessonFocus = String(form.querySelector('[name="lessonFocus"]')?.value || "").trim();
     const lessonNotes = String(form.querySelector('[name="lessonNotes"]')?.value || "").trim();
-    const publishActivity = Boolean(form.querySelector('[name="publishActivity"]')?.checked);
-    const addToCalendar = Boolean(form.querySelector('[name="addToCalendar"]')?.checked);
+    const publishActivity = form.querySelector('[name="publishActivity"]')
+        ? Boolean(form.querySelector('[name="publishActivity"]')?.checked)
+        : true;
+    const addToCalendar = form.querySelector('[name="addToCalendar"]')
+        ? Boolean(form.querySelector('[name="addToCalendar"]')?.checked)
+        : false;
     const lessonPlan = Object.fromEntries([
         ["unit", "planUnit"], ["component", "planComponent"], ["theme", "planTheme"], ["aim", "planAim"],
         ["resources", "planResources"], ["preparation", "planPreparation"], ["healthSafety", "planHealthSafety"],
