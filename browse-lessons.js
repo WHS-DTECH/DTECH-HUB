@@ -121,6 +121,13 @@ async function loadReliefPlan() {
         if (!response.ok || data.ok === false) throw new Error(data.error || "The Relief Plan is currently unavailable.");
         reliefPlanEvents = Array.isArray(data.events) ? data.events : [];
         reliefPlanLoaded = true;
+        const firstEventDate = reliefPlanEvents
+            .map((event) => parseReliefDate(event.startDate))
+            .filter(Boolean)
+            .sort((left, right) => left - right)[0];
+        if (firstEventDate) {
+            reliefPlanViewDate = new Date(firstEventDate.getFullYear(), firstEventDate.getMonth(), 1);
+        }
         reliefPlanStatus.textContent = `${reliefPlanEvents.length} events loaded for ${data.year || "the shared calendar"}.`;
         renderCalendar();
     } catch (error) {
