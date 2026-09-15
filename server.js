@@ -4671,7 +4671,7 @@ async function seedOzoneLayerReliefLesson() {
     if (!memoryLessons.has(lessonId)) memoryLessons.set(lessonId, { ...payload, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
     if (!memoryLessons.has(seniorLessonId)) memoryLessons.set(seniorLessonId, { ...seniorPayload, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
     if (!memoryLessons.has(seniorDtechLessonId)) memoryLessons.set(seniorDtechLessonId, { ...seniorDtechPayload, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
-    return;
+    return seniorDtechPayload;
   }
 
   await pool.query(
@@ -4708,6 +4708,8 @@ async function seedOzoneLayerReliefLesson() {
        updated_at = NOW()`,
     [seniorDtechPayload.id, seniorDtechPayload.lesson_title, seniorDtechPayload.lesson_week, seniorDtechPayload.lesson_date, seniorDtechPayload.lesson_duration_minutes, seniorDtechPayload.lesson_type, seniorDtechPayload.lesson_card_color, seniorDtechPayload.activity_name, seniorDtechPayload.lesson_year_level, seniorDtechPayload.lesson_link_url, seniorDtechPayload.lesson_focus, seniorDtechPayload.lesson_notes, seniorDtechPayload.relief_course_code, JSON.stringify(seniorDtechPayload.lesson_plan), seniorDtechPayload.publish_activity, seniorDtechPayload.add_to_calendar, seniorDtechPayload.created_by_email]
   );
+
+  return seniorDtechPayload;
 }
 
 async function syncDtechExcludedActivitiesVisibility() {
@@ -14556,11 +14558,14 @@ app.get("/api/relief-lessons/:courseCode", requireSchoolAccountAccess, async (re
     );
 
     if (courseCode === "SENIORDTECH" && (!result.rows || result.rows.length === 0)) {
-      await seedOzoneLayerReliefLesson();
+      const seededLesson = await seedOzoneLayerReliefLesson();
       result = await pool.query(
         `SELECT * FROM lessons WHERE relief_course_code = $1 AND publish_activity = TRUE ORDER BY lesson_date ASC NULLS LAST, lesson_title ASC`,
         [courseCode]
       );
+      if (!result.rows || result.rows.length === 0) {
+        result = { rows: [seededLesson] };
+      }
     }
 
     res.json({ courseCode, lessons: result.rows || [] });
