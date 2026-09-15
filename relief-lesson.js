@@ -21,7 +21,7 @@ function setReliefLessonDocumentTitle() {
     document.title = `Relief lesson - ${getReliefLessonTopicName(title)} - ${String(course).trim()}`;
 }
 
-function renderAttachedResources(plan) {
+function renderAttachedResources(plan, courseCode, lessonTitle) {
     if (!attachedResourcesBox || !attachedResourcesList) return;
 
     const resourceText = String(plan?.resources || "").trim();
@@ -40,6 +40,30 @@ function renderAttachedResources(plan) {
     if (/NZ Ministry for the Environment/i.test(resourceText)) {
         addLink("NZ Ministry for the Environment information", "https://environment.govt.nz/");
     }
+
+    const normalizedCourse = String(courseCode || "").trim().toUpperCase();
+    const yearBand = normalizedCourse === "JDTECH" ? "Y7-8" : normalizedCourse === "SENIORDTECH" ? "Y11-13" : "Y9-10";
+    const topic = /democracy/i.test(String(lessonTitle || "")) ? "Democracy_Day" : "Ozone_Day";
+    const resourceFolder = topic === "Democracy_Day" ? "TeacherFiles/Lesson Plans/Democracy" : "TeacherFiles/Lesson Plans";
+    const resourcePrefix = `${resourceFolder}/${topic}_${yearBand}`;
+    const resourceFiles = topic === "Democracy_Day"
+        ? [
+            [`${resourcePrefix}_Student_Slides.pptx`, "Student Slides"],
+            [`${resourcePrefix}_Student_Task_Sheet.docx`, "Student Task Sheet"],
+            [`${resourcePrefix}_Student_Evidence_Brief.docx`, "Student Evidence Brief"]
+        ]
+        : yearBand === "Y7-8"
+            ? [
+                [`${resourcePrefix}_Student_Slides.pptx`, "Student Slides"],
+                [`${resourcePrefix}_Student_Task_Sheet.docx`, "Student Task Sheet"]
+            ]
+            : yearBand === "Y9-10"
+                ? [[`${resourcePrefix}_Student_Slides.pptx`, "Student Slides"]]
+                : [];
+    resourceFiles.forEach(([filePath, label]) => {
+        const href = `/${filePath.split("/").map((part) => encodeURIComponent(part)).join("/")}`;
+        addLink(`${label} (${yearBand})`, href);
+    });
 
     attachedResourcesList.innerHTML = "";
     [...links, ...resources.filter((resource) => !/UN Ozone Day|Montreal Protocol|NZ Ministry for the Environment/i.test(resource)).map((label) => ({ label }))]
@@ -81,7 +105,7 @@ function setText(id, value) {
 
 function renderLesson(lesson, courseCode) {
     const plan = lesson.lesson_plan && typeof lesson.lesson_plan === "object" ? lesson.lesson_plan : {};
-    renderAttachedResources(plan);
+    renderAttachedResources(plan, courseCode, lesson.lesson_title || lesson.activity_name);
     setText("relief-lesson-title", lesson.lesson_title || lesson.activity_name);
     setText("relief-lesson-course", courseCode);
     setText("relief-lesson-unit", plan.unit || lesson.lesson_title);
