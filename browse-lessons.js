@@ -101,6 +101,17 @@ function updateReliefLessonLinks(event) {
     });
 }
 
+function isEventToday(event) {
+    const start = parseReliefDate(event?.startDate);
+    const end = parseReliefDate(event?.endDate || event?.startDate);
+    if (!start || !end) return false;
+
+    const today = new Date();
+    const todayTime = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+    return new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime() <= todayTime
+        && new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime() >= todayTime;
+}
+
 function renderCalendar() {
     const year = reliefPlanViewDate.getFullYear();
     const month = reliefPlanViewDate.getMonth();
@@ -182,12 +193,12 @@ function openRequestedReliefPlanEvent() {
     const params = new URLSearchParams(window.location.search);
     const requestedSubject = String(params.get("event") || "").trim().toLowerCase();
     const requestedDate = String(params.get("date") || "").trim();
-    if (!requestedSubject) return;
-
-    const matchingEvent = reliefPlanEvents.find((event) =>
-        String(event?.subject || "").trim().toLowerCase() === requestedSubject
-        && (!requestedDate || String(event?.startDate || "").trim() === requestedDate)
-    );
+    const matchingEvent = requestedSubject
+        ? reliefPlanEvents.find((event) =>
+            String(event?.subject || "").trim().toLowerCase() === requestedSubject
+            && (!requestedDate || String(event?.startDate || "").trim() === requestedDate)
+        )
+        : reliefPlanEvents.find((event) => isEventToday(event));
     if (!matchingEvent) return;
 
     const eventDate = parseReliefDate(matchingEvent.startDate);
