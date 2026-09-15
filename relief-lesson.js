@@ -127,6 +127,36 @@ function setText(id, value) {
     if (element) element.textContent = String(value || "Not provided");
 }
 
+function escapeLessonHtml(value) {
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function renderRequiredResources(value, courseCode) {
+    const resourceElement = document.querySelector("#relief-lesson-resources");
+    if (!resourceElement) return;
+
+    const normalizedCourse = String(courseCode || "").trim().toUpperCase();
+    const yearBand = normalizedCourse === "JDTECH" ? "Y7-8" : normalizedCourse === "SENIORDTECH" ? "Y11-13" : "Y9-10";
+    const fileName = normalizedCourse === "SENIORDTECH"
+        ? `Ozone_Exemplar_${yearBand}.pptx`
+        : `Ozone_Day_${yearBand}_Student_Slides.pptx`;
+    const resourceHref = `/TeacherFiles/Lesson%20Plans/${encodeURIComponent(fileName)}`;
+    let safeText = escapeLessonHtml(value);
+    const googleResourceLabel = /Google Drawings/i.test(String(value || ""))
+        ? "Google Slides or Google Drawings"
+        : "Google Slides or Google Docs";
+    safeText = safeText.replace(
+        new RegExp(googleResourceLabel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"),
+        `<a href="${resourceHref}" target="_blank" rel="noopener noreferrer">${googleResourceLabel}</a>`
+    );
+    resourceElement.innerHTML = safeText;
+}
+
 function renderLesson(lesson, courseCode) {
     const plan = lesson.lesson_plan && typeof lesson.lesson_plan === "object" ? lesson.lesson_plan : {};
     renderAttachedResources(plan, courseCode, lesson.lesson_title || lesson.activity_name);
@@ -138,7 +168,7 @@ function renderLesson(lesson, courseCode) {
     setText("relief-lesson-theme", plan.theme);
     setText("relief-lesson-date", lesson.lesson_date);
     setText("relief-lesson-aim", plan.aim || lesson.lesson_focus);
-    setText("relief-lesson-resources", plan.resources);
+    renderRequiredResources(plan.resources, courseCode);
     setText("relief-lesson-preparation", plan.preparation);
     setText("relief-lesson-safety", plan.healthSafety);
     setText("relief-lesson-starter", plan.starter);
