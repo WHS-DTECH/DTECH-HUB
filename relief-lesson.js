@@ -73,6 +73,9 @@ function renderAttachedResources(plan, courseCode, lessonTitle) {
         const href = String(resource?.url || "").trim();
         if (label && href) addLink(label, href);
     });
+    if (plan?.exemplar?.label && plan?.exemplar?.url) {
+        addLink(`Exemplar: ${plan.exemplar.label}`, plan.exemplar.url);
+    }
 
     attachedResourcesList.innerHTML = "";
     [...links, ...resources.filter((resource) => !/UN Ozone Day|Montreal Protocol|NZ Ministry for the Environment/i.test(resource)).map((label) => ({ label }))]

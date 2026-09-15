@@ -1000,6 +1000,8 @@
     border-color: #e8a6a6;
 }
 
+.quick-exemplar-preview{margin-top:8px;padding:10px;border:1px solid #c8dfd5;border-radius:6px;background:#f9fffc}.quick-exemplar-preview p{margin:0 0 8px;color:#245c4e;font-weight:700}.quick-exemplar-preview iframe{display:block;width:100%;height:280px;border:1px solid #c8dfd5;border-radius:4px}.quick-exemplar-preview a{color:#5d2290;font-weight:700;text-decoration:underline}
+
 .upload-status {
     margin: 0;
     padding: 6px 10px;

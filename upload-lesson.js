@@ -55,6 +55,8 @@ function withLessonAuthHeaders(headers = {}) {
 const quickEventSelect = document.querySelector("#relief-event-select");
 const quickClassSelect = document.querySelector("#relief-class-select");
 const quickFilesInput = document.querySelector("#quick-relief-files");
+const quickExemplarInput = document.querySelector("#quick-exemplar-file");
+const quickExemplarPreview = document.querySelector("#quick-exemplar-preview");
 const quickPreviewButton = document.querySelector("#preview-relief-lesson");
 const quickStatus = document.querySelector("#quick-relief-status");
 let reliefPlanEvents = [];
@@ -151,6 +153,34 @@ async function previewReliefLesson() {
     }
 }
 
+function previewSelectedExemplar() {
+    const file = quickExemplarInput?.files?.[0];
+    if (!quickExemplarPreview) return;
+    quickExemplarPreview.innerHTML = "";
+    if (!file) {
+        quickExemplarPreview.hidden = true;
+        return;
+    }
+    const url = URL.createObjectURL(file);
+    const label = document.createElement("p");
+    label.textContent = `Exemplar selected: ${file.name}`;
+    quickExemplarPreview.appendChild(label);
+    if (file.name.toLowerCase().endsWith(".pdf")) {
+        const frame = document.createElement("iframe");
+        frame.src = url;
+        frame.title = "Exemplar PDF preview";
+        quickExemplarPreview.appendChild(frame);
+    } else {
+        const link = document.createElement("a");
+        link.href = url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = "Open selected PowerPoint exemplar";
+        quickExemplarPreview.appendChild(link);
+    }
+    quickExemplarPreview.hidden = false;
+}
+
 function collectLessonPayload() {
     const form = document.querySelector("#lesson-form");
     if (!form) {
@@ -219,9 +249,11 @@ async function saveLessonToServer(payload) {
         });
         const resourceFiles = document.querySelector('[name="resourceFiles"]')?.files || [];
         const quickFiles = quickFilesInput?.files || [];
+        const exemplarFile = quickExemplarInput?.files?.[0];
         const allFiles = [...Array.from(resourceFiles), ...Array.from(quickFiles)];
         const uniqueFiles = allFiles.filter((file, index, files) => files.findIndex((item) => item.name === file.name && item.size === file.size) === index);
         uniqueFiles.forEach((file) => formData.append("resourceFiles", file));
+        if (exemplarFile) formData.append("exemplarFile", exemplarFile);
 
         const response = await fetch("/api/lessons", {
             method: "POST",
@@ -274,4 +306,5 @@ document.addEventListener("DOMContentLoaded", () => {
     initializeLessonForm();
     loadReliefPlanEventOptions();
     quickPreviewButton?.addEventListener("click", previewReliefLesson);
+    quickExemplarInput?.addEventListener("change", previewSelectedExemplar);
 });

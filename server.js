@@ -14711,7 +14711,7 @@ app.post("/api/lessons/preview-relief-docx", requireSchoolAccountAccess, lessonR
 });
 
 // POST /api/lessons — Create a new lesson
-app.post("/api/lessons", lessonResourceUpload.array("resourceFiles", 12), async (req, res) => {
+app.post("/api/lessons", lessonResourceUpload.fields([{ name: "resourceFiles", maxCount: 12 }, { name: "exemplarFile", maxCount: 1 }]), async (req, res) => {
   const body = req.body || {};
   const lessonTitle = String(body.lesson_title || body.lessonTitle || "").trim();
   const lessonType = String(body.lesson_type || body.lessonType || "").trim();
@@ -14735,7 +14735,8 @@ app.post("/api/lessons", lessonResourceUpload.array("resourceFiles", 12), async 
     }
   }
   const lessonPlan = parsedLessonPlan && typeof parsedLessonPlan === "object" ? { ...parsedLessonPlan } : {};
-  const resourceFiles = Array.isArray(req.files) ? req.files : [];
+  const resourceFiles = Array.isArray(req.files?.resourceFiles) ? req.files.resourceFiles : [];
+  const exemplarFiles = Array.isArray(req.files?.exemplarFile) ? req.files.exemplarFile : [];
   if (resourceFiles.length) {
     const uploadDirectory = path.join(__dirname, "TeacherFiles", "Lesson Plans", "Uploaded");
     await fs.promises.mkdir(uploadDirectory, { recursive: true });
@@ -14755,6 +14756,15 @@ app.post("/api/lessons", lessonResourceUpload.array("resourceFiles", 12), async 
       ...(Array.isArray(lessonPlan.attachedResources) ? lessonPlan.attachedResources : []),
       ...uploadedResources
     ];
+  }
+  if (exemplarFiles.length) {
+    const file = exemplarFiles[0];
+    const uploadDirectory = path.join(__dirname, "TeacherFiles", "Lesson Plans", "Uploaded");
+    await fs.promises.mkdir(uploadDirectory, { recursive: true });
+    const safeName = String(file.originalname || "exemplar").replace(/[^a-zA-Z0-9._-]+/g, "-") || "exemplar";
+    const storedName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`;
+    await fs.promises.writeFile(path.join(uploadDirectory, storedName), file.buffer);
+    lessonPlan.exemplar = { label: String(file.originalname || safeName), url: `/TeacherFiles/Lesson%20Plans/Uploaded/${encodeURIComponent(storedName)}` };
   }
 
   const payload = {
