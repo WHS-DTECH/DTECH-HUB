@@ -4611,8 +4611,37 @@ async function seedOzoneLayerReliefLesson() {
     created_by_email: "relief-plan-seed@westlandhigh.school.nz"
   };
 
+  const seniorLessonId = "relief-mdtech-s2-ozone-layer-2026";
+  const seniorLessonPlan = {
+    unit: "Reliever Classwork",
+    component: "Technology",
+    theme: "International Day for the Preservation of the Ozone Layer",
+    aim: "Students will explain the purpose and technological causes of ozone depletion, identify how technology, regulation, and international cooperation responded, judge reliable digital information, and create a concise evidence-based infographic.",
+    resources: "Chromebook with internet access; Google Slides or Google Drawings; UN Ozone Day and Montreal Protocol information; NZ Ministry for the Environment information; normal school submission/sharing system.",
+    preparation: "Confirm students can access Google Slides or Google Drawings. Display the required outcome. Students should use reliable sources, paraphrase rather than copy, record source names or URLs, and create one digital slide/infographic rather than a multi-slide presentation.",
+    healthSafety: "Students remain seated while using Chromebooks, keep bags and charging leads clear of walkways, use school-approved websites, avoid entering personal information into unfamiliar sites, and follow normal classroom expectations. No workshop or practical-material hazards are involved.",
+    starter: "5 mins. Prompt: A technology solves a problem today but creates an environmental problem later. Who is responsible for fixing it? Students write a brief response. Establish that ozone depletion and climate change are different environmental issues.",
+    demonstration: "10 mins. Introduce the chain: useful technology -> unintended consequence -> evidence identifies problem -> technology and policy changes -> recovery. Explain stratospheric ozone, CFCs, the Montreal Protocol, source checking, and how to build a strong infographic using visual hierarchy, evidence-based statements, relationships, consistent formatting, and sources.",
+    practice: "40 mins. Create one infographic titled Ozone: When Technology Has to Fix Technology. Include the need, consequence, response, result, and an Aotearoa New Zealand connection. Show cause and effect visually, use at least two reliable sources, acknowledge images, and explain whether technological progress is always positive. Another student should identify the problem, response, and result within 30 seconds.",
+    plenary: "5 mins. Peer check: Is the science understandable? Is the technology connection obvious? Can you tell where the information came from? Exit response: One lesson designers and technologists should learn from the ozone-layer problem is... Save as Surname_OzoneDay_2027 and submit as normal.",
+    homework: "None. If unfinished, students may complete the infographic if normal class procedures allow.",
+    evaluation: "What went well? What did not go well? What changes are needed? How will impact be gathered? Did changes from last time make a difference? What are the next steps? Other comments: This is a stand-alone lesson. Year 9/10 students should show source judgement, cause-and-effect thinking, concise digital communication, and evaluation of technology’s consequences."
+  };
+  const seniorPayload = {
+    ...payload,
+    id: seniorLessonId,
+    lesson_title: seniorLessonPlan.theme,
+    activity_name: seniorLessonPlan.theme,
+    lesson_year_level: "NZ Year 9/10 combined",
+    lesson_focus: seniorLessonPlan.aim,
+    lesson_notes: "Relief lesson imported from the Y9-10 Ozone Layer Word lesson plan.",
+    relief_course_code: "MDTECH-S2",
+    lesson_plan: seniorLessonPlan
+  };
+
   if (!hasDatabase) {
     if (!memoryLessons.has(lessonId)) memoryLessons.set(lessonId, { ...payload, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+    if (!memoryLessons.has(seniorLessonId)) memoryLessons.set(seniorLessonId, { ...seniorPayload, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
     return;
   }
 
@@ -4621,6 +4650,13 @@ async function seedOzoneLayerReliefLesson() {
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15, $16, $17)
     ON CONFLICT (id) DO NOTHING`,
     [payload.id, payload.lesson_title, payload.lesson_week, payload.lesson_date, payload.lesson_duration_minutes, payload.lesson_type, payload.lesson_card_color, payload.activity_name, payload.lesson_year_level, payload.lesson_link_url, payload.lesson_focus, payload.lesson_notes, payload.relief_course_code, JSON.stringify(payload.lesson_plan), payload.publish_activity, payload.add_to_calendar, payload.created_by_email]
+  );
+
+  await pool.query(
+    `INSERT INTO lessons (id, lesson_title, lesson_week, lesson_date, lesson_duration_minutes, lesson_type, lesson_card_color, activity_name, lesson_year_level, lesson_link_url, lesson_focus, lesson_notes, relief_course_code, lesson_plan, publish_activity, add_to_calendar, created_by_email)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15, $16, $17)
+     ON CONFLICT (id) DO NOTHING`,
+    [seniorPayload.id, seniorPayload.lesson_title, seniorPayload.lesson_week, seniorPayload.lesson_date, seniorPayload.lesson_duration_minutes, seniorPayload.lesson_type, seniorPayload.lesson_card_color, seniorPayload.activity_name, seniorPayload.lesson_year_level, seniorPayload.lesson_link_url, seniorPayload.lesson_focus, seniorPayload.lesson_notes, seniorPayload.relief_course_code, JSON.stringify(seniorPayload.lesson_plan), seniorPayload.publish_activity, seniorPayload.add_to_calendar, seniorPayload.created_by_email]
   );
 }
 
