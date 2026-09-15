@@ -693,7 +693,7 @@ function resolveTaskTopicMergeDecision(project, shortName, topics) {
 
 function inferSourceTypeFromRecord(record) {
     const explicitType = String(record?.sourceType || "").toLowerCase();
-    if (explicitType === "project" || explicitType === "activity" || explicitType === "assessment" || explicitType === "standard" || explicitType === "lesson" || explicitType === "task-topic") {
+    if (explicitType === "project" || explicitType === "activity" || explicitType === "assessment" || explicitType === "standard" || explicitType === "lesson" || explicitType === "relief-lesson" || explicitType === "task-topic") {
         return explicitType;
     }
 
@@ -710,7 +710,7 @@ function inferSourceTypeFromRecord(record) {
         return "standard";
     }
     if (category.includes("lesson")) {
-        return "lesson";
+        return category.includes("relief") ? "relief-lesson" : "lesson";
     }
     if (category.includes("task topic")) {
         return "task-topic";
@@ -1001,16 +1001,16 @@ async function loadSharedLessons() {
                     title: lessonTitle,
                     className: `${yearLevel} Computer Lab`,
                     area: lessonType,
-                    activityCategory: "Lesson",
-                    showThisWeek: false,
+                    activityCategory: "Relief Lesson",
+                    showThisWeek: Boolean(lesson.publish_activity),
                     status: "active",
                     term: String(lesson.term || "Term 2"),
                     updated: created,
                     href: lessonLink || "browse-lessons.html",
                     external: isExternalLink,
                     summary,
-                    keywords: [lessonType, String(lesson.activity_name || ""), String(lesson.lesson_week || ""), "lesson"].filter(Boolean),
-                    sourceType: "lesson",
+                    keywords: [lessonType, String(lesson.activity_name || ""), String(lesson.lesson_week || ""), "lesson", "relief lesson"].filter(Boolean),
+                    sourceType: "relief-lesson",
                     imageUrl: null,
                     visual: {
                         icon: textToIcon(lessonType),
@@ -1160,7 +1160,7 @@ function getUnifiedLibraryItems() {
         ...projectItems,
         ...lessons.map((lesson) => ({
             ...lesson,
-            sourceType: "lesson"
+            sourceType: "relief-lesson"
         })),
         ...standardCards.map((card) => ({
             ...card,
@@ -3184,7 +3184,7 @@ function getTypes() {
 }
 
 function getContentTypes() {
-    return ["All", "Activities", "Projects", "Assessments", "Standards", "Lessons", "Task Topics"];
+    return ["All", "Activities", "Projects", "Assessments", "Standards", "Lessons", "Relief Lessons", "Task Topics"];
 }
 
 function hasStandardReference(project) {
@@ -3256,6 +3256,7 @@ function filterProjects(items) {
             (state.content === "Assessments" && project.sourceType === "assessment") ||
             (state.content === "Standards" && (project.sourceType === "standard" || project.activityCategory === "Standard")) ||
             (state.content === "Lessons" && project.sourceType === "lesson") ||
+            (state.content === "Relief Lessons" && project.sourceType === "relief-lesson") ||
             (state.content === "Task Topics" && project.sourceType === "task-topic");
         const haystack = [
             project.title,
@@ -3513,7 +3514,9 @@ function createProjectCard(project, options = {}) {
             ? "STANDARD"
             : sourceType === "assessment"
             ? "ASSESSMENT TASK"
-            : sourceType === "lesson"
+                : sourceType === "relief-lesson"
+                ? "Relief Lesson"
+                : sourceType === "lesson"
                 ? "LESSON"
                 : sourceType === "task-topic"
                     ? "TASK TOPIC"
@@ -3763,6 +3766,7 @@ function renderCurrentWeek() {
 
     const activeActivities = sortProjects(projects.filter((project) => project.showThisWeek
         && String(project?.id || "").trim() !== "49"));
+    const activeReliefLessons = sortProjects(lessons.filter((lesson) => lesson.showThisWeek));
     const activeLabProjects = sortLabProjects(labProjects.filter((project) => project.showThisWeek));
     const activeStandards = sortProjects(standardCards);
 
@@ -3771,6 +3775,11 @@ function renderCurrentWeek() {
             title: String(project.title || "").toLowerCase(),
             element: createProjectCard(project),
             record: project
+        })),
+        ...activeReliefLessons.map((lesson) => ({
+            title: String(lesson.title || "").toLowerCase(),
+            element: createProjectCard(lesson),
+            record: lesson
         })),
         ...activeLabProjects.map((project) => ({
             title: String(project.title || "").toLowerCase(),
@@ -3799,6 +3808,7 @@ function renderCurrentWeek() {
     // Group cards by sourceType
     const grouped = {
         activity: [],
+        "relief-lesson": [],
         assessment: [],
         standard: [],
         project: []
@@ -3812,6 +3822,8 @@ function renderCurrentWeek() {
             grouped.standard.push(card);
         } else if (sourceType === "project") {
             grouped.project.push(card);
+        } else if (sourceType === "relief-lesson") {
+            grouped["relief-lesson"].push(card);
         } else {
             grouped.activity.push(card);
         }
@@ -3820,6 +3832,7 @@ function renderCurrentWeek() {
     // Render each group with heading and count
     const sectionOrder = [
         { key: "activity", label: "Activities" },
+        { key: "relief-lesson", label: "Relief Lessons" },
         { key: "assessment", label: "Assessment Tasks" },
         { key: "standard", label: "Standards" },
         { key: "project", label: "Projects" }
