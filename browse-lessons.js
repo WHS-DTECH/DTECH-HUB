@@ -11,6 +11,7 @@ const reliefPlanNext = document.querySelector("#relief-plan-next");
 let reliefPlanEvents = [];
 let reliefPlanViewDate = new Date();
 let reliefPlanLoaded = false;
+let reliefPlanLoadInFlight = false;
 
 function escapeHtml(value) {
     return String(value || "")
@@ -98,7 +99,7 @@ function renderCalendar() {
 }
 
 async function loadReliefPlan() {
-    if (reliefPlanLoaded) return;
+    if (reliefPlanLoaded || reliefPlanLoadInFlight) return;
 
     const storedAuth = readStoredReliefPlanAuth();
     if (!storedAuth) {
@@ -106,10 +107,15 @@ async function loadReliefPlan() {
         return;
     }
 
+    reliefPlanLoadInFlight = true;
     try {
+        const requestHeaders = { "x-user-email": storedAuth.email };
+        if (storedAuth.isIdToken) {
+            requestHeaders.Authorization = `Bearer ${storedAuth.token}`;
+        }
         const response = await fetch("/api/relief-plan/events", {
             credentials: "same-origin",
-            headers: { Authorization: `Bearer ${storedAuth.token}` }
+            headers: requestHeaders
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || data.ok === false) throw new Error(data.error || "The Relief Plan is currently unavailable.");
@@ -119,7 +125,11 @@ async function loadReliefPlan() {
         renderCalendar();
     } catch (error) {
         reliefPlanStatus.textContent = error.message;
-        reliefPlanCalendar.innerHTML = '<p class="relief-library-empty">The shared Relief Plan calendar could not be loaded.</p>';
+        if (!reliefPlanLoaded) {
+            reliefPlanCalendar.innerHTML = '<p class="relief-library-empty">The shared Relief Plan calendar could not be loaded.</p>';
+        }
+    } finally {
+        reliefPlanLoadInFlight = false;
     }
 }
 
@@ -127,9 +137,13 @@ function readStoredReliefPlanAuth() {
     try {
         const raw = localStorage.getItem("hub_google_auth_v1") || sessionStorage.getItem("hub_google_auth_v1");
         const parsed = raw ? JSON.parse(raw) : null;
-        const token = String(parsed?.idToken || parsed?.accessToken || "").trim();
+        const idToken = String(parsed?.idToken || "").trim();
+        const token = idToken || String(parsed?.accessToken || "").trim();
+        const email = String(parsed?.profile?.email || "").trim().toLowerCase();
         const expiresAt = Number(parsed?.expiresAt || 0);
-        return token && expiresAt > Date.now() ? { token } : null;
+        return token && email && expiresAt > Date.now()
+            ? { token, email, isIdToken: idToken.startsWith("eyJ") && idToken.split(".").length === 3 }
+            : null;
     } catch (_error) {
         return null;
     }
