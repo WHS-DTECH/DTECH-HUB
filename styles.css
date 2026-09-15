@@ -2546,11 +2546,27 @@ body.public-home-access .controls-panel {
     margin-top: 14px;
 }
 
-.relief-library-lessons ul {
+.relief-library-lesson-columns {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px 22px;
-    margin: 12px 0 0;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+    margin-top: 12px;
+}
+
+.relief-library-lesson-column {
+    min-width: 0;
+}
+
+.relief-library-lesson-column h3 {
+    margin: 0 0 7px;
+    color: #5d2290;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.relief-library-lesson-column ul {
+    margin: 0;
     padding-left: 20px;
 }
 
@@ -2581,7 +2597,7 @@ body.public-home-access .controls-panel {
         margin-left: 0;
     }
 
-    .relief-library-lessons ul {
+    .relief-library-lesson-columns {
         grid-template-columns: 1fr;
     }
 }
