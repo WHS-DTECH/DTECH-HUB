@@ -1583,6 +1583,78 @@ function parseReliefLessonPlanText(text) {
   };
 }
 
+function stripReliefHtml(value) {
+  return String(value || "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&ndash;/g, "-")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/\s+\n/g, "\n")
+    .replace(/\n\s+/g, "\n")
+    .trim();
+}
+
+function parseReliefLessonPlanHtml(html) {
+  const cells = [];
+  const tableMatches = String(html || "").matchAll(/<table[\s\S]*?<\/table>/gi);
+  for (const tableMatch of tableMatches) {
+    const rows = [...tableMatch[0].matchAll(/<tr[\s\S]*?<\/tr>/gi)].map((rowMatch) =>
+      [...rowMatch[0].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map((cell) => stripReliefHtml(cell[1]))
+    );
+    cells.push(...rows);
+  }
+
+  const findLabelValue = (label) => {
+    const normalizedLabel = String(label).toLowerCase();
+    for (const row of cells) {
+      const index = row.findIndex((cell) => cell.toLowerCase().includes(normalizedLabel));
+      if (index >= 0 && row[index + 1]) return row[index + 1];
+    }
+    return "";
+  };
+  const findSection = (label) => {
+    const normalizedLabel = String(label).toLowerCase();
+    for (let rowIndex = 0; rowIndex < cells.length; rowIndex += 1) {
+      const row = cells[rowIndex];
+      const labelIndex = row.findIndex((cell) => cell.toLowerCase().includes(normalizedLabel));
+      if (labelIndex < 0) continue;
+      const sameRowValue = row.slice(labelIndex + 1).filter(Boolean).join("\n");
+      if (sameRowValue) return sameRowValue;
+      const nextRow = cells[rowIndex + 1] || [];
+      return nextRow.filter(Boolean).join("\n");
+    }
+    return "";
+  };
+
+  const theme = findLabelValue("theme");
+  const focus = findLabelValue("focus");
+  return {
+    lesson_title: theme || "Relief Lesson",
+    activity_name: theme || "Relief Lesson",
+    lesson_type: "Digital Technologies",
+    lesson_year_level: findLabelValue("class"),
+    lesson_focus: focus,
+    lesson_plan: {
+      unit: findLabelValue("unit"),
+      component: findLabelValue("steam component"),
+      theme,
+      aim: findSection("aim(s) of lesson"),
+      resources: findSection("resources required"),
+      preparation: findSection("preparation"),
+      healthSafety: findSection("health & safety"),
+      starter: findSection("starter"),
+      demonstration: findSection("demonstration"),
+      practice: findSection("practice"),
+      plenary: findSection("plenary"),
+      homework: findSection("homework"),
+      evaluation: findSection("lesson evaluation")
+    }
+  };
+}
+
 
 let smtpTransporter = null;
 if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
@@ -14631,8 +14703,8 @@ app.post("/api/lessons/preview-relief-docx", requireSchoolAccountAccess, lessonR
   }
 
   try {
-    const extraction = await mammoth.extractRawText({ buffer: docxFile.buffer });
-    res.json({ ok: true, lesson: parseReliefLessonPlanText(extraction.value || "") });
+    const extraction = await mammoth.convertToHtml({ buffer: docxFile.buffer });
+    res.json({ ok: true, lesson: parseReliefLessonPlanHtml(extraction.value || "") });
   } catch (error) {
     res.status(400).json({ error: error.message || "Could not parse the lesson-plan DOCX." });
   }
