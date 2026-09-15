@@ -26,6 +26,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const SERVER_STARTED_AT = new Date().toISOString();
 const hasDatabase = Boolean(process.env.DATABASE_URL);
+const RELIEF_PLAN_BASE_URL = "https://tech-learningsites.onrender.com";
+const RELIEF_PLAN_ACCESS_KEY = String(process.env.RELIEF_PLAN_ACCESS_KEY || "").trim();
 const TRELLO_API_KEY = String(process.env.TRELLO_API_KEY || "").trim();
 const AUTH_MODE = String(process.env.AUTH_MODE || "hybrid").trim().toLowerCase();
 const GOOGLE_ID_TOKEN_AUDIENCES = Array.from(
@@ -14325,6 +14327,44 @@ app.get("/api/lessons", async (_req, res) => {
     res.json(result.rows || []);
   } catch (_error) {
     res.json([]);
+  }
+});
+
+// Proxy the protected Learning Sites calendar without exposing its access key to the browser.
+app.get("/api/relief-plan/events", requireSchoolAccountAccess, async (_req, res) => {
+  if (!RELIEF_PLAN_ACCESS_KEY) {
+    res.status(503).json({ ok: false, error: "Relief Plan integration is not configured" });
+    return;
+  }
+
+  try {
+    const loginResponse = await fetch(`${RELIEF_PLAN_BASE_URL}/api/relief-plan/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accessKey: RELIEF_PLAN_ACCESS_KEY })
+    });
+
+    if (!loginResponse.ok) {
+      res.status(502).json({ ok: false, error: "Could not authenticate with the Relief Plan" });
+      return;
+    }
+
+    const setCookie = loginResponse.headers.get("set-cookie") || "";
+    const sessionCookie = setCookie.split(";")[0];
+    const eventsResponse = await fetch(`${RELIEF_PLAN_BASE_URL}/api/relief-plan/events`, {
+      headers: { Cookie: sessionCookie }
+    });
+    const payload = await eventsResponse.json().catch(() => ({}));
+
+    if (!eventsResponse.ok || payload.ok === false) {
+      res.status(502).json({ ok: false, error: "Could not load the Relief Plan calendar" });
+      return;
+    }
+
+    res.json({ ok: true, year: payload.year, events: Array.isArray(payload.events) ? payload.events : [] });
+  } catch (error) {
+    console.error("Relief Plan proxy error:", error);
+    res.status(502).json({ ok: false, error: "The Relief Plan is currently unavailable" });
   }
 });
 

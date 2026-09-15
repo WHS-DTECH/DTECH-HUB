@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lesson Library | Computer Lab</title>
-    <meta name="description" content="Browse and manage lessons in the DTECH-HUB library.">
+    <title>Relief Lessons Library | Computer Lab</title>
+    <meta name="description" content="View the shared Relief Plan calendar and DTECH relief lesson links.">
     <meta name="theme-color" content="#4a1b6f">
     <meta name="hub-google-client-id" content="239433605438-ur2omagmkluhhn7i319g0i82l4l5l1j8.apps.googleusercontent.com">
     <meta name="hub-google-allowed-domain" content="westlandhigh.school.nz">
@@ -47,36 +47,55 @@
             </nav>
         </header>
 
-        <main class="admin-page-wrap">
-            <header class="admin-page-header">
-                <h1>Lesson Library</h1>
-                <p>Browse all lessons available for allocation to activities.</p>
-                <a class="button button-secondary" href="upload-lesson.html">Upload New Lesson</a>
-            </header>
-
-            <section class="admin-card-grid">
-                <div class="search-filter-bar">
-                    <input type="text" id="lesson-search" class="search-input" placeholder="Search by lesson title, year level, or type...">
-                    <select id="lesson-year-filter" class="filter-select">
-                        <option value="">All Year Levels</option>
-                        <option value="Junior">Junior</option>
-                        <option value="Year 7">Year 7</option>
-                        <option value="Year 8">Year 8</option>
-                        <option value="Year 9">Year 9</option>
-                        <option value="Year 10">Year 10</option>
-                        <option value="Year 11">Year 11</option>
-                        <option value="Year 12">Year 12</option>
-                        <option value="Year 13">Year 13</option>
-                        <option value="Middle">Middle</option>
-                        <option value="Senior">Senior</option>
-                    </select>
+        <main class="relief-library-page">
+            <section class="relief-library-shell" id="relief-plan-app">
+                <div class="relief-library-heading">
+                    <div>
+                        <p class="section-kicker">Staff Planning</p>
+                        <h1>Relief Plan</h1>
+                        <p class="relief-library-intro">Technology events, observances, and planning anchors from the shared reliever calendar.</p>
+                    </div>
+                    <div class="relief-library-actions">
+                        <span id="relief-plan-status" class="relief-library-status" role="status">Loading calendar...</span>
+                        <a class="button button-secondary" href="upload-lesson.html">Upload Relief Lesson</a>
+                    </div>
                 </div>
 
-                <div id="lessons-container" class="lessons-grid"></div>
-
-                <div id="empty-state" class="empty-state" hidden>
-                    <p>No lessons found. <a href="upload-lesson.html">Create one now!</a></p>
+                <div class="relief-library-controls" aria-label="Calendar navigation">
+                    <button class="button button-secondary" id="relief-plan-previous" type="button">Previous month</button>
+                    <button class="button button-secondary" id="relief-plan-today" type="button">Today</button>
+                    <label for="relief-plan-date">Go to date</label>
+                    <input id="relief-plan-date" type="date">
+                    <button class="button button-secondary" id="relief-plan-next" type="button">Next month</button>
                 </div>
+
+                <div class="relief-library-month-heading">
+                    <h2 id="relief-plan-month-label">Calendar</h2>
+                </div>
+                <div class="relief-library-calendar" id="relief-plan-calendar" aria-live="polite"></div>
+
+                <div class="relief-library-detail-grid">
+                    <aside class="relief-library-details" id="relief-plan-details" aria-live="polite">
+                        <h2>Event Details</h2>
+                        <p>Select an event in the calendar to view its description and source.</p>
+                    </aside>
+                    <aside class="relief-library-description" id="relief-plan-description" aria-live="polite">
+                        <h2>Event Description</h2>
+                        <p>Select an event in the calendar to view its description and source.</p>
+                    </aside>
+                </div>
+
+                <section class="relief-library-lessons" aria-labelledby="relief-library-lessons-title">
+                    <h2 id="relief-library-lessons-title">Relief Lessons</h2>
+                    <ul>
+                        <li><a href="https://tech-learningsites.onrender.com/DTECH/JDTECH/" target="_blank" rel="noopener noreferrer">JDTECH - Junior Digital Tech</a></li>
+                        <li><a href="https://tech-learningsites.onrender.com/DTECH/MDTECH-S1/" target="_blank" rel="noopener noreferrer">MDTECH - Semester 1</a></li>
+                        <li><a href="https://tech-learningsites.onrender.com/DTECH/MDTECH-S2/" target="_blank" rel="noopener noreferrer">MDTECH - Semester 2</a></li>
+                        <li><a href="https://tech-learningsites.onrender.com/DTECH/11DTECH/" target="_blank" rel="noopener noreferrer">11DTECH - Year 11 Digital Tech</a></li>
+                        <li><a href="https://tech-learningsites.onrender.com/DTECH/12DTECH/" target="_blank" rel="noopener noreferrer">12DTECH - Year 12 Digital Tech</a></li>
+                        <li><a href="https://tech-learningsites.onrender.com/DTECH/13DTECH/" target="_blank" rel="noopener noreferrer">13DTECH - Year 13 Digital Tech</a></li>
+                    </ul>
+                </section>
             </section>
         </main>
 

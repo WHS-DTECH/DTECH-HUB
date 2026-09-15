@@ -29,3 +29,5 @@ services:
         sync: false
       - key: STAFF_DIRECTORY_API_KEY
         sync: false
+      - key: RELIEF_PLAN_ACCESS_KEY
+        sync: false

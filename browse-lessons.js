@@ -1,201 +1,136 @@
-let allLessons = [];
+const reliefPlanCalendar = document.querySelector("#relief-plan-calendar");
+const reliefPlanDetails = document.querySelector("#relief-plan-details");
+const reliefPlanDescription = document.querySelector("#relief-plan-description");
+const reliefPlanStatus = document.querySelector("#relief-plan-status");
+const reliefPlanMonthLabel = document.querySelector("#relief-plan-month-label");
+const reliefPlanDate = document.querySelector("#relief-plan-date");
+const reliefPlanPrevious = document.querySelector("#relief-plan-previous");
+const reliefPlanToday = document.querySelector("#relief-plan-today");
+const reliefPlanNext = document.querySelector("#relief-plan-next");
 
-function renderLessonCard(lesson) {
-    const card = document.createElement("div");
-    card.className = "lesson-card";
-    card.style.borderLeft = `4px solid var(--color-${String(lesson.lesson_card_color || "Rose").toLowerCase()})`;
+let reliefPlanEvents = [];
+let reliefPlanViewDate = new Date();
 
-    const colorClass = String(lesson.lesson_card_color || "Rose").toLowerCase();
-    card.classList.add(`card-${colorClass}`);
+function escapeHtml(value) {
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
 
-    card.innerHTML = `
-        <div class="lesson-card-header">
-            <h3>${String(lesson.activity_name || lesson.lesson_title || "Unnamed Lesson").trim()}</h3>
-            <span class="lesson-badge">${String(lesson.lesson_type || "Activity").trim()}</span>
-        </div>
-        <div class="lesson-card-meta">
-            <p><strong>Title:</strong> ${String(lesson.lesson_title || "").trim()}</p>
-            <p><strong>Year Level:</strong> ${String(lesson.lesson_year_level || "").trim()}</p>
-            <p><strong>Duration:</strong> ${lesson.lesson_duration_minutes || 60} minutes</p>
-            ${String(lesson.lesson_week || "").trim() ? `<p><strong>Week/Session:</strong> ${String(lesson.lesson_week || "").trim()}</p>` : ""}
-        </div>
-        <div class="lesson-card-focus">
-            <p>${String(lesson.lesson_focus || "").trim().substring(0, 150)}${String(lesson.lesson_focus || "").trim().length > 150 ? "..." : ""}</p>
-        </div>
-        <div class="lesson-card-actions">
-            ${String(lesson.lesson_link_url || "").trim() ? `<a href="${String(lesson.lesson_link_url).trim()}" class="button button-tertiary" target="_blank" rel="noreferrer">View Resources</a>` : ""}
-            <button class="button button-secondary" type="button" data-lesson-id="${String(lesson.id)}">View Details</button>
-        </div>
+function parseReliefDate(value) {
+    const match = String(value || "").match(/^(\d{2})[/-](\d{2})[/-](\d{4})$/);
+    if (!match) return null;
+    return new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]));
+}
+
+function isoDate(date) {
+    return date ? [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-") : "";
+}
+
+function formatDate(value) {
+    const date = parseReliefDate(value);
+    return date ? date.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : value;
+}
+
+function renderDetails(event) {
+    const source = event.source
+        ? `<p><strong>Source:</strong> <a href="${escapeHtml(event.source)}" target="_blank" rel="noopener noreferrer">${escapeHtml(event.source)}</a></p>`
+        : "";
+    const date = `<strong>${escapeHtml(formatDate(event.startDate))}</strong>${event.endDate && event.endDate !== event.startDate ? ` to <strong>${escapeHtml(formatDate(event.endDate))}</strong>` : ""}`;
+
+    reliefPlanDetails.innerHTML = `
+        <h2>${escapeHtml(event.subject)}</h2>
+        <p class="relief-library-detail-date">${date}</p>
+        ${event.location ? `<p><strong>Location:</strong> ${escapeHtml(event.location)}</p>` : ""}
+        ${event.technologyContext ? `<p><strong>Technology context:</strong> ${escapeHtml(event.technologyContext)}</p>` : ""}
+        ${source}
     `;
 
-    const viewButton = card.querySelector('[data-lesson-id]');
-    if (viewButton) {
-        viewButton.addEventListener("click", () => {
-            showLessonDetails(lesson);
-        });
+    const aboutText = event.aboutTheEvent || event.description || "No description available for this event.";
+    reliefPlanDescription.innerHTML = `
+        <h2>Event Description</h2>
+        <p>${escapeHtml(aboutText).replace(/\n/g, "<br>")}</p>
+    `;
+}
+
+function renderCalendar() {
+    const year = reliefPlanViewDate.getFullYear();
+    const month = reliefPlanViewDate.getMonth();
+    const first = new Date(year, month, 1);
+    const days = new Date(year, month + 1, 0).getDate();
+    const offset = (first.getDay() + 6) % 7;
+    const todayKey = isoDate(new Date());
+    const byDate = new Map();
+
+    reliefPlanEvents.forEach((event, index) => {
+        const key = isoDate(parseReliefDate(event.startDate));
+        if (!key) return;
+        if (!byDate.has(key)) byDate.set(key, []);
+        byDate.get(key).push({ event, index });
+    });
+
+    const cells = [];
+    for (let index = 0; index < offset; index += 1) cells.push('<div class="relief-library-day relief-library-day-empty"></div>');
+    for (let day = 1; day <= days; day += 1) {
+        const date = new Date(year, month, day);
+        const dateKey = isoDate(date);
+        const events = byDate.get(dateKey) || [];
+        const todayClass = dateKey === todayKey ? " relief-library-day-today" : "";
+        const eventButtons = events.length
+            ? events.map(({ event, index }) => `<button class="relief-library-event" type="button" data-event-index="${index}" title="${escapeHtml(event.subject)}">${escapeHtml(event.subject)}</button>`).join("")
+            : '<span class="relief-library-no-event">No events</span>';
+        cells.push(`<div class="relief-library-day${todayClass}"><time datetime="${dateKey}">${day}</time>${eventButtons}</div>`);
     }
 
-    return card;
-}
-
-function showLessonDetails(lesson) {
-    const modal = document.createElement("div");
-    modal.className = "modal-overlay";
-    modal.innerHTML = `
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>${String(lesson.activity_name || lesson.lesson_title || "Lesson Details").trim()}</h2>
-                <button class="modal-close" type="button" aria-label="Close">×</button>
-            </div>
-            <div class="modal-body">
-                <div class="detail-grid">
-                    <div class="detail-item">
-                        <label>Lesson Title</label>
-                        <p>${String(lesson.lesson_title || "").trim()}</p>
-                    </div>
-                    <div class="detail-item">
-                        <label>Activity Name</label>
-                        <p>${String(lesson.activity_name || "").trim()}</p>
-                    </div>
-                    <div class="detail-item">
-                        <label>Year Level</label>
-                        <p>${String(lesson.lesson_year_level || "").trim()}</p>
-                    </div>
-                    <div class="detail-item">
-                        <label>Activity Type</label>
-                        <p>${String(lesson.lesson_type || "").trim()}</p>
-                    </div>
-                    <div class="detail-item">
-                        <label>Duration</label>
-                        <p>${lesson.lesson_duration_minutes || 60} minutes</p>
-                    </div>
-                    <div class="detail-item">
-                        <label>Card Colour</label>
-                        <p>${String(lesson.lesson_card_color || "Rose").trim()}</p>
-                    </div>
-                    ${String(lesson.lesson_week || "").trim() ? `
-                    <div class="detail-item">
-                        <label>Week / Session</label>
-                        <p>${String(lesson.lesson_week || "").trim()}</p>
-                    </div>
-                    ` : ""}
-                    ${String(lesson.lesson_date || "").trim() ? `
-                    <div class="detail-item">
-                        <label>Calendar Date</label>
-                        <p>${String(lesson.lesson_date || "").trim()}</p>
-                    </div>
-                    ` : ""}
-                </div>
-                
-                ${String(lesson.lesson_focus || "").trim() ? `
-                <div class="detail-section">
-                    <h4>Lesson Focus</h4>
-                    <p>${String(lesson.lesson_focus || "").trim()}</p>
-                </div>
-                ` : ""}
-                
-                ${String(lesson.lesson_notes || "").trim() ? `
-                <div class="detail-section">
-                    <h4>Lesson Notes</h4>
-                    <p>${String(lesson.lesson_notes || "").trim()}</p>
-                </div>
-                ` : ""}
-                
-                ${String(lesson.lesson_link_url || "").trim() ? `
-                <div class="detail-section">
-                    <h4>Lesson Link</h4>
-                    <a href="${String(lesson.lesson_link_url).trim()}" target="_blank" rel="noreferrer">${String(lesson.lesson_link_url).trim()}</a>
-                </div>
-                ` : ""}
-                
-                ${String(lesson.created_by_email || "").trim() ? `
-                <div class="detail-section">
-                    <p class="detail-meta"><small>Created by ${String(lesson.created_by_email).trim()}</small></p>
-                </div>
-                ` : ""}
-            </div>
-            <div class="modal-footer">
-                <button class="button button-secondary modal-close" type="button">Close</button>
-            </div>
-        </div>
+    reliefPlanMonthLabel.textContent = first.toLocaleDateString(undefined, { year: "numeric", month: "long" });
+    reliefPlanDate.value = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+    reliefPlanCalendar.innerHTML = `
+        <div class="relief-library-weekdays"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+        <div class="relief-library-days">${cells.join("")}</div>
     `;
-
-    document.body.appendChild(modal);
-
-    const closeButtons = modal.querySelectorAll(".modal-close");
-    closeButtons.forEach((btn) => {
-        btn.addEventListener("click", () => {
-            modal.remove();
-        });
-    });
-
-    modal.addEventListener("click", (e) => {
-        if (e.target === modal) {
-            modal.remove();
-        }
+    reliefPlanCalendar.querySelectorAll("[data-event-index]").forEach((button) => {
+        button.addEventListener("click", () => renderDetails(reliefPlanEvents[Number(button.dataset.eventIndex)]));
     });
 }
 
-function filterLessons() {
-    const searchInput = document.querySelector("#lesson-search");
-    const yearFilter = document.querySelector("#lesson-year-filter");
-    const container = document.querySelector("#lessons-container");
-    const emptyState = document.querySelector("#empty-state");
-
-    const searchQuery = String(searchInput?.value || "").toLowerCase().trim();
-    const selectedYear = String(yearFilter?.value || "").trim();
-
-    const filtered = allLessons.filter((lesson) => {
-        const matchesSearch =
-            !searchQuery ||
-            String(lesson.lesson_title || "").toLowerCase().includes(searchQuery) ||
-            String(lesson.activity_name || "").toLowerCase().includes(searchQuery) ||
-            String(lesson.lesson_type || "").toLowerCase().includes(searchQuery) ||
-            String(lesson.lesson_focus || "").toLowerCase().includes(searchQuery);
-
-        const matchesYear = !selectedYear || String(lesson.lesson_year_level || "").includes(selectedYear);
-
-        return matchesSearch && matchesYear;
-    });
-
-    container.innerHTML = "";
-    emptyState.hidden = filtered.length > 0;
-
-    filtered.forEach((lesson) => {
-        container.appendChild(renderLessonCard(lesson));
-    });
-}
-
-async function loadLessons() {
+async function loadReliefPlan() {
     try {
-        const response = await fetch("/api/lessons");
-        if (!response.ok) {
-            console.error("Failed to load lessons");
-            return;
-        }
-
-        const data = await response.json();
-        allLessons = Array.isArray(data) ? data : Array.isArray(data?.lessons) ? data.lessons : [];
-        filterLessons();
+        const response = await fetch("/api/relief-plan/events", { credentials: "same-origin" });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.ok === false) throw new Error(data.error || "The Relief Plan is currently unavailable.");
+        reliefPlanEvents = Array.isArray(data.events) ? data.events : [];
+        reliefPlanStatus.textContent = `${reliefPlanEvents.length} events loaded for ${data.year || "the shared calendar"}.`;
+        renderCalendar();
     } catch (error) {
-        console.error("Error loading lessons:", error);
+        reliefPlanStatus.textContent = error.message;
+        reliefPlanCalendar.innerHTML = '<p class="relief-library-empty">The shared Relief Plan calendar could not be loaded.</p>';
     }
 }
 
-function initializeFilters() {
-    const searchInput = document.querySelector("#lesson-search");
-    const yearFilter = document.querySelector("#lesson-year-filter");
-
-    if (searchInput) {
-        searchInput.addEventListener("input", filterLessons);
-    }
-
-    if (yearFilter) {
-        yearFilter.addEventListener("change", filterLessons);
-    }
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-    initializeFilters();
-    loadLessons();
+reliefPlanPrevious.addEventListener("click", () => {
+    reliefPlanViewDate = new Date(reliefPlanViewDate.getFullYear(), reliefPlanViewDate.getMonth() - 1, 1);
+    renderCalendar();
 });
+
+reliefPlanNext.addEventListener("click", () => {
+    reliefPlanViewDate = new Date(reliefPlanViewDate.getFullYear(), reliefPlanViewDate.getMonth() + 1, 1);
+    renderCalendar();
+});
+
+reliefPlanToday.addEventListener("click", () => {
+    reliefPlanViewDate = new Date();
+    renderCalendar();
+});
+
+reliefPlanDate.addEventListener("change", () => {
+    if (!reliefPlanDate.value) return;
+    const selected = new Date(`${reliefPlanDate.value}T00:00:00`);
+    reliefPlanViewDate = new Date(selected.getFullYear(), selected.getMonth(), 1);
+    renderCalendar();
+});
+
+renderCalendar();
+loadReliefPlan();

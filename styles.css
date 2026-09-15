@@ -2332,6 +2332,249 @@ body.public-home-access .controls-panel {
     font-size: 0.83rem;
 }
 
+.relief-library-page {
+    width: min(1100px, calc(100% - 28px));
+    margin: 18px auto 28px;
+}
+
+.relief-library-shell {
+    padding: clamp(18px, 3vw, 30px);
+    border: 1px solid #d5cfe2;
+    border-radius: 12px;
+    background: #fbfaff;
+    box-shadow: 0 12px 28px rgba(67, 45, 94, 0.1);
+}
+
+.relief-library-heading,
+.relief-library-controls {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.relief-library-heading h1,
+.relief-library-month-heading h2,
+.relief-library-details h2,
+.relief-library-description h2,
+.relief-library-lessons h2 {
+    margin: 0;
+    color: #251642;
+}
+
+.relief-library-heading h1 {
+    font-size: clamp(1.8rem, 3.6vw, 2.7rem);
+}
+
+.relief-library-intro,
+.relief-library-status,
+.relief-library-details p,
+.relief-library-description p {
+    color: #655c76;
+}
+
+.relief-library-intro {
+    max-width: 650px;
+    margin: 8px 0 0;
+}
+
+.relief-library-actions {
+    display: flex;
+    align-items: flex-end;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.relief-library-status {
+    font-size: 0.78rem;
+    text-align: right;
+}
+
+.relief-library-controls {
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 24px;
+    padding: 12px;
+    border: 1px solid #ded7e8;
+    border-radius: 8px;
+    background: #f3eff8;
+}
+
+.relief-library-controls label {
+    margin-left: auto;
+    color: #655c76;
+    font-size: 0.78rem;
+}
+
+.relief-library-controls input {
+    min-height: 34px;
+    padding: 5px 8px;
+    border: 1px solid #c9bddb;
+    border-radius: 6px;
+    color: #251642;
+    background: #ffffff;
+    font: inherit;
+    font-size: 0.78rem;
+}
+
+.relief-library-month-heading {
+    margin: 24px 0 12px;
+    text-align: center;
+}
+
+.relief-library-calendar {
+    overflow-x: auto;
+    padding: 8px;
+    border: 1px solid #d7cde2;
+    border-radius: 8px;
+    background: #ffffff;
+}
+
+.relief-library-weekdays,
+.relief-library-days {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(100px, 1fr));
+    min-width: 700px;
+}
+
+.relief-library-weekdays {
+    color: #655c76;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.relief-library-weekdays span {
+    padding: 8px 4px;
+}
+
+.relief-library-day {
+    min-height: 118px;
+    padding: 8px;
+    border: 1px solid #ebe5f0;
+    background: #ffffff;
+}
+
+.relief-library-day-empty {
+    background: #faf8fc;
+}
+
+.relief-library-day-today {
+    background: #f5edff;
+    box-shadow: inset 0 0 0 2px #7b43a6;
+}
+
+.relief-library-day time {
+    display: block;
+    margin-bottom: 8px;
+    color: #251642;
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
+.relief-library-event {
+    display: block;
+    width: 100%;
+    margin: 4px 0;
+    padding: 5px 6px;
+    border: 0;
+    border-radius: 4px;
+    color: #ffffff;
+    background: #5d2290;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.65rem;
+    text-align: left;
+}
+
+.relief-library-event:hover,
+.relief-library-event:focus-visible {
+    background: #3f1764;
+}
+
+.relief-library-no-event {
+    color: #aaa1b5;
+    font-size: 0.66rem;
+}
+
+.relief-library-detail-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.relief-library-details,
+.relief-library-description,
+.relief-library-lessons {
+    padding: 16px;
+    border: 1px solid #d7cde2;
+    border-radius: 8px;
+    background: #ffffff;
+}
+
+.relief-library-details h2,
+.relief-library-description h2,
+.relief-library-lessons h2 {
+    font-size: 1rem;
+}
+
+.relief-library-details p,
+.relief-library-description p {
+    margin: 10px 0 0;
+    font-size: 0.78rem;
+    line-height: 1.6;
+}
+
+.relief-library-detail-date {
+    color: #5d2290 !important;
+}
+
+.relief-library-lessons {
+    margin-top: 14px;
+}
+
+.relief-library-lessons ul {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 22px;
+    margin: 12px 0 0;
+    padding-left: 20px;
+}
+
+.relief-library-lessons a {
+    color: #5d2290;
+    font-size: 0.78rem;
+    text-decoration: underline;
+}
+
+.relief-library-empty {
+    padding: 32px;
+    color: #655c76;
+    text-align: center;
+}
+
+@media (max-width: 720px) {
+    .relief-library-heading,
+    .relief-library-detail-grid {
+        grid-template-columns: 1fr;
+        display: grid;
+    }
+
+    .relief-library-actions {
+        align-items: flex-start;
+    }
+
+    .relief-library-controls label {
+        margin-left: 0;
+    }
+
+    .relief-library-lessons ul {
+        grid-template-columns: 1fr;
+    }
+}
+
 .admin-card-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
