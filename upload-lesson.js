@@ -114,12 +114,17 @@ async function saveLessonToServer(payload) {
 
     try {
         const userEmail = getAuthEmail();
+        const formData = new FormData();
+        Object.entries(payload).forEach(([key, value]) => {
+            formData.append(key, typeof value === "object" ? JSON.stringify(value) : String(value ?? ""));
+        });
+        const resourceFiles = document.querySelector('[name="resourceFiles"]')?.files || [];
+        Array.from(resourceFiles).forEach((file) => formData.append("resourceFiles", file));
+
         const response = await fetch("/api/lessons", {
             method: "POST",
-            headers: withLessonAuthHeaders({
-                "Content-Type": "application/json"
-            }),
-            body: JSON.stringify(payload)
+            headers: withLessonAuthHeaders(),
+            body: formData
         });
 
         if (!response.ok) {

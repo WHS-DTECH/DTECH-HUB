@@ -68,6 +68,11 @@ function renderAttachedResources(plan, courseCode, lessonTitle) {
         const href = `/${filePath.split("/").map((part) => encodeURIComponent(part)).join("/")}`;
         addLink(`${label} (${yearBand})`, href);
     });
+    (Array.isArray(plan?.attachedResources) ? plan.attachedResources : []).forEach((resource) => {
+        const label = String(resource?.label || "Attached resource").trim();
+        const href = String(resource?.url || "").trim();
+        if (label && href) addLink(label, href);
+    });
 
     attachedResourcesList.innerHTML = "";
     [...links, ...resources.filter((resource) => !/UN Ozone Day|Montreal Protocol|NZ Ministry for the Environment/i.test(resource)).map((label) => ({ label }))]

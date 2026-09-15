@@ -1535,6 +1535,16 @@ const courseOutlinePdfUpload = multer({
   }
 });
 
+const lessonResourceUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024, files: 12 },
+  fileFilter: (_req, file, callback) => {
+    const name = String(file.originalname || "").toLowerCase();
+    const allowed = [".pdf", ".docx", ".pptx", ".ppt", ".xlsx", ".jpg", ".jpeg", ".png", ".webp"].some((extension) => name.endsWith(extension));
+    callback(null, allowed);
+  }
+});
+
 
 let smtpTransporter = null;
 if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
@@ -14575,7 +14585,7 @@ app.get("/api/relief-lessons/:courseCode", requireSchoolAccountAccess, async (re
 });
 
 // POST /api/lessons — Create a new lesson
-app.post("/api/lessons", async (req, res) => {
+app.post("/api/lessons", lessonResourceUpload.array("resourceFiles", 12), async (req, res) => {
   const body = req.body || {};
   const lessonTitle = String(body.lesson_title || body.lessonTitle || "").trim();
   const lessonType = String(body.lesson_type || body.lessonType || "").trim();
@@ -14589,6 +14599,38 @@ app.post("/api/lessons", async (req, res) => {
   }
 
   const lessonId = String(body.id || `lesson-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
+  const parseBooleanPayload = (value) => value === true || value === "true" || value === "1" || value === 1 || value === "on";
+  let parsedLessonPlan = body.lesson_plan;
+  if (typeof parsedLessonPlan === "string") {
+    try {
+      parsedLessonPlan = JSON.parse(parsedLessonPlan);
+    } catch (_error) {
+      parsedLessonPlan = {};
+    }
+  }
+  const lessonPlan = parsedLessonPlan && typeof parsedLessonPlan === "object" ? { ...parsedLessonPlan } : {};
+  const resourceFiles = Array.isArray(req.files) ? req.files : [];
+  if (resourceFiles.length) {
+    const uploadDirectory = path.join(__dirname, "TeacherFiles", "Lesson Plans", "Uploaded");
+    await fs.promises.mkdir(uploadDirectory, { recursive: true });
+    const uploadedResources = [];
+    for (const file of resourceFiles) {
+      const safeName = String(file.originalname || "resource")
+        .replace(/[^a-zA-Z0-9._-]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "resource";
+      const storedName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeName}`;
+      await fs.promises.writeFile(path.join(uploadDirectory, storedName), file.buffer);
+      uploadedResources.push({
+        label: String(file.originalname || safeName),
+        url: `/TeacherFiles/Lesson%20Plans/Uploaded/${encodeURIComponent(storedName)}`
+      });
+    }
+    lessonPlan.attachedResources = [
+      ...(Array.isArray(lessonPlan.attachedResources) ? lessonPlan.attachedResources : []),
+      ...uploadedResources
+    ];
+  }
+
   const payload = {
     id: lessonId,
     lesson_title: lessonTitle,
@@ -14603,9 +14645,9 @@ app.post("/api/lessons", async (req, res) => {
     lesson_focus: lessonFocus,
     lesson_notes: String(body.lesson_notes || body.lessonNotes || "").trim(),
     relief_course_code: String(body.relief_course_code || body.reliefCourseCode || "").trim().toUpperCase(),
-    lesson_plan: body.lesson_plan && typeof body.lesson_plan === "object" ? body.lesson_plan : {},
-    publish_activity: Boolean(body.publish_activity ?? body.publishActivity),
-    add_to_calendar: Boolean(body.add_to_calendar ?? body.addToCalendar),
+    lesson_plan: lessonPlan,
+    publish_activity: parseBooleanPayload(body.publish_activity ?? body.publishActivity),
+    add_to_calendar: parseBooleanPayload(body.add_to_calendar ?? body.addToCalendar),
     created_by_email: String(body.created_by_email || getRequestUserEmail(req) || "").trim(),
     created_at: String(body.created_at || new Date().toISOString()),
     updated_at: new Date().toISOString()

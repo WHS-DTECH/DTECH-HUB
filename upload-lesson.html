@@ -58,7 +58,7 @@
             </div>
 
             <section class="upload-form-wrapper">
-                <form id="lesson-form" class="lesson-upload-form">
+                <form id="lesson-form" class="lesson-upload-form" enctype="multipart/form-data">
                     <fieldset>
                         <legend>Lesson Details</legend>
                         <p class="help-text">Add the lesson information. All fields except the optional link are required.</p>
@@ -151,6 +151,15 @@
                             <label for="lesson-notes">Lesson Notes</label>
                             <p class="help-text">Teacher notes, resources, or setup reminders</p>
                             <textarea id="lesson-notes" name="lessonNotes" placeholder="Resources needed, room setup, safety notes..."></textarea>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Attached Resources</legend>
+                        <div class="field field-wide">
+                            <label for="lesson-resource-files">Upload resources for this lesson</label>
+                            <p class="help-text">Add slides, task sheets, exemplars, PDFs, or images. Up to 12 files, 25 MB each.</p>
+                            <input id="lesson-resource-files" name="resourceFiles" type="file" multiple accept=".pdf,.docx,.pptx,.ppt,.xlsx,.jpg,.jpeg,.png,.webp">
                         </div>
                     </fieldset>
 
