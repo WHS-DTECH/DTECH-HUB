@@ -14550,10 +14550,19 @@ app.get("/api/relief-lessons/:courseCode", requireSchoolAccountAccess, async (re
   }
 
   try {
-    const result = await pool.query(
+    let result = await pool.query(
       `SELECT * FROM lessons WHERE relief_course_code = $1 AND publish_activity = TRUE ORDER BY lesson_date ASC NULLS LAST, lesson_title ASC`,
       [courseCode]
     );
+
+    if (courseCode === "SENIORDTECH" && (!result.rows || result.rows.length === 0)) {
+      await seedOzoneLayerReliefLesson();
+      result = await pool.query(
+        `SELECT * FROM lessons WHERE relief_course_code = $1 AND publish_activity = TRUE ORDER BY lesson_date ASC NULLS LAST, lesson_title ASC`,
+        [courseCode]
+      );
+    }
+
     res.json({ courseCode, lessons: result.rows || [] });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not load Relief Lessons" });
