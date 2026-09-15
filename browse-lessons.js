@@ -171,7 +171,7 @@ reliefPlanDate.addEventListener("change", () => {
     renderCalendar();
 });
 
-renderCalendar();
+reliefPlanCalendar.innerHTML = '<p class="relief-library-empty">Loading the shared Relief Plan calendar...</p>';
 window.addEventListener("hub-auth-state-changed", (event) => {
     if (event.detail?.signedIn) loadReliefPlan();
 });
