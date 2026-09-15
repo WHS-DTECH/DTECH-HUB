@@ -1,6 +1,8 @@
 const lessonStatus = document.querySelector("#relief-lesson-status");
 const lessonContent = document.querySelector("#relief-lesson-content");
 const lessonPrintButton = document.querySelector("#relief-lesson-print");
+const attachedResourcesBox = document.querySelector("#relief-lesson-attached-resources");
+const attachedResourcesList = document.querySelector("#relief-lesson-attached-resources-list");
 
 lessonPrintButton?.addEventListener("click", () => {
     setReliefLessonDocumentTitle();
@@ -17,6 +19,46 @@ function setReliefLessonDocumentTitle() {
     const title = document.querySelector("#relief-lesson-title")?.textContent || "Relief Lesson";
     const course = document.querySelector("#relief-lesson-course")?.textContent || "Class";
     document.title = `Relief lesson - ${getReliefLessonTopicName(title)} - ${String(course).trim()}`;
+}
+
+function renderAttachedResources(plan) {
+    if (!attachedResourcesBox || !attachedResourcesList) return;
+
+    const resourceText = String(plan?.resources || "").trim();
+    const resources = resourceText
+        .split(/[;\n•]+/)
+        .map((value) => value.trim())
+        .filter(Boolean);
+    const links = [];
+    const addLink = (label, href) => {
+        if (!links.some((item) => item.href === href)) links.push({ label, href });
+    };
+
+    if (/UN Ozone Day|Montreal Protocol/i.test(resourceText)) {
+        addLink("UN Ozone Day / Montreal Protocol information", "https://www.un.org/en/observances/ozone-day");
+    }
+    if (/NZ Ministry for the Environment/i.test(resourceText)) {
+        addLink("NZ Ministry for the Environment information", "https://environment.govt.nz/");
+    }
+
+    attachedResourcesList.innerHTML = "";
+    [...links, ...resources.filter((resource) => !/UN Ozone Day|Montreal Protocol|NZ Ministry for the Environment/i.test(resource)).map((label) => ({ label }))]
+        .forEach((resource) => {
+            const item = document.createElement("li");
+            if (resource.href) {
+                const link = document.createElement("a");
+                link.href = resource.href;
+                link.target = "_blank";
+                link.rel = "noopener noreferrer";
+                link.textContent = resource.label;
+                item.appendChild(link);
+            } else {
+                item.textContent = resource.label;
+            }
+            attachedResourcesList.appendChild(item);
+        });
+
+    attachedResourcesBox.hidden = attachedResourcesList.children.length === 0;
 }
 
 function reliefAuthHeaders() {
@@ -39,6 +81,7 @@ function setText(id, value) {
 
 function renderLesson(lesson, courseCode) {
     const plan = lesson.lesson_plan && typeof lesson.lesson_plan === "object" ? lesson.lesson_plan : {};
+    renderAttachedResources(plan);
     setText("relief-lesson-title", lesson.lesson_title || lesson.activity_name);
     setText("relief-lesson-course", courseCode);
     setText("relief-lesson-unit", plan.unit || lesson.lesson_title);
