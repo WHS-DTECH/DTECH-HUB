@@ -3,8 +3,21 @@ const lessonContent = document.querySelector("#relief-lesson-content");
 const lessonPrintButton = document.querySelector("#relief-lesson-print");
 
 lessonPrintButton?.addEventListener("click", () => {
+    setReliefLessonDocumentTitle();
     window.print();
 });
+
+function getReliefLessonTopicName(title) {
+    const value = String(title || "").trim();
+    if (/ozone/i.test(value)) return "Ozone";
+    return value.replace(/^international day for the preservation of the /i, "").trim() || "Lesson";
+}
+
+function setReliefLessonDocumentTitle() {
+    const title = document.querySelector("#relief-lesson-title")?.textContent || "Relief Lesson";
+    const course = document.querySelector("#relief-lesson-course")?.textContent || "Class";
+    document.title = `Relief lesson - ${getReliefLessonTopicName(title)} - ${String(course).trim()}`;
+}
 
 function reliefAuthHeaders() {
     try {
@@ -42,6 +55,7 @@ function renderLesson(lesson, courseCode) {
     setText("relief-lesson-plenary", plan.plenary);
     setText("relief-lesson-homework", plan.homework);
     setText("relief-lesson-evaluation", plan.evaluation);
+    setReliefLessonDocumentTitle();
     lessonContent.hidden = false;
 }
 
