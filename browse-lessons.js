@@ -142,7 +142,10 @@ function renderCalendar() {
     }
 
     reliefPlanMonthLabel.textContent = first.toLocaleDateString(undefined, { year: "numeric", month: "long" });
-    reliefPlanDate.value = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+    const today = new Date();
+    reliefPlanDate.value = year === today.getFullYear() && month === today.getMonth()
+        ? isoDate(today)
+        : `${year}-${String(month + 1).padStart(2, "0")}-01`;
     reliefPlanCalendar.innerHTML = `
         <div class="relief-library-weekdays"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
         <div class="relief-library-days">${cells.join("")}</div>
