@@ -258,6 +258,19 @@ async function refreshActivitiesLibrary() {
     renderLibrary();
 }
 
+window.addEventListener("hub-auth-state-changed", (event) => {
+    if (!isHomepagePath()) return;
+
+    if (event.detail?.signedIn) {
+        void refreshActivitiesLibrary();
+        return;
+    }
+
+    lessons = [];
+    renderCurrentWeek();
+    renderLibrary();
+});
+
 function colorToPalette(colorName) {
     const palettes = {
         rose: "linear-gradient(135deg, #8d316f 0%, #b15186 56%, #c96e9c 100%)",
@@ -976,46 +989,48 @@ function mapProjectTaskTopicsToLibraryItems(project) {
 
 async function loadSharedLessons() {
     try {
-        const response = await fetch("/api/lessons");
+        const email = getActiveHubEmail();
+        if (!email) return [];
+
+        const response = await fetch("/api/relief-plan/events", {
+            headers: withHubAuthHeaders({}, email)
+        });
         if (!response.ok) return [];
 
-        const parsed = await response.json();
-        if (!Array.isArray(parsed)) return [];
+        const payload = await response.json().catch(() => ({}));
+        const events = Array.isArray(payload?.events) ? payload.events : [];
 
-        return parsed
-            .filter((lesson) => Boolean(lesson?.publish_activity))
-            .map((lesson) => {
-                const lessonTitle = String(lesson.lesson_title || lesson.activity_name || "").trim();
+        return events
+            .map((event, index) => {
+                const lessonTitle = String(event?.subject || "").trim();
                 if (!lessonTitle) return null;
 
-                const id = String(lesson.id || slugify(lessonTitle) || `lesson-${Date.now()}`);
-                const yearLevel = String(lesson.lesson_year_level || "Other").trim();
-                const lessonType = String(lesson.lesson_type || "Lesson").trim();
-                const summary = String(lesson.lesson_focus || lesson.lesson_notes || "Lesson details available.").trim();
-                const created = String(lesson.created_at || new Date().toISOString()).slice(0, 10);
-                const lessonLink = String(lesson.lesson_link_url || "").trim();
-                const isExternalLink = /^https?:\/\//i.test(lessonLink);
+                const startDate = String(event?.startDate || "").trim();
+                const endDate = String(event?.endDate || startDate).trim();
+                const id = `relief-event-${index}-${slugify(lessonTitle)}`;
+                const eventHref = `browse-lessons.html?event=${encodeURIComponent(lessonTitle)}&date=${encodeURIComponent(startDate)}`;
+                const summary = String(event?.aboutTheEvent || event?.description || "Relief Plan event details available.").trim();
 
                 return {
                     id,
                     title: lessonTitle,
-                    className: `${yearLevel} Computer Lab`,
-                    area: lessonType,
+                    className: "All Computer Lab",
+                    area: "Relief Plan",
                     activityCategory: "Relief Lesson",
-                    showThisWeek: Boolean(lesson.publish_activity),
+                    showThisWeek: false,
                     status: "active",
-                    term: String(lesson.term || "Term 2"),
-                    updated: created,
-                    href: lessonLink || "browse-lessons.html",
-                    external: isExternalLink,
+                    term: "Relief Plan",
+                    updated: startDate,
+                    href: eventHref,
+                    external: false,
                     summary,
-                    keywords: [lessonType, String(lesson.activity_name || ""), String(lesson.lesson_week || ""), "lesson", "relief lesson"].filter(Boolean),
+                    keywords: ["relief lesson", "relief plan", startDate, endDate, String(event?.location || "")].filter(Boolean),
                     sourceType: "relief-lesson",
                     imageUrl: null,
                     visual: {
-                        icon: textToIcon(lessonType),
-                        label: "Lesson",
-                        palette: colorToPalette(lesson.lesson_card_color || lesson.lesson_card_colour || "rose")
+                        icon: "RP",
+                        label: "Relief Plan",
+                        palette: colorToPalette("rose")
                     }
                 };
             })

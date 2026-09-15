@@ -154,6 +154,7 @@ async function loadReliefPlan() {
         renderEventMonthOptions();
         reliefPlanStatus.textContent = `${reliefPlanEvents.length} events loaded for ${data.year || "the shared calendar"}.`;
         renderCalendar();
+        openRequestedReliefPlanEvent();
     } catch (error) {
         reliefPlanStatus.textContent = error.message;
         if (!reliefPlanLoaded) {
@@ -162,6 +163,26 @@ async function loadReliefPlan() {
     } finally {
         reliefPlanLoadInFlight = false;
     }
+}
+
+function openRequestedReliefPlanEvent() {
+    const params = new URLSearchParams(window.location.search);
+    const requestedSubject = String(params.get("event") || "").trim().toLowerCase();
+    const requestedDate = String(params.get("date") || "").trim();
+    if (!requestedSubject) return;
+
+    const matchingEvent = reliefPlanEvents.find((event) =>
+        String(event?.subject || "").trim().toLowerCase() === requestedSubject
+        && (!requestedDate || String(event?.startDate || "").trim() === requestedDate)
+    );
+    if (!matchingEvent) return;
+
+    const eventDate = parseReliefDate(matchingEvent.startDate);
+    if (eventDate) {
+        reliefPlanViewDate = new Date(eventDate.getFullYear(), eventDate.getMonth(), 1);
+        renderCalendar();
+    }
+    renderDetails(matchingEvent);
 }
 
 function readStoredReliefPlanAuth() {
