@@ -4639,9 +4639,38 @@ async function seedOzoneLayerReliefLesson() {
     lesson_plan: seniorLessonPlan
   };
 
+  const seniorDtechLessonId = "relief-senior-dtech-ozone-layer-2026";
+  const seniorDtechLessonPlan = {
+    unit: "Reliever Classwork",
+    component: "Technology",
+    theme: "International Day for the Preservation of the Ozone Layer",
+    aim: "Students will explain the relationship between technological development, ozone-depleting substances, and environmental consequences; evaluate digital sources; analyse evidence, regulation, and redesign; and produce a concise evidence-based digital brief.",
+    resources: "Chromebook with internet access; Google Slides or Google Docs; UN Ozone Day and Montreal Protocol information; NZ Ministry for the Environment information; normal school submission/sharing system.",
+    preparation: "Confirm students can access Google Slides or Google Docs. Display the required outcome and source-check questions. Students should work independently, paraphrase evidence, distinguish fact from interpretation, and record sources. The outcome is one-page or one-slide, not a long presentation.",
+    healthSafety: "Students remain seated while using Chromebooks, keep bags and charging leads clear of walkways, use school-approved websites, avoid entering personal information into unfamiliar sites, and follow normal expectations for appropriate internet use. Students should not rely on AI-generated summaries as evidence unless the original source is checked. No workshop hazards are involved.",
+    starter: "5 mins. Prompt: When a technology produces major benefits but later causes environmental harm, what evidence should be required before society changes or restricts it? Students write 3-4 sentences. Distinguish ozone depletion from climate change and frame the lesson as a technological-systems case study.",
+    demonstration: "10 mins. Introduce the systems chain: NEED -> TECHNOLOGICAL DEVELOPMENT -> WIDESPREAD USE -> UNINTENDED CONSEQUENCE -> SCIENTIFIC EVIDENCE -> POLICY/REGULATION -> TECHNOLOGICAL REDESIGN -> OUTCOME. Explain CFCs, ozone loss, the Montreal Protocol, and source evaluation using Authority, Evidence, Currency, and Corroboration. Model a concise evidence brief for a school audience.",
+    practice: "40 mins. Research using at least three credible sources, including an authoritative international or NZ government/scientific source. Create one-page evidence brief or one-slide visual brief titled Ozone Layer: A Technology Systems Case Study. Include context, evidence, response, impact, an Aotearoa NZ connection, a justified 80-120 word technology judgement, clear hierarchy, concise writing, meaningful visualisation, and acknowledged sources. Y11 explains and justifies; Y12 analyses relationships and trade-offs; Y13 critically evaluates limitations, competing considerations, and future decision-making. Verify one claim against a second independent source.",
+    plenary: "5 mins. Pair exchange: identify the strongest evidence in a partner’s brief and one claim that could be better supported or qualified. Exit statement: The most important lesson this case gives future technologists is... Save as Surname_OzoneDay_2027 and submit as normal.",
+    homework: "None. If unfinished, students may complete the evidence brief if normal class procedures allow.",
+    evaluation: "What went well? What did not go well? What changes are needed? How will impact be gathered? Did changes from last time make a difference? What are the next steps? Other comments: This is a stand-alone lesson. Senior progression is based on depth of thinking rather than separate tasks."
+  };
+  const seniorDtechPayload = {
+    ...payload,
+    id: seniorDtechLessonId,
+    lesson_title: seniorDtechLessonPlan.theme,
+    activity_name: seniorDtechLessonPlan.theme,
+    lesson_year_level: "NZ Year 11/12/13 combined",
+    lesson_focus: seniorDtechLessonPlan.aim,
+    lesson_notes: "Relief lesson imported from the Y11-13 Ozone Layer Word lesson plan.",
+    relief_course_code: "SeniorDTECH",
+    lesson_plan: seniorDtechLessonPlan
+  };
+
   if (!hasDatabase) {
     if (!memoryLessons.has(lessonId)) memoryLessons.set(lessonId, { ...payload, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
     if (!memoryLessons.has(seniorLessonId)) memoryLessons.set(seniorLessonId, { ...seniorPayload, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+    if (!memoryLessons.has(seniorDtechLessonId)) memoryLessons.set(seniorDtechLessonId, { ...seniorDtechPayload, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
     return;
   }
 
@@ -4657,6 +4686,13 @@ async function seedOzoneLayerReliefLesson() {
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15, $16, $17)
      ON CONFLICT (id) DO NOTHING`,
     [seniorPayload.id, seniorPayload.lesson_title, seniorPayload.lesson_week, seniorPayload.lesson_date, seniorPayload.lesson_duration_minutes, seniorPayload.lesson_type, seniorPayload.lesson_card_color, seniorPayload.activity_name, seniorPayload.lesson_year_level, seniorPayload.lesson_link_url, seniorPayload.lesson_focus, seniorPayload.lesson_notes, seniorPayload.relief_course_code, JSON.stringify(seniorPayload.lesson_plan), seniorPayload.publish_activity, seniorPayload.add_to_calendar, seniorPayload.created_by_email]
+  );
+
+  await pool.query(
+    `INSERT INTO lessons (id, lesson_title, lesson_week, lesson_date, lesson_duration_minutes, lesson_type, lesson_card_color, activity_name, lesson_year_level, lesson_link_url, lesson_focus, lesson_notes, relief_course_code, lesson_plan, publish_activity, add_to_calendar, created_by_email)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15, $16, $17)
+     ON CONFLICT (id) DO NOTHING`,
+    [seniorDtechPayload.id, seniorDtechPayload.lesson_title, seniorDtechPayload.lesson_week, seniorDtechPayload.lesson_date, seniorDtechPayload.lesson_duration_minutes, seniorDtechPayload.lesson_type, seniorDtechPayload.lesson_card_color, seniorDtechPayload.activity_name, seniorDtechPayload.lesson_year_level, seniorDtechPayload.lesson_link_url, seniorDtechPayload.lesson_focus, seniorDtechPayload.lesson_notes, seniorDtechPayload.relief_course_code, JSON.stringify(seniorDtechPayload.lesson_plan), seniorDtechPayload.publish_activity, seniorDtechPayload.add_to_calendar, seniorDtechPayload.created_by_email]
   );
 }
 
