@@ -6,6 +6,7 @@ const attachedResourcesList = document.querySelector("#relief-lesson-attached-re
 const exemplarBox = document.querySelector("#relief-lesson-exemplar");
 const exemplarDescription = document.querySelector("#relief-lesson-exemplar-description");
 const exemplarLink = document.querySelector("#relief-lesson-exemplar-link");
+const exemplarFrame = document.querySelector("#relief-lesson-exemplar-frame");
 
 lessonPrintButton?.addEventListener("click", () => {
     setReliefLessonDocumentTitle();
@@ -89,7 +90,7 @@ function renderAttachedResources(plan, courseCode, lessonTitle) {
 }
 
 function renderExemplar(courseCode, lessonTitle) {
-    if (!exemplarBox || !exemplarDescription || !exemplarLink) return;
+    if (!exemplarBox || !exemplarDescription || !exemplarLink || !exemplarFrame) return;
 
     const normalizedCourse = String(courseCode || "").trim().toUpperCase();
     const yearBand = normalizedCourse === "JDTECH" ? "Y7-8" : normalizedCourse === "SENIORDTECH" ? "Y11-13" : "Y9-10";
@@ -102,6 +103,7 @@ function renderExemplar(courseCode, lessonTitle) {
     exemplarDescription.textContent = `Ozone Layer digital outcome exemplar for ${yearBand}.`;
     const absoluteFileUrl = `${window.location.origin}${filePath}`;
     exemplarLink.href = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(absoluteFileUrl)}`;
+    exemplarFrame.src = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(absoluteFileUrl)}`;
     exemplarLink.textContent = "Open slideshow exemplar in new tab";
     exemplarLink.title = `Open ${yearBand} Ozone slideshow exemplar`;
     exemplarBox.hidden = false;
