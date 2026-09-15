@@ -10,6 +10,7 @@ const reliefPlanNext = document.querySelector("#relief-plan-next");
 
 let reliefPlanEvents = [];
 let reliefPlanViewDate = new Date();
+let reliefPlanLoaded = false;
 
 function escapeHtml(value) {
     return String(value || "")
@@ -97,16 +98,40 @@ function renderCalendar() {
 }
 
 async function loadReliefPlan() {
+    if (reliefPlanLoaded) return;
+
+    const storedAuth = readStoredReliefPlanAuth();
+    if (!storedAuth) {
+        reliefPlanStatus.textContent = "School sign-in required to load calendar events.";
+        return;
+    }
+
     try {
-        const response = await fetch("/api/relief-plan/events", { credentials: "same-origin" });
+        const response = await fetch("/api/relief-plan/events", {
+            credentials: "same-origin",
+            headers: { Authorization: `Bearer ${storedAuth.token}` }
+        });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || data.ok === false) throw new Error(data.error || "The Relief Plan is currently unavailable.");
         reliefPlanEvents = Array.isArray(data.events) ? data.events : [];
+        reliefPlanLoaded = true;
         reliefPlanStatus.textContent = `${reliefPlanEvents.length} events loaded for ${data.year || "the shared calendar"}.`;
         renderCalendar();
     } catch (error) {
         reliefPlanStatus.textContent = error.message;
         reliefPlanCalendar.innerHTML = '<p class="relief-library-empty">The shared Relief Plan calendar could not be loaded.</p>';
+    }
+}
+
+function readStoredReliefPlanAuth() {
+    try {
+        const raw = localStorage.getItem("hub_google_auth_v1") || sessionStorage.getItem("hub_google_auth_v1");
+        const parsed = raw ? JSON.parse(raw) : null;
+        const token = String(parsed?.idToken || parsed?.accessToken || "").trim();
+        const expiresAt = Number(parsed?.expiresAt || 0);
+        return token && expiresAt > Date.now() ? { token } : null;
+    } catch (_error) {
+        return null;
     }
 }
 
@@ -133,4 +158,7 @@ reliefPlanDate.addEventListener("change", () => {
 });
 
 renderCalendar();
+window.addEventListener("hub-auth-state-changed", (event) => {
+    if (event.detail?.signedIn) loadReliefPlan();
+});
 loadReliefPlan();

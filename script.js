@@ -2766,6 +2766,10 @@ function renderHubAuthUi() {
 
     setPublicHomepageUiState(signedIn);
 
+    window.dispatchEvent(new CustomEvent("hub-auth-state-changed", {
+        detail: { signedIn, canTeacherView, canAdmin }
+    }));
+
     if (isHomepagePath() && libraryGrid) {
         if (signedIn && inTeacherMode) {
             loadProjectAssignmentSummaries();
