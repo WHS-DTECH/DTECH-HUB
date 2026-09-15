@@ -1,5 +1,10 @@
 const lessonStatus = document.querySelector("#relief-lesson-status");
 const lessonContent = document.querySelector("#relief-lesson-content");
+const lessonPrintButton = document.querySelector("#relief-lesson-print");
+
+lessonPrintButton?.addEventListener("click", () => {
+    window.print();
+});
 
 function reliefAuthHeaders() {
     try {
