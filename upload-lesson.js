@@ -71,6 +71,12 @@ function collectLessonPayload() {
     const lessonNotes = String(form.querySelector('[name="lessonNotes"]')?.value || "").trim();
     const publishActivity = Boolean(form.querySelector('[name="publishActivity"]')?.checked);
     const addToCalendar = Boolean(form.querySelector('[name="addToCalendar"]')?.checked);
+    const lessonPlan = Object.fromEntries([
+        ["unit", "planUnit"], ["component", "planComponent"], ["theme", "planTheme"], ["aim", "planAim"],
+        ["resources", "planResources"], ["preparation", "planPreparation"], ["healthSafety", "planHealthSafety"],
+        ["starter", "planStarter"], ["demonstration", "planDemonstration"], ["practice", "planPractice"],
+        ["plenary", "planPlenary"], ["homework", "planHomework"], ["evaluation", "planEvaluation"]
+    ].map(([key, field]) => [key, String(form.querySelector(`[name="${field}"]`)?.value || "").trim()]));
 
     if (!lessonTitle || !lessonType || !activityName || !lessonYearLevel || !lessonFocus) {
         setStatus("Please fill in all required fields.", true);
@@ -94,6 +100,8 @@ function collectLessonPayload() {
         lesson_notes: lessonNotes,
         publish_activity: publishActivity,
         add_to_calendar: addToCalendar,
+        relief_course_code: String(form.querySelector('[name="reliefCourseCode"]')?.value || "").trim().toUpperCase(),
+        lesson_plan: lessonPlan,
         created_by_email: getAuthEmail() || "unknown@westlandhigh.school.nz",
         created_at: new Date().toISOString()
     };

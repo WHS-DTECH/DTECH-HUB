@@ -3342,7 +3342,7 @@ async function syncUnitPlanLessonsToLibrary(unitPlan) {
 
     await pool.query(
       `INSERT INTO lessons
-       (id, lesson_title, lesson_week, lesson_date, lesson_duration_minutes, lesson_type, lesson_card_color,
+      (id, lesson_title, lesson_week, lesson_date, lesson_duration_minutes, lesson_type, lesson_card_color,
         activity_name, lesson_year_level, lesson_link_url, lesson_focus, lesson_notes, publish_activity,
         add_to_calendar, created_by_email, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
@@ -3977,6 +3977,8 @@ async function ensureUnitPlanSchema() {
   await pool.query(`ALTER TABLE lessons ADD COLUMN IF NOT EXISTS lesson_card_color TEXT`);
   await pool.query(`ALTER TABLE lessons ADD COLUMN IF NOT EXISTS lesson_link_url TEXT`);
   await pool.query(`ALTER TABLE lessons ADD COLUMN IF NOT EXISTS lesson_notes TEXT`);
+  await pool.query(`ALTER TABLE lessons ADD COLUMN IF NOT EXISTS relief_course_code TEXT`);
+  await pool.query(`ALTER TABLE lessons ADD COLUMN IF NOT EXISTS lesson_plan JSONB NOT NULL DEFAULT '{}'::jsonb`);
   await pool.query(`ALTER TABLE lessons ADD COLUMN IF NOT EXISTS publish_activity BOOLEAN NOT NULL DEFAULT FALSE`);
   await pool.query(`ALTER TABLE lessons ADD COLUMN IF NOT EXISTS add_to_calendar BOOLEAN NOT NULL DEFAULT FALSE`);
   await pool.query(`ALTER TABLE lessons ADD COLUMN IF NOT EXISTS created_by_email TEXT`);
@@ -14393,6 +14395,33 @@ app.get("/api/lessons/:id", async (req, res) => {
   }
 });
 
+// GET /api/relief-lessons/:courseCode — List database-backed lesson plans for a DTECH class
+app.get("/api/relief-lessons/:courseCode", requireSchoolAccountAccess, async (req, res) => {
+  const courseCode = String(req.params.courseCode || "").trim().toUpperCase();
+  if (!courseCode) {
+    res.status(400).json({ error: "Course code is required" });
+    return;
+  }
+
+  if (!hasDatabase) {
+    const lessons = Array.from(memoryLessons.values()).filter((lesson) =>
+      String(lesson.relief_course_code || "").trim().toUpperCase() === courseCode
+    );
+    res.json({ courseCode, lessons });
+    return;
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT * FROM lessons WHERE relief_course_code = $1 AND publish_activity = TRUE ORDER BY lesson_date ASC NULLS LAST, lesson_title ASC`,
+      [courseCode]
+    );
+    res.json({ courseCode, lessons: result.rows || [] });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not load Relief Lessons" });
+  }
+});
+
 // POST /api/lessons — Create a new lesson
 app.post("/api/lessons", async (req, res) => {
   const body = req.body || {};
@@ -14421,6 +14450,8 @@ app.post("/api/lessons", async (req, res) => {
     lesson_link_url: String(body.lesson_link_url || body.lessonLinkUrl || "").trim(),
     lesson_focus: lessonFocus,
     lesson_notes: String(body.lesson_notes || body.lessonNotes || "").trim(),
+    relief_course_code: String(body.relief_course_code || body.reliefCourseCode || "").trim().toUpperCase(),
+    lesson_plan: body.lesson_plan && typeof body.lesson_plan === "object" ? body.lesson_plan : {},
     publish_activity: Boolean(body.publish_activity ?? body.publishActivity),
     add_to_calendar: Boolean(body.add_to_calendar ?? body.addToCalendar),
     created_by_email: String(body.created_by_email || getRequestUserEmail(req) || "").trim(),
@@ -14436,11 +14467,11 @@ app.post("/api/lessons", async (req, res) => {
 
   try {
     const result = await pool.query(
-      `INSERT INTO lessons 
-       (id, lesson_title, lesson_week, lesson_date, lesson_duration_minutes, lesson_type, lesson_card_color, 
-        activity_name, lesson_year_level, lesson_link_url, lesson_focus, lesson_notes, publish_activity, 
-        add_to_calendar, created_by_email, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+      `INSERT INTO lessons
+      (id, lesson_title, lesson_week, lesson_date, lesson_duration_minutes, lesson_type, lesson_card_color,
+       activity_name, lesson_year_level, lesson_link_url, lesson_focus, lesson_notes, relief_course_code, lesson_plan,
+       publish_activity, add_to_calendar, created_by_email, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15, $16, $17, $18, $19)
        ON CONFLICT(id) DO UPDATE SET
        lesson_title = EXCLUDED.lesson_title,
        lesson_week = EXCLUDED.lesson_week,
@@ -14453,6 +14484,8 @@ app.post("/api/lessons", async (req, res) => {
        lesson_link_url = EXCLUDED.lesson_link_url,
        lesson_focus = EXCLUDED.lesson_focus,
        lesson_notes = EXCLUDED.lesson_notes,
+      relief_course_code = EXCLUDED.relief_course_code,
+      lesson_plan = EXCLUDED.lesson_plan,
        publish_activity = EXCLUDED.publish_activity,
        add_to_calendar = EXCLUDED.add_to_calendar,
        updated_at = EXCLUDED.updated_at
@@ -14461,7 +14494,7 @@ app.post("/api/lessons", async (req, res) => {
         payload.id, payload.lesson_title, payload.lesson_week, payload.lesson_date,
         payload.lesson_duration_minutes, payload.lesson_type, payload.lesson_card_color,
         payload.activity_name, payload.lesson_year_level, payload.lesson_link_url,
-        payload.lesson_focus, payload.lesson_notes, payload.publish_activity,
+        payload.lesson_focus, payload.lesson_notes, payload.relief_course_code, JSON.stringify(payload.lesson_plan), payload.publish_activity,
         payload.add_to_calendar, payload.created_by_email, payload.created_at, payload.updated_at
       ]
     );
