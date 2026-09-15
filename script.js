@@ -1308,6 +1308,7 @@ function renderGlobalNavbar() {
                 <a id="hub-browse-practicals-link" data-auth-browse role="menuitem" href="/browse-practicals.html" hidden>Practicals</a>
                 <a id="hub-browse-unit-plans-link" data-auth-unit-plans role="menuitem" href="/browse-unit-plans.html" hidden>Unit Plans</a>
                 <a id="hub-browse-course-outlines-link" data-auth-course-outlines role="menuitem" href="/browse-course-outlines.html" hidden>Course Outlines</a>
+                <a id="hub-browse-relief-lessons-link" data-auth-browse role="menuitem" href="/browse-lessons.html" hidden>Relief Lessons Library</a>
                 <a id="hub-browse-task-list-link" data-auth-browse role="menuitem" href="/task-list.html" hidden>Task List</a>
                 <a id="hub-browse-template-library-link" data-auth-browse role="menuitem" href="/ProjectPages/slideshow-template-library.html" hidden>Template Library</a>
             </div>
@@ -1322,6 +1323,7 @@ function renderGlobalNavbar() {
                 <a role="menuitem" href="/upload-activity.html">Upload Activity</a>
                 <a role="menuitem" href="/upload-assessment.html">Upload Assessment Task</a>
                 <a role="menuitem" href="/upload-course-outline.html">Upload Course Outline</a>
+                <a role="menuitem" href="/upload-lesson.html">Upload Relief Lesson</a>
                 <a role="menuitem" href="/upload-unit.html">Upload Unit Plan</a>
             </div>
         </details>
