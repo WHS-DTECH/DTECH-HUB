@@ -6,7 +6,9 @@ const reliefPlanMonthLabel = document.querySelector("#relief-plan-month-label");
 const reliefPlanDate = document.querySelector("#relief-plan-date");
 const reliefPlanPrevious = document.querySelector("#relief-plan-previous");
 const reliefPlanToday = document.querySelector("#relief-plan-today");
+const reliefPlanFirstEvent = document.querySelector("#relief-plan-first-event");
 const reliefPlanNext = document.querySelector("#relief-plan-next");
+const reliefPlanEventMonth = document.querySelector("#relief-plan-event-month");
 
 let reliefPlanEvents = [];
 let reliefPlanViewDate = new Date();
@@ -42,6 +44,27 @@ function isoDate(date) {
 function formatDate(value) {
     const date = parseReliefDate(value);
     return date ? date.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : value;
+}
+
+function getEventMonths() {
+    return [...new Set(reliefPlanEvents
+        .map((event) => parseReliefDate(event.startDate))
+        .filter(Boolean)
+        .map((date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`))]
+        .sort();
+}
+
+function renderEventMonthOptions() {
+    const currentValue = reliefPlanEventMonth.value;
+    reliefPlanEventMonth.innerHTML = '<option value="">Event month</option>';
+    getEventMonths().forEach((monthKey) => {
+        const [year, month] = monthKey.split("-").map(Number);
+        const option = document.createElement("option");
+        option.value = monthKey;
+        option.textContent = new Date(year, month - 1, 1).toLocaleDateString(undefined, { year: "numeric", month: "long" });
+        reliefPlanEventMonth.appendChild(option);
+    });
+    reliefPlanEventMonth.value = getEventMonths().includes(currentValue) ? currentValue : "";
 }
 
 function renderDetails(event) {
@@ -128,6 +151,7 @@ async function loadReliefPlan() {
         if (!response.ok || data.ok === false) throw new Error(data.error || "The Relief Plan is currently unavailable.");
         reliefPlanEvents = Array.isArray(data.events) ? data.events : [];
         reliefPlanLoaded = true;
+        renderEventMonthOptions();
         reliefPlanStatus.textContent = `${reliefPlanEvents.length} events loaded for ${data.year || "the shared calendar"}.`;
         renderCalendar();
     } catch (error) {
@@ -168,6 +192,23 @@ reliefPlanNext.addEventListener("click", () => {
 
 reliefPlanToday.addEventListener("click", () => {
     reliefPlanViewDate = new Date();
+    renderCalendar();
+});
+
+reliefPlanFirstEvent.addEventListener("click", () => {
+    const firstEvent = reliefPlanEvents
+        .map((event) => parseReliefDate(event.startDate))
+        .filter(Boolean)
+        .sort((left, right) => left - right)[0];
+    if (!firstEvent) return;
+    reliefPlanViewDate = new Date(firstEvent.getFullYear(), firstEvent.getMonth(), 1);
+    renderCalendar();
+});
+
+reliefPlanEventMonth.addEventListener("change", () => {
+    const [year, month] = String(reliefPlanEventMonth.value || "").split("-").map(Number);
+    if (!year || !month) return;
+    reliefPlanViewDate = new Date(year, month - 1, 1);
     renderCalendar();
 });
 

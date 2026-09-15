@@ -2417,6 +2417,17 @@ body.public-home-access .controls-panel {
     font-size: 0.78rem;
 }
 
+.relief-library-controls select {
+    min-height: 34px;
+    padding: 5px 8px;
+    border: 1px solid #c9bddb;
+    border-radius: 6px;
+    color: #251642;
+    background: #ffffff;
+    font: inherit;
+    font-size: 0.78rem;
+}
+
 .relief-library-month-heading {
     margin: 24px 0 12px;
     text-align: center;
