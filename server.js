@@ -4566,10 +4566,62 @@ async function ensureSchema() {
   await ensureCourseOutlinesSchema();
   await ensurePracticalSkillsProgressSchema();
   await ensurePracticalSkillsKitContentSchema();
+  await seedOzoneLayerReliefLesson();
   const seededProcessAssessmentAllocations = await backfillProcessAssessmentAllocations();
   if (seededProcessAssessmentAllocations > 0) {
     console.log(`[startup] Backfilled ${seededProcessAssessmentAllocations} student allocation(s) into Process Assessment (${CLIENT_PROJECTS_TASK_ID}).`);
   }
+}
+
+async function seedOzoneLayerReliefLesson() {
+  const lessonId = "relief-jdtech-ozone-layer-2026";
+  const lessonPlan = {
+    unit: "Reliever Classwork",
+    component: "Technology",
+    theme: "International Day for the Preservation of the Ozone Layer",
+    aim: "Students will explain what the ozone layer does, identify a human-made cause of ozone depletion, and create a digital infographic showing how technology and international cooperation can help protect it.",
+    resources: "Chromebook with internet access; Google Slides or Google Drawings; teacher/reliever display; UN Ozone Day and NZ Ministry for the Environment ozone information.",
+    preparation: "Confirm students can access Google Slides or Google Drawings. Display the final product requirements: title, 3 facts, problem -> response -> result sequence, one NZ connection, and sources. Students should paraphrase rather than copy.",
+    healthSafety: "Students remain seated while using Chromebooks. Keep bags and charging leads out of walkways, use school-approved websites, do not enter personal information into unfamiliar sites, and follow normal classroom expectations. Encourage a short screen break if required.",
+    starter: "5 mins. Ask: What is the ozone layer, and why might people want to protect it? Students write 2-3 ideas, share briefly, and distinguish the ozone layer from climate change.",
+    demonstration: "10 mins. Introduce ozone as O3, its location in the stratosphere, its absorption of harmful UV radiation, and the damage caused by chemicals such as CFCs. Explain the Montreal Protocol and demonstrate a one-slide infographic with a title, short text, icons, shapes, arrows, and a source box.",
+    practice: "40 mins. Students create one infographic titled Protecting Earth’s Ozone Layer. Include what the ozone layer is, why it matters, what damaged it, what people and technology changed, and why 16 September is significant. Add PROBLEM -> TECHNOLOGICAL / GLOBAL RESPONSE -> RESULT, an Aotearoa New Zealand connection, clear digital layout, paraphrased information, and at least two sources. Extension: compare technology then and now.",
+    plenary: "5 mins. Students show the infographic to a partner. Partner gives one WWW and one EBI comment. Exit question: What is one example of technology causing a problem and technology helping solve it? Save as Surname_OzoneDay_2027 and submit as directed.",
+    homework: "None. If unfinished, students may complete the infographic if normal class procedures allow.",
+    evaluation: "What went well? What did not go well? What changes are needed? How will impact be gathered? Did changes from last time make a difference? What are the next steps? Other comments: This lesson stands alone and does not require previous ozone-layer learning."
+  };
+
+  const payload = {
+    id: lessonId,
+    lesson_title: lessonPlan.theme,
+    lesson_week: "Relief Plan",
+    lesson_date: "2026-09-16",
+    lesson_duration_minutes: 60,
+    lesson_type: "Digital Technologies",
+    lesson_card_color: "Rose",
+    activity_name: lessonPlan.theme,
+    lesson_year_level: "NZ Year 7/8 mixed",
+    lesson_link_url: "",
+    lesson_focus: lessonPlan.aim,
+    lesson_notes: "Relief lesson imported from the Ozone Layer Word lesson plan.",
+    relief_course_code: "JDTECH",
+    lesson_plan: lessonPlan,
+    publish_activity: true,
+    add_to_calendar: false,
+    created_by_email: "relief-plan-seed@westlandhigh.school.nz"
+  };
+
+  if (!hasDatabase) {
+    if (!memoryLessons.has(lessonId)) memoryLessons.set(lessonId, { ...payload, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+    return;
+  }
+
+  await pool.query(
+    `INSERT INTO lessons (id, lesson_title, lesson_week, lesson_date, lesson_duration_minutes, lesson_type, lesson_card_color, activity_name, lesson_year_level, lesson_link_url, lesson_focus, lesson_notes, relief_course_code, lesson_plan, publish_activity, add_to_calendar, created_by_email)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15, $16, $17)
+    ON CONFLICT (id) DO NOTHING`,
+    [payload.id, payload.lesson_title, payload.lesson_week, payload.lesson_date, payload.lesson_duration_minutes, payload.lesson_type, payload.lesson_card_color, payload.activity_name, payload.lesson_year_level, payload.lesson_link_url, payload.lesson_focus, payload.lesson_notes, payload.relief_course_code, JSON.stringify(payload.lesson_plan), payload.publish_activity, payload.add_to_calendar, payload.created_by_email]
+  );
 }
 
 async function syncDtechExcludedActivitiesVisibility() {
