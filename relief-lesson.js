@@ -3,6 +3,9 @@ const lessonContent = document.querySelector("#relief-lesson-content");
 const lessonPrintButton = document.querySelector("#relief-lesson-print");
 const attachedResourcesBox = document.querySelector("#relief-lesson-attached-resources");
 const attachedResourcesList = document.querySelector("#relief-lesson-attached-resources-list");
+const exemplarBox = document.querySelector("#relief-lesson-exemplar");
+const exemplarDescription = document.querySelector("#relief-lesson-exemplar-description");
+const exemplarLink = document.querySelector("#relief-lesson-exemplar-link");
 
 lessonPrintButton?.addEventListener("click", () => {
     setReliefLessonDocumentTitle();
@@ -85,6 +88,22 @@ function renderAttachedResources(plan, courseCode, lessonTitle) {
     attachedResourcesBox.hidden = attachedResourcesList.children.length === 0;
 }
 
+function renderExemplar(courseCode, lessonTitle) {
+    if (!exemplarBox || !exemplarDescription || !exemplarLink) return;
+
+    const normalizedCourse = String(courseCode || "").trim().toUpperCase();
+    const yearBand = normalizedCourse === "JDTECH" ? "Y7-8" : normalizedCourse === "SENIORDTECH" ? "Y11-13" : "Y9-10";
+    if (!/ozone/i.test(String(lessonTitle || ""))) {
+        exemplarBox.hidden = true;
+        return;
+    }
+
+    const filePath = `/TeacherFiles/Lesson%20Plans/Ozone_Exemplar_${yearBand}.pptx`;
+    exemplarDescription.textContent = `Ozone Layer digital outcome exemplar for ${yearBand}.`;
+    exemplarLink.href = filePath;
+    exemplarBox.hidden = false;
+}
+
 function reliefAuthHeaders() {
     try {
         const raw = localStorage.getItem("hub_google_auth_v1") || sessionStorage.getItem("hub_google_auth_v1");
@@ -106,6 +125,7 @@ function setText(id, value) {
 function renderLesson(lesson, courseCode) {
     const plan = lesson.lesson_plan && typeof lesson.lesson_plan === "object" ? lesson.lesson_plan : {};
     renderAttachedResources(plan, courseCode, lesson.lesson_title || lesson.activity_name);
+    renderExemplar(courseCode, lesson.lesson_title || lesson.activity_name);
     setText("relief-lesson-title", lesson.lesson_title || lesson.activity_name);
     setText("relief-lesson-course", courseCode);
     setText("relief-lesson-unit", plan.unit || lesson.lesson_title);
