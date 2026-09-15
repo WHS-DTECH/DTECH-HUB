@@ -23,9 +23,16 @@ function escapeHtml(value) {
 }
 
 function parseReliefDate(value) {
-    const match = String(value || "").match(/^(\d{2})[/-](\d{2})[/-](\d{4})$/);
-    if (!match) return null;
-    return new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]));
+    const rawValue = String(value || "").trim();
+    const isoMatch = rawValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (isoMatch) {
+        return new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]));
+    }
+
+    // The Learning Sites Relief Plan exports dates as MM/DD/YYYY.
+    const csvMatch = rawValue.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+    if (!csvMatch) return null;
+    return new Date(Number(csvMatch[3]), Number(csvMatch[1]) - 1, Number(csvMatch[2]));
 }
 
 function isoDate(date) {
@@ -121,13 +128,6 @@ async function loadReliefPlan() {
         if (!response.ok || data.ok === false) throw new Error(data.error || "The Relief Plan is currently unavailable.");
         reliefPlanEvents = Array.isArray(data.events) ? data.events : [];
         reliefPlanLoaded = true;
-        const firstEventDate = reliefPlanEvents
-            .map((event) => parseReliefDate(event.startDate))
-            .filter(Boolean)
-            .sort((left, right) => left - right)[0];
-        if (firstEventDate) {
-            reliefPlanViewDate = new Date(firstEventDate.getFullYear(), firstEventDate.getMonth(), 1);
-        }
         reliefPlanStatus.textContent = `${reliefPlanEvents.length} events loaded for ${data.year || "the shared calendar"}.`;
         renderCalendar();
     } catch (error) {
