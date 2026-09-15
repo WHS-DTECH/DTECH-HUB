@@ -1039,7 +1039,7 @@ async function loadAssessmentStandardCardsForLibrary() {
 
         const payload = await response.json().catch(() => ({}));
         const cards = Array.isArray(payload?.cards) ? payload.cards : [];
-        return cards
+        const normalizedCards = cards
             .map((card) => {
                 const id = String(card?.id || "").trim();
                 const standardCodes = Array.isArray(card?.standard_codes)
@@ -1101,6 +1101,17 @@ async function loadAssessmentStandardCardsForLibrary() {
                 };
             })
             .filter(Boolean);
+
+        const uniqueCards = new Map();
+        normalizedCards.forEach((card) => {
+            const standardNumber = String(card.standardNumber || "").trim();
+            const key = standardNumber || card.id;
+            if (!uniqueCards.has(key)) {
+                uniqueCards.set(key, card);
+            }
+        });
+
+        return Array.from(uniqueCards.values());
     } catch (_error) {
         return [];
     }
