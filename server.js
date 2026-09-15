@@ -1545,6 +1545,44 @@ const lessonResourceUpload = multer({
   }
 });
 
+function extractReliefLessonField(text, label, nextLabels) {
+  const escapedLabel = String(label).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const nextPattern = nextLabels.map((value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  const match = String(text || "").match(new RegExp(`${escapedLabel}\\s*:?\\s*([\\s\\S]*?)(?=\\n\\s*(?:${nextPattern})\\s*:|$)`, "i"));
+  return String(match?.[1] || "").replace(/\s+/g, " ").trim();
+}
+
+function parseReliefLessonPlanText(text) {
+  const labels = ["Unit", "STEAM Component", "Theme", "Discipline", "Focus", "Class", "AIM(S) OF LESSON", "Resources Required", "Preparation (To do before lesson)", "Health & Safety - Digital Technologies classroom", "Starter (max 10 minutes to settle the students)", "Demonstration", "Practice", "Plenary (bring together, complete pack up activities)", "Homework", "Lesson Evaluation"];
+  const lessonTitle = extractReliefLessonField(text, "Theme", labels);
+  const className = extractReliefLessonField(text, "Class", labels);
+  const focus = extractReliefLessonField(text, "Focus", labels);
+  const plan = {
+    unit: extractReliefLessonField(text, "Unit", labels),
+    component: extractReliefLessonField(text, "STEAM Component", labels),
+    theme: lessonTitle,
+    aim: extractReliefLessonField(text, "AIM(S) OF LESSON", labels),
+    resources: extractReliefLessonField(text, "Resources Required", labels),
+    preparation: extractReliefLessonField(text, "Preparation (To do before lesson)", labels),
+    healthSafety: extractReliefLessonField(text, "Health & Safety - Digital Technologies classroom", labels),
+    starter: extractReliefLessonField(text, "Starter (max 10 minutes to settle the students)", labels),
+    demonstration: extractReliefLessonField(text, "Demonstration", labels),
+    practice: extractReliefLessonField(text, "Practice", labels),
+    plenary: extractReliefLessonField(text, "Plenary (bring together, complete pack up activities)", labels),
+    homework: extractReliefLessonField(text, "Homework", labels),
+    evaluation: extractReliefLessonField(text, "Lesson Evaluation", labels)
+  };
+
+  return {
+    lesson_title: lessonTitle || "Relief Lesson",
+    activity_name: lessonTitle || "Relief Lesson",
+    lesson_type: "Digital Technologies",
+    lesson_year_level: className || "",
+    lesson_focus: focus || plan.aim,
+    lesson_plan: plan
+  };
+}
+
 
 let smtpTransporter = null;
 if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
@@ -14581,6 +14619,22 @@ app.get("/api/relief-lessons/:courseCode", requireSchoolAccountAccess, async (re
     res.json({ courseCode, lessons: result.rows || [] });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not load Relief Lessons" });
+  }
+});
+
+app.post("/api/lessons/preview-relief-docx", requireSchoolAccountAccess, lessonResourceUpload.array("resourceFiles", 12), async (req, res) => {
+  const files = Array.isArray(req.files) ? req.files : [];
+  const docxFile = files.find((file) => String(file.originalname || "").toLowerCase().endsWith(".docx"));
+  if (!docxFile) {
+    res.status(400).json({ error: "Select a lesson-plan DOCX file to preview." });
+    return;
+  }
+
+  try {
+    const extraction = await mammoth.extractRawText({ buffer: docxFile.buffer });
+    res.json({ ok: true, lesson: parseReliefLessonPlanText(extraction.value || "") });
+  } catch (error) {
+    res.status(400).json({ error: error.message || "Could not parse the lesson-plan DOCX." });
   }
 });
 

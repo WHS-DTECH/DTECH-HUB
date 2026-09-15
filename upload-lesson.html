@@ -59,6 +59,36 @@
 
             <section class="upload-form-wrapper">
                 <form id="lesson-form" class="lesson-upload-form" enctype="multipart/form-data">
+                    <fieldset class="relief-quick-uploader">
+                        <legend>Quick Relief Lesson Uploader</legend>
+                        <p class="help-text">Choose an existing Relief Plan event and class, upload the lesson-plan DOCX plus resources, then preview the populated fields below before saving.</p>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="relief-event-select">Relief Plan Event</label>
+                                <select id="relief-event-select" name="reliefEvent" required>
+                                    <option value="">Loading Relief Plan events...</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label for="relief-class-select">Class</label>
+                                <select id="relief-class-select" name="reliefClass" required>
+                                    <option value="">Select a class</option>
+                                    <option value="JDTECH">JDTECH</option>
+                                    <option value="MDTECH-S1">MDTECH - Semester 1</option>
+                                    <option value="MDTECH-S2">MDTECH - Semester 2</option>
+                                    <option value="SeniorDTECH">Senior DTECH</option>
+                                </select>
+                            </div>
+                            <div class="field field-wide">
+                                <label for="quick-relief-files">Lesson Plan and Resource Files</label>
+                                <input id="quick-relief-files" name="quickReliefFiles" type="file" multiple accept=".docx,.pdf,.pptx,.ppt,.xlsx,.jpg,.jpeg,.png,.webp" required>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button id="preview-relief-lesson" class="button button-primary" type="button">Populate Lesson Fields</button>
+                            <span id="quick-relief-status" class="upload-status" role="status"></span>
+                        </div>
+                    </fieldset>
                     <fieldset>
                         <legend>Lesson Details</legend>
                         <p class="help-text">Add the lesson information. All fields except the optional link are required.</p>

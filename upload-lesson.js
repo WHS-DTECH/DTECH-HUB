@@ -52,6 +52,105 @@ function withLessonAuthHeaders(headers = {}) {
     return nextHeaders;
 }
 
+const quickEventSelect = document.querySelector("#relief-event-select");
+const quickClassSelect = document.querySelector("#relief-class-select");
+const quickFilesInput = document.querySelector("#quick-relief-files");
+const quickPreviewButton = document.querySelector("#preview-relief-lesson");
+const quickStatus = document.querySelector("#quick-relief-status");
+let reliefPlanEvents = [];
+
+function setQuickStatus(message, isError = false) {
+    if (!quickStatus) return;
+    quickStatus.textContent = message;
+    quickStatus.className = `upload-status ${isError ? "is-error" : "is-success"}`;
+}
+
+async function loadReliefPlanEventOptions() {
+    if (!quickEventSelect) return;
+    const email = getAuthEmail();
+    if (!email) {
+        quickEventSelect.innerHTML = '<option value="">Sign in to load Relief Plan events</option>';
+        return;
+    }
+
+    try {
+        const response = await fetch("/api/relief-plan/events", { headers: withLessonAuthHeaders({}, email) });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.ok === false) throw new Error(data.error || "Could not load Relief Plan events.");
+        reliefPlanEvents = Array.isArray(data.events) ? data.events : [];
+        quickEventSelect.innerHTML = '<option value="">Select a Relief Plan event</option>';
+        reliefPlanEvents.forEach((event, index) => {
+            const option = document.createElement("option");
+            option.value = String(index);
+            option.textContent = `${event.subject} (${event.startDate})`;
+            quickEventSelect.appendChild(option);
+        });
+    } catch (error) {
+        quickEventSelect.innerHTML = `<option value="">${error.message}</option>`;
+    }
+}
+
+function setFormField(name, value) {
+    const field = document.querySelector(`[name="${name}"]`);
+    if (field) field.value = String(value || "");
+}
+
+function populateLessonFields(lesson, event, classCode) {
+    const plan = lesson?.lesson_plan || {};
+    setFormField("lessonTitle", event.subject || lesson.lesson_title);
+    setFormField("activityName", event.subject || lesson.activity_name);
+    setFormField("lessonWeek", "Relief Plan");
+    setFormField("lessonDate", String(event.startDate || "").replace(/^(\d{2})\/(\d{2})\/(\d{4})$/, "$3-$1-$2"));
+    setFormField("lessonType", "Digital Media");
+    setFormField("lessonCardColor", "Rose");
+    setFormField("lessonYearLevel", classCode);
+    setFormField("lessonFocus", lesson.lesson_focus || plan.aim);
+    setFormField("reliefCourseCode", classCode);
+    Object.entries({
+        planUnit: plan.unit,
+        planComponent: plan.component,
+        planTheme: plan.theme || event.subject,
+        planAim: plan.aim,
+        planResources: plan.resources,
+        planPreparation: plan.preparation,
+        planHealthSafety: plan.healthSafety,
+        planStarter: plan.starter,
+        planDemonstration: plan.demonstration,
+        planPractice: plan.practice,
+        planPlenary: plan.plenary,
+        planHomework: plan.homework,
+        planEvaluation: plan.evaluation
+    }).forEach(([name, value]) => setFormField(name, value));
+}
+
+async function previewReliefLesson() {
+    const event = reliefPlanEvents[Number(quickEventSelect?.value)];
+    const classCode = String(quickClassSelect?.value || "").trim();
+    const files = Array.from(quickFilesInput?.files || []);
+    const docxFile = files.find((file) => file.name.toLowerCase().endsWith(".docx"));
+    if (!event || !classCode || !docxFile) {
+        setQuickStatus("Choose a Relief Plan event, class, and lesson-plan DOCX first.", true);
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("resourceFiles", docxFile);
+    try {
+        setQuickStatus("Reading lesson plan...");
+        const response = await fetch("/api/lessons/preview-relief-docx", {
+            method: "POST",
+            headers: withLessonAuthHeaders(),
+            body: formData
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.ok === false) throw new Error(data.error || "Could not read the DOCX lesson plan.");
+        populateLessonFields(data.lesson, event, classCode);
+        setQuickStatus("Lesson fields populated. Review below, then click Save Lesson.");
+    } catch (error) {
+        setQuickStatus(error.message, true);
+    }
+}
+
 function collectLessonPayload() {
     const form = document.querySelector("#lesson-form");
     if (!form) {
@@ -119,7 +218,10 @@ async function saveLessonToServer(payload) {
             formData.append(key, typeof value === "object" ? JSON.stringify(value) : String(value ?? ""));
         });
         const resourceFiles = document.querySelector('[name="resourceFiles"]')?.files || [];
-        Array.from(resourceFiles).forEach((file) => formData.append("resourceFiles", file));
+        const quickFiles = quickFilesInput?.files || [];
+        const allFiles = [...Array.from(resourceFiles), ...Array.from(quickFiles)];
+        const uniqueFiles = allFiles.filter((file, index, files) => files.findIndex((item) => item.name === file.name && item.size === file.size) === index);
+        uniqueFiles.forEach((file) => formData.append("resourceFiles", file));
 
         const response = await fetch("/api/lessons", {
             method: "POST",
@@ -170,4 +272,6 @@ function initializeLessonForm() {
 
 document.addEventListener("DOMContentLoaded", () => {
     initializeLessonForm();
+    loadReliefPlanEventOptions();
+    quickPreviewButton?.addEventListener("click", previewReliefLesson);
 });
