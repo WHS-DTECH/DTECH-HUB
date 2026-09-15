@@ -41,13 +41,29 @@ function renderLesson(lesson, courseCode) {
 }
 
 async function loadReliefLesson() {
-    const courseCode = String(new URLSearchParams(window.location.search).get("course") || "JDTECH").trim().toUpperCase();
+    const params = new URLSearchParams(window.location.search);
+    const courseCode = String(params.get("course") || "JDTECH").trim().toUpperCase();
+    const eventTitle = String(params.get("event") || "").trim();
+    const eventDate = String(params.get("date") || "").trim();
     try {
         const response = await fetch(`/api/relief-lessons/${encodeURIComponent(courseCode)}`, { headers: reliefAuthHeaders() });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error || "Could not load Relief Lessons.");
         const lesson = Array.isArray(data.lessons) ? data.lessons[0] : null;
-        if (!lesson) throw new Error(`No database lesson plan is published for ${courseCode} yet.`);
+        if (!lesson) {
+            renderLesson({
+                lesson_title: eventTitle || `Relief Lesson - ${courseCode}`,
+                lesson_year_level: courseCode,
+                lesson_date: eventDate,
+                lesson_type: "Technology",
+                lesson_plan: {
+                    unit: eventTitle || "Relief Lesson",
+                    component: "Technology"
+                }
+            }, courseCode);
+            lessonStatus.textContent = "Blank lesson plan ready for this class and event. Complete it through Upload Relief Lesson to save it to the database.";
+            return;
+        }
         renderLesson(lesson, courseCode);
         lessonStatus.hidden = true;
     } catch (error) {

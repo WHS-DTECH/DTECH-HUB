@@ -86,6 +86,19 @@ function renderDetails(event) {
         <h2>Event Description</h2>
         <p>${escapeHtml(aboutText).replace(/\n/g, "<br>")}</p>
     `;
+    updateReliefLessonLinks(event);
+}
+
+function updateReliefLessonLinks(event) {
+    if (!event) return;
+    document.querySelectorAll(".relief-library-lessons a[data-course-code]").forEach((link) => {
+        const params = new URLSearchParams({
+            course: link.dataset.courseCode,
+            event: String(event.subject || ""),
+            date: String(event.startDate || "")
+        });
+        link.href = `relief-lesson.html?${params.toString()}`;
+    });
 }
 
 function renderCalendar() {
