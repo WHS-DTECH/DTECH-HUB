@@ -100,7 +100,10 @@ function renderExemplar(courseCode, lessonTitle) {
 
     const filePath = `/TeacherFiles/Lesson%20Plans/Ozone_Exemplar_${yearBand}.pptx`;
     exemplarDescription.textContent = `Ozone Layer digital outcome exemplar for ${yearBand}.`;
-    exemplarLink.href = filePath;
+    const absoluteFileUrl = `${window.location.origin}${filePath}`;
+    exemplarLink.href = `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(absoluteFileUrl)}`;
+    exemplarLink.textContent = "Open slideshow exemplar in new tab";
+    exemplarLink.title = `Open ${yearBand} Ozone slideshow exemplar`;
     exemplarBox.hidden = false;
 }
 
