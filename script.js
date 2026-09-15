@@ -2323,6 +2323,7 @@ async function loadAndRenderSidebarAllocations(panel) {
         hubStudentExternalStandards = Array.isArray(data.external_standards) ? data.external_standards : [];
         renderHubSidebarProfileCard(panel, profileDetails);
         renderHubSidebarStandardsCard(panel, profileDetails.yearGroup, hubStudentAllocatedStandards, hubStudentExternalStandards);
+        renderCurrentWeek();
         renderHubPracticalSkillsMenu(profileDetails.yearGroup);
         renderStats();
 
@@ -2459,6 +2460,14 @@ function renderHubSidebarStandardsCard(panel, yearGroup, internalStandards, exte
     summaryCardsContainer.hidden = false;
 }
 
+function getHubSummaryStandardNumbers() {
+    return new Set(
+        [...hubStudentAllocatedStandards, ...hubStudentExternalStandards]
+            .map((standard) => String(standard?.standard_number || standard?.standardNumber || "").trim())
+            .filter(Boolean)
+    );
+}
+
 // Reads year group/class/digital-media strand from the student's own allocation rows (each already
 // carries year_group/course_type resolved server-side from the class-management timetable data).
 function computeHubSidebarProfileDetails(items) {
@@ -2555,6 +2564,8 @@ function clearHubAuthState() {
     hubAccessState.canAdmin = false;
     hubAccessState.defaultView = "student";
     hubAccessState.additionalRole = "";
+    hubStudentAllocatedStandards = [];
+    hubStudentExternalStandards = [];
     resetHubDriveSetupState();
     clearHubStoredAuthRaw();
     setHubProfileOpen(false);
@@ -2780,6 +2791,7 @@ function renderHubAuthUi() {
 
     if (!signedIn) {
         setHubProfileOpen(false);
+        renderCurrentWeek();
         return;
     }
 
@@ -3768,7 +3780,10 @@ function renderCurrentWeek() {
         && String(project?.id || "").trim() !== "49"));
     const activeReliefLessons = sortProjects(lessons.filter((lesson) => lesson.showThisWeek));
     const activeLabProjects = sortLabProjects(labProjects.filter((project) => project.showThisWeek));
-    const activeStandards = sortProjects(standardCards);
+    const summaryStandardNumbers = getHubSummaryStandardNumbers();
+    const activeStandards = sortProjects(standardCards.filter((standard) =>
+        summaryStandardNumbers.has(String(standard?.standardNumber || "").trim())
+    ));
 
     const allCards = [
         ...activeActivities.map((project) => ({
