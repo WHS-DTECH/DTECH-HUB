@@ -189,7 +189,32 @@ function renderLesson(lesson, courseCode) {
     lessonContent.hidden = false;
 }
 
+function findMatchingReliefLesson(lessons, eventTitle, eventDate) {
+    const list = Array.isArray(lessons) ? lessons : [];
+    if (!list.length) return null;
+    const normalizedTitle = String(eventTitle || "").trim().toLowerCase();
+    const normalizedDate = String(eventDate || "").trim();
+    if (!normalizedTitle && !normalizedDate) return list[0];
+
+    const titleMatch = list.find((lesson) => String(lesson?.lesson_title || "").trim().toLowerCase() === normalizedTitle);
+    if (titleMatch) return titleMatch;
+
+    const dateMatch = list.find((lesson) => String(lesson?.lesson_date || "").trim() === normalizedDate);
+    if (dateMatch) return dateMatch;
+
+    const partialMatch = normalizedTitle
+        ? list.find((lesson) => {
+            const lessonTitle = String(lesson?.lesson_title || "").trim().toLowerCase();
+            return lessonTitle && (lessonTitle.includes(normalizedTitle) || normalizedTitle.includes(lessonTitle));
+        })
+        : null;
+    if (partialMatch) return partialMatch;
+
+    return list[0];
+}
+
 async function loadReliefLesson() {
+
     const params = new URLSearchParams(window.location.search);
     const courseCode = String(params.get("course") || "JDTECH").trim().toUpperCase();
     const eventTitle = String(params.get("event") || "").trim();
@@ -198,7 +223,7 @@ async function loadReliefLesson() {
         const response = await fetch(`/api/relief-lessons/${encodeURIComponent(courseCode)}`, { headers: reliefAuthHeaders() });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error || "Could not load Relief Lessons.");
-        const lesson = Array.isArray(data.lessons) ? data.lessons[0] : null;
+        const lesson = findMatchingReliefLesson(data.lessons, eventTitle, eventDate);
         if (!lesson) {
             renderLesson({
                 lesson_title: eventTitle || `Relief Lesson - ${courseCode}`,
