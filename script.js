@@ -999,7 +999,20 @@ async function loadSharedLessons() {
         if (!response.ok) return [];
 
         const payload = await response.json().catch(() => ({}));
-        const events = Array.isArray(payload?.events) ? payload.events : [];
+        const rawEvents = Array.isArray(payload?.events) ? payload.events : [];
+
+        // The Relief Plan feed can list the same annual observance twice (e.g. a 2026 and
+        // 2027 copy of the same date), so drop repeats sharing a title and month/day.
+        const seenObservances = new Set();
+        const events = rawEvents.filter((event) => {
+            const subjectKey = String(event?.subject || "").trim().toLowerCase();
+            const date = parseReliefEventDate(event?.startDate);
+            if (!subjectKey || !date) return true;
+            const key = `${subjectKey}|${date.getMonth()}-${date.getDate()}`;
+            if (seenObservances.has(key)) return false;
+            seenObservances.add(key);
+            return true;
+        });
 
         return events
             .map((event, index) => {
