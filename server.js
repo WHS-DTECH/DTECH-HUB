@@ -1615,6 +1615,17 @@ function parseReliefLessonPlanHtml(html) {
     }
     return "";
   };
+  const KNOWN_SECTION_LABELS = [
+    "unit", "steam component", "theme", "focus", "class",
+    "aim(s) of lesson", "resources required", "preparation (to do before lesson)", "preparation",
+    "health & safety", "starter", "demonstration", "practice",
+    "plenary", "homework", "lesson evaluation"
+  ];
+  const looksLikeAnotherLabel = (value) => {
+    const normalized = String(value || "").toLowerCase().replace(/[:\s]+$/, "").trim();
+    if (!normalized) return false;
+    return KNOWN_SECTION_LABELS.some((label) => normalized === label || normalized.startsWith(label));
+  };
   const findSection = (label) => {
     const normalizedLabel = String(label).toLowerCase();
     for (let rowIndex = 0; rowIndex < cells.length; rowIndex += 1) {
@@ -1622,8 +1633,12 @@ function parseReliefLessonPlanHtml(html) {
       const labelIndex = row.findIndex((cell) => cell.toLowerCase().includes(normalizedLabel));
       if (labelIndex < 0) continue;
       const sameRowValue = row.slice(labelIndex + 1).filter(Boolean).join("\n");
-      if (sameRowValue) return sameRowValue;
+      // Some templates put two column labels on one row (e.g. Aim | Resources) with the
+      // actual values in the matching column of the following row, so don't mistake a
+      // neighbouring label for the value.
+      if (sameRowValue && !looksLikeAnotherLabel(sameRowValue)) return sameRowValue;
       const nextRow = cells[rowIndex + 1] || [];
+      if (nextRow[labelIndex] && !looksLikeAnotherLabel(nextRow[labelIndex])) return nextRow[labelIndex];
       return nextRow.filter(Boolean).join("\n");
     }
     return "";
