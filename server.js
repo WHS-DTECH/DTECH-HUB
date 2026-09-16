@@ -4783,7 +4783,7 @@ async function seedOzoneLayerReliefLesson() {
     lesson_year_level: "NZ Year 11/12/13 combined",
     lesson_focus: seniorDtechLessonPlan.aim,
     lesson_notes: "Relief lesson imported from the Y11-13 Ozone Layer Word lesson plan.",
-    relief_course_code: "SeniorDTECH",
+    relief_course_code: "SENIORDTECH",
     lesson_plan: seniorDtechLessonPlan
   };
 
@@ -4811,21 +4811,7 @@ async function seedOzoneLayerReliefLesson() {
   await pool.query(
     `INSERT INTO lessons (id, lesson_title, lesson_week, lesson_date, lesson_duration_minutes, lesson_type, lesson_card_color, activity_name, lesson_year_level, lesson_link_url, lesson_focus, lesson_notes, relief_course_code, lesson_plan, publish_activity, add_to_calendar, created_by_email)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15, $16, $17)
-     ON CONFLICT (id) DO UPDATE SET
-       lesson_title = EXCLUDED.lesson_title,
-       lesson_week = EXCLUDED.lesson_week,
-       lesson_date = EXCLUDED.lesson_date,
-       lesson_duration_minutes = EXCLUDED.lesson_duration_minutes,
-       lesson_type = EXCLUDED.lesson_type,
-       lesson_card_color = EXCLUDED.lesson_card_color,
-       activity_name = EXCLUDED.activity_name,
-       lesson_year_level = EXCLUDED.lesson_year_level,
-       lesson_focus = EXCLUDED.lesson_focus,
-       lesson_notes = EXCLUDED.lesson_notes,
-       relief_course_code = EXCLUDED.relief_course_code,
-       lesson_plan = EXCLUDED.lesson_plan,
-       publish_activity = EXCLUDED.publish_activity,
-       updated_at = NOW()`,
+     ON CONFLICT (id) DO NOTHING`,
     [seniorDtechPayload.id, seniorDtechPayload.lesson_title, seniorDtechPayload.lesson_week, seniorDtechPayload.lesson_date, seniorDtechPayload.lesson_duration_minutes, seniorDtechPayload.lesson_type, seniorDtechPayload.lesson_card_color, seniorDtechPayload.activity_name, seniorDtechPayload.lesson_year_level, seniorDtechPayload.lesson_link_url, seniorDtechPayload.lesson_focus, seniorDtechPayload.lesson_notes, seniorDtechPayload.relief_course_code, JSON.stringify(seniorDtechPayload.lesson_plan), seniorDtechPayload.publish_activity, seniorDtechPayload.add_to_calendar, seniorDtechPayload.created_by_email]
   );
 
@@ -14673,14 +14659,14 @@ app.get("/api/relief-lessons/:courseCode", requireSchoolAccountAccess, async (re
 
   try {
     let result = await pool.query(
-      `SELECT * FROM lessons WHERE relief_course_code = $1 AND publish_activity = TRUE ORDER BY lesson_date ASC NULLS LAST, lesson_title ASC`,
+      `SELECT * FROM lessons WHERE UPPER(TRIM(relief_course_code)) = $1 AND publish_activity = TRUE ORDER BY lesson_date ASC NULLS LAST, lesson_title ASC`,
       [courseCode]
     );
 
     if (courseCode === "SENIORDTECH" && (!result.rows || result.rows.length === 0)) {
       const seededLesson = await seedOzoneLayerReliefLesson();
       result = await pool.query(
-        `SELECT * FROM lessons WHERE relief_course_code = $1 AND publish_activity = TRUE ORDER BY lesson_date ASC NULLS LAST, lesson_title ASC`,
+        `SELECT * FROM lessons WHERE UPPER(TRIM(relief_course_code)) = $1 AND publish_activity = TRUE ORDER BY lesson_date ASC NULLS LAST, lesson_title ASC`,
         [courseCode]
       );
       if (!result.rows || result.rows.length === 0) {
