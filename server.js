@@ -10681,7 +10681,13 @@ app.post("/api/student-tracker/email-summary", requireActivityWriteAccess, async
     );
     res.json({ ok: true, sent_at: sentAt.toISOString(), comment: result.rows[0] });
   } catch (error) {
-    res.status(500).json({ error: error.message || "Could not email progress summary" });
+    console.error("[student-tracker-email] Could not email progress summary:", error);
+    const message = String(error?.code || "").toUpperCase() === "EAUTH"
+      ? "The hub email account could not authenticate. Check SMTP_USER and SMTP_PASS in Render."
+      : String(error?.code || "").toUpperCase() === "ECONNECTION"
+        ? "The hub could not connect to the email server. Check SMTP_HOST, SMTP_PORT, and SMTP_SECURE in Render."
+        : error.message || "Could not email progress summary";
+    res.status(500).json({ error: message });
   }
 });
 
