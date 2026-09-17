@@ -1781,7 +1781,7 @@ function openProgressSummaryPrintWindow(students, standard) {
         .report-links { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 5px; }
         .report-links a { color: #1f5688; font-weight: 700; }
         .report-criteria-start { page-break-before: always; }
-        .report-footer { margin-top: 16px; color: #5a7188; font-size: 9px; }
+        .report-footer { position: fixed; right: 0; bottom: 0; left: 0; margin: 0; padding-top: 5px; border-top: 1px solid #c5d7e8; color: #5a7188; font-size: 9px; text-align: center; background: #fff; }
         .report-page-number::after { content: counter(page); }
         .report-page-count::after { content: counter(pages); }
         .report-empty { padding: 12px; border: 1px dashed #b9cce3; }
