@@ -89,8 +89,20 @@ function renderDetails(event) {
     updateReliefLessonLinks(event);
 }
 
+function getReliefTopicShortName(subject) {
+    const value = String(subject || "").trim();
+    if (!value) return "";
+    return value
+        .replace(/^international day for the preservation of the /i, "")
+        .replace(/^international day of /i, "")
+        .replace(/^international /i, "")
+        .replace(/^world /i, "")
+        .trim() || value;
+}
+
 function updateReliefLessonLinks(event) {
     if (!event) return;
+    const topic = getReliefTopicShortName(event.subject);
     document.querySelectorAll(".relief-library-lessons a[data-course-code]").forEach((link) => {
         const params = new URLSearchParams({
             course: link.dataset.courseCode,
@@ -98,6 +110,8 @@ function updateReliefLessonLinks(event) {
             date: String(event.startDate || "")
         });
         link.href = `relief-lesson.html?${params.toString()}`;
+        const baseLabel = link.dataset.baseLabel || link.textContent;
+        link.textContent = topic ? `${baseLabel} - ${topic}` : baseLabel;
     });
 }
 
