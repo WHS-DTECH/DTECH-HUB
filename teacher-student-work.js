@@ -1648,7 +1648,8 @@ function exportStudentTrackerCommentsCsv() {
 }
 
 function printStudentTrackerComments() {
-    const rows = getFilteredProcessSummaryRows();
+    const rows = getStudentTrackerCommentRows(false)
+        .filter((student) => String(workState.studentTrackerComments.get(student.studentEmail) || "").trim());
     const printWindow = window.open("", "_blank", "width=900,height=700");
     if (!printWindow) {
         setStatus("Allow pop-ups to print student comments.", true);
