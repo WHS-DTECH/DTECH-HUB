@@ -1717,7 +1717,9 @@ function buildProgressSummaryReportHtml(student, standard) {
                 <p>${achievedRecords.length - achievedCompleteCount} requirement${achievedRecords.length - achievedCompleteCount === 1 ? "" : "s"} still need evidence or completion.</p>
             </section>
             ${nextStepsHtml}
-            ${reportRows || `<p class="report-empty">No criteria were found for this student and standard.</p>`}
+            <div class="report-criteria-start">
+                ${reportRows || `<p class="report-empty">No criteria were found for this student and standard.</p>`}
+            </div>
             <footer class="report-footer">Standard ${escapeHtml(targetStandard)} · Page <span class="report-page-number"></span> of <span class="report-page-count"></span> · Evidence remains in its original location. This report contains links only and does not embed evidence files.</footer>
         </article>
     `;
@@ -1778,6 +1780,7 @@ function openProgressSummaryPrintWindow(students, standard) {
         .report-item-heading span { white-space: nowrap; font-size: 10px; font-weight: 700; }
         .report-links { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 5px; }
         .report-links a { color: #1f5688; font-weight: 700; }
+        .report-criteria-start { page-break-before: always; }
         .report-footer { margin-top: 16px; color: #5a7188; font-size: 9px; }
         .report-page-number::after { content: counter(page); }
         .report-page-count::after { content: counter(pages); }
