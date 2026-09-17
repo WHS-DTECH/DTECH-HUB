@@ -52,6 +52,7 @@ const workState = {
     expandedSummaryGroup: "",
     digitalMediaStudentSearch: "",
     digitalMediaStandardSearch: "",
+    commentStudentSearch: "",
     externalAssessmentAllocations: new Map(),
     externalAssessmentStudents: [],
     externalAssignedOnly: true,
@@ -85,6 +86,7 @@ const taskCurrentLabel = document.querySelector("#task-current-label");
 const studentTrackerCommentsGrid = document.querySelector("#student-tracker-comments-grid");
 const printStudentCommentsButton = document.querySelector("#print-student-comments-button");
 const exportStudentCommentsButton = document.querySelector("#export-student-comments-button");
+const commentStudentSearchInput = document.querySelector("#comment-student-search-input");
 
 function isTaskDetailPage() {
     const path = String(window.location.pathname || "").toLowerCase();
@@ -1517,6 +1519,10 @@ function getStudentTrackerCommentRows(filtered = true) {
             digitalMediaStandards: digitalMedia?.processStandards || [],
             digitalMediaType: digitalMedia?.digitalMediaType || ""
         };
+    }).filter((student) => {
+        if (!filtered) return true;
+        const nameQuery = String(workState.commentStudentSearch || "").trim().toLowerCase();
+        return !nameQuery || `${student.studentName} ${student.studentEmail}`.toLowerCase().includes(nameQuery);
     });
 }
 
@@ -1632,6 +1638,11 @@ function csvCell(value) {
     return `"${String(value || "").replace(/"/g, '""')}"`;
 }
 
+function getStudentCommentsFileTimestamp(date = new Date()) {
+    const pad = (value) => String(value).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}_${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`;
+}
+
 function exportStudentTrackerCommentsCsv() {
     const rows = getAllStudentTrackerCommentRows();
     const csv = [
@@ -1642,7 +1653,7 @@ function exportStudentTrackerCommentsCsv() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `student-comments-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `student-comments-${getStudentCommentsFileTimestamp()}.csv`;
     link.click();
     URL.revokeObjectURL(url);
 }
@@ -1650,13 +1661,14 @@ function exportStudentTrackerCommentsCsv() {
 function printStudentTrackerComments() {
     const rows = getStudentTrackerCommentRows(false)
         .filter((student) => String(workState.studentTrackerComments.get(student.studentEmail) || "").trim());
+    const fileTimestamp = getStudentCommentsFileTimestamp();
     const printWindow = window.open("", "_blank", "width=900,height=700");
     if (!printWindow) {
         setStatus("Allow pop-ups to print student comments.", true);
         return;
     }
     const tableRows = rows.map((student) => `<tr><td>${escapeHtml(student.studentName)}</td><td>${escapeHtml(student.processStandards.join(", ") || "-")}</td><td>${escapeHtml(student.digitalMediaStandards.join(", ") || "-")}</td><td>${escapeHtml(student.digitalMediaType || "-")}</td><td>${escapeHtml(workState.studentTrackerComments.get(student.studentEmail) || "")}</td></tr>`).join("");
-    printWindow.document.write(`<!doctype html><html><head><title>Student Comments</title><style>body{font:12px Arial,sans-serif;color:#17314d;margin:24px}h1{font:20px Georgia,serif}table{width:100%;border-collapse:collapse}th,td{border:1px solid #b9cce3;padding:8px;text-align:left;vertical-align:top}th{background:#eaf3fa}</style></head><body><h1>Student Comments</h1><table><thead><tr><th>Student</th><th>Process Standard</th><th>Digital Media Standard</th><th>Digital Media Type</th><th>Comments</th></tr></thead><tbody>${tableRows}</tbody></table></body></html>`);
+    printWindow.document.write(`<!doctype html><html><head><title>Student Comments - ${fileTimestamp}</title><style>body{font:12px Arial,sans-serif;color:#17314d;margin:24px}h1{font:20px Georgia,serif}table{width:100%;border-collapse:collapse}th,td{border:1px solid #b9cce3;padding:8px;text-align:left;vertical-align:top}th{background:#eaf3fa}</style></head><body><h1>Student Comments</h1><table><thead><tr><th>Student</th><th>Process Standard</th><th>Digital Media Standard</th><th>Digital Media Type</th><th>Comments</th></tr></thead><tbody>${tableRows}</tbody></table></body></html>`);
     printWindow.document.close();
     printWindow.focus();
     window.setTimeout(() => printWindow.print(), 250);
@@ -1696,6 +1708,10 @@ function wireStudentTrackerComments() {
     });
     printStudentCommentsButton?.addEventListener("click", printStudentTrackerComments);
     exportStudentCommentsButton?.addEventListener("click", exportStudentTrackerCommentsCsv);
+    commentStudentSearchInput?.addEventListener("input", () => {
+        workState.commentStudentSearch = String(commentStudentSearchInput.value || "");
+        renderStudentTrackerComments();
+    });
 }
 
 function setExternalAssessmentStatus(message, isError = false) {
