@@ -1709,9 +1709,21 @@ function wireStudentTrackerComments() {
     printStudentCommentsButton?.addEventListener("click", printStudentTrackerComments);
     exportStudentCommentsButton?.addEventListener("click", exportStudentTrackerCommentsCsv);
     commentStudentSearchInput?.addEventListener("input", () => {
-        workState.commentStudentSearch = String(commentStudentSearchInput.value || "");
-        renderStudentTrackerComments();
+        syncStudentNameFilters(commentStudentSearchInput.value);
     });
+}
+
+function syncStudentNameFilters(value) {
+    const nextValue = String(value || "");
+    workState.studentSearch = nextValue;
+    workState.digitalMediaStudentSearch = nextValue;
+    workState.commentStudentSearch = nextValue;
+    if (studentSearchInput && studentSearchInput.value !== nextValue) studentSearchInput.value = nextValue;
+    if (digitalMediaStudentSearchInput && digitalMediaStudentSearchInput.value !== nextValue) digitalMediaStudentSearchInput.value = nextValue;
+    if (commentStudentSearchInput && commentStudentSearchInput.value !== nextValue) commentStudentSearchInput.value = nextValue;
+    renderStudentSummaryGrid();
+    renderStudentTrackerComments();
+    renderDigitalMediaSummaryGrid();
 }
 
 function setExternalAssessmentStatus(message, isError = false) {
@@ -2377,19 +2389,9 @@ function wireTaskNavigationEvents() {
 }
 
 function wireStudentSearchEvents() {
-    const syncStudentNameSearch = (value) => {
-        const nextValue = String(value || "");
-        workState.studentSearch = nextValue;
-        workState.digitalMediaStudentSearch = nextValue;
-        if (studentSearchInput && studentSearchInput.value !== nextValue) studentSearchInput.value = nextValue;
-        if (digitalMediaStudentSearchInput && digitalMediaStudentSearchInput.value !== nextValue) digitalMediaStudentSearchInput.value = nextValue;
-        renderStudentSummaryGrid();
-        renderStudentTrackerComments();
-        renderDigitalMediaSummaryGrid();
-    };
     if (studentSearchInput) {
         studentSearchInput.addEventListener("input", () => {
-            syncStudentNameSearch(studentSearchInput.value);
+            syncStudentNameFilters(studentSearchInput.value);
         });
     }
     if (standardSearchInput) {
@@ -2401,7 +2403,7 @@ function wireStudentSearchEvents() {
     }
     if (digitalMediaStudentSearchInput) {
         digitalMediaStudentSearchInput.addEventListener("input", () => {
-            syncStudentNameSearch(digitalMediaStudentSearchInput.value);
+            syncStudentNameFilters(digitalMediaStudentSearchInput.value);
         });
     }
     if (digitalMediaStandardSearchInput) {
