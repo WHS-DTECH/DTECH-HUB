@@ -10650,6 +10650,7 @@ app.post("/api/student-tracker/email-summary", requireActivityWriteAccess, async
     await smtpTransporter.sendMail({
       from: SMTP_FROM,
       to: studentEmail,
+      cc: req.user_email,
       subject: `[DTECH HUB] Progress Summary: ${scopeLabel}`,
       html: `<div style="font-family:Arial,sans-serif;color:#17314d;max-width:900px;margin:0 auto;"><p>Kia ora ${safe(studentEmail)},</p><p>Your DTECH Hub progress summary is below.</p>${safeSummaries.map((summary) => `<div style="margin:24px 0;">${summary.html}</div>`).join("")}<p style="color:#5a7188;font-size:12px;">Sent ${safe(sentAtLabel)}.</p></div>`
     });
