@@ -1557,6 +1557,12 @@ function renderStudentTrackerComments() {
                                 ${getStudentTrackerCommentScopes(student).map((scope) => `<option value="${escapeHtml(scope.value)}">${escapeHtml(scope.label)}</option>`).join("")}
                             </select>
                             <textarea class="student-tracker-comment-input" rows="2" maxlength="10000" placeholder="Click to add a timestamped comment" aria-label="Comment for ${escapeHtml(student.studentName)}">${escapeHtml(workState.studentTrackerComments.get(student.studentEmail) || "")}</textarea>
+                            <div class="student-tracker-email-controls">
+                                <select class="student-tracker-email-scope" aria-label="Summary to email to ${escapeHtml(student.studentName)}">
+                                    ${getStudentTrackerCommentScopes(student).map((scope) => `<option value="${escapeHtml(scope.value)}">Email ${escapeHtml(scope.label)} Summary</option>`).join("")}
+                                </select>
+                                <button type="button" class="student-summary-action student-tracker-email-button">Email Summary</button>
+                            </div>
                         </td>
                     </tr>
                 `).join("")}</tbody>
@@ -1674,6 +1680,52 @@ function printStudentTrackerComments() {
     window.setTimeout(() => printWindow.print(), 250);
 }
 
+function getStudentSummaryForEmail(studentEmail, kind) {
+    const rows = kind === "digital"
+        ? buildDigitalMediaSummaryRows()
+        : buildProcessSummaryRows();
+    return rows.find((student) => student.studentEmail === studentEmail) || null;
+}
+
+async function emailStudentProgressSummary(row, button, scope) {
+    const studentEmail = normalizeEmail(row?.getAttribute("data-student-comment-email") || "");
+    const studentName = String(row?.querySelector("td")?.textContent || studentEmail).trim();
+    const scopes = scope === "both" ? ["process", "digital"] : [String(scope || "").split(":")[0]];
+    const summaries = scopes.map((kind) => {
+        const student = getStudentSummaryForEmail(studentEmail, kind);
+        const standard = kind === "digital"
+            ? student?.processStandards?.[0]
+            : getAuthoritativeStudentProcessStandard(student || {});
+        if (!student || !/^\d{4,6}$/.test(String(standard || ""))) return null;
+        return {
+            standard,
+            label: kind === "digital" ? "Digital Media Summary" : "Process Summary",
+            html: buildProgressSummaryReportHtml(student, standard)
+        };
+    }).filter(Boolean);
+    if (!summaries.length) {
+        setStatus(`No summary standard is available for ${studentName}.`, true);
+        return;
+    }
+
+    button.disabled = true;
+    try {
+        const payload = await fetchJson("/api/student-tracker/email-summary", {
+            method: "POST",
+            headers: withAuthHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ student_email: studentEmail, summaries })
+        });
+        const savedComment = String(payload?.comment?.comment || "").trim();
+        if (savedComment) workState.studentTrackerComments.set(studentEmail, savedComment);
+        renderStudentTrackerComments();
+        setStatus(`Summary emailed to ${studentEmail}.`);
+    } catch (error) {
+        setStatus(error?.message || "Could not email progress summary.", true);
+    } finally {
+        button.disabled = false;
+    }
+}
+
 function wireStudentTrackerComments() {
     const startTimestampedComment = (input, scope) => {
         if (!input) return;
@@ -1700,6 +1752,12 @@ function wireStudentTrackerComments() {
         const scope = scopeSelect.selectedOptions?.[0]?.textContent?.trim() || "Both";
         startTimestampedComment(input, scope);
         input?.focus();
+    });
+    studentTrackerCommentsGrid?.addEventListener("click", (event) => {
+        const button = event.target?.closest?.(".student-tracker-email-button");
+        const row = button?.closest?.("[data-student-comment-email]");
+        const scope = row?.querySelector?.(".student-tracker-email-scope")?.value || "";
+        if (row && button) void emailStudentProgressSummary(row, button, scope);
     });
     studentTrackerCommentsGrid?.addEventListener("change", (event) => {
         const input = event.target?.closest?.(".student-tracker-comment-input");

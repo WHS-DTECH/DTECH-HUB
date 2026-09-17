@@ -10616,6 +10616,75 @@ app.put("/api/student-tracker/comments/:studentEmail", requireActivityWriteAcces
   }
 });
 
+app.post("/api/student-tracker/email-summary", requireActivityWriteAccess, async (req, res) => {
+  const studentEmail = normalizeEmail(req.body?.student_email || req.body?.studentEmail || "");
+  const summaries = Array.isArray(req.body?.summaries) ? req.body.summaries : [];
+  if (!isSchoolEmail(studentEmail)) {
+    res.status(400).json({ error: "A valid school student email is required" });
+    return;
+  }
+  if (!summaries.length || summaries.length > 2) {
+    res.status(400).json({ error: "At least one summary is required" });
+    return;
+  }
+  if (!smtpTransporter || !SMTP_FROM) {
+    res.status(503).json({ error: "Email is not configured on the hub." });
+    return;
+  }
+
+  const safeSummaries = summaries.map((summary) => ({
+    standard: String(summary?.standard || "").trim(),
+    label: String(summary?.label || "Summary").trim(),
+    html: String(summary?.html || "").trim()
+  })).filter((summary) => /^\d{4,6}$/.test(summary.standard) && summary.html && summary.html.length <= 300000);
+  if (!safeSummaries.length || safeSummaries.length !== summaries.length) {
+    res.status(400).json({ error: "Invalid summary content" });
+    return;
+  }
+
+  const sentAt = new Date();
+  const sentAtLabel = sentAt.toLocaleString("en-NZ", { dateStyle: "short", timeStyle: "medium" });
+  const scopeLabel = safeSummaries.map((summary) => `${summary.label} ${summary.standard}`).join(" and ");
+  const safe = (value) => String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  try {
+    await smtpTransporter.sendMail({
+      from: SMTP_FROM,
+      to: studentEmail,
+      subject: `[DTECH HUB] Progress Summary: ${scopeLabel}`,
+      html: `<div style="font-family:Arial,sans-serif;color:#17314d;max-width:900px;margin:0 auto;"><p>Kia ora ${safe(studentEmail)},</p><p>Your DTECH Hub progress summary is below.</p>${safeSummaries.map((summary) => `<div style="margin:24px 0;">${summary.html}</div>`).join("")}<p style="color:#5a7188;font-size:12px;">Sent ${safe(sentAtLabel)}.</p></div>`
+    });
+
+    const emailEntry = `=== Email sent | ${scopeLabel} | ${sentAtLabel} ===`;
+    if (!hasDatabase) {
+      const existing = memoryStudentTrackerComments.get(studentEmail);
+      const existingComment = String(existing?.comment || "").trim();
+      const comment = existingComment ? `${emailEntry}\n${existingComment}` : emailEntry;
+      const saved = { student_email: studentEmail, comment, updated_at: sentAt.toISOString() };
+      memoryStudentTrackerComments.set(studentEmail, saved);
+      res.json({ ok: true, sent_at: sentAt.toISOString(), comment: saved });
+      return;
+    }
+
+    await ensureStudentTrackerCommentsSchema();
+    const existingResult = await pool.query(
+      `SELECT comment FROM student_tracker_comments WHERE student_email = $1 LIMIT 1`,
+      [studentEmail]
+    );
+    const existingComment = String(existingResult.rows[0]?.comment || "").trim();
+    const combinedComment = existingComment ? `${emailEntry}\n${existingComment}` : emailEntry;
+    const result = await pool.query(
+      `INSERT INTO student_tracker_comments (student_email, comment, updated_by_email, updated_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (student_email) DO UPDATE SET comment = EXCLUDED.comment, updated_by_email = EXCLUDED.updated_by_email, updated_at = NOW()
+       RETURNING student_email, comment, updated_at`,
+      [studentEmail, combinedComment, req.user_email]
+    );
+    res.json({ ok: true, sent_at: sentAt.toISOString(), comment: result.rows[0] });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not email progress summary" });
+  }
+});
+
 app.get("/api/my-allocations", async (req, res) => {
   const email = normalizeEmail(
     req?.authenticated_email ||
