@@ -1293,7 +1293,7 @@ function isRecentEvent(project, maxAgeDays = getConfiguredNewEventWindowDays()) 
 }
 
 const HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
-const HUB_UNIFIED_OAUTH_SCOPES = "openid email profile https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly";
+const HUB_UNIFIED_OAUTH_SCOPES = "openid email profile https://www.googleapis.com/auth/drive";
 
 function getHubStoredAuthRaw() {
     let localValue = null;
@@ -1737,8 +1737,7 @@ function getActiveHubGrantedScopes() {
 
 function hasHubDriveScopes() {
     const grantedScopes = getActiveHubGrantedScopes().toLowerCase();
-    return grantedScopes.includes("https://www.googleapis.com/auth/drive.file")
-        || grantedScopes.includes("https://www.googleapis.com/auth/drive.readonly");
+    return grantedScopes.includes("https://www.googleapis.com/auth/drive");
 }
 
 function getActiveHubDriveAccessToken() {
