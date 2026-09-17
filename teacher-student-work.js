@@ -53,6 +53,7 @@ const workState = {
     digitalMediaStudentSearch: "",
     digitalMediaStandardSearch: "",
     commentStudentSearch: "",
+    studentTrackerEmailStatus: new Map(),
     externalAssessmentAllocations: new Map(),
     externalAssessmentStudents: [],
     externalAssignedOnly: true,
@@ -1562,6 +1563,7 @@ function renderStudentTrackerComments() {
                                     ${getStudentTrackerCommentScopes(student).map((scope) => `<option value="${escapeHtml(scope.value)}">Email ${escapeHtml(scope.label)} Summary</option>`).join("")}
                                 </select>
                                 <button type="button" class="student-summary-action student-tracker-email-button">Email Summary</button>
+                                <span class="student-tracker-email-status${workState.studentTrackerEmailStatus.get(student.studentEmail)?.isError ? " is-error" : ""}" aria-live="polite">${escapeHtml(workState.studentTrackerEmailStatus.get(student.studentEmail)?.message || "")}</span>
                             </div>
                         </td>
                     </tr>
@@ -1708,7 +1710,16 @@ async function emailStudentProgressSummary(row, button, scope) {
         return;
     }
 
+    const statusHost = row?.querySelector?.(".student-tracker-email-status");
+    const setEmailStatus = (message, isError = false) => {
+        workState.studentTrackerEmailStatus.set(studentEmail, { message, isError });
+        if (statusHost) {
+            statusHost.textContent = message;
+            statusHost.classList.toggle("is-error", isError);
+        }
+    };
     button.disabled = true;
+    setEmailStatus("Sending...");
     try {
         const payload = await fetchJson("/api/student-tracker/email-summary", {
             method: "POST",
@@ -1718,8 +1729,16 @@ async function emailStudentProgressSummary(row, button, scope) {
         const savedComment = String(payload?.comment?.comment || "").trim();
         if (savedComment) workState.studentTrackerComments.set(studentEmail, savedComment);
         renderStudentTrackerComments();
+        const renderedRow = studentTrackerCommentsGrid?.querySelector?.(`[data-student-comment-email="${CSS.escape(studentEmail)}"]`);
+        const renderedStatus = renderedRow?.querySelector?.(".student-tracker-email-status");
+        if (renderedStatus) {
+            renderedStatus.textContent = `Sent ${new Date().toLocaleTimeString()}`;
+            renderedStatus.classList.remove("is-error");
+        }
+        workState.studentTrackerEmailStatus.set(studentEmail, { message: `Sent ${new Date().toLocaleTimeString()}`, isError: false });
         setStatus(`Summary emailed to ${studentEmail}.`);
     } catch (error) {
+        setEmailStatus(error?.message || "Email failed.", true);
         setStatus(error?.message || "Could not email progress summary.", true);
     } finally {
         button.disabled = false;
