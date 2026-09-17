@@ -1507,9 +1507,22 @@ function getFilteredProcessSummaryRows() {
     });
 }
 
+function getStudentTrackerCommentRows(filtered = true) {
+    const digitalMediaByEmail = new Map(buildDigitalMediaSummaryRows().map((student) => [student.studentEmail, student]));
+    const processRows = filtered ? getFilteredProcessSummaryRows() : buildProcessSummaryRows();
+    return processRows.map((student) => {
+        const digitalMedia = digitalMediaByEmail.get(student.studentEmail);
+        return {
+            ...student,
+            digitalMediaStandards: digitalMedia?.processStandards || [],
+            digitalMediaType: digitalMedia?.digitalMediaType || ""
+        };
+    });
+}
+
 function renderStudentTrackerComments() {
     if (!studentTrackerCommentsGrid) return;
-    const rows = getFilteredProcessSummaryRows();
+    const rows = getStudentTrackerCommentRows();
     if (!rows.length) {
         studentTrackerCommentsGrid.innerHTML = `<div class="work-empty">No students match that search.</div>`;
         return;
@@ -1518,11 +1531,13 @@ function renderStudentTrackerComments() {
     studentTrackerCommentsGrid.innerHTML = `
         <div class="work-table-wrap">
             <table class="student-summary-table student-comments-table">
-                <thead><tr><th>Student</th><th>Process Standard</th><th>Comments</th></tr></thead>
+                <thead><tr><th>Student</th><th>Process Standard</th><th>Digital Media Standard</th><th>Digital Media Type</th><th>Comments</th></tr></thead>
                 <tbody>${rows.map((student) => `
                     <tr data-student-comment-email="${escapeHtml(student.studentEmail)}">
                         <td>${escapeHtml(student.studentName)}</td>
                         <td>${student.processStandards.map((standard) => escapeHtml(standard)).join(", ") || "-"}</td>
+                        <td>${student.digitalMediaStandards.map((standard) => escapeHtml(standard)).join(", ") || "-"}</td>
+                        <td>${escapeHtml(student.digitalMediaType || "-")}</td>
                         <td><textarea class="student-tracker-comment-input" rows="2" maxlength="10000" placeholder="Click to add a timestamped comment" aria-label="Comment for ${escapeHtml(student.studentName)}">${escapeHtml(workState.studentTrackerComments.get(student.studentEmail) || "")}</textarea></td>
                     </tr>
                 `).join("")}</tbody>
@@ -1566,11 +1581,14 @@ async function saveStudentTrackerComment(row, input) {
 }
 
 function getAllStudentTrackerCommentRows() {
-    const studentsByEmail = new Map(buildProcessSummaryRows().map((student) => [student.studentEmail, student]));
+    const studentsByEmail = new Map(getStudentTrackerCommentRows(false).map((student) => [student.studentEmail, student]));
     return Array.from(workState.studentTrackerComments.entries())
         .map(([email, comment]) => ({
             studentEmail: email,
             studentName: studentsByEmail.get(email)?.studentName || workState.studentNameByEmail.get(email) || formatNameFromEmail(email),
+            processStandards: studentsByEmail.get(email)?.processStandards || [],
+            digitalMediaStandards: studentsByEmail.get(email)?.digitalMediaStandards || [],
+            digitalMediaType: studentsByEmail.get(email)?.digitalMediaType || "",
             comment
         }))
         .sort((left, right) => left.studentName.localeCompare(right.studentName));
@@ -1583,8 +1601,8 @@ function csvCell(value) {
 function exportStudentTrackerCommentsCsv() {
     const rows = getAllStudentTrackerCommentRows();
     const csv = [
-        ["Student", "Email", "Comment"].map(csvCell).join(","),
-        ...rows.map((row) => [row.studentName, row.studentEmail, row.comment].map(csvCell).join(","))
+        ["Student", "Email", "Process Standard", "Digital Media Standard", "Digital Media Type", "Comment"].map(csvCell).join(","),
+        ...rows.map((row) => [row.studentName, row.studentEmail, row.processStandards.join(", "), row.digitalMediaStandards.join(", "), row.digitalMediaType, row.comment].map(csvCell).join(","))
     ].join("\r\n");
     const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -1602,8 +1620,8 @@ function printStudentTrackerComments() {
         setStatus("Allow pop-ups to print student comments.", true);
         return;
     }
-    const tableRows = rows.map((student) => `<tr><td>${escapeHtml(student.studentName)}</td><td>${escapeHtml(student.processStandards.join(", ") || "-")}</td><td>${escapeHtml(workState.studentTrackerComments.get(student.studentEmail) || "")}</td></tr>`).join("");
-    printWindow.document.write(`<!doctype html><html><head><title>Student Comments</title><style>body{font:12px Arial,sans-serif;color:#17314d;margin:24px}h1{font:20px Georgia,serif}table{width:100%;border-collapse:collapse}th,td{border:1px solid #b9cce3;padding:8px;text-align:left;vertical-align:top}th{background:#eaf3fa}</style></head><body><h1>Student Comments</h1><table><thead><tr><th>Student</th><th>Process Standard</th><th>Comments</th></tr></thead><tbody>${tableRows}</tbody></table></body></html>`);
+    const tableRows = rows.map((student) => `<tr><td>${escapeHtml(student.studentName)}</td><td>${escapeHtml(student.processStandards.join(", ") || "-")}</td><td>${escapeHtml(student.digitalMediaStandards.join(", ") || "-")}</td><td>${escapeHtml(student.digitalMediaType || "-")}</td><td>${escapeHtml(workState.studentTrackerComments.get(student.studentEmail) || "")}</td></tr>`).join("");
+    printWindow.document.write(`<!doctype html><html><head><title>Student Comments</title><style>body{font:12px Arial,sans-serif;color:#17314d;margin:24px}h1{font:20px Georgia,serif}table{width:100%;border-collapse:collapse}th,td{border:1px solid #b9cce3;padding:8px;text-align:left;vertical-align:top}th{background:#eaf3fa}</style></head><body><h1>Student Comments</h1><table><thead><tr><th>Student</th><th>Process Standard</th><th>Digital Media Standard</th><th>Digital Media Type</th><th>Comments</th></tr></thead><tbody>${tableRows}</tbody></table></body></html>`);
     printWindow.document.close();
     printWindow.focus();
     window.setTimeout(() => printWindow.print(), 250);
