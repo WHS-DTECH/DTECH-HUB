@@ -2004,16 +2004,16 @@ function openProgressSummaryPrintWindow(students, standard) {
         .report-next-step-item strong { grid-column: 1 / -1; }
         .report-next-step-item span { color: #6b5218; font-size: 10px; font-weight: 700; }
         .report-next-step-item a { grid-column: 1 / -1; color: #1f5688; font-size: 10px; font-weight: 700; }
-        .report-level { margin: 14px 0; page-break-inside: avoid; }
+        .report-level { margin: 14px 0; padding: 8px 10px 10px; border: 1px solid #c5d7e8; page-break-inside: avoid; }
         .report-level-heading { display: flex; justify-content: space-between; gap: 10px; padding: 8px 10px; border: 1px solid #a8c5dd; border-left: 4px solid #2f74b9; background: #eaf3fa; text-transform: uppercase; letter-spacing: .04em; }
         .report-level-heading span { font-size: 11px; text-transform: none; letter-spacing: 0; }
         .report-section { margin: 8px 0 0; page-break-inside: avoid; }
         .report-section h3 { display: flex; justify-content: space-between; gap: 10px; padding: 7px 9px; border: 1px solid #c5d7e8; background: #f4f8fc; }
         .report-section h3 span { font-size: 10px; }
-        .report-item { margin-top: 5px; padding: 7px 9px; border: 1px solid #d7e2ed; }
-        .report-item.complete { background: #eef8f1; border-color: #b7dbc3; }
-        .report-item.linked { background: #fff9ea; border-color: #ddcca5; }
-        .report-item.required { background: #f8fbff; }
+        .report-item { margin-top: 5px; padding: 4px 9px; }
+        .report-item.complete,
+        .report-item.linked,
+        .report-item.required { background: transparent; border-color: transparent; }
         .report-item-heading { display: flex; justify-content: space-between; gap: 10px; }
         .report-item-heading span { white-space: nowrap; font-size: 10px; font-weight: 700; }
         .report-links { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 5px; }
