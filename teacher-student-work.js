@@ -1590,6 +1590,7 @@ async function saveStudentTrackerComment(row, input) {
         setStatus(error?.message || "Could not save student comment.", true);
     } finally {
         input.disabled = false;
+        delete input.dataset.timestampLine;
     }
 }
 
@@ -1661,16 +1662,31 @@ function printStudentTrackerComments() {
 }
 
 function wireStudentTrackerComments() {
+    const startTimestampedComment = (input, scope) => {
+        if (!input) return;
+        const previousTimestampLine = String(input.dataset.timestampLine || "").trim();
+        const currentValue = String(input.value || "").trim();
+        const priorEntryOnly = previousTimestampLine && (currentValue === previousTimestampLine || currentValue === `${previousTimestampLine}\n`);
+        const baseValue = priorEntryOnly ? "" : currentValue;
+        const timestampLine = `=== ${scope || "Both"} | ${new Date().toLocaleString()} ===`;
+        input.value = baseValue ? `${timestampLine}\n${baseValue}` : `${timestampLine}\n`;
+        input.dataset.timestampLine = timestampLine;
+    };
+
     studentTrackerCommentsGrid?.addEventListener("focusin", (event) => {
         const input = event.target?.closest?.(".student-tracker-comment-input");
         if (!input || input.dataset.timestampLine) return;
         const row = input.closest?.("[data-student-comment-email]");
         const scope = row?.querySelector?.(".student-tracker-comment-scope")?.selectedOptions?.[0]?.textContent?.trim() || "Both";
-        const timestampLine = `=== ${scope} | ${new Date().toLocaleString()} ===`;
-        input.value = input.value.trim()
-            ? `${timestampLine}\n${input.value.trim()}`
-            : `${timestampLine}\n`;
-        input.dataset.timestampLine = timestampLine;
+        startTimestampedComment(input, scope);
+    });
+    studentTrackerCommentsGrid?.addEventListener("change", (event) => {
+        const scopeSelect = event.target?.closest?.(".student-tracker-comment-scope");
+        if (!scopeSelect) return;
+        const input = scopeSelect.closest?.("td")?.querySelector?.(".student-tracker-comment-input");
+        const scope = scopeSelect.selectedOptions?.[0]?.textContent?.trim() || "Both";
+        startTimestampedComment(input, scope);
+        input?.focus();
     });
     studentTrackerCommentsGrid?.addEventListener("change", (event) => {
         const input = event.target?.closest?.(".student-tracker-comment-input");
