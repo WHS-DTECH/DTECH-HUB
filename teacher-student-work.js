@@ -1523,7 +1523,7 @@ function renderStudentTrackerComments() {
                     <tr data-student-comment-email="${escapeHtml(student.studentEmail)}">
                         <td>${escapeHtml(student.studentName)}</td>
                         <td>${student.processStandards.map((standard) => escapeHtml(standard)).join(", ") || "-"}</td>
-                        <td><textarea class="student-tracker-comment-input" rows="2" maxlength="2000" placeholder="Add a comment" aria-label="Comment for ${escapeHtml(student.studentName)}">${escapeHtml(workState.studentTrackerComments.get(student.studentEmail) || "")}</textarea></td>
+                        <td><textarea class="student-tracker-comment-input" rows="2" maxlength="10000" placeholder="Click to add a timestamped comment" aria-label="Comment for ${escapeHtml(student.studentName)}">${escapeHtml(workState.studentTrackerComments.get(student.studentEmail) || "")}</textarea></td>
                     </tr>
                 `).join("")}</tbody>
             </table>
@@ -1547,7 +1547,8 @@ async function loadStudentTrackerComments() {
 async function saveStudentTrackerComment(row, input) {
     const studentEmail = normalizeEmail(row?.getAttribute("data-student-comment-email") || "");
     if (!studentEmail || !input) return;
-    const comment = String(input.value || "").trim();
+    const timestampLine = String(input.dataset.timestampLine || "").trim();
+    const comment = String(input.value || "").trim() === timestampLine ? "" : String(input.value || "").trim();
     input.disabled = true;
     try {
         await fetchJson(`/api/student-tracker/comments/${encodeURIComponent(studentEmail)}`, {
@@ -1609,6 +1610,15 @@ function printStudentTrackerComments() {
 }
 
 function wireStudentTrackerComments() {
+    studentTrackerCommentsGrid?.addEventListener("focusin", (event) => {
+        const input = event.target?.closest?.(".student-tracker-comment-input");
+        if (!input || input.dataset.timestampLine) return;
+        const timestampLine = `--- ${new Date().toLocaleString()} ---`;
+        input.value = input.value.trim()
+            ? `${timestampLine}\n${input.value.trim()}`
+            : `${timestampLine}\n`;
+        input.dataset.timestampLine = timestampLine;
+    });
     studentTrackerCommentsGrid?.addEventListener("change", (event) => {
         const input = event.target?.closest?.(".student-tracker-comment-input");
         const row = input?.closest?.("[data-student-comment-email]");
