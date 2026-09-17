@@ -1520,6 +1520,14 @@ function getStudentTrackerCommentRows(filtered = true) {
     });
 }
 
+function getStudentTrackerCommentScopes(student) {
+    const scopes = [];
+    student.processStandards.forEach((standard) => scopes.push({ value: `process:${standard}`, label: `Process ${standard}` }));
+    student.digitalMediaStandards.forEach((standard) => scopes.push({ value: `digital:${standard}`, label: `Digital Media ${standard}` }));
+    if (scopes.length > 1) scopes.push({ value: "both", label: "Both" });
+    return scopes;
+}
+
 function renderStudentTrackerComments() {
     if (!studentTrackerCommentsGrid) return;
     const rows = getStudentTrackerCommentRows();
@@ -1538,7 +1546,12 @@ function renderStudentTrackerComments() {
                         <td>${student.processStandards.map((standard) => escapeHtml(standard)).join(", ") || "-"}</td>
                         <td>${student.digitalMediaStandards.map((standard) => escapeHtml(standard)).join(", ") || "-"}</td>
                         <td>${escapeHtml(student.digitalMediaType || "-")}</td>
-                        <td><textarea class="student-tracker-comment-input" rows="2" maxlength="10000" placeholder="Click to add a timestamped comment" aria-label="Comment for ${escapeHtml(student.studentName)}">${escapeHtml(workState.studentTrackerComments.get(student.studentEmail) || "")}</textarea></td>
+                        <td>
+                            <select class="student-tracker-comment-scope" aria-label="Standard for comment about ${escapeHtml(student.studentName)}">
+                                ${getStudentTrackerCommentScopes(student).map((scope) => `<option value="${escapeHtml(scope.value)}">${escapeHtml(scope.label)}</option>`).join("")}
+                            </select>
+                            <textarea class="student-tracker-comment-input" rows="2" maxlength="10000" placeholder="Click to add a timestamped comment" aria-label="Comment for ${escapeHtml(student.studentName)}">${escapeHtml(workState.studentTrackerComments.get(student.studentEmail) || "")}</textarea>
+                        </td>
                     </tr>
                 `).join("")}</tbody>
             </table>
@@ -1594,6 +1607,26 @@ function getAllStudentTrackerCommentRows() {
         .sort((left, right) => left.studentName.localeCompare(right.studentName));
 }
 
+function getCommentsForStandard(commentText, targetStandard) {
+    const text = String(commentText || "").trim();
+    if (!text) return "";
+    const entryPattern = /^===\s*(Process|Digital Media|Both)(?:\s+(\d{4,6}))?\s*\|\s*([^=]+?)\s*===$/gim;
+    const matches = Array.from(text.matchAll(entryPattern));
+    if (!matches.length) return text;
+    const target = normalizeTrackerStandardValue(targetStandard);
+    const starts = matches.map((match) => match.index);
+    const entries = matches.map((match, index) => ({
+        header: match[0],
+        scope: String(match[1] || "").toLowerCase(),
+        standard: String(match[2] || "").trim(),
+        body: text.slice(match.index + match[0].length, starts[index + 1] ?? text.length).trim()
+    }));
+    return entries
+        .filter((entry) => entry.scope === "both" || !target || entry.standard === target)
+        .map((entry) => `${entry.header}\n${entry.body}`.trim())
+        .join("\n\n");
+}
+
 function csvCell(value) {
     return `"${String(value || "").replace(/"/g, '""')}"`;
 }
@@ -1631,7 +1664,9 @@ function wireStudentTrackerComments() {
     studentTrackerCommentsGrid?.addEventListener("focusin", (event) => {
         const input = event.target?.closest?.(".student-tracker-comment-input");
         if (!input || input.dataset.timestampLine) return;
-        const timestampLine = `--- ${new Date().toLocaleString()} ---`;
+        const row = input.closest?.("[data-student-comment-email]");
+        const scope = row?.querySelector?.(".student-tracker-comment-scope")?.selectedOptions?.[0]?.textContent?.trim() || "Both";
+        const timestampLine = `=== ${scope} | ${new Date().toLocaleString()} ===`;
         input.value = input.value.trim()
             ? `${timestampLine}\n${input.value.trim()}`
             : `${timestampLine}\n`;
@@ -1791,6 +1826,7 @@ function buildProgressSummaryReportHtml(student, standard) {
         && !record.acknowledged
         && !hasStudentSummaryEvidence(record));
     const nextStepGroups = buildStudentSummaryDetailGroups(incompleteAchievedRecords);
+    const standardComments = getCommentsForStandard(workState.studentTrackerComments.get(student.studentEmail), targetStandard);
     const nextStepsHtml = nextStepGroups.length
         ? `
             <section class="report-next-steps">
@@ -1869,6 +1905,7 @@ function buildProgressSummaryReportHtml(student, standard) {
                 <strong>${achievedCompleteCount}/${achievedRecords.length} complete</strong>
                 <p>${achievedRecords.length - achievedCompleteCount} requirement${achievedRecords.length - achievedCompleteCount === 1 ? "" : "s"} still need evidence or completion.</p>
             </section>
+            ${standardComments ? `<section class="report-comments"><h2>TEACHER COMMENTS</h2><p>${escapeHtml(standardComments).replace(/\r?\n/g, "<br>")}</p></section>` : ""}
             ${nextStepsHtml}
             <div class="report-criteria-start">
                 ${reportRows || `<p class="report-empty">No criteria were found for this student and standard.</p>`}
@@ -1908,6 +1945,9 @@ function openProgressSummaryPrintWindow(students, standard) {
         .report-progress { margin: 14px 0; padding: 10px 12px; border: 1px solid #c5d7e8; border-left: 4px solid #2f74b9; background: #f2f8fc; }
         .report-progress strong { display: block; margin-top: 5px; color: #1f663d; font-size: 17px; }
         .report-progress p { margin: 4px 0 0; }
+        .report-comments { margin: 14px 0; padding: 10px 12px; border: 1px solid #b9cce3; border-left: 4px solid #315f87; background: #f4f8fc; page-break-inside: avoid; }
+        .report-comments h2 { margin-bottom: 6px; font-size: 14px; letter-spacing: .06em; }
+        .report-comments p { margin: 0; line-height: 1.45; white-space: normal; }
         .report-next-steps { margin: 14px 0; padding: 10px 12px; border: 1px solid #d7c18e; border-left: 4px solid #b38424; background: #fffaf0; page-break-inside: avoid; }
         .report-next-steps.is-complete { border-color: #b7dbc3; border-left-color: #2f8b57; background: #eef8f1; }
         .report-next-steps h2 { color: #6b5218; font-size: 14px; letter-spacing: .06em; }
