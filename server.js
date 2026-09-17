@@ -65,6 +65,7 @@ const memoryDecompositionCoverage = new Map();
 const memoryTriallingComponents = new Map();
 const memoryDigiMedEfficientTools = new Map();
 const memoryExternalAssessmentAllocations = new Map();
+const memoryStudentTrackerComments = new Map();
 const memoryPracticalSkillsProgress = new Map();
 const memoryPracticalSkillsKitContent = new Map();
 const PRACTICAL_SKILLS_LIBRARY_FILE = path.join(__dirname, "practical-skills", "library.json");
@@ -5812,6 +5813,21 @@ async function ensureExternalAssessmentAllocationsSchema() {
   await pool.query(`ALTER TABLE student_external_assessment_allocations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 }
 
+async function ensureStudentTrackerCommentsSchema() {
+  if (!hasDatabase) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS student_tracker_comments (
+      student_email TEXT PRIMARY KEY,
+      comment TEXT NOT NULL DEFAULT '',
+      updated_by_email TEXT,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  await pool.query(`ALTER TABLE student_tracker_comments ADD COLUMN IF NOT EXISTS comment TEXT NOT NULL DEFAULT ''`);
+  await pool.query(`ALTER TABLE student_tracker_comments ADD COLUMN IF NOT EXISTS updated_by_email TEXT`);
+  await pool.query(`ALTER TABLE student_tracker_comments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+}
+
 async function ensureDecompositionCoverageSchema() {
   if (!hasDatabase) return;
   await pool.query(`
@@ -10543,6 +10559,60 @@ app.put("/api/external-assessment-allocations/:studentEmail", requireActivityWri
     res.json({ ok: true, allocation: result.rows[0] });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not save external assessment allocation" });
+  }
+});
+
+app.get("/api/student-tracker/comments", requireActivityWriteAccess, async (_req, res) => {
+  if (!hasDatabase) {
+    res.json({ comments: Array.from(memoryStudentTrackerComments.values()) });
+    return;
+  }
+
+  try {
+    await ensureStudentTrackerCommentsSchema();
+    const result = await pool.query(
+      `SELECT student_email, comment, updated_at FROM student_tracker_comments ORDER BY student_email ASC`
+    );
+    res.json({ comments: result.rows });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not load student tracker comments" });
+  }
+});
+
+app.put("/api/student-tracker/comments/:studentEmail", requireActivityWriteAccess, async (req, res) => {
+  const studentEmail = normalizeEmail(req.params.studentEmail || "");
+  const comment = String(req.body?.comment || "").trim();
+  if (!isSchoolEmail(studentEmail)) {
+    res.status(400).json({ error: "A valid school student email is required" });
+    return;
+  }
+
+  const savedComment = {
+    student_email: studentEmail,
+    comment,
+    updated_at: new Date().toISOString()
+  };
+  if (!hasDatabase) {
+    if (comment) memoryStudentTrackerComments.set(studentEmail, savedComment);
+    else memoryStudentTrackerComments.delete(studentEmail);
+    res.json({ ok: true, comment: savedComment });
+    return;
+  }
+
+  try {
+    await ensureStudentTrackerCommentsSchema();
+    const result = comment
+      ? await pool.query(
+          `INSERT INTO student_tracker_comments (student_email, comment, updated_by_email, updated_at)
+           VALUES ($1, $2, $3, NOW())
+           ON CONFLICT (student_email) DO UPDATE SET comment = EXCLUDED.comment, updated_by_email = EXCLUDED.updated_by_email, updated_at = NOW()
+           RETURNING student_email, comment, updated_at`,
+          [studentEmail, comment, req.user_email]
+        )
+      : await pool.query(`DELETE FROM student_tracker_comments WHERE student_email = $1 RETURNING student_email`, [studentEmail]);
+    res.json({ ok: true, comment: result.rows[0] || savedComment });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not save student tracker comment" });
   }
 });
 

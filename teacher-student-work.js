@@ -57,7 +57,8 @@ const workState = {
     externalAssignedOnly: true,
     externalStandardFilter: "",
     expandedDigitalMediaStudent: "",
-    expandedDigitalMediaGroup: ""
+    expandedDigitalMediaGroup: "",
+    studentTrackerComments: new Map()
 };
 
 const statusHost = document.querySelector("#work-status");
@@ -81,6 +82,9 @@ const taskPageNav = document.querySelector("#task-page-nav");
 const taskPrevButton = document.querySelector("#task-prev-button");
 const taskNextButton = document.querySelector("#task-next-button");
 const taskCurrentLabel = document.querySelector("#task-current-label");
+const studentTrackerCommentsGrid = document.querySelector("#student-tracker-comments-grid");
+const printStudentCommentsButton = document.querySelector("#print-student-comments-button");
+const exportStudentCommentsButton = document.querySelector("#export-student-comments-button");
 
 function isTaskDetailPage() {
     const path = String(window.location.pathname || "").toLowerCase();
@@ -1493,6 +1497,127 @@ function renderExternalAssessmentGrid() {
     `;
 }
 
+function getFilteredProcessSummaryRows() {
+    const rows = buildProcessSummaryRows();
+    const nameQuery = String(workState.studentSearch || "").trim().toLowerCase();
+    const standardQuery = String(workState.standardSearch || "").trim().toLowerCase();
+    return rows.filter((student) => {
+        const nameMatches = !nameQuery || `${student.studentName} ${student.studentEmail}`.toLowerCase().includes(nameQuery);
+        return nameMatches && studentMatchesStandardSearch(student, standardQuery);
+    });
+}
+
+function renderStudentTrackerComments() {
+    if (!studentTrackerCommentsGrid) return;
+    const rows = getFilteredProcessSummaryRows();
+    if (!rows.length) {
+        studentTrackerCommentsGrid.innerHTML = `<div class="work-empty">No students match that search.</div>`;
+        return;
+    }
+
+    studentTrackerCommentsGrid.innerHTML = `
+        <div class="work-table-wrap">
+            <table class="student-summary-table student-comments-table">
+                <thead><tr><th>Student</th><th>Process Standard</th><th>Comments</th></tr></thead>
+                <tbody>${rows.map((student) => `
+                    <tr data-student-comment-email="${escapeHtml(student.studentEmail)}">
+                        <td>${escapeHtml(student.studentName)}</td>
+                        <td>${student.processStandards.map((standard) => escapeHtml(standard)).join(", ") || "-"}</td>
+                        <td><textarea class="student-tracker-comment-input" rows="2" maxlength="2000" placeholder="Add a comment" aria-label="Comment for ${escapeHtml(student.studentName)}">${escapeHtml(workState.studentTrackerComments.get(student.studentEmail) || "")}</textarea></td>
+                    </tr>
+                `).join("")}</tbody>
+            </table>
+        </div>
+    `;
+}
+
+async function loadStudentTrackerComments() {
+    try {
+        const payload = await fetchJson("/api/student-tracker/comments", { headers: withAuthHeaders() });
+        workState.studentTrackerComments = new Map(
+            (Array.isArray(payload?.comments) ? payload.comments : [])
+                .map((row) => [normalizeEmail(row?.student_email), String(row?.comment || "")])
+                .filter(([email, comment]) => email && comment)
+        );
+    } catch (_error) {
+        setStatus("Student comments could not be loaded.", true);
+    }
+}
+
+async function saveStudentTrackerComment(row, input) {
+    const studentEmail = normalizeEmail(row?.getAttribute("data-student-comment-email") || "");
+    if (!studentEmail || !input) return;
+    const comment = String(input.value || "").trim();
+    input.disabled = true;
+    try {
+        await fetchJson(`/api/student-tracker/comments/${encodeURIComponent(studentEmail)}`, {
+            method: "PUT",
+            headers: withAuthHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ comment })
+        });
+        if (comment) workState.studentTrackerComments.set(studentEmail, comment);
+        else workState.studentTrackerComments.delete(studentEmail);
+    } catch (error) {
+        setStatus(error?.message || "Could not save student comment.", true);
+    } finally {
+        input.disabled = false;
+    }
+}
+
+function getAllStudentTrackerCommentRows() {
+    const studentsByEmail = new Map(buildProcessSummaryRows().map((student) => [student.studentEmail, student]));
+    return Array.from(workState.studentTrackerComments.entries())
+        .map(([email, comment]) => ({
+            studentEmail: email,
+            studentName: studentsByEmail.get(email)?.studentName || workState.studentNameByEmail.get(email) || formatNameFromEmail(email),
+            comment
+        }))
+        .sort((left, right) => left.studentName.localeCompare(right.studentName));
+}
+
+function csvCell(value) {
+    return `"${String(value || "").replace(/"/g, '""')}"`;
+}
+
+function exportStudentTrackerCommentsCsv() {
+    const rows = getAllStudentTrackerCommentRows();
+    const csv = [
+        ["Student", "Email", "Comment"].map(csvCell).join(","),
+        ...rows.map((row) => [row.studentName, row.studentEmail, row.comment].map(csvCell).join(","))
+    ].join("\r\n");
+    const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `student-comments-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+}
+
+function printStudentTrackerComments() {
+    const rows = getFilteredProcessSummaryRows();
+    const printWindow = window.open("", "_blank", "width=900,height=700");
+    if (!printWindow) {
+        setStatus("Allow pop-ups to print student comments.", true);
+        return;
+    }
+    const tableRows = rows.map((student) => `<tr><td>${escapeHtml(student.studentName)}</td><td>${escapeHtml(student.processStandards.join(", ") || "-")}</td><td>${escapeHtml(workState.studentTrackerComments.get(student.studentEmail) || "")}</td></tr>`).join("");
+    printWindow.document.write(`<!doctype html><html><head><title>Student Comments</title><style>body{font:12px Arial,sans-serif;color:#17314d;margin:24px}h1{font:20px Georgia,serif}table{width:100%;border-collapse:collapse}th,td{border:1px solid #b9cce3;padding:8px;text-align:left;vertical-align:top}th{background:#eaf3fa}</style></head><body><h1>Student Comments</h1><table><thead><tr><th>Student</th><th>Process Standard</th><th>Comments</th></tr></thead><tbody>${tableRows}</tbody></table></body></html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    window.setTimeout(() => printWindow.print(), 250);
+}
+
+function wireStudentTrackerComments() {
+    studentTrackerCommentsGrid?.addEventListener("change", (event) => {
+        const input = event.target?.closest?.(".student-tracker-comment-input");
+        const row = input?.closest?.("[data-student-comment-email]");
+        if (row) void saveStudentTrackerComment(row, input);
+    });
+    printStudentCommentsButton?.addEventListener("click", printStudentTrackerComments);
+    exportStudentCommentsButton?.addEventListener("click", exportStudentTrackerCommentsCsv);
+}
+
 function setExternalAssessmentStatus(message, isError = false) {
     if (!externalAssessmentStatus) return;
     externalAssessmentStatus.textContent = String(message || "");
@@ -2158,6 +2283,7 @@ function wireStudentSearchEvents() {
         if (studentSearchInput && studentSearchInput.value !== nextValue) studentSearchInput.value = nextValue;
         if (digitalMediaStudentSearchInput && digitalMediaStudentSearchInput.value !== nextValue) digitalMediaStudentSearchInput.value = nextValue;
         renderStudentSummaryGrid();
+        renderStudentTrackerComments();
         renderDigitalMediaSummaryGrid();
     };
     if (studentSearchInput) {
@@ -2169,6 +2295,7 @@ function wireStudentSearchEvents() {
         standardSearchInput.addEventListener("input", () => {
             workState.standardSearch = String(standardSearchInput.value || "");
             renderStudentSummaryGrid();
+            renderStudentTrackerComments();
         });
     }
     if (digitalMediaStudentSearchInput) {
@@ -2297,9 +2424,12 @@ async function init() {
         wireStudentSearchEvents();
         wireStudentSummaryEvents();
         wireProgressSummaryEvents();
+        wireStudentTrackerComments();
         wireExternalAssessmentEvents();
 
+        await loadStudentTrackerComments();
         renderStudentSummaryGrid();
+        renderStudentTrackerComments();
         renderDigitalMediaSummaryGrid();
         renderExternalAssessmentGrid();
         renderTaskLinks();
