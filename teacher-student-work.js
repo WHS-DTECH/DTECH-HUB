@@ -2000,7 +2000,7 @@ function openProgressSummaryPrintWindow(students, standard) {
         .report-next-step-intro { margin: 8px 0; font-weight: 700; }
         .report-next-step-group { margin-top: 9px; }
         .report-next-step-group h3 { margin: 0 0 4px; color: #6b5218; font-size: 11px; }
-        .report-next-step-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; margin-top: 4px; padding: 6px 8px; border: 1px solid #ddcca5; background: #fff; }
+        .report-next-step-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; margin-top: 4px; padding: 6px 8px; }
         .report-next-step-item strong { grid-column: 1 / -1; }
         .report-next-step-item span { color: #6b5218; font-size: 10px; font-weight: 700; }
         .report-next-step-item a { grid-column: 1 / -1; color: #1f5688; font-size: 10px; font-weight: 700; }
