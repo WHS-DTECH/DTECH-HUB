@@ -2019,7 +2019,7 @@ function buildProgressSummaryReportHtml(student, standard) {
                 <dl>
                     <div><dt>Student</dt><dd>${escapeHtml(student.studentName)}</dd></div>
                     <div><dt>Standard</dt><dd>${escapeHtml(targetStandard)}</dd></div>
-                    <div class="report-date-meta"><img src="${escapeHtml(schoolLogoUrl)}" alt="Westland High School logo"><dt>Report date</dt><dd>${escapeHtml(generatedDate)}</dd></div>
+                    <div class="report-date-meta"><img src="${escapeHtml(schoolLogoUrl)}" alt="Westland High School logo" width="96" height="96" style="display:block;width:96px;height:96px;max-width:96px;object-fit:contain;margin-bottom:5px;"><dt>Report date</dt><dd>${escapeHtml(generatedDate)}</dd></div>
                 </dl>
             </header>
             <section class="report-progress">
