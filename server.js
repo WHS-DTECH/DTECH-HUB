@@ -1498,7 +1498,7 @@ function dedupeToLatestStudentRows(rows) {
 const suggestionNotificationFallback = String(process.env.SUGGESTION_NOTIFY_EMAILS || "");
 const SMTP_HOST = String(process.env.SMTP_HOST || "").trim();
 const SMTP_PORT = Number.parseInt(process.env.SMTP_PORT || "", 10) || 587;
-const SMTP_SECURE = String(process.env.SMTP_SECURE || "false").trim().toLowerCase() === "true";
+const SMTP_SECURE = ["true", "1", "yes", "on"].includes(String(process.env.SMTP_SECURE || "false").trim().toLowerCase());
 const SMTP_USER = String(process.env.SMTP_USER || "").trim();
 const SMTP_PASS = String(process.env.SMTP_PASS || "").trim();
 const SMTP_FROM = String(process.env.SMTP_FROM || SMTP_USER || "").trim();
