@@ -4703,6 +4703,7 @@ async function ensureSchema() {
   await ensureTrelloConnectionsSchema();
   await ensureStudentHaparaFoldersSchema();
   await ensureStudentDriveSetupSchema();
+  await ensureEmailLogsSchema();
   await ensureTriallingComponentsSchema();
   await ensureDigiMedEfficientToolsSchema();
   await ensureUnitPlanSchema();
@@ -5311,6 +5312,11 @@ async function sendConfiguredHubEmail({ to, cc = "", subject, html, attachment =
 async function ensureEmailLogsSchema() {
   if (!hasDatabase) return;
   await pool.query(`CREATE TABLE IF NOT EXISTS email_logs (id BIGSERIAL PRIMARY KEY, sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), from_email TEXT, recipients TEXT[] NOT NULL DEFAULT '{}', subject TEXT, email_type TEXT)`);
+  await pool.query(`ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await pool.query(`ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS from_email TEXT`);
+  await pool.query(`ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS recipients TEXT[] NOT NULL DEFAULT '{}'`);
+  await pool.query(`ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS subject TEXT`);
+  await pool.query(`ALTER TABLE email_logs ADD COLUMN IF NOT EXISTS email_type TEXT`);
 }
 
 function getHubEmailErrorMessage(error) {
