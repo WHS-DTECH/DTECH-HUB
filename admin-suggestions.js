@@ -1,19 +1,11 @@
 const suggestionsTableBody = document.querySelector("#suggestions-table tbody");
 const suggestionsStatus = document.querySelector("#suggestions-status");
 const ADMIN_SUGGESTIONS_AUTH_STORAGE_KEY = "hub_google_auth_v1";
-const emailSuggestionsListButton = document.querySelector("#email-suggestions-list-button");
-const suggestionsEmailStatus = document.querySelector("#suggestions-email-status");
 
 function setSuggestionsStatus(message, isError = false) {
   if (!suggestionsStatus) return;
   suggestionsStatus.textContent = message;
   suggestionsStatus.style.color = isError ? "#bb3f3f" : "#2f4e73";
-}
-
-function setSuggestionsEmailStatus(message, isError = false) {
-  if (!suggestionsEmailStatus) return;
-  suggestionsEmailStatus.textContent = message;
-  suggestionsEmailStatus.style.color = isError ? "#bb3f3f" : "#2f4e73";
 }
 
 function formatDate(value) {
@@ -128,21 +120,6 @@ async function loadSuggestions() {
     setSuggestionsStatus(error.message || "Could not load suggestions.", true);
   }
 }
-
-emailSuggestionsListButton?.addEventListener("click", async () => {
-  emailSuggestionsListButton.disabled = true;
-  setSuggestionsEmailStatus("Emailing suggestions list...");
-  try {
-    const response = await fetch("/api/admin/suggestions/email-list", { method: "POST", headers: buildAdminAuthHeaders() });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || "Could not email suggestions list");
-    setSuggestionsEmailStatus(`Suggestions list emailed to ${payload.recipients} recipient${payload.recipients === 1 ? "" : "s"}.`);
-  } catch (error) {
-    setSuggestionsEmailStatus(error.message || "Could not email suggestions list.", true);
-  } finally {
-    emailSuggestionsListButton.disabled = false;
-  }
-});
 
 ensureAdminAccess().then((allowed) => {
   if (allowed) {
