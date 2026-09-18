@@ -1,6 +1,6 @@
 const suggestionsTableBody = document.querySelector("#suggestions-table tbody");
 const suggestionsStatus = document.querySelector("#suggestions-status");
-const HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
+const ADMIN_SUGGESTIONS_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 const emailSuggestionsListButton = document.querySelector("#email-suggestions-list-button");
 const suggestionsEmailStatus = document.querySelector("#suggestions-email-status");
 
@@ -31,7 +31,7 @@ function createCell(text) {
 }
 
 function readStoredHubEmail() {
-  const raw = localStorage.getItem(HUB_AUTH_STORAGE_KEY) || sessionStorage.getItem(HUB_AUTH_STORAGE_KEY);
+  const raw = localStorage.getItem(ADMIN_SUGGESTIONS_AUTH_STORAGE_KEY) || sessionStorage.getItem(ADMIN_SUGGESTIONS_AUTH_STORAGE_KEY);
   if (!raw) return "";
 
   try {
