@@ -42,6 +42,18 @@ function readStoredHubEmail() {
   }
 }
 
+function buildAdminAuthHeaders() {
+  const raw = localStorage.getItem(HUB_AUTH_STORAGE_KEY) || sessionStorage.getItem(HUB_AUTH_STORAGE_KEY);
+  const headers = { "x-user-email": readStoredHubEmail() };
+  try {
+    const parsed = JSON.parse(raw || "{}");
+    const token = String(parsed?.idToken || "").trim();
+    if (token) headers.Authorization = `Bearer ${token}`;
+  } catch (_error) {
+  }
+  return headers;
+}
+
 async function ensureAdminAccess() {
   const email = readStoredHubEmail();
   if (!email) {
@@ -75,7 +87,7 @@ function renderSuggestions(rows) {
   if (!rows.length) {
     const tr = document.createElement("tr");
     const td = document.createElement("td");
-    td.colSpan = 8;
+    td.colSpan = 6;
     td.textContent = "No suggestions submitted yet.";
     tr.appendChild(td);
     suggestionsTableBody.appendChild(tr);
@@ -84,47 +96,12 @@ function renderSuggestions(rows) {
 
   rows.forEach((row) => {
     const tr = document.createElement("tr");
-    tr.appendChild(createCell(formatDate(row.created_at)));
-    tr.appendChild(createCell(String(row.suggestion_type || "-")));
-    tr.appendChild(createCell(String(row.suggestion_title || "-")));
-    tr.appendChild(createCell(String(row.submitted_by_name || "-")));
-
-    const emailCell = document.createElement("td");
-    if (row.submitted_by_email) {
-      const emailLink = document.createElement("a");
-      emailLink.href = `mailto:${row.submitted_by_email}`;
-      emailLink.textContent = row.submitted_by_email;
-      emailCell.appendChild(emailLink);
-    } else {
-      emailCell.textContent = "-";
-    }
-    tr.appendChild(emailCell);
-
-    const urlCell = document.createElement("td");
-    if (row.reference_url) {
-      const urlLink = document.createElement("a");
-      urlLink.href = row.reference_url;
-      urlLink.target = "_blank";
-      urlLink.rel = "noreferrer";
-      urlLink.textContent = "View";
-      urlCell.appendChild(urlLink);
-    } else {
-      urlCell.textContent = "-";
-    }
-    tr.appendChild(urlCell);
-
-    tr.appendChild(createCell(String(row.reason || "-")));
-
-    const pdfCell = document.createElement("td");
-    if (row.has_attachment) {
-      const pdfLink = document.createElement("a");
-      pdfLink.href = `/api/admin/suggestions/${row.id}/attachment`;
-      pdfLink.textContent = row.attachment_filename || "Download";
-      pdfCell.appendChild(pdfLink);
-    } else {
-      pdfCell.textContent = "-";
-    }
-    tr.appendChild(pdfCell);
+    tr.appendChild(createCell(formatDate(row.date)));
+    tr.appendChild(createCell(row.kind));
+    tr.appendChild(createCell(row.title));
+    tr.appendChild(createCell(row.from));
+    tr.appendChild(createCell(row.to));
+    tr.appendChild(createCell(row.details));
 
     suggestionsTableBody.appendChild(tr);
   });
@@ -133,14 +110,20 @@ function renderSuggestions(rows) {
 async function loadSuggestions() {
   try {
     setSuggestionsStatus("Loading suggestions...");
-    const response = await fetch("/api/admin/suggestions");
+    const response = await fetch("/api/admin/suggestions/activity", { headers: buildAdminAuthHeaders() });
     if (!response.ok) {
       throw new Error("Could not load suggestions");
     }
 
-    const rows = await response.json();
-    renderSuggestions(Array.isArray(rows) ? rows : []);
-    setSuggestionsStatus("Suggestions loaded.");
+    const payload = await response.json();
+    const suggestions = Array.isArray(payload?.suggestions) ? payload.suggestions : [];
+    const emails = Array.isArray(payload?.emails) ? payload.emails : [];
+    const activities = [
+      ...suggestions.map((row) => ({ date: row.created_at, kind: "Suggestion", title: row.suggestion_title || "-", from: row.submitted_by_email || row.submitted_by_name || "-", to: "-", details: row.reason || "-" })),
+      ...emails.map((row) => ({ date: row.sent_at, kind: `Email: ${row.email_type || "hub_email"}`, title: row.subject || "-", from: row.from_email || "-", to: Array.isArray(row.recipients) ? row.recipients.join(", ") : String(row.recipients || "-"), details: "Sent successfully" }))
+    ].sort((left, right) => new Date(right.date) - new Date(left.date));
+    renderSuggestions(activities);
+    setSuggestionsStatus(`${activities.length} suggestion and email record${activities.length === 1 ? "" : "s"} loaded.`);
   } catch (error) {
     setSuggestionsStatus(error.message || "Could not load suggestions.", true);
   }
@@ -150,7 +133,7 @@ emailSuggestionsListButton?.addEventListener("click", async () => {
   emailSuggestionsListButton.disabled = true;
   setSuggestionsEmailStatus("Emailing suggestions list...");
   try {
-    const response = await fetch("/api/admin/suggestions/email-list", { method: "POST" });
+    const response = await fetch("/api/admin/suggestions/email-list", { method: "POST", headers: buildAdminAuthHeaders() });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || "Could not email suggestions list");
     setSuggestionsEmailStatus(`Suggestions list emailed to ${payload.recipients} recipient${payload.recipients === 1 ? "" : "s"}.`);

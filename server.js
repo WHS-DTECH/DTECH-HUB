@@ -1497,6 +1497,14 @@ function dedupeToLatestStudentRows(rows) {
   }));
 }
 const suggestionNotificationFallback = String(process.env.SUGGESTION_NOTIFY_EMAILS || "");
+
+function parseCsvEmails(value) {
+  return String(value || "")
+    .split(/[;,\s]+/)
+    .map((item) => normalizeEmail(item))
+    .filter((email) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email));
+}
+
 const SMTP_HOST = String(process.env.SMTP_HOST || "").trim();
 const SMTP_PORT = Number.parseInt(process.env.SMTP_PORT || "", 10) || 587;
 const SMTP_SECURE = ["true", "1", "yes", "on"].includes(String(process.env.SMTP_SECURE || "false").trim().toLowerCase());
@@ -12764,6 +12772,24 @@ app.get("/api/admin/suggestions", async (_req, res) => {
     res.json(result.rows);
   } catch (_error) {
     res.status(500).json({ error: "Could not load suggestions" });
+  }
+});
+
+app.get("/api/admin/suggestions/activity", requireAdminAccess, async (_req, res) => {
+  try {
+    const suggestions = hasDatabase
+      ? (await pool.query(`SELECT id, created_at, suggestion_type, suggestion_title, submitted_by_name, submitted_by_email, reference_url, reason, attachment_filename, COALESCE(OCTET_LENGTH(attachment_data), 0) > 0 AS has_attachment FROM suggestions ORDER BY created_at DESC, id DESC`)).rows
+      : memorySuggestions;
+    let emails = [];
+    if (hasDatabase) {
+      await ensureEmailLogsSchema();
+      emails = (await pool.query(`SELECT id, sent_at, from_email, recipients, subject, email_type FROM email_logs ORDER BY sent_at DESC, id DESC`)).rows;
+    } else {
+      emails = memoryEmailLogs;
+    }
+    res.json({ suggestions, emails });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not load suggestions and email activity" });
   }
 });
 
