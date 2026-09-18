@@ -43,7 +43,15 @@ if (suggestionForm) {
       }
 
       suggestionForm.reset();
-      setSuggestionStatus("Suggestion submitted. Admin and teaching roles have been notified.");
+      if (payload.email_status === "failed") {
+        setSuggestionStatus(`Suggestion submitted, but email notification failed: ${payload.email_error || "check the hub email settings"}.`, true);
+      } else if (payload.email_status === "not_configured") {
+        setSuggestionStatus("Suggestion submitted, but email notification is not configured on the hub.", true);
+      } else if (payload.email_status === "no_recipients") {
+        setSuggestionStatus("Suggestion submitted, but no notification recipients are configured.", true);
+      } else {
+        setSuggestionStatus("Suggestion submitted. Admin and teaching roles have been notified.");
+      }
     } catch (error) {
       setSuggestionStatus(error.message || "Could not submit suggestion.", true);
     }

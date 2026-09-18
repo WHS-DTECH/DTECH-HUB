@@ -5251,25 +5251,47 @@ async function notifySuggestionByEmail(record, attachment) {
     return { status: "no_recipients", recipients: [] };
   }
 
+  await sendConfiguredHubEmail({
+    to: recipients,
+    subject: `[Hub Suggestion] ${record.suggestion_type}: ${record.suggestion_title}`,
+    html: buildSuggestionEmailHtml(record),
+    attachment
+  });
+  return { status: "sent", recipients };
+}
+
+async function sendConfiguredHubEmail({ to, cc = "", subject, html, attachment = null }) {
+  if (!smtpTransporter || !SMTP_FROM) {
+    const error = new Error("Email is not configured on the hub. Set SMTP_HOST, SMTP_USER, SMTP_PASS, and SMTP_FROM in Render.");
+    error.code = "EMAIL_NOT_CONFIGURED";
+    throw error;
+  }
+
   const mailOptions = {
     from: SMTP_FROM,
-    to: recipients.join(","),
-    subject: `[Hub Suggestion] ${record.suggestion_type}: ${record.suggestion_title}`,
-    html: buildSuggestionEmailHtml(record)
+    to: Array.isArray(to) ? to.join(",") : to,
+    cc: cc || undefined,
+    subject,
+    html
   };
 
   if (attachment?.buffer?.length) {
-    mailOptions.attachments = [
-      {
-        filename: attachment.originalname || "suggestion.pdf",
-        content: attachment.buffer,
-        contentType: attachment.mimetype || "application/pdf"
-      }
-    ];
+    mailOptions.attachments = [{
+      filename: attachment.originalname || "attachment.pdf",
+      content: attachment.buffer,
+      contentType: attachment.mimetype || "application/pdf"
+    }];
   }
 
   await smtpTransporter.sendMail(mailOptions);
-  return { status: "sent", recipients };
+}
+
+function getHubEmailErrorMessage(error) {
+  const code = String(error?.code || "").toUpperCase();
+  if (code === "EMAIL_NOT_CONFIGURED") return error.message;
+  if (code === "EAUTH") return "The hub email account could not authenticate. Check SMTP_USER and SMTP_PASS in Render.";
+  if (code === "ECONNECTION" || code === "ESOCKET") return "The hub could not connect to the email server. Check SMTP_HOST, SMTP_PORT, and SMTP_SECURE in Render.";
+  return error?.message || "Could not send email.";
 }
 
 function buildAllocationApprovalEmailHtml({ studentEmail, activityName, activityCategory, teacherEmail, approvedAt }) {
@@ -10647,8 +10669,7 @@ app.post("/api/student-tracker/email-summary", requireActivityWriteAccess, async
   const scopeLabel = safeSummaries.map((summary) => `${summary.label} ${summary.standard}`).join(" and ");
   const safe = (value) => String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   try {
-    await smtpTransporter.sendMail({
-      from: SMTP_FROM,
+    await sendConfiguredHubEmail({
       to: studentEmail,
       cc: req.user_email,
       subject: `[DTECH HUB] Progress Summary: ${scopeLabel}`,
@@ -10683,12 +10704,7 @@ app.post("/api/student-tracker/email-summary", requireActivityWriteAccess, async
     res.json({ ok: true, sent_at: sentAt.toISOString(), comment: result.rows[0] });
   } catch (error) {
     console.error("[student-tracker-email] Could not email progress summary:", error);
-    const message = String(error?.code || "").toUpperCase() === "EAUTH"
-      ? "The hub email account could not authenticate. Check SMTP_USER and SMTP_PASS in Render."
-      : String(error?.code || "").toUpperCase() === "ECONNECTION"
-        ? "The hub could not connect to the email server. Check SMTP_HOST, SMTP_PORT, and SMTP_SECURE in Render."
-        : error.message || "Could not email progress summary";
-    res.status(500).json({ error: message });
+    res.status(500).json({ error: getHubEmailErrorMessage(error) });
   }
 });
 
@@ -12629,8 +12645,9 @@ app.post("/api/suggestions", suggestionUpload.single("attachment"), async (req, 
     try {
       const emailResult = await notifySuggestionByEmail(memoryRow, attachment);
       res.status(201).json({ ok: true, id: memoryRow.id, email_status: emailResult.status, recipients: emailResult.recipients.length });
-    } catch (_error) {
-      res.status(201).json({ ok: true, id: memoryRow.id, email_status: "failed", recipients: 0 });
+    } catch (error) {
+      console.error("[suggestion-email] Could not notify suggestion recipients:", error);
+      res.status(201).json({ ok: true, id: memoryRow.id, email_status: "failed", email_error: getHubEmailErrorMessage(error), recipients: 0 });
     }
     return;
   }
@@ -12675,8 +12692,9 @@ app.post("/api/suggestions", suggestionUpload.single("attachment"), async (req, 
     try {
       const emailResult = await notifySuggestionByEmail(savedRow, attachment);
       res.status(201).json({ ok: true, id: savedRow.id, email_status: emailResult.status, recipients: emailResult.recipients.length });
-    } catch (_error) {
-      res.status(201).json({ ok: true, id: savedRow.id, email_status: "failed", recipients: 0 });
+    } catch (error) {
+      console.error("[suggestion-email] Could not notify suggestion recipients:", error);
+      res.status(201).json({ ok: true, id: savedRow.id, email_status: "failed", email_error: getHubEmailErrorMessage(error), recipients: 0 });
     }
   } catch (error) {
     res.status(500).json({ error: "Could not save suggestion" });
