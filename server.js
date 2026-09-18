@@ -66,6 +66,7 @@ const memoryTriallingComponents = new Map();
 const memoryDigiMedEfficientTools = new Map();
 const memoryExternalAssessmentAllocations = new Map();
 const memoryStudentTrackerComments = new Map();
+const memoryEmailLogs = [];
 const memoryPracticalSkillsProgress = new Map();
 const memoryPracticalSkillsKitContent = new Map();
 const PRACTICAL_SKILLS_LIBRARY_FILE = path.join(__dirname, "practical-skills", "library.json");
@@ -5260,7 +5261,7 @@ async function notifySuggestionByEmail(record, attachment) {
   return { status: "sent", recipients };
 }
 
-async function sendConfiguredHubEmail({ to, cc = "", subject, html, attachment = null }) {
+async function sendConfiguredHubEmail({ to, cc = "", subject, html, attachment = null, emailType = "" }) {
   if (!smtpTransporter || !SMTP_FROM) {
     const error = new Error("Email is not configured on the hub. Set SMTP_HOST, SMTP_USER, SMTP_PASS, and SMTP_FROM in Render.");
     error.code = "EMAIL_NOT_CONFIGURED";
@@ -5284,6 +5285,24 @@ async function sendConfiguredHubEmail({ to, cc = "", subject, html, attachment =
   }
 
   await smtpTransporter.sendMail(mailOptions);
+  const recipients = [to, cc].flatMap((value) => Array.isArray(value) ? value : [value])
+    .map((value) => normalizeEmail(value)).filter(Boolean);
+  const log = { sent_at: new Date().toISOString(), from_email: SMTP_FROM, recipients, subject: String(subject || ""), email_type: emailType || (String(subject || "").startsWith("[Hub Suggestion]") ? "suggestion" : String(subject || "").startsWith("[DTECH HUB] Progress Summary") ? "progress_summary" : "hub_email") };
+  if (!hasDatabase) {
+    memoryEmailLogs.push(log);
+  } else {
+    try {
+      await ensureEmailLogsSchema();
+      await pool.query(`INSERT INTO email_logs (sent_at, from_email, recipients, subject, email_type) VALUES (NOW(), $1, $2, $3, $4)`, [SMTP_FROM, recipients, String(subject || ""), log.email_type]);
+    } catch (error) {
+      console.error("[email-log] Could not record sent email:", error);
+    }
+  }
+}
+
+async function ensureEmailLogsSchema() {
+  if (!hasDatabase) return;
+  await pool.query(`CREATE TABLE IF NOT EXISTS email_logs (id BIGSERIAL PRIMARY KEY, sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), from_email TEXT, recipients TEXT[] NOT NULL DEFAULT '{}', subject TEXT, email_type TEXT)`);
 }
 
 function getHubEmailErrorMessage(error) {
@@ -5346,7 +5365,12 @@ async function notifyAllocationApprovedByEmail({ studentEmail, teacherEmail, act
     })
   };
 
-  await smtpTransporter.sendMail(mailOptions);
+  await sendConfiguredHubEmail({
+    to: toEmail,
+    cc: ccEmail,
+    subject: mailOptions.subject,
+    html: mailOptions.html
+  });
   return {
     status: "sent",
     to: toEmail,
@@ -12740,6 +12764,34 @@ app.get("/api/admin/suggestions", async (_req, res) => {
     res.json(result.rows);
   } catch (_error) {
     res.status(500).json({ error: "Could not load suggestions" });
+  }
+});
+
+app.post("/api/admin/suggestions/email-list", requireAdminAccess, async (req, res) => {
+  try {
+    const rows = hasDatabase
+      ? (await pool.query(`SELECT created_at, suggestion_type, suggestion_title, submitted_by_name, submitted_by_email, reference_url, reason FROM suggestions ORDER BY created_at DESC, id DESC`)).rows
+      : memorySuggestions;
+    const recipients = await getSuggestionRecipients();
+    if (!recipients.length) {
+      res.status(400).json({ error: "No suggestion notification recipients are configured." });
+      return;
+    }
+    const safe = (value) => String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const listHtml = rows.length
+      ? `<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:13px;">${rows.map((row) => `<tr><td style="padding:7px;border:1px solid #d4dbe5;vertical-align:top;">${safe(new Date(row.created_at).toLocaleDateString())}</td><td style="padding:7px;border:1px solid #d4dbe5;vertical-align:top;"><strong>${safe(row.suggestion_title)}</strong><br>${safe(row.suggestion_type)}<br>Suggested by ${safe(row.submitted_by_name)} (${safe(row.submitted_by_email)})<br>${safe(row.reason)}</td></tr>`).join("")}</table>`
+      : "<p>No suggestions have been submitted yet.</p>";
+    const subject = `[Hub Suggestion] Suggestions List (${rows.length})`;
+    await sendConfiguredHubEmail({
+      to: recipients,
+      subject,
+      html: `<div style="font-family:Arial,sans-serif;color:#17314d;max-width:900px;margin:0 auto;"><h2>DTECH HUB Suggestions List</h2><p>${rows.length} suggestion${rows.length === 1 ? "" : "s"} currently recorded.</p>${listHtml}</div>`,
+      emailType: "suggestions_list"
+    });
+    res.json({ ok: true, count: rows.length, recipients: recipients.length });
+  } catch (error) {
+    console.error("[suggestion-list-email] Could not email suggestions list:", error);
+    res.status(500).json({ error: getHubEmailErrorMessage(error) });
   }
 });
 
