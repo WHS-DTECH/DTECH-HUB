@@ -425,8 +425,16 @@ function installDigiMedEfficientToolsHandler() {
         const state = readDigiMedEfficientToolsState(activityId, email);
         state[subtask] = Boolean(checkbox.checked);
         writeDigiMedEfficientToolsState(activityId, email, state);
+
+        const checklistChanged = autoTickEfficientToolsRequirement(taskListState.checklistState, activityId, email);
+        const evidenceChanged = autoTickEfficientToolsRequirement(taskListState.fullEvidenceState, activityId, email);
+
         renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);
         void persistVideoEfficientToolsToServer(activityId);
+        if (checklistChanged || evidenceChanged) {
+            const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
+            void saveMyEvidence(activityId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});
+        }
     });
 }
 
@@ -1910,6 +1918,9 @@ function getStepAutoManagementKind(standard, text) {
     if (std === "91897" && /^address(?:ing)? relevant implications\.?$/.test(stripped)) {
         return "locked";
     }
+    if ((std === "91893" || std === "91903") && isEfficientToolsMainStep(text)) {
+        return "auto";
+    }
     return "manual";
 }
 
@@ -2015,6 +2026,40 @@ function autoTickMultipleComponentsRequirement(stateMap, componentCount) {
             if (!/^(?:effectively\s+)?trial(?:l?ing)?\s+multiple\s+components\s+and\/or\s+techniques\b/.test(text)) {
                 return;
             }
+            if (Boolean(row?.done) !== shouldBeDone) {
+                row.done = shouldBeDone;
+                changed = true;
+            }
+        });
+    });
+    return changed;
+}
+
+function isEfficientToolsMainStep(text) {
+    return getStepLevel(text) === "Excellence"
+        && /using efficient tools and techniques in the outcome.?s production/i.test(stripStepLevel(text || ""));
+}
+
+// Mirrors the Relevant Implications "3 or more categories" pattern: the main Excellence row is
+// fully DB/localStorage-driven from the subtask ticks, never a standalone manual tick.
+function autoTickEfficientToolsRequirement(stateMap, activityId, email) {
+    let changed = false;
+    ["91893", "91903"].forEach((standard) => {
+        const rows = Array.isArray(stateMap?.[standard]) ? stateMap[standard] : [];
+        if (!rows.length) return;
+
+        const mediaType = getAllocatedDigitalMediaType(standard).toLowerCase();
+        const subtasks = mediaType === "video"
+            ? DIGIMED_VIDEO_EFFICIENT_TOOLS_SUBTASKS
+            : (mediaType === "image" || mediaType === "graphics" || mediaType === "vector")
+                ? DIGIMED_IMAGE_EFFICIENT_TOOLS_SUBTASKS
+                : DIGIMED_EFFICIENT_TOOLS_SUBTASKS;
+        const efficientToolsState = readDigiMedEfficientToolsState(activityId, email);
+        const completedCount = subtasks.filter((subtask) => Boolean(efficientToolsState[subtask])).length;
+        const shouldBeDone = completedCount >= 3;
+
+        rows.forEach((row) => {
+            if (!isEfficientToolsMainStep(row?.text)) return;
             if (Boolean(row?.done) !== shouldBeDone) {
                 row.done = shouldBeDone;
                 changed = true;
@@ -2476,7 +2521,7 @@ function renderChecklistCards(detail, allItems) {
                                         ? `<a class="task-list-step-link" href="${escapeTaskListHtml(href)}">${escapeTaskListHtml(stepText)}</a>`
                                         : `<span class="task-list-step-text">${escapeTaskListHtml(stepText)}</span>`);
                                 return `
-                                <div class="task-list-step-row ${isInformationalRow ? "is-informational" : ""} ${isLinkedRelevantImplicationsRow || isLinkedIntegrityTestingRow || isLinkedTestingImprovementRow ? "is-linked-relevant-implications" : ""} ${needsEvidence ? "is-needs-evidence" : ""}">
+                                <div class="task-list-step-row ${isInformationalRow ? "is-informational" : ""} ${isLinkedRelevantImplicationsRow || isLinkedIntegrityTestingRow || isLinkedTestingImprovementRow ? "is-linked-relevant-implications" : ""} ${is91893EfficientToolsRow ? "is-linked-efficient-tools" : ""} ${needsEvidence ? "is-needs-evidence" : ""}">
                                     <label class="task-list-step-check-wrap">
                                         ${isInformationalRow ? "" : `<input type="checkbox" ${isRowChecked ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">`}
                                         ${rowText}
@@ -3107,15 +3152,17 @@ async function loadChecklistForTask(taskId) {
     const autoRepairedChecklistRI = applyTemplateCopiesAsRelevantImplicationsState(taskListState.checklistState, taskListState.templateCopies);
     const autoChangedChecklistRI = autoTickRelevantImplicationsRequirements(taskListState.checklistState, taskListState.selectedId, signedInEmail);
     const autoSyncedChecklist91893RI = sync91893RelevantImplicationsState(taskListState.checklistState);
+    const autoChangedChecklistET = autoTickEfficientToolsRequirement(taskListState.checklistState, taskListState.selectedId, signedInEmail);
     const clearedChecklistManualTicks = clearUnverifiedManualTicks(taskListState.checklistState);
-    const autoChangedChecklist = autoChangedChecklistPM || autoChangedChecklistDO || autoChangedChecklistRI || autoRepairedChecklistRI || autoSyncedChecklist91893RI || clearedChecklistManualTicks;
+    const autoChangedChecklist = autoChangedChecklistPM || autoChangedChecklistDO || autoChangedChecklistRI || autoRepairedChecklistRI || autoSyncedChecklist91893RI || autoChangedChecklistET || clearedChecklistManualTicks;
     const autoChangedEvidencePM = autoTickProjectManagementRequirement(taskListState.fullEvidenceState);
     const autoChangedEvidenceDO = autoTickDigitalOutcomeRequirements(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
     const autoRepairedEvidenceRI = applyTemplateCopiesAsRelevantImplicationsState(taskListState.fullEvidenceState, taskListState.templateCopies);
     const autoChangedEvidenceRI = autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
     const autoSyncedEvidence91893RI = sync91893RelevantImplicationsState(taskListState.fullEvidenceState);
+    const autoChangedEvidenceET = autoTickEfficientToolsRequirement(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
     const clearedEvidenceManualTicks = clearUnverifiedManualTicks(taskListState.fullEvidenceState);
-    const autoChangedEvidence = autoChangedEvidencePM || autoChangedEvidenceDO || autoChangedEvidenceRI || autoRepairedEvidenceRI || autoSyncedEvidence91893RI || clearedEvidenceManualTicks;
+    const autoChangedEvidence = autoChangedEvidencePM || autoChangedEvidenceDO || autoChangedEvidenceRI || autoRepairedEvidenceRI || autoSyncedEvidence91893RI || autoChangedEvidenceET || clearedEvidenceManualTicks;
     if (migratedDigitalOutcomeRows || migrated91897Rows || migrated91907Rows || migrated91893Rows || migrated91903Rows || autoChangedChecklist || autoChangedEvidence) {
         const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
         await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});
@@ -3163,7 +3210,13 @@ async function loadChecklistForTask(taskId) {
         || findStudentGithubRepoUrl(taskListState.checklistState);
     if (githubRepoUrlForAutoSync && signedInEmail) {
         void runGithubEfficientToolsSync(taskListState.selectedId, signedInEmail, githubRepoUrlForAutoSync)
-            .then(() => {
+            .then(async () => {
+                const checklistChanged = autoTickEfficientToolsRequirement(taskListState.checklistState, taskListState.selectedId, signedInEmail);
+                const evidenceChanged = autoTickEfficientToolsRequirement(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
+                if (checklistChanged || evidenceChanged) {
+                    const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
+                    await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});
+                }
                 renderChecklistCards(detail || selected, taskListState.allItems);
             })
             .catch(() => {
@@ -3328,6 +3381,12 @@ async function renderTaskListPage() {
 
         try {
             const payload = await runGithubEfficientToolsSync(taskListState.selectedId, email, repoUrl);
+            const checklistChanged = autoTickEfficientToolsRequirement(taskListState.checklistState, taskListState.selectedId, email);
+            const evidenceChanged = autoTickEfficientToolsRequirement(taskListState.fullEvidenceState, taskListState.selectedId, email);
+            if (checklistChanged || evidenceChanged) {
+                const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
+                await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});
+            }
             setStatus(`GitHub sync complete. Checked ${Number(payload?.file_count || 0)} file(s) across ${Number(payload?.commit_count || 0)} commit(s).`);
             renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);
         } catch (error) {
@@ -3460,8 +3519,10 @@ async function renderTaskListPage() {
         const relevantImplicationsEvidenceChanged = autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, taskListState.selectedId, getTaskListEmail());
         const synced91893ChecklistChanged = sync91893RelevantImplicationsState(taskListState.checklistState);
         const synced91893EvidenceChanged = sync91893RelevantImplicationsState(taskListState.fullEvidenceState);
+        const efficientToolsChecklistChanged = autoTickEfficientToolsRequirement(taskListState.checklistState, taskListState.selectedId, getTaskListEmail());
+        const efficientToolsEvidenceChanged = autoTickEfficientToolsRequirement(taskListState.fullEvidenceState, taskListState.selectedId, getTaskListEmail());
 
-        if (relevantImplicationsChecklistChanged || relevantImplicationsEvidenceChanged || synced91893ChecklistChanged || synced91893EvidenceChanged) {
+        if (relevantImplicationsChecklistChanged || relevantImplicationsEvidenceChanged || synced91893ChecklistChanged || synced91893EvidenceChanged || efficientToolsChecklistChanged || efficientToolsEvidenceChanged) {
             renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);
         }
 
