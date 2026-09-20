@@ -891,11 +891,14 @@ function applyTemplateCopiesAsRelevantImplicationsState(stateMap, templateCopies
 
 function applyTemplateCopiesToStandardRelevantImplications(stateMap, standard, templateCopies) {
     const rows = Array.isArray(stateMap?.[standard]) ? stateMap[standard] : [];
-    if (!rows.length || !Array.isArray(templateCopies) || !templateCopies.length) return false;
+    // An empty/missing templateCopies list must still be enforced (all categories reset to false),
+    // not skipped, otherwise a stale incorrect tick can never be corrected.
+    if (!rows.length) return false;
+    const copies = Array.isArray(templateCopies) ? templateCopies : [];
 
     // Build set of categories confirmed by DB records
     const usedCategoryKeys = new Set();
-    templateCopies.forEach((copy) => {
+    copies.forEach((copy) => {
         // Match by templateTitle (e.g. "Relevant Implications - Functionality")
         const title = String(copy?.templateTitle || "").trim();
         const titleMatch = title.match(/^relevant\s+implications\s*-\s*(.+)$/i);
@@ -904,8 +907,8 @@ function applyTemplateCopiesToStandardRelevantImplications(stateMap, standard, t
         }
     });
 
-    if (!usedCategoryKeys.size) return false;
-
+    // Do NOT bail out when usedCategoryKeys is empty — an empty set must still force
+    // every category row back to false so stale/incorrect ticks reset each session.
     let changed = false;
     rows.forEach((row) => {
         const text = String(row?.text || "").trim();
