@@ -1537,9 +1537,11 @@ async function loadIdentifiedComponentsCount(projectId, email) {
             `/api/students/trialling-components?activity_id=${encodeURIComponent(projectId)}`,
             { headers: buildTaskListHeaders({}) }
         );
-        if (stored?.found) {
-            taskListState.identifiedComponentsCount = Math.max(0, Number.parseInt(stored.component_count, 10) || 0);
-        }
+        // "found: false" is a definitive DB answer (no record), not an unknown state — treat as 0
+        // so a stale tick from a prior session/device is corrected instead of left dangling.
+        taskListState.identifiedComponentsCount = stored?.found
+            ? Math.max(0, Number.parseInt(stored.component_count, 10) || 0)
+            : 0;
     } catch (_error) {
     }
 
@@ -1936,9 +1938,9 @@ function clearUnverifiedManualTicks(stateMap) {
 function autoTickProjectManagementRequirement(stateMap) {
     const systems = inferStudentSystemConnections(stateMap || {});
     const hasOtherSystem = systems.githubConnected || systems.oneDriveConnected || systems.googleDriveConnected;
-    if (!systems.trelloConnected || !hasOtherSystem) {
-        return false;
-    }
+    // Must correct in both directions — this row is excluded from clearUnverifiedManualTicks (treated as
+    // "auto"), so if it only ever ticks true it can never be un-ticked once the linked evidence disappears.
+    const shouldBeDone = Boolean(systems.trelloConnected && hasOtherSystem);
 
     let changed = false;
     ["91897", "91907"].forEach((standard) => {
@@ -1947,8 +1949,8 @@ function autoTickProjectManagementRequirement(stateMap) {
             const text = String(row?.text || "").trim();
             if (!text || getStepLevel(text) !== "Achieved") return;
             if (!stripStepLevel(text).toLowerCase().includes("project management")) return;
-            if (!Boolean(row?.done)) {
-                row.done = true;
+            if (Boolean(row?.done) !== shouldBeDone) {
+                row.done = shouldBeDone;
                 changed = true;
             }
         });
