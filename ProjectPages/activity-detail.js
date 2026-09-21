@@ -93,6 +93,7 @@ const ONEDRIVE_LINK_LIBRARY_STORAGE_PREFIX = "hub_onedrive_link_library_v1";
 const HTML_FILE_LINK_LIBRARY_STORAGE_PREFIX = "hub_html_file_link_library_v1";
 const CSS_FILE_LINK_LIBRARY_STORAGE_PREFIX = "hub_css_file_link_library_v1";
 const GOOGLE_DRIVE_LINK_LIBRARY_STORAGE_PREFIX = "hub_google_drive_link_library_v1";
+const GOOGLE_FORM_LINK_LIBRARY_STORAGE_PREFIX = "hub_google_form_link_library_v1";
 const TASK_TOPIC_SLIDE_SYNC_STORAGE_PREFIX = "hub_task_topic_slide_sync_v1";
 const TESTING_FUNCTIONS_LIST_COUNT_STORAGE_PREFIX = "hub_testing_functions_list_counts_v1";
 const DIGIMED_CONVENTIONS_ACK_STORAGE_PREFIX = "hub_digimed_conventions_ack_v1";
@@ -1812,6 +1813,61 @@ function getOneDriveLinkLibraryStorageKey(projectId, email) {
 
 function getGoogleDriveLinkLibraryStorageKey(projectId, email) {
     return `${GOOGLE_DRIVE_LINK_LIBRARY_STORAGE_PREFIX}:${String(projectId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
+}
+
+function getGoogleFormLinkLibraryStorageKey(projectId, email) {
+    return `${GOOGLE_FORM_LINK_LIBRARY_STORAGE_PREFIX}:${String(projectId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
+}
+
+function normalizeGoogleFormLinkLibrary(values) {
+    const seen = new Set();
+    const list = [];
+    (Array.isArray(values) ? values : []).forEach((value) => {
+        const candidateUrl = typeof value === "object" && value ? value.url : value;
+        const safeUrl = toSafeGoogleFormUrl(candidateUrl);
+        if (!safeUrl || seen.has(safeUrl)) return;
+        seen.add(safeUrl);
+        const parsed = typeof value === "object" && value ? Date.parse(String(value.savedAt || "")) : NaN;
+        list.push({ url: safeUrl, savedAt: Number.isFinite(parsed) ? new Date(parsed).toISOString() : "" });
+    });
+    return list.slice(0, 12);
+}
+
+function readStoredGoogleFormLinkLibrary(projectId, email) {
+    try {
+        return normalizeGoogleFormLinkLibrary(JSON.parse(localStorage.getItem(getGoogleFormLinkLibraryStorageKey(projectId, email)) || "[]"));
+    } catch (_error) {
+        return [];
+    }
+}
+
+function writeStoredGoogleFormLinkLibrary(projectId, email, values) {
+    const next = normalizeGoogleFormLinkLibrary(values);
+    try {
+        const key = getGoogleFormLinkLibraryStorageKey(projectId, email);
+        if (next.length) localStorage.setItem(key, JSON.stringify(next));
+        else localStorage.removeItem(key);
+    } catch (_error) {
+    }
+    return next;
+}
+
+function addStoredGoogleFormLinkLibraryLink(projectId, email, value) {
+    const safeUrl = toSafeGoogleFormUrl(value);
+    if (!safeUrl) return readStoredGoogleFormLinkLibrary(projectId, email);
+    return writeStoredGoogleFormLinkLibrary(projectId, email, [
+        { url: safeUrl, savedAt: new Date().toISOString() },
+        ...readStoredGoogleFormLinkLibrary(projectId, email)
+    ]);
+}
+
+function removeStoredGoogleFormLinkLibraryLink(projectId, email, value) {
+    const safeUrl = toSafeGoogleFormUrl(value);
+    return writeStoredGoogleFormLinkLibrary(
+        projectId,
+        email,
+        readStoredGoogleFormLinkLibrary(projectId, email).filter((item) => item.url !== safeUrl)
+    );
 }
 
 function normalizeTrelloCardLibrary(values) {
@@ -13119,6 +13175,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     const googleFormSlot = host.querySelector("#task-topic-google-form-sync-slot");
     if (googleFormSlot && isTestingFunctionsTaskTopicPage) {
         const currentGoogleFormUrl = getFirstGoogleFormUrlFromEvidenceRows(myAllocation?.evidence_steps);
+        const googleFormLinkLibrary = readStoredGoogleFormLinkLibrary(projectId, email);
         googleFormSlot.innerHTML = `
             <div class="trello-sync-panel google-form-sync-panel" id="google-form-sync-panel">
                 <h3 class="google-form-sync-title"><img src="https://ssl.gstatic.com/docs/forms/device_home.ico" alt="" aria-hidden="true"> Client Google Feedback Form</h3>
@@ -13128,6 +13185,20 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
                 <div class="trello-sync-actions">
                     <button type="button" class="detail-action detail-action-secondary" id="google-form-save-link-btn">Save Google Form Link</button>
                     <button type="button" class="detail-action detail-action-secondary" id="google-form-open-link-btn">Open Google Form</button>
+                </div>
+                <div class="google-form-link-library" id="google-form-link-library">
+                    <p class="trello-link-library-title">Saved Google Forms <span class="trello-link-library-count">(${googleFormLinkLibrary.length})</span></p>
+                    ${googleFormLinkLibrary.map((item) => `
+                        <div class="trello-link-library-item">
+                            <a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.url)}</a>
+                            <div class="trello-link-library-actions">
+                                <button type="button" class="detail-action detail-action-secondary" data-google-form-use="${escapeHtml(item.url)}">Use</button>
+                                <button type="button" class="detail-action detail-action-secondary" data-google-form-open="${escapeHtml(item.url)}">Open</button>
+                                <button type="button" class="detail-action detail-action-danger" data-google-form-delete="${escapeHtml(item.url)}">Delete</button>
+                            </div>
+                            <span class="trello-link-library-savedat">saved earlier</span>
+                        </div>
+                    `).join("")}
                 </div>
                 <p class="trello-sync-status" id="google-form-sync-status" aria-live="polite"></p>
             </div>
@@ -13144,6 +13215,40 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         googleFormStatus.classList.toggle("is-error", Boolean(isError));
     };
     const readGoogleFormUrl = () => toSafeGoogleFormUrl(googleFormInput?.value || "");
+
+    googleFormSlot?.addEventListener("click", async (event) => {
+        const useButton = event.target.closest("[data-google-form-use]");
+        const openButton = event.target.closest("[data-google-form-open]");
+        const deleteButton = event.target.closest("[data-google-form-delete]");
+        const selectedUrl = useButton?.getAttribute("data-google-form-use")
+            || openButton?.getAttribute("data-google-form-open")
+            || deleteButton?.getAttribute("data-google-form-delete");
+        if (!selectedUrl) return;
+
+        if (useButton) {
+            if (googleFormInput) googleFormInput.value = selectedUrl;
+            setGoogleFormStatus("Saved Google Form selected. Click Save Google Form Link to make it current.");
+            return;
+        }
+        if (openButton) {
+            window.open(selectedUrl, "_blank", "noopener,noreferrer");
+            setGoogleFormStatus("Opened saved Google Form.");
+            return;
+        }
+        if (deleteButton) {
+            if (!window.confirm("Delete this saved Google Form link?")) return;
+            deleteButton.disabled = true;
+            try {
+                await removeUrlFromEvidenceSteps(projectId, email, selectedUrl, ["GOOGLE_FORM_URL|"]);
+                removeStoredGoogleFormLinkLibraryLink(projectId, email, selectedUrl);
+                deleteButton.closest(".trello-link-library-item")?.remove();
+                setGoogleFormStatus("Removed saved Google Form link.");
+            } catch (_error) {
+                setGoogleFormStatus("Could not remove that Google Form link.", true);
+                deleteButton.disabled = false;
+            }
+        }
+    });
 
     googleFormInput?.addEventListener("change", () => {
         const raw = String(googleFormInput.value || "").trim();
@@ -13170,8 +13275,12 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         setGoogleFormStatus("Saving Google Form link...");
         try {
             await persistStudentGoogleFormLink(projectId, email, detailData, taskTopicValue, formUrl);
+            addStoredGoogleFormLinkLibraryLink(projectId, email, formUrl);
             googleFormInput.value = formUrl;
             setGoogleFormStatus("Google Form link saved and shared with teacher view.");
+            await loadAndRenderInterestSection(host, projectId, isTeacher, detailData);
+            const refreshedGoogleFormStatus = host.querySelector("#google-form-sync-status");
+            if (refreshedGoogleFormStatus) refreshedGoogleFormStatus.textContent = "Google Form link saved and shared with teacher view.";
         } catch (error) {
             setGoogleFormStatus(`${error?.message || "Could not save Google Form link right now."}${formatApiDebugSuffix(error)}`, true);
         } finally {
