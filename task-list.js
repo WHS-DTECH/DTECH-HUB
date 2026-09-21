@@ -3307,59 +3307,171 @@ async function renderTaskListPage() {
         history.replaceState({}, "", nextUrl.toString());
     });
 
+// Mirrors ProjectPages/activity-detail.js openInlineTrelloConnectPopup — saving a Trello board link
+// and authorizing the Trello account (this popup) are two separate steps; sync needs both.
+async function openTaskListTrelloConnectPopup() {
+    const popupRef = window.open("", "dtech_hub_trello_connect", "width=650,height=760");
+    if (!popupRef) {
+        throw new Error("Popup blocked. Please allow popups and try again.");
+    }
+
+    let config = null;
+    try {
+        config = await loadJson("/api/integrations/trello/config", { headers: buildTaskListHeaders({}) });
+    } catch (_error) {
+        popupRef.close();
+        throw new Error("Could not reach the server to start Trello connection.");
+    }
+
+    if (!config?.enabled || !config?.api_key) {
+        popupRef.close();
+        throw new Error("Trello integration is not configured on the server yet.");
+    }
+
+    const returnUrl = `${window.location.origin}/trello-callback.html`;
+    const authorizeUrl = new URL("https://trello.com/1/authorize");
+    authorizeUrl.searchParams.set("expiration", "never");
+    authorizeUrl.searchParams.set("name", "DTECH-HUB");
+    authorizeUrl.searchParams.set("scope", "read,write");
+    authorizeUrl.searchParams.set("response_type", "token");
+    authorizeUrl.searchParams.set("key", String(config.api_key));
+    authorizeUrl.searchParams.set("return_url", returnUrl);
+
+    return new Promise((resolve, reject) => {
+        let finished = false;
+        let timeoutHandle = null;
+        let closePollHandle = null;
+
+        const finish = (error, token) => {
+            if (finished) return;
+            finished = true;
+            window.removeEventListener("message", onMessage);
+            if (timeoutHandle) clearTimeout(timeoutHandle);
+            if (closePollHandle) clearInterval(closePollHandle);
+            if (error) {
+                reject(error);
+                return;
+            }
+            resolve(String(token || ""));
+        };
+
+        const onMessage = (event) => {
+            if (event.origin !== window.location.origin) return;
+            const data = event.data || {};
+            if (data.source !== "dtech-hub-trello" || !data.token) return;
+            finish(null, data.token);
+        };
+
+        window.addEventListener("message", onMessage);
+        try {
+            popupRef.location.href = authorizeUrl.toString();
+        } catch (_error) {
+            finish(new Error("Could not open the Trello authorization page. Please allow popups and try again."));
+            return;
+        }
+
+        timeoutHandle = setTimeout(() => {
+            finish(new Error("Trello authorization timed out. Please try again."));
+        }, 120000);
+
+        closePollHandle = setInterval(() => {
+            if (finished) return;
+            if (popupRef && popupRef.closed) {
+                finish(new Error("Trello authorization was cancelled."));
+            }
+        }, 350);
+    });
+}
+
+async function runTaskListTrelloSync() {
+    const trelloBtn = document.querySelector("#task-list-sync-trello");
+    const connectBtn = document.querySelector("#task-list-connect-trello");
+    if (!taskListState.selectedId) return;
+
+    const email = getTaskListEmail();
+    if (!email) {
+        setStatus("Sign in before syncing from Trello.", true);
+        return;
+    }
+
+    const boardUrl = findStudentTrelloBoardUrl(taskListState.fullEvidenceState)
+        || findStudentTrelloBoardUrl(taskListState.checklistState);
+    if (!boardUrl) {
+        setStatus("Save your Trello board link on the Project Management or Decomposition page first.", true);
+        return;
+    }
+
+    if (trelloBtn) { trelloBtn.disabled = true; trelloBtn.textContent = "Syncing Trello\u2026"; }
+
+    try {
+        const payload = await loadJson(
+            `/api/integrations/trello/list-progress?student_email=${encodeURIComponent(email)}&board_url=${encodeURIComponent(boardUrl)}`,
+            { headers: buildTaskListHeaders({}) }
+        );
+
+        const allCards = [
+            ...(Array.isArray(payload?.todo_cards) ? payload.todo_cards : []),
+            ...(Array.isArray(payload?.doing_cards) ? payload.doing_cards : []),
+            ...(Array.isArray(payload?.done_cards) ? payload.done_cards : [])
+        ];
+        const categoryRows = [
+            ...countDecompositionTaskCategories(allCards),
+            ...countProjectManagementProcessCategories(allCards)
+        ];
+        writeDecompositionCategoryCoverage(taskListState.selectedId, email, categoryRows);
+        await saveDecompositionCoverageToServer(taskListState.selectedId, categoryRows, allCards.length);
+
+        if (connectBtn) connectBtn.hidden = true;
+        setStatus(`Trello sync complete. ${allCards.length} task${allCards.length === 1 ? "" : "s"} checked against the decomposition categories.`);
+        renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);
+    } catch (error) {
+        const message = String(error?.message || "");
+        const isNotConnected = /has not connected trello/i.test(message);
+        setStatus(
+            isNotConnected
+                ? "Your Trello board link is saved, but your Trello account isn't connected yet. Click Connect Trello Account, then sync again."
+                : (message || "Could not sync from Trello."),
+            true
+        );
+        if (connectBtn) connectBtn.hidden = !isNotConnected;
+    } finally {
+        if (trelloBtn) { trelloBtn.disabled = false; trelloBtn.textContent = "\u21bb Sync from Trello"; }
+    }
+}
+
     document.addEventListener("click", async (event) => {
         const trelloBtn = event.target?.closest?.("#task-list-sync-trello");
         if (!trelloBtn || !taskListState.selectedId) return;
+        await runTaskListTrelloSync();
+    });
 
-        const email = getTaskListEmail();
-        if (!email) {
-            setStatus("Sign in before syncing from Trello.", true);
-            return;
-        }
+    document.addEventListener("click", async (event) => {
+        const connectBtn = event.target?.closest?.("#task-list-connect-trello");
+        if (!connectBtn) return;
 
-        const boardUrl = findStudentTrelloBoardUrl(taskListState.fullEvidenceState)
-            || findStudentTrelloBoardUrl(taskListState.checklistState);
-        if (!boardUrl) {
-            setStatus("Save your Trello board link on the Project Management or Decomposition page first.", true);
-            return;
-        }
-
-        trelloBtn.disabled = true;
-        trelloBtn.textContent = "Syncing Trello\u2026";
-
+        connectBtn.disabled = true;
+        setStatus("Connecting Trello\u2026 authorize DTECH-HUB in the popup window.");
         try {
-            const payload = await loadJson(
-                `/api/integrations/trello/list-progress?student_email=${encodeURIComponent(email)}&board_url=${encodeURIComponent(boardUrl)}`,
-                { headers: buildTaskListHeaders({}) }
-            );
-
-            const allCards = [
-                ...(Array.isArray(payload?.todo_cards) ? payload.todo_cards : []),
-                ...(Array.isArray(payload?.doing_cards) ? payload.doing_cards : []),
-                ...(Array.isArray(payload?.done_cards) ? payload.done_cards : [])
-            ];
-            const categoryRows = [
-                ...countDecompositionTaskCategories(allCards),
-                ...countProjectManagementProcessCategories(allCards)
-            ];
-            writeDecompositionCategoryCoverage(taskListState.selectedId, email, categoryRows);
-            await saveDecompositionCoverageToServer(taskListState.selectedId, categoryRows, allCards.length);
-
-            setStatus(`Trello sync complete. ${allCards.length} task${allCards.length === 1 ? "" : "s"} checked against the decomposition categories.`);
-            renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);
+            const token = await openTaskListTrelloConnectPopup();
+            const connectResponse = await fetch("/api/integrations/trello/connect", {
+                method: "POST",
+                headers: buildTaskListHeaders({ "Content-Type": "application/json" }),
+                body: JSON.stringify({ token })
+            });
+            const connectPayload = await connectResponse.json().catch(() => ({}));
+            if (!connectResponse.ok) {
+                throw new Error(connectPayload?.error || "Could not connect Trello.");
+            }
+            setStatus("Trello connected! Syncing your board\u2026");
+            connectBtn.hidden = true;
+            await runTaskListTrelloSync();
         } catch (error) {
-            const message = String(error?.message || "");
-            setStatus(
-                /has not connected trello/i.test(message)
-                    ? "Connect your Trello account on the Decomposition of Tasks page first, then sync again."
-                    : (message || "Could not sync from Trello."),
-                true
-            );
+            setStatus(error?.message || "Could not connect Trello.", true);
         } finally {
-            const btn = document.querySelector("#task-list-sync-trello");
-            if (btn) { btn.disabled = false; btn.textContent = "\u21bb Sync from Trello"; }
+            if (connectBtn?.isConnected) connectBtn.disabled = false;
         }
     });
+
 
     document.addEventListener("click", async (event) => {
         const githubBtn = event.target?.closest?.("#task-list-sync-github");
