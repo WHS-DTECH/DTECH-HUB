@@ -9529,6 +9529,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             "user-experience-principles": DIGITAL_OUTCOME_UX_PRINCIPLES_TITLE,
             "tools-and-techniques": DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE,
             "code-validation": DIGITAL_OUTCOME_CODE_VALIDATION_TEMPLATE_SEARCH_TITLE,
+            "testing-functions-markup-validation": DIGITAL_OUTCOME_CODE_VALIDATION_TEMPLATE_SEARCH_TITLE,
             "development-steps": DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE,
             "project-success-criteria": DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE,
             "relevant-implications": DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE,
