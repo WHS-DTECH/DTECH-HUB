@@ -13120,8 +13120,8 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     if (googleFormSlot && isTestingFunctionsTaskTopicPage) {
         const currentGoogleFormUrl = getFirstGoogleFormUrlFromEvidenceRows(myAllocation?.evidence_steps);
         googleFormSlot.innerHTML = `
-            <div class="trello-sync-panel" id="google-form-sync-panel">
-                <h3>Client Google Feedback Form</h3>
+            <div class="trello-sync-panel google-form-sync-panel" id="google-form-sync-panel">
+                <h3 class="google-form-sync-title"><img src="https://ssl.gstatic.com/docs/forms/device_home.ico" alt="" aria-hidden="true"> Client Google Feedback Form</h3>
                 <p>Link the Google Form you will use to collect client or user feedback.</p>
                 <label for="google-form-url" class="trello-sync-label">Google Form link</label>
                 <input id="google-form-url" class="trello-sync-input" type="url" placeholder="https://forms.google.com/... or https://forms.gle/..." value="${escapeHtml(currentGoogleFormUrl)}">

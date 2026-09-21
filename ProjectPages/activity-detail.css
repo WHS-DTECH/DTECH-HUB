@@ -1901,6 +1901,24 @@ h1 {
     color: #1a4870;
 }
 
+.google-form-sync-panel {
+    border-color: #c7a1e8;
+    background: #fff8e8;
+    box-shadow: inset 4px 0 0 #7b3fb2;
+}
+
+.google-form-sync-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.google-form-sync-title img {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+}
+
 .trello-sync-panel p {
     margin: 4px 0 8px;
     font-size: 0.78rem;
