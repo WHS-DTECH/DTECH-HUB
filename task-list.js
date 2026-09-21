@@ -2516,6 +2516,7 @@ function renderChecklistCards(detail, allItems) {
                                     : integrityTestingIsImage
                                         ? buildCustomActivityLink(taskListState.selectedId, "Integrity & Validation (IMAGE)", "Integrity & Validation (IMAGE)", "image-integrity-testing")
                                         : buildCustomActivityLink(taskListState.selectedId, "Integrity & Validation (WEB)", "Integrity & Validation (WEB)", "code-validation");
+                                const integrityTestingCategoryCount = (!integrityTestingIsVideo && !integrityTestingIsImage) ? 4 : 0;
                                 const testingFunctionsSubtasks = isLinkedTestingImprovementRow
                                     ? getTestingFunctionsSubtasks(taskListState.fullEvidenceState)
                                     : [];
@@ -2580,6 +2581,7 @@ function renderChecklistCards(detail, allItems) {
                                             <div class="task-list-decomposition-category-list">
                                                 <a class="task-list-decomposition-category is-covered" href="${escapeTaskListHtml(integrityTestingHref)}">
                                                     <span class="task-list-decomposition-category-label">${escapeTaskListHtml(integrityTestingTitle)}</span>
+                                                    <span class="task-list-decomposition-category-count">${integrityTestingCategoryCount || "-"}</span>
                                                 </a>
                                             </div>
                                         </div>
