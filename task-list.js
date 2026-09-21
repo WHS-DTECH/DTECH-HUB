@@ -2618,6 +2618,7 @@ function renderChecklistCards(detail, allItems) {
                                         <div class="task-list-decomposition-subtasks">
                                             <p class="task-list-system-title">SUBTASKS</p>
                                             <p class="task-list-achieved-note">Convention areas acknowledged on your ${escapeTaskListHtml(conventionsSubtask.label)} page.</p>
+                                            <p class="task-list-achieved-note">You need to apply any 3 or more conventions.</p>
                                             <div class="task-list-decomposition-category-list">
                                                 <a class="task-list-decomposition-category is-covered" href="${escapeTaskListHtml(conventionsSubtask.href)}">
                                                     <span class="task-list-decomposition-category-label">${escapeTaskListHtml(conventionsSubtask.label).toUpperCase()}</span>
@@ -2890,6 +2891,7 @@ function renderChecklistCards(detail, allItems) {
                                         <div class="task-list-decomposition-subtasks">
                                             <p class="task-list-system-title">SUBTASKS</p>
                                             <p class="task-list-achieved-note">Convention areas acknowledged in your Conventions slide.</p>
+                                            <p class="task-list-achieved-note">You need to apply any 3 or more conventions.</p>
                                             <div class="task-list-decomposition-category-list">
                                                 <a class="task-list-decomposition-category ${digiMedConventionsSubtask.count > 0 ? "is-covered" : ""}" href="${escapeTaskListHtml(digiMedConventionsSubtask.href)}">
                                                     <span class="task-list-decomposition-category-label">CONVENTIONS</span>
