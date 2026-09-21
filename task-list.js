@@ -2606,12 +2606,12 @@ function renderChecklistCards(detail, allItems) {
                                         <div class="task-list-decomposition-subtasks">
                                             <p class="task-list-system-title">SUBTASKS</p>
                                             <p class="task-list-achieved-note">Testing evidence: client feedback form and functions testing results.</p>
-                                            <div class="task-list-decomposition-subtask-list">
+                                            <div class="task-list-decomposition-category-list">
                                                 ${testingFunctionsSubtasks.map((subtask) => `
-                                                    <label class="task-list-decomposition-subtask ${subtask.done ? "is-complete" : ""}">
-                                                        <input type="checkbox" disabled ${subtask.done ? "checked" : ""}>
-                                                        <a href="${escapeTaskListHtml(subtask.href)}">${getProjectManagementSystemLogo(subtask.label)}${escapeTaskListHtml(subtask.label)}${subtask.countText ? ` - ${escapeTaskListHtml(subtask.countText)}` : ""}</a>
-                                                    </label>
+                                                    <a class="task-list-decomposition-category ${subtask.done ? "is-covered" : ""}" href="${escapeTaskListHtml(subtask.href)}">
+                                                        <span class="task-list-decomposition-category-label">${escapeTaskListHtml(subtask.label)}</span>
+                                                        <span class="task-list-decomposition-category-count">${escapeTaskListHtml(subtask.countText || (subtask.done ? "1" : "0"))}</span>
+                                                    </a>
                                                 `).join("")}
                                             </div>
                                         </div>
@@ -2879,12 +2879,12 @@ function renderChecklistCards(detail, allItems) {
                                         <div class="task-list-decomposition-subtasks">
                                             <p class="task-list-system-title">SUBTASKS</p>
                                             <p class="task-list-achieved-note">Testing evidence: client feedback form and functions testing results.</p>
-                                            <div class="task-list-decomposition-subtask-list">
+                                            <div class="task-list-decomposition-category-list">
                                                 ${testingFunctionsSubtasks.map((subtask) => `
-                                                    <label class="task-list-decomposition-subtask ${subtask.done ? "is-complete" : ""}">
-                                                        <input type="checkbox" disabled ${subtask.done ? "checked" : ""}>
-                                                        <a href="${escapeTaskListHtml(subtask.href)}">${getProjectManagementSystemLogo(subtask.label)}${escapeTaskListHtml(subtask.label)}${subtask.countText ? ` - ${escapeTaskListHtml(subtask.countText)}` : ""}</a>
-                                                    </label>
+                                                    <a class="task-list-decomposition-category ${subtask.done ? "is-covered" : ""}" href="${escapeTaskListHtml(subtask.href)}">
+                                                        <span class="task-list-decomposition-category-label">${escapeTaskListHtml(subtask.label)}</span>
+                                                        <span class="task-list-decomposition-category-count">${escapeTaskListHtml(subtask.countText || (subtask.done ? "1" : "0"))}</span>
+                                                    </a>
                                                 `).join("")}
                                             </div>
                                         </div>
