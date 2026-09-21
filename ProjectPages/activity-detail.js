@@ -11606,7 +11606,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     const isGithubTaskTopicPage = isTaskTopicPage
         && /github|version\s+control/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`);
     const isTestingFunctionsTaskTopicPage = isTaskTopicPage
-        && /testing\s+functions|test(?:ing)?\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`);
+        && isDigitalOutcomeTestingFunctionsCriterion(selectedTaskTopic, selectedTaskShortName);
     const isDevelopmentStepsTaskTopicPage = isTaskTopicPage
         && isDigitalOutcomeDevelopmentToolsCriterion(selectedTaskTopic, selectedTaskShortName);
     const isCodeValidationTaskTopicPage = isTaskTopicPage
