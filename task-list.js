@@ -1908,7 +1908,7 @@ function getStepAutoManagementKind(standard, text) {
         && /^(?:effectively\s+)?trial(?:l?ing)?\s+multiple\s+components\s+and\/or\s+techniques\b/.test(stripped)) {
         return "auto";
     }
-    if (std === "91897" && level === "Achieved" && stripped === "explain relevant implications.") {
+    if ((std === "91897" || std === "91907") && level === "Achieved" && /^explain(?:ing)? relevant implications\.?$/.test(stripped)) {
         return "auto";
     }
     if ((std === "91893" || std === "91903")
@@ -2109,34 +2109,26 @@ function sync91893RelevantImplicationsState(stateMap) {
 
 function autoTickRelevantImplicationsRequirements(stateMap, projectId, email) {
     const addressTicksChanged = clearAddressRelevantImplicationsTicks(stateMap);
-    const rows = Array.isArray(stateMap?.["91897"]) ? stateMap["91897"] : [];
-    if (!rows.length) {
-        return addressTicksChanged;
-    }
-
-    const completedCategoryCount = countCompletedRelevantImplicationsCategories(rows);
-    const shouldMarkSectionComplete = completedCategoryCount >= 3;
-
     let changed = false;
 
-    rows.forEach((row) => {
-        const text = String(row?.text || "").trim();
-        if (!text) return;
+    ["91897", "91907"].forEach((standard) => {
+        const rows = Array.isArray(stateMap?.[standard]) ? stateMap[standard] : [];
+        if (!rows.length) return;
 
-        const level = getStepLevel(text);
-        const stripped = stripStepLevel(text).toLowerCase();
+        const completedCategoryCount = countCompletedRelevantImplicationsCategories(rows);
+        const shouldMarkSectionComplete = completedCategoryCount >= 3;
 
-        if (level === "Achieved" && stripped === "explain relevant implications.") {
-            if (shouldMarkSectionComplete && !Boolean(row?.done)) {
-                row.done = true;
-                changed = true;
-            } else if (!shouldMarkSectionComplete && Boolean(row?.done)) {
-                row.done = false;
+        rows.forEach((row) => {
+            const text = String(row?.text || "").trim();
+            if (!text || getStepLevel(text) !== "Achieved") return;
+
+            const stripped = stripStepLevel(text).toLowerCase();
+            if (!/^explain(?:ing)? relevant implications\.?$/.test(stripped)) return;
+            if (Boolean(row?.done) !== shouldMarkSectionComplete) {
+                row.done = shouldMarkSectionComplete;
                 changed = true;
             }
-            return;
-        }
-
+        });
     });
 
     return addressTicksChanged || changed;
