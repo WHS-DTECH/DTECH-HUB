@@ -2864,6 +2864,7 @@ function renderChecklistCards(detail, allItems) {
                                         <div class="task-list-decomposition-subtasks">
                                             <p class="task-list-system-title">SUBTASKS</p>
                                             <p class="task-list-achieved-note">Components identified for trialling.</p>
+                                            <p class="task-list-achieved-note">You need to trial at least 3 components and/or techniques.</p>
                                             <div class="task-list-decomposition-category-list">
                                                 <a class="task-list-decomposition-category ${Number.isFinite(triallingComponentsCount) && triallingComponentsCount > 1 ? "is-covered" : ""}" href="${escapeTaskListHtml(componentsSubtaskHref)}">
                                                     <span class="task-list-decomposition-category-label">COMPONENTS</span>
