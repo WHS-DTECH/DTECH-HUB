@@ -11605,8 +11605,10 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         && selectedTaskTopic.toLowerCase().includes("project management");
     const isGithubTaskTopicPage = isTaskTopicPage
         && /github|version\s+control/i.test(`${selectedTaskTopic} ${selectedTaskShortName}`);
-    const isTestingFunctionsTaskTopicPage = isTaskTopicPage
-        && isDigitalOutcomeTestingFunctionsCriterion(selectedTaskTopic, selectedTaskShortName);
+    const isTestingFunctionsTaskTopicPage = isDigitalOutcomeTestingFunctionsCriterion(
+        selectedTaskTopic || detailData?.title,
+        selectedTaskShortName
+    );
     const isDevelopmentStepsTaskTopicPage = isTaskTopicPage
         && isDigitalOutcomeDevelopmentToolsCriterion(selectedTaskTopic, selectedTaskShortName);
     const isCodeValidationTaskTopicPage = isTaskTopicPage
