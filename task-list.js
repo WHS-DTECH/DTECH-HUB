@@ -2778,7 +2778,6 @@ function renderChecklistCards(detail, allItems) {
                                 : Boolean(taskListState.sessionTicks[getSessionTickKey(standard, step._index)]);
                             const decompositionSubtasks = isDecompositionRow ? getDecompositionSubtasks(taskListState.checklistState) : [];
                             const triallingComponentsCount = taskListState.identifiedComponentsCount;
-                            const toolsTechniquesSubtask = isTriallingComponentsRow ? getDigitalOutcomeToolsTechniquesSubtask() : null;
                             const componentsSubtaskHref = buildCustomActivityLink(taskListState.selectedId, "Trial the components of the digital technologies outcome.", "Trialling Components", "trialling-components");
                             const projectManagementSubtasks = isProjectManagementRow ? getProjectManagementSubtasks(taskListState.fullEvidenceState) : [];
                             const testingFunctionsSubtasks = (isTestingFunctionsRow || isLinkedTestingImprovementRow)
@@ -2849,14 +2848,6 @@ function renderChecklistCards(detail, allItems) {
                                             ${Number.isFinite(triallingComponentsCount)
                                                 ? ""
                                                 : `<p class="task-list-achieved-note">Sync Google Drive above to see the component count.</p>`}
-                                            ${toolsTechniquesSubtask ? `
-                                                <div class="task-list-decomposition-subtask-list">
-                                                    <label class="task-list-decomposition-subtask ${toolsTechniquesSubtask.done ? "is-complete" : ""}">
-                                                        <input type="checkbox" ${toolsTechniquesSubtask.done ? "checked" : ""} data-step-check="digital-outcome:${toolsTechniquesSubtask.index}">
-                                                        <a href="${escapeTaskListHtml(toolsTechniquesSubtask.href)}">What Tools and Techniques will be used?</a>
-                                                    </label>
-                                                </div>
-                                            ` : ""}
                                         </div>
                                     ` : ""}
                                     ${isMultipleComponentsRow ? `
