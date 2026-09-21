@@ -2470,6 +2470,8 @@ function renderChecklistCards(detail, allItems) {
                                 if (getStepLevel(step?.text) !== level) return "";
                                 const stepText = stripStepLevel(step?.text || "");
                                 const isLinkedRelevantImplicationsRow = /^(?:explain(?:ing)?|address(?:ing)?) relevant implications\.?$/i.test(stepText);
+                                // Address/Addressing has no completion criteria of its own — never tickable, purple-linked only.
+                                const isAddressRelevantImplicationsRow91893 = /^address(?:ing)? relevant implications\.?$/i.test(stepText);
                                 const href = getTaskTopicHrefForStep(standard, level, stepText);
                                 const isInformationalRow = isInformationalCriteriaRow(standard, level, stepText);
                                 const managementKind = getStepAutoManagementKind(standard, step?.text || "");
@@ -2523,7 +2525,7 @@ function renderChecklistCards(detail, allItems) {
                                 return `
                                 <div class="task-list-step-row ${isInformationalRow ? "is-informational" : ""} ${isLinkedRelevantImplicationsRow || isLinkedIntegrityTestingRow || isLinkedTestingImprovementRow ? "is-linked-relevant-implications" : ""} ${is91893EfficientToolsRow ? "is-linked-efficient-tools" : ""} ${needsEvidence ? "is-needs-evidence" : ""}">
                                     <label class="task-list-step-check-wrap">
-                                        ${isInformationalRow ? "" : `<input type="checkbox" ${isRowChecked ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">`}
+                                        ${isInformationalRow || isAddressRelevantImplicationsRow91893 ? "" : `<input type="checkbox" ${isRowChecked ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">`}
                                         ${rowText}
                                     </label>
                                     ${is91893ToolsAndTechniquesRow ? `
@@ -2790,9 +2792,9 @@ function renderChecklistCards(detail, allItems) {
                                 ${shouldRenderAchievedSectionHeading && achievedSectionMeta?.id === "relevant-implications"
                                     ? `<p class="task-list-achieved-note">Complete any 3 or more categories to mark Section 4 complete. (${relevantCategoryDoneCount}/${RELEVANT_IMPLICATIONS_CATEGORIES.length})</p>`
                                     : ""}
-                                <div ${isTestingFunctionsRow ? `id="task-list-standard-${escapeTaskListHtml(standard)}-testing-functions"` : ""} class="task-list-step-row ${isSystemComplete ? "is-system-complete" : ""} ${isRelevantCategoryRow ? "is-relevant-implications-category" : ""} ${isInformationalRow ? "is-informational" : ""} ${needsEvidence ? "is-needs-evidence" : ""}">
+                                <div ${isTestingFunctionsRow ? `id="task-list-standard-${escapeTaskListHtml(standard)}-testing-functions"` : ""} class="task-list-step-row ${isSystemComplete ? "is-system-complete" : ""} ${isRelevantCategoryRow ? "is-relevant-implications-category" : ""} ${isInformationalRow ? "is-informational" : ""} ${isAddressRelevantImplicationsRow ? "is-linked-relevant-implications" : ""} ${needsEvidence ? "is-needs-evidence" : ""}">
                                     <label class="task-list-step-check-wrap">
-                                        ${isInformationalRow ? "" : `<input type="checkbox" ${isRowChecked ? "checked" : ""} ${isTickActionDisabled ? "disabled" : ""} data-step-check="${escapeTaskListHtml(standard)}:${step._index}">`}
+                                        ${isInformationalRow || isAddressRelevantImplicationsRow ? "" : `<input type="checkbox" ${isRowChecked ? "checked" : ""} ${isTickActionDisabled ? "disabled" : ""} data-step-check="${escapeTaskListHtml(standard)}:${step._index}">`}
                                         ${isRelevantCategoryRow
                                             ? `<a class="task-list-step-link task-list-step-text-category" href="${escapeTaskListHtml(relevantCategoryHref)}">${escapeTaskListHtml(stepLabel)}</a>`
                                             : (isInformationalRow
