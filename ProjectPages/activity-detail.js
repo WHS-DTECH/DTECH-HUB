@@ -11600,6 +11600,8 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
 
     const selectedTaskTopic = String(new URLSearchParams(window.location.search || "").get("taskTopic") || "").trim();
     const selectedTaskShortName = String(new URLSearchParams(window.location.search || "").get("taskShortName") || "").trim();
+    const taskTopicValue = String(selectedTaskTopic || "").trim();
+    const myAllocation = interestData?.my_allocation || null;
     const isTaskTopicPage = Boolean(selectedTaskTopic);
     const isProjectManagementTaskTopicPage = isTaskTopicPage
         && selectedTaskTopic.toLowerCase().includes("project management");
@@ -11838,9 +11840,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         }
     }
 
-    const taskTopicValue = String(selectedTaskTopic || "").trim();
     if (email && !isTeacher && isTaskTopicPage) {
-        const myAllocation = interestData?.my_allocation || null;
         const assignedStandards = getEffectiveAssignedStandards(myAllocation, detailData);
         const completionPercent = getEvidenceCompletionPercentFromRows(myAllocation?.evidence_steps, assignedStandards);
         const templateLibraryProcessAssessmentUrl = isProjectManagementTaskTopicPage
