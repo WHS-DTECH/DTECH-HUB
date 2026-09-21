@@ -13205,10 +13205,10 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         `;
     }
 
-    const googleFormInput = section.querySelector("#google-form-url");
-    const googleFormSaveLinkBtn = section.querySelector("#google-form-save-link-btn");
-    const googleFormOpenLinkBtn = section.querySelector("#google-form-open-link-btn");
-    const googleFormStatus = section.querySelector("#google-form-sync-status");
+    const googleFormInput = googleFormSlot?.querySelector("#google-form-url");
+    const googleFormSaveLinkBtn = googleFormSlot?.querySelector("#google-form-save-link-btn");
+    const googleFormOpenLinkBtn = googleFormSlot?.querySelector("#google-form-open-link-btn");
+    const googleFormStatus = googleFormSlot?.querySelector("#google-form-sync-status");
     const setGoogleFormStatus = (message, isError = false) => {
         if (!googleFormStatus) return;
         googleFormStatus.textContent = String(message || "");
