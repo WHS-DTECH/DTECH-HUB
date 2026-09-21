@@ -85,7 +85,7 @@ const DIGITAL_OUTCOME_DETAILS_TASKS = [
     "Identify the target audience or end user for this outcome.",
     "Explain how the outcome will be developed.",
     "State how success will be measured or evaluated.",
-    "What Tools and Techniques will be used?"
+    "Identify Tools and Techniques for this outcome."
 ];
 
 const RELEVANT_IMPLICATIONS_CATEGORIES = [
@@ -324,6 +324,13 @@ function normalizeDigitalOutcomeChecklistRows(rows) {
 
         if (/^Explain how the outcome will be developed\.?$/i.test(target)) {
             const legacy = sourceRows.find((row) => legacyCombinedPattern.test(row.text));
+            if (legacy) {
+                return { text: target, done: Boolean(legacy.done) };
+            }
+        }
+
+        if (/^Identify Tools and Techniques for this outcome\.?$/i.test(target)) {
+            const legacy = sourceRows.find((row) => /what tools and techniques will be used/i.test(row.text));
             if (legacy) {
                 return { text: target, done: Boolean(legacy.done) };
             }
@@ -1009,8 +1016,9 @@ function getTaskTopicHrefForStep(standard, level, text) {
         return buildCustomActivityLink(taskListState.selectedId, safeText, "Testing Functions", "testing-functions");
     }
 
-    if (String(standard) === "91897" && normalized.includes("what tools and techniques")) {
-        return buildCustomActivityLink(taskListState.selectedId, "What Tools and Techniques will be used?", "Tools and Techniques", "tools-and-techniques");
+    if (String(standard) === "digital-outcome"
+        && /(?:what tools and techniques will be used|identify tools and techniques for this outcome)/i.test(normalized)) {
+        return buildCustomActivityLink(taskListState.selectedId, "Identify Tools and Techniques for this outcome.", "Tools and Techniques", "tools-and-techniques");
     }
 
     if (String(standard) === "digital-outcome") {
@@ -2651,9 +2659,6 @@ function renderChecklistCards(detail, allItems) {
                 <div class="task-list-step-list">
                     ${safeRows.map((step, index) => {
                         const stepText = String(step?.text || "");
-                        if (standard === "digital-outcome" && /what tools and techniques will be used/i.test(stepText)) {
-                            return "";
-                        }
                         const managementKind = getStepAutoManagementKind(standard, stepText);
                         const needsEvidence = managementKind === "manual";
                         const isRowChecked = managementKind === "auto"
