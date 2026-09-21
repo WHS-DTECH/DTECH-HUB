@@ -2471,7 +2471,7 @@ function renderChecklistCards(detail, allItems) {
                                 const stepText = stripStepLevel(step?.text || "");
                                 const isLinkedRelevantImplicationsRow = /^(?:explain(?:ing)?|address(?:ing)?) relevant implications\.?$/i.test(stepText);
                                 // Address/Addressing has no completion criteria of its own — never tickable, purple-linked only.
-                                const isAddressRelevantImplicationsRow91893 = /^address(?:ing)? relevant implications\.?$/i.test(stepText);
+                                const isNonTickableRelevantImplicationsRow91893 = /^(?:explain(?:ing)?|address(?:ing)?) relevant implications\.?$/i.test(stepText);
                                 const isApplyingRelevantConventionsRow = level !== "Achieved"
                                     && /^(?:applying|using) relevant conventions(?: to improve the quality of the outcome)?\.?$/i.test(stepText);
                                 const href = getTaskTopicHrefForStep(standard, level, stepText);
@@ -2527,7 +2527,7 @@ function renderChecklistCards(detail, allItems) {
                                 return `
                                 <div class="task-list-step-row ${isInformationalRow ? "is-informational" : ""} ${isLinkedRelevantImplicationsRow || isLinkedIntegrityTestingRow || isLinkedTestingImprovementRow || isApplyingRelevantConventionsRow ? "is-linked-relevant-implications" : ""} ${is91893EfficientToolsRow ? "is-linked-efficient-tools" : ""} ${needsEvidence ? "is-needs-evidence" : ""}">
                                     <label class="task-list-step-check-wrap">
-                                        ${isInformationalRow || isAddressRelevantImplicationsRow91893 || isApplyingRelevantConventionsRow ? "" : `<input type="checkbox" ${isRowChecked ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">`}
+                                        ${isInformationalRow || isNonTickableRelevantImplicationsRow91893 || isApplyingRelevantConventionsRow ? "" : `<input type="checkbox" ${isRowChecked ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">`}
                                         ${rowText}
                                     </label>
                                     ${is91893ToolsAndTechniquesRow ? `
