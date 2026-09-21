@@ -9453,7 +9453,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         "video-ux-principles": "video-ux-principles",
         "video-conventions": "video-conventions",
         "tools-and-techniques": "tools-and-techniques",
-        "code-validation": "code-validation",
+        "code-validation": "testing-functions-markup-validation",
         "development-steps": "development-steps",
         "success-criteria": "project-success-criteria",
         "relevant-implications": "relevant-implications",
