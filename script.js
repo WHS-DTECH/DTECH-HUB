@@ -1587,6 +1587,7 @@ const HUB_AUTO_LOGIN_PROMPT_SESSION_KEY = "hub_auto_login_prompted_v1";
 let hubGlobalSidebarNodes = null;
 let hubStudentAllocatedStandards = [];
 let hubStudentExternalStandards = [];
+let hubStudentDigitalMediaType = "";
 
 function readStoredHubViewMode() {
     try {
@@ -2383,6 +2384,7 @@ async function loadAndRenderSidebarAllocations(panel) {
         const profileDetails = computeHubSidebarProfileDetails([...assessments, ...projects]);
         hubStudentAllocatedStandards = Array.isArray(data.allocated_standards) ? data.allocated_standards : [];
         hubStudentExternalStandards = Array.isArray(data.external_standards) ? data.external_standards : [];
+        hubStudentDigitalMediaType = String(profileDetails.digitalMediaStrand || "").trim();
         renderHubSidebarProfileCard(panel, profileDetails);
         renderHubSidebarStandardsCard(panel, profileDetails.yearGroup, hubStudentAllocatedStandards, hubStudentExternalStandards);
         renderCurrentWeek();
@@ -4156,13 +4158,16 @@ function renderStats() {
             );
             const standardsHtml = relevantStandards.map((standard) => {
                 const standardNumber = String(standard.standard_number || "").trim();
+                const mediaTypeSuffix = ["91893", "91903"].includes(standardNumber) && hubStudentDigitalMediaType
+                    ? ` (${hubStudentDigitalMediaType})`
+                    : "";
                 const credits = Number.parseInt(standard.credits, 10);
                 const creditsText = Number.isInteger(credits) ? `${credits} credits` : "Credits not set";
                 const standardCard = standardCards.find((card) => String(card?.standardNumber || "").trim() === standardNumber);
                 const standardHref = String(standardCard?.href || `/assessment-standard-card.html?standard=${encodeURIComponent(standardNumber)}`);
                 return `
                     <a class="new-week-process-standard" href="${escapeHtml(standardHref)}" aria-label="Open standard ${escapeHtml(standardNumber)}">
-                        <span><strong>${escapeHtml(standardNumber)}</strong> ${escapeHtml(standardLabels[standardNumber])}</span>
+                        <span><strong>${escapeHtml(standardNumber)}</strong> ${escapeHtml(`${standardLabels[standardNumber]}${mediaTypeSuffix}`)}</span>
                         <small>${escapeHtml(creditsText)}</small>
                     </a>
                 `;
