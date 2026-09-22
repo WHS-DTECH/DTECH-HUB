@@ -2384,7 +2384,13 @@ async function loadAndRenderSidebarAllocations(panel) {
         const profileDetails = computeHubSidebarProfileDetails([...assessments, ...projects]);
         hubStudentAllocatedStandards = Array.isArray(data.allocated_standards) ? data.allocated_standards : [];
         hubStudentExternalStandards = Array.isArray(data.external_standards) ? data.external_standards : [];
-        hubStudentDigitalMediaType = String(profileDetails.digitalMediaStrand || "").trim();
+        const digitalMediaAllocation = [...assessments, ...projects].find((item) =>
+            ["91893", "91903"].includes(String(item?.standard_1 || "").trim())
+            || ["91893", "91903"].includes(String(item?.standard_2 || "").trim())
+        );
+        hubStudentDigitalMediaType = String(
+            digitalMediaAllocation?.digital_media_type || profileDetails.digitalMediaStrand || ""
+        ).trim();
         renderHubSidebarProfileCard(panel, profileDetails);
         renderHubSidebarStandardsCard(panel, profileDetails.yearGroup, hubStudentAllocatedStandards, hubStudentExternalStandards);
         renderCurrentWeek();
