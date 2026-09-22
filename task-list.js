@@ -1955,7 +1955,9 @@ function clearUnverifiedManualTicks(stateMap) {
 }
 
 function autoTickProjectManagementRequirement(stateMap) {
-    const systems = inferStudentSystemConnections(stateMap || {});
+    // The connection subtasks are rendered from fullEvidenceState, so use that same authoritative
+    // state when calculating the persisted criterion tick.
+    const systems = inferStudentSystemConnections(taskListState.fullEvidenceState || stateMap || {});
     const hasOtherSystem = systems.githubConnected || systems.oneDriveConnected || systems.googleDriveConnected;
     // Must correct in both directions — this row is excluded from clearUnverifiedManualTicks (treated as
     // "auto"), so if it only ever ticks true it can never be un-ticked once the linked evidence disappears.
