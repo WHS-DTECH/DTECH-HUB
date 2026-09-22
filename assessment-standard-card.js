@@ -135,6 +135,58 @@ function getLearningSiteUrlForStandard(standardNumber, yearLevel) {
     return `https://tech-learningsites.onrender.com/${domain}/${courseCode}/#${num}`;
 }
 
+function escapeStandardGuideHtml(value) {
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
+
+function getStudentLearningSiteUrl(standardNumber, yearLevel) {
+    const standard = String(standardNumber || "").trim();
+    const studentLearningUrls = {
+        "91893": "https://sites.google.com/westlandhigh.school.nz/dtec/unit-information/dtech-achievement-stds/digital-media-web",
+        "91903": "https://sites.google.com/westlandhigh.school.nz/dtec/unit-information/dtech-achievement-stds/digital-media-web"
+    };
+    return studentLearningUrls[standard] || getLearningSiteUrlForStandard(standard, yearLevel);
+}
+
+function renderStudentStandardGuide({ standardNumber, standardName, yearLevel, credits, achievedText, meritText, excellenceText, achievedChecklist, meritChecklist, excellenceChecklist }) {
+    const guide = document.getElementById("sc-student-guide");
+    const teacherShell = document.querySelector(".standard-card-shell");
+    const title = document.getElementById("ssg-title");
+    const purpose = document.getElementById("ssg-purpose");
+    const meta = document.getElementById("ssg-meta");
+    const criteria = document.getElementById("ssg-criteria");
+    const learningLink = document.getElementById("ssg-learning-link");
+    if (!guide || !title || !purpose || !meta || !criteria || !learningLink) return;
+
+    if (teacherShell) teacherShell.hidden = true;
+    title.textContent = `AS ${standardNumber}: ${standardName || "Assessment Standard"}`;
+    purpose.textContent = achievedText || "Use this guide to understand what you need to demonstrate in your assessment.";
+    meta.innerHTML = [yearLevel, credits ? `${credits} credits` : ""].filter(Boolean)
+        .map((item) => `<span>${escapeStandardGuideHtml(item)}</span>`).join("");
+    learningLink.href = getStudentLearningSiteUrl(standardNumber, yearLevel);
+
+    const levels = [
+        { key: "achieved", label: "Achieved", text: achievedText, checklist: achievedChecklist },
+        { key: "merit", label: "Merit", text: meritText, checklist: meritChecklist },
+        { key: "excellence", label: "Excellence", text: excellenceText, checklist: excellenceChecklist }
+    ];
+    criteria.innerHTML = levels.map((level) => {
+        const rows = Array.isArray(level.checklist) ? level.checklist.filter(Boolean) : [];
+        return `
+            <section class="student-standard-level ${level.key}">
+                <h2>${level.label}</h2>
+                <p class="student-standard-level-copy">${escapeStandardGuideHtml(level.text || "Read the assessment information with your teacher.")}</p>
+                <ul class="student-standard-checklist">${rows.map((row) => `<li>${escapeStandardGuideHtml(row)}</li>`).join("")}</ul>
+            </section>
+        `;
+    }).join("");
+    guide.hidden = false;
+}
+
 async function renderAssessmentTracker(standardNumber, email, isTeacher) {
     const trackerSection = document.getElementById("sc-process-tracker");
     if (!isTeacher) {
@@ -463,7 +515,22 @@ async function loadStandardCard() {
         }
 
         const content = document.getElementById("sc-content");
-        if (content) content.hidden = false;
+        if (content) content.hidden = !isTeacher;
+
+        if (!isTeacher) {
+            renderStudentStandardGuide({
+                standardNumber: number,
+                standardName,
+                yearLevel: safeText(card?.year_level),
+                credits: Number.isInteger(Number.parseInt(card?.credits, 10)) ? String(Number.parseInt(card.credits, 10)) : "",
+                achievedText,
+                meritText,
+                excellenceText,
+                achievedChecklist,
+                meritChecklist,
+                excellenceChecklist
+            });
+        }
 
         void renderAssessmentTracker(number, email, isTeacher);
 

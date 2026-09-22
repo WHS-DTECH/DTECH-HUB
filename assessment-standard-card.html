@@ -100,6 +100,146 @@
             text-decoration: none;
         }
 
+        .student-standard-guide {
+            display: grid;
+            gap: 16px;
+        }
+
+        .student-standard-hero {
+            border: 1px solid #abd6c5;
+            background: #eaf7f1;
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .student-standard-eyebrow {
+            margin: 0 0 6px;
+            color: #176245;
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .student-standard-hero h1 {
+            margin: 0;
+            color: #154d3b;
+            font-family: "Fraunces", Georgia, serif;
+            font-size: 1.9rem;
+            line-height: 1.1;
+        }
+
+        .student-standard-purpose {
+            max-width: 760px;
+            margin: 10px 0 0;
+            color: #245d4b;
+            font-size: 1rem;
+            line-height: 1.5;
+        }
+
+        .student-standard-meta,
+        .student-standard-resources {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .student-standard-meta {
+            margin-top: 14px;
+        }
+
+        .student-standard-meta span {
+            border: 1px solid #9fcab9;
+            border-radius: 999px;
+            background: #fff;
+            color: #176245;
+            font-size: 0.8rem;
+            font-weight: 700;
+            padding: 5px 10px;
+        }
+
+        .student-standard-resources {
+            padding: 14px;
+            border: 1px solid #c9d9ec;
+            border-radius: 10px;
+            background: #f4f8fe;
+        }
+
+        .student-standard-resource {
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            min-height: 42px;
+            border: 1px solid #78a6d1;
+            border-radius: 8px;
+            background: #fff;
+            color: #164e7c;
+            font-weight: 700;
+            padding: 8px 12px;
+            text-decoration: none;
+        }
+
+        .student-standard-resource:hover {
+            background: #eaf4ff;
+        }
+
+        .student-standard-resource img {
+            width: 22px;
+            height: 22px;
+            object-fit: contain;
+        }
+
+        .student-standard-resource.hapara {
+            border-color: #9661ba;
+            color: #5d267f;
+        }
+
+        .student-standard-resource.hapara:hover {
+            background: #f6edfc;
+        }
+
+        .student-standard-criteria {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .student-standard-level {
+            border: 1px solid #d6dee9;
+            border-radius: 10px;
+            background: #fff;
+            overflow: hidden;
+        }
+
+        .student-standard-level h2 {
+            margin: 0;
+            padding: 11px 14px;
+            color: #fff;
+            font-size: 1rem;
+        }
+
+        .student-standard-level.achieved h2 { background: #237b55; }
+        .student-standard-level.merit h2 { background: #236b9b; }
+        .student-standard-level.excellence h2 { background: #76519a; }
+
+        .student-standard-level-copy {
+            min-height: 76px;
+            margin: 0;
+            padding: 14px;
+            color: #25465e;
+            font-weight: 700;
+            line-height: 1.45;
+        }
+
+        .student-standard-checklist {
+            margin: 0;
+            padding: 0 14px 16px 32px;
+            color: #29475c;
+            line-height: 1.45;
+        }
+
+        .student-standard-checklist li + li { margin-top: 8px; }
+
         .standard-tracker-shell {
             margin-top: 20px;
             padding: 16px;
@@ -145,6 +285,10 @@
 
         @media (max-width: 620px) {
             .standard-card-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .student-standard-criteria {
                 grid-template-columns: 1fr;
             }
         }
@@ -218,6 +362,23 @@
                 <div class="standard-card-actions">
                     <a class="button button-primary" href="index.html#project-library">Back To Library</a>
                     <a class="button" id="sc-action-link" href="admin-assessment-information.html">Open Standards Manager</a>
+                </div>
+            </section>
+
+            <section class="student-standard-guide" id="sc-student-guide" aria-label="Student assessment standard guide" hidden>
+                <div class="student-standard-hero">
+                    <p class="student-standard-eyebrow">Your Assessment Standard</p>
+                    <h1 id="ssg-title">Assessment Standard</h1>
+                    <p class="student-standard-purpose" id="ssg-purpose"></p>
+                    <div class="student-standard-meta" id="ssg-meta"></div>
+                </div>
+                <section class="student-standard-resources" aria-label="Student resources">
+                    <a class="student-standard-resource" id="ssg-learning-link" href="#" target="_blank" rel="noopener noreferrer">Open Learning Site</a>
+                    <a class="student-standard-resource hapara" id="ssg-hapara-link" href="https://bit.ly/4uO74lI" target="_blank" rel="noopener noreferrer"><img src="https://app.hapara.com/favicon.ico" alt=""> Hapara Student Dashboard</a>
+                </section>
+                <div class="student-standard-criteria" id="ssg-criteria"></div>
+                <div class="standard-card-actions">
+                    <a class="button button-primary" href="index.html#project-library">Back To Library</a>
                 </div>
             </section>
 
