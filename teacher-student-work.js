@@ -993,7 +993,9 @@ function buildAllRecords() {
                     links: mergedLinks,
                     evidenceLinked: Boolean(evidence.googleSlidesUrl || mergedLinks.length || digitalMediaEvidenceLinked || (isEfficientToolsCriterion && efficientTools.length)),
                     submitted: Boolean(evidence.submitted),
-                    acknowledged: Boolean(checklistStep?.done || evidence.submitted || projectManagementComplete || digitalOutcomeTemplateComplete || digitalMediaSubtaskComplete),
+                    // Task List is the completion authority. Other evidence remains visible to teachers,
+                    // but must not independently increase the Student Work Tracker completion totals.
+                    acknowledged: Boolean(checklistStep?.done),
                     submittedAt: evidence.submittedAt,
                     taskUrl: new URL(`ProjectPages/custom-activity.html?id=${encodeURIComponent(activityId)}&taskTopic=${encodeURIComponent(taskTopic)}`, window.location.origin).toString()
                 });
