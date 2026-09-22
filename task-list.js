@@ -2768,6 +2768,9 @@ function renderChecklistCards(detail, allItems) {
                                 && /^(?:effectively\s+)?trial(?:l?ing)?\s+multiple\s+components\s+and\/or\s+techniques\b/i.test(stepText);
                             const isMeritDevFeedbackCollabRow = String(level) === "Merit"
                                 && /development,\s*feedback\s+and\/or\s+collaborative\s+processes/i.test(stepText);
+                            const isNonTickableProjectManagementProcessesMeritRow = String(standard) === "91907"
+                                && isMeritDevFeedbackCollabRow
+                                && /^effectively\s+use\s+project management techniques/i.test(stepText);
                             const isIterativeImprovementRow = (String(standard) === "91897" || String(standard) === "91907")
                                 && String(level) === "Excellence"
                                 && /iterative improvement throughout the design, development and testing process/i.test(stepText);
@@ -2803,9 +2806,9 @@ function renderChecklistCards(detail, allItems) {
                                 ${shouldRenderAchievedSectionHeading && achievedSectionMeta?.id === "relevant-implications"
                                     ? `<p class="task-list-achieved-note">Complete any 3 or more categories to mark Section 4 complete. (${relevantCategoryDoneCount}/${RELEVANT_IMPLICATIONS_CATEGORIES.length})</p>`
                                     : ""}
-                                <div ${isTestingFunctionsRow ? `id="task-list-standard-${escapeTaskListHtml(standard)}-testing-functions"` : ""} class="task-list-step-row ${isSystemComplete ? "is-system-complete" : ""} ${isRelevantCategoryRow ? "is-relevant-implications-category" : ""} ${isInformationalRow ? "is-informational" : ""} ${isAddressRelevantImplicationsRow || isNonTickableProjectManagementMeritRow ? "is-linked-relevant-implications" : ""} ${needsEvidence ? "is-needs-evidence" : ""}">
+                                <div ${isTestingFunctionsRow ? `id="task-list-standard-${escapeTaskListHtml(standard)}-testing-functions"` : ""} class="task-list-step-row ${isSystemComplete ? "is-system-complete" : ""} ${isRelevantCategoryRow ? "is-relevant-implications-category" : ""} ${isInformationalRow ? "is-informational" : ""} ${isAddressRelevantImplicationsRow || isNonTickableProjectManagementMeritRow || isNonTickableProjectManagementProcessesMeritRow ? "is-linked-relevant-implications" : ""} ${needsEvidence ? "is-needs-evidence" : ""}">
                                     <label class="task-list-step-check-wrap">
-                                        ${isInformationalRow || isAddressRelevantImplicationsRow || isNonTickableProjectManagementMeritRow ? "" : `<input type="checkbox" ${isRowChecked ? "checked" : ""} ${isTickActionDisabled ? "disabled" : ""} data-step-check="${escapeTaskListHtml(standard)}:${step._index}">`}
+                                        ${isInformationalRow || isAddressRelevantImplicationsRow || isNonTickableProjectManagementMeritRow || isNonTickableProjectManagementProcessesMeritRow ? "" : `<input type="checkbox" ${isRowChecked ? "checked" : ""} ${isTickActionDisabled ? "disabled" : ""} data-step-check="${escapeTaskListHtml(standard)}:${step._index}">`}
                                         ${isRelevantCategoryRow
                                             ? `<a class="task-list-step-link task-list-step-text-category" href="${escapeTaskListHtml(relevantCategoryHref)}">${escapeTaskListHtml(stepLabel)}</a>`
                                             : (isInformationalRow
