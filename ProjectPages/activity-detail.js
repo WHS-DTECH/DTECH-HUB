@@ -8742,8 +8742,9 @@ function isDigitalOutcomeVideoConventionsCriterion(taskTopicTitle, taskShortName
 function isToolsAndTechniquesCriterion(taskTopicTitle, taskShortName = "") {
     const topicText = String(taskTopicTitle || "").trim().toLowerCase();
     const shortNameText = String(taskShortName || "").trim().toLowerCase();
-    if (/what\s+tools\s+and\s+techniques\s+will\s+be\s+used/.test(topicText)) return true;
-    return shortNameText === DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE.toLowerCase();
+    if (/what\s+tools\s+and\s+techniques\s+will\s+be\s+used|identify\s+tools\s+and\s+techniques\s+for\s+this\s+outcome/.test(topicText)) return true;
+    return shortNameText === DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE.toLowerCase()
+        || shortNameText === "tools and techniques";
 }
 
 function isCodeValidationCriterion(taskTopicTitle, taskShortName = "") {
@@ -8793,7 +8794,7 @@ function inferDigitalOutcomeTopicKeyFromTitle(pageTitle) {
         return "target-audience";
     }
 
-    if (/what\s+tools\s+and\s+techniques/.test(normalized)) {
+    if (/what\s+tools\s+and\s+techniques|identify\s+tools\s+and\s+techniques/.test(normalized)) {
         return "tools-and-techniques";
     }
 

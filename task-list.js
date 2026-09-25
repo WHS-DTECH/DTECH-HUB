@@ -573,7 +573,7 @@ function inferDigitalOutcomeTaskTemplateId(taskText) {
     if (/identify\s+the\s+target\s+audience|target\s+audience|end\s+user/.test(normalized)) return "target-audience";
     if (/trial\s+(?:the\s+)?components|triall?ing\s+(?:the\s+)?components|trailing\s+components/.test(normalized)) return "trialling-components";
     if (/testing\s+functions|test(?:ing)?\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/.test(normalized)) return "testing-functions";
-    if (/what\s+tools\s+and\s+techniques\s+will\s+be\s+used|tools\/?technologies/.test(normalized)) return "tools-and-techniques";
+    if (/what\s+tools\s+and\s+techniques\s+will\s+be\s+used|identify\s+tools\s+and\s+techniques\s+for\s+this\s+outcome|tools\/?technologies/.test(normalized)) return "tools-and-techniques";
     if (/explain\s+how\s+the\s+outcome\s+will\s+be\s+developed|development\s+steps|outcome\s+developed/.test(normalized)) return "development-steps";
     if (/relevant\s+implications/.test(normalized)) return "relevant-implications";
     if (/state\s+how\s+success\s+will\s+be\s+measured|success\s+will\s+be\s+evaluated|project\s+success\s+criteria|success\s+criteria/.test(normalized)) return "project-success-criteria";
