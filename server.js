@@ -61,6 +61,7 @@ const memoryStudentHaparaFolders = new Map();
 const memoryStudentDriveSetup = new Map();
 const memoryTemplateLibraryEntries = new Map();
 const memoryStudentToolsTechniques = new Map();
+const memoryToolsTechniquesKeywords = new Map();
 const memoryDecompositionCoverage = new Map();
 const memoryTriallingComponents = new Map();
 const memoryDigiMedEfficientTools = new Map();
@@ -4550,6 +4551,37 @@ async function ensureStudentHaparaFoldersSchema() {
   await pool.query(`ALTER TABLE student_hapara_folders ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`ALTER TABLE student_hapara_folders ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`CREATE INDEX IF NOT EXISTS student_hapara_folders_class_idx ON student_hapara_folders (class_label)`);
+}
+
+// Growing, student-worded index of Tools & Techniques keywords, learned from what students actually push to
+// Trello. Used to recognise tool names typed directly into Trello (not just the hub's known regex keywords).
+async function ensureToolsTechniquesKeywordsSchema() {
+  if (!hasDatabase) {
+    return;
+  }
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tools_techniques_keywords (
+      id SERIAL PRIMARY KEY,
+      keyword TEXT NOT NULL,
+      keyword_lower TEXT NOT NULL UNIQUE,
+      source TEXT NOT NULL DEFAULT 'auto',
+      added_by_email TEXT,
+      use_count INTEGER NOT NULL DEFAULT 1,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`ALTER TABLE tools_techniques_keywords ADD COLUMN IF NOT EXISTS keyword_lower TEXT`);
+  await pool.query(`UPDATE tools_techniques_keywords SET keyword_lower = LOWER(TRIM(keyword)) WHERE keyword_lower IS NULL`);
+  await pool.query(`ALTER TABLE tools_techniques_keywords ALTER COLUMN keyword_lower SET NOT NULL`);
+  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS tools_techniques_keywords_lower_idx ON tools_techniques_keywords (keyword_lower)`);
+  await pool.query(`ALTER TABLE tools_techniques_keywords ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'auto'`);
+  await pool.query(`ALTER TABLE tools_techniques_keywords ADD COLUMN IF NOT EXISTS added_by_email TEXT`);
+  await pool.query(`ALTER TABLE tools_techniques_keywords ADD COLUMN IF NOT EXISTS use_count INTEGER NOT NULL DEFAULT 1`);
+  await pool.query(`ALTER TABLE tools_techniques_keywords ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await pool.query(`ALTER TABLE tools_techniques_keywords ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 }
 
 async function ensureCourseOutlinesSchema() {
@@ -10550,6 +10582,114 @@ app.patch("/api/activities/:id/my-tools-techniques", async (req, res) => {
     res.json({ tools_techniques: normalizedTools });
   } catch (_error) {
     res.status(500).json({ error: "Could not save tools & techniques" });
+  }
+});
+
+// GET /api/tools-techniques-keywords — the growing, student-worded Tools & Techniques keyword index.
+// Any signed-in school account can read it (needed client-side to recognise Trello cards typed directly,
+// without going through the Push to Trello button).
+app.get("/api/tools-techniques-keywords", requireSchoolAccountAccess, async (_req, res) => {
+  if (!hasDatabase) {
+    const rows = Array.from(memoryToolsTechniquesKeywords.values())
+      .sort((a, b) => String(a.keyword).localeCompare(String(b.keyword)));
+    res.json({ keywords: rows });
+    return;
+  }
+
+  try {
+    await ensureToolsTechniquesKeywordsSchema();
+    const result = await pool.query(
+      `SELECT id, keyword, source, added_by_email, use_count, created_at, updated_at
+       FROM tools_techniques_keywords
+       ORDER BY keyword ASC`
+    );
+    res.json({ keywords: result.rows });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not load the Tools & Techniques keyword index." });
+  }
+});
+
+// POST /api/tools-techniques-keywords — add/increment keywords. Called automatically when a student pushes
+// tool rows to Trello (each real tool name becomes/reinforces an entry), growing the index over time.
+app.post("/api/tools-techniques-keywords", requireSchoolAccountAccess, async (req, res) => {
+  const email = req.user_email;
+  const source = String(req.body?.source || "").trim().toLowerCase() === "manual" ? "manual" : "auto";
+  const keywords = Array.from(new Set(
+    (Array.isArray(req.body?.keywords) ? req.body.keywords : [])
+      .map((value) => String(value || "").trim())
+      .filter(Boolean)
+      .slice(0, 50)
+  ));
+
+  if (!keywords.length) {
+    res.status(400).json({ error: "At least one keyword is required." });
+    return;
+  }
+
+  if (!hasDatabase) {
+    keywords.forEach((keyword) => {
+      const lower = keyword.toLowerCase();
+      const existing = memoryToolsTechniquesKeywords.get(lower);
+      if (existing) {
+        existing.use_count = Number(existing.use_count || 0) + 1;
+        existing.updated_at = new Date().toISOString();
+      } else {
+        memoryToolsTechniquesKeywords.set(lower, {
+          id: memoryToolsTechniquesKeywords.size + 1,
+          keyword,
+          source,
+          added_by_email: email,
+          use_count: 1,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      }
+    });
+    res.status(201).json({ ok: true });
+    return;
+  }
+
+  try {
+    await ensureToolsTechniquesKeywordsSchema();
+    for (const keyword of keywords) {
+      await pool.query(
+        `
+          INSERT INTO tools_techniques_keywords (keyword, keyword_lower, source, added_by_email, use_count, created_at, updated_at)
+          VALUES ($1, LOWER(TRIM($1)), $3, $2, 1, NOW(), NOW())
+          ON CONFLICT (keyword_lower) DO UPDATE SET
+            use_count = tools_techniques_keywords.use_count + 1,
+            updated_at = NOW()
+        `,
+        [keyword, email, source]
+      );
+    }
+    res.status(201).json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not update the Tools & Techniques keyword index." });
+  }
+});
+
+// DELETE /api/tools-techniques-keywords/:id — admin/teacher moderation of the keyword index.
+app.delete("/api/tools-techniques-keywords/:id", requireActivityWriteAccess, async (req, res) => {
+  const id = String(req.params.id || "").trim();
+  if (!id) {
+    res.status(400).json({ error: "Keyword id is required." });
+    return;
+  }
+
+  if (!hasDatabase) {
+    const entry = Array.from(memoryToolsTechniquesKeywords.entries()).find(([, row]) => String(row.id) === id);
+    if (entry) memoryToolsTechniquesKeywords.delete(entry[0]);
+    res.status(204).send();
+    return;
+  }
+
+  try {
+    await ensureToolsTechniquesKeywordsSchema();
+    await pool.query(`DELETE FROM tools_techniques_keywords WHERE id = $1`, [id]);
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not remove that keyword." });
   }
 });
 

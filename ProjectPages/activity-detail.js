@@ -2734,7 +2734,24 @@ const DECOMPOSITION_TASK_CATEGORIES = [
     }
 ];
 
-function countDecompositionTaskCategories(cards) {
+// Session-cached fetch of the growing, student-worded Tools & Techniques keyword index (server-managed,
+// grows automatically as students push tool names to Trello). Used to recognise cards typed directly into
+// Trello that don't match the hub's own hardcoded keyword patterns.
+let decompToolsTechniquesKeywordsCache = null;
+async function fetchToolsTechniquesKeywords() {
+    if (decompToolsTechniquesKeywordsCache) return decompToolsTechniquesKeywordsCache;
+    try {
+        const response = await fetch("/api/tools-techniques-keywords", { headers: buildWriteHeaders() });
+        const payload = await response.json().catch(() => ({}));
+        const rows = response.ok && Array.isArray(payload?.keywords) ? payload.keywords : [];
+        decompToolsTechniquesKeywordsCache = rows.map((row) => String(row?.keyword || "").trim().toLowerCase()).filter(Boolean);
+    } catch (_error) {
+        decompToolsTechniquesKeywordsCache = [];
+    }
+    return decompToolsTechniquesKeywordsCache;
+}
+
+function countDecompositionTaskCategories(cards, toolsTechniquesKeywords = []) {
     const safeCards = Array.isArray(cards) ? cards : [];
     const haystacks = safeCards.map((card) => {
         const labels = Array.isArray(card?.labels)
@@ -2742,10 +2759,18 @@ function countDecompositionTaskCategories(cards) {
             : "";
         return `${String(card?.name || "")} ${labels}`.trim();
     }).filter(Boolean);
+    const keywordsLower = Array.isArray(toolsTechniquesKeywords) ? toolsTechniquesKeywords : [];
 
     return DECOMPOSITION_TASK_CATEGORIES.map((category) => ({
         label: category.label,
-        count: haystacks.filter((text) => category.pattern.test(text)).length
+        count: haystacks.filter((text) => {
+            if (category.pattern.test(text)) return true;
+            if (category.label === "Tools & Techniques" && keywordsLower.length) {
+                const lowerText = text.toLowerCase();
+                return keywordsLower.some((keyword) => keyword && lowerText.includes(keyword));
+            }
+            return false;
+        }).length
     }));
 }
 
@@ -6116,10 +6141,11 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         `;
     };
 
-    const renderDecompCategoryCoverage = (cards, persist = false) => {
+    const renderDecompCategoryCoverage = async (cards, persist = false) => {
         if (!decompCategoryListHost) return;
         const safeCards = Array.isArray(cards) ? cards : [];
-        const rows = countDecompositionTaskCategories(safeCards);
+        const toolsTechniquesKeywords = await fetchToolsTechniquesKeywords();
+        const rows = countDecompositionTaskCategories(safeCards, toolsTechniquesKeywords);
         if (persist) {
             writeDecompositionCategoryCoverage(projectId, email, rows);
             void saveDecompositionCategoryCoverage(projectId, rows, safeCards.length);
@@ -6623,13 +6649,14 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                     ...(Array.isArray(latestDecompBoardSnapshot?.done_cards) ? latestDecompBoardSnapshot.done_cards : [])
                 ];
                 const lastSyncedIso = readDecompositionTrelloSyncTime(projectId, email);
+                const pdfToolsTechniquesKeywords = await fetchToolsTechniquesKeywords();
 
                 const fileBase64 = await buildDecompositionTrelloPdfBase64({
                     projectTitle: taskTopicTitle || "Decomposition Tasks",
                     email,
                     generatedLabel: formatSubmissionTimestamp(new Date().toISOString()),
                     lastSyncedLabel: lastSyncedIso ? formatSubmissionTimestamp(lastSyncedIso) : "not yet",
-                    categories: countDecompositionTaskCategories(allCards),
+                    categories: countDecompositionTaskCategories(allCards, pdfToolsTechniquesKeywords),
                     links: readStoredTrelloCardLibrary(projectId, email),
                     columns: [
                         { title: "To Do", cards: toCardNames(latestDecompBoardSnapshot?.todo_cards) },
@@ -8135,6 +8162,7 @@ async function renderToolsTechniquesPanel({ host, projectId, detailData, taskTop
             setPushStatus("Pushing tools to Trello To Do...");
             let createdCount = 0;
             const failedTools = [];
+            const pushedToolNames = [];
             for (const row of toolRows) {
                 const cardName = `${row.toolName} (${row.status})`;
                 const cardDesc = String(row.techniques || "").trim() || "No techniques described yet.";
@@ -8154,6 +8182,17 @@ async function renderToolsTechniquesPanel({ host, projectId, detailData, taskTop
                     continue;
                 }
                 createdCount += 1;
+                pushedToolNames.push(row.toolName);
+            }
+
+            // Grow the shared Tools & Techniques keyword index with these real, student-worded tool names,
+            // so future Trello cards typed directly (without this button) can still be recognised.
+            if (pushedToolNames.length) {
+                fetch("/api/tools-techniques-keywords", {
+                    method: "POST",
+                    headers: buildWriteHeaders(),
+                    body: JSON.stringify({ keywords: pushedToolNames })
+                }).catch(() => {});
             }
 
             if (failedTools.length) {

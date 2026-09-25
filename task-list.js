@@ -1126,14 +1126,38 @@ function getDecompositionCategoryCoverageKey(activityId, email) {
     return `${DECOMPOSITION_CATEGORY_COVERAGE_STORAGE_PREFIX}:${String(activityId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
 }
 
-function countDecompositionTaskCategories(cards) {
+// Session-cached fetch of the growing, student-worded Tools & Techniques keyword index (server-managed,
+// grows automatically as students push tool names to Trello). Used to recognise cards typed directly into
+// Trello that don't match the hub's own hardcoded keyword patterns.
+let taskListToolsTechniquesKeywordsCache = null;
+async function fetchToolsTechniquesKeywords() {
+    if (taskListToolsTechniquesKeywordsCache) return taskListToolsTechniquesKeywordsCache;
+    try {
+        const payload = await loadJson("/api/tools-techniques-keywords", { headers: buildTaskListHeaders({}) });
+        const rows = Array.isArray(payload?.keywords) ? payload.keywords : [];
+        taskListToolsTechniquesKeywordsCache = rows.map((row) => String(row?.keyword || "").trim().toLowerCase()).filter(Boolean);
+    } catch (_error) {
+        taskListToolsTechniquesKeywordsCache = [];
+    }
+    return taskListToolsTechniquesKeywordsCache;
+}
+
+function countDecompositionTaskCategories(cards, toolsTechniquesKeywords = []) {
     const haystacks = (Array.isArray(cards) ? cards : [])
         .map((card) => String(card?.name || "").trim())
         .filter(Boolean);
+    const keywordsLower = Array.isArray(toolsTechniquesKeywords) ? toolsTechniquesKeywords : [];
 
     return DECOMPOSITION_TASK_CATEGORIES.map((category) => ({
         label: category.label,
-        count: haystacks.filter((text) => category.pattern.test(text)).length
+        count: haystacks.filter((text) => {
+            if (category.pattern.test(text)) return true;
+            if (category.label === "Tools & Techniques" && keywordsLower.length) {
+                const lowerText = text.toLowerCase();
+                return keywordsLower.some((keyword) => keyword && lowerText.includes(keyword));
+            }
+            return false;
+        }).length
     }));
 }
 
@@ -3424,8 +3448,9 @@ async function runTaskListTrelloSync() {
             ...(Array.isArray(payload?.doing_cards) ? payload.doing_cards : []),
             ...(Array.isArray(payload?.done_cards) ? payload.done_cards : [])
         ];
+        const toolsTechniquesKeywords = await fetchToolsTechniquesKeywords();
         const categoryRows = [
-            ...countDecompositionTaskCategories(allCards),
+            ...countDecompositionTaskCategories(allCards, toolsTechniquesKeywords),
             ...countProjectManagementProcessCategories(allCards)
         ];
         writeDecompositionCategoryCoverage(taskListState.selectedId, email, categoryRows);
