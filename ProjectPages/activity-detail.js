@@ -2712,7 +2712,9 @@ const DECOMPOSITION_TASK_CATEGORIES = [
     },
     {
         label: "Tools & Techniques",
-        pattern: /tool|technique|software|library|framework|template|api|plugin|extension|github|trello|onedrive|google drive|vs code|setup|set up|install|sync|version control/i
+        // The "(Intend to Use|Currently Using|Have Used)" suffix is written by the Tools & Techniques
+        // page's Push to Trello button — it identifies these cards regardless of the tool's own name.
+        pattern: /tool|technique|software|library|framework|template|api|plugin|extension|github|trello|onedrive|google drive|vs code|setup|set up|install|sync|version control|\((?:intend to use|currently using|have used)\)/i
     },
     {
         label: "Trialling",
