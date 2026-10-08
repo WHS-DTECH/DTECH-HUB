@@ -1,0 +1,196 @@
+"use strict";
+
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const vm = require("node:vm");
+
+const root = path.join(__dirname, "..");
+const server = fs.readFileSync(path.join(root, "server.js"), "utf8");
+
+function extract(start, end) {
+    const startIndex = server.indexOf(start);
+    const endIndex = server.indexOf(end, startIndex);
+    assert.ok(startIndex >= 0 && endIndex > startIndex, `Missing server section: ${start}`);
+    return server.slice(startIndex, endIndex);
+}
+
+async function main() {
+    const context = vm.createContext({
+        hasDatabase: false,
+        memoryPracticalSkillsProgress: new Map(),
+        normalizeEmail: (email) => email.trim().toLowerCase(),
+        ensurePracticalSkillsProgressSchema: async () => {},
+        Date
+    });
+    vm.runInContext([
+        extract("async function ensurePracticalSkillsProgressRow(", "async function getAllPracticalSkillsProgressRows("),
+        extract("async function setPracticalSkillsKitCompletion(", "const DEFAULT_TEMPLATE_LIBRARY_ENTRIES"),
+        extract("async function savePracticalSkillsKitResponses(", "async function ensureStudentHaparaFoldersSchema(")
+    ].join("\n"), context);
+
+    await context.savePracticalSkillsKitResponses("student@example.school.nz", "kit-login", { q1: "Student" });
+    await context.setPracticalSkillsActivityCompletion("student@example.school.nz", "kit-login", 0, true);
+    await context.setPracticalSkillsActivityCompletion("student@example.school.nz", "kit-login", 1, true);
+    let row = await context.ensurePracticalSkillsProgressRow("student@example.school.nz", "kit-login");
+    assert.ok(row.completed_activities["0"]);
+    assert.ok(row.completed_activities["1"]);
+    assert.equal(row.responses.q1, "Student");
+    assert.equal(row.completed, false, "Activity completion must not award kit completion");
+
+    await context.setPracticalSkillsActivityCompletion("student@example.school.nz", "kit-login", 0, false);
+    row = await context.ensurePracticalSkillsProgressRow("student@example.school.nz", "kit-login");
+    assert.equal(row.completed_activities["0"], undefined);
+    assert.ok(row.completed_activities["1"], "Undo must preserve other ticks");
+    const other = await context.ensurePracticalSkillsProgressRow("other@example.school.nz", "kit-login");
+    assert.equal(other.completed_activities, undefined, "Ticks must be student-specific");
+
+    await context.setPracticalSkillsKitCompletion("student@example.school.nz", "kit-login", true);
+    row = await context.setPracticalSkillsKitCompletion("student@example.school.nz", "kit-login", false);
+    assert.equal(Object.keys(row.completed_activities).length, 0);
+    assert.equal(row.responses.q1, "Student", "Reset must preserve answers");
+
+    const queries = [];
+    context.hasDatabase = true;
+    context.pool = {
+        query: async (sql, values) => {
+            queries.push({ sql, values });
+            return { rows: [{}] };
+        }
+    };
+    await context.setPracticalSkillsActivityCompletion("student@example.school.nz", "kit-login", 3, true);
+    let update = queries.at(-1);
+    assert.match(update.sql, /jsonb_set\(completed_activities/);
+    assert.deepEqual(Array.from(update.values), ["3", update.values[1], "student@example.school.nz", "kit-login"]);
+    await context.setPracticalSkillsActivityCompletion("student@example.school.nz", "kit-login", 3, false);
+    update = queries.at(-1);
+    assert.match(update.sql, /completed_activities - \$1::text/);
+    assert.deepEqual(Array.from(update.values), ["3", "student@example.school.nz", "kit-login"]);
+    assert.match(server, /ADD COLUMN IF NOT EXISTS completed_activities JSONB NOT NULL DEFAULT '\{\}'::jsonb/);
+
+    let handler;
+    context.app = { put: (_url, callback) => { handler = callback; } };
+    context.SCHOOL_EMAIL_DOMAIN = "example.school.nz";
+    context.getRequestUserEmail = (req) => req.email || "";
+    context.getPracticalSkillsKitDefinition = (id) => id === "kit-login";
+    context.getPracticalSkillsKitContent = async () => ({ worksheets: [{}, {}] });
+    context.setPracticalSkillsActivityCompletion = async (_email, _kit, index, completed) => ({
+        completed_activities: completed ? { [index]: "saved" } : {}
+    });
+    vm.runInContext(extract(
+        'app.put("/api/practical-skills/progress/:kitId/activities/:activityIndex"',
+        'app.get("/api/practical-skills/kit-content/:kitId"'
+    ), context);
+    async function request(overrides = {}) {
+        const req = {
+            email: "student@example.school.nz",
+            params: { kitId: "kit-login", activityIndex: "0" },
+            body: { completed: true },
+            ...overrides
+        };
+        const res = {
+            code: 200,
+            status(code) { this.code = code; return this; },
+            json(body) { this.body = body; }
+        };
+        await handler(req, res);
+        return res;
+    }
+    assert.equal((await request({ email: "" })).code, 401);
+    assert.equal((await request({ body: { completed: "true" } })).code, 400);
+    assert.equal((await request({ params: { kitId: "kit-login", activityIndex: "-1" } })).code, 400);
+    assert.equal((await request({ params: { kitId: "kit-login", activityIndex: "9" } })).code, 404);
+    assert.equal((await request({ params: { kitId: "unknown", activityIndex: "0" } })).code, 404);
+    assert.equal((await request()).body.completedActivities["0"], "saved");
+    context.setPracticalSkillsActivityCompletion = async () => { throw new Error("Database unavailable"); };
+    assert.equal((await request()).code, 500, "Database failures must not report success");
+
+    const rendererContext = { window: {} };
+    vm.runInNewContext(fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet-render.js"), "utf8"), rendererContext);
+    const host = { style: { setProperty() {} }, innerHTML: "" };
+    rendererContext.window.KitWorksheetRender.renderKitOverview(host, {
+        bannerTitle: "Login Kit",
+        worksheets: [{ activity: "First" }, { activity: "<Second>" }]
+    }, { kitId: "kit-login", completedActivities: { 1: "saved" } });
+    assert.match(host.innerHTML, /1 \/ 2 activities completed/);
+    assert.equal((host.innerHTML.match(/&#10003;/g) || []).length, 1);
+    assert.match(host.innerHTML, /aria-label="Not completed"/);
+    assert.match(host.innerHTML, /aria-label="Completed"/);
+    assert.match(host.innerHTML, /&lt;Second&gt;/);
+    assert.match(host.innerHTML, /activity=1/);
+
+    const nodes = new Map();
+    const events = {};
+    const document = {
+        getElementById(id) {
+            if (!nodes.has(id)) {
+                nodes.set(id, {
+                    hidden: true,
+                    classList: { toggle() {}, remove() {} },
+                    addEventListener(name, callback) { events[`${id}:${name}`] = callback; }
+                });
+            }
+            return nodes.get(id);
+        }
+    };
+    let savedTicks = {};
+    let failSave = false;
+    let overviewTicks;
+    const browserContext = {
+        document,
+        URLSearchParams,
+        localStorage: { getItem: () => JSON.stringify({ expiresAt: Date.now() + 60000, profile: { email: "student@example.school.nz" } }) },
+        sessionStorage: { getItem: () => null },
+        fetch: async (url, options = {}) => {
+            if (url.includes("/activities/")) {
+                if (failSave) return { ok: false, status: 500, json: async () => ({ error: "Save failed" }) };
+                savedTicks = JSON.parse(options.body).completed ? { 0: "saved" } : {};
+                return { ok: true, json: async () => ({ completedActivities: savedTicks }) };
+            }
+            return { ok: true, json: async () => url.includes("/kit-content/") ? {
+                content: { bannerTitle: "Kit", worksheets: [{ activity: "First" }] }
+            } : { responses: { q1: "Answer" }, completedActivities: savedTicks, kit: { isComplete: false } } };
+        },
+        window: {
+            location: { search: "?kit=kit-login&activity=0" },
+            clearTimeout() {},
+            setTimeout() {},
+            KitWorksheetRender: {
+                renderWorksheet() {},
+                renderKitOverview(_host, _content, options) { overviewTicks = options.completedActivities; }
+            }
+        }
+    };
+    vm.runInNewContext(fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet.js"), "utf8"), browserContext);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(nodes.get("worksheet-complete-bar").hidden, true, "Kit completion must not appear inside an activity");
+    assert.equal(nodes.get("worksheet-activity-complete-bar").hidden, false);
+    await events["worksheet-activity-complete-btn:click"]();
+    assert.equal(nodes.get("worksheet-activity-status-pill").textContent, "Completed");
+    assert.equal(nodes.get("worksheet-activity-complete-btn").textContent, "Undo Completion");
+
+    failSave = true;
+    await events["worksheet-activity-complete-btn:click"]();
+    assert.equal(nodes.get("worksheet-activity-status-pill").textContent, "Completed", "Failed saves must preserve the confirmed tick");
+    assert.equal(nodes.get("worksheet-status-message").textContent, "Save failed");
+    failSave = false;
+
+    browserContext.window.location.search = "?kit=kit-login";
+    vm.runInNewContext(fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet.js"), "utf8"), browserContext);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(overviewTicks["0"], "saved", "Reopening the list must load saved completion");
+    assert.equal(nodes.get("worksheet-activity-complete-bar").hidden, true);
+    assert.equal(nodes.get("worksheet-complete-bar").hidden, false);
+
+    browserContext.window.location.search = "?kit=kit-login&activity=0";
+    vm.runInNewContext(fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet.js"), "utf8"), browserContext);
+    await new Promise((resolve) => setImmediate(resolve));
+    await events["worksheet-activity-complete-btn:click"]();
+    assert.equal(nodes.get("worksheet-activity-status-pill").textContent, "Not Completed");
+    console.log("Practical Skills completion regression checks passed.");
+}
+
+main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+});

@@ -194,10 +194,27 @@ body.kit-worksheet-page {
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    background: var(--worksheet-accent-color);
     color: #4a3a1a;
     font-family: 'Baloo 2', cursive;
     font-weight: 800;
+    border: 2px solid #d8c8a0;
+    background: #fffaf0;
+}
+
+.worksheet-activity-number.is-complete {
+    background: var(--worksheet-theme-color);
+    border-color: var(--worksheet-theme-color);
+    color: #ffffff;
+    font-size: 1.4rem;
+}
+
+.worksheet-activity-card.is-complete {
+    border-color: var(--worksheet-theme-color);
+}
+
+.worksheet-activity-progress {
+    margin: 0;
+    font-weight: 700;
 }
 
 .worksheet-activity-copy {
@@ -402,6 +419,10 @@ body.kit-worksheet-page {
     border-radius: 20px;
     border: 3px solid #f1e4c8;
     padding: 14px 18px;
+}
+
+.worksheet-complete-bar[hidden] {
+    display: none;
 }
 
 .worksheet-status-pill {

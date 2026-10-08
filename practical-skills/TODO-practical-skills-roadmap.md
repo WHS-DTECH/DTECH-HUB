@@ -19,7 +19,13 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
 
 ## 3. Kit Detail / Checklist Behavior
 
-- Add checklist steps per kit with self-marking.
+- Implemented: students self-mark each worksheet using `Mark Activity Complete`.
+  The kit overview shows saved completion ticks and a completed-activity count.
+  Activity completion timestamps are stored per student and kit in
+  `practical_skills_progress.completed_activities` (JSONB), separately from answers.
+  Students can undo an activity completion; resetting the kit clears its activity ticks
+  without deleting answers. Kit-level points and badges remain separately awarded
+  through the existing kit completion action.
 - Support evidence capture where needed (text, link, or image).
 - Use clear kit states:
   - `not_started`

@@ -227,6 +227,7 @@ async function setPracticalSkillsKitCompletion(studentEmail, kitId, completed) {
       kit_id: safeKitId,
       completed: Boolean(completed),
       completed_at: completed ? nowIso : null,
+      completed_activities: completed ? existing.completed_activities || {} : {},
       started_at: completed ? existing.started_at : nowIso,
       updated_at: nowIso
     };
@@ -242,7 +243,7 @@ async function setPracticalSkillsKitCompletion(studentEmail, kitId, completed) {
         [email, safeKitId]
       )
     : await pool.query(
-        `UPDATE practical_skills_progress SET completed = FALSE, completed_at = NULL, started_at = NOW(), updated_at = NOW()
+        `UPDATE practical_skills_progress SET completed = FALSE, completed_at = NULL, completed_activities = '{}'::jsonb, started_at = NOW(), updated_at = NOW()
          WHERE student_email = $1 AND kit_id = $2 RETURNING *`,
         [email, safeKitId]
       );
@@ -4319,6 +4320,7 @@ async function ensurePracticalSkillsProgressSchema() {
   await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ`);
   await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS responses JSONB NOT NULL DEFAULT '{}'::jsonb`);
+  await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS completed_activities JSONB NOT NULL DEFAULT '{}'::jsonb`);
 }
 
 // Starter drafts only — teachers edit the real content via the Kit Content Builder admin page.
@@ -4520,6 +4522,39 @@ async function savePracticalSkillsKitResponses(studentEmail, kitId, responses) {
      WHERE student_email = $2 AND kit_id = $3 RETURNING *`,
     [JSON.stringify(safeResponses), email, safeKitId]
   );
+  return result.rows?.[0] || null;
+}
+
+async function setPracticalSkillsActivityCompletion(studentEmail, kitId, activityIndex, completed) {
+  const email = normalizeEmail(studentEmail);
+  await ensurePracticalSkillsProgressRow(email, kitId);
+  const key = String(activityIndex);
+  const completedAt = new Date().toISOString();
+
+  if (!hasDatabase) {
+    const progressKey = `${email}:${kitId}`;
+    const existing = memoryPracticalSkillsProgress.get(progressKey);
+    const completedActivities = { ...existing.completed_activities };
+    if (completed) completedActivities[key] = completedAt;
+    else delete completedActivities[key];
+    const next = { ...existing, completed_activities: completedActivities, updated_at: completedAt };
+    memoryPracticalSkillsProgress.set(progressKey, next);
+    return next;
+  }
+
+  const result = completed
+    ? await pool.query(
+        `UPDATE practical_skills_progress
+         SET completed_activities = jsonb_set(completed_activities, ARRAY[$1::text], to_jsonb($2::text)), updated_at = NOW()
+         WHERE student_email = $3 AND kit_id = $4 RETURNING *`,
+        [key, completedAt, email, kitId]
+      )
+    : await pool.query(
+        `UPDATE practical_skills_progress
+         SET completed_activities = completed_activities - $1::text, updated_at = NOW()
+         WHERE student_email = $2 AND kit_id = $3 RETURNING *`,
+        [key, email, kitId]
+      );
   return result.rows?.[0] || null;
 }
 
@@ -12357,7 +12392,8 @@ app.get("/api/practical-skills/progress/:kitId", async (req, res) => {
     res.json({
       kit: snapshot.kits.find((entry) => entry.id === kitId) || null,
       badges: snapshot.badges,
-      responses: row?.responses && typeof row.responses === "object" ? row.responses : {}
+      responses: row?.responses && typeof row.responses === "object" ? row.responses : {},
+      completedActivities: row?.completed_activities || {}
     });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not load kit progress." });
@@ -12381,6 +12417,36 @@ app.post("/api/practical-skills/progress/:kitId/responses", async (req, res) => 
     res.json({ ok: true, responses: saved?.responses || {} });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not save responses." });
+  }
+});
+
+app.put("/api/practical-skills/progress/:kitId/activities/:activityIndex", async (req, res) => {
+  const studentEmail = normalizeEmail(getRequestUserEmail(req));
+  const kitId = String(req.params.kitId || "").trim();
+  if (!studentEmail || !studentEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required." });
+    return;
+  }
+  if (!getPracticalSkillsKitDefinition(kitId)) {
+    res.status(404).json({ error: "Unknown kit." });
+    return;
+  }
+  const activityIndex = Number(req.params.activityIndex);
+  if (!/^\d+$/.test(req.params.activityIndex) || !Number.isSafeInteger(activityIndex) || typeof req.body?.completed !== "boolean") {
+    res.status(400).json({ error: "A valid activity index and completion state are required." });
+    return;
+  }
+
+  try {
+    const content = await getPracticalSkillsKitContent(kitId);
+    if (!Array.isArray(content?.worksheets) || !content.worksheets[activityIndex]) {
+      res.status(404).json({ error: "Unknown activity." });
+      return;
+    }
+    const saved = await setPracticalSkillsActivityCompletion(studentEmail, kitId, activityIndex, req.body.completed);
+    res.json({ completedActivities: saved.completed_activities });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not save activity completion." });
   }
 });
 

@@ -142,6 +142,8 @@
         const theme = content?.theme || {};
         const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
         const activities = Array.isArray(content?.activities) ? content.activities : [];
+        const completedActivities = options.completedActivities || {};
+        const completedCount = worksheets.filter((_worksheet, index) => Boolean(completedActivities[index])).length;
 
         host.style.setProperty("--worksheet-theme-color", theme.color || "#2f8f61");
         host.style.setProperty("--worksheet-accent-color", theme.accent || "#ffd166");
@@ -161,6 +163,7 @@
             ` : ""}
             <section class="worksheet-activities" aria-labelledby="worksheet-activities-title">
                 <h2 id="worksheet-activities-title">Activities</h2>
+                <p class="worksheet-activity-progress">${completedCount} / ${worksheets.length} activities completed</p>
                 ${worksheets.length ? `
                     <ol class="worksheet-activity-list">
                         ${worksheets.map((worksheet, index) => {
@@ -168,9 +171,10 @@
                             const title = activity.title || worksheet.activity || `Activity ${index + 1}`;
                             const establishes = activity.establishes || worksheet.establishes || "";
                             const href = `./kit-worksheet.html?kit=${encodeURIComponent(options.kitId || "")}&activity=${index}`;
+                            const completed = Boolean(completedActivities[index]);
                             return `
-                                <li class="worksheet-activity-card">
-                                    <span class="worksheet-activity-number" aria-hidden="true">${escapeHtml(worksheet.number || index + 1)}</span>
+                                <li class="worksheet-activity-card ${completed ? "is-complete" : ""}">
+                                    <span class="worksheet-activity-number ${completed ? "is-complete" : ""}" role="img" aria-label="${completed ? "Completed" : "Not completed"}">${completed ? "&#10003;" : ""}</span>
                                     <div class="worksheet-activity-copy">
                                         <h3>${escapeHtml(title)}</h3>
                                         ${establishes ? `<p>${escapeHtml(establishes)}</p>` : ""}

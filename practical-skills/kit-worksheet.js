@@ -9,6 +9,8 @@
         kitId: "",
         content: null,
         responses: {},
+        completedActivities: {},
+        progressLoaded: false,
         signInWatcherId: 0,
         saveTimerId: 0
     };
@@ -115,6 +117,24 @@
         });
     }
 
+    function getCurrentActivityIndex() {
+        const index = getActivityIndexFromUrl();
+        return index !== null && state.content?.worksheets?.[index] ? index : null;
+    }
+
+    function updateActivityCompleteBar() {
+        const bar = document.getElementById("worksheet-activity-complete-bar");
+        const pill = document.getElementById("worksheet-activity-status-pill");
+        const button = document.getElementById("worksheet-activity-complete-btn");
+        const index = getCurrentActivityIndex();
+        bar.hidden = !state.email || index === null;
+        const completed = Boolean(state.completedActivities[index]);
+        pill.textContent = completed ? "Completed" : "Not Completed";
+        pill.classList.toggle("is-complete", completed);
+        button.textContent = completed ? "Undo Completion" : "Mark Activity Complete";
+        button.disabled = !state.progressLoaded;
+    }
+
     function queueResponseSave() {
         if (!state.email) return;
         window.clearTimeout(state.saveTimerId);
@@ -137,7 +157,7 @@
             return;
         }
 
-        bar.hidden = false;
+        bar.hidden = getCurrentActivityIndex() !== null;
         const isComplete = Boolean(kitSnapshot?.isComplete);
         pill.textContent = isComplete ? "Completed" : "Not Started";
         pill.classList.toggle("is-complete", isComplete);
@@ -151,7 +171,10 @@
         const activityIndex = getActivityIndexFromUrl();
         const worksheets = Array.isArray(state.content.worksheets) ? state.content.worksheets : [];
         if (worksheets.length && (activityIndex === null || !worksheets[activityIndex])) {
-            window.KitWorksheetRender.renderKitOverview(host, state.content, { kitId: state.kitId });
+            window.KitWorksheetRender.renderKitOverview(host, state.content, {
+                kitId: state.kitId,
+                completedActivities: state.completedActivities
+            });
         } else {
             const worksheet = activityIndex === null ? null : worksheets[activityIndex];
             const activity = activityIndex === null ? null : state.content.activities?.[activityIndex];
@@ -186,6 +209,7 @@
             });
         }
 
+        updateActivityCompleteBar();
         showStatusMessage(
             state.email ? "" : "Sign in with your school Google account (top right) to save your answers and mark this kit complete."
         );
@@ -215,6 +239,29 @@
     function wireActionButtons() {
         const completeBtn = document.getElementById("worksheet-complete-btn");
         const resetBtn = document.getElementById("worksheet-reset-btn");
+        const activityCompleteBtn = document.getElementById("worksheet-activity-complete-btn");
+
+        activityCompleteBtn.addEventListener("click", async () => {
+            const index = getCurrentActivityIndex();
+            if (index === null || !state.progressLoaded) return;
+            const completed = !state.completedActivities[index];
+            activityCompleteBtn.disabled = true;
+            try {
+                window.clearTimeout(state.saveTimerId);
+                await saveResponses(state.kitId, state.responses);
+                const payload = await loadJson(`/api/practical-skills/progress/${encodeURIComponent(state.kitId)}/activities/${index}`, {
+                    method: "PUT",
+                    headers: withAuthHeaders({ "Content-Type": "application/json" }),
+                    body: JSON.stringify({ completed })
+                });
+                state.completedActivities = payload.completedActivities;
+                showStatusMessage(completed ? "Activity completed! Your tick is saved. Return to All activities to see your progress." : "Activity completion removed.");
+            } catch (error) {
+                showStatusMessage(error?.message || "Could not save activity completion.", true);
+            } finally {
+                updateActivityCompleteBar();
+            }
+        });
 
         completeBtn?.addEventListener("click", async () => {
             completeBtn.disabled = true;
@@ -233,6 +280,8 @@
             resetBtn.disabled = true;
             try {
                 const snapshot = await resetKit(state.kitId);
+                state.completedActivities = {};
+                renderPage();
                 const kitEntry = (snapshot.kits || []).find((entry) => entry.id === state.kitId) || null;
                 updateCompleteBar(kitEntry);
                 showStatusMessage("Kit progress reset.");
@@ -266,6 +315,8 @@
         try {
             const progressPayload = await fetchKitProgress(state.kitId);
             state.responses = progressPayload?.responses || {};
+            state.completedActivities = progressPayload?.completedActivities || {};
+            state.progressLoaded = true;
             renderPage();
             updateCompleteBar(progressPayload?.kit);
         } catch (error) {
