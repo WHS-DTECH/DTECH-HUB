@@ -151,11 +151,11 @@
         (state.content?.worksheets || []).forEach((worksheet, index) => {
             const row = document.createElement("tr");
             row.innerHTML = `
-                <td><input type="number" class="kit-worksheet-number" data-index="${index}" min="1" value="${Number(worksheet.number) || index + 1}"></td>
-                <td><input type="text" class="kit-worksheet-activity" data-index="${index}" maxlength="120" value="${worksheet.activity || ""}"></td>
-                <td><input type="text" class="kit-worksheet-establishes" data-index="${index}" maxlength="240" value="${worksheet.establishes || ""}"></td>
-                <td><a class="button button-primary" href="/practical-skills/admin-kit-activity.html?kit=${encodeURIComponent(state.kitId)}&activity=${index}">Activity Details</a></td>
-                <td><button type="button" class="button button-secondary kit-remove-worksheet" data-index="${index}">Remove</button></td>
+                <td data-label="Number"><input type="number" class="kit-worksheet-number" data-index="${index}" min="1" value="${Number(worksheet.number) || index + 1}"></td>
+                <td data-label="Activity"><input type="text" class="kit-worksheet-activity" data-index="${index}" maxlength="120" value="${worksheet.activity || ""}"></td>
+                <td data-label="What it establishes"><input type="text" class="kit-worksheet-establishes" data-index="${index}" maxlength="240" value="${worksheet.establishes || ""}"></td>
+                <td data-label="Details"><a class="button button-primary" href="/practical-skills/admin-kit-activity.html?kit=${encodeURIComponent(state.kitId)}&activity=${index}">Activity Details</a></td>
+                <td data-label="Remove"><button type="button" class="button button-secondary kit-remove-worksheet" data-index="${index}">Remove</button></td>
             `;
             worksheetListHost.appendChild(row);
         });
