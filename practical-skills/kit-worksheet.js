@@ -22,6 +22,12 @@
         return String(params.get("kit") || "kit-login").trim();
     }
 
+    function getActivityIndexFromUrl() {
+        const value = new URLSearchParams(window.location.search || "").get("activity");
+        if (value === null || !/^\d+$/.test(value)) return null;
+        return Number.parseInt(value, 10);
+    }
+
     function getStoredAuthRaw() {
         let localValue = null;
         let sessionValue = null;
@@ -142,14 +148,43 @@
         const host = document.getElementById("worksheet-host");
         if (!host || !state.content) return;
 
-        window.KitWorksheetRender.renderWorksheet(host, state.content, {
-            responses: state.responses,
-            readOnly: !state.email,
-            onResponseChange: (questionId, value) => {
-                state.responses[questionId] = value;
-                queueResponseSave();
-            }
-        });
+        const activityIndex = getActivityIndexFromUrl();
+        const worksheets = Array.isArray(state.content.worksheets) ? state.content.worksheets : [];
+        if (worksheets.length && (activityIndex === null || !worksheets[activityIndex])) {
+            window.KitWorksheetRender.renderKitOverview(host, state.content, { kitId: state.kitId });
+        } else {
+            const worksheet = activityIndex === null ? null : worksheets[activityIndex];
+            const activity = activityIndex === null ? null : state.content.activities?.[activityIndex];
+            const isActivity = Boolean(worksheet);
+            const questions = isActivity
+                ? (Array.isArray(activity?.questions)
+                    ? activity.questions.map((question) => activityIndex === 0
+                        ? question
+                        : { ...question, id: `${activityIndex}-${question.id}` })
+                    : activityIndex === 0 ? state.content.questions || [] : [])
+                : state.content.questions || [];
+            const images = isActivity
+                ? activity?.images || (activityIndex === 0 ? state.content.images || [] : [])
+                : state.content.images || [];
+            const activityContent = isActivity ? {
+                ...state.content,
+                bannerTitle: worksheet.activity || activity?.title || `Activity ${activityIndex + 1}`,
+                bannerSubtitle: worksheet.establishes || activity?.establishes || "",
+                questions,
+                images
+            } : state.content;
+
+            window.KitWorksheetRender.renderWorksheet(host, activityContent, {
+                responses: state.responses,
+                readOnly: !state.email,
+                backHref: isActivity ? `./kit-worksheet.html?kit=${encodeURIComponent(state.kitId)}` : "",
+                eyebrow: isActivity ? state.content.bannerTitle : "",
+                onResponseChange: (questionId, value) => {
+                    state.responses[questionId] = value;
+                    queueResponseSave();
+                }
+            });
+        }
 
         showStatusMessage(
             state.email ? "" : "Sign in with your school Google account (top right) to save your answers and mark this kit complete."

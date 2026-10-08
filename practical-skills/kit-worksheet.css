@@ -134,6 +134,109 @@ body.kit-worksheet-page {
     opacity: 0.95;
 }
 
+.worksheet-banner-eyebrow {
+    display: block;
+    margin-bottom: 2px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    opacity: 0.85;
+}
+
+.worksheet-activity-back {
+    display: inline-block;
+    margin-bottom: 14px;
+    color: var(--worksheet-theme-color);
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.worksheet-activity-back:hover,
+.worksheet-activity-back:focus-visible {
+    text-decoration: underline;
+}
+
+.worksheet-activities {
+    display: grid;
+    gap: 14px;
+}
+
+.worksheet-activities h2 {
+    margin: 0;
+    color: #3a3226;
+    font-family: 'Baloo 2', cursive;
+    font-size: 1.45rem;
+}
+
+.worksheet-activity-list {
+    display: grid;
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.worksheet-activity-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 14px;
+    padding: 16px;
+    background: #ffffff;
+    border: 3px solid #f1e4c8;
+    border-radius: 18px;
+    box-shadow: 0 3px 0 #f1e4c8;
+}
+
+.worksheet-activity-number {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--worksheet-accent-color);
+    color: #4a3a1a;
+    font-family: 'Baloo 2', cursive;
+    font-weight: 800;
+}
+
+.worksheet-activity-copy {
+    min-width: 0;
+}
+
+.worksheet-activity-copy h3,
+.worksheet-activity-copy p {
+    margin: 0;
+}
+
+.worksheet-activity-copy h3 {
+    font-size: 1rem;
+}
+
+.worksheet-activity-copy p {
+    margin-top: 4px;
+    color: #6b5c3f;
+    font-size: 0.88rem;
+}
+
+.worksheet-activity-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 9px 14px;
+    border-radius: 999px;
+    background: var(--worksheet-theme-color);
+    color: #ffffff;
+    font-weight: 800;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.worksheet-activity-link:hover,
+.worksheet-activity-link:focus-visible {
+    filter: brightness(0.92);
+}
+
 .worksheet-instructions {
     display: flex;
     align-items: flex-start;
@@ -373,5 +476,16 @@ body.kit-worksheet-page {
         box-shadow: none;
         border-color: #ccc;
         break-inside: avoid;
+    }
+}
+
+@media (max-width: 560px) {
+    .worksheet-activity-card {
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .worksheet-activity-link {
+        grid-column: 2;
+        justify-self: start;
     }
 }

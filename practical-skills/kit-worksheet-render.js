@@ -64,9 +64,11 @@
         host.style.setProperty("--worksheet-accent-color", theme.accent || "#ffd166");
 
         host.innerHTML = `
+            ${options.backHref ? `<a class="worksheet-activity-back" href="${escapeHtml(options.backHref)}">&larr; All activities</a>` : ""}
             <div class="worksheet-banner">
                 <span class="worksheet-banner-icon" aria-hidden="true">${escapeHtml(theme.icon || "\ud83d\udcdd")}</span>
                 <div class="worksheet-banner-copy">
+                    ${options.eyebrow ? `<span class="worksheet-banner-eyebrow">${escapeHtml(options.eyebrow)}</span>` : ""}
                     <h1>${escapeHtml(content?.bannerTitle || "Untitled Kit")}</h1>
                     ${content?.bannerSubtitle ? `<p>${escapeHtml(content.bannerSubtitle)}</p>` : ""}
                 </div>
@@ -134,5 +136,54 @@
         });
     }
 
-    window.KitWorksheetRender = { renderWorksheet };
+    function renderKitOverview(host, content, options = {}) {
+        if (!host) return;
+
+        const theme = content?.theme || {};
+        const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
+        const activities = Array.isArray(content?.activities) ? content.activities : [];
+
+        host.style.setProperty("--worksheet-theme-color", theme.color || "#2f8f61");
+        host.style.setProperty("--worksheet-accent-color", theme.accent || "#ffd166");
+        host.innerHTML = `
+            <div class="worksheet-banner">
+                <span class="worksheet-banner-icon" aria-hidden="true">${escapeHtml(theme.icon || "\ud83d\udcdd")}</span>
+                <div class="worksheet-banner-copy">
+                    <h1>${escapeHtml(content?.bannerTitle || "Untitled Kit")}</h1>
+                    ${content?.bannerSubtitle ? `<p>${escapeHtml(content.bannerSubtitle)}</p>` : ""}
+                </div>
+            </div>
+            ${content?.instructions ? `
+                <div class="worksheet-instructions">
+                    <span class="worksheet-instructions-icon" aria-hidden="true">\u270f\ufe0f</span>
+                    <p>${escapeHtml(content.instructions)}</p>
+                </div>
+            ` : ""}
+            <section class="worksheet-activities" aria-labelledby="worksheet-activities-title">
+                <h2 id="worksheet-activities-title">Activities</h2>
+                ${worksheets.length ? `
+                    <ol class="worksheet-activity-list">
+                        ${worksheets.map((worksheet, index) => {
+                            const activity = activities[index] || {};
+                            const title = activity.title || worksheet.activity || `Activity ${index + 1}`;
+                            const establishes = activity.establishes || worksheet.establishes || "";
+                            const href = `./kit-worksheet.html?kit=${encodeURIComponent(options.kitId || "")}&activity=${index}`;
+                            return `
+                                <li class="worksheet-activity-card">
+                                    <span class="worksheet-activity-number" aria-hidden="true">${escapeHtml(worksheet.number || index + 1)}</span>
+                                    <div class="worksheet-activity-copy">
+                                        <h3>${escapeHtml(title)}</h3>
+                                        ${establishes ? `<p>${escapeHtml(establishes)}</p>` : ""}
+                                    </div>
+                                    <a class="worksheet-activity-link" href="${escapeHtml(href)}">Open Activity</a>
+                                </li>
+                            `;
+                        }).join("")}
+                    </ol>
+                ` : `<p class="worksheet-empty-note">No activities have been added to this kit yet.</p>`}
+            </section>
+        `;
+    }
+
+    window.KitWorksheetRender = { renderWorksheet, renderKitOverview };
 })();

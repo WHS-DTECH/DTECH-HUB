@@ -4404,11 +4404,9 @@ function normalizePracticalSkillsKitContentForDisplay(kitId, content) {
   const safeContent = normalizePracticalSkillsKitContentForStorage(kitId, content);
   const {
     teacherNotes: _teacherNotes,
-    worksheets: _worksheets,
     identity: _identity,
     learning: _learning,
     completion: _completion,
-    activities: _activities,
     ...studentContent
   } = safeContent;
   return studentContent;
