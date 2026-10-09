@@ -519,6 +519,10 @@ body.kit-worksheet-page {
     display: none;
 }
 
+#worksheet-google-verification {
+    margin-top: 16px;
+}
+
 .worksheet-assessment-intro p,
 .worksheet-assessment-intro li {
     line-height: 1.6;
