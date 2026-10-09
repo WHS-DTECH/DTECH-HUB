@@ -107,9 +107,9 @@
                     <p>Use your school email for Google and Microsoft. Google Drive and Microsoft OneDrive store files online; they are not the same drive.</p>
                     <div class="worksheet-actions">
                         <button type="button" class="worksheet-btn worksheet-btn-primary" data-login-drive-setup ${readOnly ? "disabled" : ""}>Set up Google Drive (Drive Ready)</button>
-                        <a class="worksheet-btn worksheet-btn-secondary" href="https://www.microsoft365.com/?auth=2" target="_blank" rel="noopener noreferrer">Open Microsoft 365 / OneDrive</a>
+                        <a class="worksheet-btn worksheet-btn-secondary" href="https://westlandhigh-my.sharepoint.com/" target="_blank" rel="noopener noreferrer">Open school Microsoft OneDrive</a>
                     </div>
-                    <p>Microsoft: sign in with your school account, then choose <strong>Apps</strong> and <strong>OneDrive</strong>. If Microsoft shows a sign-in error or OneDrive is missing, ask your teacher or school IT for help; do not tick the confirmation until you can see your files.</p>
+                    <p>Microsoft: this link opens Westland High School's OneDrive directly. Sign in with your own school Microsoft account if asked. If the wrong account appears, switch to your school account. If Microsoft shows a sign-in error or OneDrive is missing, ask your teacher or school IT for help; do not tick the confirmation until you can see your files.</p>
                     <p>Google setup creates or reuses just one folder: <strong>WHS-DTECH</strong> in My Drive. We will add class folders later.</p>
                     <p class="worksheet-safety-note">WHS-DTECH will be shared with anyone with the link as Editor, so DTECH-HUB can work with your files. Only store class work here, not private information. Do not share the link publicly. Never enter a password into this activity.</p>
                     <p class="worksheet-assessment-result" data-login-drive-status role="status" aria-live="polite"></p>

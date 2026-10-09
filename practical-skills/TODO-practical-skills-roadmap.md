@@ -25,8 +25,11 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   Students find all eight names, set up Google Drive and confirm school Microsoft
   OneDrive access, then check answers to save a completion tick. Microsoft access
   is explicitly student-confirmed, not automatically verified.
-  Microsoft opens the work/school Microsoft 365 portal; students choose Apps >
-  OneDrive rather than relying on the failing direct OneDrive launch redirect.
+  Microsoft opens the school-specific OneDrive at
+  `https://westlandhigh-my.sharepoint.com/`, not the Microsoft 365/Copilot homepage
+  or the failing generic OneDrive launch redirect. No teacher email hint or
+  temporary authentication parameters are included. Microsoft handles sign-in
+  using each student's own school account.
   Successful Google setup opens WHS-DTECH in a separate tab, reserved during the
   setup click. If blocked or closed, the visible folder link remains available.
   The Login Kit reuses the hub's Google Drive consent flow but calls a separate

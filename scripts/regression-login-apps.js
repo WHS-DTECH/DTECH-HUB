@@ -148,7 +148,8 @@ async function main() {
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, "..", "practical-skills", "kit-worksheet-render.js"), "utf8"), rendererContext);
     rendererContext.window.KitWorksheetRender.renderWorksheet(host, { assessment: puzzle }, { readOnly: true });
     assert.equal((host.innerHTML.match(/data-word-cell=/g) || []).length, 144);
-    assert.match(host.innerHTML, /microsoft365\.com\/\?auth=2/);
+    assert.match(host.innerHTML, /href="https:\/\/westlandhigh-my\.sharepoint\.com\/" target="_blank" rel="noopener noreferrer"/);
+    assert.doesNotMatch(host.innerHTML, /microsoft365\.com|login_hint|login\.microsoftonline\.com/);
     assert.doesNotMatch(host.innerHTML, /\/launch\/onedrive/);
     assert.match(host.innerHTML, /anyone with the link as Editor/);
     rendererContext.window.KitWorksheetRender.renderKitOverview(host, combined, { kitId: "kit-login", completedActivities: { 2: "saved", 4: "old" } });
