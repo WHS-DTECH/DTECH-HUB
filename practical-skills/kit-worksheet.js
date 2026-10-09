@@ -431,7 +431,8 @@
             state.responses = { ...progressPayload?.responses, ...identityDraft };
             state.completedActivities = progressPayload?.completedActivities || {};
             state.progressLoaded = true;
-            if (state.content?.activities?.[getCurrentActivityIndex()]?.assessment?.id === "learning-sites-treasure-v1") {
+            const currentActivity = state.content?.activities?.[getCurrentActivityIndex()];
+            if (currentActivity?.assessment?.id === "learning-sites-treasure-v1" || currentActivity?.loginSites) {
                 state.huntProfile = await loadJson("/api/practical-skills/learning-sites/profile", { headers: withAuthHeaders() });
             }
             renderPage();

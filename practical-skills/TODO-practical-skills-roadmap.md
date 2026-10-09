@@ -31,6 +31,9 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   images/icons link to generic websites in new tabs; class links/codes come later.
   Legacy question data is preserved but not displayed in this activity.
   Completion is student-confirmed, not automatically inferred from opening links.
+  The staircase loads the signed-in user's server-derived year profile. Years
+  7/8 see only the three JuniorDTECH sites; MiddleDTECH and staff retain all five.
+  Without a linked year profile, the general list remains visible.
 - Implemented: Open DTECH Learning Site / Open DTECH-HUB in the Login Kit now
   includes a five-island pirate-map treasure hunt. Students follow Westland High
   Website > Intranet > Learning Sites, visit Science, Mrs O'Malley's English,

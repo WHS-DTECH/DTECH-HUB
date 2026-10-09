@@ -535,6 +535,8 @@
         const theme = content?.theme || {};
         const questions = content?.loginSites ? [] : Array.isArray(content?.questions) ? content.questions : [];
         const images = Array.isArray(content?.images) ? content.images : [];
+        const juniorLoginSites = [7, 8].includes(options.huntProfile?.year);
+        const loginSites = (content?.loginSites || []).filter((site) => !juniorLoginSites || site.group === "JuniorDTECH");
 
         host.style.setProperty("--worksheet-theme-color", theme.color || "#2f8f61");
         host.style.setProperty("--worksheet-accent-color", theme.accent || "#ffd166");
@@ -577,8 +579,9 @@
                     <h2 id="login-staircase-title">Step into your learning websites</h2>
                     <p>Each step introduces a website used in DTECH. Click its logo to open it in a new tab, keeping this activity open.</p>
                     <p>These are the general websites for now. Your teacher will give you a class link or code when needed. Follow your teacher's sign-in instructions; never share your password.</p>
+                    ${juniorLoginSites ? "<p>Showing the JuniorDTECH websites for your Year 7/8 profile.</p>" : ""}
                     <ol class="login-staircase-list">
-                        ${content.loginSites.map((site, index) => `
+                        ${loginSites.map((site, index) => `
                             <li class="login-staircase-step" style="--stair-index: ${index}">
                                 <div class="login-staircase-description"><h3>${escapeHtml(site.name)}</h3><p>${escapeHtml(site.description)}</p></div>
                                 <div class="login-staircase-years"><strong>${escapeHtml(site.group)}</strong><span>${escapeHtml(site.years)}</span></div>

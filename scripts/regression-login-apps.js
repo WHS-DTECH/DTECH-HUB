@@ -82,6 +82,24 @@ async function main() {
     assert.doesNotMatch(shortKitHost.innerHTML, /Old Kamar question|does not have any questions/);
     assert.match(shortKitHost.innerHTML, /Years 7\/8/);
     assert.match(shortKitHost.innerHTML, /Years 9\/10/);
+    for (const year of [7, 8, 9, 10, null]) {
+        shortKitRenderer.window.KitWorksheetRender.renderWorksheet(shortKitHost, {
+            bannerTitle: "Using your login details", loginSites: shortKit.activities[6].loginSites
+        }, { readOnly: true, huntProfile: { year, available: true } });
+        const junior = [7, 8].includes(year);
+        assert.equal((shortKitHost.innerHTML.match(/class="login-staircase-step"/g) || []).length, junior ? 3 : 5);
+        assert.match(shortKitHost.innerHTML, /Tinkercad/);
+        assert.match(shortKitHost.innerHTML, /SketchUp Education/);
+        assert.match(shortKitHost.innerHTML, /Gamefroot/);
+        if (junior) {
+            assert.doesNotMatch(shortKitHost.innerHTML, /Code Avengers|CodeCombat|MiddleDTECH/);
+            assert.match(shortKitHost.innerHTML, /--stair-index: 2/);
+            assert.doesNotMatch(shortKitHost.innerHTML, /--stair-index: 3/);
+        } else {
+            assert.match(shortKitHost.innerHTML, /Code Avengers/);
+            assert.match(shortKitHost.innerHTML, /CodeCombat/);
+        }
+    }
     const worksheetSource = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "kit-worksheet.js"), "utf8");
     const routing = worksheetSource.slice(worksheetSource.indexOf("    function getActivityIndexFromUrl()"), worksheetSource.indexOf("    function getStoredAuthRaw()"));
     for (const [index, expected] of [[4, 1], [5, null], [6, 6], [9, null]]) {
