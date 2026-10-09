@@ -7,7 +7,11 @@ const LOGIN_SITES_ID = "login-sites-readiness-v1";
 const loginSites = [
   { name: "Tinkercad", description: "Design 3D models, explore electronic circuits and try coding in your browser.", group: "JuniorDTECH", years: "Years 7/8", url: "https://www.tinkercad.com/joinclass/XTY22KANL", logo: "https://www.tinkercad.com/img/tinkercad-logo.png", readinessQuestion: { id: "tinkercad", prompt: "What three things can you make in Tinkercad?", hint: "Glance at the names of the design areas on your Tinkercad home page. Name all three; you do not need to create anything." } },
   { name: "Code Avengers", description: "Learn programming, web development and digital skills through guided lessons.", group: "MiddleDTECH", years: "Years 9/10", url: "https://www.codeavengers.com/", logo: "https://www.codeavengers.com/dist/assets/images/favicon/android-chrome-192x192.png", readinessQuestion: { id: "codeavengers", prompt: "Under Pro, find the Python courses. What is the topic name for Python 1?", hint: "Switch to Pro, choose Python in the course filter and read the Python 1 card. You do not need to start the course." } },
-  { name: "SketchUp Education", description: "Build 3D models of buildings, rooms and other designs using SketchUp for Schools.", group: "JuniorDTECH", years: "Years 7/8", url: "https://edu.sketchup.com/", logo: "https://edu.sketchup.com/favicon.ico" },
+  { name: "SketchUp Education", description: "Build 3D models of buildings, rooms and other designs using SketchUp for Schools.", group: "JuniorDTECH", years: "Years 7/8", url: "https://edu.sketchup.com/", logo: "https://edu.sketchup.com/favicon.ico", readinessQuestion: {
+    id: "sketchup", prompt: "What are the names of these SketchUp tools?",
+    hint: "Sign in with your school account. Hover over the matching toolbar icons to read their names. You do not need to draw or change anything.",
+    tools: [1, 2, 3, 4].map((number) => ({ id: `sketchup-tool-${number}`, image: `../images/Activites/sketchup-tool-${number}.png`, label: `Tool ${number}` }))
+  } },
   { name: "Gamefroot", description: "Create games, animations and interactive stories using visual coding.", group: "JuniorDTECH", years: "Years 7/8", url: "https://gamefroot.com/", logo: "https://make.gamefroot.com/favicon.png" },
   { name: "CodeCombat", description: "Learn Python or JavaScript by writing code to guide a hero through game challenges.", group: "MiddleDTECH", years: "Years 9/10", url: "https://codecombat.com/", logo: "https://codecombat.com/images/pages/base/logo_square_250.png" }
 ];
@@ -19,18 +23,31 @@ function gradeLoginSites(answers) {
   const codeAvengers = typeof answers?.codeavengers === "string" ? answers.codeavengers.slice(0, 200) : "";
   const topic = codeAvengers.toLowerCase();
   const codeAvengersCorrect = /\bvariables?\b/.test(topic) && /\bif statements?\b/.test(topic) && /\bloops?\b/.test(topic);
+  const sketchupAnswers = {};
+  const toolResults = ["rectangle", "move", "pushpull", "line"].map((expected, index) => {
+    const id = `sketchup-tool-${index + 1}`;
+    const answer = typeof answers?.[id] === "string" ? answers[id].slice(0, 200) : "";
+    sketchupAnswers[id] = answer;
+    const normalizedTool = answer.toLowerCase().trim().replace(/\s+tool$/, "").replace(/[\s/,-]+/g, "");
+    const toolCorrect = normalizedTool === expected;
+    return { id, correct: toolCorrect, explanation: toolCorrect ? "Correct - ka pai!" : "Hover over this icon in the SketchUp toolbar and try its name again." };
+  });
+  const sketchupCorrect = toolResults.every((result) => result.correct);
   const results = [
     { id: "tinkercad", correct, explanation: correct
       ? "Tinkercad readiness check saved! No need to make a design today."
       : "Try again: name all three design areas shown on the Tinkercad home page." },
     { id: "codeavengers", correct: codeAvengersCorrect, explanation: codeAvengersCorrect
       ? "Code Avengers readiness check saved! No need to start Python 1 today."
-      : "Try again: switch to Pro, filter for Python and copy the topic name from the Python 1 card." }
+      : "Try again: switch to Pro, filter for Python and copy the topic name from the Python 1 card." },
+    { id: "sketchup", correct: sketchupCorrect, explanation: sketchupCorrect
+      ? "SketchUp readiness check saved! All four tool names are correct. No drawing needed today."
+      : `${toolResults.filter((result) => result.correct).length} / 4 tool names correct. Hover over the toolbar icons and try again.` }
   ];
   return {
     assessmentId: LOGIN_SITES_ID, passed: false, score: results.filter((result) => result.correct).length, total: results.length,
-    answers: { tinkercad: value, tinkercadReady: correct, codeavengers: codeAvengers, codeavengersReady: codeAvengersCorrect },
-    results
+    answers: { tinkercad: value, tinkercadReady: correct, codeavengers: codeAvengers, codeavengersReady: codeAvengersCorrect, ...sketchupAnswers, sketchupReady: sketchupCorrect },
+    results, toolResults
   };
 }
 

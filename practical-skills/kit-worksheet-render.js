@@ -591,9 +591,18 @@
                                 </a>
                                 ${site.readinessQuestion ? `
                                     <form class="login-site-check" data-site-check="${escapeHtml(site.readinessQuestion.id)}">
-                                        <label for="login-site-${escapeHtml(site.readinessQuestion.id)}">${escapeHtml(site.readinessQuestion.prompt)}</label>
+                                        ${site.readinessQuestion.tools ? `<h4>${escapeHtml(site.readinessQuestion.prompt)}</h4>` : `<label for="login-site-${escapeHtml(site.readinessQuestion.id)}">${escapeHtml(site.readinessQuestion.prompt)}</label>`}
                                         <p>${escapeHtml(site.readinessQuestion.hint)}</p>
-                                        <input id="login-site-${escapeHtml(site.readinessQuestion.id)}" name="${escapeHtml(site.readinessQuestion.id)}" maxlength="200" value="${escapeHtml(options.assessmentAnswers?.[site.readinessQuestion.id] || "")}" ${readOnly ? "disabled" : ""}>
+                                        ${site.readinessQuestion.tools ? site.readinessQuestion.tools.map((tool) => `
+                                            <div class="login-site-tool">
+                                                <img src="${escapeHtml(tool.image)}" alt="SketchUp ${escapeHtml(tool.label)} icon">
+                                                <div>
+                                                    <label for="login-site-${escapeHtml(tool.id)}">${escapeHtml(tool.label)} name</label>
+                                                    <input id="login-site-${escapeHtml(tool.id)}" name="${escapeHtml(tool.id)}" maxlength="200" autocomplete="off" value="${escapeHtml(options.assessmentAnswers?.[tool.id] || "")}" aria-describedby="feedback-${escapeHtml(tool.id)}" ${readOnly ? "disabled" : ""}>
+                                                    <p id="feedback-${escapeHtml(tool.id)}" data-tool-feedback="${escapeHtml(tool.id)}" hidden></p>
+                                                </div>
+                                            </div>
+                                        `).join("") : `<input id="login-site-${escapeHtml(site.readinessQuestion.id)}" name="${escapeHtml(site.readinessQuestion.id)}" maxlength="200" value="${escapeHtml(options.assessmentAnswers?.[site.readinessQuestion.id] || "")}" ${readOnly ? "disabled" : ""}>`}
                                         <button class="worksheet-btn worksheet-btn-primary" type="submit" ${readOnly ? "disabled" : ""}>Check ${escapeHtml(site.name)} answer</button>
                                         <p class="login-site-result" role="status" aria-live="polite">${options.assessmentAnswers?.[`${site.readinessQuestion.id}Ready`] ? `&#10003; ${escapeHtml(site.name)} readiness check saved.` : `Sign in to ${escapeHtml(site.name)}, then answer from a quick glance at your home page.`}</p>
                                     </form>
@@ -626,26 +635,36 @@
         } else if (readOnly) return;
 
         if (content?.loginSites) host.querySelectorAll("[data-site-check]").forEach((form) => {
-            const input = form.querySelector("input");
+            const inputs = form.querySelectorAll("input");
             const button = form.querySelector("button");
             const result = form.querySelector(".login-site-result");
-            input.addEventListener("input", () => { result.textContent = "Answer changed. Check again to save your readiness evidence."; });
+            inputs.forEach((input) => input.addEventListener("input", () => {
+                result.textContent = "Answer changed. Check again to save your readiness evidence.";
+                form.querySelectorAll("[data-tool-feedback]").forEach((feedback) => { feedback.hidden = true; });
+            }));
             form.addEventListener("submit", async (event) => {
                 event.preventDefault();
                 if (button.disabled) return;
                 button.disabled = true;
-                input.disabled = true;
+                inputs.forEach((input) => { input.disabled = true; });
                 result.textContent = "Checking and saving...";
                 try {
                     const answers = { ...options.assessmentAnswers };
                     host.querySelectorAll("[data-site-check] input").forEach((field) => { answers[field.name] = field.value; });
                     const grade = await options.onAssessmentCheck(answers);
-                    const marked = grade.results.find((entry) => entry.id === input.name);
+                    const marked = grade.results.find((entry) => entry.id === form.getAttribute("data-site-check"));
                     result.textContent = `${marked.correct ? "\u2713 " : ""}${marked.explanation}`;
+                    form.querySelectorAll("[data-tool-feedback]").forEach((feedback) => {
+                        const tool = grade.toolResults.find((entry) => entry.id === feedback.getAttribute("data-tool-feedback"));
+                        feedback.hidden = false;
+                        feedback.textContent = tool.explanation;
+                        feedback.classList.toggle("is-correct", tool.correct);
+                        feedback.classList.toggle("is-error", !tool.correct);
+                    });
                 } catch (error) {
                     result.textContent = error?.message || "Could not save your site check. Try again.";
                 } finally {
-                    input.disabled = false;
+                    inputs.forEach((input) => { input.disabled = false; });
                     button.disabled = false;
                 }
             });

@@ -103,6 +103,29 @@ async function main() {
     for (const value of ["Variables and loops", "", ["Variable", "If Statements", "Loops"]]) {
         assert.equal(assessment.gradeLoginSites({ codeavengers: value, codeavengersReady: true }).answers.codeavengersReady, false);
     }
+    const sketchupAnswers = {
+        tinkercad: "Circuits, 3D Designs and Codeblocks", codeavengers: "Variables, If Statements and Loops",
+        "sketchup-tool-1": " Rectangle ", "sketchup-tool-2": "MOVE TOOL", "sketchup-tool-3": "Push/Pull", "sketchup-tool-4": "Line"
+    };
+    for (const pushPull of ["Push/Pull", "push pull", "Push-Pull", "pushpull tool"]) {
+        const grade = assessment.gradeLoginSites({ ...sketchupAnswers, "sketchup-tool-3": pushPull });
+        assert.equal(grade.answers.sketchupReady, true);
+        assert.equal(grade.answers.tinkercadReady, true);
+        assert.equal(grade.answers.codeavengersReady, true);
+        assert.equal(grade.score, 3);
+        assert.equal(grade.passed, false);
+        assert.ok(grade.toolResults.every((result) => result.correct));
+    }
+    for (const value of ["Move", "", ["Line"]]) {
+        const grade = assessment.gradeLoginSites({ ...sketchupAnswers, "sketchup-tool-4": value, sketchupReady: true });
+        assert.equal(grade.answers.sketchupReady, false);
+        assert.equal(grade.toolResults.filter((result) => result.correct).length, 3);
+    }
+    assert.match(shortKitHost.innerHTML, /data-site-check="sketchup"/);
+    assert.equal((shortKitHost.innerHTML.match(/class="login-site-tool"/g) || []).length, 4);
+    for (let number = 1; number <= 4; number += 1) {
+        assert.ok(fs.existsSync(path.join(__dirname, "..", "images", "Activites", `sketchup-tool-${number}.png`)));
+    }
     for (const year of [7, 8, 9, 10, null]) {
         shortKitRenderer.window.KitWorksheetRender.renderWorksheet(shortKitHost, {
             bannerTitle: "Using your login details", loginSites: shortKit.activities[6].loginSites

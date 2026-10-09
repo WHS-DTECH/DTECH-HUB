@@ -280,6 +280,19 @@ async function main() {
     context.hasDatabase = true;
     await context.savePracticalSkillsAssessment(realIdentity.email, "kit-login", 3, huntGrade);
     assert.equal(queries.at(-1).values[0], "3-learning-sites-treasure-v1");
+    const siteGrade = assessment.gradeLoginSites({
+        tinkercad: "Circuits, 3D Designs and Codeblocks",
+        "sketchup-tool-1": "Rectangle", "sketchup-tool-2": "Move", "sketchup-tool-3": "Push/Pull", "sketchup-tool-4": "Line"
+    });
+    context.hasDatabase = false;
+    const siteRow = await context.savePracticalSkillsAssessment(realIdentity.email, "kit-login", 6, siteGrade);
+    assert.equal(siteRow.responses["6-login-sites-readiness-v1"].sketchupReady, true);
+    assert.equal(siteRow.responses["6-login-sites-readiness-v1"].tinkercadReady, true);
+    assert.equal(siteRow.completed_activities["6"], undefined);
+    context.hasDatabase = true;
+    await context.savePracticalSkillsAssessment(realIdentity.email, "kit-login", 6, siteGrade);
+    assert.equal(queries.at(-1).values[0], "6-login-sites-readiness-v1");
+    assert.equal(queries.at(-1).values[4], false);
     context.SCHOOL_EMAIL_DOMAIN = "example.school.nz";
     context.getStoredPracticalSkillsKitContent = async () => enhanced;
     context.savePracticalSkillsAssessment = async () => { throw new Error("Database unavailable"); };

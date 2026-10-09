@@ -43,6 +43,12 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   topic-name check (Variables, If Statements and Loops), without starting a course.
   Both site answers are submitted together so checking one preserves the other;
   ticks are recalculated server-side, accepting singular/plural Variable.
+  SketchUp retains the generic education link. Four teacher-supplied tool
+  pictures have adjacent answer fields: Rectangle, Move, Push/Pull and Line.
+  Students hover over toolbar icons, without drawing. Each tool receives server
+  feedback; all four correct saves the SketchUp site tick alongside existing
+  site evidence. Capitalisation, optional "tool" and Push/Pull separators are
+  ignored. Image labels and filenames do not reveal the answer.
 - Implemented: Open DTECH Learning Site / Open DTECH-HUB in the Login Kit now
   includes a five-island pirate-map treasure hunt. Students follow Westland High
   Website > Intranet > Learning Sites, visit Science, Mrs O'Malley's English,

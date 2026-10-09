@@ -845,6 +845,36 @@ body.kit-worksheet-page {
     justify-self: start;
 }
 
+.login-site-check h4 {
+    margin: 0;
+}
+
+.login-site-tool {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr);
+    gap: 14px;
+    align-items: center;
+}
+
+.login-site-tool img {
+    width: 44px;
+    height: 44px;
+    object-fit: contain;
+}
+
+.login-site-tool > div {
+    display: grid;
+    gap: 6px;
+}
+
+.login-site-tool .is-correct {
+    color: #216c47;
+}
+
+.login-site-tool .is-error {
+    color: #a4342f;
+}
+
 .login-staircase-logo {
     display: grid;
     gap: 8px;
