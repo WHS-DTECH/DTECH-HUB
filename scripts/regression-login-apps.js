@@ -114,8 +114,7 @@ async function main() {
         assert.match(shortKitHost.innerHTML, /Gamefroot/);
         if (junior) {
             assert.doesNotMatch(shortKitHost.innerHTML, /Code Avengers|CodeCombat|MiddleDTECH/);
-            assert.match(shortKitHost.innerHTML, /--stair-index: 2/);
-            assert.doesNotMatch(shortKitHost.innerHTML, /--stair-index: 3/);
+            assert.doesNotMatch(shortKitHost.innerHTML, /--stair-index/);
         } else {
             assert.match(shortKitHost.innerHTML, /Code Avengers/);
             assert.match(shortKitHost.innerHTML, /CodeCombat/);

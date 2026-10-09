@@ -790,7 +790,6 @@ body.kit-worksheet-page {
     grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
     align-items: center;
     gap: 18px;
-    margin-left: calc(var(--stair-index) * 18px);
     padding: 20px;
     border: 2px solid #2f8f61;
     border-bottom-width: 8px;
@@ -878,7 +877,6 @@ body.kit-worksheet-page {
 
 @media (max-width: 560px) {
     .login-staircase-step {
-        margin-left: calc(var(--stair-index) * 3px);
         grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr);
         gap: 8px;
         padding: 12px 8px;

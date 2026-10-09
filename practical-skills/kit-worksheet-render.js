@@ -581,8 +581,8 @@
                     <p>Tinkercad opens your class link; the other links open the general websites for now. Follow your teacher's sign-in instructions; never share your password.</p>
                     ${juniorLoginSites ? "<p>Showing the JuniorDTECH websites for your Year 7/8 profile.</p>" : ""}
                     <ol class="login-staircase-list">
-                        ${loginSites.map((site, index) => `
-                            <li class="login-staircase-step" style="--stair-index: ${index}">
+                        ${loginSites.map((site) => `
+                            <li class="login-staircase-step">
                                 <div class="login-staircase-description"><h3>${escapeHtml(site.name)}</h3><p>${escapeHtml(site.description)}</p></div>
                                 <div class="login-staircase-years"><strong>${escapeHtml(site.group)}</strong><span>${escapeHtml(site.years)}</span></div>
                                 <a class="login-staircase-logo" href="${escapeHtml(site.url)}" target="_blank" rel="noopener noreferrer" aria-label="Open ${escapeHtml(site.name)} in a new tab">
