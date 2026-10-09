@@ -119,6 +119,25 @@ async function main() {
     assert.match(rendererSource, /class="treasure-map-search-keywords">Pringle DTECH<\/p>/);
     assert.match(rendererSource, /data-hunt-island/);
     assert.match(rendererSource, /Treasure unlocked! 8 \/ 8 correct/);
+    const worksheetSource = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "kit-worksheet.js"), "utf8");
+    const navigationStart = worksheetSource.indexOf("        const activityIndex = getActivityIndexFromUrl();", worksheetSource.indexOf("    function renderPage()"));
+    const navigationEnd = worksheetSource.indexOf('        const verification =', navigationStart);
+    assert.ok(navigationStart >= 0 && navigationEnd > navigationStart);
+    for (const [activityIndex, expectedHref, expectedText] of [
+        [0, "./kit-worksheet.html?kit=kit-login", "\u2190 Back to Kit Activity List"],
+        [null, "/practical-skills/checklist.html", "\u2190 Back to Checklist"],
+        [99, "/practical-skills/checklist.html", "\u2190 Back to Checklist"]
+    ]) {
+        const link = {};
+        vm.runInNewContext(worksheetSource.slice(navigationStart, navigationEnd), {
+            getActivityIndexFromUrl: () => activityIndex,
+            state: { kitId: "kit-login", content: { worksheets: [{ activity: "First activity" }] } },
+            document: { getElementById: () => link }
+        });
+        assert.equal(link.href, expectedHref);
+        assert.equal(link.textContent, expectedText);
+    }
+    assert.doesNotMatch(worksheetSource, /backHref:/, "Student page does not render a duplicate activity-list link");
     assert.ok(fs.existsSync(path.join(__dirname, "..", "images", "learning-sites-treasure-map.svg")));
     context.getStudentDirectoryRows = async () => { throw new Error("Profile lookup failed"); };
     assert.equal((await request(profileUrl)).code, 500);

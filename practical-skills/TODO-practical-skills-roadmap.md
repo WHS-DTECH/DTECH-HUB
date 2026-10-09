@@ -78,6 +78,9 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   through the existing kit completion action.
   The activity's `Completed` status is a keyboard-accessible link back to that
   kit's activity menu. `Not Completed` is not a link; undo remains separate.
+  Activity pages use one top-bar Back to Kit Activity List link instead of
+  separate checklist and All activities links. The kit activity list retains
+  Back to Checklist in that same top-bar position.
 - Implemented: Login Kit's `Password Problems` includes a Year 7/8 Password
   Detective activity with five problem/fix matches and five scenario questions.
   `Check my answers` returns helpful feedback and allows unlimited retries.

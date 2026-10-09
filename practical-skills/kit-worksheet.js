@@ -199,6 +199,14 @@
 
         const activityIndex = getActivityIndexFromUrl();
         const worksheets = Array.isArray(state.content.worksheets) ? state.content.worksheets : [];
+        const backLink = document.getElementById("worksheet-back-link");
+        const showingActivity = activityIndex !== null && Boolean(worksheets[activityIndex]);
+        if (backLink) {
+            backLink.href = showingActivity
+                ? `./kit-worksheet.html?kit=${encodeURIComponent(state.kitId)}`
+                : "/practical-skills/checklist.html";
+            backLink.textContent = showingActivity ? "\u2190 Back to Kit Activity List" : "\u2190 Back to Checklist";
+        }
         const verification = document.getElementById("worksheet-google-verification");
         if (verification) {
             host.after(verification);
@@ -237,7 +245,6 @@
             window.KitWorksheetRender.renderWorksheet(host, activityContent, {
                 responses: state.responses,
                 readOnly: !state.email,
-                backHref: isActivity ? `./kit-worksheet.html?kit=${encodeURIComponent(state.kitId)}` : "",
                 eyebrow: isActivity ? state.content.bannerTitle : "",
                 identityVerified: Boolean(JSON.parse(getStoredAuthRaw() || "{}").idToken),
                 driveSetup: state.driveSetup,
@@ -360,7 +367,7 @@
                     });
                     state.completedActivities = payload.completedActivities;
                 });
-                showStatusMessage(completed ? "Activity completed! Your tick is saved. Return to All activities to see your progress." : "Activity completion removed.");
+                showStatusMessage(completed ? "Activity completed! Your tick is saved. Return to the Kit Activity List to see your progress." : "Activity completion removed.");
             } catch (error) {
                 showStatusMessage(error?.message || "Could not save activity completion.", true);
             } finally {
