@@ -148,12 +148,65 @@ async function main() {
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, "..", "practical-skills", "kit-worksheet-render.js"), "utf8"), rendererContext);
     rendererContext.window.KitWorksheetRender.renderWorksheet(host, { assessment: puzzle }, { readOnly: true });
     assert.equal((host.innerHTML.match(/data-word-cell=/g) || []).length, 144);
-    assert.match(host.innerHTML, /microsoft365\.com\/launch\/onedrive/);
+    assert.match(host.innerHTML, /microsoft365\.com\/\?auth=2/);
+    assert.doesNotMatch(host.innerHTML, /\/launch\/onedrive/);
     assert.match(host.innerHTML, /anyone with the link as Editor/);
     rendererContext.window.KitWorksheetRender.renderKitOverview(host, combined, { kitId: "kit-login", completedActivities: { 2: "saved", 4: "old" } });
     assert.match(host.innerHTML, /1 \/ 5 activities completed/);
     assert.doesNotMatch(host.innerHTML, /activity=4/);
     assert.match(host.innerHTML, /activity=5/);
+    for (const outcome of ["success", "blocked", "failure", "unconfirmed"]) {
+        const nodes = new Map();
+        const node = (selector) => {
+            if (!nodes.has(selector)) nodes.set(selector, {
+                classList: { toggle() {}, remove() {}, add() {} },
+                events: {},
+                addEventListener(name, callback) { this.events[name] = callback; },
+                querySelector: node,
+                querySelectorAll: () => []
+            });
+            return nodes.get(selector);
+        };
+        const order = [];
+        const tab = {
+            closed: false,
+            opener: {},
+            location: { replace(url) { tab.url = url; } },
+            close() { this.closed = true; }
+        };
+        rendererContext.window.open = (url, target) => {
+            assert.equal(url, "about:blank");
+            assert.equal(target, "_blank");
+            order.push("open");
+            return outcome === "blocked" ? null : tab;
+        };
+        const interactive = {
+            ...host,
+            querySelector: node,
+            querySelectorAll: () => []
+        };
+        rendererContext.window.KitWorksheetRender.renderWorksheet(interactive, { assessment: puzzle }, {
+            onDriveSetup: async () => {
+                order.push("setup");
+                if (outcome === "failure") throw new Error("Drive permission denied");
+                return { ready: outcome !== "unconfirmed", folderUrl: "https://drive.google.com/drive/folders/test" };
+            }
+        });
+        await node("[data-login-drive-setup]").events.click();
+        assert.deepEqual(order, ["open", "setup"], "Reserve tab before asynchronous consent/setup");
+        assert.equal(node("[data-login-drive-setup]").disabled, false);
+        if (outcome === "success") {
+            assert.equal(tab.opener, null);
+            assert.equal(tab.url, "https://drive.google.com/drive/folders/test");
+        } else if (outcome === "blocked") {
+            assert.match(node("[data-login-drive-status]").textContent, /blocked or closed/);
+            assert.equal(node("[data-login-drive-link]").hidden, false);
+        } else {
+            assert.equal(tab.closed, true, "Close reserved tab if setup fails");
+            assert.equal(tab.url, undefined, "Do not open Drive before confirmed success");
+            assert.match(node("[data-login-drive-status]").textContent, /denied|did not confirm/);
+        }
+    }
     console.log("Login apps and WHS-DTECH setup regression checks passed.");
 }
 

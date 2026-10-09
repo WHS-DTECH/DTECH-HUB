@@ -107,8 +107,9 @@
                     <p>Use your school email for Google and Microsoft. Google Drive and Microsoft OneDrive store files online; they are not the same drive.</p>
                     <div class="worksheet-actions">
                         <button type="button" class="worksheet-btn worksheet-btn-primary" data-login-drive-setup ${readOnly ? "disabled" : ""}>Set up Google Drive (Drive Ready)</button>
-                        <a class="worksheet-btn worksheet-btn-secondary" href="https://www.microsoft365.com/launch/onedrive" target="_blank" rel="noopener noreferrer">Open Microsoft OneDrive</a>
+                        <a class="worksheet-btn worksheet-btn-secondary" href="https://www.microsoft365.com/?auth=2" target="_blank" rel="noopener noreferrer">Open Microsoft 365 / OneDrive</a>
                     </div>
+                    <p>Microsoft: sign in with your school account, then choose <strong>Apps</strong> and <strong>OneDrive</strong>. If Microsoft shows a sign-in error or OneDrive is missing, ask your teacher or school IT for help; do not tick the confirmation until you can see your files.</p>
                     <p>Google setup creates or reuses just one folder: <strong>WHS-DTECH</strong> in My Drive. We will add class folders later.</p>
                     <p class="worksheet-safety-note">WHS-DTECH will be shared with anyone with the link as Editor, so DTECH-HUB can work with your files. Only store class work here, not private information. Do not share the link publicly. Never enter a password into this activity.</p>
                     <p class="worksheet-assessment-result" data-login-drive-status role="status" aria-live="polite"></p>
@@ -213,13 +214,24 @@
         };
         updateDrive(options.driveSetup);
         driveButton.addEventListener("click", async () => {
+            // Reserve the tab during the click so setup/consent does not trigger popup blocking.
+            const folderTab = window.open("about:blank", "_blank");
+            if (folderTab) folderTab.opener = null;
             driveButton.disabled = true;
             driveStatus.classList.remove("is-error");
             driveStatus.textContent = "Requesting Google permission and setting up WHS-DTECH...";
             try {
                 if (!options.onDriveSetup) throw new Error("Open the student activity to set up Google Drive.");
-                updateDrive(await options.onDriveSetup());
+                const setup = await options.onDriveSetup();
+                if (!setup?.ready || !setup.folderUrl) throw new Error("Google Drive setup did not confirm your folder. Please try again.");
+                updateDrive(setup);
+                if (folderTab && !folderTab.closed) {
+                    folderTab.location.replace(setup.folderUrl);
+                } else {
+                    driveStatus.textContent += " The new tab was blocked or closed. Click Open your WHS-DTECH folder below.";
+                }
             } catch (error) {
+                if (folderTab && !folderTab.closed) folderTab.close();
                 driveStatus.classList.add("is-error");
                 driveStatus.textContent = error.message || "Could not set up Google Drive. Please try again.";
             } finally {
