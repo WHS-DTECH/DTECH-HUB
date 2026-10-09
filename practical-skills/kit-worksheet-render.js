@@ -114,7 +114,11 @@
                 </div>
                 <div class="treasure-map-start">
                     <h3>Set sail: follow the school pathway</h3>
-                    <p><a href="https://www.westlandhigh.school.nz/" target="_blank" rel="noopener noreferrer">Westland High Website</a> &rarr; <strong>Intranet</strong> &rarr; <strong>Learning Sites</strong>.</p>
+                    <ol class="treasure-map-pathway" aria-label="Pathway to Learning Sites">
+                        <li><span class="treasure-map-step" aria-hidden="true">1</span><a href="https://www.westlandhigh.school.nz/" target="_blank" rel="noopener noreferrer">Westland High Website</a></li>
+                        <li><span class="treasure-map-step" aria-hidden="true">2</span><strong>Intranet</strong></li>
+                        <li><span class="treasure-map-step" aria-hidden="true">3</span><strong>Learning Sites</strong></li>
+                    </ol>
                     <p>Use the subject names below to find the right sites in the directory. English has several entries: use <strong>Mrs O'Malley</strong>. Sign in to school Google if a page asks. Keep this map open and visit sites in another tab.</p>
                     <a class="worksheet-btn worksheet-btn-secondary" href="${escapeHtml(assessment.directoryUrl)}" target="_blank" rel="noopener noreferrer">Open Learning Sites directory</a>
                     <p>Need a course check? <a href="../user-profile.html" target="_blank" rel="noopener noreferrer">Open your User Profile</a>.</p>

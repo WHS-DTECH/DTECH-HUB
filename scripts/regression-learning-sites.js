@@ -109,7 +109,10 @@ async function main() {
     const rendererSource = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "kit-worksheet-render.js"), "utf8");
     assert.match(rendererSource, /id === "course" && courseSelect\.value/);
     assert.match(rendererSource, /huntProfile\.courseIds\.includes\(courseSelect\.value\)/);
-    assert.match(rendererSource, /Westland High Website<\/a> &rarr; <strong>Intranet<\/strong> &rarr; <strong>Learning Sites<\/strong>/);
+    assert.match(rendererSource, /<ol class="treasure-map-pathway" aria-label="Pathway to Learning Sites">/);
+    assert.match(rendererSource, /Westland High Website<\/a><\/li>/);
+    assert.match(rendererSource, /<strong>Intranet<\/strong><\/li>/);
+    assert.match(rendererSource, /<strong>Learning Sites<\/strong><\/li>/);
     assert.match(rendererSource, /data-hunt-island/);
     assert.match(rendererSource, /Treasure unlocked! 8 \/ 8 correct/);
     assert.ok(fs.existsSync(path.join(__dirname, "..", "images", "learning-sites-treasure-map.svg")));

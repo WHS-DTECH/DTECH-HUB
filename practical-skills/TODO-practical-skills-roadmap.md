@@ -23,6 +23,8 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   includes a five-island pirate-map treasure hunt. Students follow Westland High
   Website > Intranet > Learning Sites, visit Science, Mrs O'Malley's English,
   Food & Hospitality, Physical Education, then the main DTECH site.
+  The pathway stays below the Set sail heading as a high-contrast navy-and-gold
+  numbered route, stacking vertically on mobile without sideways scrolling.
   The original decorative SVG map has a dotted trail, compass, ship and X marks;
   the responsive cards retain readable labels and keyboard-accessible links.
   School Google authentication may be required by linked sites.

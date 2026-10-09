@@ -708,6 +708,71 @@ body.kit-worksheet-page {
     margin: 18px 0;
 }
 
+.treasure-map-pathway {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px 24px;
+    margin: 16px 0;
+    padding: 18px;
+    list-style: none;
+    border: 2px solid #e5bc58;
+    border-radius: 12px;
+    background: #20374a;
+    color: #fff8e8;
+    box-shadow: 0 4px 0 #896535;
+    font-size: clamp(1rem, 2vw, 1.15rem);
+    font-weight: 800;
+}
+
+.treasure-map-pathway li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.treasure-map-pathway li:not(:last-child)::after {
+    content: "\2192";
+    margin-left: 4px;
+    color: #ffe094;
+}
+
+.treasure-map-step {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #ffe094;
+    color: #20374a;
+}
+
+.treasure-map-pathway a {
+    color: #fff8e8;
+    text-underline-offset: 4px;
+}
+
+.treasure-map-pathway a:hover {
+    color: #ffe094;
+}
+
+.treasure-map-pathway a:focus-visible {
+    outline: 3px solid #ffe094;
+    outline-offset: 4px;
+}
+
+@media (max-width: 560px) {
+    .treasure-map-pathway {
+        flex-direction: column;
+    }
+
+    .treasure-map-pathway li:not(:last-child)::after {
+        content: "\2193";
+        margin-left: auto;
+    }
+}
+
 .worksheet-hunt-form,
 .treasure-map-island-body,
 [data-hunt-course-clues] {
