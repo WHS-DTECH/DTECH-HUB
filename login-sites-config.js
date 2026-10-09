@@ -104,7 +104,8 @@ function gradeConfiguredLoginSites(answers, sites) {
       : question.tools ? `${marked.filter((result) => result.correct).length} / ${marked.length} tool names correct. ${question.hint}`
         : `Try again: ${question.hint || "look at the site and read the answer."}` };
   });
-  return { assessmentId: "login-sites-readiness-v1", passed: false, score: results.filter((result) => result.correct).length, total: results.length, answers: clean, results, toolResults };
+  const score = results.filter((result) => result.correct).length;
+  return { assessmentId: "login-sites-readiness-v1", passed: results.length > 0 && score === results.length, score, total: results.length, answers: clean, results, toolResults };
 }
 
 module.exports = { validateLoginSites, publicLoginSites, visibleLoginSites, gradeConfiguredLoginSites };

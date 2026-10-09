@@ -6,6 +6,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const assessment = require("../practical-skills-assessment");
 const learningSites = require("../learning-sites-assessment");
+const loginSitesConfig = require("../login-sites-config");
 
 const root = path.join(__dirname, "..");
 const server = fs.readFileSync(path.join(root, "server.js"), "utf8");
@@ -25,6 +26,7 @@ async function main() {
         ensurePracticalSkillsProgressSchema: async () => {},
         ...assessment,
         ...learningSites,
+        ...loginSitesConfig,
         Date
     });
     vm.runInContext([
@@ -111,6 +113,14 @@ async function main() {
     assert.equal((await request({ params: { kitId: "kit-login", activityIndex: "9" } })).code, 404);
     assert.equal((await request({ params: { kitId: "unknown", activityIndex: "0" } })).code, 404);
     assert.equal((await request()).body.completedActivities["0"], "saved");
+    const configuredSites = assessment.withShortLoginKit("kit-login", { worksheets: [{ activity: "Using your login details" }] }).activities[0].loginSites;
+    context.getPracticalSkillsKitContent = async () => ({ worksheets: [{}], activities: [{ loginSites: configuredSites }] });
+    context.getLearningSitesStudentProfile = async () => ({ year: 7 });
+    assert.equal((await request()).code, 409, "Visible questions cannot be bypassed with manual completion");
+    assert.equal((await request({ body: { completed: false } })).code, 200, "Undo completion remains available");
+    context.getPracticalSkillsKitContent = async () => ({ worksheets: [{}], activities: [{ loginSites: configuredSites.filter((site) => !site.readinessQuestion) }] });
+    assert.equal((await request()).code, 200, "No-question activities retain manual completion");
+    context.getPracticalSkillsKitContent = async () => ({ worksheets: [{}, {}] });
     context.setPracticalSkillsActivityCompletion = async () => { throw new Error("Database unavailable"); };
     assert.equal((await request()).code, 500, "Database failures must not report success");
 
@@ -298,6 +308,18 @@ async function main() {
     assert.equal(queries.at(-1).values[0], "6-login-sites-readiness-v1");
     assert.equal(queries.at(-1).values[4], false);
     assert.equal(queries.at(-1).values[8], true, "SQL merges site evidence without deleting hidden site answers");
+    const completedSiteGrade = assessment.gradeLoginSites({
+        tinkercad: "Circuits, 3D Designs, Codeblocks", codeavengers: "Variables, If Statements, Loops", codecombat: "Python",
+        "sketchup-tool-1": "Rectangle", "sketchup-tool-2": "Move", "sketchup-tool-3": "Push/Pull", "sketchup-tool-4": "Line"
+    });
+    assert.equal(completedSiteGrade.passed, true);
+    context.hasDatabase = false;
+    const completedSites = await context.savePracticalSkillsAssessment(realIdentity.email, "kit-login", 6, completedSiteGrade);
+    assert.ok(completedSites.completed_activities["6"], "All visible questions save a persistent activity tick");
+    assert.equal((await context.ensurePracticalSkillsProgressRow(realIdentity.email, "kit-login")).completed_activities["6"], completedSites.completed_activities["6"]);
+    context.hasDatabase = true;
+    await context.savePracticalSkillsAssessment(realIdentity.email, "kit-login", 6, completedSiteGrade);
+    assert.equal(queries.at(-1).values[4], true, "SQL persists the automatic completion tick");
     context.SCHOOL_EMAIL_DOMAIN = "example.school.nz";
     context.getStoredPracticalSkillsKitContent = async () => enhanced;
     context.savePracticalSkillsAssessment = async () => { throw new Error("Database unavailable"); };
@@ -382,6 +404,7 @@ async function main() {
             clearTimeout() {},
             setTimeout() {},
             KitWorksheetRender: {
+                visibleLoginSites: rendererContext.window.KitWorksheetRender.visibleLoginSites,
                 renderWorksheet() {},
                 renderKitOverview(_host, _content, options) { overviewTicks = options.completedActivities; }
             }
@@ -453,6 +476,38 @@ async function main() {
     vm.runInNewContext(fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet.js"), "utf8"), browserContext);
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(nodes.get("worksheet-activity-status-pill").textContent, "Completed");
+    let siteTicks = {};
+    const juniorSiteAnswers = {
+        tinkercad: "Circuits, 3D Designs, Codeblocks",
+        "sketchup-tool-1": "Rectangle", "sketchup-tool-2": "Move", "sketchup-tool-3": "Push/Pull", "sketchup-tool-4": "Line"
+    };
+    browserContext.fetch = async (url, options = {}) => {
+        if (url.endsWith("/check")) {
+            if (failSave) return { ok: false, status: 500, json: async () => ({ error: "Database unavailable" }) };
+            const marked = assessment.gradeLoginSites(JSON.parse(options.body).answers, loginSitesConfig.visibleLoginSites(configuredSites, { year: 7 }));
+            if (marked.passed) siteTicks = { 2: "saved" };
+            return { ok: true, json: async () => ({ ...marked, completedActivities: siteTicks }) };
+        }
+        if (url.endsWith("/learning-sites/profile")) return { ok: true, json: async () => ({ year: 7 }) };
+        return { ok: true, json: async () => url.includes("/kit-content/") ? {
+            content: { bannerTitle: "Kit", worksheets: [{}, {}, { activity: "Using your login details" }], activities: [null, null, { loginSites: configuredSites }] }
+        } : { responses: { "2-login-sites-readiness-v1": { codecombatReady: true } }, completedActivities: siteTicks, kit: { isComplete: false } } };
+    };
+    vm.runInNewContext(fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet.js"), "utf8"), browserContext);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(nodes.get("worksheet-activity-complete-btn").hidden, true);
+    await worksheetOptions.onAssessmentCheck({ ...juniorSiteAnswers, tinkercad: "wrong" });
+    assert.equal(nodes.get("worksheet-activity-status-pill").textContent, "Not Completed");
+    failSave = true;
+    await assert.rejects(worksheetOptions.onAssessmentCheck(juniorSiteAnswers), /Database unavailable/);
+    assert.equal(nodes.get("worksheet-activity-status-pill").textContent, "Not Completed");
+    failSave = false;
+    await worksheetOptions.onAssessmentCheck(juniorSiteAnswers);
+    assert.equal(nodes.get("worksheet-activity-status-pill").textContent, "Completed");
+    assert.equal(nodes.get("worksheet-activity-status-pill").href, "./kit-worksheet.html?kit=kit-login");
+    vm.runInNewContext(fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet.js"), "utf8"), browserContext);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(nodes.get("worksheet-activity-status-pill").textContent, "Completed", "Site completion survives reload");
     const verificationNode = nodes.get("worksheet-google-verification");
     const worksheetHost = nodes.get("worksheet-host");
     const layoutResult = {

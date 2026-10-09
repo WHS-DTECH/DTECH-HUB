@@ -115,6 +115,14 @@ async function main() {
     assert.equal(tinkercadCheck.body.assessmentId, assessment.LOGIN_SITES_ID);
     assert.equal(tinkercadCheck.body.passed, false);
     assert.equal(tinkercadCheck.body.completedActivities["2"], undefined);
+    const juniorCheck = await request(checkUrl, {
+        params: { kitId: "kit-login", activityIndex: "2" },
+        body: { answers: { tinkercad: "Circuits, 3D Designs and Codeblocks",
+            "sketchup-tool-1": "Rectangle", "sketchup-tool-2": "Move", "sketchup-tool-3": "Push/Pull", "sketchup-tool-4": "Line",
+            codecombat: "wrong", codeavengers: "wrong" } }
+    });
+    assert.equal(juniorCheck.body.passed, true, "Latest server profile excludes invisible questions from completion");
+    assert.equal(juniorCheck.body.total, 2, "No-question sites do not count");
     assert.deepEqual(Array.from((await request(profileUrl, { email: "staff@example.school.nz" })).body.courseIds), ["STAFF"]);
     assert.equal((await request(checkUrl, { email: "staff@example.school.nz", body: { answers: staffAnswers } })).body.completedActivities["1"], "saved");
     assert.equal((await request(checkUrl, { body: { answers: staffAnswers, profile: { available: true, courseIds: ["STAFF"] }, isStaff: true } })).body.passed, false, "Client-supplied staff status is ignored");

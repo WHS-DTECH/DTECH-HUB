@@ -30,14 +30,17 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   Code Avengers and CodeCombat for MiddleDTECH (Years 9/10). Official brand
   images/icons open websites or teacher-configured class links in new tabs.
   Legacy question data is preserved but not displayed in this activity.
-  Completion is student-confirmed, not automatically inferred from opening links.
+  Completion is earned by correctly checking every visible site's questions,
+  not automatically inferred from opening links. Hidden sites and sites without
+  questions do not count. If no visible site has questions, manual completion
+  remains available. Completion is persisted using existing activity progress.
   The staircase loads the signed-in user's server-derived year profile. Years
   7/8 see only the three JuniorDTECH sites; MiddleDTECH and staff retain all five.
   Without a linked year profile, the general list remains visible.
   Tinkercad now uses the supplied class link and a quick three-design-area
   question under its stair. Server marking saves the answer and site readiness
-  tick in login-sites-readiness-v1 responses; it never awards the whole activity
-  from this single check. Readiness answers
+  tick in login-sites-readiness-v1 responses; the whole activity tick is awarded
+  when all visible question-bearing sites are correct. Readiness answers
   are evidence, not direct verification of third-party sign-in sessions.
   Code Avengers retains its generic link and adds a Pro > Python > Python 1
   topic-name check (Variables, If Statements and Loops), without starting a course.
@@ -52,8 +55,7 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   CodeCombat uses the supplied ShortDrawFast class link and asks for the
   programming language shown beside WHS-DTECH under Current Classes (Python).
   A correct answer saves its readiness tick without starting a level. Gamefroot
-  remains a generic link with no question; whole-activity completion remains
-  student-confirmed while individual checks save server-marked evidence.
+  remains a generic link with no question and does not block automatic completion.
 - Implemented: `teacher-login-sites.html` provides staff-only settings for
   Using your login details, linked from the staff activity toolbar and Activity
   Details. Teachers can add websites, edit names, descriptions, course/year

@@ -131,7 +131,7 @@ async function main() {
         assert.equal(grade.answers.tinkercadReady, true);
         assert.equal(grade.answers.codeavengersReady, true);
         assert.equal(grade.score, 4);
-        assert.equal(grade.passed, false);
+        assert.equal(grade.passed, true, "All configured site questions award whole-activity completion");
     }
     for (const answer of ["JavaScript", "", ["Python"], "Not Python"]) {
         assert.equal(assessment.gradeLoginSites({ codecombat: answer, codecombatReady: true }).answers.codecombatReady, false);

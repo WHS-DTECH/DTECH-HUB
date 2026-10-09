@@ -12575,7 +12575,10 @@ app.put("/api/practical-skills/progress/:kitId/activities/:activityIndex", async
       res.status(409).json({ error: "This activity is now part of Sign In - Google, Microsoft & Your Drives. Open it from the kit menu." });
       return;
     }
-    if (req.body.completed && (content.activities?.[activityIndex]?.assessmentId || content.activities?.[activityIndex]?.identityLessonVersion)) {
+    const activity = content.activities?.[activityIndex];
+    const siteQuestions = req.body.completed && activity?.loginSites &&
+      visibleLoginSites(activity.loginSites, await getLearningSitesStudentProfile(studentEmail)).some((site) => site.readinessQuestion);
+    if (req.body.completed && (activity?.assessmentId || activity?.identityLessonVersion || siteQuestions)) {
       res.status(409).json({ error: "Complete the activity tasks, then check your answers to earn this activity tick." });
       return;
     }

@@ -148,7 +148,9 @@
         const index = getCurrentActivityIndex();
         bar.hidden = !state.email || index === null;
         const completed = Boolean(state.completedActivities[index]);
-        const selfMarking = Boolean(state.content?.activities?.[index]?.assessment || state.content?.activities?.[index]?.identityLessonVersion);
+        const activity = state.content?.activities?.[index];
+        const siteQuestions = window.KitWorksheetRender.visibleLoginSites(activity?.loginSites, state.huntProfile).some((site) => site.readinessQuestion);
+        const selfMarking = Boolean(activity?.assessment || activity?.identityLessonVersion || siteQuestions);
         pill.textContent = completed ? "Completed" : "Not Completed";
         pill.classList.toggle("is-complete", completed);
         if (completed) {
@@ -305,7 +307,8 @@
                             headers: withAuthHeaders({ "Content-Type": "application/json" }),
                             body: JSON.stringify({ answers })
                         });
-                        state.responses[assessmentKey] = payload.answers;
+                        state.responses[assessmentKey] = activity?.loginSites
+                            ? { ...state.responses[assessmentKey], ...payload.answers } : payload.answers;
                         state.completedActivities = payload.completedActivities;
                         updateActivityCompleteBar();
                         if (payload.passed) showStatusMessage("Activity complete! Your activity tick has been saved.");

@@ -527,6 +527,14 @@
         });
     }
 
+    function visibleLoginSites(sites, profile) {
+        const junior = [7, 8].includes(profile?.year);
+        const level = profile?.courseIds?.includes("STAFF") ? "staff" : junior ? "junior"
+            : [9, 10].includes(profile?.year) ? "middle" : [11, 12, 13].includes(profile?.year) ? "senior" : null;
+        return (sites || []).filter((site) => !site.hidden &&
+            (site.levels ? site.levels.length && (!level || site.levels.includes(level)) : !junior || site.group === "JuniorDTECH"));
+    }
+
     function renderWorksheet(host, content, options = {}) {
         if (!host) return;
 
@@ -538,8 +546,8 @@
         const juniorLoginSites = [7, 8].includes(options.huntProfile?.year);
         const siteLevel = options.huntProfile?.courseIds?.includes("STAFF") ? "staff" : juniorLoginSites ? "junior"
             : [9, 10].includes(options.huntProfile?.year) ? "middle" : [11, 12, 13].includes(options.huntProfile?.year) ? "senior" : null;
-        const loginSites = (content?.loginSites || []).filter((site) => !site.hidden &&
-            (site.levels ? site.levels.length && (!siteLevel || site.levels.includes(siteLevel)) : !juniorLoginSites || site.group === "JuniorDTECH"));
+        const loginSites = visibleLoginSites(content?.loginSites, options.huntProfile);
+        const hasSiteQuestions = loginSites.some((site) => site.readinessQuestion);
 
         host.style.setProperty("--worksheet-theme-color", theme.color || "#2f8f61");
         host.style.setProperty("--worksheet-accent-color", theme.accent || "#ffd166");
@@ -614,8 +622,9 @@
                             </li>
                         `).join("")}
                     </ol>
-                    <p>When you have explored the websites for your year group, use <strong>Mark Activity Complete</strong> below to save your tick.</p>
-                    <p>Site checks save your answers as readiness evidence, not direct verification of another website's login. More site questions are being added; individual site ticks do not complete this whole activity.</p>
+                    ${hasSiteQuestions ? "<p>Answer all the questions on the websites visible to you correctly, then check your answers to save your activity completion tick automatically. Hidden websites and websites without questions do not count.</p>"
+                        : "<p>No website questions are enabled for you. When you have explored the visible websites, use <strong>Mark Activity Complete</strong> below to save your tick.</p>"}
+                    <p>Site checks save your answers as readiness evidence, not direct verification of another website's login.</p>
                 </section>
             ` : ""}
             <div class="worksheet-question-list">
@@ -818,5 +827,5 @@
         `;
     }
 
-    window.KitWorksheetRender = { renderWorksheet, renderKitOverview };
+    window.KitWorksheetRender = { renderWorksheet, renderKitOverview, visibleLoginSites };
 })();

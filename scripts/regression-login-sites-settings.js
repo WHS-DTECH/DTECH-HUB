@@ -32,6 +32,23 @@ async function main() {
     const noLevels = [{ ...edited[0], levels: [] }];
     assert.equal(config.visibleLoginSites(noLevels, null).length, 0);
     assert.equal(config.publicLoginSites(noLevels).length, 0);
+    const correctAnswers = {
+        tinkercad: "Circuits, 3D Designs, Codeblocks", codeavengers: "Variables, If Statements, Loops",
+        "sketchup-tool-1": "Rectangle", "sketchup-tool-2": "Move", "sketchup-tool-3": "Push/Pull", "sketchup-tool-4": "Line",
+        codecombat: "Python"
+    };
+    for (const profile of [{ year: 7 }, { year: 8 }, { year: 9 }, { year: 12 }, { courseIds: ["STAFF"] }]) {
+        const visible = config.visibleLoginSites(defaults, profile);
+        assert.equal(assessment.gradeLoginSites(correctAnswers, visible).passed, true);
+        assert.equal(assessment.gradeLoginSites({ ...correctAnswers, tinkercad: "wrong", tinkercadReady: true }, visible).passed, false);
+    }
+    const juniorSites = config.visibleLoginSites(defaults, { year: 7 });
+    assert.equal(assessment.gradeLoginSites({ ...correctAnswers, codecombat: "wrong", codeavengers: "wrong" }, juniorSites).passed, true, "Invisible app answers cannot block completion");
+    assert.equal(assessment.gradeLoginSites({ ...correctAnswers, "sketchup-tool-4": "wrong" }, juniorSites).passed, false);
+    assert.equal(assessment.gradeLoginSites({}, []).passed, false, "Empty visible list cannot award a tick");
+    assert.equal(assessment.gradeLoginSites({}, defaults.filter((site) => !site.readinessQuestion)).passed, false, "No questions retains manual completion");
+    const oneSite = [{ ...edited[0], readinessQuestion: { ...edited[0].readinessQuestion, answers: ["custom answer"] } }];
+    assert.equal(assessment.gradeLoginSites({ tinkercad: "custom answer" }, oneSite).passed, true, "A single visible custom question completes the activity");
     const renderer = { window: {} };
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, "..", "practical-skills", "kit-worksheet-render.js"), "utf8"), renderer);
     const host = { style: { setProperty() {} }, innerHTML: "" };
