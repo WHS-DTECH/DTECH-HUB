@@ -304,6 +304,8 @@ async function main() {
             if (!nodes.has(id)) {
                 nodes.set(id, {
                     hidden: true,
+                    after() {},
+                    querySelector() { return { before() {} }; },
                     classList: { toggle() {}, remove() {} },
                     addEventListener(name, callback) { events[`${id}:${name}`] = callback; }
                 });
@@ -444,6 +446,20 @@ async function main() {
     retry();
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(resultNode.textContent, "Connection failed");
+    pendingCheck = null;
+    rendererContext.window.KitWorksheetRender.renderWorksheet(interactiveHost, {
+        questions: identityQuestions,
+        identityLessonVersion: 1
+    }, { identityVerified: false, onIdentityCheck: async () => { throw new Error("Must not auto-check before verification"); } });
+    inputEvents["q1:input"]();
+    assert.equal(pendingCheck, null);
+    assert.match(feedbackNodes[2].textContent, /step 5/);
+    assert.match(interactiveHost.innerHTML, /Check your answers/);
+    const worksheetPage = fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet.html"), "utf8");
+    assert.match(worksheetPage, /worksheet-question-number" aria-hidden="true">5</);
+    const worksheetScript = fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet.js"), "utf8");
+    assert.match(worksheetScript, /querySelector\("#identity-result"\)\.before\(verification\)/);
+    assert.match(worksheetScript, /progressPayload\?\.responses, \.\.\.identityDraft/);
     console.log("Practical Skills completion regression checks passed.");
 }
 

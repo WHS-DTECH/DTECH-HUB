@@ -206,7 +206,7 @@
                     </article>
                 `).join("") : content?.assessment ? "" : `<p class="worksheet-empty-note">This kit does not have any questions yet.</p>`}
             </div>
-            ${content?.identityLessonVersion ? `<p class="worksheet-assessment-result" id="identity-result" role="status" aria-live="polite">All four correct answers will earn your completion tick automatically.</p><button type="button" class="worksheet-btn worksheet-btn-primary" id="identity-retry" ${readOnly ? "disabled" : ""}>Check answers again</button>` : ""}
+            ${content?.identityLessonVersion ? `<p class="worksheet-assessment-result" id="identity-result" role="status" aria-live="polite">${options.identityVerified ? "Google sign-in is ready. Click Check your answers to mark all four answers." : "Complete questions 1-4, verify your school email in step 5, then click Check your answers."}</p><button type="button" class="worksheet-btn worksheet-btn-primary" id="identity-retry" ${readOnly ? "disabled" : ""}>Check your answers</button>` : ""}
         `;
 
         if (readOnly) return;
@@ -252,8 +252,10 @@
                         node.getAttribute("data-identity-feedback") === input.getAttribute("data-question-id")
                     );
                     feedback.classList.remove("is-correct", "is-error");
-                    feedback.textContent = "Keep going! We will check when you pause typing.";
-                    timer = window.setTimeout(check, 650);
+                    feedback.textContent = options.identityVerified === false
+                        ? "Keep going! Verify your email in step 5, then check your answers."
+                        : "Keep going! We will check when you pause typing.";
+                    if (options.identityVerified !== false) timer = window.setTimeout(check, 650);
                 });
             });
             host.querySelector("#identity-retry").addEventListener("click", () => {

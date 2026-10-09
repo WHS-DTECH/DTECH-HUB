@@ -50,8 +50,10 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   guessing a name from the email. Google token verification must be configured
   on the server for these checks.
 - Activity 1 includes a visible Google ID sign-in/verification button even when
-  the hub already shows a signed-in account. The verification panel sits below
-  the answer-checking feedback and retry button, above completion status.
+  the hub already shows a signed-in account. Verification is step 5, after the
+  four answer fields and before `Check your answers`. Typed answers are retained
+  when re-verifying the same account; switching accounts loads that account's
+  own progress. Live checks wait until a Google ID token is available.
   This uses the Google Identity
   Services button, rather than the hub's OAuth access-token popup. Changed
   credentials reload the worksheet's saved account-specific progress.

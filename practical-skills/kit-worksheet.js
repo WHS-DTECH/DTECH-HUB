@@ -186,7 +186,10 @@
         const activityIndex = getActivityIndexFromUrl();
         const worksheets = Array.isArray(state.content.worksheets) ? state.content.worksheets : [];
         const verification = document.getElementById("worksheet-google-verification");
-        if (verification) verification.hidden = !state.content.activities?.[activityIndex]?.identityLessonVersion;
+        if (verification) {
+            host.after(verification);
+            verification.hidden = !state.content.activities?.[activityIndex]?.identityLessonVersion;
+        }
         if (worksheets.length && (activityIndex === null || !worksheets[activityIndex])) {
             window.KitWorksheetRender.renderKitOverview(host, state.content, {
                 kitId: state.kitId,
@@ -222,6 +225,7 @@
                 readOnly: !state.email,
                 backHref: isActivity ? `./kit-worksheet.html?kit=${encodeURIComponent(state.kitId)}` : "",
                 eyebrow: isActivity ? state.content.bannerTitle : "",
+                identityVerified: Boolean(JSON.parse(getStoredAuthRaw() || "{}").idToken),
                 onIdentityCheck: async (answers) => {
                     if (!state.progressLoaded) throw new Error("Your progress has not loaded. Refresh the page and try again.");
                     return queueProgressWrite(async () => {
@@ -230,6 +234,9 @@
                             headers: withAuthHeaders({ "Content-Type": "application/json" }),
                             body: JSON.stringify({ answers })
                         });
+                        if (verification && activity?.identityLessonVersion) {
+                            host.querySelector("#identity-result").before(verification);
+                        }
                         Object.assign(state.responses, payload.answers);
                         state.completedActivities = payload.completedActivities;
                         updateActivityCompleteBar();
@@ -351,7 +358,7 @@
         });
     }
 
-    async function init() {
+    async function init(identityDraft = {}) {
         state.kitId = getKitIdFromUrl();
         state.email = getSignedInEmail();
 
@@ -372,7 +379,7 @@
 
         try {
             const progressPayload = await fetchKitProgress(state.kitId);
-            state.responses = progressPayload?.responses || {};
+            state.responses = { ...progressPayload?.responses, ...identityDraft };
             state.completedActivities = progressPayload?.completedActivities || {};
             state.progressLoaded = true;
             renderPage();
@@ -391,11 +398,17 @@
             const nextAuth = getStoredAuthRaw();
             if (nextAuth === previousAuth) return;
             previousAuth = nextAuth;
+            const identityDraft = {};
+            if (getSignedInEmail() === state.email && state.content?.activities?.[getCurrentActivityIndex()]?.identityLessonVersion) {
+                document.querySelectorAll("#worksheet-host .worksheet-answer-input").forEach((input) => {
+                    identityDraft[input.getAttribute("data-question-id")] = input.value;
+                });
+            }
             window.clearTimeout(state.saveTimerId);
             state.progressLoaded = false;
             state.responses = {};
             state.completedActivities = {};
-            void init();
+            void init(identityDraft);
         });
     }
 
