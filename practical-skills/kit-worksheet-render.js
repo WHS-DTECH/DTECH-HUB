@@ -134,6 +134,15 @@
                                     <h3>${index + 1}. ${escapeHtml(destination.title)}</h3>
                                     <p>Directory entry: <strong>${escapeHtml(destination.subject)}</strong></p>
                                     <a class="treasure-map-rescue" href="${escapeHtml(destination.url)}" target="_blank" rel="noopener noreferrer">Stuck finding the site? Open ${escapeHtml(destination.subject)}</a>
+                                    ${destination.id === "dtech" ? `
+                                        <aside class="treasure-map-search" aria-label="Google shortcut to DTECH">
+                                            <h4>Take a shortcut to DTECH!</h4>
+                                            <p>You can bypass the school pathway and Google the DTECH learning site instead. Search using these keywords:</p>
+                                            <p class="treasure-map-search-keywords">Pringle DTECH</p>
+                                            <p>Choose the <strong>DTECH - Miss Pringle</strong> result on the Westland High School Google Sites website.</p>
+                                            <a class="worksheet-btn worksheet-btn-secondary" href="https://www.google.com/search?q=Pringle+DTECH" target="_blank" rel="noopener noreferrer">Google Pringle DTECH</a>
+                                        </aside>
+                                    ` : ""}
                                     ${clueInput(destination)}
                                     ${destination.id === "dtech" ? `
                                         <label for="hunt-course">Which DTECH course are you doing? Choose your year and course, as shown in User Profile.</label>

@@ -773,6 +773,31 @@ body.kit-worksheet-page {
     }
 }
 
+.treasure-map-search {
+    padding: 18px;
+    border: 2px solid #20374a;
+    border-left-width: 8px;
+    border-radius: 12px;
+    background: #ffe7a3;
+    color: #20374a;
+    box-shadow: 0 3px 0 #896535;
+}
+
+.treasure-map-search h4 {
+    margin: 0 0 10px;
+    font-size: 1.15rem;
+}
+
+.treasure-map-search .treasure-map-search-keywords {
+    display: inline-block;
+    padding: 10px 16px;
+    border-radius: 8px;
+    background: #20374a;
+    color: #fff8e8;
+    font-size: clamp(1.2rem, 3vw, 1.5rem);
+    font-weight: 800;
+}
+
 .worksheet-hunt-form,
 .treasure-map-island-body,
 [data-hunt-course-clues] {

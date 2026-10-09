@@ -25,6 +25,9 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   Food & Hospitality, Physical Education, then the main DTECH site.
   The pathway stays below the Set sail heading as a high-contrast navy-and-gold
   numbered route, stacking vertically on mobile without sideways scrolling.
+  DTECH Treasure Island also has a standout Google shortcut box: students can
+  bypass the school pathway by searching Pringle DTECH, with a new-tab search
+  link and guidance to choose the school's DTECH - Miss Pringle result.
   The original decorative SVG map has a dotted trail, compass, ship and X marks;
   the responsive cards retain readable labels and keyboard-accessible links.
   School Google authentication may be required by linked sites.

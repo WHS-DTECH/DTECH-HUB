@@ -113,6 +113,10 @@ async function main() {
     assert.match(rendererSource, /Westland High Website<\/a><\/li>/);
     assert.match(rendererSource, /<strong>Intranet<\/strong><\/li>/);
     assert.match(rendererSource, /<strong>Learning Sites<\/strong><\/li>/);
+    assert.match(rendererSource, /<aside class="treasure-map-search" aria-label="Google shortcut to DTECH">/);
+    assert.match(rendererSource, /You can bypass the school pathway and Google the DTECH learning site instead/);
+    assert.match(rendererSource, /href="https:\/\/www\.google\.com\/search\?q=Pringle\+DTECH" target="_blank" rel="noopener noreferrer"/);
+    assert.match(rendererSource, /class="treasure-map-search-keywords">Pringle DTECH<\/p>/);
     assert.match(rendererSource, /data-hunt-island/);
     assert.match(rendererSource, /Treasure unlocked! 8 \/ 8 correct/);
     assert.ok(fs.existsSync(path.join(__dirname, "..", "images", "learning-sites-treasure-map.svg")));
