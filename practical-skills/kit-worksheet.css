@@ -441,6 +441,20 @@ body.kit-worksheet-page {
     color: #ffffff;
 }
 
+.worksheet-status-pill[href] {
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.worksheet-status-pill[href]:hover {
+    text-decoration: underline;
+}
+
+.worksheet-status-pill[href]:focus-visible {
+    outline: 3px solid #1d4e89;
+    outline-offset: 3px;
+}
+
 .worksheet-actions {
     display: flex;
     gap: 8px;

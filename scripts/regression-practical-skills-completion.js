@@ -304,6 +304,8 @@ async function main() {
             if (!nodes.has(id)) {
                 nodes.set(id, {
                     hidden: true,
+                    setAttribute(name, value) { this[name] = value; },
+                    removeAttribute(name) { delete this[name]; },
                     after() {},
                     querySelector() { return { before() {} }; },
                     classList: { toggle() {}, remove() {} },
@@ -345,8 +347,11 @@ async function main() {
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(nodes.get("worksheet-complete-bar").hidden, true, "Kit completion must not appear inside an activity");
     assert.equal(nodes.get("worksheet-activity-complete-bar").hidden, false);
+    assert.equal(nodes.get("worksheet-activity-status-pill").href, undefined, "Incomplete activity status must not be a link");
     await events["worksheet-activity-complete-btn:click"]();
     assert.equal(nodes.get("worksheet-activity-status-pill").textContent, "Completed");
+    assert.equal(nodes.get("worksheet-activity-status-pill").href, "./kit-worksheet.html?kit=kit-login");
+    assert.match(nodes.get("worksheet-activity-status-pill")["aria-label"], /return to kit activity menu/);
     assert.equal(nodes.get("worksheet-activity-complete-btn").textContent, "Undo Completion");
 
     failSave = true;
@@ -367,6 +372,7 @@ async function main() {
     await new Promise((resolve) => setImmediate(resolve));
     await events["worksheet-activity-complete-btn:click"]();
     assert.equal(nodes.get("worksheet-activity-status-pill").textContent, "Not Completed");
+    assert.equal(nodes.get("worksheet-activity-status-pill").href, undefined, "Undo must remove the completion link");
 
     let worksheetOptions;
     let assessmentTicks = {};
@@ -398,6 +404,8 @@ async function main() {
     failSave = false;
     await worksheetOptions.onAssessmentCheck(answers);
     assert.equal(nodes.get("worksheet-activity-status-pill").textContent, "Completed");
+    assert.equal(nodes.get("worksheet-activity-status-pill").href, "./kit-worksheet.html?kit=kit-login",
+        "Self-marked completion must link to the same kit menu");
     vm.runInNewContext(fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet.js"), "utf8"), browserContext);
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(nodes.get("worksheet-activity-status-pill").textContent, "Completed");
@@ -494,6 +502,7 @@ async function main() {
     assert.match(feedbackNodes[2].textContent, /step 5/);
     assert.match(interactiveHost.innerHTML, /Check your answers/);
     const worksheetPage = fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet.html"), "utf8");
+    assert.match(worksheetPage, /<a id="worksheet-activity-status-pill"/, "Use a native link for keyboard navigation");
     assert.match(worksheetPage, /worksheet-question-number" aria-hidden="true">5</);
     const worksheetScript = fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet.js"), "utf8");
     assert.match(worksheetScript, /querySelector\("#identity-result"\)\.before\(verification\)/);

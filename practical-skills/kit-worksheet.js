@@ -145,6 +145,15 @@
         const selfMarking = Boolean(state.content?.activities?.[index]?.assessment || state.content?.activities?.[index]?.identityLessonVersion);
         pill.textContent = completed ? "Completed" : "Not Completed";
         pill.classList.toggle("is-complete", completed);
+        if (completed) {
+            pill.setAttribute("href", `./kit-worksheet.html?kit=${encodeURIComponent(state.kitId)}`);
+            pill.setAttribute("aria-label", "Completed - return to kit activity menu");
+            pill.setAttribute("title", "Return to kit activity menu");
+        } else {
+            pill.removeAttribute("href");
+            pill.removeAttribute("aria-label");
+            pill.removeAttribute("title");
+        }
         button.textContent = completed ? "Undo Completion" : "Mark Activity Complete";
         button.disabled = !state.progressLoaded;
         button.hidden = selfMarking && !completed;
