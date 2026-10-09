@@ -774,6 +774,96 @@ body.kit-worksheet-page {
     }
 }
 
+.worksheet-login-staircase {
+    margin: 24px 0;
+}
+
+.login-staircase-list {
+    list-style: none;
+    padding: 0;
+    display: grid;
+    gap: 18px;
+}
+
+.login-staircase-step {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 18px;
+    margin-left: calc(var(--stair-index) * 18px);
+    padding: 20px;
+    border: 2px solid #2f8f61;
+    border-bottom-width: 8px;
+    border-radius: 14px 14px 4px 4px;
+    background: #fff;
+    box-shadow: 0 5px 0 #e4d4b0;
+}
+
+.login-staircase-description h3 {
+    margin: 0 0 8px;
+    font-weight: 800;
+}
+
+.login-staircase-description p {
+    margin: 0;
+    line-height: 1.5;
+}
+
+.login-staircase-years {
+    display: grid;
+    gap: 6px;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+
+.login-staircase-logo {
+    display: grid;
+    gap: 8px;
+    justify-items: center;
+    padding: 10px;
+    border: 2px solid #e4d4b0;
+    border-radius: 12px;
+    color: #174968;
+    text-align: center;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.login-staircase-logo img {
+    width: 100%;
+    max-width: 110px;
+    height: 72px;
+    object-fit: contain;
+}
+
+.login-staircase-logo:hover {
+    background: #fff3d3;
+    border-color: #2f8f61;
+}
+
+.login-staircase-logo:focus-visible {
+    outline: 3px solid #174968;
+    outline-offset: 4px;
+}
+
+@media (max-width: 560px) {
+    .login-staircase-step {
+        margin-left: calc(var(--stair-index) * 3px);
+        grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr);
+        gap: 8px;
+        padding: 12px 8px;
+        font-size: 0.85rem;
+    }
+
+    .login-staircase-logo {
+        padding: 6px;
+    }
+
+    .login-staircase-years {
+        font-size: 0.75rem;
+    }
+}
+
 .treasure-map-search {
     display: grid;
     gap: 12px;

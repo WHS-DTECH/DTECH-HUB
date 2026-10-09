@@ -533,7 +533,7 @@
         const responses = options.responses || {};
         const readOnly = Boolean(options.readOnly);
         const theme = content?.theme || {};
-        const questions = Array.isArray(content?.questions) ? content.questions : [];
+        const questions = content?.loginSites ? [] : Array.isArray(content?.questions) ? content.questions : [];
         const images = Array.isArray(content?.images) ? content.images : [];
 
         host.style.setProperty("--worksheet-theme-color", theme.color || "#2f8f61");
@@ -572,6 +572,26 @@
                 </section>
             ` : ""}
             ${content?.assessment ? renderAssessment(content.assessment, options.assessmentAnswers || {}, readOnly) : ""}
+            ${content?.loginSites ? `
+                <section class="worksheet-login-staircase" aria-labelledby="login-staircase-title">
+                    <h2 id="login-staircase-title">Step into your learning websites</h2>
+                    <p>Each step introduces a website used in DTECH. Click its logo to open it in a new tab, keeping this activity open.</p>
+                    <p>These are the general websites for now. Your teacher will give you a class link or code when needed. Follow your teacher's sign-in instructions; never share your password.</p>
+                    <ol class="login-staircase-list">
+                        ${content.loginSites.map((site, index) => `
+                            <li class="login-staircase-step" style="--stair-index: ${index}">
+                                <div class="login-staircase-description"><h3>${escapeHtml(site.name)}</h3><p>${escapeHtml(site.description)}</p></div>
+                                <div class="login-staircase-years"><strong>${escapeHtml(site.group)}</strong><span>${escapeHtml(site.years)}</span></div>
+                                <a class="login-staircase-logo" href="${escapeHtml(site.url)}" target="_blank" rel="noopener noreferrer" aria-label="Open ${escapeHtml(site.name)} in a new tab">
+                                    <img src="${escapeHtml(site.logo)}" alt="${escapeHtml(site.name)} logo" referrerpolicy="no-referrer">
+                                    <span>Open ${escapeHtml(site.name)} &nearr;</span>
+                                </a>
+                            </li>
+                        `).join("")}
+                    </ol>
+                    <p>When you have explored the websites for your year group, use <strong>Mark Activity Complete</strong> below to save your tick.</p>
+                </section>
+            ` : ""}
             <div class="worksheet-question-list">
                 ${questions.length ? questions.map((question, index) => `
                     <article class="worksheet-question">
@@ -582,7 +602,7 @@
                             ${content?.identityLessonVersion ? `<p class="worksheet-assessment-feedback" data-identity-feedback="${escapeHtml(question.id)}" role="status" aria-live="polite">Type your answer. We will check it against your school Google account.</p>` : ""}
                         </div>
                     </article>
-                `).join("") : content?.assessment ? "" : `<p class="worksheet-empty-note">This kit does not have any questions yet.</p>`}
+                `).join("") : content?.assessment || content?.loginSites ? "" : `<p class="worksheet-empty-note">This kit does not have any questions yet.</p>`}
             </div>
             ${content?.identityLessonVersion ? `<p class="worksheet-assessment-result" id="identity-result" role="status" aria-live="polite">${options.identityVerified ? "Google sign-in is ready. Click Check your answers to mark all four answers." : "Complete questions 1-4, verify your school email in step 5, then click Check your answers."}</p><button type="button" class="worksheet-btn worksheet-btn-primary" id="identity-retry" ${readOnly ? "disabled" : ""}>Check your answers</button>` : ""}
         `;

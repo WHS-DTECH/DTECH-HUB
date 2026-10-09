@@ -25,6 +25,12 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   their saved answers/ticks remain intact, but do not count in the activity list.
   Old hidden activity URLs open the kit list; the merged Drive URL still opens
   the combined sign-in activity. The overall kit remains named Login Kit.
+  Using your login details displays a five-step, three-column website staircase:
+  Tinkercad, SketchUp Education and Gamefroot for JuniorDTECH (Years 7/8);
+  Code Avengers and CodeCombat for MiddleDTECH (Years 9/10). Official brand
+  images/icons link to generic websites in new tabs; class links/codes come later.
+  Legacy question data is preserved but not displayed in this activity.
+  Completion is student-confirmed, not automatically inferred from opening links.
 - Implemented: Open DTECH Learning Site / Open DTECH-HUB in the Login Kit now
   includes a five-island pirate-map treasure hunt. Students follow Westland High
   Website > Intranet > Learning Sites, visit Science, Mrs O'Malley's English,

@@ -72,6 +72,16 @@ async function main() {
     assert.match(shortKitHost.innerHTML, /Using your login details/);
     assert.doesNotMatch(shortKitHost.innerHTML, /activity=5"/);
     assert.match(shortKitHost.innerHTML, /activity=6"/);
+    assert.deepEqual(shortKit.activities[6].loginSites.map((site) => site.name), ["Tinkercad", "Code Avengers", "SketchUp Education", "Gamefroot", "CodeCombat"]);
+    shortKitRenderer.window.KitWorksheetRender.renderWorksheet(shortKitHost, {
+        bannerTitle: "Using your login details", loginSites: shortKit.activities[6].loginSites,
+        questions: [{ id: "legacy", prompt: "Old Kamar question" }]
+    }, { readOnly: true });
+    assert.equal((shortKitHost.innerHTML.match(/class="login-staircase-step"/g) || []).length, 5);
+    assert.equal((shortKitHost.innerHTML.match(/target="_blank" rel="noopener noreferrer"/g) || []).length, 5);
+    assert.doesNotMatch(shortKitHost.innerHTML, /Old Kamar question|does not have any questions/);
+    assert.match(shortKitHost.innerHTML, /Years 7\/8/);
+    assert.match(shortKitHost.innerHTML, /Years 9\/10/);
     const worksheetSource = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "kit-worksheet.js"), "utf8");
     const routing = worksheetSource.slice(worksheetSource.indexOf("    function getActivityIndexFromUrl()"), worksheetSource.indexOf("    function getStoredAuthRaw()"));
     for (const [index, expected] of [[4, 1], [5, null], [6, 6], [9, null]]) {

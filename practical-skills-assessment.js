@@ -3,6 +3,13 @@ const { LEARNING_SITES_ID, withLearningSitesActivity, getLearningSitesAssessment
 
 const PASSWORD_PROBLEMS_ID = "password-problems-v1";
 const APPS_WORDSEARCH_ID = "apps-wordsearch-v1";
+const loginSites = [
+  { name: "Tinkercad", description: "Design 3D models, explore electronic circuits and try coding in your browser.", group: "JuniorDTECH", years: "Years 7/8", url: "https://www.tinkercad.com/", logo: "https://www.tinkercad.com/img/tinkercad-logo.png" },
+  { name: "Code Avengers", description: "Learn programming, web development and digital skills through guided lessons.", group: "MiddleDTECH", years: "Years 9/10", url: "https://www.codeavengers.com/", logo: "https://www.codeavengers.com/dist/assets/images/favicon/android-chrome-192x192.png" },
+  { name: "SketchUp Education", description: "Build 3D models of buildings, rooms and other designs using SketchUp for Schools.", group: "JuniorDTECH", years: "Years 7/8", url: "https://edu.sketchup.com/", logo: "https://edu.sketchup.com/favicon.ico" },
+  { name: "Gamefroot", description: "Create games, animations and interactive stories using visual coding.", group: "JuniorDTECH", years: "Years 7/8", url: "https://gamefroot.com/", logo: "https://make.gamefroot.com/favicon.png" },
+  { name: "CodeCombat", description: "Learn Python or JavaScript by writing code to guide a hero through game challenges.", group: "MiddleDTECH", years: "Years 9/10", url: "https://codecombat.com/", logo: "https://codecombat.com/images/pages/base/logo_square_250.png" }
+];
 
 const appWords = [
   { word: "DOCS", provider: "Google", use: "Write documents and stories.", row: 0, column: 0, dr: 0, dc: 1 },
@@ -36,7 +43,7 @@ function withShortLoginKit(kitId, content) {
     const visible = index === loginIndex || Boolean(activities[index]?.identityLessonVersion) ||
       [APPS_WORDSEARCH_ID, PASSWORD_PROBLEMS_ID, LEARNING_SITES_ID].includes(activities[index]?.assessmentId);
     if (index === loginIndex) {
-      activities[index] = { ...activities[index], title: "Using your login details" };
+      activities[index] = { ...activities[index], title: "Using your login details", loginSites };
       return { ...worksheet, activity: "Using your login details", hidden: false };
     }
     return { ...worksheet, hidden: !visible };

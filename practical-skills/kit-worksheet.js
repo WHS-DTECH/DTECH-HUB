@@ -239,6 +239,7 @@
                 questions,
                 images,
                 information: activity?.information,
+                loginSites: activity?.loginSites,
                 identityLessonVersion: activity?.identityLessonVersion,
                 assessment: activity?.assessment
             } : state.content;
