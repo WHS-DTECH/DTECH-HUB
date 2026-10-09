@@ -775,6 +775,9 @@ body.kit-worksheet-page {
 }
 
 .treasure-map-search {
+    display: grid;
+    gap: 12px;
+    min-width: 0;
     padding: 18px;
     border: 2px solid #20374a;
     border-left-width: 8px;
@@ -785,7 +788,7 @@ body.kit-worksheet-page {
 }
 
 .treasure-map-search h4 {
-    margin: 0 0 10px;
+    margin: 0;
     font-size: 1.15rem;
 }
 
@@ -797,6 +800,14 @@ body.kit-worksheet-page {
     color: #fff8e8;
     font-size: clamp(1.2rem, 3vw, 1.5rem);
     font-weight: 800;
+    justify-self: start;
+}
+
+.treasure-map-search .worksheet-btn {
+    display: inline-block;
+    justify-self: start;
+    box-sizing: border-box;
+    max-width: 100%;
 }
 
 .worksheet-hunt-form,
