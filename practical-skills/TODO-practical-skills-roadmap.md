@@ -19,6 +19,21 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
 
 ## 3. Kit Detail / Checklist Behavior
 
+- Implemented: Login Kit combines Google/Microsoft sign-in and opening Drive
+  into one School Apps Explorer activity. Its interactive, keyboard-accessible
+  word search teaches Docs/Word, Sheets/Excel, Slides/PowerPoint and Drive/OneDrive.
+  Students find all eight names, set up Google Drive and confirm school Microsoft
+  OneDrive access, then check answers to save a completion tick. Microsoft access
+  is explicitly student-confirmed, not automatically verified.
+  The Login Kit reuses the hub's Google Drive consent flow but calls a separate
+  setup endpoint that creates/reuses only `My Drive/WHS-DTECH`, with anyone-with-
+  the-link Editor access. Students are warned to store class work only.
+  Setup is stored separately in `student_login_drive_setup`; it does not create
+  senior folders or unlock the senior Template Library. The homepage Drive Ready
+  button and its existing SeniorDTECH/Process Assessment setup are unchanged.
+  The old Drive worksheet is hidden in the student overview and its URL opens
+  the combined activity. Its content, answer keys and indexes remain intact;
+  no existing student responses or activity ticks are deleted/reindexed.
 - Implemented: students self-mark each worksheet using `Mark Activity Complete`.
   The kit overview shows saved completion ticks and a completed-activity count.
   Activity completion timestamps are stored per student and kit in

@@ -14,7 +14,9 @@
         progressWritePromise: Promise.resolve(),
         actionsWired: false,
         signInWatcherId: 0,
-        saveTimerId: 0
+        saveTimerId: 0,
+        driveSetup: null,
+        driveSetupInProgress: false
     };
 
     function normalizeEmail(value) {
@@ -29,7 +31,9 @@
     function getActivityIndexFromUrl() {
         const value = new URLSearchParams(window.location.search || "").get("activity");
         if (value === null || !/^\d+$/.test(value)) return null;
-        return Number.parseInt(value, 10);
+        const index = Number.parseInt(value, 10);
+        const mergedInto = state.content?.worksheets?.[index]?.mergedInto;
+        return Number.isInteger(mergedInto) ? mergedInto : index;
     }
 
     function getStoredAuthRaw() {
@@ -235,6 +239,31 @@
                 backHref: isActivity ? `./kit-worksheet.html?kit=${encodeURIComponent(state.kitId)}` : "",
                 eyebrow: isActivity ? state.content.bannerTitle : "",
                 identityVerified: Boolean(JSON.parse(getStoredAuthRaw() || "{}").idToken),
+                driveSetup: state.driveSetup,
+                onDriveSetup: async () => {
+                    if (!state.progressLoaded) throw new Error("Your progress has not loaded. Refresh the page and try again.");
+                    if (!window.requestHubDriveAccessToken) throw new Error("Google sign-in is still loading. Wait a moment and try again.");
+                    const email = state.email;
+                    state.driveSetupInProgress = true;
+                    try {
+                        const token = await window.requestHubDriveAccessToken({ forceConsent: true });
+                        if (token?.error || !token?.access_token) throw new Error("Google Drive permission was not granted. Try again, or ask your teacher for help.");
+                        if (getSignedInEmail() !== email) throw new Error("Your signed-in account changed. Reopen this activity with your school account.");
+                        const setup = await loadJson("/api/student/login-drive-setup", {
+                            method: "POST",
+                            headers: withAuthHeaders({ "Content-Type": "application/json" }),
+                            body: JSON.stringify({ driveAccessToken: token.access_token })
+                        });
+                        state.driveSetup = setup;
+                        return setup;
+                    } finally {
+                        state.driveSetupInProgress = false;
+                    }
+                },
+                onAssessmentChange: (answers) => {
+                    state.responses[`${activityIndex}-${activity.assessment.id}`] = answers;
+                    queueResponseSave();
+                },
                 onIdentityCheck: async (answers) => {
                     if (!state.progressLoaded) throw new Error("Your progress has not loaded. Refresh the page and try again.");
                     return queueProgressWrite(async () => {
@@ -265,7 +294,7 @@
                         state.responses[`${activityIndex}-${activity.assessment.id}`] = payload.answers;
                         state.completedActivities = payload.completedActivities;
                         updateActivityCompleteBar();
-                        if (payload.passed) showStatusMessage("Password detective complete! Your activity tick has been saved.");
+                        if (payload.passed) showStatusMessage("Activity complete! Your activity tick has been saved.");
                         return payload;
                     });
                 },
@@ -393,6 +422,21 @@
             state.progressLoaded = true;
             renderPage();
             updateCompleteBar(progressPayload?.kit);
+            if (state.content?.activities?.[getCurrentActivityIndex()]?.assessment?.id === "apps-wordsearch-v1") {
+                const email = state.email;
+                try {
+                    const setup = await loadJson("/api/student/login-drive-setup", { headers: withAuthHeaders() });
+                    if (state.email === email) {
+                        state.driveSetup = setup;
+                        const status = document.querySelector("[data-login-drive-status]");
+                        const link = document.querySelector("[data-login-drive-link]");
+                        if (status && setup.ready) status.textContent = "Drive Ready! Your WHS-DTECH folder and Editor sharing are set up.";
+                        if (link && setup.ready) { link.href = setup.folderUrl; link.hidden = false; }
+                    }
+                } catch (error) {
+                    if (state.email === email) showStatusMessage(error.message || "Could not load your WHS-DTECH setup. Use the setup button to retry.", true);
+                }
+            }
         } catch (error) {
             renderPage();
             showStatusMessage(error?.message || "Could not load your saved progress.", true);
@@ -407,6 +451,7 @@
             const nextAuth = getStoredAuthRaw();
             if (nextAuth === previousAuth) return;
             previousAuth = nextAuth;
+            if (state.driveSetupInProgress && getSignedInEmail() === state.email) return;
             const identityDraft = {};
             if (getSignedInEmail() === state.email && state.content?.activities?.[getCurrentActivityIndex()]?.identityLessonVersion) {
                 document.querySelectorAll("#worksheet-host .worksheet-answer-input").forEach((input) => {
@@ -417,6 +462,7 @@
             state.progressLoaded = false;
             state.responses = {};
             state.completedActivities = {};
+            state.driveSetup = null;
             void init(identityDraft);
         });
     }

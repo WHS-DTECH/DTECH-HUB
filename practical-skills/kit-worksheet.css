@@ -455,6 +455,42 @@ body.kit-worksheet-page {
     outline-offset: 3px;
 }
 
+.worksheet-wordsearch {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 3px;
+    width: 100%;
+    max-width: 480px;
+}
+
+.worksheet-wordsearch button {
+    min-width: 0;
+    aspect-ratio: 1;
+    padding: 0;
+    border: 1px solid #dac9a4;
+    border-radius: 4px;
+    background: #fff;
+    color: #1e3025;
+    font: bold clamp(0.75rem, 3vw, 1rem) monospace;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.worksheet-wordsearch button.is-found {
+    background: #d9f2e2;
+}
+
+.worksheet-wordsearch button[aria-pressed="true"],
+.worksheet-wordsearch button:focus-visible {
+    outline: 2px solid #1d4e89;
+    outline-offset: -2px;
+}
+
+.worksheet-app-word-list .is-found {
+    color: #216e40;
+    text-decoration: line-through;
+}
+
 .worksheet-actions {
     display: flex;
     gap: 8px;

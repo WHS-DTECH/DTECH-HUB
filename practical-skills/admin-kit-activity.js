@@ -102,6 +102,8 @@
         document.querySelector("#activity-page-summary").textContent = establishesInput.value || "Configure the student tasks and supporting images for this worksheet.";
         const assessmentNote = document.querySelector("#activity-assessment-note");
         assessmentNote.hidden = activity.assessmentId !== "password-problems-v1";
+        document.querySelector("#activity-apps-note").hidden = activity.assessmentId !== "apps-wordsearch-v1";
+        document.querySelector("#activity-merged-note").hidden = worksheet.mergedInto === undefined;
         document.querySelector("#activity-identity-note").hidden = !activity.identityLessonVersion;
         document.querySelector("#activity-information").hidden = !activity.information;
         document.querySelector("#activity-information-title").textContent = activity.information?.title || "";

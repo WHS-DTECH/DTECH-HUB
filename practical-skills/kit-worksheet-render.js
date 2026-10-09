@@ -52,6 +52,7 @@
     }
 
     function renderAssessment(assessment, answers, readOnly) {
+        if (assessment.id === "apps-wordsearch-v1") return renderAppsAssessment(assessment, answers, readOnly);
         return `
             <section class="worksheet-assessment" aria-labelledby="assessment-title">
                 <div class="worksheet-assessment-intro">
@@ -94,6 +95,159 @@
                 </form>
             </section>
         `;
+    }
+
+    function renderAppsAssessment(assessment, answers, readOnly) {
+        return `
+            <section class="worksheet-assessment worksheet-apps-explorer" aria-labelledby="assessment-title">
+                <div class="worksheet-assessment-intro">
+                    <h2 id="assessment-title">${escapeHtml(assessment.title)}</h2>
+                    <p>${escapeHtml(assessment.introduction)}</p>
+                    <h3>1. Sign in and get your drives ready</h3>
+                    <p>Use your school email for Google and Microsoft. Google Drive and Microsoft OneDrive store files online; they are not the same drive.</p>
+                    <div class="worksheet-actions">
+                        <button type="button" class="worksheet-btn worksheet-btn-primary" data-login-drive-setup ${readOnly ? "disabled" : ""}>Set up Google Drive (Drive Ready)</button>
+                        <a class="worksheet-btn worksheet-btn-secondary" href="https://www.microsoft365.com/launch/onedrive" target="_blank" rel="noopener noreferrer">Open Microsoft OneDrive</a>
+                    </div>
+                    <p>Google setup creates or reuses just one folder: <strong>WHS-DTECH</strong> in My Drive. We will add class folders later.</p>
+                    <p class="worksheet-safety-note">WHS-DTECH will be shared with anyone with the link as Editor, so DTECH-HUB can work with your files. Only store class work here, not private information. Do not share the link publicly. Never enter a password into this activity.</p>
+                    <p class="worksheet-assessment-result" data-login-drive-status role="status" aria-live="polite"></p>
+                    <a class="worksheet-btn worksheet-btn-secondary" data-login-drive-link target="_blank" rel="noopener noreferrer" hidden>Open your WHS-DTECH folder</a>
+                </div>
+                <form class="worksheet-apps-form">
+                    <fieldset class="worksheet-assessment-inputs" ${readOnly ? "disabled" : ""}>
+                        <legend class="worksheet-assessment-heading">2. Explore Google and Microsoft apps</legend>
+                        <label class="worksheet-assessment-choice">
+                            <input type="checkbox" data-microsoft-ready ${answers.microsoftReady ? "checked" : ""}>
+                            <span>I signed in to Microsoft OneDrive with my school account and can see my files. (This is your confirmation, not an automatic Microsoft check.)</span>
+                        </label>
+                        <ul class="worksheet-app-word-list">${assessment.words.map((app) => `
+                            <li data-app-word="${escapeHtml(app.word)}"><strong>${escapeHtml(app.word)}</strong> - ${escapeHtml(app.provider)}: ${escapeHtml(app.use)}</li>
+                        `).join("")}</ul>
+                        <p id="wordsearch-instructions">Find all eight names. Click or tap the first letter, then the last letter. Words run across or down, and can be selected in either direction. With a keyboard, Tab to a letter and press Enter or Space.</p>
+                        <div class="worksheet-wordsearch" role="group" aria-label="Apps word search" aria-describedby="wordsearch-instructions">
+                            ${assessment.grid.map((row, r) => Array.from(row).map((letter, c) => `
+                                <button type="button" data-word-cell="${r},${c}" aria-label="Row ${r + 1}, column ${c + 1}, ${letter}" aria-pressed="false">${letter}</button>
+                            `).join("")).join("")}
+                        </div>
+                        <p data-wordsearch-status role="status" aria-live="polite"></p>
+                        <button type="button" class="worksheet-btn worksheet-btn-secondary" data-wordsearch-reset>Clear found words</button>
+                    </fieldset>
+                    <button type="submit" class="worksheet-btn worksheet-btn-primary" ${readOnly ? "disabled" : ""}>Check my answers</button>
+                    <p class="worksheet-assessment-result" role="status" aria-live="polite">Get both drives ready and find all eight apps, then check your answers.</p>
+                </form>
+            </section>
+        `;
+    }
+
+    function wireAppsAssessment(host, assessment, options) {
+        const form = host.querySelector(".worksheet-apps-form");
+        const result = form.querySelector(".worksheet-assessment-result");
+        const inputs = form.querySelector("fieldset");
+        const checkButton = form.querySelector("button[type=submit]");
+        const microsoft = form.querySelector("[data-microsoft-ready]");
+        const status = form.querySelector("[data-wordsearch-status]");
+        const paths = {};
+        let start = null;
+        const readWord = (path) => path.map(([r, c]) => assessment.grid[r]?.[c] || "").join("");
+        for (const app of assessment.words) {
+            const path = options.assessmentAnswers?.paths?.[app.word];
+            if (Array.isArray(path) && path.length === app.word.length && path.every((cell) =>
+                Array.isArray(cell) && cell.length === 2 && cell.every((value) => Number.isInteger(value) && value >= 0 && value < 12)
+            ) && [app.word, Array.from(app.word).reverse().join("")].includes(readWord(path))) paths[app.word] = path;
+        }
+        const answers = () => ({ paths: { ...paths }, microsoftReady: microsoft.checked });
+        const update = (message = "") => {
+            const found = new Set(Object.values(paths).flat().map((cell) => cell.join(",")));
+            form.querySelectorAll("[data-word-cell]").forEach((cell) => {
+                const id = cell.getAttribute("data-word-cell");
+                cell.classList.toggle("is-found", found.has(id));
+                cell.setAttribute("aria-pressed", String(found.has(id) || id === start?.join(",")));
+            });
+            form.querySelectorAll("[data-app-word]").forEach((word) => {
+                word.classList.toggle("is-found", Boolean(paths[word.getAttribute("data-app-word")]));
+            });
+            status.textContent = `${Object.keys(paths).length} / 8 words found. ${message}`;
+        };
+        const changed = () => {
+            options.onAssessmentChange?.(answers());
+            result.classList.remove("is-correct", "is-error");
+            result.textContent = "Changes saved when you pause. Check your answers when you are ready.";
+        };
+        form.querySelectorAll("[data-word-cell]").forEach((cell) => cell.addEventListener("click", () => {
+            const end = cell.getAttribute("data-word-cell").split(",").map(Number);
+            if (!start) {
+                start = end;
+                update("Now select the last letter.");
+                return;
+            }
+            const dr = end[0] - start[0];
+            const dc = end[1] - start[1];
+            const length = Math.max(Math.abs(dr), Math.abs(dc)) + 1;
+            const path = Array.from({ length }, (_, i) => [start[0] + Math.sign(dr) * i, start[1] + Math.sign(dc) * i]);
+            start = null;
+            const word = readWord(path);
+            const match = (dr === 0 || dc === 0) && assessment.words.find((app) =>
+                app.word === word || app.word === Array.from(word).reverse().join("")
+            );
+            if (!match) { update("Not an app name yet. Try another first and last letter!"); return; }
+            paths[match.word] = path;
+            changed();
+            update(`Ka pai! You found ${match.word}.`);
+        }));
+        form.querySelector("[data-wordsearch-reset]").addEventListener("click", () => {
+            Object.keys(paths).forEach((word) => delete paths[word]);
+            start = null;
+            changed();
+            update();
+        });
+        microsoft.addEventListener("change", changed);
+        update();
+        const driveButton = host.querySelector("[data-login-drive-setup]");
+        const driveStatus = host.querySelector("[data-login-drive-status]");
+        const driveLink = host.querySelector("[data-login-drive-link]");
+        const updateDrive = (setup) => {
+            driveStatus.textContent = setup?.ready ? "Drive Ready! Your WHS-DTECH folder and Editor sharing are set up." : "Use the Google Drive setup button above to get ready.";
+            driveLink.hidden = !setup?.ready;
+            if (setup?.ready) driveLink.href = setup.folderUrl;
+        };
+        updateDrive(options.driveSetup);
+        driveButton.addEventListener("click", async () => {
+            driveButton.disabled = true;
+            driveStatus.classList.remove("is-error");
+            driveStatus.textContent = "Requesting Google permission and setting up WHS-DTECH...";
+            try {
+                if (!options.onDriveSetup) throw new Error("Open the student activity to set up Google Drive.");
+                updateDrive(await options.onDriveSetup());
+            } catch (error) {
+                driveStatus.classList.add("is-error");
+                driveStatus.textContent = error.message || "Could not set up Google Drive. Please try again.";
+            } finally {
+                driveButton.disabled = false;
+            }
+        });
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            if (checkButton.disabled) return;
+            checkButton.disabled = true;
+            inputs.disabled = true;
+            result.classList.remove("is-error", "is-correct");
+            result.textContent = "Checking and saving your answers...";
+            try {
+                if (!options.onAssessmentCheck) throw new Error("Open the student activity to check your answers.");
+                const grade = await options.onAssessmentCheck(answers());
+                result.classList.toggle("is-correct", grade.passed);
+                result.textContent = grade.passed
+                    ? "Ka pai! All eight apps found, both drives ready. Your completion tick is saved."
+                    : `${grade.score} / ${grade.total} tasks complete. ${grade.results.filter((entry) => !entry.correct).map((entry) => entry.explanation).join(" ")}`;
+            } catch (error) {
+                result.classList.add("is-error");
+                result.textContent = error.message || "Could not check or save your answers. Please try again.";
+            } finally {
+                checkButton.disabled = false;
+                inputs.disabled = false;
+            }
+        });
     }
 
     function wireAssessment(host, options) {
@@ -211,7 +365,8 @@
 
         if (readOnly) return;
 
-        if (content?.assessment) wireAssessment(host, options);
+        if (content?.assessment?.id === "apps-wordsearch-v1") wireAppsAssessment(host, content.assessment, options);
+        else if (content?.assessment) wireAssessment(host, options);
 
         if (content?.identityLessonVersion) {
             let timer;
@@ -304,7 +459,9 @@
         const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
         const activities = Array.isArray(content?.activities) ? content.activities : [];
         const completedActivities = options.completedActivities || {};
-        const completedCount = worksheets.filter((_worksheet, index) => Boolean(completedActivities[index])).length;
+        const visibleWorksheets = worksheets.map((worksheet, index) => ({ worksheet, index }))
+            .filter(({ worksheet }) => worksheet.mergedInto === undefined);
+        const completedCount = visibleWorksheets.filter(({ index }) => Boolean(completedActivities[index])).length;
 
         host.style.setProperty("--worksheet-theme-color", theme.color || "#2f8f61");
         host.style.setProperty("--worksheet-accent-color", theme.accent || "#ffd166");
@@ -324,10 +481,10 @@
             ` : ""}
             <section class="worksheet-activities" aria-labelledby="worksheet-activities-title">
                 <h2 id="worksheet-activities-title">Activities</h2>
-                <p class="worksheet-activity-progress">${completedCount} / ${worksheets.length} activities completed</p>
-                ${worksheets.length ? `
+                <p class="worksheet-activity-progress">${completedCount} / ${visibleWorksheets.length} activities completed</p>
+                ${visibleWorksheets.length ? `
                     <ol class="worksheet-activity-list">
-                        ${worksheets.map((worksheet, index) => {
+                        ${visibleWorksheets.map(({ worksheet, index }) => {
                             const activity = activities[index] || {};
                             const title = activity.title || worksheet.activity || `Activity ${index + 1}`;
                             const establishes = activity.establishes || worksheet.establishes || "";

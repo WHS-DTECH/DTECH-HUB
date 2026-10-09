@@ -1,6 +1,77 @@
 "use strict";
 
 const PASSWORD_PROBLEMS_ID = "password-problems-v1";
+const APPS_WORDSEARCH_ID = "apps-wordsearch-v1";
+
+const appWords = [
+  { word: "DOCS", provider: "Google", use: "Write documents and stories.", row: 0, column: 0, dr: 0, dc: 1 },
+  { word: "WORD", provider: "Microsoft", use: "Write documents and stories.", row: 2, column: 1, dr: 0, dc: 1 },
+  { word: "SHEETS", provider: "Google", use: "Organise data, calculate and make charts.", row: 4, column: 0, dr: 0, dc: 1 },
+  { word: "EXCEL", provider: "Microsoft", use: "Organise data, calculate and make charts.", row: 6, column: 1, dr: 0, dc: 1 },
+  { word: "SLIDES", provider: "Google", use: "Create presentations.", row: 8, column: 0, dr: 0, dc: 1 },
+  { word: "POWERPOINT", provider: "Microsoft", use: "Create presentations.", row: 10, column: 0, dr: 0, dc: 1 },
+  { word: "DRIVE", provider: "Google", use: "Store, organise and share your files online.", row: 0, column: 11, dr: 1, dc: 0 },
+  { word: "ONEDRIVE", provider: "Microsoft", use: "Store, organise and share your files online.", row: 3, column: 10, dr: 1, dc: 0 }
+];
+const wordsearchGrid = Array.from({ length: 12 }, (_, row) =>
+  Array.from({ length: 12 }, (_, column) => "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[(row * 17 + column * 7 + 3) % 26])
+);
+for (const app of appWords) {
+  Array.from(app.word).forEach((letter, index) => {
+    wordsearchGrid[app.row + index * app.dr][app.column + index * app.dc] = letter;
+  });
+}
+
+function withLoginAppsActivity(kitId, content) {
+  if (kitId !== "kit-login" || !Array.isArray(content?.worksheets)) return content;
+  const index = content.worksheets.findIndex((worksheet, i) =>
+    content.activities?.[i]?.appsLessonVersion === 1 || /^sign[ -]?in\b/i.test(String(worksheet?.activity || "").trim())
+  );
+  if (index < 0) return content;
+  const worksheets = content.worksheets.slice();
+  const activities = Array.isArray(content.activities) ? content.activities.slice() : [];
+  if (activities[index]?.appsLessonVersion !== 1) {
+    worksheets[index] = { ...worksheets[index], activity: "Sign In - Google, Microsoft & Your Drives", establishes: "Use your school accounts, set up WHS-DTECH and recognise everyday apps" };
+    activities[index] = {
+      ...activities[index],
+      title: worksheets[index].activity,
+      establishes: worksheets[index].establishes,
+      appsLessonVersion: 1,
+      assessmentId: APPS_WORDSEARCH_ID
+    };
+  }
+  const driveIndex = worksheets.findIndex((worksheet) => /^open google drive\b/i.test(String(worksheet?.activity || "").trim()));
+  if (driveIndex >= 0 && driveIndex !== index) {
+    worksheets[driveIndex] = { ...worksheets[driveIndex], mergedInto: index };
+  }
+  return { ...content, worksheets, activities };
+}
+
+function gradeAppsWordsearch(answers, driveReady) {
+  const cleanAnswers = { paths: {}, microsoftReady: answers?.microsoftReady === true };
+  const results = appWords.map((app) => {
+    const path = answers?.paths?.[app.word];
+    let correct = Array.isArray(path) && path.length === app.word.length && path.every((cell) =>
+      Array.isArray(cell) && cell.length === 2 && cell.every((value) => Number.isInteger(value) && value >= 0 && value < 12)
+    );
+    if (correct) {
+      const dr = path[1][0] - path[0][0];
+      const dc = path[1][1] - path[0][1];
+      const word = path.map(([r, c]) => wordsearchGrid[r][c]).join("");
+      correct = Math.abs(dr) + Math.abs(dc) === 1 &&
+        path.every(([r, c], i) => r === path[0][0] + dr * i && c === path[0][1] + dc * i) &&
+        [app.word, Array.from(app.word).reverse().join("")].includes(word);
+    }
+    if (correct) cleanAnswers.paths[app.word] = path;
+    return { id: app.word, correct, explanation: `${correct ? "" : `Find ${app.word} in the word search. `}${app.provider} ${app.word === "ONEDRIVE" ? "OneDrive" : app.word}: ${app.use}` };
+  });
+  results.push(
+    { id: "google-drive", correct: Boolean(driveReady), explanation: driveReady ? "Your WHS-DTECH folder is ready with anyone-with-the-link Editor sharing." : "Use Set up Google Drive to create or confirm your WHS-DTECH folder and sharing first." },
+    { id: "microsoft", correct: cleanAnswers.microsoftReady, explanation: "Open OneDrive with your school Microsoft account, then tick the confirmation. Ask your teacher if your account is not available." }
+  );
+  const score = results.filter((result) => result.correct).length;
+  return { assessmentId: APPS_WORDSEARCH_ID, score, total: results.length, passed: score === results.length, results, answers: cleanAnswers };
+}
 
 const passwordProblems = {
   id: PASSWORD_PROBLEMS_ID,
@@ -132,6 +203,13 @@ function withLoginIdentityActivity(kitId, content) {
 }
 
 function getStudentAssessment(assessmentId) {
+  if (assessmentId === APPS_WORDSEARCH_ID) return {
+    id: APPS_WORDSEARCH_ID,
+    title: "School apps explorer",
+    introduction: "Google and Microsoft have apps that do similar jobs. Sign in with your school accounts, get your drives ready, then find eight app names to earn your completion tick.",
+    grid: wordsearchGrid.map((row) => row.join("")),
+    words: appWords.map(({ word, provider, use }) => ({ word, provider, use }))
+  };
   if (assessmentId !== PASSWORD_PROBLEMS_ID) return null;
   return {
     ...passwordProblems,
@@ -182,4 +260,4 @@ function gradeLoginIdentity(answers, identity, questions) {
   return { score, total: 4, passed: score === 4, results, answers: cleanAnswers, identityLesson: true };
 }
 
-module.exports = { PASSWORD_PROBLEMS_ID, withPasswordProblemsActivity, withLoginIdentityActivity, getStudentAssessment, gradePasswordProblems, gradeLoginIdentity };
+module.exports = { PASSWORD_PROBLEMS_ID, APPS_WORDSEARCH_ID, withLoginAppsActivity, withPasswordProblemsActivity, withLoginIdentityActivity, getStudentAssessment, gradePasswordProblems, gradeLoginIdentity, gradeAppsWordsearch };

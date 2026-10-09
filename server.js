@@ -5,7 +5,7 @@ const multer = require("multer");
 const mammoth = require("mammoth");
 const nodemailer = require("nodemailer");
 const { Pool } = require("pg");
-const { PASSWORD_PROBLEMS_ID, withPasswordProblemsActivity, withLoginIdentityActivity, getStudentAssessment, gradePasswordProblems, gradeLoginIdentity } = require("./practical-skills-assessment");
+const { PASSWORD_PROBLEMS_ID, APPS_WORDSEARCH_ID, withLoginAppsActivity, withPasswordProblemsActivity, withLoginIdentityActivity, getStudentAssessment, gradePasswordProblems, gradeLoginIdentity, gradeAppsWordsearch } = require("./practical-skills-assessment");
 
 let OAuth2Client = null;
 try {
@@ -60,6 +60,7 @@ const memoryTrelloConnections = new Map();
 const memoryAssessmentStandardCards = new Map();
 const memoryStudentHaparaFolders = new Map();
 const memoryStudentDriveSetup = new Map();
+const memoryStudentLoginDriveSetup = new Map();
 const memoryTemplateLibraryEntries = new Map();
 const memoryStudentToolsTechniques = new Map();
 const memoryToolsTechniquesKeywords = new Map();
@@ -4391,7 +4392,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function normalizePracticalSkillsKitContentForStorage(kitId, content) {
-  const safeContent = withLoginIdentityActivity(kitId, content && typeof content === "object" ? content : {});
+  const safeContent = withLoginAppsActivity(kitId, withLoginIdentityActivity(kitId, content && typeof content === "object" ? content : {}));
   if (String(kitId || "").trim() !== "kit-login") {
     return safeContent;
   }
@@ -4464,7 +4465,7 @@ async function getStoredPracticalSkillsKitContent(kitId) {
 
   if (!hasDatabase) {
     const stored = memoryPracticalSkillsKitContent.get(safeKitId);
-    return withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, stored || getDefaultPracticalSkillsKitContent(safeKitId)));
+    return withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, stored || getDefaultPracticalSkillsKitContent(safeKitId))));
   }
 
   await ensurePracticalSkillsKitContentSchema();
@@ -4472,14 +4473,14 @@ async function getStoredPracticalSkillsKitContent(kitId) {
   const stored = result.rows?.[0]?.content;
   const defaults = getDefaultPracticalSkillsKitContent(safeKitId);
   if (!stored || !Object.keys(stored).length) {
-    return withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, defaults));
+    return withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, defaults)));
   }
 
   const merged = { ...defaults, ...stored };
   if (safeKitId === "kit-login" && (!Array.isArray(stored.worksheets) || !stored.worksheets.length)) {
     merged.worksheets = defaults.worksheets;
   }
-  return withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, merged));
+  return withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, merged)));
 }
 
 async function savePracticalSkillsKitContent(kitId, content, updatedByEmail) {
@@ -4568,7 +4569,7 @@ async function savePracticalSkillsAssessment(studentEmail, kitId, activityIndex,
   const email = normalizeEmail(studentEmail);
   await ensurePracticalSkillsProgressRow(email, kitId);
   const activityKey = String(activityIndex);
-  const responseKey = `${activityIndex}-${PASSWORD_PROBLEMS_ID}`;
+  const responseKey = `${activityIndex}-${grade.assessmentId || PASSWORD_PROBLEMS_ID}`;
   const completedAt = new Date().toISOString();
 
   if (!hasDatabase) {
@@ -7995,6 +7996,77 @@ app.patch("/api/template-library/:templateId/section", async (req, res) => {
     res.json({ ok: true, entries: nextEntries });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not move template." });
+  }
+});
+
+async function ensureStudentLoginDriveSetupSchema() {
+  if (!hasDatabase) return;
+  await pool.query(`CREATE TABLE IF NOT EXISTS student_login_drive_setup (
+    student_email TEXT PRIMARY KEY,
+    folder_id TEXT NOT NULL,
+    confirmed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
+}
+
+async function getStudentLoginDriveSetup(email) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!hasDatabase) return memoryStudentLoginDriveSetup.get(normalizedEmail) || null;
+  await ensureStudentLoginDriveSetupSchema();
+  const result = await pool.query("SELECT folder_id FROM student_login_drive_setup WHERE student_email = $1", [normalizedEmail]);
+  return result.rows?.[0] || null;
+}
+
+async function saveStudentLoginDriveSetup(email, folderId) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!hasDatabase) {
+    memoryStudentLoginDriveSetup.set(normalizedEmail, { folder_id: folderId });
+    return;
+  }
+  await ensureStudentLoginDriveSetupSchema();
+  await pool.query(`INSERT INTO student_login_drive_setup (student_email, folder_id) VALUES ($1, $2)
+    ON CONFLICT (student_email) DO UPDATE SET folder_id = EXCLUDED.folder_id, confirmed_at = NOW()`,
+  [normalizedEmail, folderId]);
+}
+
+app.get("/api/student/login-drive-setup", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email || !email.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required." }); return;
+  }
+  try {
+    const setup = await getStudentLoginDriveSetup(email);
+    res.json({ ready: Boolean(setup?.folder_id), folderUrl: setup?.folder_id ? `https://drive.google.com/drive/folders/${encodeURIComponent(setup.folder_id)}` : null });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not load your WHS-DTECH folder setup." });
+  }
+});
+
+app.post("/api/student/login-drive-setup", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email || !email.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required." }); return;
+  }
+  const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
+  if (!driveAccessToken) { res.status(400).json({ error: "Google Drive permission is required." }); return; }
+  try {
+    const identityResponse = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+      headers: { Authorization: `Bearer ${driveAccessToken}` }
+    });
+    if (!identityResponse.ok) {
+      res.status(401).json({ error: "Google Drive sign-in expired. Sign in again and retry." }); return;
+    }
+    const identity = await identityResponse.json();
+    if (!identity.email_verified || normalizeEmail(identity.email) !== email) {
+      res.status(403).json({ error: "Choose the same school Google account as your DTECH-HUB sign-in." }); return;
+    }
+    const folder = await driveEnsureFolder("root", "WHS-DTECH", driveAccessToken);
+    if (!folder?.id) throw new Error("Could not find or create your WHS-DTECH folder.");
+    const sharing = await driveEnsureAnyoneEditorPermission(folder.id, driveAccessToken);
+    if (!sharing.applied) throw new Error("Could not enable anyone-with-the-link Editor sharing. Ask your teacher for help.");
+    await saveStudentLoginDriveSetup(email, folder.id);
+    res.json({ ready: true, folderUrl: `https://drive.google.com/drive/folders/${encodeURIComponent(folder.id)}`, sharing });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not set up your WHS-DTECH folder." });
   }
 });
 
@@ -12491,8 +12563,12 @@ app.put("/api/practical-skills/progress/:kitId/activities/:activityIndex", async
       res.status(404).json({ error: "Unknown activity." });
       return;
     }
-    if (req.body.completed && (content.activities?.[activityIndex]?.assessmentId === PASSWORD_PROBLEMS_ID || content.activities?.[activityIndex]?.identityLessonVersion)) {
-      res.status(409).json({ error: "Complete the matching task and quiz, then check your answers to earn this activity tick." });
+    if (content.worksheets[activityIndex].mergedInto !== undefined) {
+      res.status(409).json({ error: "This activity is now part of Sign In - Google, Microsoft & Your Drives. Open it from the kit menu." });
+      return;
+    }
+    if (req.body.completed && (content.activities?.[activityIndex]?.assessmentId || content.activities?.[activityIndex]?.identityLessonVersion)) {
+      res.status(409).json({ error: "Complete the activity tasks, then check your answers to earn this activity tick." });
       return;
     }
     const saved = await setPracticalSkillsActivityCompletion(studentEmail, kitId, activityIndex, req.body.completed);
@@ -12524,7 +12600,7 @@ app.post("/api/practical-skills/progress/:kitId/activities/:activityIndex/check"
     const content = await getStoredPracticalSkillsKitContent(kitId);
     const activity = content?.activities?.[activityIndex];
     const identityLesson = Boolean(activity?.identityLessonVersion);
-    if (!content?.worksheets?.[activityIndex] || (!identityLesson && activity?.assessmentId !== PASSWORD_PROBLEMS_ID)) {
+    if (!content?.worksheets?.[activityIndex] || (!identityLesson && ![PASSWORD_PROBLEMS_ID, APPS_WORDSEARCH_ID].includes(activity?.assessmentId))) {
       res.status(404).json({ error: "Unknown self-marking activity." });
       return;
     }
@@ -12534,7 +12610,9 @@ app.post("/api/practical-skills/progress/:kitId/activities/:activityIndex/check"
     }
     const grade = identityLesson
       ? gradeLoginIdentity(req.body.answers, { ...req.auth_identity, email: studentEmail }, activity.questions || [])
-      : gradePasswordProblems(req.body.answers);
+      : activity.assessmentId === APPS_WORDSEARCH_ID
+        ? gradeAppsWordsearch(req.body.answers, Boolean((await getStudentLoginDriveSetup(studentEmail))?.folder_id))
+        : gradePasswordProblems(req.body.answers);
     const saved = await savePracticalSkillsAssessment(studentEmail, kitId, activityIndex, grade);
     res.json({ ...grade, completedActivities: saved.completed_activities });
   } catch (error) {

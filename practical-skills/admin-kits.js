@@ -152,7 +152,7 @@
             const row = document.createElement("tr");
             row.innerHTML = `
                 <td data-label="Number"><input type="number" class="kit-worksheet-number" data-index="${index}" min="1" value="${Number(worksheet.number) || index + 1}"></td>
-                <td data-label="Activity"><input type="text" class="kit-worksheet-activity" data-index="${index}" maxlength="120" value="${worksheet.activity || ""}"></td>
+                <td data-label="Activity"><input type="text" class="kit-worksheet-activity" data-index="${index}" maxlength="120" value="${worksheet.activity || ""}">${worksheet.mergedInto !== undefined ? `<p>Combined into activity ${worksheet.mergedInto + 1} in the student menu; retained for saved progress.</p>` : ""}</td>
                 <td data-label="What it establishes"><input type="text" class="kit-worksheet-establishes" data-index="${index}" maxlength="240" value="${worksheet.establishes || ""}"></td>
                 <td data-label="Details"><a class="button button-primary" href="/practical-skills/admin-kit-activity.html?kit=${encodeURIComponent(state.kitId)}&activity=${index}">Activity Details</a></td>
                 <td data-label="Remove"><button type="button" class="button button-secondary kit-remove-worksheet" data-index="${index}">Remove</button></td>
@@ -163,6 +163,7 @@
 
     function readFormIntoContent() {
         const worksheets = Array.from(worksheetListHost.querySelectorAll("tr")).map((row, index) => ({
+            ...state.content?.worksheets?.[index],
             number: Math.max(1, Number.parseInt(row.querySelector(".kit-worksheet-number")?.value, 10) || index + 1),
             activity: row.querySelector(".kit-worksheet-activity")?.value || "",
             establishes: row.querySelector(".kit-worksheet-establishes")?.value || ""
@@ -278,6 +279,10 @@
             const worksheets = readFormIntoContent().worksheets;
             const index = Number(button.getAttribute("data-index"));
             worksheets.splice(index, 1);
+            worksheets.forEach((worksheet) => {
+                if (worksheet.mergedInto === index) delete worksheet.mergedInto;
+                else if (worksheet.mergedInto > index) worksheet.mergedInto -= 1;
+            });
             if (Array.isArray(state.content.activities)) state.content.activities.splice(index, 1);
             state.content.worksheets = worksheets;
             renderWorksheetList();

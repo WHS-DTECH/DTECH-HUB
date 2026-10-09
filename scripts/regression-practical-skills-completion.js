@@ -258,6 +258,16 @@ async function main() {
     context.hasDatabase = true;
     await context.savePracticalSkillsAssessment(realIdentity.email, "kit-login", 0, identityGrade);
     assert.equal(queries.at(-1).values[7], true, "Identity answers use ordinary worksheet response keys");
+    const appsGrade = { assessmentId: assessment.APPS_WORDSEARCH_ID, passed: true, answers: { paths: {}, microsoftReady: true } };
+    context.hasDatabase = false;
+    const appsRow = await context.savePracticalSkillsAssessment(realIdentity.email, "kit-login", 1, appsGrade);
+    assert.equal(appsRow.responses["1-apps-wordsearch-v1"].microsoftReady, true);
+    assert.equal(appsRow.responses.q1, "m_smithjones2", "Apps marking must preserve identity answers");
+    assert.ok(appsRow.completed_activities["1"]);
+    context.hasDatabase = true;
+    await context.savePracticalSkillsAssessment(realIdentity.email, "kit-login", 1, appsGrade);
+    assert.equal(queries.at(-1).values[0], "1-apps-wordsearch-v1");
+    assert.equal(queries.at(-1).values[7], false);
     context.SCHOOL_EMAIL_DOMAIN = "example.school.nz";
     context.getStoredPracticalSkillsKitContent = async () => enhanced;
     context.savePracticalSkillsAssessment = async () => { throw new Error("Database unavailable"); };
