@@ -122,6 +122,20 @@ async function main() {
         assert.equal(grade.toolResults.filter((result) => result.correct).length, 3);
     }
     assert.match(shortKitHost.innerHTML, /data-site-check="sketchup"/);
+    assert.match(shortKitHost.innerHTML, /https:\/\/codecombat.com\/students\?_cc=ShortDrawFast/);
+    assert.match(shortKitHost.innerHTML, /data-site-check="codecombat"/);
+    for (const answer of ["Python", " python ", "PYTHON!"]) {
+        const grade = assessment.gradeLoginSites({ ...sketchupAnswers, codecombat: answer });
+        assert.equal(grade.answers.codecombatReady, true);
+        assert.equal(grade.answers.sketchupReady, true);
+        assert.equal(grade.answers.tinkercadReady, true);
+        assert.equal(grade.answers.codeavengersReady, true);
+        assert.equal(grade.score, 4);
+        assert.equal(grade.passed, false);
+    }
+    for (const answer of ["JavaScript", "", ["Python"], "Not Python"]) {
+        assert.equal(assessment.gradeLoginSites({ codecombat: answer, codecombatReady: true }).answers.codecombatReady, false);
+    }
     assert.equal((shortKitHost.innerHTML.match(/class="login-site-tool"/g) || []).length, 4);
     for (let number = 1; number <= 4; number += 1) {
         assert.ok(fs.existsSync(path.join(__dirname, "..", "images", "Activites", `sketchup-tool-${number}.png`)));

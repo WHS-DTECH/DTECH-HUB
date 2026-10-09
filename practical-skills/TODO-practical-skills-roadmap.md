@@ -49,6 +49,11 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   feedback; all four correct saves the SketchUp site tick alongside existing
   site evidence. Capitalisation, optional "tool" and Push/Pull separators are
   ignored. Image labels and filenames do not reveal the answer.
+  CodeCombat uses the supplied ShortDrawFast class link and asks for the
+  programming language shown beside WHS-DTECH under Current Classes (Python).
+  A correct answer saves its readiness tick without starting a level. Gamefroot
+  remains a generic link with no question; whole-activity completion remains
+  student-confirmed while individual checks save server-marked evidence.
 - Implemented: Open DTECH Learning Site / Open DTECH-HUB in the Login Kit now
   includes a five-island pirate-map treasure hunt. Students follow Westland High
   Website > Intranet > Learning Sites, visit Science, Mrs O'Malley's English,

@@ -578,7 +578,7 @@
                 <section class="worksheet-login-staircase" aria-labelledby="login-staircase-title">
                     <h2 id="login-staircase-title">Step into your learning websites</h2>
                     <p>Each step introduces a website used in DTECH. Click its logo to open it in a new tab, keeping this activity open.</p>
-                    <p>Tinkercad opens your class link; the other links open the general websites for now. Follow your teacher's sign-in instructions; never share your password.</p>
+                    <p>${juniorLoginSites ? "Tinkercad opens your class link" : "Tinkercad and CodeCombat open your class links"}; the other links open the general websites. Follow your teacher's sign-in instructions; never share your password.</p>
                     ${juniorLoginSites ? "<p>Showing the JuniorDTECH websites for your Year 7/8 profile.</p>" : ""}
                     <ol class="login-staircase-list">
                         ${loginSites.map((site) => `

@@ -13,7 +13,7 @@ const loginSites = [
     tools: [1, 2, 3, 4].map((number) => ({ id: `sketchup-tool-${number}`, image: `../images/Activites/sketchup-tool-${number}.png`, label: `Tool ${number}` }))
   } },
   { name: "Gamefroot", description: "Create games, animations and interactive stories using visual coding.", group: "JuniorDTECH", years: "Years 7/8", url: "https://gamefroot.com/", logo: "https://make.gamefroot.com/favicon.png" },
-  { name: "CodeCombat", description: "Learn Python or JavaScript by writing code to guide a hero through game challenges.", group: "MiddleDTECH", years: "Years 9/10", url: "https://codecombat.com/", logo: "https://codecombat.com/images/pages/base/logo_square_250.png" }
+  { name: "CodeCombat", description: "Learn programming by writing code to guide a hero through game challenges.", group: "MiddleDTECH", years: "Years 9/10", url: "https://codecombat.com/students?_cc=ShortDrawFast", logo: "https://codecombat.com/images/pages/base/logo_square_250.png", readinessQuestion: { id: "codecombat", prompt: "What is the programming language that you will use?", hint: "Sign in and look under Current Classes. Read the language in brackets beside WHS-DTECH. You do not need to press Start or play a level." } }
 ];
 
 function gradeLoginSites(answers) {
@@ -33,6 +33,8 @@ function gradeLoginSites(answers) {
     return { id, correct: toolCorrect, explanation: toolCorrect ? "Correct - ka pai!" : "Hover over this icon in the SketchUp toolbar and try its name again." };
   });
   const sketchupCorrect = toolResults.every((result) => result.correct);
+  const codeCombat = typeof answers?.codecombat === "string" ? answers.codecombat.slice(0, 200) : "";
+  const codeCombatCorrect = codeCombat.trim().toLowerCase().replace(/[.!?]+$/, "") === "python";
   const results = [
     { id: "tinkercad", correct, explanation: correct
       ? "Tinkercad readiness check saved! No need to make a design today."
@@ -42,11 +44,14 @@ function gradeLoginSites(answers) {
       : "Try again: switch to Pro, filter for Python and copy the topic name from the Python 1 card." },
     { id: "sketchup", correct: sketchupCorrect, explanation: sketchupCorrect
       ? "SketchUp readiness check saved! All four tool names are correct. No drawing needed today."
-      : `${toolResults.filter((result) => result.correct).length} / 4 tool names correct. Hover over the toolbar icons and try again.` }
+      : `${toolResults.filter((result) => result.correct).length} / 4 tool names correct. Hover over the toolbar icons and try again.` },
+    { id: "codecombat", correct: codeCombatCorrect, explanation: codeCombatCorrect
+      ? "CodeCombat readiness check saved! No need to start a level today."
+      : "Try again: look under Current Classes and read the language in brackets beside WHS-DTECH." }
   ];
   return {
     assessmentId: LOGIN_SITES_ID, passed: false, score: results.filter((result) => result.correct).length, total: results.length,
-    answers: { tinkercad: value, tinkercadReady: correct, codeavengers: codeAvengers, codeavengersReady: codeAvengersCorrect, ...sketchupAnswers, sketchupReady: sketchupCorrect },
+    answers: { tinkercad: value, tinkercadReady: correct, codeavengers: codeAvengers, codeavengersReady: codeAvengersCorrect, ...sketchupAnswers, sketchupReady: sketchupCorrect, codecombat: codeCombat, codecombatReady: codeCombatCorrect },
     results, toolResults
   };
 }
