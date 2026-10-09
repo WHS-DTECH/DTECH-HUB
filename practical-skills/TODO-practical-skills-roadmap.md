@@ -41,6 +41,14 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   suffixes. Existing username answer IDs are retained. The versioned content
   update replaces the legacy three-question activity once, preserves images,
   and allows subsequent teacher edits without reseeding the questions.
+- Activity 1 is self-marking against the verified Google account's given name,
+  family name and actual email/username (not a generated WHS username).
+  Feedback appears after a pause in typing, with a retry button for connection
+  errors. All four correct answers atomically save a completion tick. Case and
+  surrounding whitespace are ignored; surname punctuation and username suffixes
+  must match. Missing Google name fields require help from school IT rather than
+  guessing a name from the email. Google token verification must be configured
+  on the server for these checks.
 - Use clear kit states:
   - `not_started`
   - `in_progress`

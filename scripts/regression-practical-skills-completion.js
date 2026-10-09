@@ -166,6 +166,24 @@ async function main() {
     assert.match(guide, /m_smithjones/);
     assert.match(guide, /administration error/);
     assert.match(guide, /deactivated/);
+    const identityQuestions = identity.activities[0].questions;
+    const realIdentity = { givenName: "Mia", familyName: "Smith-Jones", email: "m_smithjones2@westlandhigh.school.nz" };
+    const identityAnswers = {
+        "identity-first-name": " mia ",
+        "identity-last-name": "SMITH-JONES",
+        q1: "m_smithjones2",
+        "identity-email": "M_SMITHJONES2@WESTLANDHIGH.SCHOOL.NZ"
+    };
+    assert.equal(assessment.gradeLoginIdentity(identityAnswers, realIdentity, identityQuestions).passed, true);
+    assert.equal(assessment.gradeLoginIdentity({ ...identityAnswers, q1: "m_smithjones" }, realIdentity, identityQuestions).score, 3);
+    assert.equal(assessment.gradeLoginIdentity({ ...identityAnswers, "identity-last-name": "SmithJones" }, realIdentity, identityQuestions).passed, false);
+    assert.equal(assessment.gradeLoginIdentity({}, realIdentity, identityQuestions).score, 0);
+    assert.throws(() => assessment.gradeLoginIdentity(identityAnswers, { ...realIdentity, familyName: "" }, identityQuestions), /missing name details/);
+    const exceptionalAccount = { givenName: "Vanessa", familyName: "Pringle", email: "vanessapringle@westlandhigh.school.nz" };
+    assert.equal(assessment.gradeLoginIdentity({
+        "identity-first-name": "Vanessa", "identity-last-name": "Pringle",
+        q1: "vanessapringle", "identity-email": exceptionalAccount.email
+    }, exceptionalAccount, identityQuestions).passed, true);
 
     context.hasDatabase = false;
     let saved = await context.savePracticalSkillsAssessment("student@example.school.nz", "kit-login", 1, partial);
@@ -180,7 +198,7 @@ async function main() {
     context.hasDatabase = true;
     await context.savePracticalSkillsAssessment("student@example.school.nz", "kit-login", 1, pass);
     update = queries.at(-1);
-    assert.match(update.sql, /responses = jsonb_set/);
+    assert.match(update.sql, /ELSE jsonb_set\(responses/);
     assert.match(update.sql, /completed_activities = CASE WHEN \$5::boolean/);
     assert.equal(update.values[4], true);
     await context.savePracticalSkillsAssessment("student@example.school.nz", "kit-login", 1, partial);
@@ -219,6 +237,29 @@ async function main() {
     assert.equal((await check({ email: "" })).code, 401);
     assert.equal((await check({ body: { answers: [] } })).code, 400);
     assert.equal((await check({ params: { kitId: "kit-login", activityIndex: "0" } })).code, 404);
+    context.getStoredPracticalSkillsKitContent = async () => identity;
+    assert.equal((await check({ params: { kitId: "kit-login", activityIndex: "0" } })).code, 401);
+    context.SCHOOL_EMAIL_DOMAIN = "westlandhigh.school.nz";
+    const identityChecked = await check({
+        params: { kitId: "kit-login", activityIndex: "0" },
+        auth_identity: { verified: true, givenName: "Mia", familyName: "Smith-Jones" },
+        email: realIdentity.email,
+        body: { answers: identityAnswers }
+    });
+    assert.equal(identityChecked.body.passed, true);
+    assert.equal(storedGrade.identityLesson, true);
+    context.hasDatabase = false;
+    const identityGrade = assessment.gradeLoginIdentity(identityAnswers, realIdentity, identityQuestions);
+    const originalSave = extract("async function savePracticalSkillsAssessment(", "async function ensureStudentHaparaFoldersSchema(");
+    vm.runInContext(originalSave, context);
+    const identityRow = await context.savePracticalSkillsAssessment(realIdentity.email, "kit-login", 0, identityGrade);
+    assert.equal(identityRow.responses.q1, "m_smithjones2");
+    assert.ok(identityRow.completed_activities["0"]);
+    context.hasDatabase = true;
+    await context.savePracticalSkillsAssessment(realIdentity.email, "kit-login", 0, identityGrade);
+    assert.equal(queries.at(-1).values[7], true, "Identity answers use ordinary worksheet response keys");
+    context.SCHOOL_EMAIL_DOMAIN = "example.school.nz";
+    context.getStoredPracticalSkillsKitContent = async () => enhanced;
     context.savePracticalSkillsAssessment = async () => { throw new Error("Database unavailable"); };
     assert.equal((await check()).code, 500, "Do not award ticks when saving fails");
 
@@ -358,6 +399,51 @@ async function main() {
     vm.runInNewContext(fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet.js"), "utf8"), browserContext);
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(nodes.get("worksheet-activity-status-pill").textContent, "Completed");
+    const inputEvents = {};
+    const identityInputs = identityQuestions.map((question) => ({
+        value: identityAnswers[question.id],
+        getAttribute: () => question.id,
+        addEventListener: (event, callback) => { inputEvents[`${question.id}:${event}`] = callback; }
+    }));
+    const feedbackNodes = identityQuestions.map((question) => ({
+        classList: { remove() {}, toggle() {} },
+        getAttribute: () => question.id
+    }));
+    const resultNode = { classList: { remove() {}, toggle() {}, add() {} } };
+    let retry;
+    let pendingCheck;
+    const interactiveHost = {
+        style: { setProperty() {} },
+        querySelector: (selector) => selector === "#identity-result" ? resultNode : {
+            addEventListener: (_event, callback) => { retry = callback; }
+        },
+        querySelectorAll: (selector) => selector === ".worksheet-answer-input" ? identityInputs : feedbackNodes
+    };
+    rendererContext.window.clearTimeout = () => {};
+    rendererContext.window.setTimeout = (callback) => { pendingCheck = callback; };
+    let identityCheckFail = false;
+    rendererContext.window.KitWorksheetRender.renderWorksheet(interactiveHost, {
+        questions: identityQuestions,
+        identityLessonVersion: 1
+    }, {
+        onIdentityCheck: async (values) => {
+            if (identityCheckFail) throw new Error("Connection failed");
+            return assessment.gradeLoginIdentity(values, realIdentity, identityQuestions);
+        }
+    });
+    identityInputs[2].value = "wrong";
+    inputEvents["q1:input"]();
+    await pendingCheck();
+    assert.match(feedbackNodes[2].textContent, /before @/);
+    assert.match(resultNode.textContent, /3 \/ 4/);
+    identityInputs[2].value = "m_smithjones2";
+    inputEvents["q1:input"]();
+    await pendingCheck();
+    assert.match(resultNode.textContent, /completion tick is saved/);
+    identityCheckFail = true;
+    retry();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(resultNode.textContent, "Connection failed");
     console.log("Practical Skills completion regression checks passed.");
 }
 

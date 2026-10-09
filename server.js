@@ -5,7 +5,7 @@ const multer = require("multer");
 const mammoth = require("mammoth");
 const nodemailer = require("nodemailer");
 const { Pool } = require("pg");
-const { PASSWORD_PROBLEMS_ID, withPasswordProblemsActivity, withLoginIdentityActivity, getStudentAssessment, gradePasswordProblems } = require("./practical-skills-assessment");
+const { PASSWORD_PROBLEMS_ID, withPasswordProblemsActivity, withLoginIdentityActivity, getStudentAssessment, gradePasswordProblems, gradeLoginIdentity } = require("./practical-skills-assessment");
 
 let OAuth2Client = null;
 try {
@@ -4576,7 +4576,7 @@ async function savePracticalSkillsAssessment(studentEmail, kitId, activityIndex,
     const existing = memoryPracticalSkillsProgress.get(key);
     const next = {
       ...existing,
-      responses: { ...existing.responses, [responseKey]: grade.answers },
+      responses: grade.identityLesson ? { ...existing.responses, ...grade.answers } : { ...existing.responses, [responseKey]: grade.answers },
       completed_activities: {
         ...existing.completed_activities,
         ...(grade.passed ? { [activityKey]: completedAt } : {})
@@ -4589,13 +4589,14 @@ async function savePracticalSkillsAssessment(studentEmail, kitId, activityIndex,
 
   const result = await pool.query(
     `UPDATE practical_skills_progress
-     SET responses = jsonb_set(responses, ARRAY[$1::text], $2::jsonb),
+     SET responses = CASE WHEN $8::boolean THEN responses || $2::jsonb
+           ELSE jsonb_set(responses, ARRAY[$1::text], $2::jsonb) END,
          completed_activities = CASE WHEN $5::boolean
            THEN jsonb_set(completed_activities, ARRAY[$3::text], to_jsonb($4::text))
            ELSE completed_activities END,
          updated_at = NOW()
      WHERE student_email = $6 AND kit_id = $7 RETURNING *`,
-    [responseKey, JSON.stringify(grade.answers), activityKey, completedAt, grade.passed, email, kitId]
+    [responseKey, JSON.stringify(grade.answers), activityKey, completedAt, grade.passed, email, kitId, Boolean(grade.identityLesson)]
   );
   if (!result.rows?.[0]) throw new Error("Activity progress could not be saved.");
   return result.rows[0];
@@ -5004,6 +5005,8 @@ app.use(async (req, _res, next) => {
   req.auth_identity.source = "google_id_token";
   req.auth_identity.email = verification.email;
   req.auth_identity.subject = verification.subject;
+  req.auth_identity.givenName = verification.givenName;
+  req.auth_identity.familyName = verification.familyName;
   req.auth_identity.audience = verification.audience;
   req.auth_identity.issuer = verification.issuer;
   req.authenticated_email = verification.email;
@@ -5564,6 +5567,8 @@ async function verifyGoogleIdTokenAndExtractIdentity(idToken) {
       email,
       hostedDomain,
       subject: String(payload?.sub || "").trim(),
+      givenName: String(payload?.given_name || "").trim(),
+      familyName: String(payload?.family_name || "").trim(),
       audience: String(payload?.aud || "").trim(),
       issuer: String(payload?.iss || "").trim()
     };
@@ -12486,7 +12491,7 @@ app.put("/api/practical-skills/progress/:kitId/activities/:activityIndex", async
       res.status(404).json({ error: "Unknown activity." });
       return;
     }
-    if (req.body.completed && content.activities?.[activityIndex]?.assessmentId === PASSWORD_PROBLEMS_ID) {
+    if (req.body.completed && (content.activities?.[activityIndex]?.assessmentId === PASSWORD_PROBLEMS_ID || content.activities?.[activityIndex]?.identityLessonVersion)) {
       res.status(409).json({ error: "Complete the matching task and quiz, then check your answers to earn this activity tick." });
       return;
     }
@@ -12517,11 +12522,19 @@ app.post("/api/practical-skills/progress/:kitId/activities/:activityIndex/check"
 
   try {
     const content = await getStoredPracticalSkillsKitContent(kitId);
-    if (!content?.worksheets?.[activityIndex] || content.activities?.[activityIndex]?.assessmentId !== PASSWORD_PROBLEMS_ID) {
+    const activity = content?.activities?.[activityIndex];
+    const identityLesson = Boolean(activity?.identityLessonVersion);
+    if (!content?.worksheets?.[activityIndex] || (!identityLesson && activity?.assessmentId !== PASSWORD_PROBLEMS_ID)) {
       res.status(404).json({ error: "Unknown self-marking activity." });
       return;
     }
-    const grade = gradePasswordProblems(req.body.answers);
+    if (identityLesson && !req.auth_identity?.verified) {
+      res.status(401).json({ error: "Sign in again with Google so we can check your answers against your real school account." });
+      return;
+    }
+    const grade = identityLesson
+      ? gradeLoginIdentity(req.body.answers, { ...req.auth_identity, email: studentEmail }, activity.questions || [])
+      : gradePasswordProblems(req.body.answers);
     const saved = await savePracticalSkillsAssessment(studentEmail, kitId, activityIndex, grade);
     res.json({ ...grade, completedActivities: saved.completed_activities });
   } catch (error) {

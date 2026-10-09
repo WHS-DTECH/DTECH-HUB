@@ -595,12 +595,16 @@ body.kit-worksheet-page {
     font-weight: 700;
 }
 
-.worksheet-assessment .is-correct {
+.worksheet-assessment .is-correct,
+.worksheet-assessment-feedback.is-correct,
+.worksheet-assessment-result.is-correct {
     background: #edf8ef;
     color: #175c38;
 }
 
-.worksheet-assessment .is-error {
+.worksheet-assessment .is-error,
+.worksheet-assessment-feedback.is-error,
+.worksheet-assessment-result.is-error {
     background: #fff0eb;
     color: #92351d;
 }

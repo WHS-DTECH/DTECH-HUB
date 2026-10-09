@@ -62,7 +62,13 @@
     }
 
     function withAuthHeaders(headers = {}) {
-        return state.email ? { ...headers, "x-user-email": state.email } : headers;
+        const next = state.email ? { ...headers, "x-user-email": state.email } : { ...headers };
+        const raw = getStoredAuthRaw();
+        if (raw) {
+            const auth = JSON.parse(raw);
+            if (auth.idToken) next.Authorization = `Bearer ${auth.idToken}`;
+        }
+        return next;
     }
 
     function showStatusMessage(message, isError = false) {
@@ -135,7 +141,7 @@
         const index = getCurrentActivityIndex();
         bar.hidden = !state.email || index === null;
         const completed = Boolean(state.completedActivities[index]);
-        const selfMarking = Boolean(state.content?.activities?.[index]?.assessment);
+        const selfMarking = Boolean(state.content?.activities?.[index]?.assessment || state.content?.activities?.[index]?.identityLessonVersion);
         pill.textContent = completed ? "Completed" : "Not Completed";
         pill.classList.toggle("is-complete", completed);
         button.textContent = completed ? "Undo Completion" : "Mark Activity Complete";
@@ -204,6 +210,7 @@
                 questions,
                 images,
                 information: activity?.information,
+                identityLessonVersion: activity?.identityLessonVersion,
                 assessment: activity?.assessment
             } : state.content;
 
@@ -212,6 +219,20 @@
                 readOnly: !state.email,
                 backHref: isActivity ? `./kit-worksheet.html?kit=${encodeURIComponent(state.kitId)}` : "",
                 eyebrow: isActivity ? state.content.bannerTitle : "",
+                onIdentityCheck: async (answers) => {
+                    if (!state.progressLoaded) throw new Error("Your progress has not loaded. Refresh the page and try again.");
+                    return queueProgressWrite(async () => {
+                        const payload = await loadJson(`/api/practical-skills/progress/${encodeURIComponent(state.kitId)}/activities/${activityIndex}/check`, {
+                            method: "POST",
+                            headers: withAuthHeaders({ "Content-Type": "application/json" }),
+                            body: JSON.stringify({ answers })
+                        });
+                        Object.assign(state.responses, payload.answers);
+                        state.completedActivities = payload.completedActivities;
+                        updateActivityCompleteBar();
+                        return payload;
+                    });
+                },
                 assessmentAnswers: activity?.assessment
                     ? state.responses[`${activityIndex}-${activity.assessment.id}`] || {}
                     : {},

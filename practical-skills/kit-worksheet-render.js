@@ -201,15 +201,67 @@
                         <div class="worksheet-question-body">
                             <p class="worksheet-question-prompt">${escapeHtml(question?.prompt || "")}</p>
                             ${renderQuestionBody(question, responses, readOnly)}
+                            ${content?.identityLessonVersion ? `<p class="worksheet-assessment-feedback" data-identity-feedback="${escapeHtml(question.id)}" role="status" aria-live="polite">Type your answer. We will check it against your school Google account.</p>` : ""}
                         </div>
                     </article>
                 `).join("") : content?.assessment ? "" : `<p class="worksheet-empty-note">This kit does not have any questions yet.</p>`}
             </div>
+            ${content?.identityLessonVersion ? `<p class="worksheet-assessment-result" id="identity-result" role="status" aria-live="polite">All four correct answers will earn your completion tick automatically.</p><button type="button" class="worksheet-btn worksheet-btn-primary" id="identity-retry" ${readOnly ? "disabled" : ""}>Check answers again</button>` : ""}
         `;
 
         if (readOnly) return;
 
         if (content?.assessment) wireAssessment(host, options);
+
+        if (content?.identityLessonVersion) {
+            let timer;
+            let revision = 0;
+            const result = host.querySelector("#identity-result");
+            const check = async () => {
+                const currentRevision = revision;
+                const answers = {};
+                host.querySelectorAll(".worksheet-answer-input").forEach((input) => {
+                    answers[input.getAttribute("data-question-id")] = input.value;
+                });
+                result.textContent = "Checking and saving your answers...";
+                result.classList.remove("is-error", "is-correct");
+                try {
+                    const grade = await options.onIdentityCheck(answers);
+                    if (currentRevision !== revision) return;
+                    host.querySelectorAll("[data-identity-feedback]").forEach((feedback) => {
+                        const marked = grade.results.find((entry) => entry.id === feedback.getAttribute("data-identity-feedback"));
+                        feedback.textContent = marked.explanation;
+                        feedback.classList.toggle("is-correct", marked.correct);
+                        feedback.classList.toggle("is-error", !marked.correct);
+                    });
+                    result.classList.toggle("is-correct", grade.passed);
+                    result.textContent = grade.passed
+                        ? "4 / 4 correct! Ka pai! Your completion tick is saved."
+                        : `${grade.score} / 4 correct. Your answers are saved. Keep going - use the hints and try again!`;
+                } catch (error) {
+                    if (currentRevision !== revision) return;
+                    result.classList.add("is-error");
+                    result.textContent = error?.message || "Could not check or save your answers. Please try again.";
+                }
+            };
+            host.querySelectorAll(".worksheet-answer-input").forEach((input) => {
+                input.addEventListener("input", () => {
+                    revision += 1;
+                    window.clearTimeout(timer);
+                    const feedback = Array.from(host.querySelectorAll("[data-identity-feedback]")).find((node) =>
+                        node.getAttribute("data-identity-feedback") === input.getAttribute("data-question-id")
+                    );
+                    feedback.classList.remove("is-correct", "is-error");
+                    feedback.textContent = "Keep going! We will check when you pause typing.";
+                    timer = window.setTimeout(check, 650);
+                });
+            });
+            host.querySelector("#identity-retry").addEventListener("click", () => {
+                window.clearTimeout(timer);
+                void check();
+            });
+            return;
+        }
 
         host.querySelectorAll(".worksheet-answer-input").forEach((textarea) => {
             textarea.addEventListener("change", () => {

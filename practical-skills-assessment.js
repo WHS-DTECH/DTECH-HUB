@@ -117,7 +117,8 @@ function withLoginIdentityActivity(kitId, content) {
         "If your last name has a hyphen (-), leave the hyphen out of the username. For example, Mia Smith-Jones becomes m_smithjones.",
         "Some students have a number at the end, such as v_pringle2. This may be because an administration error occurred when their details were entered, or because they were a previous student whose original account was deactivated. The number is part of their username.",
         "Your school email address is your assigned username followed by @westlandhigh.school.nz. For example, v_pringle becomes v_pringle@westlandhigh.school.nz, and v_pringle2 becomes v_pringle2@westlandhigh.school.nz.",
-        "Use the username you have actually been given, even if it is different from the usual pattern. If you are unsure, ask your teacher or school IT staff to confirm it. Do not remove a number or create your own username."
+        "Use the username you have actually been given, even if it is different from the usual pattern. If you are unsure, ask your teacher or school IT staff to confirm it. Do not remove a number or create your own username.",
+        "This activity checks your answers against the school Google account you are signed in with. Use the first name and family name on that account, and its actual username and email address. Capital letters and spaces at the start or end do not affect your mark."
       ]
     },
     questions: [
@@ -157,4 +158,28 @@ function gradePasswordProblems(answers) {
   return { score, total: results.length, passed: score === results.length, results, answers: cleanAnswers };
 }
 
-module.exports = { PASSWORD_PROBLEMS_ID, withPasswordProblemsActivity, withLoginIdentityActivity, getStudentAssessment, gradePasswordProblems };
+function gradeLoginIdentity(answers, identity, questions) {
+  const normalize = (value) => String(value || "").normalize("NFC").trim().replace(/\s+/g, " ").toLocaleLowerCase("en-NZ");
+  const email = normalize(identity.email);
+  const expected = [identity.givenName, identity.familyName, email.split("@")[0], email];
+  if (expected.some((value) => !normalize(value)) || questions.length !== 4) {
+    throw new Error("Your Google account is missing name details. Ask your teacher or school IT staff to check your Google profile, then sign in again.");
+  }
+  const hints = [
+    "Use your first name as it appears on your school Google account. Check the spelling and try again.",
+    "Use your family name as it appears on your school Google account, including any hyphen. Check the spelling and try again.",
+    "Your username is the part of your signed-in school email before @. Keep any underscore or number. Your assigned account may differ from the usual WHS pattern.",
+    "Use the full email address of your signed-in school Google account, including @westlandhigh.school.nz. Check for missing letters and try again."
+  ];
+  const cleanAnswers = {};
+  const results = questions.map((question, index) => {
+    const value = typeof answers?.[question.id] === "string" ? answers[question.id].slice(0, 254) : "";
+    cleanAnswers[question.id] = value;
+    const correct = normalize(value) === normalize(expected[index]);
+    return { id: question.id, correct, explanation: correct ? "Correct! You know this part of your school account. Ka pai!" : value.trim() ? hints[index] : "Have a go! Type your answer here." };
+  });
+  const score = results.filter((result) => result.correct).length;
+  return { score, total: 4, passed: score === 4, results, answers: cleanAnswers, identityLesson: true };
+}
+
+module.exports = { PASSWORD_PROBLEMS_ID, withPasswordProblemsActivity, withLoginIdentityActivity, getStudentAssessment, gradePasswordProblems, gradeLoginIdentity };

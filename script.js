@@ -2904,6 +2904,7 @@ function buildHubProfileFromIdTokenPayload(payload) {
         email_verified: payload?.email_verified !== false,
         name: String(payload?.name || payload?.given_name || payload?.email || "").trim(),
         given_name: String(payload?.given_name || "").trim(),
+        family_name: String(payload?.family_name || "").trim(),
         picture: String(payload?.picture || "").trim()
     };
 }
