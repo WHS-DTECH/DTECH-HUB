@@ -12580,6 +12580,7 @@ app.put("/api/practical-skills/progress/:kitId/activities/:activityIndex", async
 });
 
 async function getLearningSitesStudentProfile(email) {
+  if (await canManagePracticalSchedule(email)) return getHuntProfile(null, { isStaff: true });
   const rows = (await getStudentDirectoryRows()).map(buildStudentClassManagementRow)
     .filter((row) => row.linked_emails.some((linkedEmail) => normalizeEmail(linkedEmail) === email));
   if (new Set(rows.map(getStudentIdentityKey)).size > 1) {

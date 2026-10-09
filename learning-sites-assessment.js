@@ -55,7 +55,11 @@ const courses = [
         ...yearCourses.find((course) => course.id === "11DTECH"),
         id: "SENIORDTECH", years: [11, 12, 13], label: "Year 11/12/13 - SeniorDTECH"
     },
-    ...yearCourses.filter((course) => course.year >= 11)
+    ...yearCourses.filter((course) => course.year >= 11),
+    {
+        ...yearCourses.find((course) => course.id === "7DTECH"),
+        id: "STAFF", year: null, program: "STAFF", label: "Staff"
+    }
 ];
 
 function withLearningSitesActivity(kitId, content) {
@@ -82,7 +86,13 @@ function getLearningSitesAssessment() {
     };
 }
 
-function getHuntProfile(student) {
+function getHuntProfile(student, { isStaff = false } = {}) {
+    if (isStaff) {
+        return {
+            available: true, year: null, courseIds: ["STAFF"],
+            message: "Your staff access is confirmed. Choose Staff to explore the JuniorDTECH page and complete the hunt."
+        };
+    }
     const year = Number(String(student?.year_level || "").replace(/^year\s*/i, "").trim());
     const programs = Array.isArray(student?.programs) ? student.programs.map((program) => String(program).toUpperCase()) : [];
     let relevant;
@@ -123,7 +133,7 @@ function gradeLearningSites(answers, profile) {
     cleanAnswers.course = course?.id || "";
     results.push({
         id: "course", correct: courseCorrect,
-        explanation: courseCorrect ? "Correct course! It matches your User Profile timetable." :
+        explanation: courseCorrect ? course.id === "STAFF" ? "Staff access confirmed! Now explore the JuniorDTECH course page." : "Correct course! It matches your User Profile timetable." :
             profile?.available ? "That course/year does not match your User Profile. Check your profile and try again. If the profile is wrong, ask your teacher to correct it." : profile?.message || "Your course profile is unavailable. Ask your teacher for help."
     });
     for (const id of ["course-clue-1", "course-clue-2"]) {

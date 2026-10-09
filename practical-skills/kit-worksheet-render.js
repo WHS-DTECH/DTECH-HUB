@@ -145,7 +145,7 @@
                                     ` : ""}
                                     ${clueInput(destination)}
                                     ${destination.id === "dtech" ? `
-                                        <label for="hunt-course">Which DTECH course are you doing? Choose your year and course, as shown in User Profile.</label>
+                                        <label for="hunt-course">Which DTECH course are you doing? Choose your year and course, as shown in User Profile. School staff can choose Staff.</label>
                                         <select id="hunt-course" data-hunt-answer="course" aria-describedby="hunt-feedback-course">
                                             <option value="">Choose your course...</option>
                                             ${assessment.courses.map((course) => `<option value="${escapeHtml(course.id)}" ${answers.course === course.id || course.aliases?.includes(answers.course) ? "selected" : ""}>${escapeHtml(course.label)}</option>`).join("")}
@@ -216,7 +216,7 @@
                 feedback.hidden = false;
                 feedback.classList.toggle("is-correct", correct);
                 feedback.classList.toggle("is-error", !correct);
-                feedback.textContent = correct ? "This course matches your User Profile. Now hunt for its two clues!" :
+                feedback.textContent = correct ? courseSelect.value === "STAFF" ? "Staff access confirmed. Now hunt for the two JuniorDTECH clues!" : "This course matches your User Profile. Now hunt for its two clues!" :
                     options.huntProfile?.available ? "This course/year does not match your User Profile. Check your profile and choose again." :
                         options.huntProfile?.message || "Your course profile is unavailable. Ask your teacher to check it.";
             }

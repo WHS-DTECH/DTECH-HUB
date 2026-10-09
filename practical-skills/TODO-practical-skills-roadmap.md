@@ -43,6 +43,10 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   choice and remain markable. Missing/conflicting profiles cannot
   earn a tick and receive explicit teacher-help feedback. The endpoint only
   returns the signed-in student's own course information, never a student list.
+  Staff can choose Staff and complete the same eight-mark hunt using JuniorDTECH
+  clues. Both profile loading and marking confirm staff access server-side via
+  the existing Practical Schedule staff/role permission helper; selecting Staff
+  or supplying staff status in a request does not grant access to students.
   Existing teacher questions/images, answers and activity indexes are preserved.
   Page clues and links are defined in `learning-sites-assessment.js`, reviewed
   on 9 October 2026; update their marking keys when source pages change (especially

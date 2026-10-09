@@ -24,13 +24,13 @@ async function main() {
     assert.equal(hunt.withLearningSitesActivity("kit-minecraft", content), content);
     const publicHunt = assessment.getStudentAssessment(hunt.LEARNING_SITES_ID);
     assert.equal(publicHunt.destinations.length, 5);
-    assert.equal(publicHunt.courses.length, 14);
+    assert.equal(publicHunt.courses.length, 15);
     assert.deepEqual(publicHunt.courses.map((course) => course.label), [
         "Year 7 - JuniorDTECH", "Year 8 - JuniorDTECH", "Year 9/10 - MiddleDTECH",
         "Year 9 - MDTECH", "Year 9 - MPROG", "Year 10 - MDTECH", "Year 10 - MPROG",
         "Year 11/12/13 - SeniorDTECH", "Year 11 - Digital Tech (DTECH)", "Year 11 - Computing (COMP)",
         "Year 12 - Digital Tech (DTECH)", "Year 12 - Computing (COMP)",
-        "Year 13 - Digital Tech (DTECH)", "Year 13 - Computing (COMP)"
+        "Year 13 - Digital Tech (DTECH)", "Year 13 - Computing (COMP)", "Staff"
     ]);
     assert.deepEqual(publicHunt.courses.find((course) => course.id === "MIDDLEDTECH").aliases, ["9DTECH", "10DTECH"]);
     assert.ok(publicHunt.destinations.every((clue) => !("answers" in clue)));
@@ -41,6 +41,11 @@ async function main() {
     };
     const profile = hunt.getHuntProfile({ year_level: "Year 7", programs: ["DTECH"] });
     assert.equal(hunt.gradeLearningSites(answers, profile).passed, true);
+    const staffAnswers = { ...answers, course: "STAFF" };
+    assert.equal(hunt.gradeLearningSites(staffAnswers, hunt.getHuntProfile(null, { isStaff: true })).passed, true);
+    assert.equal(hunt.gradeLearningSites({ ...staffAnswers, "course-clue-1": "wrong" }, hunt.getHuntProfile(null, { isStaff: true })).score, 7);
+    assert.equal(hunt.gradeLearningSites(staffAnswers, profile).passed, false, "Student profiles cannot choose Staff");
+    assert.equal(hunt.gradeLearningSites(staffAnswers, hunt.getHuntProfile(null)).passed, false);
     assert.equal(hunt.gradeLearningSites({ ...answers, course: "8DTECH" }, profile).score, 5);
     assert.equal(hunt.gradeLearningSites({ ...answers, "course-clue-1": "wrong" }, profile).score, 7);
     assert.equal(hunt.gradeLearningSites(answers, hunt.getHuntProfile(null)).passed, false);
@@ -78,6 +83,7 @@ async function main() {
         normalizeEmail: (email) => String(email || "").trim().toLowerCase(),
         SCHOOL_EMAIL_DOMAIN: "example.school.nz",
         getStudentDirectoryRows: async () => ownRows,
+        canManagePracticalSchedule: async (email) => email === "staff@example.school.nz",
         buildStudentClassManagementRow: (row) => row,
         getStudentIdentityKey: (row) => row.id_number,
         shouldReplaceStudentSnapshot: (a, b) => b.upload_year > a.upload_year,
@@ -97,6 +103,9 @@ async function main() {
     assert.equal((await request(profileUrl)).body.available, true);
     assert.equal((await request(profileUrl, { email: "other@example.school.nz" })).body.available, false);
     assert.equal((await request(checkUrl)).body.completedActivities["1"], "saved");
+    assert.deepEqual(Array.from((await request(profileUrl, { email: "staff@example.school.nz" })).body.courseIds), ["STAFF"]);
+    assert.equal((await request(checkUrl, { email: "staff@example.school.nz", body: { answers: staffAnswers } })).body.completedActivities["1"], "saved");
+    assert.equal((await request(checkUrl, { body: { answers: staffAnswers, profile: { available: true, courseIds: ["STAFF"] }, isStaff: true } })).body.passed, false, "Client-supplied staff status is ignored");
     assert.equal((await request(checkUrl, { body: { answers: { ...answers, course: "8DTECH" }, profile: { available: true, courseIds: ["8DTECH"] } } })).body.passed, false);
     ownRows.push({ ...ownRows[0], year_level: "8", upload_year: 2027 });
     assert.equal((await request(checkUrl)).body.passed, false, "Latest profile determines the course");
@@ -142,6 +151,9 @@ async function main() {
     context.getStudentDirectoryRows = async () => { throw new Error("Profile lookup failed"); };
     assert.equal((await request(profileUrl)).code, 500);
     assert.equal((await request(checkUrl)).code, 500);
+    context.canManagePracticalSchedule = async () => { throw new Error("Staff access lookup failed"); };
+    assert.equal((await request(profileUrl, { email: "staff@example.school.nz" })).code, 500);
+    assert.equal((await request(checkUrl, { email: "staff@example.school.nz", body: { answers: staffAnswers } })).code, 500, "Failed staff lookup cannot award completion");
     console.log("Learning Sites treasure hunt regression checks passed.");
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });
