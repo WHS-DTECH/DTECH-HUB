@@ -34,6 +34,11 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   not automatically inferred from opening links. Hidden sites and sites without
   questions do not count. If no visible site has questions, manual completion
   remains available. Completion is persisted using existing activity progress.
+  Reopening an incomplete activity rechecks saved app answers against the latest
+  server configuration, awarding missing ticks for previously correct responses.
+  A visible Check Activity Completion button also grades the current fields;
+  incomplete checks name the apps still needing correct answers. Saved readiness
+  flags alone are never trusted to award completion.
   The staircase loads the signed-in user's server-derived year profile. Years
   7/8 see only the three JuniorDTECH sites; MiddleDTECH and staff retain all five.
   Without a linked year profile, the general list remains visible.

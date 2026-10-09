@@ -162,9 +162,35 @@
             pill.removeAttribute("aria-label");
             pill.removeAttribute("title");
         }
-        button.textContent = completed ? "Undo Completion" : "Mark Activity Complete";
+        button.textContent = completed ? "Undo Completion" : siteQuestions ? "Check Activity Completion" : "Mark Activity Complete";
         button.disabled = !state.progressLoaded;
-        button.hidden = selfMarking && !completed;
+        button.hidden = selfMarking && !siteQuestions && !completed;
+    }
+
+    async function checkLoginSiteCompletion(index, answers) {
+        return queueProgressWrite(async () => {
+            const payload = await loadJson(`/api/practical-skills/progress/${encodeURIComponent(state.kitId)}/activities/${index}/check`, {
+                method: "POST",
+                headers: withAuthHeaders({ "Content-Type": "application/json" }),
+                body: JSON.stringify({ answers })
+            });
+            const key = `${index}-login-sites-readiness-v1`;
+            state.responses[key] = { ...state.responses[key], ...payload.answers };
+            state.completedActivities = payload.completedActivities;
+            updateActivityCompleteBar();
+            return payload;
+        });
+    }
+
+    function showLoginSiteCompletionResult(grade) {
+        if (grade.passed) {
+            showStatusMessage("Activity complete! Your activity tick has been saved.");
+            return;
+        }
+        const sites = state.content.activities[getCurrentActivityIndex()].loginSites;
+        const remaining = grade.results.filter((result) => !result.correct).map((result) =>
+            sites.find((site) => site.readinessQuestion?.id === result.id)?.name || result.id);
+        showStatusMessage(remaining.length ? `Not completed yet. Check these app answers: ${remaining.join(", ")}.` : "No app questions are enabled. Use Mark Activity Complete after exploring the websites.");
     }
 
     function queueResponseSave() {
@@ -300,6 +326,11 @@
                 onAssessmentCheck: async (answers) => {
                     if (!state.progressLoaded) throw new Error("Your progress has not loaded. Refresh the page and try again.");
                     window.clearTimeout(state.saveTimerId);
+                    if (activity?.loginSites) {
+                        const payload = await checkLoginSiteCompletion(activityIndex, answers);
+                        showLoginSiteCompletionResult(payload);
+                        return payload;
+                    }
                     return queueProgressWrite(async () => {
                         await saveResponses(state.kitId, state.responses);
                         const payload = await loadJson(`/api/practical-skills/progress/${encodeURIComponent(state.kitId)}/activities/${activityIndex}/check`, {
@@ -307,8 +338,7 @@
                             headers: withAuthHeaders({ "Content-Type": "application/json" }),
                             body: JSON.stringify({ answers })
                         });
-                        state.responses[assessmentKey] = activity?.loginSites
-                            ? { ...state.responses[assessmentKey], ...payload.answers } : payload.answers;
+                        state.responses[assessmentKey] = payload.answers;
                         state.completedActivities = payload.completedActivities;
                         updateActivityCompleteBar();
                         if (payload.passed) showStatusMessage("Activity complete! Your activity tick has been saved.");
@@ -366,6 +396,15 @@
             activityCompleteBtn.disabled = true;
             try {
                 window.clearTimeout(state.saveTimerId);
+                const sites = state.content?.activities?.[index]?.loginSites;
+                if (completed && window.KitWorksheetRender.visibleLoginSites(sites, state.huntProfile).some((site) => site.readinessQuestion)) {
+                    const answers = { ...state.responses[`${index}-login-sites-readiness-v1`] };
+                    document.getElementById("worksheet-host").querySelectorAll("[data-site-check] input").forEach((field) => { answers[field.name] = field.value; });
+                    const grade = await checkLoginSiteCompletion(index, answers);
+                    renderPage();
+                    showLoginSiteCompletionResult(grade);
+                    return;
+                }
                 await queueProgressWrite(async () => {
                     await saveResponses(state.kitId, state.responses);
                     const payload = await loadJson(`/api/practical-skills/progress/${encodeURIComponent(state.kitId)}/activities/${index}`, {
@@ -441,8 +480,16 @@
             if (currentActivity?.assessment?.id === "learning-sites-treasure-v1" || currentActivity?.loginSites) {
                 state.huntProfile = await loadJson("/api/practical-skills/learning-sites/profile", { headers: withAuthHeaders() });
             }
+            let siteGrade;
+            const index = getCurrentActivityIndex();
+            const savedSiteAnswers = state.responses[`${index}-login-sites-readiness-v1`];
+            if (currentActivity?.loginSites && !state.completedActivities[index] && savedSiteAnswers &&
+                window.KitWorksheetRender.visibleLoginSites(currentActivity.loginSites, state.huntProfile).some((site) => site.readinessQuestion)) {
+                siteGrade = await checkLoginSiteCompletion(index, savedSiteAnswers);
+            }
             renderPage();
             updateCompleteBar(progressPayload?.kit);
+            if (siteGrade) showLoginSiteCompletionResult(siteGrade);
             if (state.content?.activities?.[getCurrentActivityIndex()]?.assessment?.id === "apps-wordsearch-v1") {
                 const email = state.email;
                 try {

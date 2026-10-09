@@ -667,7 +667,12 @@
                     const grade = await options.onAssessmentCheck(answers);
                     const marked = grade.results.find((entry) => entry.id === form.getAttribute("data-site-check"));
                     if (!marked) throw new Error("Your teacher has changed this website's settings. Reload the activity before checking again.");
-                    result.textContent = `${marked.correct ? "\u2713 " : ""}${marked.explanation}`;
+                    host.querySelectorAll("[data-site-check]").forEach((siteForm) => {
+                        const siteResult = grade.results.find((entry) => entry.id === siteForm.getAttribute("data-site-check"));
+                        siteForm.querySelector(".login-site-result").textContent = siteResult
+                            ? `${siteResult.correct ? "\u2713 " : ""}${siteResult.explanation}`
+                            : "Your teacher has changed this website's settings. Reload the activity.";
+                    });
                     form.querySelectorAll("[data-tool-feedback]").forEach((feedback) => {
                         const tool = grade.toolResults.find((entry) => entry.id === feedback.getAttribute("data-tool-feedback"));
                         if (!tool) throw new Error("Your teacher has changed the tool questions. Reload the activity before checking again.");

@@ -477,27 +477,34 @@ async function main() {
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(nodes.get("worksheet-activity-status-pill").textContent, "Completed");
     let siteTicks = {};
+    let siteResponses = { codecombatReady: true };
+    let siteChecks = 0;
     const juniorSiteAnswers = {
         tinkercad: "Circuits, 3D Designs, Codeblocks",
         "sketchup-tool-1": "Rectangle", "sketchup-tool-2": "Move", "sketchup-tool-3": "Push/Pull", "sketchup-tool-4": "Line"
     };
     browserContext.fetch = async (url, options = {}) => {
         if (url.endsWith("/check")) {
+            siteChecks += 1;
             if (failSave) return { ok: false, status: 500, json: async () => ({ error: "Database unavailable" }) };
             const marked = assessment.gradeLoginSites(JSON.parse(options.body).answers, loginSitesConfig.visibleLoginSites(configuredSites, { year: 7 }));
+            siteResponses = { ...siteResponses, ...marked.answers };
             if (marked.passed) siteTicks = { 2: "saved" };
             return { ok: true, json: async () => ({ ...marked, completedActivities: siteTicks }) };
         }
         if (url.endsWith("/learning-sites/profile")) return { ok: true, json: async () => ({ year: 7 }) };
         return { ok: true, json: async () => url.includes("/kit-content/") ? {
             content: { bannerTitle: "Kit", worksheets: [{}, {}, { activity: "Using your login details" }], activities: [null, null, { loginSites: configuredSites }] }
-        } : { responses: { "2-login-sites-readiness-v1": { codecombatReady: true } }, completedActivities: siteTicks, kit: { isComplete: false } } };
+        } : { responses: { "2-login-sites-readiness-v1": siteResponses }, completedActivities: siteTicks, kit: { isComplete: false } } };
     };
     vm.runInNewContext(fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet.js"), "utf8"), browserContext);
     await new Promise((resolve) => setImmediate(resolve));
-    assert.equal(nodes.get("worksheet-activity-complete-btn").hidden, true);
+    assert.equal(nodes.get("worksheet-activity-complete-btn").hidden, false);
+    assert.equal(nodes.get("worksheet-activity-complete-btn").textContent, "Check Activity Completion");
+    assert.equal(siteChecks, 1, "Saved evidence is regraded when reopening an incomplete activity");
     await worksheetOptions.onAssessmentCheck({ ...juniorSiteAnswers, tinkercad: "wrong" });
     assert.equal(nodes.get("worksheet-activity-status-pill").textContent, "Not Completed");
+    assert.match(nodes.get("worksheet-status-message").textContent, /Tinkercad/);
     failSave = true;
     await assert.rejects(worksheetOptions.onAssessmentCheck(juniorSiteAnswers), /Database unavailable/);
     assert.equal(nodes.get("worksheet-activity-status-pill").textContent, "Not Completed");
@@ -508,6 +515,19 @@ async function main() {
     vm.runInNewContext(fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet.js"), "utf8"), browserContext);
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(nodes.get("worksheet-activity-status-pill").textContent, "Completed", "Site completion survives reload");
+    siteTicks = {};
+    siteResponses = { ...juniorSiteAnswers, tinkercadReady: true, sketchupReady: true };
+    vm.runInNewContext(fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet.js"), "utf8"), browserContext);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(nodes.get("worksheet-activity-status-pill").textContent, "Completed", "Previously correct saved answers automatically earn the missing tick on reload");
+    siteTicks = {};
+    siteResponses = {};
+    vm.runInNewContext(fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet.js"), "utf8"), browserContext);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(nodes.get("worksheet-activity-status-pill").textContent, "Not Completed");
+    nodes.get("worksheet-host").querySelectorAll = () => Object.entries(juniorSiteAnswers).map(([name, value]) => ({ name, value }));
+    await events["worksheet-activity-complete-btn:click"]();
+    assert.equal(nodes.get("worksheet-activity-status-pill").textContent, "Completed", "Completion button checks current fields and awards the tick");
     const verificationNode = nodes.get("worksheet-google-verification");
     const worksheetHost = nodes.get("worksheet-host");
     const layoutResult = {
