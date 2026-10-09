@@ -590,6 +590,94 @@ body.kit-worksheet-page {
     font-weight: 700;
 }
 
+.worksheet-password-reminder {
+    margin: 20px 0;
+    padding: clamp(16px, 4vw, 26px);
+    border: 3px solid #ffd166;
+    border-radius: 20px;
+    background: linear-gradient(135deg, #172c52, #344075);
+    color: #fff;
+    box-shadow: 0 6px 0 #d3a43d, 0 12px 24px #172c5226;
+}
+
+.password-reminder-tag {
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 999px;
+    background: #ffd166;
+    color: #172c52;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+}
+
+.worksheet-password-reminder h3 {
+    margin: 14px 0;
+    font-size: clamp(1.25rem, 4vw, 1.6rem);
+    color: #fff;
+}
+
+.password-reminder-groups {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+    gap: 14px;
+}
+
+.password-reminder-group {
+    min-width: 0;
+    padding: 16px;
+    border-radius: 14px;
+    border-top: 5px solid #65d9b0;
+    background: #fff;
+    color: #172c52;
+}
+
+.password-reminder-group:nth-child(2) {
+    border-top-color: #7dbbff;
+}
+
+.password-reminder-group h4 {
+    margin: 14px 0 8px;
+    font-size: 1.1rem;
+}
+
+.password-reminder-brands {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+
+.password-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-weight: 800;
+}
+
+.password-brand svg {
+    flex-shrink: 0;
+}
+
+.password-brand-kamar {
+    padding: 4px 9px;
+    background: #123e67;
+    color: #fff;
+    border-radius: 5px;
+    letter-spacing: 0.1em;
+}
+
+.password-reminder-warning {
+    padding: 14px;
+    border-radius: 12px;
+    background: #fff0c2;
+    color: #352600;
+    border-left: 5px solid #ffd166;
+}
+
+.password-reminder-help {
+    margin-bottom: 0;
+}
+
 .worksheet-assessment-form,
 .worksheet-assessment-inputs,
 .worksheet-assessment-question {

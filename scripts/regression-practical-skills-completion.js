@@ -295,6 +295,10 @@ async function main() {
     assert.equal((host.innerHTML.match(/type="radio"/g) || []).length, 15);
     assert.match(host.innerHTML, /value="caps" selected/);
     assert.match(host.innerHTML, /Check my answers/);
+    assert.match(host.innerHTML, /One school username\. You may have TWO passwords!/);
+    assert.match(host.innerHTML, /Changing your KAMAR\/Google password does NOT change your Microsoft password/);
+    assert.match(host.innerHTML, /Microsoft \+ Computer Room Windows PCs/);
+    assert.match(host.innerHTML, /aria-labelledby="password-reminder-title"/);
     assert.doesNotMatch(host.innerHTML, /does not have any questions/);
     rendererContext.window.KitWorksheetRender.renderWorksheet(host, {
         bannerTitle: "Know Your Username and Email Address",

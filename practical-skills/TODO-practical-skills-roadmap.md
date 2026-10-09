@@ -55,8 +55,15 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   `Check my answers` returns helpful feedback and allows unlimited retries.
   The server checks all ten answers and atomically saves answers and the
   completion tick in the existing progress row when the score is 10/10.
-  Manual completion is disabled for this self-marking activity. The built-in
-  task is attached by worksheet title without replacing teacher-authored
+  Manual completion is disabled for this self-marking activity.
+  The activity includes a prominent, static branded reminder: one school username,
+  with KAMAR/Google sharing a password and Microsoft/Computer Room Windows PCs
+  using the Microsoft password. Changing KAMAR/Google does not update Microsoft;
+  students may have two passwords and should ask school IT to reset the right
+  account. The panel uses inline Google/Microsoft/Windows marks and a KAMAR
+  text badge, responsive group cards and high-contrast colours without flashing.
+  It does not change the assessment score or require students to enter passwords.
+  The built-in task is attached by worksheet title without replacing teacher-authored
   questions/images, and survives saving in Activity Details.
 - Support evidence capture where needed (text, link, or image).
 - Implemented: Login Kit Activity 1 builds from first name and last name to
