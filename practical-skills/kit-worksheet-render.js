@@ -536,7 +536,10 @@
         const questions = content?.loginSites ? [] : Array.isArray(content?.questions) ? content.questions : [];
         const images = Array.isArray(content?.images) ? content.images : [];
         const juniorLoginSites = [7, 8].includes(options.huntProfile?.year);
-        const loginSites = (content?.loginSites || []).filter((site) => !juniorLoginSites || site.group === "JuniorDTECH");
+        const siteLevel = options.huntProfile?.courseIds?.includes("STAFF") ? "staff" : juniorLoginSites ? "junior"
+            : [9, 10].includes(options.huntProfile?.year) ? "middle" : [11, 12, 13].includes(options.huntProfile?.year) ? "senior" : null;
+        const loginSites = (content?.loginSites || []).filter((site) => !site.hidden &&
+            (site.levels ? site.levels.length && (!siteLevel || site.levels.includes(siteLevel)) : !juniorLoginSites || site.group === "JuniorDTECH"));
 
         host.style.setProperty("--worksheet-theme-color", theme.color || "#2f8f61");
         host.style.setProperty("--worksheet-accent-color", theme.accent || "#ffd166");
@@ -578,8 +581,9 @@
                 <section class="worksheet-login-staircase" aria-labelledby="login-staircase-title">
                     <h2 id="login-staircase-title">Step into your learning websites</h2>
                     <p>Each step introduces a website used in DTECH. Click its logo to open it in a new tab, keeping this activity open.</p>
-                    <p>${juniorLoginSites ? "Tinkercad opens your class link" : "Tinkercad and CodeCombat open your class links"}; the other links open the general websites. Follow your teacher's sign-in instructions; never share your password.</p>
-                    ${juniorLoginSites ? "<p>Showing the JuniorDTECH websites for your Year 7/8 profile.</p>" : ""}
+                    <p>Use the website or class links below. Follow your teacher's sign-in instructions; never share your password.</p>
+                    ${siteLevel ? "<p>Showing the websites your teacher has enabled for your profile.</p>" : "<p>No year profile is linked yet. Showing generally available sites; ask your teacher to check your profile.</p>"}
+                    ${!loginSites.length ? "<p>No websites are currently enabled for your level. Ask your teacher for guidance.</p>" : ""}
                     <ol class="login-staircase-list">
                         ${loginSites.map((site) => `
                             <li class="login-staircase-step">
@@ -595,7 +599,7 @@
                                         <p>${escapeHtml(site.readinessQuestion.hint)}</p>
                                         ${site.readinessQuestion.tools ? site.readinessQuestion.tools.map((tool) => `
                                             <div class="login-site-tool">
-                                                <img src="${escapeHtml(tool.image)}" alt="SketchUp ${escapeHtml(tool.label)} icon">
+                                                <img src="${escapeHtml(tool.image)}" alt="${escapeHtml(site.name)} ${escapeHtml(tool.label)} icon">
                                                 <div>
                                                     <label for="login-site-${escapeHtml(tool.id)}">${escapeHtml(tool.label)} name</label>
                                                     <input id="login-site-${escapeHtml(tool.id)}" name="${escapeHtml(tool.id)}" maxlength="200" autocomplete="off" value="${escapeHtml(options.assessmentAnswers?.[tool.id] || "")}" aria-describedby="feedback-${escapeHtml(tool.id)}" ${readOnly ? "disabled" : ""}>
@@ -653,9 +657,11 @@
                     host.querySelectorAll("[data-site-check] input").forEach((field) => { answers[field.name] = field.value; });
                     const grade = await options.onAssessmentCheck(answers);
                     const marked = grade.results.find((entry) => entry.id === form.getAttribute("data-site-check"));
+                    if (!marked) throw new Error("Your teacher has changed this website's settings. Reload the activity before checking again.");
                     result.textContent = `${marked.correct ? "\u2713 " : ""}${marked.explanation}`;
                     form.querySelectorAll("[data-tool-feedback]").forEach((feedback) => {
                         const tool = grade.toolResults.find((entry) => entry.id === feedback.getAttribute("data-tool-feedback"));
+                        if (!tool) throw new Error("Your teacher has changed the tool questions. Reload the activity before checking again.");
                         feedback.hidden = false;
                         feedback.textContent = tool.explanation;
                         feedback.classList.toggle("is-correct", tool.correct);

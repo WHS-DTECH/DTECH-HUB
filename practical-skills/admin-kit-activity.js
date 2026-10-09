@@ -106,6 +106,7 @@
         document.querySelector("#activity-hunt-note").hidden = activity.assessmentId !== "learning-sites-treasure-v1";
         document.querySelector("#activity-merged-note").hidden = worksheet.mergedInto === undefined;
         document.querySelector("#activity-identity-note").hidden = !activity.identityLessonVersion;
+        document.querySelector("#activity-sites-note").hidden = !activity.loginSites;
         document.querySelector("#activity-information").hidden = !activity.information;
         document.querySelector("#activity-information-title").textContent = activity.information?.title || "";
         const informationHost = document.querySelector("#activity-information-paragraphs");

@@ -5,6 +5,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const hunt = require("../learning-sites-assessment");
 const assessment = require("../practical-skills-assessment");
+const loginSitesConfig = require("../login-sites-config");
 const server = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
 const between = (start, end) => {
     const from = server.indexOf(start);
@@ -77,7 +78,7 @@ async function main() {
     let ownRows = [{ id_number: "1", linked_emails: ["student@example.school.nz"], year_level: "7", programs: ["DTECH"], upload_year: 2026 }];
     const handlers = {};
     const context = vm.createContext({
-        ...assessment, ...hunt,
+        ...assessment, ...hunt, ...loginSitesConfig,
         app: { get: (url, handler) => { handlers[url] = handler; }, post: (url, handler) => { handlers[url] = handler; } },
         getRequestUserEmail: (req) => req.email || "",
         normalizeEmail: (email) => String(email || "").trim().toLowerCase(),
@@ -104,7 +105,8 @@ async function main() {
     assert.equal((await request(profileUrl, { email: "other@example.school.nz" })).body.available, false);
     assert.equal((await request(checkUrl)).body.completedActivities["1"], "saved");
     enhanced.worksheets.push({ activity: "Using your login details" });
-    enhanced.activities.push({ loginSites: [{ name: "Tinkercad" }] });
+    const siteContent = assessment.withShortLoginKit("kit-login", { worksheets: [{ activity: "Using your login details" }] });
+    enhanced.activities.push({ loginSites: siteContent.activities[0].loginSites });
     const tinkercadCheck = await request(checkUrl, {
         params: { kitId: "kit-login", activityIndex: "2" },
         body: { answers: { tinkercad: "Circuits, 3D Designs and Codeblocks", passed: true } }

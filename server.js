@@ -8,6 +8,7 @@ const { Pool } = require("pg");
 const { PASSWORD_PROBLEMS_ID, APPS_WORDSEARCH_ID, withShortLoginKit, withLoginAppsActivity, withLearningSitesActivity, withPasswordProblemsActivity, withLoginIdentityActivity, getStudentAssessment, gradePasswordProblems, gradeLoginIdentity, gradeAppsWordsearch } = require("./practical-skills-assessment");
 const { LEARNING_SITES_ID, getHuntProfile, gradeLearningSites } = require("./learning-sites-assessment");
 const { gradeLoginSites } = require("./practical-skills-assessment");
+const { validateLoginSites, publicLoginSites, visibleLoginSites } = require("./login-sites-config");
 
 let OAuth2Client = null;
 try {
@@ -4418,7 +4419,7 @@ function normalizePracticalSkillsKitContentForDisplay(kitId, content) {
   return {
     ...studentContent,
     activities: Array.isArray(studentContent.activities) ? studentContent.activities.map((activity) =>
-      activity ? { ...activity, assessment: getStudentAssessment(activity.assessmentId) } : activity
+      activity ? { ...activity, ...(activity.loginSites ? { loginSites: publicLoginSites(activity.loginSites) } : {}), assessment: getStudentAssessment(activity.assessmentId) } : activity
     ) : []
   };
 }
@@ -4572,6 +4573,7 @@ async function savePracticalSkillsAssessment(studentEmail, kitId, activityIndex,
   await ensurePracticalSkillsProgressRow(email, kitId);
   const activityKey = String(activityIndex);
   const responseKey = `${activityIndex}-${grade.assessmentId || PASSWORD_PROBLEMS_ID}`;
+  const mergeSiteAnswers = grade.assessmentId === "login-sites-readiness-v1";
   const completedAt = new Date().toISOString();
 
   if (!hasDatabase) {
@@ -4579,7 +4581,10 @@ async function savePracticalSkillsAssessment(studentEmail, kitId, activityIndex,
     const existing = memoryPracticalSkillsProgress.get(key);
     const next = {
       ...existing,
-      responses: grade.identityLesson ? { ...existing.responses, ...grade.answers } : { ...existing.responses, [responseKey]: grade.answers },
+      responses: grade.identityLesson ? { ...existing.responses, ...grade.answers } : {
+        ...existing.responses,
+        [responseKey]: mergeSiteAnswers ? { ...existing.responses[responseKey], ...grade.answers } : grade.answers
+      },
       completed_activities: {
         ...existing.completed_activities,
         ...(grade.passed ? { [activityKey]: completedAt } : {})
@@ -4593,13 +4598,14 @@ async function savePracticalSkillsAssessment(studentEmail, kitId, activityIndex,
   const result = await pool.query(
     `UPDATE practical_skills_progress
      SET responses = CASE WHEN $8::boolean THEN responses || $2::jsonb
+           WHEN $9::boolean THEN jsonb_set(responses, ARRAY[$1::text], COALESCE(responses -> $1::text, '{}'::jsonb) || $2::jsonb)
            ELSE jsonb_set(responses, ARRAY[$1::text], $2::jsonb) END,
          completed_activities = CASE WHEN $5::boolean
            THEN jsonb_set(completed_activities, ARRAY[$3::text], to_jsonb($4::text))
            ELSE completed_activities END,
          updated_at = NOW()
      WHERE student_email = $6 AND kit_id = $7 RETURNING *`,
-    [responseKey, JSON.stringify(grade.answers), activityKey, completedAt, grade.passed, email, kitId, Boolean(grade.identityLesson)]
+    [responseKey, JSON.stringify(grade.answers), activityKey, completedAt, grade.passed, email, kitId, Boolean(grade.identityLesson), mergeSiteAnswers]
   );
   if (!result.rows?.[0]) throw new Error("Activity progress could not be saved.");
   return result.rows[0];
@@ -12636,7 +12642,7 @@ app.post("/api/practical-skills/progress/:kitId/activities/:activityIndex/check"
     const grade = identityLesson
       ? gradeLoginIdentity(req.body.answers, { ...req.auth_identity, email: studentEmail }, activity.questions || [])
       : activity.loginSites
-        ? gradeLoginSites(req.body.answers)
+        ? gradeLoginSites(req.body.answers, visibleLoginSites(activity.loginSites, await getLearningSitesStudentProfile(studentEmail)))
         : activity.assessmentId === APPS_WORDSEARCH_ID
         ? gradeAppsWordsearch(req.body.answers, Boolean((await getStudentLoginDriveSetup(studentEmail))?.folder_id))
         : activity.assessmentId === LEARNING_SITES_ID
@@ -12676,6 +12682,37 @@ app.get("/api/admin/practical-skills/kit-content/:kitId", requireAdminAccess, as
     res.json({ content });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not load kit content." });
+  }
+});
+
+app.get("/api/practical-skills/login-sites/settings", async (req, res) => {
+  try {
+    const email = normalizeEmail(getRequestUserEmail(req));
+    if (!email || !(await canManagePracticalSchedule(email))) return res.status(403).json({ error: "Staff access required." });
+    const content = await getStoredPracticalSkillsKitContent("kit-login");
+    const activity = content.activities.find((entry) => entry?.loginSites);
+    if (!activity) return res.status(404).json({ error: "Login websites activity not found." });
+    res.json({ sites: activity.loginSites });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not load website settings." });
+  }
+});
+
+app.put("/api/practical-skills/login-sites/settings", async (req, res) => {
+  try {
+    const email = normalizeEmail(getRequestUserEmail(req));
+    if (!email || !(await canManagePracticalSchedule(email))) return res.status(403).json({ error: "Staff access required." });
+    let sites;
+    try { sites = validateLoginSites(req.body?.sites); }
+    catch (error) { return res.status(400).json({ error: error.message }); }
+    const content = await getStoredPracticalSkillsKitContent("kit-login");
+    const index = content.activities.findIndex((entry) => entry?.loginSites);
+    if (index < 0) return res.status(404).json({ error: "Login websites activity not found." });
+    content.activities[index] = { ...content.activities[index], loginSites: sites, loginSitesVersion: 1 };
+    await savePracticalSkillsKitContent("kit-login", content, email);
+    res.json({ sites });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not save website settings." });
   }
 });
 

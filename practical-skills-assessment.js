@@ -1,5 +1,6 @@
 "use strict";
 const { LEARNING_SITES_ID, withLearningSitesActivity, getLearningSitesAssessment } = require("./learning-sites-assessment");
+const { gradeConfiguredLoginSites, validateLoginSites } = require("./login-sites-config");
 
 const PASSWORD_PROBLEMS_ID = "password-problems-v1";
 const APPS_WORDSEARCH_ID = "apps-wordsearch-v1";
@@ -16,44 +17,25 @@ const loginSites = [
   { name: "CodeCombat", description: "Learn programming by writing code to guide a hero through game challenges.", group: "MiddleDTECH", years: "Years 9/10", url: "https://codecombat.com/students?_cc=ShortDrawFast", logo: "https://codecombat.com/images/pages/base/logo_square_250.png", readinessQuestion: { id: "codecombat", prompt: "What is the programming language that you will use?", hint: "Sign in and look under Current Classes. Read the language in brackets beside WHS-DTECH. You do not need to press Start or play a level." } }
 ];
 
-function gradeLoginSites(answers) {
-  const value = typeof answers?.tinkercad === "string" ? answers.tinkercad.slice(0, 200) : "";
-  const normalized = value.toLowerCase().replace(/3\s*[- ]?\s*d/g, "3d").replace(/code[\s-]+blocks/g, "codeblocks");
-  const correct = /\bcircuits?\b/.test(normalized) && /\b3d designs?\b/.test(normalized) && /\bcodeblocks?\b/.test(normalized);
-  const codeAvengers = typeof answers?.codeavengers === "string" ? answers.codeavengers.slice(0, 200) : "";
-  const topic = codeAvengers.toLowerCase();
-  const codeAvengersCorrect = /\bvariables?\b/.test(topic) && /\bif statements?\b/.test(topic) && /\bloops?\b/.test(topic);
-  const sketchupAnswers = {};
-  const toolResults = ["rectangle", "move", "pushpull", "line"].map((expected, index) => {
-    const id = `sketchup-tool-${index + 1}`;
-    const answer = typeof answers?.[id] === "string" ? answers[id].slice(0, 200) : "";
-    sketchupAnswers[id] = answer;
-    const normalizedTool = answer.toLowerCase().trim().replace(/\s+tool$/, "").replace(/[\s/,-]+/g, "");
-    const toolCorrect = normalizedTool === expected;
-    return { id, correct: toolCorrect, explanation: toolCorrect ? "Correct - ka pai!" : "Hover over this icon in the SketchUp toolbar and try its name again." };
-  });
-  const sketchupCorrect = toolResults.every((result) => result.correct);
-  const codeCombat = typeof answers?.codecombat === "string" ? answers.codecombat.slice(0, 200) : "";
-  const codeCombatCorrect = codeCombat.trim().toLowerCase().replace(/[.!?]+$/, "") === "python";
-  const results = [
-    { id: "tinkercad", correct, explanation: correct
-      ? "Tinkercad readiness check saved! No need to make a design today."
-      : "Try again: name all three design areas shown on the Tinkercad home page." },
-    { id: "codeavengers", correct: codeAvengersCorrect, explanation: codeAvengersCorrect
-      ? "Code Avengers readiness check saved! No need to start Python 1 today."
-      : "Try again: switch to Pro, filter for Python and copy the topic name from the Python 1 card." },
-    { id: "sketchup", correct: sketchupCorrect, explanation: sketchupCorrect
-      ? "SketchUp readiness check saved! All four tool names are correct. No drawing needed today."
-      : `${toolResults.filter((result) => result.correct).length} / 4 tool names correct. Hover over the toolbar icons and try again.` },
-    { id: "codecombat", correct: codeCombatCorrect, explanation: codeCombatCorrect
-      ? "CodeCombat readiness check saved! No need to start a level today."
-      : "Try again: look under Current Classes and read the language in brackets beside WHS-DTECH." }
-  ];
-  return {
-    assessmentId: LOGIN_SITES_ID, passed: false, score: results.filter((result) => result.correct).length, total: results.length,
-    answers: { tinkercad: value, tinkercadReady: correct, codeavengers: codeAvengers, codeavengersReady: codeAvengersCorrect, ...sketchupAnswers, sketchupReady: sketchupCorrect, codecombat: codeCombat, codecombatReady: codeCombatCorrect },
-    results, toolResults
-  };
+const configuredLoginSites = loginSites.map((site) => {
+  const id = site.readinessQuestion?.id || "gamefroot";
+  const question = site.readinessQuestion ? structuredClone(site.readinessQuestion) : null;
+  if (question?.tools) {
+    const names = ["Rectangle", "Move", "Push/Pull", "Line"];
+    question.tools.forEach((tool, index) => {
+      tool.match = "exact";
+      tool.answers = index === 2 ? ["Push/Pull", "pushpull"] : [names[index]];
+    });
+  } else if (question) {
+    question.match = ["tinkercad", "codeavengers"].includes(id) ? "all-terms" : "exact";
+    question.answers = id === "tinkercad" ? ["Circuits", "3D Designs", "Codeblocks"]
+      : id === "codeavengers" ? ["Variable", "If Statements", "Loops"] : ["Python"];
+  }
+  return { ...site, id, hidden: false, levels: site.group === "JuniorDTECH" ? ["junior", "middle", "senior", "staff"] : ["middle", "senior", "staff"], ...(question ? { readinessQuestion: question } : {}) };
+});
+
+function gradeLoginSites(answers, sites = configuredLoginSites) {
+  return gradeConfiguredLoginSites(answers, sites);
 }
 
 const appWords = [
@@ -88,7 +70,9 @@ function withShortLoginKit(kitId, content) {
     const visible = index === loginIndex || Boolean(activities[index]?.identityLessonVersion) ||
       [APPS_WORDSEARCH_ID, PASSWORD_PROBLEMS_ID, LEARNING_SITES_ID].includes(activities[index]?.assessmentId);
     if (index === loginIndex) {
-      activities[index] = { ...activities[index], title: "Using your login details", loginSites };
+      const existingSites = activities[index]?.loginSites;
+      const sites = activities[index]?.loginSitesVersion === 1 ? validateLoginSites(existingSites) : structuredClone(configuredLoginSites);
+      activities[index] = { ...activities[index], title: "Using your login details", loginSites: sites, loginSitesVersion: 1 };
       return { ...worksheet, activity: "Using your login details", hidden: false };
     }
     return { ...worksheet, hidden: !visible };

@@ -28,7 +28,7 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   Using your login details displays equal-width, aligned three-column website cards:
   Tinkercad, SketchUp Education and Gamefroot for JuniorDTECH (Years 7/8);
   Code Avengers and CodeCombat for MiddleDTECH (Years 9/10). Official brand
-  images/icons link to generic websites in new tabs; class links/codes come later.
+  images/icons open websites or teacher-configured class links in new tabs.
   Legacy question data is preserved but not displayed in this activity.
   Completion is student-confirmed, not automatically inferred from opening links.
   The staircase loads the signed-in user's server-derived year profile. Years
@@ -37,7 +37,7 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   Tinkercad now uses the supplied class link and a quick three-design-area
   question under its stair. Server marking saves the answer and site readiness
   tick in login-sites-readiness-v1 responses; it never awards the whole activity
-  from this single check. Other site questions are pending. Readiness answers
+  from this single check. Readiness answers
   are evidence, not direct verification of third-party sign-in sessions.
   Code Avengers retains its generic link and adds a Pro > Python > Python 1
   topic-name check (Variables, If Statements and Loops), without starting a course.
@@ -54,6 +54,20 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   A correct answer saves its readiness tick without starting a level. Gamefroot
   remains a generic link with no question; whole-activity completion remains
   student-confirmed while individual checks save server-marked evidence.
+- Implemented: `teacher-login-sites.html` provides staff-only settings for
+  Using your login details, linked from the staff activity toolbar and Activity
+  Details. Teachers can add websites, edit names, descriptions, course/year
+  labels, HTTPS website/class links, logo images, questions, hints and accepted
+  answers (including the existing SketchUp tool pictures). Choose exact-answer
+  alternatives or all required terms, one per line. Questions can be disabled.
+  Separate Junior, Middle, Senior and Staff switches control each website;
+  Hide from everyone overrides all levels. No selected levels also hides a site.
+  Sites remain stored when hidden and existing student evidence is preserved.
+  Unknown year profiles retain the non-globally-hidden list with selected levels.
+  Staff authorization uses the existing Practical Schedule permission helper.
+  Answer keys are removed from student content and marking uses the latest saved
+  configuration and server-derived profile. Settings persist in existing kit
+  content storage; students reload to see edits. No new database table is needed.
 - Implemented: Open DTECH Learning Site / Open DTECH-HUB in the Login Kit now
   includes a five-island pirate-map treasure hunt. Students follow Westland High
   Website > Intranet > Learning Sites, visit Science, Mrs O'Malley's English,

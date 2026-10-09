@@ -289,10 +289,15 @@ async function main() {
     assert.equal(siteRow.responses["6-login-sites-readiness-v1"].sketchupReady, true);
     assert.equal(siteRow.responses["6-login-sites-readiness-v1"].tinkercadReady, true);
     assert.equal(siteRow.completed_activities["6"], undefined);
+    const limitedGrade = { ...siteGrade, answers: { tinkercad: "changed", tinkercadReady: false } };
+    const preserved = await context.savePracticalSkillsAssessment(realIdentity.email, "kit-login", 6, limitedGrade);
+    assert.equal(preserved.responses["6-login-sites-readiness-v1"].sketchupReady, true, "Hidden site evidence remains stored");
+    assert.equal(preserved.responses["6-login-sites-readiness-v1"].tinkercadReady, false, "Visible site evidence is updated");
     context.hasDatabase = true;
     await context.savePracticalSkillsAssessment(realIdentity.email, "kit-login", 6, siteGrade);
     assert.equal(queries.at(-1).values[0], "6-login-sites-readiness-v1");
     assert.equal(queries.at(-1).values[4], false);
+    assert.equal(queries.at(-1).values[8], true, "SQL merges site evidence without deleting hidden site answers");
     context.SCHOOL_EMAIL_DOMAIN = "example.school.nz";
     context.getStoredPracticalSkillsKitContent = async () => enhanced;
     context.savePracticalSkillsAssessment = async () => { throw new Error("Database unavailable"); };

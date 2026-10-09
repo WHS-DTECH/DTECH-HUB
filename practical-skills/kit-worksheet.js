@@ -200,6 +200,8 @@
 
         const activityIndex = getActivityIndexFromUrl();
         const worksheets = Array.isArray(state.content.worksheets) ? state.content.worksheets : [];
+        const sitesSettings = document.getElementById("worksheet-sites-settings");
+        if (sitesSettings) sitesSettings.hidden = !state.content.activities?.[activityIndex]?.loginSites || !state.huntProfile?.courseIds?.includes("STAFF");
         const backLink = document.getElementById("worksheet-back-link");
         const showingActivity = activityIndex !== null && Boolean(worksheets[activityIndex]);
         if (backLink) {
