@@ -515,6 +515,10 @@ body.kit-worksheet-page {
     color: #3a3226;
 }
 
+#worksheet-google-verification[hidden] {
+    display: none;
+}
+
 .worksheet-assessment-intro p,
 .worksheet-assessment-intro li {
     line-height: 1.6;

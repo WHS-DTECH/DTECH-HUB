@@ -49,6 +49,10 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   must match. Missing Google name fields require help from school IT rather than
   guessing a name from the email. Google token verification must be configured
   on the server for these checks.
+- Activity 1 includes a visible Google ID sign-in/verification button even when
+  the hub already shows a signed-in account. This uses the Google Identity
+  Services button, rather than the hub's OAuth access-token popup. Changed
+  credentials reload the worksheet's saved account-specific progress.
 - Use clear kit states:
   - `not_started`
   - `in_progress`

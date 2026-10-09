@@ -3176,6 +3176,18 @@ function initHubGoogleAuth() {
                 }
             });
             hubAuthState.idClientReady = true;
+            const verifyButton = document.querySelector("#hub-google-verify-button");
+            if (verifyButton) {
+                window.google.accounts.id.renderButton(verifyButton, {
+                    type: "standard",
+                    theme: "outline",
+                    size: "large",
+                    text: "signin_with",
+                    width: 260
+                });
+                const verifyStatus = document.querySelector("#hub-google-verify-status");
+                if (verifyStatus) verifyStatus.textContent = "Use Sign in with Google to verify or refresh your school account.";
+            }
             maybeAutoPromptHubSignIn();
         }
 
@@ -3221,6 +3233,8 @@ function initHubGoogleAuth() {
         }
 
         if (attemptsLeft <= 0) {
+            const verifyStatus = document.querySelector("#hub-google-verify-status");
+            if (verifyStatus) verifyStatus.textContent = "Google sign-in could not load. Check your connection or browser blocking settings, then refresh this page.";
             return;
         }
         setTimeout(() => waitForGoogleLibrary(attemptsLeft - 1), 200);

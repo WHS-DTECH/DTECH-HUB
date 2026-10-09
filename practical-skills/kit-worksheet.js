@@ -12,6 +12,7 @@
         completedActivities: {},
         progressLoaded: false,
         progressWritePromise: Promise.resolve(),
+        actionsWired: false,
         signInWatcherId: 0,
         saveTimerId: 0
     };
@@ -184,6 +185,8 @@
 
         const activityIndex = getActivityIndexFromUrl();
         const worksheets = Array.isArray(state.content.worksheets) ? state.content.worksheets : [];
+        const verification = document.getElementById("worksheet-google-verification");
+        if (verification) verification.hidden = !state.content.activities?.[activityIndex]?.identityLessonVersion;
         if (worksheets.length && (activityIndex === null || !worksheets[activityIndex])) {
             window.KitWorksheetRender.renderKitOverview(host, state.content, {
                 kitId: state.kitId,
@@ -288,6 +291,8 @@
     }
 
     function wireActionButtons() {
+        if (state.actionsWired) return;
+        state.actionsWired = true;
         const completeBtn = document.getElementById("worksheet-complete-btn");
         const resetBtn = document.getElementById("worksheet-reset-btn");
         const activityCompleteBtn = document.getElementById("worksheet-activity-complete-btn");
@@ -378,6 +383,20 @@
         }
 
         wireActionButtons();
+    }
+
+    if (document.getElementById("hub-google-verify-button") && window.addEventListener) {
+        let previousAuth = getStoredAuthRaw();
+        window.addEventListener("hub-auth-state-changed", () => {
+            const nextAuth = getStoredAuthRaw();
+            if (nextAuth === previousAuth) return;
+            previousAuth = nextAuth;
+            window.clearTimeout(state.saveTimerId);
+            state.progressLoaded = false;
+            state.responses = {};
+            state.completedActivities = {};
+            void init();
+        });
     }
 
     init();
