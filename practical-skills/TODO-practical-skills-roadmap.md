@@ -26,6 +26,14 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   Students can undo an activity completion; resetting the kit clears its activity ticks
   without deleting answers. Kit-level points and badges remain separately awarded
   through the existing kit completion action.
+- Implemented: Login Kit's `Password Problems` includes a Year 7/8 Password
+  Detective activity with five problem/fix matches and five scenario questions.
+  `Check my answers` returns helpful feedback and allows unlimited retries.
+  The server checks all ten answers and atomically saves answers and the
+  completion tick in the existing progress row when the score is 10/10.
+  Manual completion is disabled for this self-marking activity. The built-in
+  task is attached by worksheet title without replacing teacher-authored
+  questions/images, and survives saving in Activity Details.
 - Support evidence capture where needed (text, link, or image).
 - Use clear kit states:
   - `not_started`

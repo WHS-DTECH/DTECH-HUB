@@ -11,6 +11,7 @@
         responses: {},
         completedActivities: {},
         progressLoaded: false,
+        progressWritePromise: Promise.resolve(),
         signInWatcherId: 0,
         saveTimerId: 0
     };
@@ -117,6 +118,11 @@
         });
     }
 
+    function queueProgressWrite(write) {
+        state.progressWritePromise = state.progressWritePromise.then(write, write);
+        return state.progressWritePromise;
+    }
+
     function getCurrentActivityIndex() {
         const index = getActivityIndexFromUrl();
         return index !== null && state.content?.worksheets?.[index] ? index : null;
@@ -129,17 +135,19 @@
         const index = getCurrentActivityIndex();
         bar.hidden = !state.email || index === null;
         const completed = Boolean(state.completedActivities[index]);
+        const selfMarking = Boolean(state.content?.activities?.[index]?.assessment);
         pill.textContent = completed ? "Completed" : "Not Completed";
         pill.classList.toggle("is-complete", completed);
         button.textContent = completed ? "Undo Completion" : "Mark Activity Complete";
         button.disabled = !state.progressLoaded;
+        button.hidden = selfMarking && !completed;
     }
 
     function queueResponseSave() {
         if (!state.email) return;
         window.clearTimeout(state.saveTimerId);
         state.saveTimerId = window.setTimeout(() => {
-            saveResponses(state.kitId, state.responses).catch(() => {
+            queueProgressWrite(() => saveResponses(state.kitId, state.responses)).catch(() => {
                 showStatusMessage("Could not save your answers. Check your connection and try again.", true);
             });
         }, RESPONSE_SAVE_DEBOUNCE_MS);
@@ -194,7 +202,8 @@
                 bannerTitle: worksheet.activity || activity?.title || `Activity ${activityIndex + 1}`,
                 bannerSubtitle: worksheet.establishes || activity?.establishes || "",
                 questions,
-                images
+                images,
+                assessment: activity?.assessment
             } : state.content;
 
             window.KitWorksheetRender.renderWorksheet(host, activityContent, {
@@ -202,6 +211,26 @@
                 readOnly: !state.email,
                 backHref: isActivity ? `./kit-worksheet.html?kit=${encodeURIComponent(state.kitId)}` : "",
                 eyebrow: isActivity ? state.content.bannerTitle : "",
+                assessmentAnswers: activity?.assessment
+                    ? state.responses[`${activityIndex}-${activity.assessment.id}`] || {}
+                    : {},
+                onAssessmentCheck: async (answers) => {
+                    if (!state.progressLoaded) throw new Error("Your progress has not loaded. Refresh the page and try again.");
+                    window.clearTimeout(state.saveTimerId);
+                    return queueProgressWrite(async () => {
+                        await saveResponses(state.kitId, state.responses);
+                        const payload = await loadJson(`/api/practical-skills/progress/${encodeURIComponent(state.kitId)}/activities/${activityIndex}/check`, {
+                            method: "POST",
+                            headers: withAuthHeaders({ "Content-Type": "application/json" }),
+                            body: JSON.stringify({ answers })
+                        });
+                        state.responses[`${activityIndex}-${activity.assessment.id}`] = payload.answers;
+                        state.completedActivities = payload.completedActivities;
+                        updateActivityCompleteBar();
+                        if (payload.passed) showStatusMessage("Password detective complete! Your activity tick has been saved.");
+                        return payload;
+                    });
+                },
                 onResponseChange: (questionId, value) => {
                     state.responses[questionId] = value;
                     queueResponseSave();
@@ -248,13 +277,15 @@
             activityCompleteBtn.disabled = true;
             try {
                 window.clearTimeout(state.saveTimerId);
-                await saveResponses(state.kitId, state.responses);
-                const payload = await loadJson(`/api/practical-skills/progress/${encodeURIComponent(state.kitId)}/activities/${index}`, {
-                    method: "PUT",
-                    headers: withAuthHeaders({ "Content-Type": "application/json" }),
-                    body: JSON.stringify({ completed })
+                await queueProgressWrite(async () => {
+                    await saveResponses(state.kitId, state.responses);
+                    const payload = await loadJson(`/api/practical-skills/progress/${encodeURIComponent(state.kitId)}/activities/${index}`, {
+                        method: "PUT",
+                        headers: withAuthHeaders({ "Content-Type": "application/json" }),
+                        body: JSON.stringify({ completed })
+                    });
+                    state.completedActivities = payload.completedActivities;
                 });
-                state.completedActivities = payload.completedActivities;
                 showStatusMessage(completed ? "Activity completed! Your tick is saved. Return to All activities to see your progress." : "Activity completion removed.");
             } catch (error) {
                 showStatusMessage(error?.message || "Could not save activity completion.", true);

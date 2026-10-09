@@ -276,7 +276,9 @@
             const button = event.target.closest(".kit-remove-worksheet");
             if (!button) return;
             const worksheets = readFormIntoContent().worksheets;
-            worksheets.splice(Number(button.getAttribute("data-index")), 1);
+            const index = Number(button.getAttribute("data-index"));
+            worksheets.splice(index, 1);
+            if (Array.isArray(state.content.activities)) state.content.activities.splice(index, 1);
             state.content.worksheets = worksheets;
             renderWorksheetList();
         });

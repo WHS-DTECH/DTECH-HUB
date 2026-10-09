@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
+const assessment = require("../practical-skills-assessment");
 
 const root = path.join(__dirname, "..");
 const server = fs.readFileSync(path.join(root, "server.js"), "utf8");
@@ -21,6 +22,7 @@ async function main() {
         memoryPracticalSkillsProgress: new Map(),
         normalizeEmail: (email) => email.trim().toLowerCase(),
         ensurePracticalSkillsProgressSchema: async () => {},
+        ...assessment,
         Date
     });
     vm.runInContext([
@@ -69,7 +71,11 @@ async function main() {
     assert.match(server, /ADD COLUMN IF NOT EXISTS completed_activities JSONB NOT NULL DEFAULT '\{\}'::jsonb/);
 
     let handler;
-    context.app = { put: (_url, callback) => { handler = callback; } };
+    let checkHandler;
+    context.app = {
+        put: (_url, callback) => { handler = callback; },
+        post: (_url, callback) => { checkHandler = callback; }
+    };
     context.SCHOOL_EMAIL_DOMAIN = "example.school.nz";
     context.getRequestUserEmail = (req) => req.email || "";
     context.getPracticalSkillsKitDefinition = (id) => id === "kit-login";
@@ -105,6 +111,96 @@ async function main() {
     context.setPracticalSkillsActivityCompletion = async () => { throw new Error("Database unavailable"); };
     assert.equal((await request()).code, 500, "Database failures must not report success");
 
+    const answers = {
+        "caps-lock": "caps",
+        "wrong-account": "account",
+        "unknown-user": "username",
+        "no-internet": "connection",
+        "locked-out": "teacher",
+        forgotten: "reset",
+        sharing: "private",
+        "new-password": "replace",
+        "help-message": "details",
+        "suspicious-link": "report"
+    };
+    const pass = assessment.gradePasswordProblems(answers);
+    assert.equal(pass.score, 10);
+    assert.equal(pass.total, 10);
+    assert.equal(pass.passed, true);
+    const partial = assessment.gradePasswordProblems({ ...answers, sharing: "secret" });
+    assert.equal(partial.score, 9);
+    assert.equal(partial.passed, false, "All ten answers must be right");
+    assert.equal(assessment.gradePasswordProblems({}).score, 0);
+    assert.equal(assessment.gradePasswordProblems({ ...answers, "caps-lock": ["caps"] }).passed, false);
+    assert.equal(assessment.gradePasswordProblems({ forgotten: "a real password" }).answers.forgotten, undefined);
+    const studentAssessment = assessment.getStudentAssessment(assessment.PASSWORD_PROBLEMS_ID);
+    assert.ok(studentAssessment.matches.every((question) => !("answer" in question)));
+    assert.ok(studentAssessment.quiz.every((question) => !("answer" in question)));
+    const authored = {
+        worksheets: [{ activity: "Other" }, { activity: "Password Problems" }],
+        activities: [null, { title: "My title", questions: [{ id: "custom" }] }]
+    };
+    const enhanced = assessment.withPasswordProblemsActivity("kit-login", authored);
+    assert.equal(enhanced.activities[1].assessmentId, assessment.PASSWORD_PROBLEMS_ID);
+    assert.equal(enhanced.activities[1].questions[0].id, "custom", "Keep teacher-authored content");
+    assert.equal(authored.activities[1].assessmentId, undefined, "Do not mutate stored content");
+    assert.equal(assessment.withPasswordProblemsActivity("kit-minecraft", authored), authored);
+
+    context.hasDatabase = false;
+    let saved = await context.savePracticalSkillsAssessment("student@example.school.nz", "kit-login", 1, partial);
+    assert.equal(saved.completed_activities["1"], undefined);
+    assert.equal(saved.responses.q1, "Student");
+    saved = await context.savePracticalSkillsAssessment("student@example.school.nz", "kit-login", 1, pass);
+    assert.ok(saved.completed_activities["1"]);
+    assert.equal(saved.responses["1-password-problems-v1"].sharing, "private");
+    const otherRow = await context.ensurePracticalSkillsProgressRow("other@example.school.nz", "kit-login");
+    assert.equal(otherRow.completed_activities, undefined);
+
+    context.hasDatabase = true;
+    await context.savePracticalSkillsAssessment("student@example.school.nz", "kit-login", 1, pass);
+    update = queries.at(-1);
+    assert.match(update.sql, /responses = jsonb_set/);
+    assert.match(update.sql, /completed_activities = CASE WHEN \$5::boolean/);
+    assert.equal(update.values[4], true);
+    await context.savePracticalSkillsAssessment("student@example.school.nz", "kit-login", 1, partial);
+    assert.equal(queries.at(-1).values[4], false);
+    const workingPool = context.pool;
+    context.pool = { query: async () => ({ rows: [] }) };
+    await assert.rejects(context.savePracticalSkillsAssessment("student@example.school.nz", "kit-login", 1, pass), /could not be saved/);
+    context.pool = workingPool;
+
+    context.getPracticalSkillsKitContent = async () => enhanced;
+    assert.equal((await request({ params: { kitId: "kit-login", activityIndex: "1" } })).code, 409, "Self-marking activities cannot be manually ticked");
+    context.getStoredPracticalSkillsKitContent = async () => enhanced;
+    let storedGrade;
+    context.savePracticalSkillsAssessment = async (_email, _kit, _index, grade) => {
+        storedGrade = grade;
+        return { completed_activities: grade.passed ? { 1: "saved" } : {} };
+    };
+    async function check(overrides = {}) {
+        const req = {
+            email: "student@example.school.nz",
+            params: { kitId: "kit-login", activityIndex: "1" },
+            body: { answers },
+            ...overrides
+        };
+        const res = {
+            code: 200,
+            status(code) { this.code = code; return this; },
+            json(body) { this.body = body; }
+        };
+        await checkHandler(req, res);
+        return res;
+    }
+    assert.equal((await check()).body.completedActivities["1"], "saved");
+    assert.equal(storedGrade.passed, true);
+    assert.equal((await check({ body: { answers: { ...answers, sharing: "secret" }, passed: true } })).body.passed, false);
+    assert.equal((await check({ email: "" })).code, 401);
+    assert.equal((await check({ body: { answers: [] } })).code, 400);
+    assert.equal((await check({ params: { kitId: "kit-login", activityIndex: "0" } })).code, 404);
+    context.savePracticalSkillsAssessment = async () => { throw new Error("Database unavailable"); };
+    assert.equal((await check()).code, 500, "Do not award ticks when saving fails");
+
     const rendererContext = { window: {} };
     vm.runInNewContext(fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet-render.js"), "utf8"), rendererContext);
     const host = { style: { setProperty() {} }, innerHTML: "" };
@@ -118,6 +214,16 @@ async function main() {
     assert.match(host.innerHTML, /aria-label="Completed"/);
     assert.match(host.innerHTML, /&lt;Second&gt;/);
     assert.match(host.innerHTML, /activity=1/);
+    rendererContext.window.KitWorksheetRender.renderWorksheet(host, {
+        bannerTitle: "Password Problems",
+        assessment: studentAssessment,
+        questions: []
+    }, { readOnly: true, assessmentAnswers: answers });
+    assert.equal((host.innerHTML.match(/<select /g) || []).length, 5);
+    assert.equal((host.innerHTML.match(/type="radio"/g) || []).length, 15);
+    assert.match(host.innerHTML, /value="caps" selected/);
+    assert.match(host.innerHTML, /Check my answers/);
+    assert.doesNotMatch(host.innerHTML, /does not have any questions/);
 
     const nodes = new Map();
     const events = {};
@@ -187,6 +293,40 @@ async function main() {
     await new Promise((resolve) => setImmediate(resolve));
     await events["worksheet-activity-complete-btn:click"]();
     assert.equal(nodes.get("worksheet-activity-status-pill").textContent, "Not Completed");
+
+    let worksheetOptions;
+    let assessmentTicks = {};
+    browserContext.window.location.search = "?kit=kit-login&activity=2";
+    browserContext.window.KitWorksheetRender.renderWorksheet = (_host, _content, options) => { worksheetOptions = options; };
+    browserContext.fetch = async (url, options = {}) => {
+        if (url.endsWith("/check")) {
+            if (failSave) return { ok: false, status: 500, json: async () => ({ error: "Database unavailable" }) };
+            const marked = assessment.gradePasswordProblems(JSON.parse(options.body).answers);
+            if (marked.passed) assessmentTicks = { 2: "saved" };
+            return { ok: true, json: async () => ({ ...marked, completedActivities: assessmentTicks }) };
+        }
+        return { ok: true, json: async () => url.includes("/kit-content/") ? {
+            content: {
+                bannerTitle: "Kit",
+                worksheets: [{}, {}, { activity: "Password Problems" }],
+                activities: [null, null, { assessment: studentAssessment }]
+            }
+        } : { responses: {}, completedActivities: assessmentTicks, kit: { isComplete: false } } };
+    };
+    vm.runInNewContext(fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet.js"), "utf8"), browserContext);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(nodes.get("worksheet-activity-complete-btn").hidden, true);
+    await worksheetOptions.onAssessmentCheck({ ...answers, sharing: "secret" });
+    assert.equal(nodes.get("worksheet-activity-status-pill").textContent, "Not Completed");
+    failSave = true;
+    await assert.rejects(worksheetOptions.onAssessmentCheck(answers), /Database unavailable/);
+    assert.equal(nodes.get("worksheet-activity-status-pill").textContent, "Not Completed");
+    failSave = false;
+    await worksheetOptions.onAssessmentCheck(answers);
+    assert.equal(nodes.get("worksheet-activity-status-pill").textContent, "Completed");
+    vm.runInNewContext(fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet.js"), "utf8"), browserContext);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(nodes.get("worksheet-activity-status-pill").textContent, "Completed");
     console.log("Practical Skills completion regression checks passed.");
 }
 

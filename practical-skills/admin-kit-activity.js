@@ -90,7 +90,7 @@
             alt: card.querySelector("input[data-image-alt]")?.value || "",
             caption: card.querySelector("input[data-image-caption]")?.value || ""
         }));
-        return { number: activityIndex + 1, title: titleInput.value, establishes: establishesInput.value, questions, images };
+        return { ...content.activities?.[activityIndex], number: activityIndex + 1, title: titleInput.value, establishes: establishesInput.value, questions, images };
     }
 
     function render() {
@@ -100,6 +100,8 @@
         establishesInput.value = activity.establishes || worksheet.establishes || "";
         document.querySelector("#activity-page-title").textContent = `Activity Details: ${titleInput.value}`;
         document.querySelector("#activity-page-summary").textContent = establishesInput.value || "Configure the student tasks and supporting images for this worksheet.";
+        const assessmentNote = document.querySelector("#activity-assessment-note");
+        assessmentNote.hidden = activity.assessmentId !== "password-problems-v1";
         renderQuestions(activity.questions || []);
         renderImages(activity.images || []);
     }

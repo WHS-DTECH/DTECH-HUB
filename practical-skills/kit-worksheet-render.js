@@ -51,6 +51,104 @@
         `;
     }
 
+    function renderAssessment(assessment, answers, readOnly) {
+        return `
+            <section class="worksheet-assessment" aria-labelledby="assessment-title">
+                <div class="worksheet-assessment-intro">
+                    <h2 id="assessment-title">${escapeHtml(assessment.title)}</h2>
+                    <p>${escapeHtml(assessment.introduction)}</p>
+                    <p class="worksheet-safety-note">${escapeHtml(assessment.safety)}</p>
+                    <h3>Your detective toolkit</h3>
+                    <ul>${assessment.tips.map((tip) => `<li>${escapeHtml(tip)}</li>`).join("")}</ul>
+                </div>
+                <form class="worksheet-assessment-form">
+                    <fieldset class="worksheet-assessment-inputs" ${readOnly ? "disabled" : ""}>
+                        <legend class="worksheet-assessment-heading">Round 1: Match the problem to the safe fix</legend>
+                        <p>Choose a fix for each problem. Each fix is used once. You can use the keyboard or tap the menus.</p>
+                        ${assessment.matches.map((question, index) => `
+                            <div class="worksheet-assessment-question">
+                                <label for="assessment-${escapeHtml(question.id)}"><strong>${index + 1}.</strong> ${escapeHtml(question.prompt)}</label>
+                                <select id="assessment-${escapeHtml(question.id)}" name="${escapeHtml(question.id)}" data-assessment-id="${escapeHtml(question.id)}" aria-describedby="feedback-${escapeHtml(question.id)}">
+                                    <option value="">Choose a safe fix...</option>
+                                    ${assessment.matchOptions.map((option) => `<option value="${escapeHtml(option.id)}" ${answers[question.id] === option.id ? "selected" : ""}>${escapeHtml(option.text)}</option>`).join("")}
+                                </select>
+                                <p id="feedback-${escapeHtml(question.id)}" class="worksheet-assessment-feedback" data-feedback-id="${escapeHtml(question.id)}" hidden></p>
+                            </div>
+                        `).join("")}
+                        <h3 class="worksheet-assessment-heading">Round 2: Solve the mini mysteries</h3>
+                        ${assessment.quiz.map((question, index) => `
+                            <fieldset class="worksheet-assessment-question" aria-describedby="feedback-${escapeHtml(question.id)}">
+                                <legend><strong>${index + 1}.</strong> ${escapeHtml(question.prompt)}</legend>
+                                ${question.options.map((option) => `
+                                    <label class="worksheet-assessment-choice">
+                                        <input type="radio" name="${escapeHtml(question.id)}" data-assessment-id="${escapeHtml(question.id)}" value="${escapeHtml(option.id)}" ${answers[question.id] === option.id ? "checked" : ""}>
+                                        <span>${escapeHtml(option.text)}</span>
+                                    </label>
+                                `).join("")}
+                                <p id="feedback-${escapeHtml(question.id)}" class="worksheet-assessment-feedback" data-feedback-id="${escapeHtml(question.id)}" hidden></p>
+                            </fieldset>
+                        `).join("")}
+                    </fieldset>
+                    <button type="submit" class="worksheet-btn worksheet-btn-primary" ${readOnly ? "disabled" : ""}>Check my answers</button>
+                    <p class="worksheet-assessment-result" role="status" aria-live="polite">Complete both rounds, then check your answers. You can try again as many times as you need.</p>
+                </form>
+            </section>
+        `;
+    }
+
+    function wireAssessment(host, options) {
+        const form = host.querySelector(".worksheet-assessment-form");
+        if (!form) return;
+        const result = form.querySelector(".worksheet-assessment-result");
+        const button = form.querySelector("button[type=submit]");
+        const inputs = form.querySelector(".worksheet-assessment-inputs");
+        form.addEventListener("change", (event) => {
+            const id = event.target.getAttribute("data-assessment-id");
+            if (!id) return;
+            form.querySelectorAll("[data-feedback-id]").forEach((feedback) => {
+                if (feedback.getAttribute("data-feedback-id") === id) feedback.hidden = true;
+            });
+            result.classList.remove("is-error", "is-correct");
+            result.textContent = "Answers changed. Check again when you are ready.";
+        });
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            if (button.disabled) return;
+            const answers = {};
+            form.querySelectorAll("[data-assessment-id]").forEach((input) => {
+                if (input.tagName === "SELECT" || input.checked) {
+                    answers[input.getAttribute("data-assessment-id")] = input.value;
+                }
+            });
+            button.disabled = true;
+            inputs.disabled = true;
+            result.classList.remove("is-error", "is-correct");
+            result.textContent = "Checking and saving your answers...";
+            try {
+                if (!options.onAssessmentCheck) throw new Error("Answer checking is unavailable here. Open the student activity to try it.");
+                const grade = await options.onAssessmentCheck(answers);
+                form.querySelectorAll("[data-feedback-id]").forEach((feedback) => {
+                    const marked = grade.results.find((entry) => entry.id === feedback.getAttribute("data-feedback-id"));
+                    if (!marked) return;
+                    feedback.hidden = false;
+                    feedback.classList.toggle("is-correct", marked.correct);
+                    feedback.classList.toggle("is-error", !marked.correct);
+                    feedback.textContent = `${marked.correct ? "Correct!" : "Try again."} ${marked.explanation}`;
+                });
+                result.classList.toggle("is-correct", grade.passed);
+                result.textContent = grade.passed
+                    ? `${grade.score} / ${grade.total} correct! Brilliant detective work. Your completion tick is saved.`
+                    : `${grade.score} / ${grade.total} correct. Your answers are saved. Read the tips beside each answer and try again. Get all ${grade.total} right to earn your tick.`;
+            } catch (error) {
+                result.classList.add("is-error");
+                result.textContent = error?.message || "Could not check and save your answers. Please try again.";
+            } finally {
+                button.disabled = false;
+                inputs.disabled = false;
+            }
+        });
+    }
+
     function renderWorksheet(host, content, options = {}) {
         if (!host) return;
 
@@ -89,6 +187,7 @@
                     `).join("")}
                 </div>
             ` : ""}
+            ${content?.assessment ? renderAssessment(content.assessment, options.assessmentAnswers || {}, readOnly) : ""}
             <div class="worksheet-question-list">
                 ${questions.length ? questions.map((question, index) => `
                     <article class="worksheet-question">
@@ -98,11 +197,13 @@
                             ${renderQuestionBody(question, responses, readOnly)}
                         </div>
                     </article>
-                `).join("") : `<p class="worksheet-empty-note">This kit does not have any questions yet.</p>`}
+                `).join("") : content?.assessment ? "" : `<p class="worksheet-empty-note">This kit does not have any questions yet.</p>`}
             </div>
         `;
 
         if (readOnly) return;
+
+        if (content?.assessment) wireAssessment(host, options);
 
         host.querySelectorAll(".worksheet-answer-input").forEach((textarea) => {
             textarea.addEventListener("change", () => {

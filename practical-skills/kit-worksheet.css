@@ -482,6 +482,128 @@ body.kit-worksheet-page {
     color: #a4342f;
 }
 
+.worksheet-btn[hidden] {
+    display: none;
+}
+
+.worksheet-assessment {
+    display: grid;
+    gap: 20px;
+    margin-bottom: 20px;
+    color: #3a3226;
+}
+
+.worksheet-assessment-intro,
+.worksheet-assessment-question {
+    min-width: 0;
+    margin: 0;
+    padding: 16px 18px;
+    border: 2px solid #f1e4c8;
+    border-radius: 16px;
+    background: #ffffff;
+}
+
+.worksheet-assessment-intro h2,
+.worksheet-assessment-heading {
+    font-family: 'Baloo 2', cursive;
+    font-size: 1.3rem;
+    margin: 0;
+}
+
+.worksheet-assessment-intro p,
+.worksheet-assessment-intro li {
+    line-height: 1.6;
+}
+
+.worksheet-safety-note {
+    padding: 12px;
+    border-left: 4px solid #b77a0c;
+    background: #fff8e1;
+    font-weight: 700;
+}
+
+.worksheet-assessment-form,
+.worksheet-assessment-inputs,
+.worksheet-assessment-question {
+    display: grid;
+    gap: 12px;
+}
+
+.worksheet-assessment-inputs {
+    min-width: 0;
+    padding: 0;
+    margin: 0;
+    border: 0;
+}
+
+.worksheet-assessment-inputs > legend {
+    padding: 0 0 8px;
+}
+
+.worksheet-assessment-question > legend,
+.worksheet-assessment-question > label:first-child {
+    font-weight: 700;
+    line-height: 1.5;
+}
+
+.worksheet-assessment-question select {
+    width: 100%;
+    min-width: 0;
+    padding: 10px;
+    border: 2px solid #d8c8a0;
+    border-radius: 10px;
+    background: #fffaf0;
+    color: #3a3226;
+    font: inherit;
+}
+
+.worksheet-assessment-choice {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px;
+    border: 1px solid #d8c8a0;
+    border-radius: 10px;
+    line-height: 1.5;
+    cursor: pointer;
+}
+
+.worksheet-assessment-choice input {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    accent-color: var(--worksheet-theme-color);
+}
+
+.worksheet-assessment-choice:has(input:checked) {
+    background: #edf8ef;
+    border-color: var(--worksheet-theme-color);
+}
+
+.worksheet-assessment-feedback,
+.worksheet-assessment-result {
+    margin: 0;
+    padding: 10px;
+    border-radius: 8px;
+    background: #fff8e1;
+    line-height: 1.6;
+    font-weight: 700;
+}
+
+.worksheet-assessment .is-correct {
+    background: #edf8ef;
+    color: #175c38;
+}
+
+.worksheet-assessment .is-error {
+    background: #fff0eb;
+    color: #92351d;
+}
+
+.worksheet-assessment-form > button {
+    justify-self: start;
+}
+
 @media print {
     .kit-worksheet-topbar,
     .worksheet-complete-bar,

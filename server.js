@@ -5,6 +5,7 @@ const multer = require("multer");
 const mammoth = require("mammoth");
 const nodemailer = require("nodemailer");
 const { Pool } = require("pg");
+const { PASSWORD_PROBLEMS_ID, withPasswordProblemsActivity, getStudentAssessment, gradePasswordProblems } = require("./practical-skills-assessment");
 
 let OAuth2Client = null;
 try {
@@ -4411,7 +4412,12 @@ function normalizePracticalSkillsKitContentForDisplay(kitId, content) {
     completion: _completion,
     ...studentContent
   } = safeContent;
-  return studentContent;
+  return {
+    ...studentContent,
+    activities: Array.isArray(studentContent.activities) ? studentContent.activities.map((activity) =>
+      activity ? { ...activity, assessment: getStudentAssessment(activity.assessmentId) } : activity
+    ) : []
+  };
 }
 
 function getDefaultPracticalSkillsKitContent(kitId) {
@@ -4458,7 +4464,7 @@ async function getStoredPracticalSkillsKitContent(kitId) {
 
   if (!hasDatabase) {
     const stored = memoryPracticalSkillsKitContent.get(safeKitId);
-    return stored || getDefaultPracticalSkillsKitContent(safeKitId);
+    return withPasswordProblemsActivity(safeKitId, stored || getDefaultPracticalSkillsKitContent(safeKitId));
   }
 
   await ensurePracticalSkillsKitContentSchema();
@@ -4466,14 +4472,14 @@ async function getStoredPracticalSkillsKitContent(kitId) {
   const stored = result.rows?.[0]?.content;
   const defaults = getDefaultPracticalSkillsKitContent(safeKitId);
   if (!stored || !Object.keys(stored).length) {
-    return defaults;
+    return withPasswordProblemsActivity(safeKitId, defaults);
   }
 
   const merged = { ...defaults, ...stored };
   if (safeKitId === "kit-login" && (!Array.isArray(stored.worksheets) || !stored.worksheets.length)) {
     merged.worksheets = defaults.worksheets;
   }
-  return merged;
+  return withPasswordProblemsActivity(safeKitId, merged);
 }
 
 async function savePracticalSkillsKitContent(kitId, content, updatedByEmail) {
@@ -4556,6 +4562,43 @@ async function setPracticalSkillsActivityCompletion(studentEmail, kitId, activit
         [key, email, kitId]
       );
   return result.rows?.[0] || null;
+}
+
+async function savePracticalSkillsAssessment(studentEmail, kitId, activityIndex, grade) {
+  const email = normalizeEmail(studentEmail);
+  await ensurePracticalSkillsProgressRow(email, kitId);
+  const activityKey = String(activityIndex);
+  const responseKey = `${activityIndex}-${PASSWORD_PROBLEMS_ID}`;
+  const completedAt = new Date().toISOString();
+
+  if (!hasDatabase) {
+    const key = `${email}:${kitId}`;
+    const existing = memoryPracticalSkillsProgress.get(key);
+    const next = {
+      ...existing,
+      responses: { ...existing.responses, [responseKey]: grade.answers },
+      completed_activities: {
+        ...existing.completed_activities,
+        ...(grade.passed ? { [activityKey]: completedAt } : {})
+      },
+      updated_at: completedAt
+    };
+    memoryPracticalSkillsProgress.set(key, next);
+    return next;
+  }
+
+  const result = await pool.query(
+    `UPDATE practical_skills_progress
+     SET responses = jsonb_set(responses, ARRAY[$1::text], $2::jsonb),
+         completed_activities = CASE WHEN $5::boolean
+           THEN jsonb_set(completed_activities, ARRAY[$3::text], to_jsonb($4::text))
+           ELSE completed_activities END,
+         updated_at = NOW()
+     WHERE student_email = $6 AND kit_id = $7 RETURNING *`,
+    [responseKey, JSON.stringify(grade.answers), activityKey, completedAt, grade.passed, email, kitId]
+  );
+  if (!result.rows?.[0]) throw new Error("Activity progress could not be saved.");
+  return result.rows[0];
 }
 
 async function ensureStudentHaparaFoldersSchema() {
@@ -12443,10 +12486,46 @@ app.put("/api/practical-skills/progress/:kitId/activities/:activityIndex", async
       res.status(404).json({ error: "Unknown activity." });
       return;
     }
+    if (req.body.completed && content.activities?.[activityIndex]?.assessmentId === PASSWORD_PROBLEMS_ID) {
+      res.status(409).json({ error: "Complete the matching task and quiz, then check your answers to earn this activity tick." });
+      return;
+    }
     const saved = await setPracticalSkillsActivityCompletion(studentEmail, kitId, activityIndex, req.body.completed);
     res.json({ completedActivities: saved.completed_activities });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not save activity completion." });
+  }
+});
+
+app.post("/api/practical-skills/progress/:kitId/activities/:activityIndex/check", async (req, res) => {
+  const studentEmail = normalizeEmail(getRequestUserEmail(req));
+  const kitId = String(req.params.kitId || "").trim();
+  const activityIndex = Number(req.params.activityIndex);
+  if (!studentEmail || !studentEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required." });
+    return;
+  }
+  if (!getPracticalSkillsKitDefinition(kitId)) {
+    res.status(404).json({ error: "Unknown kit." });
+    return;
+  }
+  if (!/^\d+$/.test(req.params.activityIndex) || !Number.isSafeInteger(activityIndex) ||
+      !req.body?.answers || typeof req.body.answers !== "object" || Array.isArray(req.body.answers)) {
+    res.status(400).json({ error: "A valid activity index and answers are required." });
+    return;
+  }
+
+  try {
+    const content = await getStoredPracticalSkillsKitContent(kitId);
+    if (!content?.worksheets?.[activityIndex] || content.activities?.[activityIndex]?.assessmentId !== PASSWORD_PROBLEMS_ID) {
+      res.status(404).json({ error: "Unknown self-marking activity." });
+      return;
+    }
+    const grade = gradePasswordProblems(req.body.answers);
+    const saved = await savePracticalSkillsAssessment(studentEmail, kitId, activityIndex, grade);
+    res.json({ ...grade, completedActivities: saved.completed_activities });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not check and save your activity." });
   }
 });
 
