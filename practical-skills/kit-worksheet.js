@@ -243,6 +243,7 @@
                 identityLessonVersion: activity?.identityLessonVersion,
                 assessment: activity?.assessment
             } : state.content;
+            const assessmentKey = `${activityIndex}-${activity?.assessment?.id || "login-sites-readiness-v1"}`;
 
             window.KitWorksheetRender.renderWorksheet(host, activityContent, {
                 responses: state.responses,
@@ -289,8 +290,8 @@
                         return payload;
                     });
                 },
-                assessmentAnswers: activity?.assessment
-                    ? state.responses[`${activityIndex}-${activity.assessment.id}`] || {}
+                assessmentAnswers: activity?.assessment || activity?.loginSites
+                    ? state.responses[assessmentKey] || {}
                     : {},
                 onAssessmentCheck: async (answers) => {
                     if (!state.progressLoaded) throw new Error("Your progress has not loaded. Refresh the page and try again.");
@@ -302,7 +303,7 @@
                             headers: withAuthHeaders({ "Content-Type": "application/json" }),
                             body: JSON.stringify({ answers })
                         });
-                        state.responses[`${activityIndex}-${activity.assessment.id}`] = payload.answers;
+                        state.responses[assessmentKey] = payload.answers;
                         state.completedActivities = payload.completedActivities;
                         updateActivityCompleteBar();
                         if (payload.passed) showStatusMessage("Activity complete! Your activity tick has been saved.");

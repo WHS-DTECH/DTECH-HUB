@@ -816,6 +816,36 @@ body.kit-worksheet-page {
     overflow-wrap: anywhere;
 }
 
+.login-site-check {
+    grid-column: 1 / -1;
+    display: grid;
+    gap: 12px;
+    padding-top: 16px;
+    border-top: 2px dashed #e4d4b0;
+}
+
+.login-site-check label {
+    font-weight: 700;
+}
+
+.login-site-check p {
+    margin: 0;
+}
+
+.login-site-check input {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    padding: 12px;
+    border: 2px solid #b5955c;
+    border-radius: 8px;
+    font: inherit;
+}
+
+.login-site-check button {
+    justify-self: start;
+}
+
 .login-staircase-logo {
     display: grid;
     gap: 8px;

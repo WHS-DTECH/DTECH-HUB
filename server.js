@@ -7,6 +7,7 @@ const nodemailer = require("nodemailer");
 const { Pool } = require("pg");
 const { PASSWORD_PROBLEMS_ID, APPS_WORDSEARCH_ID, withShortLoginKit, withLoginAppsActivity, withLearningSitesActivity, withPasswordProblemsActivity, withLoginIdentityActivity, getStudentAssessment, gradePasswordProblems, gradeLoginIdentity, gradeAppsWordsearch } = require("./practical-skills-assessment");
 const { LEARNING_SITES_ID, getHuntProfile, gradeLearningSites } = require("./learning-sites-assessment");
+const { gradeLoginSites } = require("./practical-skills-assessment");
 
 let OAuth2Client = null;
 try {
@@ -12624,7 +12625,7 @@ app.post("/api/practical-skills/progress/:kitId/activities/:activityIndex/check"
     const content = await getStoredPracticalSkillsKitContent(kitId);
     const activity = content?.activities?.[activityIndex];
     const identityLesson = Boolean(activity?.identityLessonVersion);
-    if (!content?.worksheets?.[activityIndex] || (!identityLesson && ![PASSWORD_PROBLEMS_ID, APPS_WORDSEARCH_ID, LEARNING_SITES_ID].includes(activity?.assessmentId))) {
+    if (!content?.worksheets?.[activityIndex] || (!identityLesson && !activity?.loginSites && ![PASSWORD_PROBLEMS_ID, APPS_WORDSEARCH_ID, LEARNING_SITES_ID].includes(activity?.assessmentId))) {
       res.status(404).json({ error: "Unknown self-marking activity." });
       return;
     }
@@ -12634,7 +12635,9 @@ app.post("/api/practical-skills/progress/:kitId/activities/:activityIndex/check"
     }
     const grade = identityLesson
       ? gradeLoginIdentity(req.body.answers, { ...req.auth_identity, email: studentEmail }, activity.questions || [])
-      : activity.assessmentId === APPS_WORDSEARCH_ID
+      : activity.loginSites
+        ? gradeLoginSites(req.body.answers)
+        : activity.assessmentId === APPS_WORDSEARCH_ID
         ? gradeAppsWordsearch(req.body.answers, Boolean((await getStudentLoginDriveSetup(studentEmail))?.folder_id))
         : activity.assessmentId === LEARNING_SITES_ID
           ? gradeLearningSites(req.body.answers, await getLearningSitesStudentProfile(studentEmail))

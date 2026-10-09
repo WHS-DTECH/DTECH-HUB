@@ -103,6 +103,16 @@ async function main() {
     assert.equal((await request(profileUrl)).body.available, true);
     assert.equal((await request(profileUrl, { email: "other@example.school.nz" })).body.available, false);
     assert.equal((await request(checkUrl)).body.completedActivities["1"], "saved");
+    enhanced.worksheets.push({ activity: "Using your login details" });
+    enhanced.activities.push({ loginSites: [{ name: "Tinkercad" }] });
+    const tinkercadCheck = await request(checkUrl, {
+        params: { kitId: "kit-login", activityIndex: "2" },
+        body: { answers: { tinkercad: "Circuits, 3D Designs and Codeblocks", passed: true } }
+    });
+    assert.equal(tinkercadCheck.body.answers.tinkercadReady, true);
+    assert.equal(tinkercadCheck.body.assessmentId, assessment.LOGIN_SITES_ID);
+    assert.equal(tinkercadCheck.body.passed, false);
+    assert.equal(tinkercadCheck.body.completedActivities["2"], undefined);
     assert.deepEqual(Array.from((await request(profileUrl, { email: "staff@example.school.nz" })).body.courseIds), ["STAFF"]);
     assert.equal((await request(checkUrl, { email: "staff@example.school.nz", body: { answers: staffAnswers } })).body.completedActivities["1"], "saved");
     assert.equal((await request(checkUrl, { body: { answers: staffAnswers, profile: { available: true, courseIds: ["STAFF"] }, isStaff: true } })).body.passed, false, "Client-supplied staff status is ignored");

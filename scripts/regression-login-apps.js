@@ -82,6 +82,17 @@ async function main() {
     assert.doesNotMatch(shortKitHost.innerHTML, /Old Kamar question|does not have any questions/);
     assert.match(shortKitHost.innerHTML, /Years 7\/8/);
     assert.match(shortKitHost.innerHTML, /Years 9\/10/);
+    assert.match(shortKitHost.innerHTML, /https:\/\/www.tinkercad.com\/joinclass\/XTY22KANL/);
+    assert.match(shortKitHost.innerHTML, /data-site-check="tinkercad"/);
+    for (const value of ["Circuits, 3D Designs and Codeblocks", "code blocks, circuits & 3 D designs", "3D designs / Codeblocks / Circuits"]) {
+        const grade = assessment.gradeLoginSites({ tinkercad: value });
+        assert.equal(grade.answers.tinkercadReady, true);
+        assert.equal(grade.passed, false, "One site must not award whole-activity completion");
+        assert.equal(grade.assessmentId, assessment.LOGIN_SITES_ID);
+    }
+    for (const value of ["Circuits", "", ["Circuits", "3D Designs", "Codeblocks"]]) {
+        assert.equal(assessment.gradeLoginSites({ tinkercad: value, tinkercadReady: true }).answers.tinkercadReady, false);
+    }
     for (const year of [7, 8, 9, 10, null]) {
         shortKitRenderer.window.KitWorksheetRender.renderWorksheet(shortKitHost, {
             bannerTitle: "Using your login details", loginSites: shortKit.activities[6].loginSites

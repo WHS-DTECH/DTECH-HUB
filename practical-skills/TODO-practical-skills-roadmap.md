@@ -34,6 +34,11 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   The staircase loads the signed-in user's server-derived year profile. Years
   7/8 see only the three JuniorDTECH sites; MiddleDTECH and staff retain all five.
   Without a linked year profile, the general list remains visible.
+  Tinkercad now uses the supplied class link and a quick three-design-area
+  question under its stair. Server marking saves the answer and site readiness
+  tick in login-sites-readiness-v1 responses; it never awards the whole activity
+  from this single check. Other site questions are pending. Readiness answers
+  are evidence, not direct verification of third-party sign-in sessions.
 - Implemented: Open DTECH Learning Site / Open DTECH-HUB in the Login Kit now
   includes a five-island pirate-map treasure hunt. Students follow Westland High
   Website > Intranet > Learning Sites, visit Science, Mrs O'Malley's English,

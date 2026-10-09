@@ -578,7 +578,7 @@
                 <section class="worksheet-login-staircase" aria-labelledby="login-staircase-title">
                     <h2 id="login-staircase-title">Step into your learning websites</h2>
                     <p>Each step introduces a website used in DTECH. Click its logo to open it in a new tab, keeping this activity open.</p>
-                    <p>These are the general websites for now. Your teacher will give you a class link or code when needed. Follow your teacher's sign-in instructions; never share your password.</p>
+                    <p>Tinkercad opens your class link; the other links open the general websites for now. Follow your teacher's sign-in instructions; never share your password.</p>
                     ${juniorLoginSites ? "<p>Showing the JuniorDTECH websites for your Year 7/8 profile.</p>" : ""}
                     <ol class="login-staircase-list">
                         ${loginSites.map((site, index) => `
@@ -589,10 +589,20 @@
                                     <img src="${escapeHtml(site.logo)}" alt="${escapeHtml(site.name)} logo" referrerpolicy="no-referrer">
                                     <span>Open ${escapeHtml(site.name)} &nearr;</span>
                                 </a>
+                                ${site.readinessQuestion ? `
+                                    <form class="login-site-check" data-site-check="${escapeHtml(site.readinessQuestion.id)}">
+                                        <label for="login-site-${escapeHtml(site.readinessQuestion.id)}">${escapeHtml(site.readinessQuestion.prompt)}</label>
+                                        <p>${escapeHtml(site.readinessQuestion.hint)}</p>
+                                        <input id="login-site-${escapeHtml(site.readinessQuestion.id)}" name="${escapeHtml(site.readinessQuestion.id)}" maxlength="200" value="${escapeHtml(options.assessmentAnswers?.[site.readinessQuestion.id] || "")}" ${readOnly ? "disabled" : ""}>
+                                        <button class="worksheet-btn worksheet-btn-primary" type="submit" ${readOnly ? "disabled" : ""}>Check Tinkercad answer</button>
+                                        <p class="login-site-result" role="status" aria-live="polite">${options.assessmentAnswers?.tinkercadReady ? "&#10003; Tinkercad readiness check saved." : "Sign in to Tinkercad, then answer from a quick glance at your home page."}</p>
+                                    </form>
+                                ` : ""}
                             </li>
                         `).join("")}
                     </ol>
                     <p>When you have explored the websites for your year group, use <strong>Mark Activity Complete</strong> below to save your tick.</p>
+                    <p>Site checks save your answers as readiness evidence, not direct verification of another website's login. More site questions are being added; a Tinkercad tick alone does not complete this whole activity.</p>
                 </section>
             ` : ""}
             <div class="worksheet-question-list">
@@ -614,6 +624,29 @@
             wireLearningSites(host, content.assessment, { ...options, readOnly });
             if (readOnly) return;
         } else if (readOnly) return;
+
+        if (content?.loginSites) host.querySelectorAll("[data-site-check]").forEach((form) => {
+            const input = form.querySelector("input");
+            const button = form.querySelector("button");
+            const result = form.querySelector(".login-site-result");
+            input.addEventListener("input", () => { result.textContent = "Answer changed. Check again to save your readiness evidence."; });
+            form.addEventListener("submit", async (event) => {
+                event.preventDefault();
+                if (button.disabled) return;
+                button.disabled = true;
+                input.disabled = true;
+                result.textContent = "Checking and saving...";
+                try {
+                    const grade = await options.onAssessmentCheck({ [input.name]: input.value });
+                    result.textContent = `${grade.results[0].correct ? "\u2713 " : ""}${grade.results[0].explanation}`;
+                } catch (error) {
+                    result.textContent = error?.message || "Could not save your site check. Try again.";
+                } finally {
+                    input.disabled = false;
+                    button.disabled = false;
+                }
+            });
+        });
 
         if (content?.assessment?.id === "apps-wordsearch-v1") wireAppsAssessment(host, content.assessment, options);
         else if (content?.assessment && content.assessment.id !== "learning-sites-treasure-v1") wireAssessment(host, options);
