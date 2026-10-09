@@ -203,6 +203,7 @@
                 bannerSubtitle: worksheet.establishes || activity?.establishes || "",
                 questions,
                 images,
+                information: activity?.information,
                 assessment: activity?.assessment
             } : state.content;
 

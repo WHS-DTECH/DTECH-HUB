@@ -510,6 +510,11 @@ body.kit-worksheet-page {
     margin: 0;
 }
 
+.worksheet-identity-guide {
+    margin-bottom: 20px;
+    color: #3a3226;
+}
+
 .worksheet-assessment-intro p,
 .worksheet-assessment-intro li {
     line-height: 1.6;

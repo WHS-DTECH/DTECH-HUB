@@ -5,7 +5,7 @@ const multer = require("multer");
 const mammoth = require("mammoth");
 const nodemailer = require("nodemailer");
 const { Pool } = require("pg");
-const { PASSWORD_PROBLEMS_ID, withPasswordProblemsActivity, getStudentAssessment, gradePasswordProblems } = require("./practical-skills-assessment");
+const { PASSWORD_PROBLEMS_ID, withPasswordProblemsActivity, withLoginIdentityActivity, getStudentAssessment, gradePasswordProblems } = require("./practical-skills-assessment");
 
 let OAuth2Client = null;
 try {
@@ -4391,7 +4391,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function normalizePracticalSkillsKitContentForStorage(kitId, content) {
-  const safeContent = content && typeof content === "object" ? content : {};
+  const safeContent = withLoginIdentityActivity(kitId, content && typeof content === "object" ? content : {});
   if (String(kitId || "").trim() !== "kit-login") {
     return safeContent;
   }
@@ -4464,7 +4464,7 @@ async function getStoredPracticalSkillsKitContent(kitId) {
 
   if (!hasDatabase) {
     const stored = memoryPracticalSkillsKitContent.get(safeKitId);
-    return withPasswordProblemsActivity(safeKitId, stored || getDefaultPracticalSkillsKitContent(safeKitId));
+    return withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, stored || getDefaultPracticalSkillsKitContent(safeKitId)));
   }
 
   await ensurePracticalSkillsKitContentSchema();
@@ -4472,14 +4472,14 @@ async function getStoredPracticalSkillsKitContent(kitId) {
   const stored = result.rows?.[0]?.content;
   const defaults = getDefaultPracticalSkillsKitContent(safeKitId);
   if (!stored || !Object.keys(stored).length) {
-    return withPasswordProblemsActivity(safeKitId, defaults);
+    return withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, defaults));
   }
 
   const merged = { ...defaults, ...stored };
   if (safeKitId === "kit-login" && (!Array.isArray(stored.worksheets) || !stored.worksheets.length)) {
     merged.worksheets = defaults.worksheets;
   }
-  return withPasswordProblemsActivity(safeKitId, merged);
+  return withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, merged));
 }
 
 async function savePracticalSkillsKitContent(kitId, content, updatedByEmail) {

@@ -146,6 +146,27 @@ async function main() {
     assert.equal(authored.activities[1].assessmentId, undefined, "Do not mutate stored content");
     assert.equal(assessment.withPasswordProblemsActivity("kit-minecraft", authored), authored);
 
+    const legacyIdentity = {
+        worksheets: [{ activity: "Know Your Username and Email Address" }],
+        questions: [{ id: "q1", type: "short-answer", prompt: "What is your school username?" }],
+        activities: [{ images: [{ url: "example.png" }] }]
+    };
+    const identity = assessment.withLoginIdentityActivity("kit-login", legacyIdentity);
+    assert.deepEqual(identity.activities[0].questions.map((question) => question.prompt), [
+        "What is your first name?", "What is your last name?",
+        "What is your username?", "What is your school email address?"
+    ]);
+    assert.equal(identity.activities[0].questions[2].id, "q1");
+    assert.equal(identity.activities[0].images[0].url, "example.png");
+    assert.equal(legacyIdentity.activities[0].questions, undefined);
+    assert.equal(assessment.withLoginIdentityActivity("kit-login", identity), identity);
+    assert.equal(assessment.withLoginIdentityActivity("kit-minecraft", legacyIdentity), legacyIdentity);
+    const guide = identity.activities[0].information.paragraphs.join(" ");
+    assert.match(guide, /v_pringle2@westlandhigh\.school\.nz/);
+    assert.match(guide, /m_smithjones/);
+    assert.match(guide, /administration error/);
+    assert.match(guide, /deactivated/);
+
     context.hasDatabase = false;
     let saved = await context.savePracticalSkillsAssessment("student@example.school.nz", "kit-login", 1, partial);
     assert.equal(saved.completed_activities["1"], undefined);
@@ -224,6 +245,16 @@ async function main() {
     assert.match(host.innerHTML, /value="caps" selected/);
     assert.match(host.innerHTML, /Check my answers/);
     assert.doesNotMatch(host.innerHTML, /does not have any questions/);
+    rendererContext.window.KitWorksheetRender.renderWorksheet(host, {
+        bannerTitle: "Know Your Username and Email Address",
+        ...identity.activities[0]
+    }, { readOnly: true, responses: { q1: "v_pringle2" } });
+    assert.match(host.innerHTML, /How WHS usernames are made/);
+    assert.match(host.innerHTML, /What is your first name\?/);
+    assert.match(host.innerHTML, /What is your last name\?/);
+    assert.match(host.innerHTML, /What is your school email address\?/);
+    assert.match(host.innerHTML, />v_pringle2<\/textarea>/);
+    assert.equal((host.innerHTML.match(/<textarea /g) || []).length, 4);
 
     const nodes = new Map();
     const events = {};

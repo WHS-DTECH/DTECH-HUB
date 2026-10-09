@@ -35,6 +35,12 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   task is attached by worksheet title without replacing teacher-authored
   questions/images, and survives saving in Activity Details.
 - Support evidence capture where needed (text, link, or image).
+- Implemented: Login Kit Activity 1 builds from first name and last name to
+  username and school email. Its WHS guide explains the `firstinitial_lastname`
+  pattern, removing surname hyphens, and assigned numeric
+  suffixes. Existing username answer IDs are retained. The versioned content
+  update replaces the legacy three-question activity once, preserves images,
+  and allows subsequent teacher edits without reseeding the questions.
 - Use clear kit states:
   - `not_started`
   - `in_progress`

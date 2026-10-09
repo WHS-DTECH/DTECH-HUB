@@ -187,6 +187,12 @@
                     `).join("")}
                 </div>
             ` : ""}
+            ${content?.information ? `
+                <section class="worksheet-assessment-intro worksheet-identity-guide" aria-labelledby="identity-guide-title">
+                    <h2 id="identity-guide-title">${escapeHtml(content.information.title)}</h2>
+                    ${(content.information.paragraphs || []).map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join("")}
+                </section>
+            ` : ""}
             ${content?.assessment ? renderAssessment(content.assessment, options.assessmentAnswers || {}, readOnly) : ""}
             <div class="worksheet-question-list">
                 ${questions.length ? questions.map((question, index) => `

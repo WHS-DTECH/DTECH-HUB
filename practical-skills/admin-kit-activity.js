@@ -102,6 +102,15 @@
         document.querySelector("#activity-page-summary").textContent = establishesInput.value || "Configure the student tasks and supporting images for this worksheet.";
         const assessmentNote = document.querySelector("#activity-assessment-note");
         assessmentNote.hidden = activity.assessmentId !== "password-problems-v1";
+        document.querySelector("#activity-information").hidden = !activity.information;
+        document.querySelector("#activity-information-title").textContent = activity.information?.title || "";
+        const informationHost = document.querySelector("#activity-information-paragraphs");
+        informationHost.replaceChildren();
+        (activity.information?.paragraphs || []).forEach((text) => {
+            const paragraph = document.createElement("p");
+            paragraph.textContent = text;
+            informationHost.appendChild(paragraph);
+        });
         renderQuestions(activity.questions || []);
         renderImages(activity.images || []);
     }

@@ -97,6 +97,39 @@ function withPasswordProblemsActivity(kitId, content) {
   return { ...content, activities };
 }
 
+function withLoginIdentityActivity(kitId, content) {
+  if (kitId !== "kit-login" || !content?.worksheets?.[0]) return content;
+  const activities = Array.isArray(content.activities) ? content.activities.slice() : [];
+  const existing = activities[0] || {};
+  if (existing.identityLessonVersion === 1) return content;
+  const previousQuestions = existing.questions || content.questions || [];
+  const usernameQuestion = previousQuestions.find((question) =>
+    /username/i.test(String(question?.prompt || "")) && question.type === "short-answer"
+  );
+  activities[0] = {
+    ...existing,
+    identityLessonVersion: 1,
+    information: {
+      title: "How WHS usernames are made",
+      paragraphs: [
+        "Your first name is your given name. Your last name is your surname or family name. Your username is the short name you use to sign in to your school account.",
+        "WHS student usernames usually use the first letter of your first name, an underscore (_) and your last name, written in lowercase. For example, Vanessa Pringle becomes v_pringle.",
+        "If your last name has a hyphen (-), leave the hyphen out of the username. For example, Mia Smith-Jones becomes m_smithjones.",
+        "Some students have a number at the end, such as v_pringle2. This may be because an administration error occurred when their details were entered, or because they were a previous student whose original account was deactivated. The number is part of their username.",
+        "Your school email address is your assigned username followed by @westlandhigh.school.nz. For example, v_pringle becomes v_pringle@westlandhigh.school.nz, and v_pringle2 becomes v_pringle2@westlandhigh.school.nz.",
+        "Use the username you have actually been given, even if it is different from the usual pattern. If you are unsure, ask your teacher or school IT staff to confirm it. Do not remove a number or create your own username."
+      ]
+    },
+    questions: [
+      { id: "identity-first-name", type: "short-answer", prompt: "What is your first name?", lines: 1 },
+      { id: "identity-last-name", type: "short-answer", prompt: "What is your last name?", lines: 1 },
+      { id: usernameQuestion?.id || "q1", type: "short-answer", prompt: "What is your username?", lines: 1 },
+      { id: "identity-email", type: "short-answer", prompt: "What is your school email address?", lines: 1 }
+    ]
+  };
+  return { ...content, activities };
+}
+
 function getStudentAssessment(assessmentId) {
   if (assessmentId !== PASSWORD_PROBLEMS_ID) return null;
   return {
@@ -124,4 +157,4 @@ function gradePasswordProblems(answers) {
   return { score, total: results.length, passed: score === results.length, results, answers: cleanAnswers };
 }
 
-module.exports = { PASSWORD_PROBLEMS_ID, withPasswordProblemsActivity, getStudentAssessment, gradePasswordProblems };
+module.exports = { PASSWORD_PROBLEMS_ID, withPasswordProblemsActivity, withLoginIdentityActivity, getStudentAssessment, gradePasswordProblems };
