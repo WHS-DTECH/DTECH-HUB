@@ -748,16 +748,17 @@ body.kit-worksheet-page {
     color: #20374a;
 }
 
-.treasure-map-pathway a {
+.worksheet-treasure-map .treasure-map-pathway a,
+.worksheet-treasure-map .treasure-map-pathway a:visited {
     color: #fff8e8;
     text-underline-offset: 4px;
 }
 
-.treasure-map-pathway a:hover {
+.worksheet-treasure-map .treasure-map-pathway a:hover {
     color: #ffe094;
 }
 
-.treasure-map-pathway a:focus-visible {
+.worksheet-treasure-map .treasure-map-pathway a:focus-visible {
     outline: 3px solid #ffe094;
     outline-offset: 4px;
 }
