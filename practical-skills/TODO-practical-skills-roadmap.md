@@ -19,6 +19,12 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
 
 ## 3. Kit Detail / Checklist Behavior
 
+- Login Kit shows five tasks: school identity, Google/Microsoft and Drives,
+  Password Problems, DTECH Learning Site, and Using your login details (formerly
+  Open Kamar & Hapara). Other worksheets are hidden, not deleted or reindexed;
+  their saved answers/ticks remain intact, but do not count in the activity list.
+  Old hidden activity URLs open the kit list; the merged Drive URL still opens
+  the combined sign-in activity. The overall kit remains named Login Kit.
 - Implemented: Open DTECH Learning Site / Open DTECH-HUB in the Login Kit now
   includes a five-island pirate-map treasure hunt. Students follow Westland High
   Website > Intranet > Learning Sites, visit Science, Mrs O'Malley's English,

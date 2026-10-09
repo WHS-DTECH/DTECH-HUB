@@ -33,6 +33,53 @@ async function main() {
     const renamed = structuredClone(combined);
     renamed.worksheets[1].activity = "Our edited title";
     assert.equal(assessment.withLoginAppsActivity("kit-login", renamed).worksheets[1].activity, "Our edited title");
+    const fullKit = {
+        bannerTitle: "Login Kit",
+        worksheets: [
+            { activity: "Know Your Username" }, { activity: "Sign In" }, { activity: "Password Problems" },
+            { activity: "Open DTECH-HUB" }, { activity: "Open Google Drive" }, { activity: "Find Your Files" },
+            { activity: "Open Kamar & Hapara" }, { activity: "Open a Google App" }, { activity: "Account Check" }, { activity: "Sign Out Safely" }
+        ],
+        activities: Array.from({ length: 10 }, (_, i) => ({ title: `Original ${i}`, questions: [{ id: `saved-${i}` }] }))
+    };
+    const shorten = (content) => assessment.withShortLoginKit("kit-login",
+        assessment.withLearningSitesActivity("kit-login", assessment.withLoginAppsActivity("kit-login",
+            assessment.withLoginIdentityActivity("kit-login", assessment.withPasswordProblemsActivity("kit-login", content)))));
+    const shortKit = shorten(fullKit);
+    assert.deepEqual(shortKit.worksheets.map((worksheet, index) => ({ worksheet, index }))
+        .filter(({ worksheet }) => !worksheet.hidden && worksheet.mergedInto === undefined)
+        .map(({ index }) => index), [0, 1, 2, 3, 6]);
+    assert.equal(shortKit.activities[6].title, "Using your login details");
+    assert.equal(shortKit.worksheets[6].activity, "Using your login details");
+    assert.equal(shortKit.bannerTitle, "Login Kit");
+    assert.equal(shortKit.worksheets.length, 10);
+    assert.deepEqual(shortKit.activities[6].questions, fullKit.activities[6].questions);
+    assert.deepEqual(shortKit.activities[5], fullKit.activities[5], "Hidden activity content is retained");
+    assert.equal(fullKit.worksheets[6].activity, "Open Kamar & Hapara");
+    assert.deepEqual(shorten(shortKit), shortKit);
+    assert.equal(assessment.withShortLoginKit("kit-other", fullKit), fullKit);
+    const defaultKit = structuredClone(fullKit);
+    defaultKit.worksheets[6].activity = "Open Google Classroom";
+    assert.equal(shorten(defaultKit).worksheets[6].activity, "Using your login details");
+    const shortKitRenderer = { window: {} };
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, "..", "practical-skills", "kit-worksheet-render.js"), "utf8"), shortKitRenderer);
+    const shortKitHost = { style: { setProperty() {} }, innerHTML: "" };
+    shortKitRenderer.window.KitWorksheetRender.renderKitOverview(shortKitHost, shortKit, {
+        kitId: "kit-login", completedActivities: { 0: "saved", 1: "saved", 2: "saved", 3: "saved", 5: "hidden-saved" }
+    });
+    assert.match(shortKitHost.innerHTML, /4 \/ 5 activities completed/);
+    assert.equal((shortKitHost.innerHTML.match(/>Open Activity<\/a>/g) || []).length, 5);
+    assert.match(shortKitHost.innerHTML, /Using your login details/);
+    assert.doesNotMatch(shortKitHost.innerHTML, /activity=5"/);
+    assert.match(shortKitHost.innerHTML, /activity=6"/);
+    const worksheetSource = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "kit-worksheet.js"), "utf8");
+    const routing = worksheetSource.slice(worksheetSource.indexOf("    function getActivityIndexFromUrl()"), worksheetSource.indexOf("    function getStoredAuthRaw()"));
+    for (const [index, expected] of [[4, 1], [5, null], [6, 6], [9, null]]) {
+        const result = vm.runInNewContext(`${routing}\ngetActivityIndexFromUrl()`, {
+            URLSearchParams, window: { location: { search: `?kit=kit-login&activity=${index}` } }, state: { content: shortKit }
+        });
+        assert.equal(result, expected);
+    }
 
     const puzzle = assessment.getStudentAssessment(assessment.APPS_WORDSEARCH_ID);
     assert.equal(puzzle.grid.length, 12);

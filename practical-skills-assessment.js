@@ -23,6 +23,27 @@ for (const app of appWords) {
   });
 }
 
+function withShortLoginKit(kitId, content) {
+  if (kitId !== "kit-login" || !Array.isArray(content?.worksheets)) return content;
+  const activities = Array.isArray(content.activities) ? content.activities.slice() : [];
+  let loginIndex = content.worksheets.findIndex((worksheet) =>
+    /^(?:open kamar(?:\s*&\s*hapara)?|using your login details)$/i.test(String(worksheet?.activity || "").trim())
+  );
+  if (loginIndex < 0) {
+    loginIndex = content.worksheets.findIndex((worksheet) => /^open google classroom$/i.test(String(worksheet?.activity || "").trim()));
+  }
+  const worksheets = content.worksheets.map((worksheet, index) => {
+    const visible = index === loginIndex || Boolean(activities[index]?.identityLessonVersion) ||
+      [APPS_WORDSEARCH_ID, PASSWORD_PROBLEMS_ID, LEARNING_SITES_ID].includes(activities[index]?.assessmentId);
+    if (index === loginIndex) {
+      activities[index] = { ...activities[index], title: "Using your login details" };
+      return { ...worksheet, activity: "Using your login details", hidden: false };
+    }
+    return { ...worksheet, hidden: !visible };
+  });
+  return { ...content, worksheets, activities };
+}
+
 function withLoginAppsActivity(kitId, content) {
   if (kitId !== "kit-login" || !Array.isArray(content?.worksheets)) return content;
   const index = content.worksheets.findIndex((worksheet, i) =>
@@ -262,4 +283,4 @@ function gradeLoginIdentity(answers, identity, questions) {
   return { score, total: 4, passed: score === 4, results, answers: cleanAnswers, identityLesson: true };
 }
 
-module.exports = { PASSWORD_PROBLEMS_ID, APPS_WORDSEARCH_ID, withLoginAppsActivity, withLearningSitesActivity, withPasswordProblemsActivity, withLoginIdentityActivity, getStudentAssessment, gradePasswordProblems, gradeLoginIdentity, gradeAppsWordsearch };
+module.exports = { PASSWORD_PROBLEMS_ID, APPS_WORDSEARCH_ID, withShortLoginKit, withLoginAppsActivity, withLearningSitesActivity, withPasswordProblemsActivity, withLoginIdentityActivity, getStudentAssessment, gradePasswordProblems, gradeLoginIdentity, gradeAppsWordsearch };

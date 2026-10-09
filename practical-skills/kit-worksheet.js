@@ -34,7 +34,8 @@
         if (value === null || !/^\d+$/.test(value)) return null;
         const index = Number.parseInt(value, 10);
         const mergedInto = state.content?.worksheets?.[index]?.mergedInto;
-        return Number.isInteger(mergedInto) ? mergedInto : index;
+        const resolvedIndex = Number.isInteger(mergedInto) ? mergedInto : index;
+        return state.content?.worksheets?.[resolvedIndex]?.hidden ? null : resolvedIndex;
     }
 
     function getStoredAuthRaw() {
