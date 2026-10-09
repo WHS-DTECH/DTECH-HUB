@@ -1,4 +1,5 @@
 "use strict";
+const { LEARNING_SITES_ID, withLearningSitesActivity, getLearningSitesAssessment } = require("./learning-sites-assessment");
 
 const PASSWORD_PROBLEMS_ID = "password-problems-v1";
 const APPS_WORDSEARCH_ID = "apps-wordsearch-v1";
@@ -203,6 +204,7 @@ function withLoginIdentityActivity(kitId, content) {
 }
 
 function getStudentAssessment(assessmentId) {
+  if (assessmentId === LEARNING_SITES_ID) return getLearningSitesAssessment();
   if (assessmentId === APPS_WORDSEARCH_ID) return {
     id: APPS_WORDSEARCH_ID,
     title: "School apps explorer",
@@ -260,4 +262,4 @@ function gradeLoginIdentity(answers, identity, questions) {
   return { score, total: 4, passed: score === 4, results, answers: cleanAnswers, identityLesson: true };
 }
 
-module.exports = { PASSWORD_PROBLEMS_ID, APPS_WORDSEARCH_ID, withLoginAppsActivity, withPasswordProblemsActivity, withLoginIdentityActivity, getStudentAssessment, gradePasswordProblems, gradeLoginIdentity, gradeAppsWordsearch };
+module.exports = { PASSWORD_PROBLEMS_ID, APPS_WORDSEARCH_ID, withLoginAppsActivity, withLearningSitesActivity, withPasswordProblemsActivity, withLoginIdentityActivity, getStudentAssessment, gradePasswordProblems, gradeLoginIdentity, gradeAppsWordsearch };

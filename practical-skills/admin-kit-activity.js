@@ -103,6 +103,7 @@
         const assessmentNote = document.querySelector("#activity-assessment-note");
         assessmentNote.hidden = activity.assessmentId !== "password-problems-v1";
         document.querySelector("#activity-apps-note").hidden = activity.assessmentId !== "apps-wordsearch-v1";
+        document.querySelector("#activity-hunt-note").hidden = activity.assessmentId !== "learning-sites-treasure-v1";
         document.querySelector("#activity-merged-note").hidden = worksheet.mergedInto === undefined;
         document.querySelector("#activity-identity-note").hidden = !activity.identityLessonVersion;
         document.querySelector("#activity-information").hidden = !activity.information;

@@ -16,6 +16,7 @@
         signInWatcherId: 0,
         saveTimerId: 0,
         driveSetup: null,
+        huntProfile: null,
         driveSetupInProgress: false
     };
 
@@ -240,6 +241,7 @@
                 eyebrow: isActivity ? state.content.bannerTitle : "",
                 identityVerified: Boolean(JSON.parse(getStoredAuthRaw() || "{}").idToken),
                 driveSetup: state.driveSetup,
+                huntProfile: state.huntProfile,
                 onDriveSetup: async () => {
                     if (!state.progressLoaded) throw new Error("Your progress has not loaded. Refresh the page and try again.");
                     if (!window.requestHubDriveAccessToken) throw new Error("Google sign-in is still loading. Wait a moment and try again.");
@@ -420,6 +422,9 @@
             state.responses = { ...progressPayload?.responses, ...identityDraft };
             state.completedActivities = progressPayload?.completedActivities || {};
             state.progressLoaded = true;
+            if (state.content?.activities?.[getCurrentActivityIndex()]?.assessment?.id === "learning-sites-treasure-v1") {
+                state.huntProfile = await loadJson("/api/practical-skills/learning-sites/profile", { headers: withAuthHeaders() });
+            }
             renderPage();
             updateCompleteBar(progressPayload?.kit);
             if (state.content?.activities?.[getCurrentActivityIndex()]?.assessment?.id === "apps-wordsearch-v1") {
@@ -463,6 +468,7 @@
             state.responses = {};
             state.completedActivities = {};
             state.driveSetup = null;
+            state.huntProfile = null;
             void init(identityDraft);
         });
     }

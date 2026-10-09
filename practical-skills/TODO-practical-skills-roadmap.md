@@ -19,6 +19,24 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
 
 ## 3. Kit Detail / Checklist Behavior
 
+- Implemented: Open DTECH Learning Site / Open DTECH-HUB in the Login Kit now
+  includes a five-island pirate-map treasure hunt. Students follow Westland High
+  Website > Intranet > Learning Sites, visit Science, Mrs O'Malley's English,
+  Food & Hospitality, Physical Education, then the main DTECH site.
+  The original decorative SVG map has a dotted trail, compass, ship and X marks;
+  the responsive cards retain readable labels and keyboard-accessible links.
+  School Google authentication may be required by linked sites.
+  Server marking checks five page clues, the selected year/course against the
+  latest linked User Profile timetable record, and two course-page clues (8/8
+  saves a tick). Junior Years 7/8 find Digital Skills and STEAM Project; Middle
+  Years 9/10 find Office and Adobe Suite plus a topic; senior DTECH and Computing
+  use their own verified page questions. Missing/conflicting profiles cannot
+  earn a tick and receive explicit teacher-help feedback. The endpoint only
+  returns the signed-in student's own course information, never a student list.
+  Existing teacher questions/images, answers and activity indexes are preserved.
+  Page clues and links are defined in `learning-sites-assessment.js`, reviewed
+  on 9 October 2026; update their marking keys when source pages change (especially
+  the Food Technology year). Correct answer keys are not sent to student content.
 - Implemented: Login Kit combines Google/Microsoft sign-in and opening Drive
   into one School Apps Explorer activity. Its interactive, keyboard-accessible
   word search teaches Docs/Word, Sheets/Excel, Slides/PowerPoint and Drive/OneDrive.

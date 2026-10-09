@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 const assessment = require("../practical-skills-assessment");
+const learningSites = require("../learning-sites-assessment");
 
 const root = path.join(__dirname, "..");
 const server = fs.readFileSync(path.join(root, "server.js"), "utf8");
@@ -23,6 +24,7 @@ async function main() {
         normalizeEmail: (email) => email.trim().toLowerCase(),
         ensurePracticalSkillsProgressSchema: async () => {},
         ...assessment,
+        ...learningSites,
         Date
     });
     vm.runInContext([
@@ -73,6 +75,7 @@ async function main() {
     let handler;
     let checkHandler;
     context.app = {
+        get() {},
         put: (_url, callback) => { handler = callback; },
         post: (_url, callback) => { checkHandler = callback; }
     };
@@ -268,6 +271,15 @@ async function main() {
     await context.savePracticalSkillsAssessment(realIdentity.email, "kit-login", 1, appsGrade);
     assert.equal(queries.at(-1).values[0], "1-apps-wordsearch-v1");
     assert.equal(queries.at(-1).values[7], false);
+    const huntGrade = { assessmentId: learningSites.LEARNING_SITES_ID, passed: true, answers: { course: "7DTECH", science: "evidence" } };
+    context.hasDatabase = false;
+    const huntRow = await context.savePracticalSkillsAssessment(realIdentity.email, "kit-login", 3, huntGrade);
+    assert.equal(huntRow.responses["3-learning-sites-treasure-v1"].course, "7DTECH");
+    assert.ok(huntRow.completed_activities["3"]);
+    assert.ok(huntRow.completed_activities["0"], "Hunt completion must preserve identity completion");
+    context.hasDatabase = true;
+    await context.savePracticalSkillsAssessment(realIdentity.email, "kit-login", 3, huntGrade);
+    assert.equal(queries.at(-1).values[0], "3-learning-sites-treasure-v1");
     context.SCHOOL_EMAIL_DOMAIN = "example.school.nz";
     context.getStoredPracticalSkillsKitContent = async () => enhanced;
     context.savePracticalSkillsAssessment = async () => { throw new Error("Database unavailable"); };

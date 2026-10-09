@@ -52,6 +52,7 @@
     }
 
     function renderAssessment(assessment, answers, readOnly) {
+        if (assessment.id === "learning-sites-treasure-v1") return renderLearningSites(assessment, answers, readOnly);
         if (assessment.id === "apps-wordsearch-v1") return renderAppsAssessment(assessment, answers, readOnly);
         return `
             <section class="worksheet-assessment" aria-labelledby="assessment-title">
@@ -96,6 +97,154 @@
                 </form>
             </section>
         `;
+    }
+
+    function renderLearningSites(assessment, answers, readOnly) {
+        const clueInput = (clue) => `
+            <label for="hunt-${escapeHtml(clue.id)}">${escapeHtml(clue.prompt)}</label>
+            <input id="hunt-${escapeHtml(clue.id)}" data-hunt-answer="${escapeHtml(clue.id)}" maxlength="200" value="${escapeHtml(answers[clue.id] || "")}" autocomplete="off" aria-describedby="hunt-feedback-${escapeHtml(clue.id)}">
+            <p id="hunt-feedback-${escapeHtml(clue.id)}" data-hunt-feedback="${escapeHtml(clue.id)}" class="worksheet-assessment-feedback" hidden></p>
+        `;
+        return `
+            <section class="worksheet-treasure-map" aria-labelledby="hunt-title">
+                <div class="treasure-map-heading">
+                    <span class="treasure-map-compass" aria-hidden="true">&#9875;</span>
+                    <h2 id="hunt-title">${escapeHtml(assessment.title)}</h2>
+                    <p>Ahoy, explorer! Visit five learning sites, collect the clues and find your own DTECH course treasure. All eight answers earn your saved completion tick.</p>
+                </div>
+                <div class="treasure-map-start">
+                    <h3>Set sail: follow the school pathway</h3>
+                    <p><a href="https://www.westlandhigh.school.nz/" target="_blank" rel="noopener noreferrer">Westland High Website</a> &rarr; <strong>Intranet</strong> &rarr; <strong>Learning Sites</strong>.</p>
+                    <p>Use the subject names below to find the right sites in the directory. English has several entries: use <strong>Mrs O'Malley</strong>. Sign in to school Google if a page asks. Keep this map open and visit sites in another tab.</p>
+                    <a class="worksheet-btn worksheet-btn-secondary" href="${escapeHtml(assessment.directoryUrl)}" target="_blank" rel="noopener noreferrer">Open Learning Sites directory</a>
+                    <p>Need a course check? <a href="../user-profile.html" target="_blank" rel="noopener noreferrer">Open your User Profile</a>.</p>
+                    <p data-hunt-profile role="status">Loading your course profile...</p>
+                </div>
+                <form class="worksheet-hunt-form">
+                    <fieldset class="worksheet-assessment-inputs" ${readOnly ? "disabled" : ""}>
+                        <legend class="treasure-map-legend">Five islands. Follow the trail. X marks the spot!</legend>
+                        ${assessment.destinations.map((destination, index) => `
+                            <article class="treasure-map-island" data-hunt-island="${escapeHtml(destination.id)}">
+                                <span class="treasure-map-x" aria-hidden="true">X</span>
+                                <div class="treasure-map-island-body">
+                                    <h3>${index + 1}. ${escapeHtml(destination.title)}</h3>
+                                    <p>Directory entry: <strong>${escapeHtml(destination.subject)}</strong></p>
+                                    <a class="treasure-map-rescue" href="${escapeHtml(destination.url)}" target="_blank" rel="noopener noreferrer">Stuck finding the site? Open ${escapeHtml(destination.subject)}</a>
+                                    ${clueInput(destination)}
+                                    ${destination.id === "dtech" ? `
+                                        <label for="hunt-course">Which DTECH course are you doing? Choose your year and course, as shown in User Profile.</label>
+                                        <select id="hunt-course" data-hunt-answer="course" aria-describedby="hunt-feedback-course">
+                                            <option value="">Choose your course...</option>
+                                            ${assessment.courses.map((course) => `<option value="${escapeHtml(course.id)}" ${answers.course === course.id ? "selected" : ""}>${escapeHtml(course.label)}</option>`).join("")}
+                                        </select>
+                                        <p id="hunt-feedback-course" data-hunt-feedback="course" class="worksheet-assessment-feedback" hidden></p>
+                                        <div data-hunt-course-clues></div>
+                                    ` : ""}
+                                </div>
+                            </article>
+                        `).join("")}
+                    </fieldset>
+                    <button type="submit" class="worksheet-btn worksheet-btn-primary" ${readOnly ? "disabled" : ""}>Check course &amp; treasure answers</button>
+                    <p class="worksheet-assessment-result" role="status" aria-live="polite">Collect the five island clues, choose your course and solve its two clues.</p>
+                    <p class="treasure-map-update">Clues reviewed ${escapeHtml(assessment.reviewedOn)}. If a learning page changes or a link fails, tell your teacher; do not share passwords.</p>
+                </form>
+            </section>
+        `;
+    }
+
+    function wireLearningSites(host, assessment, options) {
+        const form = host.querySelector(".worksheet-hunt-form");
+        const result = form.querySelector(".worksheet-assessment-result");
+        const button = form.querySelector("button[type=submit]");
+        const inputs = form.querySelector("fieldset");
+        const courseSelect = form.querySelector("#hunt-course");
+        const clueHost = form.querySelector("[data-hunt-course-clues]");
+        const draft = { ...options.assessmentAnswers };
+        host.querySelector("[data-hunt-profile]").textContent = options.readOnly
+            ? "Sign in with your school account to save progress and check your course."
+            : options.huntProfile?.message || "Your course profile is loading; you can explore the islands now.";
+        const renderCourse = () => {
+            const course = assessment.courses.find((entry) => entry.id === courseSelect.value);
+            clueHost.innerHTML = course ? `
+                <p><strong>Now find your course page from the DTECH home page's Course Information.</strong></p>
+                <a class="treasure-map-rescue" href="${escapeHtml(course.url)}" target="_blank" rel="noopener noreferrer">Need a shortcut? Open ${escapeHtml(course.label)} course page</a>
+                ${course.clues.map((clue) => `
+                    <label for="hunt-${escapeHtml(clue.id)}">${escapeHtml(clue.prompt)}</label>
+                    <input id="hunt-${escapeHtml(clue.id)}" data-hunt-answer="${escapeHtml(clue.id)}" maxlength="200" autocomplete="off" value="${escapeHtml(draft[clue.id] || "")}" aria-describedby="hunt-feedback-${escapeHtml(clue.id)}">
+                    <p id="hunt-feedback-${escapeHtml(clue.id)}" data-hunt-feedback="${escapeHtml(clue.id)}" class="worksheet-assessment-feedback" hidden></p>
+                `).join("")}
+            ` : "<p>Choose a course to reveal its two treasure clues.</p>";
+        };
+        renderCourse();
+        const answers = () => {
+            const values = {};
+            form.querySelectorAll("[data-hunt-answer]").forEach((input) => {
+                values[input.getAttribute("data-hunt-answer")] = input.value;
+            });
+            return values;
+        };
+        form.addEventListener("input", (event) => {
+            const id = event.target.getAttribute("data-hunt-answer");
+            if (!id) return;
+            if (id === "course") {
+                delete draft["course-clue-1"];
+                delete draft["course-clue-2"];
+                renderCourse();
+            } else draft[id] = event.target.value;
+            form.querySelectorAll("[data-hunt-feedback]").forEach((feedback) => { feedback.hidden = true; });
+            form.querySelectorAll("[data-hunt-island]").forEach((island) => {
+                if (island.getAttribute("data-hunt-island") === (id.startsWith("course") ? "dtech" : id)) {
+                    island.classList.remove("is-complete");
+                }
+            });
+            if (id === "course" && courseSelect.value) {
+                const feedback = form.querySelector('[data-hunt-feedback="course"]');
+                const correct = Boolean(options.huntProfile?.available && options.huntProfile.courseIds.includes(courseSelect.value));
+                feedback.hidden = false;
+                feedback.classList.toggle("is-correct", correct);
+                feedback.classList.toggle("is-error", !correct);
+                feedback.textContent = correct ? "This course matches your User Profile. Now hunt for its two clues!" :
+                    options.huntProfile?.available ? "This course/year does not match your User Profile. Check your profile and choose again." :
+                        options.huntProfile?.message || "Your course profile is unavailable. Ask your teacher to check it.";
+            }
+            options.onAssessmentChange?.(answers());
+            result.classList.remove("is-error", "is-correct");
+            result.textContent = "Keep exploring! Check your course and answers when you are ready.";
+        });
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            if (button.disabled) return;
+            button.disabled = true;
+            inputs.disabled = true;
+            result.classList.remove("is-error", "is-correct");
+            result.textContent = "Checking your course, clues and saved progress...";
+            try {
+                if (!options.onAssessmentCheck) throw new Error("Open the student activity to check your treasure answers.");
+                const grade = await options.onAssessmentCheck(answers());
+                form.querySelectorAll("[data-hunt-feedback]").forEach((feedback) => {
+                    const marked = grade.results.find((entry) => entry.id === feedback.getAttribute("data-hunt-feedback"));
+                    if (!marked) return;
+                    feedback.hidden = false;
+                    feedback.textContent = marked.explanation;
+                    feedback.classList.toggle("is-correct", marked.correct);
+                    feedback.classList.toggle("is-error", !marked.correct);
+                });
+                form.querySelectorAll("[data-hunt-island]").forEach((island) => {
+                    const id = island.getAttribute("data-hunt-island");
+                    const ids = id === "dtech" ? ["dtech", "course", "course-clue-1", "course-clue-2"] : [id];
+                    island.classList.toggle("is-complete", ids.every((key) => grade.results.find((entry) => entry.id === key)?.correct));
+                });
+                result.classList.toggle("is-correct", grade.passed);
+                result.textContent = grade.passed ? "Treasure unlocked! 8 / 8 correct. Ka pai! Your completion tick is saved." :
+                    `${grade.score} / ${grade.total} treasures found. Your answers are saved. Follow the hints and try again!`;
+            } catch (error) {
+                result.classList.add("is-error");
+                result.textContent = error.message || "Could not check or save your treasure hunt. Please try again.";
+            } finally {
+                button.disabled = false;
+                inputs.disabled = false;
+            }
+        });
     }
 
     function renderPasswordReminder() {
@@ -425,10 +574,13 @@
             ${content?.identityLessonVersion ? `<p class="worksheet-assessment-result" id="identity-result" role="status" aria-live="polite">${options.identityVerified ? "Google sign-in is ready. Click Check your answers to mark all four answers." : "Complete questions 1-4, verify your school email in step 5, then click Check your answers."}</p><button type="button" class="worksheet-btn worksheet-btn-primary" id="identity-retry" ${readOnly ? "disabled" : ""}>Check your answers</button>` : ""}
         `;
 
-        if (readOnly) return;
+        if (content?.assessment?.id === "learning-sites-treasure-v1") {
+            wireLearningSites(host, content.assessment, { ...options, readOnly });
+            if (readOnly) return;
+        } else if (readOnly) return;
 
         if (content?.assessment?.id === "apps-wordsearch-v1") wireAppsAssessment(host, content.assessment, options);
-        else if (content?.assessment) wireAssessment(host, options);
+        else if (content?.assessment && content.assessment.id !== "learning-sites-treasure-v1") wireAssessment(host, options);
 
         if (content?.identityLessonVersion) {
             let timer;

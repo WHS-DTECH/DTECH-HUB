@@ -5,7 +5,8 @@ const multer = require("multer");
 const mammoth = require("mammoth");
 const nodemailer = require("nodemailer");
 const { Pool } = require("pg");
-const { PASSWORD_PROBLEMS_ID, APPS_WORDSEARCH_ID, withLoginAppsActivity, withPasswordProblemsActivity, withLoginIdentityActivity, getStudentAssessment, gradePasswordProblems, gradeLoginIdentity, gradeAppsWordsearch } = require("./practical-skills-assessment");
+const { PASSWORD_PROBLEMS_ID, APPS_WORDSEARCH_ID, withLoginAppsActivity, withLearningSitesActivity, withPasswordProblemsActivity, withLoginIdentityActivity, getStudentAssessment, gradePasswordProblems, gradeLoginIdentity, gradeAppsWordsearch } = require("./practical-skills-assessment");
+const { LEARNING_SITES_ID, getHuntProfile, gradeLearningSites } = require("./learning-sites-assessment");
 
 let OAuth2Client = null;
 try {
@@ -4392,7 +4393,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function normalizePracticalSkillsKitContentForStorage(kitId, content) {
-  const safeContent = withLoginAppsActivity(kitId, withLoginIdentityActivity(kitId, content && typeof content === "object" ? content : {}));
+  const safeContent = withLearningSitesActivity(kitId, withLoginAppsActivity(kitId, withLoginIdentityActivity(kitId, content && typeof content === "object" ? content : {})));
   if (String(kitId || "").trim() !== "kit-login") {
     return safeContent;
   }
@@ -4465,7 +4466,7 @@ async function getStoredPracticalSkillsKitContent(kitId) {
 
   if (!hasDatabase) {
     const stored = memoryPracticalSkillsKitContent.get(safeKitId);
-    return withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, stored || getDefaultPracticalSkillsKitContent(safeKitId))));
+    return withLearningSitesActivity(safeKitId, withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, stored || getDefaultPracticalSkillsKitContent(safeKitId)))));
   }
 
   await ensurePracticalSkillsKitContentSchema();
@@ -4473,14 +4474,14 @@ async function getStoredPracticalSkillsKitContent(kitId) {
   const stored = result.rows?.[0]?.content;
   const defaults = getDefaultPracticalSkillsKitContent(safeKitId);
   if (!stored || !Object.keys(stored).length) {
-    return withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, defaults)));
+    return withLearningSitesActivity(safeKitId, withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, defaults))));
   }
 
   const merged = { ...defaults, ...stored };
   if (safeKitId === "kit-login" && (!Array.isArray(stored.worksheets) || !stored.worksheets.length)) {
     merged.worksheets = defaults.worksheets;
   }
-  return withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, merged)));
+  return withLearningSitesActivity(safeKitId, withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, merged))));
 }
 
 async function savePracticalSkillsKitContent(kitId, content, updatedByEmail) {
@@ -12578,6 +12579,28 @@ app.put("/api/practical-skills/progress/:kitId/activities/:activityIndex", async
   }
 });
 
+async function getLearningSitesStudentProfile(email) {
+  const rows = (await getStudentDirectoryRows()).map(buildStudentClassManagementRow)
+    .filter((row) => row.linked_emails.some((linkedEmail) => normalizeEmail(linkedEmail) === email));
+  if (new Set(rows.map(getStudentIdentityKey)).size > 1) {
+    return { available: false, courseIds: [], message: "More than one student profile is linked to your account. Ask your teacher to check your profile before completing this hunt." };
+  }
+  const latest = rows.reduce((current, row) => !current || shouldReplaceStudentSnapshot(current, row) ? row : current, null);
+  return getHuntProfile(latest?.status?.toLowerCase() === "not current" ? null : latest);
+}
+
+app.get("/api/practical-skills/learning-sites/profile", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email || !email.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required." }); return;
+  }
+  try {
+    res.json(await getLearningSitesStudentProfile(email));
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not load your course profile." });
+  }
+});
+
 app.post("/api/practical-skills/progress/:kitId/activities/:activityIndex/check", async (req, res) => {
   const studentEmail = normalizeEmail(getRequestUserEmail(req));
   const kitId = String(req.params.kitId || "").trim();
@@ -12600,7 +12623,7 @@ app.post("/api/practical-skills/progress/:kitId/activities/:activityIndex/check"
     const content = await getStoredPracticalSkillsKitContent(kitId);
     const activity = content?.activities?.[activityIndex];
     const identityLesson = Boolean(activity?.identityLessonVersion);
-    if (!content?.worksheets?.[activityIndex] || (!identityLesson && ![PASSWORD_PROBLEMS_ID, APPS_WORDSEARCH_ID].includes(activity?.assessmentId))) {
+    if (!content?.worksheets?.[activityIndex] || (!identityLesson && ![PASSWORD_PROBLEMS_ID, APPS_WORDSEARCH_ID, LEARNING_SITES_ID].includes(activity?.assessmentId))) {
       res.status(404).json({ error: "Unknown self-marking activity." });
       return;
     }
@@ -12612,7 +12635,9 @@ app.post("/api/practical-skills/progress/:kitId/activities/:activityIndex/check"
       ? gradeLoginIdentity(req.body.answers, { ...req.auth_identity, email: studentEmail }, activity.questions || [])
       : activity.assessmentId === APPS_WORDSEARCH_ID
         ? gradeAppsWordsearch(req.body.answers, Boolean((await getStudentLoginDriveSetup(studentEmail))?.folder_id))
-        : gradePasswordProblems(req.body.answers);
+        : activity.assessmentId === LEARNING_SITES_ID
+          ? gradeLearningSites(req.body.answers, await getLearningSitesStudentProfile(studentEmail))
+          : gradePasswordProblems(req.body.answers);
     const saved = await savePracticalSkillsAssessment(studentEmail, kitId, activityIndex, grade);
     res.json({ ...grade, completedActivities: saved.completed_activities });
   } catch (error) {
