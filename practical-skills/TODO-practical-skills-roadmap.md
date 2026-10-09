@@ -51,7 +51,9 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   on the server for these checks.
 - Activity 1 includes a visible Google ID sign-in/verification button even when
   the hub already shows a signed-in account. Verification is step 5, after the
-  four answer fields and before `Check your answers`. Typed answers are retained
+  four answer fields and before the marking message and `Check your answers`,
+  immediately when the worksheet opens (not only after an answer check).
+  Typed answers are retained
   when re-verifying the same account; switching accounts loads that account's
   own progress. Live checks wait until a Google ID token is available.
   This uses the Google Identity

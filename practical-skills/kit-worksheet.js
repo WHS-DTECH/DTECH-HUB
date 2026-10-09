@@ -234,9 +234,6 @@
                             headers: withAuthHeaders({ "Content-Type": "application/json" }),
                             body: JSON.stringify({ answers })
                         });
-                        if (verification && activity?.identityLessonVersion) {
-                            host.querySelector("#identity-result").before(verification);
-                        }
                         Object.assign(state.responses, payload.answers);
                         state.completedActivities = payload.completedActivities;
                         updateActivityCompleteBar();
@@ -268,6 +265,9 @@
                     queueResponseSave();
                 }
             });
+            if (verification && activityContent.identityLessonVersion) {
+                host.querySelector("#identity-result").before(verification);
+            }
         }
 
         updateActivityCompleteBar();

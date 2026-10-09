@@ -401,6 +401,44 @@ async function main() {
     vm.runInNewContext(fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet.js"), "utf8"), browserContext);
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(nodes.get("worksheet-activity-status-pill").textContent, "Completed");
+    const verificationNode = nodes.get("worksheet-google-verification");
+    const worksheetHost = nodes.get("worksheet-host");
+    const layoutResult = {
+        before(node) {
+            layout.splice(layout.indexOf(this), 0, node);
+        }
+    };
+    const layoutButton = {};
+    let layout = [];
+    worksheetHost.after = (node) => {
+        layout = layout.filter((child) => child !== node);
+    };
+    worksheetHost.querySelector = (selector) => {
+        assert.equal(selector, "#identity-result");
+        return layoutResult;
+    };
+    browserContext.window.location.search = "?kit=kit-login&activity=0";
+    browserContext.window.KitWorksheetRender.renderWorksheet = () => {
+        assert.ok(!layout.includes(verificationNode), "Detach the Google button before replacing worksheet HTML");
+        layout = [layoutResult, layoutButton];
+    };
+    browserContext.fetch = async (url) => ({
+        ok: true,
+        json: async () => url.includes("/kit-content/") ? {
+            content: {
+                bannerTitle: "Kit",
+                worksheets: [{ activity: "Identity" }],
+                activities: [{ identityLessonVersion: 1, questions: identityQuestions }]
+            }
+        } : { responses: {}, completedActivities: {}, kit: { isComplete: false } }
+    });
+    for (let render = 0; render < 2; render += 1) {
+        vm.runInNewContext(fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet.js"), "utf8"), browserContext);
+        await new Promise((resolve) => setImmediate(resolve));
+        assert.deepEqual(layout, [verificationNode, layoutResult, layoutButton],
+            "Step 5 must precede the marking message and Check your answers before any check runs");
+        assert.equal(verificationNode.hidden, false);
+    }
     const inputEvents = {};
     const identityInputs = identityQuestions.map((question) => ({
         value: identityAnswers[question.id],
