@@ -30,7 +30,12 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   latest linked User Profile timetable record, and two course-page clues (8/8
   saves a tick). Junior Years 7/8 find Digital Skills and STEAM Project; Middle
   Years 9/10 find Office and Adobe Suite plus a topic; senior DTECH and Computing
-  use their own verified page questions. Missing/conflicting profiles cannot
+  use their own verified page questions.
+  The course selector groups MiddleDTECH as Year 9/10 after Year 8
+  and adds Year 11/12/13 SeniorDTECH before Year 11. Grouped choices validate
+  the student's year and programme; specific MDTECH, MPROG, DTECH and COMP
+  choices remain. Saved year-specific MiddleDTECH answers reopen in the grouped
+  choice and remain markable. Missing/conflicting profiles cannot
   earn a tick and receive explicit teacher-help feedback. The endpoint only
   returns the signed-in student's own course information, never a student list.
   Existing teacher questions/images, answers and activity indexes are preserved.

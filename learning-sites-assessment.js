@@ -11,7 +11,7 @@ const destinations = [
     { id: "dtech", title: "DTECH Treasure Island", subject: "Digital technology", url: `${DTECH_HOME}/home`, prompt: "The DTECH home-page heading says 'Digital Tech with ...'. What is the teacher's surname?", answers: ["pringle", "miss pringle"], hint: "Look at the main heading on the DTECH home page, not the HUB." }
 ];
 
-const courses = [
+const yearCourses = [
     ...[7, 8].map((year) => ({
         id: `${year}DTECH`, year, program: "DTECH", label: `Year ${year} - JuniorDTECH`,
         url: `${DTECH_HOME}/courses/junior-school`,
@@ -41,6 +41,23 @@ const courses = [
     })))
 ];
 
+const courses = [
+    ...yearCourses.filter((course) => course.year <= 8),
+    {
+        ...yearCourses.find((course) => course.id === "9DTECH"),
+        id: "MIDDLEDTECH", years: [9, 10], programs: ["DTECH", "MDTECH", "MPROG"],
+        aliases: ["9DTECH", "10DTECH"], label: "Year 9/10 - MiddleDTECH"
+    },
+    ...yearCourses.filter((course) => [9, 10].includes(course.year)).map((course) => ({
+        ...course, hidden: course.program === "DTECH"
+    })),
+    {
+        ...yearCourses.find((course) => course.id === "11DTECH"),
+        id: "SENIORDTECH", years: [11, 12, 13], label: "Year 11/12/13 - SeniorDTECH"
+    },
+    ...yearCourses.filter((course) => course.year >= 11)
+];
+
 function withLearningSitesActivity(kitId, content) {
     if (kitId !== "kit-login" || !Array.isArray(content?.worksheets)) return content;
     const index = content.worksheets.findIndex((worksheet, i) =>
@@ -61,7 +78,7 @@ function getLearningSitesAssessment() {
         reviewedOn: "2026-10-09",
         directoryUrl: DIRECTORY_URL,
         destinations: destinations.map(publicClue),
-        courses: courses.map((course) => ({ ...course, clues: course.clues.map(publicClue) }))
+        courses: courses.filter((course) => !course.hidden).map((course) => ({ ...course, clues: course.clues.map(publicClue) }))
     };
 }
 
@@ -79,7 +96,10 @@ function getHuntProfile(student) {
         relevant = explicit.length ? explicit : programs.filter((program) => ["DTECH", "COMP"].includes(program));
         if (!explicit.length && relevant.length > 1) relevant = [];
     }
-    const courseIds = courses.filter((course) => course.year === year && relevant.includes(course.program)).map((course) => course.id);
+    const courseIds = courses.filter((course) =>
+        (course.years ? course.years.includes(year) : course.year === year) &&
+        (course.programs || [course.program]).some((program) => relevant.includes(program))
+    ).map((course) => course.id);
     return {
         available: courseIds.length > 0,
         year,

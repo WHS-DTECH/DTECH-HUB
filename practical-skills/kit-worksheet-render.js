@@ -135,7 +135,7 @@
                                         <label for="hunt-course">Which DTECH course are you doing? Choose your year and course, as shown in User Profile.</label>
                                         <select id="hunt-course" data-hunt-answer="course" aria-describedby="hunt-feedback-course">
                                             <option value="">Choose your course...</option>
-                                            ${assessment.courses.map((course) => `<option value="${escapeHtml(course.id)}" ${answers.course === course.id ? "selected" : ""}>${escapeHtml(course.label)}</option>`).join("")}
+                                            ${assessment.courses.map((course) => `<option value="${escapeHtml(course.id)}" ${answers.course === course.id || course.aliases?.includes(answers.course) ? "selected" : ""}>${escapeHtml(course.label)}</option>`).join("")}
                                         </select>
                                         <p id="hunt-feedback-course" data-hunt-feedback="course" class="worksheet-assessment-feedback" hidden></p>
                                         <div data-hunt-course-clues></div>

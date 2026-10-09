@@ -25,6 +25,14 @@ async function main() {
     const publicHunt = assessment.getStudentAssessment(hunt.LEARNING_SITES_ID);
     assert.equal(publicHunt.destinations.length, 5);
     assert.equal(publicHunt.courses.length, 14);
+    assert.deepEqual(publicHunt.courses.map((course) => course.label), [
+        "Year 7 - JuniorDTECH", "Year 8 - JuniorDTECH", "Year 9/10 - MiddleDTECH",
+        "Year 9 - MDTECH", "Year 9 - MPROG", "Year 10 - MDTECH", "Year 10 - MPROG",
+        "Year 11/12/13 - SeniorDTECH", "Year 11 - Digital Tech (DTECH)", "Year 11 - Computing (COMP)",
+        "Year 12 - Digital Tech (DTECH)", "Year 12 - Computing (COMP)",
+        "Year 13 - Digital Tech (DTECH)", "Year 13 - Computing (COMP)"
+    ]);
+    assert.deepEqual(publicHunt.courses.find((course) => course.id === "MIDDLEDTECH").aliases, ["9DTECH", "10DTECH"]);
     assert.ok(publicHunt.destinations.every((clue) => !("answers" in clue)));
     assert.ok(publicHunt.courses.every((course) => course.clues.every((clue) => !("answers" in clue))));
     const answers = {
@@ -44,6 +52,21 @@ async function main() {
     assert.equal(hunt.gradeLearningSites({ ...answers, course: "11DTECH", "course-clue-1": "Python", "course-clue-2": "HTML & CSS" }, hunt.getHuntProfile({ year_level: "11", programs: ["DTECH"] })).passed, true);
     assert.equal(hunt.gradeLearningSites({ ...answers, course: "9MPROG", "course-clue-1": "Office and Adobe Suite", "course-clue-2": "Web Coding" }, hunt.getHuntProfile({ year_level: "9", programs: ["DTECH", "MPROG"] })).passed, true);
     assert.equal(hunt.gradeLearningSites({ ...answers, course: "10MDTECH", "course-clue-1": "Office & Adobe Suite", "course-clue-2": "CAD" }, hunt.getHuntProfile({ year_level: "10", programs: ["MDTECH"] })).passed, true);
+    for (const year of [9, 10]) {
+        for (const program of ["DTECH", "MDTECH", "MPROG"]) {
+            const middleProfile = hunt.getHuntProfile({ year_level: String(year), programs: [program] });
+            assert.equal(hunt.gradeLearningSites({ ...answers, course: "MIDDLEDTECH", "course-clue-1": "Office and Adobe Suite", "course-clue-2": "CAD" }, middleProfile).passed, true);
+        }
+        const middleProfile = hunt.getHuntProfile({ year_level: String(year), programs: ["DTECH"] });
+        assert.equal(hunt.gradeLearningSites({ ...answers, course: `${year}DTECH`, "course-clue-1": "Office and Adobe Suite", "course-clue-2": "CAD" }, middleProfile).passed, true, "Saved year-specific MiddleDTECH answers still mark correctly");
+        assert.equal(hunt.gradeLearningSites({ ...answers, course: `${year === 9 ? 10 : 9}DTECH` }, middleProfile).passed, false);
+    }
+    for (const year of [11, 12, 13]) {
+        assert.equal(hunt.gradeLearningSites({ ...answers, course: "SENIORDTECH", "course-clue-1": "Python", "course-clue-2": "HTML and CSS" }, hunt.getHuntProfile({ year_level: String(year), programs: ["DTECH"] })).passed, true);
+    }
+    assert.equal(hunt.gradeLearningSites({ ...answers, course: "SENIORDTECH" }, compProfile).passed, false, "Senior Computing retains its own course and clues");
+    assert.equal(hunt.gradeLearningSites({ ...answers, course: "MIDDLEDTECH" }, profile).passed, false);
+    assert.equal(hunt.gradeLearningSites({ ...answers, course: "SENIORDTECH" }, profile).passed, false);
     assert.equal(hunt.gradeLearningSites({ ...answers, science: ["evidence"], passed: true }, profile).passed, false);
 
     let ownRows = [{ id_number: "1", linked_emails: ["student@example.school.nz"], year_level: "7", programs: ["DTECH"], upload_year: 2026 }];
