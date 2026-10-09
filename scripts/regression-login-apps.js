@@ -93,6 +93,16 @@ async function main() {
     for (const value of ["Circuits", "", ["Circuits", "3D Designs", "Codeblocks"]]) {
         assert.equal(assessment.gradeLoginSites({ tinkercad: value, tinkercadReady: true }).answers.tinkercadReady, false);
     }
+    for (const value of ["Variable, If Statements, and Loops", "Variables, if statements & loops", "VARIABLES / IF STATEMENTS / LOOPS"]) {
+        const grade = assessment.gradeLoginSites({ tinkercad: "Circuits, 3D Designs and Codeblocks", codeavengers: value });
+        assert.equal(grade.answers.codeavengersReady, true);
+        assert.equal(grade.answers.tinkercadReady, true);
+        assert.equal(grade.score, 2);
+        assert.equal(grade.passed, false);
+    }
+    for (const value of ["Variables and loops", "", ["Variable", "If Statements", "Loops"]]) {
+        assert.equal(assessment.gradeLoginSites({ codeavengers: value, codeavengersReady: true }).answers.codeavengersReady, false);
+    }
     for (const year of [7, 8, 9, 10, null]) {
         shortKitRenderer.window.KitWorksheetRender.renderWorksheet(shortKitHost, {
             bannerTitle: "Using your login details", loginSites: shortKit.activities[6].loginSites

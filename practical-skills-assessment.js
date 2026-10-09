@@ -6,7 +6,7 @@ const APPS_WORDSEARCH_ID = "apps-wordsearch-v1";
 const LOGIN_SITES_ID = "login-sites-readiness-v1";
 const loginSites = [
   { name: "Tinkercad", description: "Design 3D models, explore electronic circuits and try coding in your browser.", group: "JuniorDTECH", years: "Years 7/8", url: "https://www.tinkercad.com/joinclass/XTY22KANL", logo: "https://www.tinkercad.com/img/tinkercad-logo.png", readinessQuestion: { id: "tinkercad", prompt: "What three things can you make in Tinkercad?", hint: "Glance at the names of the design areas on your Tinkercad home page. Name all three; you do not need to create anything." } },
-  { name: "Code Avengers", description: "Learn programming, web development and digital skills through guided lessons.", group: "MiddleDTECH", years: "Years 9/10", url: "https://www.codeavengers.com/", logo: "https://www.codeavengers.com/dist/assets/images/favicon/android-chrome-192x192.png" },
+  { name: "Code Avengers", description: "Learn programming, web development and digital skills through guided lessons.", group: "MiddleDTECH", years: "Years 9/10", url: "https://www.codeavengers.com/", logo: "https://www.codeavengers.com/dist/assets/images/favicon/android-chrome-192x192.png", readinessQuestion: { id: "codeavengers", prompt: "Under Pro, find the Python courses. What is the topic name for Python 1?", hint: "Switch to Pro, choose Python in the course filter and read the Python 1 card. You do not need to start the course." } },
   { name: "SketchUp Education", description: "Build 3D models of buildings, rooms and other designs using SketchUp for Schools.", group: "JuniorDTECH", years: "Years 7/8", url: "https://edu.sketchup.com/", logo: "https://edu.sketchup.com/favicon.ico" },
   { name: "Gamefroot", description: "Create games, animations and interactive stories using visual coding.", group: "JuniorDTECH", years: "Years 7/8", url: "https://gamefroot.com/", logo: "https://make.gamefroot.com/favicon.png" },
   { name: "CodeCombat", description: "Learn Python or JavaScript by writing code to guide a hero through game challenges.", group: "MiddleDTECH", years: "Years 9/10", url: "https://codecombat.com/", logo: "https://codecombat.com/images/pages/base/logo_square_250.png" }
@@ -16,12 +16,21 @@ function gradeLoginSites(answers) {
   const value = typeof answers?.tinkercad === "string" ? answers.tinkercad.slice(0, 200) : "";
   const normalized = value.toLowerCase().replace(/3\s*[- ]?\s*d/g, "3d").replace(/code[\s-]+blocks/g, "codeblocks");
   const correct = /\bcircuits?\b/.test(normalized) && /\b3d designs?\b/.test(normalized) && /\bcodeblocks?\b/.test(normalized);
-  return {
-    assessmentId: LOGIN_SITES_ID, passed: false, score: correct ? 1 : 0, total: 1,
-    answers: { tinkercad: value, tinkercadReady: correct },
-    results: [{ id: "tinkercad", correct, explanation: correct
+  const codeAvengers = typeof answers?.codeavengers === "string" ? answers.codeavengers.slice(0, 200) : "";
+  const topic = codeAvengers.toLowerCase();
+  const codeAvengersCorrect = /\bvariables?\b/.test(topic) && /\bif statements?\b/.test(topic) && /\bloops?\b/.test(topic);
+  const results = [
+    { id: "tinkercad", correct, explanation: correct
       ? "Tinkercad readiness check saved! No need to make a design today."
-      : "Try again: name all three design areas shown on the Tinkercad home page." }]
+      : "Try again: name all three design areas shown on the Tinkercad home page." },
+    { id: "codeavengers", correct: codeAvengersCorrect, explanation: codeAvengersCorrect
+      ? "Code Avengers readiness check saved! No need to start Python 1 today."
+      : "Try again: switch to Pro, filter for Python and copy the topic name from the Python 1 card." }
+  ];
+  return {
+    assessmentId: LOGIN_SITES_ID, passed: false, score: results.filter((result) => result.correct).length, total: results.length,
+    answers: { tinkercad: value, tinkercadReady: correct, codeavengers: codeAvengers, codeavengersReady: codeAvengersCorrect },
+    results
   };
 }
 

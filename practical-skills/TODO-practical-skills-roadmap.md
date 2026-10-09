@@ -39,6 +39,10 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   tick in login-sites-readiness-v1 responses; it never awards the whole activity
   from this single check. Other site questions are pending. Readiness answers
   are evidence, not direct verification of third-party sign-in sessions.
+  Code Avengers retains its generic link and adds a Pro > Python > Python 1
+  topic-name check (Variables, If Statements and Loops), without starting a course.
+  Both site answers are submitted together so checking one preserves the other;
+  ticks are recalculated server-side, accepting singular/plural Variable.
 - Implemented: Open DTECH Learning Site / Open DTECH-HUB in the Login Kit now
   includes a five-island pirate-map treasure hunt. Students follow Westland High
   Website > Intranet > Learning Sites, visit Science, Mrs O'Malley's English,

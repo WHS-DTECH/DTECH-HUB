@@ -594,15 +594,15 @@
                                         <label for="login-site-${escapeHtml(site.readinessQuestion.id)}">${escapeHtml(site.readinessQuestion.prompt)}</label>
                                         <p>${escapeHtml(site.readinessQuestion.hint)}</p>
                                         <input id="login-site-${escapeHtml(site.readinessQuestion.id)}" name="${escapeHtml(site.readinessQuestion.id)}" maxlength="200" value="${escapeHtml(options.assessmentAnswers?.[site.readinessQuestion.id] || "")}" ${readOnly ? "disabled" : ""}>
-                                        <button class="worksheet-btn worksheet-btn-primary" type="submit" ${readOnly ? "disabled" : ""}>Check Tinkercad answer</button>
-                                        <p class="login-site-result" role="status" aria-live="polite">${options.assessmentAnswers?.tinkercadReady ? "&#10003; Tinkercad readiness check saved." : "Sign in to Tinkercad, then answer from a quick glance at your home page."}</p>
+                                        <button class="worksheet-btn worksheet-btn-primary" type="submit" ${readOnly ? "disabled" : ""}>Check ${escapeHtml(site.name)} answer</button>
+                                        <p class="login-site-result" role="status" aria-live="polite">${options.assessmentAnswers?.[`${site.readinessQuestion.id}Ready`] ? `&#10003; ${escapeHtml(site.name)} readiness check saved.` : `Sign in to ${escapeHtml(site.name)}, then answer from a quick glance at your home page.`}</p>
                                     </form>
                                 ` : ""}
                             </li>
                         `).join("")}
                     </ol>
                     <p>When you have explored the websites for your year group, use <strong>Mark Activity Complete</strong> below to save your tick.</p>
-                    <p>Site checks save your answers as readiness evidence, not direct verification of another website's login. More site questions are being added; a Tinkercad tick alone does not complete this whole activity.</p>
+                    <p>Site checks save your answers as readiness evidence, not direct verification of another website's login. More site questions are being added; individual site ticks do not complete this whole activity.</p>
                 </section>
             ` : ""}
             <div class="worksheet-question-list">
@@ -637,8 +637,11 @@
                 input.disabled = true;
                 result.textContent = "Checking and saving...";
                 try {
-                    const grade = await options.onAssessmentCheck({ [input.name]: input.value });
-                    result.textContent = `${grade.results[0].correct ? "\u2713 " : ""}${grade.results[0].explanation}`;
+                    const answers = { ...options.assessmentAnswers };
+                    host.querySelectorAll("[data-site-check] input").forEach((field) => { answers[field.name] = field.value; });
+                    const grade = await options.onAssessmentCheck(answers);
+                    const marked = grade.results.find((entry) => entry.id === input.name);
+                    result.textContent = `${marked.correct ? "\u2713 " : ""}${marked.explanation}`;
                 } catch (error) {
                     result.textContent = error?.message || "Could not save your site check. Try again.";
                 } finally {
