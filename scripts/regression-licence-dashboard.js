@@ -88,7 +88,7 @@ async function main() {
     const start = navigation.indexOf("function renderHubPracticalSkillsMenu(");
     const end = navigation.indexOf("function renderHubSidebarStandardsCard(", start);
     const summary = {};
-    const taskListLink = { dataset: {}, hidden: false };
+    const taskListLink = { dataset: {}, hidden: true };
     const navContext = vm.createContext({
         hubAuthState: { email: "student@school.nz" },
         document: { querySelector: (selector) => selector.endsWith("summary") ? summary : taskListLink }
@@ -96,11 +96,10 @@ async function main() {
     vm.runInContext(navigation.slice(start, end), navContext);
     navContext.renderHubPracticalSkillsMenu("7");
     assert.equal(summary.textContent, "Licence");
-    assert.equal(taskListLink.hidden, true, "Non-senior users see Licence without the Task List button");
+    assert.equal(taskListLink.hidden, true, "Year-group rendering does not override course-controlled Task List");
     navContext.renderHubPracticalSkillsMenu("Year 12");
     assert.equal(summary.textContent, "Licence", "Senior users retain Licence");
-    assert.equal(taskListLink.hidden, false);
-    assert.equal(taskListLink.dataset.senior, "true", "Senior students additionally see Task List");
+    assert.equal(taskListLink.hidden, true, "Senior Task List waits for actual course rather than assuming from year");
     console.log("Licence dashboard identity, stamps, next kit, stats, errors and sign-out regressions passed.");
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

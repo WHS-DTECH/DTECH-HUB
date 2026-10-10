@@ -24,6 +24,15 @@ Routing waits for both course and access resolution, including after refresh.
 - `library.json`: curriculum card seed, kept separate from the Licence Library.
 - `library-store.js`: validation, persistent storage and API routes.
 - `styles.css`: library-specific styles.
+- `task-list.html` and `task-list.js`: JuniorDTECH student Task List skeleton.
+  The green navbar and sidebar Task List buttons use the resolved actual course:
+  JuniorDTECH opens this page, SeniorDTECH retains its existing Task List, and
+  MiddleDTECH has no Task List button yet. Course changes and sign-out clear the
+  list immediately. The page lists only the names of published Junior DTECH
+  pathway cards in alphabetical order, with no tasks, completion controls,
+  assessment criteria or progress descriptors yet. Course/library failures have
+  visible retry actions. The shared `hub-course-resolved` event carries course
+  loading, success and error state; the page does not infer course from year.
 
 Keep future pathway pages, images and resources inside this folder and link to
 them from pathway cards. The dashboard reuses the existing shared card renderer
@@ -57,4 +66,5 @@ Learning Pathways does not award licence stamps, change course assignments, or
 alter Licence Library cards or kit progress.
 
 Run the focused regression checks from the repository root:
-`node scripts/regression-learning-pathways.js`.
+`node scripts/regression-learning-pathways.js` and
+`node scripts/regression-pathway-task-list.js`.

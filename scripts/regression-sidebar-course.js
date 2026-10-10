@@ -37,7 +37,7 @@ assert.equal(context.resolveSidebarCourse({ available: false, year: 8 }), "");
 assert.match(client, /void loadAndRenderSidebarCourse\(panel\)/);
 assert.match(client, /id="hub-sidebar-profile-course"/);
 const css = fs.readFileSync(path.join(root, "styles.css"), "utf8");
-assert.match(css, /#hub-global-sidebar-allocations\[hidden\],\s*\.hub-sidebar-summary-cards\[hidden\]\s*\{\s*display: none;/,
+assert.match(css, /#hub-global-sidebar-allocations\[hidden\],\s*#hub-global-sidebar-tasklist-link\[hidden\],\s*\.hub-sidebar-summary-cards\[hidden\]\s*\{\s*display: none;/,
     "Hidden sidebar sections override grid display");
 
 async function main() {
@@ -105,17 +105,26 @@ async function main() {
     const element = { textContent: "", hidden: true, dataset: {} };
     const allocations = { hidden: false };
     const summaries = { hidden: false, dataset: { available: "true" } };
+    const taskListButton = { hidden: true };
     const auth = { profile: { email: "staff@example.test" } };
     const panel = { dataset: {}, querySelector: (selector) => selector === "#hub-global-sidebar-allocations"
-        ? allocations : selector === "#hub-sidebar-summary-cards" ? summaries : element };
+        ? allocations : selector === "#hub-sidebar-summary-cards" ? summaries
+        : selector === "#hub-global-sidebar-tasklist-link" ? taskListButton : element };
     const loaderStart = client.indexOf("function updateSidebarCourseSections(");
     const loaderEnd = client.indexOf("\nasync function loadAndRenderSidebarAllocations(", loaderStart);
     let refreshCourse;
     const pathwaysLink = { hidden: true };
+    const taskListLink = { hidden: true, href: "" };
+    const courseEvents = [];
     const browser = vm.createContext({
         routeHubCourseHomepage() {},
-        window: { addEventListener(type, fn) { assert.equal(type, "hub-course-changed"); refreshCourse = fn; } },
-        document: { querySelector: (selector) => selector === "#hub-pathways-link" ? pathwaysLink : panel },
+        CustomEvent: function (type, options) { this.type = type; this.detail = options.detail; },
+        window: {
+            addEventListener(type, fn) { assert.equal(type, "hub-course-changed"); refreshCourse = fn; },
+            dispatchEvent(event) { courseEvents.push(event); }
+        },
+        document: { querySelector: (selector) => selector === "#hub-pathways-link" ? pathwaysLink
+            : selector === "#hub-senior-task-list-link" ? taskListLink : panel },
         hubAuthState: auth,
         normalizeEmail: context.normalizeEmail,
         withHubAuthHeaders: (_headers, email) => ({ "x-user-email": email }),
@@ -129,6 +138,9 @@ async function main() {
         assert.equal(summaries.hidden, course !== "SeniorDTECH");
         assert.equal(pathwaysLink.hidden, !["JuniorDTECH", "MiddleDTECH"].includes(course),
             "Pathways navbar button is only shown for Junior and Middle DTECH");
+        assert.equal(taskListLink.hidden, !["JuniorDTECH", "SeniorDTECH"].includes(course));
+        assert.equal(taskListButton.hidden, taskListLink.hidden, "Sidebar and navbar agree on Task List availability");
+        assert.equal(taskListLink.href, course === "JuniorDTECH" ? "/learning-pathways/task-list.html" : "/task-list.html");
     }
     summaries.dataset.available = "false";
     browser.updateSidebarCourseSections(panel, "SeniorDTECH");
@@ -155,11 +167,14 @@ async function main() {
     browser.fetch = async () => { throw new Error("Network failure"); };
     await browser.loadAndRenderSidebarCourse(panel);
     assert.equal(element.textContent, "Course: Could not load");
+    assert.equal(courseEvents.at(-1).detail.status, "error");
+    assert.equal(taskListLink.hidden, true, "Course failure hides Task List");
     assert.equal(allocations.hidden, true, "Course failures do not show senior content");
     assert.equal(pathwaysLink.hidden, true, "Course failures do not show Pathways");
     auth.profile = null;
     browser.updateSidebarCourseSections(panel, "JuniorDTECH");
     assert.equal(pathwaysLink.hidden, true, "Signed-out users do not see Pathways");
+    assert.equal(taskListLink.hidden, true, "Signed-out users do not see Task List");
     auth.profile = { email: "staff@example.test" };
     let release;
     browser.fetch = () => new Promise((resolve) => { release = resolve; });

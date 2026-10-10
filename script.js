@@ -2319,7 +2319,7 @@ function ensureGlobalHubSidebar() {
 }
 
 function getTaskListPageUrl() {
-    return "/task-list.html";
+    return document.querySelector("#hub-senior-task-list-link")?.getAttribute("href") || "/task-list.html";
 }
 
 function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {
@@ -2363,7 +2363,7 @@ function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {
     }
     if (adminLink) adminLink.hidden = !canAdmin || isStudentView;
     if (taskListButton) {
-        taskListButton.hidden = false;
+        taskListButton.hidden = !["JuniorDTECH", "SeniorDTECH"].includes(panel.dataset.course);
     }
 
     if (copy) {
@@ -2455,17 +2455,30 @@ function routeHubCourseHomepage(course) {
     }
 }
 
-function updateSidebarCourseSections(panel, course = panel.dataset.course || "") {
+function updateSidebarCourseSections(panel, course = panel.dataset.course || "", status = "ready") {
     panel.dataset.course = course;
+    panel.dataset.courseStatus = status;
     const pathwaysLink = document.querySelector("#hub-pathways-link");
     if (pathwaysLink) {
         pathwaysLink.hidden = !hubAuthState.profile?.email || !["JuniorDTECH", "MiddleDTECH"].includes(course);
+    }
+    const taskListLink = document.querySelector("#hub-senior-task-list-link");
+    if (taskListLink) {
+        taskListLink.href = course === "JuniorDTECH" ? "/learning-pathways/task-list.html" : "/task-list.html";
+        taskListLink.hidden = !hubAuthState.profile?.email || !["JuniorDTECH", "SeniorDTECH"].includes(course);
+    }
+    const taskListButton = panel.querySelector("#hub-global-sidebar-tasklist-link");
+    if (taskListButton) {
+        taskListButton.hidden = !hubAuthState.profile?.email || !["JuniorDTECH", "SeniorDTECH"].includes(course);
     }
     const isSenior = course === "SeniorDTECH";
     const allocations = panel.querySelector("#hub-global-sidebar-allocations");
     const summaries = panel.querySelector("#hub-sidebar-summary-cards");
     if (allocations) allocations.hidden = !isSenior;
     if (summaries) summaries.hidden = !isSenior || summaries.dataset.available !== "true";
+    window.dispatchEvent(new CustomEvent("hub-course-resolved", {
+        detail: { course, status }
+    }));
 }
 
 window.addEventListener("hub-course-changed", () => {
@@ -2474,7 +2487,7 @@ window.addEventListener("hub-course-changed", () => {
 });
 
 async function loadAndRenderSidebarCourse(panel) {
-    updateSidebarCourseSections(panel, "");
+    updateSidebarCourseSections(panel, "", "pending");
     const courseEl = panel.querySelector("#hub-sidebar-profile-course");
     if (!courseEl) return;
     const email = normalizeEmail(hubAuthState.profile?.email || "");
@@ -2498,6 +2511,7 @@ async function loadAndRenderSidebarCourse(panel) {
     } catch (error) {
         console.error("Could not load sidebar course", error);
         if (normalizeEmail(hubAuthState.profile?.email || "") !== email || courseEl.dataset.requestId !== requestId) return;
+        updateSidebarCourseSections(panel, "", "error");
         courseEl.textContent = "Course: Could not load";
         courseEl.hidden = false;
     }
@@ -2555,7 +2569,7 @@ async function loadAndRenderSidebarAllocations(panel) {
 
         const taskListButton = panel.querySelector("#hub-global-sidebar-tasklist-link");
         if (taskListButton) {
-            taskListButton.hidden = false;
+            taskListButton.hidden = !["JuniorDTECH", "SeniorDTECH"].includes(panel.dataset.course);
         }
 
         if (assessmentSection) assessmentSection.hidden = assessments.length === 0;
@@ -2568,15 +2582,8 @@ async function loadAndRenderSidebarAllocations(panel) {
 
 function renderHubPracticalSkillsMenu(yearGroup) {
     const summary = document.querySelector("#hub-practical-skills-summary");
-    const taskListLink = document.querySelector("#hub-senior-task-list-link");
-    const normalizedYear = String(yearGroup || "").trim().replace(/^year\s*/i, "");
-    const showTaskList = ["11", "12", "13"].includes(normalizedYear);
 
     if (summary) summary.textContent = "Licence";
-    if (taskListLink) {
-        taskListLink.dataset.senior = showTaskList ? "true" : "";
-        taskListLink.hidden = !showTaskList || !hubAuthState.email;
-    }
 }
 
 function renderHubSidebarStandardsCard(panel, yearGroup, internalStandards, externalStandards) {
@@ -2968,7 +2975,7 @@ function renderHubAuthUi() {
     if (pathwaysLink) pathwaysLink.hidden = true;
     routeHubCourseHomepage("");
     if (hubSeniorTaskListLink) {
-        hubSeniorTaskListLink.hidden = !signedIn || !hubSeniorTaskListLink.dataset.senior;
+        hubSeniorTaskListLink.hidden = true;
     }
     if (hubAccessBadge) {
         hubAccessBadge.hidden = !signedIn || canAdmin || !badgeLabel;

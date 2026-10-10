@@ -40,3 +40,30 @@
     overflow: visible;
     -webkit-line-clamp: unset;
 }
+
+.pathway-task-list {
+    list-style: none;
+    padding: 0;
+    margin: 18px 0 0;
+    display: grid;
+    gap: 14px;
+}
+
+.pathway-task-list[hidden],
+#pathway-task-retry[hidden] {
+    display: none;
+}
+
+.pathway-task-list li {
+    border: 1px solid #cfdded;
+    border-radius: 12px;
+    background: #f8fbff;
+    padding: 18px;
+    overflow-wrap: anywhere;
+}
+
+.pathway-task-list h3 {
+    margin: 0;
+    color: #213f60;
+    font-size: 1.15rem;
+}

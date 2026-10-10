@@ -586,6 +586,7 @@ a {
 }
 
 #hub-global-sidebar-allocations[hidden],
+#hub-global-sidebar-tasklist-link[hidden],
 .hub-sidebar-summary-cards[hidden] {
     display: none;
 }
