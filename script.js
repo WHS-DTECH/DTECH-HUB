@@ -2440,13 +2440,11 @@ async function loadAndRenderSidebarKit(panel) {
 
 function routeHubCourseHomepage(course) {
     const signedIn = hasAllowedSignedInHubAccount();
-    const studentView = !(hubAccessState.canTeacherView || hubAccessState.canAdmin)
-        || getEffectiveHubViewMode() !== "teacher";
     const juniorOrMiddle = ["JuniorDTECH", "MiddleDTECH"].includes(course);
     const destination = juniorOrMiddle ? "/learning-pathways/" : "/index.html";
     const brand = document.querySelector(".topbar .brand");
-    if (brand) brand.href = signedIn && studentView && juniorOrMiddle ? destination : "/index.html";
-    if (!signedIn || !hubAccessState.resolved || !studentView
+    if (brand) brand.href = signedIn && juniorOrMiddle ? destination : "/index.html";
+    if (!signedIn || !hubAccessState.resolved
         || !["JuniorDTECH", "MiddleDTECH", "SeniorDTECH"].includes(course)) return;
     const pathname = window.location.pathname.toLowerCase();
     const labHome = pathname === "/" || pathname === "/index.html";

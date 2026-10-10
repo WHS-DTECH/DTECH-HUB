@@ -12,12 +12,14 @@ staff course, stays hidden while the course loads or cannot be confirmed, and
 is hidden for SeniorDTECH and signed-out users. Browse also contains a library
 link; the navbar visibility does not restrict direct dashboard access.
 
-In Student View, the main home entry (`/` or `/index.html`) routes JuniorDTECH
+In either view, the main home entry (`/` or `/index.html`) routes JuniorDTECH
 and MiddleDTECH users to Learning Pathways. SeniorDTECH users use Computer Lab;
-opening the Pathways homepage in that view returns them to Computer Lab.
+opening the Pathways homepage returns them to Computer Lab.
 The Computer Lab brand link targets the user's course homepage. This applies
-to students and staff using their saved actual course in Student View.
-Teacher View, Admin pages and links to individual resources are not redirected.
+to students and staff using their saved actual course in either Student or Teacher
+View. Teacher View no longer pins staff to the SeniorDTECH homepage.
+Only homepage URLs are redirected; teacher tools, Admin pages and links to
+individual resources are not redirected.
 Signed-out users and unknown courses retain the existing public homepage.
 Routing waits for both course and access resolution, including after refresh.
 

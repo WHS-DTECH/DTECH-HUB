@@ -44,14 +44,36 @@ for (const entry of ["/admin-menu.html", "/practical-skills/admin.html", "/teach
     assert.equal(redirected, "", "Deep links and admin/teacher pages are not redirected");
 }
 context.window.location.pathname = "/index.html";
-for (const guard of ["signed-out", "teacher", "access-pending"]) {
+for (const guard of ["signed-out", "access-pending"]) {
     signedIn = guard !== "signed-out";
     mode = guard === "teacher" ? "teacher" : "student";
     context.hubAccessState.resolved = guard !== "access-pending";
     redirected = "";
     context.routeHubCourseHomepage("JuniorDTECH");
-    assert.equal(redirected, "", "Do not redirect signed-out, teacher or unresolved access");
+    assert.equal(redirected, "", "Do not redirect signed-out or unresolved access");
 }
+signedIn = true;
+mode = "teacher";
+context.hubAccessState.resolved = true;
+for (const entry of ["/index.html", "/learning-pathways/"]) {
+    for (const course of ["JuniorDTECH", "MiddleDTECH", "SeniorDTECH"]) {
+        context.window.location.pathname = entry;
+        redirected = "";
+        context.routeHubCourseHomepage(course);
+        const younger = course !== "SeniorDTECH";
+        assert.equal(brand.href, younger ? "/learning-pathways/" : "/index.html", "Teacher home link follows assigned course");
+        assert.equal(redirected, entry === "/index.html" && younger ? "/learning-pathways/"
+            : entry === "/learning-pathways/" && !younger ? "/index.html" : "", "Teacher View uses the assigned course homepage without loops");
+    }
+}
+for (const entry of ["/teacher-view.html", "/admin-menu.html", "/learning-pathways/progression-pathway.html"]) {
+    context.window.location.pathname = entry;
+    redirected = "";
+    context.routeHubCourseHomepage("JuniorDTECH");
+    assert.equal(redirected, "", "Teacher and admin tools remain accessible");
+    assert.equal(brand.href, "/learning-pathways/", "Home link from teacher tools follows course");
+}
+context.window.location.pathname = "/index.html";
 signedIn = true;
 mode = "student";
 context.hubAccessState.resolved = true;
