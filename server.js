@@ -13924,6 +13924,48 @@ async function refreshLearningSitesCheckIn(email) {
   }
 }
 
+const memoryStaffCoursePreferences = new Map();
+
+async function getStaffCoursePreference(email) {
+  if (!hasDatabase) return memoryStaffCoursePreferences.get(email) || "";
+  await ensureStaffCoursePreferencesSchema();
+  const result = await pool.query("SELECT course FROM practical_skills_staff_courses WHERE email = $1", [email]);
+  return result.rows?.[0]?.course || "";
+}
+
+async function ensureStaffCoursePreferencesSchema() {
+  await pool.query(`CREATE TABLE IF NOT EXISTS practical_skills_staff_courses (
+    email TEXT PRIMARY KEY, course TEXT NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
+}
+
+app.put("/api/admin/practical-skills/my-course", requireAdminAccess, async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  const course = req.body?.course;
+  if (!["JuniorDTECH", "MiddleDTECH", "SeniorDTECH"].includes(course)) {
+    res.status(400).json({ error: "Choose JuniorDTECH, MiddleDTECH or SeniorDTECH." });
+    return;
+  }
+  try {
+    const profile = await getLearningSitesStudentProfile(email);
+    if (!profile.courseIds?.includes("STAFF")) {
+      res.status(403).json({ error: "Only your own staff course can be changed here." });
+      return;
+    }
+    if (hasDatabase) {
+      await ensureStaffCoursePreferencesSchema();
+      await pool.query(`INSERT INTO practical_skills_staff_courses (email, course)
+        VALUES ($1, $2) ON CONFLICT (email) DO UPDATE SET course = EXCLUDED.course, updated_at = NOW()`, [email, course]);
+    } else {
+      memoryStaffCoursePreferences.set(email, course);
+    }
+    res.json({ course });
+  } catch (error) {
+    console.error("Could not save staff course", error);
+    res.status(500).json({ error: "Could not save your course. Please try again." });
+  }
+});
+
 function resolveSidebarCourse(profile, checkIn) {
   if (!profile?.available) return "";
   if (profile.courseIds?.includes("STAFF")) {
@@ -13940,9 +13982,10 @@ app.get("/api/practical-skills/my-course", async (req, res) => {
   }
   try {
     const profile = await getLearningSitesStudentProfile(email);
-    const checkIn = profile.courseIds?.includes("STAFF") ? await getSavedLearningSitesCheckIn(email) : null;
+    const savedCourse = profile.courseIds?.includes("STAFF") ? await getStaffCoursePreference(email) : "";
+    const checkIn = !savedCourse && profile.courseIds?.includes("STAFF") ? await getSavedLearningSitesCheckIn(email) : null;
     res.set("Cache-Control", "no-store");
-    res.json({ course: resolveSidebarCourse(profile, checkIn) });
+    res.json({ course: savedCourse || resolveSidebarCourse(profile, checkIn) });
   } catch (error) {
     console.error("Could not load sidebar course", error);
     res.status(500).json({ error: "Could not load your course." });
@@ -14177,10 +14220,12 @@ async function ensureStudentCourseFolders(email, programmeFolder, driveAccessTok
   });
 }
 
-// Students use their directory year level; staff use the pathway chosen in the Login Kit course check-in.
+// Students use their directory year level; staff use their saved choice or Login Kit check-in.
 async function getStudentProgrammeFolder(email) {
-  const programmeFolder = getResearchReportProgrammeFolder(await getLearningSitesStudentProfile(email),
-    getCourseProgrammeFolder((await getSavedLearningSitesCheckIn(email))?.answers?.course));
+  const profile = await getLearningSitesStudentProfile(email);
+  const savedCourse = profile.courseIds?.includes("STAFF") ? await getStaffCoursePreference(email) : "";
+  const programmeFolder = getResearchReportProgrammeFolder(profile,
+    savedCourse || getCourseProgrammeFolder((await getSavedLearningSitesCheckIn(email))?.answers?.course));
   if (!programmeFolder) {
     const error = new Error("We couldn't tell if you are in Junior, Middle or Senior DTECH. Ask your teacher to check your profile.");
     error.status = 409;

@@ -21,6 +21,7 @@ const context = vm.createContext({
     SCHOOL_EMAIL_DOMAIN: "example.test",
     getLearningSitesStudentProfile: async () => profile,
     getSavedLearningSitesCheckIn: async () => checkIn,
+    getStaffCoursePreference: async () => "",
     console: { error() {} }
 });
 vm.runInContext(server.slice(start, end), context);
@@ -40,6 +41,54 @@ assert.match(css, /#hub-global-sidebar-allocations\[hidden\],\s*\.hub-sidebar-su
     "Hidden sidebar sections override grid display");
 
 async function main() {
+    let saveHandler;
+    let databaseCourse = "";
+    const storeStart = server.indexOf("const memoryStaffCoursePreferences = new Map();");
+    const storeEnd = server.indexOf("function resolveSidebarCourse(", storeStart);
+    const saveContext = vm.createContext({
+        hasDatabase: true,
+        requireAdminAccess() {},
+        app: { put: (url, auth, fn) => {
+            assert.equal(url, "/api/admin/practical-skills/my-course");
+            assert.equal(auth, saveContext.requireAdminAccess, "Save route requires admin access");
+            saveHandler = fn;
+        } },
+        normalizeEmail: context.normalizeEmail,
+        getRequestUserEmail: (req) => req.email,
+        getLearningSitesStudentProfile: async () => ({ available: true, courseIds: ["STAFF"] }),
+        pool: { query: async (sql, params) => {
+            if (sql.includes("INSERT INTO")) {
+                assert.equal(params[0], "staff@example.test", "Save targets authenticated account, not submitted user");
+                databaseCourse = params[1];
+            }
+            return { rows: sql.includes("SELECT course") && databaseCourse ? [{ course: databaseCourse }] : [] };
+        } },
+        console: { error() {} }
+    });
+    vm.runInContext(server.slice(storeStart, storeEnd), saveContext);
+    const savedRes = { status(code) { this.code = code; return this; }, json(body) { this.body = body; } };
+    await saveHandler({ email: "staff@example.test", body: { course: "All" } }, savedRes);
+    assert.equal(savedRes.code, 400);
+    await saveHandler({ email: "staff@example.test", body: { course: "SeniorDTECH", email: "other@example.test" } }, savedRes);
+    assert.equal(savedRes.body.course, "SeniorDTECH");
+    assert.equal(await saveContext.getStaffCoursePreference("staff@example.test"), "SeniorDTECH");
+    const folderStart = server.indexOf("async function getStudentProgrammeFolder(");
+    const folderEnd = server.indexOf("\nconst MINECRAFT_EXPORTS_FOLDER_NAME", folderStart);
+    saveContext.getResearchReportProgrammeFolder = getResearchReportProgrammeFolder;
+    saveContext.getCourseProgrammeFolder = getCourseProgrammeFolder;
+    saveContext.getSavedLearningSitesCheckIn = async () => { throw new Error("Saved choice must not depend on assessment answers"); };
+    vm.runInContext(server.slice(folderStart, folderEnd), saveContext);
+    assert.equal(await saveContext.getStudentProgrammeFolder("staff@example.test"), "SeniorDTECH",
+        "Future staff folder requests use the actual saved course");
+    saveContext.hasDatabase = false;
+    await saveHandler({ email: "staff@example.test", body: { course: "MiddleDTECH" } }, savedRes);
+    assert.equal(await saveContext.getStaffCoursePreference("staff@example.test"), "MiddleDTECH");
+    saveContext.getLearningSitesStudentProfile = async () => ({ available: true, year: 8, courseIds: [] });
+    await saveHandler({ email: "staff@example.test", body: { course: "MiddleDTECH" } }, savedRes);
+    assert.equal(savedRes.code, 403);
+    saveContext.getLearningSitesStudentProfile = async () => { throw new Error("Unavailable"); };
+    await saveHandler({ email: "staff@example.test", body: { course: "MiddleDTECH" } }, savedRes);
+    assert.equal(savedRes.code, 500);
     const res = { set() { return this; }, status(code) { this.code = code; return this; }, json(body) { this.body = body; } };
     await handler({ email: "" }, res);
     assert.equal(res.code, 401);
@@ -49,6 +98,9 @@ async function main() {
     checkIn = { completed: true, answers: { course: "STAFF" } };
     await handler({ email: "staff@example.test" }, res);
     assert.equal(res.body.course, "JuniorDTECH");
+    context.getStaffCoursePreference = async () => "SeniorDTECH";
+    await handler({ email: "staff@example.test" }, res);
+    assert.equal(res.body.course, "SeniorDTECH", "Explicit staff course takes precedence over Login Kit");
 
     const element = { textContent: "", hidden: true, dataset: {} };
     const allocations = { hidden: false };
@@ -58,7 +110,10 @@ async function main() {
         ? allocations : selector === "#hub-sidebar-summary-cards" ? summaries : element };
     const loaderStart = client.indexOf("function updateSidebarCourseSections(");
     const loaderEnd = client.indexOf("\nasync function loadAndRenderSidebarAllocations(", loaderStart);
+    let refreshCourse;
     const browser = vm.createContext({
+        window: { addEventListener(type, fn) { assert.equal(type, "hub-course-changed"); refreshCourse = fn; } },
+        document: { querySelector: () => panel },
         hubAuthState: auth,
         normalizeEmail: context.normalizeEmail,
         withHubAuthHeaders: (_headers, email) => ({ "x-user-email": email }),
@@ -83,7 +138,9 @@ async function main() {
     assert.equal(allocations.hidden, true);
     assert.equal(summaries.hidden, true);
     browser.fetch = async () => ({ ok: true, json: async () => ({ course: "SeniorDTECH" }) });
-    await browser.loadAndRenderSidebarCourse(panel);
+    refreshCourse();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(element.textContent, "Course: SeniorDTECH", "Save event refreshes the actual sidebar");
     assert.equal(allocations.hidden, false);
     assert.equal(summaries.hidden, false);
     browser.fetch = async () => ({ ok: true, json: async () => ({ course: "" }) });

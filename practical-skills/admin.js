@@ -15,11 +15,14 @@ const previewDetails = document.querySelector("#practical-preview-details");
 const previewCards = document.querySelector("#practical-preview-cards");
 const previewKitSearch = document.querySelector("#practical-preview-kit-search");
 const previewRetry = document.querySelector("#practical-preview-retry");
+const saveMyCourse = document.querySelector("#practical-save-my-course");
+const saveCourseStatus = document.querySelector("#practical-save-course-status");
 
 const state = {
     cards: [],
     isAdmin: false,
-    previewUsers: []
+    previewUsers: [],
+    savingCourse: false
 };
 
 function matchesPreviewCourse(card, user, course) {
@@ -40,6 +43,9 @@ function renderUserPreview() {
     previewCards.replaceChildren();
     previewDetails.textContent = "";
     const user = state.previewUsers.find((entry) => entry.id === previewUser.value);
+    saveMyCourse.hidden = !(user?.type === "Staff" && normalizeEmail(user.email) === getActiveHubEmail());
+    saveMyCourse.disabled = saveMyCourse.hidden || state.savingCourse
+        || !["JuniorDTECH", "MiddleDTECH", "SeniorDTECH"].includes(previewCourse.value);
     previewCourse.disabled = !user;
     previewKitSearch.disabled = !user;
     if (!user) return;
@@ -133,6 +139,29 @@ previewUser.addEventListener("change", selectPreviewPerson);
 previewCourse.addEventListener("change", renderUserPreview);
 previewKitSearch.addEventListener("input", renderUserPreview);
 previewRetry.addEventListener("click", loadPreviewUsers);
+saveMyCourse.addEventListener("click", async () => {
+    if (saveMyCourse.hidden || saveMyCourse.disabled || state.savingCourse) return;
+    const course = previewCourse.value;
+    state.savingCourse = true;
+    saveMyCourse.disabled = true;
+    saveCourseStatus.textContent = "Saving your actual course...";
+    try {
+        const response = await fetch("/api/admin/practical-skills/my-course", {
+            method: "PUT", headers: withAdminAuthHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ course })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+        if (data.course !== course) throw new Error("Saved course could not be confirmed.");
+        saveCourseStatus.textContent = `Your actual course is now ${course}.`;
+        window.dispatchEvent(new CustomEvent("hub-course-changed"));
+    } catch (error) {
+        saveCourseStatus.textContent = `Could not save your course: ${error.message}`;
+    } finally {
+        state.savingCourse = false;
+        renderUserPreview();
+    }
+});
 
 function normalizeEmail(value) {
     return String(value || "").trim().toLowerCase();

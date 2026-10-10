@@ -53,8 +53,16 @@ with `node scripts/regression-button-contrast.js` from the repository root.
 
 The sidebar displays the signed-in user's actual pathway beneath their name,
 not the Admin preview selection. Student pathways follow the latest directory
-year level. Staff pathways come from their completed Login Kit course check-in;
-without a completed check-in the label says "Not confirmed yet".
+year level. Staff can select their own account in the Admin preview and click
+"Save as my actual course" for JuniorDTECH, MiddleDTECH or SeniorDTECH.
+This separate action persists their choice in Postgres and refreshes the sidebar
+immediately; it does not assign other users or move/create Google Drive folders.
+Future course-folder requests use the saved staff choice, reusing existing folders.
+Without an explicit saved choice, staff pathways come from their completed
+Login Kit course check-in; otherwise the label says "Not confirmed yet".
+The preview dropdown alone still makes no saved changes.
+`PUT /api/admin/practical-skills/my-course` saves only the authenticated admin's
+own staff course; it rejects All courses and student accounts.
 `GET /api/practical-skills/my-course` returns this read-only label.
 My Assessment Tasks, My Projects, Internal Assessment Summary and External
 Assessment Summary are only visible in the sidebar for SeniorDTECH. They stay

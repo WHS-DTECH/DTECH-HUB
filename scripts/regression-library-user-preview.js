@@ -25,7 +25,7 @@ class Element {
     addEventListener(name, handler) { this[name] = handler; }
 }
 const controls = Object.fromEntries(["previewType", "previewSearch", "previewUser", "previewCourse",
-    "previewStatus", "previewDetails", "previewCards", "previewRetry", "previewKitSearch", "previewSuggestions"].map((key) => [key, new Element()]));
+    "previewStatus", "previewDetails", "previewCards", "previewRetry", "previewKitSearch", "previewSuggestions", "saveMyCourse", "saveCourseStatus"].map((key) => [key, new Element()]));
 controls.previewType.value = "Student";
 controls.previewCourse.value = "All";
 const users = [
@@ -49,6 +49,10 @@ const original = JSON.stringify(state);
 let fetchCalls = [];
 const context = vm.createContext({
     ...controls, state,
+    normalizeEmail: (value) => String(value || "").trim().toLowerCase(),
+    getActiveHubEmail: () => "teacher@example.test",
+    window: { dispatchEvent() {} },
+    CustomEvent: function (type) { this.type = type; },
     document: { createElement: () => new Element() },
     Option: function (text, value) { this.textContent = text; this.value = value; },
     withAdminAuthHeaders: () => ({ "x-user-email": "admin@example.test" }),
@@ -103,6 +107,11 @@ controls.previewUser.value = "t1";
 controls.previewUser.change();
 assert.equal(controls.previewCourse.value, "All");
 assert.equal(controls.previewCards.children.length, cards.length - 1);
+assert.equal(controls.saveMyCourse.hidden, false, "Own staff account has a save-course action");
+assert.equal(controls.saveMyCourse.disabled, true, "All courses cannot be saved as an actual course");
+controls.previewCourse.value = "SeniorDTECH";
+controls.previewCourse.change();
+assert.equal(controls.saveMyCourse.disabled, false);
 const css = fs.readFileSync(path.join(root, "styles.css"), "utf8");
 assert.match(html, /list="practical-preview-person-suggestions"/);
 controls.previewType.value = "Student";
@@ -137,6 +146,22 @@ assert.match(css, /\.practical-preview-kit-list\s*\{[^}]*max-height:\s*240px;[^}
 assert.match(html, /aria-label="Matching kit names" tabindex="0"/);
 
 async function main() {
+    let changedEvent = false;
+    context.window.dispatchEvent = (event) => { changedEvent = event.type === "hub-course-changed"; };
+    context.fetch = async (_url, options) => ({ ok: true, json: async () => ({ course: JSON.parse(options.body).course }) });
+    controls.previewType.value = "Staff";
+    controls.previewSearch.value = "";
+    context.populatePreviewUsers();
+    controls.previewUser.value = "t1";
+    controls.previewCourse.value = "SeniorDTECH";
+    context.renderUserPreview();
+    await controls.saveMyCourse.click();
+    assert.match(controls.saveCourseStatus.textContent, /now SeniorDTECH/);
+    assert.equal(changedEvent, true);
+    context.fetch = async (url, options) => {
+        fetchCalls.push({ url, options });
+        return { ok: true, json: async () => ({ users }) };
+    };
     await context.loadPreviewUsers();
     assert.equal(fetchCalls.length, 1);
     assert.equal(fetchCalls[0].options.method, undefined, "Preview uses GET only");

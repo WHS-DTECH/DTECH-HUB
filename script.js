@@ -2372,6 +2372,11 @@ function updateSidebarCourseSections(panel, course = panel.dataset.course || "")
     if (summaries) summaries.hidden = !isSenior || summaries.dataset.available !== "true";
 }
 
+window.addEventListener("hub-course-changed", () => {
+    const panel = document.querySelector("#hub-global-sidebar");
+    if (panel) void loadAndRenderSidebarCourse(panel);
+});
+
 async function loadAndRenderSidebarCourse(panel) {
     updateSidebarCourseSections(panel, "");
     const courseEl = panel.querySelector("#hub-sidebar-profile-course");

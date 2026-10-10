@@ -112,7 +112,9 @@ async function main() {
             folderCalls.push(programmeFolder);
             return { root: { id: "root-id" }, programme: { id: `${programmeFolder}-id` }, kits: { id: "kits-id" } };
         },
-        app: { get: (url, handler) => { handlers[url] = handler; }, post: (url, handler) => { handlers[url] = handler; } },
+        requireAdminAccess() {},
+        hasDatabase: false,
+        app: { get: (url, handler) => { handlers[url] = handler; }, post: (url, handler) => { handlers[url] = handler; }, put() {} },
         getRequestUserEmail: (req) => req.email || "",
         normalizeEmail: (email) => String(email || "").trim().toLowerCase(),
         SCHOOL_EMAIL_DOMAIN: "example.school.nz",
