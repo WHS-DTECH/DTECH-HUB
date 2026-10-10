@@ -101,8 +101,8 @@ assert.equal(clockTowerMission.type, "multiple-choice");
 assert.equal(clockTowerMission.heading, "Mission 1 – Which Result Would You Open?");
 assert.equal(clockTowerMission.prompt, "You want to find out how tall the Hokitika Clock Tower is. You search for `Hokitika Clock Tower height`. Which result would you choose?");
 assert.deepEqual(Array.from(clockTowerMission.options), [
-    "Beautiful Photos of Hokitika",
     "Hokitika Clock Tower – History and Dimensions",
+    "Beautiful Photos of Hokitika",
     "Hokitika Weather Forecast"
 ]);
 assert.equal(clockTowerMission.images[0].url, "/practical-skills/images/hokitika-clock-tower.jpg");
@@ -110,27 +110,87 @@ assert.equal(clockTowerMission.images[0].attribution, "Mike Dickison");
 assert.equal(clockTowerMission.images[0].license, "CC BY 4.0");
 assert.equal(clockTowerMission.images[0].sourceUrl, "https://commons.wikimedia.org/wiki/File:Hokitika_Clock_Tower_MRD_02.jpg");
 assert.deepEqual(Array.from(clockTowerMission.searchResults.results, (result) => result.domain), [
-    "westcoastphotos.example",
     "heritage.example",
+    "westcoastphotos.example",
     "weather.example"
 ]);
 assert.equal(clockTowerMission.searchResults.note, "These are fictional results for practice, not links to real websites.");
 assert.equal(clockTowerMission.searchResults.title, "Search results (Fake website)");
-assert.equal(migrated._contentMigrations.searchResultsDetective, 7, "Search Results Detective migration marker is recorded");
+assert.equal(migrated._contentMigrations.searchResultsDetective, 8, "Search Results Detective migration marker is recorded");
 assert.equal(context.addSearchResultsDetectiveIntroduction(migrated), migrated, "Search Results Detective migration is idempotent");
+const savedResultKitBeforeShuffle = JSON.parse(JSON.stringify(migrated));
+savedResultKitBeforeShuffle._contentMigrations.searchResultsDetective = 7;
+const savedQuestionsBeforeShuffle = savedResultKitBeforeShuffle.activities[2].questions;
+const oldResultOrders = {
+    "search-result-clock-tower": [
+        "Beautiful Photos of Hokitika",
+        "Hokitika Clock Tower – History and Dimensions",
+        "Hokitika Weather Forecast"
+    ],
+    "search-result-pool-hours": [
+        "Hokitika Swimming Club – Competition Results",
+        "Hokitika Swimming Pool – Opening Hours and Contact Details",
+        "Best Swimming Pools in New Zealand – Photo Gallery"
+    ],
+    "search-result-wrong-place": [
+        "Hokitika Gorge Walk – Department of Conservation",
+        "Hokitika Gorge – Walking Track Information",
+        "Waimea Gorge Walking Track – Nelson"
+    ]
+};
+for (const [id, order] of Object.entries(oldResultOrders)) {
+    const question = savedQuestionsBeforeShuffle.find((entry) => entry.id === id);
+    question.options = order;
+    const byTitle = new Map(question.searchResults.results.map((result) => [result.title, result]));
+    question.searchResults.results = order.map((title) => byTitle.get(title));
+}
+const shuffledSavedResultKit = context.addSearchResultsDetectiveIntroduction(savedResultKitBeforeShuffle);
+assert.deepEqual(Array.from(shuffledSavedResultKit.activities[2].questions.find((question) =>
+    question.id === "search-result-clock-tower").options), [
+    "Hokitika Clock Tower – History and Dimensions",
+    "Beautiful Photos of Hokitika",
+    "Hokitika Weather Forecast"
+], "Existing saved Mission 1 receives its new answer order");
+assert.deepEqual(Array.from(shuffledSavedResultKit.activities[2].questions.find((question) =>
+    question.id === "search-result-pool-hours").options), [
+    "Hokitika Swimming Club – Competition Results",
+    "Best Swimming Pools in New Zealand – Photo Gallery",
+    "Hokitika Swimming Pool – Opening Hours and Contact Details"
+], "Existing saved Mission 2 receives its new answer order");
+assert.deepEqual(Array.from(shuffledSavedResultKit.activities[2].questions.find((question) =>
+    question.id === "search-result-wrong-place").options), [
+    "Hokitika Gorge Walk – Department of Conservation",
+    "Waimea Gorge Walking Track – Nelson",
+    "Hokitika Gorge – Walking Track Information"
+], "Existing saved Mission 3 receives its new answer order");
+assert.deepEqual(Array.from(shuffledSavedResultKit.activities[2].questions.find((question) =>
+    question.id === "search-result-clock-tower").searchResults.results, (result) => result.title),
+[
+    "Hokitika Clock Tower – History and Dimensions",
+    "Beautiful Photos of Hokitika",
+    "Hokitika Weather Forecast"
+], "Saved result cards stay aligned with the reordered choices");
+assert.equal(shuffledSavedResultKit._contentMigrations.searchResultsDetective, 8);
+const teacherEditedResultKit = JSON.parse(JSON.stringify(savedResultKitBeforeShuffle));
+teacherEditedResultKit.activities[2].questions.find((question) =>
+    question.id === "search-result-clock-tower").options[0] = "Teacher's preferred result";
+const preservedTeacherEdit = context.addSearchResultsDetectiveIntroduction(teacherEditedResultKit);
+assert.equal(preservedTeacherEdit.activities[2].questions.find((question) =>
+    question.id === "search-result-clock-tower").options[0], "Teacher's preferred result",
+"Answer-order migration preserves teacher-edited choices");
 const poolHoursMission = migrated.activities[2].questions.find((question) => question.id === "search-result-pool-hours");
 assert.ok(poolHoursMission, "Mission 2 is added");
 assert.equal(poolHoursMission.heading, "Mission 2 – Read Before You Click!");
 assert.equal(poolHoursMission.prompt, "You want to know what time the Hokitika swimming pool opens. Which result is most likely to give you the opening hours?");
 assert.deepEqual(Array.from(poolHoursMission.options), [
     "Hokitika Swimming Club – Competition Results",
-    "Hokitika Swimming Pool – Opening Hours and Contact Details",
-    "Best Swimming Pools in New Zealand – Photo Gallery"
+    "Best Swimming Pools in New Zealand – Photo Gallery",
+    "Hokitika Swimming Pool – Opening Hours and Contact Details"
 ]);
 assert.deepEqual(Array.from(poolHoursMission.searchResults.results, (result) => result.domain), [
     "hokitikaswimmingclub.example",
-    "hokitikapool.example",
-    "nzpoolphotos.example"
+    "nzpoolphotos.example",
+    "hokitikapool.example"
 ]);
 assert.equal(poolHoursMission.searchResults.note, "These are fictional results for practice, not links to real websites.");
 assert.equal(poolHoursMission.searchResults.title, "Search results (Fake website)");
@@ -140,13 +200,13 @@ assert.equal(wrongPlaceMission.heading, "Mission 3 – The Wrong Place!");
 assert.equal(wrongPlaceMission.prompt, "You search for `Hokitika Gorge walking track` but one result is about a different location. Which result doesn't belong?");
 assert.deepEqual(Array.from(wrongPlaceMission.options), [
     "Hokitika Gorge Walk – Department of Conservation",
-    "Hokitika Gorge – Walking Track Information",
-    "Waimea Gorge Walking Track – Nelson"
+    "Waimea Gorge Walking Track – Nelson",
+    "Hokitika Gorge – Walking Track Information"
 ]);
 assert.deepEqual(Array.from(wrongPlaceMission.searchResults.results, (result) => result.domain), [
     "doc.govt.nz.example",
-    "hokitikagorge.example",
-    "waimeagorge.example"
+    "waimeagorge.example",
+    "hokitikagorge.example"
 ]);
 assert.equal(wrongPlaceMission.searchResults.note, "These are fictional results for practice, not links to real websites.");
 assert.equal(wrongPlaceMission.searchResults.title, "Search results (Fake website)");
@@ -174,7 +234,7 @@ assert.deepEqual(Array.from(docTrackMission.options), [
 ]);
 assert.equal(docTrackMission.presentation, "real-search");
 assert.equal(Object.hasOwn(docTrackMission, "correctAnswer"), false, "Mission 5 does not expose an answer in student content");
-assert.equal(migrated._contentMigrations.searchResultsDetective, 7, "Search Results Detective migration marker is recorded");
+assert.equal(migrated._contentMigrations.searchResultsDetective, 8, "Search Results Detective migration marker is recorded");
 const editedResultActivity = JSON.parse(JSON.stringify(migrated));
 editedResultActivity._contentMigrations.searchResultsDetective = 1;
 editedResultActivity.activities[2].information.title = "Teacher-edited introduction";
@@ -193,7 +253,7 @@ savedActivityWithoutMissionTwo.activities[2].questions = savedActivityWithoutMis
 const upgradedWithMissionTwo = context.addSearchResultsDetectiveIntroduction(savedActivityWithoutMissionTwo);
 assert.ok(upgradedWithMissionTwo.activities[2].questions.some((question) => question.id === "search-result-pool-hours"),
     "Migration adds Mission 2 to saved activities while preserving existing questions");
-assert.equal(upgradedWithMissionTwo._contentMigrations.searchResultsDetective, 7);
+assert.equal(upgradedWithMissionTwo._contentMigrations.searchResultsDetective, 8);
 const savedActivityWithoutMissionThree = JSON.parse(JSON.stringify(migrated));
 savedActivityWithoutMissionThree._contentMigrations.searchResultsDetective = 3;
 savedActivityWithoutMissionThree.activities[2].questions = savedActivityWithoutMissionThree.activities[2].questions
@@ -201,7 +261,7 @@ savedActivityWithoutMissionThree.activities[2].questions = savedActivityWithoutM
 const upgradedWithMissionThree = context.addSearchResultsDetectiveIntroduction(savedActivityWithoutMissionThree);
 assert.ok(upgradedWithMissionThree.activities[2].questions.some((question) => question.id === "search-result-wrong-place"),
     "Migration adds Mission 3 to saved activities while preserving existing questions");
-assert.equal(upgradedWithMissionThree._contentMigrations.searchResultsDetective, 7);
+assert.equal(upgradedWithMissionThree._contentMigrations.searchResultsDetective, 8);
 const savedActivityWithoutMissionFour = JSON.parse(JSON.stringify(migrated));
 savedActivityWithoutMissionFour._contentMigrations.searchResultsDetective = 4;
 savedActivityWithoutMissionFour.activities[2].questions = savedActivityWithoutMissionFour.activities[2].questions
@@ -209,7 +269,7 @@ savedActivityWithoutMissionFour.activities[2].questions = savedActivityWithoutMi
 const upgradedWithMissionFour = context.addSearchResultsDetectiveIntroduction(savedActivityWithoutMissionFour);
 assert.ok(upgradedWithMissionFour.activities[2].questions.some((question) => question.id === "search-result-glowworm-time"),
     "Migration adds Mission 4 to saved activities while preserving existing questions");
-assert.equal(upgradedWithMissionFour._contentMigrations.searchResultsDetective, 7);
+assert.equal(upgradedWithMissionFour._contentMigrations.searchResultsDetective, 8);
 const savedActivityWithoutMissionFive = JSON.parse(JSON.stringify(migrated));
 savedActivityWithoutMissionFive._contentMigrations.searchResultsDetective = 5;
 savedActivityWithoutMissionFive.activities[2].questions = savedActivityWithoutMissionFive.activities[2].questions
@@ -217,7 +277,7 @@ savedActivityWithoutMissionFive.activities[2].questions = savedActivityWithoutMi
 const upgradedWithMissionFive = context.addSearchResultsDetectiveIntroduction(savedActivityWithoutMissionFive);
 assert.ok(upgradedWithMissionFive.activities[2].questions.some((question) => question.id === "search-result-doc-track"),
     "Migration adds Mission 5 to saved activities while preserving existing questions");
-assert.equal(upgradedWithMissionFive._contentMigrations.searchResultsDetective, 7);
+assert.equal(upgradedWithMissionFive._contentMigrations.searchResultsDetective, 8);
 const savedKitMissingResultsActivity = {
     ...original,
     _contentMigrations: { searchPenguinMission: 11, searchKeywordChallenge: 9 },
@@ -233,7 +293,7 @@ assert.deepEqual(Array.from(repairedResultsKit.activities[2].questions || [], (q
     "search-result-glowworm-time",
     "search-result-doc-track"
 ]);
-assert.equal(repairedResultsKit._contentMigrations.searchResultsDetective, 7);
+assert.equal(repairedResultsKit._contentMigrations.searchResultsDetective, 8);
 const keywordChallengeQuestion = migrated.activities[1].questions[0];
 assert.equal(keywordChallengeQuestion.id, "keyword-pounamu-treasure");
 assert.equal(keywordChallengeQuestion.type, "multiple-choice");

@@ -4476,7 +4476,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function addSearchResultsDetectiveIntroduction(content) {
-  if (content?._contentMigrations?.searchResultsDetective >= 7) return content;
+  if (content?._contentMigrations?.searchResultsDetective >= 8) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
   const activityIndex = worksheets.findIndex((worksheet) =>
@@ -4495,22 +4495,22 @@ function addSearchResultsDetectiveIntroduction(content) {
       heading: "Mission 1 – Which Result Would You Open?",
       prompt: "You want to find out how tall the Hokitika Clock Tower is. You search for `Hokitika Clock Tower height`. Which result would you choose?",
       options: [
-        "Beautiful Photos of Hokitika",
         "Hokitika Clock Tower – History and Dimensions",
+        "Beautiful Photos of Hokitika",
         "Hokitika Weather Forecast"
       ],
       searchResults: {
         title: "Search results (Fake website)",
         results: [
           {
-            domain: "westcoastphotos.example",
-            title: "Beautiful Photos of Hokitika",
-            description: "Explore pictures of Hokitika, including its famous Clock Tower."
-          },
-          {
             domain: "heritage.example",
             title: "Hokitika Clock Tower – History and Dimensions",
             description: "Learn about the Clock Tower's construction, height and historic significance."
+          },
+          {
+            domain: "westcoastphotos.example",
+            title: "Beautiful Photos of Hokitika",
+            description: "Explore pictures of Hokitika, including its famous Clock Tower."
           },
           {
             domain: "weather.example",
@@ -4541,8 +4541,8 @@ function addSearchResultsDetectiveIntroduction(content) {
       prompt: "You want to know what time the Hokitika swimming pool opens. Which result is most likely to give you the opening hours?",
       options: [
         "Hokitika Swimming Club – Competition Results",
-        "Hokitika Swimming Pool – Opening Hours and Contact Details",
-        "Best Swimming Pools in New Zealand – Photo Gallery"
+        "Best Swimming Pools in New Zealand – Photo Gallery",
+        "Hokitika Swimming Pool – Opening Hours and Contact Details"
       ],
       searchResults: {
         title: "Search results (Fake website)",
@@ -4553,14 +4553,14 @@ function addSearchResultsDetectiveIntroduction(content) {
             description: "See recent race times, competition results and club news."
           },
           {
-            domain: "hokitikapool.example",
-            title: "Hokitika Swimming Pool – Opening Hours and Contact Details",
-            description: "Find pool opening hours, contact details and visitor information."
-          },
-          {
             domain: "nzpoolphotos.example",
             title: "Best Swimming Pools in New Zealand – Photo Gallery",
             description: "Browse photos of swimming pools around New Zealand."
+          },
+          {
+            domain: "hokitikapool.example",
+            title: "Hokitika Swimming Pool – Opening Hours and Contact Details",
+            description: "Find pool opening hours, contact details and visitor information."
           }
         ],
         note: "These are fictional results for practice, not links to real websites."
@@ -4575,8 +4575,8 @@ function addSearchResultsDetectiveIntroduction(content) {
       prompt: "You search for `Hokitika Gorge walking track` but one result is about a different location. Which result doesn't belong?",
       options: [
         "Hokitika Gorge Walk – Department of Conservation",
-        "Hokitika Gorge – Walking Track Information",
-        "Waimea Gorge Walking Track – Nelson"
+        "Waimea Gorge Walking Track – Nelson",
+        "Hokitika Gorge – Walking Track Information"
       ],
       searchResults: {
         title: "Search results (Fake website)",
@@ -4587,14 +4587,14 @@ function addSearchResultsDetectiveIntroduction(content) {
             description: "Read about the walking track at Hokitika Gorge."
           },
           {
-            domain: "hokitikagorge.example",
-            title: "Hokitika Gorge – Walking Track Information",
-            description: "Find track information for a walk at Hokitika Gorge."
-          },
-          {
             domain: "waimeagorge.example",
             title: "Waimea Gorge Walking Track – Nelson",
             description: "Explore a walking track at Waimea Gorge near Nelson."
+          },
+          {
+            domain: "hokitikagorge.example",
+            title: "Hokitika Gorge – Walking Track Information",
+            description: "Find track information for a walk at Hokitika Gorge."
           }
         ],
         note: "These are fictional results for practice, not links to real websites."
@@ -4635,6 +4635,60 @@ function addSearchResultsDetectiveIntroduction(content) {
       questions[questionIndex] = { ...questions[questionIndex], presentation: "real-search" };
     }
   }
+  const resultOrders = {
+    "search-result-clock-tower": [
+      "Beautiful Photos of Hokitika",
+      "Hokitika Clock Tower – History and Dimensions",
+      "Hokitika Weather Forecast"
+    ],
+    "search-result-pool-hours": [
+      "Hokitika Swimming Club – Competition Results",
+      "Hokitika Swimming Pool – Opening Hours and Contact Details",
+      "Best Swimming Pools in New Zealand – Photo Gallery"
+    ],
+    "search-result-wrong-place": [
+      "Hokitika Gorge Walk – Department of Conservation",
+      "Hokitika Gorge – Walking Track Information",
+      "Waimea Gorge Walking Track – Nelson"
+    ]
+  };
+  const reorderedResultOrders = {
+    "search-result-clock-tower": [
+      "Hokitika Clock Tower – History and Dimensions",
+      "Beautiful Photos of Hokitika",
+      "Hokitika Weather Forecast"
+    ],
+    "search-result-pool-hours": [
+      "Hokitika Swimming Club – Competition Results",
+      "Best Swimming Pools in New Zealand – Photo Gallery",
+      "Hokitika Swimming Pool – Opening Hours and Contact Details"
+    ],
+    "search-result-wrong-place": [
+      "Hokitika Gorge Walk – Department of Conservation",
+      "Waimea Gorge Walking Track – Nelson",
+      "Hokitika Gorge – Walking Track Information"
+    ]
+  };
+  for (const [id, currentOrder] of Object.entries(resultOrders)) {
+    const questionIndex = questions.findIndex((question) => question?.id === id);
+    if (questionIndex < 0) continue;
+    const question = questions[questionIndex];
+    const results = question.searchResults?.results;
+    if (!Array.isArray(question.options) || question.options.length !== currentOrder.length ||
+        !currentOrder.every((option, index) => question.options[index] === option) ||
+        !Array.isArray(results) || results.length !== currentOrder.length ||
+        !currentOrder.every((title, index) => results[index]?.title === title)) continue;
+    const resultsByTitle = new Map(results.map((result) => [result.title, result]));
+    const nextOrder = reorderedResultOrders[id];
+    questions[questionIndex] = {
+      ...question,
+      options: nextOrder,
+      searchResults: {
+        ...question.searchResults,
+        results: nextOrder.map((title) => resultsByTitle.get(title))
+      }
+    };
+  }
 
   const hasIntroduction = content?._contentMigrations?.searchResultsDetective >= 1;
   activities[activityIndex] = {
@@ -4658,7 +4712,7 @@ function addSearchResultsDetectiveIntroduction(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchResultsDetective: 7
+      searchResultsDetective: 8
     }
   };
 }
