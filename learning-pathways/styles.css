@@ -67,3 +67,105 @@
     color: #213f60;
     font-size: 1.15rem;
 }
+
+.curriculum-strand-page .panel-section {
+    min-width: 0;
+    line-height: 1.65;
+    overflow-wrap: anywhere;
+}
+
+.curriculum-strand-page h2 {
+    scroll-margin-top: 90px;
+}
+
+.curriculum-source-note {
+    padding: 18px;
+    border: 1px solid #d5b771;
+    border-radius: 12px;
+    background: #fff7df;
+    color: #47351c;
+}
+
+.curriculum-section-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 20px;
+    margin-top: 18px;
+}
+
+.curriculum-table-wrap {
+    max-width: 100%;
+}
+
+.curriculum-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 0.95rem;
+}
+
+.curriculum-table caption {
+    text-align: left;
+    font-weight: 700;
+    padding: 12px 0;
+}
+
+.curriculum-table th,
+.curriculum-table td {
+    border: 1px solid #cfdded;
+    padding: 16px;
+    vertical-align: top;
+    text-align: left;
+}
+
+.curriculum-table thead th {
+    background: #213f60;
+    color: #fff;
+}
+
+.curriculum-table thead th:first-child {
+    width: 22%;
+}
+
+.curriculum-table tbody th {
+    background: #edf4fa;
+    color: #213f60;
+}
+
+.curriculum-table td {
+    background: #fff;
+    color: #24344a;
+}
+
+.curriculum-table p:first-child {
+    margin-top: 0;
+}
+
+.curriculum-table p:last-child {
+    margin-bottom: 0;
+}
+
+.curriculum-reference,
+.curriculum-fit {
+    font-size: 0.85rem;
+}
+
+.curriculum-fit {
+    display: block;
+    margin-top: 8px;
+    font-weight: 500;
+}
+
+.curriculum-context-list li {
+    margin-bottom: 12px;
+}
+
+@media (max-width: 700px) {
+    .curriculum-table-wrap {
+        overflow-x: auto;
+    }
+
+    .curriculum-table {
+        min-width: 700px;
+    }
+}

@@ -27,6 +27,14 @@ Routing waits for both course and access resolution, including after refresh.
 - `library.json`: curriculum card seed, kept separate from the Licence Library.
 - `library-store.js`: validation, persistent storage and API routes.
 - `styles.css`: library-specific styles.
+- `digital-systems.html`: teacher-facing curriculum reference with all eight
+  requested sections, aligned Year 7/8 knowledge and practices, integrated
+  Design, Make, and Innovate, a planning progression matrix, Minecraft contexts
+  and coverage/evidence cautions. Summaries are paraphrased from the supplied
+  September 2026 Technology Years 0-10 PDF (pp. 2, 5, 13, 16, 17 and 25).
+  The supplied document is proposed; this page does not assert later approval.
+  The public reference uses the shared site navigation, not a new admin editor.
+  No assessment descriptors or automatic completion rules are introduced.
 - `task-list.html` and `task-list.js`: JuniorDTECH student Task List skeleton.
   The green navbar and sidebar Task List buttons use the resolved actual course:
   JuniorDTECH opens this page, SeniorDTECH retains its existing Task List, and
@@ -56,6 +64,10 @@ Version 3 renames Data to **Data and Information**, including its category label
 without changing its description, ID or other card fields.
 Version 4 removes the Design and Innovation starter card without changing the
 remaining cards.
+Version 5 links an existing, unlinked Digital Systems card to its curriculum page,
+preserving all other fields, custom links, card order and deleted cards. Later
+published link changes are not undone. The source PDF stays in local TeacherFiles
+and is not copied or published as part of this page.
 
 Public reads: `/learning-pathways/library.json` and
 `GET /api/learning-pathways/library`. Admin reads and publishing:

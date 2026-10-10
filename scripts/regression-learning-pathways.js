@@ -157,7 +157,20 @@ async function main() {
     const seed = normalizeCards(JSON.parse(fs.readFileSync(path.join(root, "learning-pathways/library.json"), "utf8")));
     assert.deepEqual(seed.map((card) => card.title), ["Digital systems", "Programming & Algorithms", "Data and Information",
         "Digital citizenship", "Systems and control"]);
-    assert.ok(seed.every((card) => card.area === card.title && card.href === "" && card.yearLevel === "Junior DTECH"));
+    assert.ok(seed.every((card) => card.area === card.title && card.yearLevel === "Junior DTECH"));
+    assert.equal(seed.find((card) => card.id === "digital-systems").href, "/learning-pathways/digital-systems.html");
+    assert.ok(seed.filter((card) => card.id !== "digital-systems").every((card) => card.href === ""));
+    const curriculumPage = fs.readFileSync(path.join(root, "learning-pathways/digital-systems.html"), "utf8");
+    for (const heading of ["Overview", "Official Curriculum Strand", "Year 7 Knowledge and Practices",
+        "Year 8 Knowledge and Practices", "Design, Make, and Innovate", "Progression Matrix", "Learning Contexts", "Teacher Notes"]) {
+        assert.ok(curriculumPage.includes(heading), `Curriculum page includes ${heading}`);
+    }
+    assert.match(curriculumPage, /scope="col">Year 7 Knowledge and Practices<\/th><th scope="col">Year 8 Knowledge and Practices/);
+    assert.match(curriculumPage, /Proposed curriculum/);
+    assert.match(curriculumPage, /paraphrased/);
+    assert.match(curriculumPage, /p\. 17/);
+    assert.match(curriculumPage, /p\. 13/);
+    assert.match(curriculumPage, /href="\/practical-skills\/kit-worksheet\.html\?kit=kit-minecraft"/);
     assert.throws(() => normalizeCards(null), /cards array/);
     for (const href of ["javascript:alert(1)", "data:text/html,test", "//example.test", "/\\example.test"]) {
         assert.throws(() => normalizeCards([{ ...sample, href }]), /links/);
@@ -166,14 +179,14 @@ async function main() {
     assert.throws(() => normalizeCards([{ ...sample, status: "unknown" }]), /invalid status/);
     assert.throws(() => normalizeCards([{ ...sample, title: "" }]), /requires/);
     assert.equal(normalizeCards([{ ...sample, href: "https://example.test/path" }])[0].href, "https://example.test/path");
-    const existing = { ...sample, id: "digital-systems", title: "Existing edited systems", href: "" };
+    const existing = { ...sample, id: "digital-systems", title: "Existing edited systems", href: "/learning-pathways/custom-systems.html" };
     let stored = [existing, sample];
     let seedVersion = 0;
     const pool = { query: async (sql, params) => {
         assert.match(sql, /learning_pathways_library_store/, "Never writes the Licence Library table");
         if (sql.includes("INSERT INTO") && (stored === null || !sql.includes("DO NOTHING"))) {
             stored = JSON.parse(params[0]);
-            seedVersion = 4;
+            seedVersion = 5;
         }
         if (sql.includes("seed_version < 1") && seedVersion < 1) {
             const starters = JSON.parse(params[0]);
@@ -195,6 +208,12 @@ async function main() {
         if (sql.includes("seed_version < 4") && seedVersion < 4) {
             stored = stored.filter((card) => card.id !== "design-and-innovation");
             seedVersion = 4;
+        }
+        if (sql.includes("seed_version < 5") && seedVersion < 5) {
+            assert.match(sql, /COALESCE\(existing\.card ->> 'href', ''\) = ''/, "Migration only links blank cards");
+            stored = stored.map((card) => card.id === "digital-systems" && !card.href
+                ? { ...card, href: "/learning-pathways/digital-systems.html" } : card);
+            seedVersion = 5;
         }
         return { rows: sql.startsWith("SELECT") && stored !== null ? [{ cards: stored }] : [] };
     } };
@@ -241,6 +260,24 @@ async function main() {
         assert.deepEqual(removed, normalizeCards([existing, sample]), "Remove only Design and Innovation, preserving other cards and order");
         assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), removed,
             "Removed card stays removed after repeated reads");
+        const unlinkedSystems = { ...existing, href: "" };
+        stored = [sample, unlinkedSystems];
+        seedVersion = 4;
+        const linked = await (await fetch(`${base}/learning-pathways/library.json`)).json();
+        assert.deepEqual(linked, normalizeCards([sample, { ...unlinkedSystems, href: "/learning-pathways/digital-systems.html" }]),
+            "Curriculum page migration changes only blank Digital Systems link, preserving fields and order");
+        stored = [existing, sample];
+        seedVersion = 4;
+        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), normalizeCards(stored),
+            "Existing custom Digital Systems link is preserved");
+        stored = [];
+        seedVersion = 4;
+        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), [],
+            "New page does not restore deleted curriculum cards");
+        stored = [unlinkedSystems];
+        seedVersion = 5;
+        assert.equal((await (await fetch(`${base}/learning-pathways/library.json`)).json())[0].href, "",
+            "Later removal of the link is not undone");
         assert.equal((await fetch(`${base}/api/admin/learning-pathways/library`)).status, 403);
         const publish = (cards, admin = true) => fetch(`${base}/api/admin/learning-pathways/library`, {
             method: "PUT", headers: { "Content-Type": "application/json", "x-test-admin": admin ? "yes" : "no" },
