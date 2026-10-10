@@ -113,8 +113,8 @@ function progressionStudentOptions() {
         row.append(header);
         if (student.email) {
             const button = document.createElement("button");
-            button.type = "button"; button.className = "button button-secondary"; button.textContent = "Open results";
-            button.setAttribute("aria-label", `Open results for ${student.name}`);
+            button.type = "button"; button.className = "button button-secondary"; button.textContent = "Open Details";
+            button.setAttribute("aria-label", `Open details for ${student.name}`);
             button.addEventListener("click", () => {
                 if (!progressionDiscard()) return;
                 pp("student").value = student.email;

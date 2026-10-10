@@ -117,7 +117,7 @@ No class-to-homeroom membership is guessed. Zero matches are shown explicitly.
 Filtering away from a student prompts before discarding unsaved edits and clears
 the previous results. Timetable Class and Homeroom are saved separately from class; old records use
 their class as a display fallback. Matching students appear in a visible class
-list with Open results buttons. Students without linked school emails are also
+list with Open Details buttons. Students without linked school emails are also
 listed, with an explicit warning that email linkage is required to save results;
 they are not silently dropped or combined into one blank-email student.
 There is no Saved term results / New term record dropdown: Junior students attend
