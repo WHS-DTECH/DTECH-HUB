@@ -206,15 +206,24 @@
         }, RESPONSE_SAVE_DEBOUNCE_MS);
     }
 
-    function scheduleSearchActivityAutoMark(activityIndex) {
+    function scheduleSearchActivityAutoMark(activityIndex, assessmentId) {
         if (!state.email || !state.progressLoaded || state.completedActivities[activityIndex]) return;
-        const questionIds = [
-            "search-penguin-name",
-            "search-korora-food-search",
-            "search-tallest-mountain",
-            "search-penguin-location",
-            "search-penguin-safety"
-        ];
+        const baseQuestionIds = assessmentId === "search-keyword-challenge-v1"
+            ? [
+                "keyword-pounamu-treasure",
+                "keyword-too-many-results",
+                "keyword-glowworm-mystery",
+                "keyword-fix-the-search",
+                "keyword-hokitika-founded"
+            ]
+            : [
+                "search-penguin-name",
+                "search-korora-food-search",
+                "search-tallest-mountain",
+                "search-penguin-location",
+                "search-penguin-safety"
+            ];
+        const questionIds = baseQuestionIds.map((id) => activityIndex === 0 ? id : `${activityIndex}-${id}`);
         if (questionIds.some((id) => !String(state.responses[id] || "").trim())) return;
 
         window.clearTimeout(state.searchAutoMarkTimerId);
@@ -409,13 +418,13 @@
                 onResponseChange: (questionId, value) => {
                     state.responses[questionId] = value;
                     queueResponseSave();
-                    if (activity?.questionAutoMarkAssessmentId === "search-penguin-missions-v1") {
-                        scheduleSearchActivityAutoMark(activityIndex);
+                    if (["search-penguin-missions-v1", "search-keyword-challenge-v1"].includes(activity?.questionAutoMarkAssessmentId)) {
+                        scheduleSearchActivityAutoMark(activityIndex, activity.questionAutoMarkAssessmentId);
                     }
                 }
             });
-            if (activity?.questionAutoMarkAssessmentId === "search-penguin-missions-v1") {
-                scheduleSearchActivityAutoMark(activityIndex);
+            if (["search-penguin-missions-v1", "search-keyword-challenge-v1"].includes(activity?.questionAutoMarkAssessmentId)) {
+                scheduleSearchActivityAutoMark(activityIndex, activity.questionAutoMarkAssessmentId);
             }
             if (verification && activityContent.identityLessonVersion) {
                 host.querySelector("#identity-result").before(verification);

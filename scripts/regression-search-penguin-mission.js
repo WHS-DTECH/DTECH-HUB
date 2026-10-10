@@ -64,6 +64,7 @@ assert.deepEqual(Array.from(migrated.activities[0].information.paragraphs), [
     "Can you solve the Penguin Mystery?"
 ]);
 assert.equal(migrated.activities[1].information.title, "🔎 THE MISSION: The West Coast Treasure Hunt");
+assert.equal(migrated.activities[1].questionAutoMarkAssessmentId, "search-keyword-challenge-v1", "Keyword Challenge uses server-checked auto-marking");
 assert.deepEqual(Array.from(migrated.activities[1].information.paragraphs), [
     "You're on a treasure hunt across the West Coast!",
     "Your challenge is to choose the best search words to find clues about places, objects and wildlife.",
@@ -128,7 +129,7 @@ assert.equal(keywordChallengeMissionFive.heading, "Mission 5: Your Turn – Find
 assert.equal(keywordChallengeMissionFive.prompt, "Use a search engine to find out what year Hokitika was founded as a gold-mining settlement. What year did you find?");
 assert.equal(keywordChallengeMissionFive.lines, 1);
 assert.deepEqual(Array.from(migrated.activities[1].questions.slice(5), (question) => question.id), ["other-q"], "Existing Keyword Challenge questions are preserved");
-assert.equal(migrated._contentMigrations.searchKeywordChallenge, 7, "Keyword Challenge migration is recorded");
+assert.equal(migrated._contentMigrations.searchKeywordChallenge, 8, "Keyword Challenge migration is recorded");
 const teacherEditedKeywordChallenge = JSON.parse(JSON.stringify(migrated));
 teacherEditedKeywordChallenge._contentMigrations.searchKeywordChallenge = 1;
 teacherEditedKeywordChallenge.activities[1].information = { title: "Teacher-edited title", paragraphs: ["Teacher-edited introduction"] };
@@ -153,7 +154,7 @@ assert.ok(repairedKeywordKit.activities[1].questions.some((question) => question
 assert.ok(repairedKeywordKit.activities[1].questions.some((question) => question.id === "keyword-glowworm-mystery"), "Missing activity includes Mission 3");
 assert.ok(repairedKeywordKit.activities[1].questions.some((question) => question.id === "keyword-fix-the-search"), "Missing activity includes Mission 4");
 assert.ok(repairedKeywordKit.activities[1].questions.some((question) => question.id === "keyword-hokitika-founded"), "Missing activity includes Mission 5");
-assert.equal(repairedKeywordKit._contentMigrations.searchKeywordChallenge, 7, "Repair migration is recorded for previously incomplete saved kits");
+assert.equal(repairedKeywordKit._contentMigrations.searchKeywordChallenge, 8, "Repair migration is recorded for previously incomplete saved kits");
 assert.equal(migrated.activities[0].questions.some((question) => question.id === "google-check"), false, "Google-open confirmation is removed");
 assert.equal(migrated.activities[0].questions.some((question) => question.id === "keywords"), true, "Other search-learning questions are retained");
 const penguinQuestion = migrated.activities[0].questions.find((question) => question.id === "search-penguin-name");
@@ -210,6 +211,24 @@ assert.equal(gradeContext.gradeSearchPenguinMissions({ ...correctMissionAnswers,
 const incorrectGrade = gradeContext.gradeSearchPenguinMissions({ ...correctMissionAnswers, "search-penguin-safety": "Rainbows" });
 assert.equal(incorrectGrade.passed, false, "An incorrect answer prevents completion");
 assert.equal(incorrectGrade.score, 4);
+const correctKeywordAnswers = {
+    "1-keyword-pounamu-treasure": "where to find pounamu West Coast NZ",
+    "1-keyword-too-many-results": "Hokitika Gorge swing bridge",
+    "1-keyword-glowworm-mystery": "New Zealand glowworm diet",
+    "1-keyword-fix-the-search": "Hokitika tomorrow",
+    "1-keyword-hokitika-founded": "1864"
+};
+const completeKeywordGrade = gradeContext.gradeSearchKeywordChallenge(correctKeywordAnswers, 1);
+assert.equal(completeKeywordGrade.passed, true, "All five correct Keyword Challenge answers pass");
+assert.equal(completeKeywordGrade.score, 5);
+assert.equal(completeKeywordGrade.total, 5);
+assert.equal(completeKeywordGrade.assessmentId, "search-keyword-challenge-v1");
+const incorrectKeywordGrade = gradeContext.gradeSearchKeywordChallenge({
+    ...correctKeywordAnswers,
+    "1-keyword-hokitika-founded": "1865"
+}, 1);
+assert.equal(incorrectKeywordGrade.passed, false, "Incorrect Keyword Challenge answer prevents completion");
+assert.equal(incorrectKeywordGrade.score, 4);
 const savedContentBeforeMissionFour = JSON.parse(JSON.stringify(migrated));
 savedContentBeforeMissionFour._contentMigrations.searchPenguinMission = 7;
 savedContentBeforeMissionFour.activities[0].questions = savedContentBeforeMissionFour.activities[0].questions
@@ -321,11 +340,14 @@ assert.match(builderSource, /\.\.\.\(state\.content \|\| \{\}\)/, "Kit Builder r
 assert.match(serverSource, /UPDATE practical_skills_kit_content SET content = \$1::jsonb, updated_at = NOW\(\) WHERE kit_id = \$2/, "Migrated mission is persisted for existing saved kits");
 assert.match(serverSource, /if \(safeKitId === "kit-google-search"\) \{\s*const migrated = addSearchKitPenguinMission\(merged\);/, "Migration applies to existing Search Kit content");
 assert.match(serverSource, /if \(content\?\._contentMigrations\?\.searchPenguinMission >= 11\) \{\s*return addSearchKitKeywordChallenge\(content\);\s*\}/, "Saved migration marker preserves existing missions while applying the Keyword Challenge update");
-assert.match(serverSource, /activity\?\.questionAutoMarkAssessmentId !== "search-penguin-missions-v1"/, "Search Kit auto-marking is checked by the server");
+assert.match(serverSource, /!\["search-penguin-missions-v1", "search-keyword-challenge-v1"\]\.includes\(activity\?\.questionAutoMarkAssessmentId\)/, "Search Kit auto-marking activities are accepted by the server");
+assert.match(serverSource, /activity\.questionAutoMarkAssessmentId === "search-keyword-challenge-v1"[\s\S]{0,100}gradeSearchKeywordChallenge\(req\.body\.answers, activityIndex\)/, "Keyword Challenge answers are graded server-side");
+assert.match(serverSource, /grade\.assessmentId === "search-penguin-missions-v1" \|\|\s*grade\.assessmentId === "search-keyword-challenge-v1"/, "Keyword Challenge answers are merged into saved question responses");
 assert.match(serverSource, /if \(req\.body\.completed && \(activity\?\.assessmentId \|\| activity\?\.identityLessonVersion \|\|\s*activity\?\.questionAutoMarkAssessmentId \|\| siteQuestions\)\)/, "Manual completion cannot bypass Search Kit auto-marking");
-assert.match(worksheetSource, /function scheduleSearchActivityAutoMark\(activityIndex\)/, "Student worksheet automatically checks complete Search Kit answers");
-assert.match(worksheetSource, /scheduleSearchActivityAutoMark\(activityIndex\)/, "Answer changes trigger automatic marking");
-assert.match(worksheetSource, /if \(activity\?\.questionAutoMarkAssessmentId === "search-penguin-missions-v1"\) \{\s*scheduleSearchActivityAutoMark\(activityIndex\);/, "Previously saved complete answers are auto-marked when the activity opens");
+assert.match(worksheetSource, /function scheduleSearchActivityAutoMark\(activityIndex, assessmentId\)/, "Student worksheet automatically checks complete self-marked activity answers");
+assert.match(worksheetSource, /scheduleSearchActivityAutoMark\(activityIndex, activity\.questionAutoMarkAssessmentId\)/, "Answer changes trigger automatic marking");
+assert.match(worksheetSource, /if \(\["search-penguin-missions-v1", "search-keyword-challenge-v1"\]\.includes\(activity\?\.questionAutoMarkAssessmentId\)\) \{\s*scheduleSearchActivityAutoMark\(activityIndex, activity\.questionAutoMarkAssessmentId\);/, "Previously saved complete answers are auto-marked when the activity opens");
+assert.match(worksheetSource, /"search-keyword-challenge-v1"[\s\S]*"keyword-pounamu-treasure"[\s\S]*"keyword-hokitika-founded"/, "Keyword Challenge auto-marking waits for all five mission answers");
 assert.match(activityEditorSource, /\.\.\.\(content\.activities\?\.\[activityIndex\]\?\.images\?\.\[index\] \|\| \{\}\)/, "Activity Details preserves photo attribution metadata while editing images");
 
 console.log("Search Kit penguin mission migration regression checks passed.");
