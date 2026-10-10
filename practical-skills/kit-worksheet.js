@@ -266,7 +266,7 @@
             ? [
                 "keyword-west-coast-tree",
                 "keyword-gold-rush-town",
-                "keyword-glowworm-mystery",
+                "keyword-mountain-bird",
                 "keyword-fix-the-search",
                 "keyword-hokitika-founded"
             ]

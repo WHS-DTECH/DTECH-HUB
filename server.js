@@ -54,7 +54,7 @@ function gradeSearchKeywordChallenge(answers, activityIndex) {
   const acceptedAnswers = {
     "keyword-west-coast-tree": ["kahikatea"],
     "keyword-gold-rush-town": ["ross"],
-    "keyword-glowworm-mystery": ["new zealand glowworm diet"],
+    "keyword-mountain-bird": ["roroa"],
     "keyword-fix-the-search": ["hokitika tomorrow"],
     "keyword-hokitika-founded": ["1864"]
   };
@@ -4772,7 +4772,7 @@ function addSearchResultsDetectiveIntroduction(content) {
 }
 
 function addSearchKitKeywordChallenge(content) {
-  if (content?._contentMigrations?.searchKeywordChallenge >= 12) return content;
+  if (content?._contentMigrations?.searchKeywordChallenge >= 13) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
   const activityIndex = worksheets.findIndex((worksheet) =>
@@ -4887,8 +4887,44 @@ function addSearchKitKeywordChallenge(content) {
       ]
     });
   }
+  const mountainBirdQuestion = {
+    id: "keyword-mountain-bird",
+    type: "short-answer",
+    heading: "Mission 3 – The Mountain Bird",
+    prompt: "A large species of kiwi lives in the forests and mountains of the West Coast. What is the Māori name of the great spotted kiwi?",
+    lines: 1,
+    hint: "Search for the great spotted kiwi's Māori name.",
+    images: [
+      {
+        url: "/practical-skills/images/west-coast-mountain-bird.jpg",
+        alt: "A brown, speckled kiwi standing in a museum exhibit.",
+        caption: "A kiwi bird",
+        attribution: "J Brew",
+        sourceUrl: "https://commons.wikimedia.org/wiki/File:Great_spotted_kiwi,_apteryx_haastii,_Auckland_War_Memorial_Museum.jpg",
+        license: "CC BY-SA 2.0",
+        licenseUrl: "https://creativecommons.org/licenses/by-sa/2.0/"
+      }
+    ]
+  };
+  const previousGlowwormMission = questions.find((question) =>
+    question?.id === "keyword-glowworm-mystery" &&
+    question.type === "multiple-choice" &&
+    question.heading === "Mission 3 – The Glowworm Mystery" &&
+    question.prompt === "Your challenge: You've heard about the glowworms at Hokitika's Glow Worm Dell. You want to discover what glowworms eat. Which search would help you find the answer?" &&
+    Array.isArray(question.options) &&
+    question.options.length === 3 &&
+    question.options[0] === "Hokitika glowworm photos" &&
+    question.options[1] === "New Zealand glowworm diet" &&
+    question.options[2] === "Hokitika Glow Worm Dell directions");
+  if (previousGlowwormMission) {
+    questions.splice(questions.indexOf(previousGlowwormMission), 1, mountainBirdQuestion);
+  } else if (!questions.some((question) => question?.id === mountainBirdQuestion.id)) {
+    const missionTwoIndex = questions.findIndex((question) => question?.id === "keyword-gold-rush-town");
+    questions.splice(missionTwoIndex >= 0 ? missionTwoIndex + 1 : 2, 0, mountainBirdQuestion);
+  }
   if (!questions.some((question) => question?.id === "keyword-fix-the-search")) {
-    const missionThreeIndex = questions.findIndex((question) => question?.id === "keyword-glowworm-mystery");
+    const missionThreeIndex = questions.findIndex((question) =>
+      question?.id === "keyword-mountain-bird" || question?.id === "keyword-glowworm-mystery");
     questions.splice(missionThreeIndex >= 0 ? missionThreeIndex + 1 : questions.length, 0, {
       id: "keyword-fix-the-search",
       type: "multiple-choice",
@@ -4927,12 +4963,37 @@ function addSearchKitKeywordChallenge(content) {
     information
   };
 
+  const searchAndFindIndex = worksheets.findIndex((worksheet) =>
+    String(worksheet?.activity || "").trim().toLowerCase() === "search and find!");
+  if (searchAndFindIndex >= 0 && searchAndFindIndex !== activityIndex) {
+    const existingSearchAndFind = activities[searchAndFindIndex] &&
+      typeof activities[searchAndFindIndex] === "object"
+      ? activities[searchAndFindIndex]
+      : { title: worksheets[searchAndFindIndex].activity };
+    const searchAndFindQuestions = Array.isArray(existingSearchAndFind.questions)
+      ? existingSearchAndFind.questions.slice()
+      : [];
+    for (const question of questions) {
+      if (question?.id?.startsWith("keyword-") &&
+          !searchAndFindQuestions.some((existing) => existing?.id === question.id)) {
+        searchAndFindQuestions.push(question);
+      }
+    }
+    activities[searchAndFindIndex] = {
+      ...existingSearchAndFind,
+      questions: searchAndFindQuestions,
+      questionAutoMarkAssessmentId: "search-keyword-challenge-v1",
+      information: existingSearchAndFind.information ||
+        (searchAndFindQuestions.length ? information : undefined)
+    };
+  }
+
   return {
     ...content,
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchKeywordChallenge: 12
+      searchKeywordChallenge: 13
     }
   };
 }
