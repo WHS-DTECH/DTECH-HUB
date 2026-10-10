@@ -2,6 +2,9 @@
 
 A separate library with five pre-loaded Year 7/8 curriculum area cards and the Licence Library's card layout,
 search, year-level/category/status filters and sorting.
+The footer card type is **Curriculum Strands**: these cards describe teacher
+curriculum requirements, analogous to standards in the SeniorDTECH library.
+This label does not change pathway names or populate the student Task List.
 
 The yellow **Pathways** navbar button opens this dashboard for signed-in users
 whose actual course is JuniorDTECH or MiddleDTECH. It updates after saving a

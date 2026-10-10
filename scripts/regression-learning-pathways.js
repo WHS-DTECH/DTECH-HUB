@@ -30,8 +30,11 @@ const tick = () => new Promise((resolve) => setImmediate(resolve));
 async function testDashboard() {
     const names = ["grid", "results-meta", "search", "year-pills", "status-pills", "category-pills", "sort"];
     const elements = Object.fromEntries(names.map((name) => [`#practical-skills-${name}`, new Element()]));
+    const dashboard = fs.readFileSync(path.join(root, "learning-pathways", "index.html"), "utf8");
+    const cardLabel = dashboard.match(/data-library-card-label="([^"]+)"/)?.[1];
+    assert.equal(cardLabel, "Curriculum Strands");
     const config = { dataset: { libraryPath: "/learning-pathways/library.json",
-        libraryName: "Learning Pathways", libraryCardLabel: "LEARNING PATHWAY", libraryIcon: "LP" } };
+        libraryName: "Learning Pathways", libraryCardLabel: cardLabel, libraryIcon: "LP" } };
     let responseCards = [];
     let fails = false;
     const context = vm.createContext({
@@ -57,7 +60,7 @@ async function testDashboard() {
     fails = false;
     await grid.children[0].children[1].click();
     assert.equal(grid.children.length, 2);
-    assert.match(grid.children[0].innerHTML, /LEARNING PATHWAY/);
+    assert.match(grid.children[0].innerHTML, /Curriculum Strands/);
     assert.equal(grid.children[0].href, sample.href, "Cards retain their configured links");
     const search = elements["#practical-skills-search"];
     search.value = "web design";
@@ -82,6 +85,7 @@ async function testDashboard() {
     await tick();
     assert.equal(grid.children[0].tagName, "article", "Display-only pathways are not links");
     assert.equal(grid.children[0].href, undefined);
+    assert.match(grid.children[0].innerHTML, /Curriculum Strands/, "Display-only cards show the curriculum card type");
     config.dataset = {};
     responseCards = [sample, { ...sample, id: "practical-skills-checklist", title: "Licence" }];
     vm.runInContext(fs.readFileSync(path.join(root, "practical-skills/app.js"), "utf8"), context);
