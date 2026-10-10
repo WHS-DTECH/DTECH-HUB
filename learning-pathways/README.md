@@ -1,6 +1,6 @@
 # Learning Pathways
 
-A separate library with seven pre-loaded Year 7/8 curriculum area cards and the Licence Library's card layout,
+A separate library with six pre-loaded Year 7/8 curriculum area cards and the Licence Library's card layout,
 search, year-level/category/status filters and sorting.
 
 The yellow **Pathways** navbar button opens this dashboard for signed-in users
@@ -36,6 +36,10 @@ database read only; without `DATABASE_URL`, local development reads/writes that
 file. A versioned, one-time migration adds missing curriculum area cards to
 existing libraries without overwriting existing cards. Later edits and deletions
 are preserved; an empty published library stays empty after the migration.
+Version 2 merges the original Programming and Algorithms starter cards into
+**Programming & Algorithms**, with a combined description. Other cards are
+unchanged; an existing combined card is preserved, and later deletion of the
+combined card is not undone on refresh or restart.
 
 Public reads: `/learning-pathways/library.json` and
 `GET /api/learning-pathways/library`. Admin reads and publishing:

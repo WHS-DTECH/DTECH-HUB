@@ -151,7 +151,7 @@ async function testEditor() {
 
 async function main() {
     const seed = normalizeCards(JSON.parse(fs.readFileSync(path.join(root, "learning-pathways/library.json"), "utf8")));
-    assert.deepEqual(seed.map((card) => card.title), ["Digital systems", "Algorithms", "Programming", "Data",
+    assert.deepEqual(seed.map((card) => card.title), ["Digital systems", "Programming & Algorithms", "Data",
         "Digital citizenship", "Systems and control", "Design and innovation"]);
     assert.ok(seed.every((card) => card.area === card.title && card.href === "" && card.yearLevel === "Junior DTECH"));
     assert.throws(() => normalizeCards(null), /cards array/);
@@ -169,12 +169,19 @@ async function main() {
         assert.match(sql, /learning_pathways_library_store/, "Never writes the Licence Library table");
         if (sql.includes("INSERT INTO") && (stored === null || !sql.includes("DO NOTHING"))) {
             stored = JSON.parse(params[0]);
-            seedVersion = 1;
+            seedVersion = 2;
         }
-        if (sql.includes("UPDATE learning_pathways_library_store AS library") && seedVersion < 1) {
+        if (sql.includes("seed_version < 1") && seedVersion < 1) {
             const starters = JSON.parse(params[0]);
             stored = [...stored, ...starters.filter((card) => !stored.some((old) => old.id === card.id))];
             seedVersion = 1;
+        }
+        if (sql.includes("seed_version < 2") && seedVersion < 2) {
+            const hasOld = stored.some((card) => ["programming", "algorithms"].includes(card.id));
+            const hasCombined = stored.some((card) => card.id === "programming-and-algorithms");
+            stored = stored.filter((card) => !["programming", "algorithms"].includes(card.id));
+            if (hasOld && !hasCombined) stored.push(...JSON.parse(params[0]));
+            seedVersion = 2;
         }
         return { rows: sql.startsWith("SELECT") && stored !== null ? [{ cards: stored }] : [] };
     } };
@@ -189,12 +196,26 @@ async function main() {
         let response = await fetch(`${base}/learning-pathways/library.json`);
         assert.match(response.headers.get("cache-control"), /no-store/);
         const migrated = await response.json();
-        assert.equal(migrated.length, 8, "One-time preload preserves existing custom cards");
+        assert.equal(migrated.length, 7, "One-time preload preserves existing custom cards");
         assert.equal(migrated.find((card) => card.id === "digital-systems").title, "Existing edited systems",
             "Preload does not overwrite existing cards with the same ID");
         assert.equal(migrated.filter((card) => card.id === "digital-systems").length, 1);
-        assert.equal((await (await fetch(`${base}/learning-pathways/library.json`)).json()).length, 8,
+        assert.equal((await (await fetch(`${base}/learning-pathways/library.json`)).json()).length, 7,
             "Repeated reads do not duplicate starter cards");
+        stored = [existing, sample, { ...sample, id: "programming" }, { ...sample, id: "algorithms" }];
+        seedVersion = 1;
+        const merged = await (await fetch(`${base}/learning-pathways/library.json`)).json();
+        assert.equal(merged.length, 3);
+        assert.deepEqual(merged.slice(0, 2), normalizeCards([existing, sample]), "Unrelated cards remain unchanged");
+        assert.equal(merged[2].title, "Programming & Algorithms");
+        assert.match(merged[2].summary, /algorithms.*debug.*test and improve/);
+        assert.equal(merged[2].href, "");
+        stored = [existing, { ...seed.find((card) => card.id === "programming-and-algorithms"), title: "Edited combined card" },
+            { ...sample, id: "programming" }, { ...sample, id: "algorithms" }];
+        seedVersion = 1;
+        const preserved = await (await fetch(`${base}/learning-pathways/library.json`)).json();
+        assert.equal(preserved.length, 2);
+        assert.equal(preserved[1].title, "Edited combined card", "Existing combined edits are preserved");
         assert.equal((await fetch(`${base}/api/admin/learning-pathways/library`)).status, 403);
         const publish = (cards, admin = true) => fetch(`${base}/api/admin/learning-pathways/library`, {
             method: "PUT", headers: { "Content-Type": "application/json", "x-test-admin": admin ? "yes" : "no" },

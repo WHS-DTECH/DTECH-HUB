@@ -10,24 +10,14 @@
     "visual": { "icon": "DS" }
   },
   {
-    "id": "algorithms",
-    "title": "Algorithms",
-    "summary": "Create and apply step-by-step algorithms to solve problems, find errors, debug solutions and test that they work.",
+    "id": "programming-and-algorithms",
+    "title": "Programming & Algorithms",
+    "summary": "Use programming tools and computational thinking to create purposeful programs. Design and apply step-by-step algorithms to solve problems, find and debug errors, then test and improve your solutions.",
     "yearLevel": "Junior DTECH",
-    "area": "Algorithms",
+    "area": "Programming & Algorithms",
     "status": "active",
     "href": "",
-    "visual": { "icon": "AL" }
-  },
-  {
-    "id": "programming",
-    "title": "Programming",
-    "summary": "Use programming tools and computational thinking to create purposeful programs, then test and improve them.",
-    "yearLevel": "Junior DTECH",
-    "area": "Programming",
-    "status": "active",
-    "href": "",
-    "visual": { "icon": "PR" }
+    "visual": { "icon": "PA" }
   },
   {
     "id": "data",
