@@ -12,6 +12,15 @@
             .replace(/'/g, "&#039;");
     }
 
+    function safeExternalUrl(value) {
+        try {
+            const url = new URL(String(value || ""));
+            return url.protocol === "https:" ? url.href : "";
+        } catch (_error) {
+            return "";
+        }
+    }
+
     function renderQuestionBody(question, responses, readOnly) {
         const type = String(question?.type || "short-answer");
         const responseValue = responses?.[question.id];
@@ -574,6 +583,13 @@
                         <figure class="worksheet-image">
                             <img src="${escapeHtml(image?.url || "")}" alt="${escapeHtml(image?.alt || "")}" loading="lazy">
                             ${image?.caption ? `<figcaption>${escapeHtml(image.caption)}</figcaption>` : ""}
+                            ${image?.attribution ? `
+                                <figcaption class="worksheet-image-credit">
+                                    Photo: ${escapeHtml(image.attribution)}
+                                    ${safeExternalUrl(image.sourceUrl) ? ` · <a href="${escapeHtml(safeExternalUrl(image.sourceUrl))}" target="_blank" rel="noopener noreferrer">Source</a>` : ""}
+                                    ${image?.license ? ` · ${safeExternalUrl(image.licenseUrl) ? `<a href="${escapeHtml(safeExternalUrl(image.licenseUrl))}" target="_blank" rel="noopener noreferrer">${escapeHtml(image.license)}</a>` : escapeHtml(image.license)}` : ""}
+                                </figcaption>
+                            ` : ""}
                         </figure>
                     `).join("")}
                 </div>

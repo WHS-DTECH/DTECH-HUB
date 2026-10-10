@@ -44,7 +44,7 @@
     }
 
     function createImage() {
-        return { url: "", alt: "", caption: "" };
+        return { url: "", alt: "", caption: "", attribution: "", sourceUrl: "", license: "", licenseUrl: "" };
     }
 
     function renderQuestions(questions) {
@@ -70,7 +70,11 @@
             card.innerHTML = `<div class="activity-card-head"><span>Image ${index + 1}</span><button class="button button-secondary" type="button" data-remove-image="${index}">Remove</button></div>
               <div class="activity-editor-field"><label>Image URL</label><input data-image-url="${index}" type="text" value="${image.url || ""}"></div>
               <div class="activity-editor-field"><label>Alt text</label><input data-image-alt="${index}" type="text" value="${image.alt || ""}"></div>
-              <div class="activity-editor-field"><label>Caption</label><input data-image-caption="${index}" type="text" value="${image.caption || ""}"></div>`;
+              <div class="activity-editor-field"><label>Caption</label><input data-image-caption="${index}" type="text" value="${image.caption || ""}"></div>
+              <div class="activity-editor-field"><label>Photo attribution</label><input data-image-attribution="${index}" type="text" value="${image.attribution || ""}"></div>
+              <div class="activity-editor-field"><label>Source URL</label><input data-image-source-url="${index}" type="url" value="${image.sourceUrl || ""}"></div>
+              <div class="activity-editor-field"><label>License</label><input data-image-license="${index}" type="text" value="${image.license || ""}"></div>
+              <div class="activity-editor-field"><label>License URL</label><input data-image-license-url="${index}" type="url" value="${image.licenseUrl || ""}"></div>`;
             imageList.appendChild(card);
         });
     }
@@ -85,10 +89,15 @@
                 ? { id: existing.id || `q${index + 1}`, type, prompt, lines: Math.max(1, Number.parseInt(values, 10) || 1) }
                 : { id: existing.id || `q${index + 1}`, type, prompt, options: values.split("\n").map((value) => value.trim()).filter(Boolean) };
         });
-        const images = Array.from(imageList.children).map((card) => ({
+        const images = Array.from(imageList.children).map((card, index) => ({
+            ...(content.activities?.[activityIndex]?.images?.[index] || {}),
             url: card.querySelector("input[data-image-url]")?.value || "",
             alt: card.querySelector("input[data-image-alt]")?.value || "",
-            caption: card.querySelector("input[data-image-caption]")?.value || ""
+            caption: card.querySelector("input[data-image-caption]")?.value || "",
+            attribution: card.querySelector("input[data-image-attribution]")?.value || "",
+            sourceUrl: card.querySelector("input[data-image-source-url]")?.value || "",
+            license: card.querySelector("input[data-image-license]")?.value || "",
+            licenseUrl: card.querySelector("input[data-image-license-url]")?.value || ""
         }));
         return { ...content.activities?.[activityIndex], number: activityIndex + 1, title: titleInput.value, establishes: establishesInput.value, questions, images };
     }

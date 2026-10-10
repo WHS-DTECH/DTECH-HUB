@@ -334,6 +334,16 @@ body.kit-worksheet-page {
     color: #6b5c3f;
 }
 
+.worksheet-image .worksheet-image-credit {
+    border-top: 1px solid #eee5d2;
+    font-size: 0.72rem;
+}
+
+.worksheet-image-credit a {
+    color: #173858;
+    text-decoration: underline;
+}
+
 .worksheet-question-list {
     display: grid;
     gap: 16px;
