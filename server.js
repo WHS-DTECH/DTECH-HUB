@@ -4476,7 +4476,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function addSearchKitKeywordChallenge(content) {
-  if (content?._contentMigrations?.searchKeywordChallenge >= 8) return content;
+  if (content?._contentMigrations?.searchKeywordChallenge >= 9) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
   const activityIndex = worksheets.findIndex((worksheet) =>
@@ -4520,7 +4520,7 @@ function addSearchKitKeywordChallenge(content) {
       id: "keyword-too-many-results",
       type: "multiple-choice",
       heading: "Mission 2: Too Many Results!",
-      prompt: "You search for bridge but get results from all over the world. You actually want to find the historic bridge at Hokitika Gorge. Which search would help you narrow the results?",
+      prompt: "You search for bridge but get results from all over the world. You actually want to find the historic swing bridge at Hokitika Gorge. Which search would help you narrow the results?",
       options: [
         "bridge",
         "bridges New Zealand",
@@ -4598,7 +4598,7 @@ function addSearchKitKeywordChallenge(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchKeywordChallenge: 8
+      searchKeywordChallenge: 9
     }
   };
 }
