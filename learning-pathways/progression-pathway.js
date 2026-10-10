@@ -8,6 +8,56 @@ const progressionPathways = [
     ["systems-and-control", "Systems and Control", "systems-and-control"]
 ];
 const progressionDescriptors = ["emerging", "developing", "consolidating", "proficient", "exceeding"];
+const progressionSummaryGroups = [
+    ["Digital Technology", ["data", "digital-citizenship", "digital-systems", "programming-and-algorithms"]],
+    ["Systems and Control", ["systems-and-control"]]
+];
+function progressionSummary(student) {
+    const summary = document.createElement("div");
+    summary.className = "progression-summary";
+    const progress = student.progress;
+    const caption = document.createElement("p");
+    caption.className = "progression-summary-caption";
+    caption.textContent = progress ? `Latest results: ${progress.schoolYear} Term ${progress.term}` : "No results saved yet";
+    summary.append(caption);
+    for (const [group, ids] of progressionSummaryGroups) {
+        const section = document.createElement("div");
+        section.className = "progression-summary-group";
+        const heading = document.createElement("strong");
+        heading.className = "progression-summary-strand";
+        heading.textContent = group;
+        heading.style.gridRow = `span ${ids.length}`;
+        section.append(heading);
+        ids.forEach((id) => {
+            const definition = progressionPathways.find(([pathwayId]) => pathwayId === id);
+            const result = progress?.pathways?.find((pathway) => pathway.id === id);
+            const level = progressionDescriptors.indexOf(result?.descriptor) + 1;
+            const state = level ? result.descriptor : !result ? "Not recorded" : result.coverage === "not-taught" ? "Not taught" : "Not determined";
+            const label = level ? `${state[0].toUpperCase()}${state.slice(1)}` : state;
+            const value = document.createElement("div");
+            value.className = "progression-summary-row";
+            const name = document.createElement("a");
+            name.href = `/learning-pathways/${definition[2]}.html`;
+            name.textContent = definition[1];
+            const bar = document.createElement("span");
+            bar.className = "progression-bar";
+            bar.setAttribute("role", "img");
+            bar.setAttribute("aria-label", `${definition[1]}: ${label}${level ? ` (${level} of 5)` : ""}`);
+            progressionDescriptors.forEach((descriptor, step) => {
+                const segment = document.createElement("span");
+                segment.className = step < level ? `progression-bar-segment ${descriptor}` : "progression-bar-segment";
+                bar.append(segment);
+            });
+            const text = document.createElement("span");
+            text.className = `progression-bar-label${level ? "" : " is-empty"}`;
+            text.textContent = label;
+            value.append(name, bar, text);
+            section.append(value);
+        });
+        summary.append(section);
+    }
+    return summary;
+}
 const progression = { students: [], records: [], record: null, selected: "digital-systems", dirty: false, loading: 0, saving: false, teacherEmail: "" };
 const pp = (name) => document.querySelector(`#progression-${name}`);
 function progressionStatus(message, error = false) {
@@ -55,9 +105,12 @@ function progressionStudentOptions() {
         const label = `${student.name} - Year ${student.yearLevel} - ${student.timetableClass === undefined ? student.formClass || student.homeroom : student.timetableClass || "No timetable class"}${student.archived ? " (saved history)" : ""}`;
         if (student.email) pp("student").append(new Option(label, student.email));
         const row = document.createElement("li");
+        const header = document.createElement("div");
+        header.className = "progression-roster-header";
         const name = document.createElement("span");
         name.textContent = label;
-        row.append(name);
+        header.append(name);
+        row.append(header);
         if (student.email) {
             const button = document.createElement("button");
             button.type = "button"; button.className = "button button-secondary"; button.textContent = "Open results";
@@ -67,12 +120,13 @@ function progressionStudentOptions() {
                 pp("student").value = student.email;
                 void progressionLoadStudent(student.email);
             });
-            row.append(button);
+            header.append(button);
         } else {
             const warning = document.createElement("span");
             warning.className = "is-error"; warning.textContent = "School email not linked";
-            row.append(warning);
+            header.append(warning);
         }
+        row.append(progressionSummary(student));
         pp("roster").append(row);
     }
     pp("student").value = matching.some((student) => student.email === selected) ? selected : "";
@@ -266,6 +320,13 @@ pp("form").addEventListener("submit", async (event) => {
         progression.records = [data.record, ...progression.records.filter((old) => old.schoolYear !== record.schoolYear || old.term !== record.term)]
             .sort((a, b) => b.schoolYear - a.schoolYear || b.term - a.term);
         progressionRender(data.record);
+        const latest = progression.records[0];
+        const savedStudent = progression.students.find((student) => student.email === data.record.studentEmail);
+        if (savedStudent && latest) {
+            savedStudent.progress = { schoolYear: latest.schoolYear, term: latest.term,
+                pathways: latest.pathways.map(({ id, coverage, descriptor }) => ({ id, coverage, descriptor })) };
+            progressionStudentOptions();
+        }
         progressionStatus("Student results saved.");
     } catch (error) {
         if (!hasAllowedSignedInHubAccount() || hubAuthState.profile?.email !== teacherEmail) return;

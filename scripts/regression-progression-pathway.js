@@ -202,6 +202,12 @@ async function main() {
         assert.equal(history[2].pathways[0].descriptor, "consolidating");
         assert.equal(history[2].yearLevel, 7, "Year level is a historical snapshot");
         assert.equal(history[2].homeroom, "JPI", "Homeroom persists separately from class and term");
+        const rosterStudent = (await (await fetch(`${base}/students`, { headers })).json()).students
+            .find((student) => student.email === sample.studentEmail);
+        assert.equal(rosterStudent.progress.schoolYear, 2028, "Roster includes the latest saved results");
+        assert.deepEqual(rosterStudent.progress.pathways.map((pathway) => pathway.id), ids);
+        assert.deepEqual(Object.keys(rosterStudent.progress.pathways[0]).sort(), ["coverage", "descriptor", "id"],
+            "Roster summary omits evidence and teacher notes");
         const oldDirectory = options.getStudents;
         options.getStudents = async () => [];
         const historicalApp = express();
@@ -211,6 +217,7 @@ async function main() {
         let archived;
         await historicalHandlers["/api/teacher/progression/students"]({}, { set() {}, json(data) { archived = data.students; } });
         assert.equal(archived[0].archived, true, "History remains discoverable after student moves beyond Year 10 or leaves directory");
+        assert.ok(archived[0].progress, "Archived students also show their latest progression bars");
         options.getStudents = oldDirectory;
         const restarted = express();
         const handlers = {};

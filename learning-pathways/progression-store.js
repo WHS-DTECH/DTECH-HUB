@@ -53,14 +53,20 @@ function registerProgressionPathway(app, { pool, hasDatabase, requireTeacherAcce
         await schema();
         const saved = await pool.query(`SELECT DISTINCT ON (student_email) student_email, record
             FROM progression_pathway_results ORDER BY student_email, school_year DESC, term DESC`);
-        const students = new Map(current.filter((student) => student.email).map((student) => [student.email, student]));
+        const students = new Map(current.filter((student) => student.email).map((student) => [student.email, { ...student }]));
+        const summary = (record) => ({ schoolYear: record.schoolYear, term: record.term,
+            pathways: (Array.isArray(record.pathways) ? record.pathways : [])
+                .map((pathway) => ({ id: pathway.id, coverage: pathway.coverage, descriptor: pathway.descriptor ?? null })) });
         for (const row of saved.rows) {
-            if (!students.has(row.student_email)) {
+            if (students.has(row.student_email)) {
+                students.get(row.student_email).progress = summary(row.record);
+            } else {
                 students.set(row.student_email, { email: row.student_email,
                     name: row.record.studentName || row.student_email,
                     yearLevel: row.record.yearLevel, formClass: row.record.formClass,
                     homeroom: row.record.homeroom || row.record.formClass,
-                    ...(row.record.timetableClass === undefined ? {} : { timetableClass: row.record.timetableClass }), archived: true });
+                    ...(row.record.timetableClass === undefined ? {} : { timetableClass: row.record.timetableClass }),
+                    progress: summary(row.record), archived: true });
             }
         }
         return [...current.filter((student) => !student.email), ...students.values()];

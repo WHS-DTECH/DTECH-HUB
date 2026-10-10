@@ -8,7 +8,25 @@
 .progression-page [hidden] { display: none !important; }
 .progression-page .is-error { color: #a12626; }
 .progression-roster { list-style: none; padding: 0; display: grid; gap: 8px; }
-.progression-roster li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid #cfdded; border-radius: 8px; }
+.progression-roster li { display: grid; gap: 10px; padding: 12px; border: 1px solid #cfdded; border-radius: 8px; }
+.progression-roster-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; font-weight: 600; }
+.progression-summary { display: grid; gap: 6px; padding-top: 8px; border-top: 1px solid #e3ecf6; }
+.progression-summary-caption { margin: 0; font-size: 0.85rem; color: #4b5d74; }
+.progression-summary-group { display: grid; grid-template-columns: minmax(130px, 170px) 1fr; column-gap: 14px; row-gap: 4px; align-items: center; padding: 4px 0; }
+.progression-summary-group + .progression-summary-group { border-top: 1px solid #eef3f9; }
+.progression-summary-strand { align-self: start; padding-top: 3px; font-size: 0.92rem; }
+.progression-summary-row { grid-column: 2; display: grid; grid-template-columns: minmax(170px, 210px) minmax(150px, 260px) auto; gap: 12px; align-items: center; }
+.progression-summary-row a { color: #24344a; text-decoration: none; }
+.progression-summary-row a:hover, .progression-summary-row a:focus-visible { text-decoration: underline; }
+.progression-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; height: 14px; }
+.progression-bar-segment { border-radius: 3px; background: #e2e9f1; }
+.progression-bar-label { font-size: 0.85rem; font-weight: 700; }
+.progression-bar-label.is-empty { font-weight: 400; color: #66768a; }
+@media (max-width: 700px) {
+    .progression-summary-group { grid-template-columns: 1fr; }
+    .progression-summary-strand { grid-row: auto !important; }
+    .progression-summary-row { grid-column: 1; grid-template-columns: 1fr; gap: 4px; }
+}
 .progression-page .curriculum-table { table-layout: auto; }
 .progression-page .curriculum-table td { vertical-align: middle; }
 #progression-detail { padding: 18px; margin-top: 20px; border: 1px solid #cfdded; border-radius: 12px; background: #f8fbff; }
