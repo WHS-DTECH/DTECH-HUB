@@ -4412,7 +4412,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function addSearchKitPenguinMission(content) {
-  if (content?._contentMigrations?.searchPenguinMission >= 3) return content;
+  if (content?._contentMigrations?.searchPenguinMission >= 4) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets.slice() : [];
   if (!worksheets[0]) worksheets[0] = { number: 1, activity: "Search Like a Pro", establishes: "Understands search engines and keywords" };
@@ -4434,6 +4434,19 @@ function addSearchKitPenguinMission(content) {
       type: "short-answer",
       prompt: "What is another name for New Zealand's little blue penguin?",
       lines: 1
+    });
+  }
+  if (!questions.some((question) => question.id === "search-korora-food-search")) {
+    questions.push({
+      id: "search-korora-food-search",
+      type: "multiple-choice",
+      heading: "Mission 2: Choose your own search words",
+      prompt: "Now find out what a kororā eats. Which search would help you find the answer?",
+      options: [
+        "kororā food",
+        "penguin colours",
+        "birds in New Zealand"
+      ]
     });
   }
 
@@ -4476,7 +4489,7 @@ function addSearchKitPenguinMission(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchPenguinMission: 3
+      searchPenguinMission: 4
     }
   };
 }

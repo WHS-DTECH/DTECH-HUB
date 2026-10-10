@@ -44,6 +44,8 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   penguin, with Duncan Wright's locally stored Kapiti Island photo credited
   under CC BY-SA 3.0; the old Google-open confirmation is removed and does not
   count as evidence.
+- Implemented: Search Like a Pro Mission 2 asks students to choose useful
+  search words to learn what a kororā eats, using a multiple-choice activity.
 - Implemented: the Kit Worksheets editor displays a teacher suggestion to
   structure the first activities as foundational skills, middle activities as
   applied skills, and final activities as integrated challenges.

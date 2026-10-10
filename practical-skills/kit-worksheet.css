@@ -405,6 +405,13 @@ body.kit-worksheet-page {
     font-size: 1.02rem;
 }
 
+.worksheet-question-heading {
+    margin: 0 0 6px;
+    color: #173858;
+    font-family: 'Baloo 2', cursive;
+    font-size: 1.1rem;
+}
+
 .worksheet-answer-input {
     width: 100%;
     border: none;

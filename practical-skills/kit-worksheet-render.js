@@ -651,6 +651,7 @@
                     <article class="worksheet-question">
                         <span class="worksheet-question-number" aria-hidden="true">${index + 1}</span>
                         <div class="worksheet-question-body">
+                            ${question?.heading ? `<h3 class="worksheet-question-heading">${escapeHtml(question.heading)}</h3>` : ""}
                             <p class="worksheet-question-prompt">${escapeHtml(question?.prompt || "")}</p>
                             ${renderQuestionBody(question, responses, readOnly)}
                             ${content?.identityLessonVersion ? `<p class="worksheet-assessment-feedback" data-identity-feedback="${escapeHtml(question.id)}" role="status" aria-live="polite">Type your answer. We will check it against your school Google account.</p>` : ""}
