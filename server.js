@@ -4412,10 +4412,13 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function addSearchKitPenguinMission(content) {
-  if (content?._contentMigrations?.searchPenguinMission >= 9) return content;
+  if (content?._contentMigrations?.searchPenguinMission >= 10) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets.slice() : [];
-  if (!worksheets[0]) worksheets[0] = { number: 1, activity: "Search Like a Pro", establishes: "Understands search engines and keywords" };
+  if (!worksheets[0]) worksheets[0] = { number: 1, activity: "Search Like a Pro", establishes: "Uses a search engine to discover information" };
+  else if (worksheets[0].establishes === "Understands search engines and keywords") {
+    worksheets[0] = { ...worksheets[0], establishes: "Uses a search engine to discover information" };
+  }
   const activities = Array.isArray(content?.activities) ? content.activities.slice() : [];
   const activity = activities[0] && typeof activities[0] === "object" ? activities[0] : {};
   const questions = (Array.isArray(activity.questions) ? activity.questions : []).flatMap((question) => {
@@ -4572,7 +4575,7 @@ function addSearchKitPenguinMission(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchPenguinMission: 9
+      searchPenguinMission: 10
     }
   };
 }

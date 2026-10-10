@@ -24,7 +24,7 @@ vm.runInContext(serverSource.slice(migrationStart, migrationEnd), context);
 
 const original = {
     bannerTitle: "Search Kit",
-    worksheets: [{ number: 1, activity: "Search Like a Pro" }, { number: 2, activity: "Other activity" }],
+    worksheets: [{ number: 1, activity: "Search Like a Pro", establishes: "Understands search engines and keywords" }, { number: 2, activity: "Other activity" }],
     _contentMigrations: { searchPenguinMission: 3 },
     activities: [
         {
@@ -42,6 +42,7 @@ const original = {
 
 const migrated = context.addSearchKitPenguinMission(original);
 assert.equal(migrated.worksheets[0].activity, "Search Like a Pro", "Existing activity title is preserved");
+assert.equal(migrated.worksheets[0].establishes, "Uses a search engine to discover information");
 assert.equal(migrated.activities[0].information.title, "THE MISSION: The Penguin Mystery");
 assert.deepEqual(Array.from(migrated.activities[0].information.paragraphs), [
     "Did you know that the world's smallest penguin lives right here on the West Coast of the South Island?",
@@ -96,14 +97,19 @@ savedContentBeforeMissionFour.activities[0].questions = savedContentBeforeMissio
     .filter((question) => question.id !== "search-penguin-location");
 const savedContentWithMissionFour = context.addSearchKitPenguinMission(savedContentBeforeMissionFour);
 assert.ok(savedContentWithMissionFour.activities[0].questions.some((question) => question.id === "search-penguin-location"), "Existing saved Search Kits gain Mission 4");
-assert.equal(savedContentWithMissionFour._contentMigrations.searchPenguinMission, 9, "Migration marker records the latest Search Kit content");
+assert.equal(savedContentWithMissionFour._contentMigrations.searchPenguinMission, 10, "Migration marker records the latest Search Kit content");
 const savedContentBeforeMissionFive = JSON.parse(JSON.stringify(migrated));
-savedContentBeforeMissionFive._contentMigrations.searchPenguinMission = 8;
+savedContentBeforeMissionFive._contentMigrations.searchPenguinMission = 9;
 savedContentBeforeMissionFive.activities[0].questions = savedContentBeforeMissionFive.activities[0].questions
     .filter((question) => question.id !== "search-penguin-safety");
 const savedContentWithMissionFive = context.addSearchKitPenguinMission(savedContentBeforeMissionFive);
 assert.ok(savedContentWithMissionFive.activities[0].questions.some((question) => question.id === "search-penguin-safety"), "Existing saved Search Kits gain Mission 5");
-assert.equal(savedContentWithMissionFive._contentMigrations.searchPenguinMission, 9, "Migration marker records Mission 5");
+assert.equal(savedContentWithMissionFive._contentMigrations.searchPenguinMission, 10, "Migration marker records latest Search Kit content");
+const savedKitWithOldDescription = JSON.parse(JSON.stringify(migrated));
+savedKitWithOldDescription._contentMigrations.searchPenguinMission = 9;
+savedKitWithOldDescription.worksheets[0].establishes = "Understands search engines and keywords";
+const savedKitWithUpdatedDescription = context.addSearchKitPenguinMission(savedKitWithOldDescription);
+assert.equal(savedKitWithUpdatedDescription.worksheets[0].establishes, "Uses a search engine to discover information", "Existing saved Search Kits receive the new worksheet description");
 const savedMissionThree = JSON.parse(JSON.stringify(migrated));
 savedMissionThree._contentMigrations.searchPenguinMission = 5;
 savedMissionThree.activities[0].questions.find((question) => question.id === "search-tallest-mountain").options.pop();
@@ -112,7 +118,7 @@ const upgradedSavedKit = context.addSearchKitPenguinMission(savedMissionThree);
 const upgradedMissionThree = upgradedSavedKit.activities[0].questions.find((question) => question.id === "search-tallest-mountain");
 assert.ok(upgradedMissionThree.options.includes("Mount Taranaki"), "Existing saved Mission 3 gains the Taranaki option");
 assert.ok(upgradedMissionThree.images.some((image) => image.url === "/practical-skills/images/mount-taranaki.jpg"), "Existing saved Mission 3 gains the Taranaki image");
-assert.equal(upgradedSavedKit._contentMigrations.searchPenguinMission, 9, "Migration marker records the updated Penguin Mystery content");
+assert.equal(upgradedSavedKit._contentMigrations.searchPenguinMission, 10, "Migration marker records latest Search Kit content");
 const photo = migrated.activities[0].images.find((image) => image.url === "/practical-skills/images/little-blue-penguin.jpg");
 assert.ok(photo, "Openly licensed local penguin photo replaces the illustration");
 assert.equal(photo.attribution, "Duncan Wright");
@@ -121,7 +127,7 @@ assert.equal(photo.sourceUrl, "https://commons.wikimedia.org/wiki/File:Blue_Peng
 assert.equal(photo.licenseUrl, "https://creativecommons.org/licenses/by-sa/3.0/");
 assert.equal(migrated.activities[0].images.some((image) => image.url.endsWith(".svg")), false, "Old illustration is removed");
 assert.equal(migrated.activities[1], original.activities[1], "Other activity content is untouched");
-assert.equal(migrated._contentMigrations.searchPenguinMission, 9, "Migration marker records Mission 5");
+assert.equal(migrated._contentMigrations.searchPenguinMission, 10, "Migration marker records latest Search Kit content");
 assert.equal(context.addSearchKitPenguinMission(migrated), migrated, "Migration is idempotent");
 assert.ok(fs.existsSync(penguinImage), "Penguin illustration asset exists");
 assert.ok(fs.existsSync(ruapehuImage), "Ruapehu photo is stored locally");
@@ -180,7 +186,7 @@ assert.match(worksheetCss, /@media\s*\(max-width:\s*560px\)\s*\{[\s\S]*?\.worksh
 assert.match(builderSource, /\.\.\.\(state\.content \|\| \{\}\)/, "Kit Builder retains the migration marker when saving");
 assert.match(serverSource, /UPDATE practical_skills_kit_content SET content = \$1::jsonb, updated_at = NOW\(\) WHERE kit_id = \$2/, "Migrated mission is persisted for existing saved kits");
 assert.match(serverSource, /if \(safeKitId === "kit-google-search"\) \{\s*const migrated = addSearchKitPenguinMission\(merged\);/, "Migration applies to existing Search Kit content");
-assert.match(serverSource, /if \(content\?\._contentMigrations\?\.searchPenguinMission >= 9\) return content;/, "Saved migration marker prevents rebuilding a teacher-edited mission");
+assert.match(serverSource, /if \(content\?\._contentMigrations\?\.searchPenguinMission >= 10\) return content;/, "Saved migration marker prevents rebuilding a teacher-edited mission");
 assert.match(activityEditorSource, /\.\.\.\(content\.activities\?\.\[activityIndex\]\?\.images\?\.\[index\] \|\| \{\}\)/, "Activity Details preserves photo attribution metadata while editing images");
 
 console.log("Search Kit penguin mission migration regression checks passed.");
