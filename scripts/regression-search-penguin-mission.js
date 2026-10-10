@@ -510,13 +510,23 @@ assert.deepEqual(JSON.parse(JSON.stringify(challengeMigrated.activities[4].infor
 }, "Google Search Challenge shows the My West Coast Discoveries introduction");
 assert.equal(challengeMigrated.worksheets[4].establishes, "Use Google independently to find information",
     "Stray 'Challenge' tab text is removed from the activity subtitle");
-assert.equal(challengeMigrated._contentMigrations.googleSearchChallenge, 3);
+assert.equal(challengeMigrated._contentMigrations.googleSearchChallenge, 4);
 assert.deepEqual(JSON.parse(JSON.stringify(challengeMigrated.activities[4].researchReport)), {
     id: "search-research-report-v1",
     fileName: "Search Kit - My West Coast Discoveries",
-    templateId: "",
+    templateId: "12_9pgqJIVnFd14OMhIlBZeorX3e-vDl37uLgLSz3Qf0",
     minimumWords: 25
 }, "Google Search Challenge gets the research report settings");
+const liveVersionThreeNoTemplate = JSON.parse(JSON.stringify(challengeMigrated));
+liveVersionThreeNoTemplate._contentMigrations.googleSearchChallenge = 3;
+liveVersionThreeNoTemplate.activities[4].researchReport.templateId = "";
+liveVersionThreeNoTemplate.activities[4].researchReport.minimumWords = 40;
+const liveVersionFour = context.addSearchKitPenguinMission(liveVersionThreeNoTemplate);
+assert.equal(liveVersionFour.activities[4].researchReport.templateId, "12_9pgqJIVnFd14OMhIlBZeorX3e-vDl37uLgLSz3Qf0",
+    "Empty template link is filled with the master research report");
+assert.equal(liveVersionFour.activities[4].researchReport.minimumWords, 40, "Teacher minimum words are kept");
+assert.deepEqual(JSON.parse(JSON.stringify(liveVersionFour.activities.slice(0, 4))), JSON.parse(JSON.stringify(liveVersionThreeNoTemplate.activities.slice(0, 4))),
+    "Connecting the template leaves the first four activities unchanged");
 const versionOneChallenge = JSON.parse(JSON.stringify(challengeMigrated));
 versionOneChallenge._contentMigrations.googleSearchChallenge = 1;
 delete versionOneChallenge.activities[4].researchReport;

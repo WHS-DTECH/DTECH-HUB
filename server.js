@@ -5142,18 +5142,19 @@ const PREVIOUS_GOOGLE_SEARCH_CHALLENGE_INTRODUCTION = {
   ]
 };
 
-// The teacher's master Google Doc is copied for each student; templateId is set in the Kit Builder.
+// The teacher's master Google Doc (TeacherFiles) is copied for each student; it can be changed in the Kit Builder.
+const GOOGLE_SEARCH_RESEARCH_REPORT_TEMPLATE_ID = "12_9pgqJIVnFd14OMhIlBZeorX3e-vDl37uLgLSz3Qf0";
 const GOOGLE_SEARCH_RESEARCH_REPORT = {
   id: "search-research-report-v1",
   fileName: "Search Kit - My West Coast Discoveries",
-  templateId: "",
+  templateId: GOOGLE_SEARCH_RESEARCH_REPORT_TEMPLATE_ID,
   minimumWords: 25
 };
 
 // Only touches the "Google Search Challenge" activity; other Search Kit activities are left as they are.
 function addGoogleSearchChallenge(content) {
   const version = Number(content?._contentMigrations?.googleSearchChallenge) || 0;
-  if (version >= 3) return content;
+  if (version >= 4) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets.slice() : [];
   const challengeIndex = worksheets.findIndex((worksheet) =>
@@ -5175,7 +5176,11 @@ function addGoogleSearchChallenge(content) {
       ? GOOGLE_SEARCH_CHALLENGE_INTRODUCTION
       : challenge.information,
     researchReport: challenge.researchReport && typeof challenge.researchReport === "object"
-      ? { ...GOOGLE_SEARCH_RESEARCH_REPORT, ...challenge.researchReport }
+      ? {
+        ...GOOGLE_SEARCH_RESEARCH_REPORT,
+        ...challenge.researchReport,
+        templateId: String(challenge.researchReport.templateId || "").trim() || GOOGLE_SEARCH_RESEARCH_REPORT_TEMPLATE_ID
+      }
       : { ...GOOGLE_SEARCH_RESEARCH_REPORT }
   };
   if (activities[challengeIndex].information === undefined) delete activities[challengeIndex].information;
@@ -5186,7 +5191,7 @@ function addGoogleSearchChallenge(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      googleSearchChallenge: 3
+      googleSearchChallenge: 4
     }
   };
 }
