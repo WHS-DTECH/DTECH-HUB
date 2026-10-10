@@ -104,6 +104,8 @@ controls.previewUser.change();
 assert.equal(controls.previewCourse.value, "All");
 assert.equal(controls.previewCards.children.length, cards.length - 1);
 const css = fs.readFileSync(path.join(root, "styles.css"), "utf8");
+assert.match(html, /class="admin-panel practical-user-preview"/);
+assert.match(css, /\.admin-panel\.practical-user-preview\s*\{[^}]*background:\s*#e5f4f1;[^}]*border-left:\s*5px solid #24685e;/);
 assert.match(css, /\.practical-preview-kit-list\s*\{[^}]*max-height:\s*240px;[^}]*overflow-y:\s*auto;/);
 assert.match(html, /aria-label="Matching kit names" tabindex="0"/);
 

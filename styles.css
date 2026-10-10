@@ -3303,6 +3303,17 @@ body.public-home-access .controls-panel {
     background: #fff8ea;
 }
 
+.admin-panel.practical-user-preview {
+    background: #e5f4f1;
+    border-color: #78ada4;
+    border-left: 5px solid #24685e;
+    margin-bottom: 12px;
+}
+
+.practical-user-preview h2 {
+    color: #194f47;
+}
+
 .practical-preview-kit-list {
     max-height: 240px;
     overflow-y: auto;

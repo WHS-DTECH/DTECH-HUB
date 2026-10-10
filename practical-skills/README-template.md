@@ -24,6 +24,8 @@ This folder is the reusable Practical Skills module for HUB sites.
 
 Above the Card Editor, select Students or Staff, search for a named person, and
 choose a temporary JuniorDTECH, MiddleDTECH or SeniorDTECH course. The preview
+panel has a pale teal background and dark teal accent border to distinguish
+it from the unchanged Card Editor. The preview
 includes All Years cards and matching pathway/year cards. Student defaults are
 inferred from their directory year level; staff default to All courses.
 This is a read-only planning preview, not impersonation or a saved assignment.
