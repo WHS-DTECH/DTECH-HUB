@@ -552,6 +552,7 @@
         const theme = content?.theme || {};
         const questions = content?.loginSites ? [] : Array.isArray(content?.questions) ? content.questions : [];
         const images = Array.isArray(content?.images) ? content.images : [];
+        const imageInformationLayout = Boolean(content?.information && images.length);
         const juniorLoginSites = [7, 8].includes(options.huntProfile?.year);
         const siteLevel = options.huntProfile?.courseIds?.includes("STAFF") ? "staff" : juniorLoginSites ? "junior"
             : [9, 10].includes(options.huntProfile?.year) ? "middle" : [11, 12, 13].includes(options.huntProfile?.year) ? "senior" : null;
@@ -577,6 +578,7 @@
                     <p>${escapeHtml(content.instructions)}</p>
                 </div>
             ` : ""}
+            ${imageInformationLayout ? `<div class="worksheet-image-information-layout">` : ""}
             ${images.length ? `
                 <div class="worksheet-image-panel">
                     ${images.map((image) => `
@@ -600,6 +602,7 @@
                     ${(content.information.paragraphs || []).map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`).join("")}
                 </section>
             ` : ""}
+            ${imageInformationLayout ? `</div>` : ""}
             ${content?.assessment ? renderAssessment(content.assessment, options.assessmentAnswers || {}, readOnly) : ""}
             ${content?.loginSites ? `
                 <section class="worksheet-login-staircase" aria-labelledby="login-staircase-title">

@@ -312,6 +312,27 @@ body.kit-worksheet-page {
     margin-bottom: 20px;
 }
 
+.worksheet-image-information-layout {
+    display: grid;
+    grid-template-columns: minmax(140px, 220px) minmax(0, 1fr);
+    align-items: start;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.worksheet-image-information-layout .worksheet-image-panel,
+.worksheet-image-information-layout .worksheet-assessment-intro {
+    margin: 0;
+}
+
+.worksheet-image-information-layout .worksheet-image-panel {
+    display: block;
+}
+
+.worksheet-image-information-layout .worksheet-image {
+    width: 100%;
+}
+
 .worksheet-image {
     margin: 0;
     background: #ffffff;
@@ -1190,6 +1211,14 @@ body.kit-worksheet-page {
 }
 
 @media (max-width: 560px) {
+    .worksheet-image-information-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .worksheet-image-information-layout .worksheet-image {
+        max-width: 220px;
+    }
+
     .worksheet-activity-card {
         grid-template-columns: auto minmax(0, 1fr);
     }
