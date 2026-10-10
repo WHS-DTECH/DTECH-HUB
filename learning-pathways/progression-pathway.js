@@ -27,20 +27,21 @@ function progressionDiscard() {
 }
 function progressionMatchingStudents(students, homeroom, year, search) {
     const normalise = (value) => String(value || "").trim().toUpperCase();
-    return students.filter((student) => (!homeroom || [student.homeroom, student.formClass].some((value) => normalise(value) === normalise(homeroom)))
+    return students.filter((student) => (!homeroom || (student.timetableClass === undefined
+        ? [student.homeroom, student.formClass] : [student.timetableClass]).some((value) => normalise(value) === normalise(homeroom)))
         && (!year || Number(student.yearLevel) === Number(year))
-        && `${student.name} ${student.email} ${student.homeroom || ""} ${student.formClass || ""}`.toLowerCase().includes(search.trim().toLowerCase()));
+        && `${student.name} ${student.email} ${student.timetableClass || ""} ${student.homeroom || ""} ${student.formClass || ""}`.toLowerCase().includes(search.trim().toLowerCase()));
 }
 function progressionHomeroomOptions() {
     const selected = pp("homeroom-filter").value;
     const homerooms = new Set(["JVE", "JPI", "JMM", "JSR", "JSD", "7S", "8S"]);
     progression.students.forEach((student) => {
-        for (const value of [student.homeroom, student.formClass]) {
+        for (const value of student.timetableClass === undefined ? [student.homeroom, student.formClass] : [student.timetableClass]) {
             const homeroom = String(value || "").trim().toUpperCase();
             if (homeroom) homerooms.add(homeroom);
         }
     });
-    pp("homeroom-filter").replaceChildren(new Option("All homerooms", ""));
+    pp("homeroom-filter").replaceChildren(new Option("All timetable classes", ""));
     [...homerooms].sort().forEach((homeroom) => pp("homeroom-filter").append(new Option(homeroom, homeroom)));
     pp("homeroom-filter").value = selected;
 }
@@ -51,7 +52,7 @@ function progressionStudentOptions() {
     pp("student").replaceChildren(new Option("Select a student", ""));
     pp("roster").replaceChildren();
     for (const student of matching) {
-        const label = `${student.name} - Year ${student.yearLevel} - ${student.formClass || student.homeroom}${student.archived ? " (saved history)" : ""}`;
+        const label = `${student.name} - Year ${student.yearLevel} - ${student.timetableClass === undefined ? student.formClass || student.homeroom : student.timetableClass || "No timetable class"}${student.archived ? " (saved history)" : ""}`;
         if (student.email) pp("student").append(new Option(label, student.email));
         const row = document.createElement("li");
         const name = document.createElement("span");
@@ -83,7 +84,8 @@ function progressionStudentOptions() {
 function progressionNewRecord(student) {
     const month = new Date().getMonth();
     return { studentEmail: student.email, schoolYear: new Date().getFullYear(), term: Math.min(4, Math.floor(month / 3) + 1),
-        yearLevel: student.yearLevel, formClass: student.formClass, homeroom: student.homeroom || student.formClass, revision: 0, strengths: "", nextLearning: "",
+        yearLevel: student.yearLevel, formClass: student.formClass, homeroom: student.homeroom || student.formClass,
+        timetableClass: student.timetableClass || "", revision: 0, strengths: "", nextLearning: "",
         pathways: progressionPathways.map(([id]) => ({ id, coverage: "not-taught", descriptor: null, addressed: "", evidence: "", notes: "" })) };
 }
 function progressionDetail() {
@@ -102,6 +104,7 @@ function progressionRender(record) {
         pp(control).value = record[key];
     }
     pp("homeroom").value = record.homeroom || record.formClass;
+    pp("timetable-class").value = record.timetableClass || "";
     pp("year").disabled = record.revision > 0;
     pp("term").disabled = record.revision > 0;
     pp("saved").textContent = record.updatedAt ? `Saved ${new Date(record.updatedAt).toLocaleString()} by ${record.updatedBy}` : "Student results - not saved yet.";
@@ -250,7 +253,8 @@ pp("form").addEventListener("submit", async (event) => {
     event.preventDefault();
     if (progression.saving || !progression.record) return;
     const record = { ...progression.record, schoolYear: Number(pp("year").value), term: Number(pp("term").value),
-        yearLevel: Number(pp("level").value), formClass: pp("class").value, homeroom: pp("homeroom").value, strengths: pp("strengths").value, nextLearning: pp("next").value };
+        yearLevel: Number(pp("level").value), formClass: pp("class").value, homeroom: pp("homeroom").value,
+        timetableClass: pp("timetable-class").value, strengths: pp("strengths").value, nextLearning: pp("next").value };
     progression.saving = true;
     const teacherEmail = hubAuthState.profile?.email;
     pp("editor").disabled = true; pp("controls").disabled = true;

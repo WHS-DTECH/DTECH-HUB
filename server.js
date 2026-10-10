@@ -1538,6 +1538,7 @@ function buildStudentClassManagementRow(row) {
     year_level: pickRowValue(lower, ["year_level", "year level", "year", "level", "yeargroup", "year_group"]),
     form_class: pickRowValue(lower, ["form_class", "form class", "form", "tutor", "tutor_class", "timetable_class", "home_room", "homeroom", "class"]),
     homeroom: pickRowValue(lower, ["homeroom", "home_room", "home room", "tutor_class", "tutor", "form_class", "form class", "form", "class"]),
+    timetable_class: pickRowValue(lower, ["timetable_class", "timetable class", "timetableclass"]),
     status,
     upload_term: pickRowValue(lower, ["upload_term", "term"]),
     upload_year: pickRowValue(lower, ["upload_year", "year_uploaded"]),
@@ -6041,7 +6042,7 @@ require("./learning-pathways/progression-store").registerProgressionPathway(app,
       .map((row) => ({
         email: normalizeEmail(row.linked_emails?.[0] || ""), name: row.student_name,
         yearLevel: Number(String(row.year_level).replace(/^year\s*/i, "")),
-        formClass: row.form_class || "", homeroom: row.homeroom || ""
+        formClass: row.form_class || "", homeroom: row.homeroom || "", timetableClass: row.timetable_class || ""
       }));
   }
 });

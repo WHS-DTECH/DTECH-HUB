@@ -86,7 +86,7 @@ cards are now linked; the Junior Task List still displays names only.
 
 `progression-pathway.html`, `.js`, `.css` and `progression-store.js` provide the
 Student Work > Progression Pathway tracker. The layout follows the supplied
-JuniorDTECH tracker concept: student/homeroom, five pathway results, selected
+JuniorDTECH tracker concept: student/timetable class, five pathway results, selected
 curriculum coverage/evidence and teacher strengths/next-learning summary.
 The five user-supplied descriptors and colours are teacher selected. Coverage
 is separate; Not taught requires Not determined. No kit-derived grades or
@@ -103,14 +103,17 @@ their historical year level/class and saved name are retained. New results
 require a current Year 7-10 directory entry.
 Database-unavailable development returns an explicit 503 rather than pretending
 results were saved. Source PDFs remain local and are not published.
-The student controls use Homeroom and Year level filters together with name
+The student controls use Timetable Class and Year level filters together with name
 search (for example JPI + Year 7). JVE, JPI, JMM, JSR, JSD, 7S and 8S are offered,
-along with other directory homerooms and form classes. The filter matches either
-the explicit homeroom/tutor field or Form Class, so a separate tutor field cannot
-hide a student from their selected form class.
+along with other directory timetable classes. The uploaded `timetable_class`,
+`Timetable Class` or `TimetableClass` column is passed through independently of
+Tutor/Homeroom and Form Class. Current student filtering uses Timetable Class
+only, including when it is blank; Tutor is not a substitute for class membership.
+Legacy archived records without that field retain their previous class/homeroom
+filter fallback. Name search also searches timetable class and tutor fields.
 No class-to-homeroom membership is guessed. Zero matches are shown explicitly.
 Filtering away from a student prompts before discarding unsaved edits and clears
-the previous results. Homeroom is saved separately from class; old records use
+the previous results. Timetable Class and Homeroom are saved separately from class; old records use
 their class as a display fallback. Matching students appear in a visible class
 list with Open results buttons. Students without linked school emails are also
 listed, with an explicit warning that email linkage is required to save results;

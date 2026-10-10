@@ -7,7 +7,7 @@ const vm = require("node:vm");
 const { registerProgressionPathway, validateRecord } = require("../learning-pathways/progression-store");
 const ids = ["digital-systems", "data", "digital-citizenship", "programming-and-algorithms", "systems-and-control"];
 const sample = { studentEmail: "student@example.test", schoolYear: 2027, term: 1, yearLevel: 7,
-    revision: 0, formClass: "7XX", homeroom: "JPI", strengths: "", nextLearning: "",
+    revision: 0, formClass: "7XX", homeroom: "JPI", timetableClass: "JPI", strengths: "", nextLearning: "",
     pathways: ids.map((id) => ({ id, coverage: "not-taught", descriptor: null, addressed: "", evidence: "", notes: "" })) };
 const clone = (value) => JSON.parse(JSON.stringify(value));
 async function main() {
@@ -54,6 +54,28 @@ async function main() {
     assert.equal(context.progressionAnnualRecord(annualRecords, {}, 2028), null, "A new school year does not overwrite earlier results");
     assert.equal(context.progressionAnnualRecord(annualRecords, { archived: true }, 2028), annualRecords[0]);
     const serverSource = fs.readFileSync(path.join(root, "server.js"), "utf8");
+    const normalisation = vm.createContext({
+        STUDENT_TIMETABLE_PERIOD_COLUMNS: [], DTECH_TIMETABLE_KEYWORDS: [], TIMETABLE_LABELS: new Map(),
+        getStudentPrograms: () => [], collectStudentLinkedEmails: () => []
+    });
+    vm.runInContext(serverSource.slice(serverSource.indexOf("function buildLowerKeyMap("), serverSource.indexOf("function mergeUniqueStrings("))
+        + serverSource.slice(serverSource.indexOf("function buildStudentClassManagementRow("), serverSource.indexOf("function getStudentIdentityKey(")), normalisation);
+    for (const key of ["timetable_class", "Timetable Class", "TimetableClass"]) {
+        const row = normalisation.buildStudentClassManagementRow({ first_name: "Example", year_level: "8", tutor: "8WPAPA", [key]: "JVE" });
+        assert.equal(row.timetable_class, "JVE", "Timetable Class is normalised independently of Tutor");
+        assert.equal(row.homeroom, "8WPAPA");
+    }
+    const timetableStudents = [
+        { name: "Year seven", email: "seven", yearLevel: 7, timetableClass: "JPI", homeroom: "7WHAU", formClass: "7WHAU" },
+        { name: "Year eight", email: "eight", yearLevel: 8, timetableClass: "JPI", homeroom: "8WPAPA", formClass: "8WPAPA" },
+        { name: "Other class", email: "other", yearLevel: 7, timetableClass: "JVE", homeroom: "JPI", formClass: "JPI" },
+        { name: "Blank class", email: "blank", yearLevel: 7, timetableClass: "", homeroom: "JPI", formClass: "JPI" }
+    ];
+    assert.deepEqual(Array.from(context.progressionMatchingStudents(timetableStudents, "JPI", "", ""), (student) => student.email), ["seven", "eight"]);
+    assert.deepEqual(Array.from(context.progressionMatchingStudents(timetableStudents, "JPI", "7", ""), (student) => student.email), ["seven"]);
+    assert.equal(context.progressionMatchingStudents(timetableStudents, "", "", "8wpapa").length, 1, "Tutor remains searchable separately");
+    assert.equal(validateRecord({ ...sample, timetableClass: "JPI" }).timetableClass, "JPI");
+    assert.throws(() => validateRecord({ ...sample, timetableClass: "x".repeat(101) }));
     assert.match(serverSource, /homeroom: pickRowValue\(lower, \["homeroom", "home_room", "home room"/,
         "Explicit homeroom takes priority over class fields");
     const registrationStart = serverSource.indexOf('require("./learning-pathways/progression-store").registerProgressionPathway');
@@ -63,9 +85,9 @@ async function main() {
         require: () => ({ registerProgressionPathway: (_app, config) => { directoryAdapter = config.getStudents; } }),
         app: {}, pool: {}, hasDatabase: true, requireActivityWriteAccess: () => {},
         getStudentDirectoryRows: async () => [
-            { student_name: "No email one", year_level: "Year 7", form_class: "JPI", homeroom: "JPI", linked_emails: [] },
-            { student_name: "No email two", year_level: "8", form_class: "JPI", homeroom: "JPI", linked_emails: [] },
-            { student_name: "Linked student", year_level: "7", form_class: "JPI", homeroom: "JPI", linked_emails: ["linked@example.test"] }
+            { student_name: "No email one", year_level: "Year 7", form_class: "7WHAU", homeroom: "7WHAU", timetable_class: "JPI", linked_emails: [] },
+            { student_name: "No email two", year_level: "8", form_class: "8WPAPA", homeroom: "8WPAPA", timetable_class: "JPI", linked_emails: [] },
+            { student_name: "Linked student", year_level: "7", form_class: "7WHAU", homeroom: "7WHAU", timetable_class: "JPI", linked_emails: ["linked@example.test"] }
         ],
         buildStudentClassManagementRow: (row) => row, dedupeToLatestStudentRows: (rows) => rows,
         normalizeEmail: (value) => value.trim().toLowerCase()
@@ -143,6 +165,7 @@ async function main() {
         const savedResponse = await put(sample);
         assert.equal(savedResponse.status, 200);
         const saved = (await savedResponse.json()).record;
+        assert.equal(saved.timetableClass, "JPI", "Timetable Class snapshot survives save");
         assert.equal(saved.revision, 1); assert.equal(saved.updatedBy, "teacher@example.test");
         assert.equal((await put(sample)).status, 409);
         saved.pathways[0].coverage = "taught"; saved.pathways[0].descriptor = "consolidating";

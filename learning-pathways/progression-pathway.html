@@ -19,15 +19,15 @@
         <header class="hero"><nav class="topbar" aria-label="Primary"><a class="brand" href="/index.html">Computer Lab</a></nav></header>
         <main class="progression-page">
             <section class="panel-section">
-                <p class="section-kicker">YEAR 7-10 | TEACHER VIEW | HOMEROOM</p>
+                <p class="section-kicker">YEAR 7-10 | TEACHER VIEW | TIMETABLE CLASS</p>
                 <h1>Progression Pathway</h1>
                 <p>Curriculum progress tracker. Teacher-selected descriptors against the student's year-specific expectations.</p>
                 <p id="progression-status" role="status">Checking Teacher View access...</p>
                 <button id="progression-retry" class="button button-secondary" type="button" hidden>Reload saved results</button>
                 <fieldset id="progression-controls" disabled>
-                    <legend>Student and Homeroom</legend>
+                    <legend>Student and Timetable Class</legend>
                     <div class="progression-fields">
-                        <label>Homeroom<select id="progression-homeroom-filter"><option value="">All homerooms</option></select></label>
+                        <label>Timetable Class<select id="progression-homeroom-filter"><option value="">All timetable classes</option></select></label>
                         <label>Year level filter<select id="progression-year-filter"><option value="">All years</option><option value="7">Year 7</option><option value="8">Year 8</option><option value="9">Year 9</option><option value="10">Year 10</option></select></label>
                         <label>Find a student<input id="progression-search" type="search" placeholder="Start typing a name..."></label>
                         <label>Student<select id="progression-student"><option value="">Select a student</option></select></label>
@@ -45,6 +45,7 @@
                             <label>Student year level<select id="progression-level"><option value="7">Year 7</option><option value="8">Year 8</option><option value="9">Year 9</option><option value="10">Year 10</option></select></label>
                             <label>Class<input id="progression-class" maxlength="100"></label>
                             <label>Homeroom<input id="progression-homeroom" maxlength="100"></label>
+                            <label>Timetable Class<input id="progression-timetable-class" maxlength="100"></label>
                         </div>
                         <h2>Learning Pathway Results</h2>
                         <p>Coverage is separate from progress. Untaught pathways remain Not determined; descriptors are selected by the teacher, not calculated from kit completion.</p>
