@@ -73,13 +73,13 @@ assert.deepEqual(Array.from(migrated.activities[0].information.paragraphs), [
     "Use a search engine of your choice to find the answers to the questions below. Google, Bing or another search engine will do!",
     "Can you solve the Penguin Mystery?"
 ]);
-assert.equal(migrated.activities[1].information.title, "🔎 THE MISSION: The West Coast Treasure Hunt");
+assert.equal(migrated.activities[1].information.title, "🔎 THE MISSION: The West Coast Mystery Trail");
 assert.equal(migrated.activities[1].questionAutoMarkAssessmentId, "search-keyword-challenge-v1", "Keyword Challenge uses server-checked auto-marking");
 assert.deepEqual(Array.from(migrated.activities[1].information.paragraphs), [
-    "You're on a treasure hunt across the West Coast!",
-    "Your challenge is to choose the best search words to find clues about places, objects and wildlife.",
-    "Sometimes your first search won't give you what you need. That's when clever searchers change their keywords!",
-    "Can you solve all five clues?"
+    "There are mysteries hiding all over the West Coast!",
+    "Your challenge is to follow five clues and use a search engine to discover the answers.",
+    "You can search however you like. If your first search doesn't help, try different words.",
+    "Can you solve all five mysteries?"
 ]);
 assert.equal(migrated.activities[2].information.title, "THE MISSION: The Search Results Detective");
 assert.deepEqual(Array.from(migrated.activities[2].information.paragraphs), [
@@ -381,7 +381,7 @@ assert.equal(keywordChallengeMissionFive.heading, "Mission 5: Your Turn – Find
 assert.equal(keywordChallengeMissionFive.prompt, "Use a search engine to find out what year Hokitika was founded as a gold-mining settlement. What year did you find?");
 assert.equal(keywordChallengeMissionFive.lines, 1);
 assert.deepEqual(Array.from(migrated.activities[1].questions.slice(5), (question) => question.id), ["other-q"], "Existing Keyword Challenge questions are preserved");
-assert.equal(migrated._contentMigrations.searchKeywordChallenge, 9, "Keyword Challenge migration is recorded");
+assert.equal(migrated._contentMigrations.searchKeywordChallenge, 10, "Keyword Challenge migration is recorded");
 const teacherEditedKeywordChallenge = JSON.parse(JSON.stringify(migrated));
 teacherEditedKeywordChallenge._contentMigrations.searchKeywordChallenge = 1;
 teacherEditedKeywordChallenge.activities[1].information = { title: "Teacher-edited title", paragraphs: ["Teacher-edited introduction"] };
@@ -393,6 +393,26 @@ assert.deepEqual(upgradedKeywordChallenge.activities[1].information, {
     paragraphs: ["Teacher-edited introduction"]
 }, "Keyword Challenge question migration preserves teacher-edited introduction");
 assert.ok(upgradedKeywordChallenge.activities[1].questions.some((question) => question.id === "keyword-pounamu-treasure"), "Saved Keyword Challenge gains the pounamu mission");
+const savedDefaultKeywordIntro = JSON.parse(JSON.stringify(migrated));
+savedDefaultKeywordIntro._contentMigrations.searchKeywordChallenge = 9;
+savedDefaultKeywordIntro.activities[1].information = {
+    title: "🔎 THE MISSION: The West Coast Treasure Hunt",
+    paragraphs: [
+        "You're on a treasure hunt across the West Coast!",
+        "Your challenge is to choose the best search words to find clues about places, objects and wildlife.",
+        "Sometimes your first search won't give you what you need. That's when clever searchers change their keywords!",
+        "Can you solve all five clues?"
+    ]
+};
+const upgradedDefaultKeywordIntro = context.addSearchKitKeywordChallenge(savedDefaultKeywordIntro);
+assert.equal(upgradedDefaultKeywordIntro.activities[1].information.title, "🔎 THE MISSION: The West Coast Mystery Trail",
+    "Migration updates the previous default Keyword Challenge introduction");
+assert.equal(upgradedDefaultKeywordIntro._contentMigrations.searchKeywordChallenge, 10);
+const savedEditedKeywordIntro = JSON.parse(JSON.stringify(savedDefaultKeywordIntro));
+savedEditedKeywordIntro.activities[1].information.paragraphs[0] = "A teacher-customized opening.";
+const preservedEditedKeywordIntro = context.addSearchKitKeywordChallenge(savedEditedKeywordIntro);
+assert.equal(preservedEditedKeywordIntro.activities[1].information.paragraphs[0], "A teacher-customized opening.",
+    "Migration preserves teacher-customized Keyword Challenge introductions");
 const savedKitMissingKeywordActivity = {
     ...original,
     _contentMigrations: { searchPenguinMission: 11, searchKeywordChallenge: 1 },
@@ -400,13 +420,13 @@ const savedKitMissingKeywordActivity = {
 };
 const repairedKeywordKit = context.addSearchKitPenguinMission(savedKitMissingKeywordActivity);
 assert.equal(repairedKeywordKit.activities[1].title, "The Keyword Challenge", "Migration creates the missing activity listed in worksheets");
-assert.equal(repairedKeywordKit.activities[1].information.title, "🔎 THE MISSION: The West Coast Treasure Hunt");
+assert.equal(repairedKeywordKit.activities[1].information.title, "🔎 THE MISSION: The West Coast Mystery Trail");
 assert.ok(repairedKeywordKit.activities[1].questions.some((question) => question.id === "keyword-pounamu-treasure"), "Missing activity is populated with the pounamu mission");
 assert.ok(repairedKeywordKit.activities[1].questions.some((question) => question.id === "keyword-too-many-results"), "Missing activity includes Mission 2");
 assert.ok(repairedKeywordKit.activities[1].questions.some((question) => question.id === "keyword-glowworm-mystery"), "Missing activity includes Mission 3");
 assert.ok(repairedKeywordKit.activities[1].questions.some((question) => question.id === "keyword-fix-the-search"), "Missing activity includes Mission 4");
 assert.ok(repairedKeywordKit.activities[1].questions.some((question) => question.id === "keyword-hokitika-founded"), "Missing activity includes Mission 5");
-assert.equal(repairedKeywordKit._contentMigrations.searchKeywordChallenge, 9, "Repair migration is recorded for previously incomplete saved kits");
+assert.equal(repairedKeywordKit._contentMigrations.searchKeywordChallenge, 10, "Repair migration is recorded for previously incomplete saved kits");
 assert.equal(migrated.activities[0].questions.some((question) => question.id === "google-check"), false, "Google-open confirmation is removed");
 assert.equal(migrated.activities[0].questions.some((question) => question.id === "keywords"), true, "Other search-learning questions are retained");
 const penguinQuestion = migrated.activities[0].questions.find((question) => question.id === "search-penguin-name");

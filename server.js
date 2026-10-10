@@ -4772,7 +4772,7 @@ function addSearchResultsDetectiveIntroduction(content) {
 }
 
 function addSearchKitKeywordChallenge(content) {
-  if (content?._contentMigrations?.searchKeywordChallenge >= 9) return content;
+  if (content?._contentMigrations?.searchKeywordChallenge >= 10) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
   const activityIndex = worksheets.findIndex((worksheet) =>
@@ -4785,6 +4785,19 @@ function addSearchKitKeywordChallenge(content) {
     ? activities[activityIndex]
     : { title: worksheets[activityIndex].activity };
   const updateIntroduction = (content?._contentMigrations?.searchKeywordChallenge || 0) < 1 || !existingActivity;
+  const previousDefaultIntroduction = {
+    title: "🔎 THE MISSION: The West Coast Treasure Hunt",
+    paragraphs: [
+      "You're on a treasure hunt across the West Coast!",
+      "Your challenge is to choose the best search words to find clues about places, objects and wildlife.",
+      "Sometimes your first search won't give you what you need. That's when clever searchers change their keywords!",
+      "Can you solve all five clues?"
+    ]
+  };
+  const hasPreviousDefaultIntroduction = activity.information?.title === previousDefaultIntroduction.title &&
+    Array.isArray(activity.information?.paragraphs) &&
+    activity.information.paragraphs.length === previousDefaultIntroduction.paragraphs.length &&
+    activity.information.paragraphs.every((paragraph, index) => paragraph === previousDefaultIntroduction.paragraphs[index]);
   const questions = Array.isArray(activity.questions) ? activity.questions.slice() : [];
   if (!questions.some((question) => question?.id === "keyword-pounamu-treasure")) {
     questions.unshift({
@@ -4873,13 +4886,13 @@ function addSearchKitKeywordChallenge(content) {
       lines: 1
     });
   }
-  const information = updateIntroduction ? {
-    title: "🔎 THE MISSION: The West Coast Treasure Hunt",
+  const information = updateIntroduction || hasPreviousDefaultIntroduction ? {
+    title: "🔎 THE MISSION: The West Coast Mystery Trail",
     paragraphs: [
-      "You're on a treasure hunt across the West Coast!",
-      "Your challenge is to choose the best search words to find clues about places, objects and wildlife.",
-      "Sometimes your first search won't give you what you need. That's when clever searchers change their keywords!",
-      "Can you solve all five clues?"
+      "There are mysteries hiding all over the West Coast!",
+      "Your challenge is to follow five clues and use a search engine to discover the answers.",
+      "You can search however you like. If your first search doesn't help, try different words.",
+      "Can you solve all five mysteries?"
     ]
   } : activity.information;
   activities[activityIndex] = {
@@ -4894,7 +4907,7 @@ function addSearchKitKeywordChallenge(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchKeywordChallenge: 9
+      searchKeywordChallenge: 10
     }
   };
 }
