@@ -30,6 +30,16 @@
 .progression-page .curriculum-table { table-layout: auto; }
 .progression-page .curriculum-table td { vertical-align: middle; }
 #progression-detail { padding: 18px; margin-top: 20px; border: 1px solid #cfdded; border-radius: 12px; background: #f8fbff; }
+.progression-dialog { width: min(980px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; border: 1px solid #b9cbde; border-radius: 14px; color: #24344a; background: #f5f8fc; box-shadow: 0 24px 60px rgba(20, 35, 60, 0.35); }
+.progression-dialog::backdrop { background: rgba(20, 35, 60, 0.55); }
+.progression-dialog-header { position: sticky; top: 0; z-index: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 16px 22px; border-bottom: 1px solid #cfdded; background: #fff; }
+.progression-dialog-header h2 { margin: 2px 0 4px; }
+.progression-dialog-header p { margin: 0; }
+.progression-dialog-header .section-kicker { font-size: 0.75rem; }
+#progression-dialog-status { margin: 12px 22px 0; }
+#progression-dialog-status:empty { display: none; }
+.progression-dialog form { padding: 0 22px 22px; }
+.progression-dialog fieldset { margin-top: 14px; }
 .progression-legend { list-style: none; padding: 0; display: grid; gap: 14px; }
 .progression-legend li { display: flex; align-items: center; gap: 14px; }
 .progression-legend p { margin: 4px 0; }

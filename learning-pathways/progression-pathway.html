@@ -36,9 +36,19 @@
                     <p id="progression-email-warning" class="is-error" hidden></p>
                     <ul id="progression-roster" class="progression-roster" aria-label="Matching students"></ul>
                 </fieldset>
+                <dialog id="progression-dialog" class="progression-dialog" aria-labelledby="progression-dialog-title">
+                <div class="progression-dialog-header">
+                    <div>
+                        <p class="section-kicker">STUDENT PROGRESSION DETAILS</p>
+                        <h2 id="progression-dialog-title">Student results</h2>
+                        <p id="progression-dialog-meta"></p>
+                    </div>
+                    <button id="progression-dialog-close" class="button button-secondary" type="button">Close</button>
+                </div>
+                <p id="progression-dialog-status" role="status"></p>
                 <form id="progression-form">
                     <fieldset id="progression-editor" disabled hidden>
-                        <legend>Student results</legend>
+                        <legend class="visually-hidden">Student results</legend>
                         <div class="progression-fields">
                             <label>School year<input id="progression-year" type="number" min="2000" max="2100" required></label>
                             <label>Term<select id="progression-term"><option value="1">Term 1</option><option value="2">Term 2</option><option value="3">Term 3</option><option value="4">Term 4</option></select></label>
@@ -67,6 +77,7 @@
                         <p id="progression-saved"></p>
                     </fieldset>
                 </form>
+                </dialog>
                 <section aria-labelledby="descriptor-heading">
                     <h2 id="descriptor-heading">The five Progress Descriptors</h2>
                     <ol class="progression-legend">

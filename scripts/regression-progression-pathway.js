@@ -47,6 +47,9 @@ async function main() {
     const html = fs.readFileSync(path.join(root, "learning-pathways/progression-pathway.html"), "utf8");
     assert.ok(!html.includes("progression-history"), "Term-history dropdown has been removed");
     assert.ok(html.includes('id="progression-roster"'), "Matching students have a visible class list");
+    assert.match(html, /<dialog id="progression-dialog"[\s\S]*id="progression-form"[\s\S]*<\/dialog>/, "Student details open in a dialog");
+    assert.match(client, /progressionRender\(record \|\| progressionNewRecord\(student\)\);\s*progressionOpenDialog\(student\);/, "Open Details shows the loaded record in the dialog");
+    assert.match(client, /pp\("dialog"\)\.addEventListener\("cancel"[\s\S]*progressionCloseDialog\(\)/, "Escape uses the unsaved-change guard");
     assert.ok(!client.includes('pp("history")'), "No handlers depend on the removed selector");
     vm.runInContext(client.slice(client.indexOf("function progressionAnnualRecord("), client.indexOf("async function progressionLoadStudent(")), context);
     const annualRecords = [{ schoolYear: 2027, term: 3, revision: 2 }, { schoolYear: 2026, term: 1, revision: 1 }];

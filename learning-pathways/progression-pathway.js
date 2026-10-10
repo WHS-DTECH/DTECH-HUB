@@ -63,6 +63,29 @@ const pp = (name) => document.querySelector(`#progression-${name}`);
 function progressionStatus(message, error = false) {
     pp("status").textContent = message;
     pp("status").classList.toggle("is-error", error);
+    pp("dialog-status").textContent = message;
+    pp("dialog-status").classList.toggle("is-error", error);
+}
+function progressionHideEditor() {
+    pp("editor").hidden = true;
+    if (pp("dialog").open) pp("dialog").close();
+}
+function progressionOpenDialog(student) {
+    pp("dialog-title").textContent = student ? student.name : "Student results";
+    pp("dialog-meta").textContent = student ? [`Year ${student.yearLevel}`, student.timetableClass || student.formClass || student.homeroom]
+        .filter(Boolean).join(" | ") : "";
+    if (!pp("dialog").open) pp("dialog").showModal();
+}
+function progressionCloseDialog() {
+    if (!progressionDiscard()) return false;
+    if (progression.dirty && progression.record) {
+        progression.dirty = false;
+        const saved = progression.records.find((record) => record.schoolYear === progression.record.schoolYear && record.term === progression.record.term);
+        const student = progression.students.find((item) => item.email === progression.record.studentEmail);
+        if (saved || student) progressionRender(saved || progressionNewRecord(student));
+    }
+    pp("dialog").close();
+    return true;
 }
 async function progressionApi(path, options = {}) {
     const response = await fetch(`/api/teacher/progression/${path}`, {
@@ -205,7 +228,7 @@ async function progressionLoadStudent(email) {
     progression.record = null;
     progression.records = [];
     progression.dirty = false;
-    pp("editor").hidden = true;
+    progressionHideEditor();
     if (!email) { progressionStatus("Find and select a Year 7-10 student."); return; }
     progressionStatus("Loading student results...");
     pp("retry").hidden = true;
@@ -217,6 +240,7 @@ async function progressionLoadStudent(email) {
         const student = progression.students.find((student) => student.email === email);
         const record = progressionAnnualRecord(data.records, student, new Date().getFullYear());
         progressionRender(record || progressionNewRecord(student));
+        progressionOpenDialog(student);
         progressionStatus("Select a pathway to record coverage and evidence. Changes are not saved until you press Save.");
     } catch (error) {
         if (request !== progression.loading) return;
@@ -231,7 +255,7 @@ async function progressionInit() {
     if (progression.teacherEmail !== email) {
         progression.teacherEmail = email;
         progression.record = null; progression.records = []; progression.students = []; progression.dirty = false;
-        pp("editor").hidden = true;
+        progressionHideEditor();
         pp("student").replaceChildren(new Option("Select a student", ""));
         pp("roster").replaceChildren();
         pp("email-warning").hidden = true;
@@ -242,7 +266,7 @@ async function progressionInit() {
         progression.record = null; progression.dirty = false;
         pp("filter-count").textContent = "";
         pp("retry").hidden = true;
-        pp("editor").hidden = true; pp("student").replaceChildren(new Option("Select a student", ""));
+        progressionHideEditor(); pp("student").replaceChildren(new Option("Select a student", ""));
         pp("roster").replaceChildren();
         pp("email-warning").hidden = true;
         progressionStatus("Sign in with a Teacher/Admin account to access student results.");
@@ -251,7 +275,7 @@ async function progressionInit() {
     if (progression.saving) return;
     if (!hubAccessState.resolved) { progressionStatus("Checking Teacher View access..."); return; }
     if (!hubAccessState.canTeacherView && !hubAccessState.canAdmin) {
-        pp("editor").hidden = true;
+        progressionHideEditor();
         pp("roster").replaceChildren();
         pp("student").replaceChildren(new Option("Select a student", ""));
         pp("filter-count").textContent = "";
@@ -338,6 +362,8 @@ pp("form").addEventListener("submit", async (event) => {
         else if (hasAllowedSignedInHubAccount()) void progressionInit();
     }
 });
+pp("dialog-close").addEventListener("click", () => { progressionCloseDialog(); });
+pp("dialog").addEventListener("cancel", (event) => { event.preventDefault(); progressionCloseDialog(); });
 pp("retry").addEventListener("click", () => {
     if (!progressionDiscard()) return;
     progression.dirty = false;
