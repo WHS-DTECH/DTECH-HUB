@@ -48,15 +48,5 @@
     "status": "active",
     "href": "",
     "visual": { "icon": "SC" }
-  },
-  {
-    "id": "design-and-innovation",
-    "title": "Design and innovation",
-    "summary": "Model ideas, choose suitable methods and develop specifications. Test solutions through systematic trials, then refine and improve your outcomes.",
-    "yearLevel": "Junior DTECH",
-    "area": "Design and innovation",
-    "status": "active",
-    "href": "",
-    "visual": { "icon": "DI" }
   }
 ]

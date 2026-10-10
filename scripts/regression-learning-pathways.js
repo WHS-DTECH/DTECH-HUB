@@ -152,7 +152,7 @@ async function testEditor() {
 async function main() {
     const seed = normalizeCards(JSON.parse(fs.readFileSync(path.join(root, "learning-pathways/library.json"), "utf8")));
     assert.deepEqual(seed.map((card) => card.title), ["Digital systems", "Programming & Algorithms", "Data and Information",
-        "Digital citizenship", "Systems and control", "Design and innovation"]);
+        "Digital citizenship", "Systems and control"]);
     assert.ok(seed.every((card) => card.area === card.title && card.href === "" && card.yearLevel === "Junior DTECH"));
     assert.throws(() => normalizeCards(null), /cards array/);
     for (const href of ["javascript:alert(1)", "data:text/html,test", "//example.test", "/\\example.test"]) {
@@ -169,7 +169,7 @@ async function main() {
         assert.match(sql, /learning_pathways_library_store/, "Never writes the Licence Library table");
         if (sql.includes("INSERT INTO") && (stored === null || !sql.includes("DO NOTHING"))) {
             stored = JSON.parse(params[0]);
-            seedVersion = 3;
+            seedVersion = 4;
         }
         if (sql.includes("seed_version < 1") && seedVersion < 1) {
             const starters = JSON.parse(params[0]);
@@ -188,6 +188,10 @@ async function main() {
                 ? { ...card, title: "Data and Information", area: "Data and Information" } : card);
             seedVersion = 3;
         }
+        if (sql.includes("seed_version < 4") && seedVersion < 4) {
+            stored = stored.filter((card) => card.id !== "design-and-innovation");
+            seedVersion = 4;
+        }
         return { rows: sql.startsWith("SELECT") && stored !== null ? [{ cards: stored }] : [] };
     } };
     const app = express();
@@ -201,11 +205,11 @@ async function main() {
         let response = await fetch(`${base}/learning-pathways/library.json`);
         assert.match(response.headers.get("cache-control"), /no-store/);
         const migrated = await response.json();
-        assert.equal(migrated.length, 7, "One-time preload preserves existing custom cards");
+        assert.equal(migrated.length, 6, "One-time preload preserves existing custom cards");
         assert.equal(migrated.find((card) => card.id === "digital-systems").title, "Existing edited systems",
             "Preload does not overwrite existing cards with the same ID");
         assert.equal(migrated.filter((card) => card.id === "digital-systems").length, 1);
-        assert.equal((await (await fetch(`${base}/learning-pathways/library.json`)).json()).length, 7,
+        assert.equal((await (await fetch(`${base}/learning-pathways/library.json`)).json()).length, 6,
             "Repeated reads do not duplicate starter cards");
         stored = [existing, sample, { ...sample, id: "programming" }, { ...sample, id: "algorithms" }];
         seedVersion = 1;
@@ -227,6 +231,12 @@ async function main() {
         const renamed = await (await fetch(`${base}/learning-pathways/library.json`)).json();
         assert.deepEqual(renamed, normalizeCards([sample, { ...oldData, title: "Data and Information", area: "Data and Information" }]),
             "Rename changes only Data heading and category, preserving description and other cards");
+        stored = [existing, { ...sample, id: "design-and-innovation", title: "Design and innovation" }, sample];
+        seedVersion = 3;
+        const removed = await (await fetch(`${base}/learning-pathways/library.json`)).json();
+        assert.deepEqual(removed, normalizeCards([existing, sample]), "Remove only Design and Innovation, preserving other cards and order");
+        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), removed,
+            "Removed card stays removed after repeated reads");
         assert.equal((await fetch(`${base}/api/admin/learning-pathways/library`)).status, 403);
         const publish = (cards, admin = true) => fetch(`${base}/api/admin/learning-pathways/library`, {
             method: "PUT", headers: { "Content-Type": "application/json", "x-test-admin": admin ? "yes" : "no" },

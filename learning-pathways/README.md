@@ -1,6 +1,6 @@
 # Learning Pathways
 
-A separate library with six pre-loaded Year 7/8 curriculum area cards and the Licence Library's card layout,
+A separate library with five pre-loaded Year 7/8 curriculum area cards and the Licence Library's card layout,
 search, year-level/category/status filters and sorting.
 
 The yellow **Pathways** navbar button opens this dashboard for signed-in users
@@ -42,6 +42,8 @@ unchanged; an existing combined card is preserved, and later deletion of the
 combined card is not undone on refresh or restart.
 Version 3 renames Data to **Data and Information**, including its category label,
 without changing its description, ID or other card fields.
+Version 4 removes the Design and Innovation starter card without changing the
+remaining cards.
 
 Public reads: `/learning-pathways/library.json` and
 `GET /api/learning-pathways/library`. Admin reads and publishing:

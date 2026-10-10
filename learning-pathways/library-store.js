@@ -60,7 +60,7 @@ function registerLearningPathways(app, { pool, hasDatabase, requireAdminAccess }
         if (!hasDatabase) return normalizeCards(JSON.parse(await fs.readFile(seedFile, "utf8")));
         await ensureSchema();
         const seed = normalizeCards(JSON.parse(await fs.readFile(seedFile, "utf8")));
-        await pool.query(`INSERT INTO learning_pathways_library_store (id, cards, seed_version) VALUES ('default', $1::jsonb, 3)
+        await pool.query(`INSERT INTO learning_pathways_library_store (id, cards, seed_version) VALUES ('default', $1::jsonb, 4)
             ON CONFLICT (id) DO NOTHING`, [JSON.stringify(seed)]);
         // Add the curriculum starter cards once without replacing existing cards or restoring later deletions.
         await pool.query(`UPDATE learning_pathways_library_store AS library
@@ -97,6 +97,13 @@ function registerLearningPathways(app, { pool, hasDatabase, requireAdminAccess }
                 FROM jsonb_array_elements(library.cards) WITH ORDINALITY AS existing(card, position)
             ), '[]'::jsonb), seed_version = 3, updated_at = NOW()
             WHERE id = 'default' AND seed_version < 3`);
+        await pool.query(`UPDATE learning_pathways_library_store AS library
+            SET cards = COALESCE((
+                SELECT jsonb_agg(existing.card ORDER BY existing.position)
+                FROM jsonb_array_elements(library.cards) WITH ORDINALITY AS existing(card, position)
+                WHERE existing.card ->> 'id' <> 'design-and-innovation'
+            ), '[]'::jsonb), seed_version = 4, updated_at = NOW()
+            WHERE id = 'default' AND seed_version < 4`);
         const initialized = await pool.query("SELECT cards FROM learning_pathways_library_store WHERE id = 'default'");
         return normalizeCards(initialized.rows[0].cards);
     }
@@ -107,8 +114,8 @@ function registerLearningPathways(app, { pool, hasDatabase, requireAdminAccess }
             return;
         }
         await readCards();
-        await pool.query(`INSERT INTO learning_pathways_library_store (id, cards, seed_version) VALUES ('default', $1::jsonb, 3)
-            ON CONFLICT (id) DO UPDATE SET cards = EXCLUDED.cards, seed_version = 3, updated_at = NOW()`, [JSON.stringify(cards)]);
+        await pool.query(`INSERT INTO learning_pathways_library_store (id, cards, seed_version) VALUES ('default', $1::jsonb, 4)
+            ON CONFLICT (id) DO UPDATE SET cards = EXCLUDED.cards, seed_version = 4, updated_at = NOW()`, [JSON.stringify(cards)]);
     }
 
     const load = (admin) => async (_req, res) => {
