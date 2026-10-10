@@ -2203,6 +2203,7 @@ function ensureGlobalHubSidebar() {
             <div class="hub-sidebar-profile-avatar" id="hub-sidebar-profile-avatar">--</div>
             <div class="hub-sidebar-profile-info">
                 <p class="hub-sidebar-profile-name" id="hub-sidebar-profile-name">-</p>
+                <p class="hub-sidebar-profile-meta" id="hub-sidebar-profile-course" aria-live="polite" hidden></p>
                 <p class="hub-sidebar-profile-meta" id="hub-sidebar-profile-year" hidden></p>
                 <p class="hub-sidebar-profile-meta" id="hub-sidebar-profile-class" hidden></p>
                 <span class="hub-sidebar-profile-strand" id="hub-sidebar-profile-strand" hidden></span>
@@ -2318,6 +2319,7 @@ function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {
 
     toggle.hidden = false;
     renderHubSidebarProfileCard(panel);
+    void loadAndRenderSidebarCourse(panel);
 
     const teacherLink = panel.querySelector("#hub-global-sidebar-teacher-link");
     const adminLink = panel.querySelector("#hub-global-sidebar-admin-link");
@@ -2359,6 +2361,33 @@ function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {
     if (!readGlobalSidebarSeenThisSession()) {
         markGlobalSidebarSeenThisSession();
         setTimeout(() => setOpen(true), 180);
+    }
+}
+
+async function loadAndRenderSidebarCourse(panel) {
+    const courseEl = panel.querySelector("#hub-sidebar-profile-course");
+    if (!courseEl) return;
+    const email = normalizeEmail(hubAuthState.profile?.email || "");
+    courseEl.textContent = "";
+    courseEl.hidden = true;
+    if (!email) return;
+    const requestId = String(Number(courseEl.dataset.requestId || 0) + 1);
+    courseEl.dataset.requestId = requestId;
+    try {
+        const response = await fetch("/api/practical-skills/my-course", {
+            headers: withHubAuthHeaders({}, email), cache: "no-store"
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+        if (typeof data.course !== "string") throw new Error("Course response is invalid.");
+        if (normalizeEmail(hubAuthState.profile?.email || "") !== email || courseEl.dataset.requestId !== requestId) return;
+        courseEl.textContent = data.course ? `Course: ${data.course}` : "Course: Not confirmed yet";
+        courseEl.hidden = false;
+    } catch (error) {
+        console.error("Could not load sidebar course", error);
+        if (normalizeEmail(hubAuthState.profile?.email || "") !== email || courseEl.dataset.requestId !== requestId) return;
+        courseEl.textContent = "Course: Could not load";
+        courseEl.hidden = false;
     }
 }
 

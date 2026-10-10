@@ -13924,6 +13924,31 @@ async function refreshLearningSitesCheckIn(email) {
   }
 }
 
+function resolveSidebarCourse(profile, checkIn) {
+  if (!profile?.available) return "";
+  if (profile.courseIds?.includes("STAFF")) {
+    return checkIn?.completed ? getCourseProgrammeFolder(checkIn.answers?.course) : "";
+  }
+  return getResearchReportProgrammeFolder(profile);
+}
+
+app.get("/api/practical-skills/my-course", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email || !email.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required." });
+    return;
+  }
+  try {
+    const profile = await getLearningSitesStudentProfile(email);
+    const checkIn = profile.courseIds?.includes("STAFF") ? await getSavedLearningSitesCheckIn(email) : null;
+    res.set("Cache-Control", "no-store");
+    res.json({ course: resolveSidebarCourse(profile, checkIn) });
+  } catch (error) {
+    console.error("Could not load sidebar course", error);
+    res.status(500).json({ error: "Could not load your course." });
+  }
+});
+
 app.get("/api/practical-skills/learning-sites/profile", async (req, res) => {
   const email = normalizeEmail(getRequestUserEmail(req));
   if (!email || !email.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {

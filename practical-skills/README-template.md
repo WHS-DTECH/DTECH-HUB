@@ -45,6 +45,14 @@ Disabled labels remain readable, with a distinct disabled appearance and no
 hover movement. Keep normal and hover text contrast at least 4.5:1; validate
 with `node scripts/regression-button-contrast.js` from the repository root.
 
+## Sidebar Course
+
+The sidebar displays the signed-in user's actual pathway beneath their name,
+not the Admin preview selection. Student pathways follow the latest directory
+year level. Staff pathways come from their completed Login Kit course check-in;
+without a completed check-in the label says "Not confirmed yet".
+`GET /api/practical-skills/my-course` returns this read-only label.
+
 ## Required Server Config
 
 In `server.js`, ensure this file path constant points to this module folder:
