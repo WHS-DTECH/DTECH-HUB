@@ -34,9 +34,12 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   kit identity/theme, instructions, teacher notes, learning/completion text,
   worksheet topic/description, questions and images configured in Activity
   Details. Values continue through the existing preview and save paths.
+- Implemented: the Kit Worksheets editor lets teachers hide and restore
+  worksheets, preserving their details, activity indexes and student progress.
+  Hidden worksheets do not appear to students or count toward kit completion.
 - Implemented: the Kit Worksheets editor displays a teacher suggestion to
-  structure Activities 1–3 as foundational skills, 4–8 as applied skills, and
-  9–10 as integrated challenges.
+  structure the first activities as foundational skills, middle activities as
+  applied skills, and final activities as integrated challenges.
 - Implemented: Kit Name is the single source for the student-facing kit/banner
   title and updates that kit's Kit dropdown label after content loads or saves.
   Existing kit IDs remain unchanged so worksheet content and student progress

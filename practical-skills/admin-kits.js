@@ -148,25 +148,58 @@
     function renderWorksheetList() {
         worksheetListHost.innerHTML = "";
         (state.content?.worksheets || []).forEach((worksheet, index) => {
+            if (worksheet.hidden) return;
             const row = document.createElement("tr");
+            row.dataset.index = String(index);
             row.innerHTML = `
                 <td data-label="Number"><input type="number" class="kit-worksheet-number" data-index="${index}" min="1" value="${Number(worksheet.number) || index + 1}"></td>
-                <td data-label="Activity"><input type="text" class="kit-worksheet-activity" data-index="${index}" value="${worksheet.activity || ""}">${worksheet.mergedInto !== undefined ? `<p>Combined into activity ${worksheet.mergedInto + 1} in the student menu; retained for saved progress.</p>` : worksheet.hidden ? "<p>Hidden from the student menu; retained for saved progress.</p>" : ""}</td>
+                <td data-label="Activity"><input type="text" class="kit-worksheet-activity" data-index="${index}" value="${worksheet.activity || ""}">${worksheet.mergedInto !== undefined ? `<p>Combined into activity ${worksheet.mergedInto + 1} in the student menu; retained for saved progress.</p>` : ""}</td>
                 <td data-label="What it establishes"><input type="text" class="kit-worksheet-establishes" data-index="${index}" value="${worksheet.establishes || ""}"></td>
                 <td data-label="Details"><a class="button button-primary" href="/practical-skills/admin-kit-activity.html?kit=${encodeURIComponent(state.kitId)}&activity=${index}">Activity Details</a></td>
                 <td data-label="Remove"><button type="button" class="button button-secondary kit-remove-worksheet" data-index="${index}">Remove</button></td>
             `;
+            row.querySelector(".kit-remove-worksheet").setAttribute("aria-label", `Remove ${worksheet.activity || `Activity ${index + 1}`}`);
             worksheetListHost.appendChild(row);
+        });
+
+        const hiddenWorksheets = (state.content?.worksheets || [])
+            .map((worksheet, index) => ({ worksheet, index }))
+            .filter(({ worksheet }) => worksheet.hidden);
+        const hiddenHost = document.querySelector("#kit-hidden-worksheets-list");
+        const hiddenSection = document.querySelector("#kit-hidden-worksheets");
+        const hiddenCount = document.querySelector("#kit-hidden-worksheets-count");
+        hiddenHost.innerHTML = "";
+        hiddenSection.hidden = hiddenWorksheets.length === 0;
+        hiddenCount.textContent = String(hiddenWorksheets.length);
+        hiddenWorksheets.forEach(({ worksheet, index }) => {
+            const item = document.createElement("li");
+            const label = document.createElement("span");
+            label.textContent = worksheet.activity || `Activity ${index + 1}`;
+            const restoreButton = document.createElement("button");
+            restoreButton.type = "button";
+            restoreButton.className = "button button-secondary kit-restore-worksheet";
+            restoreButton.dataset.index = String(index);
+            restoreButton.setAttribute("aria-label", `Restore ${worksheet.activity || `Activity ${index + 1}`}`);
+            restoreButton.textContent = "Restore";
+            item.append(label, restoreButton);
+            hiddenHost.appendChild(item);
         });
     }
 
     function readFormIntoContent() {
-        const worksheets = Array.from(worksheetListHost.querySelectorAll("tr")).map((row, index) => ({
-            ...state.content?.worksheets?.[index],
-            number: Math.max(1, Number.parseInt(row.querySelector(".kit-worksheet-number")?.value, 10) || index + 1),
-            activity: row.querySelector(".kit-worksheet-activity")?.value || "",
-            establishes: row.querySelector(".kit-worksheet-establishes")?.value || ""
-        }));
+        const worksheets = Array.isArray(state.content?.worksheets)
+            ? state.content.worksheets.map((worksheet) => ({ ...worksheet }))
+            : [];
+        Array.from(worksheetListHost.querySelectorAll("tr")).forEach((row) => {
+            const index = Number(row.dataset.index);
+            if (!Number.isInteger(index) || !worksheets[index]) return;
+            worksheets[index] = {
+                ...worksheets[index],
+                number: Math.max(1, Number.parseInt(row.querySelector(".kit-worksheet-number")?.value, 10) || index + 1),
+                activity: row.querySelector(".kit-worksheet-activity")?.value || "",
+                establishes: row.querySelector(".kit-worksheet-establishes")?.value || ""
+            };
+        });
 
         return {
             kitId: state.kitId,
@@ -297,16 +330,27 @@
         worksheetListHost.addEventListener("click", (event) => {
             const button = event.target.closest(".kit-remove-worksheet");
             if (!button) return;
-            const worksheets = readFormIntoContent().worksheets;
+            state.content = readFormIntoContent();
             const index = Number(button.getAttribute("data-index"));
-            worksheets.splice(index, 1);
-            worksheets.forEach((worksheet) => {
-                if (worksheet.mergedInto === index) delete worksheet.mergedInto;
-                else if (worksheet.mergedInto > index) worksheet.mergedInto -= 1;
-            });
-            if (Array.isArray(state.content.activities)) state.content.activities.splice(index, 1);
-            state.content.worksheets = worksheets;
+            const worksheet = state.content.worksheets[index];
+            if (!worksheet) return;
+            worksheet.hidden = true;
             renderWorksheetList();
+            queuePreviewUpdate();
+            setStatus("Worksheet hidden from students. Save Kit Content to keep this change.");
+        });
+
+        document.querySelector("#kit-hidden-worksheets-list").addEventListener("click", (event) => {
+            const button = event.target.closest(".kit-restore-worksheet");
+            if (!button) return;
+            state.content = readFormIntoContent();
+            const index = Number(button.getAttribute("data-index"));
+            const worksheet = state.content.worksheets[index];
+            if (!worksheet) return;
+            delete worksheet.hidden;
+            renderWorksheetList();
+            queuePreviewUpdate();
+            setStatus("Worksheet restored for students. Save Kit Content to keep this change.");
         });
 
         addWorksheetBtn.addEventListener("click", () => {
@@ -314,6 +358,8 @@
             state.content.worksheets = readFormIntoContent().worksheets;
             state.content.worksheets.push(createDefaultWorksheet(state.content.worksheets.length + 1));
             renderWorksheetList();
+            queuePreviewUpdate();
+            setStatus("Worksheet added. Save Kit Content to keep this change.");
         });
 
         saveBtn.addEventListener("click", () => {

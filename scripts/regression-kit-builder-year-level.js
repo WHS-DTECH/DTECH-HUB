@@ -10,7 +10,7 @@ assert.match(source, /Kit content saved and its Licence Library card updated\./,
 const activityHtml = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "admin-kit-activity.html"), "utf8");
 assert.match(html, /#kit-add-worksheet\s*\{[^}]*background:\s*#173858;[^}]*color:\s*#ffffff;/s, "Add Worksheet button has high-contrast colors");
 assert.match(html, /#kit-add-worksheet:focus-visible\s*\{/);
-assert.match(html, /<h2>Kit Worksheets<\/h2>\s*<p class="kit-worksheet-suggestion"><strong>Teacher suggestion:<\/strong> Activities 1–3 as foundational skills, Activities 4–8 as applied skills, and Activities 9–10 as integrated challenges\.<\/p>/, "Teacher suggestion appears directly under Kit Worksheets");
+assert.match(html, /<h2>Kit Worksheets<\/h2>\s*<p class="kit-worksheet-suggestion"><strong>Teacher suggestion:<\/strong> Use the first activities as foundational skills, the middle activities as applied skills, and the final activities as integrated challenges\.<\/p>/, "Teacher suggestion supports kits of different lengths");
 assert.match(html, /<textarea id="kit-instructions" rows="3" placeholder=/);
 assert.match(html, /<label for="kit-name">Kit Name<\/label>[\s\S]*?<small>This name appears on the kit page and in the Kit dropdown\.<\/small>/);
 assert.doesNotMatch(html, /id="kit-banner-title"/, "Kit Name replaces the separate Banner Title field");
