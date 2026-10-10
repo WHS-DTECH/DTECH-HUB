@@ -35,6 +35,9 @@ assert.equal(context.resolveSidebarCourse(staff, { completed: true, answers: { c
 assert.equal(context.resolveSidebarCourse({ available: false, year: 8 }), "");
 assert.match(client, /void loadAndRenderSidebarCourse\(panel\)/);
 assert.match(client, /id="hub-sidebar-profile-course"/);
+const css = fs.readFileSync(path.join(root, "styles.css"), "utf8");
+assert.match(css, /#hub-global-sidebar-allocations\[hidden\],\s*\.hub-sidebar-summary-cards\[hidden\]\s*\{\s*display: none;/,
+    "Hidden sidebar sections override grid display");
 
 async function main() {
     const res = { set() { return this; }, status(code) { this.code = code; return this; }, json(body) { this.body = body; } };
@@ -48,9 +51,12 @@ async function main() {
     assert.equal(res.body.course, "JuniorDTECH");
 
     const element = { textContent: "", hidden: true, dataset: {} };
+    const allocations = { hidden: false };
+    const summaries = { hidden: false, dataset: { available: "true" } };
     const auth = { profile: { email: "staff@example.test" } };
-    const panel = { querySelector: () => element };
-    const loaderStart = client.indexOf("async function loadAndRenderSidebarCourse(");
+    const panel = { dataset: {}, querySelector: (selector) => selector === "#hub-global-sidebar-allocations"
+        ? allocations : selector === "#hub-sidebar-summary-cards" ? summaries : element };
+    const loaderStart = client.indexOf("function updateSidebarCourseSections(");
     const loaderEnd = client.indexOf("\nasync function loadAndRenderSidebarAllocations(", loaderStart);
     const browser = vm.createContext({
         hubAuthState: auth,
@@ -60,15 +66,33 @@ async function main() {
         console: { error() {} }
     });
     vm.runInContext(client.slice(loaderStart, loaderEnd), browser);
+    for (const course of ["JuniorDTECH", "MiddleDTECH", "", "SeniorDTECH"]) {
+        browser.updateSidebarCourseSections(panel, course);
+        assert.equal(allocations.hidden, course !== "SeniorDTECH");
+        assert.equal(summaries.hidden, course !== "SeniorDTECH");
+    }
+    summaries.dataset.available = "false";
+    browser.updateSidebarCourseSections(panel, "SeniorDTECH");
+    assert.equal(summaries.hidden, true, "Unpopulated summary stays hidden");
+    summaries.dataset.available = "true";
+    browser.updateSidebarCourseSections(panel);
+    assert.equal(summaries.hidden, false, "Allocations finishing after course load can reveal senior summaries");
     await browser.loadAndRenderSidebarCourse(panel);
     assert.equal(element.textContent, "Course: MiddleDTECH");
     assert.equal(element.hidden, false);
+    assert.equal(allocations.hidden, true);
+    assert.equal(summaries.hidden, true);
+    browser.fetch = async () => ({ ok: true, json: async () => ({ course: "SeniorDTECH" }) });
+    await browser.loadAndRenderSidebarCourse(panel);
+    assert.equal(allocations.hidden, false);
+    assert.equal(summaries.hidden, false);
     browser.fetch = async () => ({ ok: true, json: async () => ({ course: "" }) });
     await browser.loadAndRenderSidebarCourse(panel);
     assert.equal(element.textContent, "Course: Not confirmed yet");
     browser.fetch = async () => { throw new Error("Network failure"); };
     await browser.loadAndRenderSidebarCourse(panel);
     assert.equal(element.textContent, "Course: Could not load");
+    assert.equal(allocations.hidden, true, "Course failures do not show senior content");
     let release;
     browser.fetch = () => new Promise((resolve) => { release = resolve; });
     const pending = browser.loadAndRenderSidebarCourse(panel);
@@ -76,6 +100,9 @@ async function main() {
     release({ ok: true, json: async () => ({ course: "SeniorDTECH" }) });
     await pending;
     assert.equal(element.textContent, "", "Responses from previous signed-in users are ignored");
+    assert.equal(allocations.hidden, true);
+    assert.doesNotMatch(client, /allocationsHost\.hidden = false/, "Allocation fetch cannot override course visibility");
+    assert.match(client, /summaryCardsContainer\.dataset\.available = "true";\s*updateSidebarCourseSections\(panel\)/);
     console.log("Sidebar actual-course regressions passed.");
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

@@ -2354,7 +2354,6 @@ function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {
 
     // Load and render student allocations
     if (allocationsHost) {
-        allocationsHost.hidden = false;
         void loadAndRenderSidebarAllocations(panel);
     }
 
@@ -2364,7 +2363,17 @@ function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {
     }
 }
 
+function updateSidebarCourseSections(panel, course = panel.dataset.course || "") {
+    panel.dataset.course = course;
+    const isSenior = course === "SeniorDTECH";
+    const allocations = panel.querySelector("#hub-global-sidebar-allocations");
+    const summaries = panel.querySelector("#hub-sidebar-summary-cards");
+    if (allocations) allocations.hidden = !isSenior;
+    if (summaries) summaries.hidden = !isSenior || summaries.dataset.available !== "true";
+}
+
 async function loadAndRenderSidebarCourse(panel) {
+    updateSidebarCourseSections(panel, "");
     const courseEl = panel.querySelector("#hub-sidebar-profile-course");
     if (!courseEl) return;
     const email = normalizeEmail(hubAuthState.profile?.email || "");
@@ -2383,6 +2392,7 @@ async function loadAndRenderSidebarCourse(panel) {
         if (normalizeEmail(hubAuthState.profile?.email || "") !== email || courseEl.dataset.requestId !== requestId) return;
         courseEl.textContent = data.course ? `Course: ${data.course}` : "Course: Not confirmed yet";
         courseEl.hidden = false;
+        updateSidebarCourseSections(panel, data.course);
     } catch (error) {
         console.error("Could not load sidebar course", error);
         if (normalizeEmail(hubAuthState.profile?.email || "") !== email || courseEl.dataset.requestId !== requestId) return;
@@ -2490,6 +2500,7 @@ function renderHubSidebarStandardsCard(panel, yearGroup, internalStandards, exte
     const showSummarySection = isSenior || internalRows.length > 0 || externalRows.length > 0;
 
     if (!showSummarySection) {
+        summaryCardsContainer.dataset.available = "false";
         summaryCardsContainer.hidden = true;
         internalCard.hidden = true;
         externalCard.hidden = true;
@@ -2560,7 +2571,8 @@ function renderHubSidebarStandardsCard(panel, yearGroup, internalStandards, exte
         externalCard.hidden = false;
     }
 
-    summaryCardsContainer.hidden = false;
+    summaryCardsContainer.dataset.available = "true";
+    updateSidebarCourseSections(panel);
 }
 
 function getHubSummaryStandardNumbers() {

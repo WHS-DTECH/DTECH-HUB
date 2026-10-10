@@ -561,6 +561,11 @@ a {
     gap: 10px;
 }
 
+#hub-global-sidebar-allocations[hidden],
+.hub-sidebar-summary-cards[hidden] {
+    display: none;
+}
+
 .hub-sidebar-summary-card {
     padding: 10px 12px;
     border-radius: 10px;

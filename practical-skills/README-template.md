@@ -52,6 +52,11 @@ not the Admin preview selection. Student pathways follow the latest directory
 year level. Staff pathways come from their completed Login Kit course check-in;
 without a completed check-in the label says "Not confirmed yet".
 `GET /api/practical-skills/my-course` returns this read-only label.
+My Assessment Tasks, My Projects, Internal Assessment Summary and External
+Assessment Summary are only visible in the sidebar for SeniorDTECH. They stay
+hidden for JuniorDTECH, MiddleDTECH and unconfirmed/unavailable courses, including
+while the course is loading. Allocations themselves are not changed or deleted.
+Sidebar navigation and Quick Links are unaffected.
 
 ## Required Server Config
 
