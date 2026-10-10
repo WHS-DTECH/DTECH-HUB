@@ -2238,6 +2238,18 @@ function ensureGlobalHubSidebar() {
                 <div class="hub-sidebar-summary-list" id="hub-sidebar-external-list"></div>
             </div>
         </div>
+        <div class="hub-sidebar-bottom">
+            <section class="hub-sidebar-kit-card" aria-labelledby="hub-sidebar-kit-heading">
+                <h3 id="hub-sidebar-kit-heading">Current Learning Kit</h3>
+                <p class="hub-sidebar-kit-title" id="hub-sidebar-kit-title">Loading your kit...</p>
+                <p id="hub-sidebar-kit-description" aria-live="polite">Checking your Licence progress.</p>
+                <a class="hub-sidebar-kit-action" id="hub-sidebar-kit-open" hidden>Open Kit &#8594;</a>
+                <button class="hub-sidebar-kit-action" id="hub-sidebar-kit-retry" type="button" hidden>Retry loading kit</button>
+            </section>
+            <section class="hub-sidebar-licence-card" aria-labelledby="hub-sidebar-licence-heading">
+                <h3 id="hub-sidebar-licence-heading">My Licence</h3>
+                <a href="/practical-skills/checklist.html">View My Licence &#8594;</a>
+            </section>
         <aside class="hub-sidebar-learning-sites" aria-label="Learning sites">
             <h3>Quick Links</h3>
             <div class="hub-sidebar-learning-links">
@@ -2251,6 +2263,7 @@ function ensureGlobalHubSidebar() {
                 </a>
             </div>
         </aside>
+        </div>
     `;
 
     const setOpen = (isOpen) => {
@@ -2261,6 +2274,9 @@ function ensureGlobalHubSidebar() {
     toggle.addEventListener("click", () => setOpen(true));
     backdrop.addEventListener("click", () => setOpen(false));
     panel.querySelector("#hub-global-sidebar-close")?.addEventListener("click", () => setOpen(false));
+    panel.querySelector("#hub-sidebar-kit-retry")?.addEventListener("click", () => {
+        void loadAndRenderSidebarKit(panel);
+    });
 
     const taskListButton = panel.querySelector("#hub-global-sidebar-tasklist-link");
     taskListButton?.addEventListener("click", () => {
@@ -2314,6 +2330,8 @@ function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {
     const { toggle, panel, setOpen } = ensureGlobalHubSidebar();
 
     if (!signedIn) {
+        const kitTitle = panel.querySelector("#hub-sidebar-kit-title");
+        if (kitTitle) kitTitle.dataset.requestId = String(Number(kitTitle.dataset.requestId || 0) + 1);
         toggle.hidden = true;
         setOpen(false);
         return;
@@ -2322,6 +2340,7 @@ function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {
     toggle.hidden = false;
     renderHubSidebarProfileCard(panel);
     void loadAndRenderSidebarCourse(panel);
+    void loadAndRenderSidebarKit(panel);
 
     const teacherLink = panel.querySelector("#hub-global-sidebar-teacher-link");
     const adminLink = panel.querySelector("#hub-global-sidebar-admin-link");
@@ -2362,6 +2381,59 @@ function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {
     if (!readGlobalSidebarSeenThisSession()) {
         markGlobalSidebarSeenThisSession();
         setTimeout(() => setOpen(true), 180);
+    }
+}
+
+async function loadAndRenderSidebarKit(panel) {
+    const title = panel.querySelector("#hub-sidebar-kit-title");
+    const description = panel.querySelector("#hub-sidebar-kit-description");
+    const open = panel.querySelector("#hub-sidebar-kit-open");
+    const retry = panel.querySelector("#hub-sidebar-kit-retry");
+    if (!title || !description || !open || !retry) return;
+    const email = normalizeEmail(hubAuthState.profile?.email || "");
+    const requestId = String(Number(title.dataset.requestId || 0) + 1);
+    title.dataset.requestId = requestId;
+    title.textContent = "Loading your kit...";
+    description.textContent = "Checking your Licence progress.";
+    open.hidden = true;
+    open.removeAttribute("href");
+    retry.hidden = true;
+    if (!email) return;
+    const current = () => title.dataset.requestId === requestId
+        && normalizeEmail(hubAuthState.profile?.email || "") === email;
+    try {
+        const response = await fetch("/api/practical-skills/my-progress", {
+            headers: withHubAuthHeaders({}, email), cache: "no-store"
+        });
+        const snapshot = await response.json();
+        if (!response.ok) throw new Error(snapshot.error || `HTTP ${response.status}`);
+        if (!Array.isArray(snapshot.kits) || snapshot.kits.some((kit) =>
+            typeof kit.id !== "string" || typeof kit.isComplete !== "boolean")) {
+            throw new Error("Licence progress response is invalid.");
+        }
+        if (!current()) return;
+        const next = snapshot.kits.find((kit) => !kit.isComplete);
+        if (!next) {
+            title.textContent = "All kits completed";
+            description.textContent = "View your Licence to see your stamps and certificates.";
+            return;
+        }
+        const contentResponse = await fetch(`/api/practical-skills/kit-content/${encodeURIComponent(next.id)}`, { cache: "no-store" });
+        const content = await contentResponse.json();
+        if (!contentResponse.ok) throw new Error(content.error || `HTTP ${contentResponse.status}`);
+        const name = String(content.content?.identity?.name || content.content?.bannerTitle || "").trim();
+        if (!name) throw new Error("The kit title could not be loaded.");
+        if (!current()) return;
+        title.textContent = name;
+        description.textContent = "Continue your activities";
+        open.href = `/practical-skills/kit-worksheet.html?kit=${encodeURIComponent(next.id)}`;
+        open.hidden = false;
+    } catch (error) {
+        console.error("Could not load sidebar learning kit", error);
+        if (!current()) return;
+        title.textContent = "Kit could not be loaded";
+        description.textContent = "Please retry or open My Licence below.";
+        retry.hidden = false;
     }
 }
 

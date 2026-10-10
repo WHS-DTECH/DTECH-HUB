@@ -15,6 +15,15 @@ This folder is the reusable Practical Skills module for HUB sites.
 
 ## API Endpoints Used
 
+The global sidebar shows Current Learning Kit and View My Licence above Quick
+Links for all course levels, including SeniorDTECH. These use a copper/peach
+palette distinct from the green/blue senior assessment summaries and gold
+Quick Links. The current kit is the first unfinished kit in the Licence's
+ordered `/api/practical-skills/my-progress` response; its name comes from the
+kit content API. Open Kit links to its worksheet. When all kits are complete,
+the panel points to Licence stamps and certificates instead. Loading failures
+are visible with a Retry button; stale responses from other accounts are ignored.
+
 - `GET /api/practical-skills/library` - Public read for student page
 - `GET /api/admin/practical-skills/library` - Admin-only read
 - `PUT /api/admin/practical-skills/library` - Admin-only publish/save

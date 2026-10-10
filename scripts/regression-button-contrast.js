@@ -9,7 +9,7 @@ const templates = fs.readFileSync(path.join(root, "ProjectPages", "slideshow-tem
 
 function declarations(source, selector) {
     const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const match = source.match(new RegExp(`(?:^|\\n)${escaped}\\s*\\{([^}]+)\\}`));
+    const match = source.replace(/\r\n/g, "\n").match(new RegExp(`(?:^|\\n)${escaped}\\s*\\{([^}]+)\\}`));
     assert.ok(match, `Style exists: ${selector}`);
     return Object.fromEntries(match[1].split(";").map((entry) => entry.split(":").map((part) => part.trim()))
         .filter(([key, value]) => key && value));
@@ -35,6 +35,8 @@ for (const [source, selector, baseSelector] of [
     [shared, ".button:disabled"],
     [shared, ".topbar-links a.hub-pathways-link"],
     [shared, ".topbar-links a.hub-pathways-link:hover", ".topbar-links a.hub-pathways-link"],
+    [shared, ".hub-sidebar-kit-action,\n.hub-sidebar-licence-card a"],
+    [shared, ".hub-sidebar-kit-action:hover,\n.hub-sidebar-licence-card a:hover", ".hub-sidebar-kit-action,\n.hub-sidebar-licence-card a"],
     [shared, ".modal-button:disabled"],
     [templates, ".template-button-muted"],
     [templates, ".template-button-muted:hover", ".template-button-muted"],
