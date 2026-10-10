@@ -12,6 +12,7 @@ const previewCourse = document.querySelector("#practical-preview-course");
 const previewStatus = document.querySelector("#practical-preview-status");
 const previewDetails = document.querySelector("#practical-preview-details");
 const previewCards = document.querySelector("#practical-preview-cards");
+const previewKitSearch = document.querySelector("#practical-preview-kit-search");
 const previewRetry = document.querySelector("#practical-preview-retry");
 
 const state = {
@@ -39,54 +40,27 @@ function renderUserPreview() {
     previewDetails.textContent = "";
     const user = state.previewUsers.find((entry) => entry.id === previewUser.value);
     previewCourse.disabled = !user;
+    previewKitSearch.disabled = !user;
     if (!user) return;
     previewDetails.textContent = [user.name, user.type, user.email, user.yearLevel && `Year ${String(user.yearLevel).replace(/^year\s*/i, "")}`,
         user.homeroom && `Homeroom: ${user.homeroom}`,
         user.course ? `Course suggested by year level: ${user.course}` : "No course inferred from directory"].filter(Boolean).join(" | ");
     const cards = state.cards.filter((card) => card.id !== "practical-skills-checklist"
         && matchesPreviewCourse(card, user, previewCourse.value));
-    previewStatus.textContent = `${cards.length} card${cards.length === 1 ? "" : "s"} in this preview. Includes All Years cards; this is not a saved assignment or a change to the student library.`;
-    if (!cards.length) {
-        previewCards.textContent = "No cards match this course yet.";
+    const query = previewKitSearch.value.trim().toLowerCase();
+    const matches = cards.filter((card) => String(card.title || "").toLowerCase().includes(query))
+        .sort((a, b) => String(a.title || "").localeCompare(String(b.title || "")));
+    previewStatus.textContent = `${matches.length} of ${cards.length} kits shown in this preview. Includes All Years kits; this is not a saved assignment or a change to the student library.`;
+    if (!matches.length) {
+        const empty = document.createElement("li");
+        empty.textContent = cards.length ? "No kit names match your search." : "No kits match this course yet.";
+        previewCards.appendChild(empty);
         return;
     }
-    cards.forEach((card) => {
-        const article = document.createElement("article");
-        article.className = "project-card";
-        const visual = document.createElement("div");
-        visual.className = "project-visual";
-        if (card.imageUrl) {
-            const image = document.createElement("img");
-            image.src = card.imageUrl;
-            image.alt = card.title;
-            image.className = "project-image";
-            image.loading = "lazy";
-            visual.appendChild(image);
-        } else {
-            visual.style.background = card.visual?.palette || "linear-gradient(135deg, #2f8f61 0%, #3ca873 54%, #65c494 100%)";
-            const icon = document.createElement("span");
-            icon.className = "visual-mark";
-            icon.textContent = card.visual?.icon || "PS";
-            visual.appendChild(icon);
-        }
-        const body = document.createElement("div");
-        body.className = "project-body";
-        const heading = document.createElement("h3");
-        heading.textContent = card.title;
-        const summary = document.createElement("p");
-        summary.className = "project-description";
-        summary.textContent = card.summary;
-        const tags = document.createElement("div");
-        tags.className = "project-tags";
-        [card.status, card.yearLevel, card.area].forEach((value) => {
-            const tag = document.createElement("span");
-            tag.className = "project-tag";
-            tag.textContent = value;
-            tags.appendChild(tag);
-        });
-        body.append(heading, summary, tags);
-        article.append(visual, body);
-        previewCards.appendChild(article);
+    matches.forEach((card) => {
+        const item = document.createElement("li");
+        item.textContent = card.title;
+        previewCards.appendChild(item);
     });
 }
 
@@ -131,6 +105,7 @@ previewUser.addEventListener("change", () => {
     renderUserPreview();
 });
 previewCourse.addEventListener("change", renderUserPreview);
+previewKitSearch.addEventListener("input", renderUserPreview);
 previewRetry.addEventListener("click", loadPreviewUsers);
 
 function normalizeEmail(value) {

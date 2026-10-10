@@ -3303,11 +3303,34 @@ body.public-home-access .controls-panel {
     background: #fff8ea;
 }
 
-.practical-preview-cards {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    margin-top: 12px;
+.practical-preview-kit-list {
+    max-height: 240px;
+    overflow-y: auto;
+    margin: 12px 0 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+}
+
+.practical-preview-kit-list:empty {
+    display: none;
+}
+
+.practical-preview-kit-list li {
+    padding: 8px 12px;
+    overflow-wrap: anywhere;
+    color: #173858;
+    background: #ffffff;
+}
+
+.practical-preview-kit-list li + li {
+    border-top: 1px solid var(--panel-border);
+}
+
+.practical-preview-kit-list:focus-visible {
+    outline: 3px solid #173858;
+    outline-offset: 3px;
 }
 
 #practical-preview-retry[hidden] {

@@ -71,7 +71,11 @@
         <p id="practical-preview-status" aria-live="polite">Loading students and staff...</p>
         <button id="practical-preview-retry" class="button button-secondary" type="button" hidden>Retry loading directory</button>
         <p id="practical-preview-details"></p>
-        <div id="practical-preview-cards" class="practical-preview-cards"></div>
+        <div class="practical-skills-form">
+          <label for="practical-preview-kit-search">Find a kit</label>
+          <input id="practical-preview-kit-search" type="search" placeholder="Search kit names in this preview" disabled>
+        </div>
+        <ul id="practical-preview-cards" class="practical-preview-kit-list" aria-label="Matching kit names" tabindex="0"></ul>
       </section>
 
       <section class="admin-panel">

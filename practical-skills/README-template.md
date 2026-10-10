@@ -29,7 +29,11 @@ inferred from their directory year level; staff default to All courses.
 This is a read-only planning preview, not impersonation or a saved assignment.
 It does not change directory records, Login Kit check-ins, Drive folders, the
 student-facing library, or the full Card Editor and Current Cards sections.
-Preview cards reflect local edits; Publish Library remains the save action.
+The preview is an alphabetically sorted, searchable list of kit names rather
+than full cards. Its height is limited to 240px, with keyboard-accessible
+scrolling for long lists. Kit-name search only filters this preview, not the
+Card Editor or Current Cards. Preview names reflect local edits; Publish
+Library remains the save action.
 
 ## Shared Button Readability
 

@@ -25,7 +25,7 @@ class Element {
     addEventListener(name, handler) { this[name] = handler; }
 }
 const controls = Object.fromEntries(["previewType", "previewSearch", "previewUser", "previewCourse",
-    "previewStatus", "previewDetails", "previewCards", "previewRetry"].map((key) => [key, new Element()]));
+    "previewStatus", "previewDetails", "previewCards", "previewRetry", "previewKitSearch"].map((key) => [key, new Element()]));
 controls.previewType.value = "Student";
 controls.previewCourse.value = "All";
 const users = [
@@ -73,6 +73,17 @@ controls.previewUser.value = "s1";
 controls.previewUser.change();
 assert.equal(controls.previewCourse.value, "JuniorDTECH");
 assert.equal(controls.previewCards.children.length, 3);
+assert.deepEqual(controls.previewCards.children.map((item) => item.textContent), ["Junior", "Login", "Year 8"]);
+assert.ok(controls.previewCards.children.every((item) => item.children.length === 0), "Preview uses names only, not full cards");
+controls.previewKitSearch.value = "LOGIN";
+controls.previewKitSearch.input();
+assert.deepEqual(controls.previewCards.children.map((item) => item.textContent), ["Login"]);
+assert.match(controls.previewStatus.textContent, /1 of 3 kits/);
+controls.previewKitSearch.value = "nonexistent";
+controls.previewKitSearch.input();
+assert.equal(controls.previewCards.children[0].textContent, "No kit names match your search.");
+controls.previewKitSearch.value = "";
+controls.previewKitSearch.input();
 controls.previewCourse.value = "SeniorDTECH";
 controls.previewCourse.change();
 assert.equal(controls.previewCards.children.length, 3);
@@ -83,6 +94,7 @@ context.populatePreviewUsers();
 assert.equal(controls.previewUser.children.length, 2);
 assert.equal(controls.previewUser.value, "");
 assert.equal(controls.previewCourse.disabled, true);
+assert.equal(controls.previewKitSearch.disabled, true);
 controls.previewType.value = "Staff";
 controls.previewSearch.value = "";
 context.populatePreviewUsers();
@@ -91,6 +103,9 @@ controls.previewUser.value = "t1";
 controls.previewUser.change();
 assert.equal(controls.previewCourse.value, "All");
 assert.equal(controls.previewCards.children.length, cards.length - 1);
+const css = fs.readFileSync(path.join(root, "styles.css"), "utf8");
+assert.match(css, /\.practical-preview-kit-list\s*\{[^}]*max-height:\s*240px;[^}]*overflow-y:\s*auto;/);
+assert.match(html, /aria-label="Matching kit names" tabindex="0"/);
 
 async function main() {
     await context.loadPreviewUsers();
