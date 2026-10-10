@@ -85,8 +85,18 @@ assert.equal(keywordChallengeQuestion.images[0].attribution, "Daderot");
 assert.equal(keywordChallengeQuestion.images[0].license, "CC0");
 assert.equal(keywordChallengeQuestion.images[0].sourceUrl, "https://commons.wikimedia.org/wiki/File:Pounamu_(greenstone),_sourced_from_Arahura_River_-_Wellington_Museum_-_Wellington,_NZ_-_DSC00054.jpg");
 assert.equal(keywordChallengeQuestion.images[0].licenseUrl, "https://creativecommons.org/publicdomain/zero/1.0/");
-assert.deepEqual(Array.from(migrated.activities[1].questions.slice(1), (question) => question.id), ["other-q"], "Existing Keyword Challenge questions are preserved");
-assert.equal(migrated._contentMigrations.searchKeywordChallenge, 3, "Keyword Challenge migration is recorded");
+const keywordChallengeMissionTwo = migrated.activities[1].questions[1];
+assert.equal(keywordChallengeMissionTwo.id, "keyword-too-many-results");
+assert.equal(keywordChallengeMissionTwo.type, "multiple-choice");
+assert.equal(keywordChallengeMissionTwo.heading, "Mission 2: Too Many Results!");
+assert.equal(keywordChallengeMissionTwo.prompt, "You search for bridge but get results from all over the world. You actually want to find the historic bridge at Hokitika Gorge. Which search would help you narrow the results?");
+assert.deepEqual(Array.from(keywordChallengeMissionTwo.options), [
+    "bridge",
+    "bridges New Zealand",
+    "Hokitika Gorge swing bridge"
+]);
+assert.deepEqual(Array.from(migrated.activities[1].questions.slice(2), (question) => question.id), ["other-q"], "Existing Keyword Challenge questions are preserved");
+assert.equal(migrated._contentMigrations.searchKeywordChallenge, 4, "Keyword Challenge migration is recorded");
 const teacherEditedKeywordChallenge = JSON.parse(JSON.stringify(migrated));
 teacherEditedKeywordChallenge._contentMigrations.searchKeywordChallenge = 1;
 teacherEditedKeywordChallenge.activities[1].information = { title: "Teacher-edited title", paragraphs: ["Teacher-edited introduction"] };
@@ -107,7 +117,8 @@ const repairedKeywordKit = context.addSearchKitPenguinMission(savedKitMissingKey
 assert.equal(repairedKeywordKit.activities[1].title, "The Keyword Challenge", "Migration creates the missing activity listed in worksheets");
 assert.equal(repairedKeywordKit.activities[1].information.title, "🔎 THE MISSION: The West Coast Treasure Hunt");
 assert.ok(repairedKeywordKit.activities[1].questions.some((question) => question.id === "keyword-pounamu-treasure"), "Missing activity is populated with the pounamu mission");
-assert.equal(repairedKeywordKit._contentMigrations.searchKeywordChallenge, 3, "Repair migration is recorded for previously incomplete saved kits");
+assert.ok(repairedKeywordKit.activities[1].questions.some((question) => question.id === "keyword-too-many-results"), "Missing activity includes Mission 2");
+assert.equal(repairedKeywordKit._contentMigrations.searchKeywordChallenge, 4, "Repair migration is recorded for previously incomplete saved kits");
 assert.equal(migrated.activities[0].questions.some((question) => question.id === "google-check"), false, "Google-open confirmation is removed");
 assert.equal(migrated.activities[0].questions.some((question) => question.id === "keywords"), true, "Other search-learning questions are retained");
 const penguinQuestion = migrated.activities[0].questions.find((question) => question.id === "search-penguin-name");
@@ -200,7 +211,7 @@ assert.equal(photo.sourceUrl, "https://commons.wikimedia.org/wiki/File:Blue_Peng
 assert.equal(photo.licenseUrl, "https://creativecommons.org/licenses/by-sa/3.0/");
 assert.equal(migrated.activities[0].images.some((image) => image.url.endsWith(".svg")), false, "Old illustration is removed");
 assert.equal(migrated.activities[1].title, original.activities[1].title, "Keyword Challenge title is preserved");
-assert.deepEqual(Array.from(migrated.activities[1].questions.slice(1), (question) => question.id), ["other-q"], "Keyword Challenge questions are untouched");
+assert.deepEqual(Array.from(migrated.activities[1].questions.slice(2), (question) => question.id), ["other-q"], "Keyword Challenge questions are untouched");
 assert.equal(migrated._contentMigrations.searchPenguinMission, 11, "Migration marker records latest Search Kit content");
 assert.equal(context.addSearchKitPenguinMission(migrated), migrated, "Migration is idempotent");
 assert.ok(fs.existsSync(penguinImage), "Penguin illustration asset exists");
@@ -226,7 +237,7 @@ renderContext.window.KitWorksheetRender.renderWorksheet(imageHost, {
     bannerTitle: "Search Like a Pro",
     information: { title: "THE MISSION: The Penguin Mystery", paragraphs: ["Can you solve the Penguin Mystery?"] },
     images: [photo],
-    questions: [keywordChallengeQuestion, missionTwo, missionThree, missionFour, missionFive]
+    questions: [keywordChallengeQuestion, keywordChallengeMissionTwo, missionTwo, missionThree, missionFour, missionFive]
 }, { readOnly: true });
 assert.match(imageHost.innerHTML, /Photo: Duncan Wright/);
 assert.match(imageHost.innerHTML, /href="https:\/\/commons\.wikimedia\.org\/wiki\/File:Blue_Penguin_Kapiti\.jpg"/, "Photo credit links to its source");
@@ -250,6 +261,8 @@ assert.match(imageHost.innerHTML, /Mission 4 – Penguins on the Coast/);
 assert.match(imageHost.innerHTML, /Mission 1: Find the Treasure/);
 assert.match(imageHost.innerHTML, /where to find pounamu West Coast NZ/);
 assert.match(imageHost.innerHTML, /pounamu-arahura-river\.jpg/);
+assert.match(imageHost.innerHTML, /Mission 2: Too Many Results!/);
+assert.match(imageHost.innerHTML, /Hokitika Gorge swing bridge/);
 assert.match(imageHost.innerHTML, /Find out where Little Blue Penguins can be seen near Hokitika\./);
 for (const option of missionFour.options) assert.ok(imageHost.innerHTML.includes(option), `Mission 4 includes ${option}`);
 assert.match(imageHost.innerHTML, /data-question-id="search-penguin-location"/, "Mission 4 choices are ordinary response buttons, not auto-marked answers");

@@ -4444,7 +4444,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function addSearchKitKeywordChallenge(content) {
-  if (content?._contentMigrations?.searchKeywordChallenge >= 3) return content;
+  if (content?._contentMigrations?.searchKeywordChallenge >= 4) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
   const activityIndex = worksheets.findIndex((worksheet) =>
@@ -4482,6 +4482,20 @@ function addSearchKitKeywordChallenge(content) {
       ]
     });
   }
+  if (!questions.some((question) => question?.id === "keyword-too-many-results")) {
+    const missionOneIndex = questions.findIndex((question) => question?.id === "keyword-pounamu-treasure");
+    questions.splice(missionOneIndex >= 0 ? missionOneIndex + 1 : questions.length, 0, {
+      id: "keyword-too-many-results",
+      type: "multiple-choice",
+      heading: "Mission 2: Too Many Results!",
+      prompt: "You search for bridge but get results from all over the world. You actually want to find the historic bridge at Hokitika Gorge. Which search would help you narrow the results?",
+      options: [
+        "bridge",
+        "bridges New Zealand",
+        "Hokitika Gorge swing bridge"
+      ]
+    });
+  }
   const information = updateIntroduction ? {
     title: "🔎 THE MISSION: The West Coast Treasure Hunt",
     paragraphs: [
@@ -4502,7 +4516,7 @@ function addSearchKitKeywordChallenge(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchKeywordChallenge: 3
+      searchKeywordChallenge: 4
     }
   };
 }
