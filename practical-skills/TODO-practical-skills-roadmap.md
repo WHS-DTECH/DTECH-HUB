@@ -27,8 +27,9 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   Reset clears the award and activity ticks. Empty kits are not auto-awarded.
   Manual whole-kit completion cannot bypass unfinished visible activities.
 - Completed kits show a personalised Certificate of Completion below the
-  student activity list. The student name comes from verified Google identity
-  (the school email is shown if no verified name is available), with kit title,
+  student activity list. First and last names come from verified Google identity,
+  then the matching staff directory or latest linked student profile. The school
+  email is used only when neither source has a name. Certificates include kit title,
   activity count and the persisted completion date in New Zealand time.
   Print / Save as PDF prints only the certificate on A4 landscape; Download PDF
   supplies a one-page server-generated landscape PDF with embedded Unicode

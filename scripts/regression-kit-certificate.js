@@ -34,6 +34,11 @@ async function main() {
         getPracticalSkillsKitDefinition: (id) => id === "kit-login",
         getStoredPracticalSkillsKitContent: async () => content,
         getPracticalSkillsKitContent: async () => content,
+        getStaffDirectoryRows: async () => [],
+        getStudentDirectoryRows: async () => [],
+        collectDirectoryEmails: (entry) => [entry.email_school],
+        buildStudentClassManagementRow: (entry) => entry,
+        dedupeToLatestStudentRows: (entries) => entries,
         ensurePracticalSkillsProgressSchema: async () => {},
         computePracticalSkillsSnapshot: (rows) => ({ kits: rows.map((row) => ({ id: row.kit_id, isComplete: row.completed, completedAt: row.completed_at })), badges: [] }),
         smtpTransporter: {}, SMTP_FROM: "hub@example.school.nz",
@@ -112,6 +117,13 @@ async function main() {
     assert.equal(sent[0].emailType, "kit_certificate");
     assert.equal((await call("post", "/certificate/email")).code, 429, "Repeated sends are throttled");
     assert.equal((await call("get", "", { auth_identity: { verified: false, givenName: "Spoof" } })).body.certificate.studentName, email);
+    context.getStaffDirectoryRows = async () => [{ email_school: email, first_name: "Vanessa", last_name: "Pringle" }];
+    assert.equal((await call("get", "", { auth_identity: { verified: false, givenName: "Spoof" } })).body.certificate.studentName, "Vanessa Pringle", "Staff directory supplies first and last names without a Google ID token");
+    context.getStaffDirectoryRows = async () => [];
+    context.getStudentDirectoryRows = async () => [{ linked_emails: [email], student_name: "Māia Student" }];
+    assert.equal((await call("get", "", { auth_identity: { verified: false } })).body.certificate.studentName, "Māia Student", "Linked student profile supplies the full name");
+    assert.equal((await call("get", "", { auth_identity: { verified: true, email: "other@example.school.nz", givenName: "Wrong", familyName: "Account" } })).body.certificate.studentName, "Māia Student", "Mismatched identity cannot replace the school profile name");
+    context.getStudentDirectoryRows = async () => [];
     await call("put", "/activities/:activityIndex", { body: { completed: false } });
     const undone = (await call("get", "")).body;
     assert.equal(undone.kit.isComplete, false, "Undo revokes kit completion without losing other ticks");

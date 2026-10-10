@@ -12477,8 +12477,20 @@ async function getPracticalSkillsCertificate(req, kitId) {
   const row = await syncPracticalSkillsKitCompletion(email, kitId, content);
   const identity = req.auth_identity;
   const verifiedName = identity?.verified && normalizeEmail(identity.email) === email
-    ? [identity.givenName, identity.familyName].filter(Boolean).join(" ").trim() : "";
-  return buildKitCertificate(content, row, verifiedName || email);
+    && identity.givenName && identity.familyName
+    ? `${identity.givenName} ${identity.familyName}`.trim() : "";
+  let schoolName = "";
+  if (!verifiedName && row.completed) {
+    const staff = (await getStaffDirectoryRows()).find((entry) =>
+      collectDirectoryEmails(entry, ["email_school", "email", "user_email", "staff_email", "google_email"]).includes(email));
+    if (staff) schoolName = [staff.first_name, staff.last_name].filter(Boolean).join(" ").trim();
+    if (!schoolName) {
+      const students = dedupeToLatestStudentRows((await getStudentDirectoryRows()).map(buildStudentClassManagementRow));
+      const student = students.find((entry) => entry.linked_emails.some((value) => normalizeEmail(value) === email));
+      if (student && student.student_name !== "Unnamed student") schoolName = student.student_name;
+    }
+  }
+  return buildKitCertificate(content, row, verifiedName || schoolName || email);
 }
 
 app.get("/api/practical-skills/my-progress", async (req, res) => {
