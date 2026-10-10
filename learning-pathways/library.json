@@ -21,10 +21,10 @@
   },
   {
     "id": "data",
-    "title": "Data",
+    "title": "Data and Information",
     "summary": "Use digital tools and data to solve problems. Collect information, organise it in spreadsheets and graphs, and identify patterns.",
     "yearLevel": "Junior DTECH",
-    "area": "Data",
+    "area": "Data and Information",
     "status": "active",
     "href": "",
     "visual": { "icon": "DA" }

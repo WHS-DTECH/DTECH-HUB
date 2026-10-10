@@ -151,7 +151,7 @@ async function testEditor() {
 
 async function main() {
     const seed = normalizeCards(JSON.parse(fs.readFileSync(path.join(root, "learning-pathways/library.json"), "utf8")));
-    assert.deepEqual(seed.map((card) => card.title), ["Digital systems", "Programming & Algorithms", "Data",
+    assert.deepEqual(seed.map((card) => card.title), ["Digital systems", "Programming & Algorithms", "Data and Information",
         "Digital citizenship", "Systems and control", "Design and innovation"]);
     assert.ok(seed.every((card) => card.area === card.title && card.href === "" && card.yearLevel === "Junior DTECH"));
     assert.throws(() => normalizeCards(null), /cards array/);
@@ -169,7 +169,7 @@ async function main() {
         assert.match(sql, /learning_pathways_library_store/, "Never writes the Licence Library table");
         if (sql.includes("INSERT INTO") && (stored === null || !sql.includes("DO NOTHING"))) {
             stored = JSON.parse(params[0]);
-            seedVersion = 2;
+            seedVersion = 3;
         }
         if (sql.includes("seed_version < 1") && seedVersion < 1) {
             const starters = JSON.parse(params[0]);
@@ -182,6 +182,11 @@ async function main() {
             stored = stored.filter((card) => !["programming", "algorithms"].includes(card.id));
             if (hasOld && !hasCombined) stored.push(...JSON.parse(params[0]));
             seedVersion = 2;
+        }
+        if (sql.includes("seed_version < 3") && seedVersion < 3) {
+            stored = stored.map((card) => card.id === "data"
+                ? { ...card, title: "Data and Information", area: "Data and Information" } : card);
+            seedVersion = 3;
         }
         return { rows: sql.startsWith("SELECT") && stored !== null ? [{ cards: stored }] : [] };
     } };
@@ -216,6 +221,12 @@ async function main() {
         const preserved = await (await fetch(`${base}/learning-pathways/library.json`)).json();
         assert.equal(preserved.length, 2);
         assert.equal(preserved[1].title, "Edited combined card", "Existing combined edits are preserved");
+        const oldData = { ...sample, id: "data", title: "Data", area: "Data" };
+        stored = [sample, oldData];
+        seedVersion = 2;
+        const renamed = await (await fetch(`${base}/learning-pathways/library.json`)).json();
+        assert.deepEqual(renamed, normalizeCards([sample, { ...oldData, title: "Data and Information", area: "Data and Information" }]),
+            "Rename changes only Data heading and category, preserving description and other cards");
         assert.equal((await fetch(`${base}/api/admin/learning-pathways/library`)).status, 403);
         const publish = (cards, admin = true) => fetch(`${base}/api/admin/learning-pathways/library`, {
             method: "PUT", headers: { "Content-Type": "application/json", "x-test-admin": admin ? "yes" : "no" },

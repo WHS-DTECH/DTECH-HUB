@@ -40,6 +40,8 @@ Version 2 merges the original Programming and Algorithms starter cards into
 **Programming & Algorithms**, with a combined description. Other cards are
 unchanged; an existing combined card is preserved, and later deletion of the
 combined card is not undone on refresh or restart.
+Version 3 renames Data to **Data and Information**, including its category label,
+without changing its description, ID or other card fields.
 
 Public reads: `/learning-pathways/library.json` and
 `GET /api/learning-pathways/library`. Admin reads and publishing:
