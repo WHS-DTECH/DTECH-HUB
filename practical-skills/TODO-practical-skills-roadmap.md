@@ -34,6 +34,9 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   kit identity/theme, instructions, teacher notes, learning/completion text,
   worksheet topic/description, questions and images configured in Activity
   Details. Values continue through the existing preview and save paths.
+- Implemented: the Kit Worksheets editor displays a teacher suggestion to
+  structure Activities 1–3 as foundational skills, 4–8 as applied skills, and
+  9–10 as integrated challenges.
 - Add a `Next Best Task` panel at the top of the Practical Skills homepage.
 - Show licence progress (`X/Y kits complete`).
 - Show assessment readiness status (`Ready` or `Missing required kits`).

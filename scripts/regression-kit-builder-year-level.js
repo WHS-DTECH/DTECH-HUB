@@ -9,6 +9,7 @@ const source = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "a
 const activityHtml = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "admin-kit-activity.html"), "utf8");
 assert.match(html, /#kit-add-worksheet\s*\{[^}]*background:\s*#173858;[^}]*color:\s*#ffffff;/s, "Add Worksheet button has high-contrast colors");
 assert.match(html, /#kit-add-worksheet:focus-visible\s*\{/);
+assert.match(html, /<h2>Kit Worksheets<\/h2>\s*<p class="kit-worksheet-suggestion"><strong>Teacher suggestion:<\/strong> Activities 1–3 as foundational skills, Activities 4–8 as applied skills, and Activities 9–10 as integrated challenges\.<\/p>/, "Teacher suggestion appears directly under Kit Worksheets");
 assert.match(html, /<textarea id="kit-instructions" rows="3" placeholder=/);
 assert.doesNotMatch(html, /maxlength=/i, "Kit Builder fields have no browser character limits");
 assert.doesNotMatch(activityHtml, /maxlength=/i, "Worksheet topic/detail fields have no browser character limits");
