@@ -651,11 +651,14 @@
             openButton.textContent = exists ? "Open My Research Report" : "Create My Research Report";
             checkButton.hidden = !exists;
         };
-        const busy = (value) => { openButton.disabled = value; checkButton.disabled = value; };
+        let templateMissing = false;
+        const busy = (value) => { openButton.disabled = value || templateMissing; checkButton.disabled = value; };
 
         if (options.onResearchReportStatus) {
             options.onResearchReportStatus().then((report) => {
                 showReport(report);
+                templateMissing = !report?.exists && report?.configured === false;
+                busy(false);
                 setStatus(report?.exists
                     ? "Your research report is ready. Open it to keep working, then click Check My Report."
                     : report?.configured === false
@@ -665,6 +668,10 @@
         }
 
         openButton.addEventListener("click", async () => {
+            if (templateMissing) {
+                setStatus("Your teacher is still setting up the research report template.");
+                return;
+            }
             // Reserve the tab during the click so Google permission does not trigger popup blocking.
             const reportTab = window.open("about:blank", "_blank");
             if (reportTab) reportTab.opener = null;
