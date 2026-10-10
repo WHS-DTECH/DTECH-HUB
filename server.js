@@ -4476,7 +4476,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function addSearchResultsDetectiveIntroduction(content) {
-  if (content?._contentMigrations?.searchResultsDetective >= 8) return content;
+  if (content?._contentMigrations?.searchResultsDetective >= 9) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
   const activityIndex = worksheets.findIndex((worksheet) =>
@@ -4500,7 +4500,7 @@ function addSearchResultsDetectiveIntroduction(content) {
         "Hokitika Weather Forecast"
       ],
       searchResults: {
-        title: "Search results (Fake website)",
+        title: "Simulated (Fake website) search results",
         results: [
           {
             domain: "heritage.example",
@@ -4545,7 +4545,7 @@ function addSearchResultsDetectiveIntroduction(content) {
         "Hokitika Swimming Pool – Opening Hours and Contact Details"
       ],
       searchResults: {
-        title: "Search results (Fake website)",
+        title: "Simulated (Fake website) search results",
         results: [
           {
             domain: "hokitikaswimmingclub.example",
@@ -4579,7 +4579,7 @@ function addSearchResultsDetectiveIntroduction(content) {
         "Hokitika Gorge – Walking Track Information"
       ],
       searchResults: {
-        title: "Search results (Fake website)",
+        title: "Simulated (Fake website) search results",
         results: [
           {
             domain: "doc.govt.nz.example",
@@ -4689,6 +4689,18 @@ function addSearchResultsDetectiveIntroduction(content) {
       }
     };
   }
+  for (let index = 0; index < questions.length; index += 1) {
+    const question = questions[index];
+    if (question?.searchResults?.title === "Simulated search results") {
+      questions[index] = {
+        ...question,
+        searchResults: {
+          ...question.searchResults,
+          title: "Simulated (Fake website) search results"
+        }
+      };
+    }
+  }
 
   const hasIntroduction = content?._contentMigrations?.searchResultsDetective >= 1;
   activities[activityIndex] = {
@@ -4712,7 +4724,7 @@ function addSearchResultsDetectiveIntroduction(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchResultsDetective: 8
+      searchResultsDetective: 9
     }
   };
 }

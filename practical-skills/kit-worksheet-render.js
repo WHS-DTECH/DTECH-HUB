@@ -74,8 +74,8 @@
                     </div>
                 ` : ""}
                 ${question.searchResults ? `
-                    <section class="worksheet-search-results" aria-label="${escapeHtml(question.searchResults.title || "Search results (Fake website)")}">
-                        <h4 class="worksheet-search-results-heading"><span aria-hidden="true">🔎</span> ${escapeHtml(question.searchResults.title || "Search results (Fake website)")}</h4>
+                    <section class="worksheet-search-results" aria-label="${escapeHtml(question.searchResults.title || "Simulated (Fake website) search results")}">
+                        <h4 class="worksheet-search-results-heading"><span aria-hidden="true">🔎</span> ${escapeHtml(question.searchResults.title || "Simulated (Fake website) search results")}</h4>
                         <div class="worksheet-search-result-list">
                             ${(Array.isArray(question.searchResults.results) ? question.searchResults.results : []).map((result) => `
                                 <button type="button" class="worksheet-search-result ${selected === result.title ? "is-selected" : ""}" data-question-id="${escapeHtml(question.id)}" data-option-value="${escapeHtml(result.title)}" aria-pressed="${selected === result.title}" ${readOnly ? "disabled" : ""}>
