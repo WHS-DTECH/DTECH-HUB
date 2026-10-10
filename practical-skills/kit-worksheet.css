@@ -405,6 +405,30 @@ body.kit-worksheet-page {
     font-size: 1.02rem;
 }
 
+.worksheet-question-images {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin: 12px 0;
+    max-width: 600px;
+}
+
+.worksheet-question-image {
+    margin: 0;
+    min-width: 0;
+    background: #ffffff;
+    border: 2px solid #f1e4c8;
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+.worksheet-question-image img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    object-fit: cover;
+}
+
 .worksheet-question-heading {
     margin: 0 0 6px;
     color: #173858;
@@ -1218,6 +1242,11 @@ body.kit-worksheet-page {
 }
 
 @media (max-width: 560px) {
+    .worksheet-question-images {
+        grid-template-columns: minmax(0, 1fr);
+        max-width: 360px;
+    }
+
     .worksheet-image-information-layout {
         grid-template-columns: minmax(0, 1fr);
     }

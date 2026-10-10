@@ -21,6 +21,29 @@
         }
     }
 
+    function renderImageCredit(image) {
+        if (!image?.attribution) return "";
+        const sourceUrl = safeExternalUrl(image.sourceUrl);
+        const licenseUrl = safeExternalUrl(image.licenseUrl);
+        return `
+            <figcaption class="worksheet-image-credit">
+                Photo: ${escapeHtml(image.attribution)}
+                ${sourceUrl ? ` · <a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer">Source</a>` : ""}
+                ${image?.license ? ` · ${licenseUrl ? `<a href="${escapeHtml(licenseUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(image.license)}</a>` : escapeHtml(image.license)}` : ""}
+            </figcaption>
+        `;
+    }
+
+    function renderWorksheetImage(image, className = "worksheet-image") {
+        return `
+            <figure class="${className}">
+                <img src="${escapeHtml(image?.url || "")}" alt="${escapeHtml(image?.alt || "")}" loading="lazy">
+                ${image?.caption ? `<figcaption>${escapeHtml(image.caption)}</figcaption>` : ""}
+                ${renderImageCredit(image)}
+            </figure>
+        `;
+    }
+
     function renderQuestionBody(question, responses, readOnly) {
         const type = String(question?.type || "short-answer");
         const responseValue = responses?.[question.id];
@@ -45,6 +68,11 @@
         if (type === "multiple-choice") {
             const selected = String(responseValue || "");
             return `
+                ${Array.isArray(question.images) && question.images.length ? `
+                    <div class="worksheet-question-images">
+                        ${question.images.map((image) => renderWorksheetImage(image, "worksheet-question-image")).join("")}
+                    </div>
+                ` : ""}
                 <div class="worksheet-choices">
                     ${(Array.isArray(question.options) ? question.options : []).map((option) => `
                         <button type="button" class="worksheet-choice-bubble ${selected === option ? "is-selected" : ""}" data-question-id="${escapeHtml(question.id)}" data-option-value="${escapeHtml(option)}" ${readOnly ? "disabled" : ""}>
@@ -581,19 +609,7 @@
             ${imageInformationLayout ? `<div class="worksheet-image-information-layout">` : ""}
             ${images.length ? `
                 <div class="worksheet-image-panel">
-                    ${images.map((image) => `
-                        <figure class="worksheet-image">
-                            <img src="${escapeHtml(image?.url || "")}" alt="${escapeHtml(image?.alt || "")}" loading="lazy">
-                            ${image?.caption ? `<figcaption>${escapeHtml(image.caption)}</figcaption>` : ""}
-                            ${image?.attribution ? `
-                                <figcaption class="worksheet-image-credit">
-                                    Photo: ${escapeHtml(image.attribution)}
-                                    ${safeExternalUrl(image.sourceUrl) ? ` · <a href="${escapeHtml(safeExternalUrl(image.sourceUrl))}" target="_blank" rel="noopener noreferrer">Source</a>` : ""}
-                                    ${image?.license ? ` · ${safeExternalUrl(image.licenseUrl) ? `<a href="${escapeHtml(safeExternalUrl(image.licenseUrl))}" target="_blank" rel="noopener noreferrer">${escapeHtml(image.license)}</a>` : escapeHtml(image.license)}` : ""}
-                                </figcaption>
-                            ` : ""}
-                        </figure>
-                    `).join("")}
+                    ${images.map((image) => renderWorksheetImage(image)).join("")}
                 </div>
             ` : ""}
             ${content?.information ? `

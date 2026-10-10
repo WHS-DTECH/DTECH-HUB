@@ -4412,7 +4412,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function addSearchKitPenguinMission(content) {
-  if (content?._contentMigrations?.searchPenguinMission >= 4) return content;
+  if (content?._contentMigrations?.searchPenguinMission >= 5) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets.slice() : [];
   if (!worksheets[0]) worksheets[0] = { number: 1, activity: "Search Like a Pro", establishes: "Understands search engines and keywords" };
@@ -4446,6 +4446,38 @@ function addSearchKitPenguinMission(content) {
         "kororā food",
         "penguin colours",
         "birds in New Zealand"
+      ]
+    });
+  }
+  if (!questions.some((question) => question.id === "search-tallest-mountain")) {
+    questions.push({
+      id: "search-tallest-mountain",
+      type: "multiple-choice",
+      heading: "Mission 3: Search independently",
+      prompt: "Find the name of New Zealand's tallest mountain. What did you find?",
+      options: [
+        "Mount Ruapehu",
+        "Aoraki / Mount Cook"
+      ],
+      images: [
+        {
+          url: "/practical-skills/images/mount-ruapehu.jpg",
+          alt: "Mount Ruapehu rising above the surrounding landscape.",
+          caption: "Mount Ruapehu",
+          attribution: "Geoff McKay",
+          sourceUrl: "https://commons.wikimedia.org/wiki/File:Mount_Ruapehu_-_Flickr_-_Geoff_J_Mckay.jpg",
+          license: "CC BY 2.0",
+          licenseUrl: "https://creativecommons.org/licenses/by/2.0/"
+        },
+        {
+          url: "/practical-skills/images/aoraki-mount-cook.jpg",
+          alt: "Aoraki / Mount Cook rising above the surrounding mountains.",
+          caption: "Aoraki / Mount Cook",
+          attribution: "Michal Klajban",
+          sourceUrl: "https://commons.wikimedia.org/wiki/File:Aoraki,_Aoraki_-_Mount_Cook_National_Park,_New_Zealand_02.jpg",
+          license: "CC BY-SA 4.0",
+          licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0/"
+        }
       ]
     });
   }
@@ -4489,7 +4521,7 @@ function addSearchKitPenguinMission(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchPenguinMission: 4
+      searchPenguinMission: 5
     }
   };
 }
