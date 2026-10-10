@@ -86,7 +86,7 @@ assert.equal(keywordChallengeQuestion.images[0].license, "CC0");
 assert.equal(keywordChallengeQuestion.images[0].sourceUrl, "https://commons.wikimedia.org/wiki/File:Pounamu_(greenstone),_sourced_from_Arahura_River_-_Wellington_Museum_-_Wellington,_NZ_-_DSC00054.jpg");
 assert.equal(keywordChallengeQuestion.images[0].licenseUrl, "https://creativecommons.org/publicdomain/zero/1.0/");
 assert.deepEqual(Array.from(migrated.activities[1].questions.slice(1), (question) => question.id), ["other-q"], "Existing Keyword Challenge questions are preserved");
-assert.equal(migrated._contentMigrations.searchKeywordChallenge, 2, "Keyword Challenge migration is recorded");
+assert.equal(migrated._contentMigrations.searchKeywordChallenge, 3, "Keyword Challenge migration is recorded");
 const teacherEditedKeywordChallenge = JSON.parse(JSON.stringify(migrated));
 teacherEditedKeywordChallenge._contentMigrations.searchKeywordChallenge = 1;
 teacherEditedKeywordChallenge.activities[1].information = { title: "Teacher-edited title", paragraphs: ["Teacher-edited introduction"] };
@@ -98,6 +98,16 @@ assert.deepEqual(upgradedKeywordChallenge.activities[1].information, {
     paragraphs: ["Teacher-edited introduction"]
 }, "Keyword Challenge question migration preserves teacher-edited introduction");
 assert.ok(upgradedKeywordChallenge.activities[1].questions.some((question) => question.id === "keyword-pounamu-treasure"), "Saved Keyword Challenge gains the pounamu mission");
+const savedKitMissingKeywordActivity = {
+    ...original,
+    _contentMigrations: { searchPenguinMission: 11, searchKeywordChallenge: 1 },
+    activities: original.activities.slice(0, 1)
+};
+const repairedKeywordKit = context.addSearchKitPenguinMission(savedKitMissingKeywordActivity);
+assert.equal(repairedKeywordKit.activities[1].title, "The Keyword Challenge", "Migration creates the missing activity listed in worksheets");
+assert.equal(repairedKeywordKit.activities[1].information.title, "🔎 THE MISSION: The West Coast Treasure Hunt");
+assert.ok(repairedKeywordKit.activities[1].questions.some((question) => question.id === "keyword-pounamu-treasure"), "Missing activity is populated with the pounamu mission");
+assert.equal(repairedKeywordKit._contentMigrations.searchKeywordChallenge, 3, "Repair migration is recorded for previously incomplete saved kits");
 assert.equal(migrated.activities[0].questions.some((question) => question.id === "google-check"), false, "Google-open confirmation is removed");
 assert.equal(migrated.activities[0].questions.some((question) => question.id === "keywords"), true, "Other search-learning questions are retained");
 const penguinQuestion = migrated.activities[0].questions.find((question) => question.id === "search-penguin-name");

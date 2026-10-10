@@ -4444,16 +4444,19 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function addSearchKitKeywordChallenge(content) {
-  if (content?._contentMigrations?.searchKeywordChallenge >= 2) return content;
-  const updateIntroduction = (content?._contentMigrations?.searchKeywordChallenge || 0) < 1;
+  if (content?._contentMigrations?.searchKeywordChallenge >= 3) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
   const activityIndex = worksheets.findIndex((worksheet) =>
     String(worksheet?.activity || "").trim().toLowerCase() === "the keyword challenge");
-  if (activityIndex < 0 || !Array.isArray(content?.activities) || !content.activities[activityIndex]) return content;
+  if (activityIndex < 0) return content;
 
-  const activities = content.activities.slice();
-  const activity = activities[activityIndex];
+  const activities = Array.isArray(content.activities) ? content.activities.slice() : [];
+  const existingActivity = activities[activityIndex] && typeof activities[activityIndex] === "object";
+  const activity = existingActivity
+    ? activities[activityIndex]
+    : { title: worksheets[activityIndex].activity };
+  const updateIntroduction = (content?._contentMigrations?.searchKeywordChallenge || 0) < 1 || !existingActivity;
   const questions = Array.isArray(activity.questions) ? activity.questions.slice() : [];
   if (!questions.some((question) => question?.id === "keyword-pounamu-treasure")) {
     questions.unshift({
@@ -4499,7 +4502,7 @@ function addSearchKitKeywordChallenge(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchKeywordChallenge: 2
+      searchKeywordChallenge: 3
     }
   };
 }
