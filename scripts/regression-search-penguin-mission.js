@@ -93,8 +93,9 @@ assert.deepEqual(Array.from(migrated.activities[2].questions, (question) => ques
     "search-result-clock-tower",
     "search-result-pool-hours",
     "search-result-wrong-place",
-    "search-result-glowworm-time"
-], "Search results questions are preserved and all four missions are added");
+    "search-result-glowworm-time",
+    "search-result-doc-track"
+], "Search results questions are preserved and all five missions are added");
 const clockTowerMission = migrated.activities[2].questions.find((question) => question.id === "search-result-clock-tower");
 assert.equal(clockTowerMission.type, "multiple-choice");
 assert.equal(clockTowerMission.heading, "Mission 1 – Which Result Would You Open?");
@@ -114,7 +115,7 @@ assert.deepEqual(Array.from(clockTowerMission.searchResults.results, (result) =>
     "weather.example"
 ]);
 assert.equal(clockTowerMission.searchResults.note, "These are fictional results for practice, not links to real websites.");
-assert.equal(migrated._contentMigrations.searchResultsDetective, 5, "Search Results Detective migration marker is recorded");
+assert.equal(migrated._contentMigrations.searchResultsDetective, 6, "Search Results Detective migration marker is recorded");
 assert.equal(context.addSearchResultsDetectiveIntroduction(migrated), migrated, "Search Results Detective migration is idempotent");
 const poolHoursMission = migrated.activities[2].questions.find((question) => question.id === "search-result-pool-hours");
 assert.ok(poolHoursMission, "Mission 2 is added");
@@ -157,7 +158,18 @@ assert.deepEqual(Array.from(glowwormTimeMission.options), [
     "At lunchtime"
 ]);
 assert.equal(Object.hasOwn(glowwormTimeMission, "correctAnswer"), false, "Mission 4 does not expose an answer in student content");
-assert.equal(migrated._contentMigrations.searchResultsDetective, 5, "Search Results Detective migration marker is recorded");
+const docTrackMission = migrated.activities[2].questions.find((question) => question.id === "search-result-doc-track");
+assert.ok(docTrackMission, "Mission 5 is added");
+assert.equal(docTrackMission.type, "multiple-choice");
+assert.equal(docTrackMission.heading, "Mission 5 – Find the Official Information");
+assert.equal(docTrackMission.prompt, "Search for `Hokitika Gorge DOC`. Find and open the Department of Conservation's Hokitika Gorge Walk webpage. Which organisation manages the walking track?");
+assert.deepEqual(Array.from(docTrackMission.options), [
+    "Department of Conservation (DOC)",
+    "New Zealand Police",
+    "MetService"
+]);
+assert.equal(Object.hasOwn(docTrackMission, "correctAnswer"), false, "Mission 5 does not expose an answer in student content");
+assert.equal(migrated._contentMigrations.searchResultsDetective, 6, "Search Results Detective migration marker is recorded");
 const editedResultActivity = JSON.parse(JSON.stringify(migrated));
 editedResultActivity._contentMigrations.searchResultsDetective = 1;
 editedResultActivity.activities[2].information.title = "Teacher-edited introduction";
@@ -176,7 +188,7 @@ savedActivityWithoutMissionTwo.activities[2].questions = savedActivityWithoutMis
 const upgradedWithMissionTwo = context.addSearchResultsDetectiveIntroduction(savedActivityWithoutMissionTwo);
 assert.ok(upgradedWithMissionTwo.activities[2].questions.some((question) => question.id === "search-result-pool-hours"),
     "Migration adds Mission 2 to saved activities while preserving existing questions");
-assert.equal(upgradedWithMissionTwo._contentMigrations.searchResultsDetective, 5);
+assert.equal(upgradedWithMissionTwo._contentMigrations.searchResultsDetective, 6);
 const savedActivityWithoutMissionThree = JSON.parse(JSON.stringify(migrated));
 savedActivityWithoutMissionThree._contentMigrations.searchResultsDetective = 3;
 savedActivityWithoutMissionThree.activities[2].questions = savedActivityWithoutMissionThree.activities[2].questions
@@ -184,7 +196,7 @@ savedActivityWithoutMissionThree.activities[2].questions = savedActivityWithoutM
 const upgradedWithMissionThree = context.addSearchResultsDetectiveIntroduction(savedActivityWithoutMissionThree);
 assert.ok(upgradedWithMissionThree.activities[2].questions.some((question) => question.id === "search-result-wrong-place"),
     "Migration adds Mission 3 to saved activities while preserving existing questions");
-assert.equal(upgradedWithMissionThree._contentMigrations.searchResultsDetective, 5);
+assert.equal(upgradedWithMissionThree._contentMigrations.searchResultsDetective, 6);
 const savedActivityWithoutMissionFour = JSON.parse(JSON.stringify(migrated));
 savedActivityWithoutMissionFour._contentMigrations.searchResultsDetective = 4;
 savedActivityWithoutMissionFour.activities[2].questions = savedActivityWithoutMissionFour.activities[2].questions
@@ -192,7 +204,15 @@ savedActivityWithoutMissionFour.activities[2].questions = savedActivityWithoutMi
 const upgradedWithMissionFour = context.addSearchResultsDetectiveIntroduction(savedActivityWithoutMissionFour);
 assert.ok(upgradedWithMissionFour.activities[2].questions.some((question) => question.id === "search-result-glowworm-time"),
     "Migration adds Mission 4 to saved activities while preserving existing questions");
-assert.equal(upgradedWithMissionFour._contentMigrations.searchResultsDetective, 5);
+assert.equal(upgradedWithMissionFour._contentMigrations.searchResultsDetective, 6);
+const savedActivityWithoutMissionFive = JSON.parse(JSON.stringify(migrated));
+savedActivityWithoutMissionFive._contentMigrations.searchResultsDetective = 5;
+savedActivityWithoutMissionFive.activities[2].questions = savedActivityWithoutMissionFive.activities[2].questions
+    .filter((question) => question.id !== "search-result-doc-track");
+const upgradedWithMissionFive = context.addSearchResultsDetectiveIntroduction(savedActivityWithoutMissionFive);
+assert.ok(upgradedWithMissionFive.activities[2].questions.some((question) => question.id === "search-result-doc-track"),
+    "Migration adds Mission 5 to saved activities while preserving existing questions");
+assert.equal(upgradedWithMissionFive._contentMigrations.searchResultsDetective, 6);
 const savedKitMissingResultsActivity = {
     ...original,
     _contentMigrations: { searchPenguinMission: 11, searchKeywordChallenge: 9 },
@@ -205,9 +225,10 @@ assert.deepEqual(Array.from(repairedResultsKit.activities[2].questions || [], (q
     "search-result-clock-tower",
     "search-result-pool-hours",
     "search-result-wrong-place",
-    "search-result-glowworm-time"
+    "search-result-glowworm-time",
+    "search-result-doc-track"
 ]);
-assert.equal(repairedResultsKit._contentMigrations.searchResultsDetective, 5);
+assert.equal(repairedResultsKit._contentMigrations.searchResultsDetective, 6);
 const keywordChallengeQuestion = migrated.activities[1].questions[0];
 assert.equal(keywordChallengeQuestion.id, "keyword-pounamu-treasure");
 assert.equal(keywordChallengeQuestion.type, "multiple-choice");
@@ -502,6 +523,22 @@ assert.match(glowwormTimeHost.innerHTML, /Hokitika Glow Worm Dell/);
 assert.match(glowwormTimeHost.innerHTML, /After dark/);
 assert.match(glowwormTimeHost.innerHTML, /During the middle of the day/);
 assert.match(glowwormTimeHost.innerHTML, /At lunchtime/);
+const docTrackHost = {
+    style: { setProperty() {} },
+    innerHTML: "",
+    querySelectorAll() { return []; },
+    querySelector() { return null; }
+};
+renderContext.window.KitWorksheetRender.renderWorksheet(docTrackHost, {
+    information: { title: "THE MISSION: The Search Results Detective", paragraphs: [] },
+    questions: [docTrackMission]
+}, { readOnly: true });
+assert.match(docTrackHost.innerHTML, /Mission 5 – Find the Official Information/);
+assert.match(docTrackHost.innerHTML, /Hokitika Gorge DOC/);
+assert.match(docTrackHost.innerHTML, /Hokitika Gorge Walk webpage/);
+assert.match(docTrackHost.innerHTML, /Department of Conservation \(DOC\)/);
+assert.match(docTrackHost.innerHTML, /New Zealand Police/);
+assert.match(docTrackHost.innerHTML, /MetService/);
 assert.match(worksheetCss, /\.worksheet-search-result-list\s*\{[^}]*display:\s*grid;/, "Simulated search results render in a clear card layout");
 assert.match(imageHost.innerHTML, /little-blue-penguin\.jpg/);
 assert.match(imageHost.innerHTML, /Mission 2: Choose your own search words/);

@@ -4476,7 +4476,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function addSearchResultsDetectiveIntroduction(content) {
-  if (content?._contentMigrations?.searchResultsDetective >= 5) return content;
+  if (content?._contentMigrations?.searchResultsDetective >= 6) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
   const activityIndex = worksheets.findIndex((worksheet) =>
@@ -4614,6 +4614,19 @@ function addSearchResultsDetectiveIntroduction(content) {
       ]
     });
   }
+  if (!questions.some((question) => question?.id === "search-result-doc-track")) {
+    questions.push({
+      id: "search-result-doc-track",
+      type: "multiple-choice",
+      heading: "Mission 5 – Find the Official Information",
+      prompt: "Search for `Hokitika Gorge DOC`. Find and open the Department of Conservation's Hokitika Gorge Walk webpage. Which organisation manages the walking track?",
+      options: [
+        "Department of Conservation (DOC)",
+        "New Zealand Police",
+        "MetService"
+      ]
+    });
+  }
 
   const hasIntroduction = content?._contentMigrations?.searchResultsDetective >= 1;
   activities[activityIndex] = {
@@ -4637,7 +4650,7 @@ function addSearchResultsDetectiveIntroduction(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchResultsDetective: 5
+      searchResultsDetective: 6
     }
   };
 }
