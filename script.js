@@ -1372,11 +1372,11 @@ function renderGlobalNavbar() {
                 <a id="hub-browse-unit-plans-link" data-auth-unit-plans role="menuitem" href="/browse-unit-plans.html" hidden>Unit Plans</a>
                 <a id="hub-browse-course-outlines-link" data-auth-course-outlines role="menuitem" href="/browse-course-outlines.html" hidden>Course Outlines</a>
                 <a id="hub-browse-relief-lessons-link" data-auth-browse role="menuitem" href="/browse-lessons.html" hidden>Relief Lessons Library</a>
-                <a id="hub-browse-task-list-link" data-auth-browse role="menuitem" href="/task-list.html" hidden>Task List</a>
                 <a id="hub-browse-template-library-link" data-auth-browse role="menuitem" href="/ProjectPages/slideshow-template-library.html" hidden>Template Library</a>
             </div>
         </details>
     `;
+    const taskListLink = `<a id="hub-senior-task-list-link" class="hub-senior-task-list-link" href="/task-list.html" hidden>Task List</a>`;
 
     const uploadMenu = `
         <details class="nav-dropdown" id="hub-upload-menu" data-nav-dropdown hidden>
@@ -1410,7 +1410,7 @@ function renderGlobalNavbar() {
         </details>
     `;
     const settingsLink = `<a id="hub-settings-link" href="/settings.html" hidden>Settings</a>`;
-    const topbarMenu = `${browseMenu}${uploadMenu}${practicalSkillsMenu}${studentWorkMenu}${settingsLink}`;
+    const topbarMenu = `${browseMenu}${uploadMenu}${practicalSkillsMenu}${taskListLink}${studentWorkMenu}${settingsLink}`;
 
     topbar.dataset.globalNavbar = "true";
     topbar.setAttribute("aria-label", "Primary");
@@ -1576,6 +1576,7 @@ const hubProfileClose = document.querySelector("#hub-profile-close");
 const hubBrowseMenu = document.querySelector("#hub-browse-menu");
 const hubUploadMenu = document.querySelector("#hub-upload-menu");
 const hubPracticalSkillsMenu = document.querySelector("#hub-practical-skills-menu");
+const hubSeniorTaskListLink = document.querySelector("#hub-senior-task-list-link");
 const hubStudentWorkMenu = document.querySelector("#hub-student-work-menu");
 const hubTemplateLibraryLink = document.querySelector("#hub-browse-template-library-link");
 const hubBrowseButtons = Array.from(document.querySelectorAll("[data-auth-browse]"));
@@ -2424,14 +2425,14 @@ async function loadAndRenderSidebarAllocations(panel) {
 
 function renderHubPracticalSkillsMenu(yearGroup) {
     const summary = document.querySelector("#hub-practical-skills-summary");
-    const link = document.querySelector("#hub-practical-skills-link");
+    const taskListLink = document.querySelector("#hub-senior-task-list-link");
     const normalizedYear = String(yearGroup || "").trim().replace(/^year\s*/i, "");
     const showTaskList = ["11", "12", "13"].includes(normalizedYear);
 
-    if (summary) summary.textContent = showTaskList ? "Task List" : "Licence";
-    if (link) {
-        link.textContent = showTaskList ? "Open Task List" : "My Licence";
-        link.href = showTaskList ? "/task-list.html" : "/practical-skills/checklist.html";
+    if (summary) summary.textContent = "Licence";
+    if (taskListLink) {
+        taskListLink.dataset.senior = showTaskList ? "true" : "";
+        taskListLink.hidden = !showTaskList || !hubAuthState.email;
     }
 }
 
@@ -2814,6 +2815,9 @@ function renderHubAuthUi() {
         if (!signedIn) {
             hubPracticalSkillsMenu.open = false;
         }
+    }
+    if (hubSeniorTaskListLink) {
+        hubSeniorTaskListLink.hidden = !signedIn || !hubSeniorTaskListLink.dataset.senior;
     }
     if (hubAccessBadge) {
         hubAccessBadge.hidden = !signedIn || canAdmin || !badgeLabel;

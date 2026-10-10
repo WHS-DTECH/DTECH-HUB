@@ -104,18 +104,42 @@ a {
 }
 
 .nav-dropdown-practical-skills summary {
-    border-color: #2f8f61;
-    background: #2f8f61;
-    color: #f4fff8;
+    border-color: #2867bd;
+    background: #2867bd;
+    color: #ffffff;
 }
 
 .nav-dropdown-practical-skills[open] summary {
-    background: #3ca873;
+    background: #1e4f96;
 }
 
 .nav-dropdown-practical-skills .nav-drawer {
-    border-color: #2f8f61;
-    background: #1f4f36;
+    border-color: #2867bd;
+    background: #173858;
+}
+
+.topbar-links a.hub-senior-task-list-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 7px 12px;
+    border: 1px solid #2f8f61;
+    border-radius: 6px;
+    background: #2f8f61;
+    color: #ffffff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.topbar-links a.hub-senior-task-list-link:hover {
+    background: #246d49;
+    transform: translateY(-2px);
+}
+
+.topbar-links a.hub-senior-task-list-link[hidden] {
+    display: none !important;
 }
 
 .nav-drawer {

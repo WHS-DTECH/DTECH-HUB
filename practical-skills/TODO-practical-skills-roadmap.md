@@ -19,6 +19,9 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   Student navigation uses Licence / My Licence / Licence Library; the existing
   Years 11-13 Task List branch and API/storage identifiers remain unchanged.
   Signed-out, loading and error states do not display another account's awards.
+- Implemented: the shared signed-in navigation shows Licence for every account
+  in blue. Years 11-13 students also see a separate green Task List button;
+  it no longer replaces Licence or appears duplicated in Browse.
 - Add a `Next Best Task` panel at the top of the Practical Skills homepage.
 - Show licence progress (`X/Y kits complete`).
 - Show assessment readiness status (`Ready` or `Missing required kits`).

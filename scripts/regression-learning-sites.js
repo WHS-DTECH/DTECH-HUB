@@ -155,8 +155,8 @@ async function main() {
     assert.ok(navigationStart >= 0 && navigationEnd > navigationStart);
     for (const [activityIndex, expectedHref, expectedText] of [
         [0, "./kit-worksheet.html?kit=kit-login", "\u2190 Back to Kit Activity List"],
-        [null, "/practical-skills/checklist.html", "\u2190 Back to Checklist"],
-        [99, "/practical-skills/checklist.html", "\u2190 Back to Checklist"]
+        [null, "/practical-skills/checklist.html", "\u2190 Back to My Licence"],
+        [99, "/practical-skills/checklist.html", "\u2190 Back to My Licence"]
     ]) {
         const link = {};
         vm.runInNewContext(worksheetSource.slice(navigationStart, navigationEnd), {

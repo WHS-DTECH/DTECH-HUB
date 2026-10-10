@@ -78,18 +78,27 @@ async function main() {
     assert.equal(nodes.get("ps-next-step").hidden, true);
     assert.ok(!nodes.get("ps-stamp-list").innerHTML.includes("is-earned"), "Signing out clears awards and ignores old requests");
     const navigation = fs.readFileSync(path.join(__dirname, "..", "script.js"), "utf8");
+    const styles = fs.readFileSync(path.join(__dirname, "..", "styles.css"), "utf8");
+    assert.match(navigation, /id="hub-senior-task-list-link" class="hub-senior-task-list-link" href="\/task-list\.html" hidden>Task List<\/a>/);
+    assert.doesNotMatch(navigation, /id="hub-browse-task-list-link"/, "Task List is not duplicated in Browse");
+    assert.match(styles, /\.nav-dropdown-practical-skills summary\s*\{[^}]*background:\s*#2867bd/s, "Licence uses the blue navbar color");
+    assert.match(styles, /\.topbar-links a\.hub-senior-task-list-link\s*\{[^}]*background:\s*#2f8f61/s, "Senior Task List uses the green navbar color");
     const start = navigation.indexOf("function renderHubPracticalSkillsMenu(");
     const end = navigation.indexOf("function renderHubSidebarStandardsCard(", start);
     const summary = {};
-    const link = {};
-    const navContext = vm.createContext({ document: { querySelector: (selector) => selector.endsWith("summary") ? summary : link } });
+    const taskListLink = { dataset: {}, hidden: false };
+    const navContext = vm.createContext({
+        hubAuthState: { email: "student@school.nz" },
+        document: { querySelector: (selector) => selector.endsWith("summary") ? summary : taskListLink }
+    });
     vm.runInContext(navigation.slice(start, end), navContext);
     navContext.renderHubPracticalSkillsMenu("7");
     assert.equal(summary.textContent, "Licence");
-    assert.equal(link.href, "/practical-skills/checklist.html");
+    assert.equal(taskListLink.hidden, true, "Non-senior users see Licence without the Task List button");
     navContext.renderHubPracticalSkillsMenu("Year 12");
-    assert.equal(summary.textContent, "Task List");
-    assert.equal(link.href, "/task-list.html", "Senior Task List behaviour is preserved");
+    assert.equal(summary.textContent, "Licence", "Senior users retain Licence");
+    assert.equal(taskListLink.hidden, false);
+    assert.equal(taskListLink.dataset.senior, "true", "Senior students additionally see Task List");
     console.log("Licence dashboard identity, stamps, next kit, stats, errors and sign-out regressions passed.");
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });
