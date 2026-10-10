@@ -104,6 +104,7 @@ async function main() {
         assert.ok(Math.abs(info.pages[0].width - 841.89) < 1 && Math.abs(info.pages[0].height - 595.28) < 1, "One-page A4 landscape PDF");
         const text = await parser.getText();
         assert.match(text.text, /Certificate of Completion/);
+        assert.match(text.text, /DTECH-HUB Licence/);
         assert.match(text.text, /Māia Student/, "Unicode student names survive PDF generation");
         assert.match(text.text, /Login Kit/);
         assert.match(text.text, /2 activities completed/);

@@ -52,7 +52,7 @@ function createKitCertificatePdf(certificate) {
         text(value, y, size, font);
       };
       text("WESTLAND HIGH SCHOOL", 63, 16, "certificate-bold");
-      text("DTECH-HUB | Practical Skills", 94, 12);
+      text("DTECH-HUB Licence", 94, 12);
       text(certificate.title, 140, 32, "certificate-bold");
       text("This certificate is proudly presented to", 208, 14);
       fittedText(certificate.studentName, 247, 32);
