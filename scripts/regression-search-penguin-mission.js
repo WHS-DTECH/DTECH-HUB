@@ -91,8 +91,9 @@ assert.deepEqual(Array.from(migrated.activities[2].information.paragraphs), [
 assert.deepEqual(Array.from(migrated.activities[2].questions, (question) => question.id), [
     "result-q",
     "search-result-clock-tower",
-    "search-result-pool-hours"
-], "Search results questions are preserved and both missions are added");
+    "search-result-pool-hours",
+    "search-result-wrong-place"
+], "Search results questions are preserved and all three missions are added");
 const clockTowerMission = migrated.activities[2].questions.find((question) => question.id === "search-result-clock-tower");
 assert.equal(clockTowerMission.type, "multiple-choice");
 assert.equal(clockTowerMission.heading, "Mission 1 – Which Result Would You Open?");
@@ -112,7 +113,7 @@ assert.deepEqual(Array.from(clockTowerMission.searchResults.results, (result) =>
     "weather.example"
 ]);
 assert.equal(clockTowerMission.searchResults.note, "These are fictional results for practice, not links to real websites.");
-assert.equal(migrated._contentMigrations.searchResultsDetective, 3, "Search Results Detective migration marker is recorded");
+assert.equal(migrated._contentMigrations.searchResultsDetective, 4, "Search Results Detective migration marker is recorded");
 assert.equal(context.addSearchResultsDetectiveIntroduction(migrated), migrated, "Search Results Detective migration is idempotent");
 const poolHoursMission = migrated.activities[2].questions.find((question) => question.id === "search-result-pool-hours");
 assert.ok(poolHoursMission, "Mission 2 is added");
@@ -129,6 +130,22 @@ assert.deepEqual(Array.from(poolHoursMission.searchResults.results, (result) => 
     "nzpoolphotos.example"
 ]);
 assert.equal(poolHoursMission.searchResults.note, "These are fictional results for practice, not links to real websites.");
+const wrongPlaceMission = migrated.activities[2].questions.find((question) => question.id === "search-result-wrong-place");
+assert.ok(wrongPlaceMission, "Mission 3 is added");
+assert.equal(wrongPlaceMission.heading, "Mission 3 – The Wrong Place!");
+assert.equal(wrongPlaceMission.prompt, "You search for `Hokitika Gorge walking track` but one result is about a different location. Which result doesn't belong?");
+assert.deepEqual(Array.from(wrongPlaceMission.options), [
+    "Hokitika Gorge Walk – Department of Conservation",
+    "Hokitika Gorge – Walking Track Information",
+    "Waimea Gorge Walking Track – Nelson"
+]);
+assert.deepEqual(Array.from(wrongPlaceMission.searchResults.results, (result) => result.domain), [
+    "doc.govt.nz.example",
+    "hokitikagorge.example",
+    "waimeagorge.example"
+]);
+assert.equal(wrongPlaceMission.searchResults.note, "These are fictional results for practice, not links to real websites.");
+assert.equal(migrated._contentMigrations.searchResultsDetective, 4, "Search Results Detective migration marker is recorded");
 const editedResultActivity = JSON.parse(JSON.stringify(migrated));
 editedResultActivity._contentMigrations.searchResultsDetective = 1;
 editedResultActivity.activities[2].information.title = "Teacher-edited introduction";
@@ -147,7 +164,15 @@ savedActivityWithoutMissionTwo.activities[2].questions = savedActivityWithoutMis
 const upgradedWithMissionTwo = context.addSearchResultsDetectiveIntroduction(savedActivityWithoutMissionTwo);
 assert.ok(upgradedWithMissionTwo.activities[2].questions.some((question) => question.id === "search-result-pool-hours"),
     "Migration adds Mission 2 to saved activities while preserving existing questions");
-assert.equal(upgradedWithMissionTwo._contentMigrations.searchResultsDetective, 3);
+assert.equal(upgradedWithMissionTwo._contentMigrations.searchResultsDetective, 4);
+const savedActivityWithoutMissionThree = JSON.parse(JSON.stringify(migrated));
+savedActivityWithoutMissionThree._contentMigrations.searchResultsDetective = 3;
+savedActivityWithoutMissionThree.activities[2].questions = savedActivityWithoutMissionThree.activities[2].questions
+    .filter((question) => question.id !== "search-result-wrong-place");
+const upgradedWithMissionThree = context.addSearchResultsDetectiveIntroduction(savedActivityWithoutMissionThree);
+assert.ok(upgradedWithMissionThree.activities[2].questions.some((question) => question.id === "search-result-wrong-place"),
+    "Migration adds Mission 3 to saved activities while preserving existing questions");
+assert.equal(upgradedWithMissionThree._contentMigrations.searchResultsDetective, 4);
 const savedKitMissingResultsActivity = {
     ...original,
     _contentMigrations: { searchPenguinMission: 11, searchKeywordChallenge: 9 },
@@ -158,9 +183,10 @@ assert.equal(repairedResultsKit.activities[2].title, "Finding the Right Result",
 assert.equal(repairedResultsKit.activities[2].information.title, "THE MISSION: The Search Results Detective");
 assert.deepEqual(Array.from(repairedResultsKit.activities[2].questions || [], (question) => question.id), [
     "search-result-clock-tower",
-    "search-result-pool-hours"
+    "search-result-pool-hours",
+    "search-result-wrong-place"
 ]);
-assert.equal(repairedResultsKit._contentMigrations.searchResultsDetective, 3);
+assert.equal(repairedResultsKit._contentMigrations.searchResultsDetective, 4);
 const keywordChallengeQuestion = migrated.activities[1].questions[0];
 assert.equal(keywordChallengeQuestion.id, "keyword-pounamu-treasure");
 assert.equal(keywordChallengeQuestion.type, "multiple-choice");
@@ -424,6 +450,22 @@ assert.match(poolHoursHost.innerHTML, /hokitikapool\.example/);
 assert.match(poolHoursHost.innerHTML, /These are fictional results for practice, not links to real websites\./);
 assert.doesNotMatch(poolHoursHost.innerHTML, /href="https:\/\/(?:hokitikaswimmingclub|hokitikapool|nzpoolphotos)\.example/,
     "Mission 2 fictional results are not links");
+const wrongPlaceHost = {
+    style: { setProperty() {} },
+    innerHTML: "",
+    querySelectorAll() { return []; },
+    querySelector() { return null; }
+};
+renderContext.window.KitWorksheetRender.renderWorksheet(wrongPlaceHost, {
+    information: { title: "THE MISSION: The Search Results Detective", paragraphs: [] },
+    questions: [wrongPlaceMission]
+}, { readOnly: true });
+assert.match(wrongPlaceHost.innerHTML, /Mission 3 – The Wrong Place!/);
+assert.match(wrongPlaceHost.innerHTML, /Waimea Gorge Walking Track – Nelson/);
+assert.match(wrongPlaceHost.innerHTML, /waimeagorge\.example/);
+assert.match(wrongPlaceHost.innerHTML, /These are fictional results for practice, not links to real websites\./);
+assert.doesNotMatch(wrongPlaceHost.innerHTML, /href="https:\/\/(?:doc\.govt\.nz|hokitikagorge|waimeagorge)\.example/,
+    "Mission 3 fictional results are not links");
 assert.match(worksheetCss, /\.worksheet-search-result-list\s*\{[^}]*display:\s*grid;/, "Simulated search results render in a clear card layout");
 assert.match(imageHost.innerHTML, /little-blue-penguin\.jpg/);
 assert.match(imageHost.innerHTML, /Mission 2: Choose your own search words/);

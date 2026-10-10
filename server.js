@@ -4476,7 +4476,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function addSearchResultsDetectiveIntroduction(content) {
-  if (content?._contentMigrations?.searchResultsDetective >= 3) return content;
+  if (content?._contentMigrations?.searchResultsDetective >= 4) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
   const activityIndex = worksheets.findIndex((worksheet) =>
@@ -4567,6 +4567,40 @@ function addSearchResultsDetectiveIntroduction(content) {
       }
     });
   }
+  if (!questions.some((question) => question?.id === "search-result-wrong-place")) {
+    questions.push({
+      id: "search-result-wrong-place",
+      type: "multiple-choice",
+      heading: "Mission 3 – The Wrong Place!",
+      prompt: "You search for `Hokitika Gorge walking track` but one result is about a different location. Which result doesn't belong?",
+      options: [
+        "Hokitika Gorge Walk – Department of Conservation",
+        "Hokitika Gorge – Walking Track Information",
+        "Waimea Gorge Walking Track – Nelson"
+      ],
+      searchResults: {
+        title: "Simulated search results",
+        results: [
+          {
+            domain: "doc.govt.nz.example",
+            title: "Hokitika Gorge Walk – Department of Conservation",
+            description: "Read about the walking track at Hokitika Gorge."
+          },
+          {
+            domain: "hokitikagorge.example",
+            title: "Hokitika Gorge – Walking Track Information",
+            description: "Find track information for a walk at Hokitika Gorge."
+          },
+          {
+            domain: "waimeagorge.example",
+            title: "Waimea Gorge Walking Track – Nelson",
+            description: "Explore a walking track at Waimea Gorge near Nelson."
+          }
+        ],
+        note: "These are fictional results for practice, not links to real websites."
+      }
+    });
+  }
 
   const hasIntroduction = content?._contentMigrations?.searchResultsDetective >= 1;
   activities[activityIndex] = {
@@ -4590,7 +4624,7 @@ function addSearchResultsDetectiveIntroduction(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchResultsDetective: 3
+      searchResultsDetective: 4
     }
   };
 }
