@@ -264,12 +264,19 @@
         if (!state.email || !state.progressLoaded || state.completedActivities[activityIndex]) return;
         const baseQuestionIds = assessmentId === "search-keyword-challenge-v1"
             ? [
-                "keyword-west-coast-tree",
-                "keyword-gold-rush-town",
-                "keyword-mountain-bird",
-                "keyword-pancake-rocks",
+                "keyword-pounamu-treasure",
+                "keyword-too-many-results",
+                "keyword-glowworm-mystery",
+                "keyword-fix-the-search",
                 "keyword-hokitika-founded"
             ]
+            : assessmentId === "search-and-find-v1"
+                ? [
+                    "search-find-giant-tree",
+                    "search-find-gold-rush-town",
+                    "search-find-mountain-bird",
+                    "search-find-pancake-rocks"
+                ]
             : assessmentId === "search-results-detective-v1"
                 ? [
                     "search-result-clock-tower",
@@ -481,12 +488,12 @@
                     state.responses[questionId] = value;
                     queueResponseSave();
                     scheduleSearchChoiceCheck(activityIndex, activity?.questionAutoMarkAssessmentId, questionId);
-                    if (["search-penguin-missions-v1", "search-keyword-challenge-v1", "search-results-detective-v1"].includes(activity?.questionAutoMarkAssessmentId)) {
+                    if (["search-penguin-missions-v1", "search-keyword-challenge-v1", "search-results-detective-v1", "search-and-find-v1"].includes(activity?.questionAutoMarkAssessmentId)) {
                         scheduleSearchActivityAutoMark(activityIndex, activity.questionAutoMarkAssessmentId);
                     }
                 }
             });
-            if (["search-penguin-missions-v1", "search-keyword-challenge-v1", "search-results-detective-v1"].includes(activity?.questionAutoMarkAssessmentId)) {
+            if (["search-penguin-missions-v1", "search-keyword-challenge-v1", "search-results-detective-v1", "search-and-find-v1"].includes(activity?.questionAutoMarkAssessmentId)) {
                 scheduleSearchActivityAutoMark(activityIndex, activity.questionAutoMarkAssessmentId);
             }
             if (verification && activityContent.identityLessonVersion) {

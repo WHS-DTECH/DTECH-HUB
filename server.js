@@ -13,6 +13,7 @@ const { validateLoginSites, publicLoginSites, visibleLoginSites } = require("./l
 const SEARCH_PENGUIN_MISSIONS_ID = "search-penguin-missions-v1";
 const SEARCH_KEYWORD_CHALLENGE_ID = "search-keyword-challenge-v1";
 const SEARCH_RESULTS_DETECTIVE_ID = "search-results-detective-v1";
+const SEARCH_AND_FIND_ID = "search-and-find-v1";
 
 function gradeSearchPenguinMissions(answers) {
   const normalized = (value) => String(value || "")
@@ -52,10 +53,10 @@ function gradeSearchKeywordChallenge(answers, activityIndex) {
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
   const acceptedAnswers = {
-    "keyword-west-coast-tree": ["kahikatea"],
-    "keyword-gold-rush-town": ["ross"],
-    "keyword-mountain-bird": ["roroa"],
-    "keyword-pancake-rocks": ["limestone"],
+    "keyword-pounamu-treasure": ["where to find pounamu west coast nz"],
+    "keyword-too-many-results": ["hokitika gorge swing bridge"],
+    "keyword-glowworm-mystery": ["new zealand glowworm diet"],
+    "keyword-fix-the-search": ["hokitika tomorrow"],
     "keyword-hokitika-founded": ["1864"]
   };
   const results = Object.entries(acceptedAnswers).map(([id, accepted]) => {
@@ -67,6 +68,36 @@ function gradeSearchKeywordChallenge(answers, activityIndex) {
   const score = results.filter((result) => result.correct).length;
   return {
     assessmentId: SEARCH_KEYWORD_CHALLENGE_ID,
+    passed: score === results.length,
+    score,
+    total: results.length,
+    answers,
+    results
+  };
+}
+
+function gradeSearchAndFind(answers, activityIndex) {
+  const normalize = (value) => String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  const acceptedAnswers = {
+    "search-find-giant-tree": ["kahikatea"],
+    "search-find-gold-rush-town": ["ross"],
+    "search-find-mountain-bird": ["roroa"],
+    "search-find-pancake-rocks": ["limestone"]
+  };
+  const results = Object.entries(acceptedAnswers).map(([id, accepted]) => {
+    const responseId = `${activityIndex}-${id}`;
+    const response = normalize(answers[responseId] ?? answers[id]);
+    const correct = Boolean(response) && accepted.includes(response);
+    return { id: responseId, correct, explanation: correct ? "Answer saved." : "Search again, then update your answer." };
+  });
+  const score = results.filter((result) => result.correct).length;
+  return {
+    assessmentId: SEARCH_AND_FIND_ID,
     passed: score === results.length,
     score,
     total: results.length,
@@ -4771,107 +4802,62 @@ function addSearchResultsDetectiveIntroduction(content) {
   };
 }
 
-function addSearchKitKeywordChallenge(content) {
-  if (content?._contentMigrations?.searchKeywordChallenge >= 15) return content;
+const SEARCH_KEYWORD_CHALLENGE_INTRODUCTION = {
+  title: "🔎 THE MISSION: The West Coast Treasure Hunt",
+  paragraphs: [
+    "You're on a treasure hunt across the West Coast!",
+    "Your challenge is to choose the best search words to find clues about places, objects and wildlife.",
+    "Sometimes your first search won't give you what you need. That's when clever searchers change their keywords!",
+    "Can you solve all five clues?"
+  ]
+};
 
-  const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
-  const activityIndex = worksheets.findIndex((worksheet) =>
-    String(worksheet?.activity || "").trim().toLowerCase() === "the keyword challenge");
-  if (activityIndex < 0) return content;
+const SEARCH_AND_FIND_INTRODUCTION = {
+  title: "🔎 THE MISSION: The West Coast Mystery Trail",
+  paragraphs: [
+    "There are mysteries hiding all over the West Coast!",
+    "Your challenge is to follow five clues and use a search engine to discover the answers.",
+    "You can search however you like. If your first search doesn't help, try different words.",
+    "Can you solve all five mysteries?"
+  ]
+};
 
-  const activities = Array.isArray(content.activities) ? content.activities.slice() : [];
-  const existingActivity = activities[activityIndex] && typeof activities[activityIndex] === "object";
-  const activity = existingActivity
-    ? activities[activityIndex]
-    : { title: worksheets[activityIndex].activity };
-  const updateIntroduction = (content?._contentMigrations?.searchKeywordChallenge || 0) < 1 || !existingActivity;
-  const previousDefaultIntroduction = {
-    title: "🔎 THE MISSION: The West Coast Treasure Hunt",
-    paragraphs: [
-      "You're on a treasure hunt across the West Coast!",
-      "Your challenge is to choose the best search words to find clues about places, objects and wildlife.",
-      "Sometimes your first search won't give you what you need. That's when clever searchers change their keywords!",
-      "Can you solve all five clues?"
-    ]
-  };
-  const hasPreviousDefaultIntroduction = activity.information?.title === previousDefaultIntroduction.title &&
-    Array.isArray(activity.information?.paragraphs) &&
-    activity.information.paragraphs.length === previousDefaultIntroduction.paragraphs.length &&
-    activity.information.paragraphs.every((paragraph, index) => paragraph === previousDefaultIntroduction.paragraphs[index]);
-  const questions = Array.isArray(activity.questions) ? activity.questions.slice() : [];
-  const treeQuestion = {
-    id: "keyword-west-coast-tree",
-    type: "short-answer",
-    heading: "Mission 1 – The Giant Tree",
-    prompt: "One of New Zealand's tallest native tree species grows in West Coast forests. What is the name of this tree?",
-    lines: 1,
-    hint: "Search for New Zealand's tallest native tree species",
-    images: [
-      {
-        url: "/practical-skills/images/west-coast-tall-tree.jpg",
-        alt: "Looking up at the towering trunks of tall native forest trees.",
-        caption: "Tall native forest trees",
-        attribution: "Geoff McKay",
-        sourceUrl: "https://commons.wikimedia.org/wiki/File:Standing_Straight_And_Tall_-_Kahikatea_(51236257730)_(cropped).jpg",
-        license: "CC BY 2.0",
-        licenseUrl: "https://creativecommons.org/licenses/by/2.0/"
-      }
-    ]
-  };
-  const previousTreeQuestion = questions.find((question) =>
-    question?.id === "keyword-pounamu-treasure" &&
-    question.type === "multiple-choice" &&
-    question.heading === "Mission 1: Find the Treasure" &&
-    question.prompt === "You want to find out where pounamu can be found on the West Coast. Which search would be most useful?" &&
-    Array.isArray(question.options) &&
-    question.options.length === 3 &&
-    question.options[0] === "beautiful green rocks" &&
-    question.options[1] === "where to find pounamu West Coast NZ" &&
-    question.options[2] === "New Zealand beaches");
-  if (previousTreeQuestion) {
-    const previousTreeIndex = questions.indexOf(previousTreeQuestion);
-    questions.splice(previousTreeIndex, 1, treeQuestion);
-  } else if (!questions.some((question) => question?.id === "keyword-pounamu-treasure") &&
-      !questions.some((question) => question?.id === treeQuestion.id)) {
-    questions.unshift(treeQuestion);
-  }
-  const rossQuestion = {
-    id: "keyword-gold-rush-town",
-    type: "short-answer",
-    heading: "Mission 2 – The Gold Rush Town",
-    prompt: "Approximately 25 km south of Hokitika is a small town famous for its gold-mining history. What is the name of this town?",
-    lines: 1,
-    hint: "Search for a historic gold-mining town south of Hokitika."
-  };
-  const previousBridgeQuestion = questions.find((question) =>
-    question?.id === "keyword-too-many-results" &&
-    question.type === "multiple-choice" &&
-    question.heading === "Mission 2: Too Many Results!" &&
-    question.prompt === "You search for bridge but get results from all over the world. You actually want to find the historic swing bridge at Hokitika Gorge. Which search would help you narrow the results?" &&
-    Array.isArray(question.options) &&
-    question.options.length === 3 &&
-    question.options[0] === "bridge" &&
-    question.options[1] === "bridges New Zealand" &&
-    question.options[2] === "Hokitika Gorge swing bridge");
-  if (previousBridgeQuestion) {
-    questions.splice(questions.indexOf(previousBridgeQuestion), 1, rossQuestion);
-  } else if (!questions.some((question) => question?.id === "keyword-too-many-results") &&
-      !questions.some((question) => question?.id === rossQuestion.id)) {
-    const missionOneIndex = questions.findIndex((question) =>
-      question?.id === "keyword-west-coast-tree" || question?.id === "keyword-pounamu-treasure");
-    questions.splice(missionOneIndex >= 0 ? missionOneIndex + 1 : questions.length, 0, rossQuestion);
-  }
-  for (const question of questions) {
-    if (question?.id === rossQuestion.id &&
-        question.prompt === "South of Hokitika is a small town famous for its gold-mining history. What is the name of this town?") {
-      Object.assign(question, rossQuestion);
-    }
-  }
-  if (!questions.some((question) =>
-    question?.id === "keyword-glowworm-mystery" || question?.id === "keyword-mountain-bird")) {
-    const missionTwoIndex = questions.findIndex((question) =>
-      question?.id === "keyword-gold-rush-town" || question?.id === "keyword-too-many-results");
-    questions.splice(missionTwoIndex >= 0 ? missionTwoIndex + 1 : questions.length, 0, {
+function searchKeywordChallengeQuestions() {
+  return [
+    {
+      id: "keyword-pounamu-treasure",
+      type: "multiple-choice",
+      heading: "Mission 1: Find the Treasure",
+      prompt: "You want to find out where pounamu can be found on the West Coast. Which search would be most useful?",
+      options: [
+        "beautiful green rocks",
+        "where to find pounamu West Coast NZ",
+        "New Zealand beaches"
+      ],
+      images: [
+        {
+          url: "/practical-skills/images/pounamu-arahura-river.jpg",
+          alt: "Pounamu (greenstone) sourced from the Arahura River, displayed at Wellington Museum.",
+          caption: "Pounamu sourced from the Arahura River",
+          attribution: "Daderot",
+          sourceUrl: "https://commons.wikimedia.org/wiki/File:Pounamu_(greenstone),_sourced_from_Arahura_River_-_Wellington_Museum_-_Wellington,_NZ_-_DSC00054.jpg",
+          license: "CC0",
+          licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/"
+        }
+      ]
+    },
+    {
+      id: "keyword-too-many-results",
+      type: "multiple-choice",
+      heading: "Mission 2: Too Many Results!",
+      prompt: "You search for bridge but get results from all over the world. You actually want to find the historic swing bridge at Hokitika Gorge. Which search would help you narrow the results?",
+      options: [
+        "bridge",
+        "bridges New Zealand",
+        "Hokitika Gorge swing bridge"
+      ]
+    },
+    {
       id: "keyword-glowworm-mystery",
       type: "multiple-choice",
       heading: "Mission 3 – The Glowworm Mystery",
@@ -4892,163 +4878,173 @@ function addSearchKitKeywordChallenge(content) {
           licenseUrl: "https://creativecommons.org/licenses/by/4.0/"
         }
       ]
-    });
-  }
-  const mountainBirdQuestion = {
-    id: "keyword-mountain-bird",
-    type: "short-answer",
-    heading: "Mission 3 – The Mountain Bird",
-    prompt: "A large species of kiwi lives in the forests and mountains of the West Coast. What is the Māori name of the great spotted kiwi?",
-    lines: 1,
-    hint: "Search for the great spotted kiwi's Māori name.",
-    images: [
-      {
-        url: "/practical-skills/images/west-coast-mountain-bird.jpg",
-        alt: "A brown, speckled kiwi standing in a museum exhibit.",
-        caption: "A kiwi bird",
-        attribution: "J Brew",
-        sourceUrl: "https://commons.wikimedia.org/wiki/File:Great_spotted_kiwi,_apteryx_haastii,_Auckland_War_Memorial_Museum.jpg",
-        license: "CC BY-SA 2.0",
-        licenseUrl: "https://creativecommons.org/licenses/by-sa/2.0/"
-      }
-    ]
-  };
-  const previousGlowwormMission = questions.find((question) =>
-    question?.id === "keyword-glowworm-mystery" &&
-    question.type === "multiple-choice" &&
-    question.heading === "Mission 3 – The Glowworm Mystery" &&
-    question.prompt === "Your challenge: You've heard about the glowworms at Hokitika's Glow Worm Dell. You want to discover what glowworms eat. Which search would help you find the answer?" &&
-    Array.isArray(question.options) &&
-    question.options.length === 3 &&
-    question.options[0] === "Hokitika glowworm photos" &&
-    question.options[1] === "New Zealand glowworm diet" &&
-    question.options[2] === "Hokitika Glow Worm Dell directions");
-  if (previousGlowwormMission) {
-    questions.splice(questions.indexOf(previousGlowwormMission), 1, mountainBirdQuestion);
-  } else if (!questions.some((question) => question?.id === mountainBirdQuestion.id)) {
-    const missionTwoIndex = questions.findIndex((question) => question?.id === "keyword-gold-rush-town");
-    questions.splice(missionTwoIndex >= 0 ? missionTwoIndex + 1 : 2, 0, mountainBirdQuestion);
-  }
-  const pancakeRocksQuestion = {
-    id: "keyword-pancake-rocks",
-    type: "short-answer",
-    heading: "Mission 4 – The Famous Rock Formation",
-    prompt: "Near Punakaiki, there are famous rocks that look like stacks of pancakes. What type of rock are the Pancake Rocks made from?",
-    lines: 1,
-    hint: "Search for what the Punakaiki Pancake Rocks are made of.",
-    images: [
-      {
-        url: "/practical-skills/images/punakaiki-pancake-rocks.jpg",
-        alt: "Layered Pancake Rocks beside the sea at Punakaiki.",
-        caption: "Pancake Rocks, Paparoa National Park",
-        attribution: "W. Bulach",
-        sourceUrl: "https://commons.wikimedia.org/wiki/File:00_1273_Pancake_Rocks_-_Paparoa-Nationalpark_(New_Zealand).jpg",
-        license: "CC BY-SA 4.0",
-        licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0/"
-      }
-    ]
-  };
-  const previousSearchMission = questions.find((question) =>
-    question?.id === "keyword-fix-the-search" &&
-    question.type === "multiple-choice" &&
-    question.heading === "Mission 4: Fix the Search" &&
-    question.prompt === "Someone typed weather but wants to know whether it will rain in Hokitika tomorrow. Which words should they add?" &&
-    Array.isArray(question.options) &&
-    question.options.length === 3 &&
-    question.options[0] === "Hokitika tomorrow" &&
-    question.options[1] === "sunshine" &&
-    question.options[2] === "New Zealand");
-  if (previousSearchMission) {
-    questions.splice(questions.indexOf(previousSearchMission), 1, pancakeRocksQuestion);
-  } else if (!questions.some((question) => question?.id === pancakeRocksQuestion.id)) {
-    const missionThreeIndex = questions.findIndex((question) =>
-      question?.id === "keyword-mountain-bird" || question?.id === "keyword-glowworm-mystery");
-    questions.splice(missionThreeIndex >= 0 ? missionThreeIndex + 1 : questions.length, 0, pancakeRocksQuestion);
-  }
-  if (!questions.some((question) => question?.id === "keyword-hokitika-founded")) {
-    const missionFourIndex = questions.findIndex((question) => question?.id === "keyword-pancake-rocks");
-    questions.splice(missionFourIndex >= 0 ? missionFourIndex + 1 : questions.length, 0, {
+    },
+    {
+      id: "keyword-fix-the-search",
+      type: "multiple-choice",
+      heading: "Mission 4: Fix the Search",
+      prompt: "Someone typed weather but wants to know whether it will rain in Hokitika tomorrow. Which words should they add?",
+      options: [
+        "Hokitika tomorrow",
+        "sunshine",
+        "New Zealand"
+      ]
+    },
+    {
       id: "keyword-hokitika-founded",
       type: "short-answer",
       heading: "Mission 5: Your Turn – Find the Answer!",
       prompt: "Use a search engine to find out what year Hokitika was founded as a gold-mining settlement. What year did you find?",
       lines: 1
-    });
-  }
-  const information = updateIntroduction || hasPreviousDefaultIntroduction ? {
-    title: "🔎 THE MISSION: The West Coast Mystery Trail",
-    paragraphs: [
-      "There are mysteries hiding all over the West Coast!",
-      "Your challenge is to follow five clues and use a search engine to discover the answers.",
-      "You can search however you like. If your first search doesn't help, try different words.",
-      "Can you solve all five mysteries?"
-    ]
-  } : activity.information;
+    }
+  ];
+}
+
+function searchAndFindQuestions() {
+  return [
+    {
+      id: "search-find-giant-tree",
+      type: "short-answer",
+      heading: "Mission 1 – The Giant Tree",
+      prompt: "One of New Zealand's tallest native tree species grows in West Coast forests. What is the name of this tree?",
+      lines: 1,
+      hint: "Search for New Zealand's tallest native tree species",
+      images: [
+        {
+          url: "/practical-skills/images/west-coast-tall-tree.jpg",
+          alt: "Looking up at the towering trunks of tall native forest trees.",
+          caption: "Tall native forest trees",
+          attribution: "Geoff McKay",
+          sourceUrl: "https://commons.wikimedia.org/wiki/File:Standing_Straight_And_Tall_-_Kahikatea_(51236257730)_(cropped).jpg",
+          license: "CC BY 2.0",
+          licenseUrl: "https://creativecommons.org/licenses/by/2.0/"
+        }
+      ]
+    },
+    {
+      id: "search-find-gold-rush-town",
+      type: "short-answer",
+      heading: "Mission 2 – The Gold Rush Town",
+      prompt: "Approximately 25 km south of Hokitika is a small town famous for its gold-mining history. What is the name of this town?",
+      lines: 1,
+      hint: "Search for a historic gold-mining town south of Hokitika."
+    },
+    {
+      id: "search-find-mountain-bird",
+      type: "short-answer",
+      heading: "Mission 3 – The Mountain Bird",
+      prompt: "A large species of kiwi lives in the forests and mountains of the West Coast. What is the Māori name of the great spotted kiwi?",
+      lines: 1,
+      hint: "Search for the great spotted kiwi's Māori name.",
+      images: [
+        {
+          url: "/practical-skills/images/west-coast-mountain-bird.jpg",
+          alt: "A brown, speckled kiwi standing in a museum exhibit.",
+          caption: "A kiwi bird",
+          attribution: "J Brew",
+          sourceUrl: "https://commons.wikimedia.org/wiki/File:Great_spotted_kiwi,_apteryx_haastii,_Auckland_War_Memorial_Museum.jpg",
+          license: "CC BY-SA 2.0",
+          licenseUrl: "https://creativecommons.org/licenses/by-sa/2.0/"
+        }
+      ]
+    },
+    {
+      id: "search-find-pancake-rocks",
+      type: "short-answer",
+      heading: "Mission 4 – The Famous Rock Formation",
+      prompt: "Near Punakaiki, there are famous rocks that look like stacks of pancakes. What type of rock are the Pancake Rocks made from?",
+      lines: 1,
+      hint: "Search for what the Punakaiki Pancake Rocks are made of.",
+      images: [
+        {
+          url: "/practical-skills/images/punakaiki-pancake-rocks.jpg",
+          alt: "Layered Pancake Rocks beside the sea at Punakaiki.",
+          caption: "Pancake Rocks, Paparoa National Park",
+          attribution: "W. Bulach",
+          sourceUrl: "https://commons.wikimedia.org/wiki/File:00_1273_Pancake_Rocks_-_Paparoa-Nationalpark_(New_Zealand).jpg",
+          license: "CC BY-SA 4.0",
+          licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0/"
+        }
+      ]
+    }
+  ];
+}
+
+function isSearchIntroduction(information, introduction) {
+  return information?.title === introduction.title &&
+    Array.isArray(information?.paragraphs) &&
+    information.paragraphs.length === introduction.paragraphs.length &&
+    information.paragraphs.every((paragraph, index) => paragraph === introduction.paragraphs[index]);
+}
+
+function insertMissingDefaultQuestions(questions, defaults) {
+  defaults.forEach((question, index) => {
+    if (questions.some((existing) => existing?.id === question.id)) return;
+    const previousIndex = index > 0
+      ? questions.findIndex((existing) => existing?.id === defaults[index - 1].id)
+      : -1;
+    questions.splice(index === 0 ? 0 : previousIndex >= 0 ? previousIndex + 1 : questions.length, 0, question);
+  });
+  return questions;
+}
+
+// The West Coast Mystery Trail missions belong to "Search and Find!". Earlier migrations
+// wrongly placed them in "The Keyword Challenge", so this restores both activities.
+function addSearchKitKeywordChallenge(content) {
+  if (content?._contentMigrations?.searchKeywordChallenge >= 16) return content;
+
+  const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
+  const activityIndex = worksheets.findIndex((worksheet) =>
+    String(worksheet?.activity || "").trim().toLowerCase() === "the keyword challenge");
+  if (activityIndex < 0) return content;
+
+  const activities = Array.isArray(content.activities) ? content.activities.slice() : [];
+  const existingActivity = activities[activityIndex] && typeof activities[activityIndex] === "object";
+  const activity = existingActivity
+    ? activities[activityIndex]
+    : { title: worksheets[activityIndex].activity };
+  const updateIntroduction = (content?._contentMigrations?.searchKeywordChallenge || 0) < 1 || !existingActivity;
+  const keywordDefaults = searchKeywordChallengeQuestions();
+  const misplacedMysteryQuestions = {
+    "keyword-west-coast-tree": "keyword-pounamu-treasure",
+    "keyword-gold-rush-town": "keyword-too-many-results",
+    "keyword-mountain-bird": "keyword-glowworm-mystery",
+    "keyword-pancake-rocks": "keyword-fix-the-search"
+  };
+  const existingQuestions = Array.isArray(activity.questions) ? activity.questions : [];
+  const questions = existingQuestions.flatMap((question) => {
+    const originalId = misplacedMysteryQuestions[question?.id];
+    if (!originalId) return [question];
+    if (existingQuestions.some((existing) => existing?.id === originalId)) return [];
+    return [keywordDefaults.find((defaultQuestion) => defaultQuestion.id === originalId)];
+  });
+  insertMissingDefaultQuestions(questions, keywordDefaults);
   activities[activityIndex] = {
     ...activity,
     questions,
     questionAutoMarkAssessmentId: "search-keyword-challenge-v1",
-    information
+    information: updateIntroduction || isSearchIntroduction(activity.information, SEARCH_AND_FIND_INTRODUCTION)
+      ? SEARCH_KEYWORD_CHALLENGE_INTRODUCTION
+      : activity.information
   };
 
   const searchAndFindIndex = worksheets.findIndex((worksheet) =>
     String(worksheet?.activity || "").trim().toLowerCase() === "search and find!");
   if (searchAndFindIndex >= 0 && searchAndFindIndex !== activityIndex) {
-    const existingSearchAndFind = activities[searchAndFindIndex] &&
-      typeof activities[searchAndFindIndex] === "object"
+    const searchAndFind = activities[searchAndFindIndex] && typeof activities[searchAndFindIndex] === "object"
       ? activities[searchAndFindIndex]
       : { title: worksheets[searchAndFindIndex].activity };
-    const searchAndFindQuestions = Array.isArray(existingSearchAndFind.questions)
-      ? existingSearchAndFind.questions.slice()
-      : [];
-    const previousSearchAndFindBridgeQuestion = searchAndFindQuestions.find((question) =>
-      question?.id === "keyword-too-many-results" &&
-      question.type === "multiple-choice" &&
-      question.heading === "Mission 2: Too Many Results!" &&
-      question.prompt === "You search for bridge but get results from all over the world. You actually want to find the historic swing bridge at Hokitika Gorge. Which search would help you narrow the results?" &&
-      Array.isArray(question.options) &&
-      question.options.length === 3 &&
-      question.options[0] === "bridge" &&
-      question.options[1] === "bridges New Zealand" &&
-      question.options[2] === "Hokitika Gorge swing bridge");
-    if (previousSearchAndFindBridgeQuestion) {
-      searchAndFindQuestions.splice(
-        searchAndFindQuestions.indexOf(previousSearchAndFindBridgeQuestion),
-        1,
-        rossQuestion
-      );
-    }
-    for (const question of searchAndFindQuestions) {
-      if (question?.id === rossQuestion.id &&
-          question.prompt === "South of Hokitika is a small town famous for its gold-mining history. What is the name of this town?") {
-        Object.assign(question, rossQuestion);
-      }
-    }
-    const previousSearchAndFindMission = searchAndFindQuestions.find((question) =>
-      question?.id === "keyword-fix-the-search" &&
-      question.type === "multiple-choice" &&
-      question.heading === "Mission 4: Fix the Search" &&
-      question.prompt === "Someone typed weather but wants to know whether it will rain in Hokitika tomorrow. Which words should they add?" &&
-      Array.isArray(question.options) &&
-      question.options.length === 3 &&
-      question.options[0] === "Hokitika tomorrow" &&
-      question.options[1] === "sunshine" &&
-      question.options[2] === "New Zealand");
-    if (previousSearchAndFindMission) {
-      searchAndFindQuestions.splice(searchAndFindQuestions.indexOf(previousSearchAndFindMission), 1, pancakeRocksQuestion);
-    }
-    for (const question of questions) {
-      if (question?.id?.startsWith("keyword-") &&
-          !searchAndFindQuestions.some((existing) => existing?.id === question.id)) {
-        searchAndFindQuestions.push(question);
-      }
-    }
+    const searchAndFindQuestionsList = (Array.isArray(searchAndFind.questions) ? searchAndFind.questions : [])
+      .filter((question) => !String(question?.id || "").startsWith("keyword-"));
+    insertMissingDefaultQuestions(searchAndFindQuestionsList, searchAndFindQuestions());
     activities[searchAndFindIndex] = {
-      ...existingSearchAndFind,
-      questions: searchAndFindQuestions,
-      questionAutoMarkAssessmentId: "search-keyword-challenge-v1",
-      information: existingSearchAndFind.information ||
-        (searchAndFindQuestions.length ? information : undefined)
+      ...searchAndFind,
+      questions: searchAndFindQuestionsList,
+      questionAutoMarkAssessmentId: "search-and-find-v1",
+      information: !searchAndFind.information ||
+        isSearchIntroduction(searchAndFind.information, SEARCH_KEYWORD_CHALLENGE_INTRODUCTION)
+        ? SEARCH_AND_FIND_INTRODUCTION
+        : searchAndFind.information
     };
   }
 
@@ -5057,7 +5053,7 @@ function addSearchKitKeywordChallenge(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchKeywordChallenge: 15
+      searchKeywordChallenge: 16
     }
   };
 }
@@ -5433,7 +5429,8 @@ async function savePracticalSkillsAssessment(studentEmail, kitId, activityIndex,
   const mergeSiteAnswers = grade.assessmentId === "login-sites-readiness-v1";
   const mergeQuestionAnswers = grade.assessmentId === "search-penguin-missions-v1" ||
     grade.assessmentId === "search-keyword-challenge-v1" ||
-    grade.assessmentId === SEARCH_RESULTS_DETECTIVE_ID;
+    grade.assessmentId === SEARCH_RESULTS_DETECTIVE_ID ||
+    grade.assessmentId === SEARCH_AND_FIND_ID;
   const completedAt = new Date().toISOString();
 
   if (!hasDatabase) {
@@ -13641,7 +13638,7 @@ app.post("/api/practical-skills/progress/:kitId/activities/:activityIndex/check"
     const activity = content?.activities?.[activityIndex];
     const identityLesson = Boolean(activity?.identityLessonVersion);
     if (!content?.worksheets?.[activityIndex] || (!identityLesson && !activity?.loginSites &&
-        !["search-penguin-missions-v1", "search-keyword-challenge-v1", SEARCH_RESULTS_DETECTIVE_ID].includes(activity?.questionAutoMarkAssessmentId) &&
+        !["search-penguin-missions-v1", "search-keyword-challenge-v1", SEARCH_RESULTS_DETECTIVE_ID, SEARCH_AND_FIND_ID].includes(activity?.questionAutoMarkAssessmentId) &&
         ![PASSWORD_PROBLEMS_ID, APPS_WORDSEARCH_ID, LEARNING_SITES_ID].includes(activity?.assessmentId))) {
       res.status(404).json({ error: "Unknown self-marking activity." });
       return;
@@ -13660,6 +13657,8 @@ app.post("/api/practical-skills/progress/:kitId/activities/:activityIndex/check"
             ? gradeSearchKeywordChallenge(req.body.answers, activityIndex)
             : activity.questionAutoMarkAssessmentId === SEARCH_RESULTS_DETECTIVE_ID
               ? gradeSearchResultsDetective(req.body.answers, activityIndex)
+              : activity.questionAutoMarkAssessmentId === SEARCH_AND_FIND_ID
+                ? gradeSearchAndFind(req.body.answers, activityIndex)
         : activity.assessmentId === APPS_WORDSEARCH_ID
         ? gradeAppsWordsearch(req.body.answers, Boolean((await getStudentLoginDriveSetup(studentEmail))?.folder_id))
         : activity.assessmentId === LEARNING_SITES_ID

@@ -77,13 +77,13 @@ assert.deepEqual(Array.from(migrated.activities[0].information.paragraphs), [
     "Use a search engine of your choice to find the answers to the questions below. Google, Bing or another search engine will do!",
     "Can you solve the Penguin Mystery?"
 ]);
-assert.equal(migrated.activities[1].information.title, "🔎 THE MISSION: The West Coast Mystery Trail");
+assert.equal(migrated.activities[1].information.title, "🔎 THE MISSION: The West Coast Treasure Hunt");
 assert.equal(migrated.activities[1].questionAutoMarkAssessmentId, "search-keyword-challenge-v1", "Keyword Challenge uses server-checked auto-marking");
 assert.deepEqual(Array.from(migrated.activities[1].information.paragraphs), [
-    "There are mysteries hiding all over the West Coast!",
-    "Your challenge is to follow five clues and use a search engine to discover the answers.",
-    "You can search however you like. If your first search doesn't help, try different words.",
-    "Can you solve all five mysteries?"
+    "You're on a treasure hunt across the West Coast!",
+    "Your challenge is to choose the best search words to find clues about places, objects and wildlife.",
+    "Sometimes your first search won't give you what you need. That's when clever searchers change their keywords!",
+    "Can you solve all five clues?"
 ]);
 assert.equal(migrated.activities[2].information.title, "THE MISSION: The Search Results Detective");
 assert.deepEqual(Array.from(migrated.activities[2].information.paragraphs), [
@@ -96,33 +96,13 @@ assert.equal(migrated.activities[3].title, "Search and Find!",
     "Migration creates the missing activity object for the Search and Find worksheet");
 assert.equal(migrated.activities[3].information.title, "🔎 THE MISSION: The West Coast Mystery Trail");
 assert.deepEqual(Array.from(migrated.activities[3].questions, (question) => question.id), [
-    "keyword-west-coast-tree",
-    "keyword-gold-rush-town",
-    "keyword-mountain-bird",
-    "keyword-pancake-rocks",
-    "keyword-hokitika-founded"
-], "Search and Find receives the five Mystery Trail missions in order");
-assert.equal(migrated.activities[3].questionAutoMarkAssessmentId, "search-keyword-challenge-v1");
+    "search-find-giant-tree",
+    "search-find-gold-rush-town",
+    "search-find-mountain-bird",
+    "search-find-pancake-rocks"
+], "Search and Find receives its own Mystery Trail missions in order");
+assert.equal(migrated.activities[3].questionAutoMarkAssessmentId, "search-and-find-v1");
 assert.equal(fs.existsSync(pancakeRocksImage), true, "Pancake Rocks photo asset exists");
-const savedKitWithMissingSearchAndFind = JSON.parse(JSON.stringify(migrated));
-savedKitWithMissingSearchAndFind._contentMigrations.searchKeywordChallenge = 12;
-savedKitWithMissingSearchAndFind.activities.splice(3, 1);
-const repairedSearchAndFind = context.addSearchKitPenguinMission(savedKitWithMissingSearchAndFind);
-assert.equal(repairedSearchAndFind.activities[3].title, "Search and Find!",
-    "A saved kit missing its Search and Find activity is repaired");
-assert.equal(repairedSearchAndFind.activities[3].questions.length, 5,
-    "Repair creates all five Mystery Trail questions in the missing activity");
-assert.equal(repairedSearchAndFind._contentMigrations.searchKeywordChallenge, 15);
-const savedSearchAndFindWithTeacherQuestion = JSON.parse(JSON.stringify(savedKitWithMissingSearchAndFind));
-savedSearchAndFindWithTeacherQuestion.activities[3] = {
-    title: "Search and Find!",
-    questions: [{ id: "teacher-search-question", type: "short-answer", prompt: "Teacher question" }]
-};
-const preservedSearchAndFindQuestion = context.addSearchKitPenguinMission(savedSearchAndFindWithTeacherQuestion);
-assert.equal(preservedSearchAndFindQuestion.activities[3].questions[0].id, "teacher-search-question",
-    "Repair preserves existing teacher-authored Search and Find questions");
-assert.equal(preservedSearchAndFindQuestion.activities[3].questions.length, 6,
-    "Repair adds the five Mystery Trail questions alongside teacher questions");
 assert.deepEqual(Array.from(migrated.activities[2].questions, (question) => question.id), [
     "result-q",
     "search-result-clock-tower",
@@ -358,170 +338,7 @@ assert.deepEqual(Array.from(repairedResultsKit.activities[2].questions || [], (q
     "search-result-doc-track"
 ]);
 assert.equal(repairedResultsKit._contentMigrations.searchResultsDetective, 11);
-const keywordChallengeQuestion = migrated.activities[1].questions[0];
-assert.equal(keywordChallengeQuestion.id, "keyword-west-coast-tree");
-assert.equal(keywordChallengeQuestion.type, "short-answer");
-assert.equal(keywordChallengeQuestion.heading, "Mission 1 – The Giant Tree");
-assert.equal(keywordChallengeQuestion.prompt, "One of New Zealand's tallest native tree species grows in West Coast forests. What is the name of this tree?");
-assert.equal(keywordChallengeQuestion.lines, 1);
-assert.equal(keywordChallengeQuestion.hint, "Search for New Zealand's tallest native tree species");
-assert.equal(keywordChallengeQuestion.images[0].url, "/practical-skills/images/west-coast-tall-tree.jpg");
-assert.equal(keywordChallengeQuestion.images[0].attribution, "Geoff McKay");
-assert.equal(keywordChallengeQuestion.images[0].license, "CC BY 2.0");
-assert.equal(keywordChallengeQuestion.images[0].caption.includes("Kahikatea"), false,
-    "Tree image caption does not reveal the species name");
-assert.equal(keywordChallengeQuestion.images[0].alt.toLowerCase().includes("kahikatea"), false,
-    "Tree image alt text does not reveal the species name");
-assert.equal(fs.existsSync(treeImage), true, "West Coast tree photo asset exists");
-assert.equal(migrated.activities[1].questions.some((question) => question.id === "keyword-pounamu-treasure"), false,
-    "Previous Pounamu mission is replaced");
-const savedKeywordChallengeWithOldMission = JSON.parse(JSON.stringify(migrated));
-savedKeywordChallengeWithOldMission._contentMigrations.searchKeywordChallenge = 10;
-savedKeywordChallengeWithOldMission.activities[1].questions[0] = {
-    id: "keyword-pounamu-treasure",
-    type: "multiple-choice",
-    heading: "Mission 1: Find the Treasure",
-    prompt: "You want to find out where pounamu can be found on the West Coast. Which search would be most useful?",
-    options: ["beautiful green rocks", "where to find pounamu West Coast NZ", "New Zealand beaches"]
-};
-const upgradedKeywordChallengeMission = context.addSearchKitKeywordChallenge(savedKeywordChallengeWithOldMission);
-assert.equal(upgradedKeywordChallengeMission.activities[1].questions[0].id, "keyword-west-coast-tree",
-    "Migration replaces the saved default Pounamu question with the Giant Tree mission");
-assert.equal(upgradedKeywordChallengeMission._contentMigrations.searchKeywordChallenge, 15);
-const savedKeywordChallengeWithOldMissionTwo = JSON.parse(JSON.stringify(migrated));
-savedKeywordChallengeWithOldMissionTwo._contentMigrations.searchKeywordChallenge = 11;
-savedKeywordChallengeWithOldMissionTwo.activities[1].questions[1] = {
-    id: "keyword-too-many-results",
-    type: "multiple-choice",
-    heading: "Mission 2: Too Many Results!",
-    prompt: "You search for bridge but get results from all over the world. You actually want to find the historic swing bridge at Hokitika Gorge. Which search would help you narrow the results?",
-    options: ["bridge", "bridges New Zealand", "Hokitika Gorge swing bridge"]
-};
-const upgradedKeywordChallengeMissionTwo = context.addSearchKitKeywordChallenge(savedKeywordChallengeWithOldMissionTwo);
-assert.equal(upgradedKeywordChallengeMissionTwo.activities[1].questions[1].id, "keyword-gold-rush-town",
-    "Migration replaces the saved default bridge question with the Gold Rush Town mission");
-assert.equal(upgradedKeywordChallengeMissionTwo._contentMigrations.searchKeywordChallenge, 15);
-const teacherCustomizedOldMissionTwo = JSON.parse(JSON.stringify(savedKeywordChallengeWithOldMissionTwo));
-teacherCustomizedOldMissionTwo.activities[1].questions[1].prompt = "A teacher-customized Mission 2 prompt.";
-const preservedCustomizedOldMissionTwo = context.addSearchKitKeywordChallenge(teacherCustomizedOldMissionTwo);
-assert.equal(preservedCustomizedOldMissionTwo.activities[1].questions[1].prompt, "A teacher-customized Mission 2 prompt.",
-    "Migration preserves a teacher-customized prior Mission 2");
-assert.equal(preservedCustomizedOldMissionTwo.activities[1].questions.some((question) => question.id === "keyword-gold-rush-town"), false,
-    "Migration does not add a duplicate Gold Rush Town question beside a teacher-customized Mission 2");
-const teacherCustomizedOldMission = JSON.parse(JSON.stringify(savedKeywordChallengeWithOldMission));
-teacherCustomizedOldMission.activities[1].questions[0].prompt = "A teacher-customized Mission 1 prompt.";
-const preservedCustomizedOldMission = context.addSearchKitKeywordChallenge(teacherCustomizedOldMission);
-assert.equal(preservedCustomizedOldMission.activities[1].questions[0].prompt, "A teacher-customized Mission 1 prompt.",
-    "Migration preserves a teacher-customized prior Mission 1");
-assert.equal(preservedCustomizedOldMission.activities[1].questions.some((question) => question.id === "keyword-west-coast-tree"), false,
-    "Migration does not add a duplicate tree question beside a teacher-customized Mission 1");
-assert.equal(Object.hasOwn(keywordChallengeQuestion, "correctAnswer"), false, "Keyword challenge answer is not exposed in student content");
-assert.equal(keywordChallengeQuestion.images[0].sourceUrl, "https://commons.wikimedia.org/wiki/File:Standing_Straight_And_Tall_-_Kahikatea_(51236257730)_(cropped).jpg");
-assert.equal(keywordChallengeQuestion.images[0].licenseUrl, "https://creativecommons.org/licenses/by/2.0/");
-const keywordChallengeMissionTwo = migrated.activities[1].questions[1];
-assert.equal(keywordChallengeMissionTwo.id, "keyword-gold-rush-town");
-assert.equal(keywordChallengeMissionTwo.type, "short-answer");
-assert.equal(keywordChallengeMissionTwo.heading, "Mission 2 – The Gold Rush Town");
-assert.equal(keywordChallengeMissionTwo.prompt, "Approximately 25 km south of Hokitika is a small town famous for its gold-mining history. What is the name of this town?");
-assert.equal(keywordChallengeMissionTwo.lines, 1);
-assert.equal(keywordChallengeMissionTwo.hint, "Search for a historic gold-mining town south of Hokitika.");
-const keywordChallengeMissionThree = migrated.activities[1].questions[2];
-assert.equal(keywordChallengeMissionThree.id, "keyword-mountain-bird");
-assert.equal(keywordChallengeMissionThree.type, "short-answer");
-assert.equal(keywordChallengeMissionThree.heading, "Mission 3 – The Mountain Bird");
-assert.equal(keywordChallengeMissionThree.prompt, "A large species of kiwi lives in the forests and mountains of the West Coast. What is the Māori name of the great spotted kiwi?");
-assert.equal(keywordChallengeMissionThree.lines, 1);
-assert.equal(keywordChallengeMissionThree.hint, "Search for the great spotted kiwi's Māori name.");
-assert.equal(keywordChallengeMissionThree.images[0].url, "/practical-skills/images/west-coast-mountain-bird.jpg");
-assert.equal(keywordChallengeMissionThree.images[0].attribution, "J Brew");
-assert.equal(keywordChallengeMissionThree.images[0].license, "CC BY-SA 2.0");
-assert.equal(keywordChallengeMissionThree.images[0].sourceUrl, "https://commons.wikimedia.org/wiki/File:Great_spotted_kiwi,_apteryx_haastii,_Auckland_War_Memorial_Museum.jpg");
-assert.equal(keywordChallengeMissionThree.images[0].licenseUrl, "https://creativecommons.org/licenses/by-sa/2.0/");
-assert.equal(fs.existsSync(mountainBirdImage), true, "Mountain Bird photo asset exists");
-const keywordChallengeMissionFour = migrated.activities[1].questions[3];
-assert.equal(keywordChallengeMissionFour.id, "keyword-pancake-rocks");
-assert.equal(keywordChallengeMissionFour.type, "short-answer");
-assert.equal(keywordChallengeMissionFour.heading, "Mission 4 – The Famous Rock Formation");
-assert.equal(keywordChallengeMissionFour.prompt, "Near Punakaiki, there are famous rocks that look like stacks of pancakes. What type of rock are the Pancake Rocks made from?");
-assert.equal(keywordChallengeMissionFour.lines, 1);
-assert.equal(keywordChallengeMissionFour.hint, "Search for what the Punakaiki Pancake Rocks are made of.");
-assert.equal(keywordChallengeMissionFour.images[0].url, "/practical-skills/images/punakaiki-pancake-rocks.jpg");
-assert.equal(keywordChallengeMissionFour.images[0].attribution, "W. Bulach");
-assert.equal(keywordChallengeMissionFour.images[0].license, "CC BY-SA 4.0");
-assert.equal(keywordChallengeMissionFour.images[0].sourceUrl, "https://commons.wikimedia.org/wiki/File:00_1273_Pancake_Rocks_-_Paparoa-Nationalpark_(New_Zealand).jpg");
-assert.equal(keywordChallengeMissionFour.images[0].licenseUrl, "https://creativecommons.org/licenses/by-sa/4.0/");
-const keywordChallengeMissionFive = migrated.activities[1].questions[4];
-assert.equal(keywordChallengeMissionFive.id, "keyword-hokitika-founded");
-assert.equal(keywordChallengeMissionFive.type, "short-answer");
-assert.equal(keywordChallengeMissionFive.heading, "Mission 5: Your Turn – Find the Answer!");
-assert.equal(keywordChallengeMissionFive.prompt, "Use a search engine to find out what year Hokitika was founded as a gold-mining settlement. What year did you find?");
-assert.equal(keywordChallengeMissionFive.lines, 1);
-assert.deepEqual(Array.from(migrated.activities[1].questions.slice(5), (question) => question.id), ["other-q"], "Existing Keyword Challenge questions are preserved");
-assert.equal(migrated._contentMigrations.searchKeywordChallenge, 15, "Keyword Challenge migration is recorded");
-const legacyMissionFour = {
-    id: "keyword-fix-the-search",
-    type: "multiple-choice",
-    heading: "Mission 4: Fix the Search",
-    prompt: "Someone typed weather but wants to know whether it will rain in Hokitika tomorrow. Which words should they add?",
-    options: ["Hokitika tomorrow", "sunshine", "New Zealand"]
-};
-const savedKitWithLegacyMissionFour = JSON.parse(JSON.stringify(migrated));
-savedKitWithLegacyMissionFour._contentMigrations.searchKeywordChallenge = 13;
-savedKitWithLegacyMissionFour.activities[1].questions[3] = legacyMissionFour;
-savedKitWithLegacyMissionFour.activities[3].questions[3] = legacyMissionFour;
-const upgradedLegacyMissionFour = context.addSearchKitKeywordChallenge(savedKitWithLegacyMissionFour);
-assert.equal(upgradedLegacyMissionFour.activities[1].questions[3].id, "keyword-pancake-rocks",
-    "The default Mission 4 is replaced by the Pancake Rocks question");
-assert.equal(upgradedLegacyMissionFour.activities[3].questions[3].id, "keyword-pancake-rocks",
-    "Existing Search and Find is updated with the new Mission 4");
-assert.equal(upgradedLegacyMissionFour.activities[3].questions.length, 5,
-    "Replacing the default Mission 4 does not leave a duplicate in Search and Find");
-const legacyBridgeQuestion = {
-    id: "keyword-too-many-results",
-    type: "multiple-choice",
-    heading: "Mission 2: Too Many Results!",
-    prompt: "You search for bridge but get results from all over the world. You actually want to find the historic swing bridge at Hokitika Gorge. Which search would help you narrow the results?",
-    options: ["bridge", "bridges New Zealand", "Hokitika Gorge swing bridge"]
-};
-const savedKitWithLegacySearchAndFindMissionTwo = JSON.parse(JSON.stringify(migrated));
-savedKitWithLegacySearchAndFindMissionTwo._contentMigrations.searchKeywordChallenge = 14;
-savedKitWithLegacySearchAndFindMissionTwo.activities[1].questions[1].prompt =
-    "South of Hokitika is a small town famous for its gold-mining history. What is the name of this town?";
-savedKitWithLegacySearchAndFindMissionTwo.activities[3].questions[1] = legacyBridgeQuestion;
-const upgradedSearchAndFindMissionTwo = context.addSearchKitKeywordChallenge(savedKitWithLegacySearchAndFindMissionTwo);
-assert.equal(upgradedSearchAndFindMissionTwo.activities[1].questions[1].prompt,
-    "Approximately 25 km south of Hokitika is a small town famous for its gold-mining history. What is the name of this town?",
-    "Existing Gold Rush Town prompt gains the approximate distance");
-assert.equal(upgradedSearchAndFindMissionTwo.activities[3].questions[1].id, "keyword-gold-rush-town",
-    "Search and Find replaces its saved default bridge question with the Gold Rush Town mission");
-assert.equal(upgradedSearchAndFindMissionTwo.activities[3].questions[1].prompt,
-    "Approximately 25 km south of Hokitika is a small town famous for its gold-mining history. What is the name of this town?");
-assert.equal(upgradedSearchAndFindMissionTwo.activities[3].questions.length, 5,
-    "Replacing Mission 2 in Search and Find does not leave a duplicate");
-const savedKitWithEditedMissionFour = JSON.parse(JSON.stringify(savedKitWithLegacyMissionFour));
-savedKitWithEditedMissionFour.activities[1].questions[3].prompt = "Teacher-edited Mission 4 prompt";
-savedKitWithEditedMissionFour.activities[3].questions[3].prompt = "Teacher-edited Mission 4 prompt";
-const preservedEditedMissionFour = context.addSearchKitKeywordChallenge(savedKitWithEditedMissionFour);
-assert.equal(preservedEditedMissionFour.activities[1].questions.find((question) =>
-    question.id === "keyword-fix-the-search").prompt, "Teacher-edited Mission 4 prompt",
-    "Migration preserves a teacher-edited Mission 4");
-assert.ok(preservedEditedMissionFour.activities[1].questions.some((question) => question.id === "keyword-pancake-rocks"),
-    "Migration adds the Pancake Rocks mission without replacing customized content");
-const teacherEditedKeywordChallenge = JSON.parse(JSON.stringify(migrated));
-teacherEditedKeywordChallenge._contentMigrations.searchKeywordChallenge = 1;
-teacherEditedKeywordChallenge.activities[1].information = { title: "Teacher-edited title", paragraphs: ["Teacher-edited introduction"] };
-teacherEditedKeywordChallenge.activities[1].questions = teacherEditedKeywordChallenge.activities[1].questions
-    .filter((question) => question.id !== "keyword-west-coast-tree");
-const upgradedKeywordChallenge = context.addSearchKitKeywordChallenge(teacherEditedKeywordChallenge);
-assert.deepEqual(upgradedKeywordChallenge.activities[1].information, {
-    title: "Teacher-edited title",
-    paragraphs: ["Teacher-edited introduction"]
-}, "Keyword Challenge question migration preserves teacher-edited introduction");
-assert.ok(upgradedKeywordChallenge.activities[1].questions.some((question) => question.id === "keyword-west-coast-tree"),
-    "Saved Keyword Challenge gains the tree mission");
-const savedDefaultKeywordIntro = JSON.parse(JSON.stringify(migrated));
-savedDefaultKeywordIntro._contentMigrations.searchKeywordChallenge = 9;
-savedDefaultKeywordIntro.activities[1].information = {
+const treasureHuntIntroduction = {
     title: "🔎 THE MISSION: The West Coast Treasure Hunt",
     paragraphs: [
         "You're on a treasure hunt across the West Coast!",
@@ -530,15 +347,155 @@ savedDefaultKeywordIntro.activities[1].information = {
         "Can you solve all five clues?"
     ]
 };
-const upgradedDefaultKeywordIntro = context.addSearchKitKeywordChallenge(savedDefaultKeywordIntro);
-assert.equal(upgradedDefaultKeywordIntro.activities[1].information.title, "🔎 THE MISSION: The West Coast Mystery Trail",
-    "Migration updates the previous default Keyword Challenge introduction");
-assert.equal(upgradedDefaultKeywordIntro._contentMigrations.searchKeywordChallenge, 15);
-const savedEditedKeywordIntro = JSON.parse(JSON.stringify(savedDefaultKeywordIntro));
-savedEditedKeywordIntro.activities[1].information.paragraphs[0] = "A teacher-customized opening.";
-const preservedEditedKeywordIntro = context.addSearchKitKeywordChallenge(savedEditedKeywordIntro);
-assert.equal(preservedEditedKeywordIntro.activities[1].information.paragraphs[0], "A teacher-customized opening.",
-    "Migration preserves teacher-customized Keyword Challenge introductions");
+const mysteryTrailIntroduction = {
+    title: "🔎 THE MISSION: The West Coast Mystery Trail",
+    paragraphs: [
+        "There are mysteries hiding all over the West Coast!",
+        "Your challenge is to follow five clues and use a search engine to discover the answers.",
+        "You can search however you like. If your first search doesn't help, try different words.",
+        "Can you solve all five mysteries?"
+    ]
+};
+const keywordChallengeIds = [
+    "keyword-pounamu-treasure",
+    "keyword-too-many-results",
+    "keyword-glowworm-mystery",
+    "keyword-fix-the-search",
+    "keyword-hokitika-founded"
+];
+const searchAndFindIds = [
+    "search-find-giant-tree",
+    "search-find-gold-rush-town",
+    "search-find-mountain-bird",
+    "search-find-pancake-rocks"
+];
+assert.deepEqual(Array.from(migrated.activities[1].questions, (question) => question.id), [...keywordChallengeIds, "other-q"],
+    "Keyword Challenge has its five Treasure Hunt missions and keeps existing questions");
+const keywordPounamu = migrated.activities[1].questions[0];
+assert.equal(keywordPounamu.type, "multiple-choice");
+assert.equal(keywordPounamu.heading, "Mission 1: Find the Treasure");
+assert.deepEqual(Array.from(keywordPounamu.options), ["beautiful green rocks", "where to find pounamu West Coast NZ", "New Zealand beaches"]);
+assert.equal(keywordPounamu.images[0].url, "/practical-skills/images/pounamu-arahura-river.jpg");
+assert.equal(fs.existsSync(pounamuImage), true, "Pounamu photo asset exists");
+const keywordBridge = migrated.activities[1].questions[1];
+assert.equal(keywordBridge.heading, "Mission 2: Too Many Results!");
+assert.deepEqual(Array.from(keywordBridge.options), ["bridge", "bridges New Zealand", "Hokitika Gorge swing bridge"]);
+const keywordGlowworm = migrated.activities[1].questions[2];
+assert.equal(keywordGlowworm.heading, "Mission 3 – The Glowworm Mystery");
+assert.deepEqual(Array.from(keywordGlowworm.options), ["Hokitika glowworm photos", "New Zealand glowworm diet", "Hokitika Glow Worm Dell directions"]);
+assert.equal(keywordGlowworm.images[0].url, "/practical-skills/images/new-zealand-glowworm.jpg");
+assert.equal(fs.existsSync(glowwormImage), true, "Glowworm photo asset exists");
+const keywordFixSearch = migrated.activities[1].questions[3];
+assert.equal(keywordFixSearch.heading, "Mission 4: Fix the Search");
+assert.equal(keywordFixSearch.prompt, "Someone typed weather but wants to know whether it will rain in Hokitika tomorrow. Which words should they add?");
+assert.deepEqual(Array.from(keywordFixSearch.options), ["Hokitika tomorrow", "sunshine", "New Zealand"]);
+const keywordChallengeMissionFive = migrated.activities[1].questions[4];
+assert.equal(keywordChallengeMissionFive.type, "short-answer");
+assert.equal(keywordChallengeMissionFive.heading, "Mission 5: Your Turn – Find the Answer!");
+assert.equal(keywordChallengeMissionFive.prompt, "Use a search engine to find out what year Hokitika was founded as a gold-mining settlement. What year did you find?");
+assert.equal(keywordChallengeMissionFive.lines, 1);
+assert.equal(migrated._contentMigrations.searchKeywordChallenge, 16, "Keyword Challenge migration is recorded");
+
+const searchFindMissionOne = migrated.activities[3].questions[0];
+assert.equal(searchFindMissionOne.id, "search-find-giant-tree");
+assert.equal(searchFindMissionOne.type, "short-answer");
+assert.equal(searchFindMissionOne.heading, "Mission 1 – The Giant Tree");
+assert.equal(searchFindMissionOne.prompt, "One of New Zealand's tallest native tree species grows in West Coast forests. What is the name of this tree?");
+assert.equal(searchFindMissionOne.lines, 1);
+assert.equal(searchFindMissionOne.hint, "Search for New Zealand's tallest native tree species");
+assert.equal(searchFindMissionOne.images[0].url, "/practical-skills/images/west-coast-tall-tree.jpg");
+assert.equal(searchFindMissionOne.images[0].attribution, "Geoff McKay");
+assert.equal(searchFindMissionOne.images[0].license, "CC BY 2.0");
+assert.equal(searchFindMissionOne.images[0].sourceUrl, "https://commons.wikimedia.org/wiki/File:Standing_Straight_And_Tall_-_Kahikatea_(51236257730)_(cropped).jpg");
+assert.equal(searchFindMissionOne.images[0].licenseUrl, "https://creativecommons.org/licenses/by/2.0/");
+assert.equal(searchFindMissionOne.images[0].caption.includes("Kahikatea"), false, "Tree image caption does not reveal the species name");
+assert.equal(searchFindMissionOne.images[0].alt.toLowerCase().includes("kahikatea"), false, "Tree image alt text does not reveal the species name");
+assert.equal(Object.hasOwn(searchFindMissionOne, "correctAnswer"), false, "Search and Find answer is not exposed in student content");
+assert.equal(fs.existsSync(treeImage), true, "West Coast tree photo asset exists");
+const searchFindMissionTwo = migrated.activities[3].questions[1];
+assert.equal(searchFindMissionTwo.id, "search-find-gold-rush-town");
+assert.equal(searchFindMissionTwo.heading, "Mission 2 – The Gold Rush Town");
+assert.equal(searchFindMissionTwo.prompt, "Approximately 25 km south of Hokitika is a small town famous for its gold-mining history. What is the name of this town?");
+assert.equal(searchFindMissionTwo.hint, "Search for a historic gold-mining town south of Hokitika.");
+const searchFindMissionThree = migrated.activities[3].questions[2];
+assert.equal(searchFindMissionThree.id, "search-find-mountain-bird");
+assert.equal(searchFindMissionThree.heading, "Mission 3 – The Mountain Bird");
+assert.equal(searchFindMissionThree.prompt, "A large species of kiwi lives in the forests and mountains of the West Coast. What is the Māori name of the great spotted kiwi?");
+assert.equal(searchFindMissionThree.hint, "Search for the great spotted kiwi's Māori name.");
+assert.equal(searchFindMissionThree.images[0].url, "/practical-skills/images/west-coast-mountain-bird.jpg");
+assert.equal(searchFindMissionThree.images[0].attribution, "J Brew");
+assert.equal(searchFindMissionThree.images[0].license, "CC BY-SA 2.0");
+assert.equal(fs.existsSync(mountainBirdImage), true, "Mountain Bird photo asset exists");
+const searchFindMissionFour = migrated.activities[3].questions[3];
+assert.equal(searchFindMissionFour.id, "search-find-pancake-rocks");
+assert.equal(searchFindMissionFour.heading, "Mission 4 – The Famous Rock Formation");
+assert.equal(searchFindMissionFour.prompt, "Near Punakaiki, there are famous rocks that look like stacks of pancakes. What type of rock are the Pancake Rocks made from?");
+assert.equal(searchFindMissionFour.hint, "Search for what the Punakaiki Pancake Rocks are made of.");
+assert.equal(searchFindMissionFour.images[0].url, "/practical-skills/images/punakaiki-pancake-rocks.jpg");
+assert.equal(searchFindMissionFour.images[0].attribution, "W. Bulach");
+assert.equal(searchFindMissionFour.images[0].license, "CC BY-SA 4.0");
+
+// Saved content previously overwritten by the misplaced Mystery Trail migrations (versions 10-15).
+const overwrittenKit = JSON.parse(JSON.stringify(migrated));
+overwrittenKit._contentMigrations.searchKeywordChallenge = 15;
+const misplacedMysteryQuestions = [
+    { ...searchFindMissionOne, id: "keyword-west-coast-tree" },
+    { ...keywordBridge },
+    { ...searchFindMissionThree, id: "keyword-mountain-bird" },
+    { ...searchFindMissionFour, id: "keyword-pancake-rocks" },
+    { ...keywordChallengeMissionFive }
+];
+overwrittenKit.activities[1] = {
+    ...overwrittenKit.activities[1],
+    information: mysteryTrailIntroduction,
+    questions: misplacedMysteryQuestions
+};
+overwrittenKit.activities[3] = {
+    title: "Search and Find!",
+    information: mysteryTrailIntroduction,
+    questionAutoMarkAssessmentId: "search-keyword-challenge-v1",
+    questions: [
+        { ...searchFindMissionOne, id: "keyword-west-coast-tree" },
+        { ...searchFindMissionTwo, id: "keyword-gold-rush-town" },
+        { ...searchFindMissionThree, id: "keyword-mountain-bird" },
+        { ...searchFindMissionFour, id: "keyword-pancake-rocks" },
+        { ...keywordChallengeMissionFive },
+        { id: "teacher-search-question", type: "short-answer", prompt: "Teacher question" }
+    ]
+};
+const restoredKit = context.addSearchKitPenguinMission(overwrittenKit);
+assert.deepEqual(JSON.parse(JSON.stringify(restoredKit.activities[1].information)), treasureHuntIntroduction,
+    "Overwritten Keyword Challenge gets its Treasure Hunt introduction back");
+assert.deepEqual(Array.from(restoredKit.activities[1].questions, (question) => question.id), keywordChallengeIds,
+    "Overwritten Keyword Challenge gets its original five missions back in order");
+assert.equal(restoredKit.activities[1].questions[0].heading, "Mission 1: Find the Treasure");
+assert.equal(restoredKit.activities[1].questions[2].heading, "Mission 3 – The Glowworm Mystery");
+assert.equal(restoredKit.activities[1].questions[3].heading, "Mission 4: Fix the Search");
+assert.equal(restoredKit.activities[1].questionAutoMarkAssessmentId, "search-keyword-challenge-v1");
+assert.deepEqual(JSON.parse(JSON.stringify(restoredKit.activities[3].information)), mysteryTrailIntroduction);
+assert.deepEqual(Array.from(restoredKit.activities[3].questions, (question) => question.id),
+    [...searchAndFindIds, "teacher-search-question"],
+    "Search and Find keeps only its own missions plus teacher-added questions");
+assert.equal(restoredKit.activities[3].questionAutoMarkAssessmentId, "search-and-find-v1",
+    "Search and Find is graded separately from the Keyword Challenge");
+assert.equal(restoredKit._contentMigrations.searchKeywordChallenge, 16);
+assert.equal(context.addSearchKitKeywordChallenge(restoredKit), restoredKit, "Restoration runs once");
+
+const teacherEditedKeywordChallenge = JSON.parse(JSON.stringify(overwrittenKit));
+teacherEditedKeywordChallenge.activities[1].information = { title: "Teacher-edited title", paragraphs: ["Teacher-edited introduction"] };
+const preservedTeacherIntro = context.addSearchKitKeywordChallenge(teacherEditedKeywordChallenge);
+assert.deepEqual(JSON.parse(JSON.stringify(preservedTeacherIntro.activities[1].information)), {
+    title: "Teacher-edited title",
+    paragraphs: ["Teacher-edited introduction"]
+}, "Restoration preserves a teacher-edited Keyword Challenge introduction");
+
+const savedKitMissingSearchAndFind = JSON.parse(JSON.stringify(overwrittenKit));
+savedKitMissingSearchAndFind.activities.splice(3, 1);
+const repairedSearchAndFind = context.addSearchKitPenguinMission(savedKitMissingSearchAndFind);
+assert.equal(repairedSearchAndFind.activities[3].title, "Search and Find!", "A saved kit missing its Search and Find activity is repaired");
+assert.deepEqual(Array.from(repairedSearchAndFind.activities[3].questions, (question) => question.id), searchAndFindIds);
+assert.deepEqual(JSON.parse(JSON.stringify(repairedSearchAndFind.activities[3].information)), mysteryTrailIntroduction);
+
 const savedKitMissingKeywordActivity = {
     ...original,
     _contentMigrations: { searchPenguinMission: 11, searchKeywordChallenge: 1 },
@@ -546,13 +503,9 @@ const savedKitMissingKeywordActivity = {
 };
 const repairedKeywordKit = context.addSearchKitPenguinMission(savedKitMissingKeywordActivity);
 assert.equal(repairedKeywordKit.activities[1].title, "The Keyword Challenge", "Migration creates the missing activity listed in worksheets");
-assert.equal(repairedKeywordKit.activities[1].information.title, "🔎 THE MISSION: The West Coast Mystery Trail");
-assert.ok(repairedKeywordKit.activities[1].questions.some((question) => question.id === "keyword-west-coast-tree"), "Missing activity is populated with the tree mission");
-assert.ok(repairedKeywordKit.activities[1].questions.some((question) => question.id === "keyword-gold-rush-town"), "Missing activity includes Mission 2");
-assert.ok(repairedKeywordKit.activities[1].questions.some((question) => question.id === "keyword-mountain-bird"), "Missing activity includes Mission 3");
-assert.ok(repairedKeywordKit.activities[1].questions.some((question) => question.id === "keyword-pancake-rocks"), "Missing activity includes Mission 4");
-assert.ok(repairedKeywordKit.activities[1].questions.some((question) => question.id === "keyword-hokitika-founded"), "Missing activity includes Mission 5");
-assert.equal(repairedKeywordKit._contentMigrations.searchKeywordChallenge, 15, "Repair migration is recorded for previously incomplete saved kits");
+assert.deepEqual(JSON.parse(JSON.stringify(repairedKeywordKit.activities[1].information)), treasureHuntIntroduction);
+assert.deepEqual(Array.from(repairedKeywordKit.activities[1].questions, (question) => question.id), keywordChallengeIds);
+assert.equal(repairedKeywordKit._contentMigrations.searchKeywordChallenge, 16, "Repair migration is recorded for previously incomplete saved kits");
 assert.equal(migrated.activities[0].questions.some((question) => question.id === "google-check"), false, "Google-open confirmation is removed");
 assert.equal(migrated.activities[0].questions.some((question) => question.id === "keywords"), true, "Other search-learning questions are retained");
 const penguinQuestion = migrated.activities[0].questions.find((question) => question.id === "search-penguin-name");
@@ -610,10 +563,10 @@ const incorrectGrade = gradeContext.gradeSearchPenguinMissions({ ...correctMissi
 assert.equal(incorrectGrade.passed, false, "An incorrect answer prevents completion");
 assert.equal(incorrectGrade.score, 4);
 const correctKeywordAnswers = {
-    "1-keyword-west-coast-tree": "Kahikatea",
-    "1-keyword-gold-rush-town": "Ross",
-    "1-keyword-mountain-bird": "Roroa",
-    "1-keyword-pancake-rocks": "Limestone",
+    "1-keyword-pounamu-treasure": "where to find pounamu West Coast NZ",
+    "1-keyword-too-many-results": "Hokitika Gorge swing bridge",
+    "1-keyword-glowworm-mystery": "New Zealand glowworm diet",
+    "1-keyword-fix-the-search": "Hokitika tomorrow",
     "1-keyword-hokitika-founded": "1864"
 };
 const completeKeywordGrade = gradeContext.gradeSearchKeywordChallenge(correctKeywordAnswers, 1);
@@ -621,24 +574,26 @@ assert.equal(completeKeywordGrade.passed, true, "All five correct Keyword Challe
 assert.equal(completeKeywordGrade.score, 5);
 assert.equal(completeKeywordGrade.total, 5);
 assert.equal(completeKeywordGrade.assessmentId, "search-keyword-challenge-v1");
-assert.equal(completeKeywordGrade.results[0].correct, true, "Kahikatea is accepted for the tree question");
-assert.equal(completeKeywordGrade.results[1].correct, true, "Ross is accepted for the Gold Rush Town question");
-assert.equal(completeKeywordGrade.results[2].correct, true, "Roroa is accepted for the Mountain Bird question");
-assert.equal(completeKeywordGrade.results[3].correct, true, "Limestone is accepted for the Pancake Rocks question");
-assert.equal(gradeContext.gradeSearchKeywordChallenge({
-    ...correctKeywordAnswers,
-    "1-keyword-pancake-rocks": "Sandstone"
-}, 1).passed, false, "Incorrect Pancake Rocks answer prevents completion");
-assert.equal(gradeContext.gradeSearchKeywordChallenge({
-    ...correctKeywordAnswers,
-    "1-keyword-gold-rush-town": "Hokitika"
-}, 1).passed, false, "Incorrect Gold Rush Town answer prevents completion");
 const incorrectKeywordGrade = gradeContext.gradeSearchKeywordChallenge({
     ...correctKeywordAnswers,
-    "1-keyword-hokitika-founded": "1865"
+    "1-keyword-fix-the-search": "sunshine"
 }, 1);
 assert.equal(incorrectKeywordGrade.passed, false, "Incorrect Keyword Challenge answer prevents completion");
 assert.equal(incorrectKeywordGrade.score, 4);
+const correctSearchAndFindAnswers = {
+    "3-search-find-giant-tree": "Kahikatea",
+    "3-search-find-gold-rush-town": "Ross",
+    "3-search-find-mountain-bird": "Roroa",
+    "3-search-find-pancake-rocks": "Limestone"
+};
+const completeSearchAndFindGrade = gradeContext.gradeSearchAndFind(correctSearchAndFindAnswers, 3);
+assert.equal(completeSearchAndFindGrade.passed, true, "All Search and Find answers pass");
+assert.equal(completeSearchAndFindGrade.total, 4);
+assert.equal(completeSearchAndFindGrade.assessmentId, "search-and-find-v1");
+assert.equal(gradeContext.gradeSearchAndFind({ ...correctSearchAndFindAnswers, "3-search-find-pancake-rocks": "Sandstone" }, 3).passed, false,
+    "Incorrect Pancake Rocks answer prevents completion");
+assert.equal(gradeContext.gradeSearchAndFind({ ...correctSearchAndFindAnswers, "3-search-find-gold-rush-town": "Hokitika" }, 3).passed, false,
+    "Incorrect Gold Rush Town answer prevents completion");
 const correctSearchResultsAnswers = {
     "2-search-result-clock-tower": "Hokitika Clock Tower – History and Dimensions",
     "2-search-result-pool-hours": "Hokitika Swimming Pool – Opening Hours and Contact Details",
@@ -735,7 +690,7 @@ renderContext.window.KitWorksheetRender.renderWorksheet(imageHost, {
     bannerTitle: "Search Like a Pro",
     information: { title: "THE MISSION: The Penguin Mystery", paragraphs: ["Can you solve the Penguin Mystery?"] },
     images: [photo],
-    questions: [keywordChallengeQuestion, keywordChallengeMissionTwo, keywordChallengeMissionThree, keywordChallengeMissionFour, keywordChallengeMissionFive, missionTwo, missionThree, missionFour, missionFive]
+    questions: [searchFindMissionOne, searchFindMissionTwo, searchFindMissionThree, searchFindMissionFour, keywordChallengeMissionFive, missionTwo, missionThree, missionFour, missionFive]
 }, { readOnly: true });
 assert.match(imageHost.innerHTML, /Photo: Duncan Wright/);
 assert.match(imageHost.innerHTML, /href="https:\/\/commons\.wikimedia\.org\/wiki\/File:Blue_Penguin_Kapiti\.jpg"/, "Photo credit links to its source");
@@ -743,16 +698,16 @@ assert.match(imageHost.innerHTML, /href="https:\/\/creativecommons\.org\/license
 assert.match(imageHost.innerHTML, /west-coast-tall-tree\.jpg/);
 assert.match(imageHost.innerHTML, /Photo: Geoff McKay/);
 assert.match(imageHost.innerHTML, /Tall native forest trees/);
-assert.match(imageHost.innerHTML, /<textarea[^>]*data-question-id="keyword-west-coast-tree"/,
+assert.match(imageHost.innerHTML, /<textarea[^>]*data-question-id="search-find-giant-tree"/,
     "Giant Tree answer box is rendered");
-assert.match(imageHost.innerHTML, /data-hint-toggle="keyword-west-coast-tree"[^>]*>HINT<\/button>/,
+assert.match(imageHost.innerHTML, /data-hint-toggle="search-find-giant-tree"[^>]*>HINT<\/button>/,
     "Giant Tree HINT button is rendered");
-assert.match(imageHost.innerHTML, /data-question-hint="keyword-west-coast-tree" hidden>Hint: Search for New Zealand&#039;s tallest native tree species<\/p>/,
+assert.match(imageHost.innerHTML, /data-question-hint="search-find-giant-tree" hidden>Hint: Search for New Zealand&#039;s tallest native tree species<\/p>/,
     "Giant Tree hint is initially hidden and shows the requested wording");
 assert.match(renderSource, /querySelectorAll\("\[data-hint-toggle\]"\)\.forEach\(\(button\) => \{\s*button\.addEventListener\("click"/,
     "Hint button reveals its matching hint when clicked");
 const hintButton = {
-    attributes: { "aria-expanded": "false", "data-hint-toggle": "keyword-west-coast-tree" },
+    attributes: { "aria-expanded": "false", "data-hint-toggle": "search-find-giant-tree" },
     listeners: {},
     getAttribute(name) { return this.attributes[name]; },
     setAttribute(name, value) { this.attributes[name] = value; },
@@ -760,7 +715,7 @@ const hintButton = {
 };
 const hintText = {
     hidden: true,
-    getAttribute(name) { return name === "data-question-hint" ? "keyword-west-coast-tree" : null; }
+    getAttribute(name) { return name === "data-question-hint" ? "search-find-giant-tree" : null; }
 };
 const interactiveHintHost = {
     style: { setProperty() {} },
@@ -773,7 +728,7 @@ const interactiveHintHost = {
     querySelector() { return null; }
 };
 renderContext.window.KitWorksheetRender.renderWorksheet(interactiveHintHost, {
-    questions: [keywordChallengeQuestion]
+    questions: [searchFindMissionOne]
 }, { readOnly: false });
 hintButton.listeners.click();
 assert.equal(hintText.hidden, false, "Clicking HINT reveals the hint");
@@ -933,18 +888,18 @@ assert.match(imageHost.innerHTML, /west-coast-tall-tree\.jpg/);
 assert.match(imageHost.innerHTML, /Search for New Zealand&#039;s tallest native tree species/);
 assert.match(imageHost.innerHTML, /Mission 2 – The Gold Rush Town/);
 assert.match(imageHost.innerHTML, /Approximately 25 km south of Hokitika is a small town famous for its gold-mining history/);
-assert.match(imageHost.innerHTML, /data-question-id="keyword-gold-rush-town"/);
-assert.match(imageHost.innerHTML, /data-hint-toggle="keyword-gold-rush-town"[^>]*>HINT<\/button>/);
+assert.match(imageHost.innerHTML, /data-question-id="search-find-gold-rush-town"/);
+assert.match(imageHost.innerHTML, /data-hint-toggle="search-find-gold-rush-town"[^>]*>HINT<\/button>/);
 assert.match(imageHost.innerHTML, /Hint: Search for a historic gold-mining town south of Hokitika\./);
 assert.match(imageHost.innerHTML, /Mission 3 – The Mountain Bird/);
 assert.match(imageHost.innerHTML, /What is the Māori name of the great spotted kiwi\?/);
 assert.match(imageHost.innerHTML, /west-coast-mountain-bird\.jpg/);
-assert.match(imageHost.innerHTML, /data-hint-toggle="keyword-mountain-bird"[^>]*>HINT<\/button>/);
+assert.match(imageHost.innerHTML, /data-hint-toggle="search-find-mountain-bird"[^>]*>HINT<\/button>/);
 assert.match(imageHost.innerHTML, /Hint: Search for the great spotted kiwi&#039;s Māori name\./);
 assert.match(imageHost.innerHTML, /Mission 4 – The Famous Rock Formation/);
 assert.match(imageHost.innerHTML, /What type of rock are the Pancake Rocks made from\?/);
 assert.match(imageHost.innerHTML, /punakaiki-pancake-rocks\.jpg/);
-assert.match(imageHost.innerHTML, /data-hint-toggle="keyword-pancake-rocks"[^>]*>HINT<\/button>/);
+assert.match(imageHost.innerHTML, /data-hint-toggle="search-find-pancake-rocks"[^>]*>HINT<\/button>/);
 assert.match(imageHost.innerHTML, /Hint: Search for what the Punakaiki Pancake Rocks are made of\./);
 assert.match(imageHost.innerHTML, /Mission 5: Your Turn – Find the Answer!/);
 assert.match(imageHost.innerHTML, /What year did you find\?/);
@@ -963,10 +918,10 @@ assert.match(builderSource, /\.\.\.\(state\.content \|\| \{\}\)/, "Kit Builder r
 assert.match(serverSource, /UPDATE practical_skills_kit_content SET content = \$1::jsonb, updated_at = NOW\(\) WHERE kit_id = \$2/, "Migrated mission is persisted for existing saved kits");
 assert.match(serverSource, /if \(safeKitId === "kit-google-search"\) \{\s*const migrated = addSearchKitPenguinMission\(merged\);/, "Migration applies to existing Search Kit content");
 assert.match(serverSource, /if \(content\?\._contentMigrations\?\.searchPenguinMission >= 11\) \{\s*return addSearchResultsDetectiveIntroduction\(addSearchKitKeywordChallenge\(content\)\);\s*\}/, "Saved migration marker preserves existing missions while applying activity introductions");
-assert.match(serverSource, /!\["search-penguin-missions-v1", "search-keyword-challenge-v1", SEARCH_RESULTS_DETECTIVE_ID\]\.includes\(activity\?\.questionAutoMarkAssessmentId\)/, "Search Results Detective auto-marking is accepted by the server");
+assert.match(serverSource, /!\["search-penguin-missions-v1", "search-keyword-challenge-v1", SEARCH_RESULTS_DETECTIVE_ID, SEARCH_AND_FIND_ID\]\.includes\(activity\?\.questionAutoMarkAssessmentId\)/, "Search Results Detective auto-marking is accepted by the server");
 assert.match(serverSource, /activity\.questionAutoMarkAssessmentId === "search-keyword-challenge-v1"[\s\S]{0,100}gradeSearchKeywordChallenge\(req\.body\.answers, activityIndex\)/, "Keyword Challenge answers are graded server-side");
 assert.match(serverSource, /activity\.questionAutoMarkAssessmentId === SEARCH_RESULTS_DETECTIVE_ID[\s\S]{0,100}gradeSearchResultsDetective\(req\.body\.answers, activityIndex\)/, "Search Results Detective answers are graded server-side");
-assert.match(serverSource, /grade\.assessmentId === "search-penguin-missions-v1" \|\|\s*grade\.assessmentId === "search-keyword-challenge-v1" \|\|\s*grade\.assessmentId === SEARCH_RESULTS_DETECTIVE_ID/, "Search Results Detective answers are merged into saved question responses");
+assert.match(serverSource, /grade\.assessmentId === "search-penguin-missions-v1" \|\|\s*grade\.assessmentId === "search-keyword-challenge-v1" \|\|\s*grade\.assessmentId === SEARCH_RESULTS_DETECTIVE_ID \|\|\s*grade\.assessmentId === SEARCH_AND_FIND_ID/, "Search Results Detective answers are merged into saved question responses");
 assert.match(serverSource, /if \(req\.body\.completed && \(activity\?\.assessmentId \|\| activity\?\.identityLessonVersion \|\|\s*activity\?\.questionAutoMarkAssessmentId \|\| siteQuestions\)\)/, "Manual completion cannot bypass Search Kit auto-marking");
 assert.match(worksheetSource, /function scheduleSearchActivityAutoMark\(activityIndex, assessmentId\)/, "Student worksheet automatically checks complete self-marked activity answers");
 assert.match(worksheetSource, /scheduleSearchActivityAutoMark\(activityIndex, activity\.questionAutoMarkAssessmentId\)/, "Answer changes trigger automatic marking");
@@ -978,8 +933,10 @@ assert.match(worksheetSource, /Nice investigating! This result matches what you 
     "A matching choice receives positive feedback");
 assert.match(worksheetSource, /questionId\.endsWith\("-search-result-doc-track"\)[\s\S]*You found it! The Hokitika River flows through Hokitika Gorge\. Great searching!/,
     "A correct Mission 5 answer receives feedback specific to finding the river");
-assert.match(worksheetSource, /if \(\["search-penguin-missions-v1", "search-keyword-challenge-v1", "search-results-detective-v1"\]\.includes\(activity\?\.questionAutoMarkAssessmentId\)\) \{\s*scheduleSearchActivityAutoMark\(activityIndex, activity\.questionAutoMarkAssessmentId\);/, "Previously saved complete answers are auto-marked when the activity opens");
-assert.match(worksheetSource, /"search-keyword-challenge-v1"[\s\S]*"keyword-west-coast-tree"[\s\S]*"keyword-gold-rush-town"[\s\S]*"keyword-mountain-bird"[\s\S]*"keyword-pancake-rocks"[\s\S]*"keyword-hokitika-founded"/, "Mystery Trail auto-marking waits for all five mission answers");
+assert.match(worksheetSource, /if \(\["search-penguin-missions-v1", "search-keyword-challenge-v1", "search-results-detective-v1", "search-and-find-v1"\]\.includes\(activity\?\.questionAutoMarkAssessmentId\)\) \{\s*scheduleSearchActivityAutoMark\(activityIndex, activity\.questionAutoMarkAssessmentId\);/, "Previously saved complete answers are auto-marked when the activity opens");
+assert.match(worksheetSource, /"search-keyword-challenge-v1"[\s\S]*"keyword-pounamu-treasure"[\s\S]*"keyword-too-many-results"[\s\S]*"keyword-glowworm-mystery"[\s\S]*"keyword-fix-the-search"[\s\S]*"keyword-hokitika-founded"/, "Keyword Challenge auto-marking waits for its five mission answers");
+assert.match(worksheetSource, /"search-and-find-v1"[\s\S]*"search-find-giant-tree"[\s\S]*"search-find-gold-rush-town"[\s\S]*"search-find-mountain-bird"[\s\S]*"search-find-pancake-rocks"/, "Search and Find auto-marking waits for its own mission answers");
+assert.match(serverSource, /activity\.questionAutoMarkAssessmentId === SEARCH_AND_FIND_ID[\s\S]{0,100}gradeSearchAndFind\(req\.body\.answers, activityIndex\)/, "Search and Find answers are graded server-side");
 assert.match(worksheetSource, /"search-results-detective-v1"[\s\S]*"search-result-clock-tower"[\s\S]*"search-result-doc-track"/, "Search Results Detective auto-marking waits for all five mission answers");
 assert.match(worksheetSource, /You found a useful result for every mission\. Your activity tick is saved\./,
     "Self-marking celebrates finding a useful result for every mission");
