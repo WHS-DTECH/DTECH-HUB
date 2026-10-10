@@ -4412,7 +4412,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function addSearchKitPenguinMission(content) {
-  if (content?._contentMigrations?.searchPenguinMission >= 6) return content;
+  if (content?._contentMigrations?.searchPenguinMission >= 7) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets.slice() : [];
   if (!worksheets[0]) worksheets[0] = { number: 1, activity: "Search Like a Pro", establishes: "Understands search engines and keywords" };
@@ -4522,14 +4522,20 @@ function addSearchKitPenguinMission(content) {
     });
   }
 
+  const penguinQuestion = questions.find((question) => question.id === "search-penguin-name");
+  penguinQuestion.prompt = `Mission 1: ${String(penguinQuestion.prompt || "").replace(/^Mission 1:\s*/i, "")}`;
+
   activities[0] = {
     ...activity,
     questions,
     images,
     information: {
-      title: "Mission 1: The Penguin Mystery",
+      title: "THE MISSION: The Penguin Mystery",
       paragraphs: [
-        "Use a search engine of your choice to find another name for New Zealand's little blue penguin. Google is one example; Bing or another search engine is fine."
+        "Did you know that the world's smallest penguin lives right here on the West Coast of the South Island?",
+        "Your mission is to investigate the Little Blue Penguin and discover more about its life on our coastline.",
+        "Use a search engine of your choice to find the answers to the questions below. Google, Bing or another search engine will do!",
+        "Can you solve the Penguin Mystery?"
       ]
     }
   };
@@ -4540,7 +4546,7 @@ function addSearchKitPenguinMission(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchPenguinMission: 6
+      searchPenguinMission: 7
     }
   };
 }
