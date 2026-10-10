@@ -142,7 +142,7 @@
     }
 
     function createDefaultWorksheet(number) {
-        return { number, activity: "", establishes: "" };
+        return { number, activity: "", establishes: "", interactiveElement: "" };
     }
 
     function renderWorksheetList() {
@@ -155,9 +155,11 @@
                 <td data-label="Number"><input type="number" class="kit-worksheet-number" data-index="${index}" min="1" value="${Number(worksheet.number) || index + 1}"></td>
                 <td data-label="Activity"><input type="text" class="kit-worksheet-activity" data-index="${index}" value="${worksheet.activity || ""}">${worksheet.mergedInto !== undefined ? `<p>Combined into activity ${worksheet.mergedInto + 1} in the student menu; retained for saved progress.</p>` : ""}</td>
                 <td data-label="What it establishes"><input type="text" class="kit-worksheet-establishes" data-index="${index}" value="${worksheet.establishes || ""}"></td>
+                <td data-label="Interactive element"><input type="text" class="kit-worksheet-interactive-element" data-index="${index}"></td>
                 <td data-label="Details"><a class="button button-primary" href="/practical-skills/admin-kit-activity.html?kit=${encodeURIComponent(state.kitId)}&activity=${index}">Activity Details</a></td>
                 <td data-label="Remove"><button type="button" class="button button-secondary kit-remove-worksheet" data-index="${index}">Remove</button></td>
             `;
+            row.querySelector(".kit-worksheet-interactive-element").value = worksheet.interactiveElement || "";
             row.querySelector(".kit-remove-worksheet").setAttribute("aria-label", `Remove ${worksheet.activity || `Activity ${index + 1}`}`);
             worksheetListHost.appendChild(row);
         });
@@ -197,7 +199,8 @@
                 ...worksheets[index],
                 number: Math.max(1, Number.parseInt(row.querySelector(".kit-worksheet-number")?.value, 10) || index + 1),
                 activity: row.querySelector(".kit-worksheet-activity")?.value || "",
-                establishes: row.querySelector(".kit-worksheet-establishes")?.value || ""
+                establishes: row.querySelector(".kit-worksheet-establishes")?.value || "",
+                interactiveElement: row.querySelector(".kit-worksheet-interactive-element")?.value || ""
             };
         });
 

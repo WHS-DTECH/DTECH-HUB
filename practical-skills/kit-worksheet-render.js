@@ -813,6 +813,7 @@
                             const activity = activities[index] || {};
                             const title = activity.title || worksheet.activity || `Activity ${index + 1}`;
                             const establishes = activity.establishes || worksheet.establishes || "";
+                            const interactiveElement = worksheet.interactiveElement || "";
                             const href = `./kit-worksheet.html?kit=${encodeURIComponent(options.kitId || "")}&activity=${index}`;
                             const completed = Boolean(completedActivities[index]);
                             return `
@@ -821,6 +822,7 @@
                                     <div class="worksheet-activity-copy">
                                         <h3>${escapeHtml(title)}</h3>
                                         ${establishes ? `<p>${escapeHtml(establishes)}</p>` : ""}
+                                        ${interactiveElement ? `<p class="worksheet-activity-interactive"><strong>Interactive element:</strong> ${escapeHtml(interactiveElement)}</p>` : ""}
                                     </div>
                                     <a class="worksheet-activity-link" href="${escapeHtml(href)}">Open Activity</a>
                                 </li>

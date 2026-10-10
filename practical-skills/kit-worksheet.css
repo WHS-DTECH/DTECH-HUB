@@ -267,6 +267,10 @@ body.kit-worksheet-page {
     font-size: 0.88rem;
 }
 
+.worksheet-activity-copy .worksheet-activity-interactive {
+    color: #173858;
+}
+
 .worksheet-activity-link {
     display: inline-flex;
     align-items: center;

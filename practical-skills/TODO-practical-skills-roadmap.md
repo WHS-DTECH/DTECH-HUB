@@ -37,6 +37,8 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
 - Implemented: the Kit Worksheets editor lets teachers hide and restore
   worksheets, preserving their details, activity indexes and student progress.
   Hidden worksheets do not appear to students or count toward kit completion.
+- Implemented: the Kit Worksheets editor includes a saved Interactive element
+  field after What it establishes; student activity cards display this detail.
 - Implemented: the Kit Worksheets editor displays a teacher suggestion to
   structure the first activities as foundational skills, middle activities as
   applied skills, and final activities as integrated challenges.

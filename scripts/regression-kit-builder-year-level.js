@@ -8,6 +8,7 @@ const html = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "adm
 const source = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "admin-kits.js"), "utf8");
 assert.match(source, /Kit content saved and its Licence Library card updated\./, "Kit Builder confirms the library card was synced");
 const activityHtml = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "admin-kit-activity.html"), "utf8");
+const renderSource = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "kit-worksheet-render.js"), "utf8");
 assert.match(html, /#kit-add-worksheet\s*\{[^}]*background:\s*#173858;[^}]*color:\s*#ffffff;/s, "Add Worksheet button has high-contrast colors");
 assert.match(html, /#kit-add-worksheet:focus-visible\s*\{/);
 assert.match(html, /<h2>Kit Worksheets<\/h2>\s*<p class="kit-worksheet-suggestion"><strong>Teacher suggestion:<\/strong> Use the first activities as foundational skills, the middle activities as applied skills, and the final activities as integrated challenges\.<\/p>/, "Teacher suggestion supports kits of different lengths");
@@ -17,6 +18,26 @@ assert.doesNotMatch(html, /id="kit-banner-title"/, "Kit Name replaces the separa
 assert.doesNotMatch(html, /maxlength=/i, "Kit Builder fields have no browser character limits");
 assert.doesNotMatch(activityHtml, /maxlength=/i, "Worksheet topic/detail fields have no browser character limits");
 assert.doesNotMatch(source, /maxlength=/i, "Dynamically rendered worksheet fields have no browser character limits");
+assert.match(html, /<th scope="col">What it establishes<\/th>\s*<th scope="col">Interactive element<\/th>/, "Interactive element column follows What it establishes");
+assert.match(source, /class="kit-worksheet-interactive-element"/, "Kit Builder renders the interactive element field");
+assert.match(source, /interactiveElement:\s*row\.querySelector\("\.kit-worksheet-interactive-element"\)\?\.value\s*\|\|\s*""/, "Interactive element is included when saving worksheets");
+assert.match(source, /row\.querySelector\("\.kit-worksheet-interactive-element"\)\.value = worksheet\.interactiveElement \|\| ""/, "Saved interactive element is restored when loading worksheets");
+assert.match(renderSource, /worksheet\.interactiveElement/, "Student activity list reads the interactive element field");
+assert.match(renderSource, /Interactive element:<\/strong>/, "Student activity list labels the interactive element");
+const overviewStart = renderSource.indexOf("    function renderKitOverview(host, content, options = {}) {");
+const overviewEnd = renderSource.indexOf("\n    window.KitWorksheetRender =", overviewStart);
+assert.ok(overviewStart >= 0 && overviewEnd > overviewStart, "Kit overview renderer is available");
+const overviewContext = vm.createContext({
+    escapeHtml: (value) => String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"),
+    encodeURIComponent
+});
+vm.runInContext(renderSource.slice(overviewStart, overviewEnd), overviewContext);
+const overviewHost = { style: { setProperty() {} }, innerHTML: "" };
+overviewContext.renderKitOverview(overviewHost, {
+    bannerTitle: "Test Kit",
+    worksheets: [{ activity: "Test activity", interactiveElement: "<drag-and-drop>" }]
+}, { kitId: "test-kit" });
+assert.match(overviewHost.innerHTML, /Interactive element:<\/strong> &lt;drag-and-drop&gt;/, "Student overview displays interactive elements as escaped text");
 const start = source.indexOf("    function setYearLevelSelection(value) {");
 const end = source.indexOf("\n    function queuePreviewUpdate()", start);
 assert.ok(start >= 0 && end > start, "Year Level selection helper is present");
