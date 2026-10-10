@@ -15,6 +15,7 @@
         actionsWired: false,
         signInWatcherId: 0,
         saveTimerId: 0,
+        searchAutoMarkTimerId: 0,
         driveSetup: null,
         huntProfile: null,
         certificate: null,
@@ -151,7 +152,8 @@
         const completed = Boolean(state.completedActivities[index]);
         const activity = state.content?.activities?.[index];
         const siteQuestions = window.KitWorksheetRender.visibleLoginSites(activity?.loginSites, state.huntProfile).some((site) => site.readinessQuestion);
-        const selfMarking = Boolean(activity?.assessment || activity?.identityLessonVersion || siteQuestions);
+        const selfMarking = Boolean(activity?.assessment || activity?.identityLessonVersion ||
+            activity?.questionAutoMarkAssessmentId || siteQuestions);
         pill.textContent = completed ? "Completed" : "Not Completed";
         pill.classList.toggle("is-complete", completed);
         if (completed) {
@@ -202,6 +204,39 @@
                 showStatusMessage("Could not save your answers. Check your connection and try again.", true);
             });
         }, RESPONSE_SAVE_DEBOUNCE_MS);
+    }
+
+    function scheduleSearchActivityAutoMark(activityIndex) {
+        if (!state.email || !state.progressLoaded || state.completedActivities[activityIndex]) return;
+        const questionIds = [
+            "search-penguin-name",
+            "search-korora-food-search",
+            "search-tallest-mountain",
+            "search-penguin-location",
+            "search-penguin-safety"
+        ];
+        if (questionIds.some((id) => !String(state.responses[id] || "").trim())) return;
+
+        window.clearTimeout(state.searchAutoMarkTimerId);
+        state.searchAutoMarkTimerId = window.setTimeout(() => {
+            window.clearTimeout(state.saveTimerId);
+            const answers = Object.fromEntries(questionIds.map((id) => [id, state.responses[id]]));
+            queueProgressWrite(async () => {
+                await saveResponses(state.kitId, state.responses);
+                const grade = await loadJson(`/api/practical-skills/progress/${encodeURIComponent(state.kitId)}/activities/${activityIndex}/check`, {
+                    method: "POST",
+                    headers: withAuthHeaders({ "Content-Type": "application/json" }),
+                    body: JSON.stringify({ answers })
+                });
+                state.completedActivities = grade.completedActivities;
+                updateActivityCompleteBar();
+                showStatusMessage(grade.passed
+                    ? "Ka pai! All five answers are correct. Your activity completion tick is saved."
+                    : `${grade.score} / ${grade.total} answers correct so far. Keep investigating and update your answers.`);
+            }).catch((error) => {
+                showStatusMessage(error?.message || "Could not check and save your answers. Please try again.", true);
+            });
+        }, 400);
     }
 
     function updateCompleteBar(kitSnapshot) {
@@ -293,6 +328,7 @@
                 bannerSubtitle: worksheet.establishes || activity?.establishes || "",
                 questions,
                 images,
+                questionAutoMarkAssessmentId: activity?.questionAutoMarkAssessmentId,
                 information: activity?.information,
                 loginSites: activity?.loginSites,
                 identityLessonVersion: activity?.identityLessonVersion,
@@ -373,8 +409,14 @@
                 onResponseChange: (questionId, value) => {
                     state.responses[questionId] = value;
                     queueResponseSave();
+                    if (activity?.questionAutoMarkAssessmentId === "search-penguin-missions-v1") {
+                        scheduleSearchActivityAutoMark(activityIndex);
+                    }
                 }
             });
+            if (activity?.questionAutoMarkAssessmentId === "search-penguin-missions-v1") {
+                scheduleSearchActivityAutoMark(activityIndex);
+            }
             if (verification && activityContent.identityLessonVersion) {
                 host.querySelector("#identity-result").before(verification);
             }

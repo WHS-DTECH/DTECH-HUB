@@ -9,6 +9,38 @@ const { PASSWORD_PROBLEMS_ID, APPS_WORDSEARCH_ID, withShortLoginKit, withLoginAp
 const { LEARNING_SITES_ID, getHuntProfile, gradeLearningSites } = require("./learning-sites-assessment");
 const { gradeLoginSites } = require("./practical-skills-assessment");
 const { validateLoginSites, publicLoginSites, visibleLoginSites } = require("./login-sites-config");
+
+const SEARCH_PENGUIN_MISSIONS_ID = "search-penguin-missions-v1";
+
+function gradeSearchPenguinMissions(answers) {
+  const normalized = (value) => String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  const acceptedAnswers = {
+    "search-penguin-name": ["korora", "little blue penguin", "little penguin", "fairy penguin", "blue penguin"],
+    "search-korora-food-search": ["korora food"],
+    "search-tallest-mountain": ["aoraki mount cook"],
+    "search-penguin-location": ["hokitika beach"],
+    "search-penguin-safety": ["uncontrolled dogs"]
+  };
+  const results = Object.entries(acceptedAnswers).map(([id, accepted]) => {
+    const response = normalized(answers[id]);
+    const correct = Boolean(response) && accepted.includes(response);
+    return { id, correct, explanation: correct ? "Answer saved." : "Search again, then update your answer." };
+  });
+  const score = results.filter((result) => result.correct).length;
+  return {
+    assessmentId: SEARCH_PENGUIN_MISSIONS_ID,
+    passed: score === results.length,
+    score,
+    total: results.length,
+    answers,
+    results
+  };
+}
 const { visibleActivityIndexes, allActivitiesComplete, buildKitCertificate, createKitCertificatePdf } = require("./practical-skills-certificate");
 
 let OAuth2Client = null;
@@ -4412,7 +4444,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function addSearchKitPenguinMission(content) {
-  if (content?._contentMigrations?.searchPenguinMission >= 10) return content;
+  if (content?._contentMigrations?.searchPenguinMission >= 11) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets.slice() : [];
   if (!worksheets[0]) worksheets[0] = { number: 1, activity: "Search Like a Pro", establishes: "Uses a search engine to discover information" };
@@ -4558,6 +4590,7 @@ function addSearchKitPenguinMission(content) {
     ...activity,
     questions,
     images,
+    questionAutoMarkAssessmentId: "search-penguin-missions-v1",
     information: {
       title: "THE MISSION: The Penguin Mystery",
       paragraphs: [
@@ -4575,7 +4608,7 @@ function addSearchKitPenguinMission(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchPenguinMission: 10
+      searchPenguinMission: 11
     }
   };
 }
@@ -4777,6 +4810,7 @@ async function savePracticalSkillsAssessment(studentEmail, kitId, activityIndex,
   const activityKey = String(activityIndex);
   const responseKey = `${activityIndex}-${grade.assessmentId || PASSWORD_PROBLEMS_ID}`;
   const mergeSiteAnswers = grade.assessmentId === "login-sites-readiness-v1";
+  const mergeQuestionAnswers = grade.assessmentId === "search-penguin-missions-v1";
   const completedAt = new Date().toISOString();
 
   if (!hasDatabase) {
@@ -4784,7 +4818,7 @@ async function savePracticalSkillsAssessment(studentEmail, kitId, activityIndex,
     const existing = memoryPracticalSkillsProgress.get(key);
     const next = {
       ...existing,
-      responses: grade.identityLesson ? { ...existing.responses, ...grade.answers } : {
+      responses: grade.identityLesson || mergeQuestionAnswers ? { ...existing.responses, ...grade.answers } : {
         ...existing.responses,
         [responseKey]: mergeSiteAnswers ? { ...existing.responses?.[responseKey], ...grade.answers } : grade.answers
       },
@@ -4800,7 +4834,7 @@ async function savePracticalSkillsAssessment(studentEmail, kitId, activityIndex,
 
   const result = await pool.query(
     `UPDATE practical_skills_progress
-     SET responses = CASE WHEN $8::boolean THEN responses || $2::jsonb
+     SET responses = CASE WHEN $8::boolean OR $10::boolean THEN responses || $2::jsonb
            WHEN $9::boolean THEN jsonb_set(responses, ARRAY[$1::text], COALESCE(responses -> $1::text, '{}'::jsonb) || $2::jsonb)
            ELSE jsonb_set(responses, ARRAY[$1::text], $2::jsonb) END,
          completed_activities = CASE WHEN $5::boolean
@@ -4808,7 +4842,7 @@ async function savePracticalSkillsAssessment(studentEmail, kitId, activityIndex,
            ELSE completed_activities END,
          updated_at = NOW()
      WHERE student_email = $6 AND kit_id = $7 RETURNING *`,
-    [responseKey, JSON.stringify(grade.answers), activityKey, completedAt, grade.passed, email, kitId, Boolean(grade.identityLesson), mergeSiteAnswers]
+    [responseKey, JSON.stringify(grade.answers), activityKey, completedAt, grade.passed, email, kitId, Boolean(grade.identityLesson), mergeSiteAnswers, mergeQuestionAnswers]
   );
   if (!result.rows?.[0]) throw new Error("Activity progress could not be saved.");
   return result.rows[0];
@@ -12925,7 +12959,8 @@ app.put("/api/practical-skills/progress/:kitId/activities/:activityIndex", async
     const activity = content.activities?.[activityIndex];
     const siteQuestions = req.body.completed && activity?.loginSites &&
       visibleLoginSites(activity.loginSites, await getLearningSitesStudentProfile(studentEmail)).some((site) => site.readinessQuestion);
-    if (req.body.completed && (activity?.assessmentId || activity?.identityLessonVersion || siteQuestions)) {
+    if (req.body.completed && (activity?.assessmentId || activity?.identityLessonVersion ||
+        activity?.questionAutoMarkAssessmentId || siteQuestions)) {
       res.status(409).json({ error: "Complete the activity tasks, then check your answers to earn this activity tick." });
       return;
     }
@@ -12982,7 +13017,9 @@ app.post("/api/practical-skills/progress/:kitId/activities/:activityIndex/check"
     const content = await getStoredPracticalSkillsKitContent(kitId);
     const activity = content?.activities?.[activityIndex];
     const identityLesson = Boolean(activity?.identityLessonVersion);
-    if (!content?.worksheets?.[activityIndex] || (!identityLesson && !activity?.loginSites && ![PASSWORD_PROBLEMS_ID, APPS_WORDSEARCH_ID, LEARNING_SITES_ID].includes(activity?.assessmentId))) {
+    if (!content?.worksheets?.[activityIndex] || (!identityLesson && !activity?.loginSites &&
+        activity?.questionAutoMarkAssessmentId !== "search-penguin-missions-v1" &&
+        ![PASSWORD_PROBLEMS_ID, APPS_WORDSEARCH_ID, LEARNING_SITES_ID].includes(activity?.assessmentId))) {
       res.status(404).json({ error: "Unknown self-marking activity." });
       return;
     }
@@ -12994,6 +13031,8 @@ app.post("/api/practical-skills/progress/:kitId/activities/:activityIndex/check"
       ? gradeLoginIdentity(req.body.answers, { ...req.auth_identity, email: studentEmail }, activity.questions || [])
       : activity.loginSites
         ? gradeLoginSites(req.body.answers, visibleLoginSites(activity.loginSites, await getLearningSitesStudentProfile(studentEmail)))
+        : activity.questionAutoMarkAssessmentId === "search-penguin-missions-v1"
+          ? gradeSearchPenguinMissions(req.body.answers)
         : activity.assessmentId === APPS_WORDSEARCH_ID
         ? gradeAppsWordsearch(req.body.answers, Boolean((await getStudentLoginDriveSetup(studentEmail))?.folder_id))
         : activity.assessmentId === LEARNING_SITES_ID
