@@ -1282,6 +1282,22 @@ async function getStudentDirectoryRows() {
   return mergedRows;
 }
 
+async function getStaffDirectoryRows() {
+  if (!hasDatabase) return Array.from(memoryStaffDirectory.values());
+  const tableNames = await resolveExistingTableNames(STAFF_TABLE_CANDIDATES);
+  const rows = [];
+  for (const tableName of tableNames) {
+    const result = await pool.query(`SELECT * FROM ${quoteIdentifier(tableName)}`);
+    rows.push(...(result.rows || []));
+  }
+  return rows;
+}
+
+function collectDirectoryEmails(row, keys) {
+  const lower = buildLowerKeyMap(row);
+  return [...new Set(keys.map((key) => normalizeEmail(lower.get(key))).filter(Boolean))];
+}
+
 function buildLowerKeyMap(row) {
   const map = new Map();
   Object.keys(row || {}).forEach((key) => {

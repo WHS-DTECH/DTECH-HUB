@@ -120,9 +120,13 @@ async function main() {
     assert.equal(sent[0].emailType, "kit_certificate");
     assert.equal((await call("post", "/certificate/email")).code, 429, "Repeated sends are throttled");
     assert.equal((await call("get", "", { auth_identity: { verified: false, givenName: "Spoof" } })).body.certificate.studentName, email);
-    context.getStaffDirectoryRows = async () => [{ email_school: email, first_name: "Vanessa", last_name: "Pringle" }];
+    context.memoryStaffDirectory = new Map([[email, { email_school: email, first_name: "Vanessa", last_name: "Pringle" }]]);
+    context.STAFF_TABLE_CANDIDATES = ["staff_upload", "upload_staff"];
+    context.resolveExistingTableNames = async () => ["staff_upload"];
+    context.quoteIdentifier = (value) => `"${value}"`;
+    vm.runInContext(extract("async function getStaffDirectoryRows(", "function mergeUniqueStrings("), context);
     assert.equal((await call("get", "", { auth_identity: { verified: false, givenName: "Spoof" } })).body.certificate.studentName, "Vanessa Pringle", "Staff directory supplies first and last names without a Google ID token");
-    context.getStaffDirectoryRows = async () => [];
+    context.memoryStaffDirectory.clear();
     context.getStudentDirectoryRows = async () => [{ linked_emails: [email], student_name: "Māia Student" }];
     assert.equal((await call("get", "", { auth_identity: { verified: false } })).body.certificate.studentName, "Māia Student", "Linked student profile supplies the full name");
     assert.equal((await call("get", "", { auth_identity: { verified: true, email: "other@example.school.nz", givenName: "Wrong", familyName: "Account" } })).body.certificate.studentName, "Māia Student", "Mismatched identity cannot replace the school profile name");
@@ -154,6 +158,13 @@ async function main() {
     context.sendConfiguredHubEmail = async (options) => { sent.push(options); };
     assert.equal((await call("post", "/certificate/email")).code, 200, "Failed mail can be retried");
     context.hasDatabase = true;
+    const originalQuery = context.pool.query;
+    context.pool.query = async (sql) => {
+        assert.equal(sql, 'SELECT * FROM "staff_upload"');
+        return { rows: [{ email_school: email, first_name: "Vanessa", last_name: "Pringle" }] };
+    };
+    assert.equal((await context.getStaffDirectoryRows())[0].first_name, "Vanessa", "Real database staff helper is defined and reads the staff table");
+    context.pool.query = originalQuery;
     context.ensurePracticalSkillsProgressRow = async () => ({ student_email: email, kit_id: "kit-login" });
     await context.syncPracticalSkillsKitCompletion(email, "kit-login", content);
     assert.deepEqual(Array.from(queries.at(-1).values[2]), ["0", "1"], "SQL excludes hidden and merged activities");
