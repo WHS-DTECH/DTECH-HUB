@@ -5119,6 +5119,19 @@ function addSearchKitKeywordChallenge(content) {
 }
 
 const GOOGLE_SEARCH_CHALLENGE_INTRODUCTION = {
+  title: "🏆 THE MISSION: My West Coast Discoveries!",
+  paragraphs: [
+    "You've explored some amazing things about the West Coast!",
+    "You've searched for information about wildlife, interesting places, natural wonders and local history.",
+    "Now it's time to bring your discoveries together!",
+    "Your challenge is to create a Google Docs Research Report about three interesting things you've discovered during the Search Kit.",
+    "Your report is already set up for you. Just open it, follow the prompts and add your discoveries.",
+    "Ready to become a West Coast Research Champion?"
+  ]
+};
+
+// Replaced only when it is still unedited, so teacher-written introductions are preserved.
+const PREVIOUS_GOOGLE_SEARCH_CHALLENGE_INTRODUCTION = {
   title: "🏆 THE MISSION: The Great West Coast Adventure!",
   paragraphs: [
     "You've been asked to help a visitor explore the amazing West Coast!",
@@ -5140,7 +5153,7 @@ const GOOGLE_SEARCH_RESEARCH_REPORT = {
 // Only touches the "Google Search Challenge" activity; other Search Kit activities are left as they are.
 function addGoogleSearchChallenge(content) {
   const version = Number(content?._contentMigrations?.googleSearchChallenge) || 0;
-  if (version >= 2) return content;
+  if (version >= 3) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets.slice() : [];
   const challengeIndex = worksheets.findIndex((worksheet) =>
@@ -5157,7 +5170,10 @@ function addGoogleSearchChallenge(content) {
     : { title: worksheets[challengeIndex].activity };
   activities[challengeIndex] = {
     ...challenge,
-    information: version >= 1 || challenge.information?.title ? challenge.information : GOOGLE_SEARCH_CHALLENGE_INTRODUCTION,
+    information: JSON.stringify(challenge.information) === JSON.stringify(PREVIOUS_GOOGLE_SEARCH_CHALLENGE_INTRODUCTION) ||
+      (version < 1 && !challenge.information?.title)
+      ? GOOGLE_SEARCH_CHALLENGE_INTRODUCTION
+      : challenge.information,
     researchReport: challenge.researchReport && typeof challenge.researchReport === "object"
       ? { ...GOOGLE_SEARCH_RESEARCH_REPORT, ...challenge.researchReport }
       : { ...GOOGLE_SEARCH_RESEARCH_REPORT }
@@ -5170,7 +5186,7 @@ function addGoogleSearchChallenge(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      googleSearchChallenge: 2
+      googleSearchChallenge: 3
     }
   };
 }

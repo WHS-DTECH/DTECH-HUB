@@ -498,18 +498,19 @@ delete challengeKit._contentMigrations.googleSearchChallenge;
 challengeKit.worksheets.push({ number: 5, activity: "Google Search Challenge", establishes: "Challenge\tUse Google independently to find information" });
 const challengeMigrated = context.addSearchKitPenguinMission(challengeKit);
 assert.deepEqual(JSON.parse(JSON.stringify(challengeMigrated.activities[4].information)), {
-    title: "🏆 THE MISSION: The Great West Coast Adventure!",
+    title: "🏆 THE MISSION: My West Coast Discoveries!",
     paragraphs: [
-        "You've been asked to help a visitor explore the amazing West Coast!",
-        "They want to see interesting places, discover something unusual and enjoy a great day out.",
-        "Your challenge is to use a search engine to help them plan their adventure.",
-        "There are five missions to complete. You can use any search engine you like.",
-        "Ready to become a West Coast Search Champion?"
+        "You've explored some amazing things about the West Coast!",
+        "You've searched for information about wildlife, interesting places, natural wonders and local history.",
+        "Now it's time to bring your discoveries together!",
+        "Your challenge is to create a Google Docs Research Report about three interesting things you've discovered during the Search Kit.",
+        "Your report is already set up for you. Just open it, follow the prompts and add your discoveries.",
+        "Ready to become a West Coast Research Champion?"
     ]
-}, "Google Search Challenge shows The Great West Coast Adventure introduction");
+}, "Google Search Challenge shows the My West Coast Discoveries introduction");
 assert.equal(challengeMigrated.worksheets[4].establishes, "Use Google independently to find information",
     "Stray 'Challenge' tab text is removed from the activity subtitle");
-assert.equal(challengeMigrated._contentMigrations.googleSearchChallenge, 2);
+assert.equal(challengeMigrated._contentMigrations.googleSearchChallenge, 3);
 assert.deepEqual(JSON.parse(JSON.stringify(challengeMigrated.activities[4].researchReport)), {
     id: "search-research-report-v1",
     fileName: "Search Kit - My West Coast Discoveries",
@@ -529,6 +530,26 @@ const teacherTemplateKit = JSON.parse(JSON.stringify(versionOneChallenge));
 teacherTemplateKit.activities[4].researchReport = { templateId: "https://docs.google.com/document/d/teacherTemplateId1234567890/edit" };
 assert.equal(context.addSearchKitPenguinMission(teacherTemplateKit).activities[4].researchReport.templateId,
     "https://docs.google.com/document/d/teacherTemplateId1234567890/edit", "Teacher template link is preserved");
+const liveVersionTwo = JSON.parse(JSON.stringify(challengeMigrated));
+liveVersionTwo._contentMigrations.googleSearchChallenge = 2;
+liveVersionTwo.activities[4].information = {
+    title: "🏆 THE MISSION: The Great West Coast Adventure!",
+    paragraphs: [
+        "You've been asked to help a visitor explore the amazing West Coast!",
+        "They want to see interesting places, discover something unusual and enjoy a great day out.",
+        "Your challenge is to use a search engine to help them plan their adventure.",
+        "There are five missions to complete. You can use any search engine you like.",
+        "Ready to become a West Coast Search Champion?"
+    ]
+};
+liveVersionTwo.activities[4].researchReport.templateId = "teacherTemplateId1234567890";
+const liveVersionThree = context.addSearchKitPenguinMission(liveVersionTwo);
+assert.equal(liveVersionThree.activities[4].information.title, "🏆 THE MISSION: My West Coast Discoveries!",
+    "Saved Great West Coast Adventure introduction is upgraded");
+assert.equal(liveVersionThree.activities[4].researchReport.templateId, "teacherTemplateId1234567890", "Upgrade keeps the template link");
+assert.deepEqual(JSON.parse(JSON.stringify(liveVersionThree.activities.slice(0, 4))), JSON.parse(JSON.stringify(liveVersionTwo.activities.slice(0, 4))),
+    "Introduction upgrade leaves the first four activities unchanged");
+assert.equal(context.addSearchKitPenguinMission(liveVersionThree), liveVersionThree, "Introduction upgrade runs once");
 assert.deepEqual(JSON.parse(JSON.stringify(challengeMigrated.activities.slice(0, 4))), JSON.parse(JSON.stringify(challengeKit.activities.slice(0, 4))),
     "Adding the Google Search Challenge introduction leaves the first four activities unchanged");
 assert.deepEqual(JSON.parse(JSON.stringify(challengeMigrated.worksheets.slice(0, 4))), JSON.parse(JSON.stringify(challengeKit.worksheets.slice(0, 4))));
