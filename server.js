@@ -87,7 +87,8 @@ function gradeSearchAndFind(answers, activityIndex) {
     "search-find-giant-tree": ["kahikatea"],
     "search-find-gold-rush-town": ["ross"],
     "search-find-mountain-bird": ["roroa"],
-    "search-find-pancake-rocks": ["limestone"]
+    "search-find-pancake-rocks": ["limestone"],
+    "search-find-glacier-mystery": ["ka roimata o hine hukatere", "roimata o hine hukatere"]
   };
   const results = Object.entries(acceptedAnswers).map(([id, accepted]) => {
     const responseId = `${activityIndex}-${id}`;
@@ -4966,6 +4967,34 @@ function searchAndFindQuestions() {
           licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0/"
         }
       ]
+    },
+    {
+      id: "search-find-glacier-mystery",
+      type: "short-answer",
+      heading: "Mission 5 – The Glacier Mystery",
+      prompt: "The West Coast is home to a famous glacier called Franz Josef Glacier. What is its Māori name?",
+      lines: 1,
+      hint: "Search for the Māori name of Franz Josef Glacier.",
+      images: [
+        {
+          url: "/practical-skills/images/franz-josef-glacier-2019.jpg",
+          alt: "People walking along a wide rocky riverbed in the Franz Josef Glacier valley, with bush-covered hills and no ice in view.",
+          caption: "Recently (2019): the glacier valley, where the ice has retreated",
+          attribution: "Pedro Szekely",
+          sourceUrl: "https://commons.wikimedia.org/wiki/File:Franz_Josef_Glacier_2019.jpg",
+          license: "CC BY-SA 2.0",
+          licenseUrl: "https://creativecommons.org/licenses/by-sa/2.0/"
+        },
+        {
+          url: "/practical-skills/images/franz-josef-glacier-1906.jpg",
+          alt: "Black-and-white photo of visitors in long dresses and hats walking across thick glacier ice in the same valley.",
+          caption: "In history (1906): visitors walking on thick glacier ice",
+          attribution: "James Ring, Alexander Turnbull Library",
+          sourceUrl: "https://commons.wikimedia.org/wiki/File:Francis_Joseph_Glacier,_1906.jpg",
+          license: "Public domain",
+          licenseUrl: ""
+        }
+      ]
     }
   ];
 }
@@ -4991,7 +5020,7 @@ function insertMissingDefaultQuestions(questions, defaults) {
 // The West Coast Mystery Trail missions belong to "Search and Find!". Earlier migrations
 // wrongly placed them in "The Keyword Challenge", so this restores both activities.
 function addSearchKitKeywordChallenge(content) {
-  if (content?._contentMigrations?.searchKeywordChallenge >= 16) return content;
+  if (content?._contentMigrations?.searchKeywordChallenge >= 17) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
   const activityIndex = worksheets.findIndex((worksheet) =>
@@ -5053,7 +5082,7 @@ function addSearchKitKeywordChallenge(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchKeywordChallenge: 16
+      searchKeywordChallenge: 17
     }
   };
 }

@@ -275,7 +275,8 @@
                     "search-find-giant-tree",
                     "search-find-gold-rush-town",
                     "search-find-mountain-bird",
-                    "search-find-pancake-rocks"
+                    "search-find-pancake-rocks",
+                    "search-find-glacier-mystery"
                 ]
             : assessmentId === "search-results-detective-v1"
                 ? [

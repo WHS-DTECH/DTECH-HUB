@@ -83,7 +83,7 @@
         const type = String(question?.type || "short-answer");
         const responseValue = responses?.[question.id];
         const images = Array.isArray(question.images) && question.images.length
-            ? `<div class="worksheet-question-images${question.images.length === 1 ? " has-single-image" : ""}">
+            ? `<div class="worksheet-question-images${question.images.length === 1 ? " has-single-image" : question.images.length === 2 ? " has-two-images" : ""}">
                 ${question.images.map((image) => renderWorksheetImage(image, "worksheet-question-image")).join("")}
             </div>`
             : "";

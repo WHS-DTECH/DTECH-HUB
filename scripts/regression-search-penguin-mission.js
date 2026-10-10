@@ -22,6 +22,8 @@ const glowwormImage = path.join(root, "practical-skills", "images", "new-zealand
 const clockTowerImage = path.join(root, "practical-skills", "images", "hokitika-clock-tower.jpg");
 const mountainBirdImage = path.join(root, "practical-skills", "images", "west-coast-mountain-bird.jpg");
 const pancakeRocksImage = path.join(root, "practical-skills", "images", "punakaiki-pancake-rocks.jpg");
+const glacierRecentImage = path.join(root, "practical-skills", "images", "franz-josef-glacier-2019.jpg");
+const glacierHistoryImage = path.join(root, "practical-skills", "images", "franz-josef-glacier-1906.jpg");
 
 const migrationStart = serverSource.indexOf("function addSearchResultsDetectiveIntroduction(content) {");
 const migrationEnd = serverSource.indexOf("\nfunction normalizePracticalSkillsKitContentForStorage(", migrationStart);
@@ -99,7 +101,8 @@ assert.deepEqual(Array.from(migrated.activities[3].questions, (question) => ques
     "search-find-giant-tree",
     "search-find-gold-rush-town",
     "search-find-mountain-bird",
-    "search-find-pancake-rocks"
+    "search-find-pancake-rocks",
+    "search-find-glacier-mystery"
 ], "Search and Find receives its own Mystery Trail missions in order");
 assert.equal(migrated.activities[3].questionAutoMarkAssessmentId, "search-and-find-v1");
 assert.equal(fs.existsSync(pancakeRocksImage), true, "Pancake Rocks photo asset exists");
@@ -367,7 +370,8 @@ const searchAndFindIds = [
     "search-find-giant-tree",
     "search-find-gold-rush-town",
     "search-find-mountain-bird",
-    "search-find-pancake-rocks"
+    "search-find-pancake-rocks",
+    "search-find-glacier-mystery"
 ];
 assert.deepEqual(Array.from(migrated.activities[1].questions, (question) => question.id), [...keywordChallengeIds, "other-q"],
     "Keyword Challenge has its five Treasure Hunt missions and keeps existing questions");
@@ -394,7 +398,7 @@ assert.equal(keywordChallengeMissionFive.type, "short-answer");
 assert.equal(keywordChallengeMissionFive.heading, "Mission 5: Your Turn – Find the Answer!");
 assert.equal(keywordChallengeMissionFive.prompt, "Use a search engine to find out what year Hokitika was founded as a gold-mining settlement. What year did you find?");
 assert.equal(keywordChallengeMissionFive.lines, 1);
-assert.equal(migrated._contentMigrations.searchKeywordChallenge, 16, "Keyword Challenge migration is recorded");
+assert.equal(migrated._contentMigrations.searchKeywordChallenge, 17, "Keyword Challenge migration is recorded");
 
 const searchFindMissionOne = migrated.activities[3].questions[0];
 assert.equal(searchFindMissionOne.id, "search-find-giant-tree");
@@ -434,6 +438,36 @@ assert.equal(searchFindMissionFour.hint, "Search for what the Punakaiki Pancake 
 assert.equal(searchFindMissionFour.images[0].url, "/practical-skills/images/punakaiki-pancake-rocks.jpg");
 assert.equal(searchFindMissionFour.images[0].attribution, "W. Bulach");
 assert.equal(searchFindMissionFour.images[0].license, "CC BY-SA 4.0");
+const searchFindMissionFive = migrated.activities[3].questions[4];
+assert.equal(searchFindMissionFive.id, "search-find-glacier-mystery");
+assert.equal(searchFindMissionFive.type, "short-answer");
+assert.equal(searchFindMissionFive.heading, "Mission 5 – The Glacier Mystery");
+assert.equal(searchFindMissionFive.prompt, "The West Coast is home to a famous glacier called Franz Josef Glacier. What is its Māori name?");
+assert.equal(searchFindMissionFive.hint, "Search for the Māori name of Franz Josef Glacier.");
+assert.deepEqual(Array.from(searchFindMissionFive.images, (image) => image.url), [
+    "/practical-skills/images/franz-josef-glacier-2019.jpg",
+    "/practical-skills/images/franz-josef-glacier-1906.jpg"
+], "Mission 5 shows a recent glacier photo beside a historical one");
+assert.equal(searchFindMissionFive.images[0].license, "CC BY-SA 2.0");
+assert.equal(searchFindMissionFive.images[1].license, "Public domain");
+assert.equal(fs.existsSync(glacierRecentImage), true, "Recent glacier photo asset exists");
+assert.equal(fs.existsSync(glacierHistoryImage), true, "Historical glacier photo asset exists");
+assert.equal(migrated.activities[1].questions.some((question) => question.id === "search-find-glacier-mystery"), false,
+    "Mission 5 is not added to The Keyword Challenge");
+
+// Live content already migrated to version 16 gains Mission 5 without touching the Keyword Challenge.
+const versionSixteenKit = JSON.parse(JSON.stringify(migrated));
+versionSixteenKit._contentMigrations.searchKeywordChallenge = 16;
+versionSixteenKit.activities[3].questions = [
+    ...versionSixteenKit.activities[3].questions.slice(0, 4),
+    { id: "teacher-search-question", type: "short-answer", prompt: "Teacher question" }
+];
+const upgradedKit = context.addSearchKitKeywordChallenge(versionSixteenKit);
+assert.deepEqual(Array.from(upgradedKit.activities[3].questions, (question) => question.id),
+    [...searchAndFindIds, "teacher-search-question"], "Mission 5 is added after Mission 4 on Search and Find!");
+assert.deepEqual(JSON.parse(JSON.stringify(upgradedKit.activities[1])), JSON.parse(JSON.stringify(versionSixteenKit.activities[1])),
+    "Adding Mission 5 leaves The Keyword Challenge unchanged");
+assert.equal(upgradedKit._contentMigrations.searchKeywordChallenge, 17);
 
 // Saved content previously overwritten by the misplaced Mystery Trail migrations (versions 10-15).
 const overwrittenKit = JSON.parse(JSON.stringify(migrated));
@@ -478,7 +512,7 @@ assert.deepEqual(Array.from(restoredKit.activities[3].questions, (question) => q
     "Search and Find keeps only its own missions plus teacher-added questions");
 assert.equal(restoredKit.activities[3].questionAutoMarkAssessmentId, "search-and-find-v1",
     "Search and Find is graded separately from the Keyword Challenge");
-assert.equal(restoredKit._contentMigrations.searchKeywordChallenge, 16);
+assert.equal(restoredKit._contentMigrations.searchKeywordChallenge, 17);
 assert.equal(context.addSearchKitKeywordChallenge(restoredKit), restoredKit, "Restoration runs once");
 
 const teacherEditedKeywordChallenge = JSON.parse(JSON.stringify(overwrittenKit));
@@ -505,7 +539,7 @@ const repairedKeywordKit = context.addSearchKitPenguinMission(savedKitMissingKey
 assert.equal(repairedKeywordKit.activities[1].title, "The Keyword Challenge", "Migration creates the missing activity listed in worksheets");
 assert.deepEqual(JSON.parse(JSON.stringify(repairedKeywordKit.activities[1].information)), treasureHuntIntroduction);
 assert.deepEqual(Array.from(repairedKeywordKit.activities[1].questions, (question) => question.id), keywordChallengeIds);
-assert.equal(repairedKeywordKit._contentMigrations.searchKeywordChallenge, 16, "Repair migration is recorded for previously incomplete saved kits");
+assert.equal(repairedKeywordKit._contentMigrations.searchKeywordChallenge, 17, "Repair migration is recorded for previously incomplete saved kits");
 assert.equal(migrated.activities[0].questions.some((question) => question.id === "google-check"), false, "Google-open confirmation is removed");
 assert.equal(migrated.activities[0].questions.some((question) => question.id === "keywords"), true, "Other search-learning questions are retained");
 const penguinQuestion = migrated.activities[0].questions.find((question) => question.id === "search-penguin-name");
@@ -584,11 +618,18 @@ const correctSearchAndFindAnswers = {
     "3-search-find-giant-tree": "Kahikatea",
     "3-search-find-gold-rush-town": "Ross",
     "3-search-find-mountain-bird": "Roroa",
-    "3-search-find-pancake-rocks": "Limestone"
+    "3-search-find-pancake-rocks": "Limestone",
+    "3-search-find-glacier-mystery": "Kā Roimata o Hine Hukatere"
 };
 const completeSearchAndFindGrade = gradeContext.gradeSearchAndFind(correctSearchAndFindAnswers, 3);
 assert.equal(completeSearchAndFindGrade.passed, true, "All Search and Find answers pass");
-assert.equal(completeSearchAndFindGrade.total, 4);
+assert.equal(completeSearchAndFindGrade.total, 5);
+assert.equal(gradeContext.gradeSearchAndFind({ ...correctSearchAndFindAnswers, "3-search-find-glacier-mystery": "ka roimata o hine hukatere" }, 3).passed, true,
+    "Glacier answer is accepted without the macron");
+assert.equal(gradeContext.gradeSearchAndFind({ ...correctSearchAndFindAnswers, "3-search-find-glacier-mystery": "Roimata o Hine Hukatere" }, 3).passed, true,
+    "Glacier answer is accepted without the leading Kā");
+assert.equal(gradeContext.gradeSearchAndFind({ ...correctSearchAndFindAnswers, "3-search-find-glacier-mystery": "Fox Glacier" }, 3).passed, false,
+    "Incorrect glacier answer prevents completion");
 assert.equal(completeSearchAndFindGrade.assessmentId, "search-and-find-v1");
 assert.equal(gradeContext.gradeSearchAndFind({ ...correctSearchAndFindAnswers, "3-search-find-pancake-rocks": "Sandstone" }, 3).passed, false,
     "Incorrect Pancake Rocks answer prevents completion");
@@ -690,7 +731,7 @@ renderContext.window.KitWorksheetRender.renderWorksheet(imageHost, {
     bannerTitle: "Search Like a Pro",
     information: { title: "THE MISSION: The Penguin Mystery", paragraphs: ["Can you solve the Penguin Mystery?"] },
     images: [photo],
-    questions: [searchFindMissionOne, searchFindMissionTwo, searchFindMissionThree, searchFindMissionFour, keywordChallengeMissionFive, missionTwo, missionThree, missionFour, missionFive]
+    questions: [searchFindMissionOne, searchFindMissionTwo, searchFindMissionThree, searchFindMissionFour, searchFindMissionFive, keywordChallengeMissionFive, missionTwo, missionThree, missionFour, missionFive]
 }, { readOnly: true });
 assert.match(imageHost.innerHTML, /Photo: Duncan Wright/);
 assert.match(imageHost.innerHTML, /href="https:\/\/commons\.wikimedia\.org\/wiki\/File:Blue_Penguin_Kapiti\.jpg"/, "Photo credit links to its source");
@@ -901,6 +942,15 @@ assert.match(imageHost.innerHTML, /What type of rock are the Pancake Rocks made 
 assert.match(imageHost.innerHTML, /punakaiki-pancake-rocks\.jpg/);
 assert.match(imageHost.innerHTML, /data-hint-toggle="search-find-pancake-rocks"[^>]*>HINT<\/button>/);
 assert.match(imageHost.innerHTML, /Hint: Search for what the Punakaiki Pancake Rocks are made of\./);
+assert.match(imageHost.innerHTML, /Mission 5 – The Glacier Mystery/);
+assert.match(imageHost.innerHTML, /What is its Māori name\?/);
+assert.match(imageHost.innerHTML, /class="worksheet-question-images has-two-images">[\s\S]*franz-josef-glacier-2019\.jpg[\s\S]*franz-josef-glacier-1906\.jpg/,
+    "Recent and historical glacier photos render side by side");
+assert.match(imageHost.innerHTML, /Photo: Pedro Szekely/);
+assert.match(imageHost.innerHTML, /Photo: James Ring, Alexander Turnbull Library/);
+assert.match(imageHost.innerHTML, /data-hint-toggle="search-find-glacier-mystery"[^>]*>HINT<\/button>/);
+assert.match(imageHost.innerHTML, /Hint: Search for the Māori name of Franz Josef Glacier\./);
+assert.match(worksheetCss, /\.worksheet-question-images\.has-two-images\s*\{[^}]*grid-template-columns:\s*repeat\(2,/);
 assert.match(imageHost.innerHTML, /Mission 5: Your Turn – Find the Answer!/);
 assert.match(imageHost.innerHTML, /What year did you find\?/);
 assert.match(imageHost.innerHTML, /Find out where Little Blue Penguins can be seen near Hokitika\./);
@@ -935,7 +985,7 @@ assert.match(worksheetSource, /questionId\.endsWith\("-search-result-doc-track"\
     "A correct Mission 5 answer receives feedback specific to finding the river");
 assert.match(worksheetSource, /if \(\["search-penguin-missions-v1", "search-keyword-challenge-v1", "search-results-detective-v1", "search-and-find-v1"\]\.includes\(activity\?\.questionAutoMarkAssessmentId\)\) \{\s*scheduleSearchActivityAutoMark\(activityIndex, activity\.questionAutoMarkAssessmentId\);/, "Previously saved complete answers are auto-marked when the activity opens");
 assert.match(worksheetSource, /"search-keyword-challenge-v1"[\s\S]*"keyword-pounamu-treasure"[\s\S]*"keyword-too-many-results"[\s\S]*"keyword-glowworm-mystery"[\s\S]*"keyword-fix-the-search"[\s\S]*"keyword-hokitika-founded"/, "Keyword Challenge auto-marking waits for its five mission answers");
-assert.match(worksheetSource, /"search-and-find-v1"[\s\S]*"search-find-giant-tree"[\s\S]*"search-find-gold-rush-town"[\s\S]*"search-find-mountain-bird"[\s\S]*"search-find-pancake-rocks"/, "Search and Find auto-marking waits for its own mission answers");
+assert.match(worksheetSource, /"search-and-find-v1"[\s\S]*"search-find-giant-tree"[\s\S]*"search-find-gold-rush-town"[\s\S]*"search-find-mountain-bird"[\s\S]*"search-find-pancake-rocks"[\s\S]*"search-find-glacier-mystery"/, "Search and Find auto-marking waits for its own mission answers");
 assert.match(serverSource, /activity\.questionAutoMarkAssessmentId === SEARCH_AND_FIND_ID[\s\S]{0,100}gradeSearchAndFind\(req\.body\.answers, activityIndex\)/, "Search and Find answers are graded server-side");
 assert.match(worksheetSource, /"search-results-detective-v1"[\s\S]*"search-result-clock-tower"[\s\S]*"search-result-doc-track"/, "Search Results Detective auto-marking waits for all five mission answers");
 assert.match(worksheetSource, /You found a useful result for every mission\. Your activity tick is saved\./,

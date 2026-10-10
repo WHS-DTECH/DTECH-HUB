@@ -439,6 +439,11 @@ body.kit-worksheet-page {
     max-width: 420px;
 }
 
+.worksheet-question-images.has-two-images {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: 720px;
+}
+
 .worksheet-question-image {
     margin: 0;
     min-width: 0;
