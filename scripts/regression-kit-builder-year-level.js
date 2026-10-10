@@ -22,8 +22,7 @@ assert.match(html, /<th scope="col">What it establishes<\/th>\s*<th scope="col">
 assert.match(source, /class="kit-worksheet-interactive-element"/, "Kit Builder renders the interactive element field");
 assert.match(source, /interactiveElement:\s*row\.querySelector\("\.kit-worksheet-interactive-element"\)\?\.value\s*\|\|\s*""/, "Interactive element is included when saving worksheets");
 assert.match(source, /row\.querySelector\("\.kit-worksheet-interactive-element"\)\.value = worksheet\.interactiveElement \|\| ""/, "Saved interactive element is restored when loading worksheets");
-assert.match(renderSource, /worksheet\.interactiveElement/, "Student activity list reads the interactive element field");
-assert.match(renderSource, /Interactive element:<\/strong>/, "Student activity list labels the interactive element");
+assert.doesNotMatch(renderSource, /worksheet\.interactiveElement|Interactive element:/, "Student activity list does not show teacher-only interactive element notes");
 const overviewStart = renderSource.indexOf("    function renderKitOverview(host, content, options = {}) {");
 const overviewEnd = renderSource.indexOf("\n    window.KitWorksheetRender =", overviewStart);
 assert.ok(overviewStart >= 0 && overviewEnd > overviewStart, "Kit overview renderer is available");
@@ -37,7 +36,7 @@ overviewContext.renderKitOverview(overviewHost, {
     bannerTitle: "Test Kit",
     worksheets: [{ activity: "Test activity", interactiveElement: "<drag-and-drop>" }]
 }, { kitId: "test-kit" });
-assert.match(overviewHost.innerHTML, /Interactive element:<\/strong> &lt;drag-and-drop&gt;/, "Student overview displays interactive elements as escaped text");
+assert.doesNotMatch(overviewHost.innerHTML, /Interactive element:|drag-and-drop/, "Student overview omits teacher-only interactive element notes");
 const start = source.indexOf("    function setYearLevelSelection(value) {");
 const end = source.indexOf("\n    function queuePreviewUpdate()", start);
 assert.ok(start >= 0 && end > start, "Year Level selection helper is present");
