@@ -87,7 +87,7 @@ function gradeSearchResultsDetective(answers, activityIndex) {
     "search-result-pool-hours": ["hokitika swimming pool opening hours and contact details"],
     "search-result-wrong-place": ["waimea gorge walking track nelson"],
     "search-result-glowworm-time": ["after dark"],
-    "search-result-doc-track": ["department of conservation doc"]
+    "search-result-doc-track": ["hokitika river"]
   };
   const results = Object.entries(acceptedAnswers).map(([id, accepted]) => {
     const responseId = `${activityIndex}-${id}`;
@@ -105,6 +105,7 @@ function gradeSearchResultsDetective(answers, activityIndex) {
     results
   };
 }
+
 const { visibleActivityIndexes, allActivitiesComplete, buildKitCertificate, createKitCertificatePdf } = require("./practical-skills-certificate");
 
 let OAuth2Client = null;
@@ -4508,7 +4509,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function addSearchResultsDetectiveIntroduction(content) {
-  if (content?._contentMigrations?.searchResultsDetective >= 10) return content;
+  if (content?._contentMigrations?.searchResultsDetective >= 11) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
   const activityIndex = worksheets.findIndex((worksheet) =>
@@ -4650,14 +4651,10 @@ function addSearchResultsDetectiveIntroduction(content) {
   if (!questions.some((question) => question?.id === "search-result-doc-track")) {
     questions.push({
       id: "search-result-doc-track",
-      type: "multiple-choice",
+      type: "short-answer",
       heading: "Mission 5 – Find the Official Information",
-      prompt: "Search for `Hokitika Gorge DOC`. Find and open the Department of Conservation's Hokitika Gorge Walk webpage. Which organisation manages the walking track?",
-      options: [
-        "Department of Conservation (DOC)",
-        "New Zealand Police",
-        "MetService"
-      ],
+      prompt: "Search for `Hokitika Gorge DOC`. Find and open the Department of Conservation's Hokitika Gorge Walk webpage. What is the name of the river that flows through Hokitika Gorge?",
+      lines: 1,
       presentation: "real-search"
     });
   }
@@ -4666,6 +4663,18 @@ function addSearchResultsDetectiveIntroduction(content) {
     if (questionIndex >= 0 && !questions[questionIndex].presentation) {
       questions[questionIndex] = { ...questions[questionIndex], presentation: "real-search" };
     }
+  }
+  const docTrackQuestionIndex = questions.findIndex((question) => question?.id === "search-result-doc-track");
+  if (docTrackQuestionIndex >= 0 &&
+      questions[docTrackQuestionIndex].type === "multiple-choice" &&
+      questions[docTrackQuestionIndex].prompt === "Search for `Hokitika Gorge DOC`. Find and open the Department of Conservation's Hokitika Gorge Walk webpage. Which organisation manages the walking track?") {
+    const { options: _options, ...question } = questions[docTrackQuestionIndex];
+    questions[docTrackQuestionIndex] = {
+      ...question,
+      type: "short-answer",
+      prompt: "Search for `Hokitika Gorge DOC`. Find and open the Department of Conservation's Hokitika Gorge Walk webpage. What is the name of the river that flows through Hokitika Gorge?",
+      lines: 1
+    };
   }
   const resultOrders = {
     "search-result-clock-tower": [
@@ -4757,7 +4766,7 @@ function addSearchResultsDetectiveIntroduction(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchResultsDetective: 10
+      searchResultsDetective: 11
     }
   };
 }
