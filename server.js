@@ -4444,7 +4444,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function addSearchKitKeywordChallenge(content) {
-  if (content?._contentMigrations?.searchKeywordChallenge >= 5) return content;
+  if (content?._contentMigrations?.searchKeywordChallenge >= 6) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
   const activityIndex = worksheets.findIndex((worksheet) =>
@@ -4521,6 +4521,20 @@ function addSearchKitKeywordChallenge(content) {
       ]
     });
   }
+  if (!questions.some((question) => question?.id === "keyword-fix-the-search")) {
+    const missionThreeIndex = questions.findIndex((question) => question?.id === "keyword-glowworm-mystery");
+    questions.splice(missionThreeIndex >= 0 ? missionThreeIndex + 1 : questions.length, 0, {
+      id: "keyword-fix-the-search",
+      type: "multiple-choice",
+      heading: "Mission 4: Fix the Search",
+      prompt: "Someone typed weather but wants to know whether it will rain in Hokitika tomorrow. Which words should they add?",
+      options: [
+        "Hokitika tomorrow",
+        "sunshine",
+        "New Zealand"
+      ]
+    });
+  }
   const information = updateIntroduction ? {
     title: "🔎 THE MISSION: The West Coast Treasure Hunt",
     paragraphs: [
@@ -4541,7 +4555,7 @@ function addSearchKitKeywordChallenge(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchKeywordChallenge: 5
+      searchKeywordChallenge: 6
     }
   };
 }
