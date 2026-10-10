@@ -16,6 +16,7 @@ const penguinImage = path.join(root, "practical-skills", "images", "little-blue-
 const ruapehuImage = path.join(root, "practical-skills", "images", "mount-ruapehu.jpg");
 const aorakiImage = path.join(root, "practical-skills", "images", "aoraki-mount-cook.jpg");
 const taranakiImage = path.join(root, "practical-skills", "images", "mount-taranaki.jpg");
+const pounamuImage = path.join(root, "practical-skills", "images", "pounamu-arahura-river.jpg");
 
 const migrationStart = serverSource.indexOf("function addSearchKitKeywordChallenge(content) {");
 const migrationEnd = serverSource.indexOf("\nfunction normalizePracticalSkillsKitContentForStorage(", migrationStart);
@@ -68,8 +69,35 @@ assert.deepEqual(Array.from(migrated.activities[1].information.paragraphs), [
     "Sometimes your first search won't give you what you need. That's when clever searchers change their keywords!",
     "Can you solve all five clues?"
 ]);
-assert.deepEqual(Array.from(migrated.activities[1].questions, (question) => question.id), ["other-q"], "Keyword Challenge questions are preserved");
-assert.equal(migrated._contentMigrations.searchKeywordChallenge, 1, "Keyword Challenge introduction migration is recorded");
+const keywordChallengeQuestion = migrated.activities[1].questions[0];
+assert.equal(keywordChallengeQuestion.id, "keyword-pounamu-treasure");
+assert.equal(keywordChallengeQuestion.type, "multiple-choice");
+assert.equal(keywordChallengeQuestion.heading, "Mission 1: Find the Treasure");
+assert.equal(keywordChallengeQuestion.prompt, "You want to find out where pounamu can be found on the West Coast. Which search would be most useful?");
+assert.deepEqual(Array.from(keywordChallengeQuestion.options), [
+    "beautiful green rocks",
+    "where to find pounamu West Coast NZ",
+    "New Zealand beaches"
+]);
+assert.equal(Object.hasOwn(keywordChallengeQuestion, "correctAnswer"), false, "Keyword challenge answer is not exposed in student content");
+assert.equal(keywordChallengeQuestion.images[0].url, "/practical-skills/images/pounamu-arahura-river.jpg");
+assert.equal(keywordChallengeQuestion.images[0].attribution, "Daderot");
+assert.equal(keywordChallengeQuestion.images[0].license, "CC0");
+assert.equal(keywordChallengeQuestion.images[0].sourceUrl, "https://commons.wikimedia.org/wiki/File:Pounamu_(greenstone),_sourced_from_Arahura_River_-_Wellington_Museum_-_Wellington,_NZ_-_DSC00054.jpg");
+assert.equal(keywordChallengeQuestion.images[0].licenseUrl, "https://creativecommons.org/publicdomain/zero/1.0/");
+assert.deepEqual(Array.from(migrated.activities[1].questions.slice(1), (question) => question.id), ["other-q"], "Existing Keyword Challenge questions are preserved");
+assert.equal(migrated._contentMigrations.searchKeywordChallenge, 2, "Keyword Challenge migration is recorded");
+const teacherEditedKeywordChallenge = JSON.parse(JSON.stringify(migrated));
+teacherEditedKeywordChallenge._contentMigrations.searchKeywordChallenge = 1;
+teacherEditedKeywordChallenge.activities[1].information = { title: "Teacher-edited title", paragraphs: ["Teacher-edited introduction"] };
+teacherEditedKeywordChallenge.activities[1].questions = teacherEditedKeywordChallenge.activities[1].questions
+    .filter((question) => question.id !== "keyword-pounamu-treasure");
+const upgradedKeywordChallenge = context.addSearchKitKeywordChallenge(teacherEditedKeywordChallenge);
+assert.deepEqual(upgradedKeywordChallenge.activities[1].information, {
+    title: "Teacher-edited title",
+    paragraphs: ["Teacher-edited introduction"]
+}, "Keyword Challenge question migration preserves teacher-edited introduction");
+assert.ok(upgradedKeywordChallenge.activities[1].questions.some((question) => question.id === "keyword-pounamu-treasure"), "Saved Keyword Challenge gains the pounamu mission");
 assert.equal(migrated.activities[0].questions.some((question) => question.id === "google-check"), false, "Google-open confirmation is removed");
 assert.equal(migrated.activities[0].questions.some((question) => question.id === "keywords"), true, "Other search-learning questions are retained");
 const penguinQuestion = migrated.activities[0].questions.find((question) => question.id === "search-penguin-name");
@@ -162,13 +190,14 @@ assert.equal(photo.sourceUrl, "https://commons.wikimedia.org/wiki/File:Blue_Peng
 assert.equal(photo.licenseUrl, "https://creativecommons.org/licenses/by-sa/3.0/");
 assert.equal(migrated.activities[0].images.some((image) => image.url.endsWith(".svg")), false, "Old illustration is removed");
 assert.equal(migrated.activities[1].title, original.activities[1].title, "Keyword Challenge title is preserved");
-assert.deepEqual(Array.from(migrated.activities[1].questions, (question) => question.id), ["other-q"], "Keyword Challenge questions are untouched");
+assert.deepEqual(Array.from(migrated.activities[1].questions.slice(1), (question) => question.id), ["other-q"], "Keyword Challenge questions are untouched");
 assert.equal(migrated._contentMigrations.searchPenguinMission, 11, "Migration marker records latest Search Kit content");
 assert.equal(context.addSearchKitPenguinMission(migrated), migrated, "Migration is idempotent");
 assert.ok(fs.existsSync(penguinImage), "Penguin illustration asset exists");
 assert.ok(fs.existsSync(ruapehuImage), "Ruapehu photo is stored locally");
 assert.ok(fs.existsSync(aorakiImage), "Aoraki / Mount Cook photo is stored locally");
 assert.ok(fs.existsSync(taranakiImage), "Taranaki photo is stored locally");
+assert.ok(fs.existsSync(pounamuImage), "Pounamu photo is stored locally");
 
 assert.match(renderSource, /content\?\.information/, "Student worksheet renders the mission information heading");
 assert.match(renderSource, /images\.map\(\(image\)/, "Student worksheet renders the penguin image");
@@ -187,7 +216,7 @@ renderContext.window.KitWorksheetRender.renderWorksheet(imageHost, {
     bannerTitle: "Search Like a Pro",
     information: { title: "THE MISSION: The Penguin Mystery", paragraphs: ["Can you solve the Penguin Mystery?"] },
     images: [photo],
-    questions: [missionTwo, missionThree, missionFour, missionFive]
+    questions: [keywordChallengeQuestion, missionTwo, missionThree, missionFour, missionFive]
 }, { readOnly: true });
 assert.match(imageHost.innerHTML, /Photo: Duncan Wright/);
 assert.match(imageHost.innerHTML, /href="https:\/\/commons\.wikimedia\.org\/wiki\/File:Blue_Penguin_Kapiti\.jpg"/, "Photo credit links to its source");
@@ -208,6 +237,9 @@ assert.match(imageHost.innerHTML, /href="https:\/\/creativecommons\.org\/license
 assert.match(imageHost.innerHTML, /href="https:\/\/creativecommons\.org\/licenses\/by-sa\/4\.0\/"/);
 assert.match(imageHost.innerHTML, /class="worksheet-question-images">[\s\S]*mount-ruapehu\.jpg[\s\S]*aoraki-mount-cook\.jpg[\s\S]*mount-taranaki\.jpg[\s\S]*class="worksheet-choices"/, "Mountain photos render with Mission 3 rather than in the activity image panel");
 assert.match(imageHost.innerHTML, /Mission 4 – Penguins on the Coast/);
+assert.match(imageHost.innerHTML, /Mission 1: Find the Treasure/);
+assert.match(imageHost.innerHTML, /where to find pounamu West Coast NZ/);
+assert.match(imageHost.innerHTML, /pounamu-arahura-river\.jpg/);
 assert.match(imageHost.innerHTML, /Find out where Little Blue Penguins can be seen near Hokitika\./);
 for (const option of missionFour.options) assert.ok(imageHost.innerHTML.includes(option), `Mission 4 includes ${option}`);
 assert.match(imageHost.innerHTML, /data-question-id="search-penguin-location"/, "Mission 4 choices are ordinary response buttons, not auto-marked answers");

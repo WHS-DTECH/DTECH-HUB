@@ -4444,7 +4444,8 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function addSearchKitKeywordChallenge(content) {
-  if (content?._contentMigrations?.searchKeywordChallenge >= 1) return content;
+  if (content?._contentMigrations?.searchKeywordChallenge >= 2) return content;
+  const updateIntroduction = (content?._contentMigrations?.searchKeywordChallenge || 0) < 1;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
   const activityIndex = worksheets.findIndex((worksheet) =>
@@ -4452,17 +4453,45 @@ function addSearchKitKeywordChallenge(content) {
   if (activityIndex < 0 || !Array.isArray(content?.activities) || !content.activities[activityIndex]) return content;
 
   const activities = content.activities.slice();
-  activities[activityIndex] = {
-    ...activities[activityIndex],
-    information: {
-      title: "🔎 THE MISSION: The West Coast Treasure Hunt",
-      paragraphs: [
-        "You're on a treasure hunt across the West Coast!",
-        "Your challenge is to choose the best search words to find clues about places, objects and wildlife.",
-        "Sometimes your first search won't give you what you need. That's when clever searchers change their keywords!",
-        "Can you solve all five clues?"
+  const activity = activities[activityIndex];
+  const questions = Array.isArray(activity.questions) ? activity.questions.slice() : [];
+  if (!questions.some((question) => question?.id === "keyword-pounamu-treasure")) {
+    questions.unshift({
+      id: "keyword-pounamu-treasure",
+      type: "multiple-choice",
+      heading: "Mission 1: Find the Treasure",
+      prompt: "You want to find out where pounamu can be found on the West Coast. Which search would be most useful?",
+      options: [
+        "beautiful green rocks",
+        "where to find pounamu West Coast NZ",
+        "New Zealand beaches"
+      ],
+      images: [
+        {
+          url: "/practical-skills/images/pounamu-arahura-river.jpg",
+          alt: "Pounamu (greenstone) sourced from the Arahura River, displayed at Wellington Museum.",
+          caption: "Pounamu sourced from the Arahura River",
+          attribution: "Daderot",
+          sourceUrl: "https://commons.wikimedia.org/wiki/File:Pounamu_(greenstone),_sourced_from_Arahura_River_-_Wellington_Museum_-_Wellington,_NZ_-_DSC00054.jpg",
+          license: "CC0",
+          licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/"
+        }
       ]
-    }
+    });
+  }
+  const information = updateIntroduction ? {
+    title: "🔎 THE MISSION: The West Coast Treasure Hunt",
+    paragraphs: [
+      "You're on a treasure hunt across the West Coast!",
+      "Your challenge is to choose the best search words to find clues about places, objects and wildlife.",
+      "Sometimes your first search won't give you what you need. That's when clever searchers change their keywords!",
+      "Can you solve all five clues?"
+    ]
+  } : activity.information;
+  activities[activityIndex] = {
+    ...activity,
+    questions,
+    information
   };
 
   return {
@@ -4470,7 +4499,7 @@ function addSearchKitKeywordChallenge(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchKeywordChallenge: 1
+      searchKeywordChallenge: 2
     }
   };
 }
