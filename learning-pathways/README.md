@@ -3,6 +3,12 @@
 A separate library, initially empty, with the Licence Library's card layout,
 search, year-level/category/status filters and sorting.
 
+The yellow **Pathways** navbar button opens this dashboard for signed-in users
+whose actual course is JuniorDTECH or MiddleDTECH. It updates after saving a
+staff course, stays hidden while the course loads or cannot be confirmed, and
+is hidden for SeniorDTECH and signed-out users. Browse also contains a library
+link; the navbar visibility does not restrict direct dashboard access.
+
 - `index.html`: public dashboard (`/learning-pathways/`).
 - `admin.html` and `admin.js`: admin-only card editor. Save Card to Draft adds or
   updates a local draft; Publish Library persists additions, edits and deletions.

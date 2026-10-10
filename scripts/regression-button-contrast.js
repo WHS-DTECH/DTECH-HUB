@@ -33,6 +33,8 @@ for (const [source, selector, baseSelector] of [
     [shared, ".button-secondary"],
     [shared, ".button-secondary:hover", ".button-secondary"],
     [shared, ".button:disabled"],
+    [shared, ".topbar-links a.hub-pathways-link"],
+    [shared, ".topbar-links a.hub-pathways-link:hover", ".topbar-links a.hub-pathways-link"],
     [shared, ".modal-button:disabled"],
     [templates, ".template-button-muted"],
     [templates, ".template-button-muted:hover", ".template-button-muted"],

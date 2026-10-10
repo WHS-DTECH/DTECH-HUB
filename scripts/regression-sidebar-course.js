@@ -111,9 +111,10 @@ async function main() {
     const loaderStart = client.indexOf("function updateSidebarCourseSections(");
     const loaderEnd = client.indexOf("\nasync function loadAndRenderSidebarAllocations(", loaderStart);
     let refreshCourse;
+    const pathwaysLink = { hidden: true };
     const browser = vm.createContext({
         window: { addEventListener(type, fn) { assert.equal(type, "hub-course-changed"); refreshCourse = fn; } },
-        document: { querySelector: () => panel },
+        document: { querySelector: (selector) => selector === "#hub-pathways-link" ? pathwaysLink : panel },
         hubAuthState: auth,
         normalizeEmail: context.normalizeEmail,
         withHubAuthHeaders: (_headers, email) => ({ "x-user-email": email }),
@@ -125,6 +126,8 @@ async function main() {
         browser.updateSidebarCourseSections(panel, course);
         assert.equal(allocations.hidden, course !== "SeniorDTECH");
         assert.equal(summaries.hidden, course !== "SeniorDTECH");
+        assert.equal(pathwaysLink.hidden, !["JuniorDTECH", "MiddleDTECH"].includes(course),
+            "Pathways navbar button is only shown for Junior and Middle DTECH");
     }
     summaries.dataset.available = "false";
     browser.updateSidebarCourseSections(panel, "SeniorDTECH");
@@ -134,6 +137,7 @@ async function main() {
     assert.equal(summaries.hidden, false, "Allocations finishing after course load can reveal senior summaries");
     await browser.loadAndRenderSidebarCourse(panel);
     assert.equal(element.textContent, "Course: MiddleDTECH");
+    assert.equal(pathwaysLink.hidden, false);
     assert.equal(element.hidden, false);
     assert.equal(allocations.hidden, true);
     assert.equal(summaries.hidden, true);
@@ -142,6 +146,7 @@ async function main() {
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(element.textContent, "Course: SeniorDTECH", "Save event refreshes the actual sidebar");
     assert.equal(allocations.hidden, false);
+    assert.equal(pathwaysLink.hidden, true, "Saving SeniorDTECH hides Pathways");
     assert.equal(summaries.hidden, false);
     browser.fetch = async () => ({ ok: true, json: async () => ({ course: "" }) });
     await browser.loadAndRenderSidebarCourse(panel);
@@ -150,6 +155,11 @@ async function main() {
     await browser.loadAndRenderSidebarCourse(panel);
     assert.equal(element.textContent, "Course: Could not load");
     assert.equal(allocations.hidden, true, "Course failures do not show senior content");
+    assert.equal(pathwaysLink.hidden, true, "Course failures do not show Pathways");
+    auth.profile = null;
+    browser.updateSidebarCourseSections(panel, "JuniorDTECH");
+    assert.equal(pathwaysLink.hidden, true, "Signed-out users do not see Pathways");
+    auth.profile = { email: "staff@example.test" };
     let release;
     browser.fetch = () => new Promise((resolve) => { release = resolve; });
     const pending = browser.loadAndRenderSidebarCourse(panel);
@@ -158,6 +168,9 @@ async function main() {
     await pending;
     assert.equal(element.textContent, "", "Responses from previous signed-in users are ignored");
     assert.equal(allocations.hidden, true);
+    assert.equal(pathwaysLink.hidden, true, "Stale course responses cannot reveal Pathways");
+    assert.match(client, /id="hub-pathways-link"[^>]+href="\/learning-pathways\/" hidden>Pathways<\/a>/);
+    assert.match(css, /\.topbar-links a\.hub-pathways-link\[hidden\]\s*\{\s*display: none !important;/);
     assert.doesNotMatch(client, /allocationsHost\.hidden = false/, "Allocation fetch cannot override course visibility");
     assert.match(client, /summaryCardsContainer\.dataset\.available = "true";\s*updateSidebarCourseSections\(panel\)/);
     console.log("Sidebar actual-course regressions passed.");

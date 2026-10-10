@@ -1378,6 +1378,7 @@ function renderGlobalNavbar() {
         </details>
     `;
     const taskListLink = `<a id="hub-senior-task-list-link" class="hub-senior-task-list-link" href="/task-list.html" hidden>Task List</a>`;
+    const pathwaysLink = `<a id="hub-pathways-link" class="hub-pathways-link" href="/learning-pathways/" hidden>Pathways</a>`;
 
     const uploadMenu = `
         <details class="nav-dropdown" id="hub-upload-menu" data-nav-dropdown hidden>
@@ -1412,7 +1413,7 @@ function renderGlobalNavbar() {
         </details>
     `;
     const settingsLink = `<a id="hub-settings-link" href="/settings.html" hidden>Settings</a>`;
-    const topbarMenu = `${browseMenu}${uploadMenu}${practicalSkillsMenu}${taskListLink}${studentWorkMenu}${settingsLink}`;
+    const topbarMenu = `${browseMenu}${uploadMenu}${practicalSkillsMenu}${pathwaysLink}${taskListLink}${studentWorkMenu}${settingsLink}`;
 
     topbar.dataset.globalNavbar = "true";
     topbar.setAttribute("aria-label", "Primary");
@@ -2366,6 +2367,10 @@ function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {
 
 function updateSidebarCourseSections(panel, course = panel.dataset.course || "") {
     panel.dataset.course = course;
+    const pathwaysLink = document.querySelector("#hub-pathways-link");
+    if (pathwaysLink) {
+        pathwaysLink.hidden = !hubAuthState.profile?.email || !["JuniorDTECH", "MiddleDTECH"].includes(course);
+    }
     const isSenior = course === "SeniorDTECH";
     const allocations = panel.querySelector("#hub-global-sidebar-allocations");
     const summaries = panel.querySelector("#hub-sidebar-summary-cards");
@@ -2868,6 +2873,8 @@ function renderHubAuthUi() {
             hubPracticalSkillsMenu.open = false;
         }
     }
+    const pathwaysLink = document.querySelector("#hub-pathways-link");
+    if (pathwaysLink) pathwaysLink.hidden = true;
     if (hubSeniorTaskListLink) {
         hubSeniorTaskListLink.hidden = !signedIn || !hubSeniorTaskListLink.dataset.senior;
     }
