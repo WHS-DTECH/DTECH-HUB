@@ -4772,7 +4772,7 @@ function addSearchResultsDetectiveIntroduction(content) {
 }
 
 function addSearchKitKeywordChallenge(content) {
-  if (content?._contentMigrations?.searchKeywordChallenge >= 14) return content;
+  if (content?._contentMigrations?.searchKeywordChallenge >= 15) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
   const activityIndex = worksheets.findIndex((worksheet) =>
@@ -4839,7 +4839,7 @@ function addSearchKitKeywordChallenge(content) {
     id: "keyword-gold-rush-town",
     type: "short-answer",
     heading: "Mission 2 – The Gold Rush Town",
-    prompt: "South of Hokitika is a small town famous for its gold-mining history. What is the name of this town?",
+    prompt: "Approximately 25 km south of Hokitika is a small town famous for its gold-mining history. What is the name of this town?",
     lines: 1,
     hint: "Search for a historic gold-mining town south of Hokitika."
   };
@@ -4860,6 +4860,12 @@ function addSearchKitKeywordChallenge(content) {
     const missionOneIndex = questions.findIndex((question) =>
       question?.id === "keyword-west-coast-tree" || question?.id === "keyword-pounamu-treasure");
     questions.splice(missionOneIndex >= 0 ? missionOneIndex + 1 : questions.length, 0, rossQuestion);
+  }
+  for (const question of questions) {
+    if (question?.id === rossQuestion.id &&
+        question.prompt === "South of Hokitika is a small town famous for its gold-mining history. What is the name of this town?") {
+      Object.assign(question, rossQuestion);
+    }
   }
   if (!questions.some((question) =>
     question?.id === "keyword-glowworm-mystery" || question?.id === "keyword-mountain-bird")) {
@@ -4995,6 +5001,29 @@ function addSearchKitKeywordChallenge(content) {
     const searchAndFindQuestions = Array.isArray(existingSearchAndFind.questions)
       ? existingSearchAndFind.questions.slice()
       : [];
+    const previousSearchAndFindBridgeQuestion = searchAndFindQuestions.find((question) =>
+      question?.id === "keyword-too-many-results" &&
+      question.type === "multiple-choice" &&
+      question.heading === "Mission 2: Too Many Results!" &&
+      question.prompt === "You search for bridge but get results from all over the world. You actually want to find the historic swing bridge at Hokitika Gorge. Which search would help you narrow the results?" &&
+      Array.isArray(question.options) &&
+      question.options.length === 3 &&
+      question.options[0] === "bridge" &&
+      question.options[1] === "bridges New Zealand" &&
+      question.options[2] === "Hokitika Gorge swing bridge");
+    if (previousSearchAndFindBridgeQuestion) {
+      searchAndFindQuestions.splice(
+        searchAndFindQuestions.indexOf(previousSearchAndFindBridgeQuestion),
+        1,
+        rossQuestion
+      );
+    }
+    for (const question of searchAndFindQuestions) {
+      if (question?.id === rossQuestion.id &&
+          question.prompt === "South of Hokitika is a small town famous for its gold-mining history. What is the name of this town?") {
+        Object.assign(question, rossQuestion);
+      }
+    }
     const previousSearchAndFindMission = searchAndFindQuestions.find((question) =>
       question?.id === "keyword-fix-the-search" &&
       question.type === "multiple-choice" &&
@@ -5028,7 +5057,7 @@ function addSearchKitKeywordChallenge(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchKeywordChallenge: 14
+      searchKeywordChallenge: 15
     }
   };
 }
