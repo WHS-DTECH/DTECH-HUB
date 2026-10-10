@@ -65,6 +65,15 @@ async function main() {
         assert.equal(row.timetable_class, "JVE", "Timetable Class is normalised independently of Tutor");
         assert.equal(row.homeroom, "8WPAPA");
     }
+    const dedupeStart = serverSource.indexOf("function dedupeToLatestStudentRows(");
+    vm.runInContext(serverSource.slice(serverSource.indexOf("function mergeUniqueStrings("), serverSource.indexOf("function collectStudentLinkedEmails("))
+        + serverSource.slice(serverSource.indexOf("function getStudentIdentityKey("), serverSource.indexOf("\nconst suggestionNotificationFallback", dedupeStart)), normalisation);
+    const merged = normalisation.dedupeToLatestStudentRows([
+        normalisation.buildStudentClassManagementRow({ id_number: "1", first_name: "Zoe", year_level: "8", tutor: "8WPAPA", timetable_class: "JVE", upload_date: "2026-01-01" }),
+        normalisation.buildStudentClassManagementRow({ id_number: "1", first_name: "Zoe", year_level: "8", upload_date: "2026-06-01" })
+    ]);
+    assert.equal(merged.length, 1);
+    assert.equal(merged[0].timetable_class, "JVE", "A newer snapshot without Timetable Class keeps the uploaded class");
     const timetableStudents = [
         { name: "Year seven", email: "seven", yearLevel: 7, timetableClass: "JPI", homeroom: "7WHAU", formClass: "7WHAU" },
         { name: "Year eight", email: "eight", yearLevel: 8, timetableClass: "JPI", homeroom: "8WPAPA", formClass: "8WPAPA" },

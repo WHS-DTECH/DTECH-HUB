@@ -1637,8 +1637,16 @@ function dedupeToLatestStudentRows(rows) {
     const preferred = replace ? row : existing;
     const secondary = replace ? existing : row;
 
+    const filledFields = {};
+    ["timetable_class", "form_class", "homeroom", "year_level", "id_number"].forEach((field) => {
+      if (!String(preferred?.[field] || "").trim() && String(secondary?.[field] || "").trim()) {
+        filledFields[field] = secondary[field];
+      }
+    });
+
     latestByStudent.set(key, {
       ...preferred,
+      ...filledFields,
       linked_emails: mergeUniqueStrings([
         ...(Array.isArray(preferred?.linked_emails) ? preferred.linked_emails : []),
         ...(Array.isArray(secondary?.linked_emails) ? secondary.linked_emails : [])
