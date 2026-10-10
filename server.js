@@ -53,7 +53,7 @@ function gradeSearchKeywordChallenge(answers, activityIndex) {
     .trim();
   const acceptedAnswers = {
     "keyword-west-coast-tree": ["kahikatea"],
-    "keyword-too-many-results": ["hokitika gorge swing bridge"],
+    "keyword-gold-rush-town": ["ross"],
     "keyword-glowworm-mystery": ["new zealand glowworm diet"],
     "keyword-fix-the-search": ["hokitika tomorrow"],
     "keyword-hokitika-founded": ["1864"]
@@ -4772,7 +4772,7 @@ function addSearchResultsDetectiveIntroduction(content) {
 }
 
 function addSearchKitKeywordChallenge(content) {
-  if (content?._contentMigrations?.searchKeywordChallenge >= 11) return content;
+  if (content?._contentMigrations?.searchKeywordChallenge >= 12) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
   const activityIndex = worksheets.findIndex((worksheet) =>
@@ -4835,23 +4835,35 @@ function addSearchKitKeywordChallenge(content) {
       !questions.some((question) => question?.id === treeQuestion.id)) {
     questions.unshift(treeQuestion);
   }
-  if (!questions.some((question) => question?.id === "keyword-too-many-results")) {
+  const rossQuestion = {
+    id: "keyword-gold-rush-town",
+    type: "short-answer",
+    heading: "Mission 2 – The Gold Rush Town",
+    prompt: "South of Hokitika is a small town famous for its gold-mining history. What is the name of this town?",
+    lines: 1,
+    hint: "Search for a historic gold-mining town south of Hokitika."
+  };
+  const previousBridgeQuestion = questions.find((question) =>
+    question?.id === "keyword-too-many-results" &&
+    question.type === "multiple-choice" &&
+    question.heading === "Mission 2: Too Many Results!" &&
+    question.prompt === "You search for bridge but get results from all over the world. You actually want to find the historic swing bridge at Hokitika Gorge. Which search would help you narrow the results?" &&
+    Array.isArray(question.options) &&
+    question.options.length === 3 &&
+    question.options[0] === "bridge" &&
+    question.options[1] === "bridges New Zealand" &&
+    question.options[2] === "Hokitika Gorge swing bridge");
+  if (previousBridgeQuestion) {
+    questions.splice(questions.indexOf(previousBridgeQuestion), 1, rossQuestion);
+  } else if (!questions.some((question) => question?.id === "keyword-too-many-results") &&
+      !questions.some((question) => question?.id === rossQuestion.id)) {
     const missionOneIndex = questions.findIndex((question) =>
       question?.id === "keyword-west-coast-tree" || question?.id === "keyword-pounamu-treasure");
-    questions.splice(missionOneIndex >= 0 ? missionOneIndex + 1 : questions.length, 0, {
-      id: "keyword-too-many-results",
-      type: "multiple-choice",
-      heading: "Mission 2: Too Many Results!",
-      prompt: "You search for bridge but get results from all over the world. You actually want to find the historic swing bridge at Hokitika Gorge. Which search would help you narrow the results?",
-      options: [
-        "bridge",
-        "bridges New Zealand",
-        "Hokitika Gorge swing bridge"
-      ]
-    });
+    questions.splice(missionOneIndex >= 0 ? missionOneIndex + 1 : questions.length, 0, rossQuestion);
   }
   if (!questions.some((question) => question?.id === "keyword-glowworm-mystery")) {
-    const missionTwoIndex = questions.findIndex((question) => question?.id === "keyword-too-many-results");
+    const missionTwoIndex = questions.findIndex((question) =>
+      question?.id === "keyword-gold-rush-town" || question?.id === "keyword-too-many-results");
     questions.splice(missionTwoIndex >= 0 ? missionTwoIndex + 1 : questions.length, 0, {
       id: "keyword-glowworm-mystery",
       type: "multiple-choice",
@@ -4920,7 +4932,7 @@ function addSearchKitKeywordChallenge(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchKeywordChallenge: 11
+      searchKeywordChallenge: 12
     }
   };
 }

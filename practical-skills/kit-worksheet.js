@@ -265,7 +265,7 @@
         const baseQuestionIds = assessmentId === "search-keyword-challenge-v1"
             ? [
                 "keyword-west-coast-tree",
-                "keyword-too-many-results",
+                "keyword-gold-rush-town",
                 "keyword-glowworm-mystery",
                 "keyword-fix-the-search",
                 "keyword-hokitika-founded"
