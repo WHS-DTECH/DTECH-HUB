@@ -8,6 +8,8 @@ const html = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "adm
 const source = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "admin-kits.js"), "utf8");
 assert.match(html, /#kit-add-worksheet\s*\{[^}]*background:\s*#173858;[^}]*color:\s*#ffffff;/s, "Add Worksheet button has high-contrast colors");
 assert.match(html, /#kit-add-worksheet:focus-visible\s*\{/);
+assert.match(html, /<textarea id="kit-instructions" rows="3" placeholder=/);
+assert.doesNotMatch(html.match(/<textarea id="kit-instructions"[^>]*>/)?.[0] || "", /maxlength=/, "Kit instructions are not truncated by a character limit");
 const start = source.indexOf("    function setYearLevelSelection(value) {");
 const end = source.indexOf("\n    function queuePreviewUpdate()", start);
 assert.ok(start >= 0 && end > start, "Year Level selection helper is present");
