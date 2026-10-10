@@ -92,16 +92,19 @@ button.template-button {
 
 .template-button-muted {
     color: #ffffff;
-    border-color: #95c0e6;
-    background: rgba(15, 50, 80, 0.32);
+    border-color: #0d2b46;
+    background: #173858;
 }
 
 .template-button-muted:hover {
-    background: rgba(11, 44, 72, 0.5);
+    background: #0d2b46;
 }
 
 .template-button:disabled {
-    opacity: 0.6;
+    color: #4d5974;
+    background: #e8edf7;
+    border-color: #69758e;
+    opacity: 1;
     cursor: wait;
 }
 
@@ -314,8 +317,9 @@ button.template-button {
 }
 
 .template-card-open[aria-disabled="true"] {
-    background: #a6b4c5;
-    border-color: #8fa1b6;
+    color: #4d5974;
+    background: #e8edf7;
+    border-color: #69758e;
     cursor: default;
     pointer-events: none;
 }
@@ -368,8 +372,9 @@ button.template-button {
 
 .template-card-open[aria-disabled="true"],
 .template-card-open:disabled {
-    background: #a6b4c5;
-    border-color: #8fa1b6;
+    color: #4d5974;
+    background: #e8edf7;
+    border-color: #69758e;
     cursor: default;
     pointer-events: none;
 }
@@ -409,7 +414,7 @@ button.template-button {
 }
 
 .template-card-delete:disabled {
-    opacity: 0.55;
+    opacity: 1;
     cursor: wait;
 }
 
@@ -480,7 +485,10 @@ button.template-button {
 }
 
 .template-setup-confirm-button:disabled {
-    opacity: 0.6;
+    color: #4d5974;
+    background: #e8edf7;
+    border-color: #69758e;
+    opacity: 1;
     cursor: wait;
 }
 

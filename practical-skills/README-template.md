@@ -31,6 +31,14 @@ It does not change directory records, Login Kit check-ins, Drive folders, the
 student-facing library, or the full Card Editor and Current Cards sections.
 Preview cards reflect local edits; Publish Library remains the save action.
 
+## Shared Button Readability
+
+Admin and navigation buttons use the shared styles in `../styles.css`:
+opaque purple/white primary buttons and pale blue/navy secondary buttons.
+Disabled labels remain readable, with a distinct disabled appearance and no
+hover movement. Keep normal and hover text contrast at least 4.5:1; validate
+with `node scripts/regression-button-contrast.js` from the repository root.
+
 ## Required Server Config
 
 In `server.js`, ensure this file path constant points to this module folder:
