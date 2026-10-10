@@ -23,11 +23,11 @@ async function progressionApi(path, options = {}) {
     return data;
 }
 function progressionDiscard() {
-    return !progression.dirty || window.confirm("Discard unsaved term result changes?");
+    return !progression.dirty || window.confirm("Discard unsaved student result changes?");
 }
 function progressionMatchingStudents(students, homeroom, year, search) {
     const normalise = (value) => String(value || "").trim().toUpperCase();
-    return students.filter((student) => (!homeroom || normalise(student.homeroom || student.formClass) === normalise(homeroom))
+    return students.filter((student) => (!homeroom || [student.homeroom, student.formClass].some((value) => normalise(value) === normalise(homeroom)))
         && (!year || Number(student.yearLevel) === Number(year))
         && `${student.name} ${student.email} ${student.homeroom || ""} ${student.formClass || ""}`.toLowerCase().includes(search.trim().toLowerCase()));
 }
@@ -35,8 +35,10 @@ function progressionHomeroomOptions() {
     const selected = pp("homeroom-filter").value;
     const homerooms = new Set(["JVE", "JPI", "JMM", "JSR", "JSD", "7S", "8S"]);
     progression.students.forEach((student) => {
-        const homeroom = String(student.homeroom || student.formClass || "").trim().toUpperCase();
-        if (homeroom) homerooms.add(homeroom);
+        for (const value of [student.homeroom, student.formClass]) {
+            const homeroom = String(value || "").trim().toUpperCase();
+            if (homeroom) homerooms.add(homeroom);
+        }
     });
     pp("homeroom-filter").replaceChildren(new Option("All homerooms", ""));
     [...homerooms].sort().forEach((homeroom) => pp("homeroom-filter").append(new Option(homeroom, homeroom)));
@@ -47,11 +49,35 @@ function progressionStudentOptions() {
     const matching = progressionMatchingStudents(progression.students, pp("homeroom-filter").value,
         pp("year-filter").value, pp("search").value);
     pp("student").replaceChildren(new Option("Select a student", ""));
+    pp("roster").replaceChildren();
     for (const student of matching) {
-        pp("student").append(new Option(`${student.name} - Year ${student.yearLevel} - ${student.homeroom || student.formClass}${student.archived ? " (saved history)" : ""}`, student.email));
+        const label = `${student.name} - Year ${student.yearLevel} - ${student.formClass || student.homeroom}${student.archived ? " (saved history)" : ""}`;
+        if (student.email) pp("student").append(new Option(label, student.email));
+        const row = document.createElement("li");
+        const name = document.createElement("span");
+        name.textContent = label;
+        row.append(name);
+        if (student.email) {
+            const button = document.createElement("button");
+            button.type = "button"; button.className = "button button-secondary"; button.textContent = "Open results";
+            button.setAttribute("aria-label", `Open results for ${student.name}`);
+            button.addEventListener("click", () => {
+                if (!progressionDiscard()) return;
+                pp("student").value = student.email;
+                void progressionLoadStudent(student.email);
+            });
+            row.append(button);
+        } else {
+            const warning = document.createElement("span");
+            warning.className = "is-error"; warning.textContent = "School email not linked";
+            row.append(warning);
+        }
+        pp("roster").append(row);
     }
     pp("student").value = matching.some((student) => student.email === selected) ? selected : "";
-    pp("filter-count").textContent = `${matching.length} matching student${matching.length === 1 ? "" : "s"}${matching.length ? " - select a student below." : " - no students match these filters."}`;
+    pp("filter-count").textContent = `${matching.length} matching student${matching.length === 1 ? "" : "s"}${matching.length ? " - class list below." : " - no students match these filters."}`;
+    pp("email-warning").hidden = !matching.some((student) => !student.email);
+    pp("email-warning").textContent = "Students without a linked school email are listed, but their email must be added to the student directory before results can be saved.";
     if (selected && !pp("student").value) void progressionLoadStudent("");
 }
 function progressionNewRecord(student) {
@@ -78,7 +104,7 @@ function progressionRender(record) {
     pp("homeroom").value = record.homeroom || record.formClass;
     pp("year").disabled = record.revision > 0;
     pp("term").disabled = record.revision > 0;
-    pp("saved").textContent = record.updatedAt ? `Saved ${new Date(record.updatedAt).toLocaleString()} by ${record.updatedBy}` : "New term record - not saved yet.";
+    pp("saved").textContent = record.updatedAt ? `Saved ${new Date(record.updatedAt).toLocaleString()} by ${record.updatedBy}` : "Student results - not saved yet.";
     pp("rows").replaceChildren();
     for (const [id, title] of progressionPathways) {
         const result = progression.record.pathways.find((row) => row.id === id);
@@ -114,11 +140,8 @@ function progressionRender(record) {
     }
     progressionDetail();
 }
-function progressionHistory() {
-    const student = progression.students.find((item) => item.email === pp("student").value);
-    pp("history").replaceChildren();
-    if (!student?.archived) pp("history").append(new Option("New term record", ""));
-    progression.records.forEach((record, index) => pp("history").append(new Option(`${record.schoolYear} Term ${record.term} - Year ${record.yearLevel} / ${record.formClass}`, String(index))));
+function progressionAnnualRecord(records, student, schoolYear) {
+    return records.find((record) => record.schoolYear === schoolYear) || (student.archived ? records[0] : null);
 }
 async function progressionLoadStudent(email) {
     const request = ++progression.loading;
@@ -126,20 +149,17 @@ async function progressionLoadStudent(email) {
     progression.records = [];
     progression.dirty = false;
     pp("editor").hidden = true;
-    pp("history").replaceChildren(new Option("New term record", ""));
     if (!email) { progressionStatus("Find and select a Year 7-10 student."); return; }
-    progressionStatus("Loading saved term results...");
+    progressionStatus("Loading student results...");
     pp("retry").hidden = true;
     try {
         const data = await progressionApi(`records?studentEmail=${encodeURIComponent(email)}`);
         if (request !== progression.loading) return;
         if (!Array.isArray(data.records)) throw new Error("Saved term response is invalid.");
         progression.records = data.records;
-        progressionHistory();
-        if (data.records.length) {
-            pp("history").value = "0";
-            progressionRender(data.records[0]);
-        } else progressionRender(progressionNewRecord(progression.students.find((student) => student.email === email)));
+        const student = progression.students.find((student) => student.email === email);
+        const record = progressionAnnualRecord(data.records, student, new Date().getFullYear());
+        progressionRender(record || progressionNewRecord(student));
         progressionStatus("Select a pathway to record coverage and evidence. Changes are not saved until you press Save.");
     } catch (error) {
         if (request !== progression.loading) return;
@@ -156,7 +176,8 @@ async function progressionInit() {
         progression.record = null; progression.records = []; progression.students = []; progression.dirty = false;
         pp("editor").hidden = true;
         pp("student").replaceChildren(new Option("Select a student", ""));
-        pp("history").replaceChildren(new Option("New term record", ""));
+        pp("roster").replaceChildren();
+        pp("email-warning").hidden = true;
     }
     pp("controls").disabled = true;
     pp("editor").disabled = true;
@@ -165,6 +186,8 @@ async function progressionInit() {
         pp("filter-count").textContent = "";
         pp("retry").hidden = true;
         pp("editor").hidden = true; pp("student").replaceChildren(new Option("Select a student", ""));
+        pp("roster").replaceChildren();
+        pp("email-warning").hidden = true;
         progressionStatus("Sign in with a Teacher/Admin account to access student results.");
         return;
     }
@@ -172,6 +195,10 @@ async function progressionInit() {
     if (!hubAccessState.resolved) { progressionStatus("Checking Teacher View access..."); return; }
     if (!hubAccessState.canTeacherView && !hubAccessState.canAdmin) {
         pp("editor").hidden = true;
+        pp("roster").replaceChildren();
+        pp("student").replaceChildren(new Option("Select a student", ""));
+        pp("filter-count").textContent = "";
+        pp("email-warning").hidden = true;
         pp("retry").hidden = true;
         progressionStatus("Teacher/Admin access is required. Student results are not available in Student View.", true);
         return;
@@ -214,14 +241,6 @@ pp("student").addEventListener("change", () => {
     if (!progressionDiscard()) { pp("student").value = progression.record?.studentEmail || ""; return; }
     void progressionLoadStudent(pp("student").value);
 });
-pp("history").addEventListener("change", () => {
-    if (!progressionDiscard()) {
-        pp("history").value = String(progression.records.findIndex((record) => record.schoolYear === progression.record.schoolYear && record.term === progression.record.term));
-        return;
-    }
-    const selected = pp("history").value;
-    progressionRender(selected === "" ? progressionNewRecord(progression.students.find((student) => student.email === pp("student").value)) : progression.records[Number(selected)]);
-});
 for (const key of ["addressed", "evidence", "notes"]) pp(key).addEventListener("input", () => {
     progression.record.pathways.find((row) => row.id === progression.selected)[key] = pp(key).value;
     progression.dirty = true;
@@ -235,17 +254,15 @@ pp("form").addEventListener("submit", async (event) => {
     progression.saving = true;
     const teacherEmail = hubAuthState.profile?.email;
     pp("editor").disabled = true; pp("controls").disabled = true;
-    progressionStatus("Saving term results...");
+    progressionStatus("Saving student results...");
     try {
         const data = await progressionApi("records", { method: "PUT", body: JSON.stringify(record) });
         if (!hasAllowedSignedInHubAccount() || hubAuthState.profile?.email !== teacherEmail) return;
         if (!data.record || !data.record.revision) throw new Error("Save response is invalid. Reload to confirm saved results.");
         progression.records = [data.record, ...progression.records.filter((old) => old.schoolYear !== record.schoolYear || old.term !== record.term)]
             .sort((a, b) => b.schoolYear - a.schoolYear || b.term - a.term);
-        progressionHistory();
-        pp("history").value = String(progression.records.findIndex((old) => old.schoolYear === record.schoolYear && old.term === record.term));
         progressionRender(data.record);
-        progressionStatus("Term results saved.");
+        progressionStatus("Student results saved.");
     } catch (error) {
         if (!hasAllowedSignedInHubAccount() || hubAuthState.profile?.email !== teacherEmail) return;
         console.error("Could not save progression term results", error);

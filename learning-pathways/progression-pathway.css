@@ -7,6 +7,8 @@
 .progression-page textarea { resize: vertical; }
 .progression-page [hidden] { display: none !important; }
 .progression-page .is-error { color: #a12626; }
+.progression-roster { list-style: none; padding: 0; display: grid; gap: 8px; }
+.progression-roster li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid #cfdded; border-radius: 8px; }
 .progression-page .curriculum-table { table-layout: auto; }
 .progression-page .curriculum-table td { vertical-align: middle; }
 #progression-detail { padding: 18px; margin-top: 20px; border: 1px solid #cfdded; border-radius: 12px; background: #f8fbff; }

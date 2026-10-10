@@ -41,9 +41,38 @@ async function main() {
     assert.deepEqual(filtered("JPI", "7", "Ben"), []);
     assert.deepEqual(filtered("JSD", "7", ""), [], "Missing homeroom does not guess student membership");
     assert.deepEqual(filtered("JPI", "7", "aro"), ["one"]);
+    assert.equal(context.progressionMatchingStudents([
+        { name: "Timetable student", email: "", yearLevel: 7, formClass: "JPI", homeroom: "7WHAU" }
+    ], "JPI", "", "").length, 1, "Form Class membership works even when a separate tutor homeroom exists");
+    const html = fs.readFileSync(path.join(root, "learning-pathways/progression-pathway.html"), "utf8");
+    assert.ok(!html.includes("progression-history"), "Term-history dropdown has been removed");
+    assert.ok(html.includes('id="progression-roster"'), "Matching students have a visible class list");
+    assert.ok(!client.includes('pp("history")'), "No handlers depend on the removed selector");
+    vm.runInContext(client.slice(client.indexOf("function progressionAnnualRecord("), client.indexOf("async function progressionLoadStudent(")), context);
+    const annualRecords = [{ schoolYear: 2027, term: 3, revision: 2 }, { schoolYear: 2026, term: 1, revision: 1 }];
+    assert.equal(context.progressionAnnualRecord(annualRecords, {}, 2027), annualRecords[0], "Reopens the single attended term in this school year");
+    assert.equal(context.progressionAnnualRecord(annualRecords, {}, 2028), null, "A new school year does not overwrite earlier results");
+    assert.equal(context.progressionAnnualRecord(annualRecords, { archived: true }, 2028), annualRecords[0]);
     const serverSource = fs.readFileSync(path.join(root, "server.js"), "utf8");
     assert.match(serverSource, /homeroom: pickRowValue\(lower, \["homeroom", "home_room", "home room"/,
         "Explicit homeroom takes priority over class fields");
+    const registrationStart = serverSource.indexOf('require("./learning-pathways/progression-store").registerProgressionPathway');
+    const registrationEnd = serverSource.indexOf("app.use(express.static", registrationStart);
+    let directoryAdapter;
+    vm.runInNewContext(serverSource.slice(registrationStart, registrationEnd), {
+        require: () => ({ registerProgressionPathway: (_app, config) => { directoryAdapter = config.getStudents; } }),
+        app: {}, pool: {}, hasDatabase: true, requireActivityWriteAccess: () => {},
+        getStudentDirectoryRows: async () => [
+            { student_name: "No email one", year_level: "Year 7", form_class: "JPI", homeroom: "JPI", linked_emails: [] },
+            { student_name: "No email two", year_level: "8", form_class: "JPI", homeroom: "JPI", linked_emails: [] },
+            { student_name: "Linked student", year_level: "7", form_class: "JPI", homeroom: "JPI", linked_emails: ["linked@example.test"] }
+        ],
+        buildStudentClassManagementRow: (row) => row, dedupeToLatestStudentRows: (rows) => rows,
+        normalizeEmail: (value) => value.trim().toLowerCase()
+    });
+    const directoryStudents = await directoryAdapter();
+    assert.equal(directoryStudents.length, 3, "The directory adapter does not omit students without email");
+    assert.equal(context.progressionMatchingStudents(directoryStudents, "JPI", "", "").length, 3);
     assert.deepEqual(validateRecord(sample), sample);
     const legacy = { ...sample };
     delete legacy.homeroom;
@@ -91,7 +120,11 @@ async function main() {
         req.user_email = "teacher@example.test"; next();
     };
     const options = { pool, hasDatabase: true, requireTeacherAccess: auth,
-        getStudents: async () => [{ email: sample.studentEmail, name: "Example Student", yearLevel: 7, formClass: "7XX" }] };
+        getStudents: async () => [
+            { email: sample.studentEmail, name: "Example Student", yearLevel: 7, formClass: "7XX" },
+            { email: "", name: "Unlinked one", yearLevel: 7, formClass: "JPI" },
+            { email: "", name: "Unlinked two", yearLevel: 8, formClass: "JPI" }
+        ] };
     const app = express(); app.use(express.json()); registerProgressionPathway(app, options);
     const server = app.listen(0, "127.0.0.1");
     await new Promise((resolve) => server.once("listening", resolve));
@@ -104,6 +137,8 @@ async function main() {
         assert.equal((await fetch(`${base}/records?studentEmail=${sample.studentEmail}`)).status, 403);
         assert.equal((await put(sample, "student")).status, 403);
         assert.equal((await fetch(`${base}/students`, { headers })).status, 200);
+        const directory = (await (await fetch(`${base}/students`, { headers })).json()).students;
+        assert.equal(directory.filter((student) => !student.email).length, 2, "Both unlinked students remain in the class list");
         assert.equal((await put({ ...sample, studentEmail: "unknown@example.test" })).status, 400);
         const savedResponse = await put(sample);
         assert.equal(savedResponse.status, 200);

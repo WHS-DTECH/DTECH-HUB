@@ -52,7 +52,7 @@ function registerProgressionPathway(app, { pool, hasDatabase, requireTeacherAcce
         await schema();
         const saved = await pool.query(`SELECT DISTINCT ON (student_email) student_email, record
             FROM progression_pathway_results ORDER BY student_email, school_year DESC, term DESC`);
-        const students = new Map(current.map((student) => [student.email, student]));
+        const students = new Map(current.filter((student) => student.email).map((student) => [student.email, student]));
         for (const row of saved.rows) {
             if (!students.has(row.student_email)) {
                 students.set(row.student_email, { email: row.student_email,
@@ -61,7 +61,7 @@ function registerProgressionPathway(app, { pool, hasDatabase, requireTeacherAcce
                     homeroom: row.record.homeroom || row.record.formClass, archived: true });
             }
         }
-        return [...students.values()];
+        return [...current.filter((student) => !student.email), ...students.values()];
     }
     app.get("/api/teacher/progression/students", requireTeacherAccess, async (_req, res) => {
         try {

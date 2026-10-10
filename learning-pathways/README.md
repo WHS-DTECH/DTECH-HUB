@@ -86,7 +86,7 @@ cards are now linked; the Junior Task List still displays names only.
 
 `progression-pathway.html`, `.js`, `.css` and `progression-store.js` provide the
 Student Work > Progression Pathway tracker. The layout follows the supplied
-JuniorDTECH tracker concept: student/rotation, five pathway results, selected
+JuniorDTECH tracker concept: student/homeroom, five pathway results, selected
 curriculum coverage/evidence and teacher strengths/next-learning summary.
 The five user-supplied descriptors and colours are teacher selected. Coverage
 is separate; Not taught requires Not determined. No kit-derived grades or
@@ -97,22 +97,30 @@ Teacher/Admin-protected `/api/teacher/progression/students` and
 middleware and directory. Each student/school-year/term has its own Postgres
 record in `progression_pathway_results`, including the year level/class snapshot,
 teacher and update time. Save is explicit, and revision checks prevent concurrent
-teachers overwriting each other's edits. Earlier rotations remain available.
+teachers overwriting each other's edits. Earlier results remain stored.
 Students with saved history remain discoverable after moving beyond Year 10;
-their historical year level/class and saved name are retained. New rotations
+their historical year level/class and saved name are retained. New results
 require a current Year 7-10 directory entry.
 Database-unavailable development returns an explicit 503 rather than pretending
 results were saved. Source PDFs remain local and are not published.
 The student controls use Homeroom and Year level filters together with name
 search (for example JPI + Year 7). JVE, JPI, JMM, JSR, JSD, 7S and 8S are offered,
-along with other directory homerooms. Explicit homeroom/tutor fields take
-priority over class codes; class is used only when no homeroom is supplied.
+along with other directory homerooms and form classes. The filter matches either
+the explicit homeroom/tutor field or Form Class, so a separate tutor field cannot
+hide a student from their selected form class.
 No class-to-homeroom membership is guessed. Zero matches are shown explicitly.
 Filtering away from a student prompts before discarding unsaved edits and clears
 the previous results. Homeroom is saved separately from class; old records use
-their class as a display fallback. Saved term results keep the existing
-student/school-year/term storage key and history; this is not a storage migration
-from terms to homerooms.
+their class as a display fallback. Matching students appear in a visible class
+list with Open results buttons. Students without linked school emails are also
+listed, with an explicit warning that email linkage is required to save results;
+they are not silently dropped or combined into one blank-email student.
+There is no Saved term results / New term record dropdown: Junior students attend
+once per year. Selection automatically opens the latest saved attended term for
+the current school year, or starts a new record if that year has none. Archived
+students open their latest saved result. The attended term remains in the result
+details, and the existing student/school-year/term storage keys and earlier data
+are preserved without a database migration.
 Run `node scripts/regression-progression-pathway.js` for validation, teacher
 access, history persistence, concurrent-edit conflicts and descriptor contrast.
 

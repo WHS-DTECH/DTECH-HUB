@@ -6038,11 +6038,11 @@ require("./learning-pathways/progression-store").registerProgressionPathway(app,
     const rows = dedupeToLatestStudentRows((await getStudentDirectoryRows()).map(buildStudentClassManagementRow));
     return rows.filter((row) => String(row.status || "").toLowerCase() !== "not current"
       && [7, 8, 9, 10].includes(Number(String(row.year_level || "").replace(/^year\s*/i, ""))))
-      .flatMap((row) => (row.linked_emails || []).slice(0, 1).map((email) => ({
-        email: normalizeEmail(email), name: row.student_name,
+      .map((row) => ({
+        email: normalizeEmail(row.linked_emails?.[0] || ""), name: row.student_name,
         yearLevel: Number(String(row.year_level).replace(/^year\s*/i, "")),
         formClass: row.form_class || "", homeroom: row.homeroom || ""
-      })));
+      }));
   }
 });
 app.use(express.static(__dirname));
