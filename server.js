@@ -4444,7 +4444,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function addSearchKitKeywordChallenge(content) {
-  if (content?._contentMigrations?.searchKeywordChallenge >= 6) return content;
+  if (content?._contentMigrations?.searchKeywordChallenge >= 7) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
   const activityIndex = worksheets.findIndex((worksheet) =>
@@ -4535,6 +4535,16 @@ function addSearchKitKeywordChallenge(content) {
       ]
     });
   }
+  if (!questions.some((question) => question?.id === "keyword-hokitika-founded")) {
+    const missionFourIndex = questions.findIndex((question) => question?.id === "keyword-fix-the-search");
+    questions.splice(missionFourIndex >= 0 ? missionFourIndex + 1 : questions.length, 0, {
+      id: "keyword-hokitika-founded",
+      type: "short-answer",
+      heading: "Mission 5: Your Turn – Find the Answer!",
+      prompt: "Use a search engine to find out what year Hokitika was founded as a gold-mining settlement. What year did you find?",
+      lines: 1
+    });
+  }
   const information = updateIntroduction ? {
     title: "🔎 THE MISSION: The West Coast Treasure Hunt",
     paragraphs: [
@@ -4555,7 +4565,7 @@ function addSearchKitKeywordChallenge(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchKeywordChallenge: 6
+      searchKeywordChallenge: 7
     }
   };
 }

@@ -121,8 +121,14 @@ assert.deepEqual(Array.from(keywordChallengeMissionFour.options), [
     "sunshine",
     "New Zealand"
 ]);
-assert.deepEqual(Array.from(migrated.activities[1].questions.slice(4), (question) => question.id), ["other-q"], "Existing Keyword Challenge questions are preserved");
-assert.equal(migrated._contentMigrations.searchKeywordChallenge, 6, "Keyword Challenge migration is recorded");
+const keywordChallengeMissionFive = migrated.activities[1].questions[4];
+assert.equal(keywordChallengeMissionFive.id, "keyword-hokitika-founded");
+assert.equal(keywordChallengeMissionFive.type, "short-answer");
+assert.equal(keywordChallengeMissionFive.heading, "Mission 5: Your Turn – Find the Answer!");
+assert.equal(keywordChallengeMissionFive.prompt, "Use a search engine to find out what year Hokitika was founded as a gold-mining settlement. What year did you find?");
+assert.equal(keywordChallengeMissionFive.lines, 1);
+assert.deepEqual(Array.from(migrated.activities[1].questions.slice(5), (question) => question.id), ["other-q"], "Existing Keyword Challenge questions are preserved");
+assert.equal(migrated._contentMigrations.searchKeywordChallenge, 7, "Keyword Challenge migration is recorded");
 const teacherEditedKeywordChallenge = JSON.parse(JSON.stringify(migrated));
 teacherEditedKeywordChallenge._contentMigrations.searchKeywordChallenge = 1;
 teacherEditedKeywordChallenge.activities[1].information = { title: "Teacher-edited title", paragraphs: ["Teacher-edited introduction"] };
@@ -146,7 +152,8 @@ assert.ok(repairedKeywordKit.activities[1].questions.some((question) => question
 assert.ok(repairedKeywordKit.activities[1].questions.some((question) => question.id === "keyword-too-many-results"), "Missing activity includes Mission 2");
 assert.ok(repairedKeywordKit.activities[1].questions.some((question) => question.id === "keyword-glowworm-mystery"), "Missing activity includes Mission 3");
 assert.ok(repairedKeywordKit.activities[1].questions.some((question) => question.id === "keyword-fix-the-search"), "Missing activity includes Mission 4");
-assert.equal(repairedKeywordKit._contentMigrations.searchKeywordChallenge, 6, "Repair migration is recorded for previously incomplete saved kits");
+assert.ok(repairedKeywordKit.activities[1].questions.some((question) => question.id === "keyword-hokitika-founded"), "Missing activity includes Mission 5");
+assert.equal(repairedKeywordKit._contentMigrations.searchKeywordChallenge, 7, "Repair migration is recorded for previously incomplete saved kits");
 assert.equal(migrated.activities[0].questions.some((question) => question.id === "google-check"), false, "Google-open confirmation is removed");
 assert.equal(migrated.activities[0].questions.some((question) => question.id === "keywords"), true, "Other search-learning questions are retained");
 const penguinQuestion = migrated.activities[0].questions.find((question) => question.id === "search-penguin-name");
@@ -239,7 +246,7 @@ assert.equal(photo.sourceUrl, "https://commons.wikimedia.org/wiki/File:Blue_Peng
 assert.equal(photo.licenseUrl, "https://creativecommons.org/licenses/by-sa/3.0/");
 assert.equal(migrated.activities[0].images.some((image) => image.url.endsWith(".svg")), false, "Old illustration is removed");
 assert.equal(migrated.activities[1].title, original.activities[1].title, "Keyword Challenge title is preserved");
-assert.deepEqual(Array.from(migrated.activities[1].questions.slice(4), (question) => question.id), ["other-q"], "Keyword Challenge questions are untouched");
+assert.deepEqual(Array.from(migrated.activities[1].questions.slice(5), (question) => question.id), ["other-q"], "Keyword Challenge questions are untouched");
 assert.equal(migrated._contentMigrations.searchPenguinMission, 11, "Migration marker records latest Search Kit content");
 assert.equal(context.addSearchKitPenguinMission(migrated), migrated, "Migration is idempotent");
 assert.ok(fs.existsSync(penguinImage), "Penguin illustration asset exists");
@@ -266,7 +273,7 @@ renderContext.window.KitWorksheetRender.renderWorksheet(imageHost, {
     bannerTitle: "Search Like a Pro",
     information: { title: "THE MISSION: The Penguin Mystery", paragraphs: ["Can you solve the Penguin Mystery?"] },
     images: [photo],
-    questions: [keywordChallengeQuestion, keywordChallengeMissionTwo, keywordChallengeMissionThree, keywordChallengeMissionFour, missionTwo, missionThree, missionFour, missionFive]
+    questions: [keywordChallengeQuestion, keywordChallengeMissionTwo, keywordChallengeMissionThree, keywordChallengeMissionFour, keywordChallengeMissionFive, missionTwo, missionThree, missionFour, missionFive]
 }, { readOnly: true });
 assert.match(imageHost.innerHTML, /Photo: Duncan Wright/);
 assert.match(imageHost.innerHTML, /href="https:\/\/commons\.wikimedia\.org\/wiki\/File:Blue_Penguin_Kapiti\.jpg"/, "Photo credit links to its source");
@@ -297,6 +304,8 @@ assert.match(imageHost.innerHTML, /New Zealand glowworm diet/);
 assert.match(imageHost.innerHTML, /new-zealand-glowworm\.jpg/);
 assert.match(imageHost.innerHTML, /Mission 4: Fix the Search/);
 assert.match(imageHost.innerHTML, /Hokitika tomorrow/);
+assert.match(imageHost.innerHTML, /Mission 5: Your Turn – Find the Answer!/);
+assert.match(imageHost.innerHTML, /What year did you find\?/);
 assert.match(imageHost.innerHTML, /Find out where Little Blue Penguins can be seen near Hokitika\./);
 for (const option of missionFour.options) assert.ok(imageHost.innerHTML.includes(option), `Mission 4 includes ${option}`);
 assert.match(imageHost.innerHTML, /data-question-id="search-penguin-location"/, "Mission 4 choices are ordinary response buttons, not auto-marked answers");
