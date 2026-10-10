@@ -3,10 +3,11 @@ const assert = require("node:assert/strict");
 const express = require("express");
 const fs = require("node:fs");
 const path = require("node:path");
+const vm = require("node:vm");
 const { registerProgressionPathway, validateRecord } = require("../learning-pathways/progression-store");
 const ids = ["digital-systems", "data", "digital-citizenship", "programming-and-algorithms", "systems-and-control"];
 const sample = { studentEmail: "student@example.test", schoolYear: 2027, term: 1, yearLevel: 7,
-    revision: 0, formClass: "7XX", strengths: "", nextLearning: "",
+    revision: 0, formClass: "7XX", homeroom: "JPI", strengths: "", nextLearning: "",
     pathways: ids.map((id) => ({ id, coverage: "not-taught", descriptor: null, addressed: "", evidence: "", notes: "" })) };
 const clone = (value) => JSON.parse(JSON.stringify(value));
 async function main() {
@@ -23,7 +24,31 @@ async function main() {
     }
     const navigation = fs.readFileSync(path.join(root, "script.js"), "utf8");
     assert.match(navigation, /href="\/learning-pathways\/progression-pathway\.html">Progression Pathway/);
+    const client = fs.readFileSync(path.join(root, "learning-pathways/progression-pathway.js"), "utf8");
+    const context = vm.createContext({});
+    vm.runInContext(client.slice(client.indexOf("function progressionMatchingStudents("), client.indexOf("function progressionHomeroomOptions(")), context);
+    const students = [
+        { email: "one", name: "Aroha", yearLevel: 7, homeroom: "JPI", formClass: "7WHAU" },
+        { email: "two", name: "Ben", yearLevel: 8, homeroom: "JPI", formClass: "8WHAU" },
+        { email: "three", name: "Cara", yearLevel: 7, homeroom: "JVE", formClass: "7WHAU" },
+        { email: "four", name: "Drew", yearLevel: 7, formClass: "7S" }
+    ];
+    const filtered = (...args) => Array.from(context.progressionMatchingStudents(students, ...args), (student) => student.email);
+    assert.deepEqual(filtered("JPI", "7", ""), ["one"], "Homeroom and Year 7 are combined, not alternatives");
+    assert.deepEqual(filtered(" jpi ", "", ""), ["one", "two"]);
+    assert.deepEqual(filtered("", "7", ""), ["one", "three", "four"]);
+    assert.deepEqual(filtered("7S", "7", ""), ["four"]);
+    assert.deepEqual(filtered("JPI", "7", "Ben"), []);
+    assert.deepEqual(filtered("JSD", "7", ""), [], "Missing homeroom does not guess student membership");
+    assert.deepEqual(filtered("JPI", "7", "aro"), ["one"]);
+    const serverSource = fs.readFileSync(path.join(root, "server.js"), "utf8");
+    assert.match(serverSource, /homeroom: pickRowValue\(lower, \["homeroom", "home_room", "home room"/,
+        "Explicit homeroom takes priority over class fields");
     assert.deepEqual(validateRecord(sample), sample);
+    const legacy = { ...sample };
+    delete legacy.homeroom;
+    assert.equal(validateRecord(legacy).homeroom, sample.formClass, "Existing records without homeroom remain compatible");
+    assert.throws(() => validateRecord({ ...sample, homeroom: "x".repeat(101) }));
     for (const bad of [
         { ...sample, yearLevel: 11 }, { ...sample, term: 5 }, { ...sample, revision: -1 },
         { ...sample, pathways: [] }, { ...sample, strengths: "a".repeat(5001) },
@@ -97,6 +122,7 @@ async function main() {
         assert.equal(history.length, 3, "Separate year/term history persists");
         assert.equal(history[2].pathways[0].descriptor, "consolidating");
         assert.equal(history[2].yearLevel, 7, "Year level is a historical snapshot");
+        assert.equal(history[2].homeroom, "JPI", "Homeroom persists separately from class and term");
         const oldDirectory = options.getStudents;
         options.getStudents = async () => [];
         const historicalApp = express();

@@ -103,6 +103,16 @@ their historical year level/class and saved name are retained. New rotations
 require a current Year 7-10 directory entry.
 Database-unavailable development returns an explicit 503 rather than pretending
 results were saved. Source PDFs remain local and are not published.
+The student controls use Homeroom and Year level filters together with name
+search (for example JPI + Year 7). JVE, JPI, JMM, JSR, JSD, 7S and 8S are offered,
+along with other directory homerooms. Explicit homeroom/tutor fields take
+priority over class codes; class is used only when no homeroom is supplied.
+No class-to-homeroom membership is guessed. Zero matches are shown explicitly.
+Filtering away from a student prompts before discarding unsaved edits and clears
+the previous results. Homeroom is saved separately from class; old records use
+their class as a display fallback. Saved term results keep the existing
+student/school-year/term storage key and history; this is not a storage migration
+from terms to homerooms.
 Run `node scripts/regression-progression-pathway.js` for validation, teacher
 access, history persistence, concurrent-edit conflicts and descriptor contrast.
 

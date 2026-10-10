@@ -29,6 +29,7 @@ function validateRecord(body) {
     });
     return { studentEmail, schoolYear: body.schoolYear, term: body.term, yearLevel: body.yearLevel,
         revision: body.revision, formClass: text(body.formClass, "class", 100), pathways,
+        homeroom: body.homeroom === undefined ? text(body.formClass, "class", 100) : text(body.homeroom, "homeroom", 100),
         strengths: text(body.strengths, "strengths"), nextLearning: text(body.nextLearning, "next learning") };
 }
 
@@ -56,7 +57,8 @@ function registerProgressionPathway(app, { pool, hasDatabase, requireTeacherAcce
             if (!students.has(row.student_email)) {
                 students.set(row.student_email, { email: row.student_email,
                     name: row.record.studentName || row.student_email,
-                    yearLevel: row.record.yearLevel, formClass: row.record.formClass, archived: true });
+                    yearLevel: row.record.yearLevel, formClass: row.record.formClass,
+                    homeroom: row.record.homeroom || row.record.formClass, archived: true });
             }
         }
         return [...students.values()];

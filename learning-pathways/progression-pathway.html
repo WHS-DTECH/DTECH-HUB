@@ -19,27 +19,31 @@
         <header class="hero"><nav class="topbar" aria-label="Primary"><a class="brand" href="/index.html">Computer Lab</a></nav></header>
         <main class="progression-page">
             <section class="panel-section">
-                <p class="section-kicker">YEAR 7-10 | TEACHER VIEW | 10-WEEK ROTATION</p>
+                <p class="section-kicker">YEAR 7-10 | TEACHER VIEW | HOMEROOM</p>
                 <h1>Progression Pathway</h1>
                 <p>Curriculum progress tracker. Teacher-selected descriptors against the student's year-specific expectations.</p>
                 <p id="progression-status" role="status">Checking Teacher View access...</p>
                 <button id="progression-retry" class="button button-secondary" type="button" hidden>Reload saved results</button>
                 <fieldset id="progression-controls" disabled>
-                    <legend>Student and rotation</legend>
+                    <legend>Student and Homeroom</legend>
                     <div class="progression-fields">
+                        <label>Homeroom<select id="progression-homeroom-filter"><option value="">All homerooms</option></select></label>
+                        <label>Year level filter<select id="progression-year-filter"><option value="">All years</option><option value="7">Year 7</option><option value="8">Year 8</option><option value="9">Year 9</option><option value="10">Year 10</option></select></label>
                         <label>Find a student<input id="progression-search" type="search" placeholder="Start typing a name..."></label>
                         <label>Student<select id="progression-student"><option value="">Select a student</option></select></label>
-                        <label>Saved rotations<select id="progression-history"><option value="">New rotation</option></select></label>
+                        <label>Saved term results<select id="progression-history"><option value="">New term record</option></select></label>
                     </div>
+                    <p id="progression-filter-count" role="status"></p>
                 </fieldset>
                 <form id="progression-form">
                     <fieldset id="progression-editor" disabled hidden>
-                        <legend>Rotation results</legend>
+                        <legend>Student results</legend>
                         <div class="progression-fields">
                             <label>School year<input id="progression-year" type="number" min="2000" max="2100" required></label>
-                            <label>Term / 10-week rotation<select id="progression-term"><option value="1">Term 1</option><option value="2">Term 2</option><option value="3">Term 3</option><option value="4">Term 4</option></select></label>
+                            <label>Term<select id="progression-term"><option value="1">Term 1</option><option value="2">Term 2</option><option value="3">Term 3</option><option value="4">Term 4</option></select></label>
                             <label>Student year level<select id="progression-level"><option value="7">Year 7</option><option value="8">Year 8</option><option value="9">Year 9</option><option value="10">Year 10</option></select></label>
                             <label>Class<input id="progression-class" maxlength="100"></label>
+                            <label>Homeroom<input id="progression-homeroom" maxlength="100"></label>
                         </div>
                         <h2>Learning Pathway Results</h2>
                         <p>Coverage is separate from progress. Untaught pathways remain Not determined; descriptors are selected by the teacher, not calculated from kit completion.</p>
@@ -57,7 +61,7 @@
                         <h2>Teacher Summary</h2>
                         <label>Strengths<textarea id="progression-strengths" rows="3" maxlength="5000"></textarea></label>
                         <label>Next learning<textarea id="progression-next" rows="3" maxlength="5000"></textarea></label>
-                        <button class="button button-primary" id="progression-save" type="submit">Save rotation results</button>
+                        <button class="button button-primary" id="progression-save" type="submit">Save term results</button>
                         <p id="progression-saved"></p>
                     </fieldset>
                 </form>

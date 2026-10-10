@@ -23,23 +23,41 @@ async function progressionApi(path, options = {}) {
     return data;
 }
 function progressionDiscard() {
-    return !progression.dirty || window.confirm("Discard unsaved rotation changes?");
+    return !progression.dirty || window.confirm("Discard unsaved term result changes?");
+}
+function progressionMatchingStudents(students, homeroom, year, search) {
+    const normalise = (value) => String(value || "").trim().toUpperCase();
+    return students.filter((student) => (!homeroom || normalise(student.homeroom || student.formClass) === normalise(homeroom))
+        && (!year || Number(student.yearLevel) === Number(year))
+        && `${student.name} ${student.email} ${student.homeroom || ""} ${student.formClass || ""}`.toLowerCase().includes(search.trim().toLowerCase()));
+}
+function progressionHomeroomOptions() {
+    const selected = pp("homeroom-filter").value;
+    const homerooms = new Set(["JVE", "JPI", "JMM", "JSR", "JSD", "7S", "8S"]);
+    progression.students.forEach((student) => {
+        const homeroom = String(student.homeroom || student.formClass || "").trim().toUpperCase();
+        if (homeroom) homerooms.add(homeroom);
+    });
+    pp("homeroom-filter").replaceChildren(new Option("All homerooms", ""));
+    [...homerooms].sort().forEach((homeroom) => pp("homeroom-filter").append(new Option(homeroom, homeroom)));
+    pp("homeroom-filter").value = selected;
 }
 function progressionStudentOptions() {
     const selected = pp("student").value;
-    const search = pp("search").value.trim().toLowerCase();
+    const matching = progressionMatchingStudents(progression.students, pp("homeroom-filter").value,
+        pp("year-filter").value, pp("search").value);
     pp("student").replaceChildren(new Option("Select a student", ""));
-    for (const student of progression.students) {
-        if (student.email === selected || `${student.name} ${student.email} ${student.formClass}`.toLowerCase().includes(search)) {
-            pp("student").append(new Option(`${student.name} - Year ${student.yearLevel} - ${student.formClass}${student.archived ? " (saved history)" : ""}`, student.email));
-        }
+    for (const student of matching) {
+        pp("student").append(new Option(`${student.name} - Year ${student.yearLevel} - ${student.homeroom || student.formClass}${student.archived ? " (saved history)" : ""}`, student.email));
     }
-    pp("student").value = selected;
+    pp("student").value = matching.some((student) => student.email === selected) ? selected : "";
+    pp("filter-count").textContent = `${matching.length} matching student${matching.length === 1 ? "" : "s"}${matching.length ? " - select a student below." : " - no students match these filters."}`;
+    if (selected && !pp("student").value) void progressionLoadStudent("");
 }
 function progressionNewRecord(student) {
     const month = new Date().getMonth();
     return { studentEmail: student.email, schoolYear: new Date().getFullYear(), term: Math.min(4, Math.floor(month / 3) + 1),
-        yearLevel: student.yearLevel, formClass: student.formClass, revision: 0, strengths: "", nextLearning: "",
+        yearLevel: student.yearLevel, formClass: student.formClass, homeroom: student.homeroom || student.formClass, revision: 0, strengths: "", nextLearning: "",
         pathways: progressionPathways.map(([id]) => ({ id, coverage: "not-taught", descriptor: null, addressed: "", evidence: "", notes: "" })) };
 }
 function progressionDetail() {
@@ -57,9 +75,10 @@ function progressionRender(record) {
     for (const [control, key] of [["year", "schoolYear"], ["term", "term"], ["level", "yearLevel"], ["class", "formClass"], ["strengths", "strengths"], ["next", "nextLearning"]]) {
         pp(control).value = record[key];
     }
+    pp("homeroom").value = record.homeroom || record.formClass;
     pp("year").disabled = record.revision > 0;
     pp("term").disabled = record.revision > 0;
-    pp("saved").textContent = record.updatedAt ? `Saved ${new Date(record.updatedAt).toLocaleString()} by ${record.updatedBy}` : "New rotation - not saved yet.";
+    pp("saved").textContent = record.updatedAt ? `Saved ${new Date(record.updatedAt).toLocaleString()} by ${record.updatedBy}` : "New term record - not saved yet.";
     pp("rows").replaceChildren();
     for (const [id, title] of progressionPathways) {
         const result = progression.record.pathways.find((row) => row.id === id);
@@ -98,22 +117,23 @@ function progressionRender(record) {
 function progressionHistory() {
     const student = progression.students.find((item) => item.email === pp("student").value);
     pp("history").replaceChildren();
-    if (!student?.archived) pp("history").append(new Option("New rotation", ""));
+    if (!student?.archived) pp("history").append(new Option("New term record", ""));
     progression.records.forEach((record, index) => pp("history").append(new Option(`${record.schoolYear} Term ${record.term} - Year ${record.yearLevel} / ${record.formClass}`, String(index))));
 }
 async function progressionLoadStudent(email) {
     const request = ++progression.loading;
     progression.record = null;
+    progression.records = [];
     progression.dirty = false;
     pp("editor").hidden = true;
-    pp("history").replaceChildren(new Option("New rotation", ""));
-    if (!email) return;
-    progressionStatus("Loading saved rotations...");
+    pp("history").replaceChildren(new Option("New term record", ""));
+    if (!email) { progressionStatus("Find and select a Year 7-10 student."); return; }
+    progressionStatus("Loading saved term results...");
     pp("retry").hidden = true;
     try {
         const data = await progressionApi(`records?studentEmail=${encodeURIComponent(email)}`);
         if (request !== progression.loading) return;
-        if (!Array.isArray(data.records)) throw new Error("Saved rotation response is invalid.");
+        if (!Array.isArray(data.records)) throw new Error("Saved term response is invalid.");
         progression.records = data.records;
         progressionHistory();
         if (data.records.length) {
@@ -123,7 +143,7 @@ async function progressionLoadStudent(email) {
         progressionStatus("Select a pathway to record coverage and evidence. Changes are not saved until you press Save.");
     } catch (error) {
         if (request !== progression.loading) return;
-        console.error("Could not load progression rotations", error);
+        console.error("Could not load progression term results", error);
         progressionStatus(error.message, true);
         pp("retry").hidden = false;
     }
@@ -136,12 +156,13 @@ async function progressionInit() {
         progression.record = null; progression.records = []; progression.students = []; progression.dirty = false;
         pp("editor").hidden = true;
         pp("student").replaceChildren(new Option("Select a student", ""));
-        pp("history").replaceChildren(new Option("New rotation", ""));
+        pp("history").replaceChildren(new Option("New term record", ""));
     }
     pp("controls").disabled = true;
     pp("editor").disabled = true;
     if (!hasAllowedSignedInHubAccount()) {
         progression.record = null; progression.dirty = false;
+        pp("filter-count").textContent = "";
         pp("retry").hidden = true;
         pp("editor").hidden = true; pp("student").replaceChildren(new Option("Select a student", ""));
         progressionStatus("Sign in with a Teacher/Admin account to access student results.");
@@ -164,6 +185,7 @@ async function progressionInit() {
         if (request !== progression.loading) return;
         if (!Array.isArray(data.students)) throw new Error("Student directory response is invalid.");
         progression.students = data.students.sort((a, b) => a.name.localeCompare(b.name));
+        progressionHomeroomOptions();
         progressionStudentOptions();
         pp("controls").disabled = false;
         pp("retry").hidden = true;
@@ -175,7 +197,19 @@ async function progressionInit() {
         progressionStatus(error.message, true); pp("retry").hidden = false;
     }
 }
-pp("search").addEventListener("input", progressionStudentOptions);
+const progressionFilters = { search: "", "homeroom-filter": "", "year-filter": "" };
+function progressionFilterChanged(name) {
+    const matching = progressionMatchingStudents(progression.students, pp("homeroom-filter").value, pp("year-filter").value, pp("search").value);
+    if (progression.record && !matching.some((student) => student.email === progression.record.studentEmail) && !progressionDiscard()) {
+        pp(name).value = progressionFilters[name];
+        return;
+    }
+    progressionFilters[name] = pp(name).value;
+    progressionStudentOptions();
+}
+for (const [name, event] of [["search", "input"], ["homeroom-filter", "change"], ["year-filter", "change"]]) {
+    pp(name).addEventListener(event, () => progressionFilterChanged(name));
+}
 pp("student").addEventListener("change", () => {
     if (!progressionDiscard()) { pp("student").value = progression.record?.studentEmail || ""; return; }
     void progressionLoadStudent(pp("student").value);
@@ -197,11 +231,11 @@ pp("form").addEventListener("submit", async (event) => {
     event.preventDefault();
     if (progression.saving || !progression.record) return;
     const record = { ...progression.record, schoolYear: Number(pp("year").value), term: Number(pp("term").value),
-        yearLevel: Number(pp("level").value), formClass: pp("class").value, strengths: pp("strengths").value, nextLearning: pp("next").value };
+        yearLevel: Number(pp("level").value), formClass: pp("class").value, homeroom: pp("homeroom").value, strengths: pp("strengths").value, nextLearning: pp("next").value };
     progression.saving = true;
     const teacherEmail = hubAuthState.profile?.email;
     pp("editor").disabled = true; pp("controls").disabled = true;
-    progressionStatus("Saving rotation results...");
+    progressionStatus("Saving term results...");
     try {
         const data = await progressionApi("records", { method: "PUT", body: JSON.stringify(record) });
         if (!hasAllowedSignedInHubAccount() || hubAuthState.profile?.email !== teacherEmail) return;
@@ -211,10 +245,10 @@ pp("form").addEventListener("submit", async (event) => {
         progressionHistory();
         pp("history").value = String(progression.records.findIndex((old) => old.schoolYear === record.schoolYear && old.term === record.term));
         progressionRender(data.record);
-        progressionStatus("Rotation results saved.");
+        progressionStatus("Term results saved.");
     } catch (error) {
         if (!hasAllowedSignedInHubAccount() || hubAuthState.profile?.email !== teacherEmail) return;
-        console.error("Could not save progression rotation", error);
+        console.error("Could not save progression term results", error);
         progressionStatus(error.message, true); pp("retry").hidden = false;
     } finally {
         progression.saving = false;
