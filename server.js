@@ -4412,7 +4412,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function addSearchKitPenguinMission(content) {
-  if (content?._contentMigrations?.searchPenguinMission >= 8) return content;
+  if (content?._contentMigrations?.searchPenguinMission >= 9) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets.slice() : [];
   if (!worksheets[0]) worksheets[0] = { number: 1, activity: "Search Like a Pro", establishes: "Understands search engines and keywords" };
@@ -4513,6 +4513,19 @@ function addSearchKitPenguinMission(content) {
       ]
     });
   }
+  if (!questions.some((question) => question.id === "search-penguin-safety")) {
+    questions.push({
+      id: "search-penguin-safety",
+      type: "multiple-choice",
+      heading: "Mission 5 – Keeping Kororā Safe",
+      prompt: "Little Blue Penguins face dangers along the West Coast. Which of these can harm them?",
+      options: [
+        "Uncontrolled dogs",
+        "Native flax plants",
+        "Rainbows"
+      ]
+    });
+  }
 
   const imageUrl = "/practical-skills/images/little-blue-penguin.jpg";
   const images = Array.isArray(activity.images) ? activity.images.slice() : [];
@@ -4559,7 +4572,7 @@ function addSearchKitPenguinMission(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchPenguinMission: 8
+      searchPenguinMission: 9
     }
   };
 }

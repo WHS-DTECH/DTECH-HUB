@@ -52,6 +52,9 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
 - Implemented: Search Like a Pro Mission 4 is an ungraded search activity about
   little blue penguins near Hokitika. Hokitika Beach replaces the unverified
   Taramakau viewing-area option, based on the local tourism site's guidance.
+- Implemented: Search Like a Pro Mission 5 asks students to investigate dangers
+  to kororā, with uncontrolled dogs, native flax plants and rainbows as choices.
+  It is a saved response rather than an automatically marked answer.
 - Implemented: the Kit Worksheets editor displays a teacher suggestion to
   structure the first activities as foundational skills, middle activities as
   applied skills, and final activities as integrated challenges.
