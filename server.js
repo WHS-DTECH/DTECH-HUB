@@ -4412,7 +4412,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function addSearchKitPenguinMission(content) {
-  if (content?._contentMigrations?.searchPenguinMission >= 5) return content;
+  if (content?._contentMigrations?.searchPenguinMission >= 6) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets.slice() : [];
   if (!worksheets[0]) worksheets[0] = { number: 1, activity: "Search Like a Pro", establishes: "Understands search engines and keywords" };
@@ -4449,7 +4449,17 @@ function addSearchKitPenguinMission(content) {
       ]
     });
   }
-  if (!questions.some((question) => question.id === "search-tallest-mountain")) {
+  const taranakiImage = {
+    url: "/practical-skills/images/mount-taranaki.jpg",
+    alt: "Mount Taranaki rising above the forested slopes of Egmont National Park.",
+    caption: "Mount Taranaki",
+    attribution: "Michal Klajban",
+    sourceUrl: "https://commons.wikimedia.org/wiki/File:Mount_Taranaki,_New_Zealand_(03).JPG",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0/"
+  };
+  const missionThreeIndex = questions.findIndex((question) => question.id === "search-tallest-mountain");
+  if (missionThreeIndex < 0) {
     questions.push({
       id: "search-tallest-mountain",
       type: "multiple-choice",
@@ -4457,7 +4467,8 @@ function addSearchKitPenguinMission(content) {
       prompt: "Find the name of New Zealand's tallest mountain. What did you find?",
       options: [
         "Mount Ruapehu",
-        "Aoraki / Mount Cook"
+        "Aoraki / Mount Cook",
+        "Mount Taranaki"
       ],
       images: [
         {
@@ -4477,9 +4488,17 @@ function addSearchKitPenguinMission(content) {
           sourceUrl: "https://commons.wikimedia.org/wiki/File:Aoraki,_Aoraki_-_Mount_Cook_National_Park,_New_Zealand_02.jpg",
           license: "CC BY-SA 4.0",
           licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0/"
-        }
+        },
+        taranakiImage
       ]
     });
+  } else {
+    const missionThree = questions[missionThreeIndex];
+    const options = Array.isArray(missionThree.options) ? missionThree.options.slice() : [];
+    if (!options.includes("Mount Taranaki")) options.push("Mount Taranaki");
+    const images = Array.isArray(missionThree.images) ? missionThree.images.slice() : [];
+    if (!images.some((image) => image?.url === taranakiImage.url)) images.push(taranakiImage);
+    questions[missionThreeIndex] = { ...missionThree, options, images };
   }
 
   const imageUrl = "/practical-skills/images/little-blue-penguin.jpg";
@@ -4521,7 +4540,7 @@ function addSearchKitPenguinMission(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchPenguinMission: 5
+      searchPenguinMission: 6
     }
   };
 }

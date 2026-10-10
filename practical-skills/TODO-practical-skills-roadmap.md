@@ -48,7 +48,7 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   search words to learn what a kororā eats, using a multiple-choice activity.
 - Implemented: Search Like a Pro Mission 3 asks students to search for New
   Zealand's tallest mountain and choose between locally stored, credited photos
-  of Mount Ruapehu and Aoraki / Mount Cook.
+  of Mount Ruapehu, Aoraki / Mount Cook and Mount Taranaki.
 - Implemented: the Kit Worksheets editor displays a teacher suggestion to
   structure the first activities as foundational skills, middle activities as
   applied skills, and final activities as integrated challenges.
