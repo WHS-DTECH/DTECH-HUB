@@ -11,6 +11,15 @@
         { id: "kit-minecraft", title: "Minecraft" }
     ];
 
+    const KIT_COLOUR_SCHEMES = {
+        "Skill Kits": { color: "#2f8f61", accent: "#ffd166" },
+        "Application Kits": { color: "#2b87b6", accent: "#66fff5" }
+    };
+
+    function normaliseSkillArea(value) {
+        return /^\s*application/i.test(String(value || "")) ? "Application Kits" : "Skill Kits";
+    }
+
     const state = {
         isAdmin: false,
         kitId: KIT_CATALOG[0].id,
@@ -243,7 +252,7 @@
         const content = state.content || {};
         nameInput.value = content.identity?.name || content.bannerTitle || "";
         updateKitOptionTitle(state.kitId, nameInput.value);
-        skillAreaInput.value = content.identity?.skillArea || "";
+        skillAreaInput.value = normaliseSkillArea(content.identity?.skillArea);
         kitStatusInput.value = content.identity?.status || "active";
         setYearLevelSelection(content.identity?.yearLevel);
         bannerSubtitleInput.value = content.bannerSubtitle || "";
@@ -330,6 +339,13 @@
             input.addEventListener("input", queuePreviewUpdate);
         });
         yearLevelInput.addEventListener("change", queuePreviewUpdate);
+        skillAreaInput.addEventListener("change", () => {
+            const scheme = KIT_COLOUR_SCHEMES[skillAreaInput.value];
+            if (!scheme) return;
+            themeColorInput.value = scheme.color;
+            accentColorInput.value = scheme.accent;
+            queuePreviewUpdate();
+        });
 
         worksheetListHost.addEventListener("click", (event) => {
             const button = event.target.closest(".kit-remove-worksheet");

@@ -58,8 +58,9 @@
 
     .kit-builder-color-row {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
       gap: 12px;
+      align-items: start;
     }
 
     .kit-builder-color-row > .kit-builder-field {
@@ -384,10 +385,6 @@
               <small>This name appears on the kit page and in the Kit dropdown.</small>
             </div>
             <div class="kit-builder-field">
-              <label for="kit-skill-area">Skill Area</label>
-              <input id="kit-skill-area" type="text" placeholder="e.g. Practical Skills">
-            </div>
-            <div class="kit-builder-field">
               <label for="kit-status">Status</label>
               <select id="kit-status">
                 <option value="active">Active</option>
@@ -423,6 +420,13 @@
               <input id="kit-icon" type="text" placeholder="\ud83d\udd10">
             </div>
             <div class="kit-builder-color-row">
+              <div class="kit-builder-field">
+                <label for="kit-skill-area">Skill Area</label>
+                <select id="kit-skill-area">
+                  <option value="Skill Kits">Skill Kits</option>
+                  <option value="Application Kits">Application Kits</option>
+                </select>
+              </div>
               <div class="kit-builder-field">
                 <label for="kit-theme-color">Theme Colour</label>
                 <input id="kit-theme-color" type="color" value="#2f8f61">

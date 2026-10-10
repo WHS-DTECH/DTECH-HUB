@@ -76,4 +76,23 @@ titleContext.updateKitOptionTitle("kit-google-search", "");
 assert.equal(kitSelect.options[1].textContent, "Google Search", "Blank kit name restores the catalog fallback");
 assert.match(source, /bannerTitle:\s*nameInput\.value/, "The single Kit Name is also saved as the banner title");
 
+const colourRow = html.match(/<div class="kit-builder-color-row">([\s\S]*?)<div class="kit-builder-field">\s*<label for="kit-instructions">/);
+assert.ok(colourRow, "Colour row is present");
+assert.match(colourRow[1], /<label for="kit-skill-area">Skill Area<\/label>\s*<select id="kit-skill-area">\s*<option value="Skill Kits">Skill Kits<\/option>\s*<option value="Application Kits">Application Kits<\/option>\s*<\/select>[\s\S]*kit-theme-color[\s\S]*kit-accent-color/, "Skill Area dropdown sits left of the colours");
+assert.doesNotMatch(html, /<input id="kit-skill-area"/, "Skill Area is no longer free text");
+const schemeStart = source.indexOf("    const KIT_COLOUR_SCHEMES = {");
+const schemeEnd = source.indexOf("\n    const state = {", schemeStart);
+assert.ok(schemeStart >= 0 && schemeEnd > schemeStart, "Colour scheme presets are present");
+const schemeContext = vm.createContext({});
+vm.runInContext(source.slice(schemeStart, schemeEnd).replace("const KIT_COLOUR_SCHEMES", "var KIT_COLOUR_SCHEMES"), schemeContext);
+assert.deepEqual({ ...schemeContext.KIT_COLOUR_SCHEMES["Skill Kits"] }, { color: "#2f8f61", accent: "#ffd166" });
+assert.deepEqual({ ...schemeContext.KIT_COLOUR_SCHEMES["Application Kits"] }, { color: "#2b87b6", accent: "#66fff5" });
+assert.equal(schemeContext.normaliseSkillArea("Application: Minecraft"), "Application Kits");
+assert.equal(schemeContext.normaliseSkillArea("Application Kits"), "Application Kits");
+assert.equal(schemeContext.normaliseSkillArea("Search Skills"), "Skill Kits");
+assert.equal(schemeContext.normaliseSkillArea(""), "Skill Kits");
+assert.match(source, /skillAreaInput\.addEventListener\("change", \(\) => \{\s*const scheme = KIT_COLOUR_SCHEMES\[skillAreaInput\.value\];[\s\S]*?themeColorInput\.value = scheme\.color;\s*accentColorInput\.value = scheme\.accent;/, "Changing Skill Area applies its colour scheme");
+
+console.log("Kit Builder Skill Area colour scheme regression checks passed.");
+
 console.log("Kit Builder Year Level dropdown regression checks passed.");
