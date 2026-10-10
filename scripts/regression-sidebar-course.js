@@ -113,6 +113,7 @@ async function main() {
     let refreshCourse;
     const pathwaysLink = { hidden: true };
     const browser = vm.createContext({
+        routeHubCourseHomepage() {},
         window: { addEventListener(type, fn) { assert.equal(type, "hub-course-changed"); refreshCourse = fn; } },
         document: { querySelector: (selector) => selector === "#hub-pathways-link" ? pathwaysLink : panel },
         hubAuthState: auth,

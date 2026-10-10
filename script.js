@@ -1628,7 +1628,7 @@ function getEffectiveHubViewMode() {
 
 function isHomepagePath() {
     const path = String(window.location.pathname || "").toLowerCase();
-    return path === "/" || path.endsWith("/index.html");
+    return path === "/" || path === "/index.html";
 }
 
 function isTeacherWorkspacePath() {
@@ -2365,6 +2365,24 @@ function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {
     }
 }
 
+function routeHubCourseHomepage(course) {
+    const signedIn = hasAllowedSignedInHubAccount();
+    const studentView = !(hubAccessState.canTeacherView || hubAccessState.canAdmin)
+        || getEffectiveHubViewMode() !== "teacher";
+    const juniorOrMiddle = ["JuniorDTECH", "MiddleDTECH"].includes(course);
+    const destination = juniorOrMiddle ? "/learning-pathways/" : "/index.html";
+    const brand = document.querySelector(".topbar .brand");
+    if (brand) brand.href = signedIn && studentView && juniorOrMiddle ? destination : "/index.html";
+    if (!signedIn || !hubAccessState.resolved || !studentView
+        || !["JuniorDTECH", "MiddleDTECH", "SeniorDTECH"].includes(course)) return;
+    const pathname = window.location.pathname.toLowerCase();
+    const labHome = pathname === "/" || pathname === "/index.html";
+    const pathwaysHome = pathname === "/learning-pathways/" || pathname === "/learning-pathways/index.html";
+    if ((labHome && juniorOrMiddle) || (pathwaysHome && course === "SeniorDTECH")) {
+        window.location.replace(destination);
+    }
+}
+
 function updateSidebarCourseSections(panel, course = panel.dataset.course || "") {
     panel.dataset.course = course;
     const pathwaysLink = document.querySelector("#hub-pathways-link");
@@ -2404,6 +2422,7 @@ async function loadAndRenderSidebarCourse(panel) {
         courseEl.textContent = data.course ? `Course: ${data.course}` : "Course: Not confirmed yet";
         courseEl.hidden = false;
         updateSidebarCourseSections(panel, data.course);
+        routeHubCourseHomepage(data.course);
     } catch (error) {
         console.error("Could not load sidebar course", error);
         if (normalizeEmail(hubAuthState.profile?.email || "") !== email || courseEl.dataset.requestId !== requestId) return;
@@ -2875,6 +2894,7 @@ function renderHubAuthUi() {
     }
     const pathwaysLink = document.querySelector("#hub-pathways-link");
     if (pathwaysLink) pathwaysLink.hidden = true;
+    routeHubCourseHomepage("");
     if (hubSeniorTaskListLink) {
         hubSeniorTaskListLink.hidden = !signedIn || !hubSeniorTaskListLink.dataset.senior;
     }
