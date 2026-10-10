@@ -1534,6 +1534,18 @@ body.kit-worksheet-page {
     gap: 10px;
 }
 
+.worksheet-minecraft-exports {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 20px;
+    border-color: var(--worksheet-theme-color);
+}
+
+.worksheet-minecraft-exports ol {
+    margin: 0;
+    padding-left: 22px;
+}
+
 @media print {
     .kit-worksheet-topbar,
     .worksheet-complete-bar,

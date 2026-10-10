@@ -451,7 +451,14 @@
         if (worksheets.length && (activityIndex === null || !worksheets[activityIndex])) {
             window.KitWorksheetRender.renderKitOverview(host, state.content, {
                 kitId: state.kitId,
-                completedActivities: state.completedActivities
+                completedActivities: state.completedActivities,
+                readOnly: !state.email,
+                minecraftExports: state.kitId === "kit-minecraft",
+                onMinecraftExportsOpen: async () => loadJson("/api/practical-skills/minecraft-exports-folder", {
+                    method: "POST",
+                    headers: withAuthHeaders({ "Content-Type": "application/json" }),
+                    body: JSON.stringify({ driveAccessToken: await getResearchReportDriveToken() })
+                })
             });
         } else {
             const worksheet = activityIndex === null ? null : worksheets[activityIndex];

@@ -1026,6 +1026,22 @@
                     <div class="worksheet-instructions-copy">${renderInstructions(content.instructions)}</div>
                 </div>
             ` : ""}
+            ${options.minecraftExports ? `
+                <section class="worksheet-assessment-intro worksheet-minecraft-exports" aria-labelledby="minecraft-exports-title" data-minecraft-exports>
+                    <h2 id="minecraft-exports-title">\ud83d\udcc1 Set up your Minecraft Exports folder</h2>
+                    <p>Before you start building, make a safe place in Google Drive to keep your exported worlds, screenshots, Portfolio and videos.</p>
+                    <ol>
+                        <li>Click <strong>Create &amp; Open My Minecraft Exports Folder</strong>. Your folder opens in a new tab: <strong>WHS-DTECH \u2192 your course \u2192 KITS \u2192 Minecraft Exports</strong>.</li>
+                        <li>In Minecraft Education, go to <strong>Play \u2192 View My Worlds</strong>, click the pencil \u270f\ufe0f next to your world, then <strong>Export World</strong>.</li>
+                        <li>Check where the <strong>.mcworld</strong> file saves. If you're not sure, look in your <strong>Downloads</strong> folder.</li>
+                        <li>Drag the <strong>.mcworld</strong> file into your Minecraft Exports tab. Do this at the end of every lesson so your work is safe.</li>
+                    </ol>
+                    <div class="worksheet-research-report-actions">
+                        <button type="button" class="worksheet-btn worksheet-btn-primary" data-minecraft-exports-open ${options.readOnly ? "disabled" : ""}>Create &amp; Open My Minecraft Exports Folder</button>
+                    </div>
+                    <p class="worksheet-assessment-result" data-minecraft-exports-status role="status" aria-live="polite">${options.readOnly ? "Sign in with your school Google account to create your Minecraft Exports folder." : ""}</p>
+                </section>
+            ` : ""}
             <section class="worksheet-activities" aria-labelledby="worksheet-activities-title">
                 <h2 id="worksheet-activities-title">Activities</h2>
                 <p class="worksheet-activity-progress">${completedCount} / ${visibleWorksheets.length} activities completed</p>
@@ -1052,6 +1068,40 @@
                 ` : `<p class="worksheet-empty-note">No activities have been added to this kit yet.</p>`}
             </section>
         `;
+        wireMinecraftExports(host, options);
+    }
+
+    function wireMinecraftExports(host, options) {
+        const section = host.querySelector?.("[data-minecraft-exports]");
+        if (!section) return;
+        const button = section.querySelector("[data-minecraft-exports-open]");
+        const status = section.querySelector("[data-minecraft-exports-status]");
+        const setStatus = (message, error = false) => {
+            status.textContent = message;
+            status.classList.toggle("is-error", error);
+            status.classList.toggle("is-correct", !error && Boolean(message));
+        };
+        button.addEventListener("click", async () => {
+            // Reserve the tab during the click so Google permission does not trigger popup blocking.
+            const folderTab = window.open("about:blank", "_blank");
+            if (folderTab) folderTab.opener = null;
+            button.disabled = true;
+            setStatus("");
+            status.textContent = "Getting your Minecraft Exports folder ready...";
+            try {
+                if (!options.onMinecraftExportsOpen) throw new Error("Sign in with your school Google account first.");
+                const folder = await options.onMinecraftExportsOpen();
+                if (!folder?.folderUrl) throw new Error("Your Minecraft Exports folder could not be opened. Please try again.");
+                if (folderTab && !folderTab.closed) folderTab.location.replace(folder.folderUrl);
+                else window.open(folder.folderUrl, "_blank", "noopener");
+                setStatus(`Your folder is open in a new tab: ${(folder.path || []).join(" \u2192 ")}. Drag your exported .mcworld files into it.`);
+            } catch (error) {
+                if (folderTab && !folderTab.closed) folderTab.close();
+                setStatus(error?.message || "Could not open your Minecraft Exports folder. Please try again.", true);
+            } finally {
+                button.disabled = false;
+            }
+        });
     }
 
     window.KitWorksheetRender = { renderWorksheet, renderKitOverview, visibleLoginSites };

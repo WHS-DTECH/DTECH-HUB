@@ -17,7 +17,7 @@
         },
         {
             id: "kit-google-search",
-            title: "Google Search",
+            title: "Search Kit",
             icon: "\ud83d\udd0e",
             colour: "blue",
             description: "Use advanced search techniques to find reliable answers and cite one quality source.",

@@ -14056,12 +14056,8 @@ async function ensureStudentCourseFolders(email, programmeFolder, driveAccessTok
   });
 }
 
-// Locates WHS-DTECH > JuniorDTECH/MiddleDTECH/SeniorDTECH > KITS and reopens or copies the report. Only a brand-new copy is filled in; existing files are never changed or deleted.
-async function ensureStudentResearchReport(email, kitId, report, driveAccessToken, studentDetails = {}) {
-  const existing = await getStudentKitDocument(email, kitId, report.id);
-  const liveExisting = existing?.document_id ? await driveGetLiveFile(existing.document_id, driveAccessToken) : null;
-  if (liveExisting) return { documentId: liveExisting.id, created: false };
-
+// Students use their directory year level; staff use the pathway chosen in the Login Kit course check-in.
+async function getStudentProgrammeFolder(email) {
   const programmeFolder = getResearchReportProgrammeFolder(await getLearningSitesStudentProfile(email),
     getCourseProgrammeFolder((await getSavedLearningSitesCheckIn(email))?.answers?.course));
   if (!programmeFolder) {
@@ -14069,6 +14065,40 @@ async function ensureStudentResearchReport(email, kitId, report, driveAccessToke
     error.status = 409;
     throw error;
   }
+  return programmeFolder;
+}
+
+const MINECRAFT_EXPORTS_FOLDER_NAME = "Minecraft Exports";
+
+// Finds or creates WHS-DTECH > course > KITS > Minecraft Exports. Existing folders are reused, never moved or deleted.
+app.post("/api/practical-skills/minecraft-exports-folder", async (req, res) => {
+  const email = researchReportStudentEmail(req, res);
+  if (!email) return;
+  const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
+  if (!driveAccessToken) { res.status(400).json({ error: "Google Drive permission is required." }); return; }
+  try {
+    await verifyDriveTokenForStudent(driveAccessToken, email);
+    const programmeFolder = await getStudentProgrammeFolder(email);
+    const { kits } = await ensureStudentCourseFolders(email, programmeFolder, driveAccessToken);
+    const folder = await withResearchReportLock(`${email}:minecraft-exports`,
+      async () => driveEnsureFolder(kits.id, MINECRAFT_EXPORTS_FOLDER_NAME, driveAccessToken));
+    if (!folder?.id) throw new Error(`Could not find or create your ${MINECRAFT_EXPORTS_FOLDER_NAME} folder.`);
+    res.json({
+      folderUrl: `https://drive.google.com/drive/folders/${encodeURIComponent(folder.id)}`,
+      path: ["WHS-DTECH", programmeFolder, "KITS", MINECRAFT_EXPORTS_FOLDER_NAME]
+    });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not open your Minecraft Exports folder." });
+  }
+});
+
+// Locates WHS-DTECH > JuniorDTECH/MiddleDTECH/SeniorDTECH > KITS and reopens or copies the report. Only a brand-new copy is filled in; existing files are never changed or deleted.
+async function ensureStudentResearchReport(email, kitId, report, driveAccessToken, studentDetails = {}) {
+  const existing = await getStudentKitDocument(email, kitId, report.id);
+  const liveExisting = existing?.document_id ? await driveGetLiveFile(existing.document_id, driveAccessToken) : null;
+  if (liveExisting) return { documentId: liveExisting.id, created: false };
+
+  const programmeFolder = await getStudentProgrammeFolder(email);
   const { kits } = await ensureStudentCourseFolders(email, programmeFolder, driveAccessToken);
   const fileName = String(report.fileName || SEARCH_RESEARCH_REPORT_FILE_NAME).trim() || SEARCH_RESEARCH_REPORT_FILE_NAME;
 

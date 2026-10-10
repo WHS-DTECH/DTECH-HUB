@@ -7,7 +7,7 @@
     // until the kit catalog itself is server-driven.
     const KIT_CATALOG = [
         { id: "kit-login", title: "Login" },
-        { id: "kit-google-search", title: "Google Search" },
+        { id: "kit-google-search", title: "Search Kit" },
         { id: "kit-minecraft", title: "Minecraft" }
     ];
 
