@@ -4475,6 +4475,41 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
   }
 };
 
+function addSearchResultsDetectiveIntroduction(content) {
+  if (content?._contentMigrations?.searchResultsDetective >= 1) return content;
+
+  const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
+  const activityIndex = worksheets.findIndex((worksheet) =>
+    String(worksheet?.activity || "").trim().toLowerCase() === "finding the right result");
+  if (activityIndex < 0) return content;
+
+  const activities = Array.isArray(content.activities) ? content.activities.slice() : [];
+  const activity = activities[activityIndex] && typeof activities[activityIndex] === "object"
+    ? activities[activityIndex]
+    : { title: worksheets[activityIndex].activity };
+  activities[activityIndex] = {
+    ...activity,
+    information: {
+      title: "THE MISSION: The Search Results Detective",
+      paragraphs: [
+        "You've found the right search words. Now it's time to choose the right results!",
+        "Not every result will give you the information you're looking for.",
+        "Look at the search results, follow the clues and find the information you need.",
+        "Can you solve all five missions?"
+      ]
+    }
+  };
+
+  return {
+    ...content,
+    activities,
+    _contentMigrations: {
+      ...(content?._contentMigrations || {}),
+      searchResultsDetective: 1
+    }
+  };
+}
+
 function addSearchKitKeywordChallenge(content) {
   if (content?._contentMigrations?.searchKeywordChallenge >= 9) return content;
 
@@ -4605,7 +4640,7 @@ function addSearchKitKeywordChallenge(content) {
 
 function addSearchKitPenguinMission(content) {
   if (content?._contentMigrations?.searchPenguinMission >= 11) {
-    return addSearchKitKeywordChallenge(content);
+    return addSearchResultsDetectiveIntroduction(addSearchKitKeywordChallenge(content));
   }
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets.slice() : [];
@@ -4764,7 +4799,7 @@ function addSearchKitPenguinMission(content) {
     }
   };
 
-  return addSearchKitKeywordChallenge({
+  return addSearchResultsDetectiveIntroduction(addSearchKitKeywordChallenge({
     ...content,
     worksheets,
     activities,
@@ -4772,7 +4807,7 @@ function addSearchKitPenguinMission(content) {
       ...(content?._contentMigrations || {}),
       searchPenguinMission: 11
     }
-  });
+  }));
 }
 
 function normalizePracticalSkillsKitContentForStorage(kitId, content) {
