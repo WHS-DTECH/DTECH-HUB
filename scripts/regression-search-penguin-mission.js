@@ -72,6 +72,24 @@ assert.equal(missionThree.images[1].attribution, "Michal Klajban");
 assert.equal(missionThree.images[1].license, "CC BY-SA 4.0");
 assert.equal(missionThree.images[2].attribution, "Michal Klajban");
 assert.equal(missionThree.images[2].license, "CC BY-SA 4.0");
+const missionFour = migrated.activities[0].questions.find((question) => question.id === "search-penguin-location");
+assert.ok(missionFour, "Mission 4 question is added");
+assert.equal(missionFour.type, "multiple-choice");
+assert.equal(missionFour.heading, "Mission 4 – Penguins on the Coast");
+assert.equal(missionFour.prompt, "Find out where Little Blue Penguins can be seen near Hokitika.");
+assert.deepEqual(Array.from(missionFour.options), [
+    "The West Coast Wildlife Centre in Franz Josef",
+    "Hokitika Beach",
+    "The Hokitika Gorge"
+]);
+assert.equal(Object.hasOwn(missionFour, "correctAnswer"), false, "Mission 4 is not automatically marked");
+const savedContentBeforeMissionFour = JSON.parse(JSON.stringify(migrated));
+savedContentBeforeMissionFour._contentMigrations.searchPenguinMission = 7;
+savedContentBeforeMissionFour.activities[0].questions = savedContentBeforeMissionFour.activities[0].questions
+    .filter((question) => question.id !== "search-penguin-location");
+const savedContentWithMissionFour = context.addSearchKitPenguinMission(savedContentBeforeMissionFour);
+assert.ok(savedContentWithMissionFour.activities[0].questions.some((question) => question.id === "search-penguin-location"), "Existing saved Search Kits gain Mission 4");
+assert.equal(savedContentWithMissionFour._contentMigrations.searchPenguinMission, 8, "Migration marker records Mission 4");
 const savedMissionThree = JSON.parse(JSON.stringify(migrated));
 savedMissionThree._contentMigrations.searchPenguinMission = 5;
 savedMissionThree.activities[0].questions.find((question) => question.id === "search-tallest-mountain").options.pop();
@@ -80,7 +98,7 @@ const upgradedSavedKit = context.addSearchKitPenguinMission(savedMissionThree);
 const upgradedMissionThree = upgradedSavedKit.activities[0].questions.find((question) => question.id === "search-tallest-mountain");
 assert.ok(upgradedMissionThree.options.includes("Mount Taranaki"), "Existing saved Mission 3 gains the Taranaki option");
 assert.ok(upgradedMissionThree.images.some((image) => image.url === "/practical-skills/images/mount-taranaki.jpg"), "Existing saved Mission 3 gains the Taranaki image");
-assert.equal(upgradedSavedKit._contentMigrations.searchPenguinMission, 7, "Migration marker records the updated Penguin Mystery content");
+assert.equal(upgradedSavedKit._contentMigrations.searchPenguinMission, 8, "Migration marker records the updated Penguin Mystery content");
 const photo = migrated.activities[0].images.find((image) => image.url === "/practical-skills/images/little-blue-penguin.jpg");
 assert.ok(photo, "Openly licensed local penguin photo replaces the illustration");
 assert.equal(photo.attribution, "Duncan Wright");
@@ -89,7 +107,7 @@ assert.equal(photo.sourceUrl, "https://commons.wikimedia.org/wiki/File:Blue_Peng
 assert.equal(photo.licenseUrl, "https://creativecommons.org/licenses/by-sa/3.0/");
 assert.equal(migrated.activities[0].images.some((image) => image.url.endsWith(".svg")), false, "Old illustration is removed");
 assert.equal(migrated.activities[1], original.activities[1], "Other activity content is untouched");
-assert.equal(migrated._contentMigrations.searchPenguinMission, 7, "Migration marker records the updated Penguin Mystery content");
+assert.equal(migrated._contentMigrations.searchPenguinMission, 8, "Migration marker records Mission 4");
 assert.equal(context.addSearchKitPenguinMission(migrated), migrated, "Migration is idempotent");
 assert.ok(fs.existsSync(penguinImage), "Penguin illustration asset exists");
 assert.ok(fs.existsSync(ruapehuImage), "Ruapehu photo is stored locally");
@@ -113,7 +131,7 @@ renderContext.window.KitWorksheetRender.renderWorksheet(imageHost, {
     bannerTitle: "Search Like a Pro",
     information: { title: "THE MISSION: The Penguin Mystery", paragraphs: ["Can you solve the Penguin Mystery?"] },
     images: [photo],
-    questions: [missionTwo, missionThree]
+    questions: [missionTwo, missionThree, missionFour]
 }, { readOnly: true });
 assert.match(imageHost.innerHTML, /Photo: Duncan Wright/);
 assert.match(imageHost.innerHTML, /href="https:\/\/commons\.wikimedia\.org\/wiki\/File:Blue_Penguin_Kapiti\.jpg"/, "Photo credit links to its source");
@@ -133,6 +151,10 @@ assert.match(imageHost.innerHTML, /href="https:\/\/commons\.wikimedia\.org\/wiki
 assert.match(imageHost.innerHTML, /href="https:\/\/creativecommons\.org\/licenses\/by\/2\.0\/"/);
 assert.match(imageHost.innerHTML, /href="https:\/\/creativecommons\.org\/licenses\/by-sa\/4\.0\/"/);
 assert.match(imageHost.innerHTML, /class="worksheet-question-images">[\s\S]*mount-ruapehu\.jpg[\s\S]*aoraki-mount-cook\.jpg[\s\S]*mount-taranaki\.jpg[\s\S]*class="worksheet-choices"/, "Mountain photos render with Mission 3 rather than in the activity image panel");
+assert.match(imageHost.innerHTML, /Mission 4 – Penguins on the Coast/);
+assert.match(imageHost.innerHTML, /Find out where Little Blue Penguins can be seen near Hokitika\./);
+for (const option of missionFour.options) assert.ok(imageHost.innerHTML.includes(option), `Mission 4 includes ${option}`);
+assert.match(imageHost.innerHTML, /data-question-id="search-penguin-location"/, "Mission 4 choices are ordinary response buttons, not auto-marked answers");
 assert.match(worksheetCss, /\.worksheet-question-images\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\);/, "Three mountain photos are displayed in a responsive three-column grid");
 assert.match(imageHost.innerHTML, /<div class="worksheet-image-information-layout">\s*<div class="worksheet-image-panel">[\s\S]*?<section class="worksheet-assessment-intro worksheet-identity-guide"/, "Penguin mission text is grouped beside its image");
 assert.match(worksheetCss, /\.worksheet-image-information-layout\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*minmax\(140px,\s*220px\)\s+minmax\(0,\s*1fr\);/s, "Penguin image and mission use a side-by-side layout");
@@ -140,7 +162,7 @@ assert.match(worksheetCss, /@media\s*\(max-width:\s*560px\)\s*\{[\s\S]*?\.worksh
 assert.match(builderSource, /\.\.\.\(state\.content \|\| \{\}\)/, "Kit Builder retains the migration marker when saving");
 assert.match(serverSource, /UPDATE practical_skills_kit_content SET content = \$1::jsonb, updated_at = NOW\(\) WHERE kit_id = \$2/, "Migrated mission is persisted for existing saved kits");
 assert.match(serverSource, /if \(safeKitId === "kit-google-search"\) \{\s*const migrated = addSearchKitPenguinMission\(merged\);/, "Migration applies to existing Search Kit content");
-assert.match(serverSource, /if \(content\?\._contentMigrations\?\.searchPenguinMission >= 7\) return content;/, "Saved migration marker prevents rebuilding a teacher-edited mission");
+assert.match(serverSource, /if \(content\?\._contentMigrations\?\.searchPenguinMission >= 8\) return content;/, "Saved migration marker prevents rebuilding a teacher-edited mission");
 assert.match(activityEditorSource, /\.\.\.\(content\.activities\?\.\[activityIndex\]\?\.images\?\.\[index\] \|\| \{\}\)/, "Activity Details preserves photo attribution metadata while editing images");
 
 console.log("Search Kit penguin mission migration regression checks passed.");

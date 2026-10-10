@@ -49,6 +49,9 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
 - Implemented: Search Like a Pro Mission 3 asks students to search for New
   Zealand's tallest mountain and choose between locally stored, credited photos
   of Mount Ruapehu, Aoraki / Mount Cook and Mount Taranaki.
+- Implemented: Search Like a Pro Mission 4 is an ungraded search activity about
+  little blue penguins near Hokitika. Hokitika Beach replaces the unverified
+  Taramakau viewing-area option, based on the local tourism site's guidance.
 - Implemented: the Kit Worksheets editor displays a teacher suggestion to
   structure the first activities as foundational skills, middle activities as
   applied skills, and final activities as integrated challenges.
