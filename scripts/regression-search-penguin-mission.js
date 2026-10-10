@@ -398,7 +398,7 @@ assert.equal(keywordChallengeMissionFive.type, "short-answer");
 assert.equal(keywordChallengeMissionFive.heading, "Mission 5: Your Turn – Find the Answer!");
 assert.equal(keywordChallengeMissionFive.prompt, "Use a search engine to find out what year Hokitika was founded as a gold-mining settlement. What year did you find?");
 assert.equal(keywordChallengeMissionFive.lines, 1);
-assert.equal(migrated._contentMigrations.searchKeywordChallenge, 17, "Keyword Challenge migration is recorded");
+assert.equal(migrated._contentMigrations.searchKeywordChallenge, 18, "Keyword Challenge migration is recorded");
 
 const searchFindMissionOne = migrated.activities[3].questions[0];
 assert.equal(searchFindMissionOne.id, "search-find-giant-tree");
@@ -445,11 +445,17 @@ assert.equal(searchFindMissionFive.heading, "Mission 5 – The Glacier Mystery")
 assert.equal(searchFindMissionFive.prompt, "The West Coast is home to a famous glacier called Franz Josef Glacier. What is its Māori name?");
 assert.equal(searchFindMissionFive.hint, "Search for the Māori name of Franz Josef Glacier.");
 assert.deepEqual(Array.from(searchFindMissionFive.images, (image) => image.url), [
+    "/practical-skills/images/franz-josef-glacier-1906.jpg",
     "/practical-skills/images/franz-josef-glacier-2019.jpg",
-    "/practical-skills/images/franz-josef-glacier-1906.jpg"
-], "Mission 5 shows a recent glacier photo beside a historical one");
-assert.equal(searchFindMissionFive.images[0].license, "CC BY-SA 2.0");
-assert.equal(searchFindMissionFive.images[1].license, "Public domain");
+    "/practical-skills/images/franz-josef-glacier-2024.jpg"
+], "Mission 5 shows glacier photos oldest to newest");
+assert.deepEqual(Array.from(searchFindMissionFive.images, (image) => image.timelineYear), ["1906", "2019", "2024"]);
+assert.equal(searchFindMissionFive.imageTimeline, true, "Mission 5 shows a timeline under the photos");
+assert.equal(searchFindMissionFive.images[0].license, "Public domain");
+assert.equal(searchFindMissionFive.images[1].license, "CC BY-SA 2.0");
+assert.equal(searchFindMissionFive.images[2].license, "Public domain");
+assert.equal(fs.existsSync(path.join(root, "practical-skills", "images", "franz-josef-glacier-2024.jpg")), true,
+    "Current glacier photo asset exists");
 assert.equal(fs.existsSync(glacierRecentImage), true, "Recent glacier photo asset exists");
 assert.equal(fs.existsSync(glacierHistoryImage), true, "Historical glacier photo asset exists");
 assert.equal(migrated.activities[1].questions.some((question) => question.id === "search-find-glacier-mystery"), false,
@@ -467,7 +473,31 @@ assert.deepEqual(Array.from(upgradedKit.activities[3].questions, (question) => q
     [...searchAndFindIds, "teacher-search-question"], "Mission 5 is added after Mission 4 on Search and Find!");
 assert.deepEqual(JSON.parse(JSON.stringify(upgradedKit.activities[1])), JSON.parse(JSON.stringify(versionSixteenKit.activities[1])),
     "Adding Mission 5 leaves The Keyword Challenge unchanged");
-assert.equal(upgradedKit._contentMigrations.searchKeywordChallenge, 17);
+assert.equal(upgradedKit._contentMigrations.searchKeywordChallenge, 18);
+
+// Live content at version 17 swaps the old two glacier photos for the three-photo timeline.
+const versionSeventeenKit = JSON.parse(JSON.stringify(migrated));
+versionSeventeenKit._contentMigrations.searchKeywordChallenge = 17;
+const oldGlacierQuestion = versionSeventeenKit.activities[3].questions[4];
+delete oldGlacierQuestion.imageTimeline;
+oldGlacierQuestion.images = [
+    { url: "/practical-skills/images/franz-josef-glacier-2019.jpg", alt: "Recent" },
+    { url: "/practical-skills/images/franz-josef-glacier-1906.jpg", alt: "History" }
+];
+const timelineKit = context.addSearchKitKeywordChallenge(versionSeventeenKit);
+const timelineGlacier = timelineKit.activities[3].questions[4];
+assert.equal(timelineGlacier.imageTimeline, true);
+assert.deepEqual(Array.from(timelineGlacier.images, (image) => image.timelineYear), ["1906", "2019", "2024"],
+    "Version 17 glacier photos are upgraded to the timeline");
+assert.deepEqual(JSON.parse(JSON.stringify(timelineKit.activities[1])), JSON.parse(JSON.stringify(versionSeventeenKit.activities[1])),
+    "Glacier timeline upgrade leaves The Keyword Challenge unchanged");
+assert.equal(timelineKit._contentMigrations.searchKeywordChallenge, 18);
+
+const teacherGlacierKit = JSON.parse(JSON.stringify(versionSeventeenKit));
+teacherGlacierKit.activities[3].questions[4].images = [{ url: "/teacher-glacier.jpg", alt: "Teacher photo" }];
+const preservedGlacier = context.addSearchKitKeywordChallenge(teacherGlacierKit).activities[3].questions[4];
+assert.deepEqual(Array.from(preservedGlacier.images, (image) => image.url), ["/teacher-glacier.jpg"],
+    "Teacher-edited glacier photos are preserved");
 
 // Saved content previously overwritten by the misplaced Mystery Trail migrations (versions 10-15).
 const overwrittenKit = JSON.parse(JSON.stringify(migrated));
@@ -512,7 +542,7 @@ assert.deepEqual(Array.from(restoredKit.activities[3].questions, (question) => q
     "Search and Find keeps only its own missions plus teacher-added questions");
 assert.equal(restoredKit.activities[3].questionAutoMarkAssessmentId, "search-and-find-v1",
     "Search and Find is graded separately from the Keyword Challenge");
-assert.equal(restoredKit._contentMigrations.searchKeywordChallenge, 17);
+assert.equal(restoredKit._contentMigrations.searchKeywordChallenge, 18);
 assert.equal(context.addSearchKitKeywordChallenge(restoredKit), restoredKit, "Restoration runs once");
 
 const teacherEditedKeywordChallenge = JSON.parse(JSON.stringify(overwrittenKit));
@@ -539,7 +569,7 @@ const repairedKeywordKit = context.addSearchKitPenguinMission(savedKitMissingKey
 assert.equal(repairedKeywordKit.activities[1].title, "The Keyword Challenge", "Migration creates the missing activity listed in worksheets");
 assert.deepEqual(JSON.parse(JSON.stringify(repairedKeywordKit.activities[1].information)), treasureHuntIntroduction);
 assert.deepEqual(Array.from(repairedKeywordKit.activities[1].questions, (question) => question.id), keywordChallengeIds);
-assert.equal(repairedKeywordKit._contentMigrations.searchKeywordChallenge, 17, "Repair migration is recorded for previously incomplete saved kits");
+assert.equal(repairedKeywordKit._contentMigrations.searchKeywordChallenge, 18, "Repair migration is recorded for previously incomplete saved kits");
 assert.equal(migrated.activities[0].questions.some((question) => question.id === "google-check"), false, "Google-open confirmation is removed");
 assert.equal(migrated.activities[0].questions.some((question) => question.id === "keywords"), true, "Other search-learning questions are retained");
 const penguinQuestion = migrated.activities[0].questions.find((question) => question.id === "search-penguin-name");
@@ -963,13 +993,15 @@ assert.match(imageHost.innerHTML, /data-hint-toggle="search-find-pancake-rocks"[
 assert.match(imageHost.innerHTML, /Hint: Search for what the Punakaiki Pancake Rocks are made of\./);
 assert.match(imageHost.innerHTML, /Mission 5 – The Glacier Mystery/);
 assert.match(imageHost.innerHTML, /What is its Māori name\?/);
-assert.match(imageHost.innerHTML, /class="worksheet-question-images has-two-images">[\s\S]*franz-josef-glacier-2019\.jpg[\s\S]*franz-josef-glacier-1906\.jpg/,
-    "Recent and historical glacier photos render side by side");
+assert.match(imageHost.innerHTML, /class="worksheet-question-images has-timeline"[^>]*>[\s\S]*franz-josef-glacier-1906\.jpg[\s\S]*franz-josef-glacier-2019\.jpg[\s\S]*franz-josef-glacier-2024\.jpg[\s\S]*?<\/div>\s*<ol class="worksheet-image-timeline"[\s\S]*1906[\s\S]*2019[\s\S]*2024[\s\S]*<\/ol>/,
+    "Glacier photos render oldest to newest with a timeline directly underneath");
+assert.match(imageHost.innerHTML, /Photo: Pseudopanax/);
 assert.match(imageHost.innerHTML, /Photo: Pedro Szekely/);
 assert.match(imageHost.innerHTML, /Photo: James Ring, Alexander Turnbull Library/);
 assert.match(imageHost.innerHTML, /data-hint-toggle="search-find-glacier-mystery"[^>]*>HINT<\/button>/);
 assert.match(imageHost.innerHTML, /Hint: Search for the Māori name of Franz Josef Glacier\./);
 assert.match(worksheetCss, /\.worksheet-question-images\.has-two-images\s*\{[^}]*grid-template-columns:\s*repeat\(2,/);
+assert.match(worksheetCss, /\.worksheet-image-timeline\s*\{[^}]*grid-template-columns:\s*repeat\(var\(--timeline-count/);
 assert.match(imageHost.innerHTML, /Mission 5: Your Turn – Find the Answer!/);
 assert.match(imageHost.innerHTML, /What year did you find\?/);
 assert.match(imageHost.innerHTML, /Find out where Little Blue Penguins can be seen near Hokitika\./);

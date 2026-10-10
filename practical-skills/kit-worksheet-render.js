@@ -82,10 +82,15 @@
     function renderQuestionBody(question, responses, readOnly) {
         const type = String(question?.type || "short-answer");
         const responseValue = responses?.[question.id];
+        const hasTimeline = Boolean(question.imageTimeline) && Array.isArray(question.images) &&
+            question.images.length > 1 && question.images.every((image) => image?.timelineYear);
         const images = Array.isArray(question.images) && question.images.length
-            ? `<div class="worksheet-question-images${question.images.length === 1 ? " has-single-image" : question.images.length === 2 ? " has-two-images" : ""}">
+            ? `<div class="worksheet-question-images${question.images.length === 1 ? " has-single-image" : question.images.length === 2 ? " has-two-images" : ""}${hasTimeline ? " has-timeline" : ""}"${hasTimeline ? ` style="--timeline-count: ${question.images.length}"` : ""}>
                 ${question.images.map((image) => renderWorksheetImage(image, "worksheet-question-image")).join("")}
-            </div>`
+            </div>
+            ${hasTimeline ? `<ol class="worksheet-image-timeline" style="--timeline-count: ${question.images.length}" aria-label="Timeline">
+                ${question.images.map((image) => `<li><span class="worksheet-image-timeline-dot" aria-hidden="true"></span><strong>${escapeHtml(image.timelineYear)}</strong>${image.timelineLabel ? `<span>${escapeHtml(image.timelineLabel)}</span>` : ""}</li>`).join("")}
+            </ol>` : ""}`
             : "";
 
         if (type === "checklist") {

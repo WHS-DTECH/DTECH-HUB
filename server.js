@@ -4975,22 +4975,38 @@ function searchAndFindQuestions() {
       prompt: "The West Coast is home to a famous glacier called Franz Josef Glacier. What is its Māori name?",
       lines: 1,
       hint: "Search for the Māori name of Franz Josef Glacier.",
+      imageTimeline: true,
       images: [
+        {
+          url: "/practical-skills/images/franz-josef-glacier-1906.jpg",
+          alt: "Black-and-white photo of visitors in long dresses and hats walking across thick glacier ice low in the valley.",
+          caption: "1906: visitors walking on thick ice in the valley",
+          timelineYear: "1906",
+          timelineLabel: "Ice fills the valley",
+          attribution: "James Ring, Alexander Turnbull Library",
+          sourceUrl: "https://commons.wikimedia.org/wiki/File:Francis_Joseph_Glacier,_1906.jpg",
+          license: "Public domain",
+          licenseUrl: ""
+        },
         {
           url: "/practical-skills/images/franz-josef-glacier-2019.jpg",
           alt: "People walking along a wide rocky riverbed in the Franz Josef Glacier valley, with bush-covered hills and no ice in view.",
-          caption: "Recently (2019): the glacier valley, where the ice has retreated",
+          caption: "2019: the same valley, now a rocky riverbed",
+          timelineYear: "2019",
+          timelineLabel: "Ice gone from the valley floor",
           attribution: "Pedro Szekely",
           sourceUrl: "https://commons.wikimedia.org/wiki/File:Franz_Josef_Glacier_2019.jpg",
           license: "CC BY-SA 2.0",
           licenseUrl: "https://creativecommons.org/licenses/by-sa/2.0/"
         },
         {
-          url: "/practical-skills/images/franz-josef-glacier-1906.jpg",
-          alt: "Black-and-white photo of visitors in long dresses and hats walking across thick glacier ice in the same valley.",
-          caption: "In history (1906): visitors walking on thick glacier ice",
-          attribution: "James Ring, Alexander Turnbull Library",
-          sourceUrl: "https://commons.wikimedia.org/wiki/File:Francis_Joseph_Glacier,_1906.jpg",
+          url: "/practical-skills/images/franz-josef-glacier-2024.jpg",
+          alt: "The narrow tongue of Franz Josef Glacier high in a steep mountain valley, below snowy peaks.",
+          caption: "2024: the glacier now ends high up the mountain",
+          timelineYear: "2024",
+          timelineLabel: "Glacier today",
+          attribution: "Pseudopanax",
+          sourceUrl: "https://commons.wikimedia.org/wiki/File:Franz_Josef_Glacier_below_Fritz_Range.jpg",
           license: "Public domain",
           licenseUrl: ""
         }
@@ -4998,6 +5014,11 @@ function searchAndFindQuestions() {
     }
   ];
 }
+
+const PREVIOUS_GLACIER_IMAGE_URLS = [
+  "/practical-skills/images/franz-josef-glacier-2019.jpg",
+  "/practical-skills/images/franz-josef-glacier-1906.jpg"
+];
 
 function isSearchIntroduction(information, introduction) {
   return information?.title === introduction.title &&
@@ -5020,7 +5041,7 @@ function insertMissingDefaultQuestions(questions, defaults) {
 // The West Coast Mystery Trail missions belong to "Search and Find!". Earlier migrations
 // wrongly placed them in "The Keyword Challenge", so this restores both activities.
 function addSearchKitKeywordChallenge(content) {
-  if (content?._contentMigrations?.searchKeywordChallenge >= 17) return content;
+  if (content?._contentMigrations?.searchKeywordChallenge >= 18) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
   const activityIndex = worksheets.findIndex((worksheet) =>
@@ -5064,7 +5085,14 @@ function addSearchKitKeywordChallenge(content) {
       ? activities[searchAndFindIndex]
       : { title: worksheets[searchAndFindIndex].activity };
     const searchAndFindQuestionsList = (Array.isArray(searchAndFind.questions) ? searchAndFind.questions : [])
-      .filter((question) => !String(question?.id || "").startsWith("keyword-"));
+      .filter((question) => !String(question?.id || "").startsWith("keyword-"))
+      .map((question) => {
+        const imageUrls = Array.isArray(question?.images) ? question.images.map((image) => image?.url) : [];
+        if (question?.id !== "search-find-glacier-mystery" || imageUrls.length !== PREVIOUS_GLACIER_IMAGE_URLS.length ||
+          !imageUrls.every((url, index) => url === PREVIOUS_GLACIER_IMAGE_URLS[index])) return question;
+        const defaultGlacier = searchAndFindQuestions().find((defaultQuestion) => defaultQuestion.id === question.id);
+        return { ...question, imageTimeline: true, images: defaultGlacier.images };
+      });
     insertMissingDefaultQuestions(searchAndFindQuestionsList, searchAndFindQuestions());
     activities[searchAndFindIndex] = {
       ...searchAndFind,
@@ -5082,7 +5110,7 @@ function addSearchKitKeywordChallenge(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchKeywordChallenge: 17
+      searchKeywordChallenge: 18
     }
   };
 }
