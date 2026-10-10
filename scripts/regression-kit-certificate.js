@@ -106,6 +106,7 @@ async function main() {
         assert.match(text.text, /Certificate of Completion/);
         assert.match(text.text, /DTECH-HUB Licence/);
         assert.match(text.text, /Māia Student/, "Unicode student names survive PDF generation");
+        assert.ok(!text.text.includes(email), "No duplicate email line below the recipient name");
         assert.match(text.text, /Login Kit/);
         assert.match(text.text, /2 activities completed/);
     } finally { await parser.destroy(); }

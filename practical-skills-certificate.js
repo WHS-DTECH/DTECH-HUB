@@ -56,7 +56,6 @@ function createKitCertificatePdf(certificate) {
       text(certificate.title, 140, 32, "certificate-bold");
       text("This certificate is proudly presented to", 208, 14);
       fittedText(certificate.studentName, 247, 32);
-      fittedText(certificate.studentEmail, 300, 12, "certificate");
       text("for successfully completing all activities in", 339, 14);
       fittedText(certificate.kitTitle, 372, 25);
       text(`${certificate.activityCount} activities completed | ${certificate.completedDate}`, 437, 13);

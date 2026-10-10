@@ -234,7 +234,6 @@
         if (host.hidden) return;
         const fields = {
             "certificate-student-name": certificate.studentName,
-            "certificate-student-email": certificate.studentEmail,
             "certificate-kit-title": certificate.kitTitle,
             "certificate-completion-details": `${certificate.activityCount} activities completed | ${certificate.completedDate}`,
             "certificate-issuer": certificate.issuer
