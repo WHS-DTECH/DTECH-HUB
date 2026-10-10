@@ -4476,7 +4476,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function addSearchResultsDetectiveIntroduction(content) {
-  if (content?._contentMigrations?.searchResultsDetective >= 2) return content;
+  if (content?._contentMigrations?.searchResultsDetective >= 3) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
   const activityIndex = worksheets.findIndex((worksheet) =>
@@ -4533,6 +4533,40 @@ function addSearchResultsDetectiveIntroduction(content) {
       ]
     });
   }
+  if (!questions.some((question) => question?.id === "search-result-pool-hours")) {
+    questions.push({
+      id: "search-result-pool-hours",
+      type: "multiple-choice",
+      heading: "Mission 2 – Read Before You Click!",
+      prompt: "You want to know what time the Hokitika swimming pool opens. Which result is most likely to give you the opening hours?",
+      options: [
+        "Hokitika Swimming Club – Competition Results",
+        "Hokitika Swimming Pool – Opening Hours and Contact Details",
+        "Best Swimming Pools in New Zealand – Photo Gallery"
+      ],
+      searchResults: {
+        title: "Simulated search results",
+        results: [
+          {
+            domain: "hokitikaswimmingclub.example",
+            title: "Hokitika Swimming Club – Competition Results",
+            description: "See recent race times, competition results and club news."
+          },
+          {
+            domain: "hokitikapool.example",
+            title: "Hokitika Swimming Pool – Opening Hours and Contact Details",
+            description: "Find pool opening hours, contact details and visitor information."
+          },
+          {
+            domain: "nzpoolphotos.example",
+            title: "Best Swimming Pools in New Zealand – Photo Gallery",
+            description: "Browse photos of swimming pools around New Zealand."
+          }
+        ],
+        note: "These are fictional results for practice, not links to real websites."
+      }
+    });
+  }
 
   const hasIntroduction = content?._contentMigrations?.searchResultsDetective >= 1;
   activities[activityIndex] = {
@@ -4556,7 +4590,7 @@ function addSearchResultsDetectiveIntroduction(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchResultsDetective: 2
+      searchResultsDetective: 3
     }
   };
 }

@@ -88,7 +88,11 @@ assert.deepEqual(Array.from(migrated.activities[2].information.paragraphs), [
     "Look at the search results, follow the clues and find the information you need.",
     "Can you solve all five missions?"
 ]);
-assert.deepEqual(Array.from(migrated.activities[2].questions, (question) => question.id), ["result-q", "search-result-clock-tower"], "Search results questions are preserved and the Clock Tower mission is added");
+assert.deepEqual(Array.from(migrated.activities[2].questions, (question) => question.id), [
+    "result-q",
+    "search-result-clock-tower",
+    "search-result-pool-hours"
+], "Search results questions are preserved and both missions are added");
 const clockTowerMission = migrated.activities[2].questions.find((question) => question.id === "search-result-clock-tower");
 assert.equal(clockTowerMission.type, "multiple-choice");
 assert.equal(clockTowerMission.heading, "Mission 1 – Which Result Would You Open?");
@@ -108,8 +112,23 @@ assert.deepEqual(Array.from(clockTowerMission.searchResults.results, (result) =>
     "weather.example"
 ]);
 assert.equal(clockTowerMission.searchResults.note, "These are fictional results for practice, not links to real websites.");
-assert.equal(migrated._contentMigrations.searchResultsDetective, 2, "Search Results Detective migration marker is recorded");
+assert.equal(migrated._contentMigrations.searchResultsDetective, 3, "Search Results Detective migration marker is recorded");
 assert.equal(context.addSearchResultsDetectiveIntroduction(migrated), migrated, "Search Results Detective migration is idempotent");
+const poolHoursMission = migrated.activities[2].questions.find((question) => question.id === "search-result-pool-hours");
+assert.ok(poolHoursMission, "Mission 2 is added");
+assert.equal(poolHoursMission.heading, "Mission 2 – Read Before You Click!");
+assert.equal(poolHoursMission.prompt, "You want to know what time the Hokitika swimming pool opens. Which result is most likely to give you the opening hours?");
+assert.deepEqual(Array.from(poolHoursMission.options), [
+    "Hokitika Swimming Club – Competition Results",
+    "Hokitika Swimming Pool – Opening Hours and Contact Details",
+    "Best Swimming Pools in New Zealand – Photo Gallery"
+]);
+assert.deepEqual(Array.from(poolHoursMission.searchResults.results, (result) => result.domain), [
+    "hokitikaswimmingclub.example",
+    "hokitikapool.example",
+    "nzpoolphotos.example"
+]);
+assert.equal(poolHoursMission.searchResults.note, "These are fictional results for practice, not links to real websites.");
 const editedResultActivity = JSON.parse(JSON.stringify(migrated));
 editedResultActivity._contentMigrations.searchResultsDetective = 1;
 editedResultActivity.activities[2].information.title = "Teacher-edited introduction";
@@ -121,6 +140,14 @@ savedResultActivityWithoutMission.activities[2].questions = savedResultActivityW
     .filter((question) => question.id !== "search-result-clock-tower");
 assert.ok(context.addSearchResultsDetectiveIntroduction(savedResultActivityWithoutMission).activities[2].questions
     .some((question) => question.id === "search-result-clock-tower"), "Migration adds the mission to saved activities without replacing existing questions");
+const savedActivityWithoutMissionTwo = JSON.parse(JSON.stringify(migrated));
+savedActivityWithoutMissionTwo._contentMigrations.searchResultsDetective = 2;
+savedActivityWithoutMissionTwo.activities[2].questions = savedActivityWithoutMissionTwo.activities[2].questions
+    .filter((question) => question.id !== "search-result-pool-hours");
+const upgradedWithMissionTwo = context.addSearchResultsDetectiveIntroduction(savedActivityWithoutMissionTwo);
+assert.ok(upgradedWithMissionTwo.activities[2].questions.some((question) => question.id === "search-result-pool-hours"),
+    "Migration adds Mission 2 to saved activities while preserving existing questions");
+assert.equal(upgradedWithMissionTwo._contentMigrations.searchResultsDetective, 3);
 const savedKitMissingResultsActivity = {
     ...original,
     _contentMigrations: { searchPenguinMission: 11, searchKeywordChallenge: 9 },
@@ -129,8 +156,11 @@ const savedKitMissingResultsActivity = {
 const repairedResultsKit = context.addSearchKitPenguinMission(savedKitMissingResultsActivity);
 assert.equal(repairedResultsKit.activities[2].title, "Finding the Right Result", "Migration creates the missing worksheet activity");
 assert.equal(repairedResultsKit.activities[2].information.title, "THE MISSION: The Search Results Detective");
-assert.deepEqual(Array.from(repairedResultsKit.activities[2].questions || [], (question) => question.id), ["search-result-clock-tower"]);
-assert.equal(repairedResultsKit._contentMigrations.searchResultsDetective, 2);
+assert.deepEqual(Array.from(repairedResultsKit.activities[2].questions || [], (question) => question.id), [
+    "search-result-clock-tower",
+    "search-result-pool-hours"
+]);
+assert.equal(repairedResultsKit._contentMigrations.searchResultsDetective, 3);
 const keywordChallengeQuestion = migrated.activities[1].questions[0];
 assert.equal(keywordChallengeQuestion.id, "keyword-pounamu-treasure");
 assert.equal(keywordChallengeQuestion.type, "multiple-choice");
@@ -378,6 +408,22 @@ assert.match(clockTowerHost.innerHTML, /weather\.example/);
 assert.match(clockTowerHost.innerHTML, /These are fictional results for practice, not links to real websites\./);
 assert.match(clockTowerHost.innerHTML, /class="worksheet-search-result[\s\S]*data-option-value="Hokitika Clock Tower – History and Dimensions"[\s\S]*aria-pressed="false"/, "Fictional result cards are selectable button answers rather than external links");
 assert.doesNotMatch(clockTowerHost.innerHTML, /href="https:\/\/(?:westcoastphotos|heritage|weather)\.example/, "Fictional result domains are never linked");
+const poolHoursHost = {
+    style: { setProperty() {} },
+    innerHTML: "",
+    querySelectorAll() { return []; },
+    querySelector() { return null; }
+};
+renderContext.window.KitWorksheetRender.renderWorksheet(poolHoursHost, {
+    information: { title: "THE MISSION: The Search Results Detective", paragraphs: [] },
+    questions: [poolHoursMission]
+}, { readOnly: true });
+assert.match(poolHoursHost.innerHTML, /Mission 2 – Read Before You Click!/);
+assert.match(poolHoursHost.innerHTML, /Hokitika Swimming Pool – Opening Hours and Contact Details/);
+assert.match(poolHoursHost.innerHTML, /hokitikapool\.example/);
+assert.match(poolHoursHost.innerHTML, /These are fictional results for practice, not links to real websites\./);
+assert.doesNotMatch(poolHoursHost.innerHTML, /href="https:\/\/(?:hokitikaswimmingclub|hokitikapool|nzpoolphotos)\.example/,
+    "Mission 2 fictional results are not links");
 assert.match(worksheetCss, /\.worksheet-search-result-list\s*\{[^}]*display:\s*grid;/, "Simulated search results render in a clear card layout");
 assert.match(imageHost.innerHTML, /little-blue-penguin\.jpg/);
 assert.match(imageHost.innerHTML, /Mission 2: Choose your own search words/);
