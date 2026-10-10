@@ -722,6 +722,9 @@
                             ${question?.heading ? `<h3 class="worksheet-question-heading">${escapeHtml(question.heading)}</h3>` : ""}
                             <p class="worksheet-question-prompt">${escapeHtml(question?.prompt || "")}</p>
                             ${renderQuestionBody(question, responses, readOnly)}
+                            ${content?.questionAutoMarkAssessmentId === "search-results-detective-v1"
+                                ? `<p class="worksheet-choice-feedback" data-question-feedback="${escapeHtml(question.id)}" role="status" aria-live="polite" aria-atomic="true" hidden></p>`
+                                : ""}
                             ${content?.identityLessonVersion ? `<p class="worksheet-assessment-feedback" data-identity-feedback="${escapeHtml(question.id)}" role="status" aria-live="polite">Type your answer. We will check it against your school Google account.</p>` : ""}
                         </div>
                     </article>

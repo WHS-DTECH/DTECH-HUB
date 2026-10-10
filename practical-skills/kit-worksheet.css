@@ -601,6 +601,36 @@ body.kit-worksheet-page {
     resize: vertical;
 }
 
+.worksheet-choice-feedback {
+    margin: 10px 0 0;
+    padding: 9px 12px;
+    border-radius: 10px;
+    background: #fff8e1;
+    color: #6b5017;
+    line-height: 1.5;
+    font-weight: 700;
+}
+
+.worksheet-choice-feedback.is-correct {
+    background: #edf8ef;
+    color: #175c38;
+}
+
+.worksheet-choice-feedback.is-retry {
+    background: #fff8e1;
+    color: #6b5017;
+}
+
+.worksheet-choice-feedback.is-pending {
+    background: #f1f6fb;
+    color: #345777;
+}
+
+.worksheet-choice-feedback.is-error {
+    background: #fff0eb;
+    color: #92351d;
+}
+
 .worksheet-checklist {
     display: grid;
     gap: 8px;

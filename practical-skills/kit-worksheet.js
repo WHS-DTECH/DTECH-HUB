@@ -16,6 +16,8 @@
         signInWatcherId: 0,
         saveTimerId: 0,
         searchAutoMarkTimerId: 0,
+        searchChoiceCheckTimers: {},
+        searchChoiceCheckRevisions: {},
         driveSetup: null,
         huntProfile: null,
         certificate: null,
@@ -206,6 +208,56 @@
         }, RESPONSE_SAVE_DEBOUNCE_MS);
     }
 
+    function setSearchChoiceFeedback(questionId, message, status) {
+        const feedback = Array.from(document.querySelectorAll("[data-question-feedback]")).find((node) =>
+            node.getAttribute("data-question-feedback") === questionId);
+        if (!feedback) return;
+        feedback.hidden = false;
+        feedback.textContent = message;
+        feedback.classList.remove("is-correct", "is-retry", "is-pending", "is-error");
+        feedback.classList.add(status);
+    }
+
+    function scheduleSearchChoiceCheck(activityIndex, assessmentId, questionId) {
+        if (assessmentId !== "search-results-detective-v1") return;
+        if (!state.email) {
+            setSearchChoiceFeedback(questionId, "Sign in with your school account to check and save this choice. You can try another result any time.", "is-pending");
+            return;
+        }
+        if (!state.progressLoaded) {
+            setSearchChoiceFeedback(questionId, "Your choice is ready. We will check it as soon as your progress has loaded.", "is-pending");
+            return;
+        }
+
+        const revision = (state.searchChoiceCheckRevisions[questionId] || 0) + 1;
+        state.searchChoiceCheckRevisions[questionId] = revision;
+        window.clearTimeout(state.searchChoiceCheckTimers[questionId]);
+        setSearchChoiceFeedback(questionId, "Checking your choice...", "is-pending");
+        state.searchChoiceCheckTimers[questionId] = window.setTimeout(() => {
+            const answers = { ...state.responses };
+            queueProgressWrite(async () => {
+                await saveResponses(state.kitId, answers);
+                const grade = await loadJson(`/api/practical-skills/progress/${encodeURIComponent(state.kitId)}/activities/${activityIndex}/check`, {
+                    method: "POST",
+                    headers: withAuthHeaders({ "Content-Type": "application/json" }),
+                    body: JSON.stringify({ answers })
+                });
+                state.completedActivities = grade.completedActivities;
+                updateActivityCompleteBar();
+                if (state.searchChoiceCheckRevisions[questionId] !== revision) return;
+                const result = grade.results.find((entry) => entry.id === questionId);
+                if (!result) throw new Error("This choice could not be checked. Refresh the activity and try again.");
+                setSearchChoiceFeedback(questionId, result.correct
+                    ? "Nice investigating! This result matches what you are looking for."
+                    : "Good try! This result may not be the best match. Look for a result with the information in the question, then try again.",
+                result.correct ? "is-correct" : "is-retry");
+            }).catch(() => {
+                if (state.searchChoiceCheckRevisions[questionId] !== revision) return;
+                setSearchChoiceFeedback(questionId, "We could not check this choice just now. Your selection is still here—please try again in a moment.", "is-error");
+            });
+        }, 250);
+    }
+
     function scheduleSearchActivityAutoMark(activityIndex, assessmentId) {
         if (!state.email || !state.progressLoaded || state.completedActivities[activityIndex]) return;
         const baseQuestionIds = assessmentId === "search-keyword-challenge-v1"
@@ -248,8 +300,8 @@
                 state.completedActivities = grade.completedActivities;
                 updateActivityCompleteBar();
                 showStatusMessage(grade.passed
-                    ? "Ka pai! All five answers are correct. Your activity completion tick is saved."
-                    : `${grade.score} / ${grade.total} answers correct so far. Keep investigating and update your answers.`);
+                    ? "Ka pai! You found a useful result for every mission. Your activity tick is saved."
+                    : "Keep investigating! Use the feedback beside each choice to try a different result.");
             }).catch((error) => {
                 showStatusMessage(error?.message || "Could not check and save your answers. Please try again.", true);
             });
@@ -426,6 +478,7 @@
                 onResponseChange: (questionId, value) => {
                     state.responses[questionId] = value;
                     queueResponseSave();
+                    scheduleSearchChoiceCheck(activityIndex, activity?.questionAutoMarkAssessmentId, questionId);
                     if (["search-penguin-missions-v1", "search-keyword-challenge-v1", "search-results-detective-v1"].includes(activity?.questionAutoMarkAssessmentId)) {
                         scheduleSearchActivityAutoMark(activityIndex, activity.questionAutoMarkAssessmentId);
                     }

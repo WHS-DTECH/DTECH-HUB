@@ -590,7 +590,8 @@ const clockTowerHost = {
 };
 renderContext.window.KitWorksheetRender.renderWorksheet(clockTowerHost, {
     information: { title: "THE MISSION: The Search Results Detective", paragraphs: [] },
-    questions: [clockTowerMission]
+    questions: [clockTowerMission],
+    questionAutoMarkAssessmentId: "search-results-detective-v1"
 }, { readOnly: true });
 assert.match(clockTowerHost.innerHTML, /Mission 1 – Which Result Would You Open\?/);
 assert.match(clockTowerHost.innerHTML, /hokitika-clock-tower\.jpg/);
@@ -602,6 +603,8 @@ assert.match(clockTowerHost.innerHTML, /weather\.example/);
 assert.match(clockTowerHost.innerHTML, /These are fictional results for practice, not links to real websites\./);
 assert.match(clockTowerHost.innerHTML, /Simulated \(Fake website\) search results/);
 assert.match(clockTowerHost.innerHTML, /class="worksheet-search-result[\s\S]*data-option-value="Hokitika Clock Tower – History and Dimensions"[\s\S]*aria-pressed="false"/, "Fictional result cards are selectable button answers rather than external links");
+assert.match(clockTowerHost.innerHTML, /data-question-feedback="search-result-clock-tower" role="status" aria-live="polite"/,
+    "Search Results Detective questions include an accessible live feedback area");
 assert.doesNotMatch(clockTowerHost.innerHTML, /href="https:\/\/(?:westcoastphotos|heritage|weather)\.example/, "Fictional result domains are never linked");
 const poolHoursHost = {
     style: { setProperty() {} },
@@ -674,6 +677,8 @@ assert.match(docTrackHost.innerHTML, /Real-world search/);
 assert.match(worksheetCss, /\.worksheet-search-result-list\s*\{[^}]*display:\s*grid;/, "Simulated search results render in a clear card layout");
 assert.match(worksheetCss, /\.worksheet-search-result::before\s*\{[^}]*counter\(search-result\)/, "Simulated search result cards receive numbered visual markers");
 assert.match(worksheetCss, /\.worksheet-question--real-search \.worksheet-choice-bubble\.is-selected\s*\{[^}]*background:\s*#32764d;/, "Real-world mission choices use a distinct selected style");
+assert.match(worksheetCss, /\.worksheet-choice-feedback\.is-retry\s*\{[^}]*background:\s*#fff8e1;/,
+    "Retry feedback uses a calm, positive visual style rather than an error-red treatment");
 const instructions = "Welcome to the Search Kit! Complete five activities. 1. Read the information in each activity. 2. Follow the instructions and try the examples. 3. Complete the questions and search challenges. 4. Ask your teacher for help if you get stuck. 5. Finish all five activities to earn your Search Kit stamp! Remember: You do not need to know everything.";
 const instructionHost = {
     style: { setProperty() {} },
@@ -758,10 +763,19 @@ assert.match(serverSource, /grade\.assessmentId === "search-penguin-missions-v1"
 assert.match(serverSource, /if \(req\.body\.completed && \(activity\?\.assessmentId \|\| activity\?\.identityLessonVersion \|\|\s*activity\?\.questionAutoMarkAssessmentId \|\| siteQuestions\)\)/, "Manual completion cannot bypass Search Kit auto-marking");
 assert.match(worksheetSource, /function scheduleSearchActivityAutoMark\(activityIndex, assessmentId\)/, "Student worksheet automatically checks complete self-marked activity answers");
 assert.match(worksheetSource, /scheduleSearchActivityAutoMark\(activityIndex, activity\.questionAutoMarkAssessmentId\)/, "Answer changes trigger automatic marking");
+assert.match(worksheetSource, /function scheduleSearchChoiceCheck\(activityIndex, assessmentId, questionId\)/,
+    "Search Results Detective choices are checked as soon as a student selects one");
+assert.match(worksheetSource, /Good try! This result may not be the best match/,
+    "A non-matching choice receives an encouraging retry message");
+assert.match(worksheetSource, /Nice investigating! This result matches what you are looking for/,
+    "A matching choice receives positive feedback");
 assert.match(worksheetSource, /if \(\["search-penguin-missions-v1", "search-keyword-challenge-v1", "search-results-detective-v1"\]\.includes\(activity\?\.questionAutoMarkAssessmentId\)\) \{\s*scheduleSearchActivityAutoMark\(activityIndex, activity\.questionAutoMarkAssessmentId\);/, "Previously saved complete answers are auto-marked when the activity opens");
 assert.match(worksheetSource, /"search-keyword-challenge-v1"[\s\S]*"keyword-pounamu-treasure"[\s\S]*"keyword-hokitika-founded"/, "Keyword Challenge auto-marking waits for all five mission answers");
 assert.match(worksheetSource, /"search-results-detective-v1"[\s\S]*"search-result-clock-tower"[\s\S]*"search-result-doc-track"/, "Search Results Detective auto-marking waits for all five mission answers");
-assert.match(worksheetSource, /All five answers are correct\. Your activity completion tick is saved\./, "Self-marking gives the completion tick only after all five answers are correct");
+assert.match(worksheetSource, /You found a useful result for every mission\. Your activity tick is saved\./,
+    "Self-marking celebrates finding a useful result for every mission");
+assert.doesNotMatch(worksheetSource, /\$\{grade\.score\} \/ \$\{grade\.total\} answers correct/,
+    "Progress feedback does not frame the activity as a score");
 assert.match(activityEditorSource, /\.\.\.\(content\.activities\?\.\[activityIndex\]\?\.images\?\.\[index\] \|\| \{\}\)/, "Activity Details preserves photo attribution metadata while editing images");
 
 console.log("Search Kit penguin mission migration regression checks passed.");
