@@ -80,7 +80,9 @@ async function main() {
     const navigation = fs.readFileSync(path.join(__dirname, "..", "script.js"), "utf8");
     const styles = fs.readFileSync(path.join(__dirname, "..", "styles.css"), "utf8");
     assert.match(navigation, /id="hub-senior-task-list-link" class="hub-senior-task-list-link" href="\/task-list\.html" hidden>Task List<\/a>/);
+    assert.match(navigation, /id="hub-upload-kits-link" role="menuitem" href="\/practical-skills\/admin-kits\.html" hidden>Upload Kits<\/a>/);
     assert.doesNotMatch(navigation, /id="hub-browse-task-list-link"/, "Task List is not duplicated in Browse");
+    assert.match(navigation, /if \(hubUploadKitsLink\) \{\s*hubUploadKitsLink\.hidden = !canAdmin;/, "Kit uploader link is visible to admins only");
     assert.match(styles, /\.nav-dropdown-practical-skills summary\s*\{[^}]*background:\s*#2867bd/s, "Licence uses the blue navbar color");
     assert.match(styles, /\.topbar-links a\.hub-senior-task-list-link\s*\{[^}]*background:\s*#2f8f61/s, "Senior Task List uses the green navbar color");
     const start = navigation.indexOf("function renderHubPracticalSkillsMenu(");

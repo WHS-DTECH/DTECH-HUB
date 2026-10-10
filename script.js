@@ -1397,6 +1397,7 @@ function renderGlobalNavbar() {
             <div class="nav-drawer" role="menu">
                 <a id="hub-practical-skills-link" role="menuitem" href="/practical-skills/checklist.html">My Licence</a>
                 <a role="menuitem" href="/practical-skills/">Licence Library</a>
+                <a id="hub-upload-kits-link" role="menuitem" href="/practical-skills/admin-kits.html" hidden>Upload Kits</a>
             </div>
         </details>
     `;
@@ -1576,6 +1577,7 @@ const hubProfileClose = document.querySelector("#hub-profile-close");
 const hubBrowseMenu = document.querySelector("#hub-browse-menu");
 const hubUploadMenu = document.querySelector("#hub-upload-menu");
 const hubPracticalSkillsMenu = document.querySelector("#hub-practical-skills-menu");
+const hubUploadKitsLink = document.querySelector("#hub-upload-kits-link");
 const hubSeniorTaskListLink = document.querySelector("#hub-senior-task-list-link");
 const hubStudentWorkMenu = document.querySelector("#hub-student-work-menu");
 const hubTemplateLibraryLink = document.querySelector("#hub-browse-template-library-link");
@@ -2794,6 +2796,9 @@ function renderHubAuthUi() {
     }
     if (hubAdminLink) {
         hubAdminLink.hidden = !canAdmin;
+    }
+    if (hubUploadKitsLink) {
+        hubUploadKitsLink.hidden = !canAdmin;
     }
     if (hubSettingsLink) {
         hubSettingsLink.hidden = !canAdmin;

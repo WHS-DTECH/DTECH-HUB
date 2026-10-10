@@ -22,6 +22,9 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
 - Implemented: the shared signed-in navigation shows Licence for every account
   in blue. Years 11-13 students also see a separate green Task List button;
   it no longer replaces Licence or appears duplicated in Browse.
+- Implemented: administrators can open the existing Kit Content Builder /
+  uploader from the Licence menu's Upload Kits item. The link is hidden from
+  non-administrator accounts, matching the uploader's API access control.
 - Add a `Next Best Task` panel at the top of the Practical Skills homepage.
 - Show licence progress (`X/Y kits complete`).
 - Show assessment readiness status (`Ready` or `Missing required kits`).
