@@ -208,7 +208,7 @@
         nameInput.value = content.identity?.name || content.bannerTitle || "";
         skillAreaInput.value = content.identity?.skillArea || "";
         kitStatusInput.value = content.identity?.status || "active";
-        yearLevelInput.value = content.identity?.yearLevel || "";
+        setYearLevelSelection(content.identity?.yearLevel);
         bannerTitleInput.value = content.bannerTitle || "";
         bannerSubtitleInput.value = content.bannerSubtitle || "";
         instructionsInput.value = content.instructions || "";
@@ -224,6 +224,18 @@
         accentColorInput.value = content.theme?.accent || "#ffd166";
         renderWorksheetList();
         queuePreviewUpdate();
+    }
+
+    function setYearLevelSelection(value) {
+        const yearLevel = String(value || "").trim() || "All Years";
+        const existingOption = Array.from(yearLevelInput.options).find((option) => option.value === yearLevel);
+        if (!existingOption) {
+            const legacyOption = document.createElement("option");
+            legacyOption.value = yearLevel;
+            legacyOption.textContent = `Current value: ${yearLevel}`;
+            yearLevelInput.appendChild(legacyOption);
+        }
+        yearLevelInput.value = yearLevel;
     }
 
     function queuePreviewUpdate() {
@@ -272,6 +284,7 @@
         [nameInput, skillAreaInput, kitStatusInput, yearLevelInput, bannerTitleInput, bannerSubtitleInput, instructionsInput, teacherNotesInput, whatStudentsWillLearnInput, whyThisMattersInput, keyVocabularyInput, evidenceRequiredInput, successCriteriaInput, extensionChallengeInput, iconInput, themeColorInput, accentColorInput].forEach((input) => {
             input.addEventListener("input", queuePreviewUpdate);
         });
+        yearLevelInput.addEventListener("change", queuePreviewUpdate);
 
         worksheetListHost.addEventListener("click", (event) => {
             const button = event.target.closest(".kit-remove-worksheet");

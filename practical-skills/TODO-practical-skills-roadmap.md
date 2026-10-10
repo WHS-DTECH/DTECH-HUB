@@ -25,6 +25,10 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
 - Implemented: administrators can open the existing Kit Content Builder /
   uploader from the Licence menu's Upload Kits item. The link is hidden from
   non-administrator accounts, matching the uploader's API access control.
+- Implemented: the Kit Content Builder Year Level is a dropdown defaulting to
+  All Years, with Junior, Middle and Senior DTECH group options, individual
+  Years 7-13 DTECH options, and Staff. Existing saved values outside the list
+  remain selectable as a preserved current value rather than being discarded.
 - Add a `Next Best Task` panel at the top of the Practical Skills homepage.
 - Show licence progress (`X/Y kits complete`).
 - Show assessment readiness status (`Ready` or `Missing required kits`).
