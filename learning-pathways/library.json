@@ -48,5 +48,29 @@
     "status": "active",
     "href": "/learning-pathways/systems-and-control.html",
     "visual": { "icon": "SC" }
+  },
+  {
+    "id": "infrastructure-and-networking",
+    "title": "Infrastructure & Networking",
+    "summary": "Computer hardware, software, operating systems, input-process-output, networks and connectivity.",
+    "yearLevel": "Junior DTECH",
+    "area": "Digital systems",
+    "status": "active",
+    "cardType": "unit",
+    "strand": "digital-systems",
+    "href": "",
+    "visual": { "icon": "IN" }
+  },
+  {
+    "id": "binary-and-data",
+    "title": "Binary & Data",
+    "summary": "Binary numbers, encoding, decoding and how computers represent information.",
+    "yearLevel": "Junior DTECH",
+    "area": "Digital systems",
+    "status": "active",
+    "cardType": "unit",
+    "strand": "digital-systems",
+    "href": "",
+    "visual": { "icon": "01" }
   }
 ]

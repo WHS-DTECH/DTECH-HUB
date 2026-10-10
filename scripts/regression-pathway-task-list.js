@@ -52,8 +52,8 @@ async function main() {
     events.DOMContentLoaded();
     await tick();
     const titles = () => list.children.map((item) => item.children[0].textContent);
-    assert.deepEqual(titles(), cards.map((card) => card.title).sort((a, b) => a.localeCompare(b)));
-    assert.equal(list.children.length, 5);
+    assert.deepEqual(titles(), cards.filter((card) => card.cardType !== "unit").map((card) => card.title).sort((a, b) => a.localeCompare(b)));
+    assert.equal(list.children.length, 5, "Task List shows the five strands, not Unit cards");
     assert.equal(list.hidden, false);
     assert.equal(retry.hidden, true);
     assert.ok(list.children.every((item) => item.children.length === 1), "Only names, no fake tasks or completion");
@@ -91,11 +91,12 @@ async function main() {
     }
     response = { ok: true, json: async () => [
         { title: "<script>not HTML</script>", yearLevel: "Junior DTECH" },
-        { title: "Middle only", yearLevel: "Middle DTECH" }
+        { title: "Middle only", yearLevel: "Middle DTECH" },
+        { title: "Binary & Data", yearLevel: "Junior DTECH", cardType: "unit" }
     ] };
     retry.click();
     await tick();
-    assert.deepEqual(titles(), ["<script>not HTML</script>"], "Titles are text, and other course cards are excluded");
+    assert.deepEqual(titles(), ["<script>not HTML</script>"], "Titles are text, and other course cards and Unit cards are excluded");
     response = { ok: true, json: async () => [] };
     await context.renderPathwayTaskList();
     assert.equal(list.hidden, true);

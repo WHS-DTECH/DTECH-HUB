@@ -12,13 +12,17 @@
     const yearPillsContainer = document.getElementById("practical-skills-year-pills");
     const statusPillsContainer = document.getElementById("practical-skills-status-pills");
     const categoryPillsContainer = document.getElementById("practical-skills-category-pills");
+    const typePillsContainer = document.getElementById("practical-skills-type-pills");
     const sortSelect = document.getElementById("practical-skills-sort");
+    const cardTypeNames = { strand: config.libraryCardLabel || "Curriculum Strands", unit: config.libraryUnitLabel || "Units" };
+    const cardType = (item) => (isPathways && String(item?.cardType || "") === "unit" ? "unit" : "strand");
 
     let library = [];
     const state = {
         search: "",
         year: "All",
         status: "All",
+        type: "All",
         category: "All",
         sort: "name-asc"
     };
@@ -83,6 +87,10 @@
         renderPillGroup(categoryPillsContainer, getUniqueValues("area"), state.category, (value) => {
             state.category = value;
         });
+        const types = new Set(library.map((item) => cardTypeNames[cardType(item)]));
+        renderPillGroup(typePillsContainer, ["All", ...Object.values(cardTypeNames).filter((name) => types.has(name))], state.type, (value) => {
+            state.type = value;
+        });
     }
 
     function filterLibrary(items) {
@@ -92,6 +100,7 @@
             if (state.year !== "All" && String(item.yearLevel || "") !== state.year) return false;
             if (state.status !== "All" && String(item.status || "") !== state.status) return false;
             if (state.category !== "All" && String(item.area || "") !== state.category) return false;
+            if (state.type !== "All" && cardTypeNames[cardType(item)] !== state.type) return false;
 
             if (query) {
                 const haystack = [item.title, item.summary, item.yearLevel, item.area]
@@ -118,6 +127,12 @@
                 sorted.sort((a, b) => String(a.title || "").localeCompare(String(b.title || "")));
                 break;
         }
+        if (isPathways) {
+            const order = { strand: 0, unit: 1 };
+            return sorted.map((item, index) => ({ item, index }))
+                .sort((a, b) => order[cardType(a.item)] - order[cardType(b.item)] || a.index - b.index)
+                .map(({ item }) => item);
+        }
         return sorted;
     }
 
@@ -135,8 +150,10 @@
             card.setAttribute("aria-label", `Open ${String(item.title || "Practical Skill")}`);
         }
 
+        const isUnit = cardType(item) === "unit";
+        if (isUnit) card.classList.add("pathway-unit-card");
         const icon = String(item?.visual?.icon || config.libraryIcon || "PS").trim() || "PS";
-        const palette = String(item?.visual?.palette || config.libraryPalette || "linear-gradient(135deg, #2f8f61 0%, #3ca873 54%, #65c494 100%)");
+        const palette = String(item?.visual?.palette || (isUnit && config.libraryUnitPalette) || config.libraryPalette || "linear-gradient(135deg, #2f8f61 0%, #3ca873 54%, #65c494 100%)");
         const imageUrl = String(item.imageUrl || "").trim();
         const hasImage = imageUrl.length > 0;
         const visualStyle = hasImage ? "" : `style=\"background: ${escapeHtml(palette)};\"`;
@@ -159,7 +176,7 @@
                     <span class="project-tag">${escapeHtml(item.area || "Licence")}</span>
                 </div>
                 <div class="project-footer">
-                    <span class="project-meta">${escapeHtml(config.libraryCardLabel || "PRACTICAL SKILL")}</span>
+                    <span class="project-meta">${escapeHtml(isPathways ? cardTypeNames[cardType(item)] : config.libraryCardLabel || "PRACTICAL SKILL")}</span>
                 </div>
             </div>
         `;

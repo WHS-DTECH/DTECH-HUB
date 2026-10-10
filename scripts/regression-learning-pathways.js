@@ -28,7 +28,7 @@ class Element {
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 
 async function testDashboard() {
-    const names = ["grid", "results-meta", "search", "year-pills", "status-pills", "category-pills", "sort"];
+    const names = ["grid", "results-meta", "search", "year-pills", "status-pills", "category-pills", "type-pills", "sort"];
     const elements = Object.fromEntries(names.map((name) => [`#practical-skills-${name}`, new Element()]));
     const dashboard = fs.readFileSync(path.join(root, "learning-pathways", "index.html"), "utf8");
     const cardLabel = dashboard.match(/data-library-card-label="([^"]+)"/)?.[1];
@@ -86,6 +86,22 @@ async function testDashboard() {
     assert.equal(grid.children[0].tagName, "article", "Display-only pathways are not links");
     assert.equal(grid.children[0].href, undefined);
     assert.match(grid.children[0].innerHTML, /Curriculum Strands/, "Display-only cards show the curriculum card type");
+    const unitPalette = dashboard.match(/data-library-unit-palette="([^"]+)"/)?.[1];
+    assert.match(unitPalette, /#9f1d3a/, "Units use their own crimson palette");
+    Object.assign(config.dataset, { libraryUnitLabel: "Units", libraryUnitPalette: unitPalette,
+        libraryPalette: "linear-gradient(135deg, #2b87b6 0%, #46a6d0 100%)" });
+    responseCards = [{ ...sample, id: "unit-a", title: "Alpha Unit", cardType: "unit", strand: "web" }, { ...sample, title: "Zeta Strand" }];
+    vm.runInContext(fs.readFileSync(path.join(root, "practical-skills/app.js"), "utf8"), context);
+    await tick();
+    assert.match(grid.children[0].innerHTML, /Zeta Strand/, "Curriculum Strands appear before Units");
+    assert.match(grid.children[1].innerHTML, /Units/);
+    assert.match(grid.children[1].innerHTML, /#9f1d3a/);
+    assert.doesNotMatch(grid.children[0].innerHTML, /#9f1d3a/, "Strands keep the Pathways palette");
+    const types = elements["#practical-skills-type-pills"];
+    assert.deepEqual(types.children.map((pill) => pill.textContent), ["All", "Curriculum Strands", "Units"]);
+    types.children.find((pill) => pill.textContent === "Units").click();
+    assert.equal(grid.children.length, 1);
+    assert.match(grid.children[0].innerHTML, /Alpha Unit/);
     config.dataset = {};
     responseCards = [sample, { ...sample, id: "practical-skills-checklist", title: "Licence" }];
     vm.runInContext(fs.readFileSync(path.join(root, "practical-skills/app.js"), "utf8"), context);
@@ -97,7 +113,7 @@ async function testDashboard() {
 
 async function testEditor() {
     const names = ["form", "fields", "message", "cards", "search", "retry", "id", "title", "summary",
-        "year", "area", "href", "image", "status", "icon", "publish", "clear"];
+        "year", "area", "href", "image", "status", "icon", "type", "publish", "clear"];
     const elements = Object.fromEntries(names.map((name) => [`#pathways-${name}`, new Element()]));
     elements["#pathways-form"].reset = () => {
         ["id", "title", "summary", "year", "area", "href", "image", "icon"].forEach((name) => { elements[`#pathways-${name}`].value = ""; });
@@ -155,9 +171,18 @@ async function testEditor() {
 
 async function main() {
     const seed = normalizeCards(JSON.parse(fs.readFileSync(path.join(root, "learning-pathways/library.json"), "utf8")));
-    assert.deepEqual(seed.map((card) => card.title), ["Digital systems", "Programming & Algorithms", "Data and Information",
+    const strands = seed.filter((card) => card.cardType === "strand");
+    const units = seed.filter((card) => card.cardType === "unit");
+    const plusUnits = (cards) => normalizeCards([...cards, ...units.filter((unit) => !cards.some((card) => card.id === unit.id))]);
+    assert.deepEqual(strands.map((card) => card.title), ["Digital systems", "Programming & Algorithms", "Data and Information",
         "Digital citizenship", "Systems and control"]);
-    assert.ok(seed.every((card) => card.area === card.title && card.yearLevel === "Junior DTECH"));
+    assert.ok(strands.every((card) => card.area === card.title && card.yearLevel === "Junior DTECH"));
+    assert.deepEqual(units.map((card) => [card.title, card.strand, card.area]), [
+        ["Infrastructure & Networking", "digital-systems", "Digital systems"], ["Binary & Data", "digital-systems", "Digital systems"]]);
+    assert.ok(units.every((card) => card.yearLevel === "Junior DTECH" && card.href === ""), "Unit cards are display-only for now");
+    assert.throws(() => normalizeCards([{ ...sample, cardType: "lesson" }]), /invalid card type/);
+    assert.equal(normalizeCards([sample])[0].cardType, "strand", "Existing cards default to Curriculum Strands");
+    assert.equal(normalizeCards([{ ...sample, strand: "x" }])[0].strand, undefined, "Only units keep a parent strand");
     assert.equal(seed.find((card) => card.id === "digital-systems").href, "/learning-pathways/digital-systems.html");
     const curriculumLinks = {
         "programming-and-algorithms": "/learning-pathways/programming-and-algorithms.html",
@@ -165,7 +190,7 @@ async function main() {
         "digital-citizenship": "/learning-pathways/digital-citizenship.html",
         "systems-and-control": "/learning-pathways/systems-and-control.html"
     };
-    for (const card of seed.filter((card) => card.id !== "digital-systems")) {
+    for (const card of strands.filter((card) => card.id !== "digital-systems")) {
         assert.equal(card.href, curriculumLinks[card.id]);
         const page = fs.readFileSync(path.join(root, ...card.href.slice(1).split("/")), "utf8");
         for (const heading of ["Overview", "Official Curriculum Strand", "Year 7 Knowledge and Practices",
@@ -217,7 +242,7 @@ async function main() {
         assert.match(sql, /learning_pathways_library_store/, "Never writes the Licence Library table");
         if (sql.includes("INSERT INTO") && (stored === null || !sql.includes("DO NOTHING"))) {
             stored = JSON.parse(params[0]);
-            seedVersion = 6;
+            seedVersion = 7;
         }
         if (sql.includes("seed_version < 1") && seedVersion < 1) {
             const starters = JSON.parse(params[0]);
@@ -254,6 +279,12 @@ async function main() {
             stored = stored.map((card) => links[card.id] && !card.href ? { ...card, href: links[card.id] } : card);
             seedVersion = 6;
         }
+        if (sql.includes("seed_version < 7") && seedVersion < 7) {
+            const added = JSON.parse(params[0]);
+            assert.ok(added.length && added.every((card) => card.cardType === "unit"), "Version 7 only adds unit cards");
+            stored = [...stored, ...added.filter((card) => !stored.some((old) => old.id === card.id))];
+            seedVersion = 7;
+        }
         return { rows: sql.startsWith("SELECT") && stored !== null ? [{ cards: stored }] : [] };
     } };
     const app = express();
@@ -267,16 +298,16 @@ async function main() {
         let response = await fetch(`${base}/learning-pathways/library.json`);
         assert.match(response.headers.get("cache-control"), /no-store/);
         const migrated = await response.json();
-        assert.equal(migrated.length, 6, "One-time preload preserves existing custom cards");
+        assert.equal(migrated.length, 8, "One-time preload preserves existing custom cards");
         assert.equal(migrated.find((card) => card.id === "digital-systems").title, "Existing edited systems",
             "Preload does not overwrite existing cards with the same ID");
         assert.equal(migrated.filter((card) => card.id === "digital-systems").length, 1);
-        assert.equal((await (await fetch(`${base}/learning-pathways/library.json`)).json()).length, 6,
+        assert.equal((await (await fetch(`${base}/learning-pathways/library.json`)).json()).length, 8,
             "Repeated reads do not duplicate starter cards");
         stored = [existing, sample, { ...sample, id: "programming" }, { ...sample, id: "algorithms" }];
         seedVersion = 1;
         const merged = await (await fetch(`${base}/learning-pathways/library.json`)).json();
-        assert.equal(merged.length, 3);
+        assert.equal(merged.length, 5);
         assert.deepEqual(merged.slice(0, 2), normalizeCards([existing, sample]), "Unrelated cards remain unchanged");
         assert.equal(merged[2].title, "Programming & Algorithms");
         assert.match(merged[2].summary, /algorithms.*debug.*test and improve/);
@@ -285,59 +316,68 @@ async function main() {
             { ...sample, id: "programming" }, { ...sample, id: "algorithms" }];
         seedVersion = 1;
         const preserved = await (await fetch(`${base}/learning-pathways/library.json`)).json();
-        assert.equal(preserved.length, 2);
+        assert.equal(preserved.length, 4);
         assert.equal(preserved[1].title, "Edited combined card", "Existing combined edits are preserved");
         const oldData = { ...sample, id: "data", title: "Data", area: "Data" };
         stored = [sample, oldData];
         seedVersion = 2;
         const renamed = await (await fetch(`${base}/learning-pathways/library.json`)).json();
-        assert.deepEqual(renamed, normalizeCards([sample, { ...oldData, title: "Data and Information", area: "Data and Information" }]),
+        assert.deepEqual(renamed, plusUnits([sample, { ...oldData, title: "Data and Information", area: "Data and Information" }]),
             "Rename changes only Data heading and category, preserving description and other cards");
         stored = [existing, { ...sample, id: "design-and-innovation", title: "Design and innovation" }, sample];
         seedVersion = 3;
         const removed = await (await fetch(`${base}/learning-pathways/library.json`)).json();
-        assert.deepEqual(removed, normalizeCards([existing, sample]), "Remove only Design and Innovation, preserving other cards and order");
+        assert.deepEqual(removed, plusUnits([existing, sample]), "Remove only Design and Innovation, preserving other cards and order");
         assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), removed,
             "Removed card stays removed after repeated reads");
         const unlinkedSystems = { ...existing, href: "" };
         stored = [sample, unlinkedSystems];
         seedVersion = 4;
         const linked = await (await fetch(`${base}/learning-pathways/library.json`)).json();
-        assert.deepEqual(linked, normalizeCards([sample, { ...unlinkedSystems, href: "/learning-pathways/digital-systems.html" }]),
+        assert.deepEqual(linked, plusUnits([sample, { ...unlinkedSystems, href: "/learning-pathways/digital-systems.html" }]),
             "Curriculum page migration changes only blank Digital Systems link, preserving fields and order");
         stored = [existing, sample];
         seedVersion = 4;
-        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), normalizeCards(stored),
+        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), plusUnits(stored),
             "Existing custom Digital Systems link is preserved");
         stored = [];
         seedVersion = 4;
-        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), [],
+        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), plusUnits([]),
             "New page does not restore deleted curriculum cards");
         stored = [unlinkedSystems];
         seedVersion = 5;
         assert.equal((await (await fetch(`${base}/learning-pathways/library.json`)).json())[0].href, "",
             "Later removal of the link is not undone");
-        const unlinkedCurriculum = seed.filter((card) => card.id !== "digital-systems")
+        const unlinkedCurriculum = strands.filter((card) => card.id !== "digital-systems")
             .map((card) => ({ ...card, href: "", title: `Edited ${card.title}` }));
         stored = [sample, unlinkedSystems, ...unlinkedCurriculum];
         seedVersion = 5;
         const allLinked = await (await fetch(`${base}/learning-pathways/library.json`)).json();
-        assert.deepEqual(allLinked, normalizeCards([sample, unlinkedSystems,
+        assert.deepEqual(allLinked, plusUnits([sample, unlinkedSystems,
             ...unlinkedCurriculum.map((card) => ({ ...card, href: curriculumLinks[card.id] }))]),
             "Version 6 links all four blank cards, preserves edits/order, and does not reapply Digital Systems migration");
         assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), allLinked);
         stored = unlinkedCurriculum.map((card) => ({ ...card, href: "/learning-pathways/custom-systems.html" }));
         seedVersion = 5;
-        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), normalizeCards(stored),
+        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), plusUnits(stored),
             "Custom links on all four cards are preserved");
         stored = [];
         seedVersion = 5;
-        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), [],
+        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), plusUnits([]),
             "Version 6 does not restore deleted cards");
         stored = unlinkedCurriculum;
         seedVersion = 6;
-        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), normalizeCards(unlinkedCurriculum),
+        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), plusUnits(unlinkedCurriculum),
             "Later published link removals are not undone");
+        stored = [sample];
+        seedVersion = 7;
+        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), normalizeCards([sample]),
+            "Version 7 does not restore deleted unit cards");
+        stored = [sample, { ...units[0], title: "Edited unit" }];
+        seedVersion = 6;
+        const unitMigrated = await (await fetch(`${base}/learning-pathways/library.json`)).json();
+        assert.deepEqual(unitMigrated.map((card) => card.title), [sample.title, "Edited unit", "Binary & Data"],
+            "Unit migration keeps edits and does not duplicate units");
         assert.equal((await fetch(`${base}/api/admin/learning-pathways/library`)).status, 403);
         const publish = (cards, admin = true) => fetch(`${base}/api/admin/learning-pathways/library`, {
             method: "PUT", headers: { "Content-Type": "application/json", "x-test-admin": admin ? "yes" : "no" },

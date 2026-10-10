@@ -31,6 +31,16 @@
     cursor: default;
 }
 
+.project-card.pathway-unit-card {
+    border-color: #f0c4c4;
+    background: #fff8f7;
+}
+
+.pathway-unit-card .project-footer .project-meta {
+    color: #9f1d3a;
+    font-weight: 700;
+}
+
 .project-card.pathway-display-card:hover {
     transform: none;
 }

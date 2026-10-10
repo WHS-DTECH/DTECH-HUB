@@ -40,7 +40,7 @@
             const title = document.createElement("h3");
             title.textContent = card.title;
             const details = document.createElement("p");
-            details.textContent = `${card.yearLevel} | ${card.area} | ${card.status}`;
+            details.textContent = `${card.cardType === "unit" ? "Unit" : "Curriculum Strand"} | ${card.yearLevel} | ${card.area} | ${card.status}`;
             const summary = document.createElement("p");
             summary.textContent = card.summary;
             row.append(title, details, summary);
@@ -55,7 +55,8 @@
             };
             button("Edit", () => {
                 const values = { id: card.id, title: card.title, summary: card.summary, year: card.yearLevel,
-                    area: card.area, href: card.href, image: card.imageUrl, status: card.status, icon: card.visual?.icon || "LP" };
+                    area: card.area, href: card.href, image: card.imageUrl, status: card.status, icon: card.visual?.icon || "LP",
+                    type: card.cardType || "strand" };
                 Object.entries(values).forEach(([key, value]) => { field(key).value = value || ""; });
                 field("title").focus();
                 setMessage(`Editing ${card.title}.`);
@@ -123,8 +124,9 @@
         }
         const card = { id, title, summary: text("summary"), href: text("href"), imageUrl: text("image"),
             yearLevel: text("year") || "All Years", area: text("area") || "Learning Pathways",
-            status: text("status"), visual: { icon: text("icon") || "LP" } };
+            status: text("status"), cardType: text("type") || "strand", visual: { icon: text("icon") || "LP" } };
         const index = cards.findIndex((item) => item.id === id);
+        if (card.cardType === "unit" && index >= 0 && cards[index].strand) card.strand = cards[index].strand;
         if (index < 0) cards.push(card);
         else cards[index] = card;
         dirty = true;

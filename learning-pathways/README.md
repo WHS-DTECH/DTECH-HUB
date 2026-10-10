@@ -83,6 +83,20 @@ Version 6 links the other four unlinked curriculum cards to their reference page
 without replacing custom links, changing other card fields/order or restoring
 deleted cards. Later published link changes are preserved. All five curriculum
 cards are now linked; the Junior Task List still displays names only.
+Version 7 appends the Digital Systems **Unit** cards (Infrastructure & Networking,
+Binary & Data) when their IDs are missing, without changing existing cards or
+restoring units deleted after the migration.
+
+### Card types: Curriculum Strands and Units
+
+Each card has a `cardType` of `strand` (default, footer **Curriculum Strands**,
+Pathways blue) or `unit` (footer **Units**, crimson/coral palette distinct from
+every other library). Unit cards keep an optional `strand` ID naming their parent
+strand; both current units belong to `digital-systems`. The dashboard has a
+**Card Type** filter, lists strands before units, and the admin editor has a Card
+Type field. Units are display-only for now and are excluded from the student
+Task List, which still lists strand names only. They are the planned hook for
+linking Digital Systems into the Progression Pathway report.
 
 ## Progression Pathway (Teacher View)
 
