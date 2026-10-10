@@ -27,6 +27,7 @@ async function main() {
         ...assessment,
         ...learningSites,
         ...loginSitesConfig,
+        syncPracticalSkillsKitCompletion: async () => {},
         Date
     });
     vm.runInContext([

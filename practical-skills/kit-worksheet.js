@@ -17,6 +17,7 @@
         saveTimerId: 0,
         driveSetup: null,
         huntProfile: null,
+        certificate: null,
         driveSetupInProgress: false
     };
 
@@ -212,6 +213,7 @@
 
         if (!state.email) {
             bar.hidden = true;
+            updateCertificate();
             return;
         }
 
@@ -220,6 +222,30 @@
         pill.textContent = isComplete ? "Completed" : "Not Started";
         pill.classList.toggle("is-complete", isComplete);
         completeBtn.disabled = isComplete;
+        completeBtn.hidden = Boolean(state.content?.worksheets?.some((worksheet) => worksheet && !worksheet.hidden && worksheet.mergedInto === undefined));
+        updateCertificate();
+    }
+
+    function updateCertificate() {
+        const host = document.getElementById("worksheet-certificate");
+        if (!host) return;
+        const certificate = state.certificate;
+        host.hidden = !state.email || !certificate || getCurrentActivityIndex() !== null;
+        if (host.hidden) return;
+        const fields = {
+            "certificate-student-name": certificate.studentName,
+            "certificate-student-email": certificate.studentEmail,
+            "certificate-kit-title": certificate.kitTitle,
+            "certificate-completion-details": `${certificate.activityCount} activities completed | ${certificate.completedDate}`,
+            "certificate-issuer": certificate.issuer
+        };
+        for (const [id, value] of Object.entries(fields)) document.getElementById(id).textContent = value;
+    }
+
+    function certificateStatus(message, error = false) {
+        const host = document.getElementById("certificate-status");
+        host.textContent = message;
+        host.classList.toggle("is-error", error);
     }
 
     function renderPage() {
@@ -422,6 +448,48 @@
             }
         });
 
+        document.getElementById("certificate-print")?.addEventListener("click", () => {
+            if (!state.certificate) return;
+            document.body.classList.add("printing-certificate");
+            try { window.print(); }
+            finally { document.body.classList.remove("printing-certificate"); }
+        });
+        document.getElementById("certificate-download")?.addEventListener("click", async () => {
+            const button = document.getElementById("certificate-download");
+            const email = state.email;
+            button.disabled = true;
+            certificateStatus("Preparing your PDF...");
+            try {
+                const response = await fetch(`/api/practical-skills/progress/${encodeURIComponent(state.kitId)}/certificate.pdf`, { headers: withAuthHeaders() });
+                if (!response.ok) {
+                    const payload = await response.json();
+                    throw new Error(payload.error || `Download failed (${response.status})`);
+                }
+                if (email !== getSignedInEmail()) return;
+                const url = URL.createObjectURL(await response.blob());
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = `${state.kitId}-certificate.pdf`;
+                link.click();
+                window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+                certificateStatus("Your landscape PDF has been downloaded.");
+            } catch (error) {
+                if (email === getSignedInEmail()) certificateStatus(error.message || "Could not download your certificate.", true);
+            } finally { button.disabled = false; }
+        });
+        document.getElementById("certificate-email")?.addEventListener("click", async () => {
+            const button = document.getElementById("certificate-email");
+            const email = state.email;
+            button.disabled = true;
+            certificateStatus("Sending your certificate...");
+            try {
+                const payload = await loadJson(`/api/practical-skills/progress/${encodeURIComponent(state.kitId)}/certificate/email`, { method: "POST", headers: withAuthHeaders() });
+                if (email === getSignedInEmail()) certificateStatus(`Certificate sent to ${payload.recipient}. You can forward the email to share it.`);
+            } catch (error) {
+                if (email === getSignedInEmail()) certificateStatus(error.message || "Could not email your certificate.", true);
+            } finally { button.disabled = false; }
+        });
+
         completeBtn?.addEventListener("click", async () => {
             completeBtn.disabled = true;
             try {
@@ -440,6 +508,7 @@
             try {
                 const snapshot = await resetKit(state.kitId);
                 state.completedActivities = {};
+                state.certificate = null;
                 renderPage();
                 const kitEntry = (snapshot.kits || []).find((entry) => entry.id === state.kitId) || null;
                 updateCompleteBar(kitEntry);
@@ -475,6 +544,7 @@
             const progressPayload = await fetchKitProgress(state.kitId);
             state.responses = { ...progressPayload?.responses, ...identityDraft };
             state.completedActivities = progressPayload?.completedActivities || {};
+            state.certificate = progressPayload?.certificate || null;
             state.progressLoaded = true;
             const currentActivity = state.content?.activities?.[getCurrentActivityIndex()];
             if (currentActivity?.assessment?.id === "learning-sites-treasure-v1" || currentActivity?.loginSites) {
@@ -532,6 +602,8 @@
             state.completedActivities = {};
             state.driveSetup = null;
             state.huntProfile = null;
+            state.certificate = null;
+            updateCertificate();
             void init(identityDraft);
         });
     }

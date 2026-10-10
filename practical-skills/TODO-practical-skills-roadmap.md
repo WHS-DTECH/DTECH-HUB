@@ -19,6 +19,24 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
 
 ## 3. Kit Detail / Checklist Behavior
 
+- Kits with visible activities now complete automatically from saved activity
+  ticks, excluding hidden worksheets and merged activities. The last activity
+  check, manual activity completion, progress reload and checklist refresh all
+  synchronise the kit state. The award date is retained across reloads; undoing
+  an activity removes kit completion without clearing the other activity ticks.
+  Reset clears the award and activity ticks. Empty kits are not auto-awarded.
+  Manual whole-kit completion cannot bypass unfinished visible activities.
+- Completed kits show a personalised Certificate of Completion below the
+  student activity list. The student name comes from verified Google identity
+  (the school email is shown if no verified name is available), with kit title,
+  activity count and the persisted completion date in New Zealand time.
+  Print / Save as PDF prints only the certificate on A4 landscape; Download PDF
+  supplies a one-page server-generated landscape PDF with embedded Unicode
+  fonts, including macrons. Email me a copy uses the existing hub SMTP/email-log
+  service to send that PDF only to the signed-in student's school email.
+  Students can forward the email to share it. Email is explicit, not automatic,
+  and repeat sends have a one-minute cooldown. Incomplete kits cannot download
+  or email a certificate; errors are displayed without claiming success.
 - Login Kit shows five tasks: school identity, Google/Microsoft and Drives,
   Password Problems, DTECH Learning Site, and Using your login details (formerly
   Open Kamar & Hapara). Other worksheets are hidden, not deleted or reindexed;

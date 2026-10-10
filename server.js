@@ -9,6 +9,7 @@ const { PASSWORD_PROBLEMS_ID, APPS_WORDSEARCH_ID, withShortLoginKit, withLoginAp
 const { LEARNING_SITES_ID, getHuntProfile, gradeLearningSites } = require("./learning-sites-assessment");
 const { gradeLoginSites } = require("./practical-skills-assessment");
 const { validateLoginSites, publicLoginSites, visibleLoginSites } = require("./login-sites-config");
+const { visibleActivityIndexes, allActivitiesComplete, buildKitCertificate, createKitCertificatePdf } = require("./practical-skills-certificate");
 
 let OAuth2Client = null;
 try {
@@ -231,7 +232,7 @@ async function setPracticalSkillsKitCompletion(studentEmail, kitId, completed) {
       student_email: email,
       kit_id: safeKitId,
       completed: Boolean(completed),
-      completed_at: completed ? nowIso : null,
+      completed_at: completed ? existing.completed_at || nowIso : null,
       completed_activities: completed ? existing.completed_activities || {} : {},
       started_at: completed ? existing.started_at : nowIso,
       updated_at: nowIso
@@ -243,7 +244,7 @@ async function setPracticalSkillsKitCompletion(studentEmail, kitId, completed) {
   await ensurePracticalSkillsProgressSchema();
   const result = completed
     ? await pool.query(
-        `UPDATE practical_skills_progress SET completed = TRUE, completed_at = NOW(), updated_at = NOW()
+        `UPDATE practical_skills_progress SET completed = TRUE, completed_at = COALESCE(completed_at, NOW()), updated_at = NOW()
          WHERE student_email = $1 AND kit_id = $2 RETURNING *`,
         [email, safeKitId]
       )
@@ -4583,7 +4584,7 @@ async function savePracticalSkillsAssessment(studentEmail, kitId, activityIndex,
       ...existing,
       responses: grade.identityLesson ? { ...existing.responses, ...grade.answers } : {
         ...existing.responses,
-        [responseKey]: mergeSiteAnswers ? { ...existing.responses[responseKey], ...grade.answers } : grade.answers
+        [responseKey]: mergeSiteAnswers ? { ...existing.responses?.[responseKey], ...grade.answers } : grade.answers
       },
       completed_activities: {
         ...existing.completed_activities,
@@ -12442,6 +12443,44 @@ app.put("/api/admin/practical-skills/library", requireAdminAccess, async (req, r
   }
 });
 
+async function syncPracticalSkillsKitCompletion(studentEmail, kitId, content = null) {
+  const kitContent = content || await getStoredPracticalSkillsKitContent(kitId);
+  const indexes = visibleActivityIndexes(kitContent);
+  const row = await ensurePracticalSkillsProgressRow(studentEmail, kitId);
+  if (!row) throw new Error("Kit progress could not be loaded.");
+  if (!indexes.length) return row;
+  if (!hasDatabase) {
+    const completed = allActivitiesComplete(kitContent, row);
+    const next = {
+      ...row, completed,
+      completed_at: completed ? row.completed_at || new Date().toISOString() : null
+    };
+    memoryPracticalSkillsProgress.set(`${normalizeEmail(studentEmail)}:${kitId}`, next);
+    return next;
+  }
+  const ready = "(SELECT bool_and(COALESCE(completed_activities ->> activity_key, '') <> '') FROM unnest($3::text[]) AS activity_key)";
+  const result = await pool.query(
+    `UPDATE practical_skills_progress
+     SET completed = ${ready},
+         completed_at = CASE WHEN ${ready} THEN COALESCE(completed_at, NOW()) ELSE NULL END,
+         updated_at = CASE WHEN completed IS DISTINCT FROM ${ready} THEN NOW() ELSE updated_at END
+     WHERE student_email = $1 AND kit_id = $2 RETURNING *`,
+    [normalizeEmail(studentEmail), kitId, indexes]
+  );
+  if (!result.rows?.[0]) throw new Error("Kit completion could not be saved.");
+  return result.rows[0];
+}
+
+async function getPracticalSkillsCertificate(req, kitId) {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  const content = await getStoredPracticalSkillsKitContent(kitId);
+  const row = await syncPracticalSkillsKitCompletion(email, kitId, content);
+  const identity = req.auth_identity;
+  const verifiedName = identity?.verified && normalizeEmail(identity.email) === email
+    ? [identity.givenName, identity.familyName].filter(Boolean).join(" ").trim() : "";
+  return buildKitCertificate(content, row, verifiedName || email);
+}
+
 app.get("/api/practical-skills/my-progress", async (req, res) => {
   const studentEmail = normalizeEmail(getRequestUserEmail(req));
   if (!studentEmail || !studentEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
@@ -12451,6 +12490,7 @@ app.get("/api/practical-skills/my-progress", async (req, res) => {
 
   try {
     await Promise.all(PRACTICAL_SKILLS_KIT_DEFINITIONS.map((kit) => ensurePracticalSkillsProgressRow(studentEmail, kit.id)));
+    await Promise.all(PRACTICAL_SKILLS_KIT_DEFINITIONS.map((kit) => syncPracticalSkillsKitCompletion(studentEmail, kit.id)));
     const rows = await getAllPracticalSkillsProgressRows(studentEmail);
     res.json(computePracticalSkillsSnapshot(rows));
   } catch (error) {
@@ -12471,6 +12511,11 @@ app.post("/api/practical-skills/progress/:kitId/complete", async (req, res) => {
   }
 
   try {
+    const content = await getStoredPracticalSkillsKitContent(kitId);
+    const row = await syncPracticalSkillsKitCompletion(studentEmail, kitId, content);
+    if (visibleActivityIndexes(content).length && !allActivitiesComplete(content, row)) {
+      return res.status(409).json({ error: "Complete all visible activities to earn this kit." });
+    }
     await setPracticalSkillsKitCompletion(studentEmail, kitId, true);
     const rows = await getAllPracticalSkillsProgressRows(studentEmail);
     res.json(computePracticalSkillsSnapshot(rows));
@@ -12513,7 +12558,7 @@ app.get("/api/practical-skills/progress/:kitId", async (req, res) => {
   }
 
   try {
-    await ensurePracticalSkillsProgressRow(studentEmail, kitId);
+    const certificate = await getPracticalSkillsCertificate(req, kitId);
     const rows = await getAllPracticalSkillsProgressRows(studentEmail);
     const snapshot = computePracticalSkillsSnapshot(rows);
     const row = rows.find((entry) => String(entry?.kit_id || "").trim() === kitId);
@@ -12521,10 +12566,65 @@ app.get("/api/practical-skills/progress/:kitId", async (req, res) => {
       kit: snapshot.kits.find((entry) => entry.id === kitId) || null,
       badges: snapshot.badges,
       responses: row?.responses && typeof row.responses === "object" ? row.responses : {},
-      completedActivities: row?.completed_activities || {}
+      completedActivities: row?.completed_activities || {},
+      certificate
     });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not load kit progress." });
+  }
+});
+
+const certificateEmailCooldowns = new Map();
+
+app.get("/api/practical-skills/progress/:kitId/certificate.pdf", async (req, res) => {
+  const studentEmail = normalizeEmail(getRequestUserEmail(req));
+  const kitId = String(req.params.kitId || "").trim();
+  if (!studentEmail || !studentEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) return res.status(401).json({ error: "School sign-in required." });
+  if (!getPracticalSkillsKitDefinition(kitId)) return res.status(404).json({ error: "Unknown kit." });
+  try {
+    const certificate = await getPracticalSkillsCertificate(req, kitId);
+    if (!certificate) return res.status(409).json({ error: "Complete all visible activities before downloading your certificate." });
+    const buffer = await createKitCertificatePdf(certificate);
+    res.set("Cache-Control", "private, no-store");
+    res.type("application/pdf").attachment(`${kitId}-certificate.pdf`).send(buffer);
+  } catch (error) {
+    console.error("[kit-certificate] Could not generate certificate:", error);
+    res.status(500).json({ error: "Could not generate your certificate. Please try again." });
+  }
+});
+
+app.post("/api/practical-skills/progress/:kitId/certificate/email", async (req, res) => {
+  const studentEmail = normalizeEmail(getRequestUserEmail(req));
+  const kitId = String(req.params.kitId || "").trim();
+  if (!studentEmail || !studentEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) return res.status(401).json({ error: "School sign-in required." });
+  if (!getPracticalSkillsKitDefinition(kitId)) return res.status(404).json({ error: "Unknown kit." });
+  if (!smtpTransporter || !SMTP_FROM) return res.status(503).json({ error: "Email is not configured on the hub. You can still download or print your certificate." });
+  const key = `${studentEmail}:${kitId}`;
+  for (const [entry, expires] of certificateEmailCooldowns) {
+    if (expires <= Date.now()) certificateEmailCooldowns.delete(entry);
+  }
+  if (certificateEmailCooldowns.has(key)) return res.status(429).json({ error: "Please wait a minute before emailing another copy." });
+  certificateEmailCooldowns.set(key, Date.now() + 60000);
+  try {
+    const certificate = await getPracticalSkillsCertificate(req, kitId);
+    if (!certificate) {
+      certificateEmailCooldowns.delete(key);
+      return res.status(409).json({ error: "Complete all visible activities before emailing your certificate." });
+    }
+    const buffer = await createKitCertificatePdf(certificate);
+    const safe = (value) => String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
+    await sendConfiguredHubEmail({
+      to: studentEmail,
+      subject: `[DTECH HUB] ${certificate.kitTitle} - Certificate of Completion`,
+      html: `<div style="font-family:Arial,sans-serif;color:#173858;"><h2>Certificate of Completion</h2><p>Kia ora ${safe(certificate.studentName)},</p><p>Ka pai! You completed all ${certificate.activityCount} activities in <strong>${safe(certificate.kitTitle)}</strong> on ${safe(certificate.completedDate)}.</p><p>Your landscape PDF certificate is attached. You can save, print or forward it to share your achievement.</p><p>${safe(certificate.issuer)}</p></div>`,
+      attachment: { buffer, originalname: `${kitId}-certificate.pdf`, mimetype: "application/pdf" },
+      emailType: "kit_certificate"
+    });
+    res.json({ sent: true, recipient: studentEmail });
+  } catch (error) {
+    certificateEmailCooldowns.delete(key);
+    console.error("[kit-certificate-email] Could not email certificate:", error);
+    res.status(500).json({ error: getHubEmailErrorMessage(error) });
   }
 });
 
@@ -12583,6 +12683,7 @@ app.put("/api/practical-skills/progress/:kitId/activities/:activityIndex", async
       return;
     }
     const saved = await setPracticalSkillsActivityCompletion(studentEmail, kitId, activityIndex, req.body.completed);
+    await syncPracticalSkillsKitCompletion(studentEmail, kitId, content);
     res.json({ completedActivities: saved.completed_activities });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not save activity completion." });
@@ -12652,6 +12753,7 @@ app.post("/api/practical-skills/progress/:kitId/activities/:activityIndex/check"
           ? gradeLearningSites(req.body.answers, await getLearningSitesStudentProfile(studentEmail))
           : gradePasswordProblems(req.body.answers);
     const saved = await savePracticalSkillsAssessment(studentEmail, kitId, activityIndex, grade);
+    await syncPracticalSkillsKitCompletion(studentEmail, kitId, content);
     res.json({ ...grade, completedActivities: saved.completed_activities });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not check and save your activity." });

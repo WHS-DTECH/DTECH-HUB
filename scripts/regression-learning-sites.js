@@ -79,6 +79,7 @@ async function main() {
     const handlers = {};
     const context = vm.createContext({
         ...assessment, ...hunt, ...loginSitesConfig,
+        syncPracticalSkillsKitCompletion: async () => {},
         app: { get: (url, handler) => { handlers[url] = handler; }, post: (url, handler) => { handlers[url] = handler; } },
         getRequestUserEmail: (req) => req.email || "",
         normalizeEmail: (email) => String(email || "").trim().toLowerCase(),

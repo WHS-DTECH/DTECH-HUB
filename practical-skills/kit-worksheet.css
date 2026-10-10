@@ -7,6 +7,31 @@
     --worksheet-accent-color: #ffd166;
 }
 
+.worksheet-certificate { margin-top: 28px; }
+.certificate-sheet { border: 5px solid #1f5b3a; outline: 1px solid #c49a36; outline-offset: -14px; background: #fffaf0; color: #173858; padding: 42px 32px; text-align: center; border-radius: 8px; }
+.certificate-sheet p { margin: 14px 0; overflow-wrap: anywhere; }
+.certificate-school { font-size: 1.2rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+.certificate-programme { font-size: .9rem; }
+.certificate-sheet h2 { font-family: 'Baloo 2', sans-serif; font-size: clamp(1.6rem, 4vw, 2.8rem); margin: 28px 0; }
+.certificate-sheet h3 { font-size: clamp(1.3rem, 3.5vw, 2.3rem); margin: 22px 0; overflow-wrap: anywhere; }
+.certificate-congratulations { font-weight: 800; color: #1f5b3a; }
+.certificate-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
+.certificate-help { font-size: .9rem; }
+#certificate-status.is-error { color: #a4342f; font-weight: 700; }
+
+@page kit-certificate { size: A4 landscape; margin: 10mm; }
+@media print {
+    body.kit-worksheet-page.printing-certificate { background: #fff; min-height: 0; }
+    body.printing-certificate > :not(.worksheet-shell), body.printing-certificate .worksheet-shell > :not(#worksheet-certificate) { display: none !important; }
+    body.printing-certificate .worksheet-shell { width: 100%; max-width: none; margin: 0; padding: 0; }
+    body.printing-certificate .worksheet-certificate { margin: 0; break-inside: avoid; page: kit-certificate; }
+    body.printing-certificate .certificate-sheet { padding: 12mm 10mm; height: 185mm; border-radius: 0; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    body.printing-certificate .certificate-sheet p { margin: 2mm 0; font-size: 12pt; }
+    body.printing-certificate .certificate-sheet h2 { font-size: 30pt; margin: 6mm 0; }
+    body.printing-certificate .certificate-sheet h3 { font-size: 24pt; margin: 5mm 0; }
+    body.printing-certificate .certificate-actions, body.printing-certificate .certificate-help, body.printing-certificate #certificate-status { display: none !important; }
+}
+
 * {
     box-sizing: border-box;
 }
