@@ -769,6 +769,8 @@ assert.match(worksheetSource, /Good try! This result may not be the best match/,
     "A non-matching choice receives an encouraging retry message");
 assert.match(worksheetSource, /Nice investigating! This result matches what you are looking for/,
     "A matching choice receives positive feedback");
+assert.match(worksheetSource, /questionId\.endsWith\("-search-result-doc-track"\)[\s\S]*You found it! The Hokitika River flows through Hokitika Gorge\. Great searching!/,
+    "A correct Mission 5 answer receives feedback specific to finding the river");
 assert.match(worksheetSource, /if \(\["search-penguin-missions-v1", "search-keyword-challenge-v1", "search-results-detective-v1"\]\.includes\(activity\?\.questionAutoMarkAssessmentId\)\) \{\s*scheduleSearchActivityAutoMark\(activityIndex, activity\.questionAutoMarkAssessmentId\);/, "Previously saved complete answers are auto-marked when the activity opens");
 assert.match(worksheetSource, /"search-keyword-challenge-v1"[\s\S]*"keyword-pounamu-treasure"[\s\S]*"keyword-hokitika-founded"/, "Keyword Challenge auto-marking waits for all five mission answers");
 assert.match(worksheetSource, /"search-results-detective-v1"[\s\S]*"search-result-clock-tower"[\s\S]*"search-result-doc-track"/, "Search Results Detective auto-marking waits for all five mission answers");

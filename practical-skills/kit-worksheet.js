@@ -248,7 +248,9 @@
                 const result = grade.results.find((entry) => entry.id === questionId);
                 if (!result) throw new Error("This choice could not be checked. Refresh the activity and try again.");
                 setSearchChoiceFeedback(questionId, result.correct
-                    ? "Nice investigating! This result matches what you are looking for."
+                    ? questionId.endsWith("-search-result-doc-track")
+                        ? "You found it! The Hokitika River flows through Hokitika Gorge. Great searching!"
+                        : "Nice investigating! This result matches what you are looking for."
                     : "Good try! This result may not be the best match. Look for a result with the information in the question, then try again.",
                 result.correct ? "is-correct" : "is-retry");
             }).catch(() => {
