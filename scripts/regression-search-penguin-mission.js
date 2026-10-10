@@ -799,6 +799,25 @@ assert.match(clockTowerHost.innerHTML, /Simulated \(Fake website\) search result
 assert.match(clockTowerHost.innerHTML, /class="worksheet-search-result[\s\S]*data-option-value="Hokitika Clock Tower – History and Dimensions"[\s\S]*aria-pressed="false"/, "Fictional result cards are selectable button answers rather than external links");
 assert.match(clockTowerHost.innerHTML, /data-question-feedback="search-result-clock-tower" role="status" aria-live="polite"/,
     "Search Results Detective questions include an accessible live feedback area");
+const searchFindFeedbackHost = { style: { setProperty() {} }, innerHTML: "", querySelectorAll() { return []; }, querySelector() { return null; } };
+renderContext.window.KitWorksheetRender.renderWorksheet(searchFindFeedbackHost, {
+    questions: [{ ...searchFindMissionFour, id: "3-search-find-pancake-rocks" }],
+    questionAutoMarkAssessmentId: "search-and-find-v1"
+}, { readOnly: true });
+assert.match(searchFindFeedbackHost.innerHTML, /data-question-feedback="3-search-find-pancake-rocks" role="status" aria-live="polite"/,
+    "Search and Find missions include an accessible live feedback area");
+assert.match(worksheetSource, /"search-find-giant-tree": "You found it! The kahikatea is New Zealand's tallest native tree\. Great searching!"/);
+assert.match(worksheetSource, /"search-find-gold-rush-town": "You found it! Ross is the historic gold-mining town south of Hokitika\. Great searching!"/);
+assert.match(worksheetSource, /"search-find-mountain-bird": "You found it! Roroa is the Māori name for the great spotted kiwi\. Great searching!"/);
+assert.match(worksheetSource, /"search-find-pancake-rocks": "You found it! The Pancake Rocks are made of limestone\. Great searching!"/);
+assert.match(worksheetSource, /"search-find-glacier-mystery": "You found it! Kā Roimata o Hine Hukatere is the Māori name for Franz Josef Glacier\. Great searching!"/);
+assert.match(worksheetSource, /Good try! That's not quite it yet\. Tap HINT or try different search words, then update your answer\./,
+    "An incorrect Search and Find answer receives an encouraging retry message");
+assert.match(worksheetSource, /\["search-results-detective-v1", "search-and-find-v1"\]\.includes\(assessmentId\)/,
+    "Search and Find answers are checked in real time");
+assert.match(worksheetSource, /isTypedAnswer \? 900 : 250/, "Typed answers are checked after the student pauses typing");
+assert.match(worksheetSource, /showSavedSearchAndFindFeedback\(activityIndex, questions\)/, "Saved Search and Find answers show feedback when the activity opens");
+assert.match(worksheetSource, /You solved all five West Coast mysteries\. Your activity tick is saved\./);
 assert.doesNotMatch(clockTowerHost.innerHTML, /href="https:\/\/(?:westcoastphotos|heritage|weather)\.example/, "Fictional result domains are never linked");
 const poolHoursHost = {
     style: { setProperty() {} },

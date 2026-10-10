@@ -218,22 +218,48 @@
         feedback.classList.add(status);
     }
 
+    const SEARCH_AND_FIND_FEEDBACK = {
+        "search-find-giant-tree": "You found it! The kahikatea is New Zealand's tallest native tree. Great searching!",
+        "search-find-gold-rush-town": "You found it! Ross is the historic gold-mining town south of Hokitika. Great searching!",
+        "search-find-mountain-bird": "You found it! Roroa is the Māori name for the great spotted kiwi. Great searching!",
+        "search-find-pancake-rocks": "You found it! The Pancake Rocks are made of limestone. Great searching!",
+        "search-find-glacier-mystery": "You found it! Kā Roimata o Hine Hukatere is the Māori name for Franz Josef Glacier. Great searching!"
+    };
+
+    function searchAndFindFeedback(questionId, correct) {
+        const baseId = Object.keys(SEARCH_AND_FIND_FEEDBACK).find((id) => questionId.endsWith(id));
+        return correct
+            ? SEARCH_AND_FIND_FEEDBACK[baseId] || "You found it! Great searching!"
+            : "Good try! That's not quite it yet. Tap HINT or try different search words, then update your answer.";
+    }
+
     function scheduleSearchChoiceCheck(activityIndex, assessmentId, questionId) {
-        if (assessmentId !== "search-results-detective-v1") return;
+        if (!["search-results-detective-v1", "search-and-find-v1"].includes(assessmentId)) return;
+        const isTypedAnswer = assessmentId === "search-and-find-v1";
+        if (isTypedAnswer && !String(state.responses[questionId] || "").trim()) {
+            window.clearTimeout(state.searchChoiceCheckTimers[questionId]);
+            state.searchChoiceCheckRevisions[questionId] = (state.searchChoiceCheckRevisions[questionId] || 0) + 1;
+            const feedback = Array.from(document.querySelectorAll("[data-question-feedback]")).find((node) =>
+                node.getAttribute("data-question-feedback") === questionId);
+            if (feedback) feedback.hidden = true;
+            return;
+        }
+        const itemLabel = isTypedAnswer ? "answer" : "choice";
         if (!state.email) {
-            setSearchChoiceFeedback(questionId, "Sign in with your school account to check and save this choice. You can try another result any time.", "is-pending");
+            setSearchChoiceFeedback(questionId, `Sign in with your school account to check and save this ${itemLabel}. You can try again any time.`, "is-pending");
             return;
         }
         if (!state.progressLoaded) {
-            setSearchChoiceFeedback(questionId, "Your choice is ready. We will check it as soon as your progress has loaded.", "is-pending");
+            setSearchChoiceFeedback(questionId, `Your ${itemLabel} is ready. We will check it as soon as your progress has loaded.`, "is-pending");
             return;
         }
 
         const revision = (state.searchChoiceCheckRevisions[questionId] || 0) + 1;
         state.searchChoiceCheckRevisions[questionId] = revision;
         window.clearTimeout(state.searchChoiceCheckTimers[questionId]);
-        setSearchChoiceFeedback(questionId, "Checking your choice...", "is-pending");
+        if (!isTypedAnswer) setSearchChoiceFeedback(questionId, "Checking your choice...", "is-pending");
         state.searchChoiceCheckTimers[questionId] = window.setTimeout(() => {
+            if (isTypedAnswer) setSearchChoiceFeedback(questionId, "Checking your answer...", "is-pending");
             const answers = { ...state.responses };
             queueProgressWrite(async () => {
                 await saveResponses(state.kitId, answers);
@@ -246,8 +272,10 @@
                 updateActivityCompleteBar();
                 if (state.searchChoiceCheckRevisions[questionId] !== revision) return;
                 const result = grade.results.find((entry) => entry.id === questionId);
-                if (!result) throw new Error("This choice could not be checked. Refresh the activity and try again.");
-                setSearchChoiceFeedback(questionId, result.correct
+                if (!result) throw new Error("This answer could not be checked. Refresh the activity and try again.");
+                setSearchChoiceFeedback(questionId, isTypedAnswer
+                    ? searchAndFindFeedback(questionId, result.correct)
+                    : result.correct
                     ? questionId.endsWith("-search-result-doc-track")
                         ? "You found it! The Hokitika River flows through Hokitika Gorge. Great searching!"
                         : "Nice investigating! This result matches what you are looking for."
@@ -255,9 +283,30 @@
                 result.correct ? "is-correct" : "is-retry");
             }).catch(() => {
                 if (state.searchChoiceCheckRevisions[questionId] !== revision) return;
-                setSearchChoiceFeedback(questionId, "We could not check this choice just now. Your selection is still here—please try again in a moment.", "is-error");
+                setSearchChoiceFeedback(questionId, `We could not check this ${itemLabel} just now. Your ${itemLabel} is still here—please try again in a moment.`, "is-error");
             });
-        }, 250);
+        }, isTypedAnswer ? 900 : 250);
+    }
+
+    function showSavedSearchAndFindFeedback(activityIndex, questions) {
+        if (!state.email || !state.progressLoaded) return;
+        const answeredIds = questions.map((question) => question.id)
+            .filter((id) => SEARCH_AND_FIND_FEEDBACK[id.replace(/^\d+-/, "")] && String(state.responses[id] || "").trim());
+        if (!answeredIds.length) return;
+        const revisions = Object.fromEntries(answeredIds.map((id) => [id, state.searchChoiceCheckRevisions[id] || 0]));
+        queueProgressWrite(() => loadJson(`/api/practical-skills/progress/${encodeURIComponent(state.kitId)}/activities/${activityIndex}/check`, {
+            method: "POST",
+            headers: withAuthHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ answers: { ...state.responses } })
+        })).then((grade) => {
+            state.completedActivities = grade.completedActivities;
+            updateActivityCompleteBar();
+            answeredIds.forEach((id) => {
+                if ((state.searchChoiceCheckRevisions[id] || 0) !== revisions[id]) return;
+                const result = grade.results.find((entry) => entry.id === id);
+                if (result) setSearchChoiceFeedback(id, searchAndFindFeedback(id, result.correct), result.correct ? "is-correct" : "is-retry");
+            });
+        }).catch(() => {});
     }
 
     function scheduleSearchActivityAutoMark(activityIndex, assessmentId) {
@@ -309,7 +358,11 @@
                 });
                 state.completedActivities = grade.completedActivities;
                 updateActivityCompleteBar();
-                showStatusMessage(grade.passed
+                showStatusMessage(assessmentId === "search-and-find-v1"
+                    ? grade.passed
+                        ? "Ka pai! You solved all five West Coast mysteries. Your activity tick is saved."
+                        : "Keep investigating! Use the feedback under each mission to update your answers."
+                    : grade.passed
                     ? "Ka pai! You found a useful result for every mission. Your activity tick is saved."
                     : "Keep investigating! Use the feedback beside each choice to try a different result.");
             }).catch((error) => {
@@ -496,6 +549,9 @@
             });
             if (["search-penguin-missions-v1", "search-keyword-challenge-v1", "search-results-detective-v1", "search-and-find-v1"].includes(activity?.questionAutoMarkAssessmentId)) {
                 scheduleSearchActivityAutoMark(activityIndex, activity.questionAutoMarkAssessmentId);
+            }
+            if (activity?.questionAutoMarkAssessmentId === "search-and-find-v1") {
+                showSavedSearchAndFindFeedback(activityIndex, questions);
             }
             if (verification && activityContent.identityLessonVersion) {
                 host.querySelector("#identity-result").before(verification);
