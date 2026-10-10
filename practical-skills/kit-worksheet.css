@@ -8,7 +8,13 @@
 }
 
 .worksheet-certificate { margin-top: 28px; }
-.certificate-sheet { border: 5px solid #1f5b3a; outline: 1px solid #c49a36; outline-offset: -14px; background: #fffaf0; color: #173858; padding: 42px 32px; text-align: center; border-radius: 8px; }
+.certificate-sheet { position: relative; border: 5px solid #1f5b3a; outline: 1px solid #c49a36; outline-offset: -14px; background: #fffaf0; color: #173858; padding: 42px 32px; text-align: center; border-radius: 8px; }
+.certificate-logo { position: absolute; top: 28px; left: 28px; width: 80px; height: 80px; object-fit: contain; border-radius: 50%; }
+.certificate-school, .certificate-programme { padding-inline: 90px; }
+@media screen and (max-width: 600px) {
+    .certificate-logo { position: static; display: block; margin: 0 auto 18px; }
+    .certificate-school, .certificate-programme { padding-inline: 0; }
+}
 .certificate-sheet p { margin: 14px 0; overflow-wrap: anywhere; }
 .certificate-school { font-size: 1.2rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
 .certificate-programme { font-size: .9rem; }

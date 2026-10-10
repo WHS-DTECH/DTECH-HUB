@@ -42,6 +42,7 @@ function createKitCertificatePdf(certificate) {
       doc.rect(0, 0, width, height).fill("#fffaf0");
       doc.lineWidth(4).rect(25, 25, width - 50, height - 50).stroke("#1f5b3a");
       doc.lineWidth(1).rect(36, 36, width - 72, height - 72).stroke("#c49a36");
+      doc.image(path.join(__dirname, "images", "whs logo circular reo .png"), 65, 51, { fit: [68, 68] });
       const text = (value, y, size, font = "certificate", color = "#173858") => {
         doc.font(font).fontSize(size).fillColor(color).text(value, 65, y, { width: width - 130, align: "center", lineBreak: false });
       };

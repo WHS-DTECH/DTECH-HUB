@@ -31,6 +31,7 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   then the matching staff directory or latest linked student profile. The school
   email is used only when neither source has a name. Certificates include kit title,
   activity count and the persisted completion date in New Zealand time.
+  The circular reo school logo appears on-screen, in print and in PDF copies.
   Print / Save as PDF prints only the certificate on A4 landscape; Download PDF
   supplies a one-page server-generated landscape PDF with embedded Unicode
   fonts, including macrons. Email me a copy uses the existing hub SMTP/email-log

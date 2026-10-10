@@ -96,6 +96,7 @@ async function main() {
     assert.equal(download.headers["Cache-Control"], "private, no-store");
     assert.ok(Buffer.isBuffer(download.body));
     assert.match(download.body.subarray(0, 8).toString(), /^%PDF-/);
+    assert.match(download.body.toString("latin1"), /\/Subtype \/Image/, "School logo is embedded in the downloaded and emailed certificate PDF");
     const parser = new PDFParse({ data: download.body });
     try {
         const info = await parser.getInfo({ parsePageInfo: true });
