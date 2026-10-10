@@ -21,7 +21,7 @@ vm.runInContext(serverSource.slice(migrationStart, migrationEnd), context);
 const original = {
     bannerTitle: "Search Kit",
     worksheets: [{ number: 1, activity: "Search Like a Pro" }, { number: 2, activity: "Other activity" }],
-    _contentMigrations: { searchPenguinMission: 1 },
+    _contentMigrations: { searchPenguinMission: 2 },
     activities: [
         {
             title: "Search Like a Pro",
@@ -48,13 +48,13 @@ assert.ok(penguinQuestion, "Penguin search question is added");
 assert.match(penguinQuestion.prompt, /another name for New Zealand's little blue penguin/i);
 const photo = migrated.activities[0].images.find((image) => image.url === "/practical-skills/images/little-blue-penguin.jpg");
 assert.ok(photo, "Openly licensed local penguin photo replaces the illustration");
-assert.equal(photo.attribution, "Shaun Lee");
-assert.equal(photo.license, "CC BY 4.0");
-assert.equal(photo.sourceUrl, "https://commons.wikimedia.org/wiki/File:Eudyptula_minor,_Auckland,_New_Zealand_imported_from_iNaturalist_photo_430247598.jpg");
-assert.equal(photo.licenseUrl, "https://creativecommons.org/licenses/by/4.0/");
+assert.equal(photo.attribution, "Duncan Wright");
+assert.equal(photo.license, "CC BY-SA 3.0");
+assert.equal(photo.sourceUrl, "https://commons.wikimedia.org/wiki/File:Blue_Penguin_Kapiti.jpg");
+assert.equal(photo.licenseUrl, "https://creativecommons.org/licenses/by-sa/3.0/");
 assert.equal(migrated.activities[0].images.some((image) => image.url.endsWith(".svg")), false, "Old illustration is removed");
 assert.equal(migrated.activities[1], original.activities[1], "Other activity content is untouched");
-assert.equal(migrated._contentMigrations.searchPenguinMission, 2, "Migration marker records the photo and attribution update");
+assert.equal(migrated._contentMigrations.searchPenguinMission, 3, "Migration marker records the Kapiti photo and attribution update");
 assert.equal(context.addSearchKitPenguinMission(migrated), migrated, "Migration is idempotent");
 assert.ok(fs.existsSync(penguinImage), "Penguin illustration asset exists");
 
@@ -75,14 +75,14 @@ renderContext.window.KitWorksheetRender.renderWorksheet(imageHost, {
     bannerTitle: "Search Like a Pro",
     images: [photo]
 }, { readOnly: true });
-assert.match(imageHost.innerHTML, /Photo: Shaun Lee/);
-assert.match(imageHost.innerHTML, /href="https:\/\/commons\.wikimedia\.org\/wiki\/File:/, "Photo credit links to its source");
-assert.match(imageHost.innerHTML, /href="https:\/\/creativecommons\.org\/licenses\/by\/4\.0\/"/, "Photo credit links to the CC BY 4.0 license");
+assert.match(imageHost.innerHTML, /Photo: Duncan Wright/);
+assert.match(imageHost.innerHTML, /href="https:\/\/commons\.wikimedia\.org\/wiki\/File:Blue_Penguin_Kapiti\.jpg"/, "Photo credit links to its source");
+assert.match(imageHost.innerHTML, /href="https:\/\/creativecommons\.org\/licenses\/by-sa\/3\.0\/"/, "Photo credit links to the CC BY-SA 3.0 license");
 assert.match(imageHost.innerHTML, /little-blue-penguin\.jpg/);
 assert.match(builderSource, /\.\.\.\(state\.content \|\| \{\}\)/, "Kit Builder retains the migration marker when saving");
 assert.match(serverSource, /UPDATE practical_skills_kit_content SET content = \$1::jsonb, updated_at = NOW\(\) WHERE kit_id = \$2/, "Migrated mission is persisted for existing saved kits");
 assert.match(serverSource, /if \(safeKitId === "kit-google-search"\) \{\s*const migrated = addSearchKitPenguinMission\(merged\);/, "Migration applies to existing Search Kit content");
-assert.match(serverSource, /if \(content\?\._contentMigrations\?\.searchPenguinMission >= 2\) return content;/, "Saved migration marker prevents rebuilding a teacher-edited mission");
+assert.match(serverSource, /if \(content\?\._contentMigrations\?\.searchPenguinMission >= 3\) return content;/, "Saved migration marker prevents rebuilding a teacher-edited mission");
 assert.match(activityEditorSource, /\.\.\.\(content\.activities\?\.\[activityIndex\]\?\.images\?\.\[index\] \|\| \{\}\)/, "Activity Details preserves photo attribution metadata while editing images");
 
 console.log("Search Kit penguin mission migration regression checks passed.");

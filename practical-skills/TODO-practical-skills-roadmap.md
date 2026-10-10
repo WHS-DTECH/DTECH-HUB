@@ -41,9 +41,9 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   field after What it establishes; student activity cards display this detail.
 - Implemented: Search Like a Pro Mission 1 is the Penguin Mystery. Students
   search with any search engine for another name for New Zealand's little blue
-  penguin, with Shaun Lee's locally stored Auckland photo credited under
-  CC BY 4.0; the old Google-open confirmation is removed and does not count as
-  evidence.
+  penguin, with Duncan Wright's locally stored Kapiti Island photo credited
+  under CC BY-SA 3.0; the old Google-open confirmation is removed and does not
+  count as evidence.
 - Implemented: the Kit Worksheets editor displays a teacher suggestion to
   structure the first activities as foundational skills, middle activities as
   applied skills, and final activities as integrated challenges.

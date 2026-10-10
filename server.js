@@ -4412,7 +4412,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function addSearchKitPenguinMission(content) {
-  if (content?._contentMigrations?.searchPenguinMission >= 2) return content;
+  if (content?._contentMigrations?.searchPenguinMission >= 3) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets.slice() : [];
   if (!worksheets[0]) worksheets[0] = { number: 1, activity: "Search Like a Pro", establishes: "Understands search engines and keywords" };
@@ -4443,12 +4443,12 @@ function addSearchKitPenguinMission(content) {
     image?.url === imageUrl || image?.url === "/practical-skills/images/little-blue-penguin.svg");
   const penguinImage = {
     url: imageUrl,
-    alt: "A little blue penguin standing on a rock at the water's edge.",
+    alt: "A little blue penguin moving up from the shore towards its burrow on Kapiti Island, New Zealand.",
     caption: "New Zealand's little blue penguin",
-    attribution: "Shaun Lee",
-    sourceUrl: "https://commons.wikimedia.org/wiki/File:Eudyptula_minor,_Auckland,_New_Zealand_imported_from_iNaturalist_photo_430247598.jpg",
-    license: "CC BY 4.0",
-    licenseUrl: "https://creativecommons.org/licenses/by/4.0/"
+    attribution: "Duncan Wright",
+    sourceUrl: "https://commons.wikimedia.org/wiki/File:Blue_Penguin_Kapiti.jpg",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0/"
   };
   if (penguinImageIndex >= 0) {
     images[penguinImageIndex] = { ...images[penguinImageIndex], ...penguinImage };
@@ -4476,7 +4476,7 @@ function addSearchKitPenguinMission(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchPenguinMission: 2
+      searchPenguinMission: 3
     }
   };
 }
