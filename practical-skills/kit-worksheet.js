@@ -216,6 +216,14 @@
                 "keyword-fix-the-search",
                 "keyword-hokitika-founded"
             ]
+            : assessmentId === "search-results-detective-v1"
+                ? [
+                    "search-result-clock-tower",
+                    "search-result-pool-hours",
+                    "search-result-wrong-place",
+                    "search-result-glowworm-time",
+                    "search-result-doc-track"
+                ]
             : [
                 "search-penguin-name",
                 "search-korora-food-search",
@@ -418,12 +426,12 @@
                 onResponseChange: (questionId, value) => {
                     state.responses[questionId] = value;
                     queueResponseSave();
-                    if (["search-penguin-missions-v1", "search-keyword-challenge-v1"].includes(activity?.questionAutoMarkAssessmentId)) {
+                    if (["search-penguin-missions-v1", "search-keyword-challenge-v1", "search-results-detective-v1"].includes(activity?.questionAutoMarkAssessmentId)) {
                         scheduleSearchActivityAutoMark(activityIndex, activity.questionAutoMarkAssessmentId);
                     }
                 }
             });
-            if (["search-penguin-missions-v1", "search-keyword-challenge-v1"].includes(activity?.questionAutoMarkAssessmentId)) {
+            if (["search-penguin-missions-v1", "search-keyword-challenge-v1", "search-results-detective-v1"].includes(activity?.questionAutoMarkAssessmentId)) {
                 scheduleSearchActivityAutoMark(activityIndex, activity.questionAutoMarkAssessmentId);
             }
             if (verification && activityContent.identityLessonVersion) {

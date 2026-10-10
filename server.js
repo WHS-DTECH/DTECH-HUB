@@ -12,6 +12,7 @@ const { validateLoginSites, publicLoginSites, visibleLoginSites } = require("./l
 
 const SEARCH_PENGUIN_MISSIONS_ID = "search-penguin-missions-v1";
 const SEARCH_KEYWORD_CHALLENGE_ID = "search-keyword-challenge-v1";
+const SEARCH_RESULTS_DETECTIVE_ID = "search-results-detective-v1";
 
 function gradeSearchPenguinMissions(answers) {
   const normalized = (value) => String(value || "")
@@ -66,6 +67,37 @@ function gradeSearchKeywordChallenge(answers, activityIndex) {
   const score = results.filter((result) => result.correct).length;
   return {
     assessmentId: SEARCH_KEYWORD_CHALLENGE_ID,
+    passed: score === results.length,
+    score,
+    total: results.length,
+    answers,
+    results
+  };
+}
+
+function gradeSearchResultsDetective(answers, activityIndex) {
+  const normalize = (value) => String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  const acceptedAnswers = {
+    "search-result-clock-tower": ["hokitika clock tower history and dimensions"],
+    "search-result-pool-hours": ["hokitika swimming pool opening hours and contact details"],
+    "search-result-wrong-place": ["waimea gorge walking track nelson"],
+    "search-result-glowworm-time": ["after dark"],
+    "search-result-doc-track": ["department of conservation doc"]
+  };
+  const results = Object.entries(acceptedAnswers).map(([id, accepted]) => {
+    const responseId = `${activityIndex}-${id}`;
+    const response = normalize(answers[responseId] ?? answers[id]);
+    const correct = Boolean(response) && accepted.includes(response);
+    return { id: responseId, correct, explanation: correct ? "Answer saved." : "Search again, then update your answer." };
+  });
+  const score = results.filter((result) => result.correct).length;
+  return {
+    assessmentId: SEARCH_RESULTS_DETECTIVE_ID,
     passed: score === results.length,
     score,
     total: results.length,
@@ -4476,7 +4508,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function addSearchResultsDetectiveIntroduction(content) {
-  if (content?._contentMigrations?.searchResultsDetective >= 9) return content;
+  if (content?._contentMigrations?.searchResultsDetective >= 10) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
   const activityIndex = worksheets.findIndex((worksheet) =>
@@ -4706,6 +4738,7 @@ function addSearchResultsDetectiveIntroduction(content) {
   activities[activityIndex] = {
     ...activity,
     questions,
+    questionAutoMarkAssessmentId: "search-results-detective-v1",
     information: hasIntroduction && activity.information
       ? activity.information
       : {
@@ -4724,7 +4757,7 @@ function addSearchResultsDetectiveIntroduction(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchResultsDetective: 9
+      searchResultsDetective: 10
     }
   };
 }
@@ -5227,7 +5260,8 @@ async function savePracticalSkillsAssessment(studentEmail, kitId, activityIndex,
   const responseKey = `${activityIndex}-${grade.assessmentId || PASSWORD_PROBLEMS_ID}`;
   const mergeSiteAnswers = grade.assessmentId === "login-sites-readiness-v1";
   const mergeQuestionAnswers = grade.assessmentId === "search-penguin-missions-v1" ||
-    grade.assessmentId === "search-keyword-challenge-v1";
+    grade.assessmentId === "search-keyword-challenge-v1" ||
+    grade.assessmentId === SEARCH_RESULTS_DETECTIVE_ID;
   const completedAt = new Date().toISOString();
 
   if (!hasDatabase) {
@@ -13435,7 +13469,7 @@ app.post("/api/practical-skills/progress/:kitId/activities/:activityIndex/check"
     const activity = content?.activities?.[activityIndex];
     const identityLesson = Boolean(activity?.identityLessonVersion);
     if (!content?.worksheets?.[activityIndex] || (!identityLesson && !activity?.loginSites &&
-        !["search-penguin-missions-v1", "search-keyword-challenge-v1"].includes(activity?.questionAutoMarkAssessmentId) &&
+        !["search-penguin-missions-v1", "search-keyword-challenge-v1", SEARCH_RESULTS_DETECTIVE_ID].includes(activity?.questionAutoMarkAssessmentId) &&
         ![PASSWORD_PROBLEMS_ID, APPS_WORDSEARCH_ID, LEARNING_SITES_ID].includes(activity?.assessmentId))) {
       res.status(404).json({ error: "Unknown self-marking activity." });
       return;
@@ -13452,6 +13486,8 @@ app.post("/api/practical-skills/progress/:kitId/activities/:activityIndex/check"
           ? gradeSearchPenguinMissions(req.body.answers)
           : activity.questionAutoMarkAssessmentId === "search-keyword-challenge-v1"
             ? gradeSearchKeywordChallenge(req.body.answers, activityIndex)
+            : activity.questionAutoMarkAssessmentId === SEARCH_RESULTS_DETECTIVE_ID
+              ? gradeSearchResultsDetective(req.body.answers, activityIndex)
         : activity.assessmentId === APPS_WORDSEARCH_ID
         ? gradeAppsWordsearch(req.body.answers, Boolean((await getStudentLoginDriveSetup(studentEmail))?.folder_id))
         : activity.assessmentId === LEARNING_SITES_ID

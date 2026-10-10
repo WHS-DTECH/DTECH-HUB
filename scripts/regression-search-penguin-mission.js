@@ -116,10 +116,12 @@ assert.deepEqual(Array.from(clockTowerMission.searchResults.results, (result) =>
 ]);
 assert.equal(clockTowerMission.searchResults.note, "These are fictional results for practice, not links to real websites.");
 assert.equal(clockTowerMission.searchResults.title, "Simulated (Fake website) search results");
-assert.equal(migrated._contentMigrations.searchResultsDetective, 9, "Search Results Detective migration marker is recorded");
+assert.equal(migrated._contentMigrations.searchResultsDetective, 10, "Search Results Detective migration marker is recorded");
+assert.equal(migrated.activities[2].questionAutoMarkAssessmentId, "search-results-detective-v1",
+    "Search Results Detective uses server-checked self-marking");
 assert.equal(context.addSearchResultsDetectiveIntroduction(migrated), migrated, "Search Results Detective migration is idempotent");
 const savedResultKitWithOldTitle = JSON.parse(JSON.stringify(migrated));
-savedResultKitWithOldTitle._contentMigrations.searchResultsDetective = 8;
+savedResultKitWithOldTitle._contentMigrations.searchResultsDetective = 9;
 for (const id of ["search-result-clock-tower", "search-result-pool-hours", "search-result-wrong-place"]) {
     savedResultKitWithOldTitle.activities[2].questions.find((question) => question.id === id)
         .searchResults.title = "Simulated search results";
@@ -130,11 +132,11 @@ for (const id of ["search-result-clock-tower", "search-result-pool-hours", "sear
         .searchResults.title, "Simulated (Fake website) search results",
     `Existing ${id} gets the clearer fake-website label`);
 }
-assert.equal(upgradedResultTitle._contentMigrations.searchResultsDetective, 9);
+assert.equal(upgradedResultTitle._contentMigrations.searchResultsDetective, 10);
 assert.equal(context.addSearchResultsDetectiveIntroduction(upgradedResultTitle), upgradedResultTitle,
     "Fake website title migration is idempotent");
 const savedResultKitBeforeShuffle = JSON.parse(JSON.stringify(migrated));
-savedResultKitBeforeShuffle._contentMigrations.searchResultsDetective = 8;
+savedResultKitBeforeShuffle._contentMigrations.searchResultsDetective = 9;
 const savedQuestionsBeforeShuffle = savedResultKitBeforeShuffle.activities[2].questions;
 const oldResultOrders = {
     "search-result-clock-tower": [
@@ -185,7 +187,7 @@ assert.deepEqual(Array.from(shuffledSavedResultKit.activities[2].questions.find(
     "Beautiful Photos of Hokitika",
     "Hokitika Weather Forecast"
 ], "Saved result cards stay aligned with the reordered choices");
-assert.equal(shuffledSavedResultKit._contentMigrations.searchResultsDetective, 9);
+assert.equal(shuffledSavedResultKit._contentMigrations.searchResultsDetective, 10);
 const teacherEditedResultKit = JSON.parse(JSON.stringify(savedResultKitBeforeShuffle));
 teacherEditedResultKit.activities[2].questions.find((question) =>
     question.id === "search-result-clock-tower").options[0] = "Teacher's preferred result";
@@ -249,7 +251,7 @@ assert.deepEqual(Array.from(docTrackMission.options), [
 ]);
 assert.equal(docTrackMission.presentation, "real-search");
 assert.equal(Object.hasOwn(docTrackMission, "correctAnswer"), false, "Mission 5 does not expose an answer in student content");
-assert.equal(migrated._contentMigrations.searchResultsDetective, 9, "Search Results Detective migration marker is recorded");
+assert.equal(migrated._contentMigrations.searchResultsDetective, 10, "Search Results Detective migration marker is recorded");
 const editedResultActivity = JSON.parse(JSON.stringify(migrated));
 editedResultActivity._contentMigrations.searchResultsDetective = 1;
 editedResultActivity.activities[2].information.title = "Teacher-edited introduction";
@@ -268,7 +270,7 @@ savedActivityWithoutMissionTwo.activities[2].questions = savedActivityWithoutMis
 const upgradedWithMissionTwo = context.addSearchResultsDetectiveIntroduction(savedActivityWithoutMissionTwo);
 assert.ok(upgradedWithMissionTwo.activities[2].questions.some((question) => question.id === "search-result-pool-hours"),
     "Migration adds Mission 2 to saved activities while preserving existing questions");
-assert.equal(upgradedWithMissionTwo._contentMigrations.searchResultsDetective, 9);
+assert.equal(upgradedWithMissionTwo._contentMigrations.searchResultsDetective, 10);
 const savedActivityWithoutMissionThree = JSON.parse(JSON.stringify(migrated));
 savedActivityWithoutMissionThree._contentMigrations.searchResultsDetective = 3;
 savedActivityWithoutMissionThree.activities[2].questions = savedActivityWithoutMissionThree.activities[2].questions
@@ -276,7 +278,7 @@ savedActivityWithoutMissionThree.activities[2].questions = savedActivityWithoutM
 const upgradedWithMissionThree = context.addSearchResultsDetectiveIntroduction(savedActivityWithoutMissionThree);
 assert.ok(upgradedWithMissionThree.activities[2].questions.some((question) => question.id === "search-result-wrong-place"),
     "Migration adds Mission 3 to saved activities while preserving existing questions");
-assert.equal(upgradedWithMissionThree._contentMigrations.searchResultsDetective, 9);
+assert.equal(upgradedWithMissionThree._contentMigrations.searchResultsDetective, 10);
 const savedActivityWithoutMissionFour = JSON.parse(JSON.stringify(migrated));
 savedActivityWithoutMissionFour._contentMigrations.searchResultsDetective = 4;
 savedActivityWithoutMissionFour.activities[2].questions = savedActivityWithoutMissionFour.activities[2].questions
@@ -284,7 +286,7 @@ savedActivityWithoutMissionFour.activities[2].questions = savedActivityWithoutMi
 const upgradedWithMissionFour = context.addSearchResultsDetectiveIntroduction(savedActivityWithoutMissionFour);
 assert.ok(upgradedWithMissionFour.activities[2].questions.some((question) => question.id === "search-result-glowworm-time"),
     "Migration adds Mission 4 to saved activities while preserving existing questions");
-assert.equal(upgradedWithMissionFour._contentMigrations.searchResultsDetective, 9);
+assert.equal(upgradedWithMissionFour._contentMigrations.searchResultsDetective, 10);
 const savedActivityWithoutMissionFive = JSON.parse(JSON.stringify(migrated));
 savedActivityWithoutMissionFive._contentMigrations.searchResultsDetective = 5;
 savedActivityWithoutMissionFive.activities[2].questions = savedActivityWithoutMissionFive.activities[2].questions
@@ -292,7 +294,7 @@ savedActivityWithoutMissionFive.activities[2].questions = savedActivityWithoutMi
 const upgradedWithMissionFive = context.addSearchResultsDetectiveIntroduction(savedActivityWithoutMissionFive);
 assert.ok(upgradedWithMissionFive.activities[2].questions.some((question) => question.id === "search-result-doc-track"),
     "Migration adds Mission 5 to saved activities while preserving existing questions");
-assert.equal(upgradedWithMissionFive._contentMigrations.searchResultsDetective, 9);
+assert.equal(upgradedWithMissionFive._contentMigrations.searchResultsDetective, 10);
 const savedKitMissingResultsActivity = {
     ...original,
     _contentMigrations: { searchPenguinMission: 11, searchKeywordChallenge: 9 },
@@ -308,7 +310,7 @@ assert.deepEqual(Array.from(repairedResultsKit.activities[2].questions || [], (q
     "search-result-glowworm-time",
     "search-result-doc-track"
 ]);
-assert.equal(repairedResultsKit._contentMigrations.searchResultsDetective, 9);
+assert.equal(repairedResultsKit._contentMigrations.searchResultsDetective, 10);
 const keywordChallengeQuestion = migrated.activities[1].questions[0];
 assert.equal(keywordChallengeQuestion.id, "keyword-pounamu-treasure");
 assert.equal(keywordChallengeQuestion.type, "multiple-choice");
@@ -467,6 +469,28 @@ const incorrectKeywordGrade = gradeContext.gradeSearchKeywordChallenge({
 }, 1);
 assert.equal(incorrectKeywordGrade.passed, false, "Incorrect Keyword Challenge answer prevents completion");
 assert.equal(incorrectKeywordGrade.score, 4);
+const correctSearchResultsAnswers = {
+    "2-search-result-clock-tower": "Hokitika Clock Tower – History and Dimensions",
+    "2-search-result-pool-hours": "Hokitika Swimming Pool – Opening Hours and Contact Details",
+    "2-search-result-wrong-place": "Waimea Gorge Walking Track – Nelson",
+    "2-search-result-glowworm-time": "After dark",
+    "2-search-result-doc-track": "Department of Conservation (DOC)"
+};
+const completeSearchResultsGrade = gradeContext.gradeSearchResultsDetective(correctSearchResultsAnswers, 2);
+assert.equal(completeSearchResultsGrade.passed, true, "All five correct Search Results Detective answers pass");
+assert.equal(completeSearchResultsGrade.score, 5);
+assert.equal(completeSearchResultsGrade.total, 5);
+assert.equal(completeSearchResultsGrade.assessmentId, "search-results-detective-v1");
+const incorrectSearchResultsGrade = gradeContext.gradeSearchResultsDetective({
+    ...correctSearchResultsAnswers,
+    "2-search-result-wrong-place": "Hokitika Gorge – Walking Track Information"
+}, 2);
+assert.equal(incorrectSearchResultsGrade.passed, false, "Incorrect Search Results Detective answer prevents completion");
+assert.equal(incorrectSearchResultsGrade.score, 4);
+assert.equal(gradeContext.gradeSearchResultsDetective({
+    ...correctSearchResultsAnswers,
+    "2-search-result-doc-track": "department of conservation doc"
+}, 2).passed, true, "Grader accepts case-insensitive answers");
 const savedContentBeforeMissionFour = JSON.parse(JSON.stringify(migrated));
 savedContentBeforeMissionFour._contentMigrations.searchPenguinMission = 7;
 savedContentBeforeMissionFour.activities[0].questions = savedContentBeforeMissionFour.activities[0].questions
@@ -712,14 +736,17 @@ assert.match(builderSource, /\.\.\.\(state\.content \|\| \{\}\)/, "Kit Builder r
 assert.match(serverSource, /UPDATE practical_skills_kit_content SET content = \$1::jsonb, updated_at = NOW\(\) WHERE kit_id = \$2/, "Migrated mission is persisted for existing saved kits");
 assert.match(serverSource, /if \(safeKitId === "kit-google-search"\) \{\s*const migrated = addSearchKitPenguinMission\(merged\);/, "Migration applies to existing Search Kit content");
 assert.match(serverSource, /if \(content\?\._contentMigrations\?\.searchPenguinMission >= 11\) \{\s*return addSearchResultsDetectiveIntroduction\(addSearchKitKeywordChallenge\(content\)\);\s*\}/, "Saved migration marker preserves existing missions while applying activity introductions");
-assert.match(serverSource, /!\["search-penguin-missions-v1", "search-keyword-challenge-v1"\]\.includes\(activity\?\.questionAutoMarkAssessmentId\)/, "Search Kit auto-marking activities are accepted by the server");
+assert.match(serverSource, /!\["search-penguin-missions-v1", "search-keyword-challenge-v1", SEARCH_RESULTS_DETECTIVE_ID\]\.includes\(activity\?\.questionAutoMarkAssessmentId\)/, "Search Results Detective auto-marking is accepted by the server");
 assert.match(serverSource, /activity\.questionAutoMarkAssessmentId === "search-keyword-challenge-v1"[\s\S]{0,100}gradeSearchKeywordChallenge\(req\.body\.answers, activityIndex\)/, "Keyword Challenge answers are graded server-side");
-assert.match(serverSource, /grade\.assessmentId === "search-penguin-missions-v1" \|\|\s*grade\.assessmentId === "search-keyword-challenge-v1"/, "Keyword Challenge answers are merged into saved question responses");
+assert.match(serverSource, /activity\.questionAutoMarkAssessmentId === SEARCH_RESULTS_DETECTIVE_ID[\s\S]{0,100}gradeSearchResultsDetective\(req\.body\.answers, activityIndex\)/, "Search Results Detective answers are graded server-side");
+assert.match(serverSource, /grade\.assessmentId === "search-penguin-missions-v1" \|\|\s*grade\.assessmentId === "search-keyword-challenge-v1" \|\|\s*grade\.assessmentId === SEARCH_RESULTS_DETECTIVE_ID/, "Search Results Detective answers are merged into saved question responses");
 assert.match(serverSource, /if \(req\.body\.completed && \(activity\?\.assessmentId \|\| activity\?\.identityLessonVersion \|\|\s*activity\?\.questionAutoMarkAssessmentId \|\| siteQuestions\)\)/, "Manual completion cannot bypass Search Kit auto-marking");
 assert.match(worksheetSource, /function scheduleSearchActivityAutoMark\(activityIndex, assessmentId\)/, "Student worksheet automatically checks complete self-marked activity answers");
 assert.match(worksheetSource, /scheduleSearchActivityAutoMark\(activityIndex, activity\.questionAutoMarkAssessmentId\)/, "Answer changes trigger automatic marking");
-assert.match(worksheetSource, /if \(\["search-penguin-missions-v1", "search-keyword-challenge-v1"\]\.includes\(activity\?\.questionAutoMarkAssessmentId\)\) \{\s*scheduleSearchActivityAutoMark\(activityIndex, activity\.questionAutoMarkAssessmentId\);/, "Previously saved complete answers are auto-marked when the activity opens");
+assert.match(worksheetSource, /if \(\["search-penguin-missions-v1", "search-keyword-challenge-v1", "search-results-detective-v1"\]\.includes\(activity\?\.questionAutoMarkAssessmentId\)\) \{\s*scheduleSearchActivityAutoMark\(activityIndex, activity\.questionAutoMarkAssessmentId\);/, "Previously saved complete answers are auto-marked when the activity opens");
 assert.match(worksheetSource, /"search-keyword-challenge-v1"[\s\S]*"keyword-pounamu-treasure"[\s\S]*"keyword-hokitika-founded"/, "Keyword Challenge auto-marking waits for all five mission answers");
+assert.match(worksheetSource, /"search-results-detective-v1"[\s\S]*"search-result-clock-tower"[\s\S]*"search-result-doc-track"/, "Search Results Detective auto-marking waits for all five mission answers");
+assert.match(worksheetSource, /All five answers are correct\. Your activity completion tick is saved\./, "Self-marking gives the completion tick only after all five answers are correct");
 assert.match(activityEditorSource, /\.\.\.\(content\.activities\?\.\[activityIndex\]\?\.images\?\.\[index\] \|\| \{\}\)/, "Activity Details preserves photo attribution metadata while editing images");
 
 console.log("Search Kit penguin mission migration regression checks passed.");
