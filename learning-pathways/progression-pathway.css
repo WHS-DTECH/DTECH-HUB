@@ -37,6 +37,9 @@
 .progression-dialog-header p { margin: 0; }
 .progression-dialog-header .section-kicker { font-size: 0.75rem; }
 #progression-dialog-status { margin: 12px 22px 0; }
+.progression-dialog-summary { margin: 14px 22px 0; padding: 12px 16px; border: 1px solid #cfdded; border-radius: 10px; background: #fff; }
+.progression-dialog-summary .progression-summary { padding-top: 0; border-top: 0; }
+.progression-dialog-summary .progression-summary-caption { font-weight: 700; color: #24344a; }
 #progression-dialog-status:empty { display: none; }
 .progression-dialog form { padding: 0 22px 22px; }
 .progression-dialog fieldset { margin-top: 14px; }

@@ -165,6 +165,17 @@ function progressionNewRecord(student) {
         timetableClass: student.timetableClass || "", revision: 0, strengths: "", nextLearning: "",
         pathways: progressionPathways.map(([id]) => ({ id, coverage: "not-taught", descriptor: null, addressed: "", evidence: "", notes: "" })) };
 }
+function progressionDialogSummary() {
+    const record = progression.record;
+    const saved = record && (record.revision > 0 || progression.dirty);
+    const progress = saved ? { schoolYear: record.schoolYear, term: record.term,
+        pathways: record.pathways.map(({ id, coverage, descriptor }) => ({ id, coverage, descriptor })) } : null;
+    const summary = progressionSummary({ progress });
+    const caption = summary.querySelector(".progression-summary-caption");
+    caption.textContent = progression.dirty ? "Progression summary - unsaved changes (press Save to keep)"
+        : progress ? `Progression summary - ${progress.schoolYear} Term ${progress.term}` : "Progression summary - no results saved yet";
+    pp("dialog-summary").replaceChildren(summary);
+}
 function progressionDetail() {
     const definition = progressionPathways.find(([id]) => id === progression.selected);
     const row = progression.record.pathways.find((item) => item.id === progression.selected);
@@ -208,9 +219,9 @@ function progressionRender(record) {
         coverage.addEventListener("change", () => {
             result.coverage = coverage.value;
             if (result.coverage === "not-taught") { result.descriptor = null; descriptor.value = ""; }
-            colour(); progression.dirty = true;
+            colour(); progression.dirty = true; progressionDialogSummary();
         });
-        descriptor.addEventListener("change", () => { result.descriptor = descriptor.value || null; colour(); progression.dirty = true; });
+        descriptor.addEventListener("change", () => { result.descriptor = descriptor.value || null; colour(); progression.dirty = true; progressionDialogSummary(); });
         const details = document.createElement("button");
         details.type = "button"; details.className = "button button-secondary"; details.textContent = "View / edit";
         details.setAttribute("aria-label", `View or edit ${title} evidence`);
@@ -219,6 +230,7 @@ function progressionRender(record) {
         pp("rows").append(row);
     }
     progressionDetail();
+    progressionDialogSummary();
 }
 function progressionAnnualRecord(records, student, schoolYear) {
     return records.find((record) => record.schoolYear === schoolYear) || (student.archived ? records[0] : null);

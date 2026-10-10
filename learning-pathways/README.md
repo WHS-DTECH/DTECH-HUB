@@ -118,8 +118,9 @@ Filtering away from a student prompts before discarding unsaved edits and clears
 the previous results. Timetable Class and Homeroom are saved separately from class; old records use
 their class as a display fallback. Matching students appear in a visible class
 list with Open Details buttons; each opens the student's Learning Pathway
-Results, Curriculum Coverage & Evidence and Teacher Summary in a pop-up dialog
-(Close/Escape prompts before discarding unsaved edits). Students without linked school emails are also
+Results, Curriculum Coverage & Evidence and Teacher Summary in a pop-up dialog,
+headed by the same colour-coded progression summary (it updates live while
+editing and flags unsaved changes). Close/Escape prompts before discarding unsaved edits. Students without linked school emails are also
 listed, with an explicit warning that email linkage is required to save results;
 they are not silently dropped or combined into one blank-email student.
 There is no Saved term results / New term record dropdown: Junior students attend

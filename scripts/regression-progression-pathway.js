@@ -50,6 +50,8 @@ async function main() {
     assert.match(html, /<dialog id="progression-dialog"[\s\S]*id="progression-form"[\s\S]*<\/dialog>/, "Student details open in a dialog");
     assert.match(client, /progressionRender\(record \|\| progressionNewRecord\(student\)\);\s*progressionOpenDialog\(student\);/, "Open Details shows the loaded record in the dialog");
     assert.match(client, /pp\("dialog"\)\.addEventListener\("cancel"[\s\S]*progressionCloseDialog\(\)/, "Escape uses the unsaved-change guard");
+    assert.ok(html.includes('id="progression-dialog-summary"'), "Details dialog shows the progression summary at the top");
+    assert.match(client, /progressionDetail\(\);\s*progressionDialogSummary\(\);/, "Dialog summary renders with each record");
     assert.ok(!client.includes('pp("history")'), "No handlers depend on the removed selector");
     vm.runInContext(client.slice(client.indexOf("function progressionAnnualRecord("), client.indexOf("async function progressionLoadStudent(")), context);
     const annualRecords = [{ schoolYear: 2027, term: 3, revision: 2 }, { schoolYear: 2026, term: 1, revision: 1 }];
