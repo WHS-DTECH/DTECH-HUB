@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Practical Skills Checklist</title>
-    <meta name="description" content="Standalone Practical Skills checklist with kit progress and points scoreboard.">
+    <title>My DTECH-HUB Licence</title>
+    <meta name="description" content="Your personalised DTECH-HUB Licence: collect kit stamps, celebrate achievements and choose your next challenge.">
     <meta name="hub-google-client-id" content="239433605438-ur2omagmkluhhn7i319g0i82l4l5l1j8.apps.googleusercontent.com">
     <meta name="hub-google-allowed-domain" content="westlandhigh.school.nz">
     <link rel="icon" type="image/x-icon" href="../images/favicon.ico">
@@ -14,15 +14,15 @@
     <link rel="stylesheet" href="../styles.css">
     <link rel="stylesheet" href="./checklist.css">
 </head>
-<body>
+<body class="licence-dashboard">
     <div class="page-shell">
         <header class="hero practical-skills-hero">
             <nav class="topbar" aria-label="Primary">
-                <a class="brand" href="/practical-skills/">Practical Skills</a>
+                <a class="brand" href="/practical-skills/checklist.html">Licence</a>
                 <div class="topbar-right">
                     <div class="topbar-links standalone-links">
-                        <a href="/practical-skills/">Home</a>
-                        <a href="/practical-skills/checklist.html">Checklist</a>
+                        <a href="/practical-skills/">Licence Library</a>
+                        <a href="/practical-skills/checklist.html">My Licence</a>
                     </div>
                     <div class="utility-actions" aria-label="Utility actions">
                         <button id="hub-google-signin" class="google-signin-button" type="button">
@@ -42,19 +42,38 @@
 
             <div class="hero-panel practical-skills-panel">
                 <div class="hero-copy">
-                    <p class="eyebrow">PRACTICAL SKILLS LICENCE</p>
-                    <h1>Practical Skills Checklist</h1>
-                    <p class="hero-text">Complete each kit to unlock readiness. This checklist runs as a standalone Practical Skills module.</p>
+                    <p class="eyebrow">Learn it. Show it. Stamp it.</p>
+                    <h1>My DTECH-HUB Licence</h1>
+                    <p class="hero-text">Your skills. Your achievements. Your next adventure. Complete a kit and collect a stamp for your licence!</p>
                 </div>
             </div>
         </header>
 
         <main class="home-grid single-column">
+            <p id="ps-status" class="upload-status" role="status" aria-live="polite" hidden></p>
+            <section class="student-licence" aria-labelledby="licence-card-title">
+                <div class="licence-card-heading">
+                    <img src="../images/whs%20logo%20circular%20reo%20.png" alt="Westland High School logo" width="80" height="80">
+                    <div><p class="section-kicker">Westland High School</p><h2 id="licence-card-title">DTECH-HUB Licence</h2></div>
+                    <span class="licence-card-seal" aria-hidden="true">&#9733;</span>
+                </div>
+                <p class="licence-name-label">Licence holder</p>
+                <h3 id="ps-student-name">Your name belongs here</h3>
+                <p id="ps-student-email">Sign in with your school account to start collecting stamps.</p>
+                <div class="licence-progress-heading"><strong id="ps-licence-progress-label">Your stamp collection</strong><span id="ps-licence-progress-count">Sign in to view</span></div>
+                <progress id="ps-licence-progress" max="3" value="0" aria-label="Completed licence kits"></progress>
+                <div id="ps-stamp-list" class="licence-stamps" aria-label="Kit stamps"></div>
+                <p class="licence-card-footnote">Each completed kit earns a stamp and its own certificate. Keep building your digital confidence!</p>
+            </section>
+            <section id="ps-next-step" class="licence-next-step" aria-labelledby="ps-next-title" hidden>
+                <div><p class="section-kicker">Your next move</p><h2 id="ps-next-title"></h2><p id="ps-next-description"></p></div>
+                <a id="ps-next-link" class="button button-primary" href="./kit-worksheet.html?kit=kit-login">Open kit &rarr;</a>
+            </section>
             <section class="panel-section checklist-scoreboard">
                 <div class="section-heading">
                     <div>
-                        <p class="section-kicker">Scoreboard</p>
-                        <h2>Your Progress</h2>
+                        <p class="section-kicker">Look how far you've come</p>
+                        <h2>Your Licence Stats</h2>
                     </div>
                 </div>
                 <div class="scoreboard-grid">
@@ -63,7 +82,7 @@
                         <strong id="ps-total-points">0</strong>
                     </article>
                     <article class="scoreboard-tile">
-                        <span>Kits Completed</span>
+                        <span>Stamps Collected</span>
                         <strong id="ps-completed-kits">0 / 0</strong>
                     </article>
                     <article class="scoreboard-tile">
@@ -77,7 +96,7 @@
                 <div class="section-heading">
                     <div>
                         <p class="section-kicker">Achievements</p>
-                        <h2>Badges Earned</h2>
+                        <h2>Your Achievement Collection</h2>
                     </div>
                 </div>
                 <div id="ps-badge-list" class="ps-badge-list" aria-live="polite"></div>
@@ -86,12 +105,11 @@
             <section class="panel-section checklist-kits">
                 <div class="section-heading">
                     <div>
-                        <p class="section-kicker">Kit Activities</p>
-                        <h2>Complete In Order</h2>
+                        <p class="section-kicker">Build your licence</p>
+                        <h2>Your Kit Collection</h2>
                     </div>
                 </div>
                 <div id="ps-kit-list" class="ps-kit-list" aria-live="polite"></div>
-                <p id="ps-status" class="upload-status" aria-live="polite" hidden></p>
             </section>
         </main>
     </div>

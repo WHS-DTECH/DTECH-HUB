@@ -85,6 +85,17 @@ async function main() {
     assert.equal(progress.kit.isComplete, true, "Last activity automatically persists kit completion");
     assert.equal(progress.certificate.studentName, "Māia Student");
     assert.equal(progress.certificate.studentEmail, email);
+    const dashboardResponse = {
+        code: 200, status(code) { this.code = code; return this; },
+        json(body) { this.body = body; return this; }
+    };
+    await handlers["get /api/practical-skills/my-progress"]({
+        email, auth_identity: { verified: true, email, givenName: "Māia", familyName: "Student" }
+    }, dashboardResponse);
+    assert.equal(dashboardResponse.code, 200);
+    assert.equal(dashboardResponse.body.student.name, progress.certificate.studentName, "Dashboard and certificate share the verified identity");
+    assert.equal(dashboardResponse.body.student.email, email);
+    assert.equal(dashboardResponse.body.kits[0].isComplete, true, "Identity metadata preserves saved kit awards");
     assert.equal(progress.certificate.activityCount, 2);
     const date = progress.certificate.completedAt;
     assert.equal((await call("get", "")).body.certificate.completedAt, date, "Reload keeps the original award date");

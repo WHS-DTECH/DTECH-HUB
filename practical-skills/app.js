@@ -147,7 +147,7 @@
                 <div class="project-tags">
                     <span class="project-tag status-tag status-${escapeHtml(String(item.status || "active").toLowerCase())}">${escapeHtml(formatStatus(item.status))}</span>
                     <span class="project-tag">${escapeHtml(item.yearLevel || "All Years")}</span>
-                    <span class="project-tag">${escapeHtml(item.area || "Practical Skills")}</span>
+                    <span class="project-tag">${escapeHtml(item.area || "Licence")}</span>
                 </div>
                 <div class="project-footer">
                     <span class="project-meta">PRACTICAL SKILL</span>
@@ -231,4 +231,3 @@
 
     loadPracticalSkillsLibrary();
 })();
-

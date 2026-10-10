@@ -12491,12 +12491,18 @@ async function getPracticalSkillsCertificate(req, kitId) {
   const email = normalizeEmail(getRequestUserEmail(req));
   const content = await getStoredPracticalSkillsKitContent(kitId);
   const row = await syncPracticalSkillsKitCompletion(email, kitId, content);
+  const name = row.completed ? await getPracticalSkillsStudentName(req) : email;
+  return buildKitCertificate(content, row, name);
+}
+
+async function getPracticalSkillsStudentName(req) {
+  const email = normalizeEmail(getRequestUserEmail(req));
   const identity = req.auth_identity;
   const verifiedName = identity?.verified && normalizeEmail(identity.email) === email
     && identity.givenName && identity.familyName
     ? `${identity.givenName} ${identity.familyName}`.trim() : "";
   let schoolName = "";
-  if (!verifiedName && row.completed) {
+  if (!verifiedName) {
     const staff = (await getStaffDirectoryRows()).find((entry) =>
       collectDirectoryEmails(entry, ["email_school", "email", "user_email", "staff_email", "google_email"]).includes(email));
     if (staff) schoolName = [staff.first_name, staff.last_name].filter(Boolean).join(" ").trim();
@@ -12506,7 +12512,7 @@ async function getPracticalSkillsCertificate(req, kitId) {
       if (student && student.student_name !== "Unnamed student") schoolName = student.student_name;
     }
   }
-  return buildKitCertificate(content, row, verifiedName || schoolName || email);
+  return verifiedName || schoolName || email;
 }
 
 app.get("/api/practical-skills/my-progress", async (req, res) => {
@@ -12520,7 +12526,7 @@ app.get("/api/practical-skills/my-progress", async (req, res) => {
     await Promise.all(PRACTICAL_SKILLS_KIT_DEFINITIONS.map((kit) => ensurePracticalSkillsProgressRow(studentEmail, kit.id)));
     await Promise.all(PRACTICAL_SKILLS_KIT_DEFINITIONS.map((kit) => syncPracticalSkillsKitCompletion(studentEmail, kit.id)));
     const rows = await getAllPracticalSkillsProgressRows(studentEmail);
-    res.json(computePracticalSkillsSnapshot(rows));
+    res.json({ ...computePracticalSkillsSnapshot(rows), student: { name: await getPracticalSkillsStudentName(req), email: studentEmail } });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not load Practical Skills progress." });
   }

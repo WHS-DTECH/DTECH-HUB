@@ -1393,9 +1393,10 @@ function renderGlobalNavbar() {
     `;
     const practicalSkillsMenu = `
         <details class="nav-dropdown nav-dropdown-practical-skills" id="hub-practical-skills-menu" data-nav-dropdown hidden>
-            <summary id="hub-practical-skills-summary">Practical Skills</summary>
+            <summary id="hub-practical-skills-summary">Licence</summary>
             <div class="nav-drawer" role="menu">
-                <a id="hub-practical-skills-link" role="menuitem" href="/practical-skills/">Practical Skills Home</a>
+                <a id="hub-practical-skills-link" role="menuitem" href="/practical-skills/checklist.html">My Licence</a>
+                <a role="menuitem" href="/practical-skills/">Licence Library</a>
             </div>
         </details>
     `;
@@ -2427,10 +2428,10 @@ function renderHubPracticalSkillsMenu(yearGroup) {
     const normalizedYear = String(yearGroup || "").trim().replace(/^year\s*/i, "");
     const showTaskList = ["11", "12", "13"].includes(normalizedYear);
 
-    if (summary) summary.textContent = showTaskList ? "Task List" : "Practical Skills";
+    if (summary) summary.textContent = showTaskList ? "Task List" : "Licence";
     if (link) {
-        link.textContent = showTaskList ? "Open Task List" : "Practical Skills Home";
-        link.href = showTaskList ? "/task-list.html" : "/practical-skills/";
+        link.textContent = showTaskList ? "Open Task List" : "My Licence";
+        link.href = showTaskList ? "/task-list.html" : "/practical-skills/checklist.html";
     }
 }
 

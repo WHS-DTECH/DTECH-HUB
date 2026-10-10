@@ -261,7 +261,7 @@
             backLink.href = showingActivity
                 ? `./kit-worksheet.html?kit=${encodeURIComponent(state.kitId)}`
                 : "/practical-skills/checklist.html";
-            backLink.textContent = showingActivity ? "\u2190 Back to Kit Activity List" : "\u2190 Back to Checklist";
+            backLink.textContent = showingActivity ? "\u2190 Back to Kit Activity List" : "\u2190 Back to My Licence";
         }
         const verification = document.getElementById("worksheet-google-verification");
         if (verification) {

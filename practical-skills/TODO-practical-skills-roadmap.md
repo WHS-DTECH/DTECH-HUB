@@ -11,6 +11,14 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
 
 ## 2. Student Experience (Must-Have)
 
+- Implemented: the student dashboard is now My DTECH-HUB Licence, with the
+  school logo, a server-derived holder name (using the certificate identity
+  lookup), saved completed-kit stamps and links to each earned certificate.
+  The next uncompleted kit is recommended without locking other kits.
+  Existing points, tiers, badges and progress controls are retained.
+  Student navigation uses Licence / My Licence / Licence Library; the existing
+  Years 11-13 Task List branch and API/storage identifiers remain unchanged.
+  Signed-out, loading and error states do not display another account's awards.
 - Add a `Next Best Task` panel at the top of the Practical Skills homepage.
 - Show licence progress (`X/Y kits complete`).
 - Show assessment readiness status (`Ready` or `Missing required kits`).
