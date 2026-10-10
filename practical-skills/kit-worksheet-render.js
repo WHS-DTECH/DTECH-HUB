@@ -73,13 +73,29 @@
                         ${question.images.map((image) => renderWorksheetImage(image, "worksheet-question-image")).join("")}
                     </div>
                 ` : ""}
-                <div class="worksheet-choices">
-                    ${(Array.isArray(question.options) ? question.options : []).map((option) => `
-                        <button type="button" class="worksheet-choice-bubble ${selected === option ? "is-selected" : ""}" data-question-id="${escapeHtml(question.id)}" data-option-value="${escapeHtml(option)}" ${readOnly ? "disabled" : ""}>
-                            ${escapeHtml(option)}
-                        </button>
-                    `).join("")}
-                </div>
+                ${question.searchResults ? `
+                    <section class="worksheet-search-results" aria-label="${escapeHtml(question.searchResults.title || "Simulated search results")}">
+                        <h4>${escapeHtml(question.searchResults.title || "Simulated search results")}</h4>
+                        <div class="worksheet-search-result-list">
+                            ${(Array.isArray(question.searchResults.results) ? question.searchResults.results : []).map((result) => `
+                                <button type="button" class="worksheet-search-result ${selected === result.title ? "is-selected" : ""}" data-question-id="${escapeHtml(question.id)}" data-option-value="${escapeHtml(result.title)}" aria-pressed="${selected === result.title}" ${readOnly ? "disabled" : ""}>
+                                    <span class="worksheet-search-result-domain">${escapeHtml(result.domain)}</span>
+                                    <strong>${escapeHtml(result.title)}</strong>
+                                    <span>${escapeHtml(result.description)}</span>
+                                </button>
+                            `).join("")}
+                        </div>
+                        ${question.searchResults.note ? `<p class="worksheet-search-results-note">${escapeHtml(question.searchResults.note)}</p>` : ""}
+                    </section>
+                ` : `
+                    <div class="worksheet-choices">
+                        ${(Array.isArray(question.options) ? question.options : []).map((option) => `
+                            <button type="button" class="worksheet-choice-bubble ${selected === option ? "is-selected" : ""}" data-question-id="${escapeHtml(question.id)}" data-option-value="${escapeHtml(option)}" ${readOnly ? "disabled" : ""}>
+                                ${escapeHtml(option)}
+                            </button>
+                        `).join("")}
+                    </div>
+                `}
             `;
         }
 

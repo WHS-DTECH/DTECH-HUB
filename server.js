@@ -4476,7 +4476,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function addSearchResultsDetectiveIntroduction(content) {
-  if (content?._contentMigrations?.searchResultsDetective >= 1) return content;
+  if (content?._contentMigrations?.searchResultsDetective >= 2) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
   const activityIndex = worksheets.findIndex((worksheet) =>
@@ -4487,9 +4487,60 @@ function addSearchResultsDetectiveIntroduction(content) {
   const activity = activities[activityIndex] && typeof activities[activityIndex] === "object"
     ? activities[activityIndex]
     : { title: worksheets[activityIndex].activity };
+  const questions = Array.isArray(activity.questions) ? activity.questions.slice() : [];
+  if (!questions.some((question) => question?.id === "search-result-clock-tower")) {
+    questions.push({
+      id: "search-result-clock-tower",
+      type: "multiple-choice",
+      heading: "Mission 1 – Which Result Would You Open?",
+      prompt: "You want to find out how tall the Hokitika Clock Tower is. You search for `Hokitika Clock Tower height`. Which result would you choose?",
+      options: [
+        "Beautiful Photos of Hokitika",
+        "Hokitika Clock Tower – History and Dimensions",
+        "Hokitika Weather Forecast"
+      ],
+      searchResults: {
+        title: "Simulated search results",
+        results: [
+          {
+            domain: "westcoastphotos.example",
+            title: "Beautiful Photos of Hokitika",
+            description: "Explore pictures of Hokitika, including its famous Clock Tower."
+          },
+          {
+            domain: "heritage.example",
+            title: "Hokitika Clock Tower – History and Dimensions",
+            description: "Learn about the Clock Tower's construction, height and historic significance."
+          },
+          {
+            domain: "weather.example",
+            title: "Hokitika Weather Forecast",
+            description: "Check the weather in Hokitika today and tomorrow."
+          }
+        ],
+        note: "These are fictional results for practice, not links to real websites."
+      },
+      images: [
+        {
+          url: "/practical-skills/images/hokitika-clock-tower.jpg",
+          alt: "Hokitika Clock Tower on Weld Street, a heritage building in Hokitika.",
+          caption: "Hokitika Clock Tower",
+          attribution: "Mike Dickison",
+          sourceUrl: "https://commons.wikimedia.org/wiki/File:Hokitika_Clock_Tower_MRD_02.jpg",
+          license: "CC BY 4.0",
+          licenseUrl: "https://creativecommons.org/licenses/by/4.0/"
+        }
+      ]
+    });
+  }
+
+  const hasIntroduction = content?._contentMigrations?.searchResultsDetective >= 1;
   activities[activityIndex] = {
     ...activity,
-    information: {
+    questions,
+    information: hasIntroduction && activity.information
+      ? activity.information
+      : {
       title: "THE MISSION: The Search Results Detective",
       paragraphs: [
         "You've found the right search words. Now it's time to choose the right results!",
@@ -4505,7 +4556,7 @@ function addSearchResultsDetectiveIntroduction(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchResultsDetective: 1
+      searchResultsDetective: 2
     }
   };
 }

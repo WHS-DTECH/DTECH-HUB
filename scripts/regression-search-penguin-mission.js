@@ -18,6 +18,7 @@ const aorakiImage = path.join(root, "practical-skills", "images", "aoraki-mount-
 const taranakiImage = path.join(root, "practical-skills", "images", "mount-taranaki.jpg");
 const pounamuImage = path.join(root, "practical-skills", "images", "pounamu-arahura-river.jpg");
 const glowwormImage = path.join(root, "practical-skills", "images", "new-zealand-glowworm.jpg");
+const clockTowerImage = path.join(root, "practical-skills", "images", "hokitika-clock-tower.jpg");
 
 const migrationStart = serverSource.indexOf("function addSearchResultsDetectiveIntroduction(content) {");
 const migrationEnd = serverSource.indexOf("\nfunction normalizePracticalSkillsKitContentForStorage(", migrationStart);
@@ -87,9 +88,39 @@ assert.deepEqual(Array.from(migrated.activities[2].information.paragraphs), [
     "Look at the search results, follow the clues and find the information you need.",
     "Can you solve all five missions?"
 ]);
-assert.deepEqual(Array.from(migrated.activities[2].questions, (question) => question.id), ["result-q"], "Search results activity questions are preserved");
-assert.equal(migrated._contentMigrations.searchResultsDetective, 1, "Search Results Detective introduction migration is recorded");
+assert.deepEqual(Array.from(migrated.activities[2].questions, (question) => question.id), ["result-q", "search-result-clock-tower"], "Search results questions are preserved and the Clock Tower mission is added");
+const clockTowerMission = migrated.activities[2].questions.find((question) => question.id === "search-result-clock-tower");
+assert.equal(clockTowerMission.type, "multiple-choice");
+assert.equal(clockTowerMission.heading, "Mission 1 – Which Result Would You Open?");
+assert.equal(clockTowerMission.prompt, "You want to find out how tall the Hokitika Clock Tower is. You search for `Hokitika Clock Tower height`. Which result would you choose?");
+assert.deepEqual(Array.from(clockTowerMission.options), [
+    "Beautiful Photos of Hokitika",
+    "Hokitika Clock Tower – History and Dimensions",
+    "Hokitika Weather Forecast"
+]);
+assert.equal(clockTowerMission.images[0].url, "/practical-skills/images/hokitika-clock-tower.jpg");
+assert.equal(clockTowerMission.images[0].attribution, "Mike Dickison");
+assert.equal(clockTowerMission.images[0].license, "CC BY 4.0");
+assert.equal(clockTowerMission.images[0].sourceUrl, "https://commons.wikimedia.org/wiki/File:Hokitika_Clock_Tower_MRD_02.jpg");
+assert.deepEqual(Array.from(clockTowerMission.searchResults.results, (result) => result.domain), [
+    "westcoastphotos.example",
+    "heritage.example",
+    "weather.example"
+]);
+assert.equal(clockTowerMission.searchResults.note, "These are fictional results for practice, not links to real websites.");
+assert.equal(migrated._contentMigrations.searchResultsDetective, 2, "Search Results Detective migration marker is recorded");
 assert.equal(context.addSearchResultsDetectiveIntroduction(migrated), migrated, "Search Results Detective migration is idempotent");
+const editedResultActivity = JSON.parse(JSON.stringify(migrated));
+editedResultActivity._contentMigrations.searchResultsDetective = 1;
+editedResultActivity.activities[2].information.title = "Teacher-edited introduction";
+const upgradedResultActivity = context.addSearchResultsDetectiveIntroduction(editedResultActivity);
+assert.equal(upgradedResultActivity.activities[2].information.title, "Teacher-edited introduction", "Mission migration preserves teacher-edited introduction");
+const savedResultActivityWithoutMission = JSON.parse(JSON.stringify(migrated));
+savedResultActivityWithoutMission._contentMigrations.searchResultsDetective = 1;
+savedResultActivityWithoutMission.activities[2].questions = savedResultActivityWithoutMission.activities[2].questions
+    .filter((question) => question.id !== "search-result-clock-tower");
+assert.ok(context.addSearchResultsDetectiveIntroduction(savedResultActivityWithoutMission).activities[2].questions
+    .some((question) => question.id === "search-result-clock-tower"), "Migration adds the mission to saved activities without replacing existing questions");
 const savedKitMissingResultsActivity = {
     ...original,
     _contentMigrations: { searchPenguinMission: 11, searchKeywordChallenge: 9 },
@@ -98,8 +129,8 @@ const savedKitMissingResultsActivity = {
 const repairedResultsKit = context.addSearchKitPenguinMission(savedKitMissingResultsActivity);
 assert.equal(repairedResultsKit.activities[2].title, "Finding the Right Result", "Migration creates the missing worksheet activity");
 assert.equal(repairedResultsKit.activities[2].information.title, "THE MISSION: The Search Results Detective");
-assert.deepEqual(Array.from(repairedResultsKit.activities[2].questions || []), [], "New search results activity starts without fabricated questions");
-assert.equal(repairedResultsKit._contentMigrations.searchResultsDetective, 1);
+assert.deepEqual(Array.from(repairedResultsKit.activities[2].questions || [], (question) => question.id), ["search-result-clock-tower"]);
+assert.equal(repairedResultsKit._contentMigrations.searchResultsDetective, 2);
 const keywordChallengeQuestion = migrated.activities[1].questions[0];
 assert.equal(keywordChallengeQuestion.id, "keyword-pounamu-treasure");
 assert.equal(keywordChallengeQuestion.type, "multiple-choice");
@@ -303,6 +334,7 @@ assert.ok(fs.existsSync(aorakiImage), "Aoraki / Mount Cook photo is stored local
 assert.ok(fs.existsSync(taranakiImage), "Taranaki photo is stored locally");
 assert.ok(fs.existsSync(pounamuImage), "Pounamu photo is stored locally");
 assert.ok(fs.existsSync(glowwormImage), "Glowworm photo is stored locally");
+assert.ok(fs.existsSync(clockTowerImage), "Clock Tower photo is stored locally");
 
 assert.match(renderSource, /content\?\.information/, "Student worksheet renders the mission information heading");
 assert.match(renderSource, /images\.map\(\(image\)/, "Student worksheet renders the penguin image");
@@ -326,6 +358,27 @@ renderContext.window.KitWorksheetRender.renderWorksheet(imageHost, {
 assert.match(imageHost.innerHTML, /Photo: Duncan Wright/);
 assert.match(imageHost.innerHTML, /href="https:\/\/commons\.wikimedia\.org\/wiki\/File:Blue_Penguin_Kapiti\.jpg"/, "Photo credit links to its source");
 assert.match(imageHost.innerHTML, /href="https:\/\/creativecommons\.org\/licenses\/by-sa\/3\.0\/"/, "Photo credit links to the CC BY-SA 3.0 license");
+const clockTowerHost = {
+    style: { setProperty() {} },
+    innerHTML: "",
+    querySelectorAll() { return []; },
+    querySelector() { return null; }
+};
+renderContext.window.KitWorksheetRender.renderWorksheet(clockTowerHost, {
+    information: { title: "THE MISSION: The Search Results Detective", paragraphs: [] },
+    questions: [clockTowerMission]
+}, { readOnly: true });
+assert.match(clockTowerHost.innerHTML, /Mission 1 – Which Result Would You Open\?/);
+assert.match(clockTowerHost.innerHTML, /hokitika-clock-tower\.jpg/);
+assert.match(clockTowerHost.innerHTML, /Photo: Mike Dickison/);
+assert.match(clockTowerHost.innerHTML, /href="https:\/\/creativecommons\.org\/licenses\/by\/4\.0\/"/);
+assert.match(clockTowerHost.innerHTML, /westcoastphotos\.example/);
+assert.match(clockTowerHost.innerHTML, /heritage\.example/);
+assert.match(clockTowerHost.innerHTML, /weather\.example/);
+assert.match(clockTowerHost.innerHTML, /These are fictional results for practice, not links to real websites\./);
+assert.match(clockTowerHost.innerHTML, /class="worksheet-search-result[\s\S]*data-option-value="Hokitika Clock Tower – History and Dimensions"[\s\S]*aria-pressed="false"/, "Fictional result cards are selectable button answers rather than external links");
+assert.doesNotMatch(clockTowerHost.innerHTML, /href="https:\/\/(?:westcoastphotos|heritage|weather)\.example/, "Fictional result domains are never linked");
+assert.match(worksheetCss, /\.worksheet-search-result-list\s*\{[^}]*display:\s*grid;/, "Simulated search results render in a clear card layout");
 assert.match(imageHost.innerHTML, /little-blue-penguin\.jpg/);
 assert.match(imageHost.innerHTML, /Mission 2: Choose your own search words/);
 assert.match(imageHost.innerHTML, /Now find out what a kororā eats\. Which search would help you find the answer\?/);
