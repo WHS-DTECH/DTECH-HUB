@@ -4443,8 +4443,42 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
   }
 };
 
+function addSearchKitKeywordChallenge(content) {
+  if (content?._contentMigrations?.searchKeywordChallenge >= 1) return content;
+
+  const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
+  const activityIndex = worksheets.findIndex((worksheet) =>
+    String(worksheet?.activity || "").trim().toLowerCase() === "the keyword challenge");
+  if (activityIndex < 0 || !Array.isArray(content?.activities) || !content.activities[activityIndex]) return content;
+
+  const activities = content.activities.slice();
+  activities[activityIndex] = {
+    ...activities[activityIndex],
+    information: {
+      title: "🔎 THE MISSION: The West Coast Treasure Hunt",
+      paragraphs: [
+        "You're on a treasure hunt across the West Coast!",
+        "Your challenge is to choose the best search words to find clues about places, objects and wildlife.",
+        "Sometimes your first search won't give you what you need. That's when clever searchers change their keywords!",
+        "Can you solve all five clues?"
+      ]
+    }
+  };
+
+  return {
+    ...content,
+    activities,
+    _contentMigrations: {
+      ...(content?._contentMigrations || {}),
+      searchKeywordChallenge: 1
+    }
+  };
+}
+
 function addSearchKitPenguinMission(content) {
-  if (content?._contentMigrations?.searchPenguinMission >= 11) return content;
+  if (content?._contentMigrations?.searchPenguinMission >= 11) {
+    return addSearchKitKeywordChallenge(content);
+  }
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets.slice() : [];
   if (!worksheets[0]) worksheets[0] = { number: 1, activity: "Search Like a Pro", establishes: "Uses a search engine to discover information" };
@@ -4602,7 +4636,7 @@ function addSearchKitPenguinMission(content) {
     }
   };
 
-  return {
+  return addSearchKitKeywordChallenge({
     ...content,
     worksheets,
     activities,
@@ -4610,7 +4644,7 @@ function addSearchKitPenguinMission(content) {
       ...(content?._contentMigrations || {}),
       searchPenguinMission: 11
     }
-  };
+  });
 }
 
 function normalizePracticalSkillsKitContentForStorage(kitId, content) {

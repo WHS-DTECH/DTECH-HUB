@@ -17,7 +17,7 @@ const ruapehuImage = path.join(root, "practical-skills", "images", "mount-ruapeh
 const aorakiImage = path.join(root, "practical-skills", "images", "aoraki-mount-cook.jpg");
 const taranakiImage = path.join(root, "practical-skills", "images", "mount-taranaki.jpg");
 
-const migrationStart = serverSource.indexOf("function addSearchKitPenguinMission(content) {");
+const migrationStart = serverSource.indexOf("function addSearchKitKeywordChallenge(content) {");
 const migrationEnd = serverSource.indexOf("\nfunction normalizePracticalSkillsKitContentForStorage(", migrationStart);
 assert.ok(migrationStart >= 0 && migrationEnd > migrationStart, "Search Kit content migration exists");
 const context = vm.createContext({});
@@ -30,7 +30,7 @@ vm.runInContext(serverSource.slice(gradeStart, gradeEnd), gradeContext);
 
 const original = {
     bannerTitle: "Search Kit",
-    worksheets: [{ number: 1, activity: "Search Like a Pro", establishes: "Understands search engines and keywords" }, { number: 2, activity: "Other activity" }],
+    worksheets: [{ number: 1, activity: "Search Like a Pro", establishes: "Understands search engines and keywords" }, { number: 2, activity: "The Keyword Challenge" }],
     _contentMigrations: { searchPenguinMission: 3 },
     activities: [
         {
@@ -42,7 +42,11 @@ const original = {
             ],
             images: [{ url: "/practical-skills/images/little-blue-penguin.svg", caption: "New Zealand's little blue penguin" }]
         },
-        { title: "Other activity", questions: [{ id: "other-q", type: "short-answer", prompt: "Unchanged" }] }
+        {
+            title: "The Keyword Challenge",
+            information: { title: "Old keyword intro", paragraphs: ["Old introduction"] },
+            questions: [{ id: "other-q", type: "short-answer", prompt: "Unchanged" }]
+        }
     ]
 };
 
@@ -57,6 +61,15 @@ assert.deepEqual(Array.from(migrated.activities[0].information.paragraphs), [
     "Use a search engine of your choice to find the answers to the questions below. Google, Bing or another search engine will do!",
     "Can you solve the Penguin Mystery?"
 ]);
+assert.equal(migrated.activities[1].information.title, "🔎 THE MISSION: The West Coast Treasure Hunt");
+assert.deepEqual(Array.from(migrated.activities[1].information.paragraphs), [
+    "You're on a treasure hunt across the West Coast!",
+    "Your challenge is to choose the best search words to find clues about places, objects and wildlife.",
+    "Sometimes your first search won't give you what you need. That's when clever searchers change their keywords!",
+    "Can you solve all five clues?"
+]);
+assert.deepEqual(Array.from(migrated.activities[1].questions, (question) => question.id), ["other-q"], "Keyword Challenge questions are preserved");
+assert.equal(migrated._contentMigrations.searchKeywordChallenge, 1, "Keyword Challenge introduction migration is recorded");
 assert.equal(migrated.activities[0].questions.some((question) => question.id === "google-check"), false, "Google-open confirmation is removed");
 assert.equal(migrated.activities[0].questions.some((question) => question.id === "keywords"), true, "Other search-learning questions are retained");
 const penguinQuestion = migrated.activities[0].questions.find((question) => question.id === "search-penguin-name");
@@ -148,7 +161,8 @@ assert.equal(photo.license, "CC BY-SA 3.0");
 assert.equal(photo.sourceUrl, "https://commons.wikimedia.org/wiki/File:Blue_Penguin_Kapiti.jpg");
 assert.equal(photo.licenseUrl, "https://creativecommons.org/licenses/by-sa/3.0/");
 assert.equal(migrated.activities[0].images.some((image) => image.url.endsWith(".svg")), false, "Old illustration is removed");
-assert.equal(migrated.activities[1], original.activities[1], "Other activity content is untouched");
+assert.equal(migrated.activities[1].title, original.activities[1].title, "Keyword Challenge title is preserved");
+assert.deepEqual(Array.from(migrated.activities[1].questions, (question) => question.id), ["other-q"], "Keyword Challenge questions are untouched");
 assert.equal(migrated._contentMigrations.searchPenguinMission, 11, "Migration marker records latest Search Kit content");
 assert.equal(context.addSearchKitPenguinMission(migrated), migrated, "Migration is idempotent");
 assert.ok(fs.existsSync(penguinImage), "Penguin illustration asset exists");
@@ -208,7 +222,7 @@ assert.match(worksheetCss, /@media\s*\(max-width:\s*560px\)\s*\{[\s\S]*?\.worksh
 assert.match(builderSource, /\.\.\.\(state\.content \|\| \{\}\)/, "Kit Builder retains the migration marker when saving");
 assert.match(serverSource, /UPDATE practical_skills_kit_content SET content = \$1::jsonb, updated_at = NOW\(\) WHERE kit_id = \$2/, "Migrated mission is persisted for existing saved kits");
 assert.match(serverSource, /if \(safeKitId === "kit-google-search"\) \{\s*const migrated = addSearchKitPenguinMission\(merged\);/, "Migration applies to existing Search Kit content");
-assert.match(serverSource, /if \(content\?\._contentMigrations\?\.searchPenguinMission >= 11\) return content;/, "Saved migration marker prevents rebuilding a teacher-edited mission");
+assert.match(serverSource, /if \(content\?\._contentMigrations\?\.searchPenguinMission >= 11\) \{\s*return addSearchKitKeywordChallenge\(content\);\s*\}/, "Saved migration marker preserves existing missions while applying the Keyword Challenge update");
 assert.match(serverSource, /activity\?\.questionAutoMarkAssessmentId !== "search-penguin-missions-v1"/, "Search Kit auto-marking is checked by the server");
 assert.match(serverSource, /if \(req\.body\.completed && \(activity\?\.assessmentId \|\| activity\?\.identityLessonVersion \|\|\s*activity\?\.questionAutoMarkAssessmentId \|\| siteQuestions\)\)/, "Manual completion cannot bypass Search Kit auto-marking");
 assert.match(worksheetSource, /function scheduleSearchActivityAutoMark\(activityIndex\)/, "Student worksheet automatically checks complete Search Kit answers");
