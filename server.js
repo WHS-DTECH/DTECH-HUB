@@ -4444,7 +4444,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function addSearchKitKeywordChallenge(content) {
-  if (content?._contentMigrations?.searchKeywordChallenge >= 4) return content;
+  if (content?._contentMigrations?.searchKeywordChallenge >= 5) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
   const activityIndex = worksheets.findIndex((worksheet) =>
@@ -4496,6 +4496,31 @@ function addSearchKitKeywordChallenge(content) {
       ]
     });
   }
+  if (!questions.some((question) => question?.id === "keyword-glowworm-mystery")) {
+    const missionTwoIndex = questions.findIndex((question) => question?.id === "keyword-too-many-results");
+    questions.splice(missionTwoIndex >= 0 ? missionTwoIndex + 1 : questions.length, 0, {
+      id: "keyword-glowworm-mystery",
+      type: "multiple-choice",
+      heading: "Mission 3 – The Glowworm Mystery",
+      prompt: "Your challenge: You've heard about the glowworms at Hokitika's Glow Worm Dell. You want to discover what glowworms eat. Which search would help you find the answer?",
+      options: [
+        "Hokitika glowworm photos",
+        "New Zealand glowworm diet",
+        "Hokitika Glow Worm Dell directions"
+      ],
+      images: [
+        {
+          url: "/practical-skills/images/new-zealand-glowworm.jpg",
+          alt: "Blue-green glowworms shining in a dark cave in New Zealand.",
+          caption: "New Zealand glowworm (Arachnocampa luminosa)",
+          attribution: "Jon Sullivan",
+          sourceUrl: "https://commons.wikimedia.org/wiki/File:Arachnocampa_luminosa_2936220.jpg",
+          license: "CC BY 4.0",
+          licenseUrl: "https://creativecommons.org/licenses/by/4.0/"
+        }
+      ]
+    });
+  }
   const information = updateIntroduction ? {
     title: "🔎 THE MISSION: The West Coast Treasure Hunt",
     paragraphs: [
@@ -4516,7 +4541,7 @@ function addSearchKitKeywordChallenge(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchKeywordChallenge: 4
+      searchKeywordChallenge: 5
     }
   };
 }
