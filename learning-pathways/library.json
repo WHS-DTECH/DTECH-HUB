@@ -16,7 +16,7 @@
     "yearLevel": "Junior DTECH",
     "area": "Programming & Algorithms",
     "status": "active",
-    "href": "",
+    "href": "/learning-pathways/programming-and-algorithms.html",
     "visual": { "icon": "PA" }
   },
   {
@@ -26,7 +26,7 @@
     "yearLevel": "Junior DTECH",
     "area": "Data and Information",
     "status": "active",
-    "href": "",
+    "href": "/learning-pathways/data-and-information.html",
     "visual": { "icon": "DA" }
   },
   {
@@ -36,7 +36,7 @@
     "yearLevel": "Junior DTECH",
     "area": "Digital citizenship",
     "status": "active",
-    "href": "",
+    "href": "/learning-pathways/digital-citizenship.html",
     "visual": { "icon": "DC" }
   },
   {
@@ -46,7 +46,7 @@
     "yearLevel": "Junior DTECH",
     "area": "Systems and control",
     "status": "active",
-    "href": "",
+    "href": "/learning-pathways/systems-and-control.html",
     "visual": { "icon": "SC" }
   }
 ]

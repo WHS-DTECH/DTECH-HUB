@@ -35,6 +35,15 @@ Routing waits for both course and access resolution, including after refresh.
   The supplied document is proposed; this page does not assert later approval.
   The public reference uses the shared site navigation, not a new admin editor.
   No assessment descriptors or automatic completion rules are introduced.
+- `programming-and-algorithms.html`, `data-and-information.html`,
+  `digital-citizenship.html` and `systems-and-control.html`: the other four teacher
+  references, using the same sections, comparison tables, source/status notice
+  and styles as Digital Systems. Systems and Control maps to the official strand
+  on p. 16; the other school pathways map to Digital Technology (p. 17) and
+  Design, Make, and Innovate (p. 13). Shared responsibilities, year-specific
+  statements and school-context extensions are distinguished. Existing kit
+  outlines are context opportunities, not proof of curriculum coverage; hidden
+  Search/Login worksheets are not assumed to be active.
 - `task-list.html` and `task-list.js`: JuniorDTECH student Task List skeleton.
   The green navbar and sidebar Task List buttons use the resolved actual course:
   JuniorDTECH opens this page, SeniorDTECH retains its existing Task List, and
@@ -68,6 +77,10 @@ Version 5 links an existing, unlinked Digital Systems card to its curriculum pag
 preserving all other fields, custom links, card order and deleted cards. Later
 published link changes are not undone. The source PDF stays in local TeacherFiles
 and is not copied or published as part of this page.
+Version 6 links the other four unlinked curriculum cards to their reference pages,
+without replacing custom links, changing other card fields/order or restoring
+deleted cards. Later published link changes are preserved. All five curriculum
+cards are now linked; the Junior Task List still displays names only.
 
 Public reads: `/learning-pathways/library.json` and
 `GET /api/learning-pathways/library`. Admin reads and publishing:
