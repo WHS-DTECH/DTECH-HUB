@@ -6031,6 +6031,19 @@ app.get("/practical-skills/library.json", async (_req, res) => {
   }
 });
 require("./learning-pathways/library-store").registerLearningPathways(app, { pool, hasDatabase, requireAdminAccess });
+require("./learning-pathways/progression-store").registerProgressionPathway(app, {
+  pool, hasDatabase, requireTeacherAccess: requireActivityWriteAccess,
+  getStudents: async () => {
+    const rows = dedupeToLatestStudentRows((await getStudentDirectoryRows()).map(buildStudentClassManagementRow));
+    return rows.filter((row) => String(row.status || "").toLowerCase() !== "not current"
+      && [7, 8, 9, 10].includes(Number(String(row.year_level || "").replace(/^year\s*/i, ""))))
+      .flatMap((row) => (row.linked_emails || []).slice(0, 1).map((email) => ({
+        email: normalizeEmail(email), name: row.student_name,
+        yearLevel: Number(String(row.year_level).replace(/^year\s*/i, "")),
+        formClass: row.form_class || ""
+      })));
+  }
+});
 app.use(express.static(__dirname));
 
 function normalizeEvidenceStepsPayload(value) {

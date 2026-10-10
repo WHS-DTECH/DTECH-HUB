@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Progression Pathway | Teacher View | DTECH-HUB</title>
+    <meta name="hub-google-client-id" content="239433605438-ur2omagmkluhhn7i319g0i82l4l5l1j8.apps.googleusercontent.com">
+    <meta name="hub-google-allowed-domain" content="westlandhigh.school.nz">
+    <link rel="icon" href="../images/favicon.ico">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="progression-pathway.css">
+</head>
+<body>
+    <div class="page-shell">
+        <header class="hero"><nav class="topbar" aria-label="Primary"><a class="brand" href="/index.html">Computer Lab</a></nav></header>
+        <main class="progression-page">
+            <section class="panel-section">
+                <p class="section-kicker">YEAR 7-10 | TEACHER VIEW | 10-WEEK ROTATION</p>
+                <h1>Progression Pathway</h1>
+                <p>Curriculum progress tracker. Teacher-selected descriptors against the student's year-specific expectations.</p>
+                <p id="progression-status" role="status">Checking Teacher View access...</p>
+                <button id="progression-retry" class="button button-secondary" type="button" hidden>Reload saved results</button>
+                <fieldset id="progression-controls" disabled>
+                    <legend>Student and rotation</legend>
+                    <div class="progression-fields">
+                        <label>Find a student<input id="progression-search" type="search" placeholder="Start typing a name..."></label>
+                        <label>Student<select id="progression-student"><option value="">Select a student</option></select></label>
+                        <label>Saved rotations<select id="progression-history"><option value="">New rotation</option></select></label>
+                    </div>
+                </fieldset>
+                <form id="progression-form">
+                    <fieldset id="progression-editor" disabled hidden>
+                        <legend>Rotation results</legend>
+                        <div class="progression-fields">
+                            <label>School year<input id="progression-year" type="number" min="2000" max="2100" required></label>
+                            <label>Term / 10-week rotation<select id="progression-term"><option value="1">Term 1</option><option value="2">Term 2</option><option value="3">Term 3</option><option value="4">Term 4</option></select></label>
+                            <label>Student year level<select id="progression-level"><option value="7">Year 7</option><option value="8">Year 8</option><option value="9">Year 9</option><option value="10">Year 10</option></select></label>
+                            <label>Class<input id="progression-class" maxlength="100"></label>
+                        </div>
+                        <h2>Learning Pathway Results</h2>
+                        <p>Coverage is separate from progress. Untaught pathways remain Not determined; descriptors are selected by the teacher, not calculated from kit completion.</p>
+                        <div class="curriculum-table-wrap" tabindex="0" role="region" aria-label="Pathway results">
+                            <table class="curriculum-table"><thead><tr><th scope="col">Learning pathway</th><th scope="col">Coverage</th><th scope="col">Progress</th><th scope="col">Details</th></tr></thead><tbody id="progression-rows"></tbody></table>
+                        </div>
+                        <section id="progression-detail">
+                            <h2>Curriculum Coverage &amp; Evidence</h2>
+                            <h3 id="progression-detail-title"></h3>
+                            <a id="progression-reference" href="/learning-pathways/">Open curriculum reference</a>
+                            <label>Knowledge and practices addressed<textarea id="progression-addressed" rows="4" maxlength="5000"></textarea></label>
+                            <label>Evidence - activity links, observations and notes<textarea id="progression-evidence" rows="4" maxlength="5000"></textarea></label>
+                            <label>Pathway teacher notes<textarea id="progression-notes" rows="3" maxlength="5000"></textarea></label>
+                        </section>
+                        <h2>Teacher Summary</h2>
+                        <label>Strengths<textarea id="progression-strengths" rows="3" maxlength="5000"></textarea></label>
+                        <label>Next learning<textarea id="progression-next" rows="3" maxlength="5000"></textarea></label>
+                        <button class="button button-primary" id="progression-save" type="submit">Save rotation results</button>
+                        <p id="progression-saved"></p>
+                    </fieldset>
+                </form>
+                <section aria-labelledby="descriptor-heading">
+                    <h2 id="descriptor-heading">The five Progress Descriptors</h2>
+                    <ol class="progression-legend">
+                        <li><span class="descriptor-chip emerging">1</span><div><strong>Emerging</strong><p>Requires significant support to meet year-level curriculum expectations.</p></div></li>
+                        <li><span class="descriptor-chip developing">2</span><div><strong>Developing</strong><p>Making progress towards year-level curriculum expectations.</p></div></li>
+                        <li><span class="descriptor-chip consolidating">3</span><div><strong>Consolidating</strong><p>Meeting many expectations and strengthening understanding.</p></div></li>
+                        <li><span class="descriptor-chip proficient">4</span><div><strong>Proficient</strong><p>Meeting curriculum expectations for the year level.</p></div></li>
+                        <li><span class="descriptor-chip exceeding">5</span><div><strong>Exceeding</strong><p>Exceeding expectations through deeper understanding and application.</p></div></li>
+                    </ol>
+                </section>
+            </section>
+        </main>
+    </div>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="../script.js"></script>
+    <script src="progression-pathway.js"></script>
+</body>
+</html>

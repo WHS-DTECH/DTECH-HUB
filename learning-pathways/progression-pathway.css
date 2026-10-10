@@ -1,0 +1,23 @@
+.progression-page { width: min(1400px, calc(100% - 28px)); margin: 24px auto; }
+.progression-page fieldset { border: 0; padding: 0; margin: 18px 0; min-width: 0; }
+.progression-page legend { font-weight: 700; margin-bottom: 12px; }
+.progression-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.progression-page label { display: grid; gap: 6px; margin-bottom: 14px; font-weight: 600; }
+.progression-page input, .progression-page select, .progression-page textarea { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #b9cbde; border-radius: 7px; color: #24344a; background: #fff; font: inherit; }
+.progression-page textarea { resize: vertical; }
+.progression-page [hidden] { display: none !important; }
+.progression-page .is-error { color: #a12626; }
+.progression-page .curriculum-table { table-layout: auto; }
+.progression-page .curriculum-table td { vertical-align: middle; }
+#progression-detail { padding: 18px; margin-top: 20px; border: 1px solid #cfdded; border-radius: 12px; background: #f8fbff; }
+.progression-legend { list-style: none; padding: 0; display: grid; gap: 14px; }
+.progression-legend li { display: flex; align-items: center; gap: 14px; }
+.progression-legend p { margin: 4px 0; }
+.descriptor-chip { display: inline-block; border-radius: 8px; padding: 10px 14px; font-weight: 700; color: #000; }
+.emerging { background: #b86753 !important; }
+.developing { background: #c08b2e !important; }
+.consolidating { background: #969b32 !important; }
+.proficient { background: #278c78 !important; }
+.exceeding { background: #427bbb !important; }
+.progression-page select.descriptor-chip { color: #000; border: 2px solid #24344a; }
+@media (max-width: 700px) { .progression-page .curriculum-table { min-width: 760px; } }

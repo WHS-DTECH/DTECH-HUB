@@ -82,6 +82,30 @@ without replacing custom links, changing other card fields/order or restoring
 deleted cards. Later published link changes are preserved. All five curriculum
 cards are now linked; the Junior Task List still displays names only.
 
+## Progression Pathway (Teacher View)
+
+`progression-pathway.html`, `.js`, `.css` and `progression-store.js` provide the
+Student Work > Progression Pathway tracker. The layout follows the supplied
+JuniorDTECH tracker concept: student/rotation, five pathway results, selected
+curriculum coverage/evidence and teacher strengths/next-learning summary.
+The five user-supplied descriptors and colours are teacher selected. Coverage
+is separate; Not taught requires Not determined. No kit-derived grades or
+student-facing results are added.
+
+Teacher/Admin-protected `/api/teacher/progression/students` and
+`/api/teacher/progression/records` (GET/PUT) use the existing write-access
+middleware and directory. Each student/school-year/term has its own Postgres
+record in `progression_pathway_results`, including the year level/class snapshot,
+teacher and update time. Save is explicit, and revision checks prevent concurrent
+teachers overwriting each other's edits. Earlier rotations remain available.
+Students with saved history remain discoverable after moving beyond Year 10;
+their historical year level/class and saved name are retained. New rotations
+require a current Year 7-10 directory entry.
+Database-unavailable development returns an explicit 503 rather than pretending
+results were saved. Source PDFs remain local and are not published.
+Run `node scripts/regression-progression-pathway.js` for validation, teacher
+access, history persistence, concurrent-edit conflicts and descriptor contrast.
+
 Public reads: `/learning-pathways/library.json` and
 `GET /api/learning-pathways/library`. Admin reads and publishing:
 `GET` / `PUT /api/admin/learning-pathways/library`, protected by existing admin
