@@ -516,17 +516,18 @@ assert.deepEqual(JSON.parse(JSON.stringify(challengeMigrated.activities[4].resea
     fileName: "Search Kit - My West Coast Discoveries",
     templateId: "12_9pgqJIVnFd14OMhIlBZeorX3e-vDl37uLgLSz3Qf0",
     minimumWords: 25
-}, "Google Search Challenge gets the research report settings");
-const liveVersionThreeNoTemplate = JSON.parse(JSON.stringify(challengeMigrated));
-liveVersionThreeNoTemplate._contentMigrations.googleSearchChallenge = 3;
-liveVersionThreeNoTemplate.activities[4].researchReport.templateId = "";
-liveVersionThreeNoTemplate.activities[4].researchReport.minimumWords = 40;
-const liveVersionFour = context.addSearchKitPenguinMission(liveVersionThreeNoTemplate);
+}, "Google Search Challenge gets the research report settings and master template");
+const liveVersionThreeEmpty = JSON.parse(JSON.stringify(challengeMigrated));
+liveVersionThreeEmpty._contentMigrations.googleSearchChallenge = 3;
+liveVersionThreeEmpty.activities[4].researchReport.templateId = "";
+liveVersionThreeEmpty.activities[4].researchReport.minimumWords = 40;
+const liveVersionFour = context.addSearchKitPenguinMission(liveVersionThreeEmpty);
 assert.equal(liveVersionFour.activities[4].researchReport.templateId, "12_9pgqJIVnFd14OMhIlBZeorX3e-vDl37uLgLSz3Qf0",
-    "Empty template link is filled with the master research report");
-assert.equal(liveVersionFour.activities[4].researchReport.minimumWords, 40, "Teacher minimum words are kept");
-assert.deepEqual(JSON.parse(JSON.stringify(liveVersionFour.activities.slice(0, 4))), JSON.parse(JSON.stringify(liveVersionThreeNoTemplate.activities.slice(0, 4))),
+    "v3 -> v4 connects the master template to the Google Search Challenge");
+assert.equal(liveVersionFour.activities[4].researchReport.minimumWords, 40, "v3 -> v4 keeps teacher settings");
+assert.deepEqual(JSON.parse(JSON.stringify(liveVersionFour.activities.slice(0, 4))), JSON.parse(JSON.stringify(liveVersionThreeEmpty.activities.slice(0, 4))),
     "Connecting the template leaves the first four activities unchanged");
+assert.equal(context.addSearchKitPenguinMission(liveVersionFour), liveVersionFour, "Template migration runs once");
 const versionOneChallenge = JSON.parse(JSON.stringify(challengeMigrated));
 versionOneChallenge._contentMigrations.googleSearchChallenge = 1;
 delete versionOneChallenge.activities[4].researchReport;
