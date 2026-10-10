@@ -4476,7 +4476,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function addSearchResultsDetectiveIntroduction(content) {
-  if (content?._contentMigrations?.searchResultsDetective >= 4) return content;
+  if (content?._contentMigrations?.searchResultsDetective >= 5) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
   const activityIndex = worksheets.findIndex((worksheet) =>
@@ -4601,6 +4601,19 @@ function addSearchResultsDetectiveIntroduction(content) {
       }
     });
   }
+  if (!questions.some((question) => question?.id === "search-result-glowworm-time")) {
+    questions.push({
+      id: "search-result-glowworm-time",
+      type: "multiple-choice",
+      heading: "Mission 4 – Find the Useful Information",
+      prompt: "Use your search engine to find information about the Hokitika Glow Worm Dell. What is the best time of day to see the glowworms?",
+      options: [
+        "During the middle of the day",
+        "After dark",
+        "At lunchtime"
+      ]
+    });
+  }
 
   const hasIntroduction = content?._contentMigrations?.searchResultsDetective >= 1;
   activities[activityIndex] = {
@@ -4624,7 +4637,7 @@ function addSearchResultsDetectiveIntroduction(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchResultsDetective: 4
+      searchResultsDetective: 5
     }
   };
 }
