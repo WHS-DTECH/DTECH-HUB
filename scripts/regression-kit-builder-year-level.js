@@ -11,6 +11,8 @@ assert.match(html, /#kit-add-worksheet\s*\{[^}]*background:\s*#173858;[^}]*color
 assert.match(html, /#kit-add-worksheet:focus-visible\s*\{/);
 assert.match(html, /<h2>Kit Worksheets<\/h2>\s*<p class="kit-worksheet-suggestion"><strong>Teacher suggestion:<\/strong> Activities 1–3 as foundational skills, Activities 4–8 as applied skills, and Activities 9–10 as integrated challenges\.<\/p>/, "Teacher suggestion appears directly under Kit Worksheets");
 assert.match(html, /<textarea id="kit-instructions" rows="3" placeholder=/);
+assert.match(html, /<label for="kit-name">Kit Name<\/label>[\s\S]*?<small>This name appears on the kit page and in the Kit dropdown\.<\/small>/);
+assert.doesNotMatch(html, /id="kit-banner-title"/, "Kit Name replaces the separate Banner Title field");
 assert.doesNotMatch(html, /maxlength=/i, "Kit Builder fields have no browser character limits");
 assert.doesNotMatch(activityHtml, /maxlength=/i, "Worksheet topic/detail fields have no browser character limits");
 assert.doesNotMatch(source, /maxlength=/i, "Dynamically rendered worksheet fields have no browser character limits");
@@ -40,5 +42,17 @@ assert.equal(yearLevels.value, "Year 8 DTECH", "Existing supported value is rest
 context.setYearLevelSelection("Legacy group");
 assert.equal(yearLevels.value, "Legacy group", "Unlisted existing values are preserved");
 assert.equal(yearLevels.options.at(-1).textContent, "Current value: Legacy group");
+
+const titleStart = source.indexOf("    function updateKitOptionTitle(kitId, title) {");
+const titleEnd = source.indexOf("\n    function setYearLevelSelection(value)", titleStart);
+assert.ok(titleStart >= 0 && titleEnd > titleStart, "Dropdown title updater is present");
+const kitSelect = { options: [{ value: "kit-login", textContent: "Login" }, { value: "kit-google-search", textContent: "Google Search" }] };
+const titleContext = vm.createContext({ kitSelect, KIT_CATALOG: [{ id: "kit-login", title: "Login" }, { id: "kit-google-search", title: "Google Search" }] });
+vm.runInContext(source.slice(titleStart, titleEnd), titleContext);
+titleContext.updateKitOptionTitle("kit-google-search", "Search Kit");
+assert.equal(kitSelect.options[1].textContent, "Search Kit", "Saved kit name updates its dropdown label");
+titleContext.updateKitOptionTitle("kit-google-search", "");
+assert.equal(kitSelect.options[1].textContent, "Google Search", "Blank kit name restores the catalog fallback");
+assert.match(source, /bannerTitle:\s*nameInput\.value/, "The single Kit Name is also saved as the banner title");
 
 console.log("Kit Builder Year Level dropdown regression checks passed.");

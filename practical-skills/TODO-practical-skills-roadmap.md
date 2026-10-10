@@ -37,6 +37,10 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
 - Implemented: the Kit Worksheets editor displays a teacher suggestion to
   structure Activities 1–3 as foundational skills, 4–8 as applied skills, and
   9–10 as integrated challenges.
+- Implemented: Kit Name is the single source for the student-facing kit/banner
+  title and updates that kit's Kit dropdown label after content loads or saves.
+  Existing kit IDs remain unchanged so worksheet content and student progress
+  remain attached to their kit.
 - Add a `Next Best Task` panel at the top of the Practical Skills homepage.
 - Show licence progress (`X/Y kits complete`).
 - Show assessment readiness status (`Ready` or `Missing required kits`).

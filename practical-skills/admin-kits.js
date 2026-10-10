@@ -24,7 +24,6 @@
     const skillAreaInput = document.querySelector("#kit-skill-area");
     const kitStatusInput = document.querySelector("#kit-status");
     const yearLevelInput = document.querySelector("#kit-year-level");
-    const bannerTitleInput = document.querySelector("#kit-banner-title");
     const bannerSubtitleInput = document.querySelector("#kit-banner-subtitle");
     const instructionsInput = document.querySelector("#kit-instructions");
     const teacherNotesInput = document.querySelector("#kit-teacher-notes");
@@ -182,7 +181,7 @@
                 accent: accentColorInput.value,
                 icon: iconInput.value
             },
-            bannerTitle: bannerTitleInput.value,
+            bannerTitle: nameInput.value,
             bannerSubtitle: bannerSubtitleInput.value,
             instructions: instructionsInput.value,
             teacherNotes: teacherNotesInput.value,
@@ -206,10 +205,10 @@
     function renderForm() {
         const content = state.content || {};
         nameInput.value = content.identity?.name || content.bannerTitle || "";
+        updateKitOptionTitle(state.kitId, nameInput.value);
         skillAreaInput.value = content.identity?.skillArea || "";
         kitStatusInput.value = content.identity?.status || "active";
         setYearLevelSelection(content.identity?.yearLevel);
-        bannerTitleInput.value = content.bannerTitle || "";
         bannerSubtitleInput.value = content.bannerSubtitle || "";
         instructionsInput.value = content.instructions || "";
         teacherNotesInput.value = content.teacherNotes || "";
@@ -224,6 +223,13 @@
         accentColorInput.value = content.theme?.accent || "#ffd166";
         renderWorksheetList();
         queuePreviewUpdate();
+    }
+
+    function updateKitOptionTitle(kitId, title) {
+        const option = Array.from(kitSelect.options).find((item) => item.value === kitId);
+        if (!option) return;
+        const fallbackTitle = KIT_CATALOG.find((kit) => kit.id === kitId)?.title || kitId;
+        option.textContent = String(title || "").trim() || fallbackTitle;
     }
 
     function setYearLevelSelection(value) {
@@ -281,7 +287,7 @@
     }
 
     function wireFormEvents() {
-        [nameInput, skillAreaInput, kitStatusInput, yearLevelInput, bannerTitleInput, bannerSubtitleInput, instructionsInput, teacherNotesInput, whatStudentsWillLearnInput, whyThisMattersInput, keyVocabularyInput, evidenceRequiredInput, successCriteriaInput, extensionChallengeInput, iconInput, themeColorInput, accentColorInput].forEach((input) => {
+        [nameInput, skillAreaInput, kitStatusInput, yearLevelInput, bannerSubtitleInput, instructionsInput, teacherNotesInput, whatStudentsWillLearnInput, whyThisMattersInput, keyVocabularyInput, evidenceRequiredInput, successCriteriaInput, extensionChallengeInput, iconInput, themeColorInput, accentColorInput].forEach((input) => {
             input.addEventListener("input", queuePreviewUpdate);
         });
         yearLevelInput.addEventListener("change", queuePreviewUpdate);
