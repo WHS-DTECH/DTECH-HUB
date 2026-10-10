@@ -82,10 +82,16 @@
     function renderQuestionBody(question, responses, readOnly) {
         const type = String(question?.type || "short-answer");
         const responseValue = responses?.[question.id];
+        const images = Array.isArray(question.images) && question.images.length
+            ? `<div class="worksheet-question-images${question.images.length === 1 ? " has-single-image" : ""}">
+                ${question.images.map((image) => renderWorksheetImage(image, "worksheet-question-image")).join("")}
+            </div>`
+            : "";
 
         if (type === "checklist") {
             const checkedSet = new Set(Array.isArray(responseValue) ? responseValue : []);
             return `
+                ${images}
                 <div class="worksheet-checklist">
                     ${(Array.isArray(question.options) ? question.options : []).map((option, optionIndex) => {
                         const checked = checkedSet.has(option);
@@ -103,11 +109,7 @@
         if (type === "multiple-choice") {
             const selected = String(responseValue || "");
             return `
-                ${Array.isArray(question.images) && question.images.length ? `
-                    <div class="worksheet-question-images">
-                        ${question.images.map((image) => renderWorksheetImage(image, "worksheet-question-image")).join("")}
-                    </div>
-                ` : ""}
+                ${images}
                 ${question.searchResults ? `
                     <section class="worksheet-search-results" aria-label="${escapeHtml(question.searchResults.title || "Simulated (Fake website) search results")}">
                         <h4 class="worksheet-search-results-heading"><span aria-hidden="true">🔎</span> ${escapeHtml(question.searchResults.title || "Simulated (Fake website) search results")}</h4>
@@ -135,7 +137,12 @@
         }
 
         return `
+            ${images}
             <textarea class="worksheet-answer-input" data-question-id="${escapeHtml(question.id)}" rows="${Math.max(1, Number(question.lines) || 1)}" ${readOnly ? "disabled" : ""} placeholder="Write your answer\u2026">${escapeHtml(responseValue || "")}</textarea>
+            ${question.hint ? `
+                <button type="button" class="worksheet-hint-toggle" data-hint-toggle="${escapeHtml(question.id)}" aria-expanded="false" aria-controls="question-hint-${escapeHtml(question.id)}" ${readOnly ? "disabled" : ""}>HINT</button>
+                <p class="worksheet-question-hint" id="question-hint-${escapeHtml(question.id)}" data-question-hint="${escapeHtml(question.id)}" hidden>Hint: ${escapeHtml(question.hint)}</p>
+            ` : ""}
         `;
     }
 
@@ -840,6 +847,18 @@
             textarea.addEventListener("change", () => {
                 const questionId = textarea.getAttribute("data-question-id");
                 options.onResponseChange?.(questionId, textarea.value);
+            });
+        });
+
+        host.querySelectorAll("[data-hint-toggle]").forEach((button) => {
+            button.addEventListener("click", () => {
+                const expanded = button.getAttribute("aria-expanded") !== "true";
+                const questionId = button.getAttribute("data-hint-toggle");
+                const hint = Array.from(host.querySelectorAll("[data-question-hint]")).find((node) =>
+                    node.getAttribute("data-question-hint") === questionId);
+                if (!hint) return;
+                button.setAttribute("aria-expanded", String(expanded));
+                hint.hidden = !expanded;
             });
         });
 

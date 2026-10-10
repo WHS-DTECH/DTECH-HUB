@@ -264,7 +264,7 @@
         if (!state.email || !state.progressLoaded || state.completedActivities[activityIndex]) return;
         const baseQuestionIds = assessmentId === "search-keyword-challenge-v1"
             ? [
-                "keyword-pounamu-treasure",
+                "keyword-west-coast-tree",
                 "keyword-too-many-results",
                 "keyword-glowworm-mystery",
                 "keyword-fix-the-search",

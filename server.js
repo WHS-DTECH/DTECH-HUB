@@ -52,7 +52,7 @@ function gradeSearchKeywordChallenge(answers, activityIndex) {
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
   const acceptedAnswers = {
-    "keyword-pounamu-treasure": ["where to find pounamu west coast nz"],
+    "keyword-west-coast-tree": ["kahikatea"],
     "keyword-too-many-results": ["hokitika gorge swing bridge"],
     "keyword-glowworm-mystery": ["new zealand glowworm diet"],
     "keyword-fix-the-search": ["hokitika tomorrow"],
@@ -4772,7 +4772,7 @@ function addSearchResultsDetectiveIntroduction(content) {
 }
 
 function addSearchKitKeywordChallenge(content) {
-  if (content?._contentMigrations?.searchKeywordChallenge >= 10) return content;
+  if (content?._contentMigrations?.searchKeywordChallenge >= 11) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
   const activityIndex = worksheets.findIndex((worksheet) =>
@@ -4799,32 +4799,45 @@ function addSearchKitKeywordChallenge(content) {
     activity.information.paragraphs.length === previousDefaultIntroduction.paragraphs.length &&
     activity.information.paragraphs.every((paragraph, index) => paragraph === previousDefaultIntroduction.paragraphs[index]);
   const questions = Array.isArray(activity.questions) ? activity.questions.slice() : [];
-  if (!questions.some((question) => question?.id === "keyword-pounamu-treasure")) {
-    questions.unshift({
-      id: "keyword-pounamu-treasure",
-      type: "multiple-choice",
-      heading: "Mission 1: Find the Treasure",
-      prompt: "You want to find out where pounamu can be found on the West Coast. Which search would be most useful?",
-      options: [
-        "beautiful green rocks",
-        "where to find pounamu West Coast NZ",
-        "New Zealand beaches"
-      ],
-      images: [
-        {
-          url: "/practical-skills/images/pounamu-arahura-river.jpg",
-          alt: "Pounamu (greenstone) sourced from the Arahura River, displayed at Wellington Museum.",
-          caption: "Pounamu sourced from the Arahura River",
-          attribution: "Daderot",
-          sourceUrl: "https://commons.wikimedia.org/wiki/File:Pounamu_(greenstone),_sourced_from_Arahura_River_-_Wellington_Museum_-_Wellington,_NZ_-_DSC00054.jpg",
-          license: "CC0",
-          licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/"
-        }
-      ]
-    });
+  const treeQuestion = {
+    id: "keyword-west-coast-tree",
+    type: "short-answer",
+    heading: "Mission 1 – The Giant Tree",
+    prompt: "One of New Zealand's tallest native tree species grows in West Coast forests. What is the name of this tree?",
+    lines: 1,
+    hint: "Search for New Zealand's tallest native tree species",
+    images: [
+      {
+        url: "/practical-skills/images/west-coast-tall-tree.jpg",
+        alt: "Looking up at the towering trunks of tall native forest trees.",
+        caption: "Tall native forest trees",
+        attribution: "Geoff McKay",
+        sourceUrl: "https://commons.wikimedia.org/wiki/File:Standing_Straight_And_Tall_-_Kahikatea_(51236257730)_(cropped).jpg",
+        license: "CC BY 2.0",
+        licenseUrl: "https://creativecommons.org/licenses/by/2.0/"
+      }
+    ]
+  };
+  const previousTreeQuestion = questions.find((question) =>
+    question?.id === "keyword-pounamu-treasure" &&
+    question.type === "multiple-choice" &&
+    question.heading === "Mission 1: Find the Treasure" &&
+    question.prompt === "You want to find out where pounamu can be found on the West Coast. Which search would be most useful?" &&
+    Array.isArray(question.options) &&
+    question.options.length === 3 &&
+    question.options[0] === "beautiful green rocks" &&
+    question.options[1] === "where to find pounamu West Coast NZ" &&
+    question.options[2] === "New Zealand beaches");
+  if (previousTreeQuestion) {
+    const previousTreeIndex = questions.indexOf(previousTreeQuestion);
+    questions.splice(previousTreeIndex, 1, treeQuestion);
+  } else if (!questions.some((question) => question?.id === "keyword-pounamu-treasure") &&
+      !questions.some((question) => question?.id === treeQuestion.id)) {
+    questions.unshift(treeQuestion);
   }
   if (!questions.some((question) => question?.id === "keyword-too-many-results")) {
-    const missionOneIndex = questions.findIndex((question) => question?.id === "keyword-pounamu-treasure");
+    const missionOneIndex = questions.findIndex((question) =>
+      question?.id === "keyword-west-coast-tree" || question?.id === "keyword-pounamu-treasure");
     questions.splice(missionOneIndex >= 0 ? missionOneIndex + 1 : questions.length, 0, {
       id: "keyword-too-many-results",
       type: "multiple-choice",
@@ -4907,7 +4920,7 @@ function addSearchKitKeywordChallenge(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchKeywordChallenge: 10
+      searchKeywordChallenge: 11
     }
   };
 }
