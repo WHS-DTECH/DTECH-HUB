@@ -29,8 +29,11 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   All Years, with Junior, Middle and Senior DTECH group options, individual
   Years 7-13 DTECH options, and Staff. Existing saved values outside the list
   remain selectable as a preserved current value rather than being discarded.
-- Implemented: Kit Builder Instructions no longer has a browser-enforced
-  maxlength, so longer guidance can be entered, previewed and saved.
+- Implemented: text-entry fields across the Kit Content Builder and Worksheet
+  Details editor no longer have browser-enforced character limits. This includes
+  kit identity/theme, instructions, teacher notes, learning/completion text,
+  worksheet topic/description, questions and images configured in Activity
+  Details. Values continue through the existing preview and save paths.
 - Add a `Next Best Task` panel at the top of the Practical Skills homepage.
 - Show licence progress (`X/Y kits complete`).
 - Show assessment readiness status (`Ready` or `Missing required kits`).
