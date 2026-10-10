@@ -267,7 +267,7 @@
                 "keyword-west-coast-tree",
                 "keyword-gold-rush-town",
                 "keyword-mountain-bird",
-                "keyword-fix-the-search",
+                "keyword-pancake-rocks",
                 "keyword-hokitika-founded"
             ]
             : assessmentId === "search-results-detective-v1"

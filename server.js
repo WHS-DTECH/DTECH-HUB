@@ -55,7 +55,7 @@ function gradeSearchKeywordChallenge(answers, activityIndex) {
     "keyword-west-coast-tree": ["kahikatea"],
     "keyword-gold-rush-town": ["ross"],
     "keyword-mountain-bird": ["roroa"],
-    "keyword-fix-the-search": ["hokitika tomorrow"],
+    "keyword-pancake-rocks": ["limestone"],
     "keyword-hokitika-founded": ["1864"]
   };
   const results = Object.entries(acceptedAnswers).map(([id, accepted]) => {
@@ -4772,7 +4772,7 @@ function addSearchResultsDetectiveIntroduction(content) {
 }
 
 function addSearchKitKeywordChallenge(content) {
-  if (content?._contentMigrations?.searchKeywordChallenge >= 13) return content;
+  if (content?._contentMigrations?.searchKeywordChallenge >= 14) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
   const activityIndex = worksheets.findIndex((worksheet) =>
@@ -4861,7 +4861,8 @@ function addSearchKitKeywordChallenge(content) {
       question?.id === "keyword-west-coast-tree" || question?.id === "keyword-pounamu-treasure");
     questions.splice(missionOneIndex >= 0 ? missionOneIndex + 1 : questions.length, 0, rossQuestion);
   }
-  if (!questions.some((question) => question?.id === "keyword-glowworm-mystery")) {
+  if (!questions.some((question) =>
+    question?.id === "keyword-glowworm-mystery" || question?.id === "keyword-mountain-bird")) {
     const missionTwoIndex = questions.findIndex((question) =>
       question?.id === "keyword-gold-rush-town" || question?.id === "keyword-too-many-results");
     questions.splice(missionTwoIndex >= 0 ? missionTwoIndex + 1 : questions.length, 0, {
@@ -4922,23 +4923,44 @@ function addSearchKitKeywordChallenge(content) {
     const missionTwoIndex = questions.findIndex((question) => question?.id === "keyword-gold-rush-town");
     questions.splice(missionTwoIndex >= 0 ? missionTwoIndex + 1 : 2, 0, mountainBirdQuestion);
   }
-  if (!questions.some((question) => question?.id === "keyword-fix-the-search")) {
+  const pancakeRocksQuestion = {
+    id: "keyword-pancake-rocks",
+    type: "short-answer",
+    heading: "Mission 4 – The Famous Rock Formation",
+    prompt: "Near Punakaiki, there are famous rocks that look like stacks of pancakes. What type of rock are the Pancake Rocks made from?",
+    lines: 1,
+    hint: "Search for what the Punakaiki Pancake Rocks are made of.",
+    images: [
+      {
+        url: "/practical-skills/images/punakaiki-pancake-rocks.jpg",
+        alt: "Layered Pancake Rocks beside the sea at Punakaiki.",
+        caption: "Pancake Rocks, Paparoa National Park",
+        attribution: "W. Bulach",
+        sourceUrl: "https://commons.wikimedia.org/wiki/File:00_1273_Pancake_Rocks_-_Paparoa-Nationalpark_(New_Zealand).jpg",
+        license: "CC BY-SA 4.0",
+        licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0/"
+      }
+    ]
+  };
+  const previousSearchMission = questions.find((question) =>
+    question?.id === "keyword-fix-the-search" &&
+    question.type === "multiple-choice" &&
+    question.heading === "Mission 4: Fix the Search" &&
+    question.prompt === "Someone typed weather but wants to know whether it will rain in Hokitika tomorrow. Which words should they add?" &&
+    Array.isArray(question.options) &&
+    question.options.length === 3 &&
+    question.options[0] === "Hokitika tomorrow" &&
+    question.options[1] === "sunshine" &&
+    question.options[2] === "New Zealand");
+  if (previousSearchMission) {
+    questions.splice(questions.indexOf(previousSearchMission), 1, pancakeRocksQuestion);
+  } else if (!questions.some((question) => question?.id === pancakeRocksQuestion.id)) {
     const missionThreeIndex = questions.findIndex((question) =>
       question?.id === "keyword-mountain-bird" || question?.id === "keyword-glowworm-mystery");
-    questions.splice(missionThreeIndex >= 0 ? missionThreeIndex + 1 : questions.length, 0, {
-      id: "keyword-fix-the-search",
-      type: "multiple-choice",
-      heading: "Mission 4: Fix the Search",
-      prompt: "Someone typed weather but wants to know whether it will rain in Hokitika tomorrow. Which words should they add?",
-      options: [
-        "Hokitika tomorrow",
-        "sunshine",
-        "New Zealand"
-      ]
-    });
+    questions.splice(missionThreeIndex >= 0 ? missionThreeIndex + 1 : questions.length, 0, pancakeRocksQuestion);
   }
   if (!questions.some((question) => question?.id === "keyword-hokitika-founded")) {
-    const missionFourIndex = questions.findIndex((question) => question?.id === "keyword-fix-the-search");
+    const missionFourIndex = questions.findIndex((question) => question?.id === "keyword-pancake-rocks");
     questions.splice(missionFourIndex >= 0 ? missionFourIndex + 1 : questions.length, 0, {
       id: "keyword-hokitika-founded",
       type: "short-answer",
@@ -4973,6 +4995,19 @@ function addSearchKitKeywordChallenge(content) {
     const searchAndFindQuestions = Array.isArray(existingSearchAndFind.questions)
       ? existingSearchAndFind.questions.slice()
       : [];
+    const previousSearchAndFindMission = searchAndFindQuestions.find((question) =>
+      question?.id === "keyword-fix-the-search" &&
+      question.type === "multiple-choice" &&
+      question.heading === "Mission 4: Fix the Search" &&
+      question.prompt === "Someone typed weather but wants to know whether it will rain in Hokitika tomorrow. Which words should they add?" &&
+      Array.isArray(question.options) &&
+      question.options.length === 3 &&
+      question.options[0] === "Hokitika tomorrow" &&
+      question.options[1] === "sunshine" &&
+      question.options[2] === "New Zealand");
+    if (previousSearchAndFindMission) {
+      searchAndFindQuestions.splice(searchAndFindQuestions.indexOf(previousSearchAndFindMission), 1, pancakeRocksQuestion);
+    }
     for (const question of questions) {
       if (question?.id?.startsWith("keyword-") &&
           !searchAndFindQuestions.some((existing) => existing?.id === question.id)) {
@@ -4993,7 +5028,7 @@ function addSearchKitKeywordChallenge(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchKeywordChallenge: 13
+      searchKeywordChallenge: 14
     }
   };
 }
