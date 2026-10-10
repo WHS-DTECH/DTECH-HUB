@@ -434,10 +434,13 @@ body.kit-worksheet-page {
     padding: 14px;
     border: 1px solid #d8e2ed;
     border-radius: 12px;
-    background: #f5f8fc;
+    background: linear-gradient(145deg, #f5f8fc, #edf4fb);
 }
 
-.worksheet-search-results h4 {
+.worksheet-search-results-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     margin: 0 0 10px;
     color: #173858;
     font-size: 1rem;
@@ -446,42 +449,115 @@ body.kit-worksheet-page {
 .worksheet-search-result-list {
     display: grid;
     gap: 8px;
+    counter-reset: search-result;
 }
 
 .worksheet-search-result {
     display: grid;
+    grid-template-columns: 26px minmax(0, 1fr);
     gap: 4px;
     width: 100%;
     padding: 12px;
-    border: 2px solid #d8e2ed;
+    border: 1px solid #d8e2ed;
+    border-left: 4px solid #80a9cf;
     border-radius: 10px;
     background: #ffffff;
     color: #25364a;
     text-align: left;
     font: inherit;
     cursor: pointer;
+    counter-increment: search-result;
+    transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.worksheet-search-result::before {
+    content: counter(search-result);
+    grid-row: 1 / span 3;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #e8f1fb;
+    color: #214f7b;
+    font-size: 0.78rem;
+    font-weight: 800;
 }
 
 .worksheet-search-result:hover,
 .worksheet-search-result:focus-visible {
     border-color: #2870a8;
+    box-shadow: 0 4px 12px rgb(30 74 115 / 12%);
+    transform: translateY(-1px);
 }
 
 .worksheet-search-result.is-selected {
     border-color: #2870a8;
+    border-left-color: #2870a8;
     background: #eaf4fc;
     box-shadow: 0 0 0 2px rgb(40 112 168 / 16%);
 }
 
 .worksheet-search-result-domain {
+    justify-self: start;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: #f0f4f8;
     color: #536b83;
-    font-size: 0.82rem;
+    font-size: 0.76rem;
 }
 
 .worksheet-search-results-note {
     margin: 10px 0 0;
+    padding-top: 9px;
+    border-top: 1px dashed #c4d2e0;
     color: #536b83;
     font-size: 0.88rem;
+}
+
+.worksheet-question-context {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 6px;
+    padding: 4px 9px;
+    border: 1px solid #bbd9ca;
+    border-radius: 999px;
+    background: #eff8f2;
+    color: #286347;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.worksheet-question--real-search {
+    border-color: #cfe3d6;
+    box-shadow: 0 3px 0 #dcecdf;
+}
+
+.worksheet-question--real-search .worksheet-question-number {
+    background: #bde7ca;
+    color: #1d5136;
+}
+
+.worksheet-question--real-search .worksheet-choice-bubble {
+    border-color: #b8d6c2;
+    background: linear-gradient(180deg, #ffffff, #f3faf5);
+    transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+.worksheet-question--real-search .worksheet-choice-bubble:hover,
+.worksheet-question--real-search .worksheet-choice-bubble:focus-visible {
+    border-color: #55956c;
+    box-shadow: 0 3px 9px rgb(38 99 66 / 12%);
+    transform: translateY(-1px);
+}
+
+.worksheet-question--real-search .worksheet-choice-bubble.is-selected {
+    border-color: #32764d;
+    background: #32764d;
+    color: #ffffff;
 }
 
 .worksheet-question-heading {

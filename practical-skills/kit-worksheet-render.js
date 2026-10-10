@@ -75,7 +75,7 @@
                 ` : ""}
                 ${question.searchResults ? `
                     <section class="worksheet-search-results" aria-label="${escapeHtml(question.searchResults.title || "Simulated search results")}">
-                        <h4>${escapeHtml(question.searchResults.title || "Simulated search results")}</h4>
+                        <h4 class="worksheet-search-results-heading"><span aria-hidden="true">🔎</span> ${escapeHtml(question.searchResults.title || "Simulated search results")}</h4>
                         <div class="worksheet-search-result-list">
                             ${(Array.isArray(question.searchResults.results) ? question.searchResults.results : []).map((result) => `
                                 <button type="button" class="worksheet-search-result ${selected === result.title ? "is-selected" : ""}" data-question-id="${escapeHtml(question.id)}" data-option-value="${escapeHtml(result.title)}" aria-pressed="${selected === result.title}" ${readOnly ? "disabled" : ""}>
@@ -680,9 +680,10 @@
             ` : ""}
             <div class="worksheet-question-list">
                 ${questions.length ? questions.map((question, index) => `
-                    <article class="worksheet-question">
+                    <article class="worksheet-question ${question?.presentation === "real-search" ? "worksheet-question--real-search" : ""}">
                         <span class="worksheet-question-number" aria-hidden="true">${index + 1}</span>
                         <div class="worksheet-question-body">
+                            ${question?.presentation === "real-search" ? `<span class="worksheet-question-context"><span aria-hidden="true">🌿</span> Real-world search</span>` : ""}
                             ${question?.heading ? `<h3 class="worksheet-question-heading">${escapeHtml(question.heading)}</h3>` : ""}
                             <p class="worksheet-question-prompt">${escapeHtml(question?.prompt || "")}</p>
                             ${renderQuestionBody(question, responses, readOnly)}

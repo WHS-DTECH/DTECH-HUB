@@ -4476,7 +4476,7 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
 };
 
 function addSearchResultsDetectiveIntroduction(content) {
-  if (content?._contentMigrations?.searchResultsDetective >= 6) return content;
+  if (content?._contentMigrations?.searchResultsDetective >= 7) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
   const activityIndex = worksheets.findIndex((worksheet) =>
@@ -4611,7 +4611,8 @@ function addSearchResultsDetectiveIntroduction(content) {
         "During the middle of the day",
         "After dark",
         "At lunchtime"
-      ]
+      ],
+      presentation: "real-search"
     });
   }
   if (!questions.some((question) => question?.id === "search-result-doc-track")) {
@@ -4624,8 +4625,15 @@ function addSearchResultsDetectiveIntroduction(content) {
         "Department of Conservation (DOC)",
         "New Zealand Police",
         "MetService"
-      ]
+      ],
+      presentation: "real-search"
     });
+  }
+  for (const id of ["search-result-glowworm-time", "search-result-doc-track"]) {
+    const questionIndex = questions.findIndex((question) => question?.id === id);
+    if (questionIndex >= 0 && !questions[questionIndex].presentation) {
+      questions[questionIndex] = { ...questions[questionIndex], presentation: "real-search" };
+    }
   }
 
   const hasIntroduction = content?._contentMigrations?.searchResultsDetective >= 1;
@@ -4650,7 +4658,7 @@ function addSearchResultsDetectiveIntroduction(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      searchResultsDetective: 6
+      searchResultsDetective: 7
     }
   };
 }
