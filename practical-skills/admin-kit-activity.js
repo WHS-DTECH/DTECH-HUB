@@ -99,7 +99,13 @@
             license: card.querySelector("input[data-image-license]")?.value || "",
             licenseUrl: card.querySelector("input[data-image-license-url]")?.value || ""
         }));
-        return { ...content.activities?.[activityIndex], number: activityIndex + 1, title: titleInput.value, establishes: establishesInput.value, questions, images };
+        const existing = content.activities?.[activityIndex];
+        const researchReport = existing?.researchReport ? {
+            ...existing.researchReport,
+            templateId: document.querySelector("#activity-research-template").value.trim(),
+            minimumWords: Math.max(1, Math.min(1000, Math.round(Number(document.querySelector("#activity-research-minimum").value) || existing.researchReport.minimumWords || 25)))
+        } : undefined;
+        return { ...existing, number: activityIndex + 1, title: titleInput.value, establishes: establishesInput.value, questions, images, ...(researchReport ? { researchReport } : {}) };
     }
 
     function render() {
@@ -127,6 +133,9 @@
         });
         renderQuestions(activity.questions || []);
         renderImages(activity.images || []);
+        document.querySelector("#activity-research-report").hidden = !activity.researchReport;
+        document.querySelector("#activity-research-template").value = activity.researchReport?.templateId || "";
+        document.querySelector("#activity-research-minimum").value = activity.researchReport?.minimumWords || 25;
     }
 
     async function save() {

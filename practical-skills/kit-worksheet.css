@@ -1508,6 +1508,17 @@ body.kit-worksheet-page {
     justify-self: start;
 }
 
+.worksheet-research-report {
+    display: grid;
+    gap: 12px;
+}
+
+.worksheet-research-report-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
 @media print {
     .kit-worksheet-topbar,
     .worksheet-complete-bar,

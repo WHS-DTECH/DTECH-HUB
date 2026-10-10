@@ -7,6 +7,7 @@ const nodemailer = require("nodemailer");
 const { Pool } = require("pg");
 const { PASSWORD_PROBLEMS_ID, APPS_WORDSEARCH_ID, withShortLoginKit, withLoginAppsActivity, withLearningSitesActivity, withPasswordProblemsActivity, withLoginIdentityActivity, getStudentAssessment, gradePasswordProblems, gradeLoginIdentity, gradeAppsWordsearch } = require("./practical-skills-assessment");
 const { LEARNING_SITES_ID, getHuntProfile, gradeLearningSites } = require("./learning-sites-assessment");
+const { SEARCH_RESEARCH_REPORT_FILE_NAME, resolveResearchReportTemplateId, getResearchReportProgrammeFolder, gradeResearchReport } = require("./research-report");
 const { gradeLoginSites } = require("./practical-skills-assessment");
 const { validateLoginSites, publicLoginSites, visibleLoginSites } = require("./login-sites-config");
 
@@ -194,6 +195,8 @@ const memoryAssessmentStandardCards = new Map();
 const memoryStudentHaparaFolders = new Map();
 const memoryStudentDriveSetup = new Map();
 const memoryStudentLoginDriveSetup = new Map();
+const memoryStudentKitDocuments = new Map();
+const researchReportLocks = new Map();
 const memoryTemplateLibraryEntries = new Map();
 const memoryStudentToolsTechniques = new Map();
 const memoryToolsTechniquesKeywords = new Map();
@@ -5126,16 +5129,25 @@ const GOOGLE_SEARCH_CHALLENGE_INTRODUCTION = {
   ]
 };
 
+// The teacher's master Google Doc is copied for each student; templateId is set in the Kit Builder.
+const GOOGLE_SEARCH_RESEARCH_REPORT = {
+  id: "search-research-report-v1",
+  fileName: "Search Kit - My West Coast Discoveries",
+  templateId: "",
+  minimumWords: 25
+};
+
 // Only touches the "Google Search Challenge" activity; other Search Kit activities are left as they are.
 function addGoogleSearchChallenge(content) {
-  if (content?._contentMigrations?.googleSearchChallenge >= 1) return content;
+  const version = Number(content?._contentMigrations?.googleSearchChallenge) || 0;
+  if (version >= 2) return content;
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets.slice() : [];
   const challengeIndex = worksheets.findIndex((worksheet) =>
     String(worksheet?.activity || "").trim().toLowerCase() === "google search challenge");
   if (challengeIndex < 0) return content;
 
-  if (worksheets[challengeIndex].establishes === "Challenge\tUse Google independently to find information") {
+  if (version < 1 && worksheets[challengeIndex].establishes === "Challenge\tUse Google independently to find information") {
     worksheets[challengeIndex] = { ...worksheets[challengeIndex], establishes: "Use Google independently to find information" };
   }
   const activities = Array.isArray(content.activities) ? content.activities.slice() : [];
@@ -5145,8 +5157,12 @@ function addGoogleSearchChallenge(content) {
     : { title: worksheets[challengeIndex].activity };
   activities[challengeIndex] = {
     ...challenge,
-    information: challenge.information?.title ? challenge.information : GOOGLE_SEARCH_CHALLENGE_INTRODUCTION
+    information: version >= 1 || challenge.information?.title ? challenge.information : GOOGLE_SEARCH_CHALLENGE_INTRODUCTION,
+    researchReport: challenge.researchReport && typeof challenge.researchReport === "object"
+      ? { ...GOOGLE_SEARCH_RESEARCH_REPORT, ...challenge.researchReport }
+      : { ...GOOGLE_SEARCH_RESEARCH_REPORT }
   };
+  if (activities[challengeIndex].information === undefined) delete activities[challengeIndex].information;
 
   return {
     ...content,
@@ -5154,7 +5170,7 @@ function addGoogleSearchChallenge(content) {
     activities,
     _contentMigrations: {
       ...(content?._contentMigrations || {}),
-      googleSearchChallenge: 1
+      googleSearchChallenge: 2
     }
   };
 }
@@ -13681,7 +13697,7 @@ app.put("/api/practical-skills/progress/:kitId/activities/:activityIndex", async
     const siteQuestions = req.body.completed && activity?.loginSites &&
       visibleLoginSites(activity.loginSites, await getLearningSitesStudentProfile(studentEmail)).some((site) => site.readinessQuestion);
     if (req.body.completed && (activity?.assessmentId || activity?.identityLessonVersion ||
-        activity?.questionAutoMarkAssessmentId || siteQuestions)) {
+        activity?.questionAutoMarkAssessmentId || activity?.researchReport || siteQuestions)) {
       res.status(409).json({ error: "Complete the activity tasks, then check your answers to earn this activity tick." });
       return;
     }
@@ -13770,6 +13786,224 @@ app.post("/api/practical-skills/progress/:kitId/activities/:activityIndex/check"
     res.json({ ...grade, completedActivities: saved.completed_activities });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not check and save your activity." });
+  }
+});
+
+async function ensureStudentKitDocumentsSchema() {
+  if (!hasDatabase) return;
+  await pool.query(`CREATE TABLE IF NOT EXISTS student_kit_documents (
+    student_email TEXT NOT NULL,
+    kit_id TEXT NOT NULL,
+    document_key TEXT NOT NULL,
+    document_id TEXT NOT NULL,
+    folder_id TEXT,
+    template_id TEXT,
+    template_text TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (student_email, kit_id, document_key)
+  )`);
+}
+
+// Stored separately from kit progress so a kit reset never loses (or deletes) a student's Drive file.
+async function getStudentKitDocument(email, kitId, documentKey) {
+  const key = `${normalizeEmail(email)}:${kitId}:${documentKey}`;
+  if (!hasDatabase) return memoryStudentKitDocuments.get(key) || null;
+  await ensureStudentKitDocumentsSchema();
+  const result = await pool.query(
+    "SELECT document_id, folder_id, template_id, template_text FROM student_kit_documents WHERE student_email = $1 AND kit_id = $2 AND document_key = $3",
+    [normalizeEmail(email), kitId, documentKey]);
+  return result.rows?.[0] || null;
+}
+
+async function saveStudentKitDocument(email, kitId, documentKey, record) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!hasDatabase) {
+    memoryStudentKitDocuments.set(`${normalizedEmail}:${kitId}:${documentKey}`, { ...record });
+    return;
+  }
+  await ensureStudentKitDocumentsSchema();
+  await pool.query(`INSERT INTO student_kit_documents (student_email, kit_id, document_key, document_id, folder_id, template_id, template_text)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    ON CONFLICT (student_email, kit_id, document_key) DO UPDATE SET document_id = EXCLUDED.document_id,
+      folder_id = EXCLUDED.folder_id, template_id = EXCLUDED.template_id, template_text = EXCLUDED.template_text`,
+  [normalizedEmail, kitId, documentKey, record.document_id, record.folder_id || null, record.template_id || null, record.template_text || null]);
+}
+
+function googleDocUrl(documentId) {
+  return `https://docs.google.com/document/d/${encodeURIComponent(documentId)}/edit`;
+}
+
+async function verifyDriveTokenForStudent(driveAccessToken, email) {
+  const identityResponse = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+    headers: { Authorization: `Bearer ${driveAccessToken}` }
+  });
+  if (!identityResponse.ok) {
+    const error = new Error("Google sign-in expired. Sign in again and retry.");
+    error.status = 401;
+    throw error;
+  }
+  const identity = await identityResponse.json();
+  if (!identity.email_verified || normalizeEmail(identity.email) !== email) {
+    const error = new Error("Choose the same school Google account as your DTECH-HUB sign-in.");
+    error.status = 403;
+    throw error;
+  }
+}
+
+async function driveGetLiveFile(fileId, accessToken) {
+  if (!fileId) return null;
+  try {
+    const file = await driveApiRequest(`/files/${encodeURIComponent(fileId)}`, {
+      accessToken, queryParams: { fields: "id,name,trashed,mimeType", supportsAllDrives: true }
+    });
+    return file?.id && !file.trashed ? file : null;
+  } catch (error) {
+    if (error.status === 404 || error.status === 403) return null;
+    throw error;
+  }
+}
+
+async function exportGoogleDocText(documentId, accessToken) {
+  return (await driveDownloadExportedFile(documentId, "text/plain", accessToken)).toString("utf8");
+}
+
+async function loadResearchReportActivity(kitId, activityIndexText) {
+  const activityIndex = Number(activityIndexText);
+  if (!getPracticalSkillsKitDefinition(kitId) || !/^\d+$/.test(String(activityIndexText)) || !Number.isSafeInteger(activityIndex)) return null;
+  const content = await getStoredPracticalSkillsKitContent(kitId);
+  const activity = content?.activities?.[activityIndex];
+  if (!content?.worksheets?.[activityIndex] || !activity?.researchReport?.id) return null;
+  return { content, activity, activityIndex, report: activity.researchReport };
+}
+
+function researchReportStudentEmail(req, res) {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email || !email.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required." });
+    return "";
+  }
+  return email;
+}
+
+// Locates WHS-DTECH > JuniorDTECH/MiddleDTECH > KITS and reopens or copies the report. Never edits or deletes files.
+async function ensureStudentResearchReport(email, kitId, report, driveAccessToken) {
+  const existing = await getStudentKitDocument(email, kitId, report.id);
+  const liveExisting = existing?.document_id ? await driveGetLiveFile(existing.document_id, driveAccessToken) : null;
+  if (liveExisting) return { documentId: liveExisting.id, created: false };
+
+  const programmeFolder = getResearchReportProgrammeFolder(await getLearningSitesStudentProfile(email));
+  if (!programmeFolder) {
+    const error = new Error("We couldn't tell if you are in Junior or Middle DTECH. Ask your teacher to check your profile.");
+    error.status = 409;
+    throw error;
+  }
+  const savedRoot = await getStudentLoginDriveSetup(email);
+  const root = (savedRoot?.folder_id && await driveGetLiveFile(savedRoot.folder_id, driveAccessToken))
+    || await driveEnsureFolder("root", "WHS-DTECH", driveAccessToken);
+  if (!root?.id) throw new Error("Could not find or create your WHS-DTECH folder.");
+  const programme = await driveEnsureFolder(root.id, programmeFolder, driveAccessToken);
+  const kits = await driveEnsureFolder(programme.id, "KITS", driveAccessToken);
+  const fileName = String(report.fileName || SEARCH_RESEARCH_REPORT_FILE_NAME).trim() || SEARCH_RESEARCH_REPORT_FILE_NAME;
+
+  const found = await driveFindFileByNameInFolder(kits.id, fileName, driveAccessToken);
+  const templateId = resolveResearchReportTemplateId(report, process.env.SEARCH_KIT_REPORT_TEMPLATE_ID);
+  if (found?.id) {
+    await saveStudentKitDocument(email, kitId, report.id, {
+      document_id: found.id, folder_id: kits.id,
+      template_id: existing?.template_id || templateId,
+      template_text: existing?.template_text || (templateId ? await exportGoogleDocText(templateId, driveAccessToken).catch(() => "") : "")
+    });
+    return { documentId: found.id, created: false };
+  }
+
+  if (!templateId) {
+    const error = new Error("Your teacher hasn't connected the research report template yet. Ask your teacher for help.");
+    error.status = 409;
+    throw error;
+  }
+  let templateText;
+  try {
+    templateText = await exportGoogleDocText(templateId, driveAccessToken);
+  } catch (error) {
+    const friendly = new Error("We couldn't open your teacher's report template. Ask your teacher to check it is shared with students.");
+    friendly.status = 409;
+    throw friendly;
+  }
+  const copy = await driveCopyFile(templateId, kits.id, fileName, driveAccessToken);
+  if (!copy?.id) throw new Error("Could not create your research report. Please try again.");
+  await saveStudentKitDocument(email, kitId, report.id, { document_id: copy.id, folder_id: kits.id, template_id: templateId, template_text: templateText });
+  return { documentId: copy.id, created: true };
+}
+
+function withResearchReportLock(key, task) {
+  const previous = researchReportLocks.get(key) || Promise.resolve();
+  const next = previous.catch(() => {}).then(task);
+  const tracked = next.finally(() => { if (researchReportLocks.get(key) === tracked) researchReportLocks.delete(key); });
+  researchReportLocks.set(key, tracked);
+  return next;
+}
+
+app.get("/api/practical-skills/research-report/:kitId/:activityIndex", async (req, res) => {
+  const email = researchReportStudentEmail(req, res);
+  if (!email) return;
+  try {
+    const kitId = String(req.params.kitId || "").trim();
+    const loaded = await loadResearchReportActivity(kitId, req.params.activityIndex);
+    if (!loaded) { res.status(404).json({ error: "This activity does not have a research report." }); return; }
+    const record = await getStudentKitDocument(email, kitId, loaded.report.id);
+    res.json({
+      exists: Boolean(record?.document_id),
+      documentUrl: record?.document_id ? googleDocUrl(record.document_id) : null,
+      configured: Boolean(resolveResearchReportTemplateId(loaded.report, process.env.SEARCH_KIT_REPORT_TEMPLATE_ID))
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not load your research report." });
+  }
+});
+
+app.post("/api/practical-skills/research-report/:kitId/:activityIndex", async (req, res) => {
+  const email = researchReportStudentEmail(req, res);
+  if (!email) return;
+  const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
+  if (!driveAccessToken) { res.status(400).json({ error: "Google Drive permission is required." }); return; }
+  try {
+    const kitId = String(req.params.kitId || "").trim();
+    const loaded = await loadResearchReportActivity(kitId, req.params.activityIndex);
+    if (!loaded) { res.status(404).json({ error: "This activity does not have a research report." }); return; }
+    await verifyDriveTokenForStudent(driveAccessToken, email);
+    const result = await withResearchReportLock(`${email}:${kitId}:${loaded.report.id}`,
+      () => ensureStudentResearchReport(email, kitId, loaded.report, driveAccessToken));
+    res.json({ exists: true, created: result.created, documentUrl: googleDocUrl(result.documentId) });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not create your research report." });
+  }
+});
+
+app.post("/api/practical-skills/research-report/:kitId/:activityIndex/check", async (req, res) => {
+  const email = researchReportStudentEmail(req, res);
+  if (!email) return;
+  const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
+  if (!driveAccessToken) { res.status(400).json({ error: "Google Drive permission is required." }); return; }
+  try {
+    const kitId = String(req.params.kitId || "").trim();
+    const loaded = await loadResearchReportActivity(kitId, req.params.activityIndex);
+    if (!loaded) { res.status(404).json({ error: "This activity does not have a research report." }); return; }
+    await verifyDriveTokenForStudent(driveAccessToken, email);
+    const record = await getStudentKitDocument(email, kitId, loaded.report.id);
+    const liveFile = record?.document_id ? await driveGetLiveFile(record.document_id, driveAccessToken) : null;
+    if (!liveFile) {
+      res.status(409).json({ error: "We couldn't find your research report. Click Create My Research Report first." });
+      return;
+    }
+    let templateText = record.template_text || "";
+    if (!templateText && record.template_id) templateText = await exportGoogleDocText(record.template_id, driveAccessToken).catch(() => "");
+    const studentText = await exportGoogleDocText(liveFile.id, driveAccessToken);
+    const grade = gradeResearchReport(studentText, templateText, { minimumWords: loaded.report.minimumWords });
+    const saved = await savePracticalSkillsAssessment(email, kitId, loaded.activityIndex, grade);
+    await syncPracticalSkillsKitCompletion(email, kitId, loaded.content);
+    res.json({ ...grade, completedActivities: saved.completed_activities });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not check your research report." });
   }
 });
 

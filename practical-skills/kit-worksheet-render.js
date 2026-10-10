@@ -635,6 +635,74 @@
             (site.levels ? site.levels.length && (!level || site.levels.includes(level)) : !junior || site.group === "JuniorDTECH"));
     }
 
+    function wireResearchReport(host, options) {
+        const section = host.querySelector("[data-research-report]");
+        if (!section) return;
+        const openButton = section.querySelector("[data-research-report-open]");
+        const checkButton = section.querySelector("[data-research-report-check]");
+        const status = section.querySelector("[data-research-report-status]");
+        const setStatus = (message, kind = "") => {
+            status.textContent = message;
+            status.classList.toggle("is-error", kind === "error");
+            status.classList.toggle("is-correct", kind === "correct");
+        };
+        const showReport = (report) => {
+            const exists = Boolean(report?.exists && report.documentUrl);
+            openButton.textContent = exists ? "Open My Research Report" : "Create My Research Report";
+            checkButton.hidden = !exists;
+        };
+        const busy = (value) => { openButton.disabled = value; checkButton.disabled = value; };
+
+        if (options.onResearchReportStatus) {
+            options.onResearchReportStatus().then((report) => {
+                showReport(report);
+                setStatus(report?.exists
+                    ? "Your research report is ready. Open it to keep working, then click Check My Report."
+                    : report?.configured === false
+                        ? "Your teacher is still setting up the research report template."
+                        : "Click Create My Research Report to make your own copy in Google Docs.");
+            }).catch((error) => setStatus(error?.message || "Could not load your research report.", "error"));
+        }
+
+        openButton.addEventListener("click", async () => {
+            // Reserve the tab during the click so Google permission does not trigger popup blocking.
+            const reportTab = window.open("about:blank", "_blank");
+            if (reportTab) reportTab.opener = null;
+            busy(true);
+            setStatus("Getting your research report ready...");
+            try {
+                if (!options.onResearchReportOpen) throw new Error("Open the student activity to create your report.");
+                const report = await options.onResearchReportOpen();
+                if (!report?.documentUrl) throw new Error("Your research report could not be opened. Please try again.");
+                showReport(report);
+                if (reportTab && !reportTab.closed) reportTab.location.replace(report.documentUrl);
+                else window.open(report.documentUrl, "_blank", "noopener");
+                setStatus(report.created
+                    ? "Your research report has been created in your KITS folder. Add your research, then click Check My Report."
+                    : "Your research report is open in a new tab. Add your research, then click Check My Report.");
+            } catch (error) {
+                if (reportTab && !reportTab.closed) reportTab.close();
+                setStatus(error?.message || "Could not create your research report. Please try again.", "error");
+            } finally {
+                busy(false);
+            }
+        });
+
+        checkButton.addEventListener("click", async () => {
+            busy(true);
+            setStatus("Checking your research report...");
+            try {
+                if (!options.onResearchReportCheck) throw new Error("Open the student activity to check your report.");
+                const grade = await options.onResearchReportCheck();
+                setStatus(grade.feedback, grade.passed ? "correct" : "");
+            } catch (error) {
+                setStatus(error?.message || "Could not check your research report. Please try again.", "error");
+            } finally {
+                busy(false);
+            }
+        });
+    }
+
     function renderWorksheet(host, content, options = {}) {
         if (!host) return;
 
@@ -682,6 +750,18 @@
                 </section>
             ` : ""}
             ${imageInformationLayout ? `</div>` : ""}
+            ${content?.researchReport ? `
+                <section class="worksheet-assessment-intro worksheet-research-report" aria-labelledby="research-report-title" data-research-report>
+                    <h2 id="research-report-title">📝 My Research Report</h2>
+                    <p>Record what you discover about the West Coast in your own Google Doc. It is saved in your <strong>WHS-DTECH</strong> folder, inside your DTECH folder and <strong>KITS</strong>.</p>
+                    <p>When you have added your research, click <strong>Check My Report</strong> to earn your activity tick.</p>
+                    <div class="worksheet-research-report-actions">
+                        <button type="button" class="worksheet-btn worksheet-btn-primary" data-research-report-open ${readOnly ? "disabled" : ""}>Create My Research Report</button>
+                        <button type="button" class="worksheet-btn worksheet-btn-secondary" data-research-report-check ${readOnly ? "disabled" : ""} hidden>Check My Report</button>
+                    </div>
+                    <p class="worksheet-assessment-result" data-research-report-status role="status" aria-live="polite">${readOnly ? "Sign in with your school Google account to create your research report." : "Loading your research report..."}</p>
+                </section>
+            ` : ""}
             ${content?.assessment ? renderAssessment(content.assessment, options.assessmentAnswers || {}, readOnly) : ""}
             ${content?.loginSites ? `
                 <section class="worksheet-login-staircase" aria-labelledby="login-staircase-title">
@@ -740,7 +820,7 @@
                             ${content?.identityLessonVersion ? `<p class="worksheet-assessment-feedback" data-identity-feedback="${escapeHtml(question.id)}" role="status" aria-live="polite">Type your answer. We will check it against your school Google account.</p>` : ""}
                         </div>
                     </article>
-                `).join("") : content?.assessment || content?.loginSites ? "" : `<p class="worksheet-empty-note">This kit does not have any questions yet.</p>`}
+                `).join("") : content?.assessment || content?.loginSites || content?.researchReport ? "" : `<p class="worksheet-empty-note">This kit does not have any questions yet.</p>`}
             </div>
             ${content?.identityLessonVersion ? `<p class="worksheet-assessment-result" id="identity-result" role="status" aria-live="polite">${options.identityVerified ? "Google sign-in is ready. Click Check your answers to mark all four answers." : "Complete questions 1-4, verify your school email in step 5, then click Check your answers."}</p><button type="button" class="worksheet-btn worksheet-btn-primary" id="identity-retry" ${readOnly ? "disabled" : ""}>Check your answers</button>` : ""}
         `;
@@ -749,6 +829,8 @@
             wireLearningSites(host, content.assessment, { ...options, readOnly });
             if (readOnly) return;
         } else if (readOnly) return;
+
+        if (content?.researchReport) wireResearchReport(host, options);
 
         if (content?.loginSites) host.querySelectorAll("[data-site-check]").forEach((form) => {
             const inputs = form.querySelectorAll("input");

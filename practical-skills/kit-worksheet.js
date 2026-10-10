@@ -155,7 +155,7 @@
         const activity = state.content?.activities?.[index];
         const siteQuestions = window.KitWorksheetRender.visibleLoginSites(activity?.loginSites, state.huntProfile).some((site) => site.readinessQuestion);
         const selfMarking = Boolean(activity?.assessment || activity?.identityLessonVersion ||
-            activity?.questionAutoMarkAssessmentId || siteQuestions);
+            activity?.questionAutoMarkAssessmentId || activity?.researchReport || siteQuestions);
         pill.textContent = completed ? "Completed" : "Not Completed";
         pill.classList.toggle("is-complete", completed);
         if (completed) {
@@ -414,6 +414,19 @@
         host.classList.toggle("is-error", error);
     }
 
+    function researchReportPath(activityIndex) {
+        return `/api/practical-skills/research-report/${encodeURIComponent(state.kitId)}/${activityIndex}`;
+    }
+
+    async function getResearchReportDriveToken() {
+        if (!window.requestHubDriveAccessToken) throw new Error("Google sign-in is still loading. Wait a moment and try again.");
+        const email = state.email;
+        const token = await window.requestHubDriveAccessToken();
+        if (token?.error || !token?.access_token) throw new Error("Google Drive permission was not granted. Try again, or ask your teacher for help.");
+        if (getSignedInEmail() !== email) throw new Error("Your signed-in account changed. Reopen this activity with your school account.");
+        return token.access_token;
+    }
+
     function renderPage() {
         const host = document.getElementById("worksheet-host");
         if (!host || !state.content) return;
@@ -464,6 +477,7 @@
                 information: activity?.information,
                 loginSites: activity?.loginSites,
                 identityLessonVersion: activity?.identityLessonVersion,
+                researchReport: activity?.researchReport,
                 assessment: activity?.assessment
             } : state.content;
             const assessmentKey = `${activityIndex}-${activity?.assessment?.id || "login-sites-readiness-v1"}`;
@@ -475,6 +489,27 @@
                 identityVerified: Boolean(JSON.parse(getStoredAuthRaw() || "{}").idToken),
                 driveSetup: state.driveSetup,
                 huntProfile: state.huntProfile,
+                onResearchReportStatus: () => loadJson(researchReportPath(activityIndex), { headers: withAuthHeaders() }),
+                onResearchReportOpen: async () => loadJson(researchReportPath(activityIndex), {
+                    method: "POST",
+                    headers: withAuthHeaders({ "Content-Type": "application/json" }),
+                    body: JSON.stringify({ driveAccessToken: await getResearchReportDriveToken() })
+                }),
+                onResearchReportCheck: async () => {
+                    if (!state.progressLoaded) throw new Error("Your progress has not loaded. Refresh the page and try again.");
+                    const driveAccessToken = await getResearchReportDriveToken();
+                    return queueProgressWrite(async () => {
+                        const payload = await loadJson(`${researchReportPath(activityIndex)}/check`, {
+                            method: "POST",
+                            headers: withAuthHeaders({ "Content-Type": "application/json" }),
+                            body: JSON.stringify({ driveAccessToken })
+                        });
+                        state.responses[`${activityIndex}-${activity.researchReport.id}`] = payload.answers;
+                        state.completedActivities = payload.completedActivities;
+                        updateActivityCompleteBar();
+                        return payload;
+                    });
+                },
                 onDriveSetup: async () => {
                     if (!state.progressLoaded) throw new Error("Your progress has not loaded. Refresh the page and try again.");
                     if (!window.requestHubDriveAccessToken) throw new Error("Google sign-in is still loading. Wait a moment and try again.");

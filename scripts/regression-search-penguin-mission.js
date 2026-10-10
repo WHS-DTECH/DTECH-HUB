@@ -509,7 +509,26 @@ assert.deepEqual(JSON.parse(JSON.stringify(challengeMigrated.activities[4].infor
 }, "Google Search Challenge shows The Great West Coast Adventure introduction");
 assert.equal(challengeMigrated.worksheets[4].establishes, "Use Google independently to find information",
     "Stray 'Challenge' tab text is removed from the activity subtitle");
-assert.equal(challengeMigrated._contentMigrations.googleSearchChallenge, 1);
+assert.equal(challengeMigrated._contentMigrations.googleSearchChallenge, 2);
+assert.deepEqual(JSON.parse(JSON.stringify(challengeMigrated.activities[4].researchReport)), {
+    id: "search-research-report-v1",
+    fileName: "Search Kit - My West Coast Discoveries",
+    templateId: "",
+    minimumWords: 25
+}, "Google Search Challenge gets the research report settings");
+const versionOneChallenge = JSON.parse(JSON.stringify(challengeMigrated));
+versionOneChallenge._contentMigrations.googleSearchChallenge = 1;
+delete versionOneChallenge.activities[4].researchReport;
+versionOneChallenge.activities[4].information = { title: "Teacher intro", paragraphs: ["Kept"] };
+const versionTwoChallenge = context.addSearchKitPenguinMission(versionOneChallenge);
+assert.equal(versionTwoChallenge.activities[4].information.title, "Teacher intro", "v1 -> v2 keeps the introduction");
+assert.equal(versionTwoChallenge.activities[4].researchReport.id, "search-research-report-v1");
+assert.deepEqual(JSON.parse(JSON.stringify(versionTwoChallenge.activities.slice(0, 4))), JSON.parse(JSON.stringify(versionOneChallenge.activities.slice(0, 4))),
+    "Adding the research report leaves the first four activities unchanged");
+const teacherTemplateKit = JSON.parse(JSON.stringify(versionOneChallenge));
+teacherTemplateKit.activities[4].researchReport = { templateId: "https://docs.google.com/document/d/teacherTemplateId1234567890/edit" };
+assert.equal(context.addSearchKitPenguinMission(teacherTemplateKit).activities[4].researchReport.templateId,
+    "https://docs.google.com/document/d/teacherTemplateId1234567890/edit", "Teacher template link is preserved");
 assert.deepEqual(JSON.parse(JSON.stringify(challengeMigrated.activities.slice(0, 4))), JSON.parse(JSON.stringify(challengeKit.activities.slice(0, 4))),
     "Adding the Google Search Challenge introduction leaves the first four activities unchanged");
 assert.deepEqual(JSON.parse(JSON.stringify(challengeMigrated.worksheets.slice(0, 4))), JSON.parse(JSON.stringify(challengeKit.worksheets.slice(0, 4))));
@@ -791,6 +810,15 @@ renderContext.window.KitWorksheetRender.renderWorksheet(imageHost, {
     questions: [searchFindMissionOne, searchFindMissionTwo, searchFindMissionThree, searchFindMissionFour, searchFindMissionFive, keywordChallengeMissionFive, missionTwo, missionThree, missionFour, missionFive]
 }, { readOnly: true });
 assert.match(imageHost.innerHTML, /Photo: Duncan Wright/);
+const reportHost = { style: { setProperty() {} }, innerHTML: "", querySelectorAll() { return []; }, querySelector() { return null; } };
+renderContext.window.KitWorksheetRender.renderWorksheet(reportHost, {
+    bannerTitle: "Google Search Challenge",
+    researchReport: { id: "search-research-report-v1" },
+    questions: []
+}, { readOnly: true });
+assert.match(reportHost.innerHTML, /data-research-report-open disabled>Create My Research Report<\/button>/, "Research report Create button is rendered");
+assert.match(reportHost.innerHTML, /data-research-report-check disabled hidden>Check My Report<\/button>/, "Check My Report appears once a report exists");
+assert.doesNotMatch(reportHost.innerHTML, /does not have any questions yet/, "Research report activities do not show the empty-questions note");
 assert.match(imageHost.innerHTML, /href="https:\/\/commons\.wikimedia\.org\/wiki\/File:Blue_Penguin_Kapiti\.jpg"/, "Photo credit links to its source");
 assert.match(imageHost.innerHTML, /href="https:\/\/creativecommons\.org\/licenses\/by-sa\/3\.0\/"/, "Photo credit links to the CC BY-SA 3.0 license");
 assert.match(imageHost.innerHTML, /west-coast-tall-tree\.jpg/);
@@ -1050,7 +1078,7 @@ assert.match(serverSource, /!\["search-penguin-missions-v1", "search-keyword-cha
 assert.match(serverSource, /activity\.questionAutoMarkAssessmentId === "search-keyword-challenge-v1"[\s\S]{0,100}gradeSearchKeywordChallenge\(req\.body\.answers, activityIndex\)/, "Keyword Challenge answers are graded server-side");
 assert.match(serverSource, /activity\.questionAutoMarkAssessmentId === SEARCH_RESULTS_DETECTIVE_ID[\s\S]{0,100}gradeSearchResultsDetective\(req\.body\.answers, activityIndex\)/, "Search Results Detective answers are graded server-side");
 assert.match(serverSource, /grade\.assessmentId === "search-penguin-missions-v1" \|\|\s*grade\.assessmentId === "search-keyword-challenge-v1" \|\|\s*grade\.assessmentId === SEARCH_RESULTS_DETECTIVE_ID \|\|\s*grade\.assessmentId === SEARCH_AND_FIND_ID/, "Search Results Detective answers are merged into saved question responses");
-assert.match(serverSource, /if \(req\.body\.completed && \(activity\?\.assessmentId \|\| activity\?\.identityLessonVersion \|\|\s*activity\?\.questionAutoMarkAssessmentId \|\| siteQuestions\)\)/, "Manual completion cannot bypass Search Kit auto-marking");
+assert.match(serverSource, /if \(req\.body\.completed && \(activity\?\.assessmentId \|\| activity\?\.identityLessonVersion \|\|\s*activity\?\.questionAutoMarkAssessmentId \|\| activity\?\.researchReport \|\| siteQuestions\)\)/, "Manual completion cannot bypass Search Kit auto-marking");
 assert.match(worksheetSource, /function scheduleSearchActivityAutoMark\(activityIndex, assessmentId\)/, "Student worksheet automatically checks complete self-marked activity answers");
 assert.match(worksheetSource, /scheduleSearchActivityAutoMark\(activityIndex, activity\.questionAutoMarkAssessmentId\)/, "Answer changes trigger automatic marking");
 assert.match(worksheetSource, /function scheduleSearchChoiceCheck\(activityIndex, assessmentId, questionId\)/,
