@@ -205,6 +205,7 @@
         });
 
         return {
+            ...(state.content || {}),
             kitId: state.kitId,
             identity: {
                 name: nameInput.value,

@@ -39,6 +39,10 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   Hidden worksheets do not appear to students or count toward kit completion.
 - Implemented: the Kit Worksheets editor includes a saved Interactive element
   field after What it establishes; student activity cards display this detail.
+- Implemented: Search Like a Pro Mission 1 is the Penguin Mystery. Students
+  search with any search engine for another name for New Zealand's little blue
+  penguin, with a local illustration; the old Google-open confirmation is
+  removed and does not count as evidence.
 - Implemented: the Kit Worksheets editor displays a teacher suggestion to
   structure the first activities as foundational skills, middle activities as
   applied skills, and final activities as integrated challenges.

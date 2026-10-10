@@ -4411,6 +4411,65 @@ const DEFAULT_PRACTICAL_SKILLS_KIT_CONTENT = {
   }
 };
 
+function addSearchKitPenguinMission(content) {
+  if (content?._contentMigrations?.searchPenguinMission >= 1) return content;
+
+  const worksheets = Array.isArray(content?.worksheets) ? content.worksheets.slice() : [];
+  if (!worksheets[0]) worksheets[0] = { number: 1, activity: "Search Like a Pro", establishes: "Understands search engines and keywords" };
+  const activities = Array.isArray(content?.activities) ? content.activities.slice() : [];
+  const activity = activities[0] && typeof activities[0] === "object" ? activities[0] : {};
+  const questions = (Array.isArray(activity.questions) ? activity.questions : []).flatMap((question) => {
+    if (!question || typeof question !== "object") return [];
+    if (question.type === "checklist" && Array.isArray(question.options)) {
+      const options = question.options.filter((option) => !/i have opened google/i.test(String(option)));
+      if (!options.length && question.options.length) return [];
+      return [{ ...question, options }];
+    }
+    if (/i have opened google|find google/i.test(String(question.prompt || ""))) return [];
+    return [question];
+  });
+  if (!questions.some((question) => question.id === "search-penguin-name")) {
+    questions.push({
+      id: "search-penguin-name",
+      type: "short-answer",
+      prompt: "What is another name for New Zealand's little blue penguin?",
+      lines: 1
+    });
+  }
+
+  const imageUrl = "/practical-skills/images/little-blue-penguin.svg";
+  const images = Array.isArray(activity.images) ? activity.images.slice() : [];
+  if (!images.some((image) => image?.url === imageUrl)) {
+    images.push({
+      url: imageUrl,
+      alt: "Illustration of a little blue penguin standing on a rock.",
+      caption: "New Zealand's little blue penguin"
+    });
+  }
+
+  activities[0] = {
+    ...activity,
+    questions,
+    images,
+    information: {
+      title: "Mission 1: The Penguin Mystery",
+      paragraphs: [
+        "Use a search engine of your choice to find another name for New Zealand's little blue penguin. Google is one example; Bing or another search engine is fine."
+      ]
+    }
+  };
+
+  return {
+    ...content,
+    worksheets,
+    activities,
+    _contentMigrations: {
+      ...(content?._contentMigrations || {}),
+      searchPenguinMission: 1
+    }
+  };
+}
+
 function normalizePracticalSkillsKitContentForStorage(kitId, content) {
   const safeContent = withShortLoginKit(kitId, withLearningSitesActivity(kitId, withLoginAppsActivity(kitId, withLoginIdentityActivity(kitId, withPasswordProblemsActivity(kitId, content && typeof content === "object" ? content : {})))));
   if (String(kitId || "").trim() !== "kit-login") {
@@ -4431,6 +4490,7 @@ function normalizePracticalSkillsKitContentForDisplay(kitId, content) {
     identity: _identity,
     learning: _learning,
     completion: _completion,
+    _contentMigrations: _contentMigrations,
     ...studentContent
   } = safeContent;
   return {
@@ -4485,7 +4545,12 @@ async function getStoredPracticalSkillsKitContent(kitId) {
 
   if (!hasDatabase) {
     const stored = memoryPracticalSkillsKitContent.get(safeKitId);
-    return withShortLoginKit(safeKitId, withLearningSitesActivity(safeKitId, withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, stored || getDefaultPracticalSkillsKitContent(safeKitId))))));
+    let content = stored || getDefaultPracticalSkillsKitContent(safeKitId);
+    if (safeKitId === "kit-google-search") {
+      content = addSearchKitPenguinMission(content);
+      if (stored) memoryPracticalSkillsKitContent.set(safeKitId, content);
+    }
+    return withShortLoginKit(safeKitId, withLearningSitesActivity(safeKitId, withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, content)))));
   }
 
   await ensurePracticalSkillsKitContentSchema();
@@ -4493,12 +4558,23 @@ async function getStoredPracticalSkillsKitContent(kitId) {
   const stored = result.rows?.[0]?.content;
   const defaults = getDefaultPracticalSkillsKitContent(safeKitId);
   if (!stored || !Object.keys(stored).length) {
-    return withShortLoginKit(safeKitId, withLearningSitesActivity(safeKitId, withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, defaults)))));
+    const content = safeKitId === "kit-google-search" ? addSearchKitPenguinMission(defaults) : defaults;
+    return withShortLoginKit(safeKitId, withLearningSitesActivity(safeKitId, withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, content)))));
   }
 
-  const merged = { ...defaults, ...stored };
+  let merged = { ...defaults, ...stored };
   if (safeKitId === "kit-login" && (!Array.isArray(stored.worksheets) || !stored.worksheets.length)) {
     merged.worksheets = defaults.worksheets;
+  }
+  if (safeKitId === "kit-google-search") {
+    const migrated = addSearchKitPenguinMission(merged);
+    if (migrated !== merged) {
+      merged = migrated;
+      await pool.query(
+        `UPDATE practical_skills_kit_content SET content = $1::jsonb, updated_at = NOW() WHERE kit_id = $2`,
+        [JSON.stringify(merged), safeKitId]
+      );
+    }
   }
   return withShortLoginKit(safeKitId, withLearningSitesActivity(safeKitId, withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, merged)))));
 }
