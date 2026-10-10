@@ -5115,9 +5115,53 @@ function addSearchKitKeywordChallenge(content) {
   };
 }
 
+const GOOGLE_SEARCH_CHALLENGE_INTRODUCTION = {
+  title: "🏆 THE MISSION: The Great West Coast Adventure!",
+  paragraphs: [
+    "You've been asked to help a visitor explore the amazing West Coast!",
+    "They want to see interesting places, discover something unusual and enjoy a great day out.",
+    "Your challenge is to use a search engine to help them plan their adventure.",
+    "There are five missions to complete. You can use any search engine you like.",
+    "Ready to become a West Coast Search Champion?"
+  ]
+};
+
+// Only touches the "Google Search Challenge" activity; other Search Kit activities are left as they are.
+function addGoogleSearchChallenge(content) {
+  if (content?._contentMigrations?.googleSearchChallenge >= 1) return content;
+
+  const worksheets = Array.isArray(content?.worksheets) ? content.worksheets.slice() : [];
+  const challengeIndex = worksheets.findIndex((worksheet) =>
+    String(worksheet?.activity || "").trim().toLowerCase() === "google search challenge");
+  if (challengeIndex < 0) return content;
+
+  if (worksheets[challengeIndex].establishes === "Challenge\tUse Google independently to find information") {
+    worksheets[challengeIndex] = { ...worksheets[challengeIndex], establishes: "Use Google independently to find information" };
+  }
+  const activities = Array.isArray(content.activities) ? content.activities.slice() : [];
+  while (activities.length < challengeIndex) activities.push(null);
+  const challenge = activities[challengeIndex] && typeof activities[challengeIndex] === "object"
+    ? activities[challengeIndex]
+    : { title: worksheets[challengeIndex].activity };
+  activities[challengeIndex] = {
+    ...challenge,
+    information: challenge.information?.title ? challenge.information : GOOGLE_SEARCH_CHALLENGE_INTRODUCTION
+  };
+
+  return {
+    ...content,
+    worksheets,
+    activities,
+    _contentMigrations: {
+      ...(content?._contentMigrations || {}),
+      googleSearchChallenge: 1
+    }
+  };
+}
+
 function addSearchKitPenguinMission(content) {
   if (content?._contentMigrations?.searchPenguinMission >= 11) {
-    return addSearchResultsDetectiveIntroduction(addSearchKitKeywordChallenge(content));
+    return addGoogleSearchChallenge(addSearchResultsDetectiveIntroduction(addSearchKitKeywordChallenge(content)));
   }
 
   const worksheets = Array.isArray(content?.worksheets) ? content.worksheets.slice() : [];
@@ -5276,7 +5320,7 @@ function addSearchKitPenguinMission(content) {
     }
   };
 
-  return addSearchResultsDetectiveIntroduction(addSearchKitKeywordChallenge({
+  return addGoogleSearchChallenge(addSearchResultsDetectiveIntroduction(addSearchKitKeywordChallenge({
     ...content,
     worksheets,
     activities,
@@ -5284,7 +5328,7 @@ function addSearchKitPenguinMission(content) {
       ...(content?._contentMigrations || {}),
       searchPenguinMission: 11
     }
-  }));
+  })));
 }
 
 function normalizePracticalSkillsKitContentForStorage(kitId, content) {

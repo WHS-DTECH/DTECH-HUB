@@ -491,6 +491,33 @@ assert.deepEqual(Array.from(timelineGlacier.images, (image) => image.timelineYea
     "Version 17 glacier photos are upgraded to the timeline");
 assert.deepEqual(JSON.parse(JSON.stringify(timelineKit.activities[1])), JSON.parse(JSON.stringify(versionSeventeenKit.activities[1])),
     "Glacier timeline upgrade leaves The Keyword Challenge unchanged");
+
+// The Great West Coast Adventure introduction is added to the Google Search Challenge only.
+const challengeKit = JSON.parse(JSON.stringify(timelineKit));
+delete challengeKit._contentMigrations.googleSearchChallenge;
+challengeKit.worksheets.push({ number: 5, activity: "Google Search Challenge", establishes: "Challenge\tUse Google independently to find information" });
+const challengeMigrated = context.addSearchKitPenguinMission(challengeKit);
+assert.deepEqual(JSON.parse(JSON.stringify(challengeMigrated.activities[4].information)), {
+    title: "🏆 THE MISSION: The Great West Coast Adventure!",
+    paragraphs: [
+        "You've been asked to help a visitor explore the amazing West Coast!",
+        "They want to see interesting places, discover something unusual and enjoy a great day out.",
+        "Your challenge is to use a search engine to help them plan their adventure.",
+        "There are five missions to complete. You can use any search engine you like.",
+        "Ready to become a West Coast Search Champion?"
+    ]
+}, "Google Search Challenge shows The Great West Coast Adventure introduction");
+assert.equal(challengeMigrated.worksheets[4].establishes, "Use Google independently to find information",
+    "Stray 'Challenge' tab text is removed from the activity subtitle");
+assert.equal(challengeMigrated._contentMigrations.googleSearchChallenge, 1);
+assert.deepEqual(JSON.parse(JSON.stringify(challengeMigrated.activities.slice(0, 4))), JSON.parse(JSON.stringify(challengeKit.activities.slice(0, 4))),
+    "Adding the Google Search Challenge introduction leaves the first four activities unchanged");
+assert.deepEqual(JSON.parse(JSON.stringify(challengeMigrated.worksheets.slice(0, 4))), JSON.parse(JSON.stringify(challengeKit.worksheets.slice(0, 4))));
+assert.equal(context.addSearchKitPenguinMission(challengeMigrated), challengeMigrated, "Google Search Challenge migration runs once");
+const teacherChallengeKit = JSON.parse(JSON.stringify(challengeKit));
+teacherChallengeKit.activities[4] = { title: "Google Search Challenge", information: { title: "Teacher intro", paragraphs: ["Mine"] } };
+assert.equal(context.addSearchKitPenguinMission(teacherChallengeKit).activities[4].information.title, "Teacher intro",
+    "Teacher-written Google Search Challenge introductions are preserved");
 assert.equal(timelineKit._contentMigrations.searchKeywordChallenge, 18);
 
 const teacherGlacierKit = JSON.parse(JSON.stringify(versionSeventeenKit));
@@ -1018,7 +1045,7 @@ assert.match(worksheetCss, /@media\s*\(max-width:\s*560px\)\s*\{[\s\S]*?\.worksh
 assert.match(builderSource, /\.\.\.\(state\.content \|\| \{\}\)/, "Kit Builder retains the migration marker when saving");
 assert.match(serverSource, /UPDATE practical_skills_kit_content SET content = \$1::jsonb, updated_at = NOW\(\) WHERE kit_id = \$2/, "Migrated mission is persisted for existing saved kits");
 assert.match(serverSource, /if \(safeKitId === "kit-google-search"\) \{\s*const migrated = addSearchKitPenguinMission\(merged\);/, "Migration applies to existing Search Kit content");
-assert.match(serverSource, /if \(content\?\._contentMigrations\?\.searchPenguinMission >= 11\) \{\s*return addSearchResultsDetectiveIntroduction\(addSearchKitKeywordChallenge\(content\)\);\s*\}/, "Saved migration marker preserves existing missions while applying activity introductions");
+assert.match(serverSource, /if \(content\?\._contentMigrations\?\.searchPenguinMission >= 11\) \{\s*return addGoogleSearchChallenge\(addSearchResultsDetectiveIntroduction\(addSearchKitKeywordChallenge\(content\)\)\);\s*\}/, "Saved migration marker preserves existing missions while applying activity introductions");
 assert.match(serverSource, /!\["search-penguin-missions-v1", "search-keyword-challenge-v1", SEARCH_RESULTS_DETECTIVE_ID, SEARCH_AND_FIND_ID\]\.includes\(activity\?\.questionAutoMarkAssessmentId\)/, "Search Results Detective auto-marking is accepted by the server");
 assert.match(serverSource, /activity\.questionAutoMarkAssessmentId === "search-keyword-challenge-v1"[\s\S]{0,100}gradeSearchKeywordChallenge\(req\.body\.answers, activityIndex\)/, "Keyword Challenge answers are graded server-side");
 assert.match(serverSource, /activity\.questionAutoMarkAssessmentId === SEARCH_RESULTS_DETECTIVE_ID[\s\S]{0,100}gradeSearchResultsDetective\(req\.body\.answers, activityIndex\)/, "Search Results Detective answers are graded server-side");
