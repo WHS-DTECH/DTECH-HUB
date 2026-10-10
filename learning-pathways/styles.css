@@ -1,0 +1,29 @@
+.pathways-editor-fields {
+    border: 0;
+    padding: 0;
+    margin: 0;
+    min-width: 0;
+}
+
+.pathways-card-list {
+    display: grid;
+    gap: 12px;
+    list-style: none;
+    padding: 0;
+}
+
+.pathways-card-list li {
+    background: #edf4fa;
+    border: 1px solid #cbd9e8;
+    border-radius: 10px;
+    padding: 14px;
+    overflow-wrap: anywhere;
+}
+
+.pathways-card-list h3 {
+    margin-top: 0;
+}
+
+.pathways-card-list .button {
+    margin-right: 8px;
+}

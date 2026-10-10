@@ -6030,6 +6030,7 @@ app.get("/practical-skills/library.json", async (_req, res) => {
     res.status(500).json({ error: "Could not load Practical Skills library" });
   }
 });
+require("./learning-pathways/library-store").registerLearningPathways(app, { pool, hasDatabase, requireAdminAccess });
 app.use(express.static(__dirname));
 
 function normalizeEvidenceStepsPayload(value) {

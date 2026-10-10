@@ -1,0 +1,110 @@
+"use strict";
+
+const fs = require("node:fs/promises");
+const path = require("node:path");
+const seedFile = path.join(__dirname, "library.json");
+const statuses = ["active", "planning", "archive"];
+
+function validLink(value, allowEmpty = false) {
+    if (!value) return allowEmpty;
+    if (value.startsWith("/") && !value.startsWith("//") && !/[\\\s]/.test(value)) return true;
+    try {
+        const url = new URL(value);
+        return ["http:", "https:"].includes(url.protocol);
+    } catch {
+        return false;
+    }
+}
+
+function normalizeCards(cards) {
+    if (!Array.isArray(cards)) throw new Error("A cards array is required.");
+    const ids = new Set();
+    return cards.map((card, index) => {
+        const text = (value, limit) => {
+            if (value != null && typeof value !== "string") throw new Error(`Card ${index + 1} fields must be text.`);
+            const result = (value || "").trim();
+            if (result.length > limit) throw new Error(`Card ${index + 1} has a field that is too long.`);
+            return result;
+        };
+        const title = text(card?.title, 120);
+        const summary = text(card?.summary, 600);
+        const id = text(card?.id, 120) || title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+        const href = text(card?.href, 300);
+        const imageUrl = text(card?.imageUrl, 300);
+        const status = text(card?.status, 20) || "active";
+        if (!title || !summary || !id || !href) throw new Error(`Card ${index + 1} requires a title, summary and link.`);
+        if (ids.has(id)) throw new Error(`Duplicate card ID: ${id}`);
+        if (!statuses.includes(status)) throw new Error(`Card ${index + 1} has an invalid status.`);
+        if (!validLink(href) || !validLink(imageUrl, true)) throw new Error(`Card ${index + 1} links must be site paths or HTTP(S) URLs.`);
+        ids.add(id);
+        return {
+            id, title, summary, href, imageUrl, status,
+            yearLevel: text(card?.yearLevel, 60) || "All Years",
+            area: text(card?.area, 60) || "Learning Pathways",
+            visual: { icon: text(card?.visual?.icon, 12) || "LP" }
+        };
+    });
+}
+
+function registerLearningPathways(app, { pool, hasDatabase, requireAdminAccess }) {
+    async function ensureSchema() {
+        await pool.query(`CREATE TABLE IF NOT EXISTS learning_pathways_library_store (
+            id TEXT PRIMARY KEY, cards JSONB NOT NULL DEFAULT '[]'::jsonb,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+    }
+
+    async function readCards() {
+        if (!hasDatabase) return normalizeCards(JSON.parse(await fs.readFile(seedFile, "utf8")));
+        await ensureSchema();
+        const result = await pool.query("SELECT cards FROM learning_pathways_library_store WHERE id = 'default'");
+        if (result.rows.length) return normalizeCards(result.rows[0].cards);
+        const seed = normalizeCards(JSON.parse(await fs.readFile(seedFile, "utf8")));
+        await pool.query(`INSERT INTO learning_pathways_library_store (id, cards) VALUES ('default', $1::jsonb)
+            ON CONFLICT (id) DO NOTHING`, [JSON.stringify(seed)]);
+        const initialized = await pool.query("SELECT cards FROM learning_pathways_library_store WHERE id = 'default'");
+        return normalizeCards(initialized.rows[0].cards);
+    }
+
+    async function writeCards(cards) {
+        if (!hasDatabase) {
+            await fs.writeFile(seedFile, `${JSON.stringify(cards, null, 2)}\n`, "utf8");
+            return;
+        }
+        await ensureSchema();
+        await pool.query(`INSERT INTO learning_pathways_library_store (id, cards) VALUES ('default', $1::jsonb)
+            ON CONFLICT (id) DO UPDATE SET cards = EXCLUDED.cards, updated_at = NOW()`, [JSON.stringify(cards)]);
+    }
+
+    const load = (admin) => async (_req, res) => {
+        try {
+            const cards = await readCards();
+            res.set("Cache-Control", "no-store");
+            res.json(admin ? { cards } : cards);
+        } catch (error) {
+            console.error("Could not load Learning Pathways library", error);
+            res.status(500).json({ error: "Could not load Learning Pathways. Please try again." });
+        }
+    };
+    app.get("/learning-pathways/library.json", load(false));
+    app.get("/api/learning-pathways/library", load(false));
+    app.get("/api/admin/learning-pathways/library", requireAdminAccess, load(true));
+    app.put("/api/admin/learning-pathways/library", requireAdminAccess, async (req, res) => {
+        let cards;
+        try {
+            cards = normalizeCards(req.body?.cards);
+        } catch (error) {
+            res.status(400).json({ error: error.message });
+            return;
+        }
+        try {
+            await writeCards(cards);
+            res.json({ ok: true, cards, count: cards.length });
+        } catch (error) {
+            console.error("Could not publish Learning Pathways library", error);
+            res.status(500).json({ error: "Could not publish Learning Pathways. Your changes have not been saved." });
+        }
+    });
+}
+
+module.exports = { registerLearningPathways, normalizeCards };

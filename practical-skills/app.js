@@ -1,7 +1,10 @@
 (function () {
     "use strict";
 
-    const dataPath = "/practical-skills/library.json";
+    const config = document.querySelector("[data-library-path]")?.dataset || {};
+    const dataPath = config.libraryPath || "/practical-skills/library.json";
+    const libraryName = config.libraryName || "practical skills";
+    const isPathways = Boolean(config.libraryPath);
     const featuredChecklistId = "practical-skills-checklist";
     const grid = document.getElementById("practical-skills-grid");
     const meta = document.getElementById("practical-skills-results-meta");
@@ -126,8 +129,8 @@
         card.rel = "";
         card.setAttribute("aria-label", `Open ${String(item.title || "Practical Skill")}`);
 
-        const icon = String(item?.visual?.icon || "PS").trim() || "PS";
-        const palette = String(item?.visual?.palette || "linear-gradient(135deg, #2f8f61 0%, #3ca873 54%, #65c494 100%)");
+        const icon = String(item?.visual?.icon || config.libraryIcon || "PS").trim() || "PS";
+        const palette = String(item?.visual?.palette || config.libraryPalette || "linear-gradient(135deg, #2f8f61 0%, #3ca873 54%, #65c494 100%)");
         const imageUrl = String(item.imageUrl || "").trim();
         const hasImage = imageUrl.length > 0;
         const visualStyle = hasImage ? "" : `style=\"background: ${escapeHtml(palette)};\"`;
@@ -150,7 +153,7 @@
                     <span class="project-tag">${escapeHtml(item.area || "Licence")}</span>
                 </div>
                 <div class="project-footer">
-                    <span class="project-meta">PRACTICAL SKILL</span>
+                    <span class="project-meta">${escapeHtml(config.libraryCardLabel || "PRACTICAL SKILL")}</span>
                 </div>
             </div>
         `;
@@ -174,8 +177,8 @@
             emptyState.className = "about-card";
             emptyState.innerHTML = `
                 <p class="section-kicker">No Results</p>
-                <h2>No practical skills matched that search.</h2>
-                <p>Try a different keyword or reset the filters back to All.</p>
+                <h2>${isPathways && !library.length ? "Learning pathways are coming soon." : `No ${escapeHtml(libraryName)} matched that search.`}</h2>
+                <p>${isPathways && !library.length ? "Pathway cards will appear here when they are published." : "Try a different keyword or reset the filters back to All."}</p>
             `;
             grid.appendChild(emptyState);
             grid.style.display = "";
@@ -213,15 +216,30 @@
         try {
             const response = await fetch(dataPath, { cache: "no-store" });
             if (!response.ok) {
-                throw new Error("Could not load practical skills library.");
+                throw new Error(`Could not load ${libraryName} library.`);
             }
 
             const payload = await response.json();
-            library = Array.isArray(payload)
-                ? payload.filter((item) => String(item?.id || "") !== featuredChecklistId)
-                : [];
-        } catch (_error) {
-            library = [];
+            if (!Array.isArray(payload)) throw new Error("The library response must be a card list.");
+            library = payload.filter((item) => isPathways || String(item?.id || "") !== featuredChecklistId);
+        } catch (error) {
+            console.error(`Could not load ${libraryName}`, error);
+            if (meta) meta.textContent = "Library could not be loaded.";
+            if (grid) {
+                grid.replaceChildren();
+                const notice = document.createElement("div");
+                notice.className = "about-card";
+                const text = document.createElement("p");
+                text.textContent = `Could not load ${libraryName}. Please try again.`;
+                const retry = document.createElement("button");
+                retry.type = "button";
+                retry.className = "button button-secondary";
+                retry.textContent = "Retry loading library";
+                retry.addEventListener("click", loadPracticalSkillsLibrary);
+                notice.append(text, retry);
+                grid.appendChild(notice);
+            }
+            return;
         }
 
         populateFilters();
