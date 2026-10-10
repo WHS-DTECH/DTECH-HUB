@@ -12,6 +12,41 @@
             .replace(/'/g, "&#039;");
     }
 
+    function renderInstructions(instructions) {
+        const text = String(instructions || "");
+        const allMarkers = Array.from(text.matchAll(/\b(\d+)\.\s+/g));
+        const firstListMarkerIndex = allMarkers.findIndex((marker, index) =>
+            marker[1] === "1" && allMarkers[index + 1]?.[1] === "2");
+        if (firstListMarkerIndex < 0) return `<p>${escapeHtml(text)}</p>`;
+        const markers = allMarkers.slice(firstListMarkerIndex);
+        let sequentialCount = 1;
+        while (sequentialCount < markers.length &&
+            Number(markers[sequentialCount][1]) === sequentialCount + 1) {
+            sequentialCount += 1;
+        }
+        if (sequentialCount < 2) return `<p>${escapeHtml(text)}</p>`;
+        markers.length = sequentialCount;
+
+        const firstMarker = markers[0].index;
+        const prefix = text.slice(0, firstMarker).trim();
+        const items = markers.map((marker, index) => {
+            const start = marker.index + marker[0].length;
+            const end = markers[index + 1]?.index ?? text.length;
+            return text.slice(start, end).trim();
+        });
+        const finalItemParts = items[items.length - 1].split(/(?<=[.!?])\s+(?=[A-Z])/, 2);
+        items[items.length - 1] = finalItemParts[0];
+        const suffix = finalItemParts[1] || "";
+
+        return `
+            ${prefix ? `<p>${escapeHtml(prefix)}</p>` : ""}
+            <ol class="worksheet-instructions-list">
+                ${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+            </ol>
+            ${suffix ? `<p>${escapeHtml(suffix)}</p>` : ""}
+        `;
+    }
+
     function safeExternalUrl(value) {
         try {
             const url = new URL(String(value || ""));
@@ -619,7 +654,7 @@
             ${content?.instructions ? `
                 <div class="worksheet-instructions">
                     <span class="worksheet-instructions-icon" aria-hidden="true">\u270f\ufe0f</span>
-                    <p>${escapeHtml(content.instructions)}</p>
+                   <div class="worksheet-instructions-copy">${renderInstructions(content.instructions)}</div>
                 </div>
             ` : ""}
             ${imageInformationLayout ? `<div class="worksheet-image-information-layout">` : ""}
@@ -861,7 +896,7 @@
             ${content?.instructions ? `
                 <div class="worksheet-instructions">
                     <span class="worksheet-instructions-icon" aria-hidden="true">\u270f\ufe0f</span>
-                    <p>${escapeHtml(content.instructions)}</p>
+                    <div class="worksheet-instructions-copy">${renderInstructions(content.instructions)}</div>
                 </div>
             ` : ""}
             <section class="worksheet-activities" aria-labelledby="worksheet-activities-title">

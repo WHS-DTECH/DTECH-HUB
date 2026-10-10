@@ -516,6 +516,8 @@ assert.ok(fs.existsSync(clockTowerImage), "Clock Tower photo is stored locally")
 
 assert.match(renderSource, /content\?\.information/, "Student worksheet renders the mission information heading");
 assert.match(renderSource, /images\.map\(\(image\)/, "Student worksheet renders the penguin image");
+assert.equal((renderSource.match(/renderInstructions\(content\.instructions\)/g) || []).length, 2,
+    "Kit overview and activity pages both render structured instructions");
 assert.match(renderSource, /querySelectorAll\("\.worksheet-choice-bubble, \.worksheet-search-result"\)\.forEach\(\(button\) => \{\s*button\.addEventListener\("click"/,
     "Search-result cards and standard choices both save selections on click");
 assert.match(renderSource, /sibling\.setAttribute\("aria-pressed", String\(selected\)\)/,
@@ -633,6 +635,40 @@ assert.match(docTrackHost.innerHTML, /Real-world search/);
 assert.match(worksheetCss, /\.worksheet-search-result-list\s*\{[^}]*display:\s*grid;/, "Simulated search results render in a clear card layout");
 assert.match(worksheetCss, /\.worksheet-search-result::before\s*\{[^}]*counter\(search-result\)/, "Simulated search result cards receive numbered visual markers");
 assert.match(worksheetCss, /\.worksheet-question--real-search \.worksheet-choice-bubble\.is-selected\s*\{[^}]*background:\s*#32764d;/, "Real-world mission choices use a distinct selected style");
+const instructions = "Welcome to the Search Kit! Complete five activities. 1. Read the information in each activity. 2. Follow the instructions and try the examples. 3. Complete the questions and search challenges. 4. Ask your teacher for help if you get stuck. 5. Finish all five activities to earn your Search Kit stamp! Remember: You do not need to know everything.";
+const instructionHost = {
+    style: { setProperty() {} },
+    innerHTML: "",
+    querySelectorAll() { return []; },
+    querySelector() { return null; }
+};
+renderContext.window.KitWorksheetRender.renderWorksheet(instructionHost, {
+    bannerTitle: "Search Kit",
+    instructions,
+    questions: []
+}, { readOnly: true });
+assert.match(instructionHost.innerHTML, /<p>Welcome to the Search Kit! Complete five activities\.<\/p>/);
+assert.match(instructionHost.innerHTML, /<ol class="worksheet-instructions-list">/);
+assert.match(instructionHost.innerHTML, /<li>Read the information in each activity\.<\/li>/);
+assert.match(instructionHost.innerHTML, /<li>Follow the instructions and try the examples\.<\/li>/);
+assert.match(instructionHost.innerHTML, /<li>Complete the questions and search challenges\.<\/li>/);
+assert.match(instructionHost.innerHTML, /<li>Ask your teacher for help if you get stuck\.<\/li>/);
+assert.match(instructionHost.innerHTML, /<li>Finish all five activities to earn your Search Kit stamp!<\/li>/);
+assert.match(instructionHost.innerHTML, /<p>Remember: You do not need to know everything\.<\/p>/);
+assert.match(worksheetCss, /\.worksheet-instructions-list\s*\{[^}]*display:\s*grid;/);
+const overviewHost = {
+    style: { setProperty() {} },
+    innerHTML: "",
+    querySelectorAll() { return []; },
+    querySelector() { return null; }
+};
+renderContext.window.KitWorksheetRender.renderKitOverview(overviewHost, {
+    bannerTitle: "Search Kit",
+    instructions,
+    worksheets: []
+});
+assert.match(overviewHost.innerHTML, /<ol class="worksheet-instructions-list">/,
+    "Kit landing page instructions render as an ordered list too");
 assert.match(imageHost.innerHTML, /little-blue-penguin\.jpg/);
 assert.match(imageHost.innerHTML, /Mission 2: Choose your own search words/);
 assert.match(imageHost.innerHTML, /Now find out what a kororā eats\. Which search would help you find the answer\?/);

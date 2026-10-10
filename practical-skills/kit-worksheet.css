@@ -300,9 +300,30 @@ body.kit-worksheet-page {
     font-size: 1.2rem;
 }
 
-.worksheet-instructions p {
+.worksheet-instructions-copy {
+    min-width: 0;
+}
+
+.worksheet-instructions-copy p {
     margin: 0;
     font-weight: 600;
+}
+
+.worksheet-instructions-copy p + .worksheet-instructions-list,
+.worksheet-instructions-list + p {
+    margin-top: 8px;
+}
+
+.worksheet-instructions-list {
+    display: grid;
+    gap: 5px;
+    margin: 8px 0 0;
+    padding-left: 24px;
+    font-weight: 600;
+}
+
+.worksheet-instructions-list li {
+    padding-left: 3px;
 }
 
 .worksheet-image-panel {
