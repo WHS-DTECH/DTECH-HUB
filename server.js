@@ -4500,7 +4500,7 @@ function addSearchResultsDetectiveIntroduction(content) {
         "Hokitika Weather Forecast"
       ],
       searchResults: {
-        title: "Simulated search results",
+        title: "Search results (Fake website)",
         results: [
           {
             domain: "westcoastphotos.example",
@@ -4545,7 +4545,7 @@ function addSearchResultsDetectiveIntroduction(content) {
         "Best Swimming Pools in New Zealand – Photo Gallery"
       ],
       searchResults: {
-        title: "Simulated search results",
+        title: "Search results (Fake website)",
         results: [
           {
             domain: "hokitikaswimmingclub.example",
@@ -4579,7 +4579,7 @@ function addSearchResultsDetectiveIntroduction(content) {
         "Waimea Gorge Walking Track – Nelson"
       ],
       searchResults: {
-        title: "Simulated search results",
+        title: "Search results (Fake website)",
         results: [
           {
             domain: "doc.govt.nz.example",

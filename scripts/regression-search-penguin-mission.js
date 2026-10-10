@@ -115,6 +115,7 @@ assert.deepEqual(Array.from(clockTowerMission.searchResults.results, (result) =>
     "weather.example"
 ]);
 assert.equal(clockTowerMission.searchResults.note, "These are fictional results for practice, not links to real websites.");
+assert.equal(clockTowerMission.searchResults.title, "Search results (Fake website)");
 assert.equal(migrated._contentMigrations.searchResultsDetective, 7, "Search Results Detective migration marker is recorded");
 assert.equal(context.addSearchResultsDetectiveIntroduction(migrated), migrated, "Search Results Detective migration is idempotent");
 const poolHoursMission = migrated.activities[2].questions.find((question) => question.id === "search-result-pool-hours");
@@ -132,6 +133,7 @@ assert.deepEqual(Array.from(poolHoursMission.searchResults.results, (result) => 
     "nzpoolphotos.example"
 ]);
 assert.equal(poolHoursMission.searchResults.note, "These are fictional results for practice, not links to real websites.");
+assert.equal(poolHoursMission.searchResults.title, "Search results (Fake website)");
 const wrongPlaceMission = migrated.activities[2].questions.find((question) => question.id === "search-result-wrong-place");
 assert.ok(wrongPlaceMission, "Mission 3 is added");
 assert.equal(wrongPlaceMission.heading, "Mission 3 – The Wrong Place!");
@@ -147,6 +149,7 @@ assert.deepEqual(Array.from(wrongPlaceMission.searchResults.results, (result) =>
     "waimeagorge.example"
 ]);
 assert.equal(wrongPlaceMission.searchResults.note, "These are fictional results for practice, not links to real websites.");
+assert.equal(wrongPlaceMission.searchResults.title, "Search results (Fake website)");
 const glowwormTimeMission = migrated.activities[2].questions.find((question) => question.id === "search-result-glowworm-time");
 assert.ok(glowwormTimeMission, "Mission 4 is added");
 assert.equal(glowwormTimeMission.type, "multiple-choice");
@@ -480,6 +483,7 @@ assert.match(clockTowerHost.innerHTML, /westcoastphotos\.example/);
 assert.match(clockTowerHost.innerHTML, /heritage\.example/);
 assert.match(clockTowerHost.innerHTML, /weather\.example/);
 assert.match(clockTowerHost.innerHTML, /These are fictional results for practice, not links to real websites\./);
+assert.match(clockTowerHost.innerHTML, /Search results \(Fake website\)/);
 assert.match(clockTowerHost.innerHTML, /class="worksheet-search-result[\s\S]*data-option-value="Hokitika Clock Tower – History and Dimensions"[\s\S]*aria-pressed="false"/, "Fictional result cards are selectable button answers rather than external links");
 assert.doesNotMatch(clockTowerHost.innerHTML, /href="https:\/\/(?:westcoastphotos|heritage|weather)\.example/, "Fictional result domains are never linked");
 const poolHoursHost = {
@@ -496,6 +500,7 @@ assert.match(poolHoursHost.innerHTML, /Mission 2 – Read Before You Click!/);
 assert.match(poolHoursHost.innerHTML, /Hokitika Swimming Pool – Opening Hours and Contact Details/);
 assert.match(poolHoursHost.innerHTML, /hokitikapool\.example/);
 assert.match(poolHoursHost.innerHTML, /These are fictional results for practice, not links to real websites\./);
+assert.match(poolHoursHost.innerHTML, /Search results \(Fake website\)/);
 assert.doesNotMatch(poolHoursHost.innerHTML, /href="https:\/\/(?:hokitikaswimmingclub|hokitikapool|nzpoolphotos)\.example/,
     "Mission 2 fictional results are not links");
 const wrongPlaceHost = {
@@ -512,6 +517,7 @@ assert.match(wrongPlaceHost.innerHTML, /Mission 3 – The Wrong Place!/);
 assert.match(wrongPlaceHost.innerHTML, /Waimea Gorge Walking Track – Nelson/);
 assert.match(wrongPlaceHost.innerHTML, /waimeagorge\.example/);
 assert.match(wrongPlaceHost.innerHTML, /These are fictional results for practice, not links to real websites\./);
+assert.match(wrongPlaceHost.innerHTML, /Search results \(Fake website\)/);
 assert.doesNotMatch(wrongPlaceHost.innerHTML, /href="https:\/\/(?:doc\.govt\.nz|hokitikagorge|waimeagorge)\.example/,
     "Mission 3 fictional results are not links");
 const glowwormTimeHost = {
