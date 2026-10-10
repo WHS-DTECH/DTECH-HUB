@@ -5,11 +5,133 @@ const statusMessage = document.querySelector("#practical-status-message");
 const cardsBody = document.querySelector("#practical-cards-body");
 const publishButton = document.querySelector("#practical-publish");
 const resetButton = document.querySelector("#practical-reset-form");
+const previewType = document.querySelector("#practical-preview-type");
+const previewSearch = document.querySelector("#practical-preview-search");
+const previewUser = document.querySelector("#practical-preview-user");
+const previewCourse = document.querySelector("#practical-preview-course");
+const previewStatus = document.querySelector("#practical-preview-status");
+const previewDetails = document.querySelector("#practical-preview-details");
+const previewCards = document.querySelector("#practical-preview-cards");
+const previewRetry = document.querySelector("#practical-preview-retry");
 
 const state = {
     cards: [],
-    isAdmin: false
+    isAdmin: false,
+    previewUsers: []
 };
+
+function matchesPreviewCourse(card, user, course) {
+    if (course === "All") return true;
+    const level = String(card.yearLevel || "All Years").trim().toLowerCase().replace(/\s+/g, "");
+    if (level === "allyears") return true;
+    if (level === "staff") return user.type === "Staff";
+    if (level === course.toLowerCase()) return true;
+    const year = /^year(7|8|9|10|11|12|13)(?:dtech)?$/.exec(level);
+    if (!year) return false;
+    const number = Number(year[1]);
+    return course === "JuniorDTECH" ? number <= 8
+        : course === "MiddleDTECH" ? number >= 9 && number <= 10
+        : course === "SeniorDTECH" && number >= 11;
+}
+
+function renderUserPreview() {
+    previewCards.replaceChildren();
+    previewDetails.textContent = "";
+    const user = state.previewUsers.find((entry) => entry.id === previewUser.value);
+    previewCourse.disabled = !user;
+    if (!user) return;
+    previewDetails.textContent = [user.name, user.type, user.email, user.yearLevel && `Year ${String(user.yearLevel).replace(/^year\s*/i, "")}`,
+        user.homeroom && `Homeroom: ${user.homeroom}`,
+        user.course ? `Course suggested by year level: ${user.course}` : "No course inferred from directory"].filter(Boolean).join(" | ");
+    const cards = state.cards.filter((card) => card.id !== "practical-skills-checklist"
+        && matchesPreviewCourse(card, user, previewCourse.value));
+    previewStatus.textContent = `${cards.length} card${cards.length === 1 ? "" : "s"} in this preview. Includes All Years cards; this is not a saved assignment or a change to the student library.`;
+    if (!cards.length) {
+        previewCards.textContent = "No cards match this course yet.";
+        return;
+    }
+    cards.forEach((card) => {
+        const article = document.createElement("article");
+        article.className = "project-card";
+        const visual = document.createElement("div");
+        visual.className = "project-visual";
+        if (card.imageUrl) {
+            const image = document.createElement("img");
+            image.src = card.imageUrl;
+            image.alt = card.title;
+            image.className = "project-image";
+            image.loading = "lazy";
+            visual.appendChild(image);
+        } else {
+            visual.style.background = card.visual?.palette || "linear-gradient(135deg, #2f8f61 0%, #3ca873 54%, #65c494 100%)";
+            const icon = document.createElement("span");
+            icon.className = "visual-mark";
+            icon.textContent = card.visual?.icon || "PS";
+            visual.appendChild(icon);
+        }
+        const body = document.createElement("div");
+        body.className = "project-body";
+        const heading = document.createElement("h3");
+        heading.textContent = card.title;
+        const summary = document.createElement("p");
+        summary.className = "project-description";
+        summary.textContent = card.summary;
+        const tags = document.createElement("div");
+        tags.className = "project-tags";
+        [card.status, card.yearLevel, card.area].forEach((value) => {
+            const tag = document.createElement("span");
+            tag.className = "project-tag";
+            tag.textContent = value;
+            tags.appendChild(tag);
+        });
+        body.append(heading, summary, tags);
+        article.append(visual, body);
+        previewCards.appendChild(article);
+    });
+}
+
+function populatePreviewUsers() {
+    const previous = previewUser.value;
+    const query = previewSearch.value.trim().toLowerCase();
+    const users = state.previewUsers.filter((user) => user.type === previewType.value
+        && [user.name, user.email, user.homeroom].join(" ").toLowerCase().includes(query));
+    previewUser.replaceChildren(new Option(users.length ? "Select a person..." : "No matching people", ""));
+    users.forEach((user) => {
+        previewUser.add(new Option([user.name, user.email || user.homeroom].filter(Boolean).join(" - "), user.id));
+    });
+    previewUser.value = users.some((user) => user.id === previous) ? previous : "";
+    previewStatus.textContent = users.length ? "Select a person, then try a course." : "No people match this search.";
+    renderUserPreview();
+}
+
+async function loadPreviewUsers() {
+    previewRetry.hidden = true;
+    previewStatus.textContent = "Loading students and staff...";
+    try {
+        const response = await fetch("/api/admin/practical-skills/preview-users", {
+            headers: withAdminAuthHeaders(), cache: "no-store"
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+        if (!Array.isArray(payload.users)) throw new Error("Directory response is invalid.");
+        state.previewUsers = payload.users;
+        [previewType, previewSearch, previewUser].forEach((input) => { input.disabled = false; });
+        populatePreviewUsers();
+    } catch (error) {
+        previewStatus.textContent = `Could not load preview users: ${error.message}`;
+        previewRetry.hidden = false;
+    }
+}
+
+previewType.addEventListener("change", populatePreviewUsers);
+previewSearch.addEventListener("input", populatePreviewUsers);
+previewUser.addEventListener("change", () => {
+    const user = state.previewUsers.find((entry) => entry.id === previewUser.value);
+    previewCourse.value = user?.course || "All";
+    renderUserPreview();
+});
+previewCourse.addEventListener("change", renderUserPreview);
+previewRetry.addEventListener("click", loadPreviewUsers);
 
 function normalizeEmail(value) {
     return String(value || "").trim().toLowerCase();
@@ -146,6 +268,7 @@ function setFormFromCard(card) {
 function renderCardsTable() {
     if (!cardsBody) return;
 
+    renderUserPreview();
     cardsBody.innerHTML = "";
 
     state.cards.forEach((card) => {
@@ -332,8 +455,10 @@ if (publishButton) {
 (async function init() {
     const canLoad = await verifyAdminAccess();
     if (!canLoad) {
+        previewStatus.textContent = "Admin access is required to load preview users.";
         return;
     }
     await loadCards();
+    await loadPreviewUsers();
 })();
 })();

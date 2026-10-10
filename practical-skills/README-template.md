@@ -18,6 +18,18 @@ This folder is the reusable Practical Skills module for HUB sites.
 - `GET /api/practical-skills/library` - Public read for student page
 - `GET /api/admin/practical-skills/library` - Admin-only read
 - `PUT /api/admin/practical-skills/library` - Admin-only publish/save
+- `GET /api/admin/practical-skills/preview-users` - Admin-only directory names and basic profile details for the user/course preview
+
+## Admin User and Course Preview
+
+Above the Card Editor, select Students or Staff, search for a named person, and
+choose a temporary JuniorDTECH, MiddleDTECH or SeniorDTECH course. The preview
+includes All Years cards and matching pathway/year cards. Student defaults are
+inferred from their directory year level; staff default to All courses.
+This is a read-only planning preview, not impersonation or a saved assignment.
+It does not change directory records, Login Kit check-ins, Drive folders, the
+student-facing library, or the full Card Editor and Current Cards sections.
+Preview cards reflect local edits; Publish Library remains the save action.
 
 ## Required Server Config
 

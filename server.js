@@ -13504,6 +13504,40 @@ app.get("/api/practical-skills/library", async (_req, res) => {
   }
 });
 
+app.get("/api/admin/practical-skills/preview-users", requireAdminAccess, async (_req, res) => {
+  try {
+    const [studentRows, staffRows] = await Promise.all([getStudentDirectoryRows(), getStaffDirectoryRows()]);
+    const students = dedupeToLatestStudentRows(studentRows.map(buildStudentClassManagementRow))
+      .filter((row) => String(row.status || "").toLowerCase() !== "not current")
+      .map((row, index) => ({
+        id: `student-${index}`,
+        type: "Student",
+        name: row.student_name,
+        email: row.linked_emails[0] || "",
+        yearLevel: row.year_level,
+        homeroom: row.form_class,
+        course: getResearchReportProgrammeFolder(getHuntProfile(row)) || ""
+      }));
+    const staffByEmail = new Map();
+    staffRows.forEach((row, index) => {
+      const lower = buildLowerKeyMap(row);
+      const email = collectDirectoryEmails(row, ["email_school", "email", "user_email", "staff_email", "google_email"])[0] || "";
+      const name = pickRowValue(lower, ["display_name", "staff_name", "full_name", "name"])
+        || [pickRowValue(lower, ["first_name", "first name"]), pickRowValue(lower, ["last_name", "last name"])].filter(Boolean).join(" ")
+        || email || "Unnamed staff member";
+      staffByEmail.set(email || `staff-${index}`, {
+        id: `staff-${index}`, type: "Staff", name, email, yearLevel: "", homeroom: "", course: ""
+      });
+    });
+    const users = [...students, ...staffByEmail.values()].sort((a, b) => a.name.localeCompare(b.name));
+    res.set("Cache-Control", "no-store");
+    res.json({ users });
+  } catch (error) {
+    console.error("Could not load Licence Library preview users", error);
+    res.status(500).json({ error: "Could not load students and staff for the library preview." });
+  }
+});
+
 app.get("/api/admin/practical-skills/library", requireAdminAccess, async (_req, res) => {
   try {
     const rows = await readPracticalSkillsLibraryFile();

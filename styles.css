@@ -3280,6 +3280,17 @@ body.public-home-access .controls-panel {
     background: #fff8ea;
 }
 
+.practical-preview-cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+#practical-preview-retry[hidden] {
+    display: none;
+}
+
 .practical-skills-form {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

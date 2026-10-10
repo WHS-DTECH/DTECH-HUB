@@ -45,6 +45,35 @@
         <a class="button button-secondary" href="./admin-kits.html">Kit Content Builder</a>
       </header>
 
+      <section class="admin-panel" aria-labelledby="library-preview-heading">
+        <h2 id="library-preview-heading">User and Course Preview</h2>
+        <p>Try a course for a named student or staff member. Preview only: no accounts, course assignments or Google Drive folders are changed. The Card Editor and Current Cards below always show the full library.</p>
+        <div class="practical-skills-form">
+          <label for="practical-preview-type">User type</label>
+          <select id="practical-preview-type" disabled>
+            <option value="Student">Students</option>
+            <option value="Staff">Staff</option>
+          </select>
+          <label for="practical-preview-search">Find a person</label>
+          <input id="practical-preview-search" type="search" placeholder="Search by name, email or homeroom" disabled>
+          <label for="practical-preview-user">Student / Staff member</label>
+          <select id="practical-preview-user" disabled>
+            <option value="">Loading directory...</option>
+          </select>
+          <label for="practical-preview-course">Preview course</label>
+          <select id="practical-preview-course" disabled>
+            <option value="All">All courses</option>
+            <option value="JuniorDTECH">JuniorDTECH</option>
+            <option value="MiddleDTECH">MiddleDTECH</option>
+            <option value="SeniorDTECH">SeniorDTECH</option>
+          </select>
+        </div>
+        <p id="practical-preview-status" aria-live="polite">Loading students and staff...</p>
+        <button id="practical-preview-retry" class="button button-secondary" type="button" hidden>Retry loading directory</button>
+        <p id="practical-preview-details"></p>
+        <div id="practical-preview-cards" class="practical-preview-cards"></div>
+      </section>
+
       <section class="admin-panel">
         <h2>Card Editor</h2>
         <form id="practical-skills-form" class="practical-skills-form">
