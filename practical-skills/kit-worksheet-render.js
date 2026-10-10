@@ -818,13 +818,20 @@
             });
         });
 
-        host.querySelectorAll(".worksheet-choice-bubble").forEach((button) => {
+        host.querySelectorAll(".worksheet-choice-bubble, .worksheet-search-result").forEach((button) => {
             button.addEventListener("click", () => {
                 const questionId = button.getAttribute("data-question-id");
                 const optionValue = button.getAttribute("data-option-value");
                 responses[questionId] = optionValue;
-                host.querySelectorAll(`.worksheet-choice-bubble[data-question-id="${window.CSS?.escape ? CSS.escape(questionId) : questionId}"]`)
-                    .forEach((sibling) => sibling.classList.toggle("is-selected", sibling === button));
+                host.querySelectorAll(".worksheet-choice-bubble, .worksheet-search-result")
+                    .forEach((sibling) => {
+                        if (sibling.getAttribute("data-question-id") !== questionId) return;
+                        const selected = sibling === button;
+                        sibling.classList.toggle("is-selected", selected);
+                        if (sibling.classList.contains("worksheet-search-result")) {
+                            sibling.setAttribute("aria-pressed", String(selected));
+                        }
+                    });
                 options.onResponseChange?.(questionId, optionValue);
             });
         });

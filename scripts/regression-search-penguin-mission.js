@@ -438,6 +438,10 @@ assert.ok(fs.existsSync(clockTowerImage), "Clock Tower photo is stored locally")
 
 assert.match(renderSource, /content\?\.information/, "Student worksheet renders the mission information heading");
 assert.match(renderSource, /images\.map\(\(image\)/, "Student worksheet renders the penguin image");
+assert.match(renderSource, /querySelectorAll\("\.worksheet-choice-bubble, \.worksheet-search-result"\)\.forEach\(\(button\) => \{\s*button\.addEventListener\("click"/,
+    "Search-result cards and standard choices both save selections on click");
+assert.match(renderSource, /sibling\.setAttribute\("aria-pressed", String\(selected\)\)/,
+    "Search-result selected state is reflected for assistive technology");
 const renderContext = vm.createContext({
     window: { clearTimeout() {}, setTimeout() {} },
     URL
