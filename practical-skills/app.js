@@ -122,12 +122,18 @@
     }
 
     function createPracticalSkillCard(item) {
-        const card = document.createElement("a");
+        const displayOnly = isPathways && !String(item.href || "").trim();
+        const card = document.createElement(displayOnly ? "article" : "a");
         card.className = "project-card";
-        card.href = String(item.href || "#");
-        card.target = "_self";
-        card.rel = "";
-        card.setAttribute("aria-label", `Open ${String(item.title || "Practical Skill")}`);
+        if (displayOnly) {
+            card.classList.add("pathway-display-card");
+            card.setAttribute("aria-label", String(item.title || "Learning pathway"));
+        } else {
+            card.href = String(item.href || "#");
+            card.target = "_self";
+            card.rel = "";
+            card.setAttribute("aria-label", `Open ${String(item.title || "Practical Skill")}`);
+        }
 
         const icon = String(item?.visual?.icon || config.libraryIcon || "PS").trim() || "PS";
         const palette = String(item?.visual?.palette || config.libraryPalette || "linear-gradient(135deg, #2f8f61 0%, #3ca873 54%, #65c494 100%)");

@@ -32,10 +32,10 @@ function normalizeCards(cards) {
         const href = text(card?.href, 300);
         const imageUrl = text(card?.imageUrl, 300);
         const status = text(card?.status, 20) || "active";
-        if (!title || !summary || !id || !href) throw new Error(`Card ${index + 1} requires a title, summary and link.`);
+        if (!title || !summary || !id) throw new Error(`Card ${index + 1} requires a title and summary.`);
         if (ids.has(id)) throw new Error(`Duplicate card ID: ${id}`);
         if (!statuses.includes(status)) throw new Error(`Card ${index + 1} has an invalid status.`);
-        if (!validLink(href) || !validLink(imageUrl, true)) throw new Error(`Card ${index + 1} links must be site paths or HTTP(S) URLs.`);
+        if (!validLink(href, true) || !validLink(imageUrl, true)) throw new Error(`Card ${index + 1} links must be site paths or HTTP(S) URLs.`);
         ids.add(id);
         return {
             id, title, summary, href, imageUrl, status,
@@ -52,16 +52,27 @@ function registerLearningPathways(app, { pool, hasDatabase, requireAdminAccess }
             id TEXT PRIMARY KEY, cards JSONB NOT NULL DEFAULT '[]'::jsonb,
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )`);
+        await pool.query(`ALTER TABLE learning_pathways_library_store
+            ADD COLUMN IF NOT EXISTS seed_version INTEGER NOT NULL DEFAULT 0`);
     }
 
     async function readCards() {
         if (!hasDatabase) return normalizeCards(JSON.parse(await fs.readFile(seedFile, "utf8")));
         await ensureSchema();
-        const result = await pool.query("SELECT cards FROM learning_pathways_library_store WHERE id = 'default'");
-        if (result.rows.length) return normalizeCards(result.rows[0].cards);
         const seed = normalizeCards(JSON.parse(await fs.readFile(seedFile, "utf8")));
-        await pool.query(`INSERT INTO learning_pathways_library_store (id, cards) VALUES ('default', $1::jsonb)
+        await pool.query(`INSERT INTO learning_pathways_library_store (id, cards, seed_version) VALUES ('default', $1::jsonb, 1)
             ON CONFLICT (id) DO NOTHING`, [JSON.stringify(seed)]);
+        // Add the curriculum starter cards once without replacing existing cards or restoring later deletions.
+        await pool.query(`UPDATE learning_pathways_library_store AS library
+            SET cards = library.cards || COALESCE((
+                SELECT jsonb_agg(starter.card)
+                FROM jsonb_array_elements($1::jsonb) AS starter(card)
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM jsonb_array_elements(library.cards) AS existing(card)
+                    WHERE existing.card ->> 'id' = starter.card ->> 'id'
+                )
+            ), '[]'::jsonb), seed_version = 1, updated_at = NOW()
+            WHERE id = 'default' AND seed_version < 1`, [JSON.stringify(seed)]);
         const initialized = await pool.query("SELECT cards FROM learning_pathways_library_store WHERE id = 'default'");
         return normalizeCards(initialized.rows[0].cards);
     }
@@ -71,9 +82,9 @@ function registerLearningPathways(app, { pool, hasDatabase, requireAdminAccess }
             await fs.writeFile(seedFile, `${JSON.stringify(cards, null, 2)}\n`, "utf8");
             return;
         }
-        await ensureSchema();
-        await pool.query(`INSERT INTO learning_pathways_library_store (id, cards) VALUES ('default', $1::jsonb)
-            ON CONFLICT (id) DO UPDATE SET cards = EXCLUDED.cards, updated_at = NOW()`, [JSON.stringify(cards)]);
+        await readCards();
+        await pool.query(`INSERT INTO learning_pathways_library_store (id, cards, seed_version) VALUES ('default', $1::jsonb, 1)
+            ON CONFLICT (id) DO UPDATE SET cards = EXCLUDED.cards, seed_version = 1, updated_at = NOW()`, [JSON.stringify(cards)]);
     }
 
     const load = (admin) => async (_req, res) => {

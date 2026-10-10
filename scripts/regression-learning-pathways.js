@@ -10,7 +10,8 @@ const sample = { id: "web", title: "Web Design", summary: "Choose your next web 
     href: "/learning-pathways/web.html", yearLevel: "Senior DTECH", area: "Web", status: "active" };
 
 class Element {
-    constructor() {
+    constructor(tagName = "") {
+        this.tagName = tagName;
         this.children = []; this.value = ""; this.textContent = ""; this.dataset = {}; this.style = {};
         this.classList = { toggle() {}, add() {}, remove() {} };
     }
@@ -34,7 +35,7 @@ async function testDashboard() {
     let responseCards = [];
     let fails = false;
     const context = vm.createContext({
-        document: { querySelector: () => config, getElementById: (id) => elements[`#${id}`], createElement: () => new Element() },
+        document: { querySelector: () => config, getElementById: (id) => elements[`#${id}`], createElement: (tag) => new Element(tag) },
         fetch: async (url, options) => {
             assert.equal(url, config.dataset.libraryPath || "/practical-skills/library.json");
             assert.equal(options.cache, "no-store");
@@ -76,6 +77,11 @@ async function testDashboard() {
     categories.children.find((pill) => pill.textContent === "Design").click();
     assert.equal(grid.children.length, 1);
     assert.match(grid.children[0].innerHTML, /Art/);
+    responseCards = [{ ...sample, href: "" }];
+    vm.runInContext(fs.readFileSync(path.join(root, "practical-skills/app.js"), "utf8"), context);
+    await tick();
+    assert.equal(grid.children[0].tagName, "article", "Display-only pathways are not links");
+    assert.equal(grid.children[0].href, undefined);
     config.dataset = {};
     responseCards = [sample, { ...sample, id: "practical-skills-checklist", title: "Licence" }];
     vm.runInContext(fs.readFileSync(path.join(root, "practical-skills/app.js"), "utf8"), context);
@@ -144,7 +150,10 @@ async function testEditor() {
 }
 
 async function main() {
-    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root, "learning-pathways/library.json"), "utf8")), []);
+    const seed = normalizeCards(JSON.parse(fs.readFileSync(path.join(root, "learning-pathways/library.json"), "utf8")));
+    assert.deepEqual(seed.map((card) => card.title), ["Digital systems", "Algorithms", "Programming", "Data",
+        "Digital citizenship", "Systems and control", "Design and innovation"]);
+    assert.ok(seed.every((card) => card.area === card.title && card.href === "" && card.yearLevel === "Junior DTECH"));
     assert.throws(() => normalizeCards(null), /cards array/);
     for (const href of ["javascript:alert(1)", "data:text/html,test", "//example.test", "/\\example.test"]) {
         assert.throws(() => normalizeCards([{ ...sample, href }]), /links/);
@@ -153,10 +162,20 @@ async function main() {
     assert.throws(() => normalizeCards([{ ...sample, status: "unknown" }]), /invalid status/);
     assert.throws(() => normalizeCards([{ ...sample, title: "" }]), /requires/);
     assert.equal(normalizeCards([{ ...sample, href: "https://example.test/path" }])[0].href, "https://example.test/path");
-    let stored = null;
+    const existing = { ...sample, id: "digital-systems", title: "Existing edited systems", href: "" };
+    let stored = [existing, sample];
+    let seedVersion = 0;
     const pool = { query: async (sql, params) => {
         assert.match(sql, /learning_pathways_library_store/, "Never writes the Licence Library table");
-        if (sql.includes("INSERT INTO") && (stored === null || !sql.includes("DO NOTHING"))) stored = JSON.parse(params[0]);
+        if (sql.includes("INSERT INTO") && (stored === null || !sql.includes("DO NOTHING"))) {
+            stored = JSON.parse(params[0]);
+            seedVersion = 1;
+        }
+        if (sql.includes("UPDATE learning_pathways_library_store AS library") && seedVersion < 1) {
+            const starters = JSON.parse(params[0]);
+            stored = [...stored, ...starters.filter((card) => !stored.some((old) => old.id === card.id))];
+            seedVersion = 1;
+        }
         return { rows: sql.startsWith("SELECT") && stored !== null ? [{ cards: stored }] : [] };
     } };
     const app = express();
@@ -169,7 +188,13 @@ async function main() {
     try {
         let response = await fetch(`${base}/learning-pathways/library.json`);
         assert.match(response.headers.get("cache-control"), /no-store/);
-        assert.deepEqual(await response.json(), []);
+        const migrated = await response.json();
+        assert.equal(migrated.length, 8, "One-time preload preserves existing custom cards");
+        assert.equal(migrated.find((card) => card.id === "digital-systems").title, "Existing edited systems",
+            "Preload does not overwrite existing cards with the same ID");
+        assert.equal(migrated.filter((card) => card.id === "digital-systems").length, 1);
+        assert.equal((await (await fetch(`${base}/learning-pathways/library.json`)).json()).length, 8,
+            "Repeated reads do not duplicate starter cards");
         assert.equal((await fetch(`${base}/api/admin/learning-pathways/library`)).status, 403);
         const publish = (cards, admin = true) => fetch(`${base}/api/admin/learning-pathways/library`, {
             method: "PUT", headers: { "Content-Type": "application/json", "x-test-admin": admin ? "yes" : "no" },

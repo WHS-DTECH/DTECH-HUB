@@ -1,1 +1,72 @@
-[]
+[
+  {
+    "id": "digital-systems",
+    "title": "Digital systems",
+    "summary": "Discover how digital devices work and how different types of data are encoded, stored and organised.",
+    "yearLevel": "Junior DTECH",
+    "area": "Digital systems",
+    "status": "active",
+    "href": "",
+    "visual": { "icon": "DS" }
+  },
+  {
+    "id": "algorithms",
+    "title": "Algorithms",
+    "summary": "Create and apply step-by-step algorithms to solve problems, find errors, debug solutions and test that they work.",
+    "yearLevel": "Junior DTECH",
+    "area": "Algorithms",
+    "status": "active",
+    "href": "",
+    "visual": { "icon": "AL" }
+  },
+  {
+    "id": "programming",
+    "title": "Programming",
+    "summary": "Use programming tools and computational thinking to create purposeful programs, then test and improve them.",
+    "yearLevel": "Junior DTECH",
+    "area": "Programming",
+    "status": "active",
+    "href": "",
+    "visual": { "icon": "PR" }
+  },
+  {
+    "id": "data",
+    "title": "Data",
+    "summary": "Use digital tools and data to solve problems. Collect information, organise it in spreadsheets and graphs, and identify patterns.",
+    "yearLevel": "Junior DTECH",
+    "area": "Data",
+    "status": "active",
+    "href": "",
+    "visual": { "icon": "DA" }
+  },
+  {
+    "id": "digital-citizenship",
+    "title": "Digital citizenship",
+    "summary": "Make safe, thoughtful digital choices by considering security, reliability, accuracy, usability and bias, and evaluating misinformation, AI suitability and ethical impacts.",
+    "yearLevel": "Junior DTECH",
+    "area": "Digital citizenship",
+    "status": "active",
+    "href": "",
+    "visual": { "icon": "DC" }
+  },
+  {
+    "id": "systems-and-control",
+    "title": "Systems and control",
+    "summary": "Explore mechanical, electrical, electronic and digital systems. Use circuit symbols, build simple circuits and investigate subsystems, feedback, input-process-output relationships and combined systems.",
+    "yearLevel": "Junior DTECH",
+    "area": "Systems and control",
+    "status": "active",
+    "href": "",
+    "visual": { "icon": "SC" }
+  },
+  {
+    "id": "design-and-innovation",
+    "title": "Design and innovation",
+    "summary": "Model ideas, choose suitable methods and develop specifications. Test solutions through systematic trials, then refine and improve your outcomes.",
+    "yearLevel": "Junior DTECH",
+    "area": "Design and innovation",
+    "status": "active",
+    "href": "",
+    "visual": { "icon": "DI" }
+  }
+]

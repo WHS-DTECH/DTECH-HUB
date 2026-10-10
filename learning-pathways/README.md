@@ -1,6 +1,6 @@
 # Learning Pathways
 
-A separate library, initially empty, with the Licence Library's card layout,
+A separate library with seven pre-loaded Year 7/8 curriculum area cards and the Licence Library's card layout,
 search, year-level/category/status filters and sorting.
 
 The yellow **Pathways** navbar button opens this dashboard for signed-in users
@@ -21,7 +21,7 @@ Routing waits for both course and access resolution, including after refresh.
 - `index.html`: public dashboard (`/learning-pathways/`).
 - `admin.html` and `admin.js`: admin-only card editor. Save Card to Draft adds or
   updates a local draft; Publish Library persists additions, edits and deletions.
-- `library.json`: initial card seed, kept separate from the Licence Library.
+- `library.json`: curriculum card seed, kept separate from the Licence Library.
 - `library-store.js`: validation, persistent storage and API routes.
 - `styles.css`: library-specific styles.
 
@@ -33,13 +33,16 @@ and the site's shared navigation, sign-in, sidebar and styles.
 Published cards are stored in Postgres (`learning_pathways_library_store`) so
 they survive Render restarts and deployments. `library.json` seeds the first
 database read only; without `DATABASE_URL`, local development reads/writes that
-file. An empty published library stays empty and is not repopulated on restart.
+file. A versioned, one-time migration adds missing curriculum area cards to
+existing libraries without overwriting existing cards. Later edits and deletions
+are preserved; an empty published library stays empty after the migration.
 
 Public reads: `/learning-pathways/library.json` and
 `GET /api/learning-pathways/library`. Admin reads and publishing:
 `GET` / `PUT /api/admin/learning-pathways/library`, protected by existing admin
 access middleware. PUT accepts `{ "cards": [...] }`. Cards require title,
-summary and an internal site path or HTTP(S) link; duplicate IDs and unsafe
+summary. A blank link renders a non-clickable card; adding an internal site path
+or HTTP(S) link enables it when activities are ready. Duplicate IDs and unsafe
 link protocols are rejected.
 
 Learning Pathways does not award licence stamps, change course assignments, or
