@@ -1391,6 +1391,32 @@ async function resolveExistingTableNames(candidates) {
   return existing;
 }
 
+const STUDENT_TIMETABLE_CLASS_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+let lastStudentTimetableClassSyncAt = 0;
+
+// Persists Timetable Class from the KAMAR details upload onto matching student_upload rows (by Student ID).
+async function syncStudentTimetableClasses(tableNames, { force = false } = {}) {
+  if (!hasDatabase || !tableNames.includes("student_details_upload") || !tableNames.includes("student_upload")) {
+    return { updated: 0, skipped: true };
+  }
+  if (!force && Date.now() - lastStudentTimetableClassSyncAt < STUDENT_TIMETABLE_CLASS_SYNC_INTERVAL_MS) {
+    return { updated: 0, skipped: true };
+  }
+  lastStudentTimetableClassSyncAt = Date.now();
+
+  await pool.query("ALTER TABLE student_upload ADD COLUMN IF NOT EXISTS timetable_class TEXT");
+  const result = await pool.query(`
+    UPDATE student_upload AS target
+    SET timetable_class = source.timetable_class
+    FROM student_details_upload AS source
+    WHERE LOWER(TRIM(target.id_number)) = LOWER(TRIM(source.id_number))
+      AND COALESCE(TRIM(source.id_number), '') <> ''
+      AND COALESCE(TRIM(source.timetable_class), '') <> ''
+      AND target.timetable_class IS DISTINCT FROM source.timetable_class
+  `);
+  return { updated: result.rowCount || 0, skipped: false };
+}
+
 async function getStudentDirectoryRows() {
   if (!hasDatabase) {
     return [];
@@ -1399,6 +1425,12 @@ async function getStudentDirectoryRows() {
   const tableNames = await resolveExistingTableNames(STUDENT_TABLE_CANDIDATES);
   if (!tableNames.length) {
     return [];
+  }
+
+  try {
+    await syncStudentTimetableClasses(tableNames);
+  } catch (error) {
+    console.warn("Student Timetable Class sync failed:", error.message);
   }
 
   const mergedRows = [];
@@ -17302,6 +17334,12 @@ ensureSchema()
     app.listen(PORT, () => {
       console.log(`DTECH-HUB is running on port ${PORT} and waiting for requests`);
       console.log(`Health check available at /health`);
+      resolveExistingTableNames(STUDENT_TABLE_CANDIDATES)
+        .then((tableNames) => syncStudentTimetableClasses(tableNames, { force: true }))
+        .then((result) => {
+          if (!result.skipped) console.log(`Synced Timetable Class onto ${result.updated} student_upload rows`);
+        })
+        .catch((error) => console.warn("Student Timetable Class sync failed:", error.message));
     });
   })
   .catch((error) => {

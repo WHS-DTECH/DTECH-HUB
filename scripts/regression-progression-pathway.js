@@ -74,6 +74,18 @@ async function main() {
     ]);
     assert.equal(merged.length, 1);
     assert.equal(merged[0].timetable_class, "JVE", "A newer snapshot without Timetable Class keeps the uploaded class");
+    const syncQueries = [];
+    const syncContext = vm.createContext({
+        hasDatabase: true, Date,
+        pool: { query: async (sql) => { syncQueries.push(sql); return { rowCount: 2 }; } }
+    });
+    vm.runInContext(serverSource.slice(serverSource.indexOf("const STUDENT_TIMETABLE_CLASS_SYNC_INTERVAL_MS"), serverSource.indexOf("async function getStudentDirectoryRows(")), syncContext);
+    assert.equal((await syncContext.syncStudentTimetableClasses(["student_upload"])).skipped, true, "Sync needs both upload tables");
+    assert.deepEqual({ ...(await syncContext.syncStudentTimetableClasses(["student_details_upload", "student_upload"])) }, { updated: 2, skipped: false });
+    assert.match(syncQueries[0], /ADD COLUMN IF NOT EXISTS timetable_class/);
+    assert.match(syncQueries[1], /UPDATE student_upload[\s\S]*FROM student_details_upload[\s\S]*id_number/, "Database rows are matched by Student ID");
+    assert.equal((await syncContext.syncStudentTimetableClasses(["student_details_upload", "student_upload"])).skipped, true, "Sync is throttled");
+    assert.ok(serverSource.includes("await syncStudentTimetableClasses(tableNames)"), "Directory reads persist the merge first");
     const timetableStudents = [
         { name: "Year seven", email: "seven", yearLevel: 7, timetableClass: "JPI", homeroom: "7WHAU", formClass: "7WHAU" },
         { name: "Year eight", email: "eight", yearLevel: 8, timetableClass: "JPI", homeroom: "8WPAPA", formClass: "8WPAPA" },
