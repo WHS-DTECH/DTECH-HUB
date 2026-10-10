@@ -55,7 +55,8 @@
             <option value="Staff">Staff</option>
           </select>
           <label for="practical-preview-search">Find a person</label>
-          <input id="practical-preview-search" type="search" placeholder="Search by name, email or homeroom" disabled>
+          <input id="practical-preview-search" type="search" list="practical-preview-person-suggestions" autocomplete="off" placeholder="Start typing a name, then choose a suggestion" disabled>
+          <datalist id="practical-preview-person-suggestions"></datalist>
           <label for="practical-preview-user">Student / Staff member</label>
           <select id="practical-preview-user" disabled>
             <option value="">Loading directory...</option>

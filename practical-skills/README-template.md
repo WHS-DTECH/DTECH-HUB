@@ -36,6 +36,10 @@ than full cards. Its height is limited to 240px, with keyboard-accessible
 scrolling for long lists. Kit-name search only filters this preview, not the
 Card Editor or Current Cards. Preview names reflect local edits; Publish
 Library remains the save action.
+Find a person offers native dropdown suggestions as you type. Choose a name
+to select that person and their default preview course automatically. Suggestions
+include email or homeroom details to distinguish similar names and follow the
+Students/Staff selector. The separate person dropdown remains available.
 
 ## Shared Button Readability
 

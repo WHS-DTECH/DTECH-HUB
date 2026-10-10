@@ -7,6 +7,7 @@ const publishButton = document.querySelector("#practical-publish");
 const resetButton = document.querySelector("#practical-reset-form");
 const previewType = document.querySelector("#practical-preview-type");
 const previewSearch = document.querySelector("#practical-preview-search");
+const previewSuggestions = document.querySelector("#practical-preview-person-suggestions");
 const previewUser = document.querySelector("#practical-preview-user");
 const previewCourse = document.querySelector("#practical-preview-course");
 const previewStatus = document.querySelector("#practical-preview-status");
@@ -64,15 +65,39 @@ function renderUserPreview() {
     });
 }
 
+function getPreviewPersonLabel(user) {
+    const label = [user.name, user.email || user.homeroom || user.id].filter(Boolean).join(" - ");
+    const duplicates = state.previewUsers.filter((entry) => entry.type === user.type
+        && [entry.name, entry.email || entry.homeroom || entry.id].filter(Boolean).join(" - ") === label);
+    return duplicates.length > 1 ? `${label} (${user.id})` : label;
+}
+
+function selectPreviewPerson() {
+    const user = state.previewUsers.find((entry) => entry.id === previewUser.value);
+    previewCourse.value = user?.course || "All";
+    renderUserPreview();
+}
+
 function populatePreviewUsers() {
     const previous = previewUser.value;
     const query = previewSearch.value.trim().toLowerCase();
-    const users = state.previewUsers.filter((user) => user.type === previewType.value
-        && [user.name, user.email, user.homeroom].join(" ").toLowerCase().includes(query));
+    const people = state.previewUsers.filter((user) => user.type === previewType.value);
+    const users = people.filter((user) =>
+        `${getPreviewPersonLabel(user)} ${user.homeroom || ""}`.toLowerCase().includes(query));
+    previewSuggestions.replaceChildren();
     previewUser.replaceChildren(new Option(users.length ? "Select a person..." : "No matching people", ""));
     users.forEach((user) => {
-        previewUser.add(new Option([user.name, user.email || user.homeroom].filter(Boolean).join(" - "), user.id));
+        const label = getPreviewPersonLabel(user);
+        previewSuggestions.appendChild(new Option(label, label));
+        previewUser.add(new Option(label, user.id));
     });
+    const selected = people.find((user) => getPreviewPersonLabel(user).toLowerCase() === query);
+    if (selected) {
+        previewUser.value = selected.id;
+        if (selected.id !== previous) selectPreviewPerson();
+        else renderUserPreview();
+        return;
+    }
     previewUser.value = users.some((user) => user.id === previous) ? previous : "";
     previewStatus.textContent = users.length ? "Select a person, then try a course." : "No people match this search.";
     renderUserPreview();
@@ -97,13 +122,14 @@ async function loadPreviewUsers() {
     }
 }
 
-previewType.addEventListener("change", populatePreviewUsers);
-previewSearch.addEventListener("input", populatePreviewUsers);
-previewUser.addEventListener("change", () => {
-    const user = state.previewUsers.find((entry) => entry.id === previewUser.value);
-    previewCourse.value = user?.course || "All";
-    renderUserPreview();
+previewType.addEventListener("change", () => {
+    previewSearch.value = "";
+    previewUser.value = "";
+    populatePreviewUsers();
 });
+previewSearch.addEventListener("input", populatePreviewUsers);
+previewSearch.addEventListener("change", populatePreviewUsers);
+previewUser.addEventListener("change", selectPreviewPerson);
 previewCourse.addEventListener("change", renderUserPreview);
 previewKitSearch.addEventListener("input", renderUserPreview);
 previewRetry.addEventListener("click", loadPreviewUsers);

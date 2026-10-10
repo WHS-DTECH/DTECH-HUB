@@ -25,7 +25,7 @@ class Element {
     addEventListener(name, handler) { this[name] = handler; }
 }
 const controls = Object.fromEntries(["previewType", "previewSearch", "previewUser", "previewCourse",
-    "previewStatus", "previewDetails", "previewCards", "previewRetry", "previewKitSearch"].map((key) => [key, new Element()]));
+    "previewStatus", "previewDetails", "previewCards", "previewRetry", "previewKitSearch", "previewSuggestions"].map((key) => [key, new Element()]));
 controls.previewType.value = "Student";
 controls.previewCourse.value = "All";
 const users = [
@@ -104,6 +104,33 @@ controls.previewUser.change();
 assert.equal(controls.previewCourse.value, "All");
 assert.equal(controls.previewCards.children.length, cards.length - 1);
 const css = fs.readFileSync(path.join(root, "styles.css"), "utf8");
+assert.match(html, /list="practical-preview-person-suggestions"/);
+controls.previewType.value = "Student";
+controls.previewSearch.value = "stu";
+controls.previewUser.value = "";
+context.populatePreviewUsers();
+assert.equal(controls.previewSuggestions.children.length, 2, "Partial names offer matching student suggestions");
+assert.equal(controls.previewUser.value, "", "Partial matches do not select a person");
+controls.previewSearch.value = controls.previewSuggestions.children[1].value;
+controls.previewSearch.input();
+assert.equal(controls.previewUser.value, "s2", "Choosing a suggestion selects the named person");
+assert.equal(controls.previewCourse.value, "SeniorDTECH");
+controls.previewCourse.value = "MiddleDTECH";
+controls.previewSearch.change();
+assert.equal(controls.previewCourse.value, "MiddleDTECH", "Repeated input/change events preserve a manual preview course");
+controls.previewType.value = "Staff";
+controls.previewType.change();
+assert.equal(controls.previewSearch.value, "");
+assert.equal(controls.previewSuggestions.children.length, 1, "Staff suggestions do not include students");
+const duplicate = { ...users[2], id: "t2" };
+users.push(duplicate);
+context.populatePreviewUsers();
+assert.notEqual(controls.previewSuggestions.children[0].value, controls.previewSuggestions.children[1].value,
+    "Identical names and email labels remain distinguishable");
+controls.previewSearch.value = controls.previewSuggestions.children[1].value;
+controls.previewSearch.input();
+assert.equal(controls.previewUser.value, "t2");
+users.pop();
 assert.match(html, /class="admin-panel practical-user-preview"/);
 assert.match(css, /\.admin-panel\.practical-user-preview\s*\{[^}]*background:\s*#e5f4f1;[^}]*border-left:\s*5px solid #24685e;/);
 assert.match(css, /\.practical-preview-kit-list\s*\{[^}]*max-height:\s*240px;[^}]*overflow-y:\s*auto;/);
