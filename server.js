@@ -366,6 +366,7 @@ async function setPracticalSkillsKitCompletion(studentEmail, kitId, completed) {
       completed: Boolean(completed),
       completed_at: completed ? existing.completed_at || nowIso : null,
       completed_activities: completed ? existing.completed_activities || {} : {},
+      certificate_emailed_at: completed ? existing.certificate_emailed_at || null : null,
       started_at: completed ? existing.started_at : nowIso,
       updated_at: nowIso
     };
@@ -381,7 +382,7 @@ async function setPracticalSkillsKitCompletion(studentEmail, kitId, completed) {
         [email, safeKitId]
       )
     : await pool.query(
-        `UPDATE practical_skills_progress SET completed = FALSE, completed_at = NULL, completed_activities = '{}'::jsonb, started_at = NOW(), updated_at = NOW()
+        `UPDATE practical_skills_progress SET completed = FALSE, completed_at = NULL, completed_activities = '{}'::jsonb, certificate_emailed_at = NULL, started_at = NOW(), updated_at = NOW()
          WHERE student_email = $1 AND kit_id = $2 RETURNING *`,
         [email, safeKitId]
       );
@@ -4475,6 +4476,7 @@ async function ensurePracticalSkillsProgressSchema() {
   await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
   await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS responses JSONB NOT NULL DEFAULT '{}'::jsonb`);
   await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS completed_activities JSONB NOT NULL DEFAULT '{}'::jsonb`);
+  await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS certificate_emailed_at TIMESTAMPTZ`);
 }
 
 // Starter drafts only — teachers edit the real content via the Kit Content Builder admin page.
@@ -13556,6 +13558,7 @@ app.post("/api/practical-skills/progress/:kitId/complete", async (req, res) => {
       return res.status(409).json({ error: "Complete all visible activities to earn this kit." });
     }
     await setPracticalSkillsKitCompletion(studentEmail, kitId, true);
+    void autoEmailKitCertificate(req, kitId);
     const rows = await getAllPracticalSkillsProgressRows(studentEmail);
     res.json(computePracticalSkillsSnapshot(rows));
   } catch (error) {
@@ -13598,6 +13601,7 @@ app.get("/api/practical-skills/progress/:kitId", async (req, res) => {
 
   try {
     const certificate = await getPracticalSkillsCertificate(req, kitId);
+    const certificateEmailed = await autoEmailKitCertificate(req, kitId, certificate);
     const rows = await getAllPracticalSkillsProgressRows(studentEmail);
     const snapshot = computePracticalSkillsSnapshot(rows);
     const row = rows.find((entry) => String(entry?.kit_id || "").trim() === kitId);
@@ -13606,7 +13610,8 @@ app.get("/api/practical-skills/progress/:kitId", async (req, res) => {
       badges: snapshot.badges,
       responses: row?.responses && typeof row.responses === "object" ? row.responses : {},
       completedActivities: row?.completed_activities || {},
-      certificate
+      certificate,
+      certificateEmailed
     });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not load kit progress." });
@@ -13614,6 +13619,57 @@ app.get("/api/practical-skills/progress/:kitId", async (req, res) => {
 });
 
 const certificateEmailCooldowns = new Map();
+
+async function sendKitCertificateEmail(studentEmail, kitId, certificate) {
+  const buffer = await createKitCertificatePdf(certificate);
+  const safe = (value) => String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
+  await sendConfiguredHubEmail({
+    to: studentEmail,
+    subject: `[DTECH HUB] ${certificate.kitTitle} - Certificate of Completion`,
+    html: `<div style="font-family:Arial,sans-serif;color:#173858;"><h2>Certificate of Completion</h2><p>Kia ora ${safe(certificate.studentName)},</p><p>Ka pai! You completed all ${certificate.activityCount} activities in <strong>${safe(certificate.kitTitle)}</strong> on ${safe(certificate.completedDate)}.</p><p>Your landscape PDF certificate is attached. You can save, print or forward it to share your achievement.</p><p>${safe(certificate.issuer)}</p></div>`,
+    attachment: { buffer, originalname: `${kitId}-certificate.pdf`, mimetype: "application/pdf" },
+    emailType: "kit_certificate"
+  });
+}
+
+// Claims the one automatic certificate email for a completed kit so concurrent requests cannot send it twice.
+async function claimKitCertificateAutoEmail(studentEmail, kitId, claim = true) {
+  const email = normalizeEmail(studentEmail);
+  if (!hasDatabase) {
+    const row = memoryPracticalSkillsProgress.get(`${email}:${kitId}`);
+    if (!row) return false;
+    if (!claim) { row.certificate_emailed_at = null; return true; }
+    if (!row.completed || row.certificate_emailed_at) return false;
+    row.certificate_emailed_at = new Date().toISOString();
+    return true;
+  }
+  await ensurePracticalSkillsProgressSchema();
+  const result = claim
+    ? await pool.query(`UPDATE practical_skills_progress SET certificate_emailed_at = NOW()
+        WHERE student_email = $1 AND kit_id = $2 AND completed = TRUE AND certificate_emailed_at IS NULL RETURNING kit_id`, [email, kitId])
+    : await pool.query(`UPDATE practical_skills_progress SET certificate_emailed_at = NULL WHERE student_email = $1 AND kit_id = $2 RETURNING kit_id`, [email, kitId]);
+  return Boolean(result.rows?.[0]);
+}
+
+// Emails the certificate the first time a kit is completed. Never throws; returns true when an email was sent.
+async function autoEmailKitCertificate(req, kitId, certificate = undefined) {
+  const studentEmail = normalizeEmail(getRequestUserEmail(req));
+  try {
+    if (!studentEmail || !smtpTransporter || !SMTP_FROM) return false;
+    const ready = certificate === undefined ? await getPracticalSkillsCertificate(req, kitId) : certificate;
+    if (!ready || !await claimKitCertificateAutoEmail(studentEmail, kitId)) return false;
+    try {
+      await sendKitCertificateEmail(studentEmail, kitId, ready);
+      return true;
+    } catch (error) {
+      await claimKitCertificateAutoEmail(studentEmail, kitId, false).catch(() => {});
+      throw error;
+    }
+  } catch (error) {
+    console.error("[kit-certificate-email] Could not automatically email certificate:", error);
+    return false;
+  }
+}
 
 app.get("/api/practical-skills/progress/:kitId/certificate.pdf", async (req, res) => {
   const studentEmail = normalizeEmail(getRequestUserEmail(req));
@@ -13650,15 +13706,8 @@ app.post("/api/practical-skills/progress/:kitId/certificate/email", async (req, 
       certificateEmailCooldowns.delete(key);
       return res.status(409).json({ error: "Complete all visible activities before emailing your certificate." });
     }
-    const buffer = await createKitCertificatePdf(certificate);
-    const safe = (value) => String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
-    await sendConfiguredHubEmail({
-      to: studentEmail,
-      subject: `[DTECH HUB] ${certificate.kitTitle} - Certificate of Completion`,
-      html: `<div style="font-family:Arial,sans-serif;color:#173858;"><h2>Certificate of Completion</h2><p>Kia ora ${safe(certificate.studentName)},</p><p>Ka pai! You completed all ${certificate.activityCount} activities in <strong>${safe(certificate.kitTitle)}</strong> on ${safe(certificate.completedDate)}.</p><p>Your landscape PDF certificate is attached. You can save, print or forward it to share your achievement.</p><p>${safe(certificate.issuer)}</p></div>`,
-      attachment: { buffer, originalname: `${kitId}-certificate.pdf`, mimetype: "application/pdf" },
-      emailType: "kit_certificate"
-    });
+    await sendKitCertificateEmail(studentEmail, kitId, certificate);
+    await claimKitCertificateAutoEmail(studentEmail, kitId).catch(() => false);
     res.json({ sent: true, recipient: studentEmail });
   } catch (error) {
     certificateEmailCooldowns.delete(key);
@@ -13724,6 +13773,7 @@ app.put("/api/practical-skills/progress/:kitId/activities/:activityIndex", async
     }
     const saved = await setPracticalSkillsActivityCompletion(studentEmail, kitId, activityIndex, req.body.completed);
     await syncPracticalSkillsKitCompletion(studentEmail, kitId, content);
+    void autoEmailKitCertificate(req, kitId);
     res.json({ completedActivities: saved.completed_activities });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not save activity completion." });
@@ -13804,6 +13854,7 @@ app.post("/api/practical-skills/progress/:kitId/activities/:activityIndex/check"
           : gradePasswordProblems(req.body.answers);
     const saved = await savePracticalSkillsAssessment(studentEmail, kitId, activityIndex, grade);
     await syncPracticalSkillsKitCompletion(studentEmail, kitId, content);
+    void autoEmailKitCertificate(req, kitId);
     res.json({ ...grade, completedActivities: saved.completed_activities });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not check and save your activity." });
@@ -14056,6 +14107,7 @@ app.post("/api/practical-skills/research-report/:kitId/:activityIndex/check", as
     const grade = gradeResearchReport(studentText, templateText, { minimumWords: loaded.report.minimumWords });
     const saved = await savePracticalSkillsAssessment(email, kitId, loaded.activityIndex, grade);
     await syncPracticalSkillsKitCompletion(email, kitId, loaded.content);
+    void autoEmailKitCertificate(req, kitId);
     res.json({ ...grade, completedActivities: saved.completed_activities });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not check your research report." });

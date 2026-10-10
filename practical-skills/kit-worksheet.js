@@ -771,6 +771,9 @@
             }
             renderPage();
             updateCompleteBar(progressPayload?.kit);
+            if (progressPayload?.certificateEmailed && state.certificate) {
+                certificateStatus(`Ka pai! A copy of your certificate has been emailed to ${state.email}.`);
+            }
             if (siteGrade) showLoginSiteCompletionResult(siteGrade);
             if (state.content?.activities?.[getCurrentActivityIndex()]?.assessment?.id === "apps-wordsearch-v1") {
                 const email = state.email;

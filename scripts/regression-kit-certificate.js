@@ -14,6 +14,7 @@ function extract(start, end) {
     assert.ok(from >= 0 && to > from);
     return source.slice(from, to);
 }
+const settle = () => new Promise((resolve) => setTimeout(resolve, 1500));
 async function main() {
     const content = {
         bannerTitle: "Login Kit",
@@ -28,6 +29,7 @@ async function main() {
         ...certificateTools, ...assessment, ...loginSites,
         app: Object.fromEntries(["get", "post", "put"].map((method) => [method, (url, handler) => { handlers[`${method} ${url}`] = handler; }])),
         hasDatabase: false, memoryPracticalSkillsProgress: new Map(),
+        SEARCH_RESULTS_DETECTIVE_ID: "search-results-detective-v1", SEARCH_AND_FIND_ID: "search-and-find-v1",
         normalizeEmail: (value) => String(value || "").trim().toLowerCase(),
         SCHOOL_EMAIL_DOMAIN: "example.school.nz", getRequestUserEmail: (req) => req.email,
         PRACTICAL_SKILLS_KIT_DEFINITIONS: [{ id: "kit-login" }],
@@ -82,7 +84,15 @@ async function main() {
     assert.equal((await call("get", "")).body.certificate, null);
     assert.equal((await call("put", "/activities/:activityIndex", { params: { kitId: "kit-login", activityIndex: "1" } })).code, 200);
     const progress = (await call("get", "")).body;
+    await settle();
     assert.equal(progress.kit.isComplete, true, "Last activity automatically persists kit completion");
+    assert.equal(sent.length, 1, "Completing the kit automatically emails the certificate once");
+    assert.equal(sent[0].to, email);
+    assert.equal(sent[0].emailType, "kit_certificate");
+    assert.ok(context.memoryPracticalSkillsProgress.get(`${email}:kit-login`).certificate_emailed_at);
+    await call("get", "");
+    await call("get", "");
+    assert.equal(sent.length, 1, "Reloading the kit never resends the automatic email");
     assert.equal(progress.certificate.studentName, "Māia Student");
     assert.equal(progress.certificate.studentEmail, email);
     const dashboardResponse = {
@@ -124,11 +134,11 @@ async function main() {
     const emailed = await call("post", "/certificate/email");
     assert.equal(emailed.code, 200);
     assert.equal(emailed.body.recipient, email);
-    assert.equal(sent.length, 1);
-    assert.equal(sent[0].to, email, "Recipient is server-derived, never a client-supplied address");
-    assert.equal(sent[0].attachment.mimetype, "application/pdf");
-    assert.ok(sent[0].attachment.buffer.length > 1000);
-    assert.equal(sent[0].emailType, "kit_certificate");
+    assert.equal(sent.length, 2, "Manual Email me a copy still sends on request");
+    assert.equal(sent[1].to, email, "Recipient is server-derived, never a client-supplied address");
+    assert.equal(sent[1].attachment.mimetype, "application/pdf");
+    assert.ok(sent[1].attachment.buffer.length > 1000);
+    assert.equal(sent[1].emailType, "kit_certificate");
     assert.equal((await call("post", "/certificate/email")).code, 429, "Repeated sends are throttled");
     assert.equal((await call("get", "", { auth_identity: { verified: false, givenName: "Spoof" } })).body.certificate.studentName, email);
     context.memoryStaffDirectory = new Map([[email, { email_school: email, first_name: "Vanessa", last_name: "Pringle" }]]);
@@ -154,7 +164,20 @@ async function main() {
     assert.equal((await call("post", "/activities/:activityIndex/check", { body: { answers: { scratch: "Scratchers" } } })).body.passed, true);
     assert.equal(context.memoryPracticalSkillsProgress.get(`${email}:kit-login`).completed, true, "Final self-marked activity persists kit completion immediately");
     assert.equal((await call("get", "")).body.kit.isComplete, true);
+    await settle();
+    assert.equal(sent.length, 2, "Undo and re-complete does not resend the automatic email");
     content.activities[0] = {};
+    await call("post", "/reset");
+    assert.equal(context.memoryPracticalSkillsProgress.get(`${email}:kit-login`).certificate_emailed_at, null, "Full kit reset re-enables the automatic email");
+    assert.equal((await call("get", "")).body.certificate, null);
+    context.sendConfiguredHubEmail = async () => { throw new Error("Mail unavailable"); };
+    await call("put", "/activities/:activityIndex");
+    await call("put", "/activities/:activityIndex", { params: { kitId: "kit-login", activityIndex: "1" } });
+    await settle();
+    assert.equal(context.memoryPracticalSkillsProgress.get(`${email}:kit-login`).certificate_emailed_at, null, "Failed automatic email releases its claim");
+    context.sendConfiguredHubEmail = async (options) => { sent.push(options); };
+    assert.equal((await call("get", "")).body.certificateEmailed, true, "Automatic email retries on the next page load");
+    assert.equal(sent.length, 3);
     await call("post", "/reset");
     assert.equal((await call("get", "")).body.certificate, null);
     assert.equal(certificateTools.allActivitiesComplete({ worksheets: [] }, { completed_activities: {} }), false);
@@ -216,7 +239,7 @@ async function main() {
             if (url.endsWith("/reset")) clientCertificate = null;
             return { ok: true, json: async () => url.includes("/kit-content/") ? { content } : {
                 responses: {}, completedActivities: clientCertificate ? { 0: "saved", 1: "saved" } : {},
-                certificate: clientCertificate, kit: { isComplete: Boolean(clientCertificate) }, kits: [{ id: "kit-login", isComplete: Boolean(clientCertificate) }]
+                certificate: clientCertificate, certificateEmailed: Boolean(clientCertificate), kit: { isComplete: Boolean(clientCertificate) }, kits: [{ id: "kit-login", isComplete: Boolean(clientCertificate) }]
             } };
         },
         window: {
@@ -232,6 +255,7 @@ async function main() {
     assert.equal(nodes.get("worksheet-complete-btn").hidden, true, "Manual whole-kit button is removed");
     assert.equal(nodes.get("certificate-student-name").textContent, "Māia Student");
     assert.match(nodes.get("certificate-completion-details").textContent, /2 activities completed/);
+    assert.match(nodes.get("certificate-status").textContent, /emailed to student@example/, "Student is told the automatic email was sent");
     events["certificate-print:click"]();
     assert.equal(printCalled, true);
     assert.equal(classes.has("printing-certificate"), false, "Printing mode is cleaned up");
