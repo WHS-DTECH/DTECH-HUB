@@ -7,6 +7,8 @@ const {
     parseGoogleDocId,
     resolveResearchReportTemplateId,
     getResearchReportProgrammeFolder,
+    buildResearchReportReplacements,
+    applyResearchReportReplacements,
     gradeResearchReport
 } = require("../research-report");
 
@@ -48,6 +50,18 @@ assert.match(done.feedback, /Ka pai!/);
 assert.equal(gradeResearchReport("teh glaicer is reely big and mellting fast becos of warmer wether", "", { minimumWords: 10 }).passed, true,
     "Spelling is not assessed");
 assert.equal(gradeResearchReport("Place 1: Place 2:", template).addedWords, 0, "Deleting template text does not count as content");
+
+const headerTemplate = "Student name\n[Type your name]\nClass/homeroom\n[Type your class]\nPlace\n[Name a place]";
+const replacements = buildResearchReportReplacements({ studentName: " Aroha Smith ", formClass: "9TEC" });
+assert.deepEqual(replacements, [
+    { placeholder: "[Type your name]", value: "Aroha Smith" },
+    { placeholder: "[Type your class]", value: "9TEC" }
+]);
+assert.deepEqual(buildResearchReportReplacements({ studentName: "Staff Member", formClass: "" }).map((item) => item.placeholder), ["[Type your name]"],
+    "Unknown class leaves the class prompt for the student to fill in");
+const filledTemplate = applyResearchReportReplacements(headerTemplate, replacements);
+assert.equal(filledTemplate, "Student name\nAroha Smith\nClass/homeroom\n9TEC\nPlace\n[Name a place]");
+assert.equal(gradeResearchReport(filledTemplate, filledTemplate).addedWords, 0, "Pre-filled name and class are not counted as the student's words");
 
 const serverSource = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
 const ensureStart = serverSource.indexOf("async function ensureStudentResearchReport(");

@@ -7,7 +7,7 @@ const nodemailer = require("nodemailer");
 const { Pool } = require("pg");
 const { PASSWORD_PROBLEMS_ID, APPS_WORDSEARCH_ID, withShortLoginKit, withLoginAppsActivity, withLearningSitesActivity, withPasswordProblemsActivity, withLoginIdentityActivity, getStudentAssessment, gradePasswordProblems, gradeLoginIdentity, gradeAppsWordsearch } = require("./practical-skills-assessment");
 const { LEARNING_SITES_ID, getHuntProfile, gradeLearningSites } = require("./learning-sites-assessment");
-const { SEARCH_RESEARCH_REPORT_FILE_NAME, resolveResearchReportTemplateId, getResearchReportProgrammeFolder, gradeResearchReport } = require("./research-report");
+const { SEARCH_RESEARCH_REPORT_FILE_NAME, resolveResearchReportTemplateId, getResearchReportProgrammeFolder, buildResearchReportReplacements, applyResearchReportReplacements, gradeResearchReport } = require("./research-report");
 const { gradeLoginSites } = require("./practical-skills-assessment");
 const { validateLoginSites, publicLoginSites, visibleLoginSites } = require("./login-sites-config");
 
@@ -13869,6 +13869,35 @@ async function verifyDriveTokenForStudent(driveAccessToken, email) {
     error.status = 403;
     throw error;
   }
+  return identity;
+}
+
+// Name and form class for the report header, from the student directory (Google account name as a fallback).
+async function getResearchReportStudentDetails(email, googleName = "") {
+  const rows = (await getStudentDirectoryRows()).map(buildStudentClassManagementRow)
+    .filter((row) => row.linked_emails.some((linkedEmail) => normalizeEmail(linkedEmail) === email));
+  const latest = rows.reduce((current, row) => !current || shouldReplaceStudentSnapshot(current, row) ? row : current, null);
+  const directoryName = latest?.student_name && latest.student_name !== "Unnamed student" ? latest.student_name : "";
+  return { studentName: directoryName || String(googleName || "").trim(), formClass: String(latest?.form_class || "").trim() };
+}
+
+async function fillGoogleDocPlaceholders(documentId, replacements, accessToken) {
+  if (!replacements.length) return false;
+  const response = await fetch(`https://docs.googleapis.com/v1/documents/${encodeURIComponent(documentId)}:batchUpdate`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      requests: replacements.map(({ placeholder, value }) => ({
+        replaceAllText: { containsText: { text: placeholder, matchCase: true }, replaceText: value }
+      }))
+    })
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    console.warn("Research report details could not be filled in:", payload?.error?.message || response.status);
+    return false;
+  }
+  return true;
 }
 
 async function driveGetLiveFile(fileId, accessToken) {
@@ -13906,8 +13935,8 @@ function researchReportStudentEmail(req, res) {
   return email;
 }
 
-// Locates WHS-DTECH > JuniorDTECH/MiddleDTECH > KITS and reopens or copies the report. Never edits or deletes files.
-async function ensureStudentResearchReport(email, kitId, report, driveAccessToken) {
+// Locates WHS-DTECH > JuniorDTECH/MiddleDTECH > KITS and reopens or copies the report. Only a brand-new copy is filled in; existing files are never changed or deleted.
+async function ensureStudentResearchReport(email, kitId, report, driveAccessToken, studentDetails = {}) {
   const existing = await getStudentKitDocument(email, kitId, report.id);
   const liveExisting = existing?.document_id ? await driveGetLiveFile(existing.document_id, driveAccessToken) : null;
   if (liveExisting) return { documentId: liveExisting.id, created: false };
@@ -13952,6 +13981,10 @@ async function ensureStudentResearchReport(email, kitId, report, driveAccessToke
   }
   const copy = await driveCopyFile(templateId, kits.id, fileName, driveAccessToken);
   if (!copy?.id) throw new Error("Could not create your research report. Please try again.");
+  // Only the brand-new copy is filled in; the filled text joins the template snapshot so it is not counted as the student's own words.
+  const replacements = buildResearchReportReplacements(studentDetails);
+  const filled = await fillGoogleDocPlaceholders(copy.id, replacements, driveAccessToken).catch(() => false);
+  if (filled) templateText = applyResearchReportReplacements(templateText, replacements);
   await saveStudentKitDocument(email, kitId, report.id, { document_id: copy.id, folder_id: kits.id, template_id: templateId, template_text: templateText });
   return { documentId: copy.id, created: true };
 }
@@ -13991,9 +14024,10 @@ app.post("/api/practical-skills/research-report/:kitId/:activityIndex", async (r
     const kitId = String(req.params.kitId || "").trim();
     const loaded = await loadResearchReportActivity(kitId, req.params.activityIndex);
     if (!loaded) { res.status(404).json({ error: "This activity does not have a research report." }); return; }
-    await verifyDriveTokenForStudent(driveAccessToken, email);
+    const identity = await verifyDriveTokenForStudent(driveAccessToken, email);
     const result = await withResearchReportLock(`${email}:${kitId}:${loaded.report.id}`,
-      () => ensureStudentResearchReport(email, kitId, loaded.report, driveAccessToken));
+      async () => ensureStudentResearchReport(email, kitId, loaded.report, driveAccessToken,
+        await getResearchReportStudentDetails(email, identity?.name).catch(() => ({ studentName: identity?.name || "" }))));
     res.json({ exists: true, created: result.created, documentUrl: googleDocUrl(result.documentId) });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not create your research report." });

@@ -28,6 +28,18 @@ function getResearchReportProgrammeFolder(profile) {
     return "";
 }
 
+// Template placeholders the hub fills in when a student's copy is first made.
+function buildResearchReportReplacements({ studentName, formClass } = {}) {
+    return [
+        ["[Type your name]", String(studentName || "").trim()],
+        ["[Type your class]", String(formClass || "").trim()]
+    ].filter(([, value]) => value).map(([placeholder, value]) => ({ placeholder, value }));
+}
+
+function applyResearchReportReplacements(text, replacements) {
+    return (replacements || []).reduce((result, { placeholder, value }) => result.split(placeholder).join(value), String(text || ""));
+}
+
 function reportWords(text) {
     return String(text || "").normalize("NFKC").toLowerCase()
         .replace(/[\u2018\u2019]/g, "'")
@@ -69,5 +81,7 @@ module.exports = {
     parseGoogleDocId,
     resolveResearchReportTemplateId,
     getResearchReportProgrammeFolder,
+    buildResearchReportReplacements,
+    applyResearchReportReplacements,
     gradeResearchReport
 };
