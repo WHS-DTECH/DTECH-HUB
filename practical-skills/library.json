@@ -23,7 +23,7 @@
     "href": "/practical-skills/kit-worksheet.html?kit=kit-login",
     "imageUrl": "",
     "visual": {
-      "icon": "\ud83d\udd10",
+      "icon": "🔐",
       "palette": "linear-gradient(135deg, #2f8f61 0%, #3ca873 54%, #65c494 100%)"
     }
   },
@@ -37,7 +37,21 @@
     "href": "/practical-skills/kit-worksheet.html?kit=kit-google-search",
     "imageUrl": "",
     "visual": {
-      "icon": "\ud83d\udd0e",
+      "icon": "🔎",
+      "palette": "linear-gradient(135deg, #2f8f61 0%, #3ca873 54%, #65c494 100%)"
+    }
+  },
+  {
+    "id": "kit-minecraft",
+    "title": "Minecraft Builder Kit",
+    "summary": "Explore Minecraft Education, develop your building skills, capture your creations and take on the Famous Building Challenge!",
+    "yearLevel": "Junior DTECH",
+    "area": "Application Kits",
+    "status": "active",
+    "href": "/practical-skills/kit-worksheet.html?kit=kit-minecraft",
+    "imageUrl": "",
+    "visual": {
+      "icon": "🧱",
       "palette": "linear-gradient(135deg, #2f8f61 0%, #3ca873 54%, #65c494 100%)"
     }
   }

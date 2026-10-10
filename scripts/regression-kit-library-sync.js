@@ -91,6 +91,53 @@ async function main() {
     assert.equal(searchCard.title, "Search Kit");
     assert.equal(searchCard.href, "/practical-skills/kit-worksheet.html?kit=kit-google-search");
     assert.equal(searchCard.yearLevel, "Junior DTECH");
+    const minecraftSeed = library.find((card) => card.id === "kit-minecraft");
+    assert.ok(minecraftSeed, "Minecraft Builder Kit is in the starter library seed");
+
+    const storeStart = serverSource.indexOf("async function readPracticalSkillsLibrarySeedFile() {");
+    const storeEnd = serverSource.indexOf("\nasync function syncPracticalSkillsKitLibraryCard(", storeStart);
+    const buildStart = serverSource.indexOf("function buildPracticalSkillsKitLibraryCard(");
+    const buildEnd = serverSource.indexOf("\nasync function getSuggestionRecipients()", buildStart);
+    assert.ok(storeStart >= 0 && storeEnd > storeStart && buildStart >= 0 && buildEnd > buildStart, "Persistent library store exists");
+    let dbCards = null;
+    const queries = [];
+    const seedCards = [{ id: "kit-login", title: "Login Kit" }];
+    const storeContext = vm.createContext({
+        hasDatabase: true,
+        PRACTICAL_SKILLS_LIBRARY_FILE: "library.json",
+        fs: { promises: {
+            readFile: async () => JSON.stringify(seedCards),
+            writeFile: async () => { throw new Error("Database mode must not rely on the deploy file"); }
+        } },
+        normalizePracticalSkillLibraryItem: (card) => card,
+        ensurePracticalSkillsKitContentSchema: async () => {},
+        encodeURIComponent,
+        JSON,
+        pool: { query: async (sql, params) => {
+            queries.push(sql);
+            if (/SELECT cards FROM practical_skills_library_store/.test(sql)) return { rows: dbCards ? [{ cards: structuredClone(dbCards) }] : [] };
+            if (/SELECT kit_id, content FROM practical_skills_kit_content/.test(sql)) return { rows: [
+                { kit_id: "kit-login", content: { identity: { name: "Login Kit" } } },
+                { kit_id: "kit-minecraft", content: { identity: { name: "Minecraft Builder Kit", skillArea: "Application Kits", yearLevel: "Junior DTECH" }, bannerSubtitle: "Build it", theme: { icon: "🧱" } } }
+            ] };
+            if (/INSERT INTO practical_skills_library_store/.test(sql)) { dbCards = JSON.parse(params[0]); return { rows: [] }; }
+            return { rows: [] };
+        } }
+    });
+    vm.runInContext(serverSource.slice(storeStart, storeEnd) + serverSource.slice(buildStart, buildEnd), storeContext);
+    const firstRead = await storeContext.readPracticalSkillsLibraryFile();
+    assert.deepEqual(firstRead.map((card) => card.id), ["kit-login", "kit-minecraft"], "First read seeds from file and restores missing saved kits");
+    assert.equal(firstRead[1].area, "Application Kits");
+    assert.deepEqual(dbCards.map((card) => card.id), ["kit-login", "kit-minecraft"], "Seeded library is persisted in the database");
+    dbCards = [{ id: "kit-login", title: "Login Kit" }];
+    const laterRead = await storeContext.readPracticalSkillsLibraryFile();
+    assert.deepEqual(laterRead.map((card) => card.id), ["kit-login"], "Stored library is the source of truth after seeding (removed cards stay removed)");
+    await storeContext.writePracticalSkillsLibraryFile([{ id: "kit-login", title: "Login Kit" }, { id: "kit-minecraft", title: "Minecraft Builder Kit" }]);
+    assert.equal(dbCards.length, 2, "Saving the library writes to the database");
+
+    const staticIndex = serverSource.indexOf("app.use(express.static(__dirname));");
+    const libraryRouteIndex = serverSource.indexOf('app.get("/practical-skills/library.json"');
+    assert.ok(libraryRouteIndex >= 0 && libraryRouteIndex < staticIndex, "library.json is served from the persistent store before static files");
 
     console.log("Kit-to-Licence Library synchronization regressions passed.");
 }

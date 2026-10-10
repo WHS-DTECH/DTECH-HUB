@@ -6021,6 +6021,15 @@ app.use(async (req, _res, next) => {
 });
 app.use("/images/activities", express.static(path.join(__dirname, "images", "activities")));
 app.use("/images/activities", express.static(path.join(__dirname, "public", "images", "activities")));
+app.get("/practical-skills/library.json", async (_req, res) => {
+  try {
+    const rows = await readPracticalSkillsLibraryFile();
+    res.set("Cache-Control", "no-store");
+    res.json(rows);
+  } catch (_error) {
+    res.status(500).json({ error: "Could not load Practical Skills library" });
+  }
+});
 app.use(express.static(__dirname));
 
 function normalizeEvidenceStepsPayload(value) {
@@ -6257,7 +6266,7 @@ function normalizePracticalSkillLibraryItem(item, fallbackIndex = 0) {
   };
 }
 
-async function readPracticalSkillsLibraryFile() {
+async function readPracticalSkillsLibrarySeedFile() {
   let raw;
   try {
     raw = await fs.promises.readFile(PRACTICAL_SKILLS_LIBRARY_FILE, "utf8");
@@ -6273,10 +6282,56 @@ async function readPracticalSkillsLibraryFile() {
     .filter(Boolean);
 }
 
+async function ensurePracticalSkillsLibrarySchema() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS practical_skills_library_store (
+      id TEXT PRIMARY KEY,
+      cards JSONB NOT NULL DEFAULT '[]'::jsonb,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+}
+
+// The deployed library.json is reset on every Render deploy/restart, so the
+// published library lives in Postgres and the file is only the first-run seed.
+async function readPracticalSkillsLibraryFile() {
+  if (!hasDatabase) return readPracticalSkillsLibrarySeedFile();
+
+  await ensurePracticalSkillsLibrarySchema();
+  const result = await pool.query(`SELECT cards FROM practical_skills_library_store WHERE id = 'default' LIMIT 1`);
+  const stored = result.rows?.[0]?.cards;
+  if (Array.isArray(stored)) {
+    return stored
+      .map((item, index) => normalizePracticalSkillLibraryItem(item, index))
+      .filter(Boolean);
+  }
+
+  const cards = await readPracticalSkillsLibrarySeedFile();
+  await ensurePracticalSkillsKitContentSchema();
+  const kitRows = await pool.query(`SELECT kit_id, content FROM practical_skills_kit_content ORDER BY kit_id`);
+  for (const row of kitRows.rows || []) {
+    if (cards.some((card) => card.id === row.kit_id)) continue;
+    const card = buildPracticalSkillsKitLibraryCard(row.kit_id, row.content);
+    if (card) cards.push(card);
+  }
+  return writePracticalSkillsLibraryFile(cards);
+}
+
 async function writePracticalSkillsLibraryFile(items) {
   const normalized = (Array.isArray(items) ? items : [])
     .map((item, index) => normalizePracticalSkillLibraryItem(item, index))
     .filter(Boolean);
+
+  if (hasDatabase) {
+    await ensurePracticalSkillsLibrarySchema();
+    await pool.query(
+      `INSERT INTO practical_skills_library_store (id, cards, updated_at)
+       VALUES ('default', $1::jsonb, NOW())
+       ON CONFLICT (id) DO UPDATE SET cards = EXCLUDED.cards, updated_at = NOW()`,
+      [JSON.stringify(normalized)]
+    );
+    return normalized;
+  }
 
   await fs.promises.writeFile(
     PRACTICAL_SKILLS_LIBRARY_FILE,
@@ -6297,21 +6352,28 @@ async function syncPracticalSkillsKitLibraryCard(kitId, content) {
   const existing = existingIndex >= 0 ? cards[existingIndex] : null;
   const card = existing
     ? { ...existing, title, href: `/practical-skills/kit-worksheet.html?kit=${encodeURIComponent(safeKitId)}` }
-    : normalizePracticalSkillLibraryItem({
-        id: safeKitId,
-        title,
-        summary: content.bannerSubtitle || content.learning?.whatStudentsWillLearn || `Explore the ${title} kit and complete its activities.`,
-        yearLevel: content.identity?.yearLevel || "All Years",
-        area: content.identity?.skillArea || "Practical Skills",
-        status: content.identity?.status || "active",
-        href: `/practical-skills/kit-worksheet.html?kit=${encodeURIComponent(safeKitId)}`,
-        visual: { icon: content.theme?.icon || "PS" }
-      });
+    : buildPracticalSkillsKitLibraryCard(safeKitId, content);
 
   if (existingIndex >= 0) cards[existingIndex] = card;
   else cards.push(card);
   await writePracticalSkillsLibraryFile(cards);
   return card;
+}
+
+function buildPracticalSkillsKitLibraryCard(kitId, content) {
+  const safeKitId = String(kitId || "").trim();
+  const title = String(content?.identity?.name || content?.bannerTitle || "").trim();
+  if (!safeKitId || !title) return null;
+  return normalizePracticalSkillLibraryItem({
+    id: safeKitId,
+    title,
+    summary: content.bannerSubtitle || content.learning?.whatStudentsWillLearn || `Explore the ${title} kit and complete its activities.`,
+    yearLevel: content.identity?.yearLevel || "All Years",
+    area: content.identity?.skillArea || "Practical Skills",
+    status: content.identity?.status || "active",
+    href: `/practical-skills/kit-worksheet.html?kit=${encodeURIComponent(safeKitId)}`,
+    visual: { icon: content.theme?.icon || "PS" }
+  });
 }
 
 async function getSuggestionRecipients() {
