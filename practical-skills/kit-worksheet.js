@@ -559,12 +559,18 @@
                         showLoginSiteCompletionResult(payload);
                         return payload;
                     }
+                    // Course folder creation needs Drive permission; ask only once every answer is filled in, and never block the tick.
+                    let driveAccessToken = "";
+                    if (activity?.assessment?.id === "learning-sites-treasure-v1" &&
+                        ["science", "english", "food", "pe", "dtech", "course", "course-clue-1", "course-clue-2"].every((id) => String(answers?.[id] || "").trim())) {
+                        driveAccessToken = await getResearchReportDriveToken().catch(() => "");
+                    }
                     return queueProgressWrite(async () => {
                         await saveResponses(state.kitId, state.responses);
                         const payload = await loadJson(`/api/practical-skills/progress/${encodeURIComponent(state.kitId)}/activities/${activityIndex}/check`, {
                             method: "POST",
                             headers: withAuthHeaders({ "Content-Type": "application/json" }),
-                            body: JSON.stringify({ answers })
+                            body: JSON.stringify(driveAccessToken ? { answers, driveAccessToken } : { answers })
                         });
                         state.responses[assessmentKey] = payload.answers;
                         state.completedActivities = payload.completedActivities;

@@ -89,8 +89,8 @@ function getLearningSitesAssessment() {
 function getHuntProfile(student, { isStaff = false } = {}) {
     if (isStaff) {
         return {
-            available: true, year: null, courseIds: ["STAFF"],
-            message: "Your staff access is confirmed. Choose Staff to explore the JuniorDTECH page and complete the hunt."
+            available: true, year: null, courseIds: courses.filter((course) => !course.hidden).map((course) => course.id),
+            message: "Your staff access is confirmed. Choose Staff for the JuniorDTECH page, or any course to test that pathway and create its course folder."
         };
     }
     const year = Number(String(student?.year_level || "").replace(/^year\s*/i, "").trim());
@@ -131,9 +131,11 @@ function gradeLearningSites(answers, profile) {
         return { id: clue.id, correct, explanation: correct ? `X marks ${clue.title}! Correct - ka pai!` : clue.hint };
     });
     cleanAnswers.course = course?.id || "";
+    cleanAnswers.year = Number(profile?.year) || null;
+    const staff = Boolean(profile?.courseIds?.includes("STAFF"));
     results.push({
         id: "course", correct: courseCorrect,
-        explanation: courseCorrect ? course.id === "STAFF" ? "Staff access confirmed! Now explore the JuniorDTECH course page." : "Correct course! It matches your User Profile timetable." :
+        explanation: courseCorrect ? course.id === "STAFF" ? "Staff access confirmed! Now explore the JuniorDTECH course page." : staff ? "Staff test pathway confirmed! Now explore this course page." : "Correct course! It matches your User Profile timetable." :
             profile?.available ? "That course/year does not match your User Profile. Check your profile and try again. If the profile is wrong, ask your teacher to correct it." : profile?.message || "Your course profile is unavailable. Ask your teacher for help."
     });
     for (const id of ["course-clue-1", "course-clue-2"]) {
@@ -147,4 +149,34 @@ function gradeLearningSites(answers, profile) {
     return { assessmentId: LEARNING_SITES_ID, answers: cleanAnswers, results, score, total: 8, passed: score === 8 };
 }
 
-module.exports = { LEARNING_SITES_ID, withLearningSitesActivity, getLearningSitesAssessment, getHuntProfile, gradeLearningSites };
+function findCourse(courseId) {
+    return courses.find((course) => course.id === courseId || course.aliases?.includes(courseId)) || null;
+}
+
+// Staff -> JuniorDTECH; Year 7/8 -> JuniorDTECH; Year 9/10 -> MiddleDTECH; Year 11-13 -> SeniorDTECH.
+function getCourseProgrammeFolder(courseId) {
+    const course = findCourse(courseId);
+    if (!course) return "";
+    if (course.id === "STAFF") return "JuniorDTECH";
+    const year = Math.min(...(course.years || [course.year]).map(Number));
+    if (year === 7 || year === 8) return "JuniorDTECH";
+    if (year === 9 || year === 10) return "MiddleDTECH";
+    if (year >= 11 && year <= 13) return "SeniorDTECH";
+    return "";
+}
+
+// True when a student's directory year level differs from the year they last checked in with. Staff never need a check-in.
+function needsCourseCheckIn(savedAnswers, profile) {
+    const year = Number(profile?.year);
+    if (!profile?.available || !year || profile.courseIds?.includes("STAFF")) return false;
+    const savedYear = Number(savedAnswers?.year);
+    if (savedYear) return savedYear !== year;
+    const course = findCourse(savedAnswers?.course);
+    const years = course ? (course.years || [course.year]).map(Number).filter(Boolean) : [];
+    return years.length > 0 && !years.includes(year);
+}
+
+module.exports = {
+    LEARNING_SITES_ID, withLearningSitesActivity, getLearningSitesAssessment, getHuntProfile, gradeLearningSites,
+    getCourseProgrammeFolder, needsCourseCheckIn
+};

@@ -47,6 +47,29 @@ async function main() {
     assert.equal(hunt.gradeLearningSites({ ...staffAnswers, "course-clue-1": "wrong" }, hunt.getHuntProfile(null, { isStaff: true })).score, 7);
     assert.equal(hunt.gradeLearningSites(staffAnswers, profile).passed, false, "Student profiles cannot choose Staff");
     assert.equal(hunt.gradeLearningSites(staffAnswers, hunt.getHuntProfile(null)).passed, false);
+    const staffProfile = hunt.getHuntProfile(null, { isStaff: true });
+    assert.ok(staffProfile.courseIds.includes("STAFF") && staffProfile.courseIds.includes("SENIORDTECH"), "Staff can test every pathway");
+    assert.equal(hunt.gradeLearningSites(answers, staffProfile).passed, true, "Staff can test the Junior pathway");
+    assert.equal(hunt.gradeLearningSites({ ...answers, course: "SENIORDTECH", "course-clue-1": "Python", "course-clue-2": "HTML and CSS" }, staffProfile).passed, true);
+    assert.equal(hunt.gradeLearningSites(answers, profile).answers.year, 7, "Check-in year is saved");
+    assert.equal(hunt.getCourseProgrammeFolder("7DTECH"), "JuniorDTECH");
+    assert.equal(hunt.getCourseProgrammeFolder("8DTECH"), "JuniorDTECH");
+    assert.equal(hunt.getCourseProgrammeFolder("STAFF"), "JuniorDTECH");
+    assert.equal(hunt.getCourseProgrammeFolder("MIDDLEDTECH"), "MiddleDTECH");
+    assert.equal(hunt.getCourseProgrammeFolder("9DTECH"), "MiddleDTECH", "Aliases map to their course");
+    assert.equal(hunt.getCourseProgrammeFolder("10MPROG"), "MiddleDTECH");
+    assert.equal(hunt.getCourseProgrammeFolder("SENIORDTECH"), "SeniorDTECH");
+    assert.equal(hunt.getCourseProgrammeFolder("13COMP"), "SeniorDTECH");
+    assert.equal(hunt.getCourseProgrammeFolder("nope"), "");
+    const y8 = hunt.getHuntProfile({ year_level: "8", programs: ["DTECH"] });
+    const y9 = hunt.getHuntProfile({ year_level: "9", programs: ["DTECH"] });
+    assert.equal(hunt.needsCourseCheckIn({ course: "8DTECH", year: 8 }, y8), false);
+    assert.equal(hunt.needsCourseCheckIn({ course: "8DTECH", year: 8 }, y9), true, "Year level change reopens the check-in");
+    assert.equal(hunt.needsCourseCheckIn({ course: "MIDDLEDTECH", year: 9 }, hunt.getHuntProfile({ year_level: "10", programs: ["DTECH"] })), true);
+    assert.equal(hunt.needsCourseCheckIn({ course: "8DTECH" }, y8), false, "Legacy answers in range stay complete");
+    assert.equal(hunt.needsCourseCheckIn({ course: "8DTECH" }, y9), true, "Legacy answers out of range reopen");
+    assert.equal(hunt.needsCourseCheckIn({ course: "STAFF" }, staffProfile), false, "Staff never reopen");
+    assert.equal(hunt.needsCourseCheckIn({ course: "8DTECH", year: 8 }, hunt.getHuntProfile(null)), false, "Unknown directory never reopens");
     assert.equal(hunt.gradeLearningSites({ ...answers, course: "8DTECH" }, profile).score, 5);
     assert.equal(hunt.gradeLearningSites({ ...answers, "course-clue-1": "wrong" }, profile).score, 7);
     assert.equal(hunt.gradeLearningSites(answers, hunt.getHuntProfile(null)).passed, false);
@@ -76,10 +99,19 @@ async function main() {
     assert.equal(hunt.gradeLearningSites({ ...answers, science: ["evidence"], passed: true }, profile).passed, false);
 
     let ownRows = [{ id_number: "1", linked_emails: ["student@example.school.nz"], year_level: "7", programs: ["DTECH"], upload_year: 2026 }];
+    const folderCalls = [];
     const handlers = {};
     const context = vm.createContext({
         ...assessment, ...hunt, ...loginSitesConfig,
         syncPracticalSkillsKitCompletion: async () => {},
+        autoEmailKitCertificate: async () => {},
+        SEARCH_RESULTS_DETECTIVE_ID: "search-results-detective-v1",
+        SEARCH_AND_FIND_ID: "search-and-find-v1",
+        stubVerifyDrive: async (token) => { if (token !== "good-token") throw new Error("bad token"); return {}; },
+        stubCourseFolders: async (_email, programmeFolder) => {
+            folderCalls.push(programmeFolder);
+            return { root: { id: "root-id" }, programme: { id: `${programmeFolder}-id` }, kits: { id: "kits-id" } };
+        },
         app: { get: (url, handler) => { handlers[url] = handler; }, post: (url, handler) => { handlers[url] = handler; } },
         getRequestUserEmail: (req) => req.email || "",
         normalizeEmail: (email) => String(email || "").trim().toLowerCase(),
@@ -94,6 +126,7 @@ async function main() {
         savePracticalSkillsAssessment: async (_email, _kit, _index, grade) => ({ completed_activities: grade.passed ? { 1: "saved" } : {} })
     });
     vm.runInContext(between("async function getLearningSitesStudentProfile(", 'app.get("/api/practical-skills/kit-content/:kitId"'), context);
+    vm.runInContext("ensureStudentCourseFolders = stubCourseFolders; verifyDriveTokenForStudent = stubVerifyDrive;", context);
     const request = async (url, overrides = {}) => {
         const res = { code: 200, status(code) { this.code = code; return this; }, json(body) { this.body = body; } };
         await handlers[url]({ email: "student@example.school.nz", params: { kitId: "kit-login", activityIndex: "1" }, body: { answers }, ...overrides }, res);
@@ -104,7 +137,24 @@ async function main() {
     assert.equal((await request(profileUrl, { email: "" })).code, 401);
     assert.equal((await request(profileUrl)).body.available, true);
     assert.equal((await request(profileUrl, { email: "other@example.school.nz" })).body.available, false);
-    assert.equal((await request(checkUrl)).body.completedActivities["1"], "saved");
+    const firstCheck = await request(checkUrl); assert.ok(firstCheck.body.completedActivities, JSON.stringify(firstCheck.body));
+    assert.equal(firstCheck.body.completedActivities["1"], "saved");
+    const noTokenCheck = await request(checkUrl);
+    assert.equal(noTokenCheck.body.courseFolder, null);
+    assert.match(noTokenCheck.body.courseFolderError, /JuniorDTECH folder will be made/);
+    const folderCheck = await request(checkUrl, { body: { answers, driveAccessToken: "good-token" } });
+    assert.ok(folderCheck.body.courseFolder, JSON.stringify(folderCheck.body));
+    assert.equal(folderCheck.body.courseFolder.name, "JuniorDTECH");
+    assert.equal(folderCheck.body.courseFolder.kitsFolderId, "kits-id");
+    assert.match(folderCheck.body.courseFolder.url, /JuniorDTECH-id/);
+    assert.deepEqual(folderCalls, ["JuniorDTECH"]);
+    const badTokenCheck = await request(checkUrl, { body: { answers, driveAccessToken: "bad-token" } });
+    assert.equal(badTokenCheck.body.completedActivities["1"], "saved", "Folder problems never block the tick");
+    assert.match(badTokenCheck.body.courseFolderError, /couldn't create your JuniorDTECH folder/);
+    assert.deepEqual(folderCalls, ["JuniorDTECH"]);
+    const failedCheck = await request(checkUrl, { body: { answers: { ...answers, science: "wrong" }, driveAccessToken: "good-token" } });
+    assert.equal(failedCheck.body.courseFolder, null, "No folder until the hunt is passed");
+    assert.deepEqual(folderCalls, ["JuniorDTECH"]);
     enhanced.worksheets.push({ activity: "Using your login details" });
     const siteContent = assessment.withShortLoginKit("kit-login", { worksheets: [{ activity: "Using your login details" }] });
     enhanced.activities.push({ loginSites: siteContent.activities[0].loginSites });
@@ -124,7 +174,8 @@ async function main() {
     });
     assert.equal(juniorCheck.body.passed, true, "Latest server profile excludes invisible questions from completion");
     assert.equal(juniorCheck.body.total, 2, "No-question sites do not count");
-    assert.deepEqual(Array.from((await request(profileUrl, { email: "staff@example.school.nz" })).body.courseIds), ["STAFF"]);
+    const staffCourseIds = Array.from((await request(profileUrl, { email: "staff@example.school.nz" })).body.courseIds);
+    assert.ok(staffCourseIds.includes("STAFF") && staffCourseIds.includes("7DTECH") && staffCourseIds.includes("SENIORDTECH"), "Staff profile offers every test pathway");
     assert.equal((await request(checkUrl, { email: "staff@example.school.nz", body: { answers: staffAnswers } })).body.completedActivities["1"], "saved");
     assert.equal((await request(checkUrl, { body: { answers: staffAnswers, profile: { available: true, courseIds: ["STAFF"] }, isStaff: true } })).body.passed, false, "Client-supplied staff status is ignored");
     assert.equal((await request(checkUrl, { body: { answers: { ...answers, course: "8DTECH" }, profile: { available: true, courseIds: ["8DTECH"] } } })).body.passed, false);
@@ -169,6 +220,34 @@ async function main() {
     }
     assert.doesNotMatch(worksheetSource, /backHref:/, "Student page does not render a duplicate activity-list link");
     assert.ok(fs.existsSync(path.join(__dirname, "..", "images", "learning-sites-treasure-map.svg")));
+
+    const huntIndex = enhanced.activities.findIndex((activity) => activity?.assessmentId === hunt.LEARNING_SITES_ID);
+    const progressRow = { kit_id: "kit-login", completed_activities: { [huntIndex]: "done", 0: "done" },
+        responses: { [`${huntIndex}-${hunt.LEARNING_SITES_ID}`]: { ...answers, year: 7 } } };
+    ownRows = [{ id_number: "1", linked_emails: ["student@example.school.nz"], year_level: "7", programs: ["DTECH"], upload_year: 2026 }];
+    const refreshCalls = [];
+    context.getAllPracticalSkillsProgressRows = async () => [progressRow];
+    context.savePracticalSkillsAssessment = async (...args) => { refreshCalls.push(["save", ...args]); return {}; };
+    context.setPracticalSkillsActivityCompletion = async (...args) => { refreshCalls.push(["tick", ...args]); };
+    context.syncPracticalSkillsKitCompletion = async () => { refreshCalls.push(["sync"]); };
+    const refresh = () => vm.runInContext('refreshLearningSitesCheckIn("student@example.school.nz")', context);
+    assert.equal(await refresh(), false, "Same year level keeps the check-in complete");
+    assert.equal(refreshCalls.length, 0);
+    ownRows = [{ ...ownRows[0], year_level: "8" }];
+    assert.equal(await refresh(), true, "A new year level reopens the check-in");
+    assert.deepEqual(refreshCalls.map((call) => call[0]), ["save", "tick", "sync"]);
+    assert.equal(refreshCalls[0][3], huntIndex);
+    assert.deepEqual(JSON.parse(JSON.stringify(refreshCalls[0][4].answers)), { reopenedForYear: 8, previousCourse: "7DTECH" });
+    assert.equal(refreshCalls[1][4], false, "Only the Learning Sites tick is removed");
+    refreshCalls.length = 0;
+    delete progressRow.completed_activities[huntIndex];
+    assert.equal(await refresh(), false, "Unfinished check-ins are left alone");
+    assert.equal(refreshCalls.length, 0);
+    progressRow.completed_activities[huntIndex] = "done";
+    context.getAllPracticalSkillsProgressRows = async () => { throw new Error("db down"); };
+    assert.equal(await refresh(), false, "Refresh failures never break progress loading");
+    ownRows = [{ ...ownRows[0], year_level: "7" }];
+
     context.getStudentDirectoryRows = async () => { throw new Error("Profile lookup failed"); };
     assert.equal((await request(profileUrl)).code, 500);
     assert.equal((await request(checkUrl)).code, 500);

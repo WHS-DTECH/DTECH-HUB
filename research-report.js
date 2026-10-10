@@ -19,12 +19,14 @@ function resolveResearchReportTemplateId(researchReport, fallback = "") {
     return parseGoogleDocId(researchReport?.templateId) || parseGoogleDocId(fallback);
 }
 
-// Year 7/8 -> JuniorDTECH, Year 9/10 -> MiddleDTECH. Staff use JuniorDTECH so they can test the Junior kit.
-function getResearchReportProgrammeFolder(profile) {
-    if (Array.isArray(profile?.courseIds) && profile.courseIds.includes("STAFF")) return "JuniorDTECH";
+// Year 7/8 -> JuniorDTECH, Year 9/10 -> MiddleDTECH, Year 11-13 -> SeniorDTECH.
+// Staff use the pathway they chose in the Login Kit course check-in (JuniorDTECH if they have not chosen one).
+function getResearchReportProgrammeFolder(profile, staffProgrammeFolder = "") {
+    if (Array.isArray(profile?.courseIds) && profile.courseIds.includes("STAFF")) return staffProgrammeFolder || "JuniorDTECH";
     const year = Number(profile?.year);
     if (year === 7 || year === 8) return "JuniorDTECH";
     if (year === 9 || year === 10) return "MiddleDTECH";
+    if (year >= 11 && year <= 13) return "SeniorDTECH";
     return "";
 }
 

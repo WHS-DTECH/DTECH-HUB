@@ -26,7 +26,12 @@ assert.equal(getResearchReportProgrammeFolder({ year: 8, courseIds: [] }), "Juni
 assert.equal(getResearchReportProgrammeFolder({ year: 9, courseIds: [] }), "MiddleDTECH");
 assert.equal(getResearchReportProgrammeFolder({ year: 10, courseIds: [] }), "MiddleDTECH");
 assert.equal(getResearchReportProgrammeFolder({ year: null, courseIds: ["STAFF"] }), "JuniorDTECH");
-assert.equal(getResearchReportProgrammeFolder({ year: 12, courseIds: [] }), "");
+assert.equal(getResearchReportProgrammeFolder({ year: null, courseIds: ["STAFF"] }, "SeniorDTECH"), "SeniorDTECH", "Staff use their chosen test pathway");
+assert.equal(getResearchReportProgrammeFolder({ year: 9, courseIds: [] }, "SeniorDTECH"), "MiddleDTECH", "Students cannot pick another pathway folder");
+assert.equal(getResearchReportProgrammeFolder({ year: 11, courseIds: [] }), "SeniorDTECH");
+assert.equal(getResearchReportProgrammeFolder({ year: 12, courseIds: [] }), "SeniorDTECH");
+assert.equal(getResearchReportProgrammeFolder({ year: 13, courseIds: [] }), "SeniorDTECH");
+assert.equal(getResearchReportProgrammeFolder({ year: 14, courseIds: [] }), "");
 assert.equal(getResearchReportProgrammeFolder({ year: NaN, courseIds: [] }), "");
 
 const template = "Search Kit - My West Coast Discoveries\nPlace 1:\nWhat I found:\nPlace 2:\nWhat I found:";
@@ -68,8 +73,13 @@ const ensureStart = serverSource.indexOf("async function ensureStudentResearchRe
 const ensureSource = serverSource.slice(ensureStart, serverSource.indexOf("\nfunction withResearchReportLock(", ensureStart));
 assert.ok(ensureStart > 0);
 assert.ok(ensureSource.indexOf("driveFindFileByNameInFolder") < ensureSource.indexOf("driveCopyFile"), "Existing reports are found before any copy is made");
-assert.match(ensureSource, /driveEnsureFolder\(root\.id, programmeFolder/);
-assert.match(ensureSource, /driveEnsureFolder\(programme\.id, "KITS"/);
+assert.match(ensureSource, /ensureStudentCourseFolders\(email, programmeFolder, driveAccessToken\)/);
+const foldersStart = serverSource.indexOf("async function ensureStudentCourseFolders(");
+const foldersSource = serverSource.slice(foldersStart, ensureStart);
+assert.ok(foldersStart > 0 && foldersStart < ensureStart);
+assert.match(foldersSource, /driveEnsureFolder\(root\.id, programmeFolder/);
+assert.match(foldersSource, /driveEnsureFolder\(programme\.id, "KITS"/);
+assert.doesNotMatch(foldersSource, /method: "(DELETE|PATCH|PUT)"|\/delete|trashed: true/, "Folder setup never edits, trashes or deletes Drive files");
 assert.doesNotMatch(ensureSource, /method: "(DELETE|PATCH|PUT)"|\/delete|trashed: true/, "Report creation never edits, trashes or deletes Drive files");
 const resetStart = serverSource.indexOf('app.post("/api/practical-skills/progress/:kitId/reset"');
 const resetSource = serverSource.slice(resetStart, serverSource.indexOf("\napp.", resetStart + 10));

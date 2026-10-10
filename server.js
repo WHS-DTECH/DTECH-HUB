@@ -6,7 +6,7 @@ const mammoth = require("mammoth");
 const nodemailer = require("nodemailer");
 const { Pool } = require("pg");
 const { PASSWORD_PROBLEMS_ID, APPS_WORDSEARCH_ID, withShortLoginKit, withLoginAppsActivity, withLearningSitesActivity, withPasswordProblemsActivity, withLoginIdentityActivity, getStudentAssessment, gradePasswordProblems, gradeLoginIdentity, gradeAppsWordsearch } = require("./practical-skills-assessment");
-const { LEARNING_SITES_ID, getHuntProfile, gradeLearningSites } = require("./learning-sites-assessment");
+const { LEARNING_SITES_ID, getHuntProfile, gradeLearningSites, getCourseProgrammeFolder, needsCourseCheckIn } = require("./learning-sites-assessment");
 const { SEARCH_RESEARCH_REPORT_FILE_NAME, resolveResearchReportTemplateId, getResearchReportProgrammeFolder, buildResearchReportReplacements, applyResearchReportReplacements, gradeResearchReport } = require("./research-report");
 const { gradeLoginSites } = require("./practical-skills-assessment");
 const { validateLoginSites, publicLoginSites, visibleLoginSites } = require("./login-sites-config");
@@ -13531,6 +13531,7 @@ app.get("/api/practical-skills/my-progress", async (req, res) => {
 
   try {
     await Promise.all(PRACTICAL_SKILLS_KIT_DEFINITIONS.map((kit) => ensurePracticalSkillsProgressRow(studentEmail, kit.id)));
+    await refreshLearningSitesCheckIn(studentEmail);
     await Promise.all(PRACTICAL_SKILLS_KIT_DEFINITIONS.map((kit) => syncPracticalSkillsKitCompletion(studentEmail, kit.id)));
     const rows = await getAllPracticalSkillsProgressRows(studentEmail);
     res.json({ ...computePracticalSkillsSnapshot(rows), student: { name: await getPracticalSkillsStudentName(req), email: studentEmail } });
@@ -13600,6 +13601,7 @@ app.get("/api/practical-skills/progress/:kitId", async (req, res) => {
   }
 
   try {
+    const courseCheckIn = kitId === "kit-login" && await refreshLearningSitesCheckIn(studentEmail);
     const certificate = await getPracticalSkillsCertificate(req, kitId);
     const certificateEmailed = await autoEmailKitCertificate(req, kitId, certificate);
     const rows = await getAllPracticalSkillsProgressRows(studentEmail);
@@ -13611,7 +13613,8 @@ app.get("/api/practical-skills/progress/:kitId", async (req, res) => {
       responses: row?.responses && typeof row.responses === "object" ? row.responses : {},
       completedActivities: row?.completed_activities || {},
       certificate,
-      certificateEmailed
+      certificateEmailed,
+      courseCheckIn
     });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not load kit progress." });
@@ -13791,6 +13794,40 @@ async function getLearningSitesStudentProfile(email) {
   return getHuntProfile(latest?.status?.toLowerCase() === "not current" ? null : latest);
 }
 
+async function getSavedLearningSitesCheckIn(email) {
+  const content = await getStoredPracticalSkillsKitContent("kit-login");
+  const index = Array.isArray(content?.activities)
+    ? content.activities.findIndex((activity) => activity?.assessmentId === LEARNING_SITES_ID) : -1;
+  if (index < 0) return null;
+  const row = (await getAllPracticalSkillsProgressRows(email)).find((entry) => String(entry?.kit_id || "").trim() === "kit-login");
+  return {
+    index, content,
+    answers: row?.responses?.[`${index}-${LEARNING_SITES_ID}`] || {},
+    completed: Boolean(row?.completed_activities?.[String(index)])
+  };
+}
+
+// Yearly course check-in: reopens the Learning Sites activity when the student's directory year level changes.
+// Only the activity tick and hunt answers are cleared; Drive folders and other kit progress are untouched.
+async function refreshLearningSitesCheckIn(email) {
+  try {
+    const saved = await getSavedLearningSitesCheckIn(email);
+    if (!saved?.completed) return false;
+    const profile = await getLearningSitesStudentProfile(email);
+    if (!needsCourseCheckIn(saved.answers, profile)) return false;
+    await savePracticalSkillsAssessment(email, "kit-login", saved.index, {
+      assessmentId: LEARNING_SITES_ID, passed: false,
+      answers: { reopenedForYear: profile.year, previousCourse: saved.answers.course || "" }
+    });
+    await setPracticalSkillsActivityCompletion(email, "kit-login", saved.index, false);
+    await syncPracticalSkillsKitCompletion(email, "kit-login", saved.content);
+    return true;
+  } catch (error) {
+    console.error("[learning-sites] Could not refresh the yearly course check-in:", error);
+    return false;
+  }
+}
+
 app.get("/api/practical-skills/learning-sites/profile", async (req, res) => {
   const email = normalizeEmail(getRequestUserEmail(req));
   if (!email || !email.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
@@ -13855,7 +13892,25 @@ app.post("/api/practical-skills/progress/:kitId/activities/:activityIndex/check"
     const saved = await savePracticalSkillsAssessment(studentEmail, kitId, activityIndex, grade);
     await syncPracticalSkillsKitCompletion(studentEmail, kitId, content);
     void autoEmailKitCertificate(req, kitId);
-    res.json({ ...grade, completedActivities: saved.completed_activities });
+    let courseFolder = null;
+    let courseFolderError = "";
+    if (grade.passed && activity.assessmentId === LEARNING_SITES_ID) {
+      const programmeFolder = getCourseProgrammeFolder(grade.answers?.course);
+      const driveAccessToken = String(req.body.driveAccessToken || "").trim();
+      if (programmeFolder && driveAccessToken) {
+        try {
+          await verifyDriveTokenForStudent(driveAccessToken, studentEmail);
+          const { programme, kits } = await ensureStudentCourseFolders(studentEmail, programmeFolder, driveAccessToken);
+          courseFolder = { name: programmeFolder, url: `https://drive.google.com/drive/folders/${encodeURIComponent(programme.id)}`, kitsFolderId: kits.id };
+        } catch (error) {
+          console.error("[learning-sites] Could not create course folder:", error);
+          courseFolderError = `Your tick is saved, but we couldn't create your ${programmeFolder} folder yet. It will be made when a kit needs it.`;
+        }
+      } else if (programmeFolder) {
+        courseFolderError = `Your tick is saved. Your ${programmeFolder} folder will be made in WHS-DTECH when a kit needs it.`;
+      }
+    }
+    res.json({ ...grade, completedActivities: saved.completed_activities, courseFolder, courseFolderError });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not check and save your activity." });
   }
@@ -13986,24 +14041,35 @@ function researchReportStudentEmail(req, res) {
   return email;
 }
 
-// Locates WHS-DTECH > JuniorDTECH/MiddleDTECH > KITS and reopens or copies the report. Only a brand-new copy is filled in; existing files are never changed or deleted.
+// Finds or creates WHS-DTECH > JuniorDTECH/MiddleDTECH/SeniorDTECH > KITS. Existing folders are reused, never moved or deleted.
+async function ensureStudentCourseFolders(email, programmeFolder, driveAccessToken) {
+  return withResearchReportLock(`${normalizeEmail(email)}:course-folders`, async () => {
+    const savedRoot = await getStudentLoginDriveSetup(email);
+    const root = (savedRoot?.folder_id && await driveGetLiveFile(savedRoot.folder_id, driveAccessToken))
+      || await driveEnsureFolder("root", "WHS-DTECH", driveAccessToken);
+    if (!root?.id) throw new Error("Could not find or create your WHS-DTECH folder.");
+    const programme = await driveEnsureFolder(root.id, programmeFolder, driveAccessToken);
+    if (!programme?.id) throw new Error(`Could not find or create your ${programmeFolder} folder.`);
+    const kits = await driveEnsureFolder(programme.id, "KITS", driveAccessToken);
+    if (!kits?.id) throw new Error("Could not find or create your KITS folder.");
+    return { root, programme, kits };
+  });
+}
+
+// Locates WHS-DTECH > JuniorDTECH/MiddleDTECH/SeniorDTECH > KITS and reopens or copies the report. Only a brand-new copy is filled in; existing files are never changed or deleted.
 async function ensureStudentResearchReport(email, kitId, report, driveAccessToken, studentDetails = {}) {
   const existing = await getStudentKitDocument(email, kitId, report.id);
   const liveExisting = existing?.document_id ? await driveGetLiveFile(existing.document_id, driveAccessToken) : null;
   if (liveExisting) return { documentId: liveExisting.id, created: false };
 
-  const programmeFolder = getResearchReportProgrammeFolder(await getLearningSitesStudentProfile(email));
+  const programmeFolder = getResearchReportProgrammeFolder(await getLearningSitesStudentProfile(email),
+    getCourseProgrammeFolder((await getSavedLearningSitesCheckIn(email))?.answers?.course));
   if (!programmeFolder) {
-    const error = new Error("We couldn't tell if you are in Junior or Middle DTECH. Ask your teacher to check your profile.");
+    const error = new Error("We couldn't tell if you are in Junior, Middle or Senior DTECH. Ask your teacher to check your profile.");
     error.status = 409;
     throw error;
   }
-  const savedRoot = await getStudentLoginDriveSetup(email);
-  const root = (savedRoot?.folder_id && await driveGetLiveFile(savedRoot.folder_id, driveAccessToken))
-    || await driveEnsureFolder("root", "WHS-DTECH", driveAccessToken);
-  if (!root?.id) throw new Error("Could not find or create your WHS-DTECH folder.");
-  const programme = await driveEnsureFolder(root.id, programmeFolder, driveAccessToken);
-  const kits = await driveEnsureFolder(programme.id, "KITS", driveAccessToken);
+  const { kits } = await ensureStudentCourseFolders(email, programmeFolder, driveAccessToken);
   const fileName = String(report.fileName || SEARCH_RESEARCH_REPORT_FILE_NAME).trim() || SEARCH_RESEARCH_REPORT_FILE_NAME;
 
   const found = await driveFindFileByNameInFolder(kits.id, fileName, driveAccessToken);

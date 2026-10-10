@@ -30,6 +30,7 @@ async function main() {
         app: Object.fromEntries(["get", "post", "put"].map((method) => [method, (url, handler) => { handlers[`${method} ${url}`] = handler; }])),
         hasDatabase: false, memoryPracticalSkillsProgress: new Map(),
         SEARCH_RESULTS_DETECTIVE_ID: "search-results-detective-v1", SEARCH_AND_FIND_ID: "search-and-find-v1",
+        LEARNING_SITES_ID: "learning-sites-treasure-v1", needsCourseCheckIn: () => false, getCourseProgrammeFolder: () => "",
         normalizeEmail: (value) => String(value || "").trim().toLowerCase(),
         SCHOOL_EMAIL_DOMAIN: "example.school.nz", getRequestUserEmail: (req) => req.email,
         PRACTICAL_SKILLS_KIT_DEFINITIONS: [{ id: "kit-login" }],

@@ -245,7 +245,7 @@
                                     ` : ""}
                                     ${clueInput(destination)}
                                     ${destination.id === "dtech" ? `
-                                        <label for="hunt-course">Which DTECH course are you doing? Choose your year and course, as shown in User Profile. School staff can choose Staff.</label>
+                                        <label for="hunt-course">Which DTECH course are you doing? Choose your year and course, as shown in User Profile. When you pass, your course folder is made in WHS-DTECH. School staff can choose Staff, or any course to test it.</label>
                                         <select id="hunt-course" data-hunt-answer="course" aria-describedby="hunt-feedback-course">
                                             <option value="">Choose your course...</option>
                                             ${assessment.courses.map((course) => `<option value="${escapeHtml(course.id)}" ${answers.course === course.id || course.aliases?.includes(answers.course) ? "selected" : ""}>${escapeHtml(course.label)}</option>`).join("")}
@@ -259,6 +259,7 @@
                     </fieldset>
                     <button type="submit" class="worksheet-btn worksheet-btn-primary" ${readOnly ? "disabled" : ""}>Check course &amp; treasure answers</button>
                     <p class="worksheet-assessment-result" role="status" aria-live="polite">Collect the five island clues, choose your course and solve its two clues.</p>
+                    <p class="treasure-map-folder" data-hunt-folder role="status" hidden></p>
                     <p class="treasure-map-update">Clues reviewed ${escapeHtml(assessment.reviewedOn)}. If a learning page changes or a link fails, tell your teacher; do not share passwords.</p>
                 </form>
             </section>
@@ -276,6 +277,9 @@
         host.querySelector("[data-hunt-profile]").textContent = options.readOnly
             ? "Sign in with your school account to save progress and check your course."
             : options.huntProfile?.message || "Your course profile is loading; you can explore the islands now.";
+        if (!options.readOnly && draft.reopenedForYear) {
+            host.querySelector("[data-hunt-profile]").insertAdjacentHTML("beforebegin", `<p class="treasure-map-checkin" role="status"><strong>New year, new course check-in!</strong> You're now in Year ${escapeHtml(draft.reopenedForYear)}. Learning sites change, so sail the islands again, choose your new course and earn your tick. Your new course folder will be made in WHS-DTECH. Your old folders and work stay safe.</p>`);
+        }
         const renderCourse = () => {
             const course = assessment.courses.find((entry) => entry.id === courseSelect.value);
             clueHost.innerHTML = course ? `
@@ -316,7 +320,7 @@
                 feedback.hidden = false;
                 feedback.classList.toggle("is-correct", correct);
                 feedback.classList.toggle("is-error", !correct);
-                feedback.textContent = correct ? courseSelect.value === "STAFF" ? "Staff access confirmed. Now hunt for the two JuniorDTECH clues!" : "This course matches your User Profile. Now hunt for its two clues!" :
+                feedback.textContent = correct ? courseSelect.value === "STAFF" ? "Staff access confirmed. Now hunt for the two JuniorDTECH clues!" : options.huntProfile.courseIds.includes("STAFF") ? "Staff test pathway confirmed. Now hunt for this course's two clues!" : "This course matches your User Profile. Now hunt for its two clues!" :
                     options.huntProfile?.available ? "This course/year does not match your User Profile. Check your profile and choose again." :
                         options.huntProfile?.message || "Your course profile is unavailable. Ask your teacher to check it.";
             }
@@ -350,6 +354,13 @@
                 result.classList.toggle("is-correct", grade.passed);
                 result.textContent = grade.passed ? "Treasure unlocked! 8 / 8 correct. Ka pai! Your completion tick is saved." :
                     `${grade.score} / ${grade.total} treasures found. Your answers are saved. Follow the hints and try again!`;
+                const folderNote = form.querySelector("[data-hunt-folder]");
+                if (folderNote && grade.passed && (grade.courseFolder || grade.courseFolderError)) {
+                    folderNote.hidden = false;
+                    folderNote.innerHTML = grade.courseFolder
+                        ? `Your <strong>${escapeHtml(grade.courseFolder.name)}</strong> course folder (with a <strong>KITS</strong> folder inside) is ready in WHS-DTECH. <a href="${escapeHtml(grade.courseFolder.url)}" target="_blank" rel="noopener noreferrer">Open my course folder</a>`
+                        : escapeHtml(grade.courseFolderError);
+                }
             } catch (error) {
                 result.classList.add("is-error");
                 result.textContent = error.message || "Could not check or save your treasure hunt. Please try again.";
