@@ -26,5 +26,19 @@
       "icon": "\ud83d\udd10",
       "palette": "linear-gradient(135deg, #2f8f61 0%, #3ca873 54%, #65c494 100%)"
     }
+  },
+  {
+    "id": "kit-google-search",
+    "title": "Search Kit",
+    "summary": "Become a Search Detective! Discover clever ways to find information, solve search challenges and spot what you can trust online.",
+    "yearLevel": "Junior DTECH",
+    "area": "Search Skills",
+    "status": "active",
+    "href": "/practical-skills/kit-worksheet.html?kit=kit-google-search",
+    "imageUrl": "",
+    "visual": {
+      "icon": "\ud83d\udd0e",
+      "palette": "linear-gradient(135deg, #2f8f61 0%, #3ca873 54%, #65c494 100%)"
+    }
   }
 ]

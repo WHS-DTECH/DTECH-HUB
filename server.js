@@ -5278,19 +5278,19 @@ function normalizePracticalSkillLibraryItem(item, fallbackIndex = 0) {
 }
 
 async function readPracticalSkillsLibraryFile() {
+  let raw;
   try {
-    const raw = await fs.promises.readFile(PRACTICAL_SKILLS_LIBRARY_FILE, "utf8");
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed
-      .map((item, index) => normalizePracticalSkillLibraryItem(item, index))
-      .filter(Boolean);
-  } catch (_error) {
-    return [];
+    raw = await fs.promises.readFile(PRACTICAL_SKILLS_LIBRARY_FILE, "utf8");
+  } catch (error) {
+    if (error.code === "ENOENT") return [];
+    throw error;
   }
+
+  const parsed = JSON.parse(raw);
+  if (!Array.isArray(parsed)) throw new Error("Practical Skills library must contain a JSON array.");
+  return parsed
+    .map((item, index) => normalizePracticalSkillLibraryItem(item, index))
+    .filter(Boolean);
 }
 
 async function writePracticalSkillsLibraryFile(items) {
@@ -5305,6 +5305,33 @@ async function writePracticalSkillsLibraryFile(items) {
   );
 
   return normalized;
+}
+
+async function syncPracticalSkillsKitLibraryCard(kitId, content) {
+  const safeKitId = String(kitId || "").trim();
+  const title = String(content?.identity?.name || content?.bannerTitle || "").trim();
+  if (!safeKitId || !title) return null;
+
+  const cards = await readPracticalSkillsLibraryFile();
+  const existingIndex = cards.findIndex((card) => card.id === safeKitId);
+  const existing = existingIndex >= 0 ? cards[existingIndex] : null;
+  const card = existing
+    ? { ...existing, title, href: `/practical-skills/kit-worksheet.html?kit=${encodeURIComponent(safeKitId)}` }
+    : normalizePracticalSkillLibraryItem({
+        id: safeKitId,
+        title,
+        summary: content.bannerSubtitle || content.learning?.whatStudentsWillLearn || `Explore the ${title} kit and complete its activities.`,
+        yearLevel: content.identity?.yearLevel || "All Years",
+        area: content.identity?.skillArea || "Practical Skills",
+        status: content.identity?.status || "active",
+        href: `/practical-skills/kit-worksheet.html?kit=${encodeURIComponent(safeKitId)}`,
+        visual: { icon: content.theme?.icon || "PS" }
+      });
+
+  if (existingIndex >= 0) cards[existingIndex] = card;
+  else cards.push(card);
+  await writePracticalSkillsLibraryFile(cards);
+  return card;
 }
 
 async function getSuggestionRecipients() {
@@ -12870,7 +12897,16 @@ app.put("/api/admin/practical-skills/kit-content/:kitId", requireAdminAccess, as
 
   try {
     const saved = await savePracticalSkillsKitContent(kitId, content, requesterEmail);
-    res.json({ ok: true, content: saved });
+    let libraryCard;
+    try {
+      libraryCard = await syncPracticalSkillsKitLibraryCard(kitId, saved);
+    } catch (error) {
+      res.status(500).json({
+        error: `Kit content was saved, but its Licence Library card could not be updated. Save again to retry. ${error.message || ""}`.trim()
+      });
+      return;
+    }
+    res.json({ ok: true, content: saved, libraryCard });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not save kit content." });
   }

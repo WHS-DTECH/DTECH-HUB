@@ -6,6 +6,7 @@ const vm = require("node:vm");
 
 const html = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "admin-kits.html"), "utf8");
 const source = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "admin-kits.js"), "utf8");
+assert.match(source, /Kit content saved and its Licence Library card updated\./, "Kit Builder confirms the library card was synced");
 const activityHtml = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "admin-kit-activity.html"), "utf8");
 assert.match(html, /#kit-add-worksheet\s*\{[^}]*background:\s*#173858;[^}]*color:\s*#ffffff;/s, "Add Worksheet button has high-contrast colors");
 assert.match(html, /#kit-add-worksheet:focus-visible\s*\{/);

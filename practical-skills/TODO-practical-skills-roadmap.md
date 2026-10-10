@@ -41,6 +41,10 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
   title and updates that kit's Kit dropdown label after content loads or saves.
   Existing kit IDs remain unchanged so worksheet content and student progress
   remain attached to their kit.
+- Implemented: saving kit content creates or updates its matching Practical
+  Skills / Licence Library card, linked to that kit's worksheet page. Existing
+  card descriptions, audience, category, status and visuals are preserved when
+  updating a card title/link. Search Kit has been added to the starter library.
 - Add a `Next Best Task` panel at the top of the Practical Skills homepage.
 - Show licence progress (`X/Y kits complete`).
 - Show assessment readiness status (`Ready` or `Missing required kits`).

@@ -278,7 +278,9 @@
             });
             state.content = payload?.content || draft;
             renderForm();
-            setStatus("Kit content saved.");
+            setStatus(payload?.libraryCard
+                ? "Kit content saved and its Licence Library card updated."
+                : "Kit content saved.");
         } catch (error) {
             setStatus(error?.message || "Could not save kit content.", true);
         } finally {
