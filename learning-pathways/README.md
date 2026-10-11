@@ -119,7 +119,8 @@ editor (Card Type: Lesson Activity); `/learning-pathways/?type=activity` opens
 the filtered view. The first, **Build Your Binary Piano** (Lesson 1, Activity 1),
 opens the student page `activity-build-your-binary-piano.html` (green
 `activity-hero`, materials pills, numbered steps, place-value tiles and a
-completion check) and is linked from the Lesson 1 construction phase. Migration
+completion check). The Lesson 1 Practical phase has a green **Activity card** pill
+on the right linking to `/learning-pathways/?type=activity#card-<id>`. Migration
 v11 adds missing activity cards once without restoring later deletions.
 
 ## Progression Pathway (Teacher View)
