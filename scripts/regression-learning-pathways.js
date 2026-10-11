@@ -296,7 +296,7 @@ async function main() {
         ["0&ndash;10 min", "10&ndash;20 min", "20&ndash;35 min", "35&ndash;50 min", "50&ndash;60 min"], "Lesson 2 timeline covers 60 minutes");
     assert.ok(encodingPage.includes(">Linked Student Activity</h2>"), "Lesson 2 lists its linked student activity");
     assert.match(encodingPage, /not ASCII/, "Lesson 2 separates the classroom code from ASCII");
-    assert.match(encodingPage, /drive\.google\.com\/file\/d\/1Ecspoj2UOqNn6ZEZfqtHmzzcEp7xclXp\/view/, "Lesson 2 links the Encoding Binary resource");
+    assert.match(encodingPage, /href="https:\/\/drive\.google\.com\/file\/d\/17NuMtajjN37nE-WtxJ6CkKpSyOM0XCP_\/view\?usp=drive_link"/, "Lesson 2 links the Encoding Binary resource");
     assert.throws(() => normalizeCards([{ ...sample, cardType: "task" }]), /invalid card type/);
     assert.deepEqual(normalizeCards([{ ...sample, cardType: "lesson", unit: "u", sequence: 3, strand: "x" }])[0],
         { ...normalizeCards([sample])[0], cardType: "lesson", unit: "u", sequence: 3 }, "Lessons keep a parent unit and sequence");
