@@ -201,6 +201,18 @@
     "unit": "binary-and-data",
     "sequence": 10,
     "href": "",
-    "visual": { "icon": "L10" }
+    "visual": { "icon": "L10" }  },
+  {
+    "id": "activity-build-your-binary-piano",
+    "title": "Build Your Binary Piano",
+    "summary": "Build a Binary Piano that you can use to represent numbers using 0s and 1s.",
+    "yearLevel": "Junior DTECH",
+    "area": "Digital systems",
+    "status": "active",
+    "cardType": "activity",
+    "lesson": "lesson-binary-piano",
+    "sequence": 1,
+    "href": "/learning-pathways/activity-build-your-binary-piano.html",
+    "visual": { "icon": "A1" }
   }
 ]

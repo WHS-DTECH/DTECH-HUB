@@ -723,6 +723,13 @@
     line-height: 1.55;
 }
 
+.lesson-phase .activity-link {
+    margin-top: 10px;
+    border-color: #bfe3c6;
+    background: #f4fbf5;
+    color: #1f6b3a;
+}
+
 .panel-section.lesson-skill-check {
     border: 1px solid #b7e1c4;
     background: #f1faf3;
@@ -773,4 +780,129 @@
     .curriculum-table {
         min-width: 700px;
     }
+}
+
+.activity-hero .hero-panel {
+    background: linear-gradient(120deg, #15502b 0%, #2f9e55 56%, #7ccf7a 100%);
+}
+
+.activity-hero .stat-card {
+    display: grid;
+    gap: 10px;
+}
+
+.panel-section.activity-mission {
+    border: 1px solid #bfe3c6;
+    background: #f4fbf5;
+}
+
+.activity-mission h2,
+.activity-try h2,
+.activity-finished h2 {
+    color: #1f6b3a;
+}
+
+.activity-mission p {
+    font-size: 1.15rem;
+    line-height: 1.55;
+}
+
+.activity-needs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.activity-needs li {
+    padding: 8px 16px;
+    border: 1px solid #bfe3c6;
+    border-radius: 999px;
+    background: #f4fbf5;
+    color: #15502b;
+    font-weight: 700;
+}
+
+.activity-steps {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: activity-step;
+}
+
+.activity-steps li {
+    position: relative;
+    padding: 12px 16px 12px 58px;
+    border: 1px solid #d7ecdb;
+    border-radius: 12px;
+    background: #fff;
+    line-height: 1.5;
+    counter-increment: activity-step;
+}
+
+.activity-steps li::before {
+    content: counter(activity-step);
+    position: absolute;
+    top: 50%;
+    left: 14px;
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #1f6b3a 0%, #2f9e55 100%);
+    color: #fff;
+    font-weight: 800;
+    transform: translateY(-50%);
+}
+
+.activity-warning {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 2px 10px;
+    border-radius: 6px;
+    background: #fff4f2;
+    color: #b42318;
+}
+
+.panel-section.activity-try {
+    border: 1px solid #d9d2f5;
+    background: #f7f5ff;
+}
+
+.activity-place-values {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 12px 0;
+    padding: 0;
+    list-style: none;
+}
+
+.activity-place-values li {
+    display: grid;
+    place-items: center;
+    width: 64px;
+    height: 64px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #1f6b3a 0%, #2f9e55 100%);
+    color: #fff;
+    font-size: 1.5rem;
+    font-weight: 800;
+}
+
+.panel-section.activity-finished {
+    border: 1px solid #bfe3c6;
+    background: #f4fbf5;
+}
+
+.activity-check {
+    padding: 12px 14px;
+    border-left: 4px solid #2f9e55;
+    border-radius: 10px;
+    background: #fff;
 }

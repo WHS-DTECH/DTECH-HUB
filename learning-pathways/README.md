@@ -114,10 +114,13 @@ are excluded from the student Task List.
 The final type, `activity` (footer **Lesson Activities**, green palette), holds
 the activities within a lesson. Activity cards keep a parent `lesson` ID and a
 `sequence` number, list after lessons (by lesson, then sequence with the A-Z
-sort) and are excluded from the student Task List. None are seeded yet; add them
-from the admin editor (Card Type: Lesson Activity). The **Lesson Activities**
-filter pill appears once the first activity card exists, and
-`/learning-pathways/?type=activity` opens the filtered view.
+sort) and are excluded from the student Task List. Add more from the admin
+editor (Card Type: Lesson Activity); `/learning-pathways/?type=activity` opens
+the filtered view. The first, **Build Your Binary Piano** (Lesson 1, Activity 1),
+opens the student page `activity-build-your-binary-piano.html` (green
+`activity-hero`, materials pills, numbered steps, place-value tiles and a
+completion check) and is linked from the Lesson 1 construction phase. Migration
+v11 adds missing activity cards once without restoring later deletions.
 
 ## Progression Pathway (Teacher View)
 

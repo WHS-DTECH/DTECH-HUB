@@ -214,7 +214,9 @@ async function main() {
     const strands = seed.filter((card) => card.cardType === "strand");
     const units = seed.filter((card) => card.cardType === "unit");
     const lessons = seed.filter((card) => card.cardType === "lesson");
-    const plusLessons = (cards) => normalizeCards([...cards, ...lessons.filter((lesson) => !cards.some((card) => card.id === lesson.id))]);
+    const activities = seed.filter((card) => card.cardType === "activity");
+    const plusActivities = (cards) => normalizeCards([...cards, ...activities.filter((activity) => !cards.some((card) => card.id === activity.id))]);
+    const plusLessons = (cards) => plusActivities([...cards, ...lessons.filter((lesson) => !cards.some((card) => card.id === lesson.id))]);
     const plusUnits = (cards) => plusLessons([...cards, ...units.filter((unit) => !cards.some((card) => card.id === unit.id))]);
     assert.deepEqual(strands.map((card) => card.title), ["Digital systems", "Programming & Algorithms", "Data and Information",
         "Digital citizenship", "Systems and control"]);
@@ -274,7 +276,21 @@ async function main() {
     assert.equal(normalizeCards([{ ...sample, cardType: "lesson", sequence: "x" }])[0].sequence, undefined, "Invalid sequences are dropped");
     assert.deepEqual(normalizeCards([{ ...sample, cardType: "activity", lesson: "lesson-binary-piano", sequence: 2, unit: "x" }])[0],
         { ...normalizeCards([sample])[0], cardType: "activity", lesson: "lesson-binary-piano", sequence: 2 }, "Lesson Activities keep a parent lesson and sequence");
-    assert.ok(!seed.some((card) => card.cardType === "activity"), "No Lesson Activity cards are seeded yet");
+    assert.deepEqual(activities.map((card) => [card.id, card.lesson, card.sequence, card.href]), [["activity-build-your-binary-piano",
+        "lesson-binary-piano", 1, "/learning-pathways/activity-build-your-binary-piano.html"]], "Binary Piano Activity 1 is the first Lesson Activity card");
+    const activityPage = fs.readFileSync(path.join(root, "learning-pathways/activity-build-your-binary-piano.html"), "utf8");
+    const activityIds = [...activityPage.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
+    assert.equal(new Set(activityIds).size, activityIds.length, "Activity page IDs are unique");
+    for (const heading of ["Your Mission", "You Will Need", "Instructions", "Try It Out", "Finished?"]) {
+        assert.ok(activityPage.includes(`>${heading}</h2>`), `Activity page includes ${heading}`);
+    }
+    assert.equal((activityPage.match(/<li>/g) || []).length, 4 + 7 + 5, "Activity page lists 4 materials, 7 steps and 5 place values");
+    assert.match(activityPage, /Do not glue the moving tabs down!/);
+    assert.match(activityPage, /Completion check:<\/strong> I have built a Binary Piano with working tabs\./);
+    assert.match(activityPage, /class="hero practical-skills-hero activity-hero"/);
+    assert.match(activityPage, /href="\/learning-pathways\/\?type=activity#card-activity-build-your-binary-piano"/);
+    assert.match(activityPage, /href="\/learning-pathways\/lesson-binary-piano\.html"/);
+    assert.match(lessonPage, /href="\/learning-pathways\/activity-build-your-binary-piano\.html">Student activity/, "Lesson page links its activity");
     assert.equal(normalizeCards([sample])[0].cardType, "strand", "Existing cards default to Curriculum Strands");
     assert.equal(normalizeCards([{ ...sample, strand: "x" }])[0].strand, undefined, "Only units keep a parent strand");
     assert.equal(seed.find((card) => card.id === "digital-systems").href, "/learning-pathways/digital-systems.html");
@@ -377,7 +393,7 @@ async function main() {
         assert.match(sql, /learning_pathways_library_store/, "Never writes the Licence Library table");
         if (sql.includes("INSERT INTO") && (stored === null || !sql.includes("DO NOTHING"))) {
             stored = JSON.parse(params[0]);
-            seedVersion = 10;
+            seedVersion = 11;
         }
         if (sql.includes("seed_version < 1") && seedVersion < 1) {
             const starters = JSON.parse(params[0]);
@@ -438,6 +454,12 @@ async function main() {
                 ? { ...card, href: "/learning-pathways/lesson-binary-piano.html" } : card);
             seedVersion = 10;
         }
+        if (sql.includes("seed_version < 11") && seedVersion < 11) {
+            const added = JSON.parse(params[0]);
+            assert.ok(added.length && added.every((card) => card.cardType === "activity"), "Version 11 only adds Lesson Activity cards");
+            stored = [...stored, ...added.filter((card) => !stored.some((old) => old.id === card.id))];
+            seedVersion = 11;
+        }
         return { rows: sql.startsWith("SELECT") && stored !== null ? [{ cards: stored }] : [] };
     } };
     const app = express();
@@ -451,16 +473,16 @@ async function main() {
         let response = await fetch(`${base}/learning-pathways/library.json`);
         assert.match(response.headers.get("cache-control"), /no-store/);
         const migrated = await response.json();
-        assert.equal(migrated.length, 18, "One-time preload preserves existing custom cards");
+        assert.equal(migrated.length, 19, "One-time preload preserves existing custom cards");
         assert.equal(migrated.find((card) => card.id === "digital-systems").title, "Existing edited systems",
             "Preload does not overwrite existing cards with the same ID");
         assert.equal(migrated.filter((card) => card.id === "digital-systems").length, 1);
-        assert.equal((await (await fetch(`${base}/learning-pathways/library.json`)).json()).length, 18,
+        assert.equal((await (await fetch(`${base}/learning-pathways/library.json`)).json()).length, 19,
             "Repeated reads do not duplicate starter cards");
         stored = [existing, sample, { ...sample, id: "programming" }, { ...sample, id: "algorithms" }];
         seedVersion = 1;
         const merged = await (await fetch(`${base}/learning-pathways/library.json`)).json();
-        assert.equal(merged.length, 15);
+        assert.equal(merged.length, 16);
         assert.deepEqual(merged.slice(0, 2), normalizeCards([existing, sample]), "Unrelated cards remain unchanged");
         assert.equal(merged[2].title, "Programming & Algorithms");
         assert.match(merged[2].summary, /algorithms.*debug.*test and improve/);
@@ -469,7 +491,7 @@ async function main() {
             { ...sample, id: "programming" }, { ...sample, id: "algorithms" }];
         seedVersion = 1;
         const preserved = await (await fetch(`${base}/learning-pathways/library.json`)).json();
-        assert.equal(preserved.length, 14);
+        assert.equal(preserved.length, 15);
         assert.equal(preserved[1].title, "Edited combined card", "Existing combined edits are preserved");
         const oldData = { ...sample, id: "data", title: "Data", area: "Data" };
         stored = [sample, oldData];
@@ -533,13 +555,24 @@ async function main() {
         assert.equal(lessonMigrated.filter((card) => card.id === lessons[0].id).length, 1);
         stored = [sample];
         seedVersion = 9;
-        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), normalizeCards([sample]),
+        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), plusActivities([sample]),
             "Version 9 does not restore deleted lesson cards");
+        stored = [sample, { ...activities[0], title: "Edited activity" }];
+        seedVersion = 10;
+        const activityMigrated = await (await fetch(`${base}/learning-pathways/library.json`)).json();
+        assert.deepEqual(activityMigrated, normalizeCards(stored), "Version 11 keeps an edited activity and does not duplicate it");
+        stored = [sample];
+        seedVersion = 10;
+        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), plusActivities([sample]), "Version 11 adds missing activities");
+        stored = [sample];
+        seedVersion = 11;
+        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), normalizeCards([sample]),
+            "Version 11 does not restore deleted activity cards");
         const blankPiano = { ...lessons[0], href: "", title: "Edited piano" };
         stored = [sample, blankPiano];
         seedVersion = 9;
         assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(),
-            normalizeCards([sample, { ...blankPiano, href: "/learning-pathways/lesson-binary-piano.html" }]),
+            plusActivities([sample, { ...blankPiano, href: "/learning-pathways/lesson-binary-piano.html" }]),
             "Version 10 links the blank Binary Piano card, keeping edits and order");
         stored = [{ ...blankPiano, href: "/learning-pathways/custom.html" }];
         seedVersion = 9;
