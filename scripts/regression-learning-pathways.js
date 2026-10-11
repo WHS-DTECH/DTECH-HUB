@@ -320,6 +320,9 @@ async function main() {
     assert.doesNotMatch(activityPage, /activity-step-check|Tick when done|Tick each step/, "Steps have no tick-off completion requirement");
     assert.match(activityPage, /class="activity-step activity-step-warning">[\s\S]*?Do not glue the moving tabs down!/, "The glue step is highlighted as a warning");
     assert.match(activityPage, /Do not glue the moving tabs down!/);
+    assert.ok(activityPage.indexOf('class="activity-key-warning"') < activityPage.indexOf('class="activity-steps"'),
+        "The glue warning banner appears before the steps");
+    assert.match(activityPage, /class="activity-key-warning-title">Do NOT glue the moving tabs down!</);
     assert.doesNotMatch(activityPage, /Completion check/, "Exercise-book activity has no DTECH-HUB completion requirement");
     assert.match(activityPage, /<svg class="activity-handin-art"[^>]*role="img"/, "Finished? shows a hand-in illustration");
     assert.match(activityPage, /Well done for completing the task!/);
