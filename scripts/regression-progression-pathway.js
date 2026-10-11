@@ -55,8 +55,11 @@ async function main() {
     assert.ok(!html.includes(">Details</th>") && !html.includes("progression-detail") && !html.includes("progression-strengths"),
         "Details column, Curriculum Coverage & Evidence and Strengths have been removed");
     assert.ok(html.includes('id="progression-next"'), "Next learning remains in the Teacher Summary");
-    assert.ok(!client.includes('descriptor.disabled'), "All five Progress descriptors can be selected for every pathway");
-    assert.match(client, /result\.descriptor && result\.coverage === "not-taught"\) \{ result\.coverage = "partly-taught"/, "Choosing a descriptor keeps coverage valid");
+    assert.match(client, /select\.disabled = coverage === "not-taught";/, "Pathway Progress needs a covered linked statement");
+    assert.match(client, /dataset\.pathwayCoverage = id/, "Pathway Coverage is a calculated read-only chip");
+    assert.ok(!/select\.dataset\.pathwayCoverage|progressionSelect\(progressionCoverageOptions, result\.coverage/.test(client), "Pathway Coverage is no longer a manual select");
+    assert.ok(html.indexOf('src="progression-mapping.js"') > html.indexOf('src="progression-curriculum.js"') && html.indexOf('src="progression-mapping.js"') < html.indexOf('src="progression-pathway.js"'), "Mapping loads before the page script");
+    assert.ok(html.includes('href="curriculum-mapping.html"'), "Report links to the Curriculum Mapping admin page");
     const curriculum = require("../learning-pathways/progression-curriculum.js");
     const allStatements = Object.values(curriculum.statements).flat();
     assert.deepEqual(Object.fromEntries(Object.entries(curriculum.statements).map(([year, rows]) => [year, rows.length])), { 7: 23, 8: 22, 9: 31, 10: 30 });
@@ -75,7 +78,8 @@ async function main() {
     assert.ok(allStatements.some((statement) => statement.text.startsWith("Compare algorithms")) && allStatements.some((statement) => statement.text.startsWith("Analyse how data")), "Year 8 merged bullet is split");
     assert.ok(html.indexOf('src="progression-curriculum.js"') > 0 && html.indexOf('src="progression-curriculum.js"') < html.indexOf('src="progression-pathway.js"'), "Curriculum data loads before the page script");
     assert.ok(html.includes('id="progression-curriculum"'), "Dialog has a Curriculum Coverage section");
-    const statementContext = vm.createContext({ progressionCurriculum: curriculum, progression: { record: { statements: [
+    const mappingModule = require("../learning-pathways/progression-mapping");
+    const statementContext = vm.createContext({ progressionCurriculum: curriculum, progressionMapping: mappingModule, progression: { mapping: null, completed: [], record: { statements: [
         { id: "dt-7-p-1", discipline: "food", coverage: "taught" }, { id: "dt-7-k-1", discipline: "dtech", coverage: "partly-taught" }] } } });
     vm.runInContext(client.slice(client.indexOf("const progressionCoverageOptions"), client.indexOf("function progressionUpdateStatements(")), statementContext);
     for (const id of ids) for (const year of [7, 8, 9, 10]) {
@@ -87,7 +91,7 @@ async function main() {
     assert.match(client, /progressionDisciplines = \[\["dtech", "DTECH"\], \["textiles", "Textiles"\], \["food", "Food"\], \["wood", "Wood"\], \["dvc", "DVC"\]\]/);
     assert.match(client, /discipline: "dtech", addressed/, "New records default to the DTECH discipline");
     assert.match(client, /pp\("level"\)\.addEventListener\("change", progressionUpdateStatements\)/, "Changing year level updates the statements");
-    assert.match(client, /function progressionUpdateStatements\(\) \{\s*progressionUpdateHints\(\);\s*progressionRenderCurriculum\(\);/);
+    assert.match(client, /function progressionUpdateStatements\(\) \{\s*progressionAutoSet\(\);\s*progressionRenderCurriculum\(\);\s*progressionRefreshPathways\(\);/);
     assert.ok(!html.includes('<th scope="col">Discipline</th><th scope="col">Coverage</th><th scope="col">Progress</th>'), "Discipline is recorded per curriculum statement");
     assert.ok(client.includes('<th scope="col">Statement</th><th scope="col">Discipline</th><th scope="col">Coverage</th><th scope="col">Progress</th>'), "Curriculum statements have a Progress column");
     assert.match(client, /if \(key === "descriptor" && value && entry\.coverage === "not-taught"\) entry\.coverage = "partly-taught";\s*if \(key === "coverage" && value === "not-taught"\) entry\.descriptor = null;/, "Statement Progress keeps coverage valid");
@@ -200,7 +204,7 @@ async function main() {
             registerActivityProgress: (_app, config) => { activityStudents = config.getStudents; },
             registerProgressionPathway: (_app, config) => { directoryAdapter = config.getStudents; }
         }),
-        app: {}, pool: {}, hasDatabase: true, requireActivityWriteAccess: () => {},
+        app: {}, pool: {}, hasDatabase: true, requireActivityWriteAccess: () => {}, requireAdminAccess: () => {},
         getRequestUserEmail: () => "", SCHOOL_EMAIL_DOMAIN: "example.test", getStaffMembers: async () => [],
         getStudentDirectoryRows: async () => [
             { student_name: "No email one", year_level: "Year 7", form_class: "7WHAU", homeroom: "7WHAU", timetable_class: "JPI", linked_emails: [] },
@@ -263,11 +267,75 @@ async function main() {
     rated.pathways[0].coverage = "not-taught";
     assert.throws(() => validateRecord(rated), /Not determined/);
 
+    const progressionMapping = require("../learning-pathways/progression-mapping");
+    const defaults = progressionMapping.defaultMapping();
+    assert.deepEqual(defaults.verifiedYears, [7], "Only Year 7 is verified from the workbook");
+    assert.equal(progressionMapping.statementCode("dt-7-k-3"), "DT-K03");
+    assert.deepEqual(defaults.links["dt-7-k-3"], [{ pathway: "digital-systems", role: "primary" }, { pathway: "data", role: "supporting" }], "DT-K03 links DS (Primary) and D&I (Supporting)");
+    assert.deepEqual(defaults.links["dt-7-p-1"].map((link) => link.role), ["context", "context", "context", "context"], "DT-P01 is context dependent");
+    assert.ok(defaults.links["sc-7-k-1"].every((link) => link.pathway === "systems-and-control" && link.role === "primary"));
+    assert.deepEqual(defaults.activities.map((link) => [link.activity, link.statement, link.autoSet]),
+        [["activity-encoding-binary", "dt-7-k-3", "yes"], ["activity-encoding-binary", "dt-7-p-4", "review"]], "Encoding Binary auto-sets DT-K03 and asks for review of DT-P04");
+    const allStatementIds = Object.values(curriculum.statements).flat().map((statement) => statement.id);
+    assert.ok(allStatementIds.every((id) => Array.isArray(defaults.links[id])), "Every year is seeded");
+    assert.deepEqual(progressionMapping.validateMapping(defaults, ["activity-encoding-binary"]), defaults);
+    for (const bad of [
+        { ...defaults, links: { ...defaults.links, "dt-7-k-3": [{ pathway: "data", role: "main" }] } },
+        { ...defaults, links: { ...defaults.links, "xx-1": [] } },
+        { ...defaults, links: { ...defaults.links, "dt-7-k-3": [{ pathway: "data", role: "primary" }, { pathway: "data", role: "supporting" }] } },
+        { ...defaults, activities: [...defaults.activities, defaults.activities[0]] },
+        { ...defaults, activities: [{ activity: "activity-binary-piano", statement: "dt-7-k-3", autoSet: "yes", note: "" }] },
+        { ...defaults, activities: [{ ...defaults.activities[0], autoSet: "always" }] },
+        { ...defaults, activities: [{ ...defaults.activities[0], note: "x".repeat(501) }] },
+        { ...defaults, verifiedYears: [11] }
+    ]) assert.throws(() => progressionMapping.validateMapping(bad, ["activity-encoding-binary"]), undefined, "Rejects invalid mapping");
+    const coverageOf = (values) => (id) => values[id] || "not-taught";
+    const derive = (pathway, values) => progressionMapping.derivePathwayCoverage(defaults, 7, pathway, coverageOf(values));
+    assert.equal(derive("digital-systems", {}), "not-taught");
+    assert.equal(derive("digital-systems", { "dt-7-k-3": "partly-taught" }), "partly-taught");
+    assert.equal(derive("data", { "dt-7-k-3": "taught" }), "partly-taught", "Supporting links also count towards coverage");
+    const dsTaught = Object.fromEntries(curriculum.statements[7].filter((statement) => defaults.links[statement.id].some((link) => link.pathway === "digital-systems" && link.role !== "context")).map((statement) => [statement.id, "taught"]));
+    assert.equal(derive("digital-systems", dsTaught), "taught", "Context dependent links are optional for Taught");
+    assert.equal(derive("digital-systems", { ...dsTaught, "dt-7-p-1": "partly-taught" }), "partly-taught", "Covered context dependent links must be Taught too");
+    assert.equal(derive("digital-citizenship", { "dt-7-p-1": "taught" }), "partly-taught", "A covered context link shows partial coverage");
+    const statementRows = [];
+    assert.deepEqual(progressionMapping.autoApply(defaults, 7, statementRows, ["activity-encoding-binary"]), ["dt-7-k-3"]);
+    assert.deepEqual(statementRows, [{ id: "dt-7-k-3", discipline: "dtech", coverage: "partly-taught", descriptor: null, autoFrom: "activity-encoding-binary" }], "Auto-set only reaches Partly taught and never sets descriptors");
+    statementRows[0].coverage = "not-taught";
+    assert.deepEqual(progressionMapping.autoApply(defaults, 7, statementRows, ["activity-encoding-binary"]), [], "A teacher override is not re-applied");
+    const taughtRows = [{ id: "dt-7-k-3", discipline: "food", coverage: "taught", descriptor: "proficient" }];
+    assert.deepEqual(progressionMapping.autoApply(defaults, 7, taughtRows, ["activity-encoding-binary"]), [], "Auto-set never downgrades");
+    assert.equal(taughtRows[0].coverage, "taught");
+    assert.deepEqual(progressionMapping.autoApply(defaults, 8, [], ["activity-encoding-binary"]), [], "Year 7 links do not apply to Year 8");
+    assert.deepEqual(progressionMapping.autoApply(defaults, 7, [], []), [], "Nothing is set without a completed activity");
+    assert.equal(validateRecord({ ...clone(sample), statements: [{ id: "dt-7-k-3", coverage: "partly-taught", autoFrom: "activity-encoding-binary" }] }).statements[0].autoFrom, "activity-encoding-binary");
+    assert.throws(() => validateRecord({ ...clone(sample), statements: [{ id: "dt-7-k-3", coverage: "partly-taught", autoFrom: "activity-binary-piano" }] }), /activity source/);
+    const adminHtml = fs.readFileSync(path.join(root, "learning-pathways/curriculum-mapping.html"), "utf8");
+    const adminClient = fs.readFileSync(path.join(root, "learning-pathways/curriculum-mapping.js"), "utf8");
+    assert.match(fs.readFileSync(path.join(root, "admin-menu.html"), "utf8"), /href="learning-pathways\/curriculum-mapping\.html">\s*<h2>Curriculum Mapping<\/h2>/);
+    assert.ok(adminHtml.indexOf('src="progression-mapping.js"') > adminHtml.indexOf('src="progression-curriculum.js"') && adminHtml.indexOf('src="progression-mapping.js"') < adminHtml.indexOf('src="curriculum-mapping.js"'));
+    assert.ok(adminClient.includes('"/api/admin/progression/mapping"') && adminClient.includes("withHubAuthHeaders") && adminClient.includes("beforeunload"));
+    assert.ok(adminClient.includes("revision: state.revision"), "Publishing sends the loaded revision");
+
     const records = new Map();
+    const completedRows = [{ activity_id: "activity-encoding-binary", completed_at: "2026-10-01T00:00:00Z" }, { activity_id: "retired-activity", completed_at: "2026-10-01T00:00:00Z" }];
+    let savedMapping = null;
     let fail = false;
     const pool = { query: async (sql, params = []) => {
         if (fail) throw new Error("Database failure");
         if (sql.includes("CREATE TABLE")) return { rows: [] };
+        if (sql.includes("learning_pathways_activity_progress")) return { rows: params[0] === sample.studentEmail ? completedRows : [] };
+        if (sql.includes("FROM progression_curriculum_mapping")) return { rows: savedMapping ? [savedMapping] : [] };
+        if (sql.includes("INSERT INTO progression_curriculum_mapping")) {
+            if (savedMapping) return { rows: [] };
+            savedMapping = { mapping: JSON.parse(params[0]), revision: 1, updated_by: params[1], updated_at: new Date().toISOString() };
+            return { rows: [{ revision: 1 }] };
+        }
+        if (sql.includes("UPDATE progression_curriculum_mapping")) {
+            if (!savedMapping || savedMapping.revision !== params[2]) return { rows: [] };
+            savedMapping = { mapping: JSON.parse(params[0]), revision: savedMapping.revision + 1, updated_by: params[1], updated_at: new Date().toISOString() };
+            return { rows: [{ revision: savedMapping.revision }] };
+        }
         if (sql.includes("SELECT DISTINCT ON")) return { rows: [...records.values()].map((row) => ({ student_email: row.record.studentEmail, record: row.record })) };
         if (sql.includes("SELECT record")) return { rows: [...records.values()].filter((row) => row.record.studentEmail === params[0])
             .sort((a, b) => b.record.schoolYear - a.record.schoolYear || b.record.term - a.record.term) };
@@ -281,10 +349,14 @@ async function main() {
         return { rows: [row] };
     } };
     const auth = (req, res, next) => {
-        if (req.headers["x-test-role"] !== "teacher") return res.status(403).json({ error: "Teacher required" });
+        if (!["teacher", "admin"].includes(req.headers["x-test-role"])) return res.status(403).json({ error: "Teacher required" });
         req.user_email = "teacher@example.test"; next();
     };
-    const options = { pool, hasDatabase: true, requireTeacherAccess: auth,
+    const adminAuth = (req, res, next) => {
+        if (req.headers["x-test-role"] !== "admin") return res.status(403).json({ error: "Admin required" });
+        req.user_email = "admin@example.test"; next();
+    };
+    const options = { pool, hasDatabase: true, requireTeacherAccess: auth, requireAdminAccess: adminAuth,
         getStudents: async () => [
             { email: sample.studentEmail, name: "Example Student", yearLevel: 7, formClass: "7XX" },
             { email: "", name: "Unlinked one", yearLevel: 7, formClass: "JPI" },
@@ -327,7 +399,33 @@ async function main() {
         assert.equal((await put({ ...sample, schoolYear: 2028, yearLevel: 8 })).status, 200);
         const response = await fetch(`${base}/records?studentEmail=${sample.studentEmail}`, { headers });
         assert.match(response.headers.get("cache-control"), /no-store/);
-        const history = (await response.json()).records;
+        const historyBody = await response.json();
+        const history = historyBody.records;
+        assert.deepEqual(historyBody.completedActivities, [{ id: "activity-encoding-binary", title: "Encoding Binary", completedAt: "2026-10-01T00:00:00Z" }], "Records include completed tracked activities only");
+        const mappingUrl = `http://127.0.0.1:${server.address().port}/api/admin/progression/mapping`;
+        const teacherMapping = await (await fetch(`${base}/mapping`, { headers })).json();
+        assert.equal(teacherMapping.revision, 0, "Unpublished mapping uses the workbook defaults");
+        assert.deepEqual(teacherMapping.mapping, JSON.parse(JSON.stringify(defaults)));
+        assert.deepEqual(teacherMapping.activities.map((activity) => activity.id), ["activity-encoding-binary"]);
+        assert.equal((await fetch(mappingUrl, { headers })).status, 403, "Teachers cannot open the admin mapping");
+        const publish = (mapping, revision, role = "admin") => fetch(mappingUrl, { method: "PUT", headers: { ...headers, "x-test-role": role }, body: JSON.stringify({ mapping, revision }) });
+        assert.equal((await publish(defaults, 0, "teacher")).status, 403, "Teachers cannot publish mappings");
+        const edited = clone(defaults);
+        edited.activities[1].autoSet = "yes";
+        edited.verifiedYears = [7, 8];
+        assert.equal((await publish({ ...edited, activities: [{ ...edited.activities[0], autoSet: "maybe" }] }, 0)).status, 400);
+        const published = await publish(edited, 0);
+        assert.equal(published.status, 200);
+        const publishedBody = await published.json();
+        assert.equal(publishedBody.revision, 1); assert.equal(publishedBody.updatedBy, "admin@example.test");
+        assert.deepEqual(publishedBody.mapping.verifiedYears, [7, 8]);
+        assert.equal((await publish(defaults, 0)).status, 409, "A stale publish cannot overwrite another admin");
+        assert.equal((await (await fetch(`${base}/mapping`, { headers })).json()).mapping.activities[1].autoSet, "yes", "Teachers see the published mapping");
+        assert.equal((await publish(defaults, 1)).status, 200);
+        savedMapping.mapping.activities.push({ activity: "retired-activity", statement: "dt-7-k-3", autoSet: "yes", note: "" });
+        const originalError = console.error; console.error = () => {};
+        try { assert.equal((await (await fetch(`${base}/mapping`, { headers })).json()).mapping.activities.length, 2, "Outdated activity links are ignored"); }
+        finally { console.error = originalError; }
         assert.equal(history.length, 3, "Separate year/term history persists");
         assert.equal(history[2].pathways[0].descriptor, "consolidating");
         assert.equal(history[2].yearLevel, 7, "Year level is a historical snapshot");

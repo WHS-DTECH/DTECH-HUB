@@ -238,8 +238,34 @@ the current school year, or starts a new record if that year has none. Archived
 students open their latest saved result. The attended term remains in the result
 details, and the existing student/school-year/term storage keys and earlier data
 are preserved without a database migration.
+### Curriculum Mapping (Admin)
+
+Admin Menu > Curriculum Mapping (`curriculum-mapping.html`, `.js`, `.css`) edits the
+statement-to-pathway and activity-to-statement links in `progression-mapping.js`
+(shared by browser and server). The defaults are seeded from
+`TeacherFiles/JuniorDTECH_Year7_Pathway_Curriculum_Mapping_VSC.xlsx` for Year 7
+(roles Primary, Supporting or Context dependent; Encoding Binary auto-sets DT-K03
+and asks for review of DT-P04). Years 8-10 are seeded from the curriculum tags as
+Primary and flagged as unverified until an admin ticks "Mapping verified".
+Admin-only `GET`/`PUT /api/admin/progression/mapping` stores one revisioned mapping in
+`progression_curriculum_mapping` (409 on a stale publish); teachers read it from
+`GET /api/teacher/progression/mapping`. Until a mapping is published, the code default
+is used.
+
+In the Progression Pathway dialog, pathway Coverage is calculated and read only: Not
+taught until a linked statement is covered, Partly taught once one is, and Taught
+when every Primary/Supporting statement (plus any covered Context dependent one) is
+Taught. Pathway Progress is disabled while Not taught. The records GET includes the
+student's `completedActivities` (tracked activities only). When an activity link has
+Auto-set Yes, a Not taught statement for that year becomes Partly taught with
+`autoFrom` set to the activity, and the record auto-saves. Auto-set never
+downgrades, never sets Taught or descriptors, and is not re-applied after a teacher
+changes the statement. Review links show a prompt only. Existing records have their
+pathway Coverage recalculated when opened.
+
 Run `node scripts/regression-progression-pathway.js` for validation, teacher
-access, history persistence, concurrent-edit conflicts and descriptor contrast.
+access, history persistence, concurrent-edit conflicts, descriptor contrast and the
+curriculum mapping/auto-set rules.
 
 Public reads: `/learning-pathways/library.json` and
 `GET /api/learning-pathways/library`. Admin reads and publishing:

@@ -59,12 +59,12 @@
                             <label>Timetable Class<input id="progression-timetable-class" maxlength="100"></label>
                         </div>
                         <h2>Learning Pathway Results</h2>
-                        <p>Record overall coverage and progress for each DTECH pathway. The note under each pathway counts its linked curriculum statements recorded below. Choose a Progress descriptor: 1 Emerging, 2 Developing, 3 Consolidating, 4 Proficient or 5 Exceeding. Choosing one for a Not taught pathway changes Coverage to Partly taught; setting Coverage back to Not taught resets Progress to Not determined. Descriptors are selected by the teacher, not calculated from kit completion.</p>
+                        <p>Coverage for each DTECH pathway is calculated from its linked curriculum statements below: Not taught until a linked statement is covered, Partly taught once at least one is, and Taught when every Primary and Supporting statement is Taught. Choose a Progress descriptor (1 Emerging, 2 Developing, 3 Consolidating, 4 Proficient or 5 Exceeding) once a pathway is at least Partly taught. Descriptors are selected by the teacher, not calculated from kit completion.</p>
                         <div class="curriculum-table-wrap" tabindex="0" role="region" aria-label="Pathway results">
                             <table class="curriculum-table"><thead><tr><th scope="col">Learning pathway <span class="progression-th-note">(linked curriculum statements)</span></th><th scope="col">Coverage</th><th scope="col">Progress</th></tr></thead><tbody id="progression-rows"></tbody></table>
                         </div>
                         <h2>Curriculum Coverage</h2>
-                        <p>Statements are quoted from the Technology Years 0-10 teaching sequence (September 2026), following its Knowledge and Practices layout for the student's year level. Tags show the DTECH pathways each statement supports: DS Digital Systems, D&amp;I Data and Information, DC Digital Citizenship, P&amp;A Programming and Algorithms, S&amp;C Systems and Control. Discipline defaults to DTECH; change it if the student met the statement in Textiles, Food, Wood or DVC.</p>
+                        <p>Statements are quoted from the Technology Years 0-10 teaching sequence (September 2026), following its Knowledge and Practices layout for the student's year level. Tags show the DTECH pathways each statement supports (<a href="curriculum-mapping.html">Admin &gt; Curriculum Mapping</a>): DS Digital Systems, D&amp;I Data and Information, DC Digital Citizenship, P&amp;A Programming and Algorithms, S&amp;C Systems and Control. <span class="progression-chip role-primary">Primary</span> <span class="progression-chip role-supporting">Supporting</span> <span class="progression-chip role-context">Context dependent</span> When a student completes a tracked activity, its approved statements are set to Partly taught automatically; only the teacher can set Taught. Discipline defaults to DTECH; change it if the student met the statement in Textiles, Food, Wood or DVC.</p>
                         <div id="progression-curriculum" class="progression-curriculum" aria-live="polite"></div>
                         <h2>Teacher Summary</h2>
                         <label>Learning narrative<textarea id="progression-narrative" rows="6" maxlength="5000" placeholder="Describe the student's learning journey this term: what they explored, created and achieved."></textarea></label>
@@ -91,6 +91,7 @@
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="../script.js"></script>
     <script src="progression-curriculum.js"></script>
+    <script src="progression-mapping.js"></script>
     <script src="progression-pathway.js"></script>
 </body>
 </html>

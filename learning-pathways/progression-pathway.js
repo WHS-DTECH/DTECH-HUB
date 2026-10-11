@@ -10,6 +10,25 @@ const progressionPathways = [
 const progressionDescriptors = ["emerging", "developing", "consolidating", "proficient", "exceeding"];
 const progressionDisciplines = [["dtech", "DTECH"], ["textiles", "Textiles"], ["food", "Food"], ["wood", "Wood"], ["dvc", "DVC"]];
 const progressionCoverageOptions = [["not-taught", "Not taught"], ["partly-taught", "Partly taught"], ["taught", "Taught"]];
+let progressionDefaultMapping = null;
+// Published Admin > Curriculum Mapping, or the seeded default until it loads.
+function progressionMappingData() {
+    return progression.mapping || (progressionDefaultMapping ||= progressionMapping.defaultMapping());
+}
+function progressionLinks(statementId) {
+    return progressionMappingData().links?.[statementId] || [];
+}
+const progressionRoleLabels = { primary: "Primary", supporting: "Supporting", context: "Context dependent" };
+function progressionActivityNote(statementId) {
+    const result = progressionStatementResult(statementId);
+    return (progressionMappingData().activities || []).filter((link) => link.statement === statementId && link.autoSet !== "no")
+        .map((link) => ({ link, activity: progression.completed.find((item) => item.id === link.activity) }))
+        .filter((item) => item.activity)
+        .map(({ link, activity }) => result.autoFrom === link.activity && result.coverage === "partly-taught"
+            ? `Auto-set to Partly taught: ${activity.title} completed`
+            : link.autoSet === "review" ? `${activity.title} completed - review whether this statement was covered` : `${activity.title} completed`)
+        .join(" | ");
+}
 const progressionPathwayChips = {
     "digital-systems": "DS", data: "D&I", "digital-citizenship": "DC", "programming-and-algorithms": "P&A", "systems-and-control": "S&C"
 };
@@ -23,7 +42,7 @@ function progressionStatementResult(id) {
 }
 function progressionStatement(id, yearLevel) {
     const year = Number(yearLevel);
-    const linked = progressionCurriculumStatements(year).filter((statement) => statement.pathways.includes(id));
+    const linked = progressionCurriculumStatements(year).filter((statement) => progressionLinks(statement.id).some((link) => link.pathway === id));
     if (!linked.length) return "Select the student year level to see the linked curriculum statements.";
     const results = linked.map((statement) => progressionStatementResult(statement.id).coverage);
     const taught = results.filter((value) => value === "taught").length;
@@ -85,14 +104,18 @@ function progressionCurriculumTable(title, statements) {
             words.textContent = statement.text;
             const chips = document.createElement("span");
             chips.className = "progression-chips";
-            for (const pathway of statement.pathways) {
+            for (const link of progressionLinks(statement.id)) {
                 const chip = document.createElement("span");
-                chip.className = "progression-chip";
-                chip.textContent = progressionPathwayChips[pathway] || pathway;
-                chip.title = progressionPathways.find(([id]) => id === pathway)?.[1] || pathway;
+                chip.className = `progression-chip role-${link.role}`;
+                chip.textContent = progressionPathwayChips[link.pathway] || link.pathway;
+                chip.title = `${progressionPathways.find(([id]) => id === link.pathway)?.[1] || link.pathway} - ${progressionRoleLabels[link.role] || link.role}`;
                 chips.append(chip);
             }
-            text.append(words, chips);
+            const note = document.createElement("span");
+            note.className = "progression-activity-note";
+            const showNote = () => { note.textContent = progressionActivityNote(statement.id); note.hidden = !note.textContent; };
+            showNote();
+            text.append(words, chips, note);
             let coverage, descriptor;
             const update = (key, value) => {
                 const rows = progression.record.statements ||= [];
@@ -105,8 +128,8 @@ function progressionCurriculumTable(title, statements) {
                 coverage.value = entry.coverage; descriptor.value = entry.descriptor || "";
                 progressionCoverageColour(coverage); progressionDescriptorColour(descriptor);
                 progression.dirty = true;
-                progressionUpdateHints();
-                progressionDialogSummary();
+                showNote();
+                progressionRefreshPathways();
             };
             const discipline = progressionStatementSelect(`Discipline for: ${statement.text}`, progressionDisciplines, result.discipline || "dtech", (value) => update("discipline", value));
             coverage = progressionStatementSelect(`Coverage for: ${statement.text}`, progressionCoverageOptions, result.coverage, (value) => update("coverage", value));
@@ -145,8 +168,42 @@ function progressionRenderCurriculum() {
     }
 }
 function progressionUpdateStatements() {
-    progressionUpdateHints();
+    progressionAutoSet();
     progressionRenderCurriculum();
+    progressionRefreshPathways();
+}
+// Approved Admin > Curriculum Mapping links for completed tracked activities set statements to Partly taught.
+function progressionAutoSet() {
+    if (!progression.record) return [];
+    return progressionMapping.autoApply(progressionMappingData(), Number(pp("level").value), progression.record.statements ||= [],
+        progression.completed.map((activity) => activity.id));
+}
+// Pathway Coverage is calculated from its linked statements; Progress needs at least Partly taught.
+function progressionRefreshPathways() {
+    const record = progression.record;
+    if (!record) return false;
+    const year = Number(pp("level").value);
+    let changed = false;
+    for (const result of record.pathways) {
+        const coverage = progressionMapping.derivePathwayCoverage(progressionMappingData(), year, result.id, (id) => progressionStatementResult(id).coverage);
+        const descriptor = coverage === "not-taught" ? null : result.descriptor;
+        if (coverage !== result.coverage || descriptor !== result.descriptor) { changed = true; result.coverage = coverage; result.descriptor = descriptor; }
+        const chip = document.querySelector(`[data-pathway-coverage="${result.id}"]`);
+        if (chip) {
+            chip.className = `coverage-chip coverage-${coverage}`;
+            chip.textContent = progressionCoverageOptions.find(([value]) => value === coverage)[1];
+        }
+        const select = document.querySelector(`[data-pathway-descriptor="${result.id}"]`);
+        if (select) {
+            select.value = descriptor || "";
+            select.disabled = coverage === "not-taught";
+            select.title = select.disabled ? "Mark a linked curriculum statement as Partly taught or Taught first" : "";
+            progressionDescriptorColour(select);
+        }
+    }
+    progressionUpdateHints();
+    progressionDialogSummary();
+    return changed;
 }
 const progressionSummaryGroups = [
     ["Digital Technology", ["data", "digital-citizenship", "digital-systems", "programming-and-algorithms"]],
@@ -199,7 +256,7 @@ function progressionSummary(student) {
     return summary;
 }
 const progression = { students: [], records: [], record: null, selected: "digital-systems", dirty: false, loading: 0, saving: false, teacherEmail: "",
-    changeSeq: 0, autosaveTimer: null, saveAgain: false };
+    changeSeq: 0, autosaveTimer: null, saveAgain: false, mapping: null, completed: [] };
 const pp = (name) => document.querySelector(`#progression-${name}`);
 function progressionStatus(message, error = false) {
     pp("status").textContent = message;
@@ -418,6 +475,7 @@ function progressionRender(record) {
     pp("year").disabled = record.revision > 0;
     pp("term").disabled = record.revision > 0;
     progressionSavedText(record.updatedAt ? `All changes saved - ${new Date(record.updatedAt).toLocaleString()} by ${record.updatedBy}` : "Not saved yet - changes save automatically.");
+    const autoSet = progressionAutoSet();
     pp("rows").replaceChildren();
     for (const [id, title] of progressionPathways) {
         const result = progression.record.pathways.find((row) => row.id === id);
@@ -428,35 +486,21 @@ function progressionRender(record) {
         statement.className = "progression-statement"; statement.dataset.statement = id;
         statement.textContent = progressionStatement(id, record.yearLevel);
         name.append(title, statement); row.append(name);
-        const coverage = document.createElement("select");
-        coverage.setAttribute("aria-label", `${title} coverage`);
-        for (const [value, label] of progressionCoverageOptions) coverage.append(new Option(label, value));
-        coverage.value = result.coverage;
-        const descriptor = document.createElement("select");
-        descriptor.setAttribute("aria-label", `${title} progress`);
-        descriptor.append(new Option("Not determined", ""));
-        progressionDescriptors.forEach((value, index) => descriptor.append(new Option(`${index + 1} - ${value[0].toUpperCase() + value.slice(1)}`, value)));
-        descriptor.value = result.descriptor || "";
-        const colour = () => {
-            descriptor.className = result.descriptor ? `descriptor-chip ${result.descriptor}` : "";
-            progressionCoverageColour(coverage);
-        };
-        colour();
-        coverage.addEventListener("change", () => {
-            result.coverage = coverage.value;
-            if (result.coverage === "not-taught") { result.descriptor = null; descriptor.value = ""; }
-            colour(); progression.dirty = true; progressionDialogSummary();
-        });
+        const coverage = document.createElement("span");
+        coverage.dataset.pathwayCoverage = id;
+        coverage.title = "Calculated from the linked curriculum statements below";
+        const descriptor = progressionDescriptorSelect(`${title} progress`, result.descriptor);
+        descriptor.dataset.pathwayDescriptor = id;
         descriptor.addEventListener("change", () => {
             result.descriptor = descriptor.value || null;
-            if (result.descriptor && result.coverage === "not-taught") { result.coverage = "partly-taught"; coverage.value = result.coverage; }
-            colour(); progression.dirty = true; progressionDialogSummary();
+            progressionDescriptorColour(descriptor); progression.dirty = true; progressionDialogSummary();
         });
         for (const element of [coverage, descriptor]) { const cell = document.createElement("td"); cell.append(element); row.append(cell); }
         pp("rows").append(row);
     }
     progressionRenderCurriculum();
     progressionDialogSummary();
+    if (progressionRefreshPathways() || autoSet.length) { progressionQueueSave(); progressionDialogSummary(); }
 }
 function progressionAnnualRecord(records, student, schoolYear) {
     return records.find((record) => record.schoolYear === schoolYear) || (student.archived ? records[0] : null);
@@ -465,6 +509,7 @@ async function progressionLoadStudent(email) {
     const request = ++progression.loading;
     progression.record = null;
     progression.records = [];
+    progression.completed = [];
     progression.dirty = false;
     progressionHideEditor();
     if (!email) { progressionStatus("Find and select a Year 7-10 student."); return; }
@@ -475,6 +520,7 @@ async function progressionLoadStudent(email) {
         if (request !== progression.loading) return;
         if (!Array.isArray(data.records)) throw new Error("Saved term response is invalid.");
         progression.records = data.records;
+        progression.completed = Array.isArray(data.completedActivities) ? data.completedActivities : [];
         const student = progression.students.find((student) => student.email === email);
         const record = progressionAnnualRecord(data.records, student, new Date().getFullYear());
         progressionRender(record || progressionNewRecord(student));
@@ -527,9 +573,13 @@ async function progressionInit() {
     }
     progressionStatus("Loading student directory...");
     try {
-        const data = await progressionApi("students");
+        const [data, mapping] = await Promise.all([progressionApi("students"), progressionApi("mapping").catch((error) => {
+            console.warn("Using the default curriculum mapping", error);
+            return null;
+        })]);
         if (request !== progression.loading) return;
         if (!Array.isArray(data.students)) throw new Error("Student directory response is invalid.");
+        progression.mapping = mapping?.mapping || null;
         progression.students = data.students.sort((a, b) => a.name.localeCompare(b.name));
         progressionHomeroomOptions();
         progressionStudentOptions();

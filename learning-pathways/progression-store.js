@@ -1,6 +1,8 @@
 "use strict";
 
 const progressionCurriculum = require("./progression-curriculum");
+const progressionMapping = require("./progression-mapping");
+const { trackedActivities } = require("./activity-progress-store");
 
 const pathwayIds = ["digital-systems", "data", "digital-citizenship", "programming-and-algorithms", "systems-and-control"];
 const coverageValues = ["not-taught", "partly-taught", "taught"];
@@ -20,7 +22,8 @@ function validateStatements(rows) {
         const descriptor = row.descriptor === undefined ? null : row.descriptor;
         if (descriptor !== null && !descriptorValues.includes(descriptor)) throw new Error("Invalid curriculum statement progress.");
         if (row.coverage === "not-taught" && descriptor !== null) throw new Error("Not taught curriculum statements must be Not determined.");
-        return { id: row.id, coverage: row.coverage, discipline, descriptor };
+        if (row.autoFrom !== undefined && !Object.hasOwn(trackedActivities, row.autoFrom)) throw new Error("Invalid curriculum statement activity source.");
+        return { id: row.id, coverage: row.coverage, discipline, descriptor, ...(row.autoFrom === undefined ? {} : { autoFrom: row.autoFrom }) };
     });
 }
 
@@ -58,7 +61,7 @@ function validateRecord(body) {
         strengths: text(body.strengths, "strengths"), nextLearning: text(body.nextLearning, "next learning") };
 }
 
-function registerProgressionPathway(app, { pool, hasDatabase, requireTeacherAccess, getStudents, getStaff }) {
+function registerProgressionPathway(app, { pool, hasDatabase, requireTeacherAccess, requireAdminAccess, getStudents, getStaff }) {
     // Staff appear (Year level filter = Staff) so teachers can check their own test records.
     async function staffMembers(students) {
         if (typeof getStaff !== "function") return [];
@@ -112,6 +115,87 @@ function registerProgressionPathway(app, { pool, hasDatabase, requireTeacherAcce
         }
         return [...current.filter((student) => !student.email), ...students.values()];
     }
+    async function completedActivities(email) {
+        try {
+            const rows = (await pool.query(`SELECT activity_id, completed_at FROM learning_pathways_activity_progress
+                WHERE student_email = $1 AND completed`, [email])).rows;
+            return rows.filter((row) => Object.hasOwn(trackedActivities, row.activity_id))
+                .map((row) => ({ id: row.activity_id, title: trackedActivities[row.activity_id].title, completedAt: row.completed_at }));
+        } catch (error) {
+            if (error?.code !== "42P01") console.error("Could not load completed activities for progression", error);
+            return [];
+        }
+    }
+
+    // Curriculum mapping (Admin > Curriculum Mapping). Until an admin publishes, the seeded default is used.
+    const activityList = () => Object.entries(trackedActivities).map(([id, activity]) => ({ id, title: activity.title,
+        context: activity.context || "" }));
+    let memoryMapping = null;
+    async function mappingSchema() {
+        await pool.query(`CREATE TABLE IF NOT EXISTS progression_curriculum_mapping (
+            id TEXT PRIMARY KEY, mapping JSONB NOT NULL, revision INTEGER NOT NULL DEFAULT 1,
+            updated_by TEXT NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )`);
+    }
+    async function readMapping() {
+        const saved = hasDatabase ? (await mappingSchema(), (await pool.query(`SELECT mapping, revision, updated_by, updated_at
+            FROM progression_curriculum_mapping WHERE id = 'default'`)).rows[0]) : memoryMapping;
+        if (!saved) return { mapping: progressionMapping.defaultMapping(), revision: 0, updatedAt: null, updatedBy: null };
+        let mapping;
+        try { mapping = progressionMapping.validateMapping(saved.mapping, Object.keys(trackedActivities)); }
+        catch (error) {
+            // Drop links to activities or statements that no longer exist rather than failing the page.
+            const source = saved.mapping || {};
+            mapping = progressionMapping.validateMapping({ ...source,
+                links: Object.fromEntries(Object.entries(source.links || {}).filter(([id]) => statementIds.has(id))),
+                activities: (source.activities || []).filter((row) => Object.hasOwn(trackedActivities, row?.activity) && statementIds.has(row?.statement)) },
+                Object.keys(trackedActivities));
+            console.error("Curriculum mapping contained outdated links; they were ignored.", error.message);
+        }
+        return { mapping, revision: saved.revision, updatedAt: saved.updated_at, updatedBy: saved.updated_by };
+    }
+    const sendMapping = async (_req, res) => {
+        try {
+            res.set("Cache-Control", "no-store");
+            res.json({ ...await readMapping(), activities: activityList() });
+        } catch (error) {
+            console.error("Could not load curriculum mapping", error);
+            res.status(500).json({ error: "Could not load the curriculum mapping. Please retry." });
+        }
+    };
+    app.get("/api/teacher/progression/mapping", requireTeacherAccess, sendMapping);
+    if (typeof requireAdminAccess === "function") {
+        app.get("/api/admin/progression/mapping", requireAdminAccess, sendMapping);
+        app.put("/api/admin/progression/mapping", requireAdminAccess, async (req, res) => {
+            let mapping;
+            const revision = req.body?.revision;
+            try {
+                if (!Number.isSafeInteger(revision) || revision < 0) throw new Error("Invalid revision.");
+                mapping = progressionMapping.validateMapping(req.body?.mapping, Object.keys(trackedActivities));
+            } catch (error) { return res.status(400).json({ error: error.message }); }
+            const conflict = () => res.status(409).json({ error: "The mapping was changed by another admin. Reload it before editing again." });
+            try {
+                if (!hasDatabase) {
+                    if ((memoryMapping?.revision || 0) !== revision) return conflict();
+                    memoryMapping = { mapping, revision: revision + 1, updated_by: req.user_email || "admin", updated_at: new Date().toISOString() };
+                } else {
+                    await mappingSchema();
+                    const values = [JSON.stringify(mapping), req.user_email || "admin"];
+                    const result = revision === 0
+                        ? await pool.query(`INSERT INTO progression_curriculum_mapping (id, mapping, updated_by)
+                            VALUES ('default', $1::jsonb, $2) ON CONFLICT DO NOTHING RETURNING revision`, values)
+                        : await pool.query(`UPDATE progression_curriculum_mapping SET mapping = $1::jsonb, updated_by = $2,
+                            updated_at = NOW(), revision = revision + 1 WHERE id = 'default' AND revision = $3 RETURNING revision`, [...values, revision]);
+                    if (!result.rows.length) return conflict();
+                }
+                res.json({ ...await readMapping(), activities: activityList() });
+            } catch (error) {
+                console.error("Could not save curriculum mapping", error);
+                res.status(500).json({ error: "Could not save the curriculum mapping. Your changes have not been saved." });
+            }
+        });
+    }
+
     app.get("/api/teacher/progression/students", requireTeacherAccess, async (_req, res) => {
         try {
             res.set("Cache-Control", "no-store");
@@ -130,7 +214,7 @@ function registerProgressionPathway(app, { pool, hasDatabase, requireTeacherAcce
                 FROM progression_pathway_results WHERE student_email = $1 ORDER BY school_year DESC, term DESC`, [email]);
             res.set("Cache-Control", "no-store");
             res.json({ records: result.rows.map((row) => ({ ...row.record, revision: row.revision,
-                updatedAt: row.updated_at, updatedBy: row.updated_by })) });
+                updatedAt: row.updated_at, updatedBy: row.updated_by })), completedActivities: await completedActivities(email) });
         } catch (error) {
             console.error("Could not load progression records", error);
             res.status(500).json({ error: "Could not load saved results. Please retry." });

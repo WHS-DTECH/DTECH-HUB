@@ -47,7 +47,8 @@
                     "heading": "",
                     "text": "Digital systems use inputs, processes, outputs, and data to complete tasks and solve problems for users in different contexts.",
                     "pathways": [
-                        "digital-systems"
+                        "digital-systems",
+                        "data"
                     ]
                 },
                 {
@@ -112,7 +113,8 @@
                     "heading": "",
                     "text": "Examine how the inputs, processes, outputs, and data work together in familiar digital systems.",
                     "pathways": [
-                        "digital-systems"
+                        "digital-systems",
+                        "data"
                     ]
                 },
                 {

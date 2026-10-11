@@ -6148,7 +6148,7 @@ require("./learning-pathways/activity-progress-store").registerActivityProgress(
   requireTeacherAccess: requireActivityWriteAccess, getStudents: getYear7To10Students, getStaff: getStaffMembers
 });
 require("./learning-pathways/progression-store").registerProgressionPathway(app, {
-  pool, hasDatabase, requireTeacherAccess: requireActivityWriteAccess, getStudents: getYear7To10Students, getStaff: getStaffMembers
+  pool, hasDatabase, requireTeacherAccess: requireActivityWriteAccess, requireAdminAccess, getStudents: getYear7To10Students, getStaff: getStaffMembers
 });
 app.use(express.static(__dirname));
 
