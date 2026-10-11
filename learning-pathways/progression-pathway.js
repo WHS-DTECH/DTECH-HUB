@@ -210,7 +210,6 @@ function progressionRender(record) {
         descriptor.value = result.descriptor || "";
         const colour = () => {
             descriptor.className = result.descriptor ? `descriptor-chip ${result.descriptor}` : "";
-            descriptor.disabled = result.coverage === "not-taught";
         };
         colour();
         coverage.addEventListener("change", () => {
@@ -218,7 +217,11 @@ function progressionRender(record) {
             if (result.coverage === "not-taught") { result.descriptor = null; descriptor.value = ""; }
             colour(); progression.dirty = true; progressionDialogSummary();
         });
-        descriptor.addEventListener("change", () => { result.descriptor = descriptor.value || null; colour(); progression.dirty = true; progressionDialogSummary(); });
+        descriptor.addEventListener("change", () => {
+            result.descriptor = descriptor.value || null;
+            if (result.descriptor && result.coverage === "not-taught") { result.coverage = "partly-taught"; coverage.value = result.coverage; }
+            colour(); progression.dirty = true; progressionDialogSummary();
+        });
         for (const element of [coverage, descriptor]) { const cell = document.createElement("td"); cell.append(element); row.append(cell); }
         pp("rows").append(row);
     }

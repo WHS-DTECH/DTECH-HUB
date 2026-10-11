@@ -55,6 +55,8 @@ async function main() {
     assert.ok(!html.includes(">Details</th>") && !html.includes("progression-detail") && !html.includes("progression-strengths"),
         "Details column, Curriculum Coverage & Evidence and Strengths have been removed");
     assert.ok(html.includes('id="progression-next"'), "Next learning remains in the Teacher Summary");
+    assert.ok(!client.includes('descriptor.disabled'), "All five Progress descriptors can be selected for every pathway");
+    assert.match(client, /result\.descriptor && result\.coverage === "not-taught"\) \{ result\.coverage = "partly-taught"/, "Choosing a descriptor keeps coverage valid");
     assert.ok(!client.includes("View / edit") && !client.includes('pp("strengths")') && !client.includes("progressionDetail"));
     assert.ok(!client.includes('pp("history")'), "No handlers depend on the removed selector");
     vm.runInContext(client.slice(client.indexOf("function progressionAnnualRecord("), client.indexOf("async function progressionLoadStudent(")), context);
