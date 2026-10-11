@@ -104,12 +104,17 @@ async function main() {
     assert.throws(() => validateRecord({ ...sample, timetableClass: "x".repeat(101) }));
     assert.match(serverSource, /homeroom: pickRowValue\(lower, \["homeroom", "home_room", "home room"/,
         "Explicit homeroom takes priority over class fields");
-    const registrationStart = serverSource.indexOf('require("./learning-pathways/progression-store").registerProgressionPathway');
+    const registrationStart = serverSource.indexOf("async function getYear7To10Students(");
     const registrationEnd = serverSource.indexOf("app.use(express.static", registrationStart);
     let directoryAdapter;
+    let activityStudents;
     vm.runInNewContext(serverSource.slice(registrationStart, registrationEnd), {
-        require: () => ({ registerProgressionPathway: (_app, config) => { directoryAdapter = config.getStudents; } }),
+        require: () => ({
+            registerActivityProgress: (_app, config) => { activityStudents = config.getStudents; },
+            registerProgressionPathway: (_app, config) => { directoryAdapter = config.getStudents; }
+        }),
         app: {}, pool: {}, hasDatabase: true, requireActivityWriteAccess: () => {},
+        getRequestUserEmail: () => "", SCHOOL_EMAIL_DOMAIN: "example.test",
         getStudentDirectoryRows: async () => [
             { student_name: "No email one", year_level: "Year 7", form_class: "7WHAU", homeroom: "7WHAU", timetable_class: "JPI", linked_emails: [] },
             { student_name: "No email two", year_level: "8", form_class: "8WPAPA", homeroom: "8WPAPA", timetable_class: "JPI", linked_emails: [] },
@@ -118,6 +123,7 @@ async function main() {
         buildStudentClassManagementRow: (row) => row, dedupeToLatestStudentRows: (rows) => rows,
         normalizeEmail: (value) => value.trim().toLowerCase()
     });
+    assert.equal(activityStudents, directoryAdapter, "Unit Progression uses the same student directory");
     const directoryStudents = await directoryAdapter();
     assert.equal(directoryStudents.length, 3, "The directory adapter does not omit students without email");
     assert.equal(context.progressionMatchingStudents(directoryStudents, "JPI", "", "").length, 3);

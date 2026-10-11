@@ -1409,6 +1409,7 @@ function renderGlobalNavbar() {
             <div class="nav-drawer" role="menu">
                 <a role="menuitem" href="/teacher-student-work.html">Student Work Tracker</a>
                 <a role="menuitem" href="/learning-pathways/progression-pathway.html">Progression Pathway</a>
+                <a role="menuitem" href="/learning-pathways/unit-progression.html">Unit Progression</a>
                 <a role="menuitem" href="/user-profile.html#trello-integration-card">Trello</a>
             </div>
         </details>

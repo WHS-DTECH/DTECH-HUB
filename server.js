@@ -6125,21 +6125,22 @@ app.get("/practical-skills/library.json", async (_req, res) => {
   }
 });
 require("./learning-pathways/library-store").registerLearningPathways(app, { pool, hasDatabase, requireAdminAccess });
+async function getYear7To10Students() {
+  const rows = dedupeToLatestStudentRows((await getStudentDirectoryRows()).map(buildStudentClassManagementRow));
+  return rows.filter((row) => String(row.status || "").toLowerCase() !== "not current"
+    && [7, 8, 9, 10].includes(Number(String(row.year_level || "").replace(/^year\s*/i, ""))))
+    .map((row) => ({
+      email: normalizeEmail(row.linked_emails?.[0] || ""), name: row.student_name,
+      yearLevel: Number(String(row.year_level).replace(/^year\s*/i, "")),
+      formClass: row.form_class || "", homeroom: row.homeroom || "", timetableClass: row.timetable_class || ""
+    }));
+}
 require("./learning-pathways/activity-progress-store").registerActivityProgress(app, {
-  pool, hasDatabase, getRequestUserEmail, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN
+  pool, hasDatabase, getRequestUserEmail, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN,
+  requireTeacherAccess: requireActivityWriteAccess, getStudents: getYear7To10Students
 });
 require("./learning-pathways/progression-store").registerProgressionPathway(app, {
-  pool, hasDatabase, requireTeacherAccess: requireActivityWriteAccess,
-  getStudents: async () => {
-    const rows = dedupeToLatestStudentRows((await getStudentDirectoryRows()).map(buildStudentClassManagementRow));
-    return rows.filter((row) => String(row.status || "").toLowerCase() !== "not current"
-      && [7, 8, 9, 10].includes(Number(String(row.year_level || "").replace(/^year\s*/i, ""))))
-      .map((row) => ({
-        email: normalizeEmail(row.linked_emails?.[0] || ""), name: row.student_name,
-        yearLevel: Number(String(row.year_level).replace(/^year\s*/i, "")),
-        formClass: row.form_class || "", homeroom: row.homeroom || "", timetableClass: row.timetable_class || ""
-      }));
-  }
+  pool, hasDatabase, requireTeacherAccess: requireActivityWriteAccess, getStudents: getYear7To10Students
 });
 app.use(express.static(__dirname));
 

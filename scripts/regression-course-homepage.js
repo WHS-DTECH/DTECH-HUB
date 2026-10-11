@@ -66,7 +66,7 @@ for (const entry of ["/index.html", "/learning-pathways/"]) {
             : entry === "/learning-pathways/" && !younger ? "/index.html" : "", "Teacher View uses the assigned course homepage without loops");
     }
 }
-for (const entry of ["/teacher-view.html", "/admin-menu.html", "/learning-pathways/progression-pathway.html"]) {
+for (const entry of ["/teacher-view.html", "/admin-menu.html", "/learning-pathways/progression-pathway.html", "/learning-pathways/unit-progression.html"]) {
     context.window.location.pathname = entry;
     redirected = "";
     context.routeHubCourseHomepage("JuniorDTECH");

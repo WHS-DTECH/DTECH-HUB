@@ -12,6 +12,7 @@ const encodingLetters = [...TECHNOLOGY].map((letter, index) => ({ index, letter,
 const trackedActivities = {
     "activity-encoding-binary": {
         title: "Encoding Binary",
+        shortTitle: "Encoding",
         strand: "digital-systems",
         unit: "binary-and-data",
         lesson: "lesson-encoding-binary",
@@ -39,11 +40,26 @@ const trackedActivities = {
                 if (responses.letters[index] !== toBinary(value)) missing.push(`${letter} = ${value}`);
             }
             return missing;
+        },
+        summary(responses) {
+            const missing = this.missing(responses);
+            const correct = encodingLetters.length - missing.length;
+            const word = responses.challenge?.word || "";
+            const wordDone = Boolean(word) && [...word].every((letter, position) => responses.challenge.bits[position] === toBinary(letterValue(letter)));
+            return [
+                `Part D letters correct: ${correct} of ${encodingLetters.length}`,
+                ...(missing.length ? [`Still to finish: ${missing.join(", ")}`] : []),
+                word ? `Optional word: ${word} (${wordDone ? "encoded correctly" : "not finished yet"})` : "Optional word: not attempted"
+            ];
         }
     }
 };
 
-function registerActivityProgress(app, { pool, hasDatabase, getRequestUserEmail, normalizeEmail, schoolDomain }) {
+const trackedUnits = {
+    "binary-and-data": { title: "Binary & Data", strand: "digital-systems", strandTitle: "Digital Systems" }
+};
+
+function registerActivityProgress(app, { pool, hasDatabase, getRequestUserEmail, normalizeEmail, schoolDomain, requireTeacherAccess, getStudents }) {
     const memory = new Map();
     let schemaReady = null;
     const ensureSchema = () => {
@@ -70,6 +86,13 @@ function registerActivityProgress(app, { pool, hasDatabase, getRequestUserEmail,
         await ensureSchema();
         return (await pool.query(`SELECT responses, completed, completed_at FROM learning_pathways_activity_progress
             WHERE student_email = $1 AND activity_id = $2`, [email, activityId])).rows[0] || null;
+    }
+    async function readActivities(activityIds) {
+        if (!hasDatabase) return [...memory.entries()].map(([key, row]) => ({ student_email: key.split("\n")[0], activity_id: key.split("\n")[1], ...row }))
+            .filter((row) => activityIds.includes(row.activity_id));
+        await ensureSchema();
+        return (await pool.query(`SELECT student_email, activity_id, responses, completed, completed_at
+            FROM learning_pathways_activity_progress WHERE activity_id = ANY($1)`, [activityIds])).rows;
     }
     async function write(email, activityId, row) {
         if (!hasDatabase) {
@@ -148,6 +171,39 @@ function registerActivityProgress(app, { pool, hasDatabase, getRequestUserEmail,
             res.status(500).json({ error: "Could not save your answers. Please retry." });
         }
     });
+    if (typeof requireTeacherAccess !== "function" || typeof getStudents !== "function") return;
+    app.get("/api/teacher/unit-progression", requireTeacherAccess, async (req, res) => {
+        res.set("Cache-Control", "no-store");
+        const unitIds = Object.keys(trackedUnits);
+        const unitId = unitIds.includes(String(req.query.unit || "")) ? String(req.query.unit) : unitIds[0];
+        try {
+            const activities = Object.entries(trackedActivities).filter(([, activity]) => activity.unit === unitId);
+            const students = (await getStudents()).map((student) => ({ email: normalizeEmail(student.email || ""),
+                name: String(student.name || ""), yearLevel: student.yearLevel, homeroom: student.homeroom || "",
+                formClass: student.formClass || "", timetableClass: student.timetableClass || "" }));
+            const known = new Set(students.map((student) => student.email).filter(Boolean));
+            const progress = {};
+            for (const row of await readActivities(activities.map(([id]) => id))) {
+                const email = normalizeEmail(row.student_email);
+                if (!known.has(email)) continue;
+                const activity = trackedActivities[row.activity_id];
+                const responses = activity.sanitize(row.responses);
+                (progress[email] ||= {})[row.activity_id] = { status: row.completed ? "completed" : "in-progress",
+                    completedAt: row.completed_at ? new Date(row.completed_at).toISOString() : null,
+                    summary: activity.summary(responses) };
+            }
+            res.json({
+                units: unitIds.map((id) => ({ id, title: trackedUnits[id].title })),
+                unit: { id: unitId, ...trackedUnits[unitId] },
+                activities: activities.map(([id, activity]) => ({ id, title: activity.title,
+                    shortTitle: activity.shortTitle || activity.title, lessonLabel: activity.lessonLabel, href: activity.href })),
+                students, progress
+            });
+        } catch (error) {
+            console.error("Could not load unit progression", error);
+            res.status(500).json({ error: "Could not load unit progression. Please retry." });
+        }
+    });
 }
 
-module.exports = { registerActivityProgress, trackedActivities, encodingLetters, toBinary };
+module.exports = { registerActivityProgress, trackedActivities, trackedUnits, encodingLetters, toBinary };

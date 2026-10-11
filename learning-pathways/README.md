@@ -152,6 +152,27 @@ Start / Continue / View work link. If progress cannot load, strand names still
 show with a retry action. When a signed-in student opens an activity whose
 saved answers are all correct but not yet ticked, it re-saves to tick it off.
 
+## Unit Progression (Teacher View)
+
+`unit-progression.html`, `.js` and `.css` add Student Work > Unit Progression: a
+unit summary card (strand / unit kicker, year · term · year level · homeroom, students
+shown and completed-activity chips) with one row per student and one column per
+tracked activity in the unit. Icons show Completed (green tick), In progress (amber
+clock) and Not started (dash). The Unit evidence button opens a dialog with each
+activity's state, completion time, a short summary of the saved answers and a link
+to the activity. Unit, Homeroom, Year and Name filters show a whole class (for
+example JPI + Year 7) or one student; homeroom matches the timetable class, homeroom
+or form class. Students without a linked school email are listed but flagged.
+
+Teacher/Admin-protected `GET /api/teacher/unit-progression?unit=` is registered by
+`activity-progress-store.js` using the existing write-access middleware and the same
+Year 7-10 directory as Progression Pathway. `trackedUnits` lists units; activities
+join a unit through `unit`, `shortTitle` and an optional `summary(responses)` in
+the activity registry, so new tracked activities (for example Decoding and Images)
+become columns automatically. Only directory students are reported.
+Run `node scripts/regression-unit-progression.js` for endpoint, filter, evidence
+and access checks.
+
 ## Progression Pathway (Teacher View)
 
 `progression-pathway.html`, `.js`, `.css` and `progression-store.js` provide the
