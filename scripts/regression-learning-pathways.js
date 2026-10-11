@@ -302,6 +302,8 @@ async function main() {
     assert.match(activityPage, /class="hero practical-skills-hero activity-hero"/);
     assert.match(activityPage, /href="\/learning-pathways\/\?type=activity#card-activity-build-your-binary-piano"/);
     assert.match(activityPage, /href="\/learning-pathways\/lesson-binary-piano\.html"/);
+    assert.match(lessonPage, /<strong>Existing resource:<\/strong> <a class="lesson-resource-pill" href="https:\/\/drive\.google\.com\/file\/d\/1aK-68ZEd-Z_19HUUOYF3Q-qaB8RVs0kK\/view\?usp=drive_link" target="_blank" rel="noopener noreferrer">Binary Piano template \(Google Drive\)<\/a>/,
+        'Lesson 1 should link the existing Binary Piano template as a pill');
     assert.match(lessonPage, /<\/div><a class="lesson-activity-pill" href="\/learning-pathways\/activity-build-your-binary-piano\.html">Activity card: Build Your Binary Piano<\/a><\/li>/,
         "The Practical phase shows a right-hand pill linking to its Activity card");
     assert.equal(normalizeCards([sample])[0].cardType, "strand", "Existing cards default to Curriculum Strands");

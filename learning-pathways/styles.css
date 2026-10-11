@@ -747,6 +747,25 @@
     text-decoration: underline;
 }
 
+.lesson-resource-pill {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 7px 16px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #a35200 0%, #d97706 100%);
+    box-shadow: 0 2px 6px rgba(163, 82, 0, 0.25);
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.lesson-resource-pill:hover,
+.lesson-resource-pill:focus-visible {
+    filter: brightness(1.08);
+    text-decoration: underline;
+}
+
 .panel-section.lesson-skill-check {
     border: 1px solid #b7e1c4;
     background: #f1faf3;
