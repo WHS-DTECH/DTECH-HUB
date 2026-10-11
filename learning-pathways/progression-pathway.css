@@ -18,7 +18,7 @@
 .progression-summary-group + .progression-summary-group { border-top: 1px solid #eef3f9; }
 .progression-summary-strand { align-self: start; padding-top: 3px; font-size: 0.92rem; }
 .progression-summary-row { grid-column: 2; display: grid; grid-template-columns: minmax(170px, 210px) minmax(150px, 260px) auto; gap: 12px; align-items: center; }
-.progression-summary-row a { color: #24344a; text-decoration: none; }
+.progression-summary-row a, .progression-summary-name { color: #24344a; text-decoration: none; }
 .progression-summary-row a:hover, .progression-summary-row a:focus-visible { text-decoration: underline; }
 .progression-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; height: 14px; }
 .progression-bar-segment { border-radius: 3px; background: #e2e9f1; }

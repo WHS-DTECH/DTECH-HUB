@@ -208,7 +208,8 @@ function progressionAutoSet() {
     return progressionMapping.autoApply(progressionMappingData(), Number(pp("level").value), progression.record.statements ||= [],
         progression.completed.map((activity) => activity.id));
 }
-// Pathway Coverage is calculated from its linked statements; Progress needs at least Some Evidence.
+// Pathway Coverage is calculated from its linked statements. Any legacy pathway descriptor is kept (hidden)
+// but cleared at No Evidence so the record stays valid.
 function progressionRefreshPathways() {
     const record = progression.record;
     if (!record) return false;
@@ -222,13 +223,6 @@ function progressionRefreshPathways() {
         if (chip) {
             chip.className = `coverage-chip coverage-${coverage}`;
             chip.textContent = progressionCoverageOptions.find(([value]) => value === coverage)[1];
-        }
-        const select = document.querySelector(`[data-pathway-descriptor="${result.id}"]`);
-        if (select) {
-            select.value = descriptor || "";
-            select.disabled = coverage === "not-taught";
-            select.title = select.disabled ? "Mark a linked curriculum statement as Some Evidence or Full Evidence first" : "";
-            progressionDescriptorColour(select);
         }
     }
     for (const [strand] of progressionStrands) for (const kind of ["knowledge", "practices"]) {
@@ -252,10 +246,8 @@ function progressionRefreshPathways() {
     progressionDialogSummary();
     return changed;
 }
-const progressionSummaryGroups = [
-    ["Digital Technology", ["data", "digital-citizenship", "digital-systems", "programming-and-algorithms"]],
-    ["Systems and Control", ["systems-and-control"]]
-];
+// Summary bars show the four Statement Set Progress levels (strand Knowledge / Practices).
+const progressionSummaryKinds = [["knowledge", "Knowledge"], ["practices", "Practices"]];
 function progressionSummary(student) {
     const summary = document.createElement("div");
     summary.className = "progression-summary";
@@ -264,29 +256,27 @@ function progressionSummary(student) {
     caption.className = "progression-summary-caption";
     caption.textContent = progress ? `Latest results: ${progress.schoolYear} Term ${progress.term}` : "No results saved yet";
     summary.append(caption);
-    for (const [group, ids] of progressionSummaryGroups) {
+    for (const [strand, group] of progressionStrands) {
         const section = document.createElement("div");
         section.className = "progression-summary-group";
         const heading = document.createElement("strong");
         heading.className = "progression-summary-strand";
         heading.textContent = group;
-        heading.style.gridRow = `span ${ids.length}`;
+        heading.style.gridRow = `span ${progressionSummaryKinds.length}`;
         section.append(heading);
-        ids.forEach((id) => {
-            const definition = progressionPathways.find(([pathwayId]) => pathwayId === id);
-            const result = progress?.pathways?.find((pathway) => pathway.id === id);
-            const level = progressionDescriptors.indexOf(result?.descriptor) + 1;
-            const state = level ? result.descriptor : !result ? "Not recorded" : result.coverage === "not-taught" ? "No Evidence" : "Not determined";
-            const label = level ? `${state[0].toUpperCase()}${state.slice(1)}` : state;
+        progressionSummaryKinds.forEach(([kind, kindLabel]) => {
+            const descriptor = progress?.strandProgress?.find((row) => row.strand === strand && row.kind === kind)?.descriptor;
+            const level = progressionDescriptors.indexOf(descriptor) + 1;
+            const label = level ? `${descriptor[0].toUpperCase()}${descriptor.slice(1)}` : progress ? "Not determined" : "Not recorded";
             const value = document.createElement("div");
             value.className = "progression-summary-row";
-            const name = document.createElement("a");
-            name.href = `/learning-pathways/${definition[2]}.html`;
-            name.textContent = definition[1];
+            const name = document.createElement("span");
+            name.className = "progression-summary-name";
+            name.textContent = kindLabel;
             const bar = document.createElement("span");
             bar.className = "progression-bar";
             bar.setAttribute("role", "img");
-            bar.setAttribute("aria-label", `${definition[1]}: ${label}${level ? ` (${level} of 5)` : ""}`);
+            bar.setAttribute("aria-label", `${group} ${kindLabel}: ${label}${level ? ` (${level} of 5)` : ""}`);
             progressionDescriptors.forEach((descriptor, step) => {
                 const segment = document.createElement("span");
                 segment.className = step < level ? `progression-bar-segment ${descriptor}` : "progression-bar-segment";
@@ -499,7 +489,7 @@ function progressionDialogSummary() {
     const record = progression.record;
     const saved = record && (record.revision > 0 || progression.dirty);
     const progress = saved ? { schoolYear: record.schoolYear, term: record.term,
-        pathways: record.pathways.map(({ id, coverage, descriptor }) => ({ id, coverage, descriptor })) } : null;
+        strandProgress: (record.strandProgress || []).map(({ strand, kind, descriptor }) => ({ strand, kind, descriptor })) } : null;
     const summary = progressionSummary({ progress });
     const caption = summary.querySelector(".progression-summary-caption");
     caption.textContent = progression.dirty ? "Progression summary - saving changes automatically..."
@@ -536,13 +526,7 @@ function progressionRender(record) {
         const coverage = document.createElement("span");
         coverage.dataset.pathwayCoverage = id;
         coverage.title = "Calculated from the linked curriculum statements below";
-        const descriptor = progressionDescriptorSelect(`${title} progress`, result.descriptor);
-        descriptor.dataset.pathwayDescriptor = id;
-        descriptor.addEventListener("change", () => {
-            result.descriptor = descriptor.value || null;
-            progressionDescriptorColour(descriptor); progression.dirty = true; progressionDialogSummary();
-        });
-        for (const element of [coverage, descriptor]) { const cell = document.createElement("td"); cell.append(element); row.append(cell); }
+        const cell = document.createElement("td"); cell.append(coverage); row.append(cell);
         pp("rows").append(row);
     }
     progressionRenderCurriculum();

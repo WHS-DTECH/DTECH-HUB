@@ -55,7 +55,10 @@ async function main() {
     assert.ok(!html.includes(">Details</th>") && !html.includes("progression-detail") && !html.includes("progression-strengths"),
         "Details column, Curriculum Coverage & Evidence and Strengths have been removed");
     assert.ok(html.includes('id="progression-next"'), "Next learning remains in the Teacher Summary");
-    assert.match(client, /select\.disabled = coverage === "not-taught";/, "Pathway Progress needs a covered linked statement");
+    assert.ok(html.includes('<th scope="col">Coverage</th></tr></thead><tbody id="progression-rows">'), "Learning Pathway Results has no Progress column");
+    assert.ok(!client.includes("pathwayDescriptor") && !client.includes("data-pathway-descriptor"), "Pathway Progress selects are removed");
+    assert.match(client, /progress\?\.strandProgress\?\.find\(\(row\) => row\.strand === strand && row\.kind === kind\)/, "Summary bars show Statement Set Progress");
+    assert.match(client, /strandProgress: \(record\.strandProgress \|\| \[\]\)\.map/, "Dialog summary uses the record's Statement Set Progress");
     assert.match(client, /dataset\.pathwayCoverage = id/, "Pathway Coverage is a calculated read-only chip");
     assert.ok(!/select\.dataset\.pathwayCoverage|progressionSelect\(progressionCoverageOptions, result\.coverage/.test(client), "Pathway Coverage is no longer a manual select");
     assert.ok(html.indexOf('src="progression-mapping.js"') > html.indexOf('src="progression-curriculum.js"') && html.indexOf('src="progression-mapping.js"') < html.indexOf('src="progression-pathway.js"'), "Mapping loads before the page script");
@@ -466,6 +469,7 @@ async function main() {
         assert.deepEqual(rosterStudent.progress.pathways.map((pathway) => pathway.id), ids);
         assert.deepEqual(Object.keys(rosterStudent.progress.pathways[0]).sort(), ["coverage", "descriptor", "id"],
             "Roster summary omits evidence and teacher notes");
+        assert.ok(Array.isArray(rosterStudent.progress.strandProgress), "Roster summary includes Statement Set Progress");
         const oldDirectory = options.getStudents;
         options.getStudents = async () => [];
         const oldStaff = options.getStaff;

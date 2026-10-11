@@ -177,8 +177,8 @@ and access checks.
 
 `progression-pathway.html`, `.js`, `.css` and `progression-store.js` provide the
 Student Work > Progression Pathway tracker. The layout follows the supplied
-JuniorDTECH tracker concept: student/timetable class, five pathway results (coverage
-and progress) and a teacher next-learning summary. A Curriculum Coverage section
+JuniorDTECH tracker concept: student/timetable class, five pathway results (calculated
+coverage only; the pathway Progress column was removed) and a teacher next-learning summary. A Curriculum Coverage section
 lists the verbatim Knowledge and Practices statements for the dialog's student
 year level from `TeacherFiles/Technology-0-10-15Sep26.pdf` (Digital Technology
 pp. 17/24, Systems and Control pp. 16/23), grouped by the curriculum's own
@@ -198,7 +198,8 @@ Proficient or 5 Exceeding; if evidence later drops, it reverts to the automatic 
 Older statement-level `descriptor` values are still accepted and kept but no longer
 shown. Coverage dropdowns are colour coded (grey No Evidence, amber Some Evidence,
 green Full Evidence). Each pathway row counts its linked statements with Full Evidence
-for that year. The PDF omits a bullet between the
+for that year. Legacy pathway-level `descriptor` values are still accepted and kept
+(cleared at No Evidence) but no longer shown. The PDF omits a bullet between the
 Year 8 "Compare algorithms" and "Analyse how data" practices, so they are split.
 Older pathway-level `discipline` values are still accepted and kept.
 The Teacher Summary has a Learning narrative (optional `learningNarrative`, max
@@ -207,8 +208,10 @@ after each change: saves run one at a time with the latest revision, edits made
 during a save are saved next, and Year/Term lock once the first save starts.
 Closing the dialog or switching student waits for pending saves; a "Retry save"
 button appears only if an auto-save fails (e.g. a 409 conflict).
-The five user-supplied descriptors and colours are teacher selected. Coverage
-is separate; No Evidence requires Not determined. No kit-derived grades or
+The five user-supplied descriptors and colours are used for Set Progress. The
+progression summary bars (class list and dialog) show the four Statement Set
+Progress levels (Digital Technology / Systems and Control x Knowledge / Practices);
+the students roster includes `progress.strandProgress` for this. No kit-derived grades or
 student-facing results are added.
 
 Teacher/Admin-protected `/api/teacher/progression/students` and
@@ -236,7 +239,7 @@ the previous results. Timetable Class and Homeroom are saved separately from cla
 their class as a display fallback. Matching students appear in a visible class
 list with Open Details buttons; each opens the student's Learning Pathway
 Results (no Details column) and Teacher Summary (Next learning) in a pop-up dialog,
-headed by the same colour-coded progression summary (it updates live while
+headed by the same colour-coded Statement Set progression summary (it updates live while
 editing and flags unsaved changes). Close/Escape prompts before discarding unsaved edits. Students without linked school emails are also
 listed, with an explicit warning that email linkage is required to save results;
 they are not silently dropped or combined into one blank-email student.
@@ -263,7 +266,7 @@ is used.
 In the Progression Pathway dialog, pathway Coverage is calculated and read only: No
 Evidence until a linked statement is covered, Some Evidence once one is, and Full
 Evidence when every Primary/Supporting statement (plus any covered Context dependent
-one) has Full Evidence. Pathway Progress is disabled while No Evidence. The records GET includes the
+one) has Full Evidence. The records GET includes the
 student's `completedActivities` (tracked activities only). When an activity link has
 Auto-set Yes, a No Evidence statement for that year becomes Some Evidence with
 `autoFrom` set to the activity, and the record auto-saves. Auto-set never

@@ -115,7 +115,9 @@ function registerProgressionPathway(app, { pool, hasDatabase, requireTeacherAcce
         const students = new Map(current.filter((student) => student.email).map((student) => [student.email, { ...student }]));
         const summary = (record) => ({ schoolYear: record.schoolYear, term: record.term,
             pathways: (Array.isArray(record.pathways) ? record.pathways : [])
-                .map((pathway) => ({ id: pathway.id, coverage: pathway.coverage, descriptor: pathway.descriptor ?? null })) });
+                .map((pathway) => ({ id: pathway.id, coverage: pathway.coverage, descriptor: pathway.descriptor ?? null })),
+            strandProgress: (Array.isArray(record.strandProgress) ? record.strandProgress : [])
+                .map((row) => ({ strand: row.strand, kind: row.kind, descriptor: row.descriptor ?? null })) });
         for (const row of saved.rows) {
             if (students.has(row.student_email)) {
                 students.get(row.student_email).progress = summary(row.record);
