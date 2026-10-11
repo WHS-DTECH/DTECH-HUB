@@ -27,6 +27,20 @@ function validateStatements(rows) {
     });
 }
 
+const strandKeys = ["digital-technology", "systems-and-control"].flatMap((strand) => ["knowledge", "practices"].map((kind) => `${strand}:${kind}`));
+function validateStrandProgress(rows) {
+    if (!Array.isArray(rows) || rows.length > strandKeys.length) throw new Error("Invalid strand progress.");
+    const seen = new Set();
+    return rows.map((row) => {
+        const key = `${row?.strand}:${row?.kind}`;
+        if (!strandKeys.includes(key) || seen.has(key)) throw new Error("Strand progress must be unique Knowledge or Practices entries.");
+        seen.add(key);
+        const descriptor = row.descriptor === undefined ? null : row.descriptor;
+        if (descriptor !== null && !descriptorValues.includes(descriptor)) throw new Error("Invalid strand progress descriptor.");
+        return { strand: row.strand, kind: row.kind, descriptor };
+    });
+}
+
 function validateRecord(body) {
     if (!body || typeof body !== "object") throw new Error("A rotation record is required.");
     const studentEmail = String(body.studentEmail || "").trim().toLowerCase();
@@ -55,6 +69,7 @@ function validateRecord(body) {
     return { studentEmail, schoolYear: body.schoolYear, term: body.term, yearLevel: body.yearLevel,
         revision: body.revision, formClass: text(body.formClass, "class", 100), pathways,
         ...(body.statements === undefined ? {} : { statements: validateStatements(body.statements) }),
+        ...(body.strandProgress === undefined ? {} : { strandProgress: validateStrandProgress(body.strandProgress) }),
         ...(body.timetableClass === undefined ? {} : { timetableClass: text(body.timetableClass, "timetable class", 100) }),
         homeroom: body.homeroom === undefined ? text(body.formClass, "class", 100) : text(body.homeroom, "homeroom", 100),
         ...(body.learningNarrative === undefined ? {} : { learningNarrative: text(body.learningNarrative, "learning narrative") }),

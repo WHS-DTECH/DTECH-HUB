@@ -93,8 +93,13 @@ async function main() {
     assert.match(client, /pp\("level"\)\.addEventListener\("change", progressionUpdateStatements\)/, "Changing year level updates the statements");
     assert.match(client, /function progressionUpdateStatements\(\) \{\s*progressionAutoSet\(\);\s*progressionRenderCurriculum\(\);\s*progressionRefreshPathways\(\);/);
     assert.ok(!html.includes('<th scope="col">Discipline</th><th scope="col">Coverage</th><th scope="col">Progress</th>'), "Discipline is recorded per curriculum statement");
-    assert.ok(client.includes('<th scope="col">Statement</th><th scope="col">Discipline</th><th scope="col">Coverage</th><th scope="col">Progress</th>'), "Curriculum statements have a Progress column");
-    assert.match(client, /if \(key === "descriptor" && value && entry\.coverage === "not-taught"\) entry\.coverage = "partly-taught";\s*if \(key === "coverage" && value === "not-taught"\) entry\.descriptor = null;/, "Statement Progress keeps coverage valid");
+    assert.ok(client.includes('<th scope="col">Statement</th><th scope="col">Discipline</th><th scope="col">Coverage</th></tr></thead>'), "Curriculum statements no longer have a Progress column");
+    assert.ok(!client.includes("Progress for: ${statement.text}"), "Statement-level Progress selects are removed");
+    assert.match(client, /header\.append\(heading, progressionStrandProgress\(strand, kind, title\)\);/, "Each Knowledge and Practices heading has a Progress box");
+    assert.match(client, /progressionCurriculumTable\("Knowledge", [^\n]*strand, "knowledge"\)\);[\s\S]*progressionCurriculumTable\("Practices", [^\n]*strand, "practices"\)\);/);
+    assert.match(client, /select\.disabled = !covered;/, "Strand Progress needs a covered statement in that table");
+    assert.match(css, /\.progression-strand-header \{ display: flex;[^}]*justify-content: space-between;/, "Strand Progress sits on the far right of the heading");
+    assert.match(client, /if \(key === "coverage" && value === "not-taught"\) entry\.descriptor = null;/, "Legacy statement Progress is cleared when Not taught");
     for (const value of ["not-taught", "partly-taught", "taught"]) assert.match(css, new RegExp(`select\\.coverage-${value} \\{ background: #`), `Coverage ${value} is colour coded`);
     assert.match(client, /function progressionCoverageColour\(select\) \{\s*select\.className = `coverage-chip coverage-\$\{select\.value\}`;/);
     assert.match(html, /<h2>Teacher Summary<\/h2>\s*<label>Learning narrative<textarea id="progression-narrative"[^>]*maxlength="5000"[\s\S]*id="progression-next"/, "Learning narrative sits first under Teacher Summary");
@@ -253,6 +258,13 @@ async function main() {
     withStatements.statements[0].descriptor = "proficient";
     assert.equal(validateRecord(withStatements).statements[0].descriptor, "proficient", "Curriculum statements store a Progress descriptor");
     assert.ok(!("statements" in validateRecord(sample)), "Records without curriculum statements are unchanged");
+    const strandProgress = [{ strand: "digital-technology", kind: "knowledge", descriptor: "developing" }, { strand: "systems-and-control", kind: "practices", descriptor: null }];
+    assert.deepEqual(validateRecord({ ...clone(sample), strandProgress }).strandProgress, strandProgress, "Strand Knowledge/Practices Progress is stored");
+    assert.ok(!("strandProgress" in validateRecord(sample)));
+    for (const bad of [[{ strand: "food", kind: "knowledge", descriptor: null }], [{ strand: "digital-technology", kind: "skills", descriptor: null }],
+        [{ strand: "digital-technology", kind: "knowledge", descriptor: "achieved" }], [strandProgress[0], strandProgress[0]], "developing"]) {
+        assert.throws(() => validateRecord({ ...clone(sample), strandProgress: bad }), /strand progress/i, `Rejects strand progress ${JSON.stringify(bad)}`);
+    }
     for (const bad of [[{ id: "xx-1", coverage: "taught" }], [{ id: "sc-8-p-2", coverage: "done" }], [{ id: "sc-8-p-2", coverage: "taught", discipline: "metal" }], [{ id: "sc-8-p-2", coverage: "taught", descriptor: "achieved" }], [{ id: "sc-8-p-2", coverage: "not-taught", descriptor: "emerging" }],
         [{ id: "sc-8-p-2", coverage: "taught" }, { id: "sc-8-p-2", coverage: "taught" }], "sc-8-p-2"]) {
         assert.throws(() => validateRecord({ ...clone(sample), statements: bad }), undefined, `Rejects ${JSON.stringify(bad)}`);

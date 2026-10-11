@@ -77,14 +77,46 @@ function progressionStatementSelect(label, options, value, onChange) {
     select.addEventListener("change", () => onChange(select.value));
     return select;
 }
-function progressionCurriculumTable(title, statements) {
+function progressionStrandDescriptor(strand, kind) {
+    return (progression.record?.strandProgress || []).find((row) => row.strand === strand && row.kind === kind)?.descriptor || null;
+}
+function progressionStrandCovered(strand, kind, yearLevel) {
+    return progressionCurriculumStatements(yearLevel).some((statement) => statement.strand === strand && statement.kind === kind
+        && progressionStatementResult(statement.id).coverage !== "not-taught");
+}
+function progressionSetStrandDescriptor(strand, kind, descriptor) {
+    const rows = progression.record.strandProgress ||= [];
+    const entry = rows.find((row) => row.strand === strand && row.kind === kind);
+    if (entry) entry.descriptor = descriptor; else rows.push({ strand, kind, descriptor });
+}
+// One teacher-judged Progress descriptor per strand Knowledge / Practices table.
+function progressionStrandProgress(strand, kind, title) {
+    const label = document.createElement("label");
+    label.className = "progression-strand-progress";
+    label.append("Progress");
+    const strandLabel = progressionStrands.find(([id]) => id === strand)?.[1] || strand;
+    const select = progressionDescriptorSelect(`${strandLabel} ${title} progress`, progressionStrandDescriptor(strand, kind));
+    select.dataset.strandProgress = `${strand}:${kind}`;
+    select.addEventListener("change", () => {
+        progressionSetStrandDescriptor(strand, kind, select.value || null);
+        progressionDescriptorColour(select);
+        progression.dirty = true;
+        progressionDialogSummary();
+    });
+    label.append(select);
+    return label;
+}
+function progressionCurriculumTable(title, statements, strand, kind) {
+    const header = document.createElement("div");
+    header.className = "progression-strand-header";
     const heading = document.createElement("h4");
     heading.textContent = title;
+    header.append(heading, progressionStrandProgress(strand, kind, title));
     const wrap = document.createElement("div");
     wrap.className = "curriculum-table-wrap";
     const table = document.createElement("table");
     table.className = "curriculum-table progression-statement-table";
-    table.innerHTML = '<thead><tr><th scope="col">Statement</th><th scope="col">Discipline</th><th scope="col">Coverage</th><th scope="col">Progress</th></tr></thead>';
+    table.innerHTML = '<thead><tr><th scope="col">Statement</th><th scope="col">Discipline</th><th scope="col">Coverage</th></tr></thead>';
     const body = document.createElement("tbody");
     const groups = [...new Set(statements.map((statement) => statement.heading))].sort((a, b) => (a ? 1 : 0) - (b ? 1 : 0));
     for (const group of groups) {
@@ -92,7 +124,7 @@ function progressionCurriculumTable(title, statements) {
             const groupRow = document.createElement("tr");
             groupRow.className = "progression-statement-group";
             const cell = document.createElement("th");
-            cell.scope = "colgroup"; cell.colSpan = 4; cell.textContent = group;
+            cell.scope = "colgroup"; cell.colSpan = 3; cell.textContent = group;
             groupRow.append(cell); body.append(groupRow);
         }
         for (const statement of statements.filter((item) => item.heading === group)) {
@@ -116,17 +148,16 @@ function progressionCurriculumTable(title, statements) {
             const showNote = () => { note.textContent = progressionActivityNote(statement.id); note.hidden = !note.textContent; };
             showNote();
             text.append(words, chips, note);
-            let coverage, descriptor;
+            let coverage;
             const update = (key, value) => {
                 const rows = progression.record.statements ||= [];
                 let entry = rows.find((item) => item.id === statement.id);
                 if (!entry) { entry = { id: statement.id, discipline: "dtech", coverage: "not-taught", descriptor: null }; rows.push(entry); }
                 entry[key] = value;
-                // Same rule as the pathway table: Progress needs teaching; Not taught resets Progress.
-                if (key === "descriptor" && value && entry.coverage === "not-taught") entry.coverage = "partly-taught";
+                // Statement-level Progress is retired; clear any legacy value so Not taught stays valid.
                 if (key === "coverage" && value === "not-taught") entry.descriptor = null;
-                coverage.value = entry.coverage; descriptor.value = entry.descriptor || "";
-                progressionCoverageColour(coverage); progressionDescriptorColour(descriptor);
+                coverage.value = entry.coverage;
+                progressionCoverageColour(coverage);
                 progression.dirty = true;
                 showNote();
                 progressionRefreshPathways();
@@ -134,15 +165,13 @@ function progressionCurriculumTable(title, statements) {
             const discipline = progressionStatementSelect(`Discipline for: ${statement.text}`, progressionDisciplines, result.discipline || "dtech", (value) => update("discipline", value));
             coverage = progressionStatementSelect(`Coverage for: ${statement.text}`, progressionCoverageOptions, result.coverage, (value) => update("coverage", value));
             progressionCoverageColour(coverage);
-            descriptor = progressionDescriptorSelect(`Progress for: ${statement.text}`, result.descriptor);
-            descriptor.addEventListener("change", () => update("descriptor", descriptor.value || null));
             row.append(text);
-            for (const element of [discipline, coverage, descriptor]) { const cell = document.createElement("td"); cell.append(element); row.append(cell); }
+            for (const element of [discipline, coverage]) { const cell = document.createElement("td"); cell.append(element); row.append(cell); }
             body.append(row);
         }
     }
     table.append(body); wrap.append(table);
-    return [heading, wrap];
+    return [header, wrap];
 }
 function progressionRenderCurriculum() {
     const container = pp("curriculum");
@@ -163,8 +192,8 @@ function progressionRenderCurriculum() {
         const page = progressionCurriculum.pages?.[strand]?.[year];
         heading.textContent = `${label} - Year ${year}${page ? ` (curriculum p. ${page})` : ""}`;
         container.append(heading);
-        container.append(...progressionCurriculumTable("Knowledge", strandStatements.filter((statement) => statement.kind === "knowledge")));
-        container.append(...progressionCurriculumTable("Practices", strandStatements.filter((statement) => statement.kind === "practices")));
+        container.append(...progressionCurriculumTable("Knowledge", strandStatements.filter((statement) => statement.kind === "knowledge"), strand, "knowledge"));
+        container.append(...progressionCurriculumTable("Practices", strandStatements.filter((statement) => statement.kind === "practices"), strand, "practices"));
     }
 }
 function progressionUpdateStatements() {
@@ -198,6 +227,17 @@ function progressionRefreshPathways() {
             select.value = descriptor || "";
             select.disabled = coverage === "not-taught";
             select.title = select.disabled ? "Mark a linked curriculum statement as Partly taught or Taught first" : "";
+            progressionDescriptorColour(select);
+        }
+    }
+    for (const [strand] of progressionStrands) for (const kind of ["knowledge", "practices"]) {
+        const covered = progressionStrandCovered(strand, kind, year);
+        if (!covered && progressionStrandDescriptor(strand, kind)) { progressionSetStrandDescriptor(strand, kind, null); changed = true; }
+        const select = document.querySelector(`[data-strand-progress="${strand}:${kind}"]`);
+        if (select) {
+            select.value = progressionStrandDescriptor(strand, kind) || "";
+            select.disabled = !covered;
+            select.title = covered ? "" : "Mark a statement in this table as Partly taught or Taught first";
             progressionDescriptorColour(select);
         }
     }
