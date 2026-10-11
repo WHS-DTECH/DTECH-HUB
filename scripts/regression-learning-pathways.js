@@ -262,9 +262,10 @@ async function main() {
     const lessonJump = [...lessonPage.match(/<nav class="panel-section curriculum-jump-links"[\s\S]*?<\/nav>/)[0].matchAll(/href="#([^"]+)"/g)].map((match) => match[1]);
     assert.deepEqual(lessonJump, [...lessonPage.matchAll(/<h2 id="([^"]+)"/g)].map((match) => match[1])
         .filter((id) => !["overview", "on-this-page"].includes(id)), "Lesson page section pills follow page order");
-    for (const heading of ["Lesson Aim", "Learning Objectives", "Teacher Preparation &amp; Resources", "60-Minute Lesson Sequence",
-        "Teacher Guidance"]) assert.ok(lessonPage.includes(`>${heading}</h2>`), `Lesson page includes ${heading}`);
-    assert.ok(!lessonPage.includes(">Practical Skill Check</h2>"), "Lesson page no longer includes Practical Skill Check");
+    for (const heading of ["Lesson Aim", "Learning Objectives", "Teacher Preparation &amp; Resources", "60-Minute Lesson Sequence"]) assert.ok(lessonPage.includes(`>${heading}</h2>`), `Lesson page includes ${heading}`);
+    for (const removed of ["Practical Skill Check", "Teacher Guidance"]) {
+        assert.ok(!lessonPage.includes(`>${removed}</h2>`), `Lesson page no longer includes ${removed}`);
+    }
     assert.match(lessonPage, /<button type="button" class="button button-primary lesson-print-button" data-print-page>Print \/ Save as PDF<\/button>/);
     assert.match(lessonPage, /<script src="print-page\.js"><\/script>/);
     let printed = 0;
