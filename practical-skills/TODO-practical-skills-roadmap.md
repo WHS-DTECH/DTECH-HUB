@@ -25,6 +25,11 @@ This TODO captures the Practical Skills advice roadmap for building the DTECH-HU
 - Implemented: administrators can open the existing Kit Content Builder /
   uploader from the Licence menu's Upload Kits item. The link is hidden from
   non-administrator accounts, matching the uploader's API access control.
+- Implemented: the Kit Content Builder opens on a blank "+ New Kit (blank)"
+  by default. Saving it creates a new kit (ID made from the Kit Name) and its
+  Licence Library card; existing kits remain in the dropdown and `?kit=` links
+  still open a specific kit. New kits work for students, progress and
+  certificates but do not yet count toward Licence points or every-kit badges.
 - Implemented: the Kit Content Builder Year Level is a dropdown defaulting to
   All Years, with Junior, Middle and Senior DTECH group options, individual
   Years 7-13 DTECH options, and Staff. Existing saved values outside the list

@@ -3,13 +3,14 @@
 
     const AUTH_STORAGE_KEY = "hub_google_auth_v1";
 
-    // Hardcoded to match PRACTICAL_SKILLS_KIT_DEFINITIONS in server.js and kitDefinitions in checklist.js
-    // until the kit catalog itself is server-driven.
-    const KIT_CATALOG = [
+    // Built-in fallback; the dropdown is refreshed from /api/admin/practical-skills/kits, which also lists created kits.
+    let KIT_CATALOG = [
         { id: "kit-login", title: "Login" },
         { id: "kit-google-search", title: "Search Kit" },
         { id: "kit-minecraft", title: "Minecraft" }
     ];
+    const NEW_KIT_ID = "";
+    const NEW_KIT_LABEL = "+ New Kit (blank)";
 
     const KIT_COLOUR_SCHEMES = {
         "Skill Kits": { color: "#2f8f61", accent: "#ffd166" },
@@ -22,7 +23,7 @@
 
     const state = {
         isAdmin: false,
-        kitId: KIT_CATALOG[0].id,
+        kitId: NEW_KIT_ID,
         content: null,
         previewTimerId: 0
     };
@@ -154,6 +155,23 @@
         return { number, activity: "", establishes: "", interactiveElement: "" };
     }
 
+    function createBlankKitContent() {
+        return {
+            identity: { name: "", skillArea: "Skill Kits", status: "active", yearLevel: "All Years" },
+            theme: { ...KIT_COLOUR_SCHEMES["Skill Kits"], icon: "" },
+            bannerTitle: "",
+            bannerSubtitle: "",
+            instructions: "",
+            teacherNotes: "",
+            learning: {},
+            completion: {},
+            worksheets: [],
+            activities: [],
+            questions: [],
+            images: []
+        };
+    }
+
     function renderWorksheetList() {
         worksheetListHost.innerHTML = "";
         (state.content?.worksheets || []).forEach((worksheet, index) => {
@@ -165,7 +183,9 @@
                 <td data-label="Activity"><input type="text" class="kit-worksheet-activity" data-index="${index}" value="${worksheet.activity || ""}">${worksheet.mergedInto !== undefined ? `<p>Combined into activity ${worksheet.mergedInto + 1} in the student menu; retained for saved progress.</p>` : ""}</td>
                 <td data-label="What it establishes"><input type="text" class="kit-worksheet-establishes" data-index="${index}" value="${worksheet.establishes || ""}"></td>
                 <td data-label="Interactive element"><input type="text" class="kit-worksheet-interactive-element" data-index="${index}"></td>
-                <td data-label="Details"><a class="button button-primary" href="/practical-skills/admin-kit-activity.html?kit=${encodeURIComponent(state.kitId)}&activity=${index}">Activity Details</a></td>
+                <td data-label="Details">${state.kitId === NEW_KIT_ID
+                    ? `<span class="kit-activity-details-pending">Save the kit first</span>`
+                    : `<a class="button button-primary" href="/practical-skills/admin-kit-activity.html?kit=${encodeURIComponent(state.kitId)}&activity=${index}">Activity Details</a>`}</td>
                 <td data-label="Remove"><button type="button" class="button button-secondary kit-remove-worksheet" data-index="${index}">Remove</button></td>
             `;
             row.querySelector(".kit-worksheet-interactive-element").value = worksheet.interactiveElement || "";
@@ -272,6 +292,7 @@
     }
 
     function updateKitOptionTitle(kitId, title) {
+        if (!kitId) return;
         const option = Array.from(kitSelect.options).find((item) => item.value === kitId);
         if (!option) return;
         const fallbackTitle = KIT_CATALOG.find((kit) => kit.id === kitId)?.title || kitId;
@@ -299,6 +320,13 @@
     }
 
     async function loadKitContent(kitId) {
+        if (kitId === NEW_KIT_ID) {
+            state.content = createBlankKitContent();
+            renderForm();
+            setStatus("New blank kit. Fill in the details, then Save Kit Content to create it.");
+            nameInput.focus();
+            return;
+        }
         setStatus("Loading kit content\u2026");
         try {
             const payload = await loadJson(`/api/admin/practical-skills/kit-content/${encodeURIComponent(kitId)}`, {
@@ -312,8 +340,38 @@
         }
     }
 
+    async function createKit(draft) {
+        if (!String(draft.identity?.name || "").trim()) {
+            setStatus("Give the new kit a Kit Name before saving.", true);
+            nameInput.focus();
+            return;
+        }
+        saveBtn.disabled = true;
+        setStatus("Creating kit\u2026");
+        try {
+            const payload = await loadJson("/api/admin/practical-skills/kits", {
+                method: "POST",
+                headers: withAdminAuthHeaders({ "Content-Type": "application/json" }),
+                body: JSON.stringify({ content: draft })
+            });
+            state.kitId = payload.kitId;
+            state.content = payload.content || draft;
+            await refreshKitCatalog();
+            renderForm();
+            setStatus("New kit created and added to the Licence Library. Use Activity Details to build each activity.");
+        } catch (error) {
+            setStatus(error?.message || "Could not create kit.", true);
+        } finally {
+            saveBtn.disabled = false;
+        }
+    }
+
     async function saveKitContent() {
         const draft = readFormIntoContent();
+        if (state.kitId === NEW_KIT_ID) {
+            await createKit(draft);
+            return;
+        }
         saveBtn.disabled = true;
         setStatus("Saving\u2026");
         try {
@@ -397,15 +455,35 @@
     }
 
     function populateKitSelect() {
-        kitSelect.innerHTML = KIT_CATALOG.map((kit) => `<option value="${kit.id}">${kit.title}</option>`).join("");
+        const option = (value, label) => {
+            const item = document.createElement("option");
+            item.value = value;
+            item.textContent = label;
+            return item;
+        };
+        kitSelect.replaceChildren(option(NEW_KIT_ID, NEW_KIT_LABEL), ...KIT_CATALOG.map((kit) => option(kit.id, kit.title)));
         kitSelect.value = state.kitId;
+    }
+
+    async function refreshKitCatalog() {
+        try {
+            const payload = await loadJson("/api/admin/practical-skills/kits", { headers: withAdminAuthHeaders() });
+            if (Array.isArray(payload?.kits) && payload.kits.length) {
+                KIT_CATALOG = payload.kits.map((kit) => ({ id: String(kit.id), title: String(kit.title || kit.id) }));
+            }
+        } catch (_error) {
+            // Keep the built-in list if the catalog cannot be loaded.
+        }
+        if (state.kitId !== NEW_KIT_ID && !KIT_CATALOG.some((kit) => kit.id === state.kitId)) state.kitId = NEW_KIT_ID;
+        populateKitSelect();
     }
 
     async function init() {
         const allowed = await verifyAdminAccess();
         if (!allowed) return;
 
-        populateKitSelect();
+        state.kitId = new URLSearchParams(window.location.search).get("kit") || NEW_KIT_ID;
+        await refreshKitCatalog();
         wireFormEvents();
         await loadKitContent(state.kitId);
     }

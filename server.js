@@ -230,9 +230,53 @@ const PRACTICAL_SKILLS_BADGE_DEFINITIONS = [
   { id: "tier-gold", title: "Gold Tier", description: "Reach Gold tier total points.", icon: "\ud83e\udd47", rule: { type: "tier", value: "Gold" } }
 ];
 
+// Kits created in the Kit Content Builder. They open, save progress and issue certificates like built-in kits,
+// but are not added to PRACTICAL_SKILLS_KIT_DEFINITIONS, so existing points and "every kit" badges are unchanged.
+const customPracticalSkillsKits = new Map();
+let customPracticalSkillsKitsLoad = null;
+
 function getPracticalSkillsKitDefinition(kitId) {
   const safeKitId = String(kitId || "").trim();
-  return PRACTICAL_SKILLS_KIT_DEFINITIONS.find((kit) => kit.id === safeKitId) || null;
+  return PRACTICAL_SKILLS_KIT_DEFINITIONS.find((kit) => kit.id === safeKitId)
+    || customPracticalSkillsKits.get(safeKitId)
+    || null;
+}
+
+function registerCustomPracticalSkillsKit(kitId) {
+  const safeKitId = String(kitId || "").trim();
+  if (!/^kit-[a-z0-9-]{1,60}$/.test(safeKitId) || PRACTICAL_SKILLS_KIT_DEFINITIONS.some((kit) => kit.id === safeKitId)) return null;
+  const definition = { id: safeKitId, points: 100, timeframeHours: 24, custom: true };
+  customPracticalSkillsKits.set(safeKitId, definition);
+  return definition;
+}
+
+function ensureCustomPracticalSkillsKitsLoaded() {
+  if (!hasDatabase) return Promise.resolve();
+  if (!customPracticalSkillsKitsLoad) {
+    customPracticalSkillsKitsLoad = (async () => {
+      await ensurePracticalSkillsKitContentSchema();
+      const result = await pool.query(`SELECT kit_id FROM practical_skills_kit_content WHERE content ->> 'customKit' = 'true'`);
+      for (const row of result.rows || []) registerCustomPracticalSkillsKit(row.kit_id);
+    })().catch((error) => {
+      customPracticalSkillsKitsLoad = null;
+      throw error;
+    });
+  }
+  return customPracticalSkillsKitsLoad;
+}
+
+function slugifyPracticalSkillsKitName(name) {
+  return String(name || "").toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50).replace(/-+$/g, "") || "new";
+}
+
+function createCustomPracticalSkillsKitId(name) {
+  const base = `kit-${slugifyPracticalSkillsKitName(name).replace(/^kit-/, "")}`;
+  for (let suffix = 1; suffix < 1000; suffix += 1) {
+    const candidate = suffix === 1 ? base : `${base}-${suffix}`;
+    if (!getPracticalSkillsKitDefinition(candidate)) return candidate;
+  }
+  return `${base}-${Date.now()}`;
 }
 
 function getPracticalSkillsTier(totalPoints) {
@@ -6060,6 +6104,14 @@ app.use(async (req, _res, next) => {
   req.authenticated_email = verification.email;
 
   next();
+});
+app.use(/^\/api\/(admin\/)?practical-skills\//, async (_req, res, next) => {
+  try {
+    await ensureCustomPracticalSkillsKitsLoaded();
+    next();
+  } catch (error) {
+    res.status(500).json({ error: `Could not load kits. ${error.message || ""}`.trim() });
+  }
 });
 app.use("/images/activities", express.static(path.join(__dirname, "images", "activities")));
 app.use("/images/activities", express.static(path.join(__dirname, "public", "images", "activities")));
@@ -14507,7 +14559,7 @@ app.put("/api/admin/practical-skills/kit-content/:kitId", requireAdminAccess, as
   }
 
   try {
-    const saved = await savePracticalSkillsKitContent(kitId, content, requesterEmail);
+    const saved = await savePracticalSkillsKitContent(kitId, customPracticalSkillsKits.has(kitId) ? { ...content, customKit: true } : content, requesterEmail);
     let libraryCard;
     try {
       libraryCard = await syncPracticalSkillsKitLibraryCard(kitId, saved);
@@ -14520,6 +14572,51 @@ app.put("/api/admin/practical-skills/kit-content/:kitId", requireAdminAccess, as
     res.json({ ok: true, content: saved, libraryCard });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not save kit content." });
+  }
+});
+
+app.get("/api/admin/practical-skills/kits", requireAdminAccess, async (_req, res) => {
+  try {
+    const ids = [...PRACTICAL_SKILLS_KIT_DEFINITIONS.map((kit) => kit.id), ...customPracticalSkillsKits.keys()];
+    const kits = await Promise.all(ids.map(async (id) => {
+      const content = await getStoredPracticalSkillsKitContent(id);
+      const title = String(content?.identity?.name || content?.bannerTitle || "").trim() || id;
+      return { id, title, custom: customPracticalSkillsKits.has(id) };
+    }));
+    res.json({ kits });
+  } catch (error) {
+    res.status(500).json({ error: error.message || "Could not load kits." });
+  }
+});
+
+app.post("/api/admin/practical-skills/kits", requireAdminAccess, async (req, res) => {
+  const requesterEmail = normalizeEmail(getRequestUserEmail(req));
+  const content = req.body?.content && typeof req.body.content === "object" && !Array.isArray(req.body.content) ? req.body.content : null;
+  const name = String(content?.identity?.name || content?.bannerTitle || "").trim();
+  if (!content || !name) {
+    res.status(400).json({ error: "Give the new kit a Kit Name before saving." });
+    return;
+  }
+
+  const kitId = createCustomPracticalSkillsKitId(name);
+  registerCustomPracticalSkillsKit(kitId);
+  let saved;
+  try {
+    saved = await savePracticalSkillsKitContent(kitId, { ...content, customKit: true }, requesterEmail);
+  } catch (error) {
+    customPracticalSkillsKits.delete(kitId);
+    res.status(500).json({ error: error.message || "Could not create kit." });
+    return;
+  }
+  try {
+    const libraryCard = await syncPracticalSkillsKitLibraryCard(kitId, saved);
+    res.status(201).json({ ok: true, kitId, content: saved, libraryCard });
+  } catch (error) {
+    res.status(500).json({
+      kitId,
+      content: saved,
+      error: `Kit was created, but its Licence Library card could not be added. Save again to retry. ${error.message || ""}`.trim()
+    });
   }
 });
 
