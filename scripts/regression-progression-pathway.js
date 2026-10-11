@@ -89,6 +89,46 @@ async function main() {
     assert.match(client, /pp\("level"\)\.addEventListener\("change", progressionUpdateStatements\)/, "Changing year level updates the statements");
     assert.match(client, /function progressionUpdateStatements\(\) \{\s*progressionUpdateHints\(\);\s*progressionRenderCurriculum\(\);/);
     assert.ok(!html.includes('<th scope="col">Discipline</th><th scope="col">Coverage</th><th scope="col">Progress</th>'), "Discipline is recorded per curriculum statement");
+    assert.match(html, /<h2>Teacher Summary<\/h2>\s*<label>Learning narrative<textarea id="progression-narrative"[^>]*maxlength="5000"[\s\S]*id="progression-next"/, "Learning narrative sits first under Teacher Summary");
+    assert.match(client, /pp\("form"\)\.addEventListener\("input", \(\) => \{ if \(progression\.record\) progressionQueueSave\(\); \}\);/, "Every change queues an auto-save");
+    assert.ok(html.includes("Changes save automatically.") && /id="progression-save"[^>]*hidden>Retry save/.test(html), "Save button only appears to retry a failed auto-save");
+    const element = () => ({ value: "", disabled: false, hidden: false, textContent: "", classList: { set: new Set(), toggle(name, on) { on ? this.set.add(name) : this.set.delete(name); }, contains(name) { return this.set.has(name); } } });
+    const elements = {};
+    const calls = [];
+    let release = [];
+    const autosave = vm.createContext({ setTimeout, clearTimeout, Promise, Number, Date, JSON, console,
+        window: { confirm: () => false }, hubAuthState: { profile: { email: "teacher@example.test" } }, hasAllowedSignedInHubAccount: () => true,
+        pp: (name) => (elements[name] ||= element()), progressionStatus() {}, progressionStudentOptions() {}, progressionDialogSummary() {}, progressionInit() {},
+        progressionApi: (_path, options) => new Promise((resolve) => {
+            const body = JSON.parse(options.body);
+            calls.push(body);
+            release.push(() => resolve({ record: { ...body, revision: body.revision + 1, updatedAt: "2026-10-11T07:00:00Z", updatedBy: "teacher@example.test" } }));
+        }) });
+    vm.runInContext(client.slice(client.indexOf("const progression = {"), client.indexOf("const pp = ")), autosave);
+    vm.runInContext(client.slice(client.indexOf("function progressionDiscard("), client.indexOf("function progressionMatchingStudents(")), autosave);
+    vm.runInContext("progression.record = " + JSON.stringify({ ...sample, students: undefined }) + "; progression.students = [];", autosave);
+    Object.assign(autosave.pp("year"), { value: "2027" }); Object.assign(autosave.pp("term"), { value: "1" }); Object.assign(autosave.pp("level"), { value: "7" });
+    autosave.pp("narrative").value = "Built a binary piano.";
+    vm.runInContext("progressionQueueSave(5)", autosave);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    assert.equal(calls.length, 1, "Auto-save runs after a short pause");
+    assert.equal(calls[0].learningNarrative, "Built a binary piano.");
+    assert.equal(autosave.pp("year").disabled && autosave.pp("term").disabled, true, "Year and term lock once saving starts");
+    autosave.pp("narrative").value = "Built a binary piano and encoded TECHNOLOGY.";
+    vm.runInContext("progressionQueueSave(5)", autosave);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    assert.equal(calls.length, 1, "Only one save runs at a time");
+    release.shift()();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    assert.equal(calls.length, 2, "Edits made during a save are saved next");
+    assert.equal(calls[1].revision, 1, "The next auto-save uses the new revision");
+    assert.equal(calls[1].learningNarrative, "Built a binary piano and encoded TECHNOLOGY.");
+    const flushed = vm.runInContext("progressionFlush()", autosave);
+    release.shift()();
+    assert.equal(await flushed, true, "Closing waits for pending saves");
+    assert.equal(vm.runInContext("progression.dirty", autosave), false);
+    assert.match(autosave.pp("saved").textContent, /^All changes saved automatically/);
+    assert.equal(autosave.pp("save").hidden, true);
     assert.ok(!client.includes("View / edit") && !client.includes('pp("strengths")') && !client.includes("progressionDetail"));
     assert.ok(!client.includes('pp("history")'), "No handlers depend on the removed selector");
     vm.runInContext(client.slice(client.indexOf("function progressionAnnualRecord("), client.indexOf("async function progressionLoadStudent(")), context);
@@ -207,6 +247,10 @@ async function main() {
         [{ id: "sc-8-p-2", coverage: "taught" }, { id: "sc-8-p-2", coverage: "taught" }], "sc-8-p-2"]) {
         assert.throws(() => validateRecord({ ...clone(sample), statements: bad }), undefined, `Rejects ${JSON.stringify(bad)}`);
     }
+    assert.ok(!("learningNarrative" in validateRecord(sample)), "Records without a learning narrative are unchanged");
+    assert.equal(validateRecord({ ...clone(sample), learningNarrative: " Explored binary. " }).learningNarrative, "Explored binary.");
+    assert.throws(() => validateRecord({ ...clone(sample), learningNarrative: "x".repeat(5001) }), /learning narrative/);
+    assert.throws(() => validateRecord({ ...clone(sample), learningNarrative: 5 }), /learning narrative/);
     rated.pathways[0].descriptor = "achieved";
     assert.throws(() => validateRecord(rated));
     rated.pathways[0].descriptor = "proficient";

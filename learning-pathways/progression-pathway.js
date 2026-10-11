@@ -174,7 +174,8 @@ function progressionSummary(student) {
     }
     return summary;
 }
-const progression = { students: [], records: [], record: null, selected: "digital-systems", dirty: false, loading: 0, saving: false, teacherEmail: "" };
+const progression = { students: [], records: [], record: null, selected: "digital-systems", dirty: false, loading: 0, saving: false, teacherEmail: "",
+    changeSeq: 0, autosaveTimer: null, saveAgain: false };
 const pp = (name) => document.querySelector(`#progression-${name}`);
 function progressionStatus(message, error = false) {
     pp("status").textContent = message;
@@ -192,8 +193,8 @@ function progressionOpenDialog(student) {
         .filter(Boolean).join(" | ") : "";
     if (!pp("dialog").open) pp("dialog").showModal();
 }
-function progressionCloseDialog() {
-    if (!progressionDiscard()) return false;
+async function progressionCloseDialog() {
+    if (!await progressionLeave()) return false;
     if (progression.dirty && progression.record) {
         progression.dirty = false;
         const saved = progression.records.find((record) => record.schoolYear === progression.record.schoolYear && record.term === progression.record.term);
@@ -213,6 +214,87 @@ async function progressionApi(path, options = {}) {
 }
 function progressionDiscard() {
     return !progression.dirty || window.confirm("Discard unsaved student result changes?");
+}
+// Saves any pending changes first; only asks to discard if the auto-save failed.
+async function progressionLeave() {
+    if (await progressionFlush()) return true;
+    return progressionDiscard();
+}
+function progressionSavedText(message, error = false) {
+    pp("saved").textContent = message;
+    pp("saved").classList.toggle("is-error", error);
+    pp("save").hidden = !error;
+}
+function progressionQueueSave(delay = 1200) {
+    if (!progression.record) return;
+    progression.dirty = true;
+    progression.changeSeq += 1;
+    clearTimeout(progression.autosaveTimer);
+    progressionSavedText("Unsaved changes - saving automatically...");
+    progression.autosaveTimer = setTimeout(() => { void progressionSave(); }, delay);
+}
+async function progressionSave() {
+    clearTimeout(progression.autosaveTimer);
+    progression.autosaveTimer = null;
+    if (!progression.record || !progression.dirty) return true;
+    if (progression.saving) { progression.saveAgain = true; return false; }
+    const target = progression.record;
+    const seq = progression.changeSeq;
+    const record = { ...target, schoolYear: Number(pp("year").value), term: Number(pp("term").value),
+        yearLevel: Number(pp("level").value), formClass: pp("class").value, homeroom: pp("homeroom").value,
+        timetableClass: pp("timetable-class").value, learningNarrative: pp("narrative").value, nextLearning: pp("next").value };
+    progression.saving = true;
+    // Year and term identify the saved record, so they cannot change once saving starts.
+    pp("year").disabled = true; pp("term").disabled = true;
+    const teacherEmail = hubAuthState.profile?.email;
+    progressionSavedText("Saving...");
+    let saved = false;
+    try {
+        const data = await progressionApi("records", { method: "PUT", body: JSON.stringify(record) });
+        if (!hasAllowedSignedInHubAccount() || hubAuthState.profile?.email !== teacherEmail) return false;
+        if (!data.record || !data.record.revision) throw new Error("Save response is invalid. Reload to confirm saved results.");
+        progression.records = [data.record, ...progression.records.filter((old) => old.schoolYear !== record.schoolYear || old.term !== record.term)]
+            .sort((a, b) => b.schoolYear - a.schoolYear || b.term - a.term);
+        const latest = progression.records[0];
+        const savedStudent = progression.students.find((student) => student.email === data.record.studentEmail);
+        if (savedStudent && latest) {
+            savedStudent.progress = { schoolYear: latest.schoolYear, term: latest.term,
+                pathways: latest.pathways.map(({ id, coverage, descriptor }) => ({ id, coverage, descriptor })) };
+            progressionStudentOptions();
+        }
+        saved = true;
+        if (progression.record !== target) return true;
+        Object.assign(target, { schoolYear: record.schoolYear, term: record.term, revision: data.record.revision,
+            updatedAt: data.record.updatedAt, updatedBy: data.record.updatedBy });
+        if (progression.changeSeq === seq) progression.dirty = false;
+        progressionSavedText(`All changes saved automatically - ${new Date(data.record.updatedAt).toLocaleString()} by ${data.record.updatedBy}`);
+        progressionStatus("Student results saved automatically.");
+        progressionDialogSummary();
+        return !progression.dirty;
+    } catch (error) {
+        if (!hasAllowedSignedInHubAccount() || hubAuthState.profile?.email !== teacherEmail) return false;
+        console.error("Could not save progression term results", error);
+        if (progression.record === target && !target.revision) { pp("year").disabled = false; pp("term").disabled = false; }
+        progressionSavedText(`Changes not saved: ${error.message}`, true);
+        progressionStatus(error.message, true); pp("retry").hidden = false;
+        progression.saveAgain = false;
+        return false;
+    } finally {
+        progression.saving = false;
+        if (!hasAllowedSignedInHubAccount() || hubAuthState.profile?.email !== teacherEmail) { if (hasAllowedSignedInHubAccount()) void progressionInit(); }
+        else if (saved && progression.saveAgain && progression.dirty && progression.record === target) {
+            progression.saveAgain = false;
+            progression.autosaveTimer = setTimeout(() => { void progressionSave(); }, 200);
+        }
+    }
+}
+async function progressionFlush() {
+    for (let attempt = 0; attempt < 5 && progression.record && (progression.dirty || progression.saving); attempt += 1) {
+        while (progression.saving) await new Promise((resolve) => setTimeout(resolve, 100));
+        if (progression.dirty && !await progressionSave() && !progression.saving && progression.dirty
+            && pp("saved").classList.contains("is-error")) return false;
+    }
+    return !progression.dirty;
 }
 function progressionMatchingStudents(students, homeroom, year, search) {
     const normalise = (value) => String(value || "").trim().toUpperCase();
@@ -282,7 +364,7 @@ function progressionNewRecord(student) {
     const month = new Date().getMonth();
     return { studentEmail: student.email, schoolYear: new Date().getFullYear(), term: Math.min(4, Math.floor(month / 3) + 1),
         yearLevel: student.isStaff ? 7 : student.yearLevel, formClass: student.formClass, homeroom: student.homeroom || student.formClass,
-        timetableClass: student.timetableClass || "", revision: 0, strengths: "", nextLearning: "",
+        timetableClass: student.timetableClass || "", revision: 0, strengths: "", learningNarrative: "", nextLearning: "",
         pathways: progressionPathways.map(([id]) => ({ id, coverage: "not-taught", descriptor: null, discipline: "dtech", addressed: "", evidence: "", notes: "" })) };
 }
 function progressionDialogSummary() {
@@ -292,7 +374,7 @@ function progressionDialogSummary() {
         pathways: record.pathways.map(({ id, coverage, descriptor }) => ({ id, coverage, descriptor })) } : null;
     const summary = progressionSummary({ progress });
     const caption = summary.querySelector(".progression-summary-caption");
-    caption.textContent = progression.dirty ? "Progression summary - unsaved changes (press Save to keep)"
+    caption.textContent = progression.dirty ? "Progression summary - saving changes automatically..."
         : progress ? `Progression summary - ${progress.schoolYear} Term ${progress.term}` : "Progression summary - no results saved yet";
     pp("dialog-summary").replaceChildren(summary);
 }
@@ -304,11 +386,14 @@ function progressionRender(record) {
     for (const [control, key] of [["year", "schoolYear"], ["term", "term"], ["level", "yearLevel"], ["class", "formClass"], ["next", "nextLearning"]]) {
         pp(control).value = record[key];
     }
+    clearTimeout(progression.autosaveTimer);
+    progression.autosaveTimer = null;
+    pp("narrative").value = record.learningNarrative || "";
     pp("homeroom").value = record.homeroom || record.formClass;
     pp("timetable-class").value = record.timetableClass || "";
     pp("year").disabled = record.revision > 0;
     pp("term").disabled = record.revision > 0;
-    pp("saved").textContent = record.updatedAt ? `Saved ${new Date(record.updatedAt).toLocaleString()} by ${record.updatedBy}` : "Student results - not saved yet.";
+    progressionSavedText(record.updatedAt ? `All changes saved - ${new Date(record.updatedAt).toLocaleString()} by ${record.updatedBy}` : "Not saved yet - changes save automatically.");
     pp("rows").replaceChildren();
     for (const [id, title] of progressionPathways) {
         const result = progression.record.pathways.find((row) => row.id === id);
@@ -369,7 +454,7 @@ async function progressionLoadStudent(email) {
         const record = progressionAnnualRecord(data.records, student, new Date().getFullYear());
         progressionRender(record || progressionNewRecord(student));
         progressionOpenDialog(student);
-        progressionStatus("Record coverage and progress for each pathway. Changes are not saved until you press Save.");
+        progressionStatus("Record coverage and progress for each pathway. Changes save automatically.");
     } catch (error) {
         if (request !== progression.loading) return;
         console.error("Could not load progression term results", error);
@@ -434,9 +519,9 @@ async function progressionInit() {
     }
 }
 const progressionFilters = { search: "", "homeroom-filter": "", "year-filter": "" };
-function progressionFilterChanged(name) {
+async function progressionFilterChanged(name) {
     const matching = progressionMatchingStudents(progression.students, pp("homeroom-filter").value, pp("year-filter").value, pp("search").value);
-    if (progression.record && !matching.some((student) => student.email === progression.record.studentEmail) && !progressionDiscard()) {
+    if (progression.record && !matching.some((student) => student.email === progression.record.studentEmail) && !await progressionLeave()) {
         pp(name).value = progressionFilters[name];
         return;
     }
@@ -446,46 +531,19 @@ function progressionFilterChanged(name) {
 for (const [name, event] of [["search", "input"], ["homeroom-filter", "change"], ["year-filter", "change"]]) {
     pp(name).addEventListener(event, () => progressionFilterChanged(name));
 }
-pp("student").addEventListener("change", () => {
-    if (!progressionDiscard()) { pp("student").value = progression.record?.studentEmail || ""; return; }
+pp("student").addEventListener("change", async () => {
+    const email = pp("student").value;
+    if (!await progressionLeave()) { pp("student").value = progression.record?.studentEmail || ""; return; }
+    pp("student").value = email;
     void progressionLoadStudent(pp("student").value);
 });
-pp("form").addEventListener("input", () => { if (progression.record) progression.dirty = true; });
+pp("form").addEventListener("input", () => { if (progression.record) progressionQueueSave(); });
 pp("level").addEventListener("change", progressionUpdateStatements);
-pp("form").addEventListener("submit", async (event) => {
+pp("form").addEventListener("submit", (event) => {
     event.preventDefault();
-    if (progression.saving || !progression.record) return;
-    const record = { ...progression.record, schoolYear: Number(pp("year").value), term: Number(pp("term").value),
-        yearLevel: Number(pp("level").value), formClass: pp("class").value, homeroom: pp("homeroom").value,
-        timetableClass: pp("timetable-class").value, nextLearning: pp("next").value };
-    progression.saving = true;
-    const teacherEmail = hubAuthState.profile?.email;
-    pp("editor").disabled = true; pp("controls").disabled = true;
-    progressionStatus("Saving student results...");
-    try {
-        const data = await progressionApi("records", { method: "PUT", body: JSON.stringify(record) });
-        if (!hasAllowedSignedInHubAccount() || hubAuthState.profile?.email !== teacherEmail) return;
-        if (!data.record || !data.record.revision) throw new Error("Save response is invalid. Reload to confirm saved results.");
-        progression.records = [data.record, ...progression.records.filter((old) => old.schoolYear !== record.schoolYear || old.term !== record.term)]
-            .sort((a, b) => b.schoolYear - a.schoolYear || b.term - a.term);
-        progressionRender(data.record);
-        const latest = progression.records[0];
-        const savedStudent = progression.students.find((student) => student.email === data.record.studentEmail);
-        if (savedStudent && latest) {
-            savedStudent.progress = { schoolYear: latest.schoolYear, term: latest.term,
-                pathways: latest.pathways.map(({ id, coverage, descriptor }) => ({ id, coverage, descriptor })) };
-            progressionStudentOptions();
-        }
-        progressionStatus("Student results saved.");
-    } catch (error) {
-        if (!hasAllowedSignedInHubAccount() || hubAuthState.profile?.email !== teacherEmail) return;
-        console.error("Could not save progression term results", error);
-        progressionStatus(error.message, true); pp("retry").hidden = false;
-    } finally {
-        progression.saving = false;
-        if (hasAllowedSignedInHubAccount() && hubAuthState.profile?.email === teacherEmail) { pp("controls").disabled = false; pp("editor").disabled = false; }
-        else if (hasAllowedSignedInHubAccount()) void progressionInit();
-    }
+    if (!progression.record) return;
+    progression.dirty = true;
+    void progressionSave();
 });
 pp("dialog-close").addEventListener("click", () => { progressionCloseDialog(); });
 pp("dialog").addEventListener("cancel", (event) => { event.preventDefault(); progressionCloseDialog(); });
@@ -495,6 +553,8 @@ pp("retry").addEventListener("click", () => {
     if (pp("student").value && progression.students.length) void progressionLoadStudent(pp("student").value);
     else void progressionInit();
 });
-window.addEventListener("beforeunload", (event) => { if (progression.dirty) { event.preventDefault(); event.returnValue = ""; } });
+window.addEventListener("beforeunload", (event) => {
+    if (progression.dirty || progression.saving) { void progressionSave(); event.preventDefault(); event.returnValue = ""; }
+});
 window.addEventListener("hub-auth-state-changed", () => { void progressionInit(); });
 document.addEventListener("DOMContentLoaded", () => { void progressionInit(); });

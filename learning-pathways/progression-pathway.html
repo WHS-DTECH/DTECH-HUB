@@ -67,9 +67,11 @@
                         <p>Statements are quoted from the Technology Years 0-10 teaching sequence (September 2026), following its Knowledge and Practices layout for the student's year level. Tags show the DTECH pathways each statement supports: DS Digital Systems, D&amp;I Data and Information, DC Digital Citizenship, P&amp;A Programming and Algorithms, S&amp;C Systems and Control. Discipline defaults to DTECH; change it if the student met the statement in Textiles, Food, Wood or DVC.</p>
                         <div id="progression-curriculum" class="progression-curriculum" aria-live="polite"></div>
                         <h2>Teacher Summary</h2>
+                        <label>Learning narrative<textarea id="progression-narrative" rows="6" maxlength="5000" placeholder="Describe the student's learning journey this term: what they explored, created and achieved."></textarea></label>
                         <label>Next learning<textarea id="progression-next" rows="3" maxlength="5000"></textarea></label>
-                        <button class="button button-primary" id="progression-save" type="submit">Save student results</button>
-                        <p id="progression-saved"></p>
+                        <p class="progression-autosave-note">Changes save automatically.</p>
+                        <p id="progression-saved" role="status" aria-live="polite"></p>
+                        <button class="button button-primary" id="progression-save" type="submit" hidden>Retry save</button>
                     </fieldset>
                 </form>
                 </dialog>

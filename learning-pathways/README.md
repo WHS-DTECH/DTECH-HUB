@@ -190,6 +190,12 @@ optional `statements: [{ id, discipline, coverage }]`. Each pathway row counts
 its linked statements taught for that year. The PDF omits a bullet between the
 Year 8 "Compare algorithms" and "Analyse how data" practices, so they are split.
 Older pathway-level `discipline` values are still accepted and kept.
+The Teacher Summary has a Learning narrative (optional `learningNarrative`, max
+5000 characters) above Next learning. The dialog auto-saves about 1.2 seconds
+after each change: saves run one at a time with the latest revision, edits made
+during a save are saved next, and Year/Term lock once the first save starts.
+Closing the dialog or switching student waits for pending saves; a "Retry save"
+button appears only if an auto-save fails (e.g. a 409 conflict).
 The five user-supplied descriptors and colours are teacher selected. Coverage
 is separate; Not taught requires Not determined. No kit-derived grades or
 student-facing results are added.

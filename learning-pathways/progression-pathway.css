@@ -5,6 +5,8 @@
 .progression-page label { display: grid; gap: 6px; margin-bottom: 14px; font-weight: 600; }
 .progression-page input, .progression-page select, .progression-page textarea { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #b9cbde; border-radius: 7px; color: #24344a; background: #fff; font: inherit; }
 .progression-page textarea { resize: vertical; }
+.progression-autosave-note { margin: 4px 0 0; font-size: 0.85rem; color: #5a6b80; }
+#progression-saved.is-error { color: #a12d1f; font-weight: 700; }
 .progression-page [hidden] { display: none !important; }
 .progression-page .is-error { color: #a12626; }
 .progression-roster { list-style: none; padding: 0; display: grid; gap: 8px; }
