@@ -257,9 +257,15 @@ async function main() {
         "Lesson pills open the Lesson page, or the Lesson card until a page exists");
     assert.doesNotMatch(unitPlan, /Lesson card<|Lesson plan</, "Unit Plan uses 'Lesson' terminology");
     assert.deepEqual(lessons.filter((card) => card.href).map((card) => [card.id, card.href]),
-        [["lesson-binary-piano", "/learning-pathways/lesson-binary-piano.html"]], "Only Binary Piano has a Lesson page so far");
+        [["lesson-binary-piano", "/learning-pathways/lesson-binary-piano.html"], ["lesson-encoding-binary", "/learning-pathways/lesson-encoding-binary.html"]],
+        "Lessons 1 and 2 have Lesson pages so far");
     assert.match(unitPlan, /href="\/learning-pathways\/lesson-binary-piano\.html">Lesson</, "Unit Plan step 1 opens the Lesson page");
-    const lessonPage = fs.readFileSync(path.join(root, "learning-pathways/lesson-binary-piano.html"), "utf8");
+    assert.match(unitPlan, /href="\/learning-pathways\/lesson-encoding-binary\.html">Lesson</, "Unit Plan step 2 opens the Lesson page");
+    for (const [lessonFile, lessonNumber] of [["lesson-binary-piano", 1], ["lesson-encoding-binary", 2]]) {
+    const lessonPage = fs.readFileSync(path.join(root, `learning-pathways/${lessonFile}.html`), "utf8");
+    assert.match(lessonPage, new RegExp(`<p class="eyebrow">LESSON ${lessonNumber} \\| BINARY`), `${lessonFile} shows its lesson number`);
+    assert.match(lessonPage, new RegExp(`href="/learning-pathways/\\?type=lesson#card-${lessonFile}">Back to Lessons`), `${lessonFile} links back to its card`);
+    assert.match(lessonPage, /class="lesson-resource-pill" href="https:\/\/drive\.google\.com\/[^"]+" target="_blank" rel="noopener noreferrer"/, `${lessonFile} links its existing resource`);
     const lessonIds = [...lessonPage.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
     assert.equal(new Set(lessonIds).size, lessonIds.length, "Lesson page IDs are unique");
     const lessonJump = [...lessonPage.match(/<nav class="panel-section curriculum-jump-links"[\s\S]*?<\/nav>/)[0].matchAll(/href="#([^"]+)"/g)].map((match) => match[1]);
@@ -277,13 +283,20 @@ async function main() {
         { document: { querySelectorAll: () => [printButton] }, window: { print: () => { printed += 1; } } });
     printButton.click();
     assert.equal(printed, 1, "Print button opens the browser print dialog");
+    assert.match(lessonPage, /class="hero practical-skills-hero lesson-plan-hero"/);
+    assert.match(lessonPage, /href="\/learning-pathways\/binary-and-data\.html#learning-sequence"/);
+    }
+    const lessonPage = fs.readFileSync(path.join(root, "learning-pathways/lesson-binary-piano.html"), "utf8");
     assert.match(fs.readFileSync(path.join(root, "learning-pathways/styles.css"), "utf8"), /@media print \{[\s\S]*\.hero-stats,[\s\S]*\.curriculum-jump-links,/,
         "Print layout hides page actions and section links");
     assert.deepEqual([...lessonPage.matchAll(/<span class="lesson-time">([^<]+)</g)].map((match) => match[1]),
         ["0&ndash;10 min", "10&ndash;20 min", "20&ndash;40 min", "40&ndash;50 min", "50&ndash;60 min"], "Lesson timeline covers 60 minutes");
-    assert.match(lessonPage, /class="hero practical-skills-hero lesson-plan-hero"/);
-    assert.match(lessonPage, /href="\/learning-pathways\/\?type=lesson#card-lesson-binary-piano"/);
-    assert.match(lessonPage, /href="\/learning-pathways\/binary-and-data\.html#learning-sequence"/);
+    const encodingPage = fs.readFileSync(path.join(root, "learning-pathways/lesson-encoding-binary.html"), "utf8");
+    assert.deepEqual([...encodingPage.matchAll(/<span class="lesson-time">([^<]+)</g)].map((match) => match[1]),
+        ["0&ndash;10 min", "10&ndash;20 min", "20&ndash;35 min", "35&ndash;50 min", "50&ndash;60 min"], "Lesson 2 timeline covers 60 minutes");
+    assert.ok(encodingPage.includes(">Linked Student Activity</h2>"), "Lesson 2 lists its linked student activity");
+    assert.match(encodingPage, /not ASCII/, "Lesson 2 separates the classroom code from ASCII");
+    assert.match(encodingPage, /drive\.google\.com\/file\/d\/1Ecspoj2UOqNn6ZEZfqtHmzzcEp7xclXp\/view/, "Lesson 2 links the Encoding Binary resource");
     assert.throws(() => normalizeCards([{ ...sample, cardType: "task" }]), /invalid card type/);
     assert.deepEqual(normalizeCards([{ ...sample, cardType: "lesson", unit: "u", sequence: 3, strand: "x" }])[0],
         { ...normalizeCards([sample])[0], cardType: "lesson", unit: "u", sequence: 3 }, "Lessons keep a parent unit and sequence");
@@ -424,7 +437,7 @@ async function main() {
         assert.match(sql, /learning_pathways_library_store/, "Never writes the Licence Library table");
         if (sql.includes("INSERT INTO") && (stored === null || !sql.includes("DO NOTHING"))) {
             stored = JSON.parse(params[0]);
-            seedVersion = 11;
+            seedVersion = 12;
         }
         if (sql.includes("seed_version < 1") && seedVersion < 1) {
             const starters = JSON.parse(params[0]);
@@ -490,6 +503,12 @@ async function main() {
             assert.ok(added.length && added.every((card) => card.cardType === "activity"), "Version 11 only adds Lesson Activity cards");
             stored = [...stored, ...added.filter((card) => !stored.some((old) => old.id === card.id))];
             seedVersion = 11;
+        }
+        if (sql.includes("seed_version < 12") && seedVersion < 12) {
+            assert.match(sql, /COALESCE\(existing\.card ->> 'href', ''\) = ''/, "Version 12 only links a blank Encoding Binary card");
+            stored = stored.map((card) => card.id === "lesson-encoding-binary" && !card.href
+                ? { ...card, href: "/learning-pathways/lesson-encoding-binary.html" } : card);
+            seedVersion = 12;
         }
         return { rows: sql.startsWith("SELECT") && stored !== null ? [{ cards: stored }] : [] };
     } };

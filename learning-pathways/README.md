@@ -91,6 +91,8 @@ Version 9 appends the ten Binary & Data **Lesson** cards when their IDs are
 missing, without changing existing cards or restoring deleted lessons.
 Version 10 links a still-blank Binary Piano lesson to `lesson-binary-piano.html`
 (Lesson 1 page, amber hero, built from the Lesson 01 PDF).
+Version 12 links a still-blank Encoding Binary lesson to `lesson-encoding-binary.html`
+(Lesson 2 page, built from the Lesson 02 PDF, with a Linked Student Activity section).
 
 ### Card types: Curriculum Strands, Units, Lessons and Lesson Activities
 
