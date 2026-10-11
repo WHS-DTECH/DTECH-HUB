@@ -549,6 +549,100 @@
     margin-top: 0;
 }
 
+.unit-plan-hero .hero-panel {
+    background: linear-gradient(120deg, #7d1530 0%, #c8364f 56%, #ec6f63 100%);
+}
+
+.unit-plan-hero .stat-card {
+    display: grid;
+    gap: 10px;
+}
+
+.unit-sequence {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    margin: 0 0 8px;
+    padding: 0;
+    list-style: none;
+}
+
+.unit-step {
+    display: flex;
+    gap: 14px;
+    padding: 14px 16px;
+    border: 1px solid #f0c4c4;
+    border-radius: 12px;
+    background: #fff8f7;
+}
+
+.unit-step-number {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #9f1d3a 0%, #ec6f63 100%);
+    color: #fff;
+    font-weight: 800;
+}
+
+.curriculum-strand-page .unit-step h3 {
+    margin: 4px 0 6px;
+    color: #7d1530;
+    font-size: 1.05rem;
+}
+
+.unit-step p {
+    margin: 0 0 6px;
+    line-height: 1.5;
+}
+
+.unit-step-resources {
+    color: #4a5568;
+    font-size: 0.92rem;
+}
+
+.unit-status {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 9px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
+.unit-status.existing { background: #dff1e3; color: #1f6b35; }
+.unit-status.optional { background: #e5eefa; color: #24548a; }
+.unit-status.planned { background: #fdebc8; color: #8a5a00; }
+
+.unit-evaluation-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    padding: 0;
+    list-style: none;
+}
+
+.unit-evaluation-list li {
+    padding: 12px 14px;
+    border-left: 4px solid #c8364f;
+    border-radius: 8px;
+    background: #f7f8fb;
+    font-weight: 600;
+}
+
+@media (max-width: 700px) {
+    .unit-sequence,
+    .unit-evaluation-list {
+        grid-template-columns: 1fr;
+    }
+}
+
 @media (max-width: 700px) {
     .context-hero {
         flex-direction: column;

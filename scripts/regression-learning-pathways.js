@@ -188,7 +188,26 @@ async function main() {
     assert.ok(strands.every((card) => card.area === card.title && card.yearLevel === "Junior DTECH"));
     assert.deepEqual(units.map((card) => [card.title, card.strand, card.area]), [
         ["Infrastructure & Networking", "digital-systems", "Digital systems"], ["Binary & Data", "digital-systems", "Digital systems"]]);
-    assert.ok(units.every((card) => card.yearLevel === "Junior DTECH" && card.href === ""), "Unit cards are display-only for now");
+    assert.equal(units.find((card) => card.id === "infrastructure-and-networking").href, "", "Infrastructure & Networking stays display-only");
+    assert.equal(units.find((card) => card.id === "binary-and-data").href, "/learning-pathways/binary-and-data.html",
+        "Binary & Data opens its Unit Plan page");
+    const unitPlan = fs.readFileSync(path.join(root, "learning-pathways/binary-and-data.html"), "utf8");
+    const unitPlanIds = [...unitPlan.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
+    assert.equal(new Set(unitPlanIds).size, unitPlanIds.length, "Unit Plan IDs are unique");
+    for (const anchor of unitPlan.matchAll(/href="#([^"]+)"/g)) assert.ok(unitPlanIds.includes(anchor[1]), "Unit Plan section links resolve");
+    const unitJumpLinks = [...unitPlan.match(/<nav class="panel-section curriculum-jump-links"[\s\S]*?<\/nav>/)[0].matchAll(/href="#([^"]+)"/g)].map((match) => match[1]);
+    assert.deepEqual(unitJumpLinks, [...unitPlan.matchAll(/<h2 id="([^"]+)"/g)].map((match) => match[1])
+        .filter((id) => !["overview", "on-this-page"].includes(id)), "Unit Plan section pills follow page order");
+    for (const heading of ["Context and Rationale", "Aims of Theme", "Curriculum Connections", "Contexts of Learning",
+        "School Values in this Theme", "Practical Learning Sequence", "Resources and Equipment", "Health &amp; Safety",
+        "Evidence and Curriculum Coverage", "Theme Evaluation"]) {
+        assert.ok(unitPlan.includes(`>${heading}</h2>`), `Unit Plan includes ${heading}`);
+    }
+    assert.equal((unitPlan.match(/<li class="unit-step">/g) || []).length, 10, "All ten learning sequence activities are listed");
+    assert.equal((unitPlan.match(/unit-status planned/g) || []).length, 2, "ASCII and Unicode stay labelled as planned");
+    assert.equal((unitPlan.match(/<li>[^<]*\?<\/li>/g) || []).length, 6, "Six theme evaluation questions");
+    assert.match(unitPlan, /class="hero practical-skills-hero unit-plan-hero"/);
+    assert.match(unitPlan, /href="\/learning-pathways\/digital-systems\.html"/);
     assert.throws(() => normalizeCards([{ ...sample, cardType: "lesson" }]), /invalid card type/);
     assert.equal(normalizeCards([sample])[0].cardType, "strand", "Existing cards default to Curriculum Strands");
     assert.equal(normalizeCards([{ ...sample, strand: "x" }])[0].strand, undefined, "Only units keep a parent strand");
@@ -292,7 +311,7 @@ async function main() {
         assert.match(sql, /learning_pathways_library_store/, "Never writes the Licence Library table");
         if (sql.includes("INSERT INTO") && (stored === null || !sql.includes("DO NOTHING"))) {
             stored = JSON.parse(params[0]);
-            seedVersion = 7;
+            seedVersion = 8;
         }
         if (sql.includes("seed_version < 1") && seedVersion < 1) {
             const starters = JSON.parse(params[0]);
@@ -334,6 +353,12 @@ async function main() {
             assert.ok(added.length && added.every((card) => card.cardType === "unit"), "Version 7 only adds unit cards");
             stored = [...stored, ...added.filter((card) => !stored.some((old) => old.id === card.id))];
             seedVersion = 7;
+        }
+        if (sql.includes("seed_version < 8") && seedVersion < 8) {
+            assert.match(sql, /COALESCE\(existing\.card ->> 'href', ''\) = ''/, "Version 8 only links a blank Binary & Data card");
+            stored = stored.map((card) => card.id === "binary-and-data" && !card.href
+                ? { ...card, href: "/learning-pathways/binary-and-data.html" } : card);
+            seedVersion = 8;
         }
         return { rows: sql.startsWith("SELECT") && stored !== null ? [{ cards: stored }] : [] };
     } };
@@ -428,6 +453,20 @@ async function main() {
         const unitMigrated = await (await fetch(`${base}/learning-pathways/library.json`)).json();
         assert.deepEqual(unitMigrated.map((card) => card.title), [sample.title, "Edited unit", "Binary & Data"],
             "Unit migration keeps edits and does not duplicate units");
+        const blankBinary = { ...units.find((card) => card.id === "binary-and-data"), href: "", title: "Edited binary" };
+        stored = [sample, blankBinary];
+        seedVersion = 7;
+        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(),
+            normalizeCards([sample, { ...blankBinary, href: "/learning-pathways/binary-and-data.html" }]),
+            "Version 8 links the blank Binary & Data card, keeping edits and order");
+        stored = [{ ...blankBinary, href: "/learning-pathways/custom.html" }];
+        seedVersion = 7;
+        assert.equal((await (await fetch(`${base}/learning-pathways/library.json`)).json())[0].href, "/learning-pathways/custom.html",
+            "Version 8 preserves a custom Binary & Data link");
+        stored = [blankBinary];
+        seedVersion = 8;
+        assert.equal((await (await fetch(`${base}/learning-pathways/library.json`)).json())[0].href, "",
+            "Later link removal is not undone");
         assert.equal((await fetch(`${base}/api/admin/learning-pathways/library`)).status, 403);
         const publish = (cards, admin = true) => fetch(`${base}/api/admin/learning-pathways/library`, {
             method: "PUT", headers: { "Content-Type": "application/json", "x-test-admin": admin ? "yes" : "no" },
