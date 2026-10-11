@@ -203,7 +203,7 @@ async function main() {
         assert.match(page, /p\. 13/);
         assert.match(page, card.id === "systems-and-control" ? /p\. 16/ : /p\. 17/);
         assert.match(page, /p\. 25/);
-        assert.match(page, /Future activities - proposed, not yet added/);
+        if (card.id !== "digital-systems") assert.match(page, /Future activities - proposed, not yet added/);
         assert.match(page, /Possible evidence - teacher judgement required/);
         assert.match(page, /class="home-grid single-column curriculum-strand-page"/);
         assert.match(page, /href="styles\.css"/);
@@ -227,6 +227,11 @@ async function main() {
     assert.match(curriculumPage, /p\. 17/);
     assert.match(curriculumPage, /p\. 13/);
     assert.match(curriculumPage, /href="\/practical-skills\/kit-worksheet\.html\?kit=kit-minecraft"/);
+    for (const heading of ["Design, Make, and Innovate &mdash; Learning Opportunities", "Year 7 and Year 8 Curriculum Connections",
+        "Connection to Digital Technology", "Teacher Planning Notes", "Responsible Design and Innovation"]) {
+        assert.ok(curriculumPage.includes(heading), `Digital Systems learning contexts include ${heading}`);
+    }
+    assert.doesNotMatch(curriculumPage, /Future activities - proposed/, "Digital Systems uses the teacher-supplied learning contexts");
     assert.throws(() => normalizeCards(null), /cards array/);
     for (const href of ["javascript:alert(1)", "data:text/html,test", "//example.test", "/\\example.test"]) {
         assert.throws(() => normalizeCards([{ ...sample, href }]), /links/);
