@@ -620,25 +620,8 @@
 .unit-status.optional { background: #e5eefa; color: #24548a; }
 .unit-status.planned { background: #fdebc8; color: #8a5a00; }
 
-.unit-evaluation-list {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-    padding: 0;
-    list-style: none;
-}
-
-.unit-evaluation-list li {
-    padding: 12px 14px;
-    border-left: 4px solid #c8364f;
-    border-radius: 8px;
-    background: #f7f8fb;
-    font-weight: 600;
-}
-
 @media (max-width: 700px) {
-    .unit-sequence,
-    .unit-evaluation-list {
+    .unit-sequence {
         grid-template-columns: 1fr;
     }
 }

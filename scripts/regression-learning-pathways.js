@@ -199,13 +199,14 @@ async function main() {
     assert.deepEqual(unitJumpLinks, [...unitPlan.matchAll(/<h2 id="([^"]+)"/g)].map((match) => match[1])
         .filter((id) => !["overview", "on-this-page"].includes(id)), "Unit Plan section pills follow page order");
     for (const heading of ["Context and Rationale", "Aims of Theme", "Curriculum Connections", "Contexts of Learning",
-        "School Values in this Theme", "Practical Learning Sequence", "Resources and Equipment", "Health &amp; Safety",
-        "Evidence and Curriculum Coverage", "Theme Evaluation"]) {
+        "School Values in this Theme", "Practical Learning Sequence", "Evidence and Curriculum Coverage"]) {
         assert.ok(unitPlan.includes(`>${heading}</h2>`), `Unit Plan includes ${heading}`);
+    }
+    for (const removed of ["Resources and Equipment", "Health &amp; Safety", "Theme Evaluation"]) {
+        assert.ok(!unitPlan.includes(`>${removed}</h2>`), `Unit Plan no longer includes ${removed}`);
     }
     assert.equal((unitPlan.match(/<li class="unit-step">/g) || []).length, 10, "All ten learning sequence activities are listed");
     assert.equal((unitPlan.match(/unit-status planned/g) || []).length, 2, "ASCII and Unicode stay labelled as planned");
-    assert.equal((unitPlan.match(/<li>[^<]*\?<\/li>/g) || []).length, 6, "Six theme evaluation questions");
     assert.match(unitPlan, /class="hero practical-skills-hero unit-plan-hero"/);
     assert.match(unitPlan, /href="\/learning-pathways\/digital-systems\.html"/);
     assert.throws(() => normalizeCards([{ ...sample, cardType: "lesson" }]), /invalid card type/);
