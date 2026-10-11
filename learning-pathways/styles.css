@@ -140,6 +140,60 @@
     line-height: 1.5;
 }
 
+.curriculum-coverage {
+    border-left: 6px solid #0f7c80;
+    background: linear-gradient(135deg, #e2f4f3 0%, #f0faf9 100%);
+}
+
+.curriculum-coverage h2,
+.curriculum-coverage h3 {
+    color: #0b5c60;
+}
+
+.curriculum-unit-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 4px 0 14px;
+    padding: 0;
+    list-style: none;
+}
+
+.curriculum-unit-links a {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px 8px 8px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #9f1d3a 0%, #c8364f 54%, #ec6f63 100%);
+    color: #fff;
+    font-weight: 700;
+    text-decoration: none;
+    box-shadow: 0 2px 6px rgba(159, 29, 58, 0.25);
+}
+
+.curriculum-unit-links a:hover,
+.curriculum-unit-links a:focus-visible {
+    outline: 3px solid #0b5c60;
+    outline-offset: 2px;
+}
+
+.curriculum-unit-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.22);
+    font-size: 0.8rem;
+    font-weight: 800;
+}
+
+.pathway-card-highlight {
+    outline: 4px solid #0f7c80;
+    outline-offset: 3px;
+}
+
 .curriculum-note {
     margin: 4px 0 0;
 }

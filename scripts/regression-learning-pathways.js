@@ -102,6 +102,15 @@ async function testDashboard() {
     types.children.find((pill) => pill.textContent === "Units").click();
     assert.equal(grid.children.length, 1);
     assert.match(grid.children[0].innerHTML, /Alpha Unit/);
+    context.location = { search: "?type=unit", hash: "#card-unit-a" };
+    Element.prototype.scrollIntoView = function scrollIntoView() { this.scrolled = true; };
+    vm.runInContext(fs.readFileSync(path.join(root, "practical-skills/app.js"), "utf8"), context);
+    await tick();
+    assert.equal(grid.children.length, 1, "?type=unit preselects the Units filter");
+    assert.equal(grid.children[0].id, "card-unit-a");
+    assert.equal(grid.children[0].scrolled, true, "#card-<id> scrolls to the requested Unit card");
+    delete Element.prototype.scrollIntoView;
+    delete context.location;
     config.dataset = {};
     responseCards = [sample, { ...sample, id: "practical-skills-checklist", title: "Licence" }];
     vm.runInContext(fs.readFileSync(path.join(root, "practical-skills/app.js"), "utf8"), context);
@@ -244,6 +253,12 @@ async function main() {
     assert.match(curriculumPage, /aria-labelledby="learning-contexts">[\s\S]*?<\/section>\s*<section class="panel-section curriculum-pathway-aim" aria-labelledby="health-safety">/,
         "Health & Safety follows Learning Contexts in the Aim colour scheme");
     assert.match(curriculumPage, /DTECH-HUB Health &amp; Safety module/);
+    assert.match(curriculumPage, /aria-labelledby="health-safety">[\s\S]*?<\/section>\s*<section class="panel-section curriculum-coverage" aria-labelledby="curriculum-coverage">/,
+        "Curriculum Coverage follows Health & Safety in its own shade");
+    for (const unitId of ["binary-and-data", "infrastructure-and-networking"]) {
+        assert.ok(seed.some((card) => card.id === unitId && card.cardType === "unit"), "Coverage links target existing Unit cards");
+        assert.ok(curriculumPage.includes(`href="/learning-pathways/?type=unit#card-${unitId}"`), "Coverage links open the Unit card");
+    }
     assert.equal((curriculumPage.match(/<ul class="curriculum-skills-list">[\s\S]*?<\/ul>/)[0].match(/<li>/g) || []).length, 9);
     assert.throws(() => normalizeCards(null), /cards array/);
     for (const href of ["javascript:alert(1)", "data:text/html,test", "//example.test", "/\\example.test"]) {

@@ -16,13 +16,17 @@
     const sortSelect = document.getElementById("practical-skills-sort");
     const cardTypeNames = { strand: config.libraryCardLabel || "Curriculum Strands", unit: config.libraryUnitLabel || "Units" };
     const cardType = (item) => (isPathways && String(item?.cardType || "") === "unit" ? "unit" : "strand");
+    const pageLocation = typeof location === "undefined" ? null : location;
+    const requestedType = isPathways ? (String(pageLocation?.search || "").match(/[?&]type=([^&#]*)/) || [])[1] : null;
+    const requestedCardId = isPathways ? decodeURIComponent(String(pageLocation?.hash || "").replace(/^#card-/, "")) : "";
+    let requestedCardShown = false;
 
     let library = [];
     const state = {
         search: "",
         year: "All",
         status: "All",
-        type: "All",
+        type: Object.prototype.hasOwnProperty.call(cardTypeNames, requestedType || "") ? cardTypeNames[requestedType] : "All",
         category: "All",
         sort: "name-asc"
     };
@@ -152,6 +156,7 @@
 
         const isUnit = cardType(item) === "unit";
         if (isUnit) card.classList.add("pathway-unit-card");
+        if (isPathways && item.id) card.id = `card-${String(item.id)}`;
         const icon = String(item?.visual?.icon || config.libraryIcon || "PS").trim() || "PS";
         const palette = String(item?.visual?.palette || (isUnit && config.libraryUnitPalette) || config.libraryPalette || "linear-gradient(135deg, #2f8f61 0%, #3ca873 54%, #65c494 100%)");
         const imageUrl = String(item.imageUrl || "").trim();
@@ -217,6 +222,19 @@
         grid.style.gap = "12px";
         grid.style.marginTop = "10px";
         grid.style.minWidth = "0";
+        showRequestedCard();
+    }
+
+    // Curriculum pages link to /learning-pathways/?type=unit#card-<id> to open a specific card.
+    function showRequestedCard() {
+        if (!requestedCardId || requestedCardShown) return;
+        const target = grid.children ? Array.from(grid.children).find((child) => child.id === `card-${requestedCardId}`) : null;
+        if (!target) return;
+        requestedCardShown = true;
+        target.classList.add("pathway-card-highlight");
+        if (target.tagName.toLowerCase() === "article") target.setAttribute("tabindex", "-1");
+        if (typeof target.scrollIntoView === "function") target.scrollIntoView({ behavior: "smooth", block: "center" });
+        if (typeof target.focus === "function") target.focus({ preventScroll: true });
     }
 
     function bindControls() {
