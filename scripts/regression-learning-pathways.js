@@ -305,7 +305,8 @@ async function main() {
     assert.deepEqual(normalizeCards([{ ...sample, cardType: "activity", lesson: "lesson-binary-piano", sequence: 2, unit: "x" }])[0],
         { ...normalizeCards([sample])[0], cardType: "activity", lesson: "lesson-binary-piano", sequence: 2 }, "Lesson Activities keep a parent lesson and sequence");
     assert.deepEqual(activities.map((card) => [card.id, card.lesson, card.sequence, card.href]), [["activity-build-your-binary-piano",
-        "lesson-binary-piano", 1, "/learning-pathways/activity-build-your-binary-piano.html"]], "Binary Piano Activity 1 is the first Lesson Activity card");
+        "lesson-binary-piano", 1, "/learning-pathways/activity-build-your-binary-piano.html"], ["activity-encoding-binary",
+        "lesson-encoding-binary", 1, "/learning-pathways/activity-encoding-binary.html"]], "Lesson Activity cards for Lessons 1 and 2");
     const activityPage = fs.readFileSync(path.join(root, "learning-pathways/activity-build-your-binary-piano.html"), "utf8");
     const activityIds = [...activityPage.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
     assert.equal(new Set(activityIds).size, activityIds.length, "Activity page IDs are unique");
@@ -443,7 +444,7 @@ async function main() {
         assert.match(sql, /learning_pathways_library_store/, "Never writes the Licence Library table");
         if (sql.includes("INSERT INTO") && (stored === null || !sql.includes("DO NOTHING"))) {
             stored = JSON.parse(params[0]);
-            seedVersion = 12;
+            seedVersion = 13;
         }
         if (sql.includes("seed_version < 1") && seedVersion < 1) {
             const starters = JSON.parse(params[0]);
@@ -516,6 +517,12 @@ async function main() {
                 ? { ...card, href: "/learning-pathways/lesson-encoding-binary.html" } : card);
             seedVersion = 12;
         }
+        if (sql.includes("seed_version < 13") && seedVersion < 13) {
+            const added = JSON.parse(params[0]);
+            assert.deepEqual(added.map((card) => card.id), ["activity-encoding-binary"], "Version 13 only adds the Encoding Binary activity");
+            stored = [...stored, ...added.filter((card) => !stored.some((old) => old.id === card.id))];
+            seedVersion = 13;
+        }
         return { rows: sql.startsWith("SELECT") && stored !== null ? [{ cards: stored }] : [] };
     } };
     const app = express();
@@ -529,16 +536,16 @@ async function main() {
         let response = await fetch(`${base}/learning-pathways/library.json`);
         assert.match(response.headers.get("cache-control"), /no-store/);
         const migrated = await response.json();
-        assert.equal(migrated.length, 19, "One-time preload preserves existing custom cards");
+        assert.equal(migrated.length, 20, "One-time preload preserves existing custom cards");
         assert.equal(migrated.find((card) => card.id === "digital-systems").title, "Existing edited systems",
             "Preload does not overwrite existing cards with the same ID");
         assert.equal(migrated.filter((card) => card.id === "digital-systems").length, 1);
-        assert.equal((await (await fetch(`${base}/learning-pathways/library.json`)).json()).length, 19,
+        assert.equal((await (await fetch(`${base}/learning-pathways/library.json`)).json()).length, 20,
             "Repeated reads do not duplicate starter cards");
         stored = [existing, sample, { ...sample, id: "programming" }, { ...sample, id: "algorithms" }];
         seedVersion = 1;
         const merged = await (await fetch(`${base}/learning-pathways/library.json`)).json();
-        assert.equal(merged.length, 16);
+        assert.equal(merged.length, 17);
         assert.deepEqual(merged.slice(0, 2), normalizeCards([existing, sample]), "Unrelated cards remain unchanged");
         assert.equal(merged[2].title, "Programming & Algorithms");
         assert.match(merged[2].summary, /algorithms.*debug.*test and improve/);
@@ -547,7 +554,7 @@ async function main() {
             { ...sample, id: "programming" }, { ...sample, id: "algorithms" }];
         seedVersion = 1;
         const preserved = await (await fetch(`${base}/learning-pathways/library.json`)).json();
-        assert.equal(preserved.length, 15);
+        assert.equal(preserved.length, 16);
         assert.equal(preserved[1].title, "Edited combined card", "Existing combined edits are preserved");
         const oldData = { ...sample, id: "data", title: "Data", area: "Data" };
         stored = [sample, oldData];
@@ -616,14 +623,23 @@ async function main() {
         stored = [sample, { ...activities[0], title: "Edited activity" }];
         seedVersion = 10;
         const activityMigrated = await (await fetch(`${base}/learning-pathways/library.json`)).json();
-        assert.deepEqual(activityMigrated, normalizeCards(stored), "Version 11 keeps an edited activity and does not duplicate it");
+        assert.deepEqual(activityMigrated, plusActivities(stored), "Version 11 keeps an edited activity and does not duplicate it");
         stored = [sample];
         seedVersion = 10;
         assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), plusActivities([sample]), "Version 11 adds missing activities");
         stored = [sample];
         seedVersion = 11;
+        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(),
+            normalizeCards([sample, activities.find((card) => card.id === "activity-encoding-binary")]),
+            "Version 13 adds only the new Encoding Binary activity, not deleted Version 11 activities");
+        stored = [sample, { ...activities[1], title: "Edited encoding" }];
+        seedVersion = 12;
+        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), normalizeCards(stored),
+            "Version 13 keeps an edited Encoding Binary card without duplicating it");
+        stored = [sample];
+        seedVersion = 13;
         assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), normalizeCards([sample]),
-            "Version 11 does not restore deleted activity cards");
+            "Version 13 does not restore a deleted Encoding Binary card");
         const blankPiano = { ...lessons[0], href: "", title: "Edited piano" };
         stored = [sample, blankPiano];
         seedVersion = 9;

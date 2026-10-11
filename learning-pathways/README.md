@@ -50,9 +50,10 @@ Routing waits for both course and access resolution, including after refresh.
   The green navbar and sidebar Task List buttons use the resolved actual course:
   JuniorDTECH opens this page, SeniorDTECH retains its existing Task List, and
   MiddleDTECH has no Task List button yet. Course changes and sign-out clear the
-  list immediately. The page lists only the names of published Junior DTECH
-  pathway cards in alphabetical order, with no tasks, completion controls,
-  assessment criteria or progress descriptors yet. Course/library failures have
+  list immediately. The page lists published Junior DTECH pathway card names in
+  alphabetical order, with tracked Lesson Activities (e.g. Encoding Binary) and
+  their To do / Completed state under each strand; no assessment criteria or
+  progress descriptors yet. Course/library failures have
   visible retry actions. The shared `hub-course-resolved` event carries course
   loading, success and error state; the page does not infer course from year.
 
@@ -124,6 +125,25 @@ opens the student page `activity-build-your-binary-piano.html` (green
 a **Finished?** hand-in panel: an exercise-book illustration, "Well done! Your Binary Piano is ready to use!" and a reminder to hand in the exercise book. Reuse `.activity-handin` for exercise-book tasks with no DTECH-HUB completion requirement). The Lesson 1 Practical phase has a green **Activity card** pill
 on the right that opens the activity page directly. Migration
 v11 adds missing activity cards once without restoring later deletions.
+
+**Encoding Binary** (Lesson 2, Activity 1) is the first interactive, tracked
+activity: `activity-encoding-binary.html` + `activity-encoding-binary.js`.
+Students toggle five Binary Piano keys (16, 8, 4, 2, 1) per letter, see live
+totals and non-punitive hints (answers are never shown), practise E = 5, encode
+TECHNOLOGY (T = 10100 is the worked example), and may try an optional word.
+Answers autosave for signed-in school accounts. **Finish activity** only marks
+completion when the practice and all nine letters are correct; changing a
+required answer to a wrong one later reopens it. Migration v13 adds this card
+once without restoring later deletions; Lesson 2's Practical phase links to it.
+
+`activity-progress-store.js` stores per-student answers in
+`learning_pathways_activity_progress` (Postgres; in memory without
+`DATABASE_URL`) and only accepts registered activities and school accounts:
+`GET /api/learning-pathways/activity-progress` (tracked activities + progress),
+`GET|PUT /api/learning-pathways/activity-progress/:id` (`PUT` body
+`{responses, completed}`; 409 lists missing answers). The JuniorDTECH Task List
+shows tracked activities under their strand with **To do** / **✓ Completed**;
+if progress cannot load, strand names still show with a retry action.
 
 ## Progression Pathway (Teacher View)
 

@@ -34,6 +34,17 @@ async function renderPathwayTaskList() {
         return;
     }
     pathwayTaskStatus.textContent = "Loading your learning pathways...";
+    const progressRequest = fetch("/api/learning-pathways/activity-progress", {
+        cache: "no-store", headers: withHubAuthHeaders()
+    }).then(async (response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        if (!data || !Array.isArray(data.tracked) || typeof data.progress !== "object" || data.progress === null) {
+            throw new Error("Activity progress is invalid.");
+        }
+        return data;
+    });
+    progressRequest.catch(() => {});
     try {
         const response = await fetch("/learning-pathways/library.json", { cache: "no-store" });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -42,20 +53,58 @@ async function renderPathwayTaskList() {
             || !card.title.trim() || typeof card.yearLevel !== "string")) {
             throw new Error("Learning Pathways library is invalid.");
         }
+        let progress = null;
+        try {
+            progress = await progressRequest;
+        } catch (error) {
+            console.error("Could not load activity progress", error);
+        }
         if (request !== pathwayTaskRequest) return;
         const juniorCards = cards.filter((card) => card.yearLevel === "Junior DTECH" && !["unit", "lesson", "activity"].includes(card.cardType))
             .sort((left, right) => left.title.localeCompare(right.title));
+        let activityCount = 0;
         for (const card of juniorCards) {
             const item = document.createElement("li");
             const heading = document.createElement("h3");
             heading.textContent = card.title;
             item.append(heading);
+            const activities = (progress?.tracked || []).filter((activity) => activity && activity.strand === card.id
+                && typeof activity.title === "string" && typeof activity.href === "string" && activity.href.startsWith("/"));
+            if (activities.length) {
+                const activityList = document.createElement("ul");
+                activityList.className = "pathway-task-activities";
+                for (const activity of activities) {
+                    const done = progress.progress[activity.id]?.completed === true;
+                    const row = document.createElement("li");
+                    row.className = done ? "pathway-task-activity is-complete" : "pathway-task-activity";
+                    const link = document.createElement("a");
+                    link.href = activity.href;
+                    link.textContent = activity.title;
+                    const context = document.createElement("span");
+                    context.className = "pathway-task-context";
+                    context.textContent = typeof activity.context === "string" ? activity.context : "";
+                    const state = document.createElement("span");
+                    state.className = "pathway-task-state";
+                    state.textContent = done ? "\u2713 Completed" : "To do";
+                    row.append(link, context, state);
+                    activityList.append(row);
+                    activityCount++;
+                }
+                item.append(activityList);
+            }
             pathwayTaskList.append(item);
         }
         pathwayTaskList.hidden = juniorCards.length === 0;
-        pathwayTaskStatus.textContent = juniorCards.length
-            ? "Your learning pathways are listed below. Tasks will be added later."
-            : "No JuniorDTECH learning pathways have been added yet.";
+        if (juniorCards.length && !progress) {
+            pathwayTaskStatus.textContent = "Your learning pathways are listed below. Your activity progress could not be loaded. Please retry.";
+            pathwayTaskRetry.hidden = false;
+        } else {
+            pathwayTaskStatus.textContent = !juniorCards.length
+                ? "No JuniorDTECH learning pathways have been added yet."
+                : activityCount
+                    ? "Complete the activities listed under each learning pathway."
+                    : "Your learning pathways are listed below. Tasks will be added later.";
+        }
     } catch (error) {
         console.error("Could not load pathway Task List", error);
         if (request !== pathwayTaskRequest) return;

@@ -6125,6 +6125,9 @@ app.get("/practical-skills/library.json", async (_req, res) => {
   }
 });
 require("./learning-pathways/library-store").registerLearningPathways(app, { pool, hasDatabase, requireAdminAccess });
+require("./learning-pathways/activity-progress-store").registerActivityProgress(app, {
+  pool, hasDatabase, getRequestUserEmail, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN
+});
 require("./learning-pathways/progression-store").registerProgressionPathway(app, {
   pool, hasDatabase, requireTeacherAccess: requireActivityWriteAccess,
   getStudents: async () => {

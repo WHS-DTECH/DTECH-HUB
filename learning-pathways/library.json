@@ -214,5 +214,18 @@
     "sequence": 1,
     "href": "/learning-pathways/activity-build-your-binary-piano.html",
     "visual": { "icon": "A1" }
+  },
+  {
+    "id": "activity-encoding-binary",
+    "title": "Encoding Binary",
+    "summary": "Use your Binary Piano to encode numbers and the word TECHNOLOGY into binary.",
+    "yearLevel": "Junior DTECH",
+    "area": "Digital systems",
+    "status": "active",
+    "cardType": "activity",
+    "lesson": "lesson-encoding-binary",
+    "sequence": 1,
+    "href": "/learning-pathways/activity-encoding-binary.html",
+    "visual": { "icon": "A1" }
   }
 ]
