@@ -302,7 +302,7 @@ async function main() {
     assert.match(activityPage, /class="hero practical-skills-hero activity-hero"/);
     assert.match(activityPage, /href="\/learning-pathways\/\?type=activity#card-activity-build-your-binary-piano"/);
     assert.match(activityPage, /href="\/learning-pathways\/lesson-binary-piano\.html"/);
-    assert.match(lessonPage, /<\/div><a class="lesson-activity-pill" href="\/learning-pathways\/\?type=activity#card-activity-build-your-binary-piano">Activity card: Build Your Binary Piano<\/a><\/li>/,
+    assert.match(lessonPage, /<\/div><a class="lesson-activity-pill" href="\/learning-pathways\/activity-build-your-binary-piano\.html">Activity card: Build Your Binary Piano<\/a><\/li>/,
         "The Practical phase shows a right-hand pill linking to its Activity card");
     assert.equal(normalizeCards([sample])[0].cardType, "strand", "Existing cards default to Curriculum Strands");
     assert.equal(normalizeCards([{ ...sample, strand: "x" }])[0].strand, undefined, "Only units keep a parent strand");
