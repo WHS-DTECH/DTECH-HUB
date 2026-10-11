@@ -255,6 +255,12 @@ async function main() {
     assert.match(curriculumPage, /DTECH-HUB Health &amp; Safety module/);
     assert.match(curriculumPage, /aria-labelledby="health-safety">[\s\S]*?<\/section>\s*<section class="panel-section curriculum-coverage" aria-labelledby="curriculum-coverage">/,
         "Curriculum Coverage follows Health & Safety in its own shade");
+    assert.match(curriculumPage, /aria-labelledby="curriculum-coverage">[\s\S]*?<\/section>\s*<section class="panel-section curriculum-pathway-aim" aria-labelledby="reporting-progression">/,
+        "Reporting & Progression follows Curriculum Coverage in the Aim colour scheme");
+    const reporting = curriculumPage.match(/aria-labelledby="reporting-progression">[\s\S]*?<\/section>/)[0];
+    assert.match(reporting, /<strong>Reference:<\/strong> <a href="#progression">Digital Systems Progression Matrix<\/a>/);
+    assert.deepEqual([...reporting.matchAll(/<li>[\s\S]*?<strong>([^<]+)<\/strong>/g)].map((match) => match[1]),
+        ["Emerging", "Developing", "Consolidating", "Proficient", "Exceeding"], "Progress Descriptors close the section");
     for (const unitId of ["binary-and-data", "infrastructure-and-networking"]) {
         assert.ok(seed.some((card) => card.id === unitId && card.cardType === "unit"), "Coverage links target existing Unit cards");
         assert.ok(curriculumPage.includes(`href="/learning-pathways/?type=unit#card-${unitId}"`), "Coverage links open the Unit card");
