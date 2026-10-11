@@ -51,21 +51,44 @@ async function main() {
     assert.match(client, /progressionRender\(record \|\| progressionNewRecord\(student\)\);\s*progressionOpenDialog\(student\);/, "Open Details shows the loaded record in the dialog");
     assert.match(client, /pp\("dialog"\)\.addEventListener\("cancel"[\s\S]*progressionCloseDialog\(\)/, "Escape uses the unsaved-change guard");
     assert.ok(html.includes('id="progression-dialog-summary"'), "Details dialog shows the progression summary at the top");
-    assert.match(client, /pp\("rows"\)\.append\(row\);\s*\}\s*progressionDialogSummary\(\);/, "Dialog summary renders with each record");
+    assert.match(client, /pp\("rows"\)\.append\(row\);\s*\}\s*progressionRenderCurriculum\(\);\s*progressionDialogSummary\(\);/, "Curriculum statements and dialog summary render with each record");
     assert.ok(!html.includes(">Details</th>") && !html.includes("progression-detail") && !html.includes("progression-strengths"),
         "Details column, Curriculum Coverage & Evidence and Strengths have been removed");
     assert.ok(html.includes('id="progression-next"'), "Next learning remains in the Teacher Summary");
     assert.ok(!client.includes('descriptor.disabled'), "All five Progress descriptors can be selected for every pathway");
     assert.match(client, /result\.descriptor && result\.coverage === "not-taught"\) \{ result\.coverage = "partly-taught"/, "Choosing a descriptor keeps coverage valid");
-    vm.runInContext(client.slice(client.indexOf("const progressionYearStatements"), client.indexOf("function progressionUpdateStatements(")), context);
-    for (const id of ids) for (const year of [7, 8, 9, 10]) {
-        assert.match(context.progressionStatement(id, year), new RegExp(`^Year ${year}: \\S`), `${id} has a Year ${year} statement`);
+    const curriculum = require("../learning-pathways/progression-curriculum.js");
+    const allStatements = Object.values(curriculum.statements).flat();
+    assert.deepEqual(Object.fromEntries(Object.entries(curriculum.statements).map(([year, rows]) => [year, rows.length])), { 7: 23, 8: 22, 9: 31, 10: 30 });
+    assert.equal(new Set(allStatements.map((statement) => statement.id)).size, allStatements.length, "Curriculum statement IDs are unique");
+    for (const statement of allStatements) {
+        assert.ok(["digital-technology", "systems-and-control"].includes(statement.strand));
+        assert.ok(["knowledge", "practices"].includes(statement.kind));
+        assert.ok(statement.text.length > 20 && statement.pathways.length > 0 && statement.pathways.every((id) => ids.includes(id)), `${statement.id} is tagged`);
+        if (statement.strand === "systems-and-control") assert.deepEqual([...statement.pathways], ["systems-and-control"]);
     }
-    assert.notEqual(context.progressionStatement("data", 7), context.progressionStatement("data", 10), "Statements change with year level");
+    for (const year of ["7", "8", "9", "10"]) for (const strand of ["digital-technology", "systems-and-control"]) for (const kind of ["knowledge", "practices"]) {
+        assert.ok(curriculum.statements[year].some((statement) => statement.strand === strand && statement.kind === kind), `Year ${year} ${strand} ${kind}`);
+    }
+    const verbatim = (id) => allStatements.find((statement) => statement.id === id).text;
+    assert.equal(verbatim("sc-8-p-2"), "Produce annotated system diagrams that explain subsystems, reliability risks, and input\u2013output transformations.");
+    assert.ok(allStatements.some((statement) => statement.text.startsWith("Compare algorithms")) && allStatements.some((statement) => statement.text.startsWith("Analyse how data")), "Year 8 merged bullet is split");
+    assert.ok(html.indexOf('src="progression-curriculum.js"') > 0 && html.indexOf('src="progression-curriculum.js"') < html.indexOf('src="progression-pathway.js"'), "Curriculum data loads before the page script");
+    assert.ok(html.includes('id="progression-curriculum"'), "Dialog has a Curriculum Coverage section");
+    const statementContext = vm.createContext({ progressionCurriculum: curriculum, progression: { record: { statements: [
+        { id: "dt-7-p-1", discipline: "food", coverage: "taught" }, { id: "dt-7-k-1", discipline: "dtech", coverage: "partly-taught" }] } } });
+    vm.runInContext(client.slice(client.indexOf("const progressionCoverageOptions"), client.indexOf("function progressionUpdateStatements(")), statementContext);
+    for (const id of ids) for (const year of [7, 8, 9, 10]) {
+        assert.match(statementContext.progressionStatement(id, year), new RegExp(`^Year ${year}: \\d+ of \\d+ linked curriculum statements taught`), `${id} has Year ${year} linked statements`);
+    }
+    assert.match(statementContext.progressionStatement("programming-and-algorithms", 7), /^Year 7: 1 of \d+ linked curriculum statements taught/, "Hints count taught statements");
+    assert.equal(statementContext.progressionCurriculumStatements(9).length, 31);
+    assert.equal(statementContext.progressionStatementResult("sc-9-k-1").coverage, "not-taught", "Unrecorded statements default to Not taught");
     assert.match(client, /progressionDisciplines = \[\["dtech", "DTECH"\], \["textiles", "Textiles"\], \["food", "Food"\], \["wood", "Wood"\], \["dvc", "DVC"\]\]/);
     assert.match(client, /discipline: "dtech", addressed/, "New records default to the DTECH discipline");
     assert.match(client, /pp\("level"\)\.addEventListener\("change", progressionUpdateStatements\)/, "Changing year level updates the statements");
-    assert.ok(html.includes('<th scope="col">Discipline</th>'));
+    assert.match(client, /function progressionUpdateStatements\(\) \{\s*progressionUpdateHints\(\);\s*progressionRenderCurriculum\(\);/);
+    assert.ok(!html.includes('<th scope="col">Discipline</th><th scope="col">Coverage</th><th scope="col">Progress</th>'), "Discipline is recorded per curriculum statement");
     assert.ok(!client.includes("View / edit") && !client.includes('pp("strengths")') && !client.includes("progressionDetail"));
     assert.ok(!client.includes('pp("history")'), "No handlers depend on the removed selector");
     vm.runInContext(client.slice(client.indexOf("function progressionAnnualRecord("), client.indexOf("async function progressionLoadStudent(")), context);
@@ -176,6 +199,14 @@ async function main() {
     rated.pathways[0].discipline = "metal";
     assert.throws(() => validateRecord(rated), /discipline/);
     rated.pathways[0].discipline = "textiles";
+    const withStatements = clone(sample);
+    withStatements.statements = [{ id: "sc-8-p-2", coverage: "taught", discipline: "wood" }, { id: "dt-10-k-1", coverage: "partly-taught" }];
+    assert.deepEqual(validateRecord(withStatements).statements, [{ id: "sc-8-p-2", coverage: "taught", discipline: "wood" }, { id: "dt-10-k-1", coverage: "partly-taught", discipline: "dtech" }]);
+    assert.ok(!("statements" in validateRecord(sample)), "Records without curriculum statements are unchanged");
+    for (const bad of [[{ id: "xx-1", coverage: "taught" }], [{ id: "sc-8-p-2", coverage: "done" }], [{ id: "sc-8-p-2", coverage: "taught", discipline: "metal" }],
+        [{ id: "sc-8-p-2", coverage: "taught" }, { id: "sc-8-p-2", coverage: "taught" }], "sc-8-p-2"]) {
+        assert.throws(() => validateRecord({ ...clone(sample), statements: bad }), undefined, `Rejects ${JSON.stringify(bad)}`);
+    }
     rated.pathways[0].descriptor = "achieved";
     assert.throws(() => validateRecord(rated));
     rated.pathways[0].descriptor = "proficient";

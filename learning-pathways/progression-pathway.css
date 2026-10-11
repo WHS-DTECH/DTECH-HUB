@@ -32,6 +32,14 @@
 .progression-page .curriculum-table th[scope="row"] { min-width: 320px; }
 .progression-statement { margin: 6px 0 0; font-weight: 400; font-size: 0.88rem; line-height: 1.4; color: #34465c; }
 .progression-th-note { font-weight: 400; font-size: 0.8rem; }
+.progression-curriculum h3 { margin: 22px 0 6px; color: #12324f; }
+.progression-curriculum h4 { margin: 12px 0 6px; font-size: 1rem; color: #34465c; }
+.progression-statement-table td:first-child { min-width: 360px; line-height: 1.45; }
+.progression-statement-table td:not(:first-child) { width: 1%; white-space: nowrap; }
+.progression-statement-table select { width: auto; min-width: 9.5rem; }
+.progression-statement-group th { background: #eef4fa; color: #12324f; font-size: 0.9rem; text-align: left; }
+.progression-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.progression-chip { display: inline-block; padding: 1px 7px; border-radius: 999px; background: #e3edf8; color: #1d4f80; font-size: 0.72rem; font-weight: 700; cursor: help; }
 .progression-dialog { width: min(980px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; border: 1px solid #b9cbde; border-radius: 14px; color: #24344a; background: #f5f8fc; box-shadow: 0 24px 60px rgba(20, 35, 60, 0.35); }
 .progression-dialog::backdrop { background: rgba(20, 35, 60, 0.55); }
 .progression-dialog-header { position: sticky; top: 0; z-index: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 16px 22px; border-bottom: 1px solid #cfdded; background: #fff; }
@@ -55,4 +63,4 @@
 .proficient { background: #278c78 !important; }
 .exceeding { background: #427bbb !important; }
 .progression-page select.descriptor-chip { color: #000; border: 2px solid #24344a; }
-@media (max-width: 700px) { .progression-page .curriculum-table { min-width: 900px; } }
+@media (max-width: 700px) { .progression-page .curriculum-table { min-width: 900px; } .progression-page .progression-statement-table { min-width: 720px; } }

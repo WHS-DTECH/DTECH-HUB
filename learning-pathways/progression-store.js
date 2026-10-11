@@ -1,9 +1,25 @@
 "use strict";
 
+const progressionCurriculum = require("./progression-curriculum");
+
 const pathwayIds = ["digital-systems", "data", "digital-citizenship", "programming-and-algorithms", "systems-and-control"];
 const coverageValues = ["not-taught", "partly-taught", "taught"];
 const descriptorValues = ["emerging", "developing", "consolidating", "proficient", "exceeding"];
 const disciplineValues = ["dtech", "textiles", "food", "wood", "dvc"];
+const statementIds = new Set(Object.values(progressionCurriculum.statements).flat().map((statement) => statement.id));
+
+function validateStatements(rows) {
+    if (!Array.isArray(rows) || rows.length > statementIds.size) throw new Error("Invalid curriculum statements.");
+    const seen = new Set();
+    return rows.map((row) => {
+        if (!row || !statementIds.has(row.id) || seen.has(row.id)) throw new Error("Curriculum statement IDs must be unique and recognised.");
+        seen.add(row.id);
+        if (!coverageValues.includes(row.coverage)) throw new Error("Invalid curriculum statement coverage.");
+        const discipline = row.discipline === undefined ? "dtech" : row.discipline;
+        if (!disciplineValues.includes(discipline)) throw new Error("Invalid discipline.");
+        return { id: row.id, coverage: row.coverage, discipline };
+    });
+}
 
 function validateRecord(body) {
     if (!body || typeof body !== "object") throw new Error("A rotation record is required.");
@@ -32,6 +48,7 @@ function validateRecord(body) {
     });
     return { studentEmail, schoolYear: body.schoolYear, term: body.term, yearLevel: body.yearLevel,
         revision: body.revision, formClass: text(body.formClass, "class", 100), pathways,
+        ...(body.statements === undefined ? {} : { statements: validateStatements(body.statements) }),
         ...(body.timetableClass === undefined ? {} : { timetableClass: text(body.timetableClass, "timetable class", 100) }),
         homeroom: body.homeroom === undefined ? text(body.formClass, "class", 100) : text(body.homeroom, "homeroom", 100),
         strengths: text(body.strengths, "strengths"), nextLearning: text(body.nextLearning, "next learning") };

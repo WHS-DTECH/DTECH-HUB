@@ -9,48 +9,120 @@ const progressionPathways = [
 ];
 const progressionDescriptors = ["emerging", "developing", "consolidating", "proficient", "exceeding"];
 const progressionDisciplines = [["dtech", "DTECH"], ["textiles", "Textiles"], ["food", "Food"], ["wood", "Wood"], ["dvc", "DVC"]];
-// Year-specific statements paraphrased from the Technology Years 0-10 teaching sequence (September 2026) practices.
-const progressionYearStatements = {
-    "digital-systems": {
-        7: "Examine how inputs, processes, outputs and data work together in familiar digital systems.",
-        8: "Analyse how data is used or represented in a program, digital system or digital media outcome.",
-        9: "Explain simple problems for digital solutions by identifying purpose, users, inputs, outputs, constraints, context and key steps.",
-        10: "Design, develop, test and refine a manageable digital outcome using a brief, requirements, technical trialling and user feedback."
-    },
-    data: {
-        7: "Recognise the forms of data digital systems use (text, numbers, images, Boolean) and organise and name files appropriately.",
-        8: "Analyse how data is represented and used in a program, digital system or digital media outcome.",
-        9: "Interpret and use simple data representations, such as text, numbers, Boolean values, images and colour values.",
-        10: "Convert, interpret and explain data representations (e.g. binary, hexadecimal, text encoding) and choose suitable data types."
-    },
-    "digital-citizenship": {
-        7: "Protect personal information and use digital systems and online environments responsibly when creating and sharing outcomes.",
-        8: "Create and refine digital media for a specified audience, considering usability, accessibility and responsible sharing.",
-        9: "Apply appropriate processes when creating, sourcing, modifying, using or sharing digital content, code and data.",
-        10: "Evaluate digital, AI or emerging technology outputs for accuracy, bias, privacy, authorship, cultural representation, benefits and harms."
-    },
-    "programming-and-algorithms": {
-        7: "Represent and test simple algorithms using clear sequences, plain language, diagrams, or block- or text-based programming.",
-        8: "Build, test and debug simple programs using variables, input, output, selection and iteration; compare algorithms by counting steps.",
-        9: "Design, develop, test and debug programs using sequence, selection, iteration, variables, input/output and reusable structures.",
-        10: "Develop programs using functions and simple modularity, testing with expected, boundary and invalid inputs to refine logic."
-    },
-    "systems-and-control": {
-        7: "Build and test simple systems with feedback and control, representing functions and connections with standard symbols.",
-        8: "Produce annotated system diagrams, and build and test controlled circuits using manual or simple programmable controls.",
-        9: "Analyse how components and subsystems interact, and identify, diagnose and correct faults in simple systems.",
-        10: "Integrate sensors, actuators and programmed control into a mechatronic system that responds to changing conditions."
-    }
+const progressionCoverageOptions = [["not-taught", "Not taught"], ["partly-taught", "Partly taught"], ["taught", "Taught"]];
+const progressionPathwayChips = {
+    "digital-systems": "DS", data: "D&I", "digital-citizenship": "DC", "programming-and-algorithms": "P&A", "systems-and-control": "S&C"
 };
+const progressionStrands = [["digital-technology", "Digital Technology"], ["systems-and-control", "Systems and Control"]];
+function progressionCurriculumStatements(yearLevel) {
+    const curriculum = typeof progressionCurriculum === "undefined" ? null : progressionCurriculum;
+    return curriculum?.statements?.[String(Number(yearLevel))] || [];
+}
+function progressionStatementResult(id) {
+    return (progression.record?.statements || []).find((row) => row.id === id) || { id, discipline: "dtech", coverage: "not-taught" };
+}
 function progressionStatement(id, yearLevel) {
     const year = Number(yearLevel);
-    const statement = progressionYearStatements[id]?.[year];
-    return statement ? `Year ${year}: ${statement}` : "Select the student year level to see the expected statement.";
+    const linked = progressionCurriculumStatements(year).filter((statement) => statement.pathways.includes(id));
+    if (!linked.length) return "Select the student year level to see the linked curriculum statements.";
+    const results = linked.map((statement) => progressionStatementResult(statement.id).coverage);
+    const taught = results.filter((value) => value === "taught").length;
+    const partly = results.filter((value) => value === "partly-taught").length;
+    return `Year ${year}: ${taught} of ${linked.length} linked curriculum statements taught${partly ? `, ${partly} partly taught` : ""}.`;
 }
-function progressionUpdateStatements() {
+function progressionUpdateHints() {
     for (const element of document.querySelectorAll("#progression-rows [data-statement]")) {
         element.textContent = progressionStatement(element.dataset.statement, pp("level").value);
     }
+}
+function progressionStatementSelect(label, options, value, onChange) {
+    const select = document.createElement("select");
+    select.setAttribute("aria-label", label);
+    for (const [optionValue, optionLabel] of options) select.append(new Option(optionLabel, optionValue));
+    select.value = value;
+    select.addEventListener("change", () => onChange(select.value));
+    return select;
+}
+function progressionCurriculumTable(title, statements) {
+    const heading = document.createElement("h4");
+    heading.textContent = title;
+    const wrap = document.createElement("div");
+    wrap.className = "curriculum-table-wrap";
+    const table = document.createElement("table");
+    table.className = "curriculum-table progression-statement-table";
+    table.innerHTML = '<thead><tr><th scope="col">Statement</th><th scope="col">Discipline</th><th scope="col">Coverage</th></tr></thead>';
+    const body = document.createElement("tbody");
+    const groups = [...new Set(statements.map((statement) => statement.heading))].sort((a, b) => (a ? 1 : 0) - (b ? 1 : 0));
+    for (const group of groups) {
+        if (group) {
+            const groupRow = document.createElement("tr");
+            groupRow.className = "progression-statement-group";
+            const cell = document.createElement("th");
+            cell.scope = "colgroup"; cell.colSpan = 3; cell.textContent = group;
+            groupRow.append(cell); body.append(groupRow);
+        }
+        for (const statement of statements.filter((item) => item.heading === group)) {
+            const result = progressionStatementResult(statement.id);
+            const row = document.createElement("tr");
+            row.dataset.curriculumStatement = statement.id;
+            const text = document.createElement("td");
+            const words = document.createElement("span");
+            words.textContent = statement.text;
+            const chips = document.createElement("span");
+            chips.className = "progression-chips";
+            for (const pathway of statement.pathways) {
+                const chip = document.createElement("span");
+                chip.className = "progression-chip";
+                chip.textContent = progressionPathwayChips[pathway] || pathway;
+                chip.title = progressionPathways.find(([id]) => id === pathway)?.[1] || pathway;
+                chips.append(chip);
+            }
+            text.append(words, chips);
+            const update = (key, value) => {
+                const rows = progression.record.statements ||= [];
+                let entry = rows.find((item) => item.id === statement.id);
+                if (!entry) { entry = { id: statement.id, discipline: "dtech", coverage: "not-taught" }; rows.push(entry); }
+                entry[key] = value;
+                progression.dirty = true;
+                progressionUpdateHints();
+                progressionDialogSummary();
+            };
+            const discipline = progressionStatementSelect(`Discipline for: ${statement.text}`, progressionDisciplines, result.discipline || "dtech", (value) => update("discipline", value));
+            const coverage = progressionStatementSelect(`Coverage for: ${statement.text}`, progressionCoverageOptions, result.coverage, (value) => update("coverage", value));
+            row.append(text);
+            for (const element of [discipline, coverage]) { const cell = document.createElement("td"); cell.append(element); row.append(cell); }
+            body.append(row);
+        }
+    }
+    table.append(body); wrap.append(table);
+    return [heading, wrap];
+}
+function progressionRenderCurriculum() {
+    const container = pp("curriculum");
+    if (!container) return;
+    const year = Number(pp("level").value);
+    const statements = progressionCurriculumStatements(year);
+    container.replaceChildren();
+    if (!statements.length) {
+        const empty = document.createElement("p");
+        empty.textContent = "Select the student year level to see the curriculum statements.";
+        container.append(empty);
+        return;
+    }
+    for (const [strand, label] of progressionStrands) {
+        const strandStatements = statements.filter((statement) => statement.strand === strand);
+        if (!strandStatements.length) continue;
+        const heading = document.createElement("h3");
+        const page = progressionCurriculum.pages?.[strand]?.[year];
+        heading.textContent = `${label} - Year ${year}${page ? ` (curriculum p. ${page})` : ""}`;
+        container.append(heading);
+        container.append(...progressionCurriculumTable("Knowledge", strandStatements.filter((statement) => statement.kind === "knowledge")));
+        container.append(...progressionCurriculumTable("Practices", strandStatements.filter((statement) => statement.kind === "practices")));
+    }
+}
+function progressionUpdateStatements() {
+    progressionUpdateHints();
+    progressionRenderCurriculum();
 }
 const progressionSummaryGroups = [
     ["Digital Technology", ["data", "digital-citizenship", "digital-systems", "programming-and-algorithms"]],
@@ -247,15 +319,9 @@ function progressionRender(record) {
         statement.className = "progression-statement"; statement.dataset.statement = id;
         statement.textContent = progressionStatement(id, record.yearLevel);
         name.append(title, statement); row.append(name);
-        if (!result.discipline) result.discipline = "dtech";
-        const discipline = document.createElement("select");
-        discipline.setAttribute("aria-label", `${title} discipline where the statement was covered`);
-        for (const [value, label] of progressionDisciplines) discipline.append(new Option(label, value));
-        discipline.value = result.discipline;
-        discipline.addEventListener("change", () => { result.discipline = discipline.value; progression.dirty = true; });
         const coverage = document.createElement("select");
         coverage.setAttribute("aria-label", `${title} coverage`);
-        for (const [value, label] of [["not-taught", "Not taught"], ["partly-taught", "Partly taught"], ["taught", "Taught"]]) coverage.append(new Option(label, value));
+        for (const [value, label] of progressionCoverageOptions) coverage.append(new Option(label, value));
         coverage.value = result.coverage;
         const descriptor = document.createElement("select");
         descriptor.setAttribute("aria-label", `${title} progress`);
@@ -276,9 +342,10 @@ function progressionRender(record) {
             if (result.descriptor && result.coverage === "not-taught") { result.coverage = "partly-taught"; coverage.value = result.coverage; }
             colour(); progression.dirty = true; progressionDialogSummary();
         });
-        for (const element of [discipline, coverage, descriptor]) { const cell = document.createElement("td"); cell.append(element); row.append(cell); }
+        for (const element of [coverage, descriptor]) { const cell = document.createElement("td"); cell.append(element); row.append(cell); }
         pp("rows").append(row);
     }
+    progressionRenderCurriculum();
     progressionDialogSummary();
 }
 function progressionAnnualRecord(records, student, schoolYear) {
