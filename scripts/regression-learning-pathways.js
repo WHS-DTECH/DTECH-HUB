@@ -266,6 +266,8 @@ async function main() {
         "Curriculum Coverage follows Health & Safety in its own shade");
     assert.match(curriculumPage, /aria-labelledby="curriculum-coverage">[\s\S]*?<\/section>\s*<section class="panel-section curriculum-pathway-aim" aria-labelledby="reporting-progression">/,
         "Reporting & Progression follows Curriculum Coverage in the Aim colour scheme");
+    assert.match(curriculumPage, /aria-labelledby="reporting-progression">[\s\S]*?<\/section>\s*<section class="panel-section" aria-labelledby="progression">[\s\S]*?<\/section>\s*<\/main>/,
+        "Progression Matrix sits directly under Reporting & Progression");
     const reporting = curriculumPage.match(/aria-labelledby="reporting-progression">[\s\S]*?<\/section>/)[0];
     assert.match(reporting, /<strong>Reference:<\/strong> <a href="#progression">Digital Systems Progression Matrix<\/a>/);
     assert.deepEqual([...reporting.matchAll(/<li>[\s\S]*?<strong>([^<]+)<\/strong>/g)].map((match) => match[1]),
