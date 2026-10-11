@@ -263,7 +263,8 @@ async function main() {
     assert.deepEqual(lessonJump, [...lessonPage.matchAll(/<h2 id="([^"]+)"/g)].map((match) => match[1])
         .filter((id) => !["overview", "on-this-page"].includes(id)), "Lesson page section pills follow page order");
     for (const heading of ["Lesson Aim", "Learning Objectives", "Teacher Preparation &amp; Resources", "60-Minute Lesson Sequence",
-        "Practical Skill Check", "Teacher Guidance"]) assert.ok(lessonPage.includes(`>${heading}</h2>`), `Lesson page includes ${heading}`);
+        "Teacher Guidance"]) assert.ok(lessonPage.includes(`>${heading}</h2>`), `Lesson page includes ${heading}`);
+    assert.ok(!lessonPage.includes(">Practical Skill Check</h2>"), "Lesson page no longer includes Practical Skill Check");
     assert.deepEqual([...lessonPage.matchAll(/<span class="lesson-time">([^<]+)</g)].map((match) => match[1]),
         ["0&ndash;10 min", "10&ndash;20 min", "20&ndash;40 min", "40&ndash;50 min", "50&ndash;60 min"], "Lesson timeline covers 60 minutes");
     assert.match(lessonPage, /class="hero practical-skills-hero lesson-plan-hero"/);
