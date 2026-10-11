@@ -241,10 +241,15 @@ async function main() {
     assert.match(curriculumPage, /p\. 13/);
     assert.match(curriculumPage, /href="\/practical-skills\/kit-worksheet\.html\?kit=kit-minecraft"/);
     for (const heading of ["Design, Make, and Innovate &mdash; Learning Opportunities", "Year 7 and Year 8 Curriculum Connections",
-        "Connection to Digital Technology", "Teacher Planning Notes", "Responsible Design and Innovation"]) {
+        "Connection to Digital Technology", "Responsible Design and Innovation"]) {
         assert.ok(curriculumPage.includes(heading), `Digital Systems learning contexts include ${heading}`);
     }
     assert.doesNotMatch(curriculumPage, /Future activities - proposed/, "Digital Systems uses the teacher-supplied learning contexts");
+    assert.doesNotMatch(curriculumPage, /Teacher Planning Notes/, "Teacher Planning Notes were removed");
+    const contexts = curriculumPage.match(/aria-labelledby="learning-contexts">[\s\S]*?<\/section>/)[0];
+    assert.equal((contexts.match(/<article class="context-card/g) || []).length, 5, "Learning opportunities use readable cards");
+    assert.match(contexts, /class="context-year-card"[\s\S]*class="context-year-card year-8"/);
+    assert.match(contexts, /href="\/learning-pathways\/\?type=unit#card-infrastructure-and-networking"/);
     assert.match(curriculumPage, /aria-labelledby="overview">[\s\S]*?<\/section>\s*<nav class="panel-section curriculum-jump-links" aria-labelledby="on-this-page">[\s\S]*?<\/nav>\s*<section class="panel-section curriculum-pathway-aim" aria-labelledby="pathway-aim">/,
         "Section links sit in their own box between the Overview and the Pathway Aim");
     const jumpLinks = [...curriculumPage.match(/<nav class="panel-section curriculum-jump-links"[\s\S]*?<\/nav>/)[0].matchAll(/href="#([^"]+)"/g)].map((match) => match[1]);

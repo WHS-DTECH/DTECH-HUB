@@ -407,6 +407,159 @@
     font-size: 1rem;
 }
 
+.context-hero {
+    display: flex;
+    gap: 18px;
+    margin: 8px 0 24px;
+    padding: 20px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #e7f4e1 0%, #f4faef 100%);
+    border: 1px solid #b9dba9;
+}
+
+.context-hero h3 {
+    margin-top: 0;
+    color: #2f6b1f;
+}
+
+.context-hero p {
+    max-width: 75ch;
+}
+
+.context-hero-icon {
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #3f8f2b 0%, #6b4a2b 100%);
+    color: #fff;
+    font-weight: 800;
+}
+
+.context-hero-button {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 9px 18px;
+    border-radius: 999px;
+    background: #2f6b1f;
+    color: #fff;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.context-hero-button:hover,
+.context-hero-button:focus-visible {
+    background: #24541a;
+    outline: 3px solid #b9dba9;
+    outline-offset: 2px;
+}
+
+.context-card-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.context-card {
+    padding: 16px 18px;
+    border-radius: 12px;
+    border-top: 5px solid #2f8f9d;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(20, 40, 70, 0.08);
+}
+
+.context-card:nth-child(2) { border-top-color: #c08b2e; }
+.context-card:nth-child(3) { border-top-color: #7a5bc4; }
+.context-card:nth-child(4) { border-top-color: #c8364f; }
+.context-card-wide { grid-column: 1 / -1; border-top-color: #3f8f2b; }
+
+.curriculum-strand-page .context-card h4 {
+    margin-top: 0;
+}
+
+.context-activity-list {
+    display: grid;
+    gap: 12px;
+    margin: 0;
+}
+
+.context-activity-list dt {
+    display: inline-block;
+    margin-bottom: 4px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: #eaf1f8;
+    color: #213f60;
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.context-activity-list dd {
+    margin: 0;
+}
+
+.context-year-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.context-year-card {
+    padding: 16px 18px;
+    border-radius: 12px;
+    background: #eef5fc;
+    border-left: 5px solid #2b87b6;
+}
+
+.context-year-card.year-8 {
+    background: #fdf3e6;
+    border-left-color: #c08b2e;
+}
+
+.context-year-badge {
+    display: inline-block;
+    padding: 3px 12px;
+    border-radius: 999px;
+    background: #2b87b6;
+    color: #fff;
+    font-weight: 800;
+}
+
+.context-year-card.year-8 .context-year-badge {
+    background: #9a6a16;
+}
+
+.context-footnote {
+    margin: 10px 0 24px;
+    font-style: italic;
+}
+
+.context-callout {
+    padding: 18px 20px;
+    border-radius: 12px;
+    background: #fff8e6;
+    border: 1px solid #f2d27a;
+    border-left: 6px solid #e0a915;
+}
+
+.context-callout h3 {
+    margin-top: 0;
+}
+
+@media (max-width: 700px) {
+    .context-hero {
+        flex-direction: column;
+    }
+
+    .context-card-grid,
+    .context-year-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 @media (max-width: 700px) {
     .curriculum-table-wrap {
         overflow-x: auto;
