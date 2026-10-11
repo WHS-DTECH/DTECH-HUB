@@ -202,6 +202,9 @@ async function main() {
         assert.match(page, /paraphrased/);
         assert.match(page, /p\. 13/);
         assert.match(page, card.id === "systems-and-control" ? /p\. 16/ : /p\. 17/);
+        assert.match(page, /<details class="curriculum-note">\s*<summary class="curriculum-note-toggle">Note<\/summary>\s*<aside class="curriculum-source-note"/,
+            `${card.id} hides Source and status behind a Note button`);
+        assert.doesNotMatch(page, /<details class="curriculum-note" open/, "The note starts collapsed");
         assert.match(page, /p\. 25/);
         if (card.id !== "digital-systems") assert.match(page, /Future activities - proposed, not yet added/);
         assert.match(page, /Possible evidence - teacher judgement required/);

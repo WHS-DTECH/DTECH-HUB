@@ -88,6 +88,45 @@
     scroll-margin-top: 90px;
 }
 
+.curriculum-note {
+    margin: 4px 0 0;
+}
+
+.curriculum-note-toggle {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 14px;
+    border: 1px solid #d8c8a0;
+    border-radius: 999px;
+    background: #fff8e1;
+    color: #6b5017;
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    cursor: pointer;
+    list-style: none;
+}
+
+.curriculum-note-toggle::-webkit-details-marker {
+    display: none;
+}
+
+.curriculum-note-toggle:hover,
+.curriculum-note-toggle:focus-visible {
+    border-color: #b77a0c;
+    outline: 2px solid #b77a0c;
+    outline-offset: 2px;
+}
+
+.curriculum-note[open] > .curriculum-note-toggle {
+    background: #f6e2a6;
+}
+
+.curriculum-note .curriculum-source-note {
+    margin-top: 10px;
+}
+
 .curriculum-source-note {
     padding: 18px;
     border: 1px solid #d5b771;
