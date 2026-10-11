@@ -92,3 +92,10 @@
 .progression-activity-note { display: block; margin-top: 6px; padding: 3px 8px; border-radius: 6px; background: #eef6ff; color: #1d4f80; font-size: 0.8rem; font-weight: 600; }
 .progression-activity-note[hidden] { display: none; }
 @media (max-width: 700px) { .progression-page .curriculum-table { min-width: 900px; } .progression-page .progression-statement-table { min-width: 720px; } }
+.progression-heading-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.progression-heading-row h2 { margin-right: 0; }
+.progression-hint-toggle { display: inline-flex; align-items: center; padding: 6px 12px; border: 1px solid #d8c8a0; border-radius: 999px; background: #fff8e1; color: #6b5017; font: inherit; font-size: 0.82rem; font-weight: 800; cursor: pointer; }
+.progression-hint-toggle:hover, .progression-hint-toggle:focus-visible { border-color: #b77a0c; outline: 2px solid #b77a0c; outline-offset: 2px; }
+.progression-hint-toggle[aria-expanded="true"] { background: #f6e3a6; }
+.progression-hint { margin: 0 0 14px; padding: 9px 12px; border-left: 4px solid #d8a52e; border-radius: 6px; background: #fff8e1; color: #6b5017; line-height: 1.5; font-weight: 700; }
+.progression-hint[hidden] { display: none; }

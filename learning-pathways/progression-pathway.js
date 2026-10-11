@@ -657,6 +657,15 @@ pp("form").addEventListener("submit", (event) => {
     void progressionSave();
 });
 pp("dialog-close").addEventListener("click", () => { progressionCloseDialog(); });
+document.querySelectorAll("[data-hint-toggle]").forEach((button) => {
+    button.addEventListener("click", () => {
+        const hint = document.getElementById(button.getAttribute("data-hint-toggle"));
+        if (!hint) return;
+        const expanded = button.getAttribute("aria-expanded") !== "true";
+        button.setAttribute("aria-expanded", String(expanded));
+        hint.hidden = !expanded;
+    });
+});
 pp("dialog").addEventListener("cancel", (event) => { event.preventDefault(); progressionCloseDialog(); });
 pp("retry").addEventListener("click", () => {
     if (!progressionDiscard()) return;
