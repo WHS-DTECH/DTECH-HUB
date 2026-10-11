@@ -235,6 +235,10 @@ async function main() {
         assert.ok(curriculumPage.includes(heading), `Digital Systems learning contexts include ${heading}`);
     }
     assert.doesNotMatch(curriculumPage, /Future activities - proposed/, "Digital Systems uses the teacher-supplied learning contexts");
+    assert.match(curriculumPage, /aria-labelledby="overview">[\s\S]*?<\/section>\s*<section class="panel-section curriculum-pathway-aim" aria-labelledby="pathway-aim">/,
+        "Pathway Aim follows the Overview");
+    assert.match(curriculumPage, /<h3>Skills Developed<\/h3>/);
+    assert.equal((curriculumPage.match(/<ul class="curriculum-skills-list">[\s\S]*?<\/ul>/)[0].match(/<li>/g) || []).length, 9);
     assert.throws(() => normalizeCards(null), /cards array/);
     for (const href of ["javascript:alert(1)", "data:text/html,test", "//example.test", "/\\example.test"]) {
         assert.throws(() => normalizeCards([{ ...sample, href }]), /links/);

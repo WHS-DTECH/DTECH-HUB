@@ -88,6 +88,27 @@
     scroll-margin-top: 90px;
 }
 
+.curriculum-pathway-aim {
+    border-left: 6px solid #6a3fb5;
+    background: linear-gradient(135deg, #efe7fb 0%, #f7f2fe 100%);
+}
+
+.curriculum-pathway-aim h2,
+.curriculum-pathway-aim h3 {
+    color: #4b2a8a;
+}
+
+.curriculum-skills-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 10px 24px;
+    padding-left: 20px;
+}
+
+.curriculum-skills-list li {
+    line-height: 1.5;
+}
+
 .curriculum-note {
     margin: 4px 0 0;
 }
