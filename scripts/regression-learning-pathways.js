@@ -325,7 +325,7 @@ async function main() {
     assert.match(activityPage, /class="activity-key-warning-title">Do NOT glue the moving tabs down!</);
     assert.doesNotMatch(activityPage, /Completion check/, "Exercise-book activity has no DTECH-HUB completion requirement");
     assert.match(activityPage, /<svg class="activity-handin-art"[^>]*role="img"/, "Finished? shows a hand-in illustration");
-    assert.match(activityPage, /Well done for completing the task!/);
+    assert.match(activityPage, /Well done! Your Binary Piano is ready to use!/);
     assert.match(activityPage, /Don&rsquo;t forget to <strong>hand in your exercise book<\/strong>\./);
     assert.match(activityPage, /class="hero practical-skills-hero activity-hero"/);
     assert.match(activityPage, /href="\/learning-pathways\/\?type=activity#card-activity-build-your-binary-piano"/);
