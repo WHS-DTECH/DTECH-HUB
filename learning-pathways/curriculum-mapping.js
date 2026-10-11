@@ -89,7 +89,7 @@
             const row = document.createElement("tr");
             const activity = select(state.activities.map((item) => [item.id, item.context ? `${item.title} (${item.context})` : item.title]), link.activity, "Activity");
             const statement = select(statements.map((item) => [item.id, statementLabel(item)]), link.statement, "Statement");
-            const autoSet = select(progressionMapping.autoSetOptions, link.autoSet, "Auto-set Partly taught");
+            const autoSet = select(progressionMapping.autoSetOptions, link.autoSet, "Auto-set Some Evidence");
             const colour = () => { autoSet.className = `auto-${autoSet.value}`; };
             colour();
             const note = document.createElement("input");

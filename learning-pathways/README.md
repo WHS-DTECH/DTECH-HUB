@@ -186,13 +186,19 @@ sub-headings. The statements live in `progression-curriculum.js` (shared by the
 browser and server). Each statement is tagged with the DTECH pathway(s) it
 supports (tags are a teacher judgement and can be edited there) and has its own
 Discipline (DTECH default; Textiles, Food, Wood, DVC) and Coverage, saved as
-optional `statements: [{ id, discipline, coverage }]`. Progress is recorded once per
-strand table: a Progress box at the far right of each Knowledge / Practices heading,
-saved as optional `strandProgress: [{ strand, kind, descriptor }]`. A box is disabled
-and cleared until a statement in that table is Partly taught or Taught. Older
-statement-level `descriptor` values are still accepted and kept but no longer shown. Coverage dropdowns are colour coded (grey Not taught,
-amber Partly taught, green Taught). Each pathway row counts
-its linked statements taught for that year. The PDF omits a bullet between the
+optional `statements: [{ id, discipline, coverage }]`. Coverage values are stored as
+`not-taught` / `partly-taught` / `taught` and shown as No Evidence / Some Evidence /
+Full Evidence. Each Knowledge / Practices table is a Statement Set with a Set Progress
+indicator at the far right of its heading, saved as optional
+`strandProgress: [{ strand, kind, descriptor }]`. `progressionMapping.deriveSetProgress`
+sets it automatically: 1 Emerging when any statement has Some or Full Evidence, 2
+Developing when at least 3 do, 3 Consolidating when every statement has Full Evidence,
+otherwise Not determined. Only a Consolidating set can be raised by the teacher to 4
+Proficient or 5 Exceeding; if evidence later drops, it reverts to the automatic level.
+Older statement-level `descriptor` values are still accepted and kept but no longer
+shown. Coverage dropdowns are colour coded (grey No Evidence, amber Some Evidence,
+green Full Evidence). Each pathway row counts its linked statements with Full Evidence
+for that year. The PDF omits a bullet between the
 Year 8 "Compare algorithms" and "Analyse how data" practices, so they are split.
 Older pathway-level `discipline` values are still accepted and kept.
 The Teacher Summary has a Learning narrative (optional `learningNarrative`, max
@@ -202,7 +208,7 @@ during a save are saved next, and Year/Term lock once the first save starts.
 Closing the dialog or switching student waits for pending saves; a "Retry save"
 button appears only if an auto-save fails (e.g. a 409 conflict).
 The five user-supplied descriptors and colours are teacher selected. Coverage
-is separate; Not taught requires Not determined. No kit-derived grades or
+is separate; No Evidence requires Not determined. No kit-derived grades or
 student-facing results are added.
 
 Teacher/Admin-protected `/api/teacher/progression/students` and
@@ -254,14 +260,14 @@ Admin-only `GET`/`PUT /api/admin/progression/mapping` stores one revisioned mapp
 `GET /api/teacher/progression/mapping`. Until a mapping is published, the code default
 is used.
 
-In the Progression Pathway dialog, pathway Coverage is calculated and read only: Not
-taught until a linked statement is covered, Partly taught once one is, and Taught
-when every Primary/Supporting statement (plus any covered Context dependent one) is
-Taught. Pathway Progress is disabled while Not taught. The records GET includes the
+In the Progression Pathway dialog, pathway Coverage is calculated and read only: No
+Evidence until a linked statement is covered, Some Evidence once one is, and Full
+Evidence when every Primary/Supporting statement (plus any covered Context dependent
+one) has Full Evidence. Pathway Progress is disabled while No Evidence. The records GET includes the
 student's `completedActivities` (tracked activities only). When an activity link has
-Auto-set Yes, a Not taught statement for that year becomes Partly taught with
+Auto-set Yes, a No Evidence statement for that year becomes Some Evidence with
 `autoFrom` set to the activity, and the record auto-saves. Auto-set never
-downgrades, never sets Taught or descriptors, and is not re-applied after a teacher
+downgrades, never sets Full Evidence or pathway descriptors, and is not re-applied after a teacher
 changes the statement. Review links show a prompt only. Existing records have their
 pathway Coverage recalculated when opened.
 

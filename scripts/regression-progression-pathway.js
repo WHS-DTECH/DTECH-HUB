@@ -83,9 +83,9 @@ async function main() {
         { id: "dt-7-p-1", discipline: "food", coverage: "taught" }, { id: "dt-7-k-1", discipline: "dtech", coverage: "partly-taught" }] } } });
     vm.runInContext(client.slice(client.indexOf("const progressionCoverageOptions"), client.indexOf("function progressionUpdateStatements(")), statementContext);
     for (const id of ids) for (const year of [7, 8, 9, 10]) {
-        assert.match(statementContext.progressionStatement(id, year), new RegExp(`^Year ${year}: \\d+ of \\d+ linked curriculum statements taught`), `${id} has Year ${year} linked statements`);
+        assert.match(statementContext.progressionStatement(id, year), new RegExp(`^Year ${year}: \\d+ of \\d+ linked curriculum statements with Full Evidence`), `${id} has Year ${year} linked statements`);
     }
-    assert.match(statementContext.progressionStatement("programming-and-algorithms", 7), /^Year 7: 1 of \d+ linked curriculum statements taught/, "Hints count taught statements");
+    assert.match(statementContext.progressionStatement("programming-and-algorithms", 7), /^Year 7: 1 of \d+ linked curriculum statements with Full Evidence/, "Hints count Full Evidence statements");
     assert.equal(statementContext.progressionCurriculumStatements(9).length, 31);
     assert.equal(statementContext.progressionStatementResult("sc-9-k-1").coverage, "not-taught", "Unrecorded statements default to Not taught");
     assert.match(client, /progressionDisciplines = \[\["dtech", "DTECH"\], \["textiles", "Textiles"\], \["food", "Food"\], \["wood", "Wood"\], \["dvc", "DVC"\]\]/);
@@ -97,7 +97,11 @@ async function main() {
     assert.ok(!client.includes("Progress for: ${statement.text}"), "Statement-level Progress selects are removed");
     assert.match(client, /header\.append\(heading, progressionStrandProgress\(strand, kind, title\)\);/, "Each Knowledge and Practices heading has a Progress box");
     assert.match(client, /progressionCurriculumTable\("Knowledge", [^\n]*strand, "knowledge"\)\);[\s\S]*progressionCurriculumTable\("Practices", [^\n]*strand, "practices"\)\);/);
-    assert.match(client, /select\.disabled = !covered;/, "Strand Progress needs a covered statement in that table");
+    assert.match(client, /const level = progressionMapping\.deriveSetProgress\(coverages, current\);/, "Set Progress is calculated from the Statement Set");
+    assert.match(client, /select\.disabled = !consolidated;/, "Teachers can only choose Set Progress once the set is Consolidating");
+    assert.match(client, /label\.append\("Set Progress"\);/, "Statement Sets show a Set Progress indicator");
+    assert.match(client, /\["not-taught", "No Evidence"\], \["partly-taught", "Some Evidence"\], \["taught", "Full Evidence"\]/, "Coverage uses evidence wording");
+    for (const old of ["Not taught", "Partly taught"]) for (const [name, text] of [["client", client], ["html", html]]) assert.ok(!text.includes(old), `${name} no longer says ${old}`);
     assert.match(css, /\.progression-strand-header \{ display: flex;[^}]*justify-content: space-between;/, "Strand Progress sits on the far right of the heading");
     assert.match(client, /if \(key === "coverage" && value === "not-taught"\) entry\.descriptor = null;/, "Legacy statement Progress is cleared when Not taught");
     for (const value of ["not-taught", "partly-taught", "taught"]) assert.match(css, new RegExp(`select\\.coverage-${value} \\{ background: #`), `Coverage ${value} is colour coded`);
@@ -310,6 +314,20 @@ async function main() {
     assert.equal(derive("digital-systems", dsTaught), "taught", "Context dependent links are optional for Taught");
     assert.equal(derive("digital-systems", { ...dsTaught, "dt-7-p-1": "partly-taught" }), "partly-taught", "Covered context dependent links must be Taught too");
     assert.equal(derive("digital-citizenship", { "dt-7-p-1": "taught" }), "partly-taught", "A covered context link shows partial coverage");
+    const setProgress = progressionMapping.deriveSetProgress;
+    const set = (...values) => [...values, ...Array(5 - values.length).fill("not-taught")];
+    assert.equal(setProgress(set(), null), null, "No evidence leaves Set Progress Not determined");
+    assert.equal(setProgress(set("partly-taught"), null), "emerging", "Any Some Evidence is Emerging");
+    assert.equal(setProgress(set("taught", "taught"), null), "emerging", "One or two Full Evidence statements are Emerging");
+    assert.equal(setProgress(set("partly-taught", "taught", "partly-taught"), null), "developing", "Three with Some or Full Evidence are Developing");
+    assert.equal(setProgress(Array(5).fill("partly-taught"), null), "developing", "All Some Evidence is still Developing");
+    assert.equal(setProgress(Array(5).fill("taught"), null), "consolidating", "All Full Evidence is Consolidating");
+    assert.equal(setProgress(Array(5).fill("taught"), "exceeding"), "exceeding", "Teachers may raise a Consolidating set to Exceeding");
+    assert.equal(setProgress(Array(5).fill("taught"), "proficient"), "proficient", "Teachers may raise a Consolidating set to Proficient");
+    assert.equal(setProgress(Array(5).fill("taught"), "emerging"), "consolidating", "Teachers cannot lower an automatic level");
+    assert.equal(setProgress(set("taught", "taught", "taught", "taught"), "proficient"), "developing", "Proficient reverts when evidence drops");
+    assert.equal(setProgress(set("partly-taught"), "exceeding"), "emerging", "Exceeding needs a Consolidating set");
+    assert.equal(setProgress(set(undefined, "taught"), null), "emerging", "Unrecorded statements count as No Evidence");
     const statementRows = [];
     assert.deepEqual(progressionMapping.autoApply(defaults, 7, statementRows, ["activity-encoding-binary"]), ["dt-7-k-3"]);
     assert.deepEqual(statementRows, [{ id: "dt-7-k-3", discipline: "dtech", coverage: "partly-taught", descriptor: null, autoFrom: "activity-encoding-binary" }], "Auto-set only reaches Partly taught and never sets descriptors");

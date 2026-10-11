@@ -10,7 +10,7 @@
 })(this, function (curriculum) {
     const pathwayIds = ["digital-systems", "data", "digital-citizenship", "programming-and-algorithms", "systems-and-control"];
     const roles = [["primary", "Primary"], ["supporting", "Supporting"], ["context", "Context dependent"]];
-    const autoSetOptions = [["yes", "Yes - sets Partly taught"], ["review", "Review - teacher approval needed"], ["no", "No - never auto-set"]];
+    const autoSetOptions = [["yes", "Yes - sets Some Evidence"], ["review", "Review - teacher approval needed"], ["no", "No - never auto-set"]];
     const years = [7, 8, 9, 10];
     const allStatements = Object.values(curriculum?.statements || {}).flat();
     const statementById = new Map(allStatements.map((statement) => [statement.id, statement]));
@@ -89,8 +89,8 @@
     function linksFor(mapping, statementId) {
         return mapping?.links?.[statementId] || [];
     }
-    // Workbook rule: Not taught if no linked statement is covered; Taught only when every applicable
-    // (Primary or Supporting) statement is Taught. Context-dependent links count only once covered.
+    // Workbook rule: No Evidence if no linked statement is covered; Full Evidence only when every applicable
+    // (Primary or Supporting) statement has Full Evidence. Context-dependent links count only once covered.
     function derivePathwayCoverage(mapping, year, pathwayId, coverageOf) {
         const linked = statementsForYear(year).map((statement) => ({ statement,
             link: linksFor(mapping, statement.id).find((row) => row.pathway === pathwayId) })).filter((item) => item.link);
@@ -99,7 +99,17 @@
         const applicable = values.filter((item) => item.role !== "context" || item.coverage !== "not-taught");
         return applicable.every((item) => item.coverage === "taught") ? "taught" : "partly-taught";
     }
-    // Approved links for completed tracked activities set untouched statements to Partly taught.
+    // Statement Set Progress: 3 Consolidating when every statement has Full Evidence, 2 Developing when at
+    // least 3 have Some or Full Evidence, 1 Emerging when any do. Teacher-chosen 4 Proficient / 5 Exceeding
+    // are kept only while the set is Consolidating; otherwise the automatic level applies.
+    function deriveSetProgress(coverages, current) {
+        const values = (coverages || []).map((value) => value || "not-taught");
+        const evidenced = values.filter((value) => value !== "not-taught").length;
+        const auto = values.length && values.every((value) => value === "taught") ? "consolidating"
+            : evidenced >= 3 ? "developing" : evidenced > 0 ? "emerging" : null;
+        return auto === "consolidating" && (current === "proficient" || current === "exceeding") ? current : auto;
+    }
+    // Approved links for completed tracked activities set untouched statements to Some Evidence.
     // Never downgrades and never re-applies once a statement has been auto-set (the teacher may override it).
     function autoApply(mapping, year, rows, completedActivityIds) {
         const completed = new Set(completedActivityIds || []);
@@ -117,5 +127,5 @@
         return changed;
     }
     return { pathwayIds, roles, autoSetOptions, years, statementCode, statementsForYear, defaultMapping, validateMapping,
-        linksFor, derivePathwayCoverage, autoApply };
+        linksFor, derivePathwayCoverage, deriveSetProgress, autoApply };
 });

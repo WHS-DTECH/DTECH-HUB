@@ -28,8 +28,8 @@
                 <h2>Mapping rules</h2>
                 <ul class="mapping-rules">
                     <li>Each curriculum statement has one coverage record per student; pathway Coverage is calculated from its linked statements.</li>
-                    <li>A pathway is <strong>Not taught</strong> until a linked statement is covered, <strong>Partly taught</strong> once at least one is, and <strong>Taught</strong> only when every Primary and Supporting statement is Taught. Context dependent links count only once that statement is covered.</li>
-                    <li>Only tracked activities with Auto-set <strong>Yes</strong> change coverage, and only from Not taught to <strong>Partly taught</strong>. Taught always needs teacher confirmation, and Progress descriptors are never auto-set.</li>
+                    <li>A pathway has <strong>No Evidence</strong> until a linked statement is covered, <strong>Some Evidence</strong> once at least one is, and <strong>Full Evidence</strong> only when every Primary and Supporting statement has Full Evidence. Context dependent links count only once that statement is covered.</li>
+                    <li>Only tracked activities with Auto-set <strong>Yes</strong> change coverage, and only from No Evidence to <strong>Some Evidence</strong>. Full Evidence always needs teacher confirmation, and pathway Progress descriptors are never auto-set.</li>
                     <li>Discipline defaults to DTECH. Mappings are year specific; Year 7 links are never applied to Year 8.</li>
                 </ul>
             </section>
@@ -64,7 +64,7 @@
                     <h2>Activity Links</h2>
                     <p>Link tracked activities to the statements they provide evidence for. Use <strong>Review</strong> when the link depends on what the student actually did; the teacher sees a prompt but coverage is not changed. Untracked activities (for example Binary Piano) cannot update coverage.</p>
                     <div class="mapping-table-wrap"><table class="mapping-table">
-                        <thead><tr><th scope="col">Activity</th><th scope="col">Statement</th><th scope="col">Auto-set Partly taught?</th><th scope="col">Evidence / mapping caution</th><th scope="col"><span class="visually-hidden">Remove</span></th></tr></thead>
+                        <thead><tr><th scope="col">Activity</th><th scope="col">Statement</th><th scope="col">Auto-set Some Evidence?</th><th scope="col">Evidence / mapping caution</th><th scope="col"><span class="visually-hidden">Remove</span></th></tr></thead>
                         <tbody id="mapping-activities"></tbody>
                     </table></div>
                     <button id="mapping-add-activity" class="button button-secondary" type="button">Add activity link</button>

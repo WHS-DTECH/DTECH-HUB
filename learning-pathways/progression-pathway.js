@@ -9,7 +9,7 @@ const progressionPathways = [
 ];
 const progressionDescriptors = ["emerging", "developing", "consolidating", "proficient", "exceeding"];
 const progressionDisciplines = [["dtech", "DTECH"], ["textiles", "Textiles"], ["food", "Food"], ["wood", "Wood"], ["dvc", "DVC"]];
-const progressionCoverageOptions = [["not-taught", "Not taught"], ["partly-taught", "Partly taught"], ["taught", "Taught"]];
+const progressionCoverageOptions = [["not-taught", "No Evidence"], ["partly-taught", "Some Evidence"], ["taught", "Full Evidence"]];
 let progressionDefaultMapping = null;
 // Published Admin > Curriculum Mapping, or the seeded default until it loads.
 function progressionMappingData() {
@@ -25,7 +25,7 @@ function progressionActivityNote(statementId) {
         .map((link) => ({ link, activity: progression.completed.find((item) => item.id === link.activity) }))
         .filter((item) => item.activity)
         .map(({ link, activity }) => result.autoFrom === link.activity && result.coverage === "partly-taught"
-            ? `Auto-set to Partly taught: ${activity.title} completed`
+            ? `Auto-set to Some Evidence: ${activity.title} completed`
             : link.autoSet === "review" ? `${activity.title} completed - review whether this statement was covered` : `${activity.title} completed`)
         .join(" | ");
 }
@@ -47,7 +47,7 @@ function progressionStatement(id, yearLevel) {
     const results = linked.map((statement) => progressionStatementResult(statement.id).coverage);
     const taught = results.filter((value) => value === "taught").length;
     const partly = results.filter((value) => value === "partly-taught").length;
-    return `Year ${year}: ${taught} of ${linked.length} linked curriculum statements taught${partly ? `, ${partly} partly taught` : ""}.`;
+    return `Year ${year}: ${taught} of ${linked.length} linked curriculum statements with Full Evidence${partly ? `, ${partly} with Some Evidence` : ""}.`;
 }
 function progressionUpdateHints() {
     for (const element of document.querySelectorAll("#progression-rows [data-statement]")) {
@@ -80,28 +80,29 @@ function progressionStatementSelect(label, options, value, onChange) {
 function progressionStrandDescriptor(strand, kind) {
     return (progression.record?.strandProgress || []).find((row) => row.strand === strand && row.kind === kind)?.descriptor || null;
 }
-function progressionStrandCovered(strand, kind, yearLevel) {
-    return progressionCurriculumStatements(yearLevel).some((statement) => statement.strand === strand && statement.kind === kind
-        && progressionStatementResult(statement.id).coverage !== "not-taught");
+function progressionSetCoverages(strand, kind, yearLevel) {
+    return progressionCurriculumStatements(yearLevel).filter((statement) => statement.strand === strand && statement.kind === kind)
+        .map((statement) => progressionStatementResult(statement.id).coverage);
 }
 function progressionSetStrandDescriptor(strand, kind, descriptor) {
     const rows = progression.record.strandProgress ||= [];
     const entry = rows.find((row) => row.strand === strand && row.kind === kind);
     if (entry) entry.descriptor = descriptor; else rows.push({ strand, kind, descriptor });
 }
-// One teacher-judged Progress descriptor per strand Knowledge / Practices table.
+// One Set Progress indicator per Statement Set (strand Knowledge / Practices table): levels 1-3 are
+// calculated from statement evidence; the teacher may raise a Consolidating set to 4 or 5.
 function progressionStrandProgress(strand, kind, title) {
     const label = document.createElement("label");
     label.className = "progression-strand-progress";
-    label.append("Progress");
+    label.append("Set Progress");
     const strandLabel = progressionStrands.find(([id]) => id === strand)?.[1] || strand;
-    const select = progressionDescriptorSelect(`${strandLabel} ${title} progress`, progressionStrandDescriptor(strand, kind));
+    const select = progressionDescriptorSelect(`${strandLabel} ${title} set progress`, progressionStrandDescriptor(strand, kind));
     select.dataset.strandProgress = `${strand}:${kind}`;
     select.addEventListener("change", () => {
         progressionSetStrandDescriptor(strand, kind, select.value || null);
         progressionDescriptorColour(select);
         progression.dirty = true;
-        progressionDialogSummary();
+        progressionRefreshPathways();
     });
     label.append(select);
     return label;
@@ -154,7 +155,7 @@ function progressionCurriculumTable(title, statements, strand, kind) {
                 let entry = rows.find((item) => item.id === statement.id);
                 if (!entry) { entry = { id: statement.id, discipline: "dtech", coverage: "not-taught", descriptor: null }; rows.push(entry); }
                 entry[key] = value;
-                // Statement-level Progress is retired; clear any legacy value so Not taught stays valid.
+                // Statement-level Progress is retired; clear any legacy value so No Evidence stays valid.
                 if (key === "coverage" && value === "not-taught") entry.descriptor = null;
                 coverage.value = entry.coverage;
                 progressionCoverageColour(coverage);
@@ -201,13 +202,13 @@ function progressionUpdateStatements() {
     progressionRenderCurriculum();
     progressionRefreshPathways();
 }
-// Approved Admin > Curriculum Mapping links for completed tracked activities set statements to Partly taught.
+// Approved Admin > Curriculum Mapping links for completed tracked activities set statements to Some Evidence.
 function progressionAutoSet() {
     if (!progression.record) return [];
     return progressionMapping.autoApply(progressionMappingData(), Number(pp("level").value), progression.record.statements ||= [],
         progression.completed.map((activity) => activity.id));
 }
-// Pathway Coverage is calculated from its linked statements; Progress needs at least Partly taught.
+// Pathway Coverage is calculated from its linked statements; Progress needs at least Some Evidence.
 function progressionRefreshPathways() {
     const record = progression.record;
     if (!record) return false;
@@ -226,18 +227,24 @@ function progressionRefreshPathways() {
         if (select) {
             select.value = descriptor || "";
             select.disabled = coverage === "not-taught";
-            select.title = select.disabled ? "Mark a linked curriculum statement as Partly taught or Taught first" : "";
+            select.title = select.disabled ? "Mark a linked curriculum statement as Some Evidence or Full Evidence first" : "";
             progressionDescriptorColour(select);
         }
     }
     for (const [strand] of progressionStrands) for (const kind of ["knowledge", "practices"]) {
-        const covered = progressionStrandCovered(strand, kind, year);
-        if (!covered && progressionStrandDescriptor(strand, kind)) { progressionSetStrandDescriptor(strand, kind, null); changed = true; }
+        const coverages = progressionSetCoverages(strand, kind, year);
+        if (!coverages.length) continue;
+        const current = progressionStrandDescriptor(strand, kind);
+        const level = progressionMapping.deriveSetProgress(coverages, current);
+        if (level !== current) { progressionSetStrandDescriptor(strand, kind, level); changed = true; }
         const select = document.querySelector(`[data-strand-progress="${strand}:${kind}"]`);
         if (select) {
-            select.value = progressionStrandDescriptor(strand, kind) || "";
-            select.disabled = !covered;
-            select.title = covered ? "" : "Mark a statement in this table as Partly taught or Taught first";
+            const consolidated = progressionMapping.deriveSetProgress(coverages, null) === "consolidating";
+            for (const option of select.options) option.disabled = consolidated ? !["consolidating", "proficient", "exceeding"].includes(option.value) : option.value !== (level || "");
+            select.value = level || "";
+            select.disabled = !consolidated;
+            select.title = consolidated ? "All statements have Full Evidence: choose 4 - Proficient or 5 - Exceeding if earned"
+                : "Set automatically: 1 Emerging with any evidence, 2 Developing with 3 or more, 3 Consolidating when all have Full Evidence";
             progressionDescriptorColour(select);
         }
     }
@@ -269,7 +276,7 @@ function progressionSummary(student) {
             const definition = progressionPathways.find(([pathwayId]) => pathwayId === id);
             const result = progress?.pathways?.find((pathway) => pathway.id === id);
             const level = progressionDescriptors.indexOf(result?.descriptor) + 1;
-            const state = level ? result.descriptor : !result ? "Not recorded" : result.coverage === "not-taught" ? "Not taught" : "Not determined";
+            const state = level ? result.descriptor : !result ? "Not recorded" : result.coverage === "not-taught" ? "No Evidence" : "Not determined";
             const label = level ? `${state[0].toUpperCase()}${state.slice(1)}` : state;
             const value = document.createElement("div");
             value.className = "progression-summary-row";
