@@ -198,11 +198,11 @@ async function main() {
     const unitJumpLinks = [...unitPlan.match(/<nav class="panel-section curriculum-jump-links"[\s\S]*?<\/nav>/)[0].matchAll(/href="#([^"]+)"/g)].map((match) => match[1]);
     assert.deepEqual(unitJumpLinks, [...unitPlan.matchAll(/<h2 id="([^"]+)"/g)].map((match) => match[1])
         .filter((id) => !["overview", "on-this-page"].includes(id)), "Unit Plan section pills follow page order");
-    for (const heading of ["Context and Rationale", "Aims of Theme", "Curriculum Connections", "Contexts of Learning",
-        "School Values in this Theme", "Practical Learning Sequence", "Evidence and Curriculum Coverage"]) {
+    for (const heading of ["Context and Rationale", "Aims of Theme", "Contexts of Learning",
+        "School Values in this Theme", "Practical Learning Sequence"]) {
         assert.ok(unitPlan.includes(`>${heading}</h2>`), `Unit Plan includes ${heading}`);
     }
-    for (const removed of ["Resources and Equipment", "Health &amp; Safety", "Theme Evaluation"]) {
+    for (const removed of ["Curriculum Connections", "Evidence and Curriculum Coverage", "Resources and Equipment", "Health &amp; Safety", "Theme Evaluation"]) {
         assert.ok(!unitPlan.includes(`>${removed}</h2>`), `Unit Plan no longer includes ${removed}`);
     }
     assert.equal((unitPlan.match(/<li class="unit-step">/g) || []).length, 10, "All ten learning sequence activities are listed");
