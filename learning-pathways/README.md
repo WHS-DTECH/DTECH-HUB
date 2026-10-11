@@ -92,7 +92,7 @@ missing, without changing existing cards or restoring deleted lessons.
 Version 10 links a still-blank Binary Piano lesson to `lesson-binary-piano.html`
 (Lesson 1 page, amber hero, built from the Lesson 01 PDF).
 
-### Card types: Curriculum Strands, Units and Lessons
+### Card types: Curriculum Strands, Units, Lessons and Lesson Activities
 
 Each card has a `cardType` of `strand` (default, footer **Curriculum Strands**,
 Pathways blue) or `unit` (footer **Units**, crimson/coral palette distinct from
@@ -110,6 +110,14 @@ sequence order. ASCII and Unicode are `planning` until created. Each step on
 `binary-and-data.html` has a **Lesson card** pill linking to
 `/learning-pathways/?type=lesson#card-<id>`. Lessons are display-only for now and
 are excluded from the student Task List.
+
+The final type, `activity` (footer **Lesson Activities**, green palette), holds
+the activities within a lesson. Activity cards keep a parent `lesson` ID and a
+`sequence` number, list after lessons (by lesson, then sequence with the A-Z
+sort) and are excluded from the student Task List. None are seeded yet; add them
+from the admin editor (Card Type: Lesson Activity). The **Lesson Activities**
+filter pill appears once the first activity card exists, and
+`/learning-pathways/?type=activity` opens the filtered view.
 
 ## Progression Pathway (Teacher View)
 

@@ -4,7 +4,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const seedFile = path.join(__dirname, "library.json");
 const statuses = ["active", "planning", "archive"];
-const cardTypes = ["strand", "unit", "lesson"];
+const cardTypes = ["strand", "unit", "lesson", "activity"];
 
 function validLink(value, allowEmpty = false) {
     if (!value) return allowEmpty;
@@ -51,6 +51,12 @@ function normalizeCards(cards) {
         if (cardType === "lesson") {
             const unit = text(card?.unit, 120);
             if (unit) normalized.unit = unit;
+            const sequence = Number(card?.sequence);
+            if (Number.isInteger(sequence) && sequence > 0 && sequence < 1000) normalized.sequence = sequence;
+        }
+        if (cardType === "activity") {
+            const lesson = text(card?.lesson, 120);
+            if (lesson) normalized.lesson = lesson;
             const sequence = Number(card?.sequence);
             if (Number.isInteger(sequence) && sequence > 0 && sequence < 1000) normalized.sequence = sequence;
         }

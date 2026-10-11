@@ -127,6 +127,21 @@ async function testDashboard() {
     assert.match(grid.children[2].innerHTML, /#a35200/);
     assert.match(grid.children[2].innerHTML, />Lessons</);
     assert.deepEqual(elements["#practical-skills-type-pills"].children.map((pill) => pill.textContent), ["All", "Curriculum Strands", "Units", "Lessons"]);
+    const activityPalette = dashboard.match(/data-library-activity-palette="([^"]+)"/)?.[1];
+    assert.match(activityPalette, /#1f6b3a/, "Lesson Activities use their own green palette");
+    assert.match(dashboard, /data-library-activity-label="Lesson Activities"/);
+    Object.assign(config.dataset, { libraryActivityLabel: "Lesson Activities", libraryActivityPalette: activityPalette });
+    responseCards = [{ ...sample, id: "act-b", title: "Build", cardType: "activity", lesson: "l", sequence: 2 },
+        { ...sample, id: "act-a", title: "Zeta Starter", cardType: "activity", lesson: "l", sequence: 1 },
+        { ...sample, id: "lesson-a", title: "Zeta Lesson", cardType: "lesson", unit: "u", sequence: 1 }, { ...sample, title: "Zeta Strand" }];
+    vm.runInContext(fs.readFileSync(path.join(root, "practical-skills/app.js"), "utf8"), context);
+    await tick();
+    assert.deepEqual(grid.children.slice(1).map((card) => card.id), ["card-lesson-a", "card-act-a", "card-act-b"],
+        "Lesson Activities follow Lessons and keep sequence order");
+    assert.ok(grid.children[2].classList.contains("pathway-activity-card"));
+    assert.match(grid.children[2].innerHTML, /#1f6b3a/);
+    assert.match(grid.children[2].innerHTML, />Lesson Activities</);
+    assert.deepEqual(elements["#practical-skills-type-pills"].children.map((pill) => pill.textContent), ["All", "Curriculum Strands", "Lessons", "Lesson Activities"]);
     config.dataset = {};
     responseCards = [sample, { ...sample, id: "practical-skills-checklist", title: "Licence" }];
     vm.runInContext(fs.readFileSync(path.join(root, "practical-skills/app.js"), "utf8"), context);
@@ -257,6 +272,9 @@ async function main() {
         { ...normalizeCards([sample])[0], cardType: "lesson", unit: "u", sequence: 3 }, "Lessons keep a parent unit and sequence");
     assert.equal(normalizeCards([{ ...sample, unit: "u", sequence: 3 }])[0].unit, undefined, "Only lessons keep a parent unit");
     assert.equal(normalizeCards([{ ...sample, cardType: "lesson", sequence: "x" }])[0].sequence, undefined, "Invalid sequences are dropped");
+    assert.deepEqual(normalizeCards([{ ...sample, cardType: "activity", lesson: "lesson-binary-piano", sequence: 2, unit: "x" }])[0],
+        { ...normalizeCards([sample])[0], cardType: "activity", lesson: "lesson-binary-piano", sequence: 2 }, "Lesson Activities keep a parent lesson and sequence");
+    assert.ok(!seed.some((card) => card.cardType === "activity"), "No Lesson Activity cards are seeded yet");
     assert.equal(normalizeCards([sample])[0].cardType, "strand", "Existing cards default to Curriculum Strands");
     assert.equal(normalizeCards([{ ...sample, strand: "x" }])[0].strand, undefined, "Only units keep a parent strand");
     assert.equal(seed.find((card) => card.id === "digital-systems").href, "/learning-pathways/digital-systems.html");

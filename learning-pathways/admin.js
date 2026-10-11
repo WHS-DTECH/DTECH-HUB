@@ -40,7 +40,7 @@
             const title = document.createElement("h3");
             title.textContent = card.title;
             const details = document.createElement("p");
-            details.textContent = `${card.cardType === "unit" ? "Unit" : card.cardType === "lesson" ? "Lesson" : "Curriculum Strand"} | ${card.yearLevel} | ${card.area} | ${card.status}`;
+            details.textContent = `${card.cardType === "unit" ? "Unit" : card.cardType === "lesson" ? "Lesson" : card.cardType === "activity" ? "Lesson Activity" : "Curriculum Strand"} | ${card.yearLevel} | ${card.area} | ${card.status}`;
             const summary = document.createElement("p");
             summary.textContent = card.summary;
             row.append(title, details, summary);
@@ -129,6 +129,10 @@
         if (card.cardType === "unit" && index >= 0 && cards[index].strand) card.strand = cards[index].strand;
         if (card.cardType === "lesson" && index >= 0) {
             if (cards[index].unit) card.unit = cards[index].unit;
+            if (cards[index].sequence) card.sequence = cards[index].sequence;
+        }
+        if (card.cardType === "activity" && index >= 0) {
+            if (cards[index].lesson) card.lesson = cards[index].lesson;
             if (cards[index].sequence) card.sequence = cards[index].sequence;
         }
         if (index < 0) cards.push(card);

@@ -52,7 +52,7 @@ async function main() {
     events.DOMContentLoaded();
     await tick();
     const titles = () => list.children.map((item) => item.children[0].textContent);
-    assert.deepEqual(titles(), cards.filter((card) => !["unit", "lesson"].includes(card.cardType)).map((card) => card.title).sort((a, b) => a.localeCompare(b)));
+    assert.deepEqual(titles(), cards.filter((card) => !["unit", "lesson", "activity"].includes(card.cardType)).map((card) => card.title).sort((a, b) => a.localeCompare(b)));
     assert.equal(list.children.length, 5, "Task List shows the five strands, not Unit or Lesson cards");
     assert.equal(list.hidden, false);
     assert.equal(retry.hidden, true);
@@ -93,7 +93,8 @@ async function main() {
         { title: "<script>not HTML</script>", yearLevel: "Junior DTECH" },
         { title: "Middle only", yearLevel: "Middle DTECH" },
         { title: "Binary & Data", yearLevel: "Junior DTECH", cardType: "unit" },
-        { title: "Binary Piano", yearLevel: "Junior DTECH", cardType: "lesson" }
+        { title: "Binary Piano", yearLevel: "Junior DTECH", cardType: "lesson" },
+        { title: "Build the Piano", yearLevel: "Junior DTECH", cardType: "activity" }
     ] };
     retry.click();
     await tick();
