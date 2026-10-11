@@ -178,7 +178,7 @@ and access checks.
 `progression-pathway.html`, `.js`, `.css` and `progression-store.js` provide the
 Student Work > Progression Pathway tracker. The layout follows the supplied
 JuniorDTECH tracker concept: student/timetable class, five pathway results (calculated
-coverage only; the pathway Progress column was removed) and a teacher next-learning summary. A Curriculum Coverage section
+coverage only; the pathway Progress column was removed) and a teacher next-learning summary. A Curriculum Progression Results section
 lists the verbatim Knowledge and Practices statements for the dialog's student
 year level from `TeacherFiles/Technology-0-10-15Sep26.pdf` (Digital Technology
 pp. 17/24, Systems and Control pp. 16/23), grouped by the curriculum's own
@@ -237,8 +237,8 @@ Year level filter = Staff lists staff from the staff directory (timetable class 
 Filtering away from a student prompts before discarding unsaved edits and clears
 the previous results. Timetable Class and Homeroom are saved separately from class; old records use
 their class as a display fallback. Matching students appear in a visible class
-list with Open Details buttons; each opens the student's Learning Pathway
-Results (no Details column) and Teacher Summary (Next learning) in a pop-up dialog,
+list with Open Details buttons; each opens the student's Learning Pathways
+Coverage (no Details column) and Teacher Summary (Next learning) in a pop-up dialog,
 headed by the same colour-coded Statement Set progression summary (it updates live while
 editing and flags unsaved changes). Close/Escape prompts before discarding unsaved edits. Students without linked school emails are also
 listed, with an explicit warning that email linkage is required to save results;
