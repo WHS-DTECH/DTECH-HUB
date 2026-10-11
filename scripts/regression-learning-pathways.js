@@ -238,6 +238,9 @@ async function main() {
     assert.match(curriculumPage, /aria-labelledby="overview">[\s\S]*?<\/section>\s*<section class="panel-section curriculum-pathway-aim" aria-labelledby="pathway-aim">/,
         "Pathway Aim follows the Overview");
     assert.match(curriculumPage, /<h3>Skills Developed<\/h3>/);
+    assert.match(curriculumPage, /aria-labelledby="school-values">[\s\S]*?<\/section>\s*<section class="panel-section" aria-labelledby="learning-contexts">/,
+        "School Values comes directly before Learning Contexts");
+    for (const value of ["Whanaungatanga", "Rangatiratanga", "Manaakitanga", "Kaitiakitanga"]) assert.ok(curriculumPage.includes(`<dt>${value} &mdash;`));
     assert.equal((curriculumPage.match(/<ul class="curriculum-skills-list">[\s\S]*?<\/ul>/)[0].match(/<li>/g) || []).length, 9);
     assert.throws(() => normalizeCards(null), /cards array/);
     for (const href of ["javascript:alert(1)", "data:text/html,test", "//example.test", "/\\example.test"]) {
