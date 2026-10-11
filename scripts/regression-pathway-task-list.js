@@ -10,7 +10,8 @@ const tick = () => new Promise((resolve) => setImmediate(resolve));
 
 function node() {
     return {
-        hidden: false, textContent: "", children: [], dataset: {},
+        hidden: false, textContent: "", children: [], dataset: {}, attributes: {},
+        setAttribute(name, value) { this.attributes[name] = String(value); },
         replaceChildren() { this.children = []; },
         append(...items) { this.children.push(...items); },
         addEventListener(type, handler) { this[type] = handler; }
@@ -29,7 +30,7 @@ async function main() {
     let courseRetries = 0;
     let response = { ok: true, json: async () => cards };
     const tracked = [{ id: "activity-encoding-binary", title: "Encoding Binary", strand: "digital-systems",
-        context: "Binary & Data \u2022 Lesson 2", href: "/learning-pathways/activity-encoding-binary.html" }];
+        context: "Binary & Data \u2022 Lesson 2", unitTitle: "Binary & Data", lessonLabel: "Lesson 2", required: true, href: "/learning-pathways/activity-encoding-binary.html" }];
     let progressResponse = { ok: true, json: async () => ({ tracked, progress: {} }) };
     const progressUrl = "/api/learning-pathways/activity-progress";
     const respond = (url) => (url === progressUrl ? progressResponse : response);
@@ -58,27 +59,59 @@ async function main() {
     vm.runInContext(source, context);
     events.DOMContentLoaded();
     await tick();
-    const titles = () => list.children.map((item) => item.children[0].textContent);
+    const titles = () => list.children.map((item) => item.children[0].children[0].textContent);
+    const strand = (title) => list.children.find((item) => item.children[0].children[0].textContent === title);
+    const card = (item) => item.children[1].children[0].children[1].children[0];
+    const cardParts = (row) => ({ icon: row.children[0].children[0], title: row.children[0].children[1].children[0],
+        required: row.children[0].children[1].children[1], state: row.children[0].children[2],
+        note: row.children[1].children[0], link: row.children[1].children[1] });
     assert.deepEqual(titles(), cards.filter((card) => !["unit", "lesson", "activity"].includes(card.cardType)).map((card) => card.title).sort((a, b) => a.localeCompare(b)));
     assert.equal(list.children.length, 5, "Task List shows the five strands, not Unit or Lesson cards");
     assert.equal(list.hidden, false);
     assert.equal(retry.hidden, true);
-    const systems = list.children.find((item) => item.children[0].textContent === "Digital systems");
-    assert.ok(list.children.filter((item) => item !== systems).every((item) => item.children.length === 1),
+    const systems = strand("Digital systems");
+    assert.ok(list.children.filter((item) => item !== systems).every((item) => item.children.length === 1 && item.children[0].children.length === 1),
         "Strands without tracked activities show only their names");
     assert.equal(systems.children.length, 2, "Digital systems lists its tracked activities");
-    const activityRow = () => systems.children[1].children[0];
-    assert.equal(systems.children[1].children.length, 1, "Encoding Binary appears once");
-    assert.equal(activityRow().children[0].textContent, "Encoding Binary");
-    assert.equal(activityRow().children[0].href, "/learning-pathways/activity-encoding-binary.html");
-    assert.equal(activityRow().children[2].textContent, "To do");
-    assert.equal(activityRow().className, "pathway-task-activity");
+    const [, count, toggle] = systems.children[0].children;
+    assert.equal(count.textContent, "0 of 1 complete");
+    assert.equal(toggle.attributes["aria-expanded"], "true");
+    const body = systems.children[1];
+    assert.equal(toggle.attributes["aria-controls"], body.id);
+    toggle.click();
+    assert.equal(body.hidden, true, "Strand activities can be collapsed");
+    assert.equal(toggle.attributes["aria-expanded"], "false");
+    toggle.click();
+    assert.equal(body.hidden, false);
+    const unitHead = body.children[0].children[0];
+    assert.equal(unitHead.children[0].textContent, "Binary & Data");
+    assert.equal(unitHead.children[1].textContent, "Lesson 2");
+    assert.equal(body.children[0].children[1].children.length, 1, "Encoding Binary appears once");
+    let parts = cardParts(card(systems));
+    assert.equal(parts.title.textContent, "Encoding Binary");
+    assert.equal(parts.required.textContent, "Required activity");
+    assert.equal(parts.state.textContent, "To do");
+    assert.equal(parts.icon.textContent, "");
+    assert.equal(parts.note.textContent, "Not started yet");
+    assert.equal(parts.link.textContent, "Start activity");
+    assert.equal(parts.link.href, "/learning-pathways/activity-encoding-binary.html");
+    assert.equal(card(systems).className, "pathway-task-activity");
     assert.match(status.textContent, /Complete the activities/);
+    progressResponse = { ok: true, json: async () => ({ tracked, progress: { "activity-encoding-binary": { completed: false, responses: {} } } }) };
+    await context.renderPathwayTaskList();
+    parts = cardParts(card(strand("Digital systems")));
+    assert.equal(parts.state.textContent, "In progress");
+    assert.equal(parts.link.textContent, "Continue activity");
     progressResponse = { ok: true, json: async () => ({ tracked, progress: { "activity-encoding-binary": { completed: true } } }) };
     await context.renderPathwayTaskList();
-    const completedSystems = list.children.find((item) => item.children[0].textContent === "Digital systems");
-    assert.equal(completedSystems.children[1].children[0].children[2].textContent, "\u2713 Completed", "Completed activities are ticked");
-    assert.match(completedSystems.children[1].children[0].className, /is-complete/);
+    const completedSystems = strand("Digital systems");
+    parts = cardParts(card(completedSystems));
+    assert.equal(parts.state.textContent, "Completed", "Completed activities are ticked");
+    assert.equal(parts.icon.textContent, "\u2713");
+    assert.equal(parts.note.textContent, "Student answers saved");
+    assert.equal(parts.link.textContent, "View work");
+    assert.equal(completedSystems.children[0].children[1].textContent, "1 of 1 complete");
+    assert.match(card(completedSystems).className, /is-complete/);
     progressResponse = { ok: false, status: 401, json: async () => ({}) };
     await context.renderPathwayTaskList();
     assert.equal(list.children.length, 5, "Strands still show when progress cannot load");

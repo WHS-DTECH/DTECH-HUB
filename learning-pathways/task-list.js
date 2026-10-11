@@ -65,32 +65,107 @@ async function renderPathwayTaskList() {
         let activityCount = 0;
         for (const card of juniorCards) {
             const item = document.createElement("li");
+            item.className = "pathway-task-strand";
+            const head = document.createElement("div");
+            head.className = "pathway-task-strand-head";
             const heading = document.createElement("h3");
             heading.textContent = card.title;
-            item.append(heading);
+            head.append(heading);
+            item.append(head);
             const activities = (progress?.tracked || []).filter((activity) => activity && activity.strand === card.id
                 && typeof activity.title === "string" && typeof activity.href === "string" && activity.href.startsWith("/"));
             if (activities.length) {
-                const activityList = document.createElement("ul");
-                activityList.className = "pathway-task-activities";
+                const body = document.createElement("div");
+                body.className = "pathway-task-strand-body";
+                body.id = `pathway-task-body-${String(card.id || activityCount).replace(/[^a-z0-9-]/gi, "")}`;
+                const groups = new Map();
                 for (const activity of activities) {
-                    const done = progress.progress[activity.id]?.completed === true;
-                    const row = document.createElement("li");
-                    row.className = done ? "pathway-task-activity is-complete" : "pathway-task-activity";
-                    const link = document.createElement("a");
-                    link.href = activity.href;
-                    link.textContent = activity.title;
-                    const context = document.createElement("span");
-                    context.className = "pathway-task-context";
-                    context.textContent = typeof activity.context === "string" ? activity.context : "";
-                    const state = document.createElement("span");
-                    state.className = "pathway-task-state";
-                    state.textContent = done ? "\u2713 Completed" : "To do";
-                    row.append(link, context, state);
-                    activityList.append(row);
-                    activityCount++;
+                    const unitTitle = typeof activity.unitTitle === "string" ? activity.unitTitle : "";
+                    const lessonLabel = typeof activity.lessonLabel === "string" ? activity.lessonLabel : "";
+                    const key = `${unitTitle}\n${lessonLabel}`;
+                    if (!groups.has(key)) groups.set(key, { unitTitle, lessonLabel, activities: [] });
+                    groups.get(key).activities.push(activity);
                 }
-                item.append(activityList);
+                let doneCount = 0;
+                for (const group of groups.values()) {
+                    const unit = document.createElement("div");
+                    unit.className = "pathway-task-unit";
+                    if (group.unitTitle || group.lessonLabel) {
+                        const unitHead = document.createElement("div");
+                        unitHead.className = "pathway-task-unit-head";
+                        const unitTitle = document.createElement("h4");
+                        unitTitle.textContent = group.unitTitle;
+                        unitHead.append(unitTitle);
+                        if (group.lessonLabel) {
+                            const lesson = document.createElement("span");
+                            lesson.className = "pathway-task-lesson";
+                            lesson.textContent = group.lessonLabel;
+                            unitHead.append(lesson);
+                        }
+                        unit.append(unitHead);
+                    }
+                    const activityList = document.createElement("ul");
+                    activityList.className = "pathway-task-activities";
+                    for (const activity of group.activities) {
+                        const saved = progress.progress[activity.id];
+                        const done = saved?.completed === true;
+                        const started = Boolean(saved) && !done;
+                        if (done) doneCount++;
+                        const row = document.createElement("li");
+                        row.className = done ? "pathway-task-activity is-complete" : "pathway-task-activity";
+                        const main = document.createElement("div");
+                        main.className = "pathway-task-card-main";
+                        const icon = document.createElement("span");
+                        icon.className = "pathway-task-icon";
+                        icon.setAttribute("aria-hidden", "true");
+                        icon.textContent = done ? "\u2713" : "";
+                        const text = document.createElement("div");
+                        text.className = "pathway-task-card-text";
+                        const title = document.createElement("span");
+                        title.className = "pathway-task-title";
+                        title.textContent = activity.title;
+                        const required = document.createElement("span");
+                        required.className = "pathway-task-required";
+                        required.textContent = activity.required === false ? "Optional activity" : "Required activity";
+                        text.append(title, required);
+                        const state = document.createElement("span");
+                        state.className = "pathway-task-state";
+                        state.textContent = done ? "Completed" : started ? "In progress" : "To do";
+                        main.append(icon, text, state);
+                        const foot = document.createElement("div");
+                        foot.className = "pathway-task-card-foot";
+                        const note = document.createElement("span");
+                        note.className = "pathway-task-saved";
+                        note.textContent = done ? "Student answers saved" : started ? "Answers saved \u2013 keep going" : "Not started yet";
+                        const link = document.createElement("a");
+                        link.className = "pathway-task-open";
+                        link.href = activity.href;
+                        link.textContent = done ? "View work" : started ? "Continue activity" : "Start activity";
+                        link.setAttribute("aria-label", `${link.textContent}: ${activity.title}`);
+                        foot.append(note, link);
+                        row.append(main, foot);
+                        activityList.append(row);
+                        activityCount++;
+                    }
+                    unit.append(activityList);
+                    body.append(unit);
+                }
+                const count = document.createElement("span");
+                count.className = doneCount === activities.length ? "pathway-task-count is-all-done" : "pathway-task-count";
+                count.textContent = `${doneCount} of ${activities.length} complete`;
+                const toggle = document.createElement("button");
+                toggle.type = "button";
+                toggle.className = "pathway-task-toggle";
+                toggle.setAttribute("aria-expanded", "true");
+                toggle.setAttribute("aria-controls", body.id);
+                toggle.setAttribute("aria-label", `Hide ${card.title} activities`);
+                toggle.addEventListener("click", () => {
+                    body.hidden = !body.hidden;
+                    toggle.setAttribute("aria-expanded", String(!body.hidden));
+                    toggle.setAttribute("aria-label", `${body.hidden ? "Show" : "Hide"} ${card.title} activities`);
+                });
+                head.append(count, toggle);
+                item.append(body);
             }
             pathwayTaskList.append(item);
         }

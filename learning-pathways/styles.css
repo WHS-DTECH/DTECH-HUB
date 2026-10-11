@@ -98,38 +98,157 @@
     font-size: 1.15rem;
 }
 
+.pathway-task-strand-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+}
+
+.pathway-task-strand-head h3 {
+    margin-right: auto;
+}
+
+.pathway-task-count {
+    padding: 3px 12px;
+    border-radius: 999px;
+    background: #eef3f9;
+    color: #34506f;
+    font-size: 0.88rem;
+    font-weight: 800;
+}
+
+.pathway-task-count.is-all-done {
+    background: #e3f5e8;
+    color: #1f6b3a;
+}
+
+.pathway-task-toggle {
+    display: inline-grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid #cfdded;
+    border-radius: 50%;
+    background: #fff;
+    color: #213f60;
+    cursor: pointer;
+}
+
+.pathway-task-toggle::before {
+    content: "";
+    width: 9px;
+    height: 9px;
+    margin-top: 4px;
+    border-right: 2.5px solid currentColor;
+    border-bottom: 2.5px solid currentColor;
+    transform: rotate(225deg);
+    transition: transform 0.2s ease;
+}
+
+.pathway-task-toggle[aria-expanded="false"]::before {
+    margin-top: -4px;
+    transform: rotate(45deg);
+}
+
+.pathway-task-toggle:focus-visible,
+.pathway-task-open:focus-visible {
+    outline: 3px solid #2f7fd1;
+    outline-offset: 2px;
+}
+
+.pathway-task-strand-body {
+    display: grid;
+    gap: 14px;
+    margin-top: 14px;
+}
+
+.pathway-task-unit-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e1e9f2;
+}
+
+.pathway-task-unit-head h4 {
+    margin: 0;
+    color: #34506f;
+    font-size: 1rem;
+}
+
+.pathway-task-lesson {
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: #e8f0fb;
+    color: #24578f;
+    font-size: 0.8rem;
+    font-weight: 800;
+}
+
 .pathway-task-activities {
     display: grid;
-    gap: 8px;
-    margin: 12px 0 0;
+    gap: 10px;
+    margin: 10px 0 0;
     padding: 0;
     list-style: none;
 }
 
 .pathway-task-list .pathway-task-activity {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px 12px;
-    padding: 10px 14px;
+    display: grid;
+    gap: 12px;
+    padding: 14px 16px;
     border: 1px solid #cfdded;
-    border-radius: 10px;
+    border-radius: 12px;
     background: #fff;
 }
 
-.pathway-task-activity a {
-    color: #1f6b3a;
+.pathway-task-card-main {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.pathway-task-icon {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: 2.5px solid #b7c6d8;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 1.05rem;
+    font-weight: 900;
+}
+
+.is-complete .pathway-task-icon {
+    border-color: #2f9e55;
+    background: #2f9e55;
+}
+
+.pathway-task-card-text {
+    display: grid;
+    min-width: 0;
+    margin-right: auto;
+}
+
+.pathway-task-title {
+    color: #213f60;
+    font-size: 1.05rem;
     font-weight: 800;
 }
 
-.pathway-task-context {
+.pathway-task-required {
     color: #5a6b7d;
-    font-size: 0.9rem;
+    font-size: 0.88rem;
 }
 
 .pathway-task-state {
-    margin-left: auto;
-    padding: 2px 10px;
+    flex: none;
+    padding: 3px 12px;
     border-radius: 999px;
     background: #fff4d6;
     color: #7a4b00;
@@ -137,14 +256,57 @@
     font-weight: 800;
 }
 
-.pathway-task-list .pathway-task-activity.is-complete {
-    border-color: #2f9e55;
-    background: #f4fbf5;
-}
-
 .is-complete .pathway-task-state {
     background: #2f9e55;
     color: #fff;
+}
+
+.pathway-task-card-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 12px;
+    padding-top: 10px;
+    border-top: 1px dashed #d6e1ec;
+}
+
+.pathway-task-saved {
+    color: #5a6b7d;
+    font-size: 0.9rem;
+}
+
+.is-complete .pathway-task-saved {
+    color: #1f6b3a;
+    font-weight: 700;
+}
+
+.pathway-task-saved::before {
+    content: "\2022  ";
+}
+
+.is-complete .pathway-task-saved::before {
+    content: "\1F4BE  ";
+}
+
+.pathway-task-list .pathway-task-open {
+    padding: 7px 16px;
+    border-radius: 8px;
+    background: #24578f;
+    color: #fff;
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.pathway-task-list .is-complete .pathway-task-open {
+    border: 1.5px solid #2f9e55;
+    background: #fff;
+    color: #1f6b3a;
+}
+
+.pathway-task-list .pathway-task-activity.is-complete {
+    border-color: #2f9e55;
+    background: #f4fbf5;
 }
 
 .curriculum-strand-page .panel-section {

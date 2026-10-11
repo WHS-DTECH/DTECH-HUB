@@ -16,6 +16,9 @@ const trackedActivities = {
         unit: "binary-and-data",
         lesson: "lesson-encoding-binary",
         context: "Binary & Data \u2022 Lesson 2",
+        unitTitle: "Binary & Data",
+        lessonLabel: "Lesson 2",
+        required: true,
         href: "/learning-pathways/activity-encoding-binary.html",
         sanitize(input) {
             const source = input && typeof input === "object" ? input : {};
@@ -107,7 +110,8 @@ function registerActivityProgress(app, { pool, hasDatabase, getRequestUserEmail,
             const progress = {};
             for (const row of rows) if (Object.hasOwn(trackedActivities, row.activity_id)) progress[row.activity_id] = shape(row);
             const tracked = Object.entries(trackedActivities).map(([id, activity]) => ({ id, title: activity.title,
-                strand: activity.strand, unit: activity.unit, lesson: activity.lesson, context: activity.context, href: activity.href }));
+                strand: activity.strand, unit: activity.unit, lesson: activity.lesson, context: activity.context,
+                unitTitle: activity.unitTitle, lessonLabel: activity.lessonLabel, required: activity.required === true, href: activity.href }));
             res.json({ tracked, progress });
         } catch (error) {
             console.error("Could not load activity progress", error);

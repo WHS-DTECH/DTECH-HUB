@@ -144,8 +144,13 @@ once without restoring later deletions; Lesson 2's Practical phase links to it.
 `GET|PUT /api/learning-pathways/activity-progress/:id` (`PUT` body
 `{responses}`; completion is derived from the answers and `missing` lists
 unfinished letters). The JuniorDTECH Task List
-shows tracked activities under their strand with **To do** / **✓ Completed**;
-if progress cannot load, strand names still show with a retry action.
+shows each strand with an "N of M complete" count and a collapse toggle, then
+groups tracked activities by unit with a lesson pill (registry `unitTitle` /
+`lessonLabel`). Each activity card shows a tick icon, "Required activity",
+a **To do** / **In progress** / **Completed** pill, a saved-answers note and a
+Start / Continue / View work link. If progress cannot load, strand names still
+show with a retry action. When a signed-in student opens an activity whose
+saved answers are all correct but not yet ticked, it re-saves to tick it off.
 
 ## Progression Pathway (Teacher View)
 

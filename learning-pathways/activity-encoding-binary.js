@@ -290,6 +290,11 @@
             } else {
                 applyResponses(data.responses);
                 renderAll();
+                // Answers saved before auto-ticking existed are re-saved so the Task List ticks them off.
+                if (!completed && missingAnswers(state).length === 0) {
+                    changed();
+                    return;
+                }
                 setStatus(completed ? "Saved \u2713 Activity complete." : "Your answers are saved as you work.", completed ? "good" : "");
             }
         } catch (error) {
