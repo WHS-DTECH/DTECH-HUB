@@ -643,6 +643,101 @@
 .unit-status.optional { background: #e5eefa; color: #24548a; }
 .unit-status.planned { background: #fdebc8; color: #8a5a00; }
 
+.lesson-plan-hero .hero-panel {
+    background: linear-gradient(120deg, #7a3d00 0%, #d97706 56%, #f4b740 100%);
+}
+
+.lesson-plan-hero .stat-card {
+    display: grid;
+    gap: 10px;
+}
+
+.lesson-callouts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.lesson-callout {
+    margin: 0;
+    padding: 12px 14px;
+    border-left: 4px solid #d97706;
+    border-radius: 10px;
+    background: #fffaf0;
+    line-height: 1.5;
+}
+
+.lesson-callout.safety {
+    border-left-color: #b42318;
+    background: #fff4f2;
+}
+
+.lesson-timeline {
+    display: grid;
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.lesson-phase {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    padding: 14px 16px;
+    border: 1px solid #f3d39a;
+    border-radius: 12px;
+    background: #fffaf0;
+}
+
+.lesson-time {
+    flex: 0 0 104px;
+    padding: 6px 0;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #a35200 0%, #d97706 100%);
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 800;
+    text-align: center;
+}
+
+.curriculum-strand-page .lesson-phase h3 {
+    margin: 2px 0 6px;
+    color: #7a3d00;
+    font-size: 1.05rem;
+}
+
+.lesson-phase p {
+    margin: 0;
+    line-height: 1.55;
+}
+
+.panel-section.lesson-skill-check {
+    border: 1px solid #b7e1c4;
+    background: #f1faf3;
+}
+
+.lesson-skill-check h2 {
+    color: #1f6b35;
+}
+
+@media (max-width: 700px) {
+    .lesson-callouts {
+        grid-template-columns: 1fr;
+    }
+
+    .lesson-phase {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .lesson-time {
+        flex-basis: auto;
+        padding: 4px 12px;
+    }
+}
+
 @media (max-width: 700px) {
     .unit-sequence {
         grid-template-columns: 1fr;

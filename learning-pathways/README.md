@@ -89,6 +89,8 @@ restoring units deleted after the migration.
 Version 8 links a still-blank Binary & Data unit to its Unit Plan page.
 Version 9 appends the ten Binary & Data **Lesson** cards when their IDs are
 missing, without changing existing cards or restoring deleted lessons.
+Version 10 links a still-blank Binary Piano lesson to `lesson-binary-piano.html`
+(Lesson 1 page, amber hero, built from the Lesson 01 PDF).
 
 ### Card types: Curriculum Strands, Units and Lessons
 

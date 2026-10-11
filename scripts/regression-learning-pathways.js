@@ -236,6 +236,22 @@ async function main() {
     assert.ok(lessons.every((card) => card.unit === "binary-and-data" && card.yearLevel === "Junior DTECH" && card.area === "Digital systems"));
     const lessonLinks = [...unitPlan.matchAll(/class="unit-step-lesson-link" href="\/learning-pathways\/\?type=lesson#card-([^"]+)"/g)].map((match) => match[1]);
     assert.deepEqual(lessonLinks, lessons.map((card) => card.id), "Each sequence step links to its Lesson card");
+    assert.deepEqual(lessons.filter((card) => card.href).map((card) => [card.id, card.href]),
+        [["lesson-binary-piano", "/learning-pathways/lesson-binary-piano.html"]], "Only Binary Piano has a Lesson page so far");
+    assert.match(unitPlan, /href="\/learning-pathways\/lesson-binary-piano\.html">Lesson plan</, "Unit Plan step 1 opens the Lesson page");
+    const lessonPage = fs.readFileSync(path.join(root, "learning-pathways/lesson-binary-piano.html"), "utf8");
+    const lessonIds = [...lessonPage.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
+    assert.equal(new Set(lessonIds).size, lessonIds.length, "Lesson page IDs are unique");
+    const lessonJump = [...lessonPage.match(/<nav class="panel-section curriculum-jump-links"[\s\S]*?<\/nav>/)[0].matchAll(/href="#([^"]+)"/g)].map((match) => match[1]);
+    assert.deepEqual(lessonJump, [...lessonPage.matchAll(/<h2 id="([^"]+)"/g)].map((match) => match[1])
+        .filter((id) => !["overview", "on-this-page"].includes(id)), "Lesson page section pills follow page order");
+    for (const heading of ["Lesson Aim", "Learning Objectives", "Teacher Preparation &amp; Resources", "60-Minute Lesson Sequence",
+        "Practical Skill Check", "Teacher Guidance"]) assert.ok(lessonPage.includes(`>${heading}</h2>`), `Lesson page includes ${heading}`);
+    assert.deepEqual([...lessonPage.matchAll(/<span class="lesson-time">([^<]+)</g)].map((match) => match[1]),
+        ["0&ndash;10 min", "10&ndash;20 min", "20&ndash;40 min", "40&ndash;50 min", "50&ndash;60 min"], "Lesson timeline covers 60 minutes");
+    assert.match(lessonPage, /class="hero practical-skills-hero lesson-plan-hero"/);
+    assert.match(lessonPage, /href="\/learning-pathways\/\?type=lesson#card-lesson-binary-piano"/);
+    assert.match(lessonPage, /href="\/learning-pathways\/binary-and-data\.html#learning-sequence"/);
     assert.throws(() => normalizeCards([{ ...sample, cardType: "task" }]), /invalid card type/);
     assert.deepEqual(normalizeCards([{ ...sample, cardType: "lesson", unit: "u", sequence: 3, strand: "x" }])[0],
         { ...normalizeCards([sample])[0], cardType: "lesson", unit: "u", sequence: 3 }, "Lessons keep a parent unit and sequence");
@@ -343,7 +359,7 @@ async function main() {
         assert.match(sql, /learning_pathways_library_store/, "Never writes the Licence Library table");
         if (sql.includes("INSERT INTO") && (stored === null || !sql.includes("DO NOTHING"))) {
             stored = JSON.parse(params[0]);
-            seedVersion = 9;
+            seedVersion = 10;
         }
         if (sql.includes("seed_version < 1") && seedVersion < 1) {
             const starters = JSON.parse(params[0]);
@@ -397,6 +413,12 @@ async function main() {
             assert.ok(added.length === 10 && added.every((card) => card.cardType === "lesson"), "Version 9 only adds lesson cards");
             stored = [...stored, ...added.filter((card) => !stored.some((old) => old.id === card.id))];
             seedVersion = 9;
+        }
+        if (sql.includes("seed_version < 10") && seedVersion < 10) {
+            assert.match(sql, /COALESCE\(existing\.card ->> 'href', ''\) = ''/, "Version 10 only links a blank Binary Piano card");
+            stored = stored.map((card) => card.id === "lesson-binary-piano" && !card.href
+                ? { ...card, href: "/learning-pathways/lesson-binary-piano.html" } : card);
+            seedVersion = 10;
         }
         return { rows: sql.startsWith("SELECT") && stored !== null ? [{ cards: stored }] : [] };
     } };
@@ -495,6 +517,19 @@ async function main() {
         seedVersion = 9;
         assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), normalizeCards([sample]),
             "Version 9 does not restore deleted lesson cards");
+        const blankPiano = { ...lessons[0], href: "", title: "Edited piano" };
+        stored = [sample, blankPiano];
+        seedVersion = 9;
+        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(),
+            normalizeCards([sample, { ...blankPiano, href: "/learning-pathways/lesson-binary-piano.html" }]),
+            "Version 10 links the blank Binary Piano card, keeping edits and order");
+        stored = [{ ...blankPiano, href: "/learning-pathways/custom.html" }];
+        seedVersion = 9;
+        assert.equal((await (await fetch(`${base}/learning-pathways/library.json`)).json())[0].href, "/learning-pathways/custom.html",
+            "Version 10 preserves a custom Binary Piano link");
+        stored = [blankPiano];
+        seedVersion = 10;
+        assert.equal((await (await fetch(`${base}/learning-pathways/library.json`)).json())[0].href, "", "Later lesson link removal is not undone");
         stored = [sample, { ...units[0], title: "Edited unit" }];
         seedVersion = 6;
         const unitMigrated = await (await fetch(`${base}/learning-pathways/library.json`)).json();
