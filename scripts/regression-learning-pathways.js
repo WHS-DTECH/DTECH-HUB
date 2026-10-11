@@ -206,6 +206,7 @@ async function main() {
         assert.ok(!unitPlan.includes(`>${removed}</h2>`), `Unit Plan no longer includes ${removed}`);
     }
     assert.equal((unitPlan.match(/<li class="unit-step">/g) || []).length, 10, "All ten learning sequence activities are listed");
+    assert.doesNotMatch(unitPlan, /unit-step-resources|Resources:/, "Sequence cards no longer list resources");
     assert.equal((unitPlan.match(/unit-status planned/g) || []).length, 2, "ASCII and Unicode stay labelled as planned");
     assert.match(unitPlan, /class="hero practical-skills-hero unit-plan-hero"/);
     assert.match(unitPlan, /href="\/learning-pathways\/digital-systems\.html"/);
