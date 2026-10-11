@@ -398,7 +398,9 @@ async function main() {
         ["Emerging", "Developing", "Consolidating", "Proficient", "Exceeding"], "Progress Descriptors close the section");
     for (const unitId of ["binary-and-data", "infrastructure-and-networking"]) {
         assert.ok(seed.some((card) => card.id === unitId && card.cardType === "unit"), "Coverage links target existing Unit cards");
-        assert.ok(curriculumPage.includes(`href="/learning-pathways/?type=unit#card-${unitId}"`), "Coverage links open the Unit card");
+        const unitCard = seed.find((card) => card.id === unitId);
+        const unitHref = unitCard.href || `/learning-pathways/?type=unit#card-${unitId}`;
+        assert.ok(curriculumPage.includes(`href="${unitHref}"`), "Coverage links open the Unit page, or the Unit card until a page exists");
     }
     assert.equal((curriculumPage.match(/<ul class="curriculum-skills-list">[\s\S]*?<\/ul>/)[0].match(/<li>/g) || []).length, 9);
     assert.throws(() => normalizeCards(null), /cards array/);
