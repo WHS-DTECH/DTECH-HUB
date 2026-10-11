@@ -59,7 +59,7 @@ const trackedUnits = {
     "binary-and-data": { title: "Binary & Data", strand: "digital-systems", strandTitle: "Digital Systems" }
 };
 
-function registerActivityProgress(app, { pool, hasDatabase, getRequestUserEmail, normalizeEmail, schoolDomain, requireTeacherAccess, getStudents }) {
+function registerActivityProgress(app, { pool, hasDatabase, getRequestUserEmail, normalizeEmail, schoolDomain, requireTeacherAccess, getStudents, getStaff }) {
     const memory = new Map();
     let schemaReady = null;
     const ensureSchema = () => {
@@ -172,6 +172,16 @@ function registerActivityProgress(app, { pool, hasDatabase, getRequestUserEmail,
         }
     });
     if (typeof requireTeacherAccess !== "function" || typeof getStudents !== "function") return;
+    const loadStaff = async () => {
+        if (typeof getStaff !== "function") return [];
+        try {
+            return (await getStaff()).map((member) => ({ email: normalizeEmail(member.email || ""), name: String(member.name || member.email || ""),
+                yearLevel: "", homeroom: "", formClass: "", timetableClass: "", isStaff: true })).filter((member) => member.email);
+        } catch (error) {
+            console.error("Could not load staff for unit progression", error);
+            return [];
+        }
+    };
     app.get("/api/teacher/unit-progression", requireTeacherAccess, async (req, res) => {
         res.set("Cache-Control", "no-store");
         const unitIds = Object.keys(trackedUnits);
@@ -182,6 +192,11 @@ function registerActivityProgress(app, { pool, hasDatabase, getRequestUserEmail,
                 name: String(student.name || ""), yearLevel: student.yearLevel, homeroom: student.homeroom || "",
                 formClass: student.formClass || "", timetableClass: student.timetableClass || "" }));
             const known = new Set(students.map((student) => student.email).filter(Boolean));
+            for (const member of await loadStaff()) {
+                if (known.has(member.email)) continue;
+                known.add(member.email);
+                students.push(member);
+            }
             const progress = {};
             for (const row of await readActivities(activities.map(([id]) => id))) {
                 const email = normalizeEmail(row.student_email);

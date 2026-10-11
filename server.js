@@ -6137,7 +6137,12 @@ async function getYear7To10Students() {
 }
 require("./learning-pathways/activity-progress-store").registerActivityProgress(app, {
   pool, hasDatabase, getRequestUserEmail, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN,
-  requireTeacherAccess: requireActivityWriteAccess, getStudents: getYear7To10Students
+  requireTeacherAccess: requireActivityWriteAccess, getStudents: getYear7To10Students,
+  getStaff: async () => (await getStaffDirectoryRows()).flatMap((row) => {
+    const name = [row.last_name, row.first_name].map((part) => String(part || "").trim()).filter(Boolean).join(", ");
+    return collectDirectoryEmails(row, ["email_school", "email", "user_email", "staff_email", "google_email"]).slice(0, 1)
+      .map((email) => ({ email, name: name || email }));
+  })
 });
 require("./learning-pathways/progression-store").registerProgressionPathway(app, {
   pool, hasDatabase, requireTeacherAccess: requireActivityWriteAccess, getStudents: getYear7To10Students

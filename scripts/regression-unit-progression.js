@@ -27,7 +27,8 @@ async function testEndpoint() {
         normalizeEmail: (value) => String(value || "").trim().toLowerCase(),
         schoolDomain: DOMAIN,
         requireTeacherAccess: (req, res, next) => (req.headers["x-user-email"] === TEACHER ? next() : res.status(403).json({ error: "Teacher access required." })),
-        getStudents: async () => students
+        getStudents: async () => students,
+        getStaff: async () => [{ email: TEACHER.toUpperCase(), name: "Pringle, Vanessa" }, { email: students[0].email, name: "Duplicate" }]
     });
     const server = app.listen(0, "127.0.0.1");
     await new Promise((resolve) => server.once("listening", resolve));
@@ -39,6 +40,7 @@ async function testEndpoint() {
         await call(activity, students[0].email, { responses: { letters: correctLetters(), challenge: { word: "HI", bits: ["01000", "01001"] } } });
         await call(activity, students[1].email, { responses: { letters: { 1: "00101" } } });
         await call(activity, `stranger@${DOMAIN}`, { responses: { letters: correctLetters() } });
+        await call(activity, TEACHER, { responses: { letters: correctLetters() } });
 
         assert.equal((await call("/api/teacher/unit-progression", students[0].email)).status, 403, "Students cannot see class progress");
         const response = await call("/api/teacher/unit-progression?unit=binary-and-data", TEACHER);
@@ -47,7 +49,9 @@ async function testEndpoint() {
         assert.equal(data.unit.title, "Binary & Data");
         assert.equal(data.unit.strandTitle, "Digital Systems");
         assert.deepEqual(data.activities.map((item) => [item.id, item.shortTitle]), [["activity-encoding-binary", "Encoding"]]);
-        assert.equal(data.students.length, 4);
+        assert.equal(data.students.length, 5, "Staff are added once; students listed as staff are not duplicated");
+        assert.deepEqual([data.students[4].email, data.students[4].name, data.students[4].isStaff], [TEACHER, "Pringle, Vanessa", true]);
+        assert.equal(data.progress[TEACHER]["activity-encoding-binary"].status, "completed", "Staff records are visible");
         assert.equal(data.progress[students[0].email]["activity-encoding-binary"].status, "completed");
         assert.ok(data.progress[students[0].email]["activity-encoding-binary"].completedAt);
         assert.deepEqual(data.progress[students[0].email]["activity-encoding-binary"].summary,
@@ -95,9 +99,10 @@ async function testPage() {
         units: [{ id: "binary-and-data", title: "Binary & Data" }],
         unit: { id: "binary-and-data", title: "Binary & Data", strandTitle: "Digital Systems" },
         activities: [{ id: "activity-encoding-binary", title: "Encoding Binary", shortTitle: "Encoding", lessonLabel: "Lesson 2", href: "/learning-pathways/activity-encoding-binary.html" }],
-        students: [...students].reverse(),
+        students: [...students, { email: TEACHER, name: "Pringle, Vanessa", yearLevel: "", homeroom: "", formClass: "", timetableClass: "", isStaff: true }].reverse(),
         progress: {
             [students[0].email]: { "activity-encoding-binary": { status: "completed", completedAt: "2026-10-10T01:00:00.000Z", summary: ["Part D letters correct: 9 of 9"] } },
+            [TEACHER]: { "activity-encoding-binary": { status: "completed", completedAt: "2026-10-11T01:00:00.000Z", summary: [] } },
             [students[1].email]: { "activity-encoding-binary": { status: "in-progress", completedAt: null, summary: ["Part D letters correct: 1 of 9"] } }
         }
     };
@@ -149,6 +154,18 @@ async function testPage() {
     assert.equal(el("empty").hidden, false, "Empty state when nothing matches");
     el("search").value = "";
     el("search").listeners.input();
+    el("year").value = "staff";
+    el("year").listeners.change();
+    assert.deepEqual(rowNames(), ["Pringle, Vanessa"], "Staff filter shows staff even with a homeroom selected");
+    assert.equal(stateOf(0), "unit-status is-completed");
+    assert.equal(el("shown").textContent, "1 staff member shown");
+    assert.match(el("meta").textContent, /Term \d \u00b7 Staff$/);
+    el("year").value = "";
+    el("year").listeners.change();
+    el("homeroom").value = "";
+    el("homeroom").listeners.change();
+    assert.ok(!rowNames().includes("Pringle, Vanessa"), "Staff are not mixed into student views");
+    assert.equal(el("rows").children.length, 4);
 
     el("rows").children[0].children[2].children[0].listeners.click();
     assert.equal(el("dialog").open, true, "Unit evidence opens the student's work");

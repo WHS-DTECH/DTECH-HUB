@@ -20,9 +20,17 @@ function unitProgressClasses(student) {
 
 function unitProgressMatching(students, { homeroom, year, search }) {
     const term = String(search || "").trim().toLowerCase();
-    return students.filter((student) => (!homeroom || unitProgressClasses(student).includes(unitProgressNormalise(homeroom)))
+    // Staff rows only appear under Year = Staff, where the homeroom filter does not apply.
+    if (year === "staff") return students.filter((student) => student.isStaff
+        && (!term || `${student.name} ${student.email}`.toLowerCase().includes(term)));
+    return students.filter((student) => !student.isStaff
+        && (!homeroom || unitProgressClasses(student).includes(unitProgressNormalise(homeroom)))
         && (!year || Number(student.yearLevel) === Number(year))
         && (!term || `${student.name} ${student.email}`.toLowerCase().includes(term)));
+}
+
+function unitProgressYearLabel(student) {
+    return student.isStaff ? "Staff" : `Year ${student.yearLevel}`;
 }
 
 function unitProgressStateOf(progress, student, activityId) {
@@ -64,7 +72,7 @@ function unitProgressStatusIcon(state, studentName, activityTitle) {
 function unitProgressOpenEvidence(student) {
     const { activities, progress, unit } = unitProgress.data;
     up("dialog-title").textContent = student.name;
-    up("dialog-meta").textContent = [unit.title, `Year ${student.yearLevel}`, student.timetableClass || student.homeroom || student.formClass]
+    up("dialog-meta").textContent = [unit.title, unitProgressYearLabel(student), student.timetableClass || student.homeroom || student.formClass]
         .filter(Boolean).join(" \u00b7 ");
     up("dialog-list").replaceChildren();
     for (const activity of activities) {
@@ -113,8 +121,8 @@ function unitProgressRender() {
     up("title").textContent = unit.title;
     const now = new Date();
     up("meta").textContent = [String(now.getFullYear()), `Term ${unitProgressTerm(now)}`,
-        unitProgress.filters.year ? `Year ${unitProgress.filters.year}` : "Years 7-10",
-        unitProgress.filters.homeroom || "All homerooms"].join(" \u00b7 ");
+        ...(unitProgress.filters.year === "staff" ? ["Staff"] : [unitProgress.filters.year ? `Year ${unitProgress.filters.year}` : "Years 7-10",
+            unitProgress.filters.homeroom || "All homerooms"])].join(" \u00b7 ");
     let completedCount = 0;
     const headRow = up("head-row");
     headRow.replaceChildren();
@@ -141,10 +149,10 @@ function unitProgressRender() {
         const name = document.createElement("th");
         name.scope = "row";
         name.textContent = student.name;
-        if (data.students.filter((other) => other.name === student.name).length > 1 || !unitProgress.filters.homeroom) {
+        if (!student.isStaff && (data.students.filter((other) => other.name === student.name).length > 1 || !unitProgress.filters.homeroom)) {
             const detail = document.createElement("span");
             detail.className = "unit-progress-student-detail";
-            detail.textContent = [`Year ${student.yearLevel}`, student.timetableClass || student.homeroom || student.formClass].filter(Boolean).join(" \u00b7 ");
+            detail.textContent = [unitProgressYearLabel(student), student.timetableClass || student.homeroom || student.formClass].filter(Boolean).join(" \u00b7 ");
             name.append(detail);
         }
         row.append(name);
@@ -173,7 +181,8 @@ function unitProgressRender() {
         row.append(evidence);
         rows.append(row);
     }
-    up("shown").textContent = `${students.length} student${students.length === 1 ? "" : "s"} shown`;
+    const people = unitProgress.filters.year === "staff" ? ["staff member", "staff members"] : ["student", "students"];
+    up("shown").textContent = `${students.length} ${people[students.length === 1 ? 0 : 1]} shown`;
     up("done").textContent = `${completedCount} completed activit${completedCount === 1 ? "y" : "ies"}`;
     up("empty").hidden = students.length > 0;
     up("card").hidden = false;

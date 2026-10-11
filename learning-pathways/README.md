@@ -162,7 +162,7 @@ clock) and Not started (dash). The Unit evidence button opens a dialog with each
 activity's state, completion time, a short summary of the saved answers and a link
 to the activity. Unit, Homeroom, Year and Name filters show a whole class (for
 example JPI + Year 7) or one student; homeroom matches the timetable class, homeroom
-or form class. Students without a linked school email are listed but flagged.
+or form class. Students without a linked school email are listed but flagged. Year = Staff lists staff from the staff directory (ignoring homeroom) so teacher test runs can be checked; staff never appear in the student views.
 
 Teacher/Admin-protected `GET /api/teacher/unit-progression?unit=` is registered by
 `activity-progress-store.js` using the existing write-access middleware and the same
