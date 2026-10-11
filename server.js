@@ -6150,6 +6150,9 @@ require("./learning-pathways/activity-progress-store").registerActivityProgress(
 require("./learning-pathways/progression-store").registerProgressionPathway(app, {
   pool, hasDatabase, requireTeacherAccess: requireActivityWriteAccess, requireAdminAccess, getStudents: getYear7To10Students, getStaff: getStaffMembers
 });
+require("./learning-pathways/comment-bank-store").registerCommentBank(app, {
+  pool, hasDatabase, requireTeacherAccess: requireActivityWriteAccess, requireAdminAccess
+});
 app.use(express.static(__dirname));
 
 function normalizeEvidenceStepsPayload(value) {

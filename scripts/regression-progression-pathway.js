@@ -109,8 +109,8 @@ async function main() {
     assert.match(client, /if \(key === "coverage" && value === "not-taught"\) entry\.descriptor = null;/, "Legacy statement Progress is cleared when Not taught");
     for (const value of ["not-taught", "partly-taught", "taught"]) assert.match(css, new RegExp(`select\\.coverage-${value} \\{ background: #`), `Coverage ${value} is colour coded`);
     assert.match(client, /function progressionCoverageColour\(select\) \{\s*select\.className = `coverage-chip coverage-\$\{select\.value\}`;/);
-    assert.match(html, /<h2>Teacher Summary<\/h2>\s*<label>Learning narrative<textarea id="progression-narrative"[^>]*maxlength="5000"[\s\S]*id="progression-next"/, "Learning narrative sits first under Teacher Summary");
-    assert.match(client, /pp\("form"\)\.addEventListener\("input", \(\) => \{ if \(progression\.record\) progressionQueueSave\(\); \}\);/, "Every change queues an auto-save");
+    assert.match(html, /<h2>Teacher Summary<\/h2>\s*<details id="progression-comment-builder"[\s\S]*?<\/details>\s*<label>Learning narrative<textarea id="progression-narrative"[^>]*maxlength="5000"[\s\S]*id="progression-next"/, "Learning narrative sits under Teacher Summary, after the Comment Bank builder");
+    assert.match(client, /pp\("form"\)\.addEventListener\("input", \(event\) => \{\s*if \(event\.target\.closest\?\.\("\[data-comment-builder\]"\)\) return;\s*if \(progression\.record\) progressionQueueSave\(\);\s*\}\);/, "Every report change queues an auto-save; Comment Bank builder picks do not");
     assert.ok(html.includes("Changes save automatically.") && /id="progression-save"[^>]*hidden>Retry save/.test(html), "Save button only appears to retry a failed auto-save");
     const element = () => ({ value: "", disabled: false, hidden: false, textContent: "", classList: { set: new Set(), toggle(name, on) { on ? this.set.add(name) : this.set.delete(name); }, contains(name) { return this.set.has(name); } } });
     const elements = {};
@@ -214,7 +214,8 @@ async function main() {
     vm.runInNewContext(serverSource.slice(registrationStart, registrationEnd), {
         require: () => ({
             registerActivityProgress: (_app, config) => { activityStudents = config.getStudents; },
-            registerProgressionPathway: (_app, config) => { directoryAdapter = config.getStudents; }
+            registerProgressionPathway: (_app, config) => { directoryAdapter = config.getStudents; },
+            registerCommentBank: () => {}
         }),
         app: {}, pool: {}, hasDatabase: true, requireActivityWriteAccess: () => {}, requireAdminAccess: () => {},
         getRequestUserEmail: () => "", SCHOOL_EMAIL_DOMAIN: "example.test", getStaffMembers: async () => [],

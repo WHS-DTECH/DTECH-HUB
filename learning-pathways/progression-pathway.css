@@ -99,3 +99,25 @@
 .progression-hint-toggle[aria-expanded="true"] { background: #f6e3a6; }
 .progression-hint { margin: 0 0 14px; padding: 9px 12px; border-left: 4px solid #d8a52e; border-radius: 6px; background: #fff8e1; color: #6b5017; line-height: 1.5; font-weight: 700; }
 .progression-hint[hidden] { display: none; }
+
+/* Comment Bank narrative builder */
+.progression-comment-builder { margin: 8px 0 16px; border: 2px solid #1d4f80; border-radius: 12px; background: #f5f9fd; padding: 0 14px 14px; }
+.progression-comment-builder > summary { cursor: pointer; padding: 12px 0; font-weight: 800; color: #1d4f80; }
+.progression-cb-help { margin: 0 0 10px; color: #42505f; font-size: 0.92rem; }
+.progression-cb-options { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; }
+.progression-cb-options label, .progression-cb-controls label { display: grid; gap: 4px; font-weight: 700; font-size: 0.88rem; }
+.progression-cb-rows { display: grid; gap: 8px; }
+.progression-cb-row { background: #fff; border: 1px solid #d9e1ea; border-left: 5px solid #1d4f80; border-radius: 8px; padding: 8px 10px; }
+.progression-cb-row.cb-strengths { border-left-color: #2f6f4f; }
+.progression-cb-row.cb-behaviours { border-left-color: #7a4c9a; }
+.progression-cb-row.cb-next { border-left-color: #b0602a; }
+.progression-cb-title { margin: 0 0 6px; display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+.progression-cb-title span { color: #5a6878; font-size: 0.85rem; }
+.progression-cb-controls { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(110px, 0.6fr) minmax(260px, 3fr); gap: 8px; align-items: end; }
+.progression-cb-controls label:has(.progression-cb-comment) { grid-column: -2 / -1; }
+.progression-cb-controls select { width: 100%; min-width: 0; }
+.progression-cb-preview-label { margin: 12px 0 4px; font-weight: 800; color: #1d4f80; }
+.progression-cb-preview { margin: 0; padding: 10px 12px; background: #fff; border: 1px dashed #1d4f80; border-radius: 8px; line-height: 1.5; }
+.progression-cb-preview.is-empty { color: #6b7a8c; font-style: italic; }
+.progression-cb-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+@media (max-width: 760px) { .progression-cb-controls { grid-template-columns: 1fr; } .progression-cb-controls label:has(.progression-cb-comment) { grid-column: auto; } }

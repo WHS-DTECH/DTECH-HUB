@@ -298,7 +298,7 @@ function progressionSummary(student) {
     return summary;
 }
 const progression = { students: [], records: [], record: null, selected: "digital-systems", dirty: false, loading: 0, saving: false, teacherEmail: "",
-    changeSeq: 0, autosaveTimer: null, saveAgain: false, mapping: null, completed: [] };
+    changeSeq: 0, autosaveTimer: null, saveAgain: false, mapping: null, completed: [], commentBank: null, commentPicks: {} };
 const pp = (name) => document.querySelector(`#progression-${name}`);
 function progressionStatus(message, error = false) {
     pp("status").textContent = message;
@@ -536,6 +536,7 @@ function progressionRender(record) {
     }
     progressionRenderCurriculum();
     progressionDialogSummary();
+    progressionCommentReset();
     if (progressionRefreshPathways() || autoSet.length) { progressionQueueSave(); progressionDialogSummary(); }
 }
 function progressionAnnualRecord(records, student, schoolYear) {
@@ -612,6 +613,8 @@ async function progressionInit() {
         const [data, mapping] = await Promise.all([progressionApi("students"), progressionApi("mapping").catch((error) => {
             console.warn("Using the default curriculum mapping", error);
             return null;
+        }), progressionApi("comment-bank").then((bank) => { progression.commentBank = bank?.bank || null; }).catch((error) => {
+            console.warn("Using the starter comment bank", error);
         })]);
         if (request !== progression.loading) return;
         if (!Array.isArray(data.students)) throw new Error("Student directory response is invalid.");
@@ -628,6 +631,116 @@ async function progressionInit() {
         console.error("Could not initialise progression page", error);
         progressionStatus(error.message, true); pp("retry").hidden = false;
     }
+}
+// Narrative builder: the teacher picks bank comments; the composed text is copied into the narrative and saved
+// as plain text, so later Comment Bank edits never change saved reports.
+function progressionCommentBank() {
+    if (!window.commentBank) return null;
+    return progression.commentBank ||= window.commentBank.defaultBank();
+}
+function progressionCommentFill(select, options, value) {
+    select.replaceChildren(...options.map(([id, text]) => new Option(text, id)));
+    select.value = options.some(([id]) => id === value) ? value : options[0]?.[0] || "";
+}
+function progressionCommentReset() {
+    const cb = window.commentBank;
+    if (!cb) { pp("comment-builder").hidden = true; return; }
+    const student = progression.students.find((item) => item.email === progression.record?.studentEmail);
+    progression.commentPicks = {};
+    pp("cb-name").value = cb.firstName(student?.name || "");
+    progressionCommentRender();
+}
+function progressionCommentOptions() {
+    return { name: pp("cb-name").value, pronoun: pp("cb-pronoun").value };
+}
+function progressionCommentRender() {
+    const cb = window.commentBank;
+    const bank = progressionCommentBank();
+    if (!cb || !bank) return;
+    const active = bank.comments.filter((comment) => comment.active !== false);
+    progressionCommentFill(pp("cb-pronoun"), cb.pronouns, pp("cb-pronoun").value || "name");
+    const disciplines = cb.disciplines.filter(([id]) => active.some((comment) => comment.discipline === id));
+    progressionCommentFill(pp("cb-discipline"), disciplines.length ? disciplines : cb.disciplines.slice(0, 1), pp("cb-discipline").value || "dtech");
+    const discipline = pp("cb-discipline").value;
+    const options = progressionCommentOptions();
+    pp("cb-rows").replaceChildren();
+    for (const [category, title, hint] of cb.categories) {
+        const pick = progression.commentPicks[category] ||= { subcategory: "", level: "", id: "" };
+        const comments = active.filter((comment) => comment.discipline === discipline && comment.category === category);
+        const row = document.createElement("div");
+        row.className = `progression-cb-row cb-${category}`;
+        const heading = document.createElement("p");
+        heading.className = "progression-cb-title";
+        const strong = document.createElement("strong");
+        strong.textContent = title;
+        const note = document.createElement("span");
+        note.textContent = hint || "";
+        heading.append(strong, note);
+        const control = (text, select) => {
+            const label = document.createElement("label");
+            label.append(text, select);
+            return label;
+        };
+        const subSelect = document.createElement("select");
+        const subs = (bank.subcategories[category] || []).filter((name) => comments.some((comment) => comment.subcategory === name));
+        progressionCommentFill(subSelect, [["", "All subcategories"], ...subs.map((name) => [name, name])], pick.subcategory);
+        const levelSelect = document.createElement("select");
+        const levels = cb.levels.filter(([id]) => id !== "any" && comments.some((comment) => comment.level === id));
+        progressionCommentFill(levelSelect, [["", "All levels"], ...levels], pick.level);
+        const commentSelect = document.createElement("select");
+        commentSelect.className = "progression-cb-comment";
+        commentSelect.setAttribute("aria-label", `${title} comment`);
+        commentSelect.append(new Option("None selected (skip)", ""));
+        const shown = cb.sortComments(bank, comments.filter((comment) => (!subSelect.value || comment.subcategory === subSelect.value)
+            && (!levelSelect.value || comment.level === levelSelect.value || comment.level === "any")));
+        let group = null, groupKey = "";
+        for (const comment of shown) {
+            const key = `${comment.subcategory}|${comment.level}`;
+            if (key !== groupKey) {
+                group = document.createElement("optgroup");
+                group.label = comment.level === "any" ? comment.subcategory : `${comment.subcategory} · ${cb.label(cb.levels, comment.level)}`;
+                commentSelect.append(group);
+                groupKey = key;
+            }
+            group.append(new Option(cb.compose([comment.text], { ...options, pronoun: "name" }), comment.id));
+        }
+        commentSelect.value = shown.some((comment) => comment.id === pick.id) ? pick.id : "";
+        pick.id = commentSelect.value;
+        subSelect.addEventListener("change", () => { pick.subcategory = subSelect.value; progressionCommentRender(); });
+        levelSelect.addEventListener("change", () => { pick.level = levelSelect.value; progressionCommentRender(); });
+        commentSelect.addEventListener("change", () => { pick.id = commentSelect.value; progressionCommentPreview(); });
+        const controls = document.createElement("div");
+        controls.className = "progression-cb-controls";
+        controls.append(control("Subcategory", subSelect));
+        if (levels.length) controls.append(control("Level", levelSelect));
+        controls.append(control("Comment", commentSelect));
+        row.append(heading, controls);
+        pp("cb-rows").append(row);
+    }
+    progressionCommentPreview();
+}
+function progressionCommentText() {
+    const cb = window.commentBank;
+    const bank = progressionCommentBank();
+    if (!cb || !bank) return "";
+    const texts = cb.categories.map(([category]) => bank.comments.find((comment) => comment.id === progression.commentPicks[category]?.id)?.text);
+    return cb.compose(texts.filter(Boolean), progressionCommentOptions());
+}
+function progressionCommentPreview() {
+    const text = progressionCommentText();
+    pp("cb-preview").textContent = text || "Select comments above to build the narrative.";
+    pp("cb-preview").classList.toggle("is-empty", !text);
+    pp("cb-use").disabled = !text;
+    pp("cb-append").disabled = !text;
+}
+function progressionCommentApply(append) {
+    const text = progressionCommentText();
+    if (!text || !progression.record) return;
+    const current = pp("narrative").value.trim();
+    if (!append && current && current !== text && !window.confirm("Replace the current Learning narrative with the built paragraph?")) return;
+    pp("narrative").value = append && current ? `${current} ${text}` : text;
+    pp("narrative").dispatchEvent(new Event("input", { bubbles: true }));
+    pp("narrative").focus();
 }
 const progressionFilters = { search: "", "homeroom-filter": "", "year-filter": "" };
 async function progressionFilterChanged(name) {
@@ -648,7 +761,17 @@ pp("student").addEventListener("change", async () => {
     pp("student").value = email;
     void progressionLoadStudent(pp("student").value);
 });
-pp("form").addEventListener("input", () => { if (progression.record) progressionQueueSave(); });
+pp("form").addEventListener("input", (event) => {
+    if (event.target.closest?.("[data-comment-builder]")) return;
+    if (progression.record) progressionQueueSave();
+});
+pp("cb-name").addEventListener("input", progressionCommentRender);
+pp("cb-name").addEventListener("keydown", (event) => { if (event.key === "Enter") event.preventDefault(); });
+pp("cb-pronoun").addEventListener("change", progressionCommentPreview);
+pp("cb-discipline").addEventListener("change", progressionCommentRender);
+pp("cb-use").addEventListener("click", () => progressionCommentApply(false));
+pp("cb-append").addEventListener("click", () => progressionCommentApply(true));
+pp("cb-clear").addEventListener("click", () => { progression.commentPicks = {}; progressionCommentRender(); });
 pp("level").addEventListener("change", progressionUpdateStatements);
 pp("form").addEventListener("submit", (event) => {
     event.preventDefault();

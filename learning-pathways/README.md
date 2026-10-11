@@ -278,6 +278,28 @@ Run `node scripts/regression-progression-pathway.js` for validation, teacher
 access, history persistence, concurrent-edit conflicts, descriptor contrast and the
 curriculum mapping/auto-set rules.
 
+### Reporting Comment Bank (Admin)
+
+Admin Menu > Reporting Comment Bank (`comment-bank.html`, `comment-bank-admin.js`,
+`comment-bank.css`) manages the comments teachers use to build the Learning narrative.
+`comment-bank.js` (shared by browser and server) holds the categories, development
+levels, validation, CSV import/export, sentence composition and the starter bank
+(about 160 DTECH comments). Comments are organised Discipline > Category (Learning
+Context, Learning Strengths, Learning Behaviours, Next Learning) > Subcategory >
+Development Level (All levels, Beginning, Developing, Confident, Extending) > Display
+Order, and can be added, edited, reordered, duplicated, copied to another discipline,
+deactivated or deleted. Comment text uses `{name}` / `{name}'s`; the first mention
+becomes the student's first name and later ones the teacher's chosen pronoun.
+
+`comment-bank-store.js` stores one revisioned bank in `reporting_comment_bank`
+(seeded with the starter bank on first read; 409 on a stale publish) via admin-only
+`GET`/`PUT /api/admin/progression/comment-bank`. Teachers read active comments from
+`GET /api/teacher/progression/comment-bank`. In the Progression Pathway dialog the
+"Build the narrative from the Comment Bank" panel lets the teacher pick one comment per
+category (or skip), preview the paragraph and copy it into the Learning narrative to
+edit. Picks are never automatic or saved; the narrative is saved as text, so later bank
+edits do not change saved reports. Run `node scripts/regression-comment-bank.js`.
+
 Public reads: `/learning-pathways/library.json` and
 `GET /api/learning-pathways/library`. Admin reads and publishing:
 `GET` / `PUT /api/admin/learning-pathways/library`, protected by existing admin
