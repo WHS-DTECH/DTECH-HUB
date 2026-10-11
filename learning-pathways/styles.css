@@ -198,6 +198,23 @@
     outline-offset: 2px;
 }
 
+.curriculum-coverage-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+}
+
+.curriculum-kit-links a {
+    background: linear-gradient(135deg, #1d4f91 0%, #2f6fb8 54%, #5aa0e0 100%);
+    box-shadow: 0 2px 6px rgba(29, 79, 145, 0.25);
+}
+
+@media (max-width: 700px) {
+    .curriculum-coverage-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 .curriculum-unit-icon {
     display: inline-grid;
     place-items: center;
