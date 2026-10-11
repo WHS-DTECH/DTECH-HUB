@@ -255,21 +255,26 @@ function progressionSummary(student) {
     const caption = document.createElement("p");
     caption.className = "progression-summary-caption";
     caption.textContent = progress ? `Latest results: ${progress.schoolYear} Term ${progress.term}` : "No results saved yet";
-    summary.append(caption);
+    const cards = document.createElement("div");
+    cards.className = "progression-summary-cards";
+    summary.append(caption, cards);
     for (const [strand, group] of progressionStrands) {
         const section = document.createElement("div");
-        section.className = "progression-summary-group";
+        section.className = `progression-summary-group strand-${strand}`;
         const heading = document.createElement("strong");
         heading.className = "progression-summary-strand";
         heading.textContent = group;
-        heading.style.gridRow = `span ${progressionSummaryKinds.length}`;
         section.append(heading);
         progressionSummaryKinds.forEach(([kind, kindLabel]) => {
             const descriptor = progress?.strandProgress?.find((row) => row.strand === strand && row.kind === kind)?.descriptor;
             const level = progressionDescriptors.indexOf(descriptor) + 1;
             const label = level ? `${descriptor[0].toUpperCase()}${descriptor.slice(1)}` : progress ? "Not determined" : "Not recorded";
             const value = document.createElement("div");
-            value.className = "progression-summary-row";
+            value.className = `progression-summary-row${level ? ` is-${descriptor}` : " is-empty"}`;
+            const badge = document.createElement("span");
+            badge.className = `progression-summary-badge${level ? ` ${descriptor}` : ""}`;
+            badge.setAttribute("aria-hidden", "true");
+            badge.textContent = level || "-";
             const name = document.createElement("span");
             name.className = "progression-summary-name";
             name.textContent = kindLabel;
@@ -285,10 +290,10 @@ function progressionSummary(student) {
             const text = document.createElement("span");
             text.className = `progression-bar-label${level ? "" : " is-empty"}`;
             text.textContent = label;
-            value.append(name, bar, text);
+            value.append(badge, name, text, bar);
             section.append(value);
         });
-        summary.append(section);
+        cards.append(section);
     }
     return summary;
 }
