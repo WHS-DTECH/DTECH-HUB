@@ -251,11 +251,14 @@ async function main() {
         [7, "ASCII", "planning"], [8, "Unicode and te reo M\u0101ori", "planning"], [9, "Design a coded message", "active"],
         [10, "Consolidation", "active"]], "The ten Binary & Data activities are Lesson cards in sequence order");
     assert.ok(lessons.every((card) => card.unit === "binary-and-data" && card.yearLevel === "Junior DTECH" && card.area === "Digital systems"));
-    const lessonLinks = [...unitPlan.matchAll(/class="unit-step-lesson-link" href="\/learning-pathways\/\?type=lesson#card-([^"]+)"/g)].map((match) => match[1]);
-    assert.deepEqual(lessonLinks, lessons.map((card) => card.id), "Each sequence step links to its Lesson card");
+    const lessonLinks = [...unitPlan.matchAll(/class="unit-step-lesson-link" href="([^"]+)">([^<]+)</g)];
+    assert.deepEqual(lessonLinks.map((match) => match[2]), lessons.map(() => "Lesson"), "Each sequence step has one Lesson pill");
+    assert.deepEqual(lessonLinks.map((match) => match[1]), lessons.map((card) => card.href || `/learning-pathways/?type=lesson#card-${card.id}`),
+        "Lesson pills open the Lesson page, or the Lesson card until a page exists");
+    assert.doesNotMatch(unitPlan, /Lesson card<|Lesson plan</, "Unit Plan uses 'Lesson' terminology");
     assert.deepEqual(lessons.filter((card) => card.href).map((card) => [card.id, card.href]),
         [["lesson-binary-piano", "/learning-pathways/lesson-binary-piano.html"]], "Only Binary Piano has a Lesson page so far");
-    assert.match(unitPlan, /href="\/learning-pathways\/lesson-binary-piano\.html">Lesson plan</, "Unit Plan step 1 opens the Lesson page");
+    assert.match(unitPlan, /href="\/learning-pathways\/lesson-binary-piano\.html">Lesson</, "Unit Plan step 1 opens the Lesson page");
     const lessonPage = fs.readFileSync(path.join(root, "learning-pathways/lesson-binary-piano.html"), "utf8");
     const lessonIds = [...lessonPage.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
     assert.equal(new Set(lessonIds).size, lessonIds.length, "Lesson page IDs are unique");

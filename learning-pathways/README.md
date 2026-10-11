@@ -107,8 +107,8 @@ A third type, `lesson` (footer **Lessons**, amber/gold palette), holds the
 Binary & Data learning-sequence activities. Lesson cards keep a parent `unit` ID
 and a `sequence` number; with the default A-Z sort they list after units in
 sequence order. ASCII and Unicode are `planning` until created. Each step on
-`binary-and-data.html` has a **Lesson card** pill linking to
-`/learning-pathways/?type=lesson#card-<id>`. Lessons are display-only for now and
+`binary-and-data.html` has a **Lesson** pill that opens the Lesson page when
+one exists, otherwise `/learning-pathways/?type=lesson#card-<id>`. Lessons are display-only for now and
 are excluded from the student Task List.
 
 The final type, `activity` (footer **Lesson Activities**, green palette), holds
