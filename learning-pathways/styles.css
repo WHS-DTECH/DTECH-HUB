@@ -1304,9 +1304,31 @@
 
 .encoding-working li {
     display: flex;
+    align-items: stretch;
+    gap: 10px;
+}
+
+.encoding-working-key {
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    width: 52px;
+    min-height: 46px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #1f6b3a 0%, #2f9e55 100%);
+    color: #fff;
+    font-size: 1.25rem;
+    font-weight: 800;
+}
+
+.encoding-working-box {
+    display: flex;
+    flex: 1 1 auto;
     flex-wrap: wrap;
+    align-items: center;
     justify-content: space-between;
     gap: 8px;
+    min-width: 0;
     padding: 10px 14px;
     border-radius: 10px;
     background: #fff;

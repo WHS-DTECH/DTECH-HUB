@@ -137,6 +137,8 @@ function testPage() {
     assert.deepEqual([...page.match(/encoding-place-values"[\s\S]*?<\/ul>/)[0].matchAll(/<li>(\d+)<\/li>/g)].map((match) => match[1]),
         ["16", "8", "4", "2", "1"], "Place values are always 16, 8, 4, 2, 1");
     assert.match(page, /T = 20 = 10100/);
+    assert.deepEqual([...page.matchAll(/<span class="encoding-working-key"[^>]*>(\d+)<\/span>/g)].map((match) => match[1]),
+        ["16", "8", "4", "2", "1"], "Each worked-example step starts with its place-value tile");
     assert.match(page, /20 &minus; 16 = 4/);
     assert.match(page, /4 &minus; 4 = 0/);
     assert.match(page, /Part E &bull; Optional/);
