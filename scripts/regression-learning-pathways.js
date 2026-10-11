@@ -265,6 +265,16 @@ async function main() {
     for (const heading of ["Lesson Aim", "Learning Objectives", "Teacher Preparation &amp; Resources", "60-Minute Lesson Sequence",
         "Teacher Guidance"]) assert.ok(lessonPage.includes(`>${heading}</h2>`), `Lesson page includes ${heading}`);
     assert.ok(!lessonPage.includes(">Practical Skill Check</h2>"), "Lesson page no longer includes Practical Skill Check");
+    assert.match(lessonPage, /<button type="button" class="button button-primary lesson-print-button" data-print-page>Print \/ Save as PDF<\/button>/);
+    assert.match(lessonPage, /<script src="print-page\.js"><\/script>/);
+    let printed = 0;
+    const printButton = { addEventListener: (type, handler) => { assert.equal(type, "click"); printButton.click = handler; } };
+    vm.runInNewContext(fs.readFileSync(path.join(root, "learning-pathways/print-page.js"), "utf8"),
+        { document: { querySelectorAll: () => [printButton] }, window: { print: () => { printed += 1; } } });
+    printButton.click();
+    assert.equal(printed, 1, "Print button opens the browser print dialog");
+    assert.match(fs.readFileSync(path.join(root, "learning-pathways/styles.css"), "utf8"), /@media print \{[\s\S]*\.hero-stats,[\s\S]*\.curriculum-jump-links,/,
+        "Print layout hides page actions and section links");
     assert.deepEqual([...lessonPage.matchAll(/<span class="lesson-time">([^<]+)</g)].map((match) => match[1]),
         ["0&ndash;10 min", "10&ndash;20 min", "20&ndash;40 min", "40&ndash;50 min", "50&ndash;60 min"], "Lesson timeline covers 60 minutes");
     assert.match(lessonPage, /class="hero practical-skills-hero lesson-plan-hero"/);

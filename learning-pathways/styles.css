@@ -928,3 +928,60 @@
     border-radius: 10px;
     background: #fff;
 }
+.lesson-print-button {
+    border: 0;
+    background: #fff;
+    color: #7a3d00;
+    cursor: pointer;
+}
+
+@media print {
+    @page {
+        margin: 14mm;
+    }
+
+    body {
+        background: #fff;
+    }
+
+    .topbar,
+    .hero-stats,
+    .curriculum-jump-links,
+    .global-hub-footer,
+    .lesson-activity-pill,
+    .unit-step-lesson-link,
+    #hub-global-sidebar,
+    #hub-global-sidebar-toggle,
+    #hub-global-sidebar-backdrop {
+        display: none !important;
+    }
+
+    .page-shell,
+    .home-grid {
+        width: 100%;
+        max-width: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .lesson-plan-hero .hero-panel,
+    .panel-section,
+    .lesson-phase,
+    .lesson-time,
+    .lesson-callout {
+        box-shadow: none !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .lesson-plan-hero .hero-panel {
+        margin: 0 0 10px;
+        padding: 18px 22px;
+    }
+
+    .panel-section,
+    .lesson-phase,
+    .lesson-callout {
+        break-inside: avoid;
+    }
+}
