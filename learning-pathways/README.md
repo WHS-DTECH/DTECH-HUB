@@ -131,9 +131,10 @@ activity: `activity-encoding-binary.html` + `activity-encoding-binary.js`.
 Students toggle five Binary Piano keys (16, 8, 4, 2, 1) per letter, see live
 totals and non-punitive hints (answers are never shown), practise E = 5, encode
 TECHNOLOGY (T = 10100 is the worked example), and may try an optional word.
-Answers autosave for signed-in school accounts. **Finish activity** only marks
-completion when the practice and all nine letters are correct; changing a
-required answer to a wrong one later reopens it. Migration v13 adds this card
+Answers autosave for signed-in school accounts, and the activity is ticked off
+automatically (no finish button) as soon as all nine Part D letters are correct
+(Part C practice is not required); changing a letter to a wrong one later
+reopens it. Migration v13 adds this card
 once without restoring later deletions; Lesson 2's Practical phase links to it.
 
 `activity-progress-store.js` stores per-student answers in
@@ -141,7 +142,8 @@ once without restoring later deletions; Lesson 2's Practical phase links to it.
 `DATABASE_URL`) and only accepts registered activities and school accounts:
 `GET /api/learning-pathways/activity-progress` (tracked activities + progress),
 `GET|PUT /api/learning-pathways/activity-progress/:id` (`PUT` body
-`{responses, completed}`; 409 lists missing answers). The JuniorDTECH Task List
+`{responses}`; completion is derived from the answers and `missing` lists
+unfinished letters). The JuniorDTECH Task List
 shows tracked activities under their strand with **To do** / **✓ Completed**;
 if progress cannot load, strand names still show with a retry action.
 

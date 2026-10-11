@@ -23,7 +23,6 @@
 
     function missingAnswers(responses) {
         const missing = [];
-        if (responses.practice !== toBinary(5)) missing.push("Part C: E = 5");
         for (const { index, letter, value } of letters) {
             if (responses.letters[index] !== toBinary(value)) missing.push(`${letter} = ${value}`);
         }
@@ -176,6 +175,11 @@
     function renderCompletion() {
         completePanel.hidden = !completed;
         root.dataset.completed = String(completed);
+        const allCorrect = missingAnswers(state).length === 0;
+        finishFeedback.dataset.tone = "hint";
+        finishFeedback.textContent = allCorrect && !completed && !loadedFor
+            ? "All letters are correct! Sign in with your school account so your work can be saved and ticked off."
+            : "";
     }
 
     function renderAll() {
@@ -198,7 +202,7 @@
     function changed() {
         dirty = true;
         renderMessage();
-        finishFeedback.textContent = "";
+        renderCompletion();
         if (!loadedFor) {
             setStatus("Sign in with your school account to save your answers.", "warn");
             return;
@@ -208,17 +212,17 @@
         saveTimer = setTimeout(() => { void autoSave(); }, 700);
     }
 
-    function putProgress(markComplete) {
+    function putProgress() {
         const email = loadedFor;
         const run = async () => {
             if (email !== loadedFor) return null;
             const response = await fetch(API_URL, {
                 method: "PUT", cache: "no-store",
                 headers: withHubAuthHeaders({ "Content-Type": "application/json" }),
-                body: JSON.stringify({ responses: state, completed: markComplete })
+                body: JSON.stringify({ responses: state })
             });
             const data = await response.json().catch(() => ({}));
-            if (!response.ok && response.status !== 409) throw new Error(data.error || `HTTP ${response.status}`);
+            if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
             if (email !== loadedFor) return null;
             completed = Boolean(data.completed);
             renderCompletion();
@@ -232,11 +236,11 @@
         clearTimeout(retryTimer);
         const wasCompleted = completed;
         try {
-            const data = await putProgress(false);
+            const data = await putProgress();
             if (!data) return;
             dirty = false;
             if (wasCompleted && !completed) {
-                setStatus("Saved. One of your answers changed, so the activity is no longer finished. Fix it and press Save and finish again.", "warn");
+                setStatus("Saved. One of your answers changed, so the activity is no longer complete. Fix it and it will be ticked off again.", "warn");
             } else {
                 setStatus(completed ? "Saved \u2713 Activity complete." : "Saved \u2713 Your answers are saved as you work.", "good");
             }
@@ -280,40 +284,6 @@
             setStatus("Your saved answers could not be loaded. Refresh the page to try again.", "error");
         }
     }
-
-    $("#encoding-finish").addEventListener("click", async () => {
-        const missing = missingAnswers(state);
-        if (missing.length) {
-            finishFeedback.dataset.tone = "hint";
-            finishFeedback.textContent = `Almost there! Still to finish: ${missing.join(", ")}.`;
-            return;
-        }
-        if (!loadedFor) {
-            finishFeedback.dataset.tone = "hint";
-            finishFeedback.textContent = "Sign in with your school account so your work can be saved and ticked off.";
-            return;
-        }
-        clearTimeout(saveTimer);
-        finishFeedback.dataset.tone = "";
-        finishFeedback.textContent = "Saving\u2026";
-        try {
-            const data = await putProgress(true);
-            if (!data) return;
-            dirty = false;
-            if (completed) {
-                finishFeedback.textContent = "";
-                setStatus("Saved \u2713 Activity complete.", "good");
-                completePanel.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
-            } else {
-                finishFeedback.dataset.tone = "hint";
-                finishFeedback.textContent = `Almost there! Still to finish: ${(data.missing || []).join(", ")}.`;
-            }
-        } catch (error) {
-            console.error("Could not finish Encoding Binary", error);
-            finishFeedback.dataset.tone = "error";
-            finishFeedback.textContent = "Could not save. Check your connection and try again.";
-        }
-    });
 
     renderAll();
     window.addEventListener("hub-auth-state-changed", () => { void loadProgress(); });

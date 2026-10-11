@@ -66,17 +66,17 @@ async function testStore() {
         saved = await response.json();
         assert.equal(saved.completed, false);
         assert.ok(saved.missing.includes("C = 3") && !saved.missing.includes("E = 5"), "Missing answers are listed");
+        response = await call(activity, { method: "PUT", body: { responses: partial } });
+        saved = await response.json();
+        assert.equal(saved.completed, false, "Autosave with unfinished letters is not complete");
 
-        const finished = { practice: "00101", letters: correctLetters(), challenge: { word: "", bits: [] } };
+        const finished = { practice: "00000", letters: correctLetters(), challenge: { word: "", bits: [] } };
         response = await call(activity, { method: "PUT", body: { responses: finished } });
-        assert.equal((await response.json()).completed, false, "Correct answers alone do not finish until requested");
-        response = await call(activity, { method: "PUT", body: { responses: { ...finished, practice: "00000" }, completed: true } });
-        assert.equal(response.status, 409, "Guided practice is required too");
-        response = await call(activity, { method: "PUT", body: { responses: finished, completed: true } });
         assert.equal(response.status, 200);
         saved = await response.json();
-        assert.equal(saved.completed, true);
+        assert.equal(saved.completed, true, "All Part D letters correct auto-ticks the activity (Part C practice is not required)");
         assert.ok(saved.completedAt);
+        assert.deepEqual(saved.missing, []);
 
         const reloaded = await (await call(activity)).json();
         assert.deepEqual(reloaded.responses, finished, "Answers persist across reloads");
@@ -114,7 +114,7 @@ async function testStore() {
             .map(([key, row]) => ({ activity_id: key.split("|")[1], ...row })) };
     } };
     await withServer({ hasDatabase: true, pool }, async (base) => {
-        const body = { responses: { practice: "00101", letters: correctLetters() }, completed: true };
+        const body = { responses: { practice: "00101", letters: correctLetters() } };
         assert.equal((await call(`${base}/activity-encoding-binary`, { method: "PUT", body })).status, 200);
         assert.equal((await (await call(base)).json()).progress["activity-encoding-binary"].completed, true);
     });
@@ -166,8 +166,11 @@ function testPage() {
     assert.doesNotMatch(working.text, /00101/, "Hints never reveal the answer");
     assert.equal(api.cleanWord("c0de!xyzabcdefg"), "CDEXYZABCD");
     const empty = { practice: "00000", letters: {} };
-    assert.equal(api.missingAnswers(empty).length, 10);
-    assert.equal(api.missingAnswers({ practice: "00101", letters: correctLetters() }).length, 0);
+    assert.equal(api.missingAnswers(empty).length, 9);
+    assert.equal(api.missingAnswers({ practice: "00000", letters: correctLetters() }).length, 0);
+    assert.match(page, /When you have completed all the letters in Part D, your work will be saved automatically\./);
+    assert.doesNotMatch(page, /id="encoding-finish"|Save and finish/, "No finish button: completion is automatic");
+    assert.doesNotMatch(script, /completed: markComplete|encoding-finish"/, "Client does not request completion");
 
     const server = read("server.js");
     assert.match(server, /require\("\.\/learning-pathways\/activity-progress-store"\)\.registerActivityProgress\(app, \{\s*pool, hasDatabase, getRequestUserEmail, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN/);

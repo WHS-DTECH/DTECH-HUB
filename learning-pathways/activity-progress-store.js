@@ -32,7 +32,6 @@ const trackedActivities = {
         },
         missing(responses) {
             const missing = [];
-            if (responses.practice !== toBinary(5)) missing.push("Guided practice (E = 5)");
             for (const { index, letter, value } of encodingLetters) {
                 if (responses.letters[index] !== toBinary(value)) missing.push(`${letter} = ${value}`);
             }
@@ -130,8 +129,8 @@ function registerActivityProgress(app, { pool, hasDatabase, getRequestUserEmail,
             const responses = activity.sanitize(req.body?.responses);
             const missing = activity.missing(responses);
             const previous = await readOne(req.activityProgressEmail, req.params.activityId);
-            // Completion needs correct answers; editing a correct answer back to a wrong one reopens the activity.
-            const completed = (req.body?.completed === true || Boolean(previous?.completed)) && missing.length === 0;
+            // Completes automatically once every required answer is correct; a wrong answer later reopens it.
+            const completed = missing.length === 0;
             const completedAt = completed ? (previous?.completed && previous.completed_at) || new Date().toISOString() : null;
             const saved = await write(req.activityProgressEmail, req.params.activityId,
                 { responses, completed, completed_at: completedAt });
