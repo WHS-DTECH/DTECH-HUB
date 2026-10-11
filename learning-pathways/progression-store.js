@@ -17,7 +17,10 @@ function validateStatements(rows) {
         if (!coverageValues.includes(row.coverage)) throw new Error("Invalid curriculum statement coverage.");
         const discipline = row.discipline === undefined ? "dtech" : row.discipline;
         if (!disciplineValues.includes(discipline)) throw new Error("Invalid discipline.");
-        return { id: row.id, coverage: row.coverage, discipline };
+        const descriptor = row.descriptor === undefined ? null : row.descriptor;
+        if (descriptor !== null && !descriptorValues.includes(descriptor)) throw new Error("Invalid curriculum statement progress.");
+        if (row.coverage === "not-taught" && descriptor !== null) throw new Error("Not taught curriculum statements must be Not determined.");
+        return { id: row.id, coverage: row.coverage, discipline, descriptor };
     });
 }
 

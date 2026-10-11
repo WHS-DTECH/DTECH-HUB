@@ -35,6 +35,21 @@ function progressionUpdateHints() {
         element.textContent = progressionStatement(element.dataset.statement, pp("level").value);
     }
 }
+function progressionCoverageColour(select) {
+    select.className = `coverage-chip coverage-${select.value}`;
+}
+function progressionDescriptorColour(select) {
+    select.className = select.value ? `descriptor-chip ${select.value}` : "";
+}
+function progressionDescriptorSelect(label, value) {
+    const select = document.createElement("select");
+    select.setAttribute("aria-label", label);
+    select.append(new Option("Not determined", ""));
+    progressionDescriptors.forEach((item, index) => select.append(new Option(`${index + 1} - ${item[0].toUpperCase() + item.slice(1)}`, item)));
+    select.value = value || "";
+    progressionDescriptorColour(select);
+    return select;
+}
 function progressionStatementSelect(label, options, value, onChange) {
     const select = document.createElement("select");
     select.setAttribute("aria-label", label);
@@ -50,7 +65,7 @@ function progressionCurriculumTable(title, statements) {
     wrap.className = "curriculum-table-wrap";
     const table = document.createElement("table");
     table.className = "curriculum-table progression-statement-table";
-    table.innerHTML = '<thead><tr><th scope="col">Statement</th><th scope="col">Discipline</th><th scope="col">Coverage</th></tr></thead>';
+    table.innerHTML = '<thead><tr><th scope="col">Statement</th><th scope="col">Discipline</th><th scope="col">Coverage</th><th scope="col">Progress</th></tr></thead>';
     const body = document.createElement("tbody");
     const groups = [...new Set(statements.map((statement) => statement.heading))].sort((a, b) => (a ? 1 : 0) - (b ? 1 : 0));
     for (const group of groups) {
@@ -58,7 +73,7 @@ function progressionCurriculumTable(title, statements) {
             const groupRow = document.createElement("tr");
             groupRow.className = "progression-statement-group";
             const cell = document.createElement("th");
-            cell.scope = "colgroup"; cell.colSpan = 3; cell.textContent = group;
+            cell.scope = "colgroup"; cell.colSpan = 4; cell.textContent = group;
             groupRow.append(cell); body.append(groupRow);
         }
         for (const statement of statements.filter((item) => item.heading === group)) {
@@ -78,19 +93,28 @@ function progressionCurriculumTable(title, statements) {
                 chips.append(chip);
             }
             text.append(words, chips);
+            let coverage, descriptor;
             const update = (key, value) => {
                 const rows = progression.record.statements ||= [];
                 let entry = rows.find((item) => item.id === statement.id);
-                if (!entry) { entry = { id: statement.id, discipline: "dtech", coverage: "not-taught" }; rows.push(entry); }
+                if (!entry) { entry = { id: statement.id, discipline: "dtech", coverage: "not-taught", descriptor: null }; rows.push(entry); }
                 entry[key] = value;
+                // Same rule as the pathway table: Progress needs teaching; Not taught resets Progress.
+                if (key === "descriptor" && value && entry.coverage === "not-taught") entry.coverage = "partly-taught";
+                if (key === "coverage" && value === "not-taught") entry.descriptor = null;
+                coverage.value = entry.coverage; descriptor.value = entry.descriptor || "";
+                progressionCoverageColour(coverage); progressionDescriptorColour(descriptor);
                 progression.dirty = true;
                 progressionUpdateHints();
                 progressionDialogSummary();
             };
             const discipline = progressionStatementSelect(`Discipline for: ${statement.text}`, progressionDisciplines, result.discipline || "dtech", (value) => update("discipline", value));
-            const coverage = progressionStatementSelect(`Coverage for: ${statement.text}`, progressionCoverageOptions, result.coverage, (value) => update("coverage", value));
+            coverage = progressionStatementSelect(`Coverage for: ${statement.text}`, progressionCoverageOptions, result.coverage, (value) => update("coverage", value));
+            progressionCoverageColour(coverage);
+            descriptor = progressionDescriptorSelect(`Progress for: ${statement.text}`, result.descriptor);
+            descriptor.addEventListener("change", () => update("descriptor", descriptor.value || null));
             row.append(text);
-            for (const element of [discipline, coverage]) { const cell = document.createElement("td"); cell.append(element); row.append(cell); }
+            for (const element of [discipline, coverage, descriptor]) { const cell = document.createElement("td"); cell.append(element); row.append(cell); }
             body.append(row);
         }
     }
@@ -415,6 +439,7 @@ function progressionRender(record) {
         descriptor.value = result.descriptor || "";
         const colour = () => {
             descriptor.className = result.descriptor ? `descriptor-chip ${result.descriptor}` : "";
+            progressionCoverageColour(coverage);
         };
         colour();
         coverage.addEventListener("change", () => {

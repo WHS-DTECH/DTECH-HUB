@@ -185,8 +185,11 @@ pp. 17/24, Systems and Control pp. 16/23), grouped by the curriculum's own
 sub-headings. The statements live in `progression-curriculum.js` (shared by the
 browser and server). Each statement is tagged with the DTECH pathway(s) it
 supports (tags are a teacher judgement and can be edited there) and has its own
-Discipline (DTECH default; Textiles, Food, Wood, DVC) and Coverage, saved as
-optional `statements: [{ id, discipline, coverage }]`. Each pathway row counts
+Discipline (DTECH default; Textiles, Food, Wood, DVC), Coverage and Progress
+descriptor, saved as optional `statements: [{ id, discipline, coverage, descriptor }]`
+(same rule as pathways: choosing Progress on Not taught sets Partly taught; Not
+taught resets Progress). Coverage dropdowns are colour coded (grey Not taught,
+amber Partly taught, green Taught). Each pathway row counts
 its linked statements taught for that year. The PDF omits a bullet between the
 Year 8 "Compare algorithms" and "Analyse how data" practices, so they are split.
 Older pathway-level `discipline` values are still accepted and kept.

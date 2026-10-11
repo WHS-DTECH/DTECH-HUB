@@ -89,6 +89,10 @@ async function main() {
     assert.match(client, /pp\("level"\)\.addEventListener\("change", progressionUpdateStatements\)/, "Changing year level updates the statements");
     assert.match(client, /function progressionUpdateStatements\(\) \{\s*progressionUpdateHints\(\);\s*progressionRenderCurriculum\(\);/);
     assert.ok(!html.includes('<th scope="col">Discipline</th><th scope="col">Coverage</th><th scope="col">Progress</th>'), "Discipline is recorded per curriculum statement");
+    assert.ok(client.includes('<th scope="col">Statement</th><th scope="col">Discipline</th><th scope="col">Coverage</th><th scope="col">Progress</th>'), "Curriculum statements have a Progress column");
+    assert.match(client, /if \(key === "descriptor" && value && entry\.coverage === "not-taught"\) entry\.coverage = "partly-taught";\s*if \(key === "coverage" && value === "not-taught"\) entry\.descriptor = null;/, "Statement Progress keeps coverage valid");
+    for (const value of ["not-taught", "partly-taught", "taught"]) assert.match(css, new RegExp(`select\\.coverage-${value} \\{ background: #`), `Coverage ${value} is colour coded`);
+    assert.match(client, /function progressionCoverageColour\(select\) \{\s*select\.className = `coverage-chip coverage-\$\{select\.value\}`;/);
     assert.match(html, /<h2>Teacher Summary<\/h2>\s*<label>Learning narrative<textarea id="progression-narrative"[^>]*maxlength="5000"[\s\S]*id="progression-next"/, "Learning narrative sits first under Teacher Summary");
     assert.match(client, /pp\("form"\)\.addEventListener\("input", \(\) => \{ if \(progression\.record\) progressionQueueSave\(\); \}\);/, "Every change queues an auto-save");
     assert.ok(html.includes("Changes save automatically.") && /id="progression-save"[^>]*hidden>Retry save/.test(html), "Save button only appears to retry a failed auto-save");
@@ -110,7 +114,7 @@ async function main() {
     Object.assign(autosave.pp("year"), { value: "2027" }); Object.assign(autosave.pp("term"), { value: "1" }); Object.assign(autosave.pp("level"), { value: "7" });
     autosave.pp("narrative").value = "Built a binary piano.";
     vm.runInContext("progressionQueueSave(5)", autosave);
-    await new Promise((resolve) => setTimeout(resolve, 30));
+    for (let wait = 0; wait < 100 && calls.length < 1; wait += 1) await new Promise((resolve) => setTimeout(resolve, 20));
     assert.equal(calls.length, 1, "Auto-save runs after a short pause");
     assert.equal(calls[0].learningNarrative, "Built a binary piano.");
     assert.equal(autosave.pp("year").disabled && autosave.pp("term").disabled, true, "Year and term lock once saving starts");
@@ -119,7 +123,7 @@ async function main() {
     await new Promise((resolve) => setTimeout(resolve, 30));
     assert.equal(calls.length, 1, "Only one save runs at a time");
     release.shift()();
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    for (let wait = 0; wait < 100 && calls.length < 2; wait += 1) await new Promise((resolve) => setTimeout(resolve, 20));
     assert.equal(calls.length, 2, "Edits made during a save are saved next");
     assert.equal(calls[1].revision, 1, "The next auto-save uses the new revision");
     assert.equal(calls[1].learningNarrative, "Built a binary piano and encoded TECHNOLOGY.");
@@ -241,9 +245,11 @@ async function main() {
     rated.pathways[0].discipline = "textiles";
     const withStatements = clone(sample);
     withStatements.statements = [{ id: "sc-8-p-2", coverage: "taught", discipline: "wood" }, { id: "dt-10-k-1", coverage: "partly-taught" }];
-    assert.deepEqual(validateRecord(withStatements).statements, [{ id: "sc-8-p-2", coverage: "taught", discipline: "wood" }, { id: "dt-10-k-1", coverage: "partly-taught", discipline: "dtech" }]);
+    assert.deepEqual(validateRecord(withStatements).statements, [{ id: "sc-8-p-2", coverage: "taught", discipline: "wood", descriptor: null }, { id: "dt-10-k-1", coverage: "partly-taught", discipline: "dtech", descriptor: null }]);
+    withStatements.statements[0].descriptor = "proficient";
+    assert.equal(validateRecord(withStatements).statements[0].descriptor, "proficient", "Curriculum statements store a Progress descriptor");
     assert.ok(!("statements" in validateRecord(sample)), "Records without curriculum statements are unchanged");
-    for (const bad of [[{ id: "xx-1", coverage: "taught" }], [{ id: "sc-8-p-2", coverage: "done" }], [{ id: "sc-8-p-2", coverage: "taught", discipline: "metal" }],
+    for (const bad of [[{ id: "xx-1", coverage: "taught" }], [{ id: "sc-8-p-2", coverage: "done" }], [{ id: "sc-8-p-2", coverage: "taught", discipline: "metal" }], [{ id: "sc-8-p-2", coverage: "taught", descriptor: "achieved" }], [{ id: "sc-8-p-2", coverage: "not-taught", descriptor: "emerging" }],
         [{ id: "sc-8-p-2", coverage: "taught" }, { id: "sc-8-p-2", coverage: "taught" }], "sc-8-p-2"]) {
         assert.throws(() => validateRecord({ ...clone(sample), statements: bad }), undefined, `Rejects ${JSON.stringify(bad)}`);
     }

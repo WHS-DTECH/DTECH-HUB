@@ -65,4 +65,8 @@
 .proficient { background: #278c78 !important; }
 .exceeding { background: #427bbb !important; }
 .progression-page select.descriptor-chip { color: #000; border: 2px solid #24344a; }
+.progression-page select.coverage-chip { font-weight: 700; border-width: 2px; }
+.progression-page select.coverage-not-taught { background: #eceff3; border-color: #9aa6b4; color: #3c4756; }
+.progression-page select.coverage-partly-taught { background: #fdecc8; border-color: #c9922a; color: #5c3b00; }
+.progression-page select.coverage-taught { background: #d4f0dc; border-color: #2f8a4f; color: #10421f; }
 @media (max-width: 700px) { .progression-page .curriculum-table { min-width: 900px; } .progression-page .progression-statement-table { min-width: 720px; } }
