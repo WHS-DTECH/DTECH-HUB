@@ -43,7 +43,7 @@ async function renderPathwayTaskList() {
             throw new Error("Learning Pathways library is invalid.");
         }
         if (request !== pathwayTaskRequest) return;
-        const juniorCards = cards.filter((card) => card.yearLevel === "Junior DTECH" && card.cardType !== "unit")
+        const juniorCards = cards.filter((card) => card.yearLevel === "Junior DTECH" && !["unit", "lesson"].includes(card.cardType))
             .sort((left, right) => left.title.localeCompare(right.title));
         for (const card of juniorCards) {
             const item = document.createElement("li");

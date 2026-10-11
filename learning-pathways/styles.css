@@ -41,6 +41,16 @@
     font-weight: 700;
 }
 
+.project-card.pathway-lesson-card {
+    border-color: #f3d39a;
+    background: #fffaf0;
+}
+
+.pathway-lesson-card .project-footer .project-meta {
+    color: #a35200;
+    font-weight: 700;
+}
+
 .project-card.pathway-display-card:hover {
     transform: none;
 }
@@ -597,6 +607,24 @@
 .unit-step p {
     margin: 0;
     line-height: 1.5;
+}
+
+.unit-step-lesson-link {
+    display: inline-block;
+    margin-top: 0.5rem;
+    padding: 0.2rem 0.75rem;
+    border-radius: 999px;
+    background: #a35200;
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.unit-step-lesson-link:hover,
+.unit-step-lesson-link:focus-visible {
+    filter: brightness(1.08);
+    text-decoration: underline;
 }
 
 .unit-status {

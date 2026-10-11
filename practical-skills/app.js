@@ -14,8 +14,8 @@
     const categoryPillsContainer = document.getElementById("practical-skills-category-pills");
     const typePillsContainer = document.getElementById("practical-skills-type-pills");
     const sortSelect = document.getElementById("practical-skills-sort");
-    const cardTypeNames = { strand: config.libraryCardLabel || "Curriculum Strands", unit: config.libraryUnitLabel || "Units" };
-    const cardType = (item) => (isPathways && String(item?.cardType || "") === "unit" ? "unit" : "strand");
+    const cardTypeNames = { strand: config.libraryCardLabel || "Curriculum Strands", unit: config.libraryUnitLabel || "Units", lesson: config.libraryLessonLabel || "Lessons" };
+    const cardType = (item) => (isPathways && ["unit", "lesson"].includes(String(item?.cardType || "")) ? String(item.cardType) : "strand");
     const pageLocation = typeof location === "undefined" ? null : location;
     const requestedType = isPathways ? (String(pageLocation?.search || "").match(/[?&]type=([^&#]*)/) || [])[1] : null;
     const requestedCardId = isPathways ? decodeURIComponent(String(pageLocation?.hash || "").replace(/^#card-/, "")) : "";
@@ -132,9 +132,11 @@
                 break;
         }
         if (isPathways) {
-            const order = { strand: 0, unit: 1 };
+            const order = { strand: 0, unit: 1, lesson: 2 };
+            const lessonOrder = (a, b) => (cardType(a) === "lesson" && cardType(b) === "lesson" && state.sort === "name-asc"
+                ? String(a.unit || "").localeCompare(String(b.unit || "")) || (Number(a.sequence) || 999) - (Number(b.sequence) || 999) : 0);
             return sorted.map((item, index) => ({ item, index }))
-                .sort((a, b) => order[cardType(a.item)] - order[cardType(b.item)] || a.index - b.index)
+                .sort((a, b) => order[cardType(a.item)] - order[cardType(b.item)] || lessonOrder(a.item, b.item) || a.index - b.index)
                 .map(({ item }) => item);
         }
         return sorted;
@@ -155,10 +157,12 @@
         }
 
         const isUnit = cardType(item) === "unit";
+        const isLesson = cardType(item) === "lesson";
         if (isUnit) card.classList.add("pathway-unit-card");
+        if (isLesson) card.classList.add("pathway-lesson-card");
         if (isPathways && item.id) card.id = `card-${String(item.id)}`;
         const icon = String(item?.visual?.icon || config.libraryIcon || "PS").trim() || "PS";
-        const palette = String(item?.visual?.palette || (isUnit && config.libraryUnitPalette) || config.libraryPalette || "linear-gradient(135deg, #2f8f61 0%, #3ca873 54%, #65c494 100%)");
+        const palette = String(item?.visual?.palette || (isUnit && config.libraryUnitPalette) || (isLesson && config.libraryLessonPalette) || config.libraryPalette || "linear-gradient(135deg, #2f8f61 0%, #3ca873 54%, #65c494 100%)");
         const imageUrl = String(item.imageUrl || "").trim();
         const hasImage = imageUrl.length > 0;
         const visualStyle = hasImage ? "" : `style=\"background: ${escapeHtml(palette)};\"`;

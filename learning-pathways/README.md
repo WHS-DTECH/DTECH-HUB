@@ -86,8 +86,11 @@ cards are now linked; the Junior Task List still displays names only.
 Version 7 appends the Digital Systems **Unit** cards (Infrastructure & Networking,
 Binary & Data) when their IDs are missing, without changing existing cards or
 restoring units deleted after the migration.
+Version 8 links a still-blank Binary & Data unit to its Unit Plan page.
+Version 9 appends the ten Binary & Data **Lesson** cards when their IDs are
+missing, without changing existing cards or restoring deleted lessons.
 
-### Card types: Curriculum Strands and Units
+### Card types: Curriculum Strands, Units and Lessons
 
 Each card has a `cardType` of `strand` (default, footer **Curriculum Strands**,
 Pathways blue) or `unit` (footer **Units**, crimson/coral palette distinct from
@@ -97,6 +100,14 @@ strand; both current units belong to `digital-systems`. The dashboard has a
 Type field. Units are display-only for now and are excluded from the student
 Task List, which still lists strand names only. They are the planned hook for
 linking Digital Systems into the Progression Pathway report.
+
+A third type, `lesson` (footer **Lessons**, amber/gold palette), holds the
+Binary & Data learning-sequence activities. Lesson cards keep a parent `unit` ID
+and a `sequence` number; with the default A-Z sort they list after units in
+sequence order. ASCII and Unicode are `planning` until created. Each step on
+`binary-and-data.html` has a **Lesson card** pill linking to
+`/learning-pathways/?type=lesson#card-<id>`. Lessons are display-only for now and
+are excluded from the student Task List.
 
 ## Progression Pathway (Teacher View)
 

@@ -40,7 +40,7 @@
             const title = document.createElement("h3");
             title.textContent = card.title;
             const details = document.createElement("p");
-            details.textContent = `${card.cardType === "unit" ? "Unit" : "Curriculum Strand"} | ${card.yearLevel} | ${card.area} | ${card.status}`;
+            details.textContent = `${card.cardType === "unit" ? "Unit" : card.cardType === "lesson" ? "Lesson" : "Curriculum Strand"} | ${card.yearLevel} | ${card.area} | ${card.status}`;
             const summary = document.createElement("p");
             summary.textContent = card.summary;
             row.append(title, details, summary);
@@ -127,6 +127,10 @@
             status: text("status"), cardType: text("type") || "strand", visual: { icon: text("icon") || "LP" } };
         const index = cards.findIndex((item) => item.id === id);
         if (card.cardType === "unit" && index >= 0 && cards[index].strand) card.strand = cards[index].strand;
+        if (card.cardType === "lesson" && index >= 0) {
+            if (cards[index].unit) card.unit = cards[index].unit;
+            if (cards[index].sequence) card.sequence = cards[index].sequence;
+        }
         if (index < 0) cards.push(card);
         else cards[index] = card;
         dirty = true;
