@@ -320,7 +320,10 @@ async function main() {
     assert.doesNotMatch(activityPage, /activity-step-check|Tick when done|Tick each step/, "Steps have no tick-off completion requirement");
     assert.match(activityPage, /class="activity-step activity-step-warning">[\s\S]*?Do not glue the moving tabs down!/, "The glue step is highlighted as a warning");
     assert.match(activityPage, /Do not glue the moving tabs down!/);
-    assert.match(activityPage, /Completion check:<\/strong> I have built a Binary Piano with working tabs\./);
+    assert.doesNotMatch(activityPage, /Completion check/, "Exercise-book activity has no DTECH-HUB completion requirement");
+    assert.match(activityPage, /<svg class="activity-handin-art"[^>]*role="img"/, "Finished? shows a hand-in illustration");
+    assert.match(activityPage, /Well done for completing the task!/);
+    assert.match(activityPage, /Don&rsquo;t forget to <strong>hand in your exercise book<\/strong>\./);
     assert.match(activityPage, /class="hero practical-skills-hero activity-hero"/);
     assert.match(activityPage, /href="\/learning-pathways\/\?type=activity#card-activity-build-your-binary-piano"/);
     assert.match(activityPage, /href="\/learning-pathways\/lesson-binary-piano\.html"/);
