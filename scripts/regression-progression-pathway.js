@@ -99,6 +99,11 @@ async function main() {
     ];
     assert.deepEqual(Array.from(context.progressionMatchingStudents(timetableStudents, "JPI", "", ""), (student) => student.email), ["seven", "eight"]);
     assert.deepEqual(Array.from(context.progressionMatchingStudents(timetableStudents, "JPI", "7", ""), (student) => student.email), ["seven"]);
+    const withStaff = [...timetableStudents, { name: "Pringle, Vanessa", email: "vp", yearLevel: "", timetableClass: "", isStaff: true }];
+    assert.deepEqual(Array.from(context.progressionMatchingStudents(withStaff, "JPI", "staff", ""), (student) => student.email), ["vp"], "Staff filter ignores timetable class");
+    assert.equal(context.progressionMatchingStudents(withStaff, "", "staff", "nobody").length, 0);
+    assert.equal(context.progressionMatchingStudents(withStaff, "", "", "").length, 4, "Staff are not mixed into student lists");
+    assert.match(fs.readFileSync(path.join(root, "learning-pathways/progression-pathway.html"), "utf8"), /id="progression-year-filter"[^\n]*<option value="staff">Staff<\/option>/);
     assert.equal(context.progressionMatchingStudents(timetableStudents, "", "", "8wpapa").length, 1, "Tutor remains searchable separately");
     assert.equal(validateRecord({ ...sample, timetableClass: "JPI" }).timetableClass, "JPI");
     assert.throws(() => validateRecord({ ...sample, timetableClass: "x".repeat(101) }));
@@ -114,7 +119,7 @@ async function main() {
             registerProgressionPathway: (_app, config) => { directoryAdapter = config.getStudents; }
         }),
         app: {}, pool: {}, hasDatabase: true, requireActivityWriteAccess: () => {},
-        getRequestUserEmail: () => "", SCHOOL_EMAIL_DOMAIN: "example.test",
+        getRequestUserEmail: () => "", SCHOOL_EMAIL_DOMAIN: "example.test", getStaffMembers: async () => [],
         getStudentDirectoryRows: async () => [
             { student_name: "No email one", year_level: "Year 7", form_class: "7WHAU", homeroom: "7WHAU", timetable_class: "JPI", linked_emails: [] },
             { student_name: "No email two", year_level: "8", form_class: "8WPAPA", homeroom: "8WPAPA", timetable_class: "JPI", linked_emails: [] },
@@ -178,7 +183,8 @@ async function main() {
             { email: sample.studentEmail, name: "Example Student", yearLevel: 7, formClass: "7XX" },
             { email: "", name: "Unlinked one", yearLevel: 7, formClass: "JPI" },
             { email: "", name: "Unlinked two", yearLevel: 8, formClass: "JPI" }
-        ] };
+        ],
+        getStaff: async () => [{ email: "Teacher@Example.test", name: "Pringle, Vanessa" }, { email: sample.studentEmail, name: "Not duplicated" }] };
     const app = express(); app.use(express.json()); registerProgressionPathway(app, options);
     const server = app.listen(0, "127.0.0.1");
     await new Promise((resolve) => server.once("listening", resolve));
@@ -194,6 +200,13 @@ async function main() {
         const directory = (await (await fetch(`${base}/students`, { headers })).json()).students;
         assert.equal(directory.filter((student) => !student.email).length, 2, "Both unlinked students remain in the class list");
         assert.equal((await put({ ...sample, studentEmail: "unknown@example.test" })).status, 400);
+        const staffRow = directory.find((student) => student.email === "teacher@example.test");
+        assert.equal(staffRow.isStaff, true, "Staff are listed for the Staff year filter");
+        assert.equal(staffRow.name, "Pringle, Vanessa");
+        assert.equal(directory.filter((student) => student.email === sample.studentEmail).length, 1, "Students are not duplicated as staff");
+        assert.equal((await put({ ...sample, studentEmail: "teacher@example.test" })).status, 200, "Staff can save a test record");
+        const staffProgress = (await (await fetch(`${base}/students`, { headers })).json()).students.find((student) => student.email === "teacher@example.test");
+        assert.equal(staffProgress.isStaff, true); assert.ok(staffProgress.progress, "Staff record shows in the class list");
         const savedResponse = await put(sample);
         assert.equal(savedResponse.status, 200);
         const saved = (await savedResponse.json()).record;
@@ -221,6 +234,8 @@ async function main() {
             "Roster summary omits evidence and teacher notes");
         const oldDirectory = options.getStudents;
         options.getStudents = async () => [];
+        const oldStaff = options.getStaff;
+        options.getStaff = async () => [];
         const historicalApp = express();
         const historicalHandlers = {};
         historicalApp.get = (url, ...functions) => { historicalHandlers[url] = functions.at(-1); };
@@ -230,6 +245,7 @@ async function main() {
         assert.equal(archived[0].archived, true, "History remains discoverable after student moves beyond Year 10 or leaves directory");
         assert.ok(archived[0].progress, "Archived students also show their latest progression bars");
         options.getStudents = oldDirectory;
+        options.getStaff = oldStaff;
         const restarted = express();
         const handlers = {};
         restarted.get = (url, ...functions) => { handlers[url] = functions.at(-1); };

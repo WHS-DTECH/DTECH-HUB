@@ -34,7 +34,24 @@ function validateRecord(body) {
         strengths: text(body.strengths, "strengths"), nextLearning: text(body.nextLearning, "next learning") };
 }
 
-function registerProgressionPathway(app, { pool, hasDatabase, requireTeacherAccess, getStudents }) {
+function registerProgressionPathway(app, { pool, hasDatabase, requireTeacherAccess, getStudents, getStaff }) {
+    // Staff appear (Year level filter = Staff) so teachers can check their own test records.
+    async function staffMembers(students) {
+        if (typeof getStaff !== "function") return [];
+        const known = new Set(students.map((student) => student.email).filter(Boolean));
+        try {
+            return (await getStaff()).map((member) => ({ email: String(member.email || "").trim().toLowerCase(),
+                name: String(member.name || member.email || ""), yearLevel: "", formClass: "", homeroom: "", timetableClass: "", isStaff: true }))
+                .filter((member) => member.email && !known.has(member.email) && known.add(member.email));
+        } catch (error) {
+            console.error("Could not load staff for progression", error);
+            return [];
+        }
+    }
+    async function currentPeople() {
+        const students = await getStudents();
+        return [...students, ...await staffMembers(students)];
+    }
     const available = (_req, res, next) => {
         if (!hasDatabase) return res.status(503).json({ error: "Progression results require the database. No results have been saved." });
         next();
@@ -48,7 +65,7 @@ function registerProgressionPathway(app, { pool, hasDatabase, requireTeacherAcce
         )`);
     }
     async function studentsWithHistory() {
-        const current = await getStudents();
+        const current = await currentPeople();
         if (!hasDatabase) return current;
         await schema();
         const saved = await pool.query(`SELECT DISTINCT ON (student_email) student_email, record
@@ -100,9 +117,9 @@ function registerProgressionPathway(app, { pool, hasDatabase, requireTeacherAcce
         try { record = validateRecord(req.body); }
         catch (error) { return res.status(400).json({ error: error.message }); }
         try {
-            const students = await getStudents();
+            const students = await currentPeople();
             const student = students.find((student) => student.email === record.studentEmail);
-            if (!student && record.revision === 0) return res.status(400).json({ error: "Select a Year 7-10 student from the school directory." });
+            if (!student && record.revision === 0) return res.status(400).json({ error: "Select a Year 7-10 student or staff member from the school directory." });
             const historicalStudent = student || (await studentsWithHistory()).find((item) => item.email === record.studentEmail);
             if (historicalStudent) record.studentName = historicalStudent.name;
             await schema();

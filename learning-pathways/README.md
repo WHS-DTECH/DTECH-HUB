@@ -202,7 +202,7 @@ Tutor/Homeroom and Form Class. Current student filtering uses Timetable Class
 only, including when it is blank; Tutor is not a substitute for class membership.
 Legacy archived records without that field retain their previous class/homeroom
 filter fallback. Name search also searches timetable class and tutor fields.
-No class-to-homeroom membership is guessed. Zero matches are shown explicitly.
+Year level filter = Staff lists staff from the staff directory (timetable class is ignored) so teachers can open and save their own test record; new staff records default to Year 7 expectations. Staff never appear in student lists. No class-to-homeroom membership is guessed. Zero matches are shown explicitly.
 Filtering away from a student prompts before discarding unsaved edits and clears
 the previous results. Timetable Class and Homeroom are saved separately from class; old records use
 their class as a display fallback. Matching students appear in a visible class

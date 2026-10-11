@@ -72,7 +72,7 @@ function progressionHideEditor() {
 }
 function progressionOpenDialog(student) {
     pp("dialog-title").textContent = student ? student.name : "Student results";
-    pp("dialog-meta").textContent = student ? [`Year ${student.yearLevel}`, student.timetableClass || student.formClass || student.homeroom]
+    pp("dialog-meta").textContent = student ? [student.isStaff ? "Staff" : `Year ${student.yearLevel}`, student.timetableClass || student.formClass || student.homeroom]
         .filter(Boolean).join(" | ") : "";
     if (!pp("dialog").open) pp("dialog").showModal();
 }
@@ -100,7 +100,10 @@ function progressionDiscard() {
 }
 function progressionMatchingStudents(students, homeroom, year, search) {
     const normalise = (value) => String(value || "").trim().toUpperCase();
-    return students.filter((student) => (!homeroom || (student.timetableClass === undefined
+    // Staff only appear under Year level = Staff, where timetable class does not apply.
+    if (year === "staff") return students.filter((student) => student.isStaff
+        && `${student.name} ${student.email}`.toLowerCase().includes(search.trim().toLowerCase()));
+    return students.filter((student) => !student.isStaff && (!homeroom || (student.timetableClass === undefined
         ? [student.homeroom, student.formClass] : [student.timetableClass]).some((value) => normalise(value) === normalise(homeroom)))
         && (!year || Number(student.yearLevel) === Number(year))
         && `${student.name} ${student.email} ${student.timetableClass || ""} ${student.homeroom || ""} ${student.formClass || ""}`.toLowerCase().includes(search.trim().toLowerCase()));
@@ -125,7 +128,7 @@ function progressionStudentOptions() {
     pp("student").replaceChildren(new Option("Select a student", ""));
     pp("roster").replaceChildren();
     for (const student of matching) {
-        const label = `${student.name} - Year ${student.yearLevel} - ${student.timetableClass === undefined ? student.formClass || student.homeroom : student.timetableClass || "No timetable class"}${student.archived ? " (saved history)" : ""}`;
+        const label = student.isStaff ? `${student.name} - Staff` : `${student.name} - Year ${student.yearLevel} - ${student.timetableClass === undefined ? student.formClass || student.homeroom : student.timetableClass || "No timetable class"}${student.archived ? " (saved history)" : ""}`;
         if (student.email) pp("student").append(new Option(label, student.email));
         const row = document.createElement("li");
         const header = document.createElement("div");
@@ -153,7 +156,8 @@ function progressionStudentOptions() {
         pp("roster").append(row);
     }
     pp("student").value = matching.some((student) => student.email === selected) ? selected : "";
-    pp("filter-count").textContent = `${matching.length} matching student${matching.length === 1 ? "" : "s"}${matching.length ? " - class list below." : " - no students match these filters."}`;
+    const people = pp("year-filter").value === "staff" ? ["staff member", "staff members", "staff"] : ["student", "students", "students"];
+    pp("filter-count").textContent = `${matching.length} matching ${people[matching.length === 1 ? 0 : 1]}${matching.length ? " - class list below." : ` - no ${people[2]} match these filters.`}`;
     pp("email-warning").hidden = !matching.some((student) => !student.email);
     pp("email-warning").textContent = "Students without a linked school email are listed, but their email must be added to the student directory before results can be saved.";
     if (selected && !pp("student").value) void progressionLoadStudent("");
@@ -161,7 +165,7 @@ function progressionStudentOptions() {
 function progressionNewRecord(student) {
     const month = new Date().getMonth();
     return { studentEmail: student.email, schoolYear: new Date().getFullYear(), term: Math.min(4, Math.floor(month / 3) + 1),
-        yearLevel: student.yearLevel, formClass: student.formClass, homeroom: student.homeroom || student.formClass,
+        yearLevel: student.isStaff ? 7 : student.yearLevel, formClass: student.formClass, homeroom: student.homeroom || student.formClass,
         timetableClass: student.timetableClass || "", revision: 0, strengths: "", nextLearning: "",
         pathways: progressionPathways.map(([id]) => ({ id, coverage: "not-taught", descriptor: null, addressed: "", evidence: "", notes: "" })) };
 }
