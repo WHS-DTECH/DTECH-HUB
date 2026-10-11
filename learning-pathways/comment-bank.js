@@ -12,7 +12,7 @@
         ["context", "Learning Context", "What the student has been learning."],
         ["strengths", "Learning Strengths", "What the student can demonstrate."],
         ["behaviours", "Learning Behaviours", "How the student approaches learning."],
-        ["next", "Next Learning", "What the student should work on next."]
+        ["next", "Next Learning Steps", "What the student should work on next (goes in the Next learning steps box)."]
     ];
     const levels = [["any", "All levels"], ["beginning", "Beginning"], ["developing", "Developing"], ["confident", "Confident"], ["extending", "Extending"]];
     const pronouns = [["name", "First name each time"], ["she", "She / her"], ["he", "He / his"]];
@@ -493,7 +493,8 @@
         for (const column of ["discipline", "category", "subcategory", "level", "text"]) if (at(column) < 0) throw new Error(`The CSV needs a "${column}" column.`);
         const lookup = (list, value, what, line) => {
             const clean = String(value || "").trim().toLowerCase();
-            const match = list.find(([id, name]) => id === clean || name.toLowerCase() === clean);
+            const alias = { "next learning": "next" }[clean];
+            const match = list.find(([id, name]) => id === clean || id === alias || name.toLowerCase() === clean);
             if (!match) throw new Error(`Row ${line}: unknown ${what} "${value}".`);
             return match[0];
         };

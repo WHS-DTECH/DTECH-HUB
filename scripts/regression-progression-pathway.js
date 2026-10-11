@@ -55,6 +55,8 @@ async function main() {
     assert.ok(!html.includes(">Details</th>") && !html.includes("progression-detail") && !html.includes("progression-strengths"),
         "Details column, Curriculum Coverage & Evidence and Strengths have been removed");
     assert.ok(html.includes('id="progression-next"'), "Next learning remains in the Teacher Summary");
+    assert.ok(html.includes("Next learning steps<textarea") && html.includes('id="progression-cb-next-preview"'), "Next Learning Steps comments preview and land in the Next learning steps box");
+    assert.ok(/progressionCommentText\(true\)[\s\S]*\["next", progressionCommentText\(true\)\]/.test(client), "The builder routes Next Learning Steps comments to the Next learning steps box");
     assert.ok(html.includes('<th scope="col">Coverage</th></tr></thead><tbody id="progression-rows">'), "Learning Pathway Results has no Progress column");
     assert.ok(!client.includes("pathwayDescriptor") && !client.includes("data-pathway-descriptor"), "Pathway Progress selects are removed");
     assert.match(client, /progress\?\.strandProgress\?\.find\(\(row\) => row\.strand === strand && row\.kind === kind\)/, "Summary bars show Statement Set Progress");

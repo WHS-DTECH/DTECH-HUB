@@ -69,23 +69,25 @@
                         <h2>Teacher Summary</h2>
                         <details id="progression-comment-builder" class="progression-comment-builder" data-comment-builder open>
                             <summary>Build the narrative from the Comment Bank</summary>
-                            <p class="progression-cb-help">Choose one comment per category (or skip it), check the preview, then copy it into the Learning narrative and edit it to suit the student. Comments come from <a href="comment-bank.html">Admin &gt; Reporting Comment Bank</a>.</p>
+                            <p class="progression-cb-help">Choose one comment per category (or skip it), check the preview, then copy it into the report and edit it to suit the student. Learning Context, Strengths and Behaviours go into the Learning narrative; Next Learning Steps goes into the Next learning steps box. Comments come from <a href="comment-bank.html">Admin &gt; Reporting Comment Bank</a>.</p>
                             <div class="progression-cb-options">
                                 <label>Name used<input id="progression-cb-name" maxlength="40" autocomplete="off"></label>
                                 <label>Later sentences<select id="progression-cb-pronoun"></select></label>
                                 <label>Discipline<select id="progression-cb-discipline"></select></label>
                             </div>
                             <div id="progression-cb-rows" class="progression-cb-rows"></div>
-                            <p class="progression-cb-preview-label">Preview</p>
+                            <p class="progression-cb-preview-label">Learning narrative preview</p>
                             <p id="progression-cb-preview" class="progression-cb-preview" aria-live="polite"></p>
+                            <p class="progression-cb-preview-label">Next learning steps preview</p>
+                            <p id="progression-cb-next-preview" class="progression-cb-preview" aria-live="polite"></p>
                             <div class="progression-cb-actions">
-                                <button type="button" class="button button-primary" id="progression-cb-use">Use as Learning narrative</button>
-                                <button type="button" class="button button-secondary" id="progression-cb-append">Add to end of narrative</button>
+                                <button type="button" class="button button-primary" id="progression-cb-use">Use in report</button>
+                                <button type="button" class="button button-secondary" id="progression-cb-append">Add to end of report text</button>
                                 <button type="button" class="button button-secondary" id="progression-cb-clear">Clear selections</button>
                             </div>
                         </details>
                         <label>Learning narrative<textarea id="progression-narrative" rows="6" maxlength="5000" placeholder="Describe the student's learning journey this term: what they explored, created and achieved."></textarea></label>
-                        <label>Next learning<textarea id="progression-next" rows="3" maxlength="5000"></textarea></label>
+                        <label>Next learning steps<textarea id="progression-next" rows="3" maxlength="5000"></textarea></label>
                         <p class="progression-autosave-note">Changes save automatically.</p>
                         <p id="progression-saved" role="status" aria-live="polite"></p>
                         <button class="button button-primary" id="progression-save" type="submit" hidden>Retry save</button>

@@ -719,28 +719,39 @@ function progressionCommentRender() {
     }
     progressionCommentPreview();
 }
-function progressionCommentText() {
+function progressionCommentText(next = false) {
     const cb = window.commentBank;
     const bank = progressionCommentBank();
     if (!cb || !bank) return "";
-    const texts = cb.categories.map(([category]) => bank.comments.find((comment) => comment.id === progression.commentPicks[category]?.id)?.text);
+    const texts = cb.categories.filter(([category]) => (category === "next") === next)
+        .map(([category]) => bank.comments.find((comment) => comment.id === progression.commentPicks[category]?.id)?.text);
     return cb.compose(texts.filter(Boolean), progressionCommentOptions());
 }
 function progressionCommentPreview() {
     const text = progressionCommentText();
-    pp("cb-preview").textContent = text || "Select comments above to build the narrative.";
+    const next = progressionCommentText(true);
+    pp("cb-preview").textContent = text || "Select Learning Context, Strengths or Behaviours comments to build the narrative.";
     pp("cb-preview").classList.toggle("is-empty", !text);
-    pp("cb-use").disabled = !text;
-    pp("cb-append").disabled = !text;
+    pp("cb-next-preview").textContent = next || "Select a Next Learning Steps comment.";
+    pp("cb-next-preview").classList.toggle("is-empty", !next);
+    pp("cb-use").disabled = !text && !next;
+    pp("cb-append").disabled = !text && !next;
 }
 function progressionCommentApply(append) {
-    const text = progressionCommentText();
-    if (!text || !progression.record) return;
-    const current = pp("narrative").value.trim();
-    if (!append && current && current !== text && !window.confirm("Replace the current Learning narrative with the built paragraph?")) return;
-    pp("narrative").value = append && current ? `${current} ${text}` : text;
-    pp("narrative").dispatchEvent(new Event("input", { bubbles: true }));
-    pp("narrative").focus();
+    if (!progression.record) return;
+    const parts = [["narrative", progressionCommentText()], ["next", progressionCommentText(true)]].filter(([, text]) => text);
+    if (!parts.length) return;
+    const replacing = parts.filter(([field, text]) => { const current = pp(field).value.trim(); return current && current !== text; });
+    if (!append && replacing.length) {
+        const names = replacing.map(([field]) => field === "next" ? "Next learning steps" : "Learning narrative").join(" and ");
+        if (!window.confirm(`Replace the current ${names} with the built text?`)) return;
+    }
+    for (const [field, text] of parts) {
+        const current = pp(field).value.trim();
+        pp(field).value = append && current ? `${current} ${text}` : text;
+        pp(field).dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    pp(parts[0][0]).focus();
 }
 const progressionFilters = { search: "", "homeroom-filter": "", "year-filter": "" };
 async function progressionFilterChanged(name) {

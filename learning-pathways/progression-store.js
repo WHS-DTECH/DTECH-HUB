@@ -73,7 +73,7 @@ function validateRecord(body) {
         ...(body.timetableClass === undefined ? {} : { timetableClass: text(body.timetableClass, "timetable class", 100) }),
         homeroom: body.homeroom === undefined ? text(body.formClass, "class", 100) : text(body.homeroom, "homeroom", 100),
         ...(body.learningNarrative === undefined ? {} : { learningNarrative: text(body.learningNarrative, "learning narrative") }),
-        strengths: text(body.strengths, "strengths"), nextLearning: text(body.nextLearning, "next learning") };
+        strengths: text(body.strengths, "strengths"), nextLearning: text(body.nextLearning, "next learning steps") };
 }
 
 function registerProgressionPathway(app, { pool, hasDatabase, requireTeacherAccess, requireAdminAccess, getStudents, getStaff }) {

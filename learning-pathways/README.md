@@ -285,7 +285,7 @@ Admin Menu > Reporting Comment Bank (`comment-bank.html`, `comment-bank-admin.js
 `comment-bank.js` (shared by browser and server) holds the categories, development
 levels, validation, CSV import/export, sentence composition and the starter bank
 (about 160 DTECH comments). Comments are organised Discipline > Category (Learning
-Context, Learning Strengths, Learning Behaviours, Next Learning) > Subcategory >
+Context, Learning Strengths, Learning Behaviours, Next Learning Steps) > Subcategory >
 Development Level (All levels, Beginning, Developing, Confident, Extending) > Display
 Order, and can be added, edited, reordered, duplicated, copied to another discipline,
 deactivated or deleted. Comment text uses `{name}` / `{name}'s`; the first mention
@@ -296,8 +296,9 @@ becomes the student's first name and later ones the teacher's chosen pronoun.
 `GET`/`PUT /api/admin/progression/comment-bank`. Teachers read active comments from
 `GET /api/teacher/progression/comment-bank`. In the Progression Pathway dialog the
 "Build the narrative from the Comment Bank" panel lets the teacher pick one comment per
-category (or skip), preview the paragraph and copy it into the Learning narrative to
-edit. Picks are never automatic or saved; the narrative is saved as text, so later bank
+category (or skip), preview the text and copy it into the report to edit: Context,
+Strengths and Behaviours go into the Learning narrative, and the Next Learning Steps
+comment goes into the Next learning steps box. Picks are never automatic or saved; the narrative is saved as text, so later bank
 edits do not change saved reports. Run `node scripts/regression-comment-bank.js`.
 
 Public reads: `/learning-pathways/library.json` and
