@@ -304,7 +304,7 @@ async function main() {
         "Activity 1 links the Binary Piano template");
     assert.deepEqual([...activityPage.matchAll(/<span class="activity-step-title">([^<]+)<\/span>/g)].map((match) => match[1]),
         ["Collect", "Find", "Cut", "Fold", "Check", "Glue", "Name it"], "Instructions are student-friendly step cards");
-    assert.equal((activityPage.match(/class="activity-step-check"/g) || []).length, 7, "Each step can be ticked off");
+    assert.doesNotMatch(activityPage, /activity-step-check|Tick when done|Tick each step/, "Steps have no tick-off completion requirement");
     assert.match(activityPage, /class="activity-step activity-step-warning">[\s\S]*?Do not glue the moving tabs down!/, "The glue step is highlighted as a warning");
     assert.match(activityPage, /Do not glue the moving tabs down!/);
     assert.match(activityPage, /Completion check:<\/strong> I have built a Binary Piano with working tabs\./);
