@@ -299,7 +299,9 @@ async function main() {
     for (const heading of ["Your Mission", "You Will Need", "Instructions", "Try It Out", "Finished?"]) {
         assert.ok(activityPage.includes(`>${heading}</h2>`), `Activity page includes ${heading}`);
     }
-    assert.equal((activityPage.match(/<li>/g) || []).length, 4 + 7 + 5, "Activity page lists 4 materials, 7 steps and 5 place values");
+    assert.equal((activityPage.match(/<li[ >]/g) || []).length, 4 + 7 + 5, "Activity page lists 4 materials, 7 steps and 5 place values");
+    assert.match(activityPage, /<li class="activity-need-link"><a href="https:\/\/drive\.google\.com\/file\/d\/1aK-68ZEd-Z_19HUUOYF3Q-qaB8RVs0kK\/view\?usp=drive_link" target="_blank" rel="noopener noreferrer">Binary Piano template provided by your teacher<\/a><\/li>/,
+        "Activity 1 links the Binary Piano template");
     assert.match(activityPage, /Do not glue the moving tabs down!/);
     assert.match(activityPage, /Completion check:<\/strong> I have built a Binary Piano with working tabs\./);
     assert.match(activityPage, /class="hero practical-skills-hero activity-hero"/);

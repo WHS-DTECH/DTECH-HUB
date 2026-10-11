@@ -883,6 +883,28 @@
     font-weight: 700;
 }
 
+.activity-needs li.activity-need-link {
+    padding: 0;
+    border: 0;
+    background: none;
+}
+
+.activity-need-link a {
+    display: inline-block;
+    padding: 8px 16px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #1f6b3a 0%, #2f9e55 100%);
+    box-shadow: 0 2px 6px rgba(31, 107, 58, 0.25);
+    color: #fff;
+    text-decoration: none;
+}
+
+.activity-need-link a:hover,
+.activity-need-link a:focus-visible {
+    filter: brightness(1.08);
+    text-decoration: underline;
+}
+
 .activity-steps {
     display: grid;
     gap: 10px;
