@@ -180,19 +180,12 @@ function progressionDialogSummary() {
         : progress ? `Progression summary - ${progress.schoolYear} Term ${progress.term}` : "Progression summary - no results saved yet";
     pp("dialog-summary").replaceChildren(summary);
 }
-function progressionDetail() {
-    const definition = progressionPathways.find(([id]) => id === progression.selected);
-    const row = progression.record.pathways.find((item) => item.id === progression.selected);
-    pp("detail-title").textContent = definition[1];
-    pp("reference").href = `/learning-pathways/${definition[2]}.html`;
-    for (const key of ["addressed", "evidence", "notes"]) pp(key).value = row[key];
-}
 function progressionRender(record) {
     progression.record = JSON.parse(JSON.stringify(record));
     progression.dirty = false;
     pp("editor").hidden = false;
     pp("editor").disabled = false;
-    for (const [control, key] of [["year", "schoolYear"], ["term", "term"], ["level", "yearLevel"], ["class", "formClass"], ["strengths", "strengths"], ["next", "nextLearning"]]) {
+    for (const [control, key] of [["year", "schoolYear"], ["term", "term"], ["level", "yearLevel"], ["class", "formClass"], ["next", "nextLearning"]]) {
         pp(control).value = record[key];
     }
     pp("homeroom").value = record.homeroom || record.formClass;
@@ -226,14 +219,9 @@ function progressionRender(record) {
             colour(); progression.dirty = true; progressionDialogSummary();
         });
         descriptor.addEventListener("change", () => { result.descriptor = descriptor.value || null; colour(); progression.dirty = true; progressionDialogSummary(); });
-        const details = document.createElement("button");
-        details.type = "button"; details.className = "button button-secondary"; details.textContent = "View / edit";
-        details.setAttribute("aria-label", `View or edit ${title} evidence`);
-        details.addEventListener("click", () => { progression.selected = id; progressionDetail(); pp("detail").scrollIntoView({ block: "nearest" }); });
-        for (const element of [coverage, descriptor, details]) { const cell = document.createElement("td"); cell.append(element); row.append(cell); }
+        for (const element of [coverage, descriptor]) { const cell = document.createElement("td"); cell.append(element); row.append(cell); }
         pp("rows").append(row);
     }
-    progressionDetail();
     progressionDialogSummary();
 }
 function progressionAnnualRecord(records, student, schoolYear) {
@@ -257,7 +245,7 @@ async function progressionLoadStudent(email) {
         const record = progressionAnnualRecord(data.records, student, new Date().getFullYear());
         progressionRender(record || progressionNewRecord(student));
         progressionOpenDialog(student);
-        progressionStatus("Select a pathway to record coverage and evidence. Changes are not saved until you press Save.");
+        progressionStatus("Record coverage and progress for each pathway. Changes are not saved until you press Save.");
     } catch (error) {
         if (request !== progression.loading) return;
         console.error("Could not load progression term results", error);
@@ -338,17 +326,13 @@ pp("student").addEventListener("change", () => {
     if (!progressionDiscard()) { pp("student").value = progression.record?.studentEmail || ""; return; }
     void progressionLoadStudent(pp("student").value);
 });
-for (const key of ["addressed", "evidence", "notes"]) pp(key).addEventListener("input", () => {
-    progression.record.pathways.find((row) => row.id === progression.selected)[key] = pp(key).value;
-    progression.dirty = true;
-});
 pp("form").addEventListener("input", () => { if (progression.record) progression.dirty = true; });
 pp("form").addEventListener("submit", async (event) => {
     event.preventDefault();
     if (progression.saving || !progression.record) return;
     const record = { ...progression.record, schoolYear: Number(pp("year").value), term: Number(pp("term").value),
         yearLevel: Number(pp("level").value), formClass: pp("class").value, homeroom: pp("homeroom").value,
-        timetableClass: pp("timetable-class").value, strengths: pp("strengths").value, nextLearning: pp("next").value };
+        timetableClass: pp("timetable-class").value, nextLearning: pp("next").value };
     progression.saving = true;
     const teacherEmail = hubAuthState.profile?.email;
     pp("editor").disabled = true; pp("controls").disabled = true;
