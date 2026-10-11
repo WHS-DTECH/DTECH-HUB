@@ -51,6 +51,9 @@
     const messageOutput = $("#encoding-message");
     const challengeInput = $("#encoding-challenge-word");
     const challengeHost = $("#encoding-challenge");
+    const challengeMessage = $("#encoding-challenge-message");
+    const challengeMessageBits = $("#encoding-challenge-bits");
+    const challengeMessageDone = $("#encoding-challenge-done");
 
     const el = (tag, className, text) => {
         const node = document.createElement(tag);
@@ -161,15 +164,26 @@
         changed();
     });
 
-    function renderMessage() {
-        messageOutput.replaceChildren();
-        [...WORD].forEach((letter, index) => {
-            const bits = index === 0 ? "10100" : state.letters[index];
-            const done = index === 0 || bits === toBinary(letterValue(letter));
+    function renderChips(host, word, bitsAt) {
+        host.replaceChildren();
+        let complete = word.length > 0;
+        [...word].forEach((letter, index) => {
+            const bits = bitsAt(index);
+            const done = bits === toBinary(letterValue(letter));
+            if (!done) complete = false;
             const chip = el("span", `encoding-message-chip${done ? " is-done" : ""}`);
             chip.append(el("b", "", letter), el("span", "", done ? bits : "?????"));
-            messageOutput.append(chip);
+            host.append(chip);
         });
+        return complete;
+    }
+
+    function renderMessage() {
+        renderChips(messageOutput, WORD, (index) => (index === 0 ? "10100" : state.letters[index]));
+        const word = state.challenge.word;
+        challengeMessage.hidden = !word;
+        const complete = renderChips(challengeMessageBits, word, (index) => state.challenge.bits[index]);
+        challengeMessageDone.textContent = complete ? `\u2713 You encoded ${word} in binary!` : "";
     }
 
     function renderCompletion() {

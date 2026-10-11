@@ -171,6 +171,8 @@ function testPage() {
     assert.match(page, /When you have completed all the letters in Part D, your work will be saved automatically\./);
     assert.doesNotMatch(page, /id="encoding-finish"|Save and finish/, "No finish button: completion is automatic");
     assert.doesNotMatch(script, /completed: markComplete|encoding-finish"/, "Client does not request completion");
+    assert.match(page, /<div id="encoding-challenge" class="encoding-letters"><\/div>\s*<div id="encoding-challenge-message" class="encoding-message" hidden>\s*<p class="encoding-message-label">Your encoded word<\/p>/,
+        "Optional word has its own encoded message panel beneath its letters");
 
     const server = read("server.js");
     assert.match(server, /require\("\.\/learning-pathways\/activity-progress-store"\)\.registerActivityProgress\(app, \{\s*pool, hasDatabase, getRequestUserEmail, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN/);

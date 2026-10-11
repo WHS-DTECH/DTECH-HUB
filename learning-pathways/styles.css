@@ -1516,6 +1516,16 @@
     margin: 0;
 }
 
+.encoding-message-done {
+    margin: 0;
+    font-weight: 800;
+    color: #bdf5cd;
+}
+
+.encoding-message-done:not(:empty) {
+    margin-top: 12px;
+}
+
 .encoding-message-chip {
     display: flex;
     flex-direction: column;

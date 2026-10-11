@@ -120,6 +120,11 @@
                 <label class="encoding-word-label" for="encoding-challenge-word">Your word</label>
                 <input id="encoding-challenge-word" class="encoding-word-input" type="text" maxlength="10" autocomplete="off" spellcheck="false" placeholder="e.g. CODE">
                 <div id="encoding-challenge" class="encoding-letters"></div>
+                <div id="encoding-challenge-message" class="encoding-message" hidden>
+                    <p class="encoding-message-label">Your encoded word</p>
+                    <p id="encoding-challenge-bits" class="encoding-message-bits" aria-live="polite"></p>
+                    <p id="encoding-challenge-done" class="encoding-message-done" role="status"></p>
+                </div>
             </section>
 
             <section class="panel-section activity-finished" aria-labelledby="finished">
