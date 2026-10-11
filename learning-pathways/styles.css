@@ -289,6 +289,51 @@
     margin-top: 18px;
 }
 
+.curriculum-jump-links {
+    border-left: 6px solid #f2b134;
+    background: linear-gradient(135deg, #163a5c 0%, #1f5f8b 100%);
+    color: #fff;
+}
+
+.curriculum-jump-links h2 {
+    margin-top: 0;
+    color: #fff;
+}
+
+.curriculum-jump-links ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.curriculum-jump-links a {
+    display: inline-block;
+    padding: 8px 16px;
+    border: 2px solid #fff;
+    border-radius: 999px;
+    background: #fff;
+    color: #163a5c;
+    font-weight: 700;
+    text-decoration: none;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.curriculum-jump-links a:hover,
+.curriculum-jump-links a:focus-visible {
+    background: #f2b134;
+    border-color: #f2b134;
+    color: #12304d;
+    outline: none;
+}
+
+.curriculum-jump-links a:focus-visible {
+    box-shadow: 0 0 0 3px #fff;
+}
+
 .curriculum-table-wrap {
     max-width: 100%;
 }

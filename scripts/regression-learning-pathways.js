@@ -245,8 +245,11 @@ async function main() {
         assert.ok(curriculumPage.includes(heading), `Digital Systems learning contexts include ${heading}`);
     }
     assert.doesNotMatch(curriculumPage, /Future activities - proposed/, "Digital Systems uses the teacher-supplied learning contexts");
-    assert.match(curriculumPage, /aria-labelledby="overview">[\s\S]*?<\/section>\s*<section class="panel-section curriculum-pathway-aim" aria-labelledby="pathway-aim">/,
-        "Pathway Aim follows the Overview");
+    assert.match(curriculumPage, /aria-labelledby="overview">[\s\S]*?<\/section>\s*<nav class="panel-section curriculum-jump-links" aria-labelledby="on-this-page">[\s\S]*?<\/nav>\s*<section class="panel-section curriculum-pathway-aim" aria-labelledby="pathway-aim">/,
+        "Section links sit in their own box between the Overview and the Pathway Aim");
+    const jumpLinks = [...curriculumPage.match(/<nav class="panel-section curriculum-jump-links"[\s\S]*?<\/nav>/)[0].matchAll(/href="#([^"]+)"/g)].map((match) => match[1]);
+    const sectionIds = [...curriculumPage.matchAll(/<h2 id="([^"]+)"/g)].map((match) => match[1]).filter((id) => !["overview", "on-this-page"].includes(id));
+    assert.deepEqual(jumpLinks, sectionIds, "Section link pills list every section in page order");
     assert.match(curriculumPage, /<h3>Skills Developed<\/h3>/);
     assert.match(curriculumPage, /aria-labelledby="school-values">[\s\S]*?<\/section>\s*<section class="panel-section" aria-labelledby="learning-contexts">/,
         "School Values comes directly before Learning Contexts");
