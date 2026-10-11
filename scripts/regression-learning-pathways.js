@@ -230,9 +230,10 @@ async function main() {
     }
     const curriculumPage = fs.readFileSync(path.join(root, "learning-pathways/digital-systems.html"), "utf8");
     for (const heading of ["Overview", "Official Curriculum Strand", "Year 7 Knowledge and Practices",
-        "Year 8 Knowledge and Practices", "Design, Make, and Innovate", "Progression Matrix", "Learning Contexts", "Teacher Notes"]) {
+        "Year 8 Knowledge and Practices", "Design, Make, and Innovate", "Progression Matrix", "Learning Contexts"]) {
         assert.ok(curriculumPage.includes(heading), `Curriculum page includes ${heading}`);
     }
+    assert.doesNotMatch(curriculumPage, /teacher-notes|<h2[^>]*>Teacher Notes</, "Digital Systems no longer has a Teacher Notes section");
     assert.match(curriculumPage, /scope="col">Year 7 Knowledge and Practices<\/th><th scope="col">Year 8 Knowledge and Practices/);
     assert.match(curriculumPage, /Proposed curriculum/);
     assert.match(curriculumPage, /paraphrased/);
