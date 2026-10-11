@@ -3,6 +3,7 @@
 const pathwayIds = ["digital-systems", "data", "digital-citizenship", "programming-and-algorithms", "systems-and-control"];
 const coverageValues = ["not-taught", "partly-taught", "taught"];
 const descriptorValues = ["emerging", "developing", "consolidating", "proficient", "exceeding"];
+const disciplineValues = ["dtech", "textiles", "food", "wood", "dvc"];
 
 function validateRecord(body) {
     if (!body || typeof body !== "object") throw new Error("A rotation record is required.");
@@ -23,7 +24,9 @@ function validateRecord(body) {
         if (!coverageValues.includes(row.coverage)) throw new Error("Invalid curriculum coverage.");
         if (row.descriptor !== null && !descriptorValues.includes(row.descriptor)) throw new Error("Invalid progress descriptor.");
         if (row.coverage === "not-taught" && row.descriptor !== null) throw new Error("Not taught pathways must be Not determined.");
-        return { id, coverage: row.coverage, descriptor: row.descriptor,
+        const discipline = row.discipline === undefined ? "dtech" : row.discipline;
+        if (!disciplineValues.includes(discipline)) throw new Error("Invalid discipline.");
+        return { id, coverage: row.coverage, descriptor: row.descriptor, discipline,
             addressed: text(row.addressed, "knowledge and practices"),
             evidence: text(row.evidence, "evidence"), notes: text(row.notes, "teacher notes") };
     });
@@ -142,4 +145,4 @@ function registerProgressionPathway(app, { pool, hasDatabase, requireTeacherAcce
     });
 }
 
-module.exports = { registerProgressionPathway, validateRecord };
+module.exports = { disciplineValues, registerProgressionPathway, validateRecord };

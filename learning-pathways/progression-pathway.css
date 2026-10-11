@@ -29,6 +29,9 @@
 }
 .progression-page .curriculum-table { table-layout: auto; }
 .progression-page .curriculum-table td { vertical-align: middle; }
+.progression-page .curriculum-table th[scope="row"] { min-width: 320px; }
+.progression-statement { margin: 6px 0 0; font-weight: 400; font-size: 0.88rem; line-height: 1.4; color: #34465c; }
+.progression-th-note { font-weight: 400; font-size: 0.8rem; }
 .progression-dialog { width: min(980px, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0; border: 1px solid #b9cbde; border-radius: 14px; color: #24344a; background: #f5f8fc; box-shadow: 0 24px 60px rgba(20, 35, 60, 0.35); }
 .progression-dialog::backdrop { background: rgba(20, 35, 60, 0.55); }
 .progression-dialog-header { position: sticky; top: 0; z-index: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 16px 22px; border-bottom: 1px solid #cfdded; background: #fff; }
@@ -52,4 +55,4 @@
 .proficient { background: #278c78 !important; }
 .exceeding { background: #427bbb !important; }
 .progression-page select.descriptor-chip { color: #000; border: 2px solid #24344a; }
-@media (max-width: 700px) { .progression-page .curriculum-table { min-width: 760px; } }
+@media (max-width: 700px) { .progression-page .curriculum-table { min-width: 900px; } }

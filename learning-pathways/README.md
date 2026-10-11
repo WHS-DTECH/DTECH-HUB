@@ -178,7 +178,11 @@ and access checks.
 `progression-pathway.html`, `.js`, `.css` and `progression-store.js` provide the
 Student Work > Progression Pathway tracker. The layout follows the supplied
 JuniorDTECH tracker concept: student/timetable class, five pathway results (coverage
-and progress) and a teacher next-learning summary.
+and progress) and a teacher next-learning summary. Each pathway row shows a
+Year 7/8/9/10 statement (paraphrased from the September 2026 teaching sequence
+practices) that follows the dialog's student year level, plus a Discipline
+dropdown (DTECH default; Textiles, Food, Wood, DVC) saved per pathway as
+`discipline`. Records saved before this default to DTECH.
 The five user-supplied descriptors and colours are teacher selected. Coverage
 is separate; Not taught requires Not determined. No kit-derived grades or
 student-facing results are added.

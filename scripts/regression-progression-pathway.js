@@ -8,7 +8,7 @@ const { registerProgressionPathway, validateRecord } = require("../learning-path
 const ids = ["digital-systems", "data", "digital-citizenship", "programming-and-algorithms", "systems-and-control"];
 const sample = { studentEmail: "student@example.test", schoolYear: 2027, term: 1, yearLevel: 7,
     revision: 0, formClass: "7XX", homeroom: "JPI", timetableClass: "JPI", strengths: "", nextLearning: "",
-    pathways: ids.map((id) => ({ id, coverage: "not-taught", descriptor: null, addressed: "", evidence: "", notes: "" })) };
+    pathways: ids.map((id) => ({ id, coverage: "not-taught", descriptor: null, discipline: "dtech", addressed: "", evidence: "", notes: "" })) };
 const clone = (value) => JSON.parse(JSON.stringify(value));
 async function main() {
     const root = path.join(__dirname, "..");
@@ -57,6 +57,15 @@ async function main() {
     assert.ok(html.includes('id="progression-next"'), "Next learning remains in the Teacher Summary");
     assert.ok(!client.includes('descriptor.disabled'), "All five Progress descriptors can be selected for every pathway");
     assert.match(client, /result\.descriptor && result\.coverage === "not-taught"\) \{ result\.coverage = "partly-taught"/, "Choosing a descriptor keeps coverage valid");
+    vm.runInContext(client.slice(client.indexOf("const progressionYearStatements"), client.indexOf("function progressionUpdateStatements(")), context);
+    for (const id of ids) for (const year of [7, 8, 9, 10]) {
+        assert.match(context.progressionStatement(id, year), new RegExp(`^Year ${year}: \\S`), `${id} has a Year ${year} statement`);
+    }
+    assert.notEqual(context.progressionStatement("data", 7), context.progressionStatement("data", 10), "Statements change with year level");
+    assert.match(client, /progressionDisciplines = \[\["dtech", "DTECH"\], \["textiles", "Textiles"\], \["food", "Food"\], \["wood", "Wood"\], \["dvc", "DVC"\]\]/);
+    assert.match(client, /discipline: "dtech", addressed/, "New records default to the DTECH discipline");
+    assert.match(client, /pp\("level"\)\.addEventListener\("change", progressionUpdateStatements\)/, "Changing year level updates the statements");
+    assert.ok(html.includes('<th scope="col">Discipline</th>'));
     assert.ok(!client.includes("View / edit") && !client.includes('pp("strengths")') && !client.includes("progressionDetail"));
     assert.ok(!client.includes('pp("history")'), "No handlers depend on the removed selector");
     vm.runInContext(client.slice(client.indexOf("function progressionAnnualRecord("), client.indexOf("async function progressionLoadStudent(")), context);
@@ -157,6 +166,16 @@ async function main() {
         rated.pathways[0].descriptor = descriptor;
         assert.equal(validateRecord(rated).pathways[0].descriptor, descriptor);
     }
+    const noDiscipline = clone(sample);
+    delete noDiscipline.pathways[0].discipline;
+    assert.equal(validateRecord(noDiscipline).pathways[0].discipline, "dtech", "Records saved before disciplines default to DTECH");
+    for (const discipline of ["dtech", "textiles", "food", "wood", "dvc"]) {
+        rated.pathways[0].discipline = discipline;
+        assert.equal(validateRecord(rated).pathways[0].discipline, discipline);
+    }
+    rated.pathways[0].discipline = "metal";
+    assert.throws(() => validateRecord(rated), /discipline/);
+    rated.pathways[0].discipline = "textiles";
     rated.pathways[0].descriptor = "achieved";
     assert.throws(() => validateRecord(rated));
     rated.pathways[0].descriptor = "proficient";
