@@ -143,11 +143,11 @@ async function testDashboard() {
     assert.match(grid.children[2].innerHTML, />Lesson Activities</);
     assert.deepEqual(elements["#practical-skills-type-pills"].children.map((pill) => pill.textContent), ["All", "Curriculum Strands", "Lessons", "Lesson Activities"]);
     config.dataset = {};
-    responseCards = [sample, { ...sample, id: "practical-skills-checklist", title: "Licence" }];
+    responseCards = [{ ...sample, cardLabel: "LICENCE KIT" }, { ...sample, id: "practical-skills-checklist", title: "Licence" }];
     vm.runInContext(fs.readFileSync(path.join(root, "practical-skills/app.js"), "utf8"), context);
     await tick();
     assert.equal(grid.children.length, 1, "Licence Library still excludes the standalone checklist");
-    assert.match(grid.children[0].innerHTML, /PRACTICAL SKILL/);
+    assert.match(grid.children[0].innerHTML, /LICENCE KIT/, "Licence Library honours a card-specific footer label");
     assert.match(grid.children[0].innerHTML, /#2f8f61/, "Existing Licence Library green palette is preserved");
 }
 

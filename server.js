@@ -6118,7 +6118,17 @@ app.use("/images/activities", express.static(path.join(__dirname, "public", "ima
 app.get("/practical-skills/library.json", async (_req, res) => {
   try {
     await ensureCustomPracticalSkillsKitsLoaded();
-    const kitCards = await readPracticalSkillsLibraryFile();
+    const kitCards = (await readPracticalSkillsLibraryFile())
+      .map((card) => getPracticalSkillsKitDefinition(card.id)
+        ? {
+            ...card,
+            cardLabel: "LICENCE KIT",
+            visual: {
+              ...card.visual,
+              palette: "linear-gradient(135deg, #173858 0%, #246b78 54%, #4fa38d 100%)"
+            }
+          }
+        : card);
     const activityCards = (await Promise.all(kitCards.map((card) => buildPracticalSkillsActivityLibraryCards(card))))
       .flat();
     res.set("Cache-Control", "no-store");
@@ -6527,8 +6537,9 @@ async function buildPracticalSkillsActivityLibraryCards(kitCard) {
         status: kitCard.status || "active",
         href: `/practical-skills/kit-worksheet.html?kit=${encodeURIComponent(kitId)}&activity=${index}`,
         visual: { icon: themeIcon }
-      });
+      }, index);
     })
+    .map((card) => card ? { ...card, cardLabel: "PRACTICAL SKILL" } : null)
     .filter(Boolean);
 }
 

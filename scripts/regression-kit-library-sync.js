@@ -20,6 +20,25 @@ const existingCards = [{
 }];
 let persistedCards = existingCards;
 
+const libraryRouteIndex = serverSource.indexOf('app.get("/practical-skills/library.json"');
+const libraryRouteEnd = serverSource.indexOf('\nrequire("./learning-pathways/library-store")', libraryRouteIndex);
+assert.ok(libraryRouteIndex >= 0 && libraryRouteEnd > libraryRouteIndex, "Licence library route exists");
+const libraryRoutes = {};
+const libraryRouteContext = vm.createContext({
+    app: { get: (url, handler) => { libraryRoutes[url] = handler; } },
+    ensureCustomPracticalSkillsKitsLoaded: async () => {},
+    readPracticalSkillsLibraryFile: async () => [
+        { id: "kit-login", title: "Login Kit", visual: { icon: "🔐", palette: "old kit palette" } },
+        { id: "teacher-card", title: "Teacher Card", visual: { icon: "T", palette: "teacher palette" } }
+    ],
+    getPracticalSkillsKitDefinition: (id) => id === "kit-login",
+    buildPracticalSkillsActivityLibraryCards: async (card) => card.id === "kit-login"
+        ? [{ id: "activity-kit-login-0", title: "Sign In", cardLabel: "PRACTICAL SKILL", visual: { palette: "activity palette" } }]
+        : [],
+    Promise
+});
+vm.runInContext(serverSource.slice(libraryRouteIndex, libraryRouteEnd), libraryRouteContext);
+
 const helperStart = serverSource.indexOf("async function syncPracticalSkillsKitLibraryCard(");
 const helperEnd = serverSource.indexOf("\nasync function getSuggestionRecipients()", helperStart);
 assert.ok(helperStart >= 0 && helperEnd > helperStart, "Kit library sync helper exists");
@@ -32,6 +51,19 @@ const libraryContext = vm.createContext({
 vm.runInContext(serverSource.slice(helperStart, helperEnd), libraryContext);
 
 async function main() {
+    const libraryResponse = {
+        set() {},
+        json(body) { this.body = body; },
+        status() { return this; }
+    };
+    await libraryRoutes["/practical-skills/library.json"]({}, libraryResponse);
+    assert.equal(libraryResponse.body[0].cardLabel, "LICENCE KIT");
+    assert.match(libraryResponse.body[0].visual.palette, /#173858/, "Licence Kits use the distinct blue-teal palette");
+    assert.equal(libraryResponse.body[1].cardLabel, undefined, "Independent library cards retain their existing presentation");
+    assert.equal(libraryResponse.body[1].visual.palette, "teacher palette");
+    assert.equal(libraryResponse.body[2].cardLabel, "PRACTICAL SKILL", "Kit activities keep the Practical Skill label");
+    assert.equal(libraryResponse.body[2].visual.palette, "activity palette");
+
     const saved = {
         identity: { name: "Search Kit", yearLevel: "Junior DTECH", skillArea: "Search Skills", status: "active" },
         bannerTitle: "Search Kit",

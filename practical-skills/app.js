@@ -188,7 +188,7 @@
                     <span class="project-tag">${escapeHtml(item.area || "Licence")}</span>
                 </div>
                 <div class="project-footer">
-                    <span class="project-meta">${escapeHtml(isPathways ? cardTypeNames[cardType(item)] : config.libraryCardLabel || "PRACTICAL SKILL")}</span>
+                    <span class="project-meta">${escapeHtml(isPathways ? cardTypeNames[cardType(item)] : item.cardLabel || config.libraryCardLabel || "PRACTICAL SKILL")}</span>
                 </div>
             </div>
         `;
