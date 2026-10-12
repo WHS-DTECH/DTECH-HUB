@@ -46,10 +46,16 @@ async function main() {
         const codedProfile = hunt.getHuntProfile({ year_level: "Year 8 - JuniorDTECH", programs: [code] });
         assert.deepEqual(codedProfile.courseIds, ["8DTECH"], `${code} is recognised as a JuniorDTECH timetable code`);
     }
+    for (const code of ["SRDTECH", "PIDTECH", "VEDTECH", "MMDTECH", "SDTECH", "JDTECH", "8SDTECH", "7SDTECH"]) {
+        const homeroomProfile = hunt.getHuntProfile({ year_level: "Year 7", homeroom: code });
+        assert.deepEqual(homeroomProfile.courseIds, ["7DTECH"], `${code} in homeroom matches the Year 7 JuniorDTECH class`);
+    }
     assert.deepEqual(hunt.getHuntProfile({ programs: ["8SDTECH"] }).courseIds, ["8DTECH"],
         "A year-prefixed DTECH code can supply the year when the year-level field is missing");
     assert.deepEqual(hunt.getHuntProfile({ dtech_timetable: [{ value: "7SDTECH" }] }).courseIds, ["7DTECH"],
         "Year-prefixed codes in DTECH timetable entries are recognised");
+    assert.deepEqual(hunt.getHuntProfile({ form_class: "8SDTECH" }).courseIds, ["8DTECH"],
+        "A year-prefixed form-class code supplies the JuniorDTECH year");
     const staffAnswers = { ...answers, course: "STAFF" };
     assert.equal(hunt.gradeLearningSites(staffAnswers, hunt.getHuntProfile(null, { isStaff: true })).passed, true);
     assert.equal(hunt.gradeLearningSites({ ...staffAnswers, "course-clue-1": "wrong" }, hunt.getHuntProfile(null, { isStaff: true })).score, 7);

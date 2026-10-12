@@ -95,13 +95,16 @@ function getHuntProfile(student, { isStaff = false } = {}) {
     }
     const rawPrograms = Array.isArray(student?.programs) ? student.programs.map((program) => String(program).trim().toUpperCase()) : [];
     const timetable = (student?.dtech_timetable || []).map((entry) => String(entry?.value || "").trim().toUpperCase());
+    const classCodes = [student?.homeroom, student?.form_class, student?.timetable_class]
+        .map((value) => String(value || "").trim().toUpperCase()).filter(Boolean);
+    const profileCodes = [...rawPrograms, ...timetable, ...classCodes];
     const yearText = String(student?.year_level || "").trim();
     const yearMatch = yearText.match(/(?:^|\D)(7|8|9|10|11|12|13)(?=\D|$)/)
-        || [...rawPrograms, ...timetable].map((code) => code.match(/(?:^|\D)(7|8|9|10|11|12|13)(?=[A-Z]|\b)/)).find(Boolean);
+        || profileCodes.map((code) => code.match(/(?:^|\D)(7|8|9|10|11|12|13)(?=[A-Z]|\b)/)).find(Boolean);
     const year = Number(yearMatch?.[1] || 0);
     const programs = [
         ...rawPrograms.map((program) => ["DTECH", "MDTECH", "MPROG"].includes(program) || !/DTECH$/.test(program) ? program : "DTECH"),
-        ...timetable.filter((code) => /DTECH/.test(code)).map(() => "DTECH")
+        ...[...timetable, ...classCodes].filter((code) => /DTECH/.test(code)).map(() => "DTECH")
     ];
     let relevant;
     if ([7, 8].includes(year)) relevant = programs.some((program) => ["DTECH", "MDTECH", "MPROG"].includes(program)) ? ["DTECH"] : [];
