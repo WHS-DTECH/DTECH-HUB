@@ -81,6 +81,57 @@ assert.match(server, /app\.post\("\/api\/student\/mdtech-project-folder"/);
 assert.match(server, /mdtech_project_folder_id/);
 assert.match(server, /getStudentTaskListDriveFolder\(email\)/);
 assert.match(script, /"JuniorDTECH", "MiddleDTECH", "SeniorDTECH"/);
+assert.match(taskList, /setStatus\(taskListState\.course === "MiddleDTECH"\s*\? `Year Group: \$\{yearGroup\} \| Course Type: \$\{courseType\}`/);
+assert.match(taskList, /isMiddleDtech \? "" : `<h4>\$\{level\}<\/h4>`/);
+assert.match(taskList, /isMiddleDtech \? "" : `<h4>\$\{escapeTaskListHtml\(level\)\}<\/h4>`/);
+assert.match(taskList, /level === "Excellence" && !isMiddleDtech/);
+
+const checklistHost = { innerHTML: "" };
+const renderState = {
+    course: "MiddleDTECH",
+    checklistStandards: ["digital-outcome", "91897", "91907", "91893", "91903"],
+    checklistState: {},
+    allItems: [],
+    sessionTicks: {}
+};
+const renderContext = vm.createContext({
+    taskListState: renderState,
+    document: { querySelector: () => checklistHost },
+    installTaskListSectionAnchorHandler() {},
+    installDigiMedEfficientToolsHandler() {},
+    installDigiMedToolsTechniquesHandler() {},
+    getTopicTypeLabel: () => "",
+    inferStudentSystemConnections: () => ({}),
+    getMiddleDtechChecklistRows: context.getMiddleDtechChecklistRows,
+    escapeTaskListHtml: (value) => String(value),
+    readDecompositionCategoryCoverage: () => ({}),
+    readDigiMedEfficientToolsState: () => ({}),
+    readGithubRepoAnalysis: () => ({}),
+    readDigiMedToolsTechniquesState: () => ({}),
+    getTaskListEmail: () => "student@westlandhigh.school.nz",
+    DIGIMED_L3_TOOLS_TECHNIQUES_SUBTASKS: [],
+    DIGIMED_TOOLS_TECHNIQUES_SUBTASKS: [],
+    TASK_LIST_MERIT_TRELLO_NOTE: "Merit evidence note",
+    TASK_LIST_EXCELLENCE_TRELLO_NOTE: "Excellence evidence note"
+});
+const renderStart = taskList.indexOf("function renderChecklistCards(");
+const renderEnd = taskList.indexOf("function getStandardCodes(", renderStart);
+vm.runInContext(taskList.slice(renderStart, renderEnd), renderContext);
+renderContext.renderChecklistCards({ name: "My Project" }, []);
+assert.match(checklistHost.innerHTML, /Project Development/);
+assert.match(checklistHost.innerHTML, /Digital Media/);
+assert.match(checklistHost.innerHTML, /Digital Outcome Topic/);
+assert.doesNotMatch(checklistHost.innerHTML, /Standard \d{5}|Achieved|Merit|Excellence/,
+    "MiddleDTECH uses descriptive headings without standard numbers or achievement labels");
+renderState.course = "SeniorDTECH";
+renderContext.renderChecklistCards({ name: "My Project" }, []);
+assert.match(checklistHost.innerHTML, /Standard 91897/);
+assert.match(checklistHost.innerHTML, /Standard 91893/);
+for (const level of ["Achieved", "Merit", "Excellence"]) {
+    assert.ok(checklistHost.innerHTML.includes(`<h4>${level}</h4>`),
+        `SeniorDTECH keeps its ${level} heading`);
+}
+
 assert.match(templateLibrary, /const setupUrl = isMiddleDtech \? "\/api\/student\/mdtech-project-folder"/);
 assert.match(templateLibrary, /driveState\.setupState\?\.confirmed && destination\.folderId/);
 assert.match(templateLibrary, /Saved to \$\{escapeHtml\(destination\.folderName\)\}\./);

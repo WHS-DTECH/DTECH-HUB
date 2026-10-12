@@ -2486,6 +2486,7 @@ function renderRelevantImplicationsCategoryGrid(standard, rows) {
 function renderChecklistCards(detail, allItems) {
     const checklistHost = document.querySelector("#task-list-checklist");
     if (!checklistHost) return;
+    const isMiddleDtech = taskListState.course === "MiddleDTECH";
     installTaskListSectionAnchorHandler();
     installDigiMedEfficientToolsHandler();
     installDigiMedToolsTechniquesHandler();
@@ -2523,10 +2524,10 @@ function renderChecklistCards(detail, allItems) {
             return `
                 ${levels.map((level) => `
                     <section class="task-list-level-group">
-                        <h4>${level}</h4>
+                        ${isMiddleDtech ? "" : `<h4>${level}</h4>`}
                         ${level === "Achieved" ? `<p class="task-list-achieved-subheading">Section 1: Digital Media</p>` : ""}
                         ${level === "Merit" ? `<p class="task-list-merit-trello-note">${escapeTaskListHtml(TASK_LIST_MERIT_TRELLO_NOTE)}</p>` : ""}
-                        ${level === "Excellence" ? `<p class="task-list-merit-trello-note">${escapeTaskListHtml(TASK_LIST_EXCELLENCE_TRELLO_NOTE)}</p>` : ""}
+                        ${level === "Excellence" && !isMiddleDtech ? `<p class="task-list-merit-trello-note">${escapeTaskListHtml(TASK_LIST_EXCELLENCE_TRELLO_NOTE)}</p>` : ""}
                         <div class="task-list-step-list">
                             ${safeRows.map((step, index) => {
                                 if (getStepLevel(step?.text) !== level) return "";
@@ -2759,9 +2760,9 @@ function renderChecklistCards(detail, allItems) {
 
             return `
                 <section class="task-list-level-group">
-                    <h4>${escapeTaskListHtml(level)}</h4>
+                    ${isMiddleDtech ? "" : `<h4>${escapeTaskListHtml(level)}</h4>`}
                     ${level === "Merit" ? `<p class="task-list-merit-trello-note">${escapeTaskListHtml(TASK_LIST_MERIT_TRELLO_NOTE)}</p>` : ""}
-                    ${level === "Excellence" ? `<p class="task-list-merit-trello-note">${escapeTaskListHtml(TASK_LIST_EXCELLENCE_TRELLO_NOTE)}</p>` : ""}
+                    ${level === "Excellence" && !isMiddleDtech ? `<p class="task-list-merit-trello-note">${escapeTaskListHtml(TASK_LIST_EXCELLENCE_TRELLO_NOTE)}</p>` : ""}
                     <div class="task-list-step-list">
                         ${levelRows.map((step) => {
                             const stepText = stripStepLevel(step?.text);
@@ -3018,7 +3019,11 @@ function renderChecklistCards(detail, allItems) {
         )
         : taskListState.checklistStandards;
     const cardsHtml = visibleStandards.map((standard) => {
-        const title = standard === "digital-outcome" ? "Digital Outcome Description" : `Standard ${escapeTaskListHtml(standard)}`;
+        const title = standard === "digital-outcome"
+            ? "Digital Outcome Description"
+            : isMiddleDtech
+                ? (["91897", "91907"].includes(String(standard)) ? "Project Development" : "Digital Media")
+                : `Standard ${escapeTaskListHtml(standard)}`;
         const summaryTitle = standard === "digital-outcome" ? "Digital Outcome Topic" : title;
         const rows = Array.isArray(taskListState.checklistState[standard]) ? taskListState.checklistState[standard] : [];
         const digitalMediaType = getAllocatedDigitalMediaType(standard);
@@ -3310,7 +3315,9 @@ async function loadChecklistForTask(taskId) {
     const projectTaskStandard = String(selected?.standard_2 || "").trim() || "Not set";
     const yearGroup = String(selected?.year_group || "").trim() || "Not set";
     const courseType = String(selected?.course_type || "").trim() || "Not set";
-    setStatus(`Year Group: ${yearGroup} | Course Type: ${courseType} | Process Std No: ${processStandard} | Project/Task Std No: ${projectTaskStandard}`);
+    setStatus(taskListState.course === "MiddleDTECH"
+        ? `Year Group: ${yearGroup} | Course Type: ${courseType}`
+        : `Year Group: ${yearGroup} | Course Type: ${courseType} | Process Std No: ${processStandard} | Project/Task Std No: ${projectTaskStandard}`);
 }
 
 async function renderTaskListPage() {
