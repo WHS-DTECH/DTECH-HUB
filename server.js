@@ -15773,7 +15773,14 @@ async function githubApiRequest(pathname, query = {}) {
     headers.Authorization = `Bearer ${GITHUB_TOKEN}`;
   }
 
-  const response = await fetch(url, { headers });
+  let response = await fetch(url, { headers });
+  if (response.status === 401 && GITHUB_TOKEN) {
+    // These endpoints only inspect public repositories, so an expired server token
+    // should not prevent the same read from succeeding anonymously.
+    const publicHeaders = { ...headers };
+    delete publicHeaders.Authorization;
+    response = await fetch(url, { headers: publicHeaders });
+  }
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     const message = String(payload?.message || `GitHub request failed (${response.status}).`);
