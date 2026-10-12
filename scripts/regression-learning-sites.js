@@ -42,6 +42,14 @@ async function main() {
     };
     const profile = hunt.getHuntProfile({ year_level: "Year 7", programs: ["DTECH"] });
     assert.equal(hunt.gradeLearningSites(answers, profile).passed, true);
+    for (const code of ["SRDTECH", "PIDTECH", "VEDTECH", "MMDTECH", "SDTECH", "JDTECH", "8SDTECH", "7SDTECH"]) {
+        const codedProfile = hunt.getHuntProfile({ year_level: "Year 8 - JuniorDTECH", programs: [code] });
+        assert.deepEqual(codedProfile.courseIds, ["8DTECH"], `${code} is recognised as a JuniorDTECH timetable code`);
+    }
+    assert.deepEqual(hunt.getHuntProfile({ programs: ["8SDTECH"] }).courseIds, ["8DTECH"],
+        "A year-prefixed DTECH code can supply the year when the year-level field is missing");
+    assert.deepEqual(hunt.getHuntProfile({ dtech_timetable: [{ value: "7SDTECH" }] }).courseIds, ["7DTECH"],
+        "Year-prefixed codes in DTECH timetable entries are recognised");
     const staffAnswers = { ...answers, course: "STAFF" };
     assert.equal(hunt.gradeLearningSites(staffAnswers, hunt.getHuntProfile(null, { isStaff: true })).passed, true);
     assert.equal(hunt.gradeLearningSites({ ...staffAnswers, "course-clue-1": "wrong" }, hunt.getHuntProfile(null, { isStaff: true })).score, 7);
@@ -74,6 +82,7 @@ async function main() {
     assert.equal(hunt.gradeLearningSites({ ...answers, "course-clue-1": "wrong" }, profile).score, 7);
     assert.equal(hunt.gradeLearningSites(answers, hunt.getHuntProfile(null)).passed, false);
     assert.equal(hunt.getHuntProfile({ year_level: "7", programs: ["TEXT"] }).available, false);
+    assert.match(hunt.getHuntProfile({ year_level: "7", programs: ["TEXT"] }).message, /do not need to type the timetable code/);
     assert.equal(hunt.getHuntProfile({ year_level: "11", programs: ["COMP", "DTECH"] }).available, false, "Ambiguous senior course is not guessed");
     const compProfile = hunt.getHuntProfile({ year_level: "11", programs: ["COMP", "DTECH"], dtech_timetable: [{ value: "11COMP CW" }] });
     assert.deepEqual(compProfile.courseIds, ["11COMP"], "Ignore inferred generic DTECH if timetable identifies COMP");

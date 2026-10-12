@@ -93,16 +93,24 @@ function getHuntProfile(student, { isStaff = false } = {}) {
             message: "Your staff access is confirmed. Choose Staff for the JuniorDTECH page, or any course to test that pathway and create its course folder."
         };
     }
-    const year = Number(String(student?.year_level || "").replace(/^year\s*/i, "").trim());
-    const programs = Array.isArray(student?.programs) ? student.programs.map((program) => String(program).toUpperCase()) : [];
+    const rawPrograms = Array.isArray(student?.programs) ? student.programs.map((program) => String(program).trim().toUpperCase()) : [];
+    const timetable = (student?.dtech_timetable || []).map((entry) => String(entry?.value || "").trim().toUpperCase());
+    const yearText = String(student?.year_level || "").trim();
+    const yearMatch = yearText.match(/(?:^|\D)(7|8|9|10|11|12|13)(?=\D|$)/)
+        || [...rawPrograms, ...timetable].map((code) => code.match(/(?:^|\D)(7|8|9|10|11|12|13)(?=[A-Z]|\b)/)).find(Boolean);
+    const year = Number(yearMatch?.[1] || 0);
+    const programs = [
+        ...rawPrograms.map((program) => ["DTECH", "MDTECH", "MPROG"].includes(program) || !/DTECH$/.test(program) ? program : "DTECH"),
+        ...timetable.filter((code) => /DTECH/.test(code)).map(() => "DTECH")
+    ];
     let relevant;
     if ([7, 8].includes(year)) relevant = programs.some((program) => ["DTECH", "MDTECH", "MPROG"].includes(program)) ? ["DTECH"] : [];
     else if ([9, 10].includes(year)) {
         relevant = programs.filter((program) => ["MDTECH", "MPROG"].includes(program));
         if (!relevant.length && programs.includes("DTECH") && !programs.includes("COMP")) relevant = ["DTECH"];
     } else {
-        const timetable = (student?.dtech_timetable || []).map((entry) => entry.value).join(" ");
-        const explicit = [...timetable.matchAll(/\b(?:\d{1,2})?(DTECH|COMP)\b/gi)].map((match) => match[1].toUpperCase());
+        const timetableText = timetable.join(" ");
+        const explicit = [...timetableText.matchAll(/\b(?:\d{1,2})?(DTECH|COMP)\b/gi)].map((match) => match[1].toUpperCase());
         relevant = explicit.length ? explicit : programs.filter((program) => ["DTECH", "COMP"].includes(program));
         if (!explicit.length && relevant.length > 1) relevant = [];
     }
@@ -115,7 +123,7 @@ function getHuntProfile(student, { isStaff = false } = {}) {
         year,
         courseIds,
         message: courseIds.length ? "Your course choice will be checked against the timetable data used by User Profile." :
-            "Your User Profile has no supported DTECH course/year record yet. Ask your teacher to check your timetable/profile. You can practise the hunt, but a completion tick cannot be awarded until it is linked."
+            "We could not match a supported DTECH year/course from your User Profile and timetable. You do not need to type the timetable code; ask your teacher to check that your timetable and year are linked to your profile. You can practise the hunt, but a completion tick cannot be awarded until it is linked."
     };
 }
 
