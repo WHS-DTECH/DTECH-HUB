@@ -185,6 +185,12 @@ async function main() {
         assert.ok(found.length >= 1, `${word} must be findable (Drive can also occur inside OneDrive)`);
         paths[word] = found[0];
     }
+    const drive = puzzle.words.find((word) => word.word === "DRIVE");
+    const oneDrive = puzzle.words.find((word) => word.word === "ONEDRIVE");
+    assert.ok(drive.legacyPaths?.length, "The previous DRIVE location is retained for saved progress migration");
+    assert.deepEqual(paths.DRIVE, [[1, 0], [1, 1], [1, 2], [1, 3], [1, 4]], "DRIVE has a separate horizontal placement");
+    assert.ok(!paths.DRIVE.some(([r, c]) => paths.ONEDRIVE.some(([otherR, otherC]) => r === otherR && c === otherC)),
+        "DRIVE and ONEDRIVE no longer share puzzle cells");
     const answers = { paths, microsoftReady: true };
     const passed = assessment.gradeAppsWordsearch(answers, true);
     assert.equal(passed.score, 10);
@@ -193,6 +199,11 @@ async function main() {
     assert.equal(assessment.gradeAppsWordsearch(answers, false).passed, false, "Client must not invent Drive readiness");
     assert.equal(assessment.gradeAppsWordsearch({ paths: Object.fromEntries(Object.entries(paths).map(([word, cells]) => [word, cells.slice().reverse()])), microsoftReady: true }, true).passed, true);
     assert.equal(assessment.gradeAppsWordsearch({ ...answers, paths: { ...paths, DOCS: [[0, "0"], [0, 1], [0, 2], [0, 3]] } }, true).passed, false);
+    const migrated = assessment.gradeAppsWordsearch({
+        ...answers, paths: { ...paths, DRIVE: drive.legacyPaths[0] }
+    }, true);
+    assert.equal(migrated.passed, true, "A previously saved DRIVE selection still passes after relocation");
+    assert.deepEqual(migrated.answers.paths.DRIVE, paths.DRIVE, "Legacy DRIVE selections are normalised to the new position");
     assert.equal(assessment.gradeAppsWordsearch({ ...answers, paths: { ...paths, DOCS: "DOCS" }, passed: true }, true).answers.paths.DOCS, undefined);
     assert.equal(assessment.gradeAppsWordsearch({ ...answers, microsoftReady: "true" }, true).passed, false);
     assert.equal(assessment.gradeAppsWordsearch({ ...answers, paths: { ...paths, WORD: [[12, 0], [12, 1], [12, 2], [12, 3]] } }, true).passed, false);

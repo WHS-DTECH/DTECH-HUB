@@ -474,8 +474,22 @@
         const paths = {};
         let start = null;
         const readWord = (path) => path.map(([r, c]) => assessment.grid[r]?.[c] || "").join("");
+        const findWordPath = (word) => {
+            for (let r = 0; r < assessment.grid.length; r += 1) {
+                for (let c = 0; c < assessment.grid[r].length; c += 1) {
+                    for (const [dr, dc] of [[0, 1], [1, 0]]) {
+                        const candidate = Array.from(word, (_, i) => [r + dr * i, c + dc * i]);
+                        if ([word, Array.from(word).reverse().join("")].includes(readWord(candidate))) return candidate;
+                    }
+                }
+            }
+            return null;
+        };
         for (const app of assessment.words) {
-            const path = options.assessmentAnswers?.paths?.[app.word];
+            let path = options.assessmentAnswers?.paths?.[app.word];
+            if (app.legacyPaths?.some((legacy) => JSON.stringify(legacy) === JSON.stringify(path))) {
+                path = findWordPath(app.word);
+            }
             if (Array.isArray(path) && path.length === app.word.length && path.every((cell) =>
                 Array.isArray(cell) && cell.length === 2 && cell.every((value) => Number.isInteger(value) && value >= 0 && value < 12)
             ) && [app.word, Array.from(app.word).reverse().join("")].includes(readWord(path))) paths[app.word] = path;

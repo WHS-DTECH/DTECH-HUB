@@ -45,7 +45,7 @@ const appWords = [
   { word: "EXCEL", provider: "Microsoft", use: "Organise data, calculate and make charts.", row: 6, column: 1, dr: 0, dc: 1 },
   { word: "SLIDES", provider: "Google", use: "Create presentations.", row: 8, column: 0, dr: 0, dc: 1 },
   { word: "POWERPOINT", provider: "Microsoft", use: "Create presentations.", row: 10, column: 0, dr: 0, dc: 1 },
-  { word: "DRIVE", provider: "Google", use: "Store, organise and share your files online.", row: 0, column: 11, dr: 1, dc: 0 },
+  { word: "DRIVE", provider: "Google", use: "Store, organise and share your files online.", row: 1, column: 0, dr: 0, dc: 1 },
   { word: "ONEDRIVE", provider: "Microsoft", use: "Store, organise and share your files online.", row: 3, column: 10, dr: 1, dc: 0 }
 ];
 const wordsearchGrid = Array.from({ length: 12 }, (_, row) =>
@@ -108,7 +108,10 @@ function withLoginAppsActivity(kitId, content) {
 function gradeAppsWordsearch(answers, driveReady) {
   const cleanAnswers = { paths: {}, microsoftReady: answers?.microsoftReady === true };
   const results = appWords.map((app) => {
-    const path = answers?.paths?.[app.word];
+    let path = answers?.paths?.[app.word];
+    const isLegacyDrivePath = app.word === "DRIVE" && Array.isArray(path) &&
+      JSON.stringify(path) === JSON.stringify([[0, 11], [1, 11], [2, 11], [3, 11], [4, 11]]);
+    if (isLegacyDrivePath) path = Array.from(app.word, (_, index) => [app.row + index * app.dr, app.column + index * app.dc]);
     let correct = Array.isArray(path) && path.length === app.word.length && path.every((cell) =>
       Array.isArray(cell) && cell.length === 2 && cell.every((value) => Number.isInteger(value) && value >= 0 && value < 12)
     );
@@ -267,7 +270,10 @@ function getStudentAssessment(assessmentId) {
     title: "School apps explorer",
     introduction: "Google and Microsoft have apps that do similar jobs. Sign in with your school accounts, get your drives ready, then find eight app names to earn your completion tick.",
     grid: wordsearchGrid.map((row) => row.join("")),
-    words: appWords.map(({ word, provider, use }) => ({ word, provider, use }))
+    words: appWords.map(({ word, provider, use }) => ({
+      word, provider, use,
+      ...(word === "DRIVE" ? { legacyPaths: [[[0, 11], [1, 11], [2, 11], [3, 11], [4, 11]]] } : {})
+    }))
   };
   if (assessmentId !== PASSWORD_PROBLEMS_ID) return null;
   return {
