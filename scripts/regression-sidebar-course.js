@@ -110,7 +110,7 @@ async function main() {
     const panel = { dataset: {}, querySelector: (selector) => selector === "#hub-global-sidebar-allocations"
         ? allocations : selector === "#hub-sidebar-summary-cards" ? summaries
         : selector === "#hub-global-sidebar-tasklist-link" ? taskListButton : element };
-    const loaderStart = client.indexOf("function updateSidebarCourseSections(");
+    const loaderStart = client.indexOf("function getTaskListCourseFromAllocations(");
     const loaderEnd = client.indexOf("\nasync function loadAndRenderSidebarAllocations(", loaderStart);
     let refreshCourse;
     const pathwaysLink = { hidden: true };
@@ -132,6 +132,17 @@ async function main() {
         console: { error() {} }
     });
     vm.runInContext(client.slice(loaderStart, loaderEnd), browser);
+    assert.equal(browser.getTaskListCourseFromAllocations([
+        { year_group: "Year 11", course_type: "DTECH" }
+    ]), "SeniorDTECH", "Senior DTECH project/assessment allocations provide a Task List fallback");
+    assert.equal(browser.getTaskListCourseFromAllocations([
+        { year_group: "Year 11", course_type: "COMP" }
+    ]), "", "Computing allocations do not infer SeniorDTECH");
+    assert.equal(browser.getTaskListCourseFromAllocations([
+        { year_group: "Year 10", course_type: "DTECH" }
+    ]), "", "Middle-school DTECH allocations do not infer SeniorDTECH");
+    assert.match(client, /panel\.dataset\.allocationCourse = getTaskListCourseFromAllocations\(\[\.\.\.assessments, \.\.\.projects\]\)/,
+        "Sidebar reads course details from the student's allocations");
     for (const course of ["JuniorDTECH", "MiddleDTECH", "", "SeniorDTECH"]) {
         browser.updateSidebarCourseSections(panel, course);
         assert.equal(allocations.hidden, course !== "SeniorDTECH");
@@ -148,6 +159,21 @@ async function main() {
     summaries.dataset.available = "true";
     browser.updateSidebarCourseSections(panel);
     assert.equal(summaries.hidden, false, "Allocations finishing after course load can reveal senior summaries");
+    panel.dataset.allocationCourse = browser.getTaskListCourseFromAllocations([
+        { year_group: "Year 11", course_type: "DTECH" }
+    ]);
+    browser.updateSidebarCourseSections(panel, "");
+    assert.equal(taskListLink.hidden, false, "Senior allocation fallback reveals the navbar Task List");
+    assert.equal(taskListButton.hidden, false, "Senior allocation fallback reveals the sidebar Task List");
+    assert.equal(allocations.hidden, false, "Senior allocation fallback reveals its allocation panel");
+    browser.updateSidebarCourseSections(panel, "MiddleDTECH");
+    assert.equal(taskListLink.hidden, true, "Explicit course resolution takes precedence over an allocation fallback");
+    browser.updateSidebarCourseSections(panel, "");
+    auth.profile = null;
+    browser.updateSidebarCourseSections(panel, "");
+    assert.equal(taskListLink.hidden, true, "Allocation fallback does not reveal the Task List when signed out");
+    assert.equal(taskListButton.hidden, true, "Allocation fallback does not reveal the sidebar link when signed out");
+    auth.profile = { email: "staff@example.test" };
     await browser.loadAndRenderSidebarCourse(panel);
     assert.equal(element.textContent, "Course: MiddleDTECH");
     assert.equal(pathwaysLink.hidden, false);
@@ -162,9 +188,11 @@ async function main() {
     assert.equal(pathwaysLink.hidden, true, "Saving SeniorDTECH hides Pathways");
     assert.equal(summaries.hidden, false);
     browser.fetch = async () => ({ ok: true, json: async () => ({ course: "" }) });
+    panel.dataset.allocationCourse = "";
     await browser.loadAndRenderSidebarCourse(panel);
     assert.equal(element.textContent, "Course: Not confirmed yet");
     browser.fetch = async () => { throw new Error("Network failure"); };
+    panel.dataset.allocationCourse = "";
     await browser.loadAndRenderSidebarCourse(panel);
     assert.equal(element.textContent, "Course: Could not load");
     assert.equal(courseEvents.at(-1).detail.status, "error");

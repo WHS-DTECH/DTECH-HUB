@@ -2455,9 +2455,18 @@ function routeHubCourseHomepage(course) {
     }
 }
 
+function getTaskListCourseFromAllocations(items) {
+    return (Array.isArray(items) ? items : []).some((item) => {
+        const year = Number.parseInt(String(item?.year_group || "").replace(/[^0-9]/g, ""), 10);
+        const course = String(item?.course_type || "").trim().toUpperCase();
+        return [11, 12, 13].includes(year) && course === "DTECH";
+    }) ? "SeniorDTECH" : "";
+}
+
 function updateSidebarCourseSections(panel, course = panel.dataset.course || "", status = "ready") {
     panel.dataset.course = course;
     panel.dataset.courseStatus = status;
+    const taskListCourse = course || panel.dataset.allocationCourse || "";
     const pathwaysLink = document.querySelector("#hub-pathways-link");
     if (pathwaysLink) {
         pathwaysLink.hidden = !hubAuthState.profile?.email || !["JuniorDTECH", "MiddleDTECH"].includes(course);
@@ -2465,13 +2474,13 @@ function updateSidebarCourseSections(panel, course = panel.dataset.course || "",
     const taskListLink = document.querySelector("#hub-senior-task-list-link");
     if (taskListLink) {
         taskListLink.href = course === "JuniorDTECH" ? "/learning-pathways/task-list.html" : "/task-list.html";
-        taskListLink.hidden = !hubAuthState.profile?.email || !["JuniorDTECH", "SeniorDTECH"].includes(course);
+        taskListLink.hidden = !hubAuthState.profile?.email || !["JuniorDTECH", "SeniorDTECH"].includes(taskListCourse);
     }
     const taskListButton = panel.querySelector("#hub-global-sidebar-tasklist-link");
     if (taskListButton) {
-        taskListButton.hidden = !hubAuthState.profile?.email || !["JuniorDTECH", "SeniorDTECH"].includes(course);
+        taskListButton.hidden = !hubAuthState.profile?.email || !["JuniorDTECH", "SeniorDTECH"].includes(taskListCourse);
     }
-    const isSenior = course === "SeniorDTECH";
+    const isSenior = taskListCourse === "SeniorDTECH";
     const allocations = panel.querySelector("#hub-global-sidebar-allocations");
     const summaries = panel.querySelector("#hub-sidebar-summary-cards");
     if (allocations) allocations.hidden = !isSenior;
@@ -2541,6 +2550,8 @@ async function loadAndRenderSidebarAllocations(panel) {
         const projects = Array.isArray(data.projects) ? data.projects : [];
 
         const profileDetails = computeHubSidebarProfileDetails([...assessments, ...projects]);
+        panel.dataset.allocationCourse = getTaskListCourseFromAllocations([...assessments, ...projects]);
+        updateSidebarCourseSections(panel);
         hubStudentAllocatedStandards = Array.isArray(data.allocated_standards) ? data.allocated_standards : [];
         hubStudentExternalStandards = Array.isArray(data.external_standards) ? data.external_standards : [];
         const digitalMediaAllocation = [...assessments, ...projects].find((item) =>
