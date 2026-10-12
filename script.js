@@ -2365,7 +2365,7 @@ function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {
     }
     if (adminLink) adminLink.hidden = !canAdmin || isStudentView;
     if (taskListButton) {
-        taskListButton.hidden = !["JuniorDTECH", "SeniorDTECH"].includes(panel.dataset.course);
+        taskListButton.hidden = !["JuniorDTECH", "MiddleDTECH", "SeniorDTECH"].includes(panel.dataset.course);
     }
 
     if (copy) {
@@ -2456,11 +2456,19 @@ function routeHubCourseHomepage(course) {
 }
 
 function getTaskListCourseFromAllocations(items) {
-    return (Array.isArray(items) ? items : []).some((item) => {
+    const rows = Array.isArray(items) ? items : [];
+    if (rows.some((item) => {
         const year = Number.parseInt(String(item?.year_group || "").replace(/[^0-9]/g, ""), 10);
         const course = String(item?.course_type || "").trim().toUpperCase();
         return [11, 12, 13].includes(year) && course === "DTECH";
-    }) ? "SeniorDTECH" : "";
+    })) {
+        return "SeniorDTECH";
+    }
+    return rows.some((item) => {
+        const year = Number.parseInt(String(item?.year_group || "").replace(/[^0-9]/g, ""), 10);
+        const course = String(item?.course_type || "").trim().toUpperCase();
+        return [9, 10].includes(year) && ["DTECH", "MDTECH"].includes(course);
+    }) ? "MiddleDTECH" : "";
 }
 
 function updateSidebarCourseSections(panel, course = panel.dataset.course || "", status = "ready") {
@@ -2474,11 +2482,11 @@ function updateSidebarCourseSections(panel, course = panel.dataset.course || "",
     const taskListLink = document.querySelector("#hub-senior-task-list-link");
     if (taskListLink) {
         taskListLink.href = course === "JuniorDTECH" ? "/learning-pathways/task-list.html" : "/task-list.html";
-        taskListLink.hidden = !hubAuthState.profile?.email || !["JuniorDTECH", "SeniorDTECH"].includes(taskListCourse);
+        taskListLink.hidden = !hubAuthState.profile?.email || !["JuniorDTECH", "MiddleDTECH", "SeniorDTECH"].includes(taskListCourse);
     }
     const taskListButton = panel.querySelector("#hub-global-sidebar-tasklist-link");
     if (taskListButton) {
-        taskListButton.hidden = !hubAuthState.profile?.email || !["JuniorDTECH", "SeniorDTECH"].includes(taskListCourse);
+        taskListButton.hidden = !hubAuthState.profile?.email || !["JuniorDTECH", "MiddleDTECH", "SeniorDTECH"].includes(taskListCourse);
     }
     const isSenior = taskListCourse === "SeniorDTECH";
     const allocations = panel.querySelector("#hub-global-sidebar-allocations");
@@ -2580,7 +2588,7 @@ async function loadAndRenderSidebarAllocations(panel) {
 
         const taskListButton = panel.querySelector("#hub-global-sidebar-tasklist-link");
         if (taskListButton) {
-            taskListButton.hidden = !["JuniorDTECH", "SeniorDTECH"].includes(panel.dataset.course);
+            taskListButton.hidden = !["JuniorDTECH", "MiddleDTECH", "SeniorDTECH"].includes(panel.dataset.course);
         }
 
         if (assessmentSection) assessmentSection.hidden = assessments.length === 0;

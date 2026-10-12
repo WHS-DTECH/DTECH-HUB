@@ -257,6 +257,7 @@ const EVIDENCE_STEPS_DEFAULTS = {
 const taskListState = {
     allItems: [],
     selectedId: "",
+    course: "",
     fullEvidenceState: {},
     checklistState: {},
     checklistStandards: [],
@@ -267,6 +268,34 @@ const taskListState = {
     // Planning ticks for criteria with no automatic evidence source. In-memory only, never sent to the server.
     sessionTicks: {}
 };
+
+function getTaskListCourseFromAllocations(items) {
+    return (Array.isArray(items) ? items : []).some((item) => {
+        const year = Number.parseInt(String(item?.year_group || "").replace(/[^0-9]/g, ""), 10);
+        const course = String(item?.course_type || "").trim().toUpperCase();
+        return [9, 10].includes(year) && ["DTECH", "MDTECH"].includes(course);
+    }) ? "MiddleDTECH" : "";
+}
+
+function getMiddleDtechChecklistRows(standard, rows) {
+    const safeRows = Array.isArray(rows) ? rows : [];
+    if (standard === "digital-outcome") return safeRows;
+    if (standard === "91897" || standard === "91907") {
+        return safeRows.filter((step) => {
+            if (getStepLevel(step?.text) !== "Achieved") return false;
+            const text = stripStepLevel(step?.text || "").toLowerCase();
+            return text.includes("project management")
+                || text.includes("decompos")
+                || /trial(?:l?ing)?\s+(?:the\s+)?components|trailing\s+components/.test(text)
+                || /testing\s+functions|test(?:ing)?\s+that\s+the\s+digital\s+technologies\s+outcome\s+functions/i.test(text);
+        });
+    }
+    if (standard === "91893" || standard === "91903") {
+        return safeRows.filter((step) => getStepLevel(step?.text) === "Excellence"
+            && /using efficient tools and techniques in the outcome.?s production/i.test(stripStepLevel(step?.text || "")));
+    }
+    return [];
+}
 
 // Minimal Drive OAuth client for task list — only needs read access to list slides
 const taskListDriveState = { tokenClient: null, accessToken: "", tokenExpiry: 0 };
@@ -2477,10 +2506,15 @@ function renderChecklistCards(detail, allItems) {
     const systemConnections = inferStudentSystemConnections(taskListState.fullEvidenceState);
 
     const renderRowsForStandard = (standard, rows) => {
-        const safeRows = Array.isArray(rows) ? rows : [];
+        const allRows = Array.isArray(rows) ? rows : [];
+        const safeRows = taskListState.course === "MiddleDTECH"
+            ? getMiddleDtechChecklistRows(String(standard), allRows)
+            : allRows;
 
         if (String(standard) === "91893" || String(standard) === "91903") {
-            const levels = ["Achieved", "Merit", "Excellence"];
+            const levels = ["Achieved", "Merit", "Excellence"].filter((level) =>
+                taskListState.course !== "MiddleDTECH" || safeRows.some((step) => getStepLevel(step?.text) === level)
+            );
             const decompositionCoverage = readDecompositionCategoryCoverage(taskListState.selectedId, getTaskListEmail());
             const efficientToolsState = readDigiMedEfficientToolsState(taskListState.selectedId, getTaskListEmail());
             const githubRepoAnalysis = readGithubRepoAnalysis(taskListState.selectedId, getTaskListEmail());
@@ -2713,7 +2747,9 @@ function renderChecklistCards(detail, allItems) {
             `;
         }
 
-        const levels = ["Achieved", "Merit", "Excellence"];
+        const levels = ["Achieved", "Merit", "Excellence"].filter((level) =>
+            taskListState.course !== "MiddleDTECH" || safeRows.some((step) => getStepLevel(step?.text) === level)
+        );
         return levels.map((level) => {
             const levelRows = safeRows
                 .map((step, index) => ({ ...step, _index: index }))
@@ -2976,7 +3012,12 @@ function renderChecklistCards(detail, allItems) {
         }).join("");
     };
 
-    const cardsHtml = taskListState.checklistStandards.map((standard) => {
+    const visibleStandards = taskListState.course === "MiddleDTECH"
+        ? taskListState.checklistStandards.filter((standard) =>
+            ["digital-outcome", "91897", "91907", "91893", "91903"].includes(String(standard))
+        )
+        : taskListState.checklistStandards;
+    const cardsHtml = visibleStandards.map((standard) => {
         const title = standard === "digital-outcome" ? "Digital Outcome Description" : `Standard ${escapeTaskListHtml(standard)}`;
         const summaryTitle = standard === "digital-outcome" ? "Digital Outcome Topic" : title;
         const rows = Array.isArray(taskListState.checklistState[standard]) ? taskListState.checklistState[standard] : [];
@@ -3292,6 +3333,25 @@ async function renderTaskListPage() {
         ...allocations.projects.map((item) => ({ ...item, kind: "Project" }))
     ];
 
+    let courseLookupError = null;
+    try {
+        const coursePayload = await loadJson("/api/practical-skills/my-course", {
+            headers: buildTaskListHeaders({}),
+            cache: "no-store"
+        });
+        taskListState.course = String(coursePayload?.course || "").trim();
+    } catch (error) {
+        courseLookupError = error;
+        taskListState.course = "";
+    }
+    if (!taskListState.course) {
+        taskListState.course = getTaskListCourseFromAllocations(taskListState.allItems);
+    }
+    if (!taskListState.course && courseLookupError) {
+        setStatus("Could not confirm your DTECH course. Please reload or ask your teacher for help.", true);
+        return;
+    }
+
     renderHeader({
         totalLinked: taskListState.allItems.length,
         assessmentCount: allocations.assessment_tasks.length,
@@ -3301,6 +3361,58 @@ async function renderTaskListPage() {
         linkedAssessments: allocations.assessment_tasks,
         linkedProjects: allocations.projects
     });
+
+    if (taskListState.course === "MiddleDTECH") {
+        const setupHost = document.querySelector("#task-list-mdtech-drive-setup");
+        const setupStatus = document.querySelector("#task-list-mdtech-drive-setup-status");
+        const setupButton = document.querySelector("#task-list-mdtech-drive-setup-button");
+        const checklistCard = document.querySelector("#task-list-checklist-card");
+        let setup = null;
+        try {
+            setup = await loadJson("/api/student/mdtech-project-folder", {
+                headers: buildTaskListHeaders({}),
+                cache: "no-store"
+            });
+        } catch (error) {
+            if (setupStatus) setupStatus.textContent = error?.message || "Could not check your Google Drive folder.";
+        }
+
+        if (!setup?.ready) {
+            if (setupHost) setupHost.hidden = false;
+            if (checklistCard) checklistCard.hidden = true;
+            if (setupStatus && !setupStatus.textContent) {
+                setupStatus.textContent = "Set up this folder to unlock your MiddleDTECH Task List.";
+            }
+            if (setupButton && setupButton.dataset.bound !== "true") {
+                setupButton.dataset.bound = "true";
+                setupButton.addEventListener("click", async () => {
+                    setupButton.disabled = true;
+                    if (setupStatus) setupStatus.textContent = "Requesting Google Drive access…";
+                    try {
+                        if (typeof requestHubDriveAccessToken !== "function") {
+                            throw new Error("Google Drive setup is not available on this page. Reload and try again.");
+                        }
+                        const tokenResponse = await requestHubDriveAccessToken({ forceConsent: true });
+                        if (tokenResponse?.error || !tokenResponse?.access_token) {
+                            throw new Error("Google Drive permission is required to create your MDTECH Project folder.");
+                        }
+                        await loadJson("/api/student/mdtech-project-folder", {
+                            method: "POST",
+                            headers: buildTaskListHeaders({ "Content-Type": "application/json" }),
+                            body: JSON.stringify({ driveAccessToken: tokenResponse.access_token })
+                        });
+                        window.location.reload();
+                    } catch (error) {
+                        if (setupStatus) setupStatus.textContent = error?.message || "Could not set up your MDTECH Project folder.";
+                        setupButton.disabled = false;
+                    }
+                });
+            }
+            return;
+        }
+
+        if (setupHost) setupHost.hidden = true;
+    }
 
     const contextHost = document.querySelector("#task-list-context");
     if (contextHost) {
@@ -3323,6 +3435,9 @@ async function renderTaskListPage() {
         setStatus("No allocations found yet. Ask your teacher to assign a task.", true);
         return;
     }
+
+    const checklistCard = document.querySelector("#task-list-checklist-card");
+    if (checklistCard) checklistCard.hidden = false;
 
     const preferred = context.id
         ? taskListState.allItems.find((item) => String(item.id) === String(context.id)) || null

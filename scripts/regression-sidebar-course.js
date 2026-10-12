@@ -140,7 +140,7 @@ async function main() {
     ]), "", "Computing allocations do not infer SeniorDTECH");
     assert.equal(browser.getTaskListCourseFromAllocations([
         { year_group: "Year 10", course_type: "DTECH" }
-    ]), "", "Middle-school DTECH allocations do not infer SeniorDTECH");
+    ]), "MiddleDTECH", "Middle-school DTECH allocations provide MiddleDTECH access");
     assert.match(client, /panel\.dataset\.allocationCourse = getTaskListCourseFromAllocations\(\[\.\.\.assessments, \.\.\.projects\]\)/,
         "Sidebar reads course details from the student's allocations");
     for (const course of ["JuniorDTECH", "MiddleDTECH", "", "SeniorDTECH"]) {
@@ -149,7 +149,7 @@ async function main() {
         assert.equal(summaries.hidden, course !== "SeniorDTECH");
         assert.equal(pathwaysLink.hidden, !["JuniorDTECH", "MiddleDTECH"].includes(course),
             "Pathways navbar button is only shown for Junior and Middle DTECH");
-        assert.equal(taskListLink.hidden, !["JuniorDTECH", "SeniorDTECH"].includes(course));
+        assert.equal(taskListLink.hidden, !["JuniorDTECH", "MiddleDTECH", "SeniorDTECH"].includes(course));
         assert.equal(taskListButton.hidden, taskListLink.hidden, "Sidebar and navbar agree on Task List availability");
         assert.equal(taskListLink.href, course === "JuniorDTECH" ? "/learning-pathways/task-list.html" : "/task-list.html");
     }
@@ -167,7 +167,8 @@ async function main() {
     assert.equal(taskListButton.hidden, false, "Senior allocation fallback reveals the sidebar Task List");
     assert.equal(allocations.hidden, false, "Senior allocation fallback reveals its allocation panel");
     browser.updateSidebarCourseSections(panel, "MiddleDTECH");
-    assert.equal(taskListLink.hidden, true, "Explicit course resolution takes precedence over an allocation fallback");
+    assert.equal(taskListLink.hidden, false, "Explicit MiddleDTECH course resolution retains Task List access");
+    assert.equal(allocations.hidden, true, "Explicit MiddleDTECH course resolution takes precedence over Senior allocation panels");
     browser.updateSidebarCourseSections(panel, "");
     auth.profile = null;
     browser.updateSidebarCourseSections(panel, "");

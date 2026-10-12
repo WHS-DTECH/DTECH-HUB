@@ -7178,11 +7178,13 @@ async function ensureStudentDriveSetupSchema() {
     CREATE TABLE IF NOT EXISTS student_drive_setup (
       student_email TEXT PRIMARY KEY,
       process_assessment_folder_id TEXT,
+      mdtech_project_folder_id TEXT,
       confirmed_at TIMESTAMPTZ,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `);
   await pool.query(`ALTER TABLE student_drive_setup ADD COLUMN IF NOT EXISTS process_assessment_folder_id TEXT`);
+  await pool.query(`ALTER TABLE student_drive_setup ADD COLUMN IF NOT EXISTS mdtech_project_folder_id TEXT`);
   await pool.query(`ALTER TABLE student_drive_setup ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMPTZ`);
   await pool.query(`ALTER TABLE student_drive_setup ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 }
@@ -8968,6 +8970,7 @@ async function getStudentDriveSetup(email) {
     haparaFolderUrl: String(haparaRow?.folder_url || "").trim(),
     classLabel: String(haparaRow?.class_label || "").trim(),
     processAssessmentFolderId: String(setupRow?.process_assessment_folder_id || "").trim(),
+    mdtechProjectFolderId: String(setupRow?.mdtech_project_folder_id || "").trim(),
     confirmed: Boolean(setupRow?.confirmed_at)
   };
 }
@@ -9066,6 +9069,56 @@ async function saveStudentDriveSetup(email, processAssessmentFolderId) {
     [normalizedEmail, processAssessmentFolderId]
   );
   return r.rows?.[0] || null;
+}
+
+async function saveStudentMdtechProjectFolder(email, folderId) {
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedFolderId = String(folderId || "").trim();
+  if (!normalizedEmail || !normalizedFolderId) return null;
+
+  if (!hasDatabase) {
+    const existing = memoryStudentDriveSetup.get(normalizedEmail) || {};
+    const next = {
+      ...existing,
+      student_email: normalizedEmail,
+      mdtech_project_folder_id: normalizedFolderId,
+      confirmed_at: existing.confirmed_at || new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    memoryStudentDriveSetup.set(normalizedEmail, next);
+    return next;
+  }
+
+  await ensureStudentDriveSetupSchema();
+  const result = await pool.query(
+    `INSERT INTO student_drive_setup (student_email, mdtech_project_folder_id, confirmed_at, updated_at)
+     VALUES ($1, $2, NOW(), NOW())
+     ON CONFLICT (student_email) DO UPDATE SET
+       mdtech_project_folder_id = EXCLUDED.mdtech_project_folder_id,
+       confirmed_at = COALESCE(student_drive_setup.confirmed_at, NOW()),
+       updated_at = NOW()
+     RETURNING *`,
+    [normalizedEmail, normalizedFolderId]
+  );
+  return result.rows?.[0] || null;
+}
+
+async function getStudentTaskListDriveFolder(email) {
+  const programmeFolder = await getStudentProgrammeFolder(email);
+  const setup = await getStudentDriveSetup(email);
+  if (programmeFolder === "MiddleDTECH") {
+    return {
+      folderId: String(setup?.mdtechProjectFolderId || "").trim(),
+      folderName: "MDTECH Project",
+      programmeFolder
+    };
+  }
+
+  return {
+    folderId: String(setup?.processAssessmentFolderId || "").trim(),
+    folderName: "Process Assessment",
+    programmeFolder
+  };
 }
 
 app.get("/api/template-library", async (_req, res) => {
@@ -9287,6 +9340,98 @@ app.post("/api/student/login-drive-setup", async (req, res) => {
   }
 });
 
+app.get("/api/student/mdtech-project-folder", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email || !email.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required." });
+    return;
+  }
+
+  try {
+    const programmeFolder = await getStudentProgrammeFolder(email);
+    if (programmeFolder !== "MiddleDTECH") {
+      res.status(403).json({ error: "The MDTECH Project folder is only available to MiddleDTECH students." });
+      return;
+    }
+
+    const setup = await getStudentDriveSetup(email);
+    const folderId = String(setup?.mdtechProjectFolderId || "").trim();
+    res.json({
+      ready: Boolean(folderId),
+      folderId: folderId || null,
+      folderUrl: folderId ? buildDriveFolderUrlFromId(folderId) : null,
+      folderName: "MDTECH Project"
+    });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not check your MDTECH Project folder." });
+  }
+});
+
+app.post("/api/student/mdtech-project-folder", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email || !email.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required." });
+    return;
+  }
+
+  const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
+  if (!driveAccessToken) {
+    res.status(400).json({ error: "Google Drive permission is required." });
+    return;
+  }
+
+  try {
+    const programmeFolder = await getStudentProgrammeFolder(email);
+    if (programmeFolder !== "MiddleDTECH") {
+      res.status(403).json({ error: "The MDTECH Project folder is only available to MiddleDTECH students." });
+      return;
+    }
+
+    const identityResponse = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+      headers: { Authorization: `Bearer ${driveAccessToken}` }
+    });
+    if (!identityResponse.ok) {
+      res.status(401).json({ error: "Google Drive sign-in expired. Sign in again and retry." });
+      return;
+    }
+    const identity = await identityResponse.json();
+    if (!identity.email_verified || normalizeEmail(identity.email) !== email) {
+      res.status(403).json({ error: "Choose the same school Google account as your DTECH-HUB sign-in." });
+      return;
+    }
+
+    const savedLoginSetup = await getStudentLoginDriveSetup(email);
+    const existingRoot = savedLoginSetup?.folder_id
+      ? await driveGetLiveFile(String(savedLoginSetup.folder_id), driveAccessToken)
+      : null;
+    const root = existingRoot || await driveEnsureFolder("root", "WHS-DTECH", driveAccessToken);
+    if (!root?.id) {
+      res.status(500).json({ error: "Could not find or create your WHS-DTECH folder." });
+      return;
+    }
+    const middleFolder = await driveEnsureFolder(String(root.id), "MiddleDTECH", driveAccessToken);
+    if (!middleFolder?.id) {
+      res.status(500).json({ error: "Could not find or create your MiddleDTECH folder." });
+      return;
+    }
+    const folder = await driveEnsureFolder(String(middleFolder.id), "MDTECH Project", driveAccessToken);
+    if (!folder?.id) {
+      res.status(500).json({ error: "Could not find or create your MDTECH Project folder." });
+      return;
+    }
+
+    await saveStudentMdtechProjectFolder(email, String(folder.id));
+    res.json({
+      ready: true,
+      folderId: String(folder.id),
+      folderUrl: String(folder.webViewLink || buildDriveFolderUrlFromId(folder.id)).trim(),
+      folderName: "MDTECH Project"
+    });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not set up your MDTECH Project folder." });
+  }
+});
+
 app.get("/api/student/drive-setup", async (req, res) => {
   const email = normalizeEmail(getRequestUserEmail(req));
   if (!email) { res.status(401).json({ error: "Sign in is required." }); return; }
@@ -9467,13 +9612,21 @@ app.post("/api/student/drive-setup/upload-decomposition-pdf", async (req, res) =
   if (!buffer?.length) { res.status(400).json({ error: "The PDF was empty." }); return; }
 
   try {
-    const seniorDtechFolder = await driveEnsureFolder("root", "SeniorDTECH", driveAccessToken);
-    if (!seniorDtechFolder?.id) { res.status(500).json({ error: "Could not find or create the SeniorDTECH folder." }); return; }
+    const taskFolder = await getStudentTaskListDriveFolder(email);
+    let taskFolderId = String(taskFolder.folderId || "").trim();
+    if (!taskFolderId && taskFolder.programmeFolder === "MiddleDTECH") {
+      res.status(400).json({ error: "Please set up your MDTECH Project folder first." });
+      return;
+    }
+    if (!taskFolderId) {
+      const seniorDtechFolder = await driveEnsureFolder("root", "SeniorDTECH", driveAccessToken);
+      if (!seniorDtechFolder?.id) { res.status(500).json({ error: "Could not find or create the SeniorDTECH folder." }); return; }
+      const processAssessmentFolder = await driveEnsureFolder(String(seniorDtechFolder.id), "Process Assessment", driveAccessToken);
+      if (!processAssessmentFolder?.id) { res.status(500).json({ error: "Could not find or create the Process Assessment folder." }); return; }
+      taskFolderId = String(processAssessmentFolder.id);
+    }
 
-    const processAssessmentFolder = await driveEnsureFolder(String(seniorDtechFolder.id), "Process Assessment", driveAccessToken);
-    if (!processAssessmentFolder?.id) { res.status(500).json({ error: "Could not find or create the Process Assessment folder." }); return; }
-
-    const decompositionFolder = await driveEnsureFolder(String(processAssessmentFolder.id), PROCESS_ASSESSMENT_DECOMPOSITION_FOLDER_NAME, driveAccessToken);
+    const decompositionFolder = await driveEnsureFolder(taskFolderId, PROCESS_ASSESSMENT_DECOMPOSITION_FOLDER_NAME, driveAccessToken);
     if (!decompositionFolder?.id) { res.status(500).json({ error: "Could not find or create the Decomposition folder." }); return; }
 
     const existing = await driveFindFileByNameInFolder(String(decompositionFolder.id), fileName, driveAccessToken);
@@ -9520,12 +9673,12 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
     return;
   }
   try {
-    const setup = await getStudentDriveSetup(email);
-    if (!setup?.processAssessmentFolderId) {
-      res.status(400).json({ error: "Please confirm your Process Assessment folder first." });
+    const taskFolder = await getStudentTaskListDriveFolder(email);
+    if (!taskFolder.folderId) {
+      res.status(400).json({ error: `Please confirm your ${taskFolder.folderName} folder first.` });
       return;
     }
-    const processAssessmentFolderId = String(setup.processAssessmentFolderId || "").trim();
+    const processAssessmentFolderId = String(taskFolder.folderId || "").trim();
     const processAssessmentFolderUrl = buildDriveFolderUrlFromId(processAssessmentFolderId);
     const activityId = String(req.body?.activityId || "").trim();
     await driveEnsureAnyoneEditorPermission(processAssessmentFolderId, driveAccessToken).catch(() => {});
@@ -9696,16 +9849,16 @@ app.post("/api/student/drive-setup/find-slide", async (req, res) => {
   }
 
   try {
-    const setup = await getStudentDriveSetup(email);
-    const folderId = String(setup?.processAssessmentFolderId || "").trim();
+    const taskFolder = await getStudentTaskListDriveFolder(email);
+    const folderId = String(taskFolder.folderId || "").trim();
     if (!folderId) {
-      res.status(400).json({ error: "Please confirm your Process Assessment folder first." });
+      res.status(400).json({ error: `Please confirm your ${taskFolder.folderName} folder first.` });
       return;
     }
 
     const slides = await driveListSlidesInProcessAssessmentTree(folderId, driveAccessToken);
     if (!slides.length) {
-      res.status(404).json({ error: "No Google Slides files found in Process Assessment folder." });
+      res.status(404).json({ error: `No Google Slides files found in ${taskFolder.folderName} folder.` });
       return;
     }
 
@@ -9851,10 +10004,10 @@ app.post("/api/activities/:id/sync-drive-templates", async (req, res) => {
   if (!driveAccessToken) { res.status(400).json({ error: "driveAccessToken is required." }); return; }
 
   try {
-    const setup = await getStudentDriveSetup(requesterEmail);
-    const folderId = String(setup?.processAssessmentFolderId || "").trim();
+    const taskFolder = await getStudentTaskListDriveFolder(requesterEmail);
+    const folderId = String(taskFolder.folderId || "").trim();
     if (!folderId) {
-      res.status(400).json({ error: "Please confirm your Process Assessment folder first." });
+      res.status(400).json({ error: `Please confirm your ${taskFolder.folderName} folder first.` });
       return;
     }
 
@@ -9905,10 +10058,10 @@ app.post("/api/student/drive-setup/list-process-assessment-slides", async (req, 
   }
 
   try {
-    const setup = await getStudentDriveSetup(email);
-    const folderId = String(setup?.processAssessmentFolderId || "").trim();
+    const taskFolder = await getStudentTaskListDriveFolder(email);
+    const folderId = String(taskFolder.folderId || "").trim();
     if (!folderId) {
-      res.status(400).json({ error: "Please confirm your Process Assessment folder first." });
+      res.status(400).json({ error: `Please confirm your ${taskFolder.folderName} folder first.` });
       return;
     }
 

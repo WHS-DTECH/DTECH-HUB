@@ -830,6 +830,40 @@ async function loadDriveSetup() {
     }
 
     try {
+        let taskListCourse = "";
+        try {
+            const courseResponse = await fetch("/api/practical-skills/my-course", {
+                headers: withLibraryAuthHeaders({}),
+                cache: "no-store"
+            });
+            const coursePayload = await courseResponse.json().catch(() => ({}));
+            if (courseResponse.ok) taskListCourse = String(coursePayload?.course || "").trim();
+        } catch (_error) {
+            taskListCourse = "";
+        }
+
+        if (taskListCourse === "MiddleDTECH") {
+            const response = await fetch("/api/student/mdtech-project-folder", {
+                headers: withLibraryAuthHeaders({}),
+                cache: "no-store"
+            });
+            const payload = await response.json().catch(() => ({}));
+            driveState.setupResolved = true;
+            if (!response.ok) {
+                driveState.setupState = { taskListCourse, configured: false, confirmed: false };
+                return driveState.setupState;
+            }
+            driveState.setupState = {
+                ...payload,
+                taskListCourse,
+                configured: Boolean(payload?.ready),
+                confirmed: Boolean(payload?.ready),
+                mdtechProjectFolderId: String(payload?.folderId || "").trim(),
+                mdtechProjectFolderUrl: String(payload?.folderUrl || "").trim()
+            };
+            return driveState.setupState;
+        }
+
         const storedDriveAccessToken = getLibraryStoredDriveAccessToken();
         const response = storedDriveAccessToken
             ? await fetch("/api/student/drive-setup/status", {
@@ -841,12 +875,29 @@ async function loadDriveSetup() {
         const payload = await response.json().catch(() => ({}));
         driveState.setupResolved = true;
         if (!response.ok) return null;
-        driveState.setupState = payload;
-        return payload;
+        driveState.setupState = { ...payload, taskListCourse };
+        return driveState.setupState;
     } catch (_error) {
         driveState.setupResolved = true;
         return null;
     }
+}
+
+function getTemplateDestination(setup = driveState.setupState) {
+    const isMiddleDtech = setup?.taskListCourse === "MiddleDTECH";
+    const folderId = String(isMiddleDtech
+        ? setup?.mdtechProjectFolderId || ""
+        : setup?.processAssessmentFolderId || "").trim();
+    const folderUrl = String(isMiddleDtech
+        ? setup?.mdtechProjectFolderUrl || ""
+        : setup?.processAssessmentFolderUrl || "").trim()
+        || (folderId ? `https://drive.google.com/drive/folders/${encodeURIComponent(folderId)}` : "");
+    return {
+        folderId,
+        folderUrl,
+        folderName: isMiddleDtech ? "MDTECH Project" : "Process Assessment",
+        path: isMiddleDtech ? "WHS-DTECH / MiddleDTECH / MDTECH Project" : "SeniorDTECH / Process Assessment"
+    };
 }
 
 function normalizeTemplateLibraryEntries(items) {
@@ -1002,16 +1053,27 @@ function renderSetupBanner(setup) {
         return;
     }
 
-    if (setup?.confirmed && setup?.processAssessmentFolderId) {
-        const processAssessmentFolderId = String(setup.processAssessmentFolderId || "").trim();
-        const processAssessmentFolderUrl = String(setup.processAssessmentFolderUrl || "").trim() || (processAssessmentFolderId
-            ? `https://drive.google.com/drive/folders/${encodeURIComponent(processAssessmentFolderId)}`
-            : "");
+    const destination = getTemplateDestination(setup);
+    if (setup?.confirmed && destination.folderId) {
         banner.innerHTML = `
             <div class="template-setup-banner-inner template-setup-banner-ok">
-                <p class="template-setup-banner-text">&#10003; Your <strong><a class="template-setup-banner-link" href="${escapeHtml(processAssessmentFolderUrl)}" target="_blank" rel="noreferrer">Process Assessment</a></strong> folder is ready. Templates copied will go directly there.</p>
+                <p class="template-setup-banner-text">&#10003; Your <strong><a class="template-setup-banner-link" href="${escapeHtml(destination.folderUrl)}" target="_blank" rel="noreferrer">${escapeHtml(destination.folderName)}</a></strong> folder is ready. Templates copied will go directly there.</p>
             </div>`;
         banner.hidden = false;
+        return;
+    }
+
+    if (setup?.taskListCourse === "MiddleDTECH") {
+        banner.innerHTML = `
+            <div class="template-setup-banner-inner template-setup-banner-action">
+                <p class="template-setup-banner-text">Before using these templates, create or confirm <strong>${escapeHtml(destination.path)}</strong> in your Google Drive. Templates copied will be saved in <strong>MDTECH Project</strong>.</p>
+                <button type="button" class="template-setup-confirm-button" id="template-setup-confirm">Set up MDTECH Project</button>
+                <p class="template-setup-banner-status" id="template-setup-status" aria-live="polite"></p>
+            </div>`;
+        banner.hidden = false;
+        document.querySelector("#template-setup-confirm")?.addEventListener("click", () => {
+            void handleConfirmFolder();
+        });
         return;
     }
 
@@ -1068,6 +1130,8 @@ function renderSetupBanner(setup) {
 async function handleConfirmFolder() {
     const confirmButton = document.querySelector("#template-setup-confirm");
     const statusEl = document.querySelector("#template-setup-status");
+    const isMiddleDtech = driveState.setupState?.taskListCourse === "MiddleDTECH";
+    const setupUrl = isMiddleDtech ? "/api/student/mdtech-project-folder" : "/api/student/drive-setup/confirm";
     if (confirmButton) confirmButton.disabled = true;
     if (statusEl) statusEl.textContent = "Requesting Drive access\u2026";
 
@@ -1078,10 +1142,12 @@ async function handleConfirmFolder() {
         return;
     }
 
-    if (statusEl) statusEl.textContent = "Creating SeniorDTECH/Process Assessment folders and sub-folders\u2026";
+    if (statusEl) statusEl.textContent = isMiddleDtech
+        ? "Creating your MDTECH Project folder\u2026"
+        : "Creating SeniorDTECH/Process Assessment folders and sub-folders\u2026";
 
     try {
-        const response = await fetch("/api/student/drive-setup/confirm", {
+        const response = await fetch(setupUrl, {
             method: "POST",
             headers: withLibraryAuthHeaders({ "Content-Type": "application/json" }),
             body: JSON.stringify({ driveAccessToken: tokenResponse.access_token })
@@ -1089,15 +1155,24 @@ async function handleConfirmFolder() {
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(payload.error || `Error ${response.status}`);
 
-        driveState.setupState = { ...driveState.setupState, confirmed: true, processAssessmentFolderId: payload.processAssessmentFolderId };
+        driveState.setupState = isMiddleDtech
+            ? {
+                ...driveState.setupState,
+                ready: true,
+                configured: true,
+                confirmed: true,
+                mdtechProjectFolderId: String(payload.folderId || "").trim(),
+                mdtechProjectFolderUrl: String(payload.folderUrl || "").trim()
+            }
+            : { ...driveState.setupState, confirmed: true, processAssessmentFolderId: payload.processAssessmentFolderId };
         renderSetupBanner(driveState.setupState);
         
         // Clear the status element since the banner has been successfully updated
         if (statusEl) statusEl.textContent = "";
         
-        // Open the Process Assessment folder in a new window
-        if (payload.processAssessmentFolderUrl) {
-            window.open(payload.processAssessmentFolderUrl, "_blank", "noopener");
+        const folderUrl = isMiddleDtech ? payload.folderUrl : payload.processAssessmentFolderUrl;
+        if (folderUrl) {
+            window.open(folderUrl, "_blank", "noopener");
         }
     } catch (error) {
         const message = String(error?.message || "");
@@ -1112,13 +1187,15 @@ async function handleConfirmFolder() {
         driveState.tokenExpiry = 0;
         const consentTokenResponse = await requestDriveToken({ forceConsent: true });
         if (consentTokenResponse.error) {
-            if (statusEl) statusEl.textContent = "Google Drive permission is required to create your SeniorDTECH/Process Assessment folders.";
+            if (statusEl) statusEl.textContent = isMiddleDtech
+                ? "Google Drive permission is required to create your MDTECH Project folder."
+                : "Google Drive permission is required to create your SeniorDTECH/Process Assessment folders.";
             if (confirmButton) confirmButton.disabled = false;
             return;
         }
 
         try {
-            const retryResponse = await fetch("/api/student/drive-setup/confirm", {
+            const retryResponse = await fetch(setupUrl, {
                 method: "POST",
                 headers: withLibraryAuthHeaders({ "Content-Type": "application/json" }),
                 body: JSON.stringify({ driveAccessToken: consentTokenResponse.access_token })
@@ -1126,15 +1203,24 @@ async function handleConfirmFolder() {
             const retryPayload = await retryResponse.json().catch(() => ({}));
             if (!retryResponse.ok) throw new Error(retryPayload.error || `Error ${retryResponse.status}`);
 
-            driveState.setupState = { ...driveState.setupState, confirmed: true, processAssessmentFolderId: retryPayload.processAssessmentFolderId };
+            driveState.setupState = isMiddleDtech
+                ? {
+                    ...driveState.setupState,
+                    ready: true,
+                    configured: true,
+                    confirmed: true,
+                    mdtechProjectFolderId: String(retryPayload.folderId || "").trim(),
+                    mdtechProjectFolderUrl: String(retryPayload.folderUrl || "").trim()
+                }
+                : { ...driveState.setupState, confirmed: true, processAssessmentFolderId: retryPayload.processAssessmentFolderId };
             renderSetupBanner(driveState.setupState);
             
             // Clear the status element since the banner has been successfully updated
             if (statusEl) statusEl.textContent = "";
             
-            // Open the Process Assessment folder in a new window
-            if (retryPayload.processAssessmentFolderUrl) {
-                window.open(retryPayload.processAssessmentFolderUrl, "_blank", "noopener");
+            const folderUrl = isMiddleDtech ? retryPayload.folderUrl : retryPayload.processAssessmentFolderUrl;
+            if (folderUrl) {
+                window.open(folderUrl, "_blank", "noopener");
             }
         } catch (retryError) {
             if (statusEl) statusEl.textContent = `Could not confirm folder: ${retryError.message || "Unknown error"}`;
@@ -1170,10 +1256,11 @@ async function handleUseTemplate(templateId) {
         return;
     }
 
-    // Do not allow template use until setup is confirmed.
+    // Do not allow template use until the course-specific folder is confirmed.
     const setup = driveState.setupState;
-    if (!setup?.confirmed || !setup?.processAssessmentFolderId) {
-        alert("Please click Confirm My Folder first. We only allow templates after Process Assessment is set up.");
+    const destination = getTemplateDestination(setup);
+    if (!setup?.confirmed || !destination.folderId) {
+        alert(`Please set up your ${destination.folderName} folder first. Templates are available once it is ready.`);
         return;
     }
 
@@ -1281,7 +1368,8 @@ function updateCardAfterCopy(templateId, copyResult) {
     const actionsArea = card.querySelector(".template-card-actions");
     if (!actionsArea) return;
 
-    const existingLabel = copyResult.alreadyExists ? "Opened your existing copy." : "Saved to Process Assessment.";
+    const destination = getTemplateDestination();
+    const existingLabel = copyResult.alreadyExists ? "Opened your existing copy." : `Saved to ${destination.folderName}.`;
     const deleteButtonHtml = canManageTemplates()
         ? `<button type="button" class="template-card-delete" data-delete-template="${escapeHtml(templateId)}">Delete</button>`
         : "";
@@ -1367,7 +1455,8 @@ function renderTemplateCard(item) {
     const imageAlt = `${title} preview`;
     const standardsLabel = standards.length ? standards.join(", ") : "Not set";
     
-    // Use real-time Process Assessment folder files (no cached fallback to avoid stale data)
+    // Use real-time files from the current course folder (no cached fallback).
+    const destination = getTemplateDestination();
     let existingCopy = null;
     const normalizeForMatching = (text) => String(text || "")
         .trim()
@@ -1409,7 +1498,7 @@ function renderTemplateCard(item) {
     const actionHtml = !canUse
         ? `<button class="template-card-open" aria-disabled="true" disabled>${status === "live" ? "Template Link Needed" : "Template Coming Soon"}</button>${moveButtonHtml}`
         : existingCopy
-            ? `<a class="template-card-open template-card-open-existing" href="${escapeHtml(existingCopy.fileUrl)}" target="_blank" rel="noreferrer">Open Your Copy</a>${resetButtonHtml}${moveButtonHtml}${deleteButtonHtml}<p class="template-card-copy-note">Saved to Process Assessment.</p>`
+            ? `<a class="template-card-open template-card-open-existing" href="${escapeHtml(existingCopy.fileUrl)}" target="_blank" rel="noreferrer">Open Your Copy</a>${resetButtonHtml}${moveButtonHtml}${deleteButtonHtml}<p class="template-card-copy-note">Saved to ${escapeHtml(destination.folderName)}.</p>`
             : `<button class="template-card-open" type="button" data-use-template="${escapeHtml(item.id)}">Use Template</button>${resetButtonHtml}${moveButtonHtml}${deleteButtonHtml}`;
 
     const previewClickHtml = canUse && !existingCopy
@@ -1559,11 +1648,12 @@ function renderLibrary() {
     const searchStatus = document.querySelector("#template-search-status");
     if (!host) return;
 
-    if (getLibraryEmail() && driveState.setupResolved && !Boolean(driveState.setupState?.confirmed && driveState.setupState?.processAssessmentFolderId)) {
+    const destination = getTemplateDestination();
+    if (getLibraryEmail() && driveState.setupResolved && !Boolean(driveState.setupState?.confirmed && destination.folderId)) {
         if (searchStatus) {
             searchStatus.textContent = "";
         }
-        host.innerHTML = '<p class="template-empty">Set up your SeniorDTECH/Process Assessment folder first. Use Google Drive Sync in the top bar or confirm the folder below to unlock the template library.</p>';
+        host.innerHTML = `<p class="template-empty">Set up your ${escapeHtml(destination.folderName)} folder first. Confirm the folder below to unlock the template library.</p>`;
         return;
     }
 

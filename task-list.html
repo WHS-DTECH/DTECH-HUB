@@ -170,6 +170,30 @@
             color: #b23a3a;
         }
 
+        .task-list-mdtech-setup {
+            margin-top: 12px;
+            border: 1px solid #e5c47a;
+            border-radius: 10px;
+            background: #fff9e9;
+            padding: 14px;
+        }
+
+        .task-list-mdtech-setup p {
+            margin: 0 0 10px;
+            color: #59420d;
+        }
+
+        .task-list-mdtech-setup-status {
+            margin-top: 8px !important;
+            font-size: 0.88rem;
+        }
+
+        .task-list-mdtech-folder-link {
+            display: inline-block;
+            margin-top: 8px;
+            font-weight: 700;
+        }
+
         .task-list-section-title {
             margin: 0 0 10px;
             font-size: 1rem;
@@ -825,9 +849,16 @@
                         </div>
                         <div id="task-list-context" class="task-list-callout" hidden></div>
                         <p id="task-list-status" class="task-list-status" aria-live="polite"></p>
+                        <div id="task-list-mdtech-drive-setup" class="task-list-mdtech-setup" hidden>
+                            <h3>Set up your MiddleDTECH project folder</h3>
+                            <p>Before using this Task List, create or confirm <strong>WHS-DTECH / MiddleDTECH / MDTECH Project</strong> in your Google Drive. Your project work will be saved in this folder.</p>
+                            <button type="button" id="task-list-mdtech-drive-setup-button" class="detail-action detail-action-primary">Set up MDTECH Project folder</button>
+                            <p id="task-list-mdtech-drive-setup-status" class="task-list-mdtech-setup-status" role="status" aria-live="polite"></p>
+                            <a id="task-list-mdtech-drive-folder-link" class="task-list-mdtech-folder-link" href="#" target="_blank" rel="noopener" hidden>Open MDTECH Project in Google Drive</a>
+                        </div>
                     </section>
 
-                    <section class="task-list-card">
+                    <section class="task-list-card" id="task-list-checklist-card" hidden>
                         <div class="section-heading">
                             <div>
                                 <p class="section-kicker">TASK LIST</p>
