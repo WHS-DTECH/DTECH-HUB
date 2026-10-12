@@ -1859,7 +1859,7 @@ function requestHubDriveAccessToken(options = {}) {
 
     return new Promise((resolve) => {
         hubAuthState.pendingTokenResolvers.push(resolve);
-        hubAuthState.tokenClient.requestAccessToken({ prompt: forceConsent ? "consent" : "" });
+        hubAuthState.tokenClient.requestAccessToken({ prompt: forceConsent ? "select_account consent" : "" });
     });
 }
 

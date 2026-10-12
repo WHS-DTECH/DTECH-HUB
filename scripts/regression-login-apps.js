@@ -304,6 +304,7 @@ async function main() {
         const tab = {
             closed: false,
             opener: {},
+            document: { title: "", body: { textContent: "" } },
             location: { replace(url) { tab.url = url; } },
             close() { this.closed = true; }
         };
@@ -330,6 +331,7 @@ async function main() {
         assert.equal(node("[data-login-drive-setup]").disabled, false);
         if (outcome === "success") {
             assert.equal(tab.opener, null);
+            assert.match(tab.document.body.textContent, /school Google account and allow Drive access/);
             assert.equal(tab.url, "https://drive.google.com/drive/folders/test");
         } else if (outcome === "blocked") {
             assert.match(node("[data-login-drive-status]").textContent, /blocked or closed/);
@@ -340,6 +342,9 @@ async function main() {
             assert.match(node("[data-login-drive-status]").textContent, /denied|did not confirm/);
         }
     }
+    const hubScript = fs.readFileSync(path.join(__dirname, "..", "script.js"), "utf8");
+    assert.match(hubScript, /requestAccessToken\(\{ prompt: forceConsent \? "select_account consent" : "" \}\)/,
+        "Explicit Drive setup asks the student to reselect their Google account");
     console.log("Login apps and WHS-DTECH setup regression checks passed.");
 }
 

@@ -433,7 +433,7 @@
                         <a class="worksheet-btn worksheet-btn-secondary" href="https://westlandhigh-my.sharepoint.com/" target="_blank" rel="noopener noreferrer">Open school Microsoft OneDrive</a>
                     </div>
                     <p>Microsoft: this link opens Westland High School's OneDrive directly. Sign in with your own school Microsoft account if asked. If the wrong account appears, switch to your school account. If Microsoft shows a sign-in error or OneDrive is missing, ask your teacher or school IT for help; do not tick the confirmation until you can see your files.</p>
-                    <p>Google setup creates or reuses just one folder: <strong>WHS-DTECH</strong> in My Drive. We will add class folders later.</p>
+                    <p>Click <strong>Set up Google Drive</strong> and choose your school Google account in the sign-in window. Allow Drive access when prompted. The setup creates or reuses just one folder: <strong>WHS-DTECH</strong> in My Drive. We will add class folders later.</p>
                     <p class="worksheet-safety-note">WHS-DTECH will be shared with anyone with the link as Editor, so DTECH-HUB can work with your files. Only store class work here, not private information. Do not share the link publicly. Never enter a password into this activity.</p>
                     <p class="worksheet-assessment-result" data-login-drive-status role="status" aria-live="polite"></p>
                     <a class="worksheet-btn worksheet-btn-secondary" data-login-drive-link target="_blank" rel="noopener noreferrer" hidden>Open your WHS-DTECH folder</a>
@@ -539,10 +539,14 @@
         driveButton.addEventListener("click", async () => {
             // Reserve the tab during the click so setup/consent does not trigger popup blocking.
             const folderTab = window.open("about:blank", "_blank");
-            if (folderTab) folderTab.opener = null;
+            if (folderTab) {
+                folderTab.opener = null;
+                folderTab.document.title = "Connecting to Google Drive";
+                folderTab.document.body.textContent = "Connecting to Google Drive. A Google sign-in window should appear. Choose your school Google account and allow Drive access, then keep this tab open.";
+            }
             driveButton.disabled = true;
             driveStatus.classList.remove("is-error");
-            driveStatus.textContent = "Requesting Google permission and setting up WHS-DTECH...";
+            driveStatus.textContent = "Choose your school Google account in the sign-in window and allow Drive access. We will create or open WHS-DTECH when setup is complete.";
             try {
                 if (!options.onDriveSetup) throw new Error("Open the student activity to set up Google Drive.");
                 const setup = await options.onDriveSetup();
