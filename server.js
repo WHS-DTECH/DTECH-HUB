@@ -6117,9 +6117,12 @@ app.use("/images/activities", express.static(path.join(__dirname, "images", "act
 app.use("/images/activities", express.static(path.join(__dirname, "public", "images", "activities")));
 app.get("/practical-skills/library.json", async (_req, res) => {
   try {
-    const rows = await readPracticalSkillsLibraryFile();
+    await ensureCustomPracticalSkillsKitsLoaded();
+    const kitCards = await readPracticalSkillsLibraryFile();
+    const activityCards = (await Promise.all(kitCards.map((card) => buildPracticalSkillsActivityLibraryCards(card))))
+      .flat();
     res.set("Cache-Control", "no-store");
-    res.json(rows);
+    res.json([...kitCards, ...activityCards]);
   } catch (_error) {
     res.status(500).json({ error: "Could not load Practical Skills library" });
   }
@@ -6497,6 +6500,36 @@ function buildPracticalSkillsKitLibraryCard(kitId, content) {
     href: `/practical-skills/kit-worksheet.html?kit=${encodeURIComponent(safeKitId)}`,
     visual: { icon: content.theme?.icon || "PS" }
   });
+}
+
+async function buildPracticalSkillsActivityLibraryCards(kitCard) {
+  const kitId = String(kitCard?.id || "").trim();
+  if (!kitId || !getPracticalSkillsKitDefinition(kitId)) return [];
+
+  const content = await getPracticalSkillsKitContent(kitId);
+  const worksheets = Array.isArray(content?.worksheets) ? content.worksheets : [];
+  const activities = Array.isArray(content?.activities) ? content.activities : [];
+  const themeIcon = String(content?.theme?.icon || kitCard.visual?.icon || "PS").trim() || "PS";
+
+  return worksheets
+    .map((worksheet, index) => ({ worksheet, index }))
+    .filter(({ worksheet }) => worksheet?.mergedInto === undefined && !worksheet?.hidden)
+    .map(({ worksheet, index }) => {
+      const activity = activities[index] || {};
+      const title = String(activity.title || worksheet.activity || `Activity ${index + 1}`).trim();
+      if (!title) return null;
+      return normalizePracticalSkillLibraryItem({
+        id: `activity-${kitId}-${index}`,
+        title,
+        summary: activity.establishes || worksheet.establishes || `Complete this activity from the ${kitCard.title} kit.`,
+        yearLevel: kitCard.yearLevel || "All Years",
+        area: kitCard.area || "Practical Skills",
+        status: kitCard.status || "active",
+        href: `/practical-skills/kit-worksheet.html?kit=${encodeURIComponent(kitId)}&activity=${index}`,
+        visual: { icon: themeIcon }
+      });
+    })
+    .filter(Boolean);
 }
 
 async function getSuggestionRecipients() {
