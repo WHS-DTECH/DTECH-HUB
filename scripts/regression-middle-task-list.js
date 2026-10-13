@@ -32,6 +32,29 @@ assert.equal(context.getTaskListCourseFromAllocations([
     { year_group: "Year 10", course_type: "COMP" }
 ]), "");
 
+const libraryDedupeStart = script.indexOf("function dedupeTaskTopicLibraryItems(");
+const libraryDedupeEnd = script.indexOf("\nasync function loadSharedLessons", libraryDedupeStart);
+assert.ok(libraryDedupeStart >= 0 && libraryDedupeEnd > libraryDedupeStart,
+    "Homepage Task Topic deduplication helper is present");
+const libraryContext = vm.createContext({});
+vm.runInContext(script.slice(libraryDedupeStart, libraryDedupeEnd), libraryContext);
+const repeatedTopic = { standardNumber: "91897", taskTopicText: "Trialling multiple components and/or techniques" };
+const uniqueLibraryTopics = libraryContext.dedupeTaskTopicLibraryItems([
+    { ...repeatedTopic, id: "activity-1" },
+    { ...repeatedTopic, taskTopicText: "  TRIALling multiple components\nand/or techniques ", id: "activity-2" },
+    { ...repeatedTopic, taskTopicText: "Trial the components of the outcome", id: "activity-3" },
+    { ...repeatedTopic, standardNumber: "91907", id: "activity-4" },
+    { taskTopicText: repeatedTopic.taskTopicText, id: "activity-5" },
+    { taskTopicText: repeatedTopic.taskTopicText, id: "activity-6" }
+]);
+assert.deepEqual(
+    JSON.parse(JSON.stringify(uniqueLibraryTopics.map((item) => item.id))),
+    ["activity-1", "activity-3", "activity-4", "activity-5", "activity-6"],
+    "Homepage Library removes repeated standard/topic cards while preserving distinct topics and unnumbered cards"
+);
+assert.match(taskList, /loadJson\("\/api\/my-allocations"/,
+    "Senior and Middle Task Lists continue to load assigned records independently of the homepage Library");
+
 const digitalOutcomeRows = [
     { text: "Describe the digital outcome" },
     { text: "Identify the target audience" }

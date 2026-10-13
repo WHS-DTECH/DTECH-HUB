@@ -988,6 +988,24 @@ function mapProjectTaskTopicsToLibraryItems(project) {
     });
 }
 
+function dedupeTaskTopicLibraryItems(items) {
+    const seen = new Set();
+    return items.filter((item) => {
+        const standardNumber = String(item?.standardNumber || "").trim();
+        const topicText = String(item?.taskTopicText || "").trim().replace(/\s+/g, " ").toLowerCase();
+        if (!standardNumber || !topicText) {
+            return true;
+        }
+
+        const key = `${standardNumber}\u0000${topicText}`;
+        if (seen.has(key)) {
+            return false;
+        }
+        seen.add(key);
+        return true;
+    });
+}
+
 async function loadSharedLessons() {
     try {
         const email = getActiveHubEmail();
@@ -1218,6 +1236,7 @@ function getUnifiedLibraryItems() {
     const taskTopicItems = projectItems
         .filter((project) => project.sourceType === "assessment")
         .flatMap((project) => mapProjectTaskTopicsToLibraryItems(project));
+    const uniqueTaskTopicItems = dedupeTaskTopicLibraryItems(taskTopicItems);
 
     return [
         ...projectItems,
@@ -1229,7 +1248,7 @@ function getUnifiedLibraryItems() {
             ...card,
             sourceType: "standard"
         })),
-        ...taskTopicItems,
+        ...uniqueTaskTopicItems,
         ...labProjects.map(mapLabProjectToLibraryItem)
     ];
 }
