@@ -1377,7 +1377,7 @@ function renderGlobalNavbar() {
             </div>
         </details>
     `;
-    const taskListLink = `<a id="hub-senior-task-list-link" class="hub-senior-task-list-link" href="/task-list.html" hidden>Task List</a>`;
+    const taskListLink = `<a id="hub-senior-task-list-link" class="hub-senior-task-list-link" href="/task-list.html" hidden><span class="hub-task-list-course" data-task-list-course hidden></span><span class="hub-task-list-label">Task List</span></a>`;
     const pathwaysLink = `<a id="hub-pathways-link" class="hub-pathways-link" href="/learning-pathways/" hidden>Pathways</a>`;
 
     const uploadMenu = `
@@ -2487,6 +2487,14 @@ function getTaskListCourseFromAllocations(items) {
     }) ? "MiddleDTECH" : "";
 }
 
+function getShortTaskListCourseName(course) {
+    return {
+        JuniorDTECH: "JnrDTECH",
+        MiddleDTECH: "MidDTECH",
+        SeniorDTECH: "SnrDTECH"
+    }[String(course || "").trim()] || "";
+}
+
 function updateSidebarCourseSections(panel, course = panel.dataset.course || "", status = "ready") {
     panel.dataset.course = course;
     panel.dataset.courseStatus = status;
@@ -2499,6 +2507,12 @@ function updateSidebarCourseSections(panel, course = panel.dataset.course || "",
     if (taskListLink) {
         taskListLink.href = course === "JuniorDTECH" ? "/learning-pathways/task-list.html" : "/task-list.html";
         taskListLink.hidden = !hubAuthState.profile?.email || !["JuniorDTECH", "MiddleDTECH", "SeniorDTECH"].includes(taskListCourse);
+        const courseBadge = taskListLink.querySelector?.("[data-task-list-course]");
+        if (courseBadge) {
+            const shortCourse = getShortTaskListCourseName(taskListCourse);
+            courseBadge.textContent = shortCourse;
+            courseBadge.hidden = !shortCourse;
+        }
     }
     const taskListButton = panel.querySelector("#hub-global-sidebar-tasklist-link");
     if (taskListButton) {

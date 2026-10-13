@@ -114,7 +114,8 @@ async function main() {
     const loaderEnd = client.indexOf("\nasync function loadAndRenderSidebarAllocations(", loaderStart);
     let refreshCourse;
     const pathwaysLink = { hidden: true };
-    const taskListLink = { hidden: true, href: "" };
+    const taskListCourseBadge = { textContent: "", hidden: true };
+    const taskListLink = { hidden: true, href: "", querySelector: () => taskListCourseBadge };
     const courseEvents = [];
     const browser = vm.createContext({
         routeHubCourseHomepage() {},
@@ -152,6 +153,9 @@ async function main() {
         assert.equal(taskListLink.hidden, !["JuniorDTECH", "MiddleDTECH", "SeniorDTECH"].includes(course));
         assert.equal(taskListButton.hidden, taskListLink.hidden, "Sidebar and navbar agree on Task List availability");
         assert.equal(taskListLink.href, course === "JuniorDTECH" ? "/learning-pathways/task-list.html" : "/task-list.html");
+        const expectedBadge = { JuniorDTECH: "JnrDTECH", MiddleDTECH: "MidDTECH", SeniorDTECH: "SnrDTECH" }[course] || "";
+        assert.equal(taskListCourseBadge.textContent, expectedBadge, "Task List button names the course whose list is in use");
+        assert.equal(taskListCourseBadge.hidden, !expectedBadge, "Unknown courses leave the Task List button unlabelled");
     }
     summaries.dataset.available = "false";
     browser.updateSidebarCourseSections(panel, "SeniorDTECH");
@@ -164,6 +168,7 @@ async function main() {
     ]);
     browser.updateSidebarCourseSections(panel, "");
     assert.equal(taskListLink.hidden, false, "Senior allocation fallback reveals the navbar Task List");
+    assert.equal(taskListCourseBadge.textContent, "SnrDTECH", "Allocation fallback still names the Task List course");
     assert.equal(taskListButton.hidden, false, "Senior allocation fallback reveals the sidebar Task List");
     assert.equal(allocations.hidden, false, "Senior allocation fallback reveals its allocation panel");
     browser.updateSidebarCourseSections(panel, "MiddleDTECH");
