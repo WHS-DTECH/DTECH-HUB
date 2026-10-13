@@ -3016,8 +3016,7 @@ function filterDtechActivities(rows) {
 }
 
 function filterStudentTaskListActivities(rows) {
-  return filterDtechActivities(rows)
-    .filter((row) => String(row?.id || "").trim() !== "49");
+  return filterDtechActivities(rows);
 }
 
 function normalizeUnitLessons(value) {
@@ -12637,9 +12636,9 @@ app.get("/api/my-allocations", async (req, res) => {
          ON v.activity_id = a.id::text
         AND v.hub_name = $2
        WHERE pi.student_email = $1
-         AND ($3::boolean = FALSE OR COALESCE(v.is_visible, TRUE) = TRUE)
+         AND ($3::boolean = FALSE OR a.id::text = $4::text OR COALESCE(v.is_visible, TRUE) = TRUE)
        ORDER BY a.name ASC`,
-      [email, DTECH_HUB_NAME, taskListView]
+      [email, DTECH_HUB_NAME, taskListView, CLIENT_PROJECTS_TASK_ID]
     );
 
     const assessmentTasks = [];

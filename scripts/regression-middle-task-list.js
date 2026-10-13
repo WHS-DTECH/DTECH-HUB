@@ -69,13 +69,15 @@ assert.deepEqual(
         { id: "50", isDtech: false },
         { id: "51", isDtech: true }
     ]).map((item) => item.id))),
-    ["51"],
-    "Student Task List omits the homepage-excluded Client Projects activity and non-DTECH activities"
+    ["49", "51"],
+    "Student Task List retains Client Projects and filters non-DTECH activities"
 );
-assert.match(server, /\(\$3::boolean = FALSE OR COALESCE\(v\.is_visible, TRUE\) = TRUE\)[\s\S]*?\[email, DTECH_HUB_NAME, taskListView\]/,
-    "Task List allocations respect per-hub homepage visibility without changing other allocation consumers");
+assert.match(server, /\(\$3::boolean = FALSE OR a\.id::text = \$4::text OR COALESCE\(v\.is_visible, TRUE\) = TRUE\)[\s\S]*?\[email, DTECH_HUB_NAME, taskListView, CLIENT_PROJECTS_TASK_ID\]/,
+    "Task List allocations respect homepage visibility while preserving Client Projects");
 assert.match(server, /taskListView \? filterStudentTaskListActivities\(result\.rows\) : result\.rows/,
-    "The homepage-excluded activity is filtered only for the Task List view");
+    "The Task List applies DTECH activity filtering without deleting allocation records");
+assert.match(script, /\.filter\(\(item\) => String\(item\?\.id \|\| ""\)\.trim\(\) !== "49"\)/,
+    "Client Projects remains hidden from the homepage Library");
 
 const slideMatcherStart = server.indexOf("function findBestStudentTaskTopicSlide(");
 const slideMatcherEnd = server.indexOf('\napp.post("/api/student/drive-setup/find-slide"', slideMatcherStart);
