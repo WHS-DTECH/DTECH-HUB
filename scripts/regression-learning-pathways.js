@@ -149,6 +149,10 @@ async function testDashboard() {
     assert.equal(grid.children.length, 1, "Licence Library still excludes the standalone checklist");
     assert.match(grid.children[0].innerHTML, /LICENCE KIT/, "Licence Library honours a card-specific footer label");
     assert.match(grid.children[0].innerHTML, /#2f8f61/, "Existing Licence Library green palette is preserved");
+    const licenceCategories = elements["#practical-skills-category-pills"];
+    assert.ok(licenceCategories.children.some((pill) => pill.textContent === "Licence Kit"), "Licence Kit appears as a Licence Library category filter");
+    licenceCategories.children.find((pill) => pill.textContent === "Licence Kit").click();
+    assert.equal(grid.children.length, 1, "Licence Kit category filter shows kit cards");
 }
 
 async function testEditor() {

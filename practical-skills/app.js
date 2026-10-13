@@ -88,7 +88,11 @@
         renderPillGroup(statusPillsContainer, getUniqueValues("status"), state.status, (value) => {
             state.status = value;
         });
-        renderPillGroup(categoryPillsContainer, getUniqueValues("area"), state.category, (value) => {
+        const categories = getUniqueValues("area");
+        if (!isPathways && library.some((item) => item.cardLabel === "LICENCE KIT")) {
+            categories.push("Licence Kit");
+        }
+        renderPillGroup(categoryPillsContainer, categories, state.category, (value) => {
             state.category = value;
         });
         const types = new Set(library.map((item) => cardTypeNames[cardType(item)]));
@@ -103,7 +107,8 @@
         return items.filter((item) => {
             if (state.year !== "All" && String(item.yearLevel || "") !== state.year) return false;
             if (state.status !== "All" && String(item.status || "") !== state.status) return false;
-            if (state.category !== "All" && String(item.area || "") !== state.category) return false;
+            if (state.category === "Licence Kit" && item.cardLabel !== "LICENCE KIT") return false;
+            if (state.category !== "All" && state.category !== "Licence Kit" && String(item.area || "") !== state.category) return false;
             if (state.type !== "All" && cardTypeNames[cardType(item)] !== state.type) return false;
 
             if (query) {
