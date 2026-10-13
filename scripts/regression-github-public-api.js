@@ -20,17 +20,16 @@ async function main() {
         URLSearchParams,
         fetch: async (url, options) => {
             calls.push({ url, headers: options.headers });
-            return calls.length === 1
-                ? makeResponse(401, { message: "Bad credentials" })
-                : makeResponse(200, { default_branch: "main" });
+            return makeResponse(401, { message: "Bad credentials" });
         }
     });
     vm.runInContext(`const GITHUB_TOKEN = "invalid-token"; ${helper}`, context);
-    const result = await context.githubApiRequest("/repos/student/project");
-    assert.equal(result.default_branch, "main", "A rejected token falls back to anonymous public access");
-    assert.equal(calls.length, 2, "The request is retried only once");
+    await assert.rejects(
+        context.githubApiRequest("/repos/student/project"),
+        (error) => error.status === 503 && /GITHUB_TOKEN was rejected/.test(error.message)
+    );
+    assert.equal(calls.length, 1, "A rejected token is not retried anonymously");
     assert.ok(calls[0].headers.Authorization, "The configured token is attempted first");
-    assert.ok(!("Authorization" in calls[1].headers), "The fallback request omits Authorization");
 
     const anonymousCalls = [];
     const anonymousContext = vm.createContext({
@@ -41,13 +40,15 @@ async function main() {
         }
     });
     vm.runInContext(`const GITHUB_TOKEN = ""; ${helper}`, anonymousContext);
-    await anonymousContext.githubApiRequest("/repos/student/project");
-    assert.equal(anonymousCalls.length, 1, "Requests without a token are not duplicated");
-    assert.ok(!("Authorization" in anonymousCalls[0]), "Anonymous requests remain unauthenticated");
+    await assert.rejects(
+        anonymousContext.githubApiRequest("/repos/student/project"),
+        (error) => error.status === 503 && /GITHUB_TOKEN is not configured/.test(error.message)
+    );
+    assert.equal(anonymousCalls.length, 0, "Requests without a token do not consume the shared anonymous quota");
 }
 
 main().then(() => {
-    console.log("GitHub public API credential fallback regressions passed.");
+    console.log("GitHub public API credential regressions passed.");
 }).catch((error) => {
     console.error(error);
     process.exitCode = 1;

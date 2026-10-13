@@ -16113,6 +16113,12 @@ function parseGithubRepoIdentifier(repoUrl) {
 }
 
 async function githubApiRequest(pathname, query = {}) {
+  if (!GITHUB_TOKEN) {
+    const error = new Error("GitHub sync is unavailable because the server GITHUB_TOKEN is not configured. Ask a DTECH-HUB administrator to configure it in Render.");
+    error.status = 503;
+    throw error;
+  }
+
   const params = new URLSearchParams(query || {});
   const suffix = params.toString();
   const url = `https://api.github.com${pathname}${suffix ? `?${suffix}` : ""}`;
@@ -16120,23 +16126,16 @@ async function githubApiRequest(pathname, query = {}) {
     Accept: "application/vnd.github+json",
     "User-Agent": "DTECH-HUB"
   };
-  if (GITHUB_TOKEN) {
-    headers.Authorization = `Bearer ${GITHUB_TOKEN}`;
-  }
+  headers.Authorization = `Bearer ${GITHUB_TOKEN}`;
 
-  let response = await fetch(url, { headers });
-  if (response.status === 401 && GITHUB_TOKEN) {
-    // These endpoints only inspect public repositories, so an expired server token
-    // should not prevent the same read from succeeding anonymously.
-    const publicHeaders = { ...headers };
-    delete publicHeaders.Authorization;
-    response = await fetch(url, { headers: publicHeaders });
-  }
+  const response = await fetch(url, { headers });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const message = String(payload?.message || `GitHub request failed (${response.status}).`);
+    const message = response.status === 401
+      ? "The server GITHUB_TOKEN was rejected by GitHub. A DTECH-HUB administrator needs to refresh the token in Render."
+      : String(payload?.message || `GitHub request failed (${response.status}).`);
     const error = new Error(message);
-    error.status = response.status === 404 ? 404 : (response.status === 403 ? 429 : response.status);
+    error.status = response.status === 401 ? 503 : (response.status === 404 ? 404 : (response.status === 403 ? 429 : response.status));
     throw error;
   }
   return payload;
