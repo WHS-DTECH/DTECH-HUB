@@ -28,10 +28,14 @@ async function main() {
     const context = vm.createContext({
         ...certificateTools, ...assessment, ...loginSites,
         app: Object.fromEntries(["get", "post", "put"].map((method) => [method, (url, handler) => { handlers[`${method} ${url}`] = handler; }])),
+        requireAdminAccess: () => {},
         hasDatabase: false, memoryPracticalSkillsProgress: new Map(),
         SEARCH_RESULTS_DETECTIVE_ID: "search-results-detective-v1", SEARCH_AND_FIND_ID: "search-and-find-v1",
         LEARNING_SITES_ID: "learning-sites-treasure-v1", needsCourseCheckIn: () => false, getCourseProgrammeFolder: () => "",
         normalizeEmail: (value) => String(value || "").trim().toLowerCase(),
+        canonicalizeRoleName: (value) => String(value || "").trim().toLowerCase() === "lead teacher" ? "Lead Teacher" : String(value || "").trim(),
+        DTECH_HUB_NAME: "DTECH-HUB",
+        memoryUserRoles: new Map(), hasDatabase: false,
         SCHOOL_EMAIL_DOMAIN: "example.school.nz", getRequestUserEmail: (req) => req.email,
         PRACTICAL_SKILLS_KIT_DEFINITIONS: [{ id: "kit-login" }],
         getPracticalSkillsKitDefinition: (id) => id === "kit-login",
@@ -50,6 +54,24 @@ async function main() {
         console: { error() {} },
         pool: { query: async (sql, values) => { queries.push({ sql, values }); return { rows: [{ student_email: email, kit_id: "kit-login", completed: true }] }; } }
     });
+    const roleContext = vm.createContext({
+        normalizeEmail: (value) => String(value || "").trim().toLowerCase(),
+        canonicalizeRoleName: (value) => String(value || "").trim().toLowerCase() === "lead teacher" ? "Lead Teacher" : String(value || "").trim(),
+        DTECH_HUB_NAME: "DTECH-HUB",
+        memoryUserRoles: new Map([
+            ["lead@example.school.nz", { user_email: "lead@example.school.nz", user_type: "Staff", additional_role: "Lead Teacher", hub_access: ["DTECH-HUB"] }],
+            ["teacher@example.school.nz", { user_email: "teacher@example.school.nz", user_type: "Staff", additional_role: "Teacher", hub_access: ["DTECH-HUB"] }],
+            ["other-hub@example.school.nz", { user_email: "other-hub@example.school.nz", user_type: "Staff", additional_role: "Lead Teacher", hub_access: ["OTHER-HUB"] }]
+        ]),
+        hasDatabase: false
+    });
+    vm.runInContext(extract("async function getPracticalSkillsCertificateTeacherRecipients(", "\nasync function getSuggestionRecipients"), roleContext);
+    assert.deepEqual(
+        JSON.parse(JSON.stringify(await roleContext.getPracticalSkillsCertificateTeacherRecipients())),
+        ["lead@example.school.nz"],
+        "Certificate copies go to DTECH Lead Teachers, not other staff or roles in other hubs"
+    );
+    context.getPracticalSkillsCertificateTeacherRecipients = async () => ["lead@example.school.nz"];
     vm.runInContext([
         extract("async function ensurePracticalSkillsProgressRow(", "const DEFAULT_TEMPLATE_LIBRARY_ENTRIES"),
         extract("async function savePracticalSkillsKitResponses(", "async function ensureStudentHaparaFoldersSchema("),
@@ -89,6 +111,7 @@ async function main() {
     assert.equal(progress.kit.isComplete, true, "Last activity automatically persists kit completion");
     assert.equal(sent.length, 1, "Completing the kit automatically emails the certificate once");
     assert.equal(sent[0].to, email);
+    assert.deepEqual(sent[0].cc, ["lead@example.school.nz"], "Automatic certificate email CCs the DTECH Lead Teacher");
     assert.equal(sent[0].emailType, "kit_certificate");
     assert.ok(context.memoryPracticalSkillsProgress.get(`${email}:kit-login`).certificate_emailed_at);
     await call("get", "");
@@ -137,6 +160,7 @@ async function main() {
     assert.equal(emailed.body.recipient, email);
     assert.equal(sent.length, 2, "Manual Email me a copy still sends on request");
     assert.equal(sent[1].to, email, "Recipient is server-derived, never a client-supplied address");
+    assert.deepEqual(sent[1].cc, ["lead@example.school.nz"], "Manual certificate resend also CCs the DTECH Lead Teacher");
     assert.equal(sent[1].attachment.mimetype, "application/pdf");
     assert.ok(sent[1].attachment.buffer.length > 1000);
     assert.equal(sent[1].emailType, "kit_certificate");

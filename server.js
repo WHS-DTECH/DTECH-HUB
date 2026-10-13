@@ -6622,6 +6622,57 @@ async function buildPracticalSkillsActivityLibraryCards(kitCard) {
     .filter(Boolean);
 }
 
+async function getPracticalSkillsCertificateTeacherRecipients() {
+  const recipients = new Set();
+  const hasDtechHubAccess = (value) => {
+    const hubs = value === undefined || value === null || value === ""
+      ? [DTECH_HUB_NAME]
+      : (Array.isArray(value) ? value : String(value).split(","));
+    return hubs.some((hub) => String(hub || "").trim().toLowerCase() === DTECH_HUB_NAME.toLowerCase());
+  };
+  const addLeadTeacher = (row) => {
+    const role = canonicalizeRoleName(row?.additional_role || row?.user_type || "");
+    const email = normalizeEmail(row?.user_email || "");
+    if (role === "Lead Teacher" && email && hasDtechHubAccess(row?.hub_access)) {
+      recipients.add(email);
+    }
+  };
+
+  for (const row of memoryUserRoles.values()) {
+    addLeadTeacher(row);
+  }
+
+  if (!hasDatabase) {
+    return Array.from(recipients);
+  }
+
+  try {
+    const columns = await resolveUserRolesColumns();
+    if (!columns.email) {
+      return Array.from(recipients);
+    }
+
+    const selectColumns = [
+      `${quoteIdentifier(columns.email)} AS user_email`,
+      columns.userType ? `${quoteIdentifier(columns.userType)} AS user_type` : `'' AS user_type`,
+      columns.additionalRole && columns.legacyRoleName && columns.additionalRole !== columns.legacyRoleName
+        ? `COALESCE(NULLIF(${quoteIdentifier(columns.additionalRole)}, ''), ${quoteIdentifier(columns.legacyRoleName)}) AS additional_role`
+        : columns.additionalRole
+          ? `${quoteIdentifier(columns.additionalRole)} AS additional_role`
+          : `'' AS additional_role`,
+      columns.hubAccess
+        ? `${quoteIdentifier(columns.hubAccess)} AS hub_access`
+        : `ARRAY['DTECH-HUB']::text[] AS hub_access`
+    ];
+    const result = await pool.query(`SELECT ${selectColumns.join(", ")} FROM user_additional_roles`);
+    result.rows.forEach(addLeadTeacher);
+  } catch (error) {
+    console.error("[kit-certificate-email] Could not load Lead Teacher recipients:", error);
+  }
+
+  return Array.from(recipients);
+}
+
 async function getSuggestionRecipients() {
   const recipients = new Set(parseCsvEmails(suggestionNotificationFallback));
 
@@ -14142,8 +14193,11 @@ const certificateEmailCooldowns = new Map();
 async function sendKitCertificateEmail(studentEmail, kitId, certificate) {
   const buffer = await createKitCertificatePdf(certificate);
   const safe = (value) => String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
+  const teacherRecipients = (await getPracticalSkillsCertificateTeacherRecipients())
+    .filter((email) => email !== normalizeEmail(studentEmail));
   await sendConfiguredHubEmail({
     to: studentEmail,
+    cc: teacherRecipients,
     subject: `[DTECH HUB] ${certificate.kitTitle} - Certificate of Completion`,
     html: `<div style="font-family:Arial,sans-serif;color:#173858;"><h2>Certificate of Completion</h2><p>Kia ora ${safe(certificate.studentName)},</p><p>Ka pai! You completed all ${certificate.activityCount} activities in <strong>${safe(certificate.kitTitle)}</strong> on ${safe(certificate.completedDate)}.</p><p>Your landscape PDF certificate is attached. You can save, print or forward it to share your achievement.</p><p>${safe(certificate.issuer)}</p></div>`,
     attachment: { buffer, originalname: `${kitId}-certificate.pdf`, mimetype: "application/pdf" },
