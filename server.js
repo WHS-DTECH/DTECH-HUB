@@ -7911,9 +7911,9 @@ async function listTemplateLibraryEntries() {
   const mergedEntries = entries.map((entry) => {
     const key = String(entry?.id || "").trim().toLowerCase();
     const fallback = defaultsById.get(key);
-    const hasUsableTemplate = Boolean(String(entry?.templateUrl || "").trim()) || Boolean(String(entry?.imageUrl || "").trim());
-    // A DB row with no template/image link is a blank placeholder — back it with the built-in default instead.
-    if (fallback && !hasUsableTemplate) {
+    const hasTemplateUrl = Boolean(String(entry?.templateUrl || "").trim());
+    // A preview image cannot be opened as a template, so restore the default when the Slides URL is missing.
+    if (fallback && !hasTemplateUrl) {
       return toTemplateLibraryEntry({ ...fallback, sortOrder: entry.sortOrder }, 0);
     }
     return entry;
@@ -9957,6 +9957,85 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
   }
 });
 
+function findBestStudentTaskTopicSlide(slides, taskTopic) {
+  const normalizeText = (value) => String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+  const normalizedTopic = normalizeText(taskTopic);
+  const tokens = normalizedTopic.split(/\s+/).filter(Boolean);
+  const wantsDevelopmentStepsExact = normalizedTopic === "development steps";
+  const wantsTargetAudience = tokens.includes("target") || tokens.includes("audience") || (tokens.includes("end") && tokens.includes("user"));
+  const wantsDescription = tokens.includes("description") || (tokens.includes("digital") && tokens.includes("outcome"));
+  const wantsToolsAndTechniques = tokens.includes("tools") && tokens.includes("techniques");
+  const wantsDevelopmentTools = !wantsToolsAndTechniques && !wantsDevelopmentStepsExact
+    && (tokens.includes("developed") || tokens.includes("tools") || tokens.includes("technologies"));
+  const wantsSuccessCriteria = tokens.includes("success") || tokens.includes("measured") || tokens.includes("evaluated");
+
+  const scored = (Array.isArray(slides) ? slides : [])
+    .map((file) => {
+      const name = String(file?.name || "").trim();
+      const normalizedName = normalizeText(name);
+      const normalizedNameWithoutStudent = normalizedName.replace(/\s+-\s+[a-z0-9._-]+$/, "").trim();
+      let score = 0;
+
+      if (wantsDevelopmentStepsExact) {
+        if (normalizedNameWithoutStudent === "development steps") score += 1000;
+        else return { file, score: 0, modifiedTs: Date.parse(String(file?.modifiedTime || "")) || 0 };
+      }
+
+      if (wantsTargetAudience) {
+        if (normalizedName.includes("target audience")) score += 100;
+        if (normalizedName.includes("audience")) score += 50;
+        if (normalizedName.includes("end user")) score += 40;
+      }
+
+      if (wantsDescription) {
+        if (normalizedName.includes("digital outcome description")) score += 100;
+        if (normalizedName.includes("description")) score += 40;
+      }
+
+      if (wantsToolsAndTechniques
+        && normalizedName.includes("tools")
+        && normalizedName.includes("techniques")) {
+        score += 200;
+      }
+
+      if (wantsDevelopmentTools) {
+        if (normalizedName.includes("relevant implications")) score += 100;
+        if (normalizedName.includes("project success criteria")) score += 80;
+        if (normalizedName.includes("tools") || normalizedName.includes("technologies")) score += 35;
+      }
+
+      if (wantsSuccessCriteria) {
+        if (normalizedName.includes("project success criteria")) score += 110;
+        if (normalizedName.includes("success")) score += 45;
+        if (normalizedName.includes("criteria")) score += 25;
+      }
+
+      if (!wantsTargetAudience && !wantsDescription && !wantsDevelopmentTools
+        && !wantsToolsAndTechniques && !wantsSuccessCriteria) {
+        score += tokens.reduce((sum, token) => sum + (normalizedName.includes(token) ? 5 : 0), 0);
+      }
+
+      return {
+        file,
+        score,
+        modifiedTs: Date.parse(String(file?.modifiedTime || "")) || 0
+      };
+    })
+    .sort((left, right) => {
+      if (right.score !== left.score) return right.score - left.score;
+      return right.modifiedTs - left.modifiedTs;
+    });
+
+  const requiresMatch = wantsDevelopmentStepsExact || wantsToolsAndTechniques;
+  return requiresMatch
+    ? scored.find((entry) => entry.score > 0)?.file || null
+    : scored[0]?.file || null;
+}
+
 app.post("/api/student/drive-setup/find-slide", async (req, res) => {
   const email = normalizeEmail(getRequestUserEmail(req));
   if (!email) {
@@ -9985,71 +10064,7 @@ app.post("/api/student/drive-setup/find-slide", async (req, res) => {
       return;
     }
 
-    const normalizeText = (value) => String(value || "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, " ")
-      .trim();
-
-    const tokens = normalizeText(taskTopic).split(/\s+/).filter(Boolean);
-    const wantsDevelopmentStepsExact = normalizeText(taskTopic) === "development steps";
-    const wantsTargetAudience = tokens.includes("target") || tokens.includes("audience") || (tokens.includes("end") && tokens.includes("user"));
-    const wantsDescription = tokens.includes("description") || (tokens.includes("digital") && tokens.includes("outcome"));
-    const wantsDevelopmentTools = !wantsDevelopmentStepsExact && (tokens.includes("developed") || tokens.includes("tools") || tokens.includes("technologies"));
-    const wantsSuccessCriteria = tokens.includes("success") || tokens.includes("measured") || tokens.includes("evaluated");
-
-    const scored = slides
-      .map((file) => {
-        const name = String(file?.name || "").trim();
-        const normalizedName = normalizeText(name);
-        const normalizedNameWithoutStudent = normalizedName.replace(/\s+-\s+[a-z0-9._-]+$/, "").trim();
-        let score = 0;
-
-        if (wantsDevelopmentStepsExact) {
-          if (normalizedNameWithoutStudent === "development steps") score += 1000;
-          else return { file, score: 0, modifiedTs: Date.parse(String(file?.modifiedTime || "")) || 0 };
-        }
-
-        if (wantsTargetAudience) {
-          if (normalizedName.includes("target audience")) score += 100;
-          if (normalizedName.includes("audience")) score += 50;
-          if (normalizedName.includes("end user")) score += 40;
-        }
-
-        if (wantsDescription) {
-          if (normalizedName.includes("digital outcome description")) score += 100;
-          if (normalizedName.includes("description")) score += 40;
-        }
-
-        if (wantsDevelopmentTools) {
-          if (normalizedName.includes("relevant implications")) score += 100;
-          if (normalizedName.includes("project success criteria")) score += 80;
-          if (normalizedName.includes("tools") || normalizedName.includes("technologies")) score += 35;
-        }
-
-        if (wantsSuccessCriteria) {
-          if (normalizedName.includes("project success criteria")) score += 110;
-          if (normalizedName.includes("success")) score += 45;
-          if (normalizedName.includes("criteria")) score += 25;
-        }
-
-        if (!wantsTargetAudience && !wantsDescription && !wantsDevelopmentTools && !wantsSuccessCriteria) {
-          score += tokens.reduce((sum, token) => sum + (normalizedName.includes(token) ? 5 : 0), 0);
-        }
-
-        return {
-          file,
-          score,
-          modifiedTs: Date.parse(String(file?.modifiedTime || "")) || 0
-        };
-      })
-      .sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score;
-        return b.modifiedTs - a.modifiedTs;
-      });
-
-    const best = (wantsDevelopmentStepsExact
-      ? scored.find((entry) => entry.score > 0)?.file
-      : scored[0]?.file);
+    const best = findBestStudentTaskTopicSlide(slides, taskTopic);
     if (!best) {
       res.status(404).json({ error: "No matching slide found." });
       return;
@@ -10074,7 +10089,7 @@ const TEMPLATE_ID_FROM_TITLE_PATTERNS = [
   { pattern: /^digital\s+outcome\s+description(?:\s*-\s*.+)?$/i, id: "digital-outcome-description", title: "Digital Outcome Description" },
   { pattern: /^target\s+audience(?:\s*-\s*.+)?$/i, id: "target-audience", title: "Target Audience" },
   { pattern: /^development\s+steps(?:\s*-\s*.+)?$/i, id: "development-steps", title: "Development Steps" },
-  { pattern: /^tools?\s*(?:&|and)\s*techniques?(?:\s*-\s*.+)?$/i, id: "tools-and-techniques", title: "Tools & Techniques" },
+  { pattern: /^(?:.*\s+)?tools?\s*(?:&|and)\s*techniques?(?:\s*-\s*.+)?$/i, id: "tools-and-techniques", title: "Tools & Techniques" },
   { pattern: /^triall?ing\s+components(?:\s*-\s*.+)?$/i, id: "trialling-components", title: "Trialling Components" },
   { pattern: /^trailing\s+comp(?:onents|onets|onets)?(?:\s*-\s*.+)?$/i, id: "trialling-components", title: "Trialling Components" },
   { pattern: /^testing\s+functions(?:\s*-\s*.+)?$/i, id: "testing-functions", title: "Testing Functions" },

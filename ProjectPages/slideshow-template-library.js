@@ -10,6 +10,16 @@ const DEFAULT_TEMPLATE_LIBRARY = [
         status: "live"
     },
     {
+        id: "tools-and-techniques",
+        title: "Tools & Techniques",
+        standardCodes: ["91897", "91907"],
+        criteriaText: "List the tools you use and describe the techniques you implement with each one.",
+        summary: "Two-column slide for listing tools and the techniques applied during development.",
+        imageUrl: "https://drive.google.com/thumbnail?id=1F3F10KG2JCFQ-x41q6TEK15YjoxblmjRCGUZ6d254wg&sz=w1000",
+        templateUrl: "https://docs.google.com/presentation/d/1F3F10KG2JCFQ-x41q6TEK15YjoxblmjRCGUZ6d254wg/edit?usp=sharing",
+        status: "live"
+    },
+    {
         id: "speaker-notes-criteria-mapping",
         title: "Speaker Notes Criteria Mapping",
         standardCodes: ["91897"],
@@ -1440,6 +1450,26 @@ async function handleMoveTemplateSection(templateId, clickedButton) {
     }
 }
 
+function matchesExistingTemplateCopyFile(templateId, templateTitle, fileName, email) {
+    const normalizeForMatching = (text) => String(text || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .replace(/\s+/g, " ");
+    const normalizedTitle = normalizeForMatching(templateTitle);
+    const normalizedFileName = normalizeForMatching(fileName);
+
+    if (String(templateId || "").trim() !== "tools-and-techniques") {
+        return normalizedFileName.includes(normalizedTitle);
+    }
+
+    const emailUsername = String(email || "").trim().toLowerCase().split("@")[0];
+    const firstName = emailUsername.split(/[._]/)[0] || "";
+    const formattedFirstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
+    return Boolean(formattedFirstName)
+        && normalizedFileName === normalizeForMatching(`${templateTitle} - ${formattedFirstName}`);
+}
+
 function renderTemplateCard(item) {
     const title = String(item?.title || "Untitled Template").trim();
     const criteriaText = String(item?.criteriaText || "").trim();
@@ -1458,20 +1488,12 @@ function renderTemplateCard(item) {
     // Use real-time files from the current course folder (no cached fallback).
     const destination = getTemplateDestination();
     let existingCopy = null;
-    const normalizeForMatching = (text) => String(text || "")
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9\s]/g, " ")
-        .replace(/\s+/g, " ");
-    
-    const normalizedTitle = normalizeForMatching(title);
     const matchingFile = driveState.resetTemplateIds[item.id]
         ? null
         : driveState.processAssessmentFiles.find((file) => {
-        const normalizedFileName = normalizeForMatching(file?.name || "");
-        const isMatch = normalizedFileName.includes(normalizedTitle);
+        const isMatch = matchesExistingTemplateCopyFile(item.id, title, file?.name || "", getLibraryEmail());
         if (!isMatch) {
-            console.debug(`No match for "${title}": file "${file?.name}" normalizes to "${normalizedFileName}", template normalizes to "${normalizedTitle}"`);
+            console.debug(`No match for "${title}" in student file "${file?.name}".`);
         }
         return isMatch;
         });

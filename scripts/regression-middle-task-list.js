@@ -77,6 +77,58 @@ assert.match(server, /\(\$3::boolean = FALSE OR COALESCE\(v\.is_visible, TRUE\) 
 assert.match(server, /taskListView \? filterStudentTaskListActivities\(result\.rows\) : result\.rows/,
     "The homepage-excluded activity is filtered only for the Task List view");
 
+const slideMatcherStart = server.indexOf("function findBestStudentTaskTopicSlide(");
+const slideMatcherEnd = server.indexOf('\napp.post("/api/student/drive-setup/find-slide"', slideMatcherStart);
+assert.ok(slideMatcherStart >= 0 && slideMatcherEnd > slideMatcherStart,
+    "Student slide matching helper is present");
+const slideMatcherContext = vm.createContext({});
+vm.runInContext(server.slice(slideMatcherStart, slideMatcherEnd), slideMatcherContext);
+const matchingSlides = [
+    { name: "Relevant Implications - Tyler", modifiedTime: "2026-10-13T12:00:00Z" },
+    { name: "Tools & Techniques - Tyler", modifiedTime: "2026-10-12T12:00:00Z" }
+];
+assert.equal(
+    slideMatcherContext.findBestStudentTaskTopicSlide(matchingSlides, "Tools & Techniques")?.name,
+    "Tools & Techniques - Tyler",
+    "Tools & Techniques queries select the student's matching slideshow over unrelated development slides"
+);
+assert.equal(
+    slideMatcherContext.findBestStudentTaskTopicSlide([{ name: "Relevant Implications - Tyler" }], "Tools & Techniques"),
+    null,
+    "Tools & Techniques queries do not silently select an unrelated slideshow"
+);
+assert.match(server, /if \(fallback && !hasTemplateUrl\)/,
+    "Template defaults are restored when a synced entry has only a preview but no Slides link");
+assert.match(templateLibrary, /id: "tools-and-techniques",\s*title: "Tools & Techniques"[\s\S]*?status: "live"/,
+    "The Template Library fallback includes an openable Tools & Techniques template");
+const templateCopyMatcherStart = templateLibrary.indexOf("function matchesExistingTemplateCopyFile(");
+const templateCopyMatcherEnd = templateLibrary.indexOf("\nfunction renderTemplateCard", templateCopyMatcherStart);
+assert.ok(templateCopyMatcherStart >= 0 && templateCopyMatcherEnd > templateCopyMatcherStart,
+    "Template Library distinguishes student Tools & Techniques slides from template copies");
+const templateCopyContext = vm.createContext({});
+vm.runInContext(templateLibrary.slice(templateCopyMatcherStart, templateCopyMatcherEnd), templateCopyContext);
+assert.equal(
+    templateCopyContext.matchesExistingTemplateCopyFile("tools-and-techniques", "Tools & Techniques", "Tools & Techniques", "tyler@westlandhigh.school.nz"),
+    false,
+    "A self-authored Tools & Techniques slideshow does not hide the Use Template action"
+);
+assert.equal(
+    templateCopyContext.matchesExistingTemplateCopyFile("tools-and-techniques", "Tools & Techniques", "Tools & Techniques - Tyler", "tyler@westlandhigh.school.nz"),
+    true,
+    "A generated Tools & Techniques copy still opens as the student's existing copy"
+);
+const templateIdentityStart = server.indexOf("const TEMPLATE_ID_FROM_TITLE_PATTERNS = [");
+const templateIdentityEnd = server.indexOf("\n// POST /api/activities/:id/sync-drive-templates", templateIdentityStart);
+assert.ok(templateIdentityStart >= 0 && templateIdentityEnd > templateIdentityStart,
+    "Student Drive template title inference is present");
+const templateIdentityContext = vm.createContext({});
+vm.runInContext(server.slice(templateIdentityStart, templateIdentityEnd), templateIdentityContext);
+assert.equal(
+    templateIdentityContext.inferTemplateCopyFromFileName("Tyler - Tools & Techniques").templateId,
+    "tools-and-techniques",
+    "Drive sync recognizes student-owned Tools & Techniques decks with a name prefix"
+);
+
 const digitalOutcomeRows = [
     { text: "Describe the digital outcome" },
     { text: "Identify the target audience" }
