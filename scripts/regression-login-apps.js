@@ -48,9 +48,11 @@ async function main() {
     const shortKit = shorten(fullKit);
     assert.deepEqual(shortKit.worksheets.map((worksheet, index) => ({ worksheet, index }))
         .filter(({ worksheet }) => !worksheet.hidden && worksheet.mergedInto === undefined)
-        .map(({ index }) => index), [0, 1, 2, 3, 6]);
+        .map(({ index }) => index), [0, 1, 2, 3]);
     assert.equal(shortKit.activities[6].title, "Using your login details");
     assert.equal(shortKit.worksheets[6].activity, "Using your login details");
+    assert.equal(shortKit.worksheets[6].hidden, true);
+    assert.equal(shortKit.worksheets[6].libraryOnly, true);
     assert.equal(shortKit.bannerTitle, "Login Kit");
     assert.equal(shortKit.worksheets.length, 10);
     assert.deepEqual(shortKit.activities[6].questions, fullKit.activities[6].questions);
@@ -67,11 +69,11 @@ async function main() {
     shortKitRenderer.window.KitWorksheetRender.renderKitOverview(shortKitHost, shortKit, {
         kitId: "kit-login", completedActivities: { 0: "saved", 1: "saved", 2: "saved", 3: "saved", 5: "hidden-saved" }
     });
-    assert.match(shortKitHost.innerHTML, /4 \/ 5 activities completed/);
-    assert.equal((shortKitHost.innerHTML.match(/>Open Activity<\/a>/g) || []).length, 5);
-    assert.match(shortKitHost.innerHTML, /Using your login details/);
+    assert.match(shortKitHost.innerHTML, /4 \/ 4 activities completed/);
+    assert.equal((shortKitHost.innerHTML.match(/>Open Activity<\/a>/g) || []).length, 4);
+    assert.doesNotMatch(shortKitHost.innerHTML, /Using your login details/);
     assert.doesNotMatch(shortKitHost.innerHTML, /activity=5"/);
-    assert.match(shortKitHost.innerHTML, /activity=6"/);
+    assert.doesNotMatch(shortKitHost.innerHTML, /activity=6"/);
     assert.deepEqual(shortKit.activities[6].loginSites.map((site) => site.name), ["Tinkercad", "Code Avengers", "SketchUp Education", "Gamefroot", "CodeCombat"]);
     shortKitRenderer.window.KitWorksheetRender.renderWorksheet(shortKitHost, {
         bannerTitle: "Using your login details", loginSites: shortKit.activities[6].loginSites,

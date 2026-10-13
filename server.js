@@ -6523,7 +6523,7 @@ async function buildPracticalSkillsActivityLibraryCards(kitCard) {
 
   return worksheets
     .map((worksheet, index) => ({ worksheet, index }))
-    .filter(({ worksheet }) => worksheet?.mergedInto === undefined && !worksheet?.hidden)
+    .filter(({ worksheet }) => worksheet?.mergedInto === undefined && (!worksheet?.hidden || worksheet?.libraryOnly))
     .map(({ worksheet, index }) => {
       const activity = activities[index] || {};
       const title = String(activity.title || worksheet.activity || `Activity ${index + 1}`).trim();

@@ -1025,7 +1025,7 @@
         const activities = Array.isArray(content?.activities) ? content.activities : [];
         const completedActivities = options.completedActivities || {};
         const visibleWorksheets = worksheets.map((worksheet, index) => ({ worksheet, index }))
-            .filter(({ worksheet }) => worksheet.mergedInto === undefined && !worksheet.hidden);
+            .filter(({ worksheet }) => worksheet.mergedInto === undefined && !worksheet.hidden && !worksheet.libraryOnly);
         const completedCount = visibleWorksheets.filter(({ index }) => Boolean(completedActivities[index])).length;
 
         host.style.setProperty("--worksheet-theme-color", theme.color || "#2f8f61");

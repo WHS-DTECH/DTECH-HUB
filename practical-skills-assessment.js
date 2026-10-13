@@ -73,7 +73,7 @@ function withShortLoginKit(kitId, content) {
       const existingSites = activities[index]?.loginSites;
       const sites = activities[index]?.loginSitesVersion === 1 ? validateLoginSites(existingSites) : structuredClone(configuredLoginSites);
       activities[index] = { ...activities[index], title: "Using your login details", loginSites: sites, loginSitesVersion: 1 };
-      return { ...worksheet, activity: "Using your login details", hidden: false };
+      return { ...worksheet, activity: "Using your login details", hidden: true, libraryOnly: true };
     }
     return { ...worksheet, hidden: !visible };
   });

@@ -39,7 +39,8 @@
         const index = Number.parseInt(value, 10);
         const mergedInto = state.content?.worksheets?.[index]?.mergedInto;
         const resolvedIndex = Number.isInteger(mergedInto) ? mergedInto : index;
-        return state.content?.worksheets?.[resolvedIndex]?.hidden ? null : resolvedIndex;
+        const worksheet = state.content?.worksheets?.[resolvedIndex];
+        return worksheet?.hidden && !worksheet.libraryOnly ? null : resolvedIndex;
     }
 
     function getStoredAuthRaw() {
@@ -389,7 +390,7 @@
         pill.textContent = isComplete ? "Completed" : "Not Started";
         pill.classList.toggle("is-complete", isComplete);
         completeBtn.disabled = isComplete;
-        completeBtn.hidden = Boolean(state.content?.worksheets?.some((worksheet) => worksheet && !worksheet.hidden && worksheet.mergedInto === undefined));
+        completeBtn.hidden = Boolean(state.content?.worksheets?.some((worksheet) => worksheet && !worksheet.hidden && !worksheet.libraryOnly && worksheet.mergedInto === undefined));
         updateCertificate();
     }
 
