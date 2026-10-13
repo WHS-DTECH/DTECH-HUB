@@ -3015,6 +3015,11 @@ function filterDtechActivities(rows) {
     .map((row) => normalizeActivityCategoryForResponse(row));
 }
 
+function filterStudentTaskListActivities(rows) {
+  return filterDtechActivities(rows)
+    .filter((row) => String(row?.id || "").trim() !== "49");
+}
+
 function normalizeUnitLessons(value) {
   if (!Array.isArray(value)) {
     return [];
@@ -12528,6 +12533,7 @@ app.post("/api/student-tracker/email-summary", requireActivityWriteAccess, async
 });
 
 app.get("/api/my-allocations", async (req, res) => {
+  const taskListView = String(req.query?.view || "").trim().toLowerCase() === "task-list";
   const email = normalizeEmail(
     req?.authenticated_email ||
     req?.headers?.["x-user-email"] ||
@@ -12561,14 +12567,19 @@ app.get("/api/my-allocations", async (req, res) => {
       `SELECT a.id, a.name, a.activity_category, a.type, pi.student_email, pi.standard_1, pi.standard_2, pi.digital_media_type
        FROM project_interests pi
        JOIN activities a ON a.id::text = pi.project_id::text
+       LEFT JOIN activity_hub_visibility v
+         ON v.activity_id = a.id::text
+        AND v.hub_name = $2
        WHERE pi.student_email = $1
+         AND ($3::boolean = FALSE OR COALESCE(v.is_visible, TRUE) = TRUE)
        ORDER BY a.name ASC`,
-      [email]
+      [email, DTECH_HUB_NAME, taskListView]
     );
 
     const assessmentTasks = [];
     const projects = [];
-    for (const row of result.rows) {
+    const visibleAllocationRows = taskListView ? filterStudentTaskListActivities(result.rows) : result.rows;
+    for (const row of visibleAllocationRows) {
       const cat = String(row.activity_category || "").toLowerCase();
       const item = {
         id: String(row.id),

@@ -52,8 +52,30 @@ assert.deepEqual(
     ["activity-1", "activity-3", "activity-4", "activity-5", "activity-6"],
     "Homepage Library removes repeated standard/topic cards while preserving distinct topics and unnumbered cards"
 );
-assert.match(taskList, /loadJson\("\/api\/my-allocations"/,
+assert.match(taskList, /loadJson\("\/api\/my-allocations\?view=task-list"/,
     "Senior and Middle Task Lists continue to load assigned records independently of the homepage Library");
+
+const allocationFilterStart = server.indexOf("function filterStudentTaskListActivities(");
+const allocationFilterEnd = server.indexOf("\nfunction normalizeUnitLessons", allocationFilterStart);
+assert.ok(allocationFilterStart >= 0 && allocationFilterEnd > allocationFilterStart,
+    "Student Task List activity visibility filter is present");
+const allocationFilterContext = vm.createContext({
+    filterDtechActivities: (rows) => rows.filter((row) => row.isDtech !== false)
+});
+vm.runInContext(server.slice(allocationFilterStart, allocationFilterEnd), allocationFilterContext);
+assert.deepEqual(
+    JSON.parse(JSON.stringify(allocationFilterContext.filterStudentTaskListActivities([
+        { id: "49", isDtech: true },
+        { id: "50", isDtech: false },
+        { id: "51", isDtech: true }
+    ]).map((item) => item.id))),
+    ["51"],
+    "Student Task List omits the homepage-excluded Client Projects activity and non-DTECH activities"
+);
+assert.match(server, /\(\$3::boolean = FALSE OR COALESCE\(v\.is_visible, TRUE\) = TRUE\)[\s\S]*?\[email, DTECH_HUB_NAME, taskListView\]/,
+    "Task List allocations respect per-hub homepage visibility without changing other allocation consumers");
+assert.match(server, /taskListView \? filterStudentTaskListActivities\(result\.rows\) : result\.rows/,
+    "The homepage-excluded activity is filtered only for the Task List view");
 
 const digitalOutcomeRows = [
     { text: "Describe the digital outcome" },

@@ -2220,7 +2220,7 @@ async function fetchAllocations() {
     if (!email) {
         return { assessment_tasks: [], projects: [] };
     }
-    const payload = await loadJson("/api/my-allocations", { headers: buildTaskListHeaders({}) });
+    const payload = await loadJson("/api/my-allocations?view=task-list", { headers: buildTaskListHeaders({}) });
     return {
         assessment_tasks: Array.isArray(payload?.assessment_tasks) ? payload.assessment_tasks : [],
         projects: Array.isArray(payload?.projects) ? payload.projects : []
