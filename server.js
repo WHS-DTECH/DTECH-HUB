@@ -777,6 +777,80 @@ const DEFAULT_ASSESSMENT_STANDARD_CARDS = [
       "Critically evaluate how synthesis of planning, testing, trialling, and feedback contributed to a high-quality outcome.",
       "Reflect insightfully on trade-offs, limitations, and future developments for the outcome."
     ]
+  },
+  {
+    standardNumber: "92004",
+    standardName: "Create a computer program",
+    level: "Level 1",
+    version: 2024,
+    credits: 5,
+    achievedText: "Create a computer program.",
+    meritText: "Create an informed computer program.",
+    excellenceText: "Create a refined computer program.",
+    achievedChecklist: [
+      "Write a program that uses variables, input, output, sequence, selection, and iteration.",
+      "Use correct syntax so the program runs without errors.",
+      "Set the program out clearly using meaningful names and comments.",
+      "Test the program to show that it works for expected cases."
+    ],
+    meritChecklist: [
+      "Follow the conventions of the programming language so the program is readable and well structured.",
+      "Test and debug the program using a range of relevant test cases, including boundary cases."
+    ],
+    excellenceChecklist: [
+      "Make the program flexible and robust so it handles invalid or unexpected input without failing.",
+      "Explain how testing and debugging decisions improved the quality of the program."
+    ]
+  },
+  {
+    standardNumber: "91896",
+    standardName: "Use advanced programming techniques to develop a computer program",
+    level: "Level 2",
+    version: 2024,
+    credits: 6,
+    achievedText: "Use advanced programming techniques to develop a computer program.",
+    meritText: "Use advanced programming techniques to develop an informed computer program.",
+    excellenceText: "Use advanced programming techniques to develop a refined computer program.",
+    achievedChecklist: [
+      "Write a program that uses advanced techniques such as collections, sub-programs with parameters and return values, and file or stream input and output.",
+      "Set the program out clearly using meaningful names, comments, and correct syntax.",
+      "Test the program to show that it works for expected cases.",
+      "Explain relevant implications for the program."
+    ],
+    meritChecklist: [
+      "Follow the conventions of the programming language so the program is readable and logically structured.",
+      "Test and debug the program in an organised way, using a range of relevant test cases including boundary cases.",
+      "Address relevant implications in the program."
+    ],
+    excellenceChecklist: [
+      "Make the program flexible and robust so it handles invalid and unexpected input without failing.",
+      "Justify the structure and techniques chosen, explaining how testing and debugging produced a quality program."
+    ]
+  },
+  {
+    standardNumber: "91906",
+    standardName: "Use complex programming techniques to develop a computer program",
+    level: "Level 3",
+    version: 2024,
+    credits: 6,
+    achievedText: "Use complex programming techniques to develop a computer program.",
+    meritText: "Use complex programming techniques to develop an informed computer program.",
+    excellenceText: "Use complex programming techniques to develop a refined computer program.",
+    achievedChecklist: [
+      "Write a program that uses complex techniques such as classes and objects, inheritance, recursion, complex data structures, or a graphical user interface.",
+      "Set the program out clearly using meaningful names, comments, and correct syntax.",
+      "Test the program to show that it works for expected cases.",
+      "Explain relevant implications for the program."
+    ],
+    meritChecklist: [
+      "Follow the conventions of the programming language so the program is readable, modular, and logically structured.",
+      "Test and debug the program comprehensively, using relevant test cases including boundary cases.",
+      "Address relevant implications in the program."
+    ],
+    excellenceChecklist: [
+      "Make the program flexible, robust, and efficient so it handles invalid and unexpected input without failing.",
+      "Evaluate the techniques, structure, and testing decisions that produced a quality program."
+    ]
   }
 ];
 const DEFAULT_CLASS_DATA_AGING_DAYS = 3;
