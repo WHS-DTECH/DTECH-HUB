@@ -1858,8 +1858,24 @@ function requestHubDriveAccessToken(options = {}) {
     }
 
     return new Promise((resolve) => {
-        hubAuthState.pendingTokenResolvers.push(resolve);
-        hubAuthState.tokenClient.requestAccessToken({ prompt: forceConsent ? "select_account consent" : "" });
+        let timeoutId = 0;
+        const finish = (response) => {
+            if (timeoutId) window.clearTimeout(timeoutId);
+            resolve(response);
+        };
+        hubAuthState.pendingTokenResolvers.push(finish);
+        timeoutId = window.setTimeout(() => {
+            const index = hubAuthState.pendingTokenResolvers.indexOf(finish);
+            if (index >= 0) hubAuthState.pendingTokenResolvers.splice(index, 1);
+            finish({ error: "Google sign-in did not open. Allow pop-ups for this site, then try again." });
+        }, 60000);
+        try {
+            hubAuthState.tokenClient.requestAccessToken({ prompt: forceConsent ? "select_account consent" : "" });
+        } catch (error) {
+            const index = hubAuthState.pendingTokenResolvers.indexOf(finish);
+            if (index >= 0) hubAuthState.pendingTokenResolvers.splice(index, 1);
+            finish({ error: error?.message || "Google Drive sign-in could not start." });
+        }
     });
 }
 
@@ -3378,6 +3394,19 @@ function initHubGoogleAuth() {
                 client_id: hubGoogleClientId,
                 scope: HUB_UNIFIED_OAUTH_SCOPES,
                 include_granted_scopes: true,
+                error_callback: (error) => {
+                    const messages = {
+                        popup_failed_to_open: "Google sign-in popup was blocked. Allow pop-ups for this site, then try again.",
+                        popup_closed: "Google sign-in was closed before Drive access was allowed. Try again and keep the Google window open."
+                    };
+                    hubAuthState.autoPromptInFlight = false;
+                    const pendingResolvers = Array.isArray(hubAuthState.pendingTokenResolvers)
+                        ? hubAuthState.pendingTokenResolvers.splice(0)
+                        : [];
+                    pendingResolvers.forEach((resolve) => resolve({
+                        error: messages[error?.type] || "Google Drive sign-in could not start. Please try again."
+                    }));
+                },
                 callback: async (tokenResponse) => {
                     const pendingResolvers = Array.isArray(hubAuthState.pendingTokenResolvers)
                         ? hubAuthState.pendingTokenResolvers.splice(0)

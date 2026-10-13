@@ -551,13 +551,6 @@
         };
         updateDrive(options.driveSetup);
         driveButton.addEventListener("click", async () => {
-            // Reserve the tab during the click so setup/consent does not trigger popup blocking.
-            const folderTab = window.open("about:blank", "_blank");
-            if (folderTab) {
-                folderTab.opener = null;
-                folderTab.document.title = "Connecting to Google Drive";
-                folderTab.document.body.textContent = "Connecting to Google Drive. A Google sign-in window should appear. Choose your school Google account and allow Drive access, then keep this tab open.";
-            }
             driveButton.disabled = true;
             driveStatus.classList.remove("is-error");
             driveStatus.textContent = "Choose your school Google account in the sign-in window and allow Drive access. We will create or open WHS-DTECH when setup is complete.";
@@ -566,13 +559,7 @@
                 const setup = await options.onDriveSetup();
                 if (!setup?.ready || !setup.folderUrl) throw new Error("Google Drive setup did not confirm your folder. Please try again.");
                 updateDrive(setup);
-                if (folderTab && !folderTab.closed) {
-                    folderTab.location.replace(setup.folderUrl);
-                } else {
-                    driveStatus.textContent += " The new tab was blocked or closed. Click Open your WHS-DTECH folder below.";
-                }
             } catch (error) {
-                if (folderTab && !folderTab.closed) folderTab.close();
                 driveStatus.classList.add("is-error");
                 driveStatus.textContent = error.message || "Could not set up Google Drive. Please try again.";
             } finally {

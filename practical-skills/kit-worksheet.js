@@ -423,7 +423,10 @@
         if (!window.requestHubDriveAccessToken) throw new Error("Google sign-in is still loading. Wait a moment and try again.");
         const email = state.email;
         const token = await window.requestHubDriveAccessToken();
-        if (token?.error || !token?.access_token) throw new Error("Google Drive permission was not granted. Try again, or ask your teacher for help.");
+        if (token?.error || !token?.access_token) {
+            const message = String(token?.error || "");
+            throw new Error(message.startsWith("Google ") ? message : "Google Drive permission was not granted. Try again, or ask your teacher for help.");
+        }
         if (getSignedInEmail() !== email) throw new Error("Your signed-in account changed. Reopen this activity with your school account.");
         return token.access_token;
     }
@@ -525,7 +528,10 @@
                     state.driveSetupInProgress = true;
                     try {
                         const token = await window.requestHubDriveAccessToken({ forceConsent: true });
-                        if (token?.error || !token?.access_token) throw new Error("Google Drive permission was not granted. Try again, or ask your teacher for help.");
+                        if (token?.error || !token?.access_token) {
+                            const message = String(token?.error || "");
+                            throw new Error(message.startsWith("Google ") ? message : "Google Drive permission was not granted. Try again, or ask your teacher for help.");
+                        }
                         if (getSignedInEmail() !== email) throw new Error("Your signed-in account changed. Reopen this activity with your school account.");
                         const setup = await loadJson("/api/student/login-drive-setup", {
                             method: "POST",

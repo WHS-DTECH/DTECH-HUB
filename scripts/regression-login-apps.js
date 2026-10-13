@@ -301,7 +301,7 @@ async function main() {
     assert.match(host.innerHTML, /1 \/ 5 activities completed/);
     assert.doesNotMatch(host.innerHTML, /activity=4/);
     assert.match(host.innerHTML, /activity=5/);
-    for (const outcome of ["success", "blocked", "failure", "unconfirmed"]) {
+    for (const outcome of ["success", "failure", "unconfirmed"]) {
         const nodes = new Map();
         const node = (selector) => {
             if (!nodes.has(selector)) nodes.set(selector, {
@@ -313,20 +313,8 @@ async function main() {
             });
             return nodes.get(selector);
         };
-        const order = [];
-        const tab = {
-            closed: false,
-            opener: {},
-            document: { title: "", body: { textContent: "" } },
-            location: { replace(url) { tab.url = url; } },
-            close() { this.closed = true; }
-        };
-        rendererContext.window.open = (url, target) => {
-            assert.equal(url, "about:blank");
-            assert.equal(target, "_blank");
-            order.push("open");
-            return outcome === "blocked" ? null : tab;
-        };
+        let openedTab = false;
+        rendererContext.window.open = () => { openedTab = true; };
         const interactive = {
             ...host,
             querySelector: node,
@@ -334,30 +322,26 @@ async function main() {
         };
         rendererContext.window.KitWorksheetRender.renderWorksheet(interactive, { assessment: puzzle }, {
             onDriveSetup: async () => {
-                order.push("setup");
                 if (outcome === "failure") throw new Error("Drive permission denied");
                 return { ready: outcome !== "unconfirmed", folderUrl: "https://drive.google.com/drive/folders/test" };
             }
         });
         await node("[data-login-drive-setup]").events.click();
-        assert.deepEqual(order, ["open", "setup"], "Reserve tab before asynchronous consent/setup");
+        assert.equal(openedTab, false, "Drive setup leaves the click available for Google's consent popup");
         assert.equal(node("[data-login-drive-setup]").disabled, false);
         if (outcome === "success") {
-            assert.equal(tab.opener, null);
-            assert.match(tab.document.body.textContent, /school Google account and allow Drive access/);
-            assert.equal(tab.url, "https://drive.google.com/drive/folders/test");
-        } else if (outcome === "blocked") {
-            assert.match(node("[data-login-drive-status]").textContent, /blocked or closed/);
             assert.equal(node("[data-login-drive-link]").hidden, false);
+            assert.equal(node("[data-login-drive-link]").href, "https://drive.google.com/drive/folders/test");
         } else {
-            assert.equal(tab.closed, true, "Close reserved tab if setup fails");
-            assert.equal(tab.url, undefined, "Do not open Drive before confirmed success");
             assert.match(node("[data-login-drive-status]").textContent, /denied|did not confirm/);
         }
     }
     const hubScript = fs.readFileSync(path.join(__dirname, "..", "script.js"), "utf8");
     assert.match(hubScript, /requestAccessToken\(\{ prompt: forceConsent \? "select_account consent" : "" \}\)/,
         "Explicit Drive setup asks the student to reselect their Google account");
+    assert.match(hubScript, /error_callback:\s*\(error\)\s*=>/, "Google popup failures resolve the waiting Drive setup");
+    assert.match(hubScript, /popup_failed_to_open:[^,\n]+Allow pop-ups/, "Blocked Google popups give actionable guidance");
+    assert.match(hubScript, /popup_closed:[^,\n]+keep the Google window open/, "Closed Google popups give actionable guidance");
     console.log("Login apps and WHS-DTECH setup regression checks passed.");
 }
 
