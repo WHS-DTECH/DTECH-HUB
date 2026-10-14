@@ -2061,7 +2061,11 @@ function hasTemplateCopyForDigitalOutcomeTask(taskText) {
     const templateId = inferDigitalOutcomeTaskTemplateId(taskText);
     if (!templateId) return false;
     return (Array.isArray(taskListState.templateCopies) ? taskListState.templateCopies : [])
-        .some((copy) => String(copy?.templateId || "").trim().toLowerCase() === templateId);
+        .some((copy) => {
+            const copyId = String(copy?.templateId || "").trim().toLowerCase();
+            return copyId === templateId
+                || (templateId === "testing-functions" && copyId.startsWith("testing-functions-"));
+        });
 }
 
 function isTestingFunctionsRequirementStep(standard, text) {
@@ -2074,7 +2078,10 @@ function isTestingFunctionsRequirementStep(standard, text) {
 
 function autoTickTestingFunctionsRequirement(stateMap, countStateMap, activityId, email) {
     const counts = readTestingFunctionsListCounts(activityId, email, countStateMap);
-    const shouldBeDone = counts.functionalCount + counts.userCount > 0;
+    const hasTestingFunctionsSlide = hasTemplateCopyForDigitalOutcomeTask(
+        "Test that the digital technologies outcome functions as intended."
+    );
+    const shouldBeDone = hasTestingFunctionsSlide || counts.functionalCount + counts.userCount > 0;
     let changed = false;
 
     ["91897", "91907"].forEach((standard) => {

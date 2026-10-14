@@ -53,11 +53,14 @@ assert.equal(context.getTaskListCourseFromAllocations([
 const testingCriterion = "Achieved: Testing that the digital technologies outcome functions as intended.";
 const testingChecklistState = { "91907": [{ text: testingCriterion, done: false }] };
 const testingCountsState = {
-    "testing-functions-counts": [{ text: "TESTING_FUNCTIONS_COUNT|4|4", done: true }]
+    "testing-functions-counts": [{ text: "TESTING_FUNCTIONS_COUNT|0|0", done: false }]
 };
 const testingAutoContext = vm.createContext({
     getStepLevel: (text) => String(text || "").split(":")[0].trim(),
     stripStepLevel: (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim(),
+    inferDigitalOutcomeTaskTemplateId: (text) => /test(?:ing)? that the digital technologies outcome functions as intended/i.test(String(text || ""))
+        ? "testing-functions" : "",
+    taskListState: { templateCopies: [{ templateId: "testing-functions-markup-validation" }] },
     TESTING_FUNCTIONS_LIST_COUNT_STORAGE_PREFIX: "hub_testing_functions_list_counts_v1",
     localStorage: { getItem: () => null }
 });
@@ -65,15 +68,19 @@ const testingCountsStart = taskList.indexOf("function readTestingFunctionsListCo
 const testingCountsEnd = taskList.indexOf("\nfunction getTestingFunctionsSubtasks", testingCountsStart);
 const testingManagementStart = taskList.indexOf("function getStepAutoManagementKind(");
 const testingManagementEnd = taskList.indexOf("\nfunction getSessionTickKey", testingManagementStart);
+const hasTemplateCopyStart = taskList.indexOf("function hasTemplateCopyForDigitalOutcomeTask(");
+const hasTemplateCopyEnd = taskList.indexOf("\nfunction isTestingFunctionsRequirementStep", hasTemplateCopyStart);
 const testingAutoStart = taskList.indexOf("function isTestingFunctionsRequirementStep(");
 const testingAutoEnd = taskList.indexOf("\nfunction autoTickDigitalOutcomeRequirements", testingAutoStart);
 assert.ok(testingCountsStart >= 0 && testingCountsEnd > testingCountsStart
     && testingManagementStart >= 0 && testingManagementEnd > testingManagementStart
+    && hasTemplateCopyStart >= 0 && hasTemplateCopyEnd > hasTemplateCopyStart
     && testingAutoStart >= 0 && testingAutoEnd > testingAutoStart,
     "Testing Functions count and auto-tick helpers are present");
 vm.runInContext([
     taskList.slice(testingCountsStart, testingCountsEnd),
     taskList.slice(testingManagementStart, testingManagementEnd),
+    taskList.slice(hasTemplateCopyStart, hasTemplateCopyEnd),
     taskList.slice(testingAutoStart, testingAutoEnd)
 ].join("\n"), testingAutoContext);
 assert.equal(testingAutoContext.getStepAutoManagementKind("91907", testingCriterion), "auto",
@@ -84,6 +91,14 @@ assert.equal(
     "Testing Functions content auto-ticks the criterion"
 );
 assert.equal(testingChecklistState["91907"][0].done, true);
+testingChecklistState["91907"][0].done = true;
+testingAutoContext.taskListState.templateCopies = [];
+testingCountsState["testing-functions-counts"][0].text = "TESTING_FUNCTIONS_COUNT|4|4";
+assert.equal(
+    testingAutoContext.autoTickTestingFunctionsRequirement(testingChecklistState, testingCountsState, "activity-1", "student@example.test"),
+    false,
+    "Existing functional/user test counts preserve the completed criterion"
+);
 testingChecklistState["91907"][0].done = true;
 testingCountsState["testing-functions-counts"][0].text = "TESTING_FUNCTIONS_COUNT|0|0";
 assert.equal(
