@@ -32,6 +32,51 @@ assert.equal(context.getTaskListCourseFromAllocations([
     { year_group: "Year 10", course_type: "COMP" }
 ]), "");
 
+const testingCriterion = "Achieved: Testing that the digital technologies outcome functions as intended.";
+const testingChecklistState = { "91907": [{ text: testingCriterion, done: false }] };
+const testingCountsState = {
+    "testing-functions-counts": [{ text: "TESTING_FUNCTIONS_COUNT|4|4", done: true }]
+};
+const testingAutoContext = vm.createContext({
+    getStepLevel: (text) => String(text || "").split(":")[0].trim(),
+    stripStepLevel: (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim(),
+    TESTING_FUNCTIONS_LIST_COUNT_STORAGE_PREFIX: "hub_testing_functions_list_counts_v1",
+    localStorage: { getItem: () => null }
+});
+const testingCountsStart = taskList.indexOf("function readTestingFunctionsListCounts(");
+const testingCountsEnd = taskList.indexOf("\nfunction getTestingFunctionsSubtasks", testingCountsStart);
+const testingManagementStart = taskList.indexOf("function getStepAutoManagementKind(");
+const testingManagementEnd = taskList.indexOf("\nfunction getSessionTickKey", testingManagementStart);
+const testingAutoStart = taskList.indexOf("function isTestingFunctionsRequirementStep(");
+const testingAutoEnd = taskList.indexOf("\nfunction autoTickDigitalOutcomeRequirements", testingAutoStart);
+assert.ok(testingCountsStart >= 0 && testingCountsEnd > testingCountsStart
+    && testingManagementStart >= 0 && testingManagementEnd > testingManagementStart
+    && testingAutoStart >= 0 && testingAutoEnd > testingAutoStart,
+    "Testing Functions count and auto-tick helpers are present");
+vm.runInContext([
+    taskList.slice(testingCountsStart, testingCountsEnd),
+    taskList.slice(testingManagementStart, testingManagementEnd),
+    taskList.slice(testingAutoStart, testingAutoEnd)
+].join("\n"), testingAutoContext);
+assert.equal(testingAutoContext.getStepAutoManagementKind("91907", testingCriterion), "auto",
+    "The Level 3 testing criterion is automatically managed from Testing Functions slideshow entries");
+assert.equal(
+    testingAutoContext.autoTickTestingFunctionsRequirement(testingChecklistState, testingCountsState, "activity-1", "student@example.test"),
+    true,
+    "Testing Functions content auto-ticks the criterion"
+);
+assert.equal(testingChecklistState["91907"][0].done, true);
+testingChecklistState["91907"][0].done = true;
+testingCountsState["testing-functions-counts"][0].text = "TESTING_FUNCTIONS_COUNT|0|0";
+assert.equal(
+    testingAutoContext.autoTickTestingFunctionsRequirement(testingChecklistState, testingCountsState, "activity-1", "student@example.test"),
+    true,
+    "Removing all Testing Functions entries clears the criterion tick"
+);
+assert.equal(testingChecklistState["91907"][0].done, false);
+assert.match(taskList, /window\.addEventListener\("pageshow",[\s\S]*loadChecklistForTask\(taskListState\.selectedId\)/,
+    "Returning to the Task List refreshes evidence after opening a topic page");
+
 const libraryDedupeStart = script.indexOf("function dedupeTaskTopicLibraryItems(");
 const libraryDedupeEnd = script.indexOf("\nasync function loadSharedLessons", libraryDedupeStart);
 assert.ok(libraryDedupeStart >= 0 && libraryDedupeEnd > libraryDedupeStart,

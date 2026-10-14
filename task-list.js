@@ -1685,19 +1685,34 @@ function getFirstGoogleFormUrlFromEvidenceRows(stateMap) {
     return "";
 }
 
-function readTestingFunctionsListCounts(activityId, email) {
+function readTestingFunctionsListCounts(activityId, email, stateMap = {}) {
+    const evidenceCountRow = (Array.isArray(stateMap?.["testing-functions-counts"])
+        ? stateMap["testing-functions-counts"] : [])
+        .find((step) => String(step?.text || "").trim().startsWith("TESTING_FUNCTIONS_COUNT|"));
+    if (evidenceCountRow) {
+        const match = String(evidenceCountRow.text || "").trim().match(/^TESTING_FUNCTIONS_COUNT\|(\d+)\|(\d+)$/);
+        return match
+            ? { functionalCount: Number(match[1]), userCount: Number(match[2]) }
+            : { functionalCount: 0, userCount: 0 };
+    }
+
     try {
         const key = `${TESTING_FUNCTIONS_LIST_COUNT_STORAGE_PREFIX}:${String(activityId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
         const parsed = JSON.parse(localStorage.getItem(key) || "{}");
-        return parsed && typeof parsed === "object" ? parsed : {};
+        return parsed && typeof parsed === "object"
+            ? {
+                functionalCount: Math.max(0, Number.parseInt(parsed.functionalCount, 10) || 0),
+                userCount: Math.max(0, Number.parseInt(parsed.userCount, 10) || 0)
+            }
+            : { functionalCount: 0, userCount: 0 };
     } catch (_error) {
-        return {};
+        return { functionalCount: 0, userCount: 0 };
     }
 }
 
 function getTestingFunctionsSubtasks(stateMap) {
     const activityId = taskListState.selectedId;
-    const counts = readTestingFunctionsListCounts(activityId, getTaskListEmail());
+    const counts = readTestingFunctionsListCounts(activityId, getTaskListEmail(), stateMap);
     const functionalCount = Number(counts.functionalCount || 0);
     const userCount = Number(counts.userCount || 0);
     const formUrl = getFirstGoogleFormUrlFromEvidenceRows(stateMap);
@@ -1964,6 +1979,9 @@ function getStepAutoManagementKind(standard, text) {
     if ((std === "91897" || std === "91907") && level === "Achieved" && stripped.includes("project management")) {
         return "auto";
     }
+    if (isTestingFunctionsRequirementStep(std, text)) {
+        return "auto";
+    }
     if (std === "digital-outcome" && Boolean(inferDigitalOutcomeTaskTemplateId(stripped))) {
         return "auto";
     }
@@ -2041,6 +2059,33 @@ function hasTemplateCopyForDigitalOutcomeTask(taskText) {
     if (!templateId) return false;
     return (Array.isArray(taskListState.templateCopies) ? taskListState.templateCopies : [])
         .some((copy) => String(copy?.templateId || "").trim().toLowerCase() === templateId);
+}
+
+function isTestingFunctionsRequirementStep(standard, text) {
+    const safeStandard = String(standard || "").trim();
+    const normalizedText = stripStepLevel(text || "").toLowerCase().replace(/\s+/g, " ").trim();
+    return ["91897", "91907"].includes(safeStandard)
+        && getStepLevel(text) === "Achieved"
+        && /^test(?:ing)? that the digital technologies outcome functions as intended\.?$/.test(normalizedText);
+}
+
+function autoTickTestingFunctionsRequirement(stateMap, countStateMap, activityId, email) {
+    const counts = readTestingFunctionsListCounts(activityId, email, countStateMap);
+    const shouldBeDone = counts.functionalCount + counts.userCount > 0;
+    let changed = false;
+
+    ["91897", "91907"].forEach((standard) => {
+        const rows = Array.isArray(stateMap?.[standard]) ? stateMap[standard] : [];
+        rows.forEach((row) => {
+            if (!isTestingFunctionsRequirementStep(standard, row?.text || "")) return;
+            if (Boolean(row?.done) !== shouldBeDone) {
+                row.done = shouldBeDone;
+                changed = true;
+            }
+        });
+    });
+
+    return changed;
 }
 
 function autoTickDigitalOutcomeRequirements(stateMap, projectId, email) {
@@ -3230,21 +3275,27 @@ async function loadChecklistForTask(taskId) {
         ? templateCopiesPayload.template_copies : [];
 
     const autoChangedChecklistPM = autoTickProjectManagementRequirement(taskListState.checklistState);
+    const autoChangedChecklistTesting = autoTickTestingFunctionsRequirement(
+        taskListState.checklistState, taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail
+    );
     const autoChangedChecklistDO = autoTickDigitalOutcomeRequirements(taskListState.checklistState, taskListState.selectedId, signedInEmail);
     const autoRepairedChecklistRI = applyTemplateCopiesAsRelevantImplicationsState(taskListState.checklistState, taskListState.templateCopies);
     const autoChangedChecklistRI = autoTickRelevantImplicationsRequirements(taskListState.checklistState, taskListState.selectedId, signedInEmail);
     const autoSyncedChecklist91893RI = sync91893RelevantImplicationsState(taskListState.checklistState);
     const autoChangedChecklistET = autoTickEfficientToolsRequirement(taskListState.checklistState, taskListState.selectedId, signedInEmail);
     const clearedChecklistManualTicks = clearUnverifiedManualTicks(taskListState.checklistState);
-    const autoChangedChecklist = autoChangedChecklistPM || autoChangedChecklistDO || autoChangedChecklistRI || autoRepairedChecklistRI || autoSyncedChecklist91893RI || autoChangedChecklistET || clearedChecklistManualTicks;
+    const autoChangedChecklist = autoChangedChecklistPM || autoChangedChecklistTesting || autoChangedChecklistDO || autoChangedChecklistRI || autoRepairedChecklistRI || autoSyncedChecklist91893RI || autoChangedChecklistET || clearedChecklistManualTicks;
     const autoChangedEvidencePM = autoTickProjectManagementRequirement(taskListState.fullEvidenceState);
+    const autoChangedEvidenceTesting = autoTickTestingFunctionsRequirement(
+        taskListState.fullEvidenceState, taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail
+    );
     const autoChangedEvidenceDO = autoTickDigitalOutcomeRequirements(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
     const autoRepairedEvidenceRI = applyTemplateCopiesAsRelevantImplicationsState(taskListState.fullEvidenceState, taskListState.templateCopies);
     const autoChangedEvidenceRI = autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
     const autoSyncedEvidence91893RI = sync91893RelevantImplicationsState(taskListState.fullEvidenceState);
     const autoChangedEvidenceET = autoTickEfficientToolsRequirement(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
     const clearedEvidenceManualTicks = clearUnverifiedManualTicks(taskListState.fullEvidenceState);
-    const autoChangedEvidence = autoChangedEvidencePM || autoChangedEvidenceDO || autoChangedEvidenceRI || autoRepairedEvidenceRI || autoSyncedEvidence91893RI || autoChangedEvidenceET || clearedEvidenceManualTicks;
+    const autoChangedEvidence = autoChangedEvidencePM || autoChangedEvidenceTesting || autoChangedEvidenceDO || autoChangedEvidenceRI || autoRepairedEvidenceRI || autoSyncedEvidence91893RI || autoChangedEvidenceET || clearedEvidenceManualTicks;
     if (migratedDigitalOutcomeRows || migrated91897Rows || migrated91907Rows || migrated91893Rows || migrated91903Rows || autoChangedChecklist || autoChangedEvidence) {
         const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
         await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});
@@ -3788,12 +3839,18 @@ async function runTaskListTrelloSync() {
 
         const relevantImplicationsChecklistChanged = autoTickRelevantImplicationsRequirements(taskListState.checklistState, taskListState.selectedId, getTaskListEmail());
         const relevantImplicationsEvidenceChanged = autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, taskListState.selectedId, getTaskListEmail());
+        const testingChecklistChanged = autoTickTestingFunctionsRequirement(
+            taskListState.checklistState, taskListState.fullEvidenceState, taskListState.selectedId, getTaskListEmail()
+        );
+        const testingEvidenceChanged = autoTickTestingFunctionsRequirement(
+            taskListState.fullEvidenceState, taskListState.fullEvidenceState, taskListState.selectedId, getTaskListEmail()
+        );
         const synced91893ChecklistChanged = sync91893RelevantImplicationsState(taskListState.checklistState);
         const synced91893EvidenceChanged = sync91893RelevantImplicationsState(taskListState.fullEvidenceState);
         const efficientToolsChecklistChanged = autoTickEfficientToolsRequirement(taskListState.checklistState, taskListState.selectedId, getTaskListEmail());
         const efficientToolsEvidenceChanged = autoTickEfficientToolsRequirement(taskListState.fullEvidenceState, taskListState.selectedId, getTaskListEmail());
 
-        if (relevantImplicationsChecklistChanged || relevantImplicationsEvidenceChanged || synced91893ChecklistChanged || synced91893EvidenceChanged || efficientToolsChecklistChanged || efficientToolsEvidenceChanged) {
+        if (relevantImplicationsChecklistChanged || relevantImplicationsEvidenceChanged || testingChecklistChanged || testingEvidenceChanged || synced91893ChecklistChanged || synced91893EvidenceChanged || efficientToolsChecklistChanged || efficientToolsEvidenceChanged) {
             renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);
         }
 
@@ -3809,4 +3866,9 @@ async function runTaskListTrelloSync() {
 
 document.addEventListener("DOMContentLoaded", () => {
     void renderTaskListPage();
+});
+
+window.addEventListener("pageshow", (event) => {
+    if (!event.persisted || !taskListState.selectedId) return;
+    void loadChecklistForTask(taskListState.selectedId);
 });
