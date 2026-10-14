@@ -31,6 +31,17 @@ async function main() {
     assert.equal(calls.length, 1, "A rejected token is not retried anonymously");
     assert.ok(calls[0].headers.Authorization, "The configured token is attempted first");
 
+    assert.equal(context.githubSourceHasComments("<!-- Student log-in section -->"), true, "HTML comments are detected");
+    assert.equal(context.githubSourceHasComments("/* responsive layout */"), true, "CSS/JS block comments are detected");
+    assert.equal(context.githubSourceHasComments("// explain navigation state"), true, "JavaScript line comments are detected");
+    assert.equal(context.githubSourceHasComments("<title>Student Login</title>"), false, "Comment-free source stays undetected");
+    assert.equal(context.buildGithubCommentingCategory(["<main><!-- structure --></main>"]).done, true);
+    assert.equal(context.buildGithubCommentingCategory(["<main><p>Welcome</p></main>"]).done, false);
+    assert.match(server, /categories\.push\(buildGithubCommentingCategory\(commentScanContents\)\)/,
+        "Task List GitHub sync includes Commenting detection");
+    assert.match(server, /buildGithubCommentingCategory\(\[\.\.\.htmlContents, \.\.\.cssContents, \.\.\.javascriptContents\]\)/,
+        "Asset Manager GitHub sync includes Commenting detection");
+
     const anonymousCalls = [];
     const anonymousContext = vm.createContext({
         URLSearchParams,

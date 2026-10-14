@@ -16096,6 +16096,7 @@ app.post("/api/integrations/trello/work-log", async (req, res) => {
 const GITHUB_TOKEN = String(process.env.GITHUB_TOKEN || "").trim();
 const GITHUB_RAW_CONTENT_BASE = "https://raw.githubusercontent.com";
 const GITHUB_EFFICIENT_TOOLS_MAX_VALIDATED_FILES = 3;
+const GITHUB_COMMENT_SCAN_MAX_FILES = 40;
 const GITHUB_ASSET_FOLDER_NAMES = new Set(["images", "img", "assets", "css", "styles", "js", "scripts", "media"]);
 const GITHUB_IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".tif", ".tiff", ".bmp", ".heic", ".heif"]);
 const GITHUB_OPTIMISED_IMAGE_MAX_BYTES = 500 * 1024;
@@ -16138,6 +16139,23 @@ async function githubApiRequest(pathname, query = {}) {
     throw error;
   }
   return payload;
+}
+
+function githubSourceHasComments(source) {
+  const candidates = String(source || "").match(/<!--[\s\S]*?-->|\/\*[\s\S]*?\*\/|^[ \t]*\/\/[^\r\n]*/gm) || [];
+  return candidates.some((comment) => {
+    const body = comment.startsWith("<!--")
+      ? comment.slice(4, -3)
+      : comment.startsWith("/*") ? comment.slice(2, -2) : comment.slice(2);
+    return Boolean(body.trim());
+  });
+}
+
+function buildGithubCommentingCategory(sourceFiles) {
+  return {
+    label: "Commenting",
+    done: (Array.isArray(sourceFiles) ? sourceFiles : []).some(githubSourceHasComments)
+  };
 }
 
 function computeGithubEfficientToolsCategories(treeItems, imageStats) {
@@ -16730,12 +16748,18 @@ app.get("/api/integrations/github/repo-analysis", async (req, res) => {
     const jsFilePaths = treeItems
       .filter((item) => item?.type === "blob" && GITHUB_JS_EXTENSION.test(String(item?.path || "")))
       .map((item) => String(item?.path || "").trim());
-    const toolsTechniquesSampleFiles = [...cssFiles.slice(0, 3), ...jsFilePaths.slice(0, 3)];
+    const toolsTechniquesSampleFiles = Array.from(new Set([
+      ...htmlFiles.slice(0, GITHUB_COMMENT_SCAN_MAX_FILES),
+      ...cssFiles.slice(0, 3),
+      ...jsFilePaths.slice(0, 3)
+    ]));
+    const commentScanContents = [];
     let hasCompositeCss = false;
     let hasThirdPartyImport = false;
     await Promise.all(toolsTechniquesSampleFiles.map(async (filePath) => {
       const content = await fetchGithubRepoRawFile(identifier.owner, identifier.repo, defaultBranch, filePath);
       if (!content) return;
+      commentScanContents.push(content);
       if (/mix-blend-mode|backdrop-filter|filter\s*:|linear-gradient|radial-gradient|animation\s*:|transform\s*:|clip-path/i.test(content)) {
         hasCompositeCss = true;
       }
@@ -16743,6 +16767,7 @@ app.get("/api/integrations/github/repo-analysis", async (req, res) => {
         hasThirdPartyImport = true;
       }
     }));
+    categories.push(buildGithubCommentingCategory(commentScanContents));
 
     const toolsTechniquesCategories = {
       web: computeGithubToolsTechniquesCategories("web", {
@@ -17081,6 +17106,7 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
     // layers, smart objects, type layers, guides) rather than only inferring from the extension.
     const psdSignals = await computeGithubPsdSignals(identifier.owner, identifier.repo, defaultBranch, blobs);
 
+    const javascriptFileCount = countByExt(GITHUB_JS_EXTENSION);
     const topLevelFolders = new Set(
       Array.from(blobPaths)
         .filter((filePath) => filePath.includes("/"))
@@ -17093,6 +17119,7 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
       { label: "Management of assets", done: hasOrganisedAssetFolders },
       { label: "Using stylesheets", done: cssFileCount > 0 },
       { label: "Master pages or student developed templates", done: htmlFileCount >= 2 && cssFileCount > 0 },
+      buildGithubCommentingCategory([...htmlContents, ...cssContents, ...javascriptContents]),
       { label: "Reusing objects, styles and/or frames", done: cssFileCount > 0 && htmlFileCount >= 2 },
       { label: "HTML/CSS validation procedures", done: htmlFileCount > 0 && cssFileCount > 0 && brokenReferences.length === 0 },
       { label: "Optimisation of media assets", done: imageStats.count > 0 && imageStats.maxBytes > 0 && imageStats.maxBytes <= GITHUB_OPTIMISED_IMAGE_MAX_BYTES }
@@ -17106,7 +17133,7 @@ app.get("/api/integrations/github/asset-health", async (req, res) => {
       counts: {
         html: countByExt(/\.html?$/i),
         css: countByExt(/\.css$/i),
-        javascript: countByExt(GITHUB_JS_EXTENSION),
+        javascript: javascriptFileCount,
         images: imageStats.count,
         media: blobs.filter((item) => {
           const extMatch = String(item?.path || "").toLowerCase().match(/\.[a-z0-9]+$/);
