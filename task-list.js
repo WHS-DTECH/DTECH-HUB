@@ -2361,6 +2361,37 @@ function evidenceMapToRows(currentState, standards) {
         .filter((row) => row.standard);
 }
 
+const TASK_LIST_AUTO_DRIVE_SYNC_COOLDOWN_MS = 15 * 60 * 1000;
+const taskListAutoDriveSyncAttemptAt = new Map();
+
+async function autoSyncToolsAndTechniquesTemplateCopy(activityId, email, currentCopies) {
+    const copies = Array.isArray(currentCopies) ? currentCopies : [];
+    if (!activityId || !email || copies.some((copy) => String(copy?.templateId || "").trim().toLowerCase() === "tools-and-techniques")) {
+        return copies;
+    }
+
+    const accessToken = typeof window.getActiveHubDriveAccessToken === "function"
+        ? String(window.getActiveHubDriveAccessToken() || "").trim()
+        : "";
+    if (!accessToken) return copies;
+
+    const syncKey = `${String(activityId).trim()}:${String(email).trim().toLowerCase()}`;
+    const previousAttempt = Number(taskListAutoDriveSyncAttemptAt.get(syncKey) || 0);
+    if (Date.now() - previousAttempt < TASK_LIST_AUTO_DRIVE_SYNC_COOLDOWN_MS) return copies;
+    taskListAutoDriveSyncAttemptAt.set(syncKey, Date.now());
+
+    try {
+        const payload = await loadJson(`/api/activities/${encodeURIComponent(activityId)}/sync-drive-templates`, {
+            method: "POST",
+            headers: buildTaskListHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ driveAccessToken: accessToken })
+        });
+        return Array.isArray(payload?.template_copies) ? payload.template_copies : copies;
+    } catch (_error) {
+        return copies;
+    }
+}
+
 async function fetchMyEvidence(projectId) {
     if (!projectId) return [];
     const payload = await loadJson(`/api/activities/${encodeURIComponent(projectId)}/my-evidence`, { headers: buildTaskListHeaders({}) });
@@ -3301,8 +3332,11 @@ async function loadChecklistForTask(taskId) {
         `/api/activities/${encodeURIComponent(taskListState.selectedId)}/my-template-copies`,
         { headers: buildTaskListHeaders({}) }
     ).catch(() => ({ template_copies: [] }));
-    taskListState.templateCopies = Array.isArray(templateCopiesPayload?.template_copies)
-        ? templateCopiesPayload.template_copies : [];
+    taskListState.templateCopies = await autoSyncToolsAndTechniquesTemplateCopy(
+        taskListState.selectedId,
+        signedInEmail,
+        Array.isArray(templateCopiesPayload?.template_copies) ? templateCopiesPayload.template_copies : []
+    );
 
     const autoChangedChecklistPM = autoTickProjectManagementRequirement(taskListState.checklistState);
     const autoChangedChecklistTesting = autoTickTestingFunctionsRequirement(

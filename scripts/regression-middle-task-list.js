@@ -76,6 +76,50 @@ assert.equal(
 assert.equal(testingChecklistState["91907"][0].done, false);
 assert.match(taskList, /window\.addEventListener\("pageshow",[\s\S]*loadChecklistForTask\(taskListState\.selectedId\)/,
     "Returning to the Task List refreshes evidence after opening a topic page");
+assert.match(taskList, /taskListState\.templateCopies = await autoSyncToolsAndTechniquesTemplateCopy/,
+    "Task List load uses automatically discovered template copy records");
+
+const autoDriveSyncStart = taskList.indexOf("const TASK_LIST_AUTO_DRIVE_SYNC_COOLDOWN_MS");
+const autoDriveSyncEnd = taskList.indexOf("\nasync function fetchMyEvidence", autoDriveSyncStart);
+assert.ok(autoDriveSyncStart >= 0 && autoDriveSyncEnd > autoDriveSyncStart,
+    "Automatic Tools & Techniques Drive scan helper is present");
+const autoDriveCalls = [];
+const autoDriveContext = vm.createContext({
+    window: { getActiveHubDriveAccessToken: () => "cached-drive-token" },
+    loadJson: async (url, options) => {
+        autoDriveCalls.push({ url, options });
+        return { template_copies: [{ templateId: "tools-and-techniques", templateTitle: "Tools & Techniques" }] };
+    },
+    buildTaskListHeaders: (headers) => headers,
+    encodeURIComponent,
+    Date
+});
+vm.runInContext(taskList.slice(autoDriveSyncStart, autoDriveSyncEnd), autoDriveContext);
+async function runAutoDriveSyncRegression() {
+    const discoveredCopies = await autoDriveContext.autoSyncToolsAndTechniquesTemplateCopy(
+        "activity-1", "student@example.test", []
+    );
+    assert.equal(autoDriveCalls.length, 1, "A cached Drive token triggers one quiet folder scan");
+    assert.equal(autoDriveCalls[0].options.method, "POST");
+    assert.equal(JSON.parse(autoDriveCalls[0].options.body).driveAccessToken, "cached-drive-token");
+    assert.equal(discoveredCopies[0].templateId, "tools-and-techniques");
+    await autoDriveContext.autoSyncToolsAndTechniquesTemplateCopy("activity-1", "student@example.test", []);
+    assert.equal(autoDriveCalls.length, 1, "Repeated task loads respect the Drive scan cooldown");
+    await autoDriveContext.autoSyncToolsAndTechniquesTemplateCopy("activity-1", "student@example.test", discoveredCopies);
+    assert.equal(autoDriveCalls.length, 1, "Existing Tools & Techniques copy records avoid another Drive scan");
+
+    const noTokenCalls = [];
+    const noTokenContext = vm.createContext({
+        window: { getActiveHubDriveAccessToken: () => "" },
+        loadJson: async (...args) => { noTokenCalls.push(args); },
+        buildTaskListHeaders: (headers) => headers,
+        encodeURIComponent,
+        Date
+    });
+    vm.runInContext(taskList.slice(autoDriveSyncStart, autoDriveSyncEnd), noTokenContext);
+    await noTokenContext.autoSyncToolsAndTechniquesTemplateCopy("activity-2", "student@example.test", []);
+    assert.equal(noTokenCalls.length, 0, "Auto-discovery never prompts or calls Drive without a cached token");
+}
 
 const triallingCriterion = "Achieved: Trial the components of the digital technologies outcome.";
 const triallingChecklistState = { "91907": [{ text: triallingCriterion, done: false }] };
@@ -436,7 +480,7 @@ async function runFolderRouteRegression() {
     assert.equal(wrongIdentityResponse.statusCode, 403, "Drive setup requires the same Google and Hub account");
 }
 
-runFolderRouteRegression().then(() => {
+Promise.all([runFolderRouteRegression(), runAutoDriveSyncRegression()]).then(() => {
     console.log("MiddleDTECH Task List filtering and folder setup regressions passed.");
 }).catch((error) => {
     console.error(error);
