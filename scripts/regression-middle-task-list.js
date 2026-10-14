@@ -283,6 +283,31 @@ assert.equal(endUserImplicationsCopy.templateId, "relevant-implications-end-user
     "Drive sync keeps the hyphen inside End-User Considerations when identifying its template");
 assert.equal(endUserImplicationsCopy.templateTitle, "Relevant Implications - End-User Considerations",
     "The recorded copy title matches the Task List category used for auto-ticking");
+const slideSetCopies = templateIdentityContext.inferTemplateCopiesFromSlideSet({
+    slides: [
+        { pageElements: [{ shape: { text: { textElements: [{ textRun: { content: "Digital Outcome Description\nDescribe your outcome" } }] } } }] },
+        { pageElements: [{ shape: { text: { textElements: [{ textRun: { content: "Tools & Techniques\nList tools used" } }] } } }] },
+        { pageElements: [{ shape: { text: { textElements: [{ textRun: { content: "Relevant Implications - End-User Considerations\nEnd-user needs" } }] } } }] },
+        { pageElements: [{ shape: { text: { textElements: [{ textRun: { content: "Untitled worksheet" } }] } } }] }
+    ]
+}, "https://docs.google.com/presentation/d/full-set-id/edit", "Web & Processing standard Checklist");
+assert.deepEqual(
+    JSON.parse(JSON.stringify(slideSetCopies.map((copy) => copy.templateId))),
+    ["digital-outcome-description", "tools-and-techniques", "relevant-implications-end-user-considerations"],
+    "A combined slide set records only recognized task sections"
+);
+assert.ok(slideSetCopies.every((copy) => copy.fileUrl.includes("full-set-id")),
+    "Each recognized slide section points back to the supplied full-set deck");
+assert.match(server, /app\.post\("\/api\/activities\/:id\/sync-slide-set"/,
+    "The Task List full slide-set sync endpoint is registered");
+assert.match(server, /testing_functions_counts:[\s\S]*functionalCount: testingFunctionsCounts\.functionalTesting\.length[\s\S]*userCount: testingFunctionsCounts\.userTesting\.length/,
+    "Full slide-set sync returns Testing Functions table counts when that section is present");
+assert.match(taskList, /#task-list-sync-slide-set[\s\S]*sync-slide-set/,
+    "The Task List link control calls the full slide-set sync endpoint");
+assert.match(taskList, /TESTING_FUNCTIONS_COUNT\|\$\{functionalCount\}\|\$\{userCount\}/,
+    "Task List saves full slide-set Testing Functions counts for the normal auto-tick path");
+assert.match(html, /id="task-list-slide-set-url"/,
+    "The Task List provides a full slide-set URL field");
 
 const digitalOutcomeRows = [
     { text: "Describe the digital outcome" },

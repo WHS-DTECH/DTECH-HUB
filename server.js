@@ -10179,6 +10179,71 @@ function inferTemplateCopyFromFileName(fileName) {
   return null;
 }
 
+function inferTemplateCopiesFromSlideSet(presentation, fileUrl, fileName) {
+  const copiesById = new Map();
+  const slides = Array.isArray(presentation?.slides) ? presentation.slides : [];
+  const standaloneImplicationCategories = new Set([
+    "social", "cultural", "legal", "ethical", "intellectual property", "privacy",
+    "accessibility", "usability", "functionality", "aesthetics",
+    "sustainability and future proofing", "end-user considerations", "health and safety"
+  ]);
+
+  slides.forEach((slide) => {
+    const lines = [];
+    (Array.isArray(slide?.pageElements) ? slide.pageElements : []).forEach((element) => {
+      const textElements = Array.isArray(element?.shape?.text?.textElements)
+        ? element.shape.text.textElements : [];
+      const shapeText = textElements
+        .map((entry) => String(entry?.textRun?.content || ""))
+        .join("");
+      shapeText.split(/\r?\n/).forEach((line) => {
+        const cleanLine = String(line || "")
+          .replace(/^\s*(?:\d+\s*[.)]|[\u2022\u25CF\u25E6*-])\s*/, "")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (cleanLine) lines.push(cleanLine);
+      });
+
+      const rows = Array.isArray(element?.table?.tableRows) ? element.table.tableRows : [];
+      rows.forEach((row) => {
+        (Array.isArray(row?.tableCells) ? row.tableCells : []).forEach((cell) => {
+          const cellText = extractGoogleSlidesTableCellText(cell);
+          String(cellText || "").split(/\r?\n/).forEach((line) => {
+            const cleanLine = String(line || "").replace(/\s+/g, " ").trim();
+            if (cleanLine) lines.push(cleanLine);
+          });
+        });
+      });
+    });
+
+    const entry = lines.map((heading) => {
+      const canonical = inferTemplateCopyFromFileName(heading);
+      if (canonical) return canonical;
+
+      const normalizedHeading = heading.toLowerCase().replace(/[()]/g, "").replace(/\s+/g, " ").trim();
+      if (standaloneImplicationCategories.has(normalizedHeading)) {
+        const category = heading.trim();
+        const slug = category.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+        return {
+          templateId: `relevant-implications-${slug}`,
+          templateTitle: `Relevant Implications - ${category}`
+        };
+      }
+
+      return null;
+    }).find(Boolean);
+
+    if (!entry?.templateId || copiesById.has(entry.templateId)) return;
+    copiesById.set(entry.templateId, {
+      ...entry,
+      fileUrl: String(fileUrl || "").trim(),
+      fileName: String(fileName || "").trim()
+    });
+  });
+
+  return Array.from(copiesById.values());
+}
+
 // POST /api/activities/:id/sync-drive-templates — scan Drive folder, infer template copies, save to DB
 app.post("/api/activities/:id/sync-drive-templates", async (req, res) => {
   const projectId = String(req.params.id || "").trim();
@@ -10229,6 +10294,74 @@ app.post("/api/activities/:id/sync-drive-templates", async (req, res) => {
     res.json({ ok: true, synced: inferred.length, template_copies: allCopies });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not sync from Drive." });
+  }
+});
+
+app.post("/api/activities/:id/sync-slide-set", async (req, res) => {
+  const projectId = String(req.params.id || "").trim();
+  const requesterEmail = normalizeEmail(getRequestUserEmail(req));
+  const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
+  const presentationUrl = String(req.body?.presentationUrl || "").trim();
+  const presentationId = presentationUrl.match(/docs\.google\.com\/presentation\/d\/([A-Za-z0-9_-]+)/i)?.[1] || "";
+
+  if (!projectId) { res.status(400).json({ error: "Project ID is required." }); return; }
+  if (!requesterEmail || !requesterEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required." }); return;
+  }
+  if (!driveAccessToken) { res.status(400).json({ error: "driveAccessToken is required." }); return; }
+  if (!presentationId) {
+    res.status(400).json({ error: "Paste a valid Google Slides presentation link." });
+    return;
+  }
+
+  try {
+    const file = await driveApiRequest(`/files/${encodeURIComponent(presentationId)}`, {
+      accessToken: driveAccessToken,
+      queryParams: { fields: "id,name,mimeType,webViewLink,trashed" }
+    });
+    if (file?.mimeType !== "application/vnd.google-apps.presentation" || file?.trashed) {
+      res.status(400).json({ error: "The link must open a Google Slides presentation." });
+      return;
+    }
+
+    const presentation = await googleSlidesApiRequest(presentationId, driveAccessToken);
+    const fileUrl = String(file?.webViewLink || presentationUrl).trim();
+    const fileName = String(file?.name || "Full slide set").trim();
+    const inferred = inferTemplateCopiesFromSlideSet(presentation, fileUrl, fileName);
+    if (!inferred.length) {
+      res.status(422).json({ error: "No recognized assessment slide headings were found in that deck." });
+      return;
+    }
+    const testingFunctionsCounts = inferred.some((entry) => entry.templateId === "testing-functions")
+      ? extractGoogleSlidesTestingFunctionLists(presentation)
+      : null;
+
+    if (hasDatabase) {
+      for (const entry of inferred) {
+        await recordTemplateCopyInDb(projectId, requesterEmail, entry);
+      }
+    }
+
+    let allCopies = inferred;
+    if (hasDatabase) {
+      const result = await pool.query(
+        `SELECT template_copies FROM project_interests WHERE project_id = $1 AND student_email = $2 LIMIT 1`,
+        [projectId, requesterEmail]
+      );
+      allCopies = Array.isArray(result.rows?.[0]?.template_copies) ? result.rows[0].template_copies : inferred;
+    }
+
+    res.json({
+      ok: true,
+      synced: inferred.length,
+      template_copies: allCopies,
+      matched: inferred.map((entry) => entry.templateTitle),
+      testing_functions_counts: testingFunctionsCounts
+        ? { functionalCount: testingFunctionsCounts.functionalTesting.length, userCount: testingFunctionsCounts.userTesting.length }
+        : null
+    });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not sync the full slide set." });
   }
 });
 

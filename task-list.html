@@ -410,6 +410,40 @@
             gap: 8px;
         }
 
+        .task-list-slide-set-link {
+            margin: -2px 0 12px;
+            padding: 8px 10px;
+            border: 1px solid #c9d9eb;
+            border-radius: 8px;
+            background: #f7faff;
+        }
+        .task-list-slide-set-link summary {
+            color: #1a5fa8;
+            font-size: 0.78rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .task-list-slide-set-form {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            margin-top: 8px;
+        }
+        .task-list-slide-set-form input {
+            flex: 1 1 280px;
+            min-width: 0;
+            padding: 7px 9px;
+            border: 1px solid #b8c8da;
+            border-radius: 6px;
+            font: inherit;
+        }
+        .task-list-slide-set-status {
+            margin: 6px 0 0;
+            color: #345778;
+            font-size: 0.75rem;
+        }
+
         .task-list-system-list {
             margin: 8px 0 2px;
             border: 1px solid #d6ddef;
@@ -872,6 +906,14 @@
                                 <button type="button" class="task-list-sync-drive-btn" id="task-list-open-asset-manager">Asset Manager</button>
                             </div>
                         </div>
+                        <details class="task-list-slide-set-link">
+                            <summary>Link an existing full slide set</summary>
+                            <div class="task-list-slide-set-form">
+                                <input id="task-list-slide-set-url" type="url" inputmode="url" placeholder="Paste a Google Slides presentation link" aria-label="Full slide set Google Slides link">
+                                <button type="button" class="task-list-sync-drive-btn" id="task-list-sync-slide-set">Sync slide set</button>
+                            </div>
+                            <p class="task-list-slide-set-status">Recognized slide titles will be linked to their matching Task List items.</p>
+                        </details>
                         <div id="task-list-checklist" class="task-list-checklist-grid"></div>
                     </section>
                 </section>

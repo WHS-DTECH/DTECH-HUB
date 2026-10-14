@@ -3795,6 +3795,64 @@ async function runTaskListTrelloSync() {
     });
 
     document.addEventListener("click", async (event) => {
+        const slideSetButton = event.target?.closest?.("#task-list-sync-slide-set");
+        if (!slideSetButton || !taskListState.selectedId) return;
+
+        const input = document.querySelector("#task-list-slide-set-url");
+        const presentationUrl = String(input?.value || "").trim();
+        if (!presentationUrl) {
+            setStatus("Paste the Google Slides link to your full slide set first.", true);
+            input?.focus();
+            return;
+        }
+
+        slideSetButton.disabled = true;
+        slideSetButton.textContent = "Requesting Drive access...";
+        try {
+            const tokenResponse = await requestTaskListDriveToken();
+            if (tokenResponse.error || !tokenResponse.access_token) {
+                throw new Error("Drive access was not granted.");
+            }
+
+            slideSetButton.textContent = "Reading slide titles...";
+            const payload = await loadJson(
+                `/api/activities/${encodeURIComponent(taskListState.selectedId)}/sync-slide-set`,
+                {
+                    method: "POST",
+                    headers: buildTaskListHeaders({ "Content-Type": "application/json" }),
+                    body: JSON.stringify({ driveAccessToken: tokenResponse.access_token, presentationUrl })
+                }
+            );
+
+            const testingCounts = payload?.testing_functions_counts;
+            if (testingCounts && taskListState.fullEvidenceState) {
+                const functionalCount = Math.max(0, Number.parseInt(testingCounts.functionalCount, 10) || 0);
+                const userCount = Math.max(0, Number.parseInt(testingCounts.userCount, 10) || 0);
+                taskListState.fullEvidenceState["testing-functions-counts"] = [{
+                    text: `TESTING_FUNCTIONS_COUNT|${functionalCount}|${userCount}`,
+                    done: functionalCount + userCount > 0
+                }];
+                const standards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
+                await saveMyEvidence(
+                    taskListState.selectedId,
+                    evidenceMapToRows(taskListState.fullEvidenceState, standards)
+                );
+            }
+
+            await loadChecklistForTask(taskListState.selectedId);
+            const matchedTitles = Array.isArray(payload?.matched) ? payload.matched : [];
+            setStatus(`Slide set synced. Linked ${matchedTitles.length} recognized section${matchedTitles.length === 1 ? "" : "s"} to this Task List.`);
+        } catch (error) {
+            setStatus(error?.message || "Could not sync the full slide set.", true);
+        } finally {
+            if (slideSetButton?.isConnected) {
+                slideSetButton.disabled = false;
+                slideSetButton.textContent = "Sync slide set";
+            }
+        }
+    });
+
+    document.addEventListener("click", async (event) => {
         const syncBtn = event.target?.closest?.("#task-list-sync-drive");
         if (!syncBtn || !taskListState.selectedId) return;
 
