@@ -1982,6 +1982,9 @@ function getStepAutoManagementKind(standard, text) {
     if (isTestingFunctionsRequirementStep(std, text)) {
         return "auto";
     }
+    if (isTriallingComponentsRequirementStep(std, text)) {
+        return "auto";
+    }
     if (std === "digital-outcome" && Boolean(inferDigitalOutcomeTaskTemplateId(stripped))) {
         return "auto";
     }
@@ -2142,6 +2145,33 @@ function autoTickMultipleComponentsRequirement(stateMap, componentCount) {
             }
         });
     });
+    return changed;
+}
+
+function isTriallingComponentsRequirementStep(standard, text) {
+    const safeStandard = String(standard || "").trim();
+    const stripped = stripStepLevel(text || "").toLowerCase().replace(/\s+/g, " ").trim();
+    return ["91897", "91907"].includes(safeStandard)
+        && getStepLevel(text) === "Achieved"
+        && /^trial(?:l?ing)?\s+(?:the\s+)?components\b/.test(stripped);
+}
+
+function autoTickTriallingComponentsRequirement(stateMap, componentCount) {
+    if (!Number.isFinite(componentCount)) return false;
+
+    const shouldBeDone = componentCount > 0;
+    let changed = false;
+    ["91897", "91907"].forEach((standard) => {
+        const rows = Array.isArray(stateMap?.[standard]) ? stateMap[standard] : [];
+        rows.forEach((row) => {
+            if (!isTriallingComponentsRequirementStep(standard, row?.text || "")) return;
+            if (Boolean(row?.done) !== shouldBeDone) {
+                row.done = shouldBeDone;
+                changed = true;
+            }
+        });
+    });
+
     return changed;
 }
 
@@ -3325,7 +3355,9 @@ async function loadChecklistForTask(taskId) {
         if (count !== null) {
             const checklistChanged = autoTickMultipleComponentsRequirement(taskListState.checklistState, count);
             const evidenceChanged = autoTickMultipleComponentsRequirement(taskListState.fullEvidenceState, count);
-            if (checklistChanged || evidenceChanged) {
+            const triallingChecklistChanged = autoTickTriallingComponentsRequirement(taskListState.checklistState, count);
+            const triallingEvidenceChanged = autoTickTriallingComponentsRequirement(taskListState.fullEvidenceState, count);
+            if (checklistChanged || evidenceChanged || triallingChecklistChanged || triallingEvidenceChanged) {
                 const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
                 void saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});
             }
@@ -3756,6 +3788,8 @@ async function runTaskListTrelloSync() {
             const componentCount = await loadIdentifiedComponentsCount(taskListState.selectedId, getTaskListEmail());
             const checklistMultipleComponentsChanged = autoTickMultipleComponentsRequirement(taskListState.checklistState, componentCount);
             const evidenceMultipleComponentsChanged = autoTickMultipleComponentsRequirement(taskListState.fullEvidenceState, componentCount);
+            const checklistTriallingChanged = autoTickTriallingComponentsRequirement(taskListState.checklistState, componentCount);
+            const evidenceTriallingChanged = autoTickTriallingComponentsRequirement(taskListState.fullEvidenceState, componentCount);
 
             const repairedChecklist = applyTemplateCopiesAsRelevantImplicationsState(taskListState.checklistState, taskListState.templateCopies);
             const repairedEvidence = applyTemplateCopiesAsRelevantImplicationsState(taskListState.fullEvidenceState, taskListState.templateCopies);
@@ -3766,7 +3800,7 @@ async function runTaskListTrelloSync() {
             autoTickRelevantImplicationsRequirements(taskListState.checklistState, taskListState.selectedId, getTaskListEmail());
             autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, taskListState.selectedId, getTaskListEmail());
 
-            if (repairedChecklist || repairedEvidence || checklistMultipleComponentsChanged || evidenceMultipleComponentsChanged || digitalOutcomeChecklistChanged || digitalOutcomeEvidenceChanged) {
+            if (repairedChecklist || repairedEvidence || checklistMultipleComponentsChanged || evidenceMultipleComponentsChanged || checklistTriallingChanged || evidenceTriallingChanged || digitalOutcomeChecklistChanged || digitalOutcomeEvidenceChanged) {
                 const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
                 await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});
             }

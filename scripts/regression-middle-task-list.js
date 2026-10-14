@@ -77,6 +77,34 @@ assert.equal(testingChecklistState["91907"][0].done, false);
 assert.match(taskList, /window\.addEventListener\("pageshow",[\s\S]*loadChecklistForTask\(taskListState\.selectedId\)/,
     "Returning to the Task List refreshes evidence after opening a topic page");
 
+const triallingCriterion = "Achieved: Trial the components of the digital technologies outcome.";
+const triallingChecklistState = { "91907": [{ text: triallingCriterion, done: false }] };
+const triallingStart = taskList.indexOf("function isTriallingComponentsRequirementStep(");
+const triallingEnd = taskList.indexOf("\nfunction isEfficientToolsMainStep", triallingStart);
+assert.ok(triallingStart >= 0 && triallingEnd > triallingStart,
+    "Trialling Components criterion auto-tick helpers are present");
+const triallingContext = vm.createContext({
+    getStepLevel: (text) => String(text || "").split(":")[0].trim(),
+    stripStepLevel: (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim(),
+    isTestingFunctionsRequirementStep: () => false
+});
+const triallingManagementStart = taskList.indexOf("function getStepAutoManagementKind(");
+const triallingManagementEnd = taskList.indexOf("\nfunction getSessionTickKey", triallingManagementStart);
+assert.ok(triallingManagementStart >= 0 && triallingManagementEnd > triallingManagementStart,
+    "Task List criterion auto-management classifier is present");
+vm.runInContext([
+    taskList.slice(triallingStart, triallingEnd),
+    taskList.slice(triallingManagementStart, triallingManagementEnd)
+].join("\n"), triallingContext);
+assert.equal(triallingContext.getStepAutoManagementKind("91907", triallingCriterion), "auto",
+    "The Level 3 Trialling Components criterion is automatically managed from slide content");
+assert.equal(triallingContext.autoTickTriallingComponentsRequirement(triallingChecklistState, 4), true,
+    "A non-empty Trialling Components slideshow ticks the Achieved criterion");
+assert.equal(triallingChecklistState["91907"][0].done, true);
+assert.equal(triallingContext.autoTickTriallingComponentsRequirement(triallingChecklistState, 0), true,
+    "An empty Trialling Components slideshow clears the Achieved criterion");
+assert.equal(triallingChecklistState["91907"][0].done, false);
+
 const libraryDedupeStart = script.indexOf("function dedupeTaskTopicLibraryItems(");
 const libraryDedupeEnd = script.indexOf("\nasync function loadSharedLessons", libraryDedupeStart);
 assert.ok(libraryDedupeStart >= 0 && libraryDedupeEnd > libraryDedupeStart,
