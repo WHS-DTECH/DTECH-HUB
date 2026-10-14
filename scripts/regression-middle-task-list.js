@@ -192,6 +192,17 @@ assert.equal(
     true,
     "A generated Tools & Techniques copy still opens as the student's existing copy"
 );
+const templateSearchStart = templateLibrary.indexOf("function normalizeTemplateSearchText(");
+const templateSearchEnd = templateLibrary.indexOf("\nasync function loadProcessAssessmentFiles", templateSearchStart);
+assert.ok(templateSearchStart >= 0 && templateSearchEnd > templateSearchStart,
+    "Template search normalization helpers are present");
+const templateSearchContext = vm.createContext({});
+vm.runInContext(templateLibrary.slice(templateSearchStart, templateSearchEnd), templateSearchContext);
+assert.equal(templateSearchContext.matchesTemplateSearch({
+    title: "User Experience (UX) Principles",
+    criteriaText: "Apply user experience principles relevant to the outcome."
+}, "UX Principles (Web)"), true,
+"A media-tagged UX Principles query finds the User Experience (UX) Principles template");
 const templateIdentityStart = server.indexOf("const TEMPLATE_ID_FROM_TITLE_PATTERNS = [");
 const templateIdentityEnd = server.indexOf("\n// POST /api/activities/:id/sync-drive-templates", templateIdentityStart);
 assert.ok(templateIdentityStart >= 0 && templateIdentityEnd > templateIdentityStart,

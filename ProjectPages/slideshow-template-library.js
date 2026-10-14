@@ -1628,6 +1628,24 @@ function focusRequestedTemplateCard() {
     target.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
+function normalizeTemplateSearchText(value) {
+    return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s*\((?:web|video|image)\)\s*$/i, "")
+        .replace(/[^a-z0-9]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+function matchesTemplateSearch(item, searchText) {
+    const query = normalizeTemplateSearchText(searchText);
+    if (!query) return true;
+
+    return normalizeTemplateSearchText(item?.title).includes(query)
+        || normalizeTemplateSearchText(item?.criteriaText).includes(query);
+}
+
 async function loadProcessAssessmentFiles() {
     try {
         // Request Google Drive token to access Process Assessment folder
@@ -1680,19 +1698,9 @@ function renderLibrary() {
     }
 
     templateLibraryData = Array.isArray(templateLibraryData) ? [...templateLibraryData].sort(compareTemplateEntries) : [];
-    // Task topic titles like "Conventions (WEB)"/"(VIDEO)"/"(IMAGE)" are UI-only media-type
-    // labels; the underlying template title/criteria never include that suffix, so strip it
-    // before matching, and also match against the assessment criteria text, not just the title.
-    const normalizedQuery = String(templateSearchQuery || "")
-        .trim()
-        .toLowerCase()
-        .replace(/\s*\((?:web|video|image)\)\s*$/i, "");
+    const normalizedQuery = normalizeTemplateSearchText(templateSearchQuery);
     const filteredTemplates = normalizedQuery
-        ? templateLibraryData.filter((item) => {
-            const title = String(item?.title || "").toLowerCase();
-            const criteriaText = String(item?.criteriaText || "").toLowerCase();
-            return title.includes(normalizedQuery) || criteriaText.includes(normalizedQuery);
-        })
+        ? templateLibraryData.filter((item) => matchesTemplateSearch(item, templateSearchQuery))
         : templateLibraryData;
 
     if (!Array.isArray(templateLibraryData) || !templateLibraryData.length) {
