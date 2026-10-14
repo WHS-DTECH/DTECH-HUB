@@ -203,6 +203,13 @@ assert.equal(
     "tools-and-techniques",
     "Drive sync recognizes student-owned Tools & Techniques decks with a name prefix"
 );
+const endUserImplicationsCopy = templateIdentityContext.inferTemplateCopyFromFileName(
+    "Relevant Implications - End-User Considerations - Otto"
+);
+assert.equal(endUserImplicationsCopy.templateId, "relevant-implications-end-user-considerations",
+    "Drive sync keeps the hyphen inside End-User Considerations when identifying its template");
+assert.equal(endUserImplicationsCopy.templateTitle, "Relevant Implications - End-User Considerations",
+    "The recorded copy title matches the Task List category used for auto-ticking");
 
 const digitalOutcomeRows = [
     { text: "Describe the digital outcome" },

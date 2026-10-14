@@ -10134,8 +10134,8 @@ app.post("/api/student/drive-setup/find-slide", async (req, res) => {
 });
 
 const TEMPLATE_ID_FROM_TITLE_PATTERNS = [
-  { pattern: /^relevant\s+implications\s*-\s*(.+?)(?:\s*-\s*.+)?$/i, prefix: "relevant-implications-" },
-  { pattern: /^testing\s+functions\s*-\s*(.+?)(?:\s*-\s*.+)?$/i, prefix: "testing-functions-" },
+  { pattern: /^relevant\s+implications\s*-\s*(.+?)(?:\s+-\s+.+)?$/i, prefix: "relevant-implications-" },
+  { pattern: /^testing\s+functions\s*-\s*(.+?)(?:\s+-\s+.+)?$/i, prefix: "testing-functions-" },
   { pattern: /^digital\s+outcome\s+description(?:\s*-\s*.+)?$/i, id: "digital-outcome-description", title: "Digital Outcome Description" },
   { pattern: /^target\s+audience(?:\s*-\s*.+)?$/i, id: "target-audience", title: "Target Audience" },
   { pattern: /^development\s+steps(?:\s*-\s*.+)?$/i, id: "development-steps", title: "Development Steps" },
