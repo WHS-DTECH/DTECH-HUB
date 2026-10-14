@@ -705,6 +705,23 @@ function resolveTaskTopicMergeDecision(project, shortName, topics) {
     return shouldMerge;
 }
 
+function shouldHideStudentAssessmentTask(standard, text) {
+    const safeStandard = String(standard || "").trim();
+    const normalizedText = String(text || "")
+        .trim()
+        .replace(/^(?:Achieved|Merit|Excellence)\s*:\s*/i, "")
+        .replace(/\s+/g, " ")
+        .replace(/[.]+$/, "")
+        .toLowerCase();
+
+    return safeStandard === "91897"
+        && normalizedText === "list the key features or requirements the outcome must include";
+}
+
+if (typeof window !== "undefined") {
+    window.hubShouldHideStudentAssessmentTask = shouldHideStudentAssessmentTask;
+}
+
 function inferSourceTypeFromRecord(record) {
     const explicitType = String(record?.sourceType || "").toLowerCase();
     if (explicitType === "project" || explicitType === "activity" || explicitType === "assessment" || explicitType === "standard" || explicitType === "lesson" || explicitType === "relief-lesson" || explicitType === "task-topic") {

@@ -3218,6 +3218,8 @@ function normalize91893ChecklistRows(rows, standardCode = "91893") {
 
 function buildChecklistState(standardCodes, evidenceMap) {
     const next = {};
+    const visibleStudentRows = (standard, rows) => (Array.isArray(rows) ? rows : [])
+        .filter((step) => !window.hubShouldHideStudentAssessmentTask?.(standard, step?.text));
     standardCodes.forEach((standard) => {
         const existing = Array.isArray(evidenceMap[standard]) ? evidenceMap[standard] : [];
         if (existing.length) {
@@ -3228,7 +3230,7 @@ function buildChecklistState(standardCodes, evidenceMap) {
 
             if (standard === "91897" || standard === "91907") {
                 const legacyMigrated = standard === "91907" ? normalize91907ChecklistRows(existing) : existing;
-                next[standard] = normalize91897ChecklistRows(legacyMigrated);
+                next[standard] = visibleStudentRows(standard, normalize91897ChecklistRows(legacyMigrated));
                 return;
             }
 
@@ -3248,11 +3250,12 @@ function buildChecklistState(standardCodes, evidenceMap) {
 
         const defaults = Array.isArray(EVIDENCE_STEPS_DEFAULTS[standard]) ? EVIDENCE_STEPS_DEFAULTS[standard] : ["Add a step..."];
         const defaultRows = defaults.map((text) => ({ text, done: false }));
-        next[standard] = standard === "91897"
+        const normalizedDefaults = standard === "91897"
             ? normalize91897ChecklistRows(defaultRows)
             : standard === "91907"
                 ? normalize91897ChecklistRows(normalize91907ChecklistRows(defaultRows))
                 : defaultRows;
+        next[standard] = visibleStudentRows(standard, normalizedDefaults);
     });
     return next;
 }

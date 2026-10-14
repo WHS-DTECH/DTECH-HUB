@@ -7383,6 +7383,9 @@ async function renderEvidenceSidebar({ host, projectId, viewerEmail, studentEmai
         const filtered = steps
             .map((step, index) => ({ step, index }))
             .filter(({ step }) => {
+                if (isSelfTaskListView && window.hubShouldHideStudentAssessmentTask?.(standardCode, step?.text)) {
+                    return false;
+                }
                 if (!levelFilter) {
                     return true;
                 }

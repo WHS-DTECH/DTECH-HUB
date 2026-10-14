@@ -175,7 +175,9 @@ function renderStudentStandardGuide({ standardNumber, standardName, yearLevel, c
         { key: "excellence", label: "Excellence", text: excellenceText, checklist: excellenceChecklist }
     ];
     criteria.innerHTML = levels.map((level) => {
-        const rows = Array.isArray(level.checklist) ? level.checklist.filter(Boolean) : [];
+        const rows = Array.isArray(level.checklist)
+            ? level.checklist.filter(Boolean).filter((row) => !window.hubShouldHideStudentAssessmentTask?.(standardNumber, row))
+            : [];
         return `
             <section class="student-standard-level ${level.key}">
                 <h2>${level.label}</h2>

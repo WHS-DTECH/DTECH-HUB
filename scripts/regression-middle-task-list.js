@@ -11,6 +11,24 @@ const server = fs.readFileSync(path.join(root, "server.js"), "utf8");
 const script = fs.readFileSync(path.join(root, "script.js"), "utf8");
 const html = fs.readFileSync(path.join(root, "task-list.html"), "utf8");
 const templateLibrary = fs.readFileSync(path.join(root, "ProjectPages", "slideshow-template-library.js"), "utf8");
+const activityDetail = fs.readFileSync(path.join(root, "ProjectPages", "activity-detail.js"), "utf8");
+const standardCard = fs.readFileSync(path.join(root, "assessment-standard-card.js"), "utf8");
+
+const hiddenTaskFilterStart = script.indexOf("function shouldHideStudentAssessmentTask(");
+const hiddenTaskFilterEnd = script.indexOf("\nif (typeof window !== \"undefined\")", hiddenTaskFilterStart);
+assert.ok(hiddenTaskFilterStart >= 0 && hiddenTaskFilterEnd > hiddenTaskFilterStart,
+    "Shared hidden-student-task filter is present");
+const hiddenTaskContext = vm.createContext({});
+vm.runInContext(script.slice(hiddenTaskFilterStart, hiddenTaskFilterEnd), hiddenTaskContext);
+assert.equal(hiddenTaskContext.shouldHideStudentAssessmentTask("91897", "Achieved: List the key features or requirements the outcome must include."), true);
+assert.equal(hiddenTaskContext.shouldHideStudentAssessmentTask("91897", "Achieved: Decompose the outcome into smaller components."), false);
+assert.equal(hiddenTaskContext.shouldHideStudentAssessmentTask("91907", "Achieved: List the key features or requirements the outcome must include."), false);
+assert.match(taskList, /visibleStudentRows\(standard, normalize91897ChecklistRows/,
+    "Task List excludes the row even when it exists in previously saved evidence");
+assert.match(standardCard, /hubShouldHideStudentAssessmentTask\?\.\(standardNumber, row\)/,
+    "Student Assessment Standard guide excludes the row");
+assert.match(activityDetail, /isSelfTaskListView && window\.hubShouldHideStudentAssessmentTask/,
+    "Student activity-detail evidence sidebar excludes the row without changing teacher view");
 
 const helperStart = taskList.indexOf("function getTaskListCourseFromAllocations(");
 const helperEnd = taskList.indexOf("// Minimal Drive OAuth client", helperStart);
