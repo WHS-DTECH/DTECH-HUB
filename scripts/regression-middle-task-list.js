@@ -323,6 +323,42 @@ assert.match(taskList, /TESTING_FUNCTIONS_COUNT\|\$\{functionalCount\}\|\$\{user
     "Task List saves full slide-set Testing Functions counts for the normal auto-tick path");
 assert.match(html, /id="task-list-slide-set-url"/,
     "The Task List provides a full slide-set URL field");
+assert.match(server, /templateId: "assessment-full-slide-set"[\s\S]*?templateTitle: "Full Assessment Slide Set"/,
+    "Full slide-set sync stores the source deck separately from its recognized task sections");
+assert.match(taskList, /renderSavedFullSlideSet\(taskListState\.templateCopies\)/,
+    "Task List reloads the saved full slide set for the selected activity");
+const savedSetHelperStart = taskList.indexOf("function renderSavedFullSlideSet(");
+const savedSetHelperEnd = taskList.indexOf("\nasync function fetchMyEvidence", savedSetHelperStart);
+assert.ok(savedSetHelperStart >= 0 && savedSetHelperEnd > savedSetHelperStart,
+    "Saved full slide-set rendering helper is present");
+const savedSetElements = {
+    input: { value: "" },
+    saved: { innerHTML: "", hidden: true },
+    button: { textContent: "" }
+};
+const savedSetContext = vm.createContext({
+    document: {
+        querySelector(selector) {
+            return {
+                "#task-list-slide-set-url": savedSetElements.input,
+                "#task-list-slide-set-saved": savedSetElements.saved,
+                "#task-list-sync-slide-set": savedSetElements.button
+            }[selector] || null;
+        }
+    },
+    escapeTaskListHtml: (value) => String(value || "")
+});
+vm.runInContext(taskList.slice(savedSetHelperStart, savedSetHelperEnd), savedSetContext);
+savedSetContext.renderSavedFullSlideSet([{
+    templateId: "assessment-full-slide-set",
+    templateTitle: "Full Assessment Slide Set",
+    fileName: "Web & Processing standard Checklist",
+    fileUrl: "https://docs.google.com/presentation/d/full-set-id/edit"
+}]);
+assert.equal(savedSetElements.input.value, "https://docs.google.com/presentation/d/full-set-id/edit");
+assert.equal(savedSetElements.button.textContent, "Sync saved slide set");
+assert.equal(savedSetElements.saved.hidden, false);
+assert.match(savedSetElements.saved.innerHTML, /Open saved set/);
 
 const digitalOutcomeRows = [
     { text: "Describe the digital outcome" },

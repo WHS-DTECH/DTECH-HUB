@@ -10327,22 +10327,24 @@ app.post("/api/activities/:id/sync-slide-set", async (req, res) => {
     const presentation = await googleSlidesApiRequest(presentationId, driveAccessToken);
     const fileUrl = String(file?.webViewLink || presentationUrl).trim();
     const fileName = String(file?.name || "Full slide set").trim();
+    const fullSlideSetEntry = {
+      templateId: "assessment-full-slide-set",
+      templateTitle: "Full Assessment Slide Set",
+      fileUrl,
+      fileName
+    };
     const inferred = inferTemplateCopiesFromSlideSet(presentation, fileUrl, fileName);
-    if (!inferred.length) {
-      res.status(422).json({ error: "No recognized assessment slide headings were found in that deck." });
-      return;
-    }
     const testingFunctionsCounts = inferred.some((entry) => entry.templateId === "testing-functions")
       ? extractGoogleSlidesTestingFunctionLists(presentation)
       : null;
 
     if (hasDatabase) {
-      for (const entry of inferred) {
+      for (const entry of [fullSlideSetEntry, ...inferred]) {
         await recordTemplateCopyInDb(projectId, requesterEmail, entry);
       }
     }
 
-    let allCopies = inferred;
+    let allCopies = [fullSlideSetEntry, ...inferred];
     if (hasDatabase) {
       const result = await pool.query(
         `SELECT template_copies FROM project_interests WHERE project_id = $1 AND student_email = $2 LIMIT 1`,
@@ -10356,6 +10358,7 @@ app.post("/api/activities/:id/sync-slide-set", async (req, res) => {
       synced: inferred.length,
       template_copies: allCopies,
       matched: inferred.map((entry) => entry.templateTitle),
+      full_slide_set: { fileUrl, fileName },
       testing_functions_counts: testingFunctionsCounts
         ? { functionalCount: testingFunctionsCounts.functionalTesting.length, userCount: testingFunctionsCounts.userTesting.length }
         : null

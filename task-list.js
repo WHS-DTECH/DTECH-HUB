@@ -2399,6 +2399,24 @@ async function autoSyncToolsAndTechniquesTemplateCopy(activityId, email, current
     }
 }
 
+function renderSavedFullSlideSet(copies) {
+    const input = document.querySelector("#task-list-slide-set-url");
+    const savedHost = document.querySelector("#task-list-slide-set-saved");
+    const syncButton = document.querySelector("#task-list-sync-slide-set");
+    const savedEntry = (Array.isArray(copies) ? copies : [])
+        .find((copy) => String(copy?.templateId || "").trim().toLowerCase() === "assessment-full-slide-set");
+    const savedUrl = String(savedEntry?.fileUrl || "").trim();
+
+    if (input) input.value = savedUrl;
+    if (syncButton) syncButton.textContent = savedUrl ? "Sync saved slide set" : "Save and sync slide set";
+    if (savedHost) {
+        savedHost.innerHTML = savedUrl
+            ? `<span>Saved: ${escapeTaskListHtml(String(savedEntry?.fileName || "Full slide set"))}</span> <a href="${escapeTaskListHtml(savedUrl)}" target="_blank" rel="noopener">Open saved set</a>`
+            : "";
+        savedHost.hidden = !savedUrl;
+    }
+}
+
 async function fetchMyEvidence(projectId) {
     if (!projectId) return [];
     const payload = await loadJson(`/api/activities/${encodeURIComponent(projectId)}/my-evidence`, { headers: buildTaskListHeaders({}) });
@@ -3347,6 +3365,7 @@ async function loadChecklistForTask(taskId) {
         signedInEmail,
         Array.isArray(templateCopiesPayload?.template_copies) ? templateCopiesPayload.template_copies : []
     );
+    renderSavedFullSlideSet(taskListState.templateCopies);
 
     const autoChangedChecklistPM = autoTickProjectManagementRequirement(taskListState.checklistState);
     const autoChangedChecklistTesting = autoTickTestingFunctionsRequirement(
@@ -3848,13 +3867,16 @@ async function runTaskListTrelloSync() {
 
             await loadChecklistForTask(taskListState.selectedId);
             const matchedTitles = Array.isArray(payload?.matched) ? payload.matched : [];
-            setStatus(`Slide set synced. Linked ${matchedTitles.length} recognized section${matchedTitles.length === 1 ? "" : "s"} to this Task List.`);
+            setStatus(matchedTitles.length
+                ? `Saved slide set and linked ${matchedTitles.length} recognized section${matchedTitles.length === 1 ? "" : "s"} to this Task List.`
+                : "Saved the slide-set link, but found no recognized task headings. No tasks were ticked.");
         } catch (error) {
             setStatus(error?.message || "Could not sync the full slide set.", true);
         } finally {
             if (slideSetButton?.isConnected) {
                 slideSetButton.disabled = false;
-                slideSetButton.textContent = "Sync slide set";
+                const savedLink = Boolean(document.querySelector("#task-list-slide-set-saved a"));
+                slideSetButton.textContent = savedLink ? "Sync saved slide set" : "Save and sync slide set";
             }
         }
     });

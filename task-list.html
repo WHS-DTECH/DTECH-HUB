@@ -438,6 +438,16 @@
             border-radius: 6px;
             font: inherit;
         }
+        .task-list-slide-set-saved {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            margin: 7px 0 0;
+            color: #345778;
+            font-size: 0.75rem;
+        }
+        .task-list-slide-set-saved[hidden] { display: none; }
         .task-list-slide-set-status {
             margin: 6px 0 0;
             color: #345778;
@@ -910,8 +920,9 @@
                             <summary>Link an existing full slide set</summary>
                             <div class="task-list-slide-set-form">
                                 <input id="task-list-slide-set-url" type="url" inputmode="url" placeholder="Paste a Google Slides presentation link" aria-label="Full slide set Google Slides link">
-                                <button type="button" class="task-list-sync-drive-btn" id="task-list-sync-slide-set">Sync slide set</button>
+                                <button type="button" class="task-list-sync-drive-btn" id="task-list-sync-slide-set">Save and sync slide set</button>
                             </div>
+                            <p id="task-list-slide-set-saved" class="task-list-slide-set-saved" hidden></p>
                             <p class="task-list-slide-set-status">Recognized slide titles will be linked to their matching Task List items.</p>
                         </details>
                         <div id="task-list-checklist" class="task-list-checklist-grid"></div>
