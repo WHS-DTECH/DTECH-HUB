@@ -1254,6 +1254,13 @@ async function handleUseTemplate(templateId) {
     }
 
     // If already copied this session, open existing
+    const rememberedCopyId = extractSlidesFileId(driveState.copyMap[templateId]?.fileUrl || "");
+    if (rememberedCopyId && driveState.processAssessmentFilesLoaded
+        && !driveState.processAssessmentFiles.some((file) => String(file?.id || "") === rememberedCopyId)) {
+        // The remembered copy was deleted in Drive, so make a fresh one.
+        delete driveState.copyMap[templateId];
+        persistCurrentTemplateCopyMap();
+    }
     const refreshSuccessCriteriaCopy = templateId === "project-success-criteria";
     if (driveState.copyMap[templateId] && !refreshSuccessCriteriaCopy) {
         clearTemplateResetMarker(templateId);
@@ -1676,6 +1683,7 @@ async function loadProcessAssessmentFiles() {
         const data = await response.json();
         if (data?.ok && Array.isArray(data.slides)) {
             driveState.processAssessmentFiles = data.slides;
+            driveState.processAssessmentFilesLoaded = true;
             console.log(`Loaded ${data.slides.length} files from Process Assessment folder:`, data.slides.map(f => f.name));
         } else {
             console.warn("Unexpected response format:", data);
