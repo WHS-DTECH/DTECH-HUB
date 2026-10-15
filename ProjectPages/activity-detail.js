@@ -2310,9 +2310,9 @@ function removeStoredCodeFileLinkLibraryLink(prefix, projectId, email, value) {
     return writeStoredCodeFileLinkLibrary(prefix, projectId, email, current);
 }
 
-async function renderUseOfToolsTechniquesPanel(host, projectId, allocation, anchorSection) {
-    if (!host || !anchorSection) return;
-    host.querySelector("#use-of-tools-techniques-section")?.remove();
+async function renderUseOfToolsTechniquesPanel(host, projectId, allocation) {
+    const slot = host?.querySelector("#use-of-tools-techniques-slot");
+    if (!slot) return;
 
     const digitalMediaType = String(allocation?.digital_media_type || "").trim();
     const projectTaskStandard = String(allocation?.standard_2 || "").match(/\b(91893|91903)\b/)?.[1] || "";
@@ -2335,19 +2335,19 @@ async function renderUseOfToolsTechniquesPanel(host, projectId, allocation, anch
     }
 
     const detectedCount = labels.filter((label) => detected[label]).length;
-    const section = document.createElement("section");
-    section.className = "proposal-section interest-section";
-    section.id = "use-of-tools-techniques-section";
-    section.innerHTML = `
-        <h2>Student Details</h2>
-        <p class="interest-count">${projectTaskStandard ? `<strong>Project/Task Std:</strong> ${escapeHtml(projectTaskStandard)} &nbsp; ` : ""}<strong>Digital Media:</strong> ${escapeHtml(digitalMediaType ? digitalMediaType.toUpperCase() : "Not set")}</p>
-        <h2>Tools &amp; Techniques Detected${digitalMediaType ? ` (${escapeHtml(digitalMediaType.toUpperCase())})` : ""}</h2>
-        <p class="task-topic-submission-note">${detectedCount} of ${labels.length} detected in your project. Run <strong>Sync from GitHub</strong> on the Task List page to refresh this list.</p>
-        <div class="task-list-decomposition-subtask-list">
-            ${labels.map((label) => `<label class="task-list-decomposition-subtask ${detected[label] ? "is-complete" : ""}"><input type="checkbox" disabled ${detected[label] ? "checked" : ""}><span>${escapeHtml(label)}</span></label>`).join("")}
-        </div>
+    const mediaLabel = digitalMediaType ? digitalMediaType.toUpperCase() : "";
+    slot.innerHTML = `
+        <section class="task-topic-guide-block">
+            <h3>Subtasks</h3>
+            <p class="task-topic-submission-note"><strong>Project/Task Std:</strong> ${escapeHtml(projectTaskStandard || "Not set")} &nbsp; <strong>Digital Media Type:</strong> ${escapeHtml(mediaLabel || "Not set")}</p>
+            <p class="task-topic-submission-note">Tools &amp; Techniques${mediaLabel ? ` (${escapeHtml(mediaLabel)})` : ""}: ${detectedCount} of ${labels.length} detected in your project.</p>
+            <div class="task-list-decomposition-subtask-list">
+                ${labels.map((label) => `<label class="task-list-decomposition-subtask ${detected[label] ? "is-complete" : ""}"><input type="checkbox" disabled ${detected[label] ? "checked" : ""}><span>${escapeHtml(label)}</span></label>`).join("")}
+            </div>
+            ${projectTaskStandard === "91893" ? `<p class="task-topic-submission-note">Complete any 3 or more categories.</p>` : ""}
+            <p class="task-topic-submission-note">Auto-detected from your GitHub repo where possible. Click Sync from GitHub on the Task List to refresh these boxes.</p>
+        </section>
     `;
-    anchorSection.insertAdjacentElement("afterend", section);
 }
 
 function renderCodeValidationSyncPanel(host, projectId, email, kind) {
@@ -10391,9 +10391,10 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                             ${isDigitalOutcomeSuccessCriteriaTopic
                                 ? `<div class="digital-outcome-must-dos" id="success-criteria-must-dos" aria-live="polite"><p class="task-topic-submission-note">Loading MUST-DOs from your Digital Outcome Description slideshow...</p></div><div class="digital-outcome-must-dos" id="success-criteria-relevant-implications" aria-live="polite"><p class="task-topic-submission-note">Loading Relevant Implications slideshows...</p></div>`
                                 : ""}
-                            ${isDigitalOutcomeDevelopmentToolsTopic
+                            ${isDigitalOutcomeDevelopmentToolsTopic && !isUseOfToolsTechniquesTopic
                                 ? `<div class="digital-outcome-must-dos" id="development-steps-must-dos" aria-live="polite"><p class="task-topic-submission-note">Loading MUST-DOs from your Digital Outcome Description slideshow...</p></div>`
                                 : ""}
+                            ${isUseOfToolsTechniquesTopic ? `<div id="use-of-tools-techniques-slot"></div>` : ""}
                             ${isDigitalOutcomeTriallingComponentsTopic
                                 ? `<div class="digital-outcome-must-dos" id="trialling-components-table" aria-live="polite"><p class="task-topic-submission-note">Loading components from your Development Steps slideshow...</p></div>`
                                 : ""}
@@ -13460,7 +13461,7 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
     });
 
     if (email && !isTeacher && isTaskTopicPage && isUseOfToolsTechniquesCriterion(selectedTaskTopic, selectedTaskShortName)) {
-        await renderUseOfToolsTechniquesPanel(host, projectId, interestData?.my_allocation || null, section);
+        await renderUseOfToolsTechniquesPanel(host, projectId, interestData?.my_allocation || null);
     }
 
     if (isCodeValidationTaskTopicPage && email) {
