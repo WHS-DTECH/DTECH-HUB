@@ -2411,7 +2411,19 @@ function renderSavedFullSlideSet(copies) {
     if (syncButton) syncButton.textContent = savedUrl ? "Sync saved slide set" : "Save and sync slide set";
     if (savedHost) {
         savedHost.innerHTML = savedUrl
-            ? `<span>Saved: ${escapeTaskListHtml(String(savedEntry?.fileName || "Full slide set"))}</span> <a href="${escapeTaskListHtml(savedUrl)}" target="_blank" rel="noopener">Open saved set</a>`
+            ? `
+                <div class="task-list-slide-set-card">
+                    <div class="task-list-slide-set-card-main">
+                        <span class="task-list-slide-set-card-title">${escapeTaskListHtml(String(savedEntry?.fileName || "Full slide set"))}</span>
+                        <span>Saved for this assessment</span>
+                    </div>
+                    <div class="task-list-slide-set-card-actions">
+                        <button type="button" data-slide-set-use>Use</button>
+                        <a href="${escapeTaskListHtml(savedUrl)}" target="_blank" rel="noopener">Open</a>
+                        <button type="button" data-slide-set-delete>Delete</button>
+                    </div>
+                </div>
+            `
             : "";
         savedHost.hidden = !savedUrl;
     }
@@ -3821,6 +3833,43 @@ async function runTaskListTrelloSync() {
     });
 
     document.addEventListener("click", async (event) => {
+        const useSavedSetButton = event.target?.closest?.("[data-slide-set-use]");
+        if (useSavedSetButton) {
+            const savedEntry = taskListState.templateCopies.find((copy) =>
+                String(copy?.templateId || "").trim().toLowerCase() === "assessment-full-slide-set");
+            const input = document.querySelector("#task-list-slide-set-url");
+            if (input && savedEntry?.fileUrl) {
+                input.value = String(savedEntry.fileUrl);
+                input.focus();
+                setStatus("Saved full slide set selected. Sync it to refresh the Task List.");
+            }
+            return;
+        }
+
+        const deleteSavedSetButton = event.target?.closest?.("[data-slide-set-delete]");
+        if (deleteSavedSetButton && taskListState.selectedId) {
+            if (!window.confirm("Remove the saved full slide-set link from this Task List? The Google Slides file will remain in Drive.")) return;
+            deleteSavedSetButton.disabled = true;
+            try {
+                await loadJson(`/api/activities/${encodeURIComponent(taskListState.selectedId)}/reset-template-use`, {
+                    method: "POST",
+                    headers: buildTaskListHeaders({ "Content-Type": "application/json" }),
+                    body: JSON.stringify({ templateId: "assessment-full-slide-set" })
+                });
+                const payload = await loadJson(
+                    `/api/activities/${encodeURIComponent(taskListState.selectedId)}/my-template-copies`,
+                    { headers: buildTaskListHeaders({}) }
+                );
+                taskListState.templateCopies = Array.isArray(payload?.template_copies) ? payload.template_copies : [];
+                renderSavedFullSlideSet(taskListState.templateCopies);
+                setStatus("Saved slide-set link removed. The presentation remains in Google Drive.");
+            } catch (error) {
+                setStatus(error?.message || "Could not remove the saved slide-set link.", true);
+                deleteSavedSetButton.disabled = false;
+            }
+            return;
+        }
+
         const slideSetButton = event.target?.closest?.("#task-list-sync-slide-set");
         if (!slideSetButton || !taskListState.selectedId) return;
 

@@ -439,15 +439,56 @@
             font: inherit;
         }
         .task-list-slide-set-saved {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            align-items: center;
-            margin: 7px 0 0;
-            color: #345778;
-            font-size: 0.75rem;
+            margin-top: 8px;
         }
         .task-list-slide-set-saved[hidden] { display: none; }
+        .task-list-slide-set-card {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px 14px;
+            padding: 9px 10px;
+            border: 1px solid #b8dec4;
+            border-radius: 7px;
+            background: #eef8f0;
+            color: #244a32;
+            font-size: 0.75rem;
+        }
+        .task-list-slide-set-card-main {
+            display: grid;
+            gap: 3px;
+            min-width: 0;
+        }
+        .task-list-slide-set-card-title {
+            overflow-wrap: anywhere;
+            font-weight: 700;
+        }
+        .task-list-slide-set-card-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+        }
+        .task-list-slide-set-card-actions a {
+            color: #1a5fa8;
+            font-weight: 700;
+            text-decoration: underline;
+        }
+        .task-list-slide-set-card-actions button {
+            border: 1px solid #9cb7d0;
+            border-radius: 5px;
+            background: #fff;
+            color: #1a5fa8;
+            padding: 3px 9px;
+            font: inherit;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .task-list-slide-set-card-actions button[data-slide-set-delete] {
+            border-color: #d7a0a0;
+            color: #9b2f2f;
+        }
         .task-list-slide-set-status {
             margin: 6px 0 0;
             color: #345778;
@@ -922,7 +963,7 @@
                                 <input id="task-list-slide-set-url" type="url" inputmode="url" placeholder="Paste a Google Slides presentation link" aria-label="Full slide set Google Slides link">
                                 <button type="button" class="task-list-sync-drive-btn" id="task-list-sync-slide-set">Save and sync slide set</button>
                             </div>
-                            <p id="task-list-slide-set-saved" class="task-list-slide-set-saved" hidden></p>
+                            <div id="task-list-slide-set-saved" class="task-list-slide-set-saved" hidden></div>
                             <p class="task-list-slide-set-status">Recognized slide titles will be linked to their matching Task List items.</p>
                         </details>
                         <div id="task-list-checklist" class="task-list-checklist-grid"></div>

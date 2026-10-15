@@ -358,7 +358,13 @@ savedSetContext.renderSavedFullSlideSet([{
 assert.equal(savedSetElements.input.value, "https://docs.google.com/presentation/d/full-set-id/edit");
 assert.equal(savedSetElements.button.textContent, "Sync saved slide set");
 assert.equal(savedSetElements.saved.hidden, false);
-assert.match(savedSetElements.saved.innerHTML, /Open saved set/);
+assert.match(savedSetElements.saved.innerHTML, /data-slide-set-use/);
+assert.match(savedSetElements.saved.innerHTML, />Open</);
+assert.match(savedSetElements.saved.innerHTML, /data-slide-set-delete/);
+assert.match(taskList, /templateId: "assessment-full-slide-set"/,
+    "Delete targets only the Task List saved-link record");
+assert.doesNotMatch(taskList, /driveDeleteFile|DELETE.*drive\.googleapis/i,
+    "Deleting a saved slide-set link never deletes its Google Slides file");
 
 const digitalOutcomeRows = [
     { text: "Describe the digital outcome" },
