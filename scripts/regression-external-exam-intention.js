@@ -1,0 +1,89 @@
+"use strict";
+
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const vm = require("node:vm");
+
+const root = path.join(__dirname, "..");
+const server = fs.readFileSync(path.join(root, "server.js"), "utf8");
+const script = fs.readFileSync(path.join(root, "script.js"), "utf8");
+
+const normalizeStart = server.indexOf("function normalizeExternalExamIntention(");
+const normalizeEnd = server.indexOf("\nasync function ensureStudentTrackerCommentsSchema", normalizeStart);
+assert.ok(normalizeStart >= 0 && normalizeEnd > normalizeStart, "External exam decision normalizer exists");
+const normalizeContext = vm.createContext({ String });
+vm.runInContext(server.slice(normalizeStart, normalizeEnd), normalizeContext);
+assert.equal(normalizeContext.normalizeExternalExamIntention("Yes"), "yes");
+assert.equal(normalizeContext.normalizeExternalExamIntention("No, I do not intend to sit"), "no");
+assert.equal(normalizeContext.normalizeExternalExamIntention("Maybe"), "");
+
+const routeStart = server.indexOf('app.post("/api/integrations/external-exam-intention"');
+const routeEnd = server.indexOf('\napp.get("/api/external-assessment-allocations"', routeStart);
+assert.ok(routeStart >= 0 && routeEnd > routeStart, "External exam form webhook route exists");
+const routes = {};
+const memoryIntentions = new Map();
+const routeContext = vm.createContext({
+    app: { post: (url, handler) => { routes[url] = handler; } },
+    process: { env: { EXTERNAL_EXAM_FORM_WEBHOOK_SECRET: "test-webhook-secret" } },
+    normalizeEmail: (value) => String(value || "").trim().toLowerCase(),
+    normalizeExternalExamIntention: normalizeContext.normalizeExternalExamIntention,
+    isSchoolEmail: (value) => String(value || "").endsWith("@westlandhigh.school.nz"),
+    memoryExternalExamIntentions: memoryIntentions,
+    hasDatabase: false,
+    Date,
+    console: { error() {} }
+});
+vm.runInContext(server.slice(routeStart, routeEnd), routeContext);
+
+const callWebhook = async (headers, body) => {
+    const response = {
+        statusCode: 200,
+        status(code) { this.statusCode = code; return this; },
+        json(payload) { this.payload = payload; return this; }
+    };
+    await routes["/api/integrations/external-exam-intention"]({ headers, body }, response);
+    return response;
+};
+
+async function main() {
+    const unauthorized = await callWebhook({}, {
+        student_email: "student@westlandhigh.school.nz",
+        decision: "yes"
+    });
+    assert.equal(unauthorized.statusCode, 401, "The webhook requires its configured secret");
+
+    const studentEmail = "student@westlandhigh.school.nz";
+    const requestHeaders = { "x-external-exam-webhook-secret": "test-webhook-secret" };
+    const declined = await callWebhook(requestHeaders, {
+        student_email: studentEmail,
+        decision: "No",
+        submitted_at: "2026-10-15T09:00:00.000Z"
+    });
+    assert.equal(declined.statusCode, 200);
+    assert.equal(memoryIntentions.get(studentEmail).decision, "no");
+
+    const updated = await callWebhook(requestHeaders, {
+        student_email: studentEmail,
+        decision: "Yes",
+        submitted_at: "2026-10-15T09:10:00.000Z"
+    });
+    assert.equal(updated.statusCode, 200);
+    assert.equal(memoryIntentions.get(studentEmail).decision, "yes", "A revised form response updates the prior decision");
+
+    assert.match(server, /externalExamIntention === "no" \? \[\] : externalStandardNumbers/,
+        "A No response hides external standards without deleting the saved allocation");
+    assert.match(server, /has_external_exam_allocation: externalStandardNumbers\.length > 0[\s\S]*?external_exam_intention: externalExamIntention/,
+        "Allocation and response status are returned separately to the sidebar");
+    assert.match(script, /externalExamFormLink\.hidden = !hasExternalExamAllocation \|\| externalExamIntention === "no"/,
+        "The sidebar form link is limited to students still proceeding with an allocated external exam");
+    assert.match(script, /hasExternalExamAllocation && !externalExamIntention/,
+        "Only allocated students with no recorded answer get the login reminder");
+
+    console.log("External exam intention webhook and visibility regressions passed.");
+}
+
+main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+});

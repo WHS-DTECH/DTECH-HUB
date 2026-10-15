@@ -749,6 +749,72 @@ a {
     background: rgba(255, 255, 255, 0.18);
 }
 
+.hub-external-exam-reminder {
+    width: min(460px, calc(100vw - 32px));
+    max-width: none;
+    padding: 0;
+    border: 1px solid #8ec5ee;
+    border-radius: 12px;
+    background: #f7fbff;
+    color: #173858;
+    box-shadow: 0 18px 50px rgba(10, 30, 55, 0.28);
+}
+.hub-external-exam-reminder::backdrop {
+    background: rgba(13, 24, 39, 0.58);
+}
+.hub-external-exam-reminder-content {
+    padding: 22px;
+}
+.hub-external-exam-reminder-kicker {
+    margin: 0 0 7px;
+    color: #236b9d;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.hub-external-exam-reminder h2 {
+    margin: 0 0 10px;
+    color: #173858;
+    font-size: 1.2rem;
+}
+.hub-external-exam-reminder-content > p:not(.hub-external-exam-reminder-kicker) {
+    margin: 0;
+    color: #36536f;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+.hub-external-exam-reminder-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-top: 18px;
+}
+.hub-external-exam-reminder-actions a,
+.hub-external-exam-reminder-actions button {
+    display: inline-flex;
+    min-height: 38px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #4389b7;
+    border-radius: 7px;
+    padding: 8px 12px;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+}
+.hub-external-exam-reminder-actions a {
+    background: #216c9f;
+    color: #ffffff;
+}
+.hub-external-exam-reminder-actions button {
+    background: #ffffff;
+    color: #24506f;
+}
+
 .hub-sidebar-alloc-section {
     margin-top: 14px;
 }

@@ -204,6 +204,7 @@ const memoryDecompositionCoverage = new Map();
 const memoryTriallingComponents = new Map();
 const memoryDigiMedEfficientTools = new Map();
 const memoryExternalAssessmentAllocations = new Map();
+const memoryExternalExamIntentions = new Map();
 const memoryStudentTrackerComments = new Map();
 const memoryEmailLogs = [];
 const memoryPracticalSkillsProgress = new Map();
@@ -7379,6 +7380,28 @@ async function ensureExternalAssessmentAllocationsSchema() {
   await pool.query(`ALTER TABLE student_external_assessment_allocations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
 }
 
+async function ensureExternalExamIntentionsSchema() {
+  if (!hasDatabase) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS student_external_exam_intentions (
+      student_email TEXT PRIMARY KEY,
+      decision TEXT NOT NULL CHECK (decision IN ('yes', 'no')),
+      submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  await pool.query(`ALTER TABLE student_external_exam_intentions ADD COLUMN IF NOT EXISTS decision TEXT`);
+  await pool.query(`ALTER TABLE student_external_exam_intentions ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+  await pool.query(`ALTER TABLE student_external_exam_intentions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`);
+}
+
+function normalizeExternalExamIntention(value) {
+  const answer = String(value || "").trim().toLowerCase();
+  if (/^(?:no\b|not\b|i do not\b|i don't\b)/.test(answer)) return "no";
+  if (/^(?:yes\b|i intend\b|i will\b|i am\b)/.test(answer)) return "yes";
+  return "";
+}
+
 async function ensureStudentTrackerCommentsSchema() {
   if (!hasDatabase) return;
   await pool.query(`
@@ -12541,6 +12564,65 @@ app.delete("/api/tools-techniques-keywords/:id", requireActivityWriteAccess, asy
 });
 
 // GET /api/my-allocations — returns all projects and assessment tasks the signed-in student is allocated to
+app.post("/api/integrations/external-exam-intention", async (req, res) => {
+  const expectedSecret = String(process.env.EXTERNAL_EXAM_FORM_WEBHOOK_SECRET || "").trim();
+  const suppliedSecret = String(req.headers?.["x-external-exam-webhook-secret"] || "").trim();
+  if (!expectedSecret) {
+    res.status(503).json({ error: "External exam form sync is not configured." });
+    return;
+  }
+  if (suppliedSecret !== expectedSecret) {
+    res.status(401).json({ error: "Unauthorized form response sync." });
+    return;
+  }
+
+  const studentEmail = normalizeEmail(req.body?.student_email || req.body?.email || "");
+  const decision = normalizeExternalExamIntention(req.body?.decision || req.body?.answer || "");
+  const submittedAtValue = String(req.body?.submitted_at || "").trim();
+  const submittedAtDate = submittedAtValue ? new Date(submittedAtValue) : new Date();
+  if (!isSchoolEmail(studentEmail)) {
+    res.status(400).json({ error: "A valid school student email is required." });
+    return;
+  }
+  if (!decision) {
+    res.status(400).json({ error: "The form answer must clearly be Yes or No." });
+    return;
+  }
+  if (Number.isNaN(submittedAtDate.getTime())) {
+    res.status(400).json({ error: "The form submission timestamp is invalid." });
+    return;
+  }
+
+  const record = {
+    student_email: studentEmail,
+    decision,
+    submitted_at: submittedAtDate.toISOString(),
+    updated_at: new Date().toISOString()
+  };
+  if (!hasDatabase) {
+    memoryExternalExamIntentions.set(studentEmail, record);
+    res.json({ ok: true, student_email: studentEmail, decision });
+    return;
+  }
+
+  try {
+    await ensureExternalExamIntentionsSchema();
+    await pool.query(
+      `INSERT INTO student_external_exam_intentions (student_email, decision, submitted_at, updated_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (student_email) DO UPDATE SET
+         decision = EXCLUDED.decision,
+         submitted_at = EXCLUDED.submitted_at,
+         updated_at = NOW()`,
+      [studentEmail, decision, submittedAtDate]
+    );
+    res.json({ ok: true, student_email: studentEmail, decision });
+  } catch (error) {
+    console.error("[external-exam-intention] Could not store form response:", error.message);
+    res.status(500).json({ error: "Could not save external exam intention." });
+  }
+});
+
 app.get("/api/external-assessment-allocations", requireActivityWriteAccess, async (_req, res) => {
   if (!hasDatabase) {
     res.json({ allocations: Array.from(memoryExternalAssessmentAllocations.values()) });
@@ -12749,7 +12831,18 @@ app.get("/api/my-allocations", async (req, res) => {
   }
 
   if (!hasDatabase) {
-    res.json({ assessment_tasks: [], projects: [] });
+    const externalAllocation = memoryExternalAssessmentAllocations.get(email) || {};
+    const intention = memoryExternalExamIntentions.get(email)?.decision || "";
+    const assignedExternalStandards = [externalAllocation.project_exam_standard, externalAllocation.computer_science_exam_standard]
+      .map((standardNumber) => String(standardNumber || "").trim())
+      .filter(Boolean);
+    res.json({
+      assessment_tasks: [],
+      projects: [],
+      has_external_exam_allocation: assignedExternalStandards.length > 0,
+      external_exam_intention: intention,
+      external_standards: intention === "no" ? [] : assignedExternalStandards.map((standard_number) => ({ standard_number }))
+    });
     return;
   }
 
@@ -12848,7 +12941,13 @@ app.get("/api/my-allocations", async (req, res) => {
           .map((standard) => String(standard || "").trim())
           .filter(Boolean)
       : [];
-    const externalStandards = externalStandardNumbers.map((standardNumber) => {
+    await ensureExternalExamIntentionsSchema();
+    const intentionResult = await pool.query(
+      `SELECT decision FROM student_external_exam_intentions WHERE student_email = $1 LIMIT 1`,
+      [email]
+    );
+    const externalExamIntention = String(intentionResult.rows?.[0]?.decision || "").trim().toLowerCase();
+    const externalStandards = (externalExamIntention === "no" ? [] : externalStandardNumbers).map((standardNumber) => {
       const standard = NZQA_STANDARDS_FALLBACK.find((row) =>
         row.stream === "digital" && row.standard_number === standardNumber
       );
@@ -12863,7 +12962,9 @@ app.get("/api/my-allocations", async (req, res) => {
       assessment_tasks: assessmentTasks,
       projects,
       allocated_standards: allocatedStandards,
-      external_standards: externalStandards
+      external_standards: externalStandards,
+      has_external_exam_allocation: externalStandardNumbers.length > 0,
+      external_exam_intention: externalExamIntention
     });
   } catch (error) {
     console.error("[my-allocations] Query failed:", error.message);

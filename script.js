@@ -1330,6 +1330,7 @@ function isRecentEvent(project, maxAgeDays = getConfiguredNewEventWindowDays()) 
 
 const HUB_AUTH_STORAGE_KEY = "hub_google_auth_v1";
 const HUB_UNIFIED_OAUTH_SCOPES = "openid email profile https://www.googleapis.com/auth/drive";
+const SENIOR_EXTERNAL_EXAM_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLScQwfyEI_K0e9AUzSakLx2TivFVj0XwrS_WlL1PkBDjJvgPWw/viewform?usp=sharing&ouid=106667548820420028390";
 
 function getHubStoredAuthRaw() {
     let localValue = null;
@@ -2270,6 +2271,7 @@ function ensureGlobalHubSidebar() {
             <a href="/teacher-view.html" id="hub-global-sidebar-teacher-link" hidden>Teacher View</a>
             <a href="/admin-menu.html" id="hub-global-sidebar-admin-link" hidden>Admin Menu</a>
             <button type="button" id="hub-global-sidebar-tasklist-link" hidden>Open Task List</button>
+            <a href="${escapeHtml(SENIOR_EXTERNAL_EXAM_FORM_URL)}" id="hub-global-sidebar-external-exam-form" target="_blank" rel="noopener noreferrer" hidden>SeniorDTECH External Exam Confirmation Form</a>
         </nav>
         <div id="hub-global-sidebar-allocations" hidden>
             <section class="hub-sidebar-alloc-section" id="hub-sidebar-assessment-section" hidden>
@@ -2622,6 +2624,16 @@ async function loadAndRenderSidebarAllocations(panel) {
         const data = await resp.json();
         const assessments = Array.isArray(data.assessment_tasks) ? data.assessment_tasks : [];
         const projects = Array.isArray(data.projects) ? data.projects : [];
+        const hasExternalExamAllocation = Boolean(data.has_external_exam_allocation);
+        const externalExamIntention = String(data.external_exam_intention || "").trim().toLowerCase();
+        const externalExamFormLink = panel.querySelector("#hub-global-sidebar-external-exam-form");
+        if (externalExamFormLink) {
+            externalExamFormLink.hidden = !hasExternalExamAllocation || externalExamIntention === "no";
+            externalExamFormLink.href = SENIOR_EXTERNAL_EXAM_FORM_URL;
+        }
+        if (hasExternalExamAllocation && !externalExamIntention) {
+            showExternalExamIntentionReminder(email);
+        }
 
         const profileDetails = computeHubSidebarProfileDetails([...assessments, ...projects]);
         panel.dataset.allocationCourse = getTaskListCourseFromAllocations([...assessments, ...projects]);
@@ -2636,7 +2648,7 @@ async function loadAndRenderSidebarAllocations(panel) {
             digitalMediaAllocation?.digital_media_type || profileDetails.digitalMediaStrand || ""
         ).trim();
         renderHubSidebarProfileCard(panel, profileDetails);
-        renderHubSidebarStandardsCard(panel, profileDetails.yearGroup, hubStudentAllocatedStandards, hubStudentExternalStandards);
+        renderHubSidebarStandardsCard(panel, profileDetails.yearGroup, hubStudentAllocatedStandards, hubStudentExternalStandards, externalExamIntention);
         renderCurrentWeek();
         renderHubPracticalSkillsMenu(profileDetails.yearGroup);
         renderStats();
@@ -2665,13 +2677,44 @@ async function loadAndRenderSidebarAllocations(panel) {
     }
 }
 
+function showExternalExamIntentionReminder(email) {
+    const safeEmail = normalizeEmail(email);
+    if (!safeEmail || typeof document.createElement !== "function") return;
+    const reminderKey = `hub_external_exam_reminder_dismissed_v1:${safeEmail}`;
+    try {
+        if (sessionStorage.getItem(reminderKey)) return;
+        sessionStorage.setItem(reminderKey, "1");
+    } catch (_error) {
+    }
+
+    const dialog = document.createElement("dialog");
+    dialog.className = "hub-external-exam-reminder";
+    dialog.setAttribute("aria-labelledby", "hub-external-exam-reminder-title");
+    dialog.innerHTML = `
+        <div class="hub-external-exam-reminder-content">
+            <p class="hub-external-exam-reminder-kicker">SeniorDTECH External Exam</p>
+            <h2 id="hub-external-exam-reminder-title">Please confirm your November exam plans</h2>
+            <p>Our records show that you are allocated to an external exam, but we have not received your confirmation yet. Please complete the short form, even if you do not plan to sit the exam.</p>
+            <div class="hub-external-exam-reminder-actions">
+                <a href="${escapeHtml(SENIOR_EXTERNAL_EXAM_FORM_URL)}" target="_blank" rel="noopener noreferrer">Open confirmation form</a>
+                <button type="button" data-external-exam-reminder-dismiss>Remind me later</button>
+            </div>
+        </div>
+    `;
+    dialog.querySelector("[data-external-exam-reminder-dismiss]")?.addEventListener("click", () => dialog.close());
+    dialog.addEventListener("close", () => dialog.remove(), { once: true });
+    document.body.appendChild(dialog);
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "");
+}
+
 function renderHubPracticalSkillsMenu(yearGroup) {
     const summary = document.querySelector("#hub-practical-skills-summary");
 
     if (summary) summary.textContent = "Licence";
 }
 
-function renderHubSidebarStandardsCard(panel, yearGroup, internalStandards, externalStandards) {
+function renderHubSidebarStandardsCard(panel, yearGroup, internalStandards, externalStandards, externalExamIntention = "") {
     const summaryCardsContainer = panel.querySelector("#hub-sidebar-summary-cards");
     const internalCard = panel.querySelector("#hub-sidebar-internal-card");
     const internalList = panel.querySelector("#hub-sidebar-internal-list");
@@ -2761,7 +2804,10 @@ function renderHubSidebarStandardsCard(panel, yearGroup, internalStandards, exte
         }).join("");
         externalCard.hidden = false;
     } else {
-        externalList.innerHTML = `<div class="hub-sidebar-summary-empty hub-sidebar-external-empty">You ARE NOT enrolled to sit any External DTECH exams</div>`;
+        const externalEmptyMessage = String(externalExamIntention || "").trim().toLowerCase() === "no"
+            ? "You indicated that you do not plan to sit the external exam."
+            : "You are not currently enrolled in an External DTECH exam.";
+        externalList.innerHTML = `<div class="hub-sidebar-summary-empty hub-sidebar-external-empty">${escapeHtml(externalEmptyMessage)}</div>`;
         externalCard.hidden = false;
     }
 
