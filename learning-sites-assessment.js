@@ -86,6 +86,8 @@ function getLearningSitesAssessment() {
     };
 }
 
+const JUNIOR_DTECH_CLASS_CODES = /(?:^|[^A-Z])(?:JPI|JSR|JSD|JMM|JVE)(?![A-Z])/;
+
 function getHuntProfile(student, { isStaff = false } = {}) {
     if (isStaff) {
         return {
@@ -98,13 +100,17 @@ function getHuntProfile(student, { isStaff = false } = {}) {
     const classCodes = [student?.homeroom, student?.form_class, student?.timetable_class]
         .map((value) => String(value || "").trim().toUpperCase()).filter(Boolean);
     const profileCodes = [...rawPrograms, ...timetable, ...classCodes];
+    const allTimetableValues = (Array.isArray(student?.timetable) ? student.timetable : [])
+        .map((entry) => String(entry?.value || "").trim().toUpperCase());
     const yearText = String(student?.year_level || "").trim();
     const yearMatch = yearText.match(/(?:^|\D)(7|8|9|10|11|12|13)(?=\D|$)/)
         || profileCodes.map((code) => code.match(/(?:^|\D)(7|8|9|10|11|12|13)(?=[A-Z]|\b)/)).find(Boolean);
     const year = Number(yearMatch?.[1] || 0);
     const programs = [
         ...rawPrograms.map((program) => ["DTECH", "MDTECH", "MPROG"].includes(program) || !/DTECH$/.test(program) ? program : "DTECH"),
-        ...[...timetable, ...classCodes].filter((code) => /DTECH/.test(code)).map(() => "DTECH")
+        ...[...timetable, ...classCodes].filter((code) => /DTECH/.test(code)).map(() => "DTECH"),
+        // JuniorDTECH classes are listed by teacher code (JPI, JSR, JSD, JMM, JVE) rather than the word DTECH.
+        ...([7, 8].includes(year) && [...profileCodes, ...allTimetableValues].some((code) => JUNIOR_DTECH_CLASS_CODES.test(code)) ? ["DTECH"] : [])
     ];
     let relevant;
     if ([7, 8].includes(year)) relevant = programs.some((program) => ["DTECH", "MDTECH", "MPROG"].includes(program)) ? ["DTECH"] : [];

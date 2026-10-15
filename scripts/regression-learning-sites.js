@@ -50,6 +50,11 @@ async function main() {
         const homeroomProfile = hunt.getHuntProfile({ year_level: "Year 7", homeroom: code });
         assert.deepEqual(homeroomProfile.courseIds, ["7DTECH"], `${code} in homeroom matches the Year 7 JuniorDTECH class`);
     }
+    for (const code of ["JPI", "JSR", "JSD", "JMM", "JVE"]) {
+        assert.deepEqual(hunt.getHuntProfile({ year_level: "Year 7", timetable_class: code }).courseIds, ["7DTECH"], `${code} timetable class matches Year 7 JuniorDTECH`);
+        assert.deepEqual(hunt.getHuntProfile({ year_level: "Year 8", timetable: [{ label: "Mon P1", value: code }] }).courseIds, ["8DTECH"], `${code} timetable period matches Year 8 JuniorDTECH`);
+        assert.deepEqual(hunt.getHuntProfile({ year_level: "Year 9", timetable_class: code }).courseIds, [], `${code} does not match Year 9`);
+    }
     assert.deepEqual(hunt.getHuntProfile({ programs: ["8SDTECH"] }).courseIds, ["8DTECH"],
         "A year-prefixed DTECH code can supply the year when the year-level field is missing");
     assert.deepEqual(hunt.getHuntProfile({ dtech_timetable: [{ value: "7SDTECH" }] }).courseIds, ["7DTECH"],
