@@ -2360,7 +2360,7 @@ async function renderUseOfToolsTechniquesPanel(host, projectId, allocation) {
             <p class="task-topic-submission-note"><strong>Project/Task Std:</strong> ${escapeHtml(projectTaskStandard || "Not set")} &nbsp; <strong>Digital Media Type:</strong> ${escapeHtml(mediaLabel || "Not set")}</p>
             <p class="task-topic-submission-note">Tools &amp; Techniques${mediaLabel ? ` (${escapeHtml(mediaLabel)})` : ""}: ${detectedCount} of ${labels.length} detected in your project.</p>
             <ul class="list task-topic-guide-list" style="list-style:none;padding-left:0">
-                ${labels.map((label) => `<li><input type="checkbox" disabled ${detected[label] ? "checked" : ""}> ${escapeHtml(label)}</li>`).join("")}
+                ${labels.map((label) => `<li><input type="checkbox" tabindex="-1" aria-readonly="true" style="accent-color:#1d4ed8;pointer-events:none;width:1.05rem;height:1.05rem;vertical-align:middle" ${detected[label] ? "checked" : ""}> ${escapeHtml(label)}</li>`).join("")}
             </ul>
             ${projectTaskStandard === "91893" ? `<p class="task-topic-submission-note">Complete any 3 or more categories.</p>` : ""}
             <p class="task-topic-submission-note">Auto-detected from your GitHub repo where possible. Click Sync from GitHub on the Task List to refresh these boxes.</p>

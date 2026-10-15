@@ -8816,6 +8816,60 @@ async function populateTriallingComponents(presentationId, sourcePresentationId,
   return { updated: true, count: Math.min(sourceRows.length, rowCount - 1) };
 }
 
+async function populateUseOfToolsTechniques(presentationId, activityId, studentEmail, accessToken) {
+  const safeActivityId = String(activityId || "").trim();
+  const safeEmail = normalizeEmail(studentEmail || "");
+  if (!hasDatabase || !presentationId || !safeActivityId || !safeEmail) return { updated: false, count: 0 };
+
+  const result = await pool.query(
+    "SELECT evidence_steps FROM project_interests WHERE project_id = $1 AND student_email = $2 LIMIT 1",
+    [safeActivityId, safeEmail]
+  );
+  const labels = [];
+  normalizeEvidenceStepsPayload(result.rows?.[0]?.evidence_steps).forEach((row) => {
+    if (String(row?.standard || "").trim() !== "digimed-tools-techniques") return;
+    (Array.isArray(row?.steps) ? row.steps : []).forEach((step) => {
+      const match = String(step?.text || "").match(/^DIGIMED_TOOLS_TECHNIQUES_ACK\|(.+)\|true$/i);
+      if (match?.[1] && !labels.includes(match[1].trim())) labels.push(match[1].trim());
+    });
+  });
+  if (!labels.length) return { updated: false, count: 0 };
+
+  const presentation = await googleSlidesApiRequest(presentationId, accessToken);
+  const slides = Array.isArray(presentation?.slides) ? presentation.slides : [];
+  const tableElement = slides.flatMap((slide) => Array.isArray(slide?.pageElements) ? slide.pageElements : [])
+    .find((element) => element?.table);
+  const table = tableElement?.table;
+  const objectId = String(tableElement?.objectId || "").trim();
+  const rowCount = Number(table?.rows || 0);
+  if (!objectId || rowCount < 2 || Number(table?.columns || 0) < 1) return { updated: false, count: 0 };
+
+  // Only fill empty cells so a student's own edits are never overwritten.
+  const requests = [];
+  let filled = 0;
+  labels.slice(0, rowCount - 1).forEach((label, index) => {
+    const rowIndex = index + 1;
+    const cell = table?.tableRows?.[rowIndex]?.tableCells?.[0];
+    if (extractGoogleSlidesTableCellText(cell)) return;
+    requests.push({ insertText: { objectId, cellLocation: { rowIndex, columnIndex: 0 }, insertionIndex: 0, text: label } });
+    filled += 1;
+  });
+  if (!requests.length) return { updated: false, count: 0 };
+
+  const response = await fetch(`https://slides.googleapis.com/v1/presentations/${encodeURIComponent(presentationId)}:batchUpdate`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ requests })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(String(payload?.error?.message || `Google Slides update error (${response.status})`));
+    error.status = response.status;
+    throw error;
+  }
+  return { updated: true, count: filled };
+}
+
 async function driveFindFolderByName(parentFolderId, folderName, accessToken) {
   const safeName = folderName.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
   const safeParent = parentFolderId.replace(/'/g, "\\'");
@@ -9935,6 +9989,14 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
         || /triall?ing\s+components|trailing\s+components/i.test(templateTitle);
       const isTestingFunctions = templateId.toLowerCase() === "testing-functions"
         || /testing\s+functions/i.test(templateTitle);
+      if (templateId.toLowerCase() === "use-of-tools-and-techniques" || /^use\s+of\s+tools/i.test(templateTitle)) {
+        try {
+          const result = await populateUseOfToolsTechniques(targetFileId, activityId, email, driveAccessToken);
+          return { updated: result.updated, count: result.count, implicationsCount: 0 };
+        } catch (error) {
+          return { updated: false, count: 0, warning: error.message || "Could not populate Tools & Techniques." };
+        }
+      }
       if ((!isSuccessCriteria && !isDevelopmentSteps && !isTriallingComponents && !isTestingFunctions) || !resolvedSourcePresentationId) return { updated: false, count: 0 };
 
       try {
