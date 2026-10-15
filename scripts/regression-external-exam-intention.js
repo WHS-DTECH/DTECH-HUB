@@ -8,6 +8,7 @@ const vm = require("node:vm");
 const root = path.join(__dirname, "..");
 const server = fs.readFileSync(path.join(root, "server.js"), "utf8");
 const script = fs.readFileSync(path.join(root, "script.js"), "utf8");
+const appsScript = fs.readFileSync(path.join(root, "scripts", "google-form-external-exam-sync.gs"), "utf8");
 
 const normalizeStart = server.indexOf("function normalizeExternalExamIntention(");
 const normalizeEnd = server.indexOf("\nasync function ensureStudentTrackerCommentsSchema", normalizeStart);
@@ -63,6 +64,36 @@ async function main() {
     assert.equal(declined.statusCode, 200);
     assert.equal(memoryIntentions.get(studentEmail).decision, "no");
 
+    const snapshotRouteStart = server.indexOf('app.post("/api/integrations/external-exam-intentions/sync"');
+    const snapshotRouteEnd = server.indexOf('\napp.get("/api/external-assessment-allocations"', snapshotRouteStart);
+    assert.ok(snapshotRouteStart >= 0 && snapshotRouteEnd > snapshotRouteStart,
+        "Full external-exam response reconciliation route exists");
+    const snapshotRoutes = {};
+    const snapshotContext = vm.createContext({
+        app: { post: (url, handler) => { snapshotRoutes[url] = handler; } },
+        process: { env: { EXTERNAL_EXAM_FORM_WEBHOOK_SECRET: "test-webhook-secret" } },
+        normalizeEmail: (value) => String(value || "").trim().toLowerCase(),
+        normalizeExternalExamIntention: normalizeContext.normalizeExternalExamIntention,
+        isSchoolEmail: (value) => String(value || "").endsWith("@westlandhigh.school.nz"),
+        memoryExternalExamIntentions: memoryIntentions,
+        hasDatabase: false,
+        Date,
+        console: { error() {} }
+    });
+    vm.runInContext(server.slice(snapshotRouteStart, snapshotRouteEnd), snapshotContext);
+    const snapshotResponse = {
+        statusCode: 200,
+        status(code) { this.statusCode = code; return this; },
+        json(payload) { this.payload = payload; return this; }
+    };
+    await snapshotRoutes["/api/integrations/external-exam-intentions/sync"]({
+        headers: requestHeaders,
+        body: { responses: [] }
+    }, snapshotResponse);
+    assert.equal(snapshotResponse.statusCode, 200);
+    assert.equal(memoryIntentions.has(studentEmail), false,
+        "Removing the student's response from the sheet clears the No override");
+
     const updated = await callWebhook(requestHeaders, {
         student_email: studentEmail,
         decision: "Yes",
@@ -70,6 +101,14 @@ async function main() {
     });
     assert.equal(updated.statusCode, 200);
     assert.equal(memoryIntentions.get(studentEmail).decision, "yes", "A revised form response updates the prior decision");
+    assert.match(server, /DELETE FROM student_external_exam_intentions WHERE NOT \(student_email = ANY\(\$1::text\[\]\)\)/,
+        "Snapshot reconciliation removes deleted responses while preserving current responses");
+    assert.match(appsScript, /syncExternalExamResponse\(_event\)\s*\{\s*return syncExistingExternalExamResponses\(\);/,
+        "New form submissions sync the whole response sheet, not just one row");
+    assert.match(appsScript, /everyMinutes\(15\)/,
+        "Deleted Form responses are reconciled by the periodic sheet sync");
+    assert.match(appsScript, /external-exam-intentions\/sync/,
+        "Apps Script sends the full current response snapshot to the hub");
 
     assert.match(server, /externalExamIntention === "no" \? \[\] : externalStandardNumbers/,
         "A No response hides external standards without deleting the saved allocation");

@@ -12623,6 +12623,72 @@ app.post("/api/integrations/external-exam-intention", async (req, res) => {
   }
 });
 
+app.post("/api/integrations/external-exam-intentions/sync", async (req, res) => {
+  const expectedSecret = String(process.env.EXTERNAL_EXAM_FORM_WEBHOOK_SECRET || "").trim();
+  const suppliedSecret = String(req.headers?.["x-external-exam-webhook-secret"] || "").trim();
+  if (!expectedSecret) return res.status(503).json({ error: "External exam form sync is not configured." });
+  if (suppliedSecret !== expectedSecret) return res.status(401).json({ error: "Unauthorized form response sync." });
+
+  const input = req.body?.responses;
+  if (!Array.isArray(input) || input.length > 1000) {
+    return res.status(400).json({ error: "A valid external exam response snapshot is required." });
+  }
+
+  const responsesByEmail = new Map();
+  for (const row of input) {
+    const studentEmail = normalizeEmail(row?.student_email || row?.email || "");
+    const decision = normalizeExternalExamIntention(row?.decision || row?.answer || "");
+    const submittedAtValue = String(row?.submitted_at || "").trim();
+    const submittedAtDate = submittedAtValue ? new Date(submittedAtValue) : new Date();
+    if (!isSchoolEmail(studentEmail) || !decision || Number.isNaN(submittedAtDate.getTime())) {
+      return res.status(400).json({ error: "Every response needs a school email, a Yes/No decision, and a valid timestamp." });
+    }
+    responsesByEmail.set(studentEmail, {
+      student_email: studentEmail,
+      decision,
+      submitted_at: submittedAtDate.toISOString()
+    });
+  }
+
+  const responses = Array.from(responsesByEmail.values());
+  if (!hasDatabase) {
+    memoryExternalExamIntentions.clear();
+    responses.forEach((row) => memoryExternalExamIntentions.set(row.student_email, { ...row, updated_at: new Date().toISOString() }));
+    return res.json({ ok: true, synced: responses.length, cleared: input.length - responses.length });
+  }
+
+  let client;
+  try {
+    await ensureExternalExamIntentionsSchema();
+    client = await pool.connect();
+    await client.query("BEGIN");
+    const currentEmails = responses.map((row) => row.student_email);
+    const deleted = await client.query(
+      `DELETE FROM student_external_exam_intentions WHERE NOT (student_email = ANY($1::text[]))`,
+      [currentEmails]
+    );
+    for (const row of responses) {
+      await client.query(
+        `INSERT INTO student_external_exam_intentions (student_email, decision, submitted_at, updated_at)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (student_email) DO UPDATE SET
+           decision = EXCLUDED.decision,
+           submitted_at = EXCLUDED.submitted_at,
+           updated_at = NOW()`,
+        [row.student_email, row.decision, row.submitted_at]
+      );
+    }
+    await client.query("COMMIT");
+    res.json({ ok: true, synced: responses.length, cleared: Number(deleted.rowCount || 0) });
+  } catch (error) {
+    if (client) await client.query("ROLLBACK").catch(() => {});
+    console.error("[external-exam-intention-sync] Could not reconcile form responses:", error.message);
+    res.status(500).json({ error: "Could not sync external exam responses." });
+  } finally {
+    client?.release();
+  }
+});
+
 app.get("/api/external-assessment-allocations", requireActivityWriteAccess, async (_req, res) => {
   if (!hasDatabase) {
     res.json({ allocations: Array.from(memoryExternalAssessmentAllocations.values()) });
