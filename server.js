@@ -7848,6 +7848,14 @@ function inferCanonicalTemplateIdentityFromTitle(title) {
     };
   }
 
+  if (/use\s+of\s+tools?\s*(&|and)\s*techniques/.test(normalizedTitle)) {
+    return {
+      id: "use-of-tools-and-techniques",
+      title: "Use of Tools & Techniques",
+      criteriaText: "Show the tools and techniques you used, and explain how they are appropriate for the purpose and end users."
+    };
+  }
+
   if (/tools\s*(&|and)\s*techniques/.test(normalizedTitle)) {
     return {
       id: "tools-and-techniques",
@@ -8919,6 +8927,7 @@ const DIGITAL_OUTCOME_DETAILS_TEMPLATE_IDS = new Set([
   "development-steps",
   "trialling-components",
   "tools-and-techniques",
+  "use-of-tools-and-techniques",
   "project-success-criteria"
 ]);
 
@@ -10169,6 +10178,7 @@ const TEMPLATE_ID_FROM_TITLE_PATTERNS = [
   { pattern: /^digital\s+outcome\s+description(?:\s*-\s*.+)?$/i, id: "digital-outcome-description", title: "Digital Outcome Description" },
   { pattern: /^target\s+audience(?:\s*-\s*.+)?$/i, id: "target-audience", title: "Target Audience" },
   { pattern: /^development\s+steps(?:\s*-\s*.+)?$/i, id: "development-steps", title: "Development Steps" },
+  { pattern: /^use\s+of\s+tools?\s*(?:&|and)\s*techniques?(?:\s*-\s*.+)?$/i, id: "use-of-tools-and-techniques", title: "Use of Tools & Techniques" },
   { pattern: /^(?:.*\s+)?tools?\s*(?:&|and)\s*techniques?(?:\s*-\s*.+)?$/i, id: "tools-and-techniques", title: "Tools & Techniques" },
   { pattern: /^triall?ing\s+components(?:\s*-\s*.+)?$/i, id: "trialling-components", title: "Trialling Components" },
   { pattern: /^trailing\s+comp(?:onents|onets|onets)?(?:\s*-\s*.+)?$/i, id: "trialling-components", title: "Trialling Components" },

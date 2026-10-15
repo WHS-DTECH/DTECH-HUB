@@ -558,6 +558,10 @@ function getTemplateStepMatchers(templateId) {
         return [/what\s+tools\s+and\s+techniques\s+will\s+be\s+used/i, /tools\/?technologies/i];
     }
 
+    if (id === "use-of-tools-and-techniques") {
+        return [/using\s+appropriate\s+tools\s+and\s+techniques/i, /applying\s+appropriate\s+tools\s+and\s+techniques/i, /using\s+tools\s*(?:&|and)\s*techniques/i];
+    }
+
     if (id === "relevant-digimed-conventions") {
         return [/relevant\s+(?:digimed\s+)?conventions/i, /relevant\s+conventions\s+for\s+the\s+media\s+type/i];
     }

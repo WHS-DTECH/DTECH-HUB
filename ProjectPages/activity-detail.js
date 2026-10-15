@@ -185,6 +185,24 @@ const DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE = "Target Audience";
 const DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE = "Development Steps";
 const DIGITAL_OUTCOME_TRIALLING_COMPONENTS_TITLE = "Trialling Components";
 const DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE = "Tools & Techniques";
+const USE_OF_TOOLS_TECHNIQUES_TITLE = "Using Tools & Techniques";
+const USE_OF_TOOLS_TECHNIQUES_TEMPLATE_TITLE = "Use of Tools & Techniques";
+const USE_OF_TOOLS_TECHNIQUES_EVIDENCE_STANDARD = "digimed-tools-techniques";
+const USE_OF_TOOLS_TECHNIQUES_LABELS_91893 = [
+    "Creating or customising scripts, code or presets",
+    "Using a combination of steps to manipulate or enhance elements",
+    "Using a third-party library",
+    "Using composite effects"
+];
+const USE_OF_TOOLS_TECHNIQUES_LABELS_91903 = [
+    "Non-core functionality",
+    "Sophisticated digital effects",
+    "Applying industry standards or guidelines",
+    "Responsive design for use on multiple devices",
+    "Integration of original media assets",
+    "Dynamic data handling and interactivity",
+    "Automation through scripts"
+];
 const DIGITAL_OUTCOME_TESTING_FUNCTIONS_TITLE = "Testing Functions";
 const DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE = "Conventions (WEB)";
 const DIGITAL_OUTCOME_UX_PRINCIPLES_TITLE = "UX Principles (Web)";
@@ -2281,6 +2299,46 @@ function removeStoredCodeFileLinkLibraryLink(prefix, projectId, email, value) {
     }
     const current = readStoredCodeFileLinkLibrary(prefix, projectId, email).filter((item) => item.url !== safeUrl);
     return writeStoredCodeFileLinkLibrary(prefix, projectId, email, current);
+}
+
+async function renderUseOfToolsTechniquesPanel(host, projectId, allocation, anchorSection) {
+    if (!host || !anchorSection) return;
+    host.querySelector("#use-of-tools-techniques-section")?.remove();
+
+    const digitalMediaType = String(allocation?.digital_media_type || "").trim();
+    const projectTaskStandard = String(allocation?.standard_2 || "").match(/\b(91893|91903)\b/)?.[1] || "";
+    const labels = projectTaskStandard === "91903"
+        ? USE_OF_TOOLS_TECHNIQUES_LABELS_91903
+        : USE_OF_TOOLS_TECHNIQUES_LABELS_91893;
+
+    let detected = {};
+    try {
+        const rows = await fetchMyEvidenceRows(projectId);
+        rows.forEach((row) => {
+            if (String(row?.standard || "").trim() !== USE_OF_TOOLS_TECHNIQUES_EVIDENCE_STANDARD) return;
+            (Array.isArray(row?.steps) ? row.steps : []).forEach((step) => {
+                const match = String(step?.text || "").match(/^DIGIMED_TOOLS_TECHNIQUES_ACK\|(.+)\|true$/i);
+                if (match?.[1]) detected[match[1].trim()] = true;
+            });
+        });
+    } catch (_error) {
+        detected = {};
+    }
+
+    const detectedCount = labels.filter((label) => detected[label]).length;
+    const section = document.createElement("section");
+    section.className = "proposal-section interest-section";
+    section.id = "use-of-tools-techniques-section";
+    section.innerHTML = `
+        <h2>Student Details</h2>
+        <p class="interest-count">${projectTaskStandard ? `<strong>Project/Task Std:</strong> ${escapeHtml(projectTaskStandard)} &nbsp; ` : ""}<strong>Digital Media:</strong> ${escapeHtml(digitalMediaType ? digitalMediaType.toUpperCase() : "Not set")}</p>
+        <h2>Tools &amp; Techniques Detected${digitalMediaType ? ` (${escapeHtml(digitalMediaType.toUpperCase())})` : ""}</h2>
+        <p class="task-topic-submission-note">${detectedCount} of ${labels.length} detected in your project. Run <strong>Sync from GitHub</strong> on the Task List page to refresh this list.</p>
+        <div class="task-list-decomposition-subtask-list">
+            ${labels.map((label) => `<label class="task-list-decomposition-subtask ${detected[label] ? "is-complete" : ""}"><input type="checkbox" disabled ${detected[label] ? "checked" : ""}><span>${escapeHtml(label)}</span></label>`).join("")}
+        </div>
+    `;
+    anchorSection.insertAdjacentElement("afterend", section);
 }
 
 function renderCodeValidationSyncPanel(host, projectId, email, kind) {
@@ -5271,6 +5329,7 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
         || isDigitalOutcomeTestingFunctionsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
         || isDigitalOutcomeRelevantDigiMedConventionsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
         || isToolsAndTechniquesCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
+        || isUseOfToolsTechniquesCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
         || isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
         || Boolean(keywordMatchedTopicKey);
     if (isDigitalOutcomeDescriptionTopic) {
@@ -5619,7 +5678,10 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             || keywordMatchedTopicKey === "success-criteria";
         const isRelevantImplicationsTopic = isDigitalOutcomeRelevantImplicationsCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle))
             || keywordMatchedTopicKey === "relevant-implications";
-        const syncTopicLabel = isTargetAudienceTopic
+        const isUseOfToolsTechniquesSyncTopic = isUseOfToolsTechniquesCriterion(taskTopicTitle, taskTopicShortName || deriveTaskShortName(taskTopicTitle));
+        const syncTopicLabel = isUseOfToolsTechniquesSyncTopic
+            ? USE_OF_TOOLS_TECHNIQUES_TEMPLATE_TITLE
+            : isTargetAudienceTopic
             ? DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE
             : (isToolsAndTechniquesSyncTopic
                 ? DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE
@@ -5634,7 +5696,9 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
                     : (isSuccessCriteriaTopic
                         ? DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE
                         : (isRelevantImplicationsTopic ? DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE : "Digital Outcome: Description")))))));
-        const syncTemplateId = isTargetAudienceTopic
+        const syncTemplateId = isUseOfToolsTechniquesSyncTopic
+            ? "use-of-tools-and-techniques"
+            : isTargetAudienceTopic
             ? "target-audience"
             : (isToolsAndTechniquesSyncTopic
                 ? "tools-and-techniques"
@@ -5657,7 +5721,8 @@ async function renderTaskTopicSubmissionPanel({ host, projectId, detailData, ema
             || syncTemplateId === "trialling-components"
             || syncTemplateId === "project-success-criteria"
             || syncTemplateId === "relevant-implications"
-            || syncTemplateId === "tools-and-techniques";
+            || syncTemplateId === "tools-and-techniques"
+            || syncTemplateId === "use-of-tools-and-techniques";
 
         // For staged rollout, do not pre-connect Relevant Implications (or other non-enabled pages)
         // from passive folder matches when the student has not explicitly linked/downloaded.
@@ -8783,6 +8848,13 @@ function isDigitalOutcomeVideoConventionsCriterion(taskTopicTitle, taskShortName
     return shortNameText === DIGITAL_OUTCOME_VIDEO_CONVENTIONS_TITLE.toLowerCase();
 }
 
+function isUseOfToolsTechniquesCriterion(taskTopicTitle, taskShortName = "") {
+    const topicText = String(taskTopicTitle || "").trim().toLowerCase();
+    const shortNameText = String(taskShortName || "").trim().toLowerCase();
+    return /^using\s+tools\s*(?:&|and)\s*techniques(?:\s*\(.*\))?$/.test(topicText)
+        || /^using\s+tools\s*(?:&|and)\s*techniques(?:\s*\(.*\))?$/.test(shortNameText);
+}
+
 function isToolsAndTechniquesCriterion(taskTopicTitle, taskShortName = "") {
     const topicText = String(taskTopicTitle || "").trim().toLowerCase();
     const shortNameText = String(taskShortName || "").trim().toLowerCase();
@@ -9427,13 +9499,16 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     const isDigitalOutcomeVideoConventionsTopic = isDigitalOutcomeVideoConventionsCriterion(taskTopicTitle, resolvedTaskShortName)
         || keywordMatchedTopicKey === "video-conventions";
     const isToolsAndTechniquesTopic = isToolsAndTechniquesCriterion(taskTopicTitle, resolvedTaskShortName);
+    const isUseOfToolsTechniquesTopic = isUseOfToolsTechniquesCriterion(taskTopicTitle, resolvedTaskShortName);
     const isCodeValidationTopic = isCodeValidationCriterion(taskTopicTitle, resolvedTaskShortName)
         || keywordMatchedTopicKey === "code-validation";
     const isDigitalOutcomeSuccessCriteriaTopic = isDigitalOutcomeSuccessCriteriaCriterion(taskTopicTitle, resolvedTaskShortName)
         || keywordMatchedTopicKey === "success-criteria";
     const isDigitalOutcomeRelevantImplicationsTopic = isDigitalOutcomeRelevantImplicationsCriterion(taskTopicTitle, resolvedTaskShortName)
         || keywordMatchedTopicKey === "relevant-implications";
-    const digitalOutcomeTopicKey = isDigitalOutcomeTargetAudienceTopic
+    const digitalOutcomeTopicKey = isUseOfToolsTechniquesTopic
+        ? "use-of-tools-and-techniques"
+        : isDigitalOutcomeTargetAudienceTopic
         ? "target-audience"
         : isDigitalOutcomeTriallingComponentsTopic
             ? "trialling-components"
@@ -9480,6 +9555,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         "video-ux-principles": DIGITAL_OUTCOME_VIDEO_UX_PRINCIPLES_TITLE,
         "video-conventions": DIGITAL_OUTCOME_VIDEO_CONVENTIONS_TITLE,
         "tools-and-techniques": DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE,
+        "use-of-tools-and-techniques": String(taskTopicTitle || "").trim() || USE_OF_TOOLS_TECHNIQUES_TITLE,
         "code-validation": DIGITAL_OUTCOME_CODE_VALIDATION_TITLE,
         "development-steps": DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE,
         "success-criteria": DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE,
@@ -9532,6 +9608,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         || isDigitalOutcomeVideoUXPrinciplesTopic
         || isDigitalOutcomeVideoConventionsTopic
         || isToolsAndTechniquesTopic
+        || isUseOfToolsTechniquesTopic
         || isCodeValidationTopic
         || isDigitalOutcomeSuccessCriteriaTopic
         || isDigitalOutcomeRelevantImplicationsTopic;
@@ -9554,6 +9631,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         "video-ux-principles": "video-ux-principles",
         "video-conventions": "video-conventions",
         "tools-and-techniques": "tools-and-techniques",
+        "use-of-tools-and-techniques": "use-of-tools-and-techniques",
         "code-validation": "testing-functions-markup-validation",
         "development-steps": "development-steps",
         "success-criteria": "project-success-criteria",
@@ -9573,6 +9651,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             "relevant-digimed-conventions": DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE,
             "user-experience-principles": DIGITAL_OUTCOME_UX_PRINCIPLES_TITLE,
             "tools-and-techniques": DIGITAL_OUTCOME_TOOLS_TECHNIQUES_TITLE,
+            "use-of-tools-and-techniques": USE_OF_TOOLS_TECHNIQUES_TEMPLATE_TITLE,
             "code-validation": DIGITAL_OUTCOME_CODE_VALIDATION_TEMPLATE_SEARCH_TITLE,
             "testing-functions-markup-validation": DIGITAL_OUTCOME_CODE_VALIDATION_TEMPLATE_SEARCH_TITLE,
             "development-steps": DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE,
@@ -9791,6 +9870,15 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 ];
             }
 
+            if (digitalOutcomeTopicKey === "use-of-tools-and-techniques") {
+                return [
+                    "Review the Tools & Techniques detected from your project below.",
+                    "Open your Use of Tools & Techniques slideshow (sync it from the Template Library if it is not linked yet).",
+                    "For each detected tool or technique, add evidence (screenshots, code or file examples) showing where you used it.",
+                    "Explain why each choice is appropriate for the purpose and the end users."
+                ];
+            }
+
             if (digitalOutcomeTopicKey === "code-validation") {
                 return [
                     "Open the W3C Markup Validation Service at https://validator.w3.org/.",
@@ -9894,6 +9982,15 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                     "Identify legal, ethical, social, and accessibility implications that apply.",
                     "Describe risks and impacts for users, stakeholders, and the wider context.",
                     "Justify mitigation actions you will take in design, development, and testing."
+                ];
+            }
+
+            if (digitalOutcomeTopicKey === "use-of-tools-and-techniques") {
+                return [
+                    "Check the Tools & Techniques detected from your project are correct.",
+                    "Link your Use of Tools & Techniques slideshow.",
+                    "Add evidence and an explanation for each detected tool or technique.",
+                    "Justify how each one suits the purpose and end users."
                 ];
             }
 
@@ -10003,6 +10100,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         if (digitalOutcomeTopicKey === "tools-and-techniques") {
             return "List the tools you plan to use, are currently using, or have used for this task, and describe the techniques you implement with each one.";
         }
+        if (digitalOutcomeTopicKey === "use-of-tools-and-techniques") {
+            return "Use this guide to show the tools and techniques you used in your outcome and explain why they suit the purpose and end users.";
+        }
         if (digitalOutcomeTopicKey === "trialling-components") {
             return "Use this guide to trial components systematically, compare evidence, and justify the option you select.";
         }
@@ -10032,6 +10132,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         }
         if (digitalOutcomeTopicKey === "tools-and-techniques") {
             return "Tools & Techniques Table";
+        }
+        if (digitalOutcomeTopicKey === "use-of-tools-and-techniques") {
+            return "Use of Tools & Techniques - Google Slides";
         }
         if (digitalOutcomeTopicKey === "development-steps") {
             return "Development Steps - Google Slides";
@@ -10704,7 +10807,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             const isUXPrinciplesTopic = isDigitalOutcomeUXPrinciplesCriterion(taskTopicTitle, resolvedTaskShortName)
                 || keywordMatchedTopicKey === "user-experience-principles";
 
-            const syncTemplateId = isTargetAudienceTopic
+            const syncTemplateId = isUseOfToolsTechniquesTopic
+                ? "use-of-tools-and-techniques"
+                : isTargetAudienceTopic
                 ? "target-audience"
                 : (isTriallingComponentsTopic
                     ? "trialling-components"
@@ -10718,6 +10823,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                                     ? "relevant-digimed-conventions"
                                     : (isUXPrinciplesTopic ? "user-experience-principles" : "digital-outcome-description"))))));
             const syncTopicLabels = {
+                "use-of-tools-and-techniques": USE_OF_TOOLS_TECHNIQUES_TEMPLATE_TITLE,
                 "target-audience": DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE,
                 "trialling-components": DIGITAL_OUTCOME_TRIALLING_COMPONENTS_TITLE,
                 "development-steps": DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE,
@@ -13343,6 +13449,10 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         window.open(formUrl, "_blank", "noopener,noreferrer");
         setGoogleFormStatus("Opened Google Form.");
     });
+
+    if (email && !isTeacher && isTaskTopicPage && isUseOfToolsTechniquesCriterion(selectedTaskTopic, selectedTaskShortName)) {
+        await renderUseOfToolsTechniquesPanel(host, projectId, interestData?.my_allocation || null, section);
+    }
 
     if (isCodeValidationTaskTopicPage && email) {
         renderCodeValidationSyncPanel(host, projectId, email, "html");

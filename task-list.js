@@ -1026,7 +1026,14 @@ function getTaskTopicHrefForStep(standard, level, text) {
     }
 
     if ((String(standard) === "91893" || String(standard) === "91903")
-        && /(?:using appropriate tools and techniques for the purpose and end users|applying appropriate tools and techniques to meet the purpose and end-user requirements|using efficient tools and techniques in the outcome.?s production)/i.test(normalized)) {
+        && /(?:using appropriate tools and techniques for the purpose and end users|applying appropriate tools and techniques to meet the purpose and end-user requirements)/i.test(normalized)) {
+        const useToolsMediaType = String(getAllocatedDigitalMediaType(standard) || "").trim().toUpperCase();
+        const useToolsTitle = useToolsMediaType ? `Using Tools & Techniques (${useToolsMediaType})` : "Using Tools & Techniques";
+        return buildCustomActivityLink(taskListState.selectedId, useToolsTitle, useToolsTitle, "use-of-tools-and-techniques");
+    }
+
+    if ((String(standard) === "91893" || String(standard) === "91903")
+        && /using efficient tools and techniques in the outcome.?s production/i.test(normalized)) {
         return buildCustomActivityLink(taskListState.selectedId, "What Tools and Techniques will be used?", "Tools & Techniques", "tools-and-techniques");
     }
 

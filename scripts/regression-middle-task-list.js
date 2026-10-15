@@ -291,6 +291,20 @@ assert.equal(
     "tools-and-techniques",
     "Drive sync recognizes student-owned Tools & Techniques decks with a name prefix"
 );
+assert.equal(
+    templateIdentityContext.inferTemplateCopyFromFileName("Use of Tools & Techniques - Tyler").templateId,
+    "use-of-tools-and-techniques",
+    "Drive sync recognizes Use of Tools & Techniques decks separately from Tools & Techniques"
+);
+assert.equal(
+    templateIdentityContext.inferTemplateCopyFromFileName("Tools & Techniques").templateId,
+    "tools-and-techniques",
+    "The Digital Outcome Tools & Techniques template identity is unchanged"
+);
+assert.ok(server.includes('id: "use-of-tools-and-techniques"') && server.includes("use\\s+of\\s+tools?"),
+    "Template Library sync gives Use of Tools & Techniques its own canonical identity");
+assert.ok(taskList.includes('"use-of-tools-and-techniques"') && taskList.includes("Using Tools & Techniques ("),
+    "Task List links the 91893/91903 appropriate-tools row to the media-type Use of Tools & Techniques page");
 const endUserImplicationsCopy = templateIdentityContext.inferTemplateCopyFromFileName(
     "Relevant Implications - End-User Considerations - Otto"
 );
