@@ -1161,6 +1161,9 @@ async function fetchTemplateLibraryPreviewByTemplateId(templateId = "") {
             || (targetTemplateId === "tools-and-techniques"
                 ? entries.find((entry) => /tools\s*(&|and)\s*techniques/i.test(String(entry?.title || "")))
                 : null)
+            || (targetTemplateId === "use-of-tools-and-techniques"
+                ? entries.find((entry) => /use\s+of\s+tools\s*(&|and)\s*techniques/i.test(String(entry?.title || "")))
+                : null)
             || (targetTemplateId === "relevant-digimed-conventions"
                 ? entries.find((entry) => /relevant.*conventions/i.test(String(entry?.title || "")))
                 : null)
@@ -1169,6 +1172,12 @@ async function fetchTemplateLibraryPreviewByTemplateId(templateId = "") {
                 : null);
         if (!match) {
             return "";
+        }
+
+        // Match the Template Library, which previews by file id (stored thumbnail links can expire).
+        if (targetTemplateId === "use-of-tools-and-techniques") {
+            const fileThumbnail = toGoogleSlidesThumbnailUrl(match?.templateUrl || "");
+            if (fileThumbnail) return fileThumbnail;
         }
 
         return toSafeExternalUrl(match?.imageUrl || "")
