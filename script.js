@@ -2805,7 +2805,7 @@ function renderHubSidebarStandardsCard(panel, yearGroup, internalStandards, exte
         externalCard.hidden = false;
     } else {
         const externalEmptyMessage = String(externalExamIntention || "").trim().toLowerCase() === "no"
-            ? "You indicated that you do not plan to sit the external exam."
+            ? "You have chosen not to continue with the exam."
             : "You are not currently enrolled in an External DTECH exam.";
         externalList.innerHTML = `<div class="hub-sidebar-summary-empty hub-sidebar-external-empty">${escapeHtml(externalEmptyMessage)}</div>`;
         externalCard.hidden = false;
