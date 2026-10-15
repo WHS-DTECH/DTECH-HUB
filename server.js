@@ -7402,6 +7402,13 @@ function normalizeExternalExamIntention(value) {
   return "";
 }
 
+function normalizeExternalExamStudentEmail(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  const escapedDomain = SCHOOL_EMAIL_DOMAIN.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = raw.match(new RegExp(`[a-z0-9._%+-]+@${escapedDomain}\\b`, "i"));
+  return normalizeEmail(match?.[0] || raw);
+}
+
 async function ensureStudentTrackerCommentsSchema() {
   if (!hasDatabase) return;
   await pool.query(`
@@ -12576,7 +12583,7 @@ app.post("/api/integrations/external-exam-intention", async (req, res) => {
     return;
   }
 
-  const studentEmail = normalizeEmail(req.body?.student_email || req.body?.email || "");
+  const studentEmail = normalizeExternalExamStudentEmail(req.body?.student_email || req.body?.email || "");
   const decision = normalizeExternalExamIntention(req.body?.decision || req.body?.answer || "");
   const submittedAtValue = String(req.body?.submitted_at || "").trim();
   const submittedAtDate = submittedAtValue ? new Date(submittedAtValue) : new Date();
@@ -12636,7 +12643,7 @@ app.post("/api/integrations/external-exam-intentions/sync", async (req, res) => 
 
   const responsesByEmail = new Map();
   for (const row of input) {
-    const studentEmail = normalizeEmail(row?.student_email || row?.email || "");
+    const studentEmail = normalizeExternalExamStudentEmail(row?.student_email || row?.email || "");
     const decision = normalizeExternalExamIntention(row?.decision || row?.answer || "");
     const submittedAtValue = String(row?.submitted_at || "").trim();
     const submittedAtDate = submittedAtValue ? new Date(submittedAtValue) : new Date();

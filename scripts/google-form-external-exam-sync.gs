@@ -41,6 +41,11 @@ function syncExternalExamResponse(_event) {
   return syncExistingExternalExamResponses();
 }
 
+function extractSchoolEmail(value) {
+  const match = String(value || "").match(/[a-z0-9._%+-]+@westlandhigh\.school\.nz\b/i);
+  return match ? String(match[0]).trim().toLowerCase() : "";
+}
+
 function syncExistingExternalExamResponses() {
   const spreadsheetId = String(PropertiesService.getScriptProperties().getProperty("DTECH_HUB_RESPONSE_SPREADSHEET_ID") || "").trim();
   const spreadsheet = spreadsheetId
@@ -70,16 +75,20 @@ function syncExistingExternalExamResponses() {
   if (emailIndex < 0 || decisionIndex < 0) throw new Error("Required Form response columns were not found.");
 
   const responses = [];
-  values.slice(1).forEach((row) => {
-    const email = String(row[emailIndex] || "").trim();
+  values.slice(1).forEach((row, index) => {
+    const email = extractSchoolEmail(row[emailIndex]);
     const decision = String(row[decisionIndex] || "").trim();
     if (!email && !decision) return;
-    if (!email || !decision) throw new Error("A response row is missing its email or external exam decision.");
+    if (!email || !decision) {
+      throw new Error("Response row " + (index + 2) + " does not contain a valid school email and exam decision. No snapshot was sent.");
+    }
     const lowered = decision.toLowerCase();
     const normalizedDecision = /^(?:no\b|not\b|i do not\b|i don't\b)/.test(lowered)
       ? "no"
       : /^(?:yes\b|i intend\b|i will\b|i am\b)/.test(lowered) ? "yes" : "";
-    if (!normalizedDecision) throw new Error("Unrecognized exam decision for " + email + ". No response snapshot was sent.");
+    if (!normalizedDecision) {
+      throw new Error("Response row " + (index + 2) + " has an unrecognized exam decision. No snapshot was sent.");
+    }
     const timestamp = row[0] ? new Date(row[0]) : new Date();
     responses.push({
       student_email: email.trim().toLowerCase(),

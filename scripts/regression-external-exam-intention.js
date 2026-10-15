@@ -18,6 +18,15 @@ vm.runInContext(server.slice(normalizeStart, normalizeEnd), normalizeContext);
 assert.equal(normalizeContext.normalizeExternalExamIntention("Yes"), "yes");
 assert.equal(normalizeContext.normalizeExternalExamIntention("No, I do not intend to sit"), "no");
 assert.equal(normalizeContext.normalizeExternalExamIntention("Maybe"), "");
+const studentEmailStart = server.indexOf("function normalizeExternalExamStudentEmail(");
+const studentEmailEnd = server.indexOf("\nasync function ensureStudentTrackerCommentsSchema", studentEmailStart);
+assert.ok(studentEmailStart >= 0 && studentEmailEnd > studentEmailStart, "External exam student email normalizer exists");
+const studentEmailContext = vm.createContext({
+    SCHOOL_EMAIL_DOMAIN: "westlandhigh.school.nz",
+    normalizeEmail: (value) => String(value || "").trim().toLowerCase()
+});
+vm.runInContext(server.slice(studentEmailStart, studentEmailEnd), studentEmailContext);
+assert.equal(studentEmailContext.normalizeExternalExamStudentEmail("Sierra Hargreaves <s_hargreaves@westlandhigh.school.nz>"), "s_hargreaves@westlandhigh.school.nz");
 
 const routeStart = server.indexOf('app.post("/api/integrations/external-exam-intention"');
 const routeEnd = server.indexOf('\napp.get("/api/external-assessment-allocations"', routeStart);
@@ -28,6 +37,7 @@ const routeContext = vm.createContext({
     app: { post: (url, handler) => { routes[url] = handler; } },
     process: { env: { EXTERNAL_EXAM_FORM_WEBHOOK_SECRET: "test-webhook-secret" } },
     normalizeEmail: (value) => String(value || "").trim().toLowerCase(),
+    normalizeExternalExamStudentEmail: studentEmailContext.normalizeExternalExamStudentEmail,
     normalizeExternalExamIntention: normalizeContext.normalizeExternalExamIntention,
     isSchoolEmail: (value) => String(value || "").endsWith("@westlandhigh.school.nz"),
     memoryExternalExamIntentions: memoryIntentions,
@@ -73,6 +83,7 @@ async function main() {
         app: { post: (url, handler) => { snapshotRoutes[url] = handler; } },
         process: { env: { EXTERNAL_EXAM_FORM_WEBHOOK_SECRET: "test-webhook-secret" } },
         normalizeEmail: (value) => String(value || "").trim().toLowerCase(),
+        normalizeExternalExamStudentEmail: studentEmailContext.normalizeExternalExamStudentEmail,
         normalizeExternalExamIntention: normalizeContext.normalizeExternalExamIntention,
         isSchoolEmail: (value) => String(value || "").endsWith("@westlandhigh.school.nz"),
         memoryExternalExamIntentions: memoryIntentions,
