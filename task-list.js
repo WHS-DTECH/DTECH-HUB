@@ -3317,6 +3317,13 @@ async function loadChecklistForTask(taskId) {
     const evidenceRows = await fetchMyEvidence(taskListState.selectedId).catch(() => []);
     const evidenceMap = evidenceRowsToMap(evidenceRows);
     const persistedToolsTechniquesState = getDigiMedToolsTechniquesStateFromEvidence(evidenceRows);
+    {
+        const localToolsTechniquesState = readDigiMedToolsTechniquesState(taskListState.selectedId, getTaskListEmail());
+        const unsavedLabels = Object.keys(localToolsTechniquesState).filter((label) => localToolsTechniquesState[label] && !persistedToolsTechniquesState[label]);
+        if (unsavedLabels.length) {
+            void persistDigiMedToolsTechniquesState(taskListState.selectedId, { ...localToolsTechniquesState, ...persistedToolsTechniquesState });
+        }
+    }
     if (Object.keys(persistedToolsTechniquesState).length) {
         const cachedToolsTechniquesState = readDigiMedToolsTechniquesState(taskListState.selectedId, getTaskListEmail());
         writeDigiMedToolsTechniquesState(taskListState.selectedId, getTaskListEmail(), {

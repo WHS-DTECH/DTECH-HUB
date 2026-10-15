@@ -2330,6 +2330,24 @@ async function renderUseOfToolsTechniquesPanel(host, projectId, allocation) {
                 if (match?.[1]) detected[match[1].trim()] = true;
             });
         });
+
+        // Ticks made on the Task List may exist only in this browser; back-fill them into the database.
+        const email = readStoredHubEmail();
+        let localState = {};
+        try {
+            localState = JSON.parse(localStorage.getItem(`hub_digimed_tools_techniques_v1:${String(projectId || "").trim()}:${String(email || "").trim().toLowerCase()}`) || "{}") || {};
+        } catch (_error) {
+            localState = {};
+        }
+        const missingInDb = [...USE_OF_TOOLS_TECHNIQUES_LABELS_91893, ...USE_OF_TOOLS_TECHNIQUES_LABELS_91903]
+            .filter((label) => localState[label] && !detected[label]);
+        if (missingInDb.length) {
+            missingInDb.forEach((label) => { detected[label] = true; });
+            const steps = Object.keys(detected).map((label) => ({ text: `DIGIMED_TOOLS_TECHNIQUES_ACK|${label}|true`, done: true }));
+            const nextRows = rows.filter((row) => String(row?.standard || "").trim() !== USE_OF_TOOLS_TECHNIQUES_EVIDENCE_STANDARD);
+            nextRows.push({ standard: USE_OF_TOOLS_TECHNIQUES_EVIDENCE_STANDARD, steps });
+            await saveMyEvidenceRows(projectId, nextRows).catch(() => {});
+        }
     } catch (_error) {
         detected = {};
     }
@@ -2341,9 +2359,9 @@ async function renderUseOfToolsTechniquesPanel(host, projectId, allocation) {
             <h3>Subtasks</h3>
             <p class="task-topic-submission-note"><strong>Project/Task Std:</strong> ${escapeHtml(projectTaskStandard || "Not set")} &nbsp; <strong>Digital Media Type:</strong> ${escapeHtml(mediaLabel || "Not set")}</p>
             <p class="task-topic-submission-note">Tools &amp; Techniques${mediaLabel ? ` (${escapeHtml(mediaLabel)})` : ""}: ${detectedCount} of ${labels.length} detected in your project.</p>
-            <div class="task-list-decomposition-subtask-list">
-                ${labels.map((label) => `<label class="task-list-decomposition-subtask ${detected[label] ? "is-complete" : ""}"><input type="checkbox" disabled ${detected[label] ? "checked" : ""}><span>${escapeHtml(label)}</span></label>`).join("")}
-            </div>
+            <ul class="list task-topic-guide-list" style="list-style:none;padding-left:0">
+                ${labels.map((label) => `<li><input type="checkbox" disabled ${detected[label] ? "checked" : ""}> ${escapeHtml(label)}</li>`).join("")}
+            </ul>
             ${projectTaskStandard === "91893" ? `<p class="task-topic-submission-note">Complete any 3 or more categories.</p>` : ""}
             <p class="task-topic-submission-note">Auto-detected from your GitHub repo where possible. Click Sync from GitHub on the Task List to refresh these boxes.</p>
         </section>
