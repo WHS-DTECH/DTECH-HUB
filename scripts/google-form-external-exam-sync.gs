@@ -5,7 +5,8 @@
  *   DTECH_HUB_WEBHOOK_URL = https://dtech-hub2.onrender.com/api/integrations/external-exam-intention
  *   DTECH_HUB_WEBHOOK_SECRET = the same secret configured as EXTERNAL_EXAM_FORM_WEBHOOK_SECRET in Render
  *
- * Run installExternalExamResponseTrigger() once and authorize it. Do not put the secret in the sheet.
+ * Run syncExistingExternalExamResponses() once to import current responses, then run
+ * installExternalExamResponseTrigger() once and authorize it. Do not put the secret in the sheet.
  */
 function installExternalExamResponseTrigger() {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
@@ -63,4 +64,38 @@ function syncExternalExamResponse(event) {
   if (status < 200 || status >= 300) {
     throw new Error("DTECH-HUB response sync failed (HTTP " + status + "): " + response.getContentText());
   }
+}
+
+function syncExistingExternalExamResponses() {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  if (!spreadsheet) throw new Error("Open this script from the form response spreadsheet first.");
+
+  const sheet = spreadsheet.getSheets().find((candidate) => {
+    const lastColumn = candidate.getLastColumn();
+    if (!lastColumn) return false;
+    const headers = candidate.getRange(1, 1, 1, lastColumn).getDisplayValues()[0].map((value) => String(value || "").trim());
+    return headers.some((header) => /email/i.test(header))
+      && headers.some((header) => /external exam.*november|intending.*external exam/i.test(header));
+  });
+  if (!sheet) throw new Error("Could not find the Form responses sheet headers for email and the November external exam question.");
+
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return 0;
+  const headers = values[0].map((value) => String(value || "").trim());
+  const emailIndex = headers.findIndex((header) => /email/i.test(header));
+  const decisionIndex = headers.findIndex((header) => /external exam.*november|intending.*external exam/i.test(header));
+  if (emailIndex < 0 || decisionIndex < 0) throw new Error("Required Form response columns were not found.");
+
+  let synced = 0;
+  values.slice(1).forEach((row) => {
+    const email = String(row[emailIndex] || "").trim();
+    const decision = String(row[decisionIndex] || "").trim();
+    if (!email || !decision) return;
+    const namedValues = {};
+    namedValues[headers[emailIndex]] = [email];
+    namedValues[headers[decisionIndex]] = [decision];
+    syncExternalExamResponse({ namedValues, values: [row[0]] });
+    synced += 1;
+  });
+  return synced;
 }
