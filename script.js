@@ -1632,6 +1632,7 @@ const HUB_AUTO_LOGIN_PROMPT_SESSION_KEY = "hub_auto_login_prompted_v1";
 let hubGlobalSidebarNodes = null;
 let hubStudentAllocatedStandards = [];
 let hubStudentExternalStandards = [];
+let hubStudentExternalExamIntention = "";
 let hubStudentDigitalMediaType = "";
 
 function readStoredHubViewMode() {
@@ -2640,6 +2641,7 @@ async function loadAndRenderSidebarAllocations(panel) {
         updateSidebarCourseSections(panel);
         hubStudentAllocatedStandards = Array.isArray(data.allocated_standards) ? data.allocated_standards : [];
         hubStudentExternalStandards = Array.isArray(data.external_standards) ? data.external_standards : [];
+        hubStudentExternalExamIntention = externalExamIntention;
         const digitalMediaAllocation = [...assessments, ...projects].find((item) =>
             ["91893", "91903"].includes(String(item?.standard_1 || "").trim())
             || ["91893", "91903"].includes(String(item?.standard_2 || "").trim())
@@ -2921,6 +2923,7 @@ function clearHubAuthState() {
     hubAccessState.additionalRole = "";
     hubStudentAllocatedStandards = [];
     hubStudentExternalStandards = [];
+    hubStudentExternalExamIntention = "";
     resetHubDriveSetupState();
     clearHubStoredAuthRaw();
     setHubProfileOpen(false);
@@ -4528,7 +4531,7 @@ function renderStats() {
                 </div>
                 <div class="new-week-process-card new-week-external-card">
                     <span class="new-week-process-title">External Assessment Summary</span>
-                    ${externalStandardsHtml || `<span class="new-week-external-empty">You ARE NOT enrolled to sit any External DTECH exams</span>`}
+                    ${externalStandardsHtml || `<span class="new-week-external-empty">${hubStudentExternalExamIntention === "no" ? "You have CHOSEN not to continue with the Exam." : "You are not currently enrolled in an External DTECH exam."}</span>`}
                 </div>
             `;
         } else {

@@ -127,8 +127,10 @@ async function main() {
         "Allocation and response status are returned separately to the sidebar");
     assert.match(script, /externalExamFormLink\.hidden = !hasExternalExamAllocation \|\| externalExamIntention === "no"/,
         "The sidebar form link is limited to students still proceeding with an allocated external exam");
-    assert.match(script, /You have CHOSEN not to continue with the Exam\./,
-        "Students who opt out see the explicit choice reflected in the sidebar summary");
+    assert.ok((script.match(/You have CHOSEN not to continue with the Exam\./g) || []).length >= 2,
+        "Students who opt out see the explicit choice reflected in both sidebar and homepage summaries");
+    assert.match(script, /hubStudentExternalExamIntention = externalExamIntention/,
+        "Homepage summary receives the same synced intention as the sidebar");
     assert.match(script, /hasExternalExamAllocation && !externalExamIntention/,
         "Only allocated students with no recorded answer get the login reminder");
 
