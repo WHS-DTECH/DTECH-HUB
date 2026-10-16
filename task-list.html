@@ -885,6 +885,34 @@
             filter: saturate(180%) contrast(130%);
         }
 
+        .task-list-step-check-wrap input[type="checkbox"].is-auto-complete {
+            appearance: none;
+            -webkit-appearance: none;
+            border: 2px solid #1d4ed8;
+            border-radius: 4px;
+            background: #ffffff;
+            opacity: 1;
+            position: relative;
+        }
+
+        .task-list-step-check-wrap input[type="checkbox"].is-auto-complete:checked {
+            border-color: #1d4ed8;
+            background: #1d4ed8;
+            filter: none;
+        }
+
+        .task-list-step-check-wrap input[type="checkbox"].is-auto-complete:checked::after {
+            content: "";
+            position: absolute;
+            left: 5px;
+            top: 1px;
+            width: 4px;
+            height: 8px;
+            border: solid #ffffff;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
+
         .task-list-step-text {
             font-size: 0.92rem;
             color: #17314d;
