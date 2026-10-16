@@ -71,6 +71,26 @@
     font-weight: 700;
 }
 
+.project-client-details {
+    display: grid;
+    gap: 3px;
+    margin-top: 8px;
+    color: #17495a;
+    font-size: 0.82rem;
+    overflow-wrap: anywhere;
+}
+
+.project-client-details a {
+    color: #0f6174;
+    font-weight: 700;
+}
+
+.project-client-details span {
+    color: #496a73;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
 .project-card.pathway-display-card:hover {
     transform: none;
 }

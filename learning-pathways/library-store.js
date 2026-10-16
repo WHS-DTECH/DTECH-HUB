@@ -46,6 +46,20 @@ function normalizeCards(cards) {
             area: text(card?.area, 60) || "Learning Pathways",
             visual: { icon: text(card?.visual?.icon, 12) || "LP" }
         };
+        if (cardType === "job") {
+            const clientEnabled = card?.client?.enabled === true;
+            const clientName = clientEnabled ? text(card?.client?.name, 120) : "";
+            const clientEmail = clientEnabled ? text(card?.client?.email, 254).toLowerCase() : "";
+            if (clientEnabled && (!clientName || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(clientEmail))) {
+                throw new Error(`Card ${index + 1} needs a client name and valid email address.`);
+            }
+            normalized.client = {
+                enabled: clientEnabled,
+                name: clientName,
+                email: clientEmail,
+                onsite: clientEnabled ? card?.client?.onsite !== false : true
+            };
+        }
         const strand = text(card?.strand, 120);
         if (cardType === "unit" && strand) normalized.strand = strand;
         if (cardType === "lesson") {
@@ -271,6 +285,7 @@ function registerLearningPathways(app, { pool, hasDatabase, requireAdminAccess, 
                 cardType: "job",
                 yearLevel: "MiddleDTECH",
                 area: "Jobs",
+                client: req.body?.client,
                 visual: { icon: req.body?.icon || "JB" }
             }])[0];
         } catch (error) {

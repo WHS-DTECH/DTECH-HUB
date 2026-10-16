@@ -126,6 +126,11 @@
             yearLevel: text("year") || "All Years", area: text("area") || "Learning Pathways",
             status: text("status"), cardType: text("type") || "strand", visual: { icon: text("icon") || "LP" } };
         const index = cards.findIndex((item) => item.id === id);
+        if (card.cardType === "job") {
+            card.client = index >= 0 && cards[index].client
+                ? cards[index].client
+                : { enabled: false, name: "", email: "", onsite: true };
+        }
         if (card.cardType === "unit" && index >= 0 && cards[index].strand) card.strand = cards[index].strand;
         if (card.cardType === "lesson" && index >= 0) {
             if (cards[index].unit) card.unit = cards[index].unit;

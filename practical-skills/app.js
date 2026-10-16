@@ -183,6 +183,10 @@
             ? `<img src=\"${escapeHtml(imageUrl)}\" alt=\"${escapeHtml(item.title)}\" class=\"project-image\" loading=\"lazy\">`
             : `<span class=\"visual-mark\">${escapeHtml(icon)}</span>`;
 
+        const clientDetails = isJob && item.client?.enabled
+            ? `<div class=\"project-client-details\"><strong>Client:</strong> ${escapeHtml(item.client.name)}<br><a href=\"mailto:${escapeHtml(item.client.email)}\">${escapeHtml(item.client.email)}</a><span>${item.client.onsite ? "Onsite client" : "Offsite client"}</span></div>`
+            : "";
+
         card.innerHTML = `
             <div class="project-visual" ${visualStyle}>
                 ${visualContent}
@@ -192,6 +196,7 @@
                     <h3>${escapeHtml(item.title)}</h3>
                 </div>
                 <p class="project-description">${escapeHtml(item.summary)}</p>
+                    ${clientDetails}
                 <div class="project-tags">
                     <span class="project-tag status-tag status-${escapeHtml(String(item.status || "active").toLowerCase())}">${escapeHtml(formatStatus(item.status))}</span>
                     <span class="project-tag">${escapeHtml(item.yearLevel || "All Years")}</span>

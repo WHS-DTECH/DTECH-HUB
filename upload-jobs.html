@@ -62,6 +62,33 @@
                                 <textarea id="job-summary" name="summary" maxlength="600" rows="4" required></textarea>
                             </div>
                             <div class="field field-wide">
+                                <label class="checkbox-field" for="job-client-enabled">
+                                    <input id="job-client-enabled" name="clientEnabled" type="checkbox">
+                                    Client - Yes/No
+                                </label>
+                                <p class="upload-helper-text">Unchecked means No.</p>
+                            </div>
+                            <fieldset id="job-client-details" class="form-section field-wide" hidden disabled>
+                                <legend>Client Details</legend>
+                                <div class="form-grid">
+                                    <div class="field">
+                                        <label for="job-client-name">Client Name</label>
+                                        <input id="job-client-name" name="clientName" type="text" maxlength="120">
+                                    </div>
+                                    <div class="field">
+                                        <label for="job-client-email">Email Address</label>
+                                        <input id="job-client-email" name="clientEmail" type="email" maxlength="254">
+                                    </div>
+                                    <div class="field field-wide">
+                                        <label class="checkbox-field" for="job-client-onsite">
+                                            <input id="job-client-onsite" name="onsiteClient" type="checkbox" checked>
+                                            Onsite Client (Yes/No)
+                                        </label>
+                                        <p class="upload-helper-text">Checked by default.</p>
+                                    </div>
+                                </div>
+                            </fieldset>
+                            <div class="field field-wide">
                                 <label for="job-link">Project Link (optional)</label>
                                 <input id="job-link" name="href" type="text" maxlength="300" placeholder="https://... or /learning-pathways/...">
                             </div>

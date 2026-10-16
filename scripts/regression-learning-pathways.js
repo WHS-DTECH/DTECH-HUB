@@ -147,7 +147,7 @@ async function testDashboard() {
     assert.match(jobPalette, /#0f5b75/, "Jobs use a distinct cyan-teal palette");
     assert.match(dashboard, /data-library-job-label="Jobs"/);
     Object.assign(config.dataset, { libraryJobLabel: "Jobs", libraryJobPalette: jobPalette });
-    const jobCard = { ...sample, id: "middle-job-space-project", title: "Space Project", cardType: "job", yearLevel: "MiddleDTECH", area: "Jobs", visual: { icon: "JB" } };
+    const jobCard = { ...sample, id: "middle-job-space-project", title: "Space Project", cardType: "job", yearLevel: "MiddleDTECH", area: "Jobs", client: { enabled: true, name: "Kim Client", email: "kim@example.org", onsite: true }, visual: { icon: "JB" } };
     responseCards = [jobCard, { ...sample, id: "other-project", title: "Other Project", yearLevel: "Senior DTECH" }];
     vm.runInContext(fs.readFileSync(path.join(root, "practical-skills/app.js"), "utf8"), context);
     await tick();
@@ -155,6 +155,8 @@ async function testDashboard() {
     assert.ok(jobElement.classList.contains("pathway-job-card"));
     assert.match(jobElement.innerHTML, /#0f5b75/);
     assert.match(jobElement.innerHTML, />Jobs</);
+    assert.match(jobElement.innerHTML, /Kim Client[\s\S]*kim@example\.org[\s\S]*Onsite client/,
+        "Jobs cards show the chosen public client details and onsite status");
     assert.deepEqual(elements["#practical-skills-type-pills"].children.map((pill) => pill.textContent), ["All", "Curriculum Strands", "Jobs"]);
     elements["#practical-skills-type-pills"].children.find((pill) => pill.textContent === "Jobs").click();
     assert.equal(grid.children.length, 1, "Jobs type filter hides non-job cards");
@@ -368,8 +370,12 @@ async function main() {
         "The Practical phase shows a right-hand pill linking to its Activity card");
     assert.equal(normalizeCards([sample])[0].cardType, "strand", "Existing cards default to Curriculum Strands");
     assert.deepEqual(normalizeCards([{ ...sample, id: "middle-job-space-project", cardType: "job", yearLevel: "MiddleDTECH", area: "Jobs" }])[0],
-        { ...normalizeCards([sample])[0], id: "middle-job-space-project", cardType: "job", yearLevel: "MiddleDTECH", area: "Jobs" },
+        { ...normalizeCards([sample])[0], id: "middle-job-space-project", cardType: "job", yearLevel: "MiddleDTECH", area: "Jobs", client: { enabled: false, name: "", email: "", onsite: true } },
         "Jobs cards retain their dedicated type, course and category through normalization");
+    assert.deepEqual(normalizeCards([{ ...sample, cardType: "job", client: { enabled: true, name: "Kim Client", email: "KIM@EXAMPLE.ORG", onsite: false } }])[0].client,
+        { enabled: true, name: "Kim Client", email: "kim@example.org", onsite: false },
+        "Jobs cards retain public client details and normalize email case");
+    assert.throws(() => normalizeCards([{ ...sample, cardType: "job", client: { enabled: true, name: "Kim Client", email: "not-an-email" } }]), /valid email/);
     assert.equal(normalizeCards([{ ...sample, strand: "x" }])[0].strand, undefined, "Only units keep a parent strand");
     assert.equal(seed.find((card) => card.id === "digital-systems").href, "/learning-pathways/digital-systems.html");
     const curriculumLinks = {
@@ -715,20 +721,27 @@ async function main() {
         assert.equal((await publish([sample], false)).status, 403);
         assert.equal((await publish([{ ...sample, href: "javascript:test" }])).status, 400);
         assert.equal((await publish([sample])).status, 200);
-        const jobUpload = (headers = { "Content-Type": "application/json", "x-test-teacher": "yes" }) => fetch(`${base}/api/learning-pathways/jobs`, {
+        const jobUpload = (overrides = {}, headers = { "Content-Type": "application/json", "x-test-teacher": "yes" }) => fetch(`${base}/api/learning-pathways/jobs`, {
             method: "POST", headers,
-            body: JSON.stringify({ title: "Space Project", summary: "Build an interactive solar system model.", status: "active" })
+            body: JSON.stringify({ title: "Space Project", summary: "Build an interactive solar system model.", status: "active", ...overrides })
         });
         response = await jobUpload();
         assert.equal(response.status, 201, "Teacher can upload a MiddleDTECH Jobs card");
         const savedJob = (await response.json()).card;
         assert.deepEqual([savedJob.id, savedJob.cardType, savedJob.yearLevel, savedJob.area],
             ["middle-job-space-project", "job", "MiddleDTECH", "Jobs"]);
+        assert.deepEqual(savedJob.client, { enabled: false, name: "", email: "", onsite: true },
+            "Jobs cards default to no client and onsite yes");
         const libraryAfterJob = await (await fetch(`${base}/learning-pathways/library.json`)).json();
         assert.deepEqual(libraryAfterJob.map((card) => card.id), [sample.id, savedJob.id],
             "Job upload appends to the Learning Pathways library without replacing existing cards");
         assert.equal((await jobUpload()).status, 409, "Duplicate job titles are not added twice");
-        assert.equal((await jobUpload({ "Content-Type": "application/json" })).status, 403,
+        response = await jobUpload({ title: "Client Job", client: { enabled: true, name: "Kim Client", email: "KIM@EXAMPLE.ORG", onsite: false } });
+        assert.equal(response.status, 201);
+        const clientJob = (await response.json()).card;
+        assert.deepEqual(clientJob.client, { enabled: true, name: "Kim Client", email: "kim@example.org", onsite: false },
+            "Client name, email and onsite selection are persisted on Jobs cards");
+        assert.equal((await jobUpload({}, { "Content-Type": "application/json" })).status, 403,
             "Jobs upload requires teacher access");
         response = await fetch(`${base}/api/learning-pathways/library`);
         assert.equal((await response.json())[0].title, sample.title);

@@ -3,7 +3,21 @@
 const jobForm = document.querySelector("#upload-job-form");
 const jobStatus = document.querySelector("#job-upload-status");
 const jobAuthStatus = document.querySelector("#jobs-auth-status");
+const jobClientEnabled = document.querySelector("#job-client-enabled");
+const jobClientDetails = document.querySelector("#job-client-details");
+const jobClientName = document.querySelector("#job-client-name");
+const jobClientEmail = document.querySelector("#job-client-email");
 const JOB_DRAFT_STORAGE_KEY = "dtechHub:uploadJobsDraft:v1";
+
+function renderClientFields() {
+    const enabled = Boolean(jobClientEnabled?.checked);
+    if (jobClientDetails) {
+        jobClientDetails.hidden = !enabled;
+        jobClientDetails.disabled = !enabled;
+    }
+    if (jobClientName) jobClientName.required = enabled;
+    if (jobClientEmail) jobClientEmail.required = enabled;
+}
 
 function setJobUploadStatus(message, isError = false) {
     if (!jobStatus) return;
@@ -28,6 +42,8 @@ function renderJobAuthStatus() {
 function saveJobDraft() {
     if (!jobForm) return;
     const values = Object.fromEntries(new FormData(jobForm).entries());
+    values.clientEnabled = Boolean(jobClientEnabled?.checked);
+    values.onsiteClient = Boolean(jobForm.elements.namedItem("onsiteClient")?.checked);
     try {
         localStorage.setItem(JOB_DRAFT_STORAGE_KEY, JSON.stringify(values));
     } catch (_error) {
@@ -41,16 +57,23 @@ function restoreJobDraft() {
         if (!draft || typeof draft !== "object") return;
         Object.entries(draft).forEach(([key, value]) => {
             const field = jobForm.elements.namedItem(key);
-            if (field) field.value = String(value || "");
+            if (!field) return;
+            if (field.type === "checkbox") field.checked = value === "on" || value === true;
+            else field.value = String(value || "");
         });
     } catch (_error) {
     }
+    renderClientFields();
 }
 
 jobForm?.addEventListener("input", saveJobDraft);
-jobForm?.addEventListener("change", saveJobDraft);
+jobForm?.addEventListener("change", () => {
+    renderClientFields();
+    saveJobDraft();
+});
 document.querySelector("#clear-job-draft")?.addEventListener("click", () => {
     jobForm?.reset();
+    renderClientFields();
     try {
         localStorage.removeItem(JOB_DRAFT_STORAGE_KEY);
     } catch (_error) {
@@ -72,7 +95,13 @@ jobForm?.addEventListener("submit", async (event) => {
         summary: String(formData.get("summary") || "").trim(),
         href: String(formData.get("href") || "").trim(),
         imageUrl: String(formData.get("imageUrl") || "").trim(),
-        status: String(formData.get("status") || "active").trim()
+        status: String(formData.get("status") || "active").trim(),
+        client: {
+            enabled: formData.get("clientEnabled") === "on",
+            name: String(formData.get("clientName") || "").trim(),
+            email: String(formData.get("clientEmail") || "").trim(),
+            onsite: formData.get("onsiteClient") === "on"
+        }
     };
     const submit = jobForm.querySelector('[type="submit"]');
     if (submit) {
@@ -91,6 +120,7 @@ jobForm?.addEventListener("submit", async (event) => {
         if (!response.ok) throw new Error(result?.error || `Could not save job (HTTP ${response.status}).`);
 
         jobForm.reset();
+        renderClientFields();
         try {
             localStorage.removeItem(JOB_DRAFT_STORAGE_KEY);
         } catch (_error) {
@@ -108,5 +138,6 @@ jobForm?.addEventListener("submit", async (event) => {
 });
 
 restoreJobDraft();
+renderClientFields();
 renderJobAuthStatus();
 window.addEventListener("hub-auth-state-changed", renderJobAuthStatus);
