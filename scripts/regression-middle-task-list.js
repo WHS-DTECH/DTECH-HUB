@@ -121,7 +121,7 @@ const autoDriveContext = vm.createContext({
     window: { getActiveHubDriveAccessToken: () => "cached-drive-token" },
     loadJson: async (url, options) => {
         autoDriveCalls.push({ url, options });
-        return { template_copies: [{ templateId: "tools-and-techniques", templateTitle: "Tools & Techniques" }] };
+        return { template_copies: [{ templateId: "use-of-tools-and-techniques", templateTitle: "Use of Tools & Techniques" }] };
     },
     buildTaskListHeaders: (headers) => headers,
     encodeURIComponent,
@@ -135,11 +135,11 @@ async function runAutoDriveSyncRegression() {
     assert.equal(autoDriveCalls.length, 1, "A cached Drive token triggers one quiet folder scan");
     assert.equal(autoDriveCalls[0].options.method, "POST");
     assert.equal(JSON.parse(autoDriveCalls[0].options.body).driveAccessToken, "cached-drive-token");
-    assert.equal(discoveredCopies[0].templateId, "tools-and-techniques");
+    assert.equal(discoveredCopies[0].templateId, "use-of-tools-and-techniques");
     await autoDriveContext.autoSyncToolsAndTechniquesTemplateCopy("activity-1", "student@example.test", []);
     assert.equal(autoDriveCalls.length, 1, "Repeated task loads respect the Drive scan cooldown");
     await autoDriveContext.autoSyncToolsAndTechniquesTemplateCopy("activity-1", "student@example.test", discoveredCopies);
-    assert.equal(autoDriveCalls.length, 1, "Existing Tools & Techniques copy records avoid another Drive scan");
+    assert.equal(autoDriveCalls.length, 1, "Existing Use of Tools & Techniques copy records avoid another Drive scan");
 
     const noTokenCalls = [];
     const noTokenContext = vm.createContext({
@@ -154,6 +154,52 @@ async function runAutoDriveSyncRegression() {
     assert.equal(noTokenCalls.length, 0, "Auto-discovery never prompts or calls Drive without a cached token");
 }
 
+const useToolsCriterionTexts = {
+    "91893": "Achieved: Using appropriate tools and techniques for the purpose and end users.",
+    "91903": "Achieved: Applying appropriate tools and techniques to meet the purpose and end-user requirements."
+};
+const useToolsState = {};
+const useToolsTaskState = { selectedId: "activity-1" };
+const useToolsContext = vm.createContext({
+    DIGIMED_TOOLS_TECHNIQUES_EVIDENCE_STANDARD: "digimed-tools-techniques",
+    DIGIMED_TOOLS_TECHNIQUES_SUBTASKS: ["one", "two", "three", "four"],
+    DIGIMED_L3_TOOLS_TECHNIQUES_SUBTASKS: ["one", "two", "three", "four", "five", "six", "seven"],
+    taskListState: useToolsTaskState,
+    getTaskListEmail: () => "student@example.test",
+    readDigiMedToolsTechniquesState: () => useToolsState,
+    stripStepLevel: (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim(),
+    getStepLevel: (text) => String(text || "").split(":")[0].trim(),
+    isTestingFunctionsRequirementStep: () => false,
+    isTriallingComponentsRequirementStep: () => false
+});
+const useToolsStart = taskList.indexOf("function isUseOfToolsTechniquesRequirementStep(");
+const useToolsAutoStart = taskList.indexOf("function getStepAutoManagementKind(", useToolsStart);
+const useToolsAutoEnd = taskList.indexOf("\nfunction getSessionTickKey", useToolsAutoStart);
+assert.ok(useToolsStart >= 0 && useToolsAutoStart > useToolsStart && useToolsAutoEnd > useToolsAutoStart,
+    "Use of Tools & Techniques requirement helpers are present");
+vm.runInContext(taskList.slice(useToolsStart, useToolsAutoStart) + "\n" + taskList.slice(useToolsAutoStart, useToolsAutoEnd), useToolsContext);
+for (const standard of ["91893", "91903"]) {
+    const rows = [{ text: useToolsCriterionTexts[standard], done: false }];
+    const state = { [standard]: rows };
+    useToolsState.one = true;
+    useToolsState.two = true;
+    delete useToolsState.three;
+    assert.equal(useToolsContext.autoTickUseOfToolsTechniquesRequirement(state, [{ templateId: "use-of-tools-and-techniques" }]), false,
+        `${standard} remains unticked with only two detected subtasks`);
+    useToolsState.three = true;
+    assert.equal(useToolsContext.autoTickUseOfToolsTechniquesRequirement(state, []), false,
+        `${standard} remains unticked until the template is used`);
+    assert.equal(useToolsContext.autoTickUseOfToolsTechniquesRequirement(state, [{ templateId: "use-of-tools-and-techniques" }]), true,
+        `${standard} ticks after three subtasks and template use`);
+    assert.equal(rows[0].done, true);
+    delete useToolsState.three;
+    assert.equal(useToolsContext.autoTickUseOfToolsTechniquesRequirement(state, [{ templateId: "use-of-tools-and-techniques" }]), true,
+        `${standard} clears when fewer than three subtasks remain checked`);
+    assert.equal(rows[0].done, false);
+    assert.equal(useToolsContext.getStepAutoManagementKind(standard, useToolsCriterionTexts[standard]), "auto",
+        `${standard} cannot use a manual criterion tick`);
+}
+
 const triallingCriterion = "Achieved: Trial the components of the digital technologies outcome.";
 const triallingChecklistState = { "91907": [{ text: triallingCriterion, done: false }] };
 const triallingStart = taskList.indexOf("function isTriallingComponentsRequirementStep(");
@@ -163,7 +209,8 @@ assert.ok(triallingStart >= 0 && triallingEnd > triallingStart,
 const triallingContext = vm.createContext({
     getStepLevel: (text) => String(text || "").split(":")[0].trim(),
     stripStepLevel: (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim(),
-    isTestingFunctionsRequirementStep: () => false
+    isTestingFunctionsRequirementStep: () => false,
+    isUseOfToolsTechniquesRequirementStep: () => false
 });
 const triallingManagementStart = taskList.indexOf("function getStepAutoManagementKind(");
 const triallingManagementEnd = taskList.indexOf("\nfunction getSessionTickKey", triallingManagementStart);

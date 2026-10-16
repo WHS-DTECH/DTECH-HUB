@@ -526,7 +526,7 @@ async function persistVideoEfficientToolsToServer(activityId) {
 function installDigiMedToolsTechniquesHandler() {
     if (window.__dtechDigiMedToolsTechniquesHandlerBound) return;
     window.__dtechDigiMedToolsTechniquesHandlerBound = true;
-    document.addEventListener("change", (event) => {
+    document.addEventListener("change", async (event) => {
         const checkbox = event.target?.closest?.("[data-digimed-tools-technique]");
         if (!checkbox) return;
         const subtask = String(checkbox.getAttribute("data-digimed-tools-technique") || "").trim();
@@ -534,7 +534,13 @@ function installDigiMedToolsTechniquesHandler() {
         const state = readDigiMedToolsTechniquesState(taskListState.selectedId, getTaskListEmail());
         state[subtask] = Boolean(checkbox.checked);
         writeDigiMedToolsTechniquesState(taskListState.selectedId, getTaskListEmail(), state);
-        void persistDigiMedToolsTechniquesState(taskListState.selectedId, state);
+        taskListState.fullEvidenceState[DIGIMED_TOOLS_TECHNIQUES_EVIDENCE_STANDARD] = Object.entries(state)
+            .filter(([, done]) => Boolean(done))
+            .map(([label]) => ({ text: `DIGIMED_TOOLS_TECHNIQUES_ACK|${label}|true`, done: true }));
+        autoTickUseOfToolsTechniquesRequirement(taskListState.checklistState, taskListState.templateCopies);
+        autoTickUseOfToolsTechniquesRequirement(taskListState.fullEvidenceState, taskListState.templateCopies);
+        const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
+        await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});
         renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);
     });
 }
@@ -1978,6 +1984,42 @@ function inferStudentSystemConnections(currentState) {
 
 // Rows whose tick state is derived from connected evidence (Trello/GitHub, synced templates, component counts,
 // completed implication categories). Everything else has no automatic source and must not persist a manual tick.
+function isUseOfToolsTechniquesRequirementStep(standard, text) {
+    const safeStandard = String(standard || "").trim();
+    const normalizedText = stripStepLevel(text || "").toLowerCase().replace(/\s+/g, " ").trim();
+    return (safeStandard === "91893" || safeStandard === "91903")
+        && /^(?:using appropriate tools and techniques for the purpose and end users|applying appropriate tools and techniques to meet the purpose and end-user requirements)\.?$/.test(normalizedText);
+}
+
+function autoTickUseOfToolsTechniquesRequirement(stateMap, templateCopies) {
+    const hasUsedTemplate = (Array.isArray(templateCopies) ? templateCopies : [])
+        .some((copy) => String(copy?.templateId || "").trim().toLowerCase() === "use-of-tools-and-techniques");
+    const evidenceSteps = Array.isArray(stateMap?.[DIGIMED_TOOLS_TECHNIQUES_EVIDENCE_STANDARD])
+        ? stateMap[DIGIMED_TOOLS_TECHNIQUES_EVIDENCE_STANDARD]
+        : [];
+    const locallyDetected = readDigiMedToolsTechniquesState(taskListState.selectedId, getTaskListEmail());
+    let changed = false;
+
+    ["91893", "91903"].forEach((standard) => {
+        const labels = standard === "91903" ? DIGIMED_L3_TOOLS_TECHNIQUES_SUBTASKS : DIGIMED_TOOLS_TECHNIQUES_SUBTASKS;
+        const detectedCount = labels.filter((label) => Boolean(locallyDetected[label]) || evidenceSteps.some((step) => {
+            const match = String(step?.text || "").match(/^DIGIMED_TOOLS_TECHNIQUES_ACK\|(.+)\|true$/i);
+            return match?.[1]?.trim() === label;
+        })).length;
+        const shouldBeDone = hasUsedTemplate && detectedCount >= 3;
+        const rows = Array.isArray(stateMap?.[standard]) ? stateMap[standard] : [];
+        rows.forEach((row) => {
+            if (!isUseOfToolsTechniquesRequirementStep(standard, row?.text || "")) return;
+            if (Boolean(row?.done) !== shouldBeDone) {
+                row.done = shouldBeDone;
+                changed = true;
+            }
+        });
+    });
+
+    return changed;
+}
+
 function getStepAutoManagementKind(standard, text) {
     const std = String(standard || "").trim();
     const level = getStepLevel(text);
@@ -1987,6 +2029,9 @@ function getStepAutoManagementKind(standard, text) {
         return "auto";
     }
     if (isTestingFunctionsRequirementStep(std, text)) {
+        return "auto";
+    }
+    if (isUseOfToolsTechniquesRequirementStep(std, text)) {
         return "auto";
     }
     if (isTriallingComponentsRequirementStep(std, text)) {
@@ -2380,7 +2425,7 @@ const taskListAutoDriveSyncAttemptAt = new Map();
 
 async function autoSyncToolsAndTechniquesTemplateCopy(activityId, email, currentCopies) {
     const copies = Array.isArray(currentCopies) ? currentCopies : [];
-    if (!activityId || !email || copies.some((copy) => String(copy?.templateId || "").trim().toLowerCase() === "tools-and-techniques")) {
+    if (!activityId || !email || copies.some((copy) => String(copy?.templateId || "").trim().toLowerCase() === "use-of-tools-and-techniques")) {
         return copies;
     }
 
@@ -2695,6 +2740,7 @@ function renderChecklistCards(detail, allItems) {
                                     ? Boolean(step?.done)
                                     : Boolean(taskListState.sessionTicks[getSessionTickKey(standard, index)]);
                                 const is91893ToolsAndTechniquesRow = /using appropriate tools and techniques for the purpose and end users|applying appropriate tools and techniques to meet the purpose and end-user requirements/i.test(stepText);
+                                const isUseOfToolsTechniquesRequirement = isUseOfToolsTechniquesRequirementStep(standard, step?.text || "");
                                 const is91893ConventionsRow = /using relevant conventions for the media type|applying relevant conventions to improve the quality of the outcome/i.test(stepText);
                                 const is91903UXPrinciplesRow = /applying user experience principles relevant to the purpose of the outcome|applying user experience principles to improve the quality of the digital media outcome/i.test(stepText);
                                 const isNonTickableUXPrinciplesMeritRow = String(standard) === "91903"
@@ -2746,7 +2792,7 @@ function renderChecklistCards(detail, allItems) {
                                 return `
                                 <div class="task-list-step-row ${isInformationalRow ? "is-informational" : ""} ${isLinkedRelevantImplicationsRow || isLinkedIntegrityTestingRow || isLinkedTestingImprovementRow || isApplyingRelevantConventionsRow || isNonTickableUXPrinciplesMeritRow ? "is-linked-relevant-implications" : ""} ${is91893EfficientToolsRow ? "is-linked-efficient-tools" : ""} ${needsEvidence ? "is-needs-evidence" : ""}">
                                     <label class="task-list-step-check-wrap">
-                                        ${isInformationalRow || isNonTickableRelevantImplicationsRow91893 || isApplyingRelevantConventionsRow || isNonTickableIntegrityTestingRow || isNonTickableUXPrinciplesMeritRow ? "" : `<input type="checkbox" ${isRowChecked ? "checked" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">`}
+                                        ${isInformationalRow || isNonTickableRelevantImplicationsRow91893 || isApplyingRelevantConventionsRow || isNonTickableIntegrityTestingRow || isNonTickableUXPrinciplesMeritRow ? "" : `<input type="checkbox" ${isRowChecked ? "checked" : ""} ${isUseOfToolsTechniquesRequirement ? "disabled title=\"Requires at least three checked subtasks and Use of Tools & Techniques template\"" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">`}
                                         ${rowText}
                                     </label>
                                     ${is91893ToolsAndTechniquesRow ? `
@@ -2767,7 +2813,7 @@ function renderChecklistCards(detail, allItems) {
                                                     </label>
                                                 `).join("")}
                                             </div>
-                                            ${String(standard) === "91893" ? `<p class="task-list-achieved-note">Complete any 3 or more categories.</p><p class="task-list-achieved-note">Auto-detected from your GitHub repo where possible \u2014 click Sync from GitHub above to check these boxes.</p>` : ""}
+                                            ${String(standard) === "91893" || String(standard) === "91903" ? `<p class="task-list-achieved-note">You must include three of the items listed. (${toolsTechniquesSubtasksList.filter((subtask) => toolsTechniquesState[subtask]).length}/${toolsTechniquesSubtasksList.length} detected.)</p><p class="task-list-achieved-note">Auto-detected from your GitHub repo where possible \u2014 click Sync from GitHub above to check these boxes.</p>` : ""}
                                         </div>
                                     ` : ""}
                                     ${is91893EfficientToolsRow ? `
@@ -3397,24 +3443,26 @@ async function loadChecklistForTask(taskId) {
     const autoChangedChecklistTesting = autoTickTestingFunctionsRequirement(
         taskListState.checklistState, taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail
     );
+    const autoChangedChecklistTools = autoTickUseOfToolsTechniquesRequirement(taskListState.checklistState, taskListState.templateCopies);
     const autoChangedChecklistDO = autoTickDigitalOutcomeRequirements(taskListState.checklistState, taskListState.selectedId, signedInEmail);
     const autoRepairedChecklistRI = applyTemplateCopiesAsRelevantImplicationsState(taskListState.checklistState, taskListState.templateCopies);
     const autoChangedChecklistRI = autoTickRelevantImplicationsRequirements(taskListState.checklistState, taskListState.selectedId, signedInEmail);
     const autoSyncedChecklist91893RI = sync91893RelevantImplicationsState(taskListState.checklistState);
     const autoChangedChecklistET = autoTickEfficientToolsRequirement(taskListState.checklistState, taskListState.selectedId, signedInEmail);
     const clearedChecklistManualTicks = clearUnverifiedManualTicks(taskListState.checklistState);
-    const autoChangedChecklist = autoChangedChecklistPM || autoChangedChecklistTesting || autoChangedChecklistDO || autoChangedChecklistRI || autoRepairedChecklistRI || autoSyncedChecklist91893RI || autoChangedChecklistET || clearedChecklistManualTicks;
+    const autoChangedChecklist = autoChangedChecklistPM || autoChangedChecklistTesting || autoChangedChecklistTools || autoChangedChecklistDO || autoChangedChecklistRI || autoRepairedChecklistRI || autoSyncedChecklist91893RI || autoChangedChecklistET || clearedChecklistManualTicks;
     const autoChangedEvidencePM = autoTickProjectManagementRequirement(taskListState.fullEvidenceState);
     const autoChangedEvidenceTesting = autoTickTestingFunctionsRequirement(
         taskListState.fullEvidenceState, taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail
     );
+    const autoChangedEvidenceTools = autoTickUseOfToolsTechniquesRequirement(taskListState.fullEvidenceState, taskListState.templateCopies);
     const autoChangedEvidenceDO = autoTickDigitalOutcomeRequirements(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
     const autoRepairedEvidenceRI = applyTemplateCopiesAsRelevantImplicationsState(taskListState.fullEvidenceState, taskListState.templateCopies);
     const autoChangedEvidenceRI = autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
     const autoSyncedEvidence91893RI = sync91893RelevantImplicationsState(taskListState.fullEvidenceState);
     const autoChangedEvidenceET = autoTickEfficientToolsRequirement(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
     const clearedEvidenceManualTicks = clearUnverifiedManualTicks(taskListState.fullEvidenceState);
-    const autoChangedEvidence = autoChangedEvidencePM || autoChangedEvidenceTesting || autoChangedEvidenceDO || autoChangedEvidenceRI || autoRepairedEvidenceRI || autoSyncedEvidence91893RI || autoChangedEvidenceET || clearedEvidenceManualTicks;
+    const autoChangedEvidence = autoChangedEvidencePM || autoChangedEvidenceTesting || autoChangedEvidenceTools || autoChangedEvidenceDO || autoChangedEvidenceRI || autoRepairedEvidenceRI || autoSyncedEvidence91893RI || autoChangedEvidenceET || clearedEvidenceManualTicks;
     if (migratedDigitalOutcomeRows || migrated91897Rows || migrated91907Rows || migrated91893Rows || migrated91903Rows || autoChangedChecklist || autoChangedEvidence) {
         const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
         await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});
