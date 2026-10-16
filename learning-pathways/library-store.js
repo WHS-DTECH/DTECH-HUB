@@ -4,7 +4,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const seedFile = path.join(__dirname, "library.json");
 const statuses = ["active", "planning", "archive"];
-const cardTypes = ["strand", "unit", "lesson", "activity"];
+const cardTypes = ["strand", "unit", "lesson", "activity", "job"];
 
 function validLink(value, allowEmpty = false) {
     if (!value) return allowEmpty;
@@ -64,7 +64,7 @@ function normalizeCards(cards) {
     });
 }
 
-function registerLearningPathways(app, { pool, hasDatabase, requireAdminAccess }) {
+function registerLearningPathways(app, { pool, hasDatabase, requireAdminAccess, requireActivityWriteAccess = requireAdminAccess }) {
     async function ensureSchema() {
         await pool.query(`CREATE TABLE IF NOT EXISTS learning_pathways_library_store (
             id TEXT PRIMARY KEY, cards JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -251,6 +251,46 @@ function registerLearningPathways(app, { pool, hasDatabase, requireAdminAccess }
     app.get("/learning-pathways/library.json", load(false));
     app.get("/api/learning-pathways/library", load(false));
     app.get("/api/admin/learning-pathways/library", requireAdminAccess, load(true));
+    app.post("/api/learning-pathways/jobs", requireActivityWriteAccess, async (req, res) => {
+        const title = String(req.body?.title || "").trim();
+        const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 100);
+        if (!title || !String(req.body?.summary || "").trim() || !slug) {
+            res.status(400).json({ error: "A job title and summary are required." });
+            return;
+        }
+
+        let card;
+        try {
+            card = normalizeCards([{
+                id: `middle-job-${slug}`,
+                title,
+                summary: req.body.summary,
+                href: req.body?.href || "",
+                imageUrl: req.body?.imageUrl || "",
+                status: req.body?.status || "active",
+                cardType: "job",
+                yearLevel: "MiddleDTECH",
+                area: "Jobs",
+                visual: { icon: req.body?.icon || "JB" }
+            }])[0];
+        } catch (error) {
+            res.status(400).json({ error: error.message || "The job card is invalid." });
+            return;
+        }
+
+        try {
+            const cards = await readCards();
+            if (cards.some((existing) => existing.id === card.id)) {
+                res.status(409).json({ error: "A Jobs card with that title already exists." });
+                return;
+            }
+            await writeCards([...cards, card]);
+            res.status(201).json({ ok: true, card });
+        } catch (error) {
+            console.error("Could not save MiddleDTECH Jobs card", error);
+            res.status(500).json({ error: "Could not save the Jobs card." });
+        }
+    });
     app.put("/api/admin/learning-pathways/library", requireAdminAccess, async (req, res) => {
         let cards;
         try {

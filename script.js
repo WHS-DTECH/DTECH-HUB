@@ -1422,6 +1422,7 @@ function renderGlobalNavbar() {
             <summary>Upload</summary>
             <div class="nav-drawer" role="menu">
                 <a role="menuitem" href="/upload-project.html">Upload Project</a>
+                <a role="menuitem" href="/upload-jobs.html">Upload Jobs</a>
                 <a role="menuitem" href="/upload-activity.html">Upload Activity</a>
                 <a role="menuitem" href="/upload-assessment.html">Upload Assessment Task</a>
                 <a role="menuitem" href="/upload-course-outline.html">Upload Course Outline</a>

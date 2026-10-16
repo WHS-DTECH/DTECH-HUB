@@ -40,7 +40,7 @@
             const title = document.createElement("h3");
             title.textContent = card.title;
             const details = document.createElement("p");
-            details.textContent = `${card.cardType === "unit" ? "Unit" : card.cardType === "lesson" ? "Lesson" : card.cardType === "activity" ? "Lesson Activity" : "Curriculum Strand"} | ${card.yearLevel} | ${card.area} | ${card.status}`;
+            details.textContent = `${card.cardType === "unit" ? "Unit" : card.cardType === "lesson" ? "Lesson" : card.cardType === "activity" ? "Lesson Activity" : card.cardType === "job" ? "Jobs" : "Curriculum Strand"} | ${card.yearLevel} | ${card.area} | ${card.status}`;
             const summary = document.createElement("p");
             summary.textContent = card.summary;
             row.append(title, details, summary);

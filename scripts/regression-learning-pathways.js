@@ -39,6 +39,7 @@ async function testDashboard() {
     let responseCards = [];
     let fails = false;
     const context = vm.createContext({
+        URLSearchParams,
         document: { querySelector: () => config, getElementById: (id) => elements[`#${id}`], createElement: (tag) => new Element(tag) },
         fetch: async (url, options) => {
             assert.equal(url, config.dataset.libraryPath || "/practical-skills/library.json");
@@ -142,6 +143,32 @@ async function testDashboard() {
     assert.match(grid.children[2].innerHTML, /#1f6b3a/);
     assert.match(grid.children[2].innerHTML, />Lesson Activities</);
     assert.deepEqual(elements["#practical-skills-type-pills"].children.map((pill) => pill.textContent), ["All", "Curriculum Strands", "Lessons", "Lesson Activities"]);
+    const jobPalette = dashboard.match(/data-library-job-palette="([^"]+)"/)?.[1];
+    assert.match(jobPalette, /#0f5b75/, "Jobs use a distinct cyan-teal palette");
+    assert.match(dashboard, /data-library-job-label="Jobs"/);
+    Object.assign(config.dataset, { libraryJobLabel: "Jobs", libraryJobPalette: jobPalette });
+    const jobCard = { ...sample, id: "middle-job-space-project", title: "Space Project", cardType: "job", yearLevel: "MiddleDTECH", area: "Jobs", visual: { icon: "JB" } };
+    responseCards = [jobCard, { ...sample, id: "other-project", title: "Other Project", yearLevel: "Senior DTECH" }];
+    vm.runInContext(fs.readFileSync(path.join(root, "practical-skills/app.js"), "utf8"), context);
+    await tick();
+    const jobElement = grid.children.find((card) => card.id === "card-middle-job-space-project");
+    assert.ok(jobElement.classList.contains("pathway-job-card"));
+    assert.match(jobElement.innerHTML, /#0f5b75/);
+    assert.match(jobElement.innerHTML, />Jobs</);
+    assert.deepEqual(elements["#practical-skills-type-pills"].children.map((pill) => pill.textContent), ["All", "Curriculum Strands", "Jobs"]);
+    elements["#practical-skills-type-pills"].children.find((pill) => pill.textContent === "Jobs").click();
+    assert.equal(grid.children.length, 1, "Jobs type filter hides non-job cards");
+    elements["#practical-skills-type-pills"].children[0].click();
+    elements["#practical-skills-year-pills"].children.find((pill) => pill.textContent === "MiddleDTECH").click();
+    assert.equal(grid.children.length, 1, "MiddleDTECH year filter selects Jobs projects");
+    elements["#practical-skills-category-pills"].children.find((pill) => pill.textContent === "Jobs").click();
+    assert.equal(grid.children.length, 1, "Jobs category filter selects job cards");
+    context.location = { search: "?type=job&year=MiddleDTECH&category=Jobs", hash: "" };
+    vm.runInContext(fs.readFileSync(path.join(root, "practical-skills/app.js"), "utf8"), context);
+    await tick();
+    assert.equal(grid.children.length, 1, "Jobs upload link opens with MiddleDTECH and Jobs filters applied");
+    assert.equal(grid.children[0].id, "card-middle-job-space-project");
+    delete context.location;
     config.dataset = {};
     responseCards = [{ ...sample, cardLabel: "LICENCE KIT" }, { ...sample, id: "practical-skills-checklist", title: "Licence" }];
     vm.runInContext(fs.readFileSync(path.join(root, "practical-skills/app.js"), "utf8"), context);
@@ -340,6 +367,9 @@ async function main() {
     assert.match(lessonPage, /<\/div><a class="lesson-activity-pill" href="\/learning-pathways\/activity-build-your-binary-piano\.html">Activity card: Build Your Binary Piano<\/a><\/li>/,
         "The Practical phase shows a right-hand pill linking to its Activity card");
     assert.equal(normalizeCards([sample])[0].cardType, "strand", "Existing cards default to Curriculum Strands");
+    assert.deepEqual(normalizeCards([{ ...sample, id: "middle-job-space-project", cardType: "job", yearLevel: "MiddleDTECH", area: "Jobs" }])[0],
+        { ...normalizeCards([sample])[0], id: "middle-job-space-project", cardType: "job", yearLevel: "MiddleDTECH", area: "Jobs" },
+        "Jobs cards retain their dedicated type, course and category through normalization");
     assert.equal(normalizeCards([{ ...sample, strand: "x" }])[0].strand, undefined, "Only units keep a parent strand");
     assert.equal(seed.find((card) => card.id === "digital-systems").href, "/learning-pathways/digital-systems.html");
     const curriculumLinks = {
@@ -532,7 +562,8 @@ async function main() {
     const app = express();
     app.use(express.json());
     const auth = (req, res, next) => req.headers["x-test-admin"] === "yes" ? next() : res.status(403).json({ error: "Admin required" });
-    registerLearningPathways(app, { pool, hasDatabase: true, requireAdminAccess: auth });
+    const teacherAccess = (req, res, next) => req.headers["x-test-teacher"] === "yes" ? next() : res.status(403).json({ error: "Teacher required" });
+    registerLearningPathways(app, { pool, hasDatabase: true, requireAdminAccess: auth, requireActivityWriteAccess: teacherAccess });
     const server = app.listen(0, "127.0.0.1");
     await new Promise((resolve) => server.once("listening", resolve));
     const base = `http://127.0.0.1:${server.address().port}`;
@@ -684,6 +715,21 @@ async function main() {
         assert.equal((await publish([sample], false)).status, 403);
         assert.equal((await publish([{ ...sample, href: "javascript:test" }])).status, 400);
         assert.equal((await publish([sample])).status, 200);
+        const jobUpload = (headers = { "Content-Type": "application/json", "x-test-teacher": "yes" }) => fetch(`${base}/api/learning-pathways/jobs`, {
+            method: "POST", headers,
+            body: JSON.stringify({ title: "Space Project", summary: "Build an interactive solar system model.", status: "active" })
+        });
+        response = await jobUpload();
+        assert.equal(response.status, 201, "Teacher can upload a MiddleDTECH Jobs card");
+        const savedJob = (await response.json()).card;
+        assert.deepEqual([savedJob.id, savedJob.cardType, savedJob.yearLevel, savedJob.area],
+            ["middle-job-space-project", "job", "MiddleDTECH", "Jobs"]);
+        const libraryAfterJob = await (await fetch(`${base}/learning-pathways/library.json`)).json();
+        assert.deepEqual(libraryAfterJob.map((card) => card.id), [sample.id, savedJob.id],
+            "Job upload appends to the Learning Pathways library without replacing existing cards");
+        assert.equal((await jobUpload()).status, 409, "Duplicate job titles are not added twice");
+        assert.equal((await jobUpload({ "Content-Type": "application/json" })).status, 403,
+            "Jobs upload requires teacher access");
         response = await fetch(`${base}/api/learning-pathways/library`);
         assert.equal((await response.json())[0].title, sample.title);
         // A newly registered app represents a restart, reading the same durable store.

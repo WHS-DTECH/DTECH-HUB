@@ -6216,7 +6216,7 @@ app.get("/practical-skills/library.json", async (_req, res) => {
     res.status(500).json({ error: "Could not load Practical Skills library" });
   }
 });
-require("./learning-pathways/library-store").registerLearningPathways(app, { pool, hasDatabase, requireAdminAccess });
+require("./learning-pathways/library-store").registerLearningPathways(app, { pool, hasDatabase, requireAdminAccess, requireActivityWriteAccess });
 async function getStaffMembers() {
   return (await getStaffDirectoryRows()).flatMap((row) => {
     const name = [row.last_name, row.first_name].map((part) => String(part || "").trim()).filter(Boolean).join(", ");

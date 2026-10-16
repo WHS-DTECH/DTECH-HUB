@@ -61,6 +61,16 @@
     font-weight: 700;
 }
 
+.project-card.pathway-job-card {
+    border-color: #9acbd3;
+    background: #f1fbfc;
+}
+
+.pathway-job-card .project-footer .project-meta {
+    color: #0f6174;
+    font-weight: 700;
+}
+
 .project-card.pathway-display-card:hover {
     transform: none;
 }

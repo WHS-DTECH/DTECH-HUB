@@ -14,20 +14,23 @@
     const categoryPillsContainer = document.getElementById("practical-skills-category-pills");
     const typePillsContainer = document.getElementById("practical-skills-type-pills");
     const sortSelect = document.getElementById("practical-skills-sort");
-    const cardTypeNames = { strand: config.libraryCardLabel || "Curriculum Strands", unit: config.libraryUnitLabel || "Units", lesson: config.libraryLessonLabel || "Lessons", activity: config.libraryActivityLabel || "Lesson Activities" };
-    const cardType = (item) => (isPathways && ["unit", "lesson", "activity"].includes(String(item?.cardType || "")) ? String(item.cardType) : "strand");
+    const cardTypeNames = { strand: config.libraryCardLabel || "Curriculum Strands", unit: config.libraryUnitLabel || "Units", lesson: config.libraryLessonLabel || "Lessons", activity: config.libraryActivityLabel || "Lesson Activities", job: config.libraryJobLabel || "Jobs" };
+    const cardType = (item) => (isPathways && ["unit", "lesson", "activity", "job"].includes(String(item?.cardType || "")) ? String(item.cardType) : "strand");
     const pageLocation = typeof location === "undefined" ? null : location;
-    const requestedType = isPathways ? (String(pageLocation?.search || "").match(/[?&]type=([^&#]*)/) || [])[1] : null;
+    const requestedParams = new URLSearchParams(pageLocation?.search || "");
+    const requestedType = isPathways ? requestedParams.get("type") : null;
+    const requestedYear = isPathways ? requestedParams.get("year") : null;
+    const requestedCategory = isPathways ? requestedParams.get("category") : null;
     const requestedCardId = isPathways ? decodeURIComponent(String(pageLocation?.hash || "").replace(/^#card-/, "")) : "";
     let requestedCardShown = false;
 
     let library = [];
     const state = {
         search: "",
-        year: "All",
+        year: requestedYear || "All",
         status: "All",
         type: Object.prototype.hasOwnProperty.call(cardTypeNames, requestedType || "") ? cardTypeNames[requestedType] : "All",
-        category: "All",
+        category: requestedCategory || "All",
         sort: "name-asc"
     };
 
@@ -137,7 +140,7 @@
                 break;
         }
         if (isPathways) {
-            const order = { strand: 0, unit: 1, lesson: 2, activity: 3 };
+            const order = { strand: 0, job: 1, unit: 2, lesson: 3, activity: 4 };
             const parentKey = { lesson: "unit", activity: "lesson" };
             const lessonOrder = (a, b) => (parentKey[cardType(a)] && cardType(a) === cardType(b) && state.sort === "name-asc"
                 ? String(a[parentKey[cardType(a)]] || "").localeCompare(String(b[parentKey[cardType(b)]] || "")) || (Number(a.sequence) || 999) - (Number(b.sequence) || 999) : 0);
@@ -168,9 +171,11 @@
         if (isLesson) card.classList.add("pathway-lesson-card");
         const isActivity = cardType(item) === "activity";
         if (isActivity) card.classList.add("pathway-activity-card");
+        const isJob = cardType(item) === "job";
+        if (isJob) card.classList.add("pathway-job-card");
         if (isPathways && item.id) card.id = `card-${String(item.id)}`;
         const icon = String(item?.visual?.icon || config.libraryIcon || "PS").trim() || "PS";
-        const palette = String(item?.visual?.palette || (isUnit && config.libraryUnitPalette) || (isLesson && config.libraryLessonPalette) || (isActivity && config.libraryActivityPalette) || config.libraryPalette || "linear-gradient(135deg, #2f8f61 0%, #3ca873 54%, #65c494 100%)");
+        const palette = String(item?.visual?.palette || (isJob && config.libraryJobPalette) || (isUnit && config.libraryUnitPalette) || (isLesson && config.libraryLessonPalette) || (isActivity && config.libraryActivityPalette) || config.libraryPalette || "linear-gradient(135deg, #2f8f61 0%, #3ca873 54%, #65c494 100%)");
         const imageUrl = String(item.imageUrl || "").trim();
         const hasImage = imageUrl.length > 0;
         const visualStyle = hasImage ? "" : `style=\"background: ${escapeHtml(palette)};\"`;
