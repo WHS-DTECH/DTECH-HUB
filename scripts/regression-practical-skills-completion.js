@@ -189,6 +189,8 @@ async function main() {
         "identity-email": "M_SMITHJONES2@WESTLANDHIGH.SCHOOL.NZ"
     };
     assert.equal(assessment.gradeLoginIdentity(identityAnswers, realIdentity, identityQuestions).passed, true);
+    assert.equal(assessment.gradeLoginIdentity({ ...identityAnswers, q1: "m_\u200Bsmithjones2" }, realIdentity, identityQuestions).passed, true,
+        "Username grading ignores an invisible zero-width character while preserving the assigned underscore and number");
     assert.equal(assessment.gradeLoginIdentity({ ...identityAnswers, q1: "m_smithjones" }, realIdentity, identityQuestions).score, 3);
     assert.equal(assessment.gradeLoginIdentity({ ...identityAnswers, "identity-last-name": "SmithJones" }, realIdentity, identityQuestions).passed, false);
     assert.equal(assessment.gradeLoginIdentity({}, realIdentity, identityQuestions).score, 0);

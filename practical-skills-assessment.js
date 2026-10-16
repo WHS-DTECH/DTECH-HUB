@@ -302,7 +302,7 @@ function gradePasswordProblems(answers) {
 }
 
 function gradeLoginIdentity(answers, identity, questions) {
-  const normalize = (value) => String(value || "").normalize("NFC").trim().replace(/\s+/g, " ").toLocaleLowerCase("en-NZ");
+  const normalize = (value) => String(value || "").normalize("NFC").replace(/[\u200B-\u200D\uFEFF]/g, "").trim().replace(/\s+/g, " ").toLocaleLowerCase("en-NZ");
   const email = normalize(identity.email);
   const expected = [identity.givenName, identity.familyName, email.split("@")[0], email];
   if (expected.some((value) => !normalize(value)) || questions.length !== 4) {
