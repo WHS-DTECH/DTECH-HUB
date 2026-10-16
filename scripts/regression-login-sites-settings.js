@@ -37,6 +37,15 @@ async function main() {
         "sketchup-tool-1": "Rectangle", "sketchup-tool-2": "Move", "sketchup-tool-3": "Push/Pull", "sketchup-tool-4": "Line",
         codecombat: "Python"
     };
+    const caseVariedAnswers = {
+        ...correctAnswers,
+        tinkercad: "circuits, 3d designs, CODEBLOCKS",
+        codeavengers: "VARIABLES, if statements, loops",
+        "sketchup-tool-1": "rEcTaNgLe",
+        codecombat: "pYtHoN"
+    };
+    assert.equal(assessment.gradeLoginSites(caseVariedAnswers, defaults).passed, true,
+        "Login Sites accepts lowercase and mixed-case typed answers");
     for (const profile of [{ year: 7 }, { year: 8 }, { year: 9 }, { year: 12 }, { courseIds: ["STAFF"] }]) {
         const visible = config.visibleLoginSites(defaults, profile);
         assert.equal(assessment.gradeLoginSites(correctAnswers, visible).passed, true);

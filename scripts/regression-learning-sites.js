@@ -42,6 +42,8 @@ async function main() {
     };
     const profile = hunt.getHuntProfile({ year_level: "Year 7", programs: ["DTECH"] });
     assert.equal(hunt.gradeLearningSites(answers, profile).passed, true);
+    assert.equal(hunt.gradeLearningSites({ ...answers, science: "evidence", english: "KOKATAHI", pe: "junior physical EDUCATION", dtech: "MISS PrInGle", "course-clue-1": "dIGITAL SkILLS", "course-clue-2": "steam PROJECT" }, profile).passed, true,
+        "Learning Sites accepts lowercase and mixed-case typed answers");
     for (const code of ["SRDTECH", "PIDTECH", "VEDTECH", "MMDTECH", "SDTECH", "JDTECH", "8SDTECH", "7SDTECH"]) {
         const codedProfile = hunt.getHuntProfile({ year_level: "Year 8 - JuniorDTECH", programs: [code] });
         assert.deepEqual(codedProfile.courseIds, ["8DTECH"], `${code} is recognised as a JuniorDTECH timetable code`);

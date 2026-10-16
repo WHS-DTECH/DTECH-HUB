@@ -701,6 +701,8 @@ const completeGrade = gradeContext.gradeSearchPenguinMissions(correctMissionAnsw
 assert.equal(completeGrade.passed, true, "All five correct answers pass the activity");
 assert.equal(completeGrade.score, 5);
 assert.equal(completeGrade.total, 5);
+assert.equal(gradeContext.gradeSearchPenguinMissions(Object.fromEntries(Object.entries(correctMissionAnswers).map(([id, answer]) => [id, answer.toLowerCase()]))).passed, true,
+    "Penguin mission answers are case-insensitive");
 assert.equal(gradeContext.gradeSearchPenguinMissions({ ...correctMissionAnswers, "search-penguin-name": "korora" }).passed, true, "Macron-free korora is accepted");
 const incorrectGrade = gradeContext.gradeSearchPenguinMissions({ ...correctMissionAnswers, "search-penguin-safety": "Rainbows" });
 assert.equal(incorrectGrade.passed, false, "An incorrect answer prevents completion");
@@ -717,6 +719,8 @@ assert.equal(completeKeywordGrade.passed, true, "All five correct Keyword Challe
 assert.equal(completeKeywordGrade.score, 5);
 assert.equal(completeKeywordGrade.total, 5);
 assert.equal(completeKeywordGrade.assessmentId, "search-keyword-challenge-v1");
+assert.equal(gradeContext.gradeSearchKeywordChallenge(Object.fromEntries(Object.entries(correctKeywordAnswers).map(([id, answer]) => [id, answer.toLowerCase()])), 1).passed, true,
+    "Keyword Challenge answers are case-insensitive");
 const incorrectKeywordGrade = gradeContext.gradeSearchKeywordChallenge({
     ...correctKeywordAnswers,
     "1-keyword-fix-the-search": "sunshine"
@@ -733,6 +737,8 @@ const correctSearchAndFindAnswers = {
 const completeSearchAndFindGrade = gradeContext.gradeSearchAndFind(correctSearchAndFindAnswers, 3);
 assert.equal(completeSearchAndFindGrade.passed, true, "All Search and Find answers pass");
 assert.equal(completeSearchAndFindGrade.total, 5);
+assert.equal(gradeContext.gradeSearchAndFind(Object.fromEntries(Object.entries(correctSearchAndFindAnswers).map(([id, answer]) => [id, answer.toLowerCase()])), 3).passed, true,
+    "Search and Find answers are case-insensitive");
 assert.equal(gradeContext.gradeSearchAndFind({ ...correctSearchAndFindAnswers, "3-search-find-glacier-mystery": "ka roimata o hine hukatere" }, 3).passed, true,
     "Glacier answer is accepted without the macron");
 assert.equal(gradeContext.gradeSearchAndFind({ ...correctSearchAndFindAnswers, "3-search-find-glacier-mystery": "Roimata o Hine Hukatere" }, 3).passed, true,
