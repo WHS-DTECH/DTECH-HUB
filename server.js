@@ -12960,6 +12960,28 @@ app.post("/api/student-tracker/email-summary", requireActivityWriteAccess, async
   }
 });
 
+function isMiddleDtechTaskListProfile(profile) {
+  const courseIds = Array.isArray(profile?.courseIds) ? profile.courseIds.map((courseId) => String(courseId || "").trim()) : [];
+  return !courseIds.includes("STAFF") && courseIds.some((courseId) => /^\d{1,2}MDTECH$/.test(courseId));
+}
+
+async function ensureMiddleDtechTaskListEnrollment(studentEmail) {
+  const email = normalizeEmail(studentEmail);
+  const projectId = String(CLIENT_PROJECTS_TASK_ID || "").trim();
+  if (!hasDatabase || !isSchoolEmail(email) || !projectId) return false;
+
+  const profile = await getLearningSitesStudentProfile(email);
+  if (!isMiddleDtechTaskListProfile(profile)) return false;
+
+  await pool.query(
+    `INSERT INTO project_interests (project_id, student_email, confirmed, created_at, updated_at)
+     VALUES ($1, $2, TRUE, NOW(), NOW())
+     ON CONFLICT (project_id, student_email) DO UPDATE SET confirmed = TRUE, updated_at = NOW()`,
+    [projectId, email]
+  );
+  return true;
+}
+
 app.get("/api/my-allocations", async (req, res) => {
   const taskListView = String(req.query?.view || "").trim().toLowerCase() === "task-list";
   const email = normalizeEmail(
@@ -12992,6 +13014,7 @@ app.get("/api/my-allocations", async (req, res) => {
   }
 
   try {
+    if (taskListView) await ensureMiddleDtechTaskListEnrollment(email);
     const studentDirectoryRows = await getStudentDirectoryRows();
     const studentByEmail = new Map();
     studentDirectoryRows.forEach((row) => {

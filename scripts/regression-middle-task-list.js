@@ -50,6 +50,40 @@ assert.equal(context.getTaskListCourseFromAllocations([
     { year_group: "Year 10", course_type: "COMP" }
 ]), "");
 
+const mdtechProfileStart = server.indexOf("function isMiddleDtechTaskListProfile(");
+const mdtechProfileEnd = server.indexOf('\napp.get("/api/my-allocations"', mdtechProfileStart);
+assert.ok(mdtechProfileStart >= 0 && mdtechProfileEnd > mdtechProfileStart,
+    "MDTECH Task List enrollment helper is present");
+const mdtechEnrollmentQueries = [];
+const mdtechProfileContext = vm.createContext({
+    CLIENT_PROJECTS_TASK_ID: "49",
+    hasDatabase: true,
+    normalizeEmail: (email) => String(email || "").trim().toLowerCase(),
+    isSchoolEmail: (email) => String(email || "").endsWith("@westlandhigh.school.nz"),
+    getLearningSitesStudentProfile: async () => ({ courseIds: ["MIDDLEDTECH", "9MDTECH"] }),
+    pool: { query: async (sql, values) => { mdtechEnrollmentQueries.push({ sql, values }); return { rowCount: 1 }; } }
+});
+vm.runInContext(server.slice(mdtechProfileStart, mdtechProfileEnd), mdtechProfileContext);
+async function runMdtechTaskListEnrollmentRegression() {
+    assert.equal(mdtechProfileContext.isMiddleDtechTaskListProfile({ courseIds: ["MIDDLEDTECH", "9MDTECH"] }), true,
+        "Explicit Year 9 MDTECH profiles qualify for automatic enrollment");
+    assert.equal(mdtechProfileContext.isMiddleDtechTaskListProfile({ courseIds: ["MIDDLEDTECH", "9DTECH"] }), false,
+        "MiddleDTECH DTECH profiles are not enrolled by the MDTECH-only rule");
+    assert.equal(mdtechProfileContext.isMiddleDtechTaskListProfile({ courseIds: ["MIDDLEDTECH", "9MPROG"] }), false,
+        "MiddleDTECH MPROG profiles are not enrolled by the MDTECH-only rule");
+    assert.equal(mdtechProfileContext.isMiddleDtechTaskListProfile({ courseIds: ["STAFF", "9MDTECH"] }), false,
+        "Staff test profiles are excluded");
+    assert.equal(await mdtechProfileContext.ensureMiddleDtechTaskListEnrollment("mdtech@westlandhigh.school.nz"), true);
+    assert.equal(mdtechEnrollmentQueries.length, 1);
+    assert.equal(mdtechEnrollmentQueries[0].values[0], "49");
+    assert.match(mdtechEnrollmentQueries[0].sql, /ON CONFLICT \(project_id, student_email\) DO UPDATE SET confirmed = TRUE/);
+    mdtechProfileContext.getLearningSitesStudentProfile = async () => ({ courseIds: ["MIDDLEDTECH", "9DTECH"] });
+    assert.equal(await mdtechProfileContext.ensureMiddleDtechTaskListEnrollment("dtech@westlandhigh.school.nz"), false);
+    assert.equal(mdtechEnrollmentQueries.length, 1, "Non-MDTECH profiles do not create a task-list allocation");
+    assert.match(server, /if \(taskListView\) await ensureMiddleDtechTaskListEnrollment\(email\);/,
+        "Task List allocation loading triggers MDTECH auto-enrollment");
+}
+
 const testingCriterion = "Achieved: Testing that the digital technologies outcome functions as intended.";
 const testingChecklistState = { "91907": [{ text: testingCriterion, done: false }] };
 const testingCountsState = {
@@ -641,7 +675,7 @@ async function runFolderRouteRegression() {
     assert.equal(wrongIdentityResponse.statusCode, 403, "Drive setup requires the same Google and Hub account");
 }
 
-Promise.all([runFolderRouteRegression(), runAutoDriveSyncRegression()]).then(() => {
+Promise.all([runFolderRouteRegression(), runAutoDriveSyncRegression(), runMdtechTaskListEnrollmentRegression()]).then(() => {
     console.log("MiddleDTECH Task List filtering and folder setup regressions passed.");
 }).catch((error) => {
     console.error(error);
