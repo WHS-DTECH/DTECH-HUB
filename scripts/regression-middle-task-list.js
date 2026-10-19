@@ -34,6 +34,34 @@ const helperStart = taskList.indexOf("function getTaskListCourseFromAllocations(
 const helperEnd = taskList.indexOf("// Minimal Drive OAuth client", helperStart);
 assert.ok(helperStart >= 0 && helperEnd > helperStart, "Task List course and filter helpers are present");
 
+const directoryLoadStart = server.indexOf("let studentDirectoryRowsInFlight = null;");
+const directoryLoadEnd = server.indexOf("\nasync function getStaffDirectoryRows", directoryLoadStart);
+assert.ok(directoryLoadStart >= 0 && directoryLoadEnd > directoryLoadStart,
+    "Student directory loading helper is present for Task List profile lookup");
+const directoryLoadCounts = { tableNames: 0, timetableSync: 0, selects: 0 };
+const directoryLoadContext = vm.createContext({
+    hasDatabase: true,
+    STUDENT_TABLE_CANDIDATES: ["student_upload"],
+    resolveExistingTableNames: async () => { directoryLoadCounts.tableNames += 1; return ["student_upload"]; },
+    syncStudentTimetableClasses: async () => { directoryLoadCounts.timetableSync += 1; },
+    quoteIdentifier: (value) => `"${value}"`,
+    pool: { query: async () => { directoryLoadCounts.selects += 1; await new Promise((resolve) => setImmediate(resolve)); return { rows: [{ id: "student-1" }] }; } },
+    console: { warn() {} }
+});
+vm.runInContext(server.slice(directoryLoadStart, directoryLoadEnd), directoryLoadContext);
+async function runStudentDirectoryDeduplicationRegression() {
+    const parallelRows = await Promise.all([
+        directoryLoadContext.getStudentDirectoryRows(),
+        directoryLoadContext.getStudentDirectoryRows()
+    ]);
+    assert.deepEqual(directoryLoadCounts, { tableNames: 1, timetableSync: 1, selects: 1 },
+        "Concurrent Task List profile requests share one in-flight student directory scan");
+    assert.equal(parallelRows[0][0].id, "student-1");
+    await directoryLoadContext.getStudentDirectoryRows();
+    assert.deepEqual(directoryLoadCounts, { tableNames: 2, timetableSync: 2, selects: 2 },
+        "Completed directory reads are not cached across later requests");
+}
+
 const context = vm.createContext({
     getStepLevel: (text) => String(text || "").split(":")[0].trim(),
     stripStepLevel: (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim()
@@ -80,7 +108,7 @@ async function runMdtechTaskListEnrollmentRegression() {
     mdtechProfileContext.getLearningSitesStudentProfile = async () => ({ courseIds: ["MIDDLEDTECH", "9DTECH"] });
     assert.equal(await mdtechProfileContext.ensureMiddleDtechTaskListEnrollment("dtech@westlandhigh.school.nz"), false);
     assert.equal(mdtechEnrollmentQueries.length, 1, "Non-MDTECH profiles do not create a task-list allocation");
-    assert.match(server, /if \(taskListView\) await ensureMiddleDtechTaskListEnrollment\(email\);/,
+    assert.match(server, /if \(taskListView\) await ensureMiddleDtechTaskListEnrollment\(email, studentDirectoryRows\);/,
         "Task List allocation loading triggers MDTECH auto-enrollment");
 }
 
@@ -143,8 +171,16 @@ assert.equal(
 assert.equal(testingChecklistState["91907"][0].done, false);
 assert.match(taskList, /window\.addEventListener\("pageshow",[\s\S]*loadChecklistForTask\(taskListState\.selectedId\)/,
     "Returning to the Task List refreshes evidence after opening a topic page");
-assert.match(taskList, /taskListState\.templateCopies = await autoSyncToolsAndTechniquesTemplateCopy/,
-    "Task List load uses automatically discovered template copy records");
+assert.match(taskList, /taskListState\.templateCopies = Array\.isArray\(templateCopiesPayload\?\.template_copies\)/,
+    "Task List renders from its immediately available database template-copy records");
+assert.match(taskList, /void templateCopySyncPromise\.then\(/,
+    "Drive template discovery runs after the first checklist render");
+const allocationsRouteStart = server.indexOf('app.get("/api/my-allocations", async (req, res) =>');
+const taskListAllocationsFastPath = server.indexOf("if (taskListView) {", allocationsRouteStart);
+const standardCardLookup = server.indexOf("await ensureAssessmentStandardCardsSchema();", allocationsRouteStart);
+assert.ok(allocationsRouteStart >= 0 && taskListAllocationsFastPath > allocationsRouteStart
+    && standardCardLookup > taskListAllocationsFastPath,
+    "Task List allocations have a fast path before standard-card and external-exam lookups");
 
 const autoDriveSyncStart = taskList.indexOf("const TASK_LIST_AUTO_DRIVE_SYNC_COOLDOWN_MS");
 const autoDriveSyncEnd = taskList.indexOf("\nasync function fetchMyEvidence", autoDriveSyncStart);
@@ -675,7 +711,7 @@ async function runFolderRouteRegression() {
     assert.equal(wrongIdentityResponse.statusCode, 403, "Drive setup requires the same Google and Hub account");
 }
 
-Promise.all([runFolderRouteRegression(), runAutoDriveSyncRegression(), runMdtechTaskListEnrollmentRegression()]).then(() => {
+Promise.all([runFolderRouteRegression(), runAutoDriveSyncRegression(), runMdtechTaskListEnrollmentRegression(), runStudentDirectoryDeduplicationRegression()]).then(() => {
     console.log("MiddleDTECH Task List filtering and folder setup regressions passed.");
 }).catch((error) => {
     console.error(error);

@@ -2357,7 +2357,8 @@ async function fetchAllocations() {
     const payload = await loadJson("/api/my-allocations?view=task-list", { headers: buildTaskListHeaders({}) });
     return {
         assessment_tasks: Array.isArray(payload?.assessment_tasks) ? payload.assessment_tasks : [],
-        projects: Array.isArray(payload?.projects) ? payload.projects : []
+        projects: Array.isArray(payload?.projects) ? payload.projects : [],
+        task_list_course: String(payload?.task_list_course || "").trim()
     };
 }
 
@@ -3357,10 +3358,11 @@ async function loadChecklistForTask(taskId) {
     }
 
     taskListState.selectedId = String(selected.id);
-    const detail = await fetchActivityDetail(taskListState.selectedId);
+    const detailPromise = fetchActivityDetail(taskListState.selectedId);
+    const evidencePromise = fetchMyEvidence(taskListState.selectedId).catch(() => []);
+    const [detail, evidenceRows] = await Promise.all([detailPromise, evidencePromise]);
     taskListState.taskTopic = String(detail?.name || selected?.name || "Task List").trim();
 
-    const evidenceRows = await fetchMyEvidence(taskListState.selectedId).catch(() => []);
     const evidenceMap = evidenceRowsToMap(evidenceRows);
     const persistedToolsTechniquesState = getDigiMedToolsTechniquesStateFromEvidence(evidenceRows);
     {
@@ -3424,18 +3426,19 @@ async function loadChecklistForTask(taskId) {
     });
 
     const signedInEmail = getTaskListEmail();
-
-    await loadVideoEfficientToolsFromServer(taskListState.selectedId, signedInEmail);
-
-    // Fetch which templates the student has copied (DB-backed, reliable across devices)
-    const templateCopiesPayload = await loadJson(
-        `/api/activities/${encodeURIComponent(taskListState.selectedId)}/my-template-copies`,
-        { headers: buildTaskListHeaders({}) }
-    ).catch(() => ({ template_copies: [] }));
-    taskListState.templateCopies = await autoSyncToolsAndTechniquesTemplateCopy(
+    const selectedMediaStandard = String(selected?.standard_2 || "").match(/\b(91893|91903)\b/)?.[1] || "";
+    const [, templateCopiesPayload] = await Promise.all([
+        selectedMediaStandard ? loadVideoEfficientToolsFromServer(taskListState.selectedId, signedInEmail) : Promise.resolve(null),
+        loadJson(
+            `/api/activities/${encodeURIComponent(taskListState.selectedId)}/my-template-copies`,
+            { headers: buildTaskListHeaders({}) }
+        ).catch(() => ({ template_copies: [] }))
+    ]);
+    taskListState.templateCopies = Array.isArray(templateCopiesPayload?.template_copies) ? templateCopiesPayload.template_copies : [];
+    const templateCopySyncPromise = autoSyncToolsAndTechniquesTemplateCopy(
         taskListState.selectedId,
         signedInEmail,
-        Array.isArray(templateCopiesPayload?.template_copies) ? templateCopiesPayload.template_copies : []
+        taskListState.templateCopies
     );
     renderSavedFullSlideSet(taskListState.templateCopies);
 
@@ -3487,6 +3490,34 @@ async function loadChecklistForTask(taskId) {
 
     renderTaskPicker(taskListState.allItems, taskListState.selectedId);
     renderChecklistCards(detail || selected, taskListState.allItems);
+
+    void templateCopySyncPromise.then(async (templateCopies) => {
+        if (String(taskListState.selectedId) !== String(selected.id)) return;
+        const nextCopies = Array.isArray(templateCopies) ? templateCopies : [];
+        if (JSON.stringify(nextCopies) === JSON.stringify(taskListState.templateCopies)) return;
+        taskListState.templateCopies = nextCopies;
+        renderSavedFullSlideSet(nextCopies);
+
+        const checklistChanged = [
+            autoTickTestingFunctionsRequirement(taskListState.checklistState, taskListState.fullEvidenceState, selected.id, signedInEmail),
+            autoTickUseOfToolsTechniquesRequirement(taskListState.checklistState, nextCopies),
+            autoTickDigitalOutcomeRequirements(taskListState.checklistState, selected.id, signedInEmail),
+            applyTemplateCopiesAsRelevantImplicationsState(taskListState.checklistState, nextCopies),
+            autoTickRelevantImplicationsRequirements(taskListState.checklistState, selected.id, signedInEmail)
+        ].some(Boolean);
+        const evidenceChanged = [
+            autoTickTestingFunctionsRequirement(taskListState.fullEvidenceState, taskListState.fullEvidenceState, selected.id, signedInEmail),
+            autoTickUseOfToolsTechniquesRequirement(taskListState.fullEvidenceState, nextCopies),
+            autoTickDigitalOutcomeRequirements(taskListState.fullEvidenceState, selected.id, signedInEmail),
+            applyTemplateCopiesAsRelevantImplicationsState(taskListState.fullEvidenceState, nextCopies),
+            autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, selected.id, signedInEmail)
+        ].some(Boolean);
+        if (evidenceChanged) {
+            const standards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
+            await saveMyEvidence(selected.id, evidenceMapToRows(taskListState.fullEvidenceState, standards)).catch(() => {});
+        }
+        if (checklistChanged || evidenceChanged) renderChecklistCards(detail || selected, taskListState.allItems);
+    }).catch(() => {});
 
     void loadIdentifiedComponentsCount(taskListState.selectedId, signedInEmail).then((count) => {
         if (count !== null) {
@@ -3548,12 +3579,13 @@ async function renderTaskListPage() {
     }
 
     const context = getQueryContext();
-    let allocations = { assessment_tasks: [], projects: [] };
+    let allocations = { assessment_tasks: [], projects: [], task_list_course: "" };
     try {
         allocations = await fetchAllocations();
     } catch (_error) {
-        allocations = { assessment_tasks: [], projects: [] };
+        allocations = { assessment_tasks: [], projects: [], task_list_course: "" };
     }
+    taskListState.course = String(allocations.task_list_course || "").trim();
 
     taskListState.allItems = [
         ...allocations.assessment_tasks.map((item) => ({ ...item, kind: "Assessment" })),
@@ -3561,19 +3593,19 @@ async function renderTaskListPage() {
     ];
 
     let courseLookupError = null;
-    try {
-        const coursePayload = await loadJson("/api/practical-skills/my-course", {
-            headers: buildTaskListHeaders({}),
-            cache: "no-store"
-        });
-        taskListState.course = String(coursePayload?.course || "").trim();
-    } catch (error) {
-        courseLookupError = error;
-        taskListState.course = "";
-    }
     if (!taskListState.course) {
-        taskListState.course = getTaskListCourseFromAllocations(taskListState.allItems);
+        try {
+            const coursePayload = await loadJson("/api/practical-skills/my-course", {
+                headers: buildTaskListHeaders({}),
+                cache: "no-store"
+            });
+            taskListState.course = String(coursePayload?.course || "").trim();
+        } catch (error) {
+            courseLookupError = error;
+            taskListState.course = "";
+        }
     }
+    if (!taskListState.course) taskListState.course = getTaskListCourseFromAllocations(taskListState.allItems);
     if (!taskListState.course && courseLookupError) {
         setStatus("Could not confirm your DTECH course. Please reload or ask your teacher for help.", true);
         return;

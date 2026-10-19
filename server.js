@@ -1536,34 +1536,44 @@ async function syncStudentTimetableClasses(tableNames, { force = false } = {}) {
   return { updated: result.rowCount || 0, skipped: false };
 }
 
+let studentDirectoryRowsInFlight = null;
+
 async function getStudentDirectoryRows() {
   if (!hasDatabase) {
     return [];
   }
 
-  const tableNames = await resolveExistingTableNames(STUDENT_TABLE_CANDIDATES);
-  if (!tableNames.length) {
-    return [];
-  }
+  if (studentDirectoryRowsInFlight) return studentDirectoryRowsInFlight;
 
-  try {
-    await syncStudentTimetableClasses(tableNames);
-  } catch (error) {
-    console.warn("Student Timetable Class sync failed:", error.message);
-  }
+  const pending = (async () => {
+    const tableNames = await resolveExistingTableNames(STUDENT_TABLE_CANDIDATES);
+    if (!tableNames.length) return [];
 
-  const mergedRows = [];
-  for (const tableName of tableNames) {
     try {
-      const result = await pool.query(`SELECT * FROM ${quoteIdentifier(tableName)}`);
-      if (Array.isArray(result.rows) && result.rows.length) {
-        mergedRows.push(...result.rows);
-      }
-    } catch (_error) {
+      await syncStudentTimetableClasses(tableNames);
+    } catch (error) {
+      console.warn("Student Timetable Class sync failed:", error.message);
     }
-  }
 
-  return mergedRows;
+    const mergedRows = [];
+    for (const tableName of tableNames) {
+      try {
+        const result = await pool.query(`SELECT * FROM ${quoteIdentifier(tableName)}`);
+        if (Array.isArray(result.rows) && result.rows.length) {
+          mergedRows.push(...result.rows);
+        }
+      } catch (_error) {
+      }
+    }
+    return mergedRows;
+  })();
+
+  studentDirectoryRowsInFlight = pending;
+  try {
+    return await pending;
+  } finally {
+    if (studentDirectoryRowsInFlight === pending) studentDirectoryRowsInFlight = null;
+  }
 }
 
 async function getStaffDirectoryRows() {
@@ -12965,12 +12975,12 @@ function isMiddleDtechTaskListProfile(profile) {
   return !courseIds.includes("STAFF") && courseIds.some((courseId) => /^\d{1,2}MDTECH$/.test(courseId));
 }
 
-async function ensureMiddleDtechTaskListEnrollment(studentEmail) {
+async function ensureMiddleDtechTaskListEnrollment(studentEmail, directoryRows = null) {
   const email = normalizeEmail(studentEmail);
   const projectId = String(CLIENT_PROJECTS_TASK_ID || "").trim();
   if (!hasDatabase || !isSchoolEmail(email) || !projectId) return false;
 
-  const profile = await getLearningSitesStudentProfile(email);
+  const profile = await getLearningSitesStudentProfile(email, directoryRows);
   if (!isMiddleDtechTaskListProfile(profile)) return false;
 
   await pool.query(
@@ -13014,8 +13024,8 @@ app.get("/api/my-allocations", async (req, res) => {
   }
 
   try {
-    if (taskListView) await ensureMiddleDtechTaskListEnrollment(email);
     const studentDirectoryRows = await getStudentDirectoryRows();
+    if (taskListView) await ensureMiddleDtechTaskListEnrollment(email, studentDirectoryRows);
     const studentByEmail = new Map();
     studentDirectoryRows.forEach((row) => {
       const normalized = buildStudentClassManagementRow(row);
@@ -13024,6 +13034,10 @@ app.get("/api/my-allocations", async (req, res) => {
         studentByEmail.set(normalizeEmail(linkedEmail), normalized);
       });
     });
+    const directoryStudent = studentByEmail.get(email);
+    const taskListCourse = directoryStudent
+      ? getResearchReportProgrammeFolder(getHuntProfile(directoryStudent))
+      : "";
 
     const result = await pool.query(
       `SELECT a.id, a.name, a.activity_category, a.type, pi.student_email, pi.standard_1, pi.standard_2, pi.digital_media_type
@@ -13062,6 +13076,11 @@ app.get("/api/my-allocations", async (req, res) => {
       } else {
         projects.push(item);
       }
+    }
+
+    if (taskListView) {
+      res.json({ assessment_tasks: assessmentTasks, projects, task_list_course: taskListCourse });
+      return;
     }
 
     await ensureAssessmentStandardCardsSchema();
@@ -14757,9 +14776,10 @@ app.put("/api/practical-skills/progress/:kitId/activities/:activityIndex", async
   }
 });
 
-async function getLearningSitesStudentProfile(email) {
+async function getLearningSitesStudentProfile(email, directoryRows = null) {
   if (await canManagePracticalSchedule(email)) return getHuntProfile(null, { isStaff: true });
-  const rows = (await getStudentDirectoryRows()).map(buildStudentClassManagementRow)
+  const sourceRows = Array.isArray(directoryRows) ? directoryRows : await getStudentDirectoryRows();
+  const rows = sourceRows.map(buildStudentClassManagementRow)
     .filter((row) => row.linked_emails.some((linkedEmail) => normalizeEmail(linkedEmail) === email));
   if (new Set(rows.map(getStudentIdentityKey)).size > 1) {
     return { available: false, courseIds: [], message: "More than one student profile is linked to your account. Ask your teacher to check your profile before completing this hunt." };
