@@ -9550,28 +9550,101 @@ async function ensureStudentLoginDriveSetupSchema() {
   await pool.query(`CREATE TABLE IF NOT EXISTS student_login_drive_setup (
     student_email TEXT PRIMARY KEY,
     folder_id TEXT NOT NULL,
+    junior_folder_id TEXT,
+    middle_folder_id TEXT,
     confirmed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   )`);
+  await pool.query(`ALTER TABLE student_login_drive_setup ADD COLUMN IF NOT EXISTS junior_folder_id TEXT`);
+  await pool.query(`ALTER TABLE student_login_drive_setup ADD COLUMN IF NOT EXISTS middle_folder_id TEXT`);
 }
 
 async function getStudentLoginDriveSetup(email) {
   const normalizedEmail = normalizeEmail(email);
   if (!hasDatabase) return memoryStudentLoginDriveSetup.get(normalizedEmail) || null;
   await ensureStudentLoginDriveSetupSchema();
-  const result = await pool.query("SELECT folder_id FROM student_login_drive_setup WHERE student_email = $1", [normalizedEmail]);
+  const result = await pool.query("SELECT * FROM student_login_drive_setup WHERE student_email = $1", [normalizedEmail]);
   return result.rows?.[0] || null;
 }
 
 async function saveStudentLoginDriveSetup(email, folderId) {
   const normalizedEmail = normalizeEmail(email);
   if (!hasDatabase) {
-    memoryStudentLoginDriveSetup.set(normalizedEmail, { folder_id: folderId });
+    const existing = memoryStudentLoginDriveSetup.get(normalizedEmail) || {};
+    memoryStudentLoginDriveSetup.set(normalizedEmail, { ...existing, student_email: normalizedEmail, folder_id: folderId });
     return;
   }
   await ensureStudentLoginDriveSetupSchema();
   await pool.query(`INSERT INTO student_login_drive_setup (student_email, folder_id) VALUES ($1, $2)
     ON CONFLICT (student_email) DO UPDATE SET folder_id = EXCLUDED.folder_id, confirmed_at = NOW()`,
   [normalizedEmail, folderId]);
+}
+
+async function saveStudentLoginDriveCourseFolder(email, rootFolderId, programmeFolder, folderId) {
+  const normalizedEmail = normalizeEmail(email);
+  const safeRootFolderId = String(rootFolderId || "").trim();
+  const safeFolderId = String(folderId || "").trim();
+  const column = programmeFolder === "JuniorDTECH" ? "junior_folder_id"
+    : programmeFolder === "MiddleDTECH" ? "middle_folder_id" : "";
+  if (!normalizedEmail || !safeRootFolderId || !safeFolderId || !column) return false;
+
+  if (!hasDatabase) {
+    const existing = memoryStudentLoginDriveSetup.get(normalizedEmail) || {};
+    memoryStudentLoginDriveSetup.set(normalizedEmail, {
+      ...existing,
+      student_email: normalizedEmail,
+      folder_id: safeRootFolderId,
+      [column]: safeFolderId,
+      confirmed_at: existing.confirmed_at || new Date().toISOString()
+    });
+    return true;
+  }
+
+  await ensureStudentLoginDriveSetupSchema();
+  await pool.query(`INSERT INTO student_login_drive_setup (student_email, folder_id, ${column}, confirmed_at)
+    VALUES ($1, $2, $3, NOW())
+    ON CONFLICT (student_email) DO UPDATE SET folder_id = EXCLUDED.folder_id, ${column} = EXCLUDED.${column}, confirmed_at = NOW()`,
+  [normalizedEmail, safeRootFolderId, safeFolderId]);
+  return true;
+}
+
+function buildStudentLoginKitCourseFolderPayload(programmeFolder, folderId = "") {
+  const safeProgrammeFolder = String(programmeFolder || "").trim();
+  const safeFolderId = String(folderId || "").trim();
+  const allowed = ["JuniorDTECH", "MiddleDTECH"].includes(safeProgrammeFolder);
+  return {
+    courseFolder: allowed,
+    programmeFolder: allowed ? safeProgrammeFolder : "",
+    courseFolderName: safeProgrammeFolder,
+    courseFolderId: safeFolderId || null,
+    courseFolderUrl: safeFolderId ? buildDriveFolderUrlFromId(safeFolderId) : null,
+    ready: allowed && Boolean(safeFolderId),
+    configured: allowed && Boolean(safeFolderId),
+    confirmed: allowed && Boolean(safeFolderId),
+    driveReady: allowed && Boolean(safeFolderId)
+  };
+}
+
+async function resolveStudentLoginKitCourseFolder(email, driveAccessToken = "", programmeFolderOverride = "") {
+  const programmeFolder = String(programmeFolderOverride || await getStudentProgrammeFolder(email)).trim();
+  if (!["JuniorDTECH", "MiddleDTECH"].includes(programmeFolder)) {
+    return buildStudentLoginKitCourseFolderPayload(programmeFolder);
+  }
+
+  const storedSetup = await getStudentLoginDriveSetup(email);
+  const storedFolderId = String(storedSetup?.[programmeFolder === "JuniorDTECH" ? "junior_folder_id" : "middle_folder_id"] || "").trim();
+  if (!driveAccessToken) return buildStudentLoginKitCourseFolderPayload(programmeFolder, storedFolderId);
+
+  await verifyDriveTokenForStudent(driveAccessToken, normalizeEmail(email));
+  const root = (storedSetup?.folder_id
+    ? await driveGetLiveFile(String(storedSetup.folder_id), driveAccessToken)
+    : null) || await driveFindFolderByName("root", "WHS-DTECH", driveAccessToken);
+  if (!root?.id) return buildStudentLoginKitCourseFolderPayload(programmeFolder);
+
+  const storedFolder = storedFolderId ? await driveGetLiveFile(storedFolderId, driveAccessToken) : null;
+  const courseFolder = storedFolder || await driveFindFolderByName(String(root.id), programmeFolder, driveAccessToken);
+  const folderId = String(courseFolder?.id || "").trim();
+  if (folderId) await saveStudentLoginDriveCourseFolder(email, String(root.id), programmeFolder, folderId);
+  return buildStudentLoginKitCourseFolderPayload(programmeFolder, folderId);
 }
 
 app.get("/api/student/login-drive-setup", async (req, res) => {
@@ -9712,6 +9785,16 @@ app.get("/api/student/drive-setup", async (req, res) => {
   const email = normalizeEmail(getRequestUserEmail(req));
   if (!email) { res.status(401).json({ error: "Sign in is required." }); return; }
   try {
+    let programmeFolder = "";
+    try {
+      programmeFolder = await getStudentProgrammeFolder(email);
+    } catch (error) {
+      if (Number(error?.status) !== 409) throw error;
+    }
+    if (["JuniorDTECH", "MiddleDTECH"].includes(programmeFolder)) {
+      res.json(await resolveStudentLoginKitCourseFolder(email, "", programmeFolder));
+      return;
+    }
     const setup = await resolveStudentDriveSetupState(email);
     if (!setup) {
       res.json(buildStudentDriveSetupPayload());
@@ -9738,6 +9821,16 @@ app.post("/api/student/drive-setup/status", async (req, res) => {
   }
 
   try {
+    let programmeFolder = "";
+    try {
+      programmeFolder = await getStudentProgrammeFolder(email);
+    } catch (error) {
+      if (Number(error?.status) !== 409) throw error;
+    }
+    if (["JuniorDTECH", "MiddleDTECH"].includes(programmeFolder)) {
+      res.json(await resolveStudentLoginKitCourseFolder(email, driveAccessToken, programmeFolder));
+      return;
+    }
     const setup = await resolveStudentDriveSetupState(email, driveAccessToken);
     if (!setup) {
       res.json(buildStudentDriveSetupPayload());
@@ -15112,6 +15205,9 @@ async function ensureStudentCourseFolders(email, programmeFolder, driveAccessTok
     if (!root?.id) throw new Error("Could not find or create your WHS-DTECH folder.");
     const programme = await driveEnsureFolder(root.id, programmeFolder, driveAccessToken);
     if (!programme?.id) throw new Error(`Could not find or create your ${programmeFolder} folder.`);
+    if (["JuniorDTECH", "MiddleDTECH"].includes(programmeFolder)) {
+      await saveStudentLoginDriveCourseFolder(email, root.id, programmeFolder, programme.id);
+    }
     const kits = await driveEnsureFolder(programme.id, "KITS", driveAccessToken);
     if (!kits?.id) throw new Error("Could not find or create your KITS folder.");
     return { root, programme, kits };

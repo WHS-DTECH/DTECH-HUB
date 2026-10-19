@@ -69,6 +69,7 @@ assert.equal(filledTemplate, "Student name\nAroha Smith\nClass/homeroom\n9TEC\nP
 assert.equal(gradeResearchReport(filledTemplate, filledTemplate).addedWords, 0, "Pre-filled name and class are not counted as the student's words");
 
 const serverSource = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
+const clientSource = fs.readFileSync(path.join(__dirname, "..", "script.js"), "utf8");
 const ensureStart = serverSource.indexOf("async function ensureStudentResearchReport(");
 const ensureSource = serverSource.slice(ensureStart, serverSource.indexOf("\nfunction withResearchReportLock(", ensureStart));
 assert.ok(ensureStart > 0);
@@ -79,6 +80,23 @@ const foldersSource = serverSource.slice(foldersStart, ensureStart);
 assert.ok(foldersStart > 0 && foldersStart < ensureStart);
 assert.match(foldersSource, /driveEnsureFolder\(root\.id, programmeFolder/);
 assert.match(foldersSource, /driveEnsureFolder\(programme\.id, "KITS"/);
+assert.match(foldersSource, /if \(\["JuniorDTECH", "MiddleDTECH"\]\.includes\(programmeFolder\)\)\s*\{\s*await saveStudentLoginDriveCourseFolder\(email, root\.id, programmeFolder, programme\.id\);/,
+    "Junior and Middle Login Kit folder IDs are saved without changing Senior folder setup");
+const driveSetupReadStart = serverSource.indexOf('app.get("/api/student/drive-setup"');
+const driveSetupStatusStart = serverSource.indexOf('app.post("/api/student/drive-setup/status"', driveSetupReadStart);
+const driveSetupConfirmStart = serverSource.indexOf('app.post("/api/student/drive-setup/confirm"', driveSetupStatusStart);
+const driveSetupReadRoute = serverSource.slice(driveSetupReadStart, driveSetupStatusStart);
+const driveSetupStatusRoute = serverSource.slice(driveSetupStatusStart, driveSetupConfirmStart);
+assert.match(driveSetupReadRoute, /\["JuniorDTECH", "MiddleDTECH"\]\.includes\(programmeFolder\)[\s\S]*?resolveStudentLoginKitCourseFolder\(email, "", programmeFolder\)/);
+assert.match(driveSetupStatusRoute, /\["JuniorDTECH", "MiddleDTECH"\]\.includes\(programmeFolder\)[\s\S]*?resolveStudentLoginKitCourseFolder\(email, driveAccessToken, programmeFolder\)/);
+assert.match(driveSetupStatusRoute, /resolveStudentDriveSetupState\(email, driveAccessToken\)/,
+    "Senior continues through the existing Process Assessment setup resolver");
+const courseFolderClickStart = clientSource.indexOf("if (currentSetup?.courseFolder)");
+const processAssessmentClickStart = clientSource.indexOf("if (currentSetup?.confirmed && currentSetup?.processAssessmentFolderId)", courseFolderClickStart);
+const courseFolderClickBranch = clientSource.slice(courseFolderClickStart, processAssessmentClickStart);
+assert.match(courseFolderClickBranch, /window\.open\(currentSetup\.courseFolderUrl/);
+assert.doesNotMatch(courseFolderClickBranch, /confirmHubDriveSetup/,
+    "Junior and Middle Drive Ready clicks never create a Senior Process Assessment folder");
 assert.doesNotMatch(foldersSource, /method: "(DELETE|PATCH|PUT)"|\/delete|trashed: true/, "Folder setup never edits, trashes or deletes Drive files");
 assert.doesNotMatch(ensureSource, /method: "(DELETE|PATCH|PUT)"|\/delete|trashed: true/, "Report creation never edits, trashes or deletes Drive files");
 const resetStart = serverSource.indexOf('app.post("/api/practical-skills/progress/:kitId/reset"');

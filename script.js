@@ -1537,6 +1537,11 @@ const hubDriveSetupState = {
     driveReady: false,
     confirmed: false,
     inferredFromDrive: false,
+    courseFolder: false,
+    programmeFolder: "",
+    courseFolderName: "",
+    courseFolderId: "",
+    courseFolderUrl: "",
     haparaFolderId: "",
     processAssessmentFolderId: "",
     processAssessmentFolderUrl: ""
@@ -1803,12 +1808,20 @@ function resetHubDriveSetupState() {
     hubDriveSetupState.driveReady = false;
     hubDriveSetupState.confirmed = false;
     hubDriveSetupState.inferredFromDrive = false;
+    hubDriveSetupState.courseFolder = false;
+    hubDriveSetupState.programmeFolder = "";
+    hubDriveSetupState.courseFolderName = "";
+    hubDriveSetupState.courseFolderId = "";
+    hubDriveSetupState.courseFolderUrl = "";
     hubDriveSetupState.haparaFolderId = "";
     hubDriveSetupState.processAssessmentFolderId = "";
     hubDriveSetupState.processAssessmentFolderUrl = "";
 }
 
 function isHubDriveSetupReady() {
+    if (hubDriveSetupState.courseFolder) {
+        return Boolean(hubDriveSetupState.confirmed && hubDriveSetupState.courseFolderId);
+    }
     return Boolean(hubDriveSetupState.confirmed && hubDriveSetupState.processAssessmentFolderId);
 }
 
@@ -1818,6 +1831,11 @@ function applyHubDriveSetupState(setup) {
     hubDriveSetupState.driveReady = Boolean(setup?.driveReady);
     hubDriveSetupState.confirmed = Boolean(setup?.confirmed);
     hubDriveSetupState.inferredFromDrive = Boolean(setup?.inferredFromDrive);
+    hubDriveSetupState.courseFolder = Boolean(setup?.courseFolder);
+    hubDriveSetupState.programmeFolder = String(setup?.programmeFolder || "").trim();
+    hubDriveSetupState.courseFolderName = String(setup?.courseFolderName || "").trim();
+    hubDriveSetupState.courseFolderId = String(setup?.courseFolderId || "").trim();
+    hubDriveSetupState.courseFolderUrl = String(setup?.courseFolderUrl || "").trim();
     hubDriveSetupState.haparaFolderId = String(setup?.haparaFolderId || "").trim();
     hubDriveSetupState.processAssessmentFolderId = String(setup?.processAssessmentFolderId || "").trim();
     hubDriveSetupState.processAssessmentFolderUrl = String(
@@ -1842,9 +1860,12 @@ function renderHubDriveSyncButton() {
     }
 
     const label = hubDriveSyncButton.querySelector("span");
-    let nextLabel = "Google Drive Sync";
+    const courseFolderName = hubDriveSetupState.courseFolderName || hubDriveSetupState.programmeFolder;
+    let nextLabel = hubDriveSetupState.courseFolder ? "Check Course Folder" : "Google Drive Sync";
     let nextClass = "google-drive-sync-button drive-state-unknown";
-    let title = "Check that your SeniorDTECH/Process Assessment folder is ready.";
+    let title = hubDriveSetupState.courseFolder
+        ? `Check your ${courseFolderName || "course"} folder created in Login Kit.`
+        : "Check that your SeniorDTECH/Process Assessment folder is ready.";
 
     if (hubDriveSetupState.checking) {
         nextLabel = "Checking Drive...";
@@ -1853,13 +1874,17 @@ function renderHubDriveSyncButton() {
     } else if (isHubDriveSetupReady()) {
         nextLabel = "Drive Ready";
         nextClass = "google-drive-sync-button drive-state-ready";
-        title = hubDriveSetupState.inferredFromDrive
+        title = hubDriveSetupState.courseFolder
+            ? `Your ${courseFolderName} folder is ready.`
+            : hubDriveSetupState.inferredFromDrive
             ? "Process Assessment was found in Google Drive and linked automatically."
             : "Your Process Assessment folder is ready.";
     } else if (hubDriveSetupState.checked) {
-        nextLabel = "Set Up Drive";
+        nextLabel = hubDriveSetupState.courseFolder ? "Check Course Folder" : "Set Up Drive";
         nextClass = "google-drive-sync-button drive-state-action";
-        title = "Create or confirm your SeniorDTECH/Process Assessment folder before using Template Library.";
+        title = hubDriveSetupState.courseFolder
+            ? `Complete Login Kit setup to create your ${courseFolderName} folder.`
+            : "Create or confirm your SeniorDTECH/Process Assessment folder before using Template Library.";
     }
 
     hubDriveSyncButton.className = nextClass;
@@ -2010,6 +2035,14 @@ async function handleHubDriveSyncClick(options = {}) {
 
     try {
         const currentSetup = await fetchHubDriveSetup({ requireDriveToken: true });
+        if (currentSetup?.courseFolder) {
+            if (currentSetup.ready && currentSetup.courseFolderUrl) {
+                if (options.openFolder !== false) window.open(currentSetup.courseFolderUrl, "_blank", "noopener");
+                return true;
+            }
+            alert(`Your ${currentSetup.courseFolderName || currentSetup.programmeFolder} folder isn't ready yet. Finish Google Drive setup in the Login Kit, then check again.`);
+            return false;
+        }
         if (currentSetup?.confirmed && currentSetup?.processAssessmentFolderId) {
             if (options.openFolder !== false && currentSetup.processAssessmentFolderUrl) {
                 window.open(currentSetup.processAssessmentFolderUrl, "_blank", "noopener");
