@@ -62,6 +62,8 @@ assert.equal(decompositionContext.autoTickDecompositionRequirement(decomposition
 assert.equal(decompositionState["91907"][0].done, false, "Unknown coverage never leaves a stale parent tick");
 assert.match(taskList, /isTickActionDisabled \|\| isDecompositionRow/,
     "The decomposition parent cannot be manually ticked");
+assert.match(taskList, /isDecompositionRow \? "is-auto-complete" : ""/,
+    "The auto-managed decomposition checkbox uses the blue auto-complete style");
 assert.match(taskList, /isInformationalRow \|\| isDecompositionRow[\s\S]*?task-list-step-text/,
     "The decomposition parent title is unlinked while subtask category links remain available");
 assert.match(taskList, /autoChangedChecklistDecomposition = autoTickDecompositionRequirement\(taskListState\.checklistState, taskListState\.selectedId, signedInEmail\)/,
