@@ -3702,11 +3702,30 @@ function getFirstGoogleFormUrlFromEvidenceRows(evidenceRows) {
     return "";
 }
 
+async function resolveDigiMedConventionsSlideUrl(projectId, email, taskTopicTitle) {
+    const storedUrl = readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, "relevant-digimed-conventions")?.url;
+    if (storedUrl) return storedUrl;
+
+    try {
+        const evidenceRows = await fetchEvidenceRowsEnsuringAllocation(projectId, email);
+        for (const standard of ["91903", "91893", "91907", "91897"]) {
+            const standardKey = buildTaskTopicSubmissionStandardKey(taskTopicTitle, standard);
+            const submission = parseTaskTopicSubmissionFromEvidenceRows(evidenceRows, standardKey);
+            const evidenceUrl = toSafeExternalUrl(submission.googleSlidesUrl || submission.evidenceLink);
+            if (evidenceUrl) return evidenceUrl;
+        }
+    } catch (_error) {
+    }
+
+    return getDbTemplateCopyUrlById(await fetchDbTemplateCopies(projectId), "relevant-digimed-conventions");
+}
+
 async function syncDigiMedConventionsFromSlide(projectId, email, taskTopicTitle) {
-    const slideUrl = readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, "relevant-digimed-conventions")?.url;
+    const slideUrl = await resolveDigiMedConventionsSlideUrl(projectId, email, taskTopicTitle);
     const presentationId = extractSlidesIdFromValue(slideUrl);
     const driveAccessToken = readStoredHubDriveAccessToken();
-    if (!presentationId || !driveAccessToken) return null;
+    if (!presentationId) return { acknowledgements: {}, status: "No personal Conventions slide is linked yet." };
+    if (!driveAccessToken) return { acknowledgements: {}, status: "Connect Google Drive to read your Conventions slide." };
 
     const response = await fetch("/api/student/drive-setup/read-relevant-conventions", {
         method: "POST",
@@ -10712,16 +10731,22 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             });
         });
         if (!canEdit && readStoredHubEmail()) {
-            void syncDigiMedConventionsFromSlide(id, readStoredHubEmail(), taskTopicTitle)
+            const syncConventionsSlide = () => syncDigiMedConventionsFromSlide(id, readStoredHubEmail(), taskTopicTitle)
                 .then((result) => {
                     if (!result) return;
                     host.querySelectorAll("[data-digimed-convention-ack]").forEach((checkbox) => {
                         checkbox.checked = Boolean(result.acknowledgements[checkbox.getAttribute("data-digimed-convention-ack") || ""]);
                     });
                     const lastSync = host.querySelector("#digimed-conventions-last-sync");
-                    if (lastSync && result.syncedAt) lastSync.textContent = `Last Sync: ${formatSyncCreatedDate(result.syncedAt)}`;
+                    if (lastSync) {
+                        lastSync.textContent = result.syncedAt
+                            ? `Last Sync: ${formatSyncCreatedDate(result.syncedAt)} (${Object.values(result.acknowledgements).filter(Boolean).length} conventions detected)`
+                            : result.status || "Conventions slide sync unavailable.";
+                    }
                 })
                 .catch((error) => console.warn("Could not sync Relevant DigiMed Conventions.", error));
+            void syncConventionsSlide();
+            window.addEventListener("focus", () => { void syncConventionsSlide(); }, { once: true });
         }
     }
 

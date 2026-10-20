@@ -66,6 +66,78 @@ assert.equal(filledUXResult.filled, true,
 assert.ok(["Consistency and standards", "Recognition rather than recall", "Aesthetic and minimalist design", "Accessibility"]
     .every((area) => filledUXResult.areas.includes(area)), "Filled responses identify the relevant UX principles");
 
+const conventionsReaderStart = server.indexOf("function extractGoogleSlidesConventionAreas(");
+const conventionsReaderEnd = server.indexOf("\nfunction extractGoogleSlidesUXPrincipleResponses", conventionsReaderStart);
+assert.ok(conventionsReaderStart >= 0 && conventionsReaderEnd > conventionsReaderStart,
+    "Google Slides Conventions reader is present");
+const conventionsReaderContext = vm.createContext({
+    extractGoogleSlidesTableCellText: (cell) => String(cell?.text || "").trim()
+});
+vm.runInContext(server.slice(conventionsReaderStart, conventionsReaderEnd), conventionsReaderContext);
+const conventionTableSlide = (rows) => ({ slides: [{ pageElements: [{ table: { tableRows: rows.map(([area, response]) => ({
+    tableCells: [{ text: area }, { text: response }]
+})) } }] }] });
+assert.deepEqual(JSON.parse(JSON.stringify(conventionsReaderContext.extractGoogleSlidesConventionAreas(conventionTableSlide([
+    ["Typography", "I used Georgia for readability."],
+    ["Buttons/Controls", "Buttons change on hover to show they are clickable."],
+    ["Consistency", "The layout and terms match the client's expectations."]
+])))), ["Typography", "Buttons/Controls", "Consistency"], "Sierra's populated convention rows are detected");
+assert.deepEqual(JSON.parse(JSON.stringify(conventionsReaderContext.extractGoogleSlidesConventionAreas(conventionTableSlide([
+    ["Typography", ""], ["Buttons/Controls", ""], ["Consistency", ""]
+])))), [], "Convention labels without written responses do not count");
+
+const conventionCountStart = taskList.indexOf("function getDigiMedConventionsAcknowledgementCount(");
+const conventionCountEnd = taskList.indexOf("\nfunction getDigiMedConventionsSubtask", conventionCountStart);
+const conventionAutoStart = taskList.indexOf("function isWebConventionsRequirementStep(");
+const conventionAutoEnd = taskList.indexOf("\nfunction getDigiMedUXPrinciplesAcknowledgementCount", conventionAutoStart);
+const conventionsManagementStart = taskList.indexOf("function getStepAutoManagementKind(");
+const conventionsManagementEnd = taskList.indexOf("\nfunction getSessionTickKey", conventionsManagementStart);
+assert.ok(conventionCountStart >= 0 && conventionCountEnd > conventionCountStart
+    && conventionAutoStart >= 0 && conventionAutoEnd > conventionAutoStart
+    && conventionsManagementStart >= 0 && conventionsManagementEnd > conventionsManagementStart,
+    "Web Conventions count, completion, and management helpers are present");
+const conventionTaskContext = vm.createContext({
+    DIGIMED_CONVENTIONS_ACK_STORAGE_PREFIX: "hub_digimed_conventions_ack_v1",
+    localStorage: { getItem: () => null },
+    getTaskListEmail: () => "sierra@example.test",
+    getAllocatedDigitalMediaType: () => "web",
+    getStepLevel: (text) => String(text || "").split(":")[0].trim(),
+    stripStepLevel: (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim(),
+    isUXPrinciplesRequirementStep: () => false,
+    isDecompositionRequirementStep: () => false,
+    isTestingFunctionsRequirementStep: () => false,
+    isUseOfToolsTechniquesRequirementStep: () => false,
+    isTriallingComponentsRequirementStep: () => false,
+    inferDigitalOutcomeTaskTemplateId: () => "",
+    isEfficientToolsMainStep: () => false,
+    isRelevantImplicationsCategoryStep: () => false
+});
+vm.runInContext([
+    taskList.slice(conventionCountStart, conventionCountEnd),
+    taskList.slice(conventionAutoStart, conventionAutoEnd),
+    taskList.slice(conventionsManagementStart, conventionsManagementEnd)
+].join("\n"), conventionTaskContext);
+const conventionCriterion = "Achieved: Using relevant conventions for the media type.";
+const conventionState = { "91903": [{ text: conventionCriterion, done: false }] };
+const conventionEvidence = { "digital-media-conventions": [
+    { text: "CONVENTION_ACK|Typography|true", done: true },
+    { text: "CONVENTION_ACK|Buttons/Controls|true", done: true }
+] };
+assert.equal(conventionTaskContext.getStepAutoManagementKind("91903", conventionCriterion), "auto");
+assert.equal(conventionTaskContext.autoTickWebConventionsRequirement({ ...conventionState, ...conventionEvidence }, "activity-1", "sierra@example.test"), false,
+    "Two web conventions do not complete the criterion");
+conventionState["digital-media-conventions"] = [...conventionEvidence["digital-media-conventions"],
+    { text: "CONVENTION_ACK|Consistency|true", done: true }];
+assert.equal(conventionTaskContext.autoTickWebConventionsRequirement(conventionState, "activity-1", "sierra@example.test"), true);
+assert.equal(conventionState["91903"][0].done, true, "Three web conventions tick the criterion");
+conventionState["digital-media-conventions"].pop();
+assert.equal(conventionTaskContext.autoTickWebConventionsRequirement(conventionState, "activity-1", "sierra@example.test"), true);
+assert.equal(conventionState["91903"][0].done, false, "Dropping below three clears the criterion");
+assert.match(activityDetail, /async function resolveDigiMedConventionsSlideUrl[\s\S]*?readStoredTaskTopicSlideSyncEntryByTemplateId[\s\S]*?fetchEvidenceRowsEnsuringAllocation[\s\S]*?getDbTemplateCopyUrlById/,
+    "Conventions slide lookup falls back across local sync, saved evidence, and database copies");
+assert.match(taskList, /autoChangedChecklistConventions = autoTickWebConventionsRequirement/,
+    "Task List applies convention evidence during load");
+
 const uxCountStart = taskList.indexOf("function getDigiMedUXPrinciplesAcknowledgementCount(");
 const uxCountEnd = taskList.indexOf("\nfunction getDigiMedUXPrinciplesSubtask", uxCountStart);
 const uxAutoTickStart = taskList.indexOf("function isUXPrinciplesRequirementStep(");
@@ -132,6 +204,15 @@ assert.equal(teacherUxContext.hasDigitalMediaCriterionEvidence("Applying user ex
 assert.equal(teacherUxContext.hasDigitalMediaCriterionEvidence("Applying user experience principles", teacherUxEvidence([
     "Visibility of system status", "Consistency and standards", "Accessibility"
 ])), true, "Teacher summary recognizes three UX principle areas");
+const teacherConventionEvidence = (areas) => [{ steps: areas.map((area) => ({
+    text: `DIGIMED_STATE|conventions|${area}|true`
+})) }];
+assert.equal(teacherUxContext.hasDigitalMediaCriterionEvidence("Using relevant conventions for the media type", teacherConventionEvidence([
+    "Typography", "Buttons/Controls"
+])), false, "Teacher summary requires three convention areas");
+assert.equal(teacherUxContext.hasDigitalMediaCriterionEvidence("Using relevant conventions for the media type", teacherConventionEvidence([
+    "Typography", "Buttons/Controls", "Consistency"
+])), true, "Teacher summary recognizes three convention areas");
 assert.match(activityDetail, /syncDigiMedUXPrinciplesFromSlide\(id, readStoredHubEmail\(\), taskTopicTitle\)/,
     "Opening the UX page reads the linked slide");
 assert.match(activityDetail, /async function resolveDigiMedUXPrinciplesSlideUrl[\s\S]*?readStoredTaskTopicSlideSyncEntryByTemplateId[\s\S]*?fetchEvidenceRowsEnsuringAllocation[\s\S]*?getDbTemplateCopyUrlById/,
@@ -163,6 +244,7 @@ const decompositionContext = vm.createContext({
     getStepLevel: (text) => String(text || "").split(":")[0].trim(),
     stripStepLevel: (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim(),
     isUXPrinciplesRequirementStep: () => false,
+    isWebConventionsRequirementStep: () => false,
     isTestingFunctionsRequirementStep: () => false,
     isUseOfToolsTechniquesRequirementStep: () => false,
     isTriallingComponentsRequirementStep: () => false,
@@ -308,6 +390,7 @@ const testingAutoContext = vm.createContext({
     getStepLevel: (text) => String(text || "").split(":")[0].trim(),
     stripStepLevel: (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim(),
     isUXPrinciplesRequirementStep: () => false,
+    isWebConventionsRequirementStep: () => false,
     inferDigitalOutcomeTaskTemplateId: (text) => /test(?:ing)? that the digital technologies outcome functions as intended/i.test(String(text || ""))
         ? "testing-functions" : "",
     taskListState: { templateCopies: [{ templateId: "testing-functions-markup-validation" }] },
@@ -428,6 +511,7 @@ const useToolsContext = vm.createContext({
     stripStepLevel: (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim(),
     getStepLevel: (text) => String(text || "").split(":")[0].trim(),
     isUXPrinciplesRequirementStep: () => false,
+    isWebConventionsRequirementStep: () => false,
     isTestingFunctionsRequirementStep: () => false,
     isTriallingComponentsRequirementStep: () => false
 });
@@ -469,6 +553,7 @@ const triallingContext = vm.createContext({
     getStepLevel: (text) => String(text || "").split(":")[0].trim(),
     stripStepLevel: (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim(),
     isUXPrinciplesRequirementStep: () => false,
+    isWebConventionsRequirementStep: () => false,
     isTestingFunctionsRequirementStep: () => false,
     isUseOfToolsTechniquesRequirementStep: () => false
 });

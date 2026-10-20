@@ -716,8 +716,17 @@ function hasDigitalMediaCriterionEvidence(taskTopic, evidenceRows) {
         return getDigiMedToolsTechniquesEvidenceCount(evidenceRows) > 0;
     }
     if (/conventions/.test(text)) {
-        return hasEvidenceStepMatching(evidenceRows, /^CONVENTION_ACK\|.+\|true$/i)
-            || hasPersistedDigiMedState(evidenceRows, ["conventions", "image-conventions", "video-conventions"]);
+        const areas = new Set();
+        (Array.isArray(evidenceRows) ? evidenceRows : []).forEach((row) => {
+            (Array.isArray(row?.steps) ? row.steps : []).forEach((step) => {
+                const stepText = String(step?.text || "").trim();
+                const acknowledgement = stepText.match(/^CONVENTION_ACK\|(.+)\|true$/i);
+                const persistedState = stepText.match(/^DIGIMED_STATE\|(?:conventions|image-conventions|video-conventions)\|(.+)\|true$/i);
+                if (acknowledgement?.[1]) areas.add(acknowledgement[1].trim().toLowerCase());
+                if (persistedState?.[1]) areas.add(persistedState[1].trim().toLowerCase());
+            });
+        });
+        return areas.size >= 3;
     }
     if (/user experience principles/.test(text)) {
         const areas = new Set();
