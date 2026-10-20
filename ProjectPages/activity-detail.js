@@ -3733,11 +3733,28 @@ async function syncDigiMedConventionsFromSlide(projectId, email, taskTopicTitle)
     return { acknowledgements: detected, syncedAt: String(payload?.syncedAt || "").trim() };
 }
 
-async function syncDigiMedUXPrinciplesFromSlide(projectId, email) {
-    const slideUrl = readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, "user-experience-principles")?.url;
+async function resolveDigiMedUXPrinciplesSlideUrl(projectId, email, taskTopicTitle) {
+    const storedUrl = readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, "user-experience-principles")?.url;
+    if (storedUrl) return storedUrl;
+
+    try {
+        const evidenceRows = await fetchEvidenceRowsEnsuringAllocation(projectId, email);
+        const standardKey = buildTaskTopicSubmissionStandardKey(taskTopicTitle, "91903");
+        const submission = parseTaskTopicSubmissionFromEvidenceRows(evidenceRows, standardKey);
+        const evidenceUrl = toSafeExternalUrl(submission.googleSlidesUrl || submission.evidenceLink);
+        if (evidenceUrl) return evidenceUrl;
+    } catch (_error) {
+    }
+
+    return getDbTemplateCopyUrlById(await fetchDbTemplateCopies(projectId), "user-experience-principles");
+}
+
+async function syncDigiMedUXPrinciplesFromSlide(projectId, email, taskTopicTitle) {
+    const slideUrl = await resolveDigiMedUXPrinciplesSlideUrl(projectId, email, taskTopicTitle);
     const presentationId = extractSlidesIdFromValue(slideUrl);
     const driveAccessToken = readStoredHubDriveAccessToken();
-    if (!presentationId || !driveAccessToken) return null;
+    if (!presentationId) return { linked: false, filled: false, areas: [], status: "No personal UX Principles slide is linked yet." };
+    if (!driveAccessToken) return { linked: true, filled: false, areas: [], status: "Connect Google Drive to read your UX Principles slide." };
 
     const response = await fetch("/api/student/drive-setup/read-ux-principles", {
         method: "POST",
@@ -3750,7 +3767,7 @@ async function syncDigiMedUXPrinciplesFromSlide(projectId, email) {
     await persistDigiMedLocalState(projectId, email, "ux-principles-slide", {
         filled: Boolean(payload?.filled)
     });
-    return { ...payload, syncedAt: String(payload?.syncedAt || "").trim() };
+    return { ...payload, linked: true, syncedAt: String(payload?.syncedAt || "").trim() };
 }
 
 function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
@@ -10719,11 +10736,24 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             });
         });
         if (!canEdit && readStoredHubEmail()) {
-            const syncUXSlide = () => syncDigiMedUXPrinciplesFromSlide(id, readStoredHubEmail())
+            const syncUXSlide = () => syncDigiMedUXPrinciplesFromSlide(id, readStoredHubEmail(), taskTopicTitle)
                 .then((result) => {
                     if (!result) return;
                     const lastSync = host.querySelector("#digimed-ux-principles-last-sync");
-                    if (lastSync && result.syncedAt) lastSync.textContent = `Last Sync: ${formatSyncCreatedDate(result.syncedAt)}`;
+                    if (result.filled) {
+                        (Array.isArray(result.areas) ? result.areas : []).forEach((area) => {
+                            if (DIGIMED_UX_PRINCIPLE_AREAS.includes(area)) acknowledgements[area] = true;
+                        });
+                        writeDigiMedUXPrinciplesAcknowledgements(id, readStoredHubEmail(), acknowledgements);
+                    }
+                    host.querySelectorAll("[data-digimed-ux-principle-ack]").forEach((checkbox) => {
+                        checkbox.checked = Boolean(acknowledgements[checkbox.getAttribute("data-digimed-ux-principle-ack") || ""]);
+                    });
+                    if (lastSync) {
+                        lastSync.textContent = result.syncedAt
+                            ? `Last Sync: ${formatSyncCreatedDate(result.syncedAt)}${result.filled ? ` (${result.areas.length} UX principles detected)` : " (add substantive responses to the worksheet)"}`
+                            : result.status || "UX slide sync unavailable.";
+                    }
                 })
                 .catch((error) => console.warn("Could not sync UX Principles slideshow.", error));
             void syncUXSlide();

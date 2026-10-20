@@ -57,10 +57,13 @@ const filledUXSlides = {
     ]), ...blankUXSlides.slides.slice(1)]
 };
 assert.deepEqual(JSON.parse(JSON.stringify(uxSlideReaderContext.extractGoogleSlidesUXPrincipleResponses(blankUXSlides))), {
-    responseCount: 0, responseCharacters: 0, filled: false
+    responseCount: 0, responseCharacters: 0, areas: [], filled: false
 }, "A blank UX template and reference slide do not count as student evidence");
-assert.equal(uxSlideReaderContext.extractGoogleSlidesUXPrincipleResponses(filledUXSlides).filled, true,
+const filledUXResult = uxSlideReaderContext.extractGoogleSlidesUXPrincipleResponses(filledUXSlides);
+assert.equal(filledUXResult.filled, true,
     "Substantive responses across the UX prompts count as a filled slide");
+assert.ok(["Consistency and standards", "Recognition rather than recall", "Aesthetic and minimalist design", "Accessibility"]
+    .every((area) => filledUXResult.areas.includes(area)), "Filled responses identify the relevant UX principles");
 
 const uxCountStart = taskList.indexOf("function getDigiMedUXPrinciplesAcknowledgementCount(");
 const uxCountEnd = taskList.indexOf("\nfunction getDigiMedUXPrinciplesSubtask", uxCountStart);
@@ -99,8 +102,10 @@ assert.equal(uxCompletionState["91903"][0].done, true, "A filled UX slide ticks 
 delete uxCompletionState["digimed-local-state:ux-principles-slide"];
 assert.equal(uxTaskContext.autoTickUXPrinciplesRequirement(uxCompletionState, "activity-1", "student@example.test"), true);
 assert.equal(uxCompletionState["91903"][0].done, false, "Removing slide evidence clears the criterion tick");
-assert.match(activityDetail, /syncDigiMedUXPrinciplesFromSlide\(id, readStoredHubEmail\(\)\)/,
+assert.match(activityDetail, /syncDigiMedUXPrinciplesFromSlide\(id, readStoredHubEmail\(\), taskTopicTitle\)/,
     "Opening the UX page reads the linked slide");
+assert.match(activityDetail, /async function resolveDigiMedUXPrinciplesSlideUrl[\s\S]*?readStoredTaskTopicSlideSyncEntryByTemplateId[\s\S]*?fetchEvidenceRowsEnsuringAllocation[\s\S]*?getDbTemplateCopyUrlById/,
+    "UX slide lookup falls back from local sync storage to saved evidence and DB template copies");
 assert.match(activityDetail, /read-ux-principles/,
     "The UX page calls the authenticated server slide reader");
 assert.match(taskList, /autoChangedChecklistUX = autoTickUXPrinciplesRequirement/,

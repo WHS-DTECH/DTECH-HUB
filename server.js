@@ -8379,9 +8379,23 @@ function extractGoogleSlidesUXPrincipleResponses(presentation) {
     .filter((line) => line.length >= 12);
   const uniqueResponses = Array.from(new Set(responseLines));
   const responseText = uniqueResponses.join(" ");
+  const principlePatterns = [
+    ["Visibility of system status", /feedback|status|progress|inform(?:ed|ation)/i],
+    ["Match between system and the real world", /familiar (?:words|terms|concepts)|real world|everyday language/i],
+    ["User control and freedom", /user control|undo|redo|clear exits?|leave unwanted/i],
+    ["Consistency and standards", /consisten(?:t|cy)|standards/i],
+    ["Error prevention", /error prevention|prevent(?:ing)? errors|prevent problems|risky actions/i],
+    ["Recognition rather than recall", /recognition rather than recall|clear navigation|find .{0,40} easily|easily retriev|visible options/i],
+    ["Flexibility and efficiency of use", /flexib(?:le|ility)|efficien(?:t|cy)|shortcuts/i],
+    ["Aesthetic and minimalist design", /simplici(?:ty|tous)|minimal(?:ist)? design|unnecessary clutter/i],
+    ["Help users recognise and recover from errors", /recover from errors|error messages|recognise .{0,30} errors/i],
+    ["Accessibility", /accessib(?:ility|le)/i]
+  ];
+  const areas = principlePatterns.filter(([, pattern]) => pattern.test(responseText)).map(([area]) => area);
   return {
     responseCount: uniqueResponses.length,
     responseCharacters: responseText.length,
+    areas,
     filled: uniqueResponses.length >= 3 && responseText.length >= 80
   };
 }
