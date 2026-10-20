@@ -720,8 +720,17 @@ function hasDigitalMediaCriterionEvidence(taskTopic, evidenceRows) {
             || hasPersistedDigiMedState(evidenceRows, ["conventions", "image-conventions", "video-conventions"]);
     }
     if (/user experience principles/.test(text)) {
-        return hasEvidenceStepMatching(evidenceRows, /^UX_PRINCIPLE_ACK\|.+\|true$/i)
-            || hasPersistedDigiMedState(evidenceRows, ["ux-principles", "ux-principles-slide", "video-ux"]);
+        const areas = new Set();
+        (Array.isArray(evidenceRows) ? evidenceRows : []).forEach((row) => {
+            (Array.isArray(row?.steps) ? row.steps : []).forEach((step) => {
+                const stepText = String(step?.text || "").trim();
+                const acknowledgement = stepText.match(/^UX_PRINCIPLE_ACK\|(.+)\|true$/i);
+                const persistedState = stepText.match(/^DIGIMED_STATE\|(?:ux-principles|video-ux)\|(.+)\|true$/i);
+                if (acknowledgement?.[1]) areas.add(acknowledgement[1].trim().toLowerCase());
+                if (persistedState?.[1]) areas.add(persistedState[1].trim().toLowerCase());
+            });
+        });
+        return areas.size >= 3;
     }
     if (/data integrity and testing/.test(text)) return hasPersistedDigiMedState(evidenceRows, ["image-integrity", "video-integrity"]);
     if (/using information from testing procedures/.test(text)) {

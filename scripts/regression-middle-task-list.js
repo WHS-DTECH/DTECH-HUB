@@ -12,6 +12,7 @@ const script = fs.readFileSync(path.join(root, "script.js"), "utf8");
 const html = fs.readFileSync(path.join(root, "task-list.html"), "utf8");
 const templateLibrary = fs.readFileSync(path.join(root, "ProjectPages", "slideshow-template-library.js"), "utf8");
 const activityDetail = fs.readFileSync(path.join(root, "ProjectPages", "activity-detail.js"), "utf8");
+const teacherStudentWork = fs.readFileSync(path.join(root, "teacher-student-work.js"), "utf8");
 const standardCard = fs.readFileSync(path.join(root, "assessment-standard-card.js"), "utf8");
 
 const uxSlideReaderStart = server.indexOf("function extractGoogleSlidesUXPrincipleResponses(");
@@ -96,12 +97,41 @@ const uxEvidence = { "digimed-local-state:ux-principles-slide": [{ text: "DIGIME
 assert.equal(uxTaskContext.isUXPrinciplesRequirementStep("91903", uxCriterion), true);
 assert.match(taskList, /if \(isUXPrinciplesRequirementStep\(std, text\)\)\s*\{\s*return "auto"/,
     "Achieved UX principles are classified as evidence-managed");
-const uxCompletionState = { "91903": [{ text: uxCriterion, done: false }], ...uxEvidence };
+const uxCompletionState = {
+    "91903": [{ text: uxCriterion, done: false }],
+    "digimed-local-state:ux-principles": [
+        { text: "DIGIMED_STATE|ux-principles|Visibility of system status|true", done: true },
+        { text: "DIGIMED_STATE|ux-principles|Consistency and standards|true", done: true }
+    ],
+    ...uxEvidence
+};
+assert.equal(uxTaskContext.autoTickUXPrinciplesRequirement(uxCompletionState, "activity-1", "student@example.test"), false);
+assert.equal(uxCompletionState["91903"][0].done, false, "Two UX principles do not complete the criterion even when the slide is filled");
+uxCompletionState["digimed-local-state:ux-principles"].push({
+    text: "DIGIMED_STATE|ux-principles|Accessibility|true", done: true
+});
 assert.equal(uxTaskContext.autoTickUXPrinciplesRequirement(uxCompletionState, "activity-1", "student@example.test"), true);
-assert.equal(uxCompletionState["91903"][0].done, true, "A filled UX slide ticks the Achieved criterion");
-delete uxCompletionState["digimed-local-state:ux-principles-slide"];
+assert.equal(uxCompletionState["91903"][0].done, true, "Three UX principles tick the Achieved criterion");
+uxCompletionState["digimed-local-state:ux-principles"].pop();
 assert.equal(uxTaskContext.autoTickUXPrinciplesRequirement(uxCompletionState, "activity-1", "student@example.test"), true);
-assert.equal(uxCompletionState["91903"][0].done, false, "Removing slide evidence clears the criterion tick");
+assert.equal(uxCompletionState["91903"][0].done, false, "Dropping below three UX principles clears the criterion tick");
+const teacherUxStart = teacherStudentWork.indexOf("function hasDigitalMediaCriterionEvidence(");
+const teacherUxEnd = teacherStudentWork.indexOf("\nfunction getDigiMedToolsTechniquesEvidenceCount", teacherUxStart);
+assert.ok(teacherUxStart >= 0 && teacherUxEnd > teacherUxStart, "Teacher Digital Media evidence checker is present");
+const teacherUxContext = vm.createContext({
+    stripTaskTopicLevel: (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim(),
+    getTaskTopicGroup: () => ""
+});
+vm.runInContext(teacherStudentWork.slice(teacherUxStart, teacherUxEnd), teacherUxContext);
+const teacherUxEvidence = (areas) => [{ steps: areas.map((area) => ({
+    text: `DIGIMED_STATE|ux-principles|${area}|true`
+})) }];
+assert.equal(teacherUxContext.hasDigitalMediaCriterionEvidence("Applying user experience principles", teacherUxEvidence([
+    "Visibility of system status", "Consistency and standards"
+])), false, "Teacher summary requires three UX principle areas");
+assert.equal(teacherUxContext.hasDigitalMediaCriterionEvidence("Applying user experience principles", teacherUxEvidence([
+    "Visibility of system status", "Consistency and standards", "Accessibility"
+])), true, "Teacher summary recognizes three UX principle areas");
 assert.match(activityDetail, /syncDigiMedUXPrinciplesFromSlide\(id, readStoredHubEmail\(\), taskTopicTitle\)/,
     "Opening the UX page reads the linked slide");
 assert.match(activityDetail, /async function resolveDigiMedUXPrinciplesSlideUrl[\s\S]*?readStoredTaskTopicSlideSyncEntryByTemplateId[\s\S]*?fetchEvidenceRowsEnsuringAllocation[\s\S]*?getDbTemplateCopyUrlById/,

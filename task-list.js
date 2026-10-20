@@ -1800,7 +1800,6 @@ function getDigiMedConventionsSubtask(stateMap = {}, digitalMediaType = "") {
 
 function getDigiMedUXPrinciplesAcknowledgementCount(activityId, email, stateMap = {}) {
     const databaseAreas = new Set();
-    let hasFilledSlide = false;
     Object.values(stateMap || {}).forEach((steps) => {
         (Array.isArray(steps) ? steps : []).forEach((step) => {
             const text = String(step?.text || "").trim();
@@ -1809,16 +1808,13 @@ function getDigiMedUXPrinciplesAcknowledgementCount(activityId, email, stateMap 
                 if (area && String(value || "").trim().toLowerCase() === "true") databaseAreas.add(area.trim());
                 return;
             }
-            const stateMatch = text.match(/^DIGIMED_STATE\|ux-principles\|(.+)\|true$/i);
+            const stateMatch = text.match(/^DIGIMED_STATE\|(?:ux-principles|video-ux)\|(.+)\|true$/i);
             if (stateMatch) {
                 databaseAreas.add(stateMatch[1].trim());
-                return;
             }
-            if (/^DIGIMED_STATE\|ux-principles-slide\|filled\|true$/i.test(text)) hasFilledSlide = true;
         });
     });
     if (databaseAreas.size) return databaseAreas.size;
-    if (hasFilledSlide) return 1;
 
     try {
         const key = `${DIGIMED_UX_PRINCIPLES_ACK_STORAGE_PREFIX}:${String(activityId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
@@ -1849,17 +1845,8 @@ function isUXPrinciplesRequirementStep(standard, text) {
         && /^applying user experience principles relevant to the purpose of the outcome\.?$/.test(normalizedText);
 }
 
-function hasFilledDigiMedUXSlideEvidence(stateMap) {
-    return Object.values(stateMap || {}).some((steps) =>
-        (Array.isArray(steps) ? steps : []).some((step) =>
-            /^DIGIMED_STATE\|ux-principles-slide\|filled\|true$/i.test(String(step?.text || "").trim())
-        )
-    );
-}
-
 function autoTickUXPrinciplesRequirement(stateMap, activityId, email) {
-    const shouldBeDone = getDigiMedUXPrinciplesAcknowledgementCount(activityId, email, stateMap) > 0
-        || hasFilledDigiMedUXSlideEvidence(stateMap);
+    const shouldBeDone = getDigiMedUXPrinciplesAcknowledgementCount(activityId, email, stateMap) >= 3;
     let changed = false;
 
     ["91893", "91903"].forEach((standard) => {
@@ -2876,7 +2863,7 @@ function renderChecklistCards(detail, allItems) {
                                 return `
                                 <div class="task-list-step-row ${isInformationalRow ? "is-informational" : ""} ${isLinkedRelevantImplicationsRow || isLinkedIntegrityTestingRow || isLinkedTestingImprovementRow || isApplyingRelevantConventionsRow || isNonTickableUXPrinciplesMeritRow ? "is-linked-relevant-implications" : ""} ${is91893EfficientToolsRow ? "is-linked-efficient-tools" : ""} ${needsEvidence ? "is-needs-evidence" : ""}">
                                     <label class="task-list-step-check-wrap">
-                                        ${isInformationalRow || isNonTickableRelevantImplicationsRow91893 || isApplyingRelevantConventionsRow || isNonTickableIntegrityTestingRow || isNonTickableUXPrinciplesMeritRow ? "" : `<input type="checkbox" class="${isUseOfToolsTechniquesRequirement || isUXPrinciplesRequirement ? "is-auto-complete" : ""}" ${isRowChecked ? "checked" : ""} ${isUseOfToolsTechniquesRequirement ? "disabled title=\"Requires at least three checked subtasks and Use of Tools & Techniques template\"" : isUXPrinciplesRequirement ? "disabled title=\"Automatically checked from UX slide responses or acknowledgements\"" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">`}
+                                        ${isInformationalRow || isNonTickableRelevantImplicationsRow91893 || isApplyingRelevantConventionsRow || isNonTickableIntegrityTestingRow || isNonTickableUXPrinciplesMeritRow ? "" : `<input type="checkbox" class="${isUseOfToolsTechniquesRequirement || isUXPrinciplesRequirement ? "is-auto-complete" : ""}" ${isRowChecked ? "checked" : ""} ${isUseOfToolsTechniquesRequirement ? "disabled title=\"Requires at least three checked subtasks and Use of Tools & Techniques template\"" : isUXPrinciplesRequirement ? "disabled title=\"Requires at least three UX principles to be identified and applied\"" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">`}
                                         ${rowText}
                                     </label>
                                     ${is91893ToolsAndTechniquesRow ? `
@@ -2982,7 +2969,7 @@ function renderChecklistCards(detail, allItems) {
                                     ${uxPrinciplesSubtask ? `
                                         <div class="task-list-decomposition-subtasks">
                                             <p class="task-list-system-title">SUBTASKS</p>
-                                            <p class="task-list-achieved-note">UX responses detected on your ${escapeTaskListHtml(uxPrinciplesSubtask.label)} page.</p>
+                                            <p class="task-list-achieved-note">Identify and apply at least 3 UX principles (${uxPrinciplesSubtask.count}/10).</p>
                                             <div class="task-list-decomposition-category-list">
                                                 <a class="task-list-decomposition-category is-covered" href="${escapeTaskListHtml(uxPrinciplesSubtask.href)}">
                                                     <span class="task-list-decomposition-category-label">${escapeTaskListHtml(uxPrinciplesSubtask.label).toUpperCase()}</span>
