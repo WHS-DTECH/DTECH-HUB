@@ -41,6 +41,13 @@ const yearCourses = [
     })))
 ];
 
+const studentYearCourses = Array.from({ length: 7 }, (_, index) => {
+    const year = index + 7;
+    const program = year <= 8 || year >= 11 ? "DTECH" : "MDTECH";
+    const course = yearCourses.find((entry) => entry.year === year && entry.program === program);
+    return { ...course, id: `STUDENT_YEAR_${year}`, program: "STUDENT_YEAR", studentYear: true, label: `Student - Year ${year}` };
+});
+
 const courses = [
     ...yearCourses.filter((course) => course.year <= 8),
     {
@@ -56,6 +63,7 @@ const courses = [
         id: "SENIORDTECH", years: [11, 12, 13], label: "Year 11/12/13 - SeniorDTECH"
     },
     ...yearCourses.filter((course) => course.year >= 11),
+    ...studentYearCourses,
     {
         ...yearCourses.find((course) => course.id === "7DTECH"),
         id: "STAFF", year: null, program: "STAFF", label: "Staff"
@@ -127,11 +135,17 @@ function getHuntProfile(student, { isStaff = false } = {}) {
         (course.years ? course.years.includes(year) : course.year === year) &&
         (course.programs || [course.program]).some((program) => relevant.includes(program))
     ).map((course) => course.id);
+    if (!courseIds.length) {
+        const studentYearCourse = studentYearCourses.find((course) => course.year === year);
+        if (studentYearCourse) courseIds.push(studentYearCourse.id);
+    }
     return {
         available: courseIds.length > 0,
         year,
         courseIds,
-        message: courseIds.length ? "Your course choice will be checked against the timetable data used by User Profile." :
+        message: courseIds[0]?.startsWith("STUDENT_YEAR_")
+            ? `Your profile confirms Year ${year}. Choose Student - Year ${year} to complete the hunt and create your year folder.`
+            : courseIds.length ? "Your course choice will be checked against the timetable data used by User Profile." :
             "We could not match a supported DTECH year/course from your User Profile and timetable. You do not need to type the timetable code; ask your teacher to check that your timetable and year are linked to your profile. You can practise the hunt, but a completion tick cannot be awarded until it is linked."
     };
 }
@@ -152,7 +166,7 @@ function gradeLearningSites(answers, profile) {
     const staff = Boolean(profile?.courseIds?.includes("STAFF"));
     results.push({
         id: "course", correct: courseCorrect,
-        explanation: courseCorrect ? course.id === "STAFF" ? "Staff access confirmed! Now explore the JuniorDTECH course page." : staff ? "Staff test pathway confirmed! Now explore this course page." : "Correct course! It matches your User Profile timetable." :
+        explanation: courseCorrect ? course.id === "STAFF" ? "Staff access confirmed! Now explore the JuniorDTECH course page." : course.studentYear ? `${course.label} confirmed. Your folder will be created in WHS-DTECH.` : staff ? "Staff test pathway confirmed! Now explore this course page." : "Correct course! It matches your User Profile timetable." :
             profile?.available ? "That course/year does not match your User Profile. Check your profile and try again. If the profile is wrong, ask your teacher to correct it." : profile?.message || "Your course profile is unavailable. Ask your teacher for help."
     });
     for (const id of ["course-clue-1", "course-clue-2"]) {
@@ -175,6 +189,7 @@ function getCourseProgrammeFolder(courseId) {
     const course = findCourse(courseId);
     if (!course) return "";
     if (course.id === "STAFF") return "JuniorDTECH";
+    if (course.studentYear) return course.label;
     const year = Math.min(...(course.years || [course.year]).map(Number));
     if (year === 7 || year === 8) return "JuniorDTECH";
     if (year === 9 || year === 10) return "MiddleDTECH";

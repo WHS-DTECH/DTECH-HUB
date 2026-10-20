@@ -6,6 +6,7 @@ const vm = require("node:vm");
 const hunt = require("../learning-sites-assessment");
 const assessment = require("../practical-skills-assessment");
 const loginSitesConfig = require("../login-sites-config");
+const { getResearchReportProgrammeFolder } = require("../research-report");
 const server = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
 const between = (start, end) => {
     const from = server.indexOf(start);
@@ -25,13 +26,15 @@ async function main() {
     assert.equal(hunt.withLearningSitesActivity("kit-minecraft", content), content);
     const publicHunt = assessment.getStudentAssessment(hunt.LEARNING_SITES_ID);
     assert.equal(publicHunt.destinations.length, 5);
-    assert.equal(publicHunt.courses.length, 15);
+    assert.equal(publicHunt.courses.length, 22);
     assert.deepEqual(publicHunt.courses.map((course) => course.label), [
         "Year 7 - JuniorDTECH", "Year 8 - JuniorDTECH", "Year 9/10 - MiddleDTECH",
         "Year 9 - MDTECH", "Year 9 - MPROG", "Year 10 - MDTECH", "Year 10 - MPROG",
         "Year 11/12/13 - SeniorDTECH", "Year 11 - Digital Tech (DTECH)", "Year 11 - Computing (COMP)",
         "Year 12 - Digital Tech (DTECH)", "Year 12 - Computing (COMP)",
-        "Year 13 - Digital Tech (DTECH)", "Year 13 - Computing (COMP)", "Staff"
+        "Year 13 - Digital Tech (DTECH)", "Year 13 - Computing (COMP)",
+        "Student - Year 7", "Student - Year 8", "Student - Year 9", "Student - Year 10",
+        "Student - Year 11", "Student - Year 12", "Student - Year 13", "Staff"
     ]);
     assert.deepEqual(publicHunt.courses.find((course) => course.id === "MIDDLEDTECH").aliases, ["9DTECH", "10DTECH"]);
     assert.ok(publicHunt.destinations.every((clue) => !("answers" in clue)));
@@ -55,7 +58,7 @@ async function main() {
     for (const code of ["JPI", "JSR", "JSD", "JMM", "JVE"]) {
         assert.deepEqual(hunt.getHuntProfile({ year_level: "Year 7", timetable_class: code }).courseIds, ["7DTECH"], `${code} timetable class matches Year 7 JuniorDTECH`);
         assert.deepEqual(hunt.getHuntProfile({ year_level: "Year 8", timetable: [{ label: "Mon P1", value: code }] }).courseIds, ["8DTECH"], `${code} timetable period matches Year 8 JuniorDTECH`);
-        assert.deepEqual(hunt.getHuntProfile({ year_level: "Year 9", timetable_class: code }).courseIds, [], `${code} does not match Year 9`);
+        assert.deepEqual(hunt.getHuntProfile({ year_level: "Year 9", timetable_class: code }).courseIds, ["STUDENT_YEAR_9"], `${code} does not match Year 9, so the year-only choice is offered`);
     }
     assert.deepEqual(hunt.getHuntProfile({ programs: ["8SDTECH"] }).courseIds, ["8DTECH"],
         "A year-prefixed DTECH code can supply the year when the year-level field is missing");
@@ -81,7 +84,23 @@ async function main() {
     assert.equal(hunt.getCourseProgrammeFolder("10MPROG"), "MiddleDTECH");
     assert.equal(hunt.getCourseProgrammeFolder("SENIORDTECH"), "SeniorDTECH");
     assert.equal(hunt.getCourseProgrammeFolder("13COMP"), "SeniorDTECH");
+    assert.equal(hunt.getCourseProgrammeFolder("STUDENT_YEAR_9"), "Student - Year 9");
     assert.equal(hunt.getCourseProgrammeFolder("nope"), "");
+    let savedCourse = "STUDENT_YEAR_9";
+    const programmeStart = server.indexOf("async function getStudentProgrammeFolder(");
+    const programmeEnd = server.indexOf("\nconst MINECRAFT_EXPORTS_FOLDER_NAME", programmeStart);
+    const programmeContext = vm.createContext({
+        getLearningSitesStudentProfile: async () => ({ year: 9, courseIds: ["STUDENT_YEAR_9"] }),
+        getSavedLearningSitesCheckIn: async () => ({ answers: { course: savedCourse } }),
+        getStaffCoursePreference: async () => "",
+        getResearchReportProgrammeFolder,
+        getCourseProgrammeFolder: hunt.getCourseProgrammeFolder
+    });
+    vm.runInContext(server.slice(programmeStart, programmeEnd), programmeContext);
+    assert.equal(await programmeContext.getStudentProgrammeFolder("student@example.school.nz"), "Student - Year 9");
+    savedCourse = "9MDTECH";
+    assert.equal(await programmeContext.getStudentProgrammeFolder("student@example.school.nz"), "MiddleDTECH",
+        "A regular course check-in continues using the existing year-level folder");
     const y8 = hunt.getHuntProfile({ year_level: "8", programs: ["DTECH"] });
     const y9 = hunt.getHuntProfile({ year_level: "9", programs: ["DTECH"] });
     assert.equal(hunt.needsCourseCheckIn({ course: "8DTECH", year: 8 }, y8), false);
@@ -94,9 +113,16 @@ async function main() {
     assert.equal(hunt.gradeLearningSites({ ...answers, course: "8DTECH" }, profile).score, 5);
     assert.equal(hunt.gradeLearningSites({ ...answers, "course-clue-1": "wrong" }, profile).score, 7);
     assert.equal(hunt.gradeLearningSites(answers, hunt.getHuntProfile(null)).passed, false);
-    assert.equal(hunt.getHuntProfile({ year_level: "7", programs: ["TEXT"] }).available, false);
-    assert.match(hunt.getHuntProfile({ year_level: "7", programs: ["TEXT"] }).message, /do not need to type the timetable code/);
-    assert.equal(hunt.getHuntProfile({ year_level: "11", programs: ["COMP", "DTECH"] }).available, false, "Ambiguous senior course is not guessed");
+    const nonDtechYearProfile = hunt.getHuntProfile({ year_level: "Year 9", programs: ["TEXT"] });
+    assert.deepEqual(nonDtechYearProfile.courseIds, ["STUDENT_YEAR_9"]);
+    assert.match(nonDtechYearProfile.message, /Choose Student - Year 9/);
+    assert.equal(hunt.getHuntProfile({ year_level: "Year 9", programs: ["TEXT"] }).available, true);
+    assert.deepEqual(hunt.getHuntProfile({ year_level: "Year 10", programs: ["TEXT"] }).courseIds, ["STUDENT_YEAR_10"]);
+    assert.equal(hunt.getHuntProfile({ year_level: "Year 14", programs: ["TEXT"] }).available, false);
+    const studentYearAnswers = { ...answers, course: "STUDENT_YEAR_9", "course-clue-1": "Office and Adobe Suite", "course-clue-2": "CAD" };
+    assert.equal(hunt.gradeLearningSites(studentYearAnswers, nonDtechYearProfile).passed, true);
+    assert.equal(hunt.getCourseProgrammeFolder("STUDENT_YEAR_9"), "Student - Year 9");
+    assert.deepEqual(hunt.getHuntProfile({ year_level: "11", programs: ["COMP", "DTECH"] }).courseIds, ["STUDENT_YEAR_11"], "Ambiguous senior course offers the year-only choice rather than guessing");
     const compProfile = hunt.getHuntProfile({ year_level: "11", programs: ["COMP", "DTECH"], dtech_timetable: [{ value: "11COMP CW" }] });
     assert.deepEqual(compProfile.courseIds, ["11COMP"], "Ignore inferred generic DTECH if timetable identifies COMP");
     assert.equal(hunt.gradeLearningSites({ ...answers, course: "11COMP", "course-clue-1": "Networking", "course-clue-2": "Word Processing" }, compProfile).passed, true);
@@ -179,6 +205,13 @@ async function main() {
     const failedCheck = await request(checkUrl, { body: { answers: { ...answers, science: "wrong" }, driveAccessToken: "good-token" } });
     assert.equal(failedCheck.body.courseFolder, null, "No folder until the hunt is passed");
     assert.deepEqual(folderCalls, ["JuniorDTECH"]);
+    const originalRows = ownRows;
+    ownRows = [{ ...ownRows[0], year_level: "Year 9", programs: ["TEXT"] }];
+    const studentYearCheck = await request(checkUrl, { body: { answers: studentYearAnswers, driveAccessToken: "good-token" } });
+    assert.equal(studentYearCheck.body.passed, true);
+    assert.equal(studentYearCheck.body.courseFolder.name, "Student - Year 9");
+    assert.deepEqual(folderCalls, ["JuniorDTECH", "Student - Year 9"]);
+    ownRows = originalRows;
     enhanced.worksheets.push({ activity: "Using your login details" });
     const siteContent = assessment.withShortLoginKit("kit-login", { worksheets: [{ activity: "Using your login details" }] });
     enhanced.activities.push({ loginSites: siteContent.activities[0].loginSites });

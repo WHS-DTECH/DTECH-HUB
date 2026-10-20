@@ -80,15 +80,17 @@ const foldersSource = serverSource.slice(foldersStart, ensureStart);
 assert.ok(foldersStart > 0 && foldersStart < ensureStart);
 assert.match(foldersSource, /driveEnsureFolder\(root\.id, programmeFolder/);
 assert.match(foldersSource, /driveEnsureFolder\(programme\.id, "KITS"/);
-assert.match(foldersSource, /if \(\["JuniorDTECH", "MiddleDTECH"\]\.includes\(programmeFolder\)\)\s*\{\s*await saveStudentLoginDriveCourseFolder\(email, root\.id, programmeFolder, programme\.id\);/,
-    "Junior and Middle Login Kit folder IDs are saved without changing Senior folder setup");
+assert.match(foldersSource, /if \(isStudentLoginKitCourseFolder\(programmeFolder\)\)\s*\{\s*await saveStudentLoginDriveCourseFolder\(email, root\.id, programmeFolder, programme\.id\);/,
+    "Junior, Middle, and Student-Year Login Kit folder IDs are saved without changing Senior folder setup");
+assert.match(serverSource, /student_year_folder_id TEXT[\s\S]*student_year_folder_name TEXT/,
+    "Student-Year Drive Ready IDs are stored separately from the Junior and Middle IDs");
 const driveSetupReadStart = serverSource.indexOf('app.get("/api/student/drive-setup"');
 const driveSetupStatusStart = serverSource.indexOf('app.post("/api/student/drive-setup/status"', driveSetupReadStart);
 const driveSetupConfirmStart = serverSource.indexOf('app.post("/api/student/drive-setup/confirm"', driveSetupStatusStart);
 const driveSetupReadRoute = serverSource.slice(driveSetupReadStart, driveSetupStatusStart);
 const driveSetupStatusRoute = serverSource.slice(driveSetupStatusStart, driveSetupConfirmStart);
-assert.match(driveSetupReadRoute, /\["JuniorDTECH", "MiddleDTECH"\]\.includes\(programmeFolder\)[\s\S]*?resolveStudentLoginKitCourseFolder\(email, "", programmeFolder\)/);
-assert.match(driveSetupStatusRoute, /\["JuniorDTECH", "MiddleDTECH"\]\.includes\(programmeFolder\)[\s\S]*?resolveStudentLoginKitCourseFolder\(email, driveAccessToken, programmeFolder\)/);
+assert.match(driveSetupReadRoute, /isStudentLoginKitCourseFolder\(programmeFolder\)[\s\S]*?resolveStudentLoginKitCourseFolder\(email, "", programmeFolder\)/);
+assert.match(driveSetupStatusRoute, /isStudentLoginKitCourseFolder\(programmeFolder\)[\s\S]*?resolveStudentLoginKitCourseFolder\(email, driveAccessToken, programmeFolder\)/);
 assert.match(driveSetupStatusRoute, /resolveStudentDriveSetupState\(email, driveAccessToken\)/,
     "Senior continues through the existing Process Assessment setup resolver");
 const courseFolderClickStart = clientSource.indexOf("if (currentSetup?.courseFolder)");

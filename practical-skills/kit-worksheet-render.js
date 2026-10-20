@@ -246,6 +246,7 @@
                                     ${clueInput(destination)}
                                     ${destination.id === "dtech" ? `
                                         <label for="hunt-course">Which DTECH course are you doing? Choose your year and course, as shown in User Profile. When you pass, your course folder is made in WHS-DTECH. School staff can choose Staff, or any course to test it.</label>
+                                            <label for="hunt-course">Which DTECH course are you doing, or which year are you in if you do not take DTECH? Choose the option matching your User Profile. When you pass, your folder is made in WHS-DTECH. School staff can choose Staff, or any course to test it.</label>
                                         <select id="hunt-course" data-hunt-answer="course" aria-describedby="hunt-feedback-course">
                                             <option value="">Choose your course...</option>
                                             ${assessment.courses.map((course) => `<option value="${escapeHtml(course.id)}" ${answers.course === course.id || course.aliases?.includes(answers.course) ? "selected" : ""}>${escapeHtml(course.label)}</option>`).join("")}
@@ -316,11 +317,12 @@
             });
             if (id === "course" && courseSelect.value) {
                 const feedback = form.querySelector('[data-hunt-feedback="course"]');
+                const selectedCourse = assessment.courses.find((course) => course.id === courseSelect.value);
                 const correct = Boolean(options.huntProfile?.available && options.huntProfile.courseIds.includes(courseSelect.value));
                 feedback.hidden = false;
                 feedback.classList.toggle("is-correct", correct);
                 feedback.classList.toggle("is-error", !correct);
-                feedback.textContent = correct ? courseSelect.value === "STAFF" ? "Staff access confirmed. Now hunt for the two JuniorDTECH clues!" : options.huntProfile.courseIds.includes("STAFF") ? "Staff test pathway confirmed. Now hunt for this course's two clues!" : "This course matches your User Profile. Now hunt for its two clues!" :
+                feedback.textContent = correct ? courseSelect.value === "STAFF" ? "Staff access confirmed. Now hunt for the two JuniorDTECH clues!" : selectedCourse?.studentYear ? `${selectedCourse.label} matches your User Profile year. Now hunt for its two clues!` : options.huntProfile.courseIds.includes("STAFF") ? "Staff test pathway confirmed. Now hunt for this course's two clues!" : "This course matches your User Profile. Now hunt for its two clues!" :
                     options.huntProfile?.available ? "This course/year does not match your User Profile. Check your profile and choose again." :
                         options.huntProfile?.message || "Your course profile is unavailable. Ask your teacher to check it.";
             }
