@@ -8330,6 +8330,62 @@ function extractGoogleSlidesConventionAreas(presentation) {
   return found;
 }
 
+function extractGoogleSlidesUXPrincipleResponses(presentation) {
+  const fixedTemplateCopy = [
+    /user experience \(ux\) principles/gi,
+    /what user experience principles are relevant to your digital outcome\?/gi,
+    /identify the ux principles that are important for your particular outcome, purpose and end users\./gi,
+    /why are these ux principles important for your end users\?/gi,
+    /refer to the end-user requirements you identified earlier\. explain what experience your users need and why the selected principles matter\./gi,
+    /how will you apply these ux principles to your outcome\?/gi,
+    /identify the components, features or design decisions where the principles will be applied and explain what you intend to do\./gi,
+    /what evidence shows that you applied the ux principles\?/gi,
+    /show examples from your developed outcome using screenshots, prototypes, code, testing, trello evidence, client\/end-user feedback or other appropriate evidence\./gi,
+    /did testing, feedback or development cause you to change or refine how you applied a ux principle\?/gi,
+    /explain what you discovered, what you changed and why you made that development decision\./gi,
+    /how did applying or refining the ux principles improve the quality of your outcome\?/gi,
+    /explain what became better for the end user as a result[\s\S]*?more accessible or more effective\./gi,
+    /for example, easier, clearer, faster, more predictable, more accessible or more effective\./gi,
+    /what to look for|discussed|ux principle/gi
+  ];
+  const worksheetText = [];
+  const slides = Array.isArray(presentation?.slides) ? presentation.slides : [];
+  slides.forEach((slide) => {
+    const blocks = [];
+    (Array.isArray(slide?.pageElements) ? slide.pageElements : []).forEach((element) => {
+      const shapeText = element?.shape?.text?.textElements;
+      if (Array.isArray(shapeText)) {
+        blocks.push(shapeText.map((item) => String(item?.textRun?.content || "")).join(""));
+      }
+      (Array.isArray(element?.table?.tableRows) ? element.table.tableRows : []).forEach((row) => {
+        (Array.isArray(row?.tableCells) ? row.tableCells : []).forEach((cell) => {
+          blocks.push(extractGoogleSlidesTableCellText(cell));
+        });
+      });
+    });
+    const slideText = blocks.join("\n");
+    if (/what user experience principles are relevant|why are these ux principles important|how will you apply these ux principles|what evidence shows that you applied the ux principles/i.test(slideText)) {
+      worksheetText.push(slideText);
+    }
+  });
+
+  const responseLines = worksheetText.join("\n")
+    .replace(/[\u2022\u25CF\u25E6\u25AA\u2023\u2043\u00B7\u2219]/g, "\n")
+    .split(/\r?\n/)
+    .map((line) => fixedTemplateCopy.reduce((text, pattern) => text.replace(pattern, " "), line)
+      .replace(/^\s*(?:\d+[.)]|[-*])\s*/, "")
+      .replace(/\s+/g, " ")
+      .trim())
+    .filter((line) => line.length >= 12);
+  const uniqueResponses = Array.from(new Set(responseLines));
+  const responseText = uniqueResponses.join(" ");
+  return {
+    responseCount: uniqueResponses.length,
+    responseCharacters: responseText.length,
+    filled: uniqueResponses.length >= 3 && responseText.length >= 80
+  };
+}
+
 function extractGoogleSlidesDevelopmentRows(presentation) {
   const slides = Array.isArray(presentation?.slides) ? presentation.slides : [];
   const allTableRows = [];
@@ -10740,6 +10796,22 @@ app.post("/api/student/drive-setup/read-relevant-conventions", async (req, res) 
     res.json({ ok: true, presentationId, areas, syncedAt: new Date().toISOString() });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not read the Relevant DigiMed Conventions slideshow." });
+  }
+});
+
+app.post("/api/student/drive-setup/read-ux-principles", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email) { res.status(401).json({ error: "Sign in is required." }); return; }
+  const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
+  const presentationId = String(req.body?.presentationId || "").trim();
+  if (!driveAccessToken) { res.status(400).json({ error: "driveAccessToken is required." }); return; }
+  if (!/^[A-Za-z0-9_-]{10,}$/.test(presentationId)) { res.status(400).json({ error: "A valid Google Slides presentation ID is required." }); return; }
+
+  try {
+    const presentation = await googleSlidesApiRequest(presentationId, driveAccessToken);
+    res.json({ ok: true, presentationId, ...extractGoogleSlidesUXPrincipleResponses(presentation), syncedAt: new Date().toISOString() });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not read the UX Principles slideshow." });
   }
 });
 

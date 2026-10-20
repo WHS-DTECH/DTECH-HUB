@@ -14,6 +14,98 @@ const templateLibrary = fs.readFileSync(path.join(root, "ProjectPages", "slidesh
 const activityDetail = fs.readFileSync(path.join(root, "ProjectPages", "activity-detail.js"), "utf8");
 const standardCard = fs.readFileSync(path.join(root, "assessment-standard-card.js"), "utf8");
 
+const uxSlideReaderStart = server.indexOf("function extractGoogleSlidesUXPrincipleResponses(");
+const uxSlideReaderEnd = server.indexOf("\nfunction extractGoogleSlidesDevelopmentRows", uxSlideReaderStart);
+assert.ok(uxSlideReaderStart >= 0 && uxSlideReaderEnd > uxSlideReaderStart,
+    "UX Principles slide response reader is present");
+const uxSlideReaderContext = vm.createContext({
+    extractGoogleSlidesTableCellText: (cell) => (cell?.text?.textElements || []).map((entry) => entry?.textRun?.content || "").join("")
+});
+vm.runInContext(server.slice(uxSlideReaderStart, uxSlideReaderEnd), uxSlideReaderContext);
+const uxTemplateLines = [
+    "User Experience (UX) Principles",
+    "1. What User Experience Principles are relevant to YOUR digital outcome?",
+    "Identify the UX principles that are important for your particular outcome, purpose and end users.",
+    "2. Why are these UX Principles important for YOUR end users?",
+    "Refer to the end-user requirements you identified earlier. Explain what experience your users need and why the selected principles matter.",
+    "3. How will you APPLY these UX Principles to your outcome?",
+    "Identify the components, features or design decisions where the principles will be applied and explain what you intend to do.",
+    "4. What EVIDENCE shows that you applied the UX Principles?",
+    "Show examples from your developed outcome using screenshots, prototypes, code, testing, Trello evidence, client/end-user feedback or other appropriate evidence.",
+    "5. Did testing, feedback or development cause you to CHANGE or REFINE how you applied a UX Principle?",
+    "Explain what you discovered, what you changed and why you made that development decision.",
+    "6. How did applying or refining the UX Principles IMPROVE THE QUALITY of your outcome?",
+    "Explain what became better for the end user as a result - for example, easier, clearer, faster, more predictable, more accessible or more effective."
+];
+const uxSlide = (lines) => ({
+    pageElements: [{ shape: { text: { textElements: lines.map((content) => ({ textRun: { content: `${content}\n` } })) } } }]
+});
+const blankUXSlides = {
+    slides: [uxSlide(uxTemplateLines), uxSlide(["Visibility of system status", "The outcome keeps users informed with timely, appropriate feedback."])]
+};
+const filledUXSlides = {
+    slides: [uxSlide([
+        ...uxTemplateLines,
+        "Simplicity, consistency, accessibility and clear navigation are important for this website.",
+        "Users need to find Solar System information easily, and users have different levels of astronomy knowledge.",
+        "A consistent layout makes the website easier to understand.",
+        "Use consistent navigation across pages and organise information with clear headings and sections.",
+        "Use readable fonts, colours and spacing, with relevant images and interactive content.",
+        "Screenshots show the website pages and navigation; HTML and CSS show layout and styling.",
+        "User testing showed the menu label was unclear, so I changed it to make navigation easier.",
+        "The new headings and mobile CSS make the website easier to use on smaller screens."
+    ]), ...blankUXSlides.slides.slice(1)]
+};
+assert.deepEqual(JSON.parse(JSON.stringify(uxSlideReaderContext.extractGoogleSlidesUXPrincipleResponses(blankUXSlides))), {
+    responseCount: 0, responseCharacters: 0, filled: false
+}, "A blank UX template and reference slide do not count as student evidence");
+assert.equal(uxSlideReaderContext.extractGoogleSlidesUXPrincipleResponses(filledUXSlides).filled, true,
+    "Substantive responses across the UX prompts count as a filled slide");
+
+const uxCountStart = taskList.indexOf("function getDigiMedUXPrinciplesAcknowledgementCount(");
+const uxCountEnd = taskList.indexOf("\nfunction getDigiMedUXPrinciplesSubtask", uxCountStart);
+const uxAutoTickStart = taskList.indexOf("function isUXPrinciplesRequirementStep(");
+const uxAutoTickEnd = taskList.indexOf("\nfunction getProjectManagementSystemLogo", uxAutoTickStart);
+assert.ok(uxCountStart >= 0 && uxCountEnd > uxCountStart
+    && uxAutoTickStart >= 0 && uxAutoTickEnd > uxAutoTickStart,
+    "UX acknowledgement count and auto-tick helpers are present");
+const uxTaskContext = vm.createContext({
+    DIGIMED_UX_PRINCIPLES_ACK_STORAGE_PREFIX: "hub_digimed_ux_principles_ack_v1",
+    localStorage: { getItem: () => null },
+    getTaskListEmail: () => "student@example.test",
+    getStepLevel: (text) => String(text || "").split(":")[0].trim(),
+    stripStepLevel: (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim(),
+    isUXPrinciplesRequirementStep: (standard, text) => String(standard) === "91903" && String(text).includes("Applying user experience principles relevant"),
+    isTestingFunctionsRequirementStep: () => false,
+    isDecompositionRequirementStep: () => false,
+    isUseOfToolsTechniquesRequirementStep: () => false,
+    isTriallingComponentsRequirementStep: () => false,
+    inferDigitalOutcomeTaskTemplateId: () => "",
+    isEfficientToolsMainStep: () => false,
+    isRelevantImplicationsCategoryStep: () => false
+});
+vm.runInContext([
+    taskList.slice(uxCountStart, uxCountEnd),
+    taskList.slice(uxAutoTickStart, uxAutoTickEnd)
+].join("\n"), uxTaskContext);
+const uxCriterion = "Achieved: Applying user experience principles relevant to the purpose of the outcome.";
+const uxEvidence = { "digimed-local-state:ux-principles-slide": [{ text: "DIGIMED_STATE|ux-principles-slide|filled|true", done: true }] };
+assert.equal(uxTaskContext.isUXPrinciplesRequirementStep("91903", uxCriterion), true);
+assert.match(taskList, /if \(isUXPrinciplesRequirementStep\(std, text\)\)\s*\{\s*return "auto"/,
+    "Achieved UX principles are classified as evidence-managed");
+const uxCompletionState = { "91903": [{ text: uxCriterion, done: false }], ...uxEvidence };
+assert.equal(uxTaskContext.autoTickUXPrinciplesRequirement(uxCompletionState, "activity-1", "student@example.test"), true);
+assert.equal(uxCompletionState["91903"][0].done, true, "A filled UX slide ticks the Achieved criterion");
+delete uxCompletionState["digimed-local-state:ux-principles-slide"];
+assert.equal(uxTaskContext.autoTickUXPrinciplesRequirement(uxCompletionState, "activity-1", "student@example.test"), true);
+assert.equal(uxCompletionState["91903"][0].done, false, "Removing slide evidence clears the criterion tick");
+assert.match(activityDetail, /syncDigiMedUXPrinciplesFromSlide\(id, readStoredHubEmail\(\)\)/,
+    "Opening the UX page reads the linked slide");
+assert.match(activityDetail, /read-ux-principles/,
+    "The UX page calls the authenticated server slide reader");
+assert.match(taskList, /autoChangedChecklistUX = autoTickUXPrinciplesRequirement/,
+    "Task List applies the saved UX evidence during load");
+
 const decompositionCategoriesStart = taskList.indexOf("const DECOMPOSITION_TASK_CATEGORIES = [");
 const decompositionCategoriesEnd = taskList.indexOf("\n];", decompositionCategoriesStart) + 3;
 const decompositionCoverageStart = taskList.indexOf("function hasCompleteDecompositionCategoryCoverage(");
@@ -35,6 +127,7 @@ const decompositionContext = vm.createContext({
     readDecompositionCategoryCoverage: () => decompositionCoverage,
     getStepLevel: (text) => String(text || "").split(":")[0].trim(),
     stripStepLevel: (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim(),
+    isUXPrinciplesRequirementStep: () => false,
     isTestingFunctionsRequirementStep: () => false,
     isUseOfToolsTechniquesRequirementStep: () => false,
     isTriallingComponentsRequirementStep: () => false,
@@ -179,6 +272,7 @@ const testingCountsState = {
 const testingAutoContext = vm.createContext({
     getStepLevel: (text) => String(text || "").split(":")[0].trim(),
     stripStepLevel: (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim(),
+    isUXPrinciplesRequirementStep: () => false,
     inferDigitalOutcomeTaskTemplateId: (text) => /test(?:ing)? that the digital technologies outcome functions as intended/i.test(String(text || ""))
         ? "testing-functions" : "",
     taskListState: { templateCopies: [{ templateId: "testing-functions-markup-validation" }] },
@@ -298,6 +392,7 @@ const useToolsContext = vm.createContext({
     readDigiMedToolsTechniquesState: () => useToolsState,
     stripStepLevel: (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim(),
     getStepLevel: (text) => String(text || "").split(":")[0].trim(),
+    isUXPrinciplesRequirementStep: () => false,
     isTestingFunctionsRequirementStep: () => false,
     isTriallingComponentsRequirementStep: () => false
 });
@@ -338,6 +433,7 @@ assert.ok(triallingStart >= 0 && triallingEnd > triallingStart,
 const triallingContext = vm.createContext({
     getStepLevel: (text) => String(text || "").split(":")[0].trim(),
     stripStepLevel: (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim(),
+    isUXPrinciplesRequirementStep: () => false,
     isTestingFunctionsRequirementStep: () => false,
     isUseOfToolsTechniquesRequirementStep: () => false
 });

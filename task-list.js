@@ -1800,17 +1800,25 @@ function getDigiMedConventionsSubtask(stateMap = {}, digitalMediaType = "") {
 
 function getDigiMedUXPrinciplesAcknowledgementCount(activityId, email, stateMap = {}) {
     const databaseAreas = new Set();
+    let hasFilledSlide = false;
     Object.values(stateMap || {}).forEach((steps) => {
         (Array.isArray(steps) ? steps : []).forEach((step) => {
             const text = String(step?.text || "").trim();
-            if (!text.startsWith("UX_PRINCIPLE_ACK|")) return;
-            const [, area, value] = text.split("|");
-            if (area && String(value || "").trim().toLowerCase() === "true") {
-                databaseAreas.add(area.trim());
+            if (text.startsWith("UX_PRINCIPLE_ACK|")) {
+                const [, area, value] = text.split("|");
+                if (area && String(value || "").trim().toLowerCase() === "true") databaseAreas.add(area.trim());
+                return;
             }
+            const stateMatch = text.match(/^DIGIMED_STATE\|ux-principles\|(.+)\|true$/i);
+            if (stateMatch) {
+                databaseAreas.add(stateMatch[1].trim());
+                return;
+            }
+            if (/^DIGIMED_STATE\|ux-principles-slide\|filled\|true$/i.test(text)) hasFilledSlide = true;
         });
     });
     if (databaseAreas.size) return databaseAreas.size;
+    if (hasFilledSlide) return 1;
 
     try {
         const key = `${DIGIMED_UX_PRINCIPLES_ACK_STORAGE_PREFIX}:${String(activityId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
@@ -1831,6 +1839,41 @@ function getDigiMedUXPrinciplesSubtask(stateMap = {}, digitalMediaType = "") {
             : buildCustomActivityLink(activityId, "Applying user experience principles relevant to the purpose of the outcome.", "UX Principles (Web)", "user-experience-principles"),
         count: getDigiMedUXPrinciplesAcknowledgementCount(activityId, getTaskListEmail(), stateMap)
     };
+}
+
+function isUXPrinciplesRequirementStep(standard, text) {
+    const safeStandard = String(standard || "").trim();
+    const normalizedText = stripStepLevel(text || "").toLowerCase().replace(/\s+/g, " ").trim();
+    return ["91893", "91903"].includes(safeStandard)
+        && getStepLevel(text) === "Achieved"
+        && /^applying user experience principles relevant to the purpose of the outcome\.?$/.test(normalizedText);
+}
+
+function hasFilledDigiMedUXSlideEvidence(stateMap) {
+    return Object.values(stateMap || {}).some((steps) =>
+        (Array.isArray(steps) ? steps : []).some((step) =>
+            /^DIGIMED_STATE\|ux-principles-slide\|filled\|true$/i.test(String(step?.text || "").trim())
+        )
+    );
+}
+
+function autoTickUXPrinciplesRequirement(stateMap, activityId, email) {
+    const shouldBeDone = getDigiMedUXPrinciplesAcknowledgementCount(activityId, email, stateMap) > 0
+        || hasFilledDigiMedUXSlideEvidence(stateMap);
+    let changed = false;
+
+    ["91893", "91903"].forEach((standard) => {
+        const rows = Array.isArray(stateMap?.[standard]) ? stateMap[standard] : [];
+        rows.forEach((row) => {
+            if (!isUXPrinciplesRequirementStep(standard, row?.text || "")) return;
+            if (Boolean(row?.done) !== shouldBeDone) {
+                row.done = shouldBeDone;
+                changed = true;
+            }
+        });
+    });
+
+    return changed;
 }
 
 function getProjectManagementSystemLogo(systemName) {
@@ -2035,6 +2078,9 @@ function getStepAutoManagementKind(standard, text) {
         return "auto";
     }
     if (isTestingFunctionsRequirementStep(std, text)) {
+        return "auto";
+    }
+    if (isUXPrinciplesRequirementStep(std, text)) {
         return "auto";
     }
     if (isDecompositionRequirementStep(std, text)) {
@@ -2780,6 +2826,7 @@ function renderChecklistCards(detail, allItems) {
                                 const isUseOfToolsTechniquesRequirement = isUseOfToolsTechniquesRequirementStep(standard, step?.text || "");
                                 const is91893ConventionsRow = /using relevant conventions for the media type|applying relevant conventions to improve the quality of the outcome/i.test(stepText);
                                 const is91903UXPrinciplesRow = /applying user experience principles relevant to the purpose of the outcome|applying user experience principles to improve the quality of the digital media outcome/i.test(stepText);
+                                const isUXPrinciplesRequirement = isUXPrinciplesRequirementStep(standard, step?.text || "");
                                 const isNonTickableUXPrinciplesMeritRow = String(standard) === "91903"
                                     && String(level) === "Merit"
                                     && /applying user experience principles to improve the quality of the digital media outcome/i.test(stepText);
@@ -2829,7 +2876,7 @@ function renderChecklistCards(detail, allItems) {
                                 return `
                                 <div class="task-list-step-row ${isInformationalRow ? "is-informational" : ""} ${isLinkedRelevantImplicationsRow || isLinkedIntegrityTestingRow || isLinkedTestingImprovementRow || isApplyingRelevantConventionsRow || isNonTickableUXPrinciplesMeritRow ? "is-linked-relevant-implications" : ""} ${is91893EfficientToolsRow ? "is-linked-efficient-tools" : ""} ${needsEvidence ? "is-needs-evidence" : ""}">
                                     <label class="task-list-step-check-wrap">
-                                        ${isInformationalRow || isNonTickableRelevantImplicationsRow91893 || isApplyingRelevantConventionsRow || isNonTickableIntegrityTestingRow || isNonTickableUXPrinciplesMeritRow ? "" : `<input type="checkbox" class="${isUseOfToolsTechniquesRequirement ? "is-auto-complete" : ""}" ${isRowChecked ? "checked" : ""} ${isUseOfToolsTechniquesRequirement ? "disabled title=\"Requires at least three checked subtasks and Use of Tools & Techniques template\"" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">`}
+                                        ${isInformationalRow || isNonTickableRelevantImplicationsRow91893 || isApplyingRelevantConventionsRow || isNonTickableIntegrityTestingRow || isNonTickableUXPrinciplesMeritRow ? "" : `<input type="checkbox" class="${isUseOfToolsTechniquesRequirement || isUXPrinciplesRequirement ? "is-auto-complete" : ""}" ${isRowChecked ? "checked" : ""} ${isUseOfToolsTechniquesRequirement ? "disabled title=\"Requires at least three checked subtasks and Use of Tools & Techniques template\"" : isUXPrinciplesRequirement ? "disabled title=\"Automatically checked from UX slide responses or acknowledgements\"" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">`}
                                         ${rowText}
                                     </label>
                                     ${is91893ToolsAndTechniquesRow ? `
@@ -2935,7 +2982,7 @@ function renderChecklistCards(detail, allItems) {
                                     ${uxPrinciplesSubtask ? `
                                         <div class="task-list-decomposition-subtasks">
                                             <p class="task-list-system-title">SUBTASKS</p>
-                                            <p class="task-list-achieved-note">UX principle areas acknowledged on your ${escapeTaskListHtml(uxPrinciplesSubtask.label)} page.</p>
+                                            <p class="task-list-achieved-note">UX responses detected on your ${escapeTaskListHtml(uxPrinciplesSubtask.label)} page.</p>
                                             <div class="task-list-decomposition-category-list">
                                                 <a class="task-list-decomposition-category is-covered" href="${escapeTaskListHtml(uxPrinciplesSubtask.href)}">
                                                     <span class="task-list-decomposition-category-label">${escapeTaskListHtml(uxPrinciplesSubtask.label).toUpperCase()}</span>
@@ -3480,6 +3527,7 @@ async function loadChecklistForTask(taskId) {
 
     const autoChangedChecklistPM = autoTickProjectManagementRequirement(taskListState.checklistState);
     const autoChangedChecklistDecomposition = autoTickDecompositionRequirement(taskListState.checklistState, taskListState.selectedId, signedInEmail);
+    const autoChangedChecklistUX = autoTickUXPrinciplesRequirement(taskListState.checklistState, taskListState.selectedId, signedInEmail);
     const autoChangedChecklistTesting = autoTickTestingFunctionsRequirement(
         taskListState.checklistState, taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail
     );
@@ -3490,9 +3538,10 @@ async function loadChecklistForTask(taskId) {
     const autoSyncedChecklist91893RI = sync91893RelevantImplicationsState(taskListState.checklistState);
     const autoChangedChecklistET = autoTickEfficientToolsRequirement(taskListState.checklistState, taskListState.selectedId, signedInEmail);
     const clearedChecklistManualTicks = clearUnverifiedManualTicks(taskListState.checklistState);
-    const autoChangedChecklist = autoChangedChecklistPM || autoChangedChecklistDecomposition || autoChangedChecklistTesting || autoChangedChecklistTools || autoChangedChecklistDO || autoChangedChecklistRI || autoRepairedChecklistRI || autoSyncedChecklist91893RI || autoChangedChecklistET || clearedChecklistManualTicks;
+    const autoChangedChecklist = autoChangedChecklistPM || autoChangedChecklistDecomposition || autoChangedChecklistUX || autoChangedChecklistTesting || autoChangedChecklistTools || autoChangedChecklistDO || autoChangedChecklistRI || autoRepairedChecklistRI || autoSyncedChecklist91893RI || autoChangedChecklistET || clearedChecklistManualTicks;
     const autoChangedEvidencePM = autoTickProjectManagementRequirement(taskListState.fullEvidenceState);
     const autoChangedEvidenceDecomposition = autoTickDecompositionRequirement(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
+    const autoChangedEvidenceUX = autoTickUXPrinciplesRequirement(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
     const autoChangedEvidenceTesting = autoTickTestingFunctionsRequirement(
         taskListState.fullEvidenceState, taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail
     );
@@ -3503,7 +3552,7 @@ async function loadChecklistForTask(taskId) {
     const autoSyncedEvidence91893RI = sync91893RelevantImplicationsState(taskListState.fullEvidenceState);
     const autoChangedEvidenceET = autoTickEfficientToolsRequirement(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
     const clearedEvidenceManualTicks = clearUnverifiedManualTicks(taskListState.fullEvidenceState);
-    const autoChangedEvidence = autoChangedEvidencePM || autoChangedEvidenceDecomposition || autoChangedEvidenceTesting || autoChangedEvidenceTools || autoChangedEvidenceDO || autoChangedEvidenceRI || autoRepairedEvidenceRI || autoSyncedEvidence91893RI || autoChangedEvidenceET || clearedEvidenceManualTicks;
+    const autoChangedEvidence = autoChangedEvidencePM || autoChangedEvidenceDecomposition || autoChangedEvidenceUX || autoChangedEvidenceTesting || autoChangedEvidenceTools || autoChangedEvidenceDO || autoChangedEvidenceRI || autoRepairedEvidenceRI || autoSyncedEvidence91893RI || autoChangedEvidenceET || clearedEvidenceManualTicks;
     if (migratedDigitalOutcomeRows || migrated91897Rows || migrated91907Rows || migrated91893Rows || migrated91903Rows || autoChangedChecklist || autoChangedEvidence) {
         const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
         await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});

@@ -3733,6 +3733,26 @@ async function syncDigiMedConventionsFromSlide(projectId, email, taskTopicTitle)
     return { acknowledgements: detected, syncedAt: String(payload?.syncedAt || "").trim() };
 }
 
+async function syncDigiMedUXPrinciplesFromSlide(projectId, email) {
+    const slideUrl = readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, "user-experience-principles")?.url;
+    const presentationId = extractSlidesIdFromValue(slideUrl);
+    const driveAccessToken = readStoredHubDriveAccessToken();
+    if (!presentationId || !driveAccessToken) return null;
+
+    const response = await fetch("/api/student/drive-setup/read-ux-principles", {
+        method: "POST",
+        headers: buildWriteHeaders(),
+        body: JSON.stringify({ driveAccessToken, presentationId })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload?.error || "Could not read the UX Principles slideshow.");
+
+    await persistDigiMedLocalState(projectId, email, "ux-principles-slide", {
+        filled: Boolean(payload?.filled)
+    });
+    return { ...payload, syncedAt: String(payload?.syncedAt || "").trim() };
+}
+
 function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     const existingSubmission = parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey);
     const sourceRows = normalizeEvidenceSteps(rows).filter(
@@ -10698,6 +10718,17 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 writeDigiMedUXPrinciplesAcknowledgements(id, readStoredHubEmail(), acknowledgements);
             });
         });
+        if (!canEdit && readStoredHubEmail()) {
+            const syncUXSlide = () => syncDigiMedUXPrinciplesFromSlide(id, readStoredHubEmail())
+                .then((result) => {
+                    if (!result) return;
+                    const lastSync = host.querySelector("#digimed-ux-principles-last-sync");
+                    if (lastSync && result.syncedAt) lastSync.textContent = `Last Sync: ${formatSyncCreatedDate(result.syncedAt)}`;
+                })
+                .catch((error) => console.warn("Could not sync UX Principles slideshow.", error));
+            void syncUXSlide();
+            window.addEventListener("focus", () => { void syncUXSlide(); }, { once: true });
+        }
     }
 
     if (digitalOutcomeTopicKey === "video-integrity-testing") {

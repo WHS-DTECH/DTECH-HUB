@@ -721,7 +721,7 @@ function hasDigitalMediaCriterionEvidence(taskTopic, evidenceRows) {
     }
     if (/user experience principles/.test(text)) {
         return hasEvidenceStepMatching(evidenceRows, /^UX_PRINCIPLE_ACK\|.+\|true$/i)
-            || hasPersistedDigiMedState(evidenceRows, ["ux-principles", "video-ux"]);
+            || hasPersistedDigiMedState(evidenceRows, ["ux-principles", "ux-principles-slide", "video-ux"]);
     }
     if (/data integrity and testing/.test(text)) return hasPersistedDigiMedState(evidenceRows, ["image-integrity", "video-integrity"]);
     if (/using information from testing procedures/.test(text)) {
