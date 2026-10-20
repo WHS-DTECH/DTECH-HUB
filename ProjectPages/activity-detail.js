@@ -3717,7 +3717,27 @@ async function resolveDigiMedConventionsSlideUrl(projectId, email, taskTopicTitl
     } catch (_error) {
     }
 
-    return getDbTemplateCopyUrlById(await fetchDbTemplateCopies(projectId), "relevant-digimed-conventions");
+    const storedCopyUrl = getDbTemplateCopyUrlById(await fetchDbTemplateCopies(projectId), "relevant-digimed-conventions");
+    if (storedCopyUrl) return storedCopyUrl;
+
+    const driveAccessToken = readStoredHubDriveAccessToken();
+    if (!driveAccessToken) return "";
+    try {
+        const response = await fetch(`/api/activities/${encodeURIComponent(projectId)}/sync-drive-templates`, {
+            method: "POST",
+            headers: buildWriteHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ driveAccessToken })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) return "";
+        const copy = (Array.isArray(payload?.template_copies) ? payload.template_copies : [])
+            .find((entry) => String(entry?.templateId || "").trim().toLowerCase() === "relevant-digimed-conventions");
+        const discoveredUrl = toSafeExternalUrl(copy?.fileUrl || "");
+        if (discoveredUrl) dbTemplateCopiesCache.set(String(projectId || "").trim(), payload.template_copies);
+        return discoveredUrl;
+    } catch (_error) {
+        return "";
+    }
 }
 
 async function syncDigiMedConventionsFromSlide(projectId, email, taskTopicTitle) {

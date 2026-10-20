@@ -1756,11 +1756,10 @@ function getDigiMedConventionsAcknowledgementCount(activityId, email, stateMap =
     Object.values(stateMap || {}).forEach((steps) => {
         (Array.isArray(steps) ? steps : []).forEach((step) => {
             const text = String(step?.text || "").trim();
-            if (!text.startsWith("CONVENTION_ACK|")) return;
-            const [, area, value] = text.split("|");
-            if (area && String(value || "").trim().toLowerCase() === "true") {
-                databaseAreas.add(area.trim());
-            }
+            const conventionAck = text.match(/^CONVENTION_ACK\|(.+)\|true$/i);
+            const persistedState = text.match(/^DIGIMED_STATE\|conventions\|(.+)\|true$/i);
+            const area = conventionAck?.[1] || persistedState?.[1] || "";
+            if (area) databaseAreas.add(area.trim());
         });
     });
     if (databaseAreas.size) return databaseAreas.size;

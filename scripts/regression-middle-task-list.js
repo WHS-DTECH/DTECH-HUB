@@ -133,8 +133,21 @@ assert.equal(conventionState["91903"][0].done, true, "Three web conventions tick
 conventionState["digital-media-conventions"].pop();
 assert.equal(conventionTaskContext.autoTickWebConventionsRequirement(conventionState, "activity-1", "sierra@example.test"), true);
 assert.equal(conventionState["91903"][0].done, false, "Dropping below three clears the criterion");
+const persistedConventionState = {
+    "91903": [{ text: conventionCriterion, done: false }],
+    "digital-media-conventions": [
+        { text: "DIGIMED_STATE|conventions|Typography|true", done: true },
+        { text: "DIGIMED_STATE|conventions|Buttons/Controls|true", done: true },
+        { text: "DIGIMED_STATE|conventions|Consistency|true", done: true }
+    ]
+};
+assert.equal(conventionTaskContext.autoTickWebConventionsRequirement(persistedConventionState, "activity-1", "sierra@example.test"), true);
+assert.equal(persistedConventionState["91903"][0].done, true,
+    "Three persisted convention acknowledgements also complete the criterion across devices");
 assert.match(activityDetail, /async function resolveDigiMedConventionsSlideUrl[\s\S]*?readStoredTaskTopicSlideSyncEntryByTemplateId[\s\S]*?fetchEvidenceRowsEnsuringAllocation[\s\S]*?getDbTemplateCopyUrlById/,
     "Conventions slide lookup falls back across local sync, saved evidence, and database copies");
+assert.match(activityDetail, /sync-drive-templates[\s\S]*?relevant-digimed-conventions/,
+    "Conventions slide lookup scans the student's Drive task folder when stored links are missing");
 assert.match(taskList, /autoChangedChecklistConventions = autoTickWebConventionsRequirement/,
     "Task List applies convention evidence during load");
 
@@ -692,6 +705,11 @@ assert.equal(
     templateIdentityContext.inferTemplateCopyFromFileName("Tools & Techniques").templateId,
     "tools-and-techniques",
     "The Digital Outcome Tools & Techniques template identity is unchanged"
+);
+assert.equal(
+    templateIdentityContext.inferTemplateCopyFromFileName("Conventions - Sierra").templateId,
+    "relevant-digimed-conventions",
+    "Drive sync recognizes personal Conventions slides with a student-name suffix"
 );
 assert.ok(server.includes('id: "use-of-tools-and-techniques"') && server.includes("use\\s+of\\s+tools?"),
     "Template Library sync gives Use of Tools & Techniques its own canonical identity");

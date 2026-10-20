@@ -10441,6 +10441,7 @@ const TEMPLATE_ID_FROM_TITLE_PATTERNS = [
   { pattern: /^triall?ing\s+components(?:\s*-\s*.+)?$/i, id: "trialling-components", title: "Trialling Components" },
   { pattern: /^trailing\s+comp(?:onents|onets|onets)?(?:\s*-\s*.+)?$/i, id: "trialling-components", title: "Trialling Components" },
   { pattern: /^testing\s+functions(?:\s*-\s*.+)?$/i, id: "testing-functions", title: "Testing Functions" },
+  { pattern: /^conventions(?:\s*-\s*.+)?$/i, id: "relevant-digimed-conventions", title: "Relevant DigiMed Conventions" },
   { pattern: /^(?:afull\s*-\s*)?relevant\s+(?:digimed\s+)?conventions(?:\s+template)?(?:\s*-\s*.+)?$/i, id: "relevant-digimed-conventions", title: "Relevant DigiMed Conventions" },
   { pattern: /^user\s+experience\s+(?:\(ux\)\s+)?principles(?:\s*-\s*.+)?$/i, id: "user-experience-principles", title: "User Experience (UX) Principles" },
   { pattern: /^project\s+success\s+criteria(?:\s*-\s*.+)?$/i, id: "project-success-criteria", title: "Project Success Criteria" },
