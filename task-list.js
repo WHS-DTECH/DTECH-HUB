@@ -1203,6 +1203,12 @@ function countDecompositionTaskCategories(cards, toolsTechniquesKeywords = []) {
     }));
 }
 
+function hasCompleteDecompositionCategoryCoverage(coverage) {
+    return Boolean(coverage?.hasData && DECOMPOSITION_TASK_CATEGORIES.every((category) =>
+        Number(coverage.counts?.[category.label] || 0) > 0
+    ));
+}
+
 function writeDecompositionCategoryCoverage(activityId, email, rows) {
     try {
         localStorage.setItem(
@@ -2031,6 +2037,9 @@ function getStepAutoManagementKind(standard, text) {
     if (isTestingFunctionsRequirementStep(std, text)) {
         return "auto";
     }
+    if (isDecompositionRequirementStep(std, text)) {
+        return "auto";
+    }
     if (isUseOfToolsTechniquesRequirementStep(std, text)) {
         return "auto";
     }
@@ -2058,6 +2067,33 @@ function getStepAutoManagementKind(standard, text) {
         return "auto";
     }
     return "manual";
+}
+
+function isDecompositionRequirementStep(standard, text) {
+    const safeStandard = String(standard || "").trim();
+    const normalizedText = stripStepLevel(text || "").toLowerCase().replace(/\s+/g, " ").trim();
+    return ["91897", "91907"].includes(safeStandard)
+        && getStepLevel(text) === "Achieved"
+        && /\bdecompos/.test(normalizedText);
+}
+
+function autoTickDecompositionRequirement(stateMap, activityId, email) {
+    const coverage = readDecompositionCategoryCoverage(activityId, email);
+    const shouldBeDone = hasCompleteDecompositionCategoryCoverage(coverage);
+    let changed = false;
+
+    ["91897", "91907"].forEach((standard) => {
+        const rows = Array.isArray(stateMap?.[standard]) ? stateMap[standard] : [];
+        rows.forEach((row) => {
+            if (!isDecompositionRequirementStep(standard, row?.text || "")) return;
+            if (Boolean(row?.done) !== shouldBeDone) {
+                row.done = shouldBeDone;
+                changed = true;
+            }
+        });
+    });
+
+    return changed;
 }
 
 function getSessionTickKey(standard, index) {
@@ -3068,10 +3104,10 @@ function renderChecklistCards(detail, allItems) {
                                     : ""}
                                 <div ${isTestingFunctionsRow ? `id="task-list-standard-${escapeTaskListHtml(standard)}-testing-functions"` : ""} class="task-list-step-row ${isSystemComplete ? "is-system-complete" : ""} ${isRelevantCategoryRow ? "is-relevant-implications-category" : ""} ${isInformationalRow ? "is-informational" : ""} ${isAddressRelevantImplicationsRow || isNonTickableProjectManagementMeritRow || isNonTickableProjectManagementProcessesMeritRow ? "is-linked-relevant-implications" : ""} ${needsEvidence ? "is-needs-evidence" : ""}">
                                     <label class="task-list-step-check-wrap">
-                                        ${isInformationalRow || isAddressRelevantImplicationsRow || isNonTickableProjectManagementMeritRow || isNonTickableProjectManagementProcessesMeritRow ? "" : `<input type="checkbox" ${isRowChecked ? "checked" : ""} ${isTickActionDisabled ? "disabled" : ""} data-step-check="${escapeTaskListHtml(standard)}:${step._index}">`}
+                                        ${isInformationalRow || isAddressRelevantImplicationsRow || isNonTickableProjectManagementMeritRow || isNonTickableProjectManagementProcessesMeritRow ? "" : `<input type="checkbox" ${isRowChecked ? "checked" : ""} ${isTickActionDisabled || isDecompositionRow ? "disabled" : ""} ${isDecompositionRow ? "title=\"Automatically checked when every Decomposition category has at least one Trello task\"" : ""} data-step-check="${escapeTaskListHtml(standard)}:${step._index}">`}
                                         ${isRelevantCategoryRow
                                             ? `<a class="task-list-step-link task-list-step-text-category" href="${escapeTaskListHtml(relevantCategoryHref)}">${escapeTaskListHtml(stepLabel)}</a>`
-                                            : (isInformationalRow
+                                            : (isInformationalRow || isDecompositionRow
                                                 ? `<span class="task-list-step-text">${escapeTaskListHtml(stepLabel)}</span>`
                                                 : (href
                                                 ? `<a class="task-list-step-link" href="${escapeTaskListHtml(href)}">${escapeTaskListHtml(stepLabel)}</a>`
@@ -3443,6 +3479,7 @@ async function loadChecklistForTask(taskId) {
     renderSavedFullSlideSet(taskListState.templateCopies);
 
     const autoChangedChecklistPM = autoTickProjectManagementRequirement(taskListState.checklistState);
+    const autoChangedChecklistDecomposition = autoTickDecompositionRequirement(taskListState.checklistState, taskListState.selectedId, signedInEmail);
     const autoChangedChecklistTesting = autoTickTestingFunctionsRequirement(
         taskListState.checklistState, taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail
     );
@@ -3453,8 +3490,9 @@ async function loadChecklistForTask(taskId) {
     const autoSyncedChecklist91893RI = sync91893RelevantImplicationsState(taskListState.checklistState);
     const autoChangedChecklistET = autoTickEfficientToolsRequirement(taskListState.checklistState, taskListState.selectedId, signedInEmail);
     const clearedChecklistManualTicks = clearUnverifiedManualTicks(taskListState.checklistState);
-    const autoChangedChecklist = autoChangedChecklistPM || autoChangedChecklistTesting || autoChangedChecklistTools || autoChangedChecklistDO || autoChangedChecklistRI || autoRepairedChecklistRI || autoSyncedChecklist91893RI || autoChangedChecklistET || clearedChecklistManualTicks;
+    const autoChangedChecklist = autoChangedChecklistPM || autoChangedChecklistDecomposition || autoChangedChecklistTesting || autoChangedChecklistTools || autoChangedChecklistDO || autoChangedChecklistRI || autoRepairedChecklistRI || autoSyncedChecklist91893RI || autoChangedChecklistET || clearedChecklistManualTicks;
     const autoChangedEvidencePM = autoTickProjectManagementRequirement(taskListState.fullEvidenceState);
+    const autoChangedEvidenceDecomposition = autoTickDecompositionRequirement(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
     const autoChangedEvidenceTesting = autoTickTestingFunctionsRequirement(
         taskListState.fullEvidenceState, taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail
     );
@@ -3465,7 +3503,7 @@ async function loadChecklistForTask(taskId) {
     const autoSyncedEvidence91893RI = sync91893RelevantImplicationsState(taskListState.fullEvidenceState);
     const autoChangedEvidenceET = autoTickEfficientToolsRequirement(taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail);
     const clearedEvidenceManualTicks = clearUnverifiedManualTicks(taskListState.fullEvidenceState);
-    const autoChangedEvidence = autoChangedEvidencePM || autoChangedEvidenceTesting || autoChangedEvidenceTools || autoChangedEvidenceDO || autoChangedEvidenceRI || autoRepairedEvidenceRI || autoSyncedEvidence91893RI || autoChangedEvidenceET || clearedEvidenceManualTicks;
+    const autoChangedEvidence = autoChangedEvidencePM || autoChangedEvidenceDecomposition || autoChangedEvidenceTesting || autoChangedEvidenceTools || autoChangedEvidenceDO || autoChangedEvidenceRI || autoRepairedEvidenceRI || autoSyncedEvidence91893RI || autoChangedEvidenceET || clearedEvidenceManualTicks;
     if (migratedDigitalOutcomeRows || migrated91897Rows || migrated91907Rows || migrated91893Rows || migrated91903Rows || autoChangedChecklist || autoChangedEvidence) {
         const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
         await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});
@@ -3535,6 +3573,12 @@ async function loadChecklistForTask(taskId) {
 
     void loadDecompositionCoverageFromServer(taskListState.selectedId).then((coverage) => {
         if (coverage?.found) {
+            autoTickDecompositionRequirement(taskListState.checklistState, selected.id, signedInEmail);
+            const evidenceChanged = autoTickDecompositionRequirement(taskListState.fullEvidenceState, selected.id, signedInEmail);
+            if (evidenceChanged) {
+                const standards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
+                void saveMyEvidence(selected.id, evidenceMapToRows(taskListState.fullEvidenceState, standards)).catch(() => {});
+            }
             renderChecklistCards(detail || selected, taskListState.allItems);
         }
     });
@@ -3829,6 +3873,12 @@ async function runTaskListTrelloSync() {
         ];
         writeDecompositionCategoryCoverage(taskListState.selectedId, email, categoryRows);
         await saveDecompositionCoverageToServer(taskListState.selectedId, categoryRows, allCards.length);
+        autoTickDecompositionRequirement(taskListState.checklistState, taskListState.selectedId, email);
+        const evidenceChanged = autoTickDecompositionRequirement(taskListState.fullEvidenceState, taskListState.selectedId, email);
+        if (evidenceChanged) {
+            const standards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
+            await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, standards)).catch(() => {});
+        }
 
         if (connectBtn) connectBtn.hidden = true;
         setStatus(`Trello sync complete. ${allCards.length} task${allCards.length === 1 ? "" : "s"} checked against the decomposition categories.`);

@@ -14,6 +14,63 @@ const templateLibrary = fs.readFileSync(path.join(root, "ProjectPages", "slidesh
 const activityDetail = fs.readFileSync(path.join(root, "ProjectPages", "activity-detail.js"), "utf8");
 const standardCard = fs.readFileSync(path.join(root, "assessment-standard-card.js"), "utf8");
 
+const decompositionCategoriesStart = taskList.indexOf("const DECOMPOSITION_TASK_CATEGORIES = [");
+const decompositionCategoriesEnd = taskList.indexOf("\n];", decompositionCategoriesStart) + 3;
+const decompositionCoverageStart = taskList.indexOf("function hasCompleteDecompositionCategoryCoverage(");
+const decompositionCoverageEnd = taskList.indexOf("\nfunction writeDecompositionCategoryCoverage", decompositionCoverageStart);
+const decompositionManagementStart = taskList.indexOf("function getStepAutoManagementKind(");
+const decompositionManagementEnd = taskList.indexOf("\nfunction getSessionTickKey", decompositionManagementStart);
+const decompositionAutoTickStart = taskList.indexOf("function isDecompositionRequirementStep(", decompositionManagementStart);
+const decompositionAutoTickEnd = taskList.indexOf("\nfunction autoTickProjectManagementRequirement", decompositionAutoTickStart);
+assert.ok(decompositionCategoriesStart >= 0 && decompositionCategoriesEnd > decompositionCategoriesStart
+    && decompositionCoverageStart >= 0 && decompositionCoverageEnd > decompositionCoverageStart
+    && decompositionManagementStart >= 0 && decompositionManagementEnd > decompositionManagementStart
+    && decompositionAutoTickStart >= 0 && decompositionAutoTickEnd > decompositionAutoTickStart,
+    "Decomposition coverage and auto-tick helpers are present");
+let decompositionCoverage = { hasData: true, counts: {
+    "Development Steps": 1, "Tools & Techniques": 1, Trialling: 1,
+    Testing: 1, "Success Criteria": 1, "Client Interaction": 1
+} };
+const decompositionContext = vm.createContext({
+    readDecompositionCategoryCoverage: () => decompositionCoverage,
+    getStepLevel: (text) => String(text || "").split(":")[0].trim(),
+    stripStepLevel: (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim(),
+    isTestingFunctionsRequirementStep: () => false,
+    isUseOfToolsTechniquesRequirementStep: () => false,
+    isTriallingComponentsRequirementStep: () => false,
+    inferDigitalOutcomeTaskTemplateId: () => "",
+    isEfficientToolsMainStep: () => false,
+    isRelevantImplicationsCategoryStep: () => false
+});
+vm.runInContext([
+    taskList.slice(decompositionCategoriesStart, decompositionCategoriesEnd),
+    taskList.slice(decompositionCoverageStart, decompositionCoverageEnd),
+    taskList.slice(decompositionManagementStart, decompositionManagementEnd),
+    taskList.slice(decompositionAutoTickStart, decompositionAutoTickEnd)
+].join("\n"), decompositionContext);
+const decompositionCriterion = "Achieved: Decompose the digital technologies outcome into smaller components.";
+const decompositionState = { "91907": [{ text: decompositionCriterion, done: false }] };
+assert.equal(decompositionContext.getStepAutoManagementKind("91907", decompositionCriterion), "auto");
+assert.equal(decompositionContext.autoTickDecompositionRequirement(decompositionState, "activity-1", "student@example.test"), true);
+assert.equal(decompositionState["91907"][0].done, true, "Every category with at least one Trello task checks the parent criterion");
+decompositionCoverage.counts["Client Interaction"] = 0;
+assert.equal(decompositionContext.autoTickDecompositionRequirement(decompositionState, "activity-1", "student@example.test"), true);
+assert.equal(decompositionState["91907"][0].done, false, "Missing category coverage clears the parent criterion");
+decompositionCoverage = { hasData: false, counts: {} };
+decompositionState["91907"][0].done = true;
+assert.equal(decompositionContext.autoTickDecompositionRequirement(decompositionState, "activity-1", "student@example.test"), true);
+assert.equal(decompositionState["91907"][0].done, false, "Unknown coverage never leaves a stale parent tick");
+assert.match(taskList, /isTickActionDisabled \|\| isDecompositionRow/,
+    "The decomposition parent cannot be manually ticked");
+assert.match(taskList, /isInformationalRow \|\| isDecompositionRow[\s\S]*?task-list-step-text/,
+    "The decomposition parent title is unlinked while subtask category links remain available");
+assert.match(taskList, /autoChangedChecklistDecomposition = autoTickDecompositionRequirement\(taskListState\.checklistState, taskListState\.selectedId, signedInEmail\)/,
+    "Saved decomposition coverage is applied during checklist load");
+assert.match(taskList, /loadDecompositionCoverageFromServer\(taskListState\.selectedId\)[\s\S]*?autoTickDecompositionRequirement\(taskListState\.checklistState/,
+    "Fresh server coverage updates the parent criterion after loading");
+assert.match(taskList, /writeDecompositionCategoryCoverage\(taskListState\.selectedId, email, categoryRows\)[\s\S]*?autoTickDecompositionRequirement\(taskListState\.checklistState/,
+    "A Trello sync updates the parent criterion immediately");
+
 const hiddenTaskFilterStart = script.indexOf("function shouldHideStudentAssessmentTask(");
 const hiddenTaskFilterEnd = script.indexOf("\nif (typeof window !== \"undefined\")", hiddenTaskFilterStart);
 assert.ok(hiddenTaskFilterStart >= 0 && hiddenTaskFilterEnd > hiddenTaskFilterStart,
