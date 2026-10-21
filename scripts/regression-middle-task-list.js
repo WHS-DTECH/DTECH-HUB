@@ -86,6 +86,105 @@ assert.deepEqual(JSON.parse(JSON.stringify(conventionsReaderContext.extractGoogl
     ["Typography", ""], ["Buttons/Controls", ""], ["Consistency", ""]
 ])))), [], "Convention labels without written responses do not count");
 
+const webIntegrityReaderStart = server.indexOf("function extractGoogleSlidesWebIntegrityEvidence(");
+const webIntegrityReaderEnd = server.indexOf("\nfunction extractGoogleSlidesDevelopmentRows", webIntegrityReaderStart);
+assert.ok(webIntegrityReaderStart >= 0 && webIntegrityReaderEnd > webIntegrityReaderStart,
+    "Web Integrity slide evidence reader is present");
+const webIntegrityReaderContext = vm.createContext({
+    extractGoogleSlidesTableCellText: (cell) => (cell?.text?.textElements || []).map((entry) => entry?.textRun?.content || "").join("")
+});
+vm.runInContext(server.slice(webIntegrityReaderStart, webIntegrityReaderEnd), webIntegrityReaderContext);
+const webIntegritySlide = (lines) => ({
+    slides: [{ pageElements: [{ shape: { text: { textElements: lines.map((content) => ({ textRun: { content: `${content}\n` } })) } } }] }]
+});
+assert.deepEqual(JSON.parse(JSON.stringify(webIntegrityReaderContext.extractGoogleSlidesWebIntegrityEvidence(webIntegritySlide([
+    "HTML validation results", "Enter the result from the W3C HTML validator.",
+    "CSS validation results", "Enter the result from the W3C CSS validator."
+])))), { htmlComplete: false, cssComplete: false, complete: false },
+"Template prompts and blank result fields do not complete Web Integrity");
+assert.equal(webIntegrityReaderContext.extractGoogleSlidesWebIntegrityEvidence(webIntegritySlide([
+    "HTML validation results", "W3C Nu Validator: 0 errors and 0 warnings.",
+    "CSS validation results", "Enter the result from the W3C CSS validator."
+])).complete, false, "HTML results alone do not complete Web Integrity");
+assert.equal(webIntegrityReaderContext.extractGoogleSlidesWebIntegrityEvidence(webIntegritySlide([
+    "HTML validation results", "Note the result from the W3C HTML validator here.",
+    "CSS validation results", "Note the result from the W3C CSS validator here."
+])).complete, false, "Template instructions to note results are not student validation evidence");
+assert.deepEqual(JSON.parse(JSON.stringify(webIntegrityReaderContext.extractGoogleSlidesWebIntegrityEvidence(webIntegritySlide([
+    "HTML validation results", "W3C Nu Validator: 0 errors and 0 warnings.",
+    "CSS validation results", "W3C CSS Validator: no errors found in the stylesheet."
+])))), { htmlComplete: true, cssComplete: true, complete: true },
+"Substantive HTML and CSS validation results complete Web Integrity");
+
+const webIntegrityAutoStart = taskList.indexOf("function isWebIntegrityRequirementStep(");
+const webIntegrityAutoEnd = taskList.indexOf("\nfunction autoTickDigitalOutcomeRequirements", webIntegrityAutoStart);
+const integrityManagementStart = taskList.indexOf("function getStepAutoManagementKind(");
+const integrityManagementEnd = taskList.indexOf("\nfunction getSessionTickKey", integrityManagementStart);
+assert.ok(webIntegrityAutoStart >= 0 && webIntegrityAutoEnd > webIntegrityAutoStart
+    && integrityManagementStart >= 0 && integrityManagementEnd > integrityManagementStart,
+    "Web Integrity requirement and auto-tick helpers are present");
+let webIntegrityMediaType = "web";
+const webIntegrityTaskContext = vm.createContext({
+    getAllocatedDigitalMediaType: () => webIntegrityMediaType,
+    getStepLevel: (text) => String(text || "").split(":")[0].trim(),
+    stripStepLevel: (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim(),
+    isTestingFunctionsRequirementStep: () => false,
+    isWebIntegrityRequirementStep: () => false,
+    isUXPrinciplesRequirementStep: () => false,
+    isWebConventionsRequirementStep: () => false,
+    isDecompositionRequirementStep: () => false,
+    isUseOfToolsTechniquesRequirementStep: () => false,
+    isTriallingComponentsRequirementStep: () => false,
+    inferDigitalOutcomeTaskTemplateId: () => "",
+    isEfficientToolsMainStep: () => false,
+    isRelevantImplicationsCategoryStep: () => false
+});
+vm.runInContext([
+    taskList.slice(webIntegrityAutoStart, webIntegrityAutoEnd),
+    taskList.slice(integrityManagementStart, integrityManagementEnd)
+].join("\n"), webIntegrityTaskContext);
+const integrityCriteria = ["91893", "91903"].map((standard) => ({
+    standard,
+    text: "Achieved: Applying appropriate data integrity and testing procedures.",
+    done: false
+}));
+const webIntegrityTaskState = {
+    "91893": [integrityCriteria[0]],
+    "91903": [integrityCriteria[1]]
+};
+assert.equal(webIntegrityTaskContext.getStepAutoManagementKind("91893", integrityCriteria[0].text), "auto");
+assert.equal(webIntegrityTaskContext.getStepAutoManagementKind("91903", integrityCriteria[1].text), "auto");
+assert.equal(webIntegrityTaskContext.autoTickWebIntegrityRequirement(webIntegrityTaskState), false,
+    "A missing Web Integrity slide does not tick either standard");
+webIntegrityTaskState["digimed-local-state:web-integrity"] = [{
+    text: "DIGIMED_STATE|web-integrity|html-css-results|true", done: true
+}];
+assert.equal(webIntegrityTaskContext.autoTickWebIntegrityRequirement(webIntegrityTaskState), true);
+assert.ok(integrityCriteria.every((criterion) => webIntegrityTaskState[criterion.standard][0].done),
+    "Completed HTML and CSS slide results tick both 91893 and 91903");
+webIntegrityTaskState["digimed-local-state:web-integrity"] = [];
+assert.equal(webIntegrityTaskContext.autoTickWebIntegrityRequirement(webIntegrityTaskState), true);
+assert.ok(integrityCriteria.every((criterion) => !webIntegrityTaskState[criterion.standard][0].done),
+    "Removing Web Integrity slide evidence clears both ticks");
+webIntegrityMediaType = "video";
+assert.equal(webIntegrityTaskContext.isWebIntegrityRequirementStep("91903", integrityCriteria[1].text), false,
+    "Web slide completion does not manage Video Integrity checklists");
+assert.match(taskList, /const isWebIntegrityComplete = isWebIntegrityRequirement && hasCompletedWebIntegritySlide\(taskListState\.fullEvidenceState\)/);
+assert.match(taskList, /const isRowChecked = isWebIntegrityRequirement\s*\? isWebIntegrityComplete/,
+    "The visible Web Integrity checkbox follows the saved completed-slide marker");
+assert.match(taskList, /isWebIntegrityRequirement \? integrityTestingCategoryCount : integrityTestingCategoryCount \|\| "-"/,
+    "The Web Integrity subtask shows 0/1 until both validation results are present");
+assert.match(activityDetail, /syncDigiMedWebIntegrityFromSlide\(projectId, email, selectedTaskTopic\)/,
+    "Opening the Code Validation page reads the linked Integrity & Validation slide");
+assert.match(activityDetail, /read-web-integrity/,
+    "The Code Validation page calls the authenticated Web Integrity slide reader");
+assert.match(activityDetail, /web-integrity-slide-status[\s\S]*?Integrity & Validation slide checked/,
+    "The Code Validation page reports the detected HTML/CSS result status");
+assert.match(activityDetail, /async function resolveDigiMedWebIntegritySlideUrl[\s\S]*?sync-drive-templates[\s\S]*?testing-functions-markup-validation/,
+    "Web Integrity slide lookup falls back to a Drive scan for the personal Markup Validation copy");
+assert.match(teacherStudentWork, /\["web-integrity", "image-integrity", "video-integrity"\]/,
+    "Teacher summaries recognize the Web Integrity completion marker");
+
 const conventionCountStart = taskList.indexOf("function getDigiMedConventionsAcknowledgementCount(");
 const conventionCountEnd = taskList.indexOf("\nfunction getDigiMedConventionsSubtask", conventionCountStart);
 const conventionAutoStart = taskList.indexOf("function isWebConventionsRequirementStep(");
@@ -106,6 +205,7 @@ const conventionTaskContext = vm.createContext({
     isUXPrinciplesRequirementStep: () => false,
     isDecompositionRequirementStep: () => false,
     isTestingFunctionsRequirementStep: () => false,
+    isWebIntegrityRequirementStep: () => false,
     isUseOfToolsTechniquesRequirementStep: () => false,
     isTriallingComponentsRequirementStep: () => false,
     inferDigitalOutcomeTaskTemplateId: () => "",
@@ -150,9 +250,9 @@ assert.match(activityDetail, /sync-drive-templates[\s\S]*?relevant-digimed-conve
     "Conventions slide lookup scans the student's Drive task folder when stored links are missing");
 assert.match(taskList, /autoChangedChecklistConventions = autoTickWebConventionsRequirement/,
     "Task List applies convention evidence during load");
-assert.match(taskList, /const isRowChecked = isWebConventionsRequirement[\s\S]*?getDigiMedConventionsAcknowledgementCount\(taskListState\.selectedId, getTaskListEmail\(\), taskListState\.fullEvidenceState\) >= 3/,
+assert.match(taskList, /isWebConventionsRequirement\s*\?\s*getDigiMedConventionsAcknowledgementCount\(taskListState\.selectedId, getTaskListEmail\(\), taskListState\.fullEvidenceState\) >= 3/,
     "The visible conventions tick uses the same count shown beside it");
-assert.match(taskList, /isUseOfToolsTechniquesRequirement \|\| isUXPrinciplesRequirement \|\| isWebConventionsRequirement \? "is-auto-complete"/,
+assert.match(taskList, /isUseOfToolsTechniquesRequirement \|\| isUXPrinciplesRequirement \|\| isWebConventionsRequirement \|\| isWebIntegrityRequirement \? "is-auto-complete"/,
     "The auto-managed conventions tick uses the blue completion style");
 
 const uxCountStart = taskList.indexOf("function getDigiMedUXPrinciplesAcknowledgementCount(");
@@ -209,9 +309,21 @@ const teacherUxEnd = teacherStudentWork.indexOf("\nfunction getDigiMedToolsTechn
 assert.ok(teacherUxStart >= 0 && teacherUxEnd > teacherUxStart, "Teacher Digital Media evidence checker is present");
 const teacherUxContext = vm.createContext({
     stripTaskTopicLevel: (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim(),
-    getTaskTopicGroup: () => ""
+    getTaskTopicGroup: () => "",
+    hasPersistedDigiMedState: (rows, kinds) => (Array.isArray(rows) ? rows : []).some((row) =>
+        (Array.isArray(row?.steps) ? row.steps : []).some((step) => {
+            const match = String(step?.text || "").match(/^DIGIMED_STATE\|([^|]+)\|.+\|true$/i);
+            return match && (Array.isArray(kinds) ? kinds : [kinds]).includes(match[1]);
+        })
+    )
 });
 vm.runInContext(teacherStudentWork.slice(teacherUxStart, teacherUxEnd), teacherUxContext);
+assert.equal(teacherUxContext.hasDigitalMediaCriterionEvidence("Applying appropriate data integrity and testing procedures", [{ steps: [
+    { text: "DIGIMED_STATE|web-integrity|html-css-results|true" }
+] }]), true, "Teacher summary accepts completed HTML and CSS validation results");
+assert.equal(teacherUxContext.hasDigitalMediaCriterionEvidence("Applying appropriate data integrity and testing procedures", [{ steps: [
+    { text: "DIGIMED_STATE|web-integrity|html-css-results|false" }
+] }]), false, "Teacher summary rejects incomplete Web Integrity evidence");
 const teacherUxEvidence = (areas) => [{ steps: areas.map((area) => ({
     text: `DIGIMED_STATE|ux-principles|${area}|true`
 })) }];
@@ -263,6 +375,7 @@ const decompositionContext = vm.createContext({
     isUXPrinciplesRequirementStep: () => false,
     isWebConventionsRequirementStep: () => false,
     isTestingFunctionsRequirementStep: () => false,
+    isWebIntegrityRequirementStep: () => false,
     isUseOfToolsTechniquesRequirementStep: () => false,
     isTriallingComponentsRequirementStep: () => false,
     inferDigitalOutcomeTaskTemplateId: () => "",
@@ -530,6 +643,8 @@ const useToolsContext = vm.createContext({
     isUXPrinciplesRequirementStep: () => false,
     isWebConventionsRequirementStep: () => false,
     isTestingFunctionsRequirementStep: () => false,
+    isWebIntegrityRequirementStep: () => false,
+    isWebIntegrityRequirementStep: () => false,
     isTriallingComponentsRequirementStep: () => false
 });
 const useToolsStart = taskList.indexOf("function isUseOfToolsTechniquesRequirementStep(");
@@ -572,6 +687,7 @@ const triallingContext = vm.createContext({
     isUXPrinciplesRequirementStep: () => false,
     isWebConventionsRequirementStep: () => false,
     isTestingFunctionsRequirementStep: () => false,
+    isWebIntegrityRequirementStep: () => false,
     isUseOfToolsTechniquesRequirementStep: () => false
 });
 const triallingManagementStart = taskList.indexOf("function getStepAutoManagementKind(");
@@ -709,6 +825,16 @@ assert.equal(
     templateIdentityContext.inferTemplateCopyFromFileName("Tools & Techniques").templateId,
     "tools-and-techniques",
     "The Digital Outcome Tools & Techniques template identity is unchanged"
+);
+assert.equal(
+    templateIdentityContext.inferTemplateCopyFromFileName("Markup Validation - Otto").templateId,
+    "testing-functions-markup-validation",
+    "Drive scan recognizes personal Integrity & Validation Web slides"
+);
+assert.equal(
+    templateIdentityContext.inferTemplateCopyFromFileName("Markup Validation - Otto").templateId,
+    "testing-functions-markup-validation",
+    "Drive scans recognize the personal Integrity & Validation Web slide"
 );
 assert.equal(
     templateIdentityContext.inferTemplateCopyFromFileName("Conventions - Sierra").templateId,

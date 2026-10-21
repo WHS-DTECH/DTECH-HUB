@@ -8330,6 +8330,63 @@ function extractGoogleSlidesConventionAreas(presentation) {
   return found;
 }
 
+function extractGoogleSlidesWebIntegrityEvidence(presentation) {
+  const result = { htmlComplete: false, cssComplete: false, complete: false };
+  const isStudentResponse = (value, type) => {
+    let text = String(value || "").replace(/\s+/g, " ").trim();
+    if (!text) return false;
+    text = text.replace(new RegExp(`^${type}(?:\\s+(?:validation|results?))?\\s*[:\\-]?\\s*`, "i"), "")
+      .replace(/^(?:validation\s+)?results?\s*[:\-]?\s*/i, "").trim();
+    if (text.length < 4) return false;
+    if (/^(?:url|link|result|errors?|warnings?|status|notes?|fix(?:es)?)\s*[:\-]?$/i.test(text)) return false;
+    return !/^(?:enter|paste|insert|add|record|write|run|fix|open|use|save|link|what|how|check|validate|validation|html|css|student|tbd|n\/a)\b/i.test(text);
+  };
+  const mark = (type, value) => {
+    if (isStudentResponse(value, type)) result[`${type}Complete`] = true;
+  };
+  const slides = Array.isArray(presentation?.slides) ? presentation.slides : [];
+
+  slides.forEach((slide) => {
+    let activeType = "";
+    (Array.isArray(slide?.pageElements) ? slide.pageElements : []).forEach((element) => {
+      const shapeElements = element?.shape?.text?.textElements;
+      if (Array.isArray(shapeElements)) {
+        const lines = shapeElements.map((item) => String(item?.textRun?.content || "")).join("").split(/\r?\n/);
+        lines.forEach((line) => {
+          const section = line.trim().match(/^(html|css)(?:\s+(?:validation|check|results?))?\s*[:\-]?\s*(.*)$/i);
+          if (section) {
+            activeType = section[1].toLowerCase();
+            mark(activeType, section[2]);
+            return;
+          }
+          const inlineResult = line.trim().match(/\b(html|css)\s+(?:validation|results?)\s*[:\-]\s*(.+)$/i);
+          if (inlineResult) {
+            activeType = inlineResult[1].toLowerCase();
+            mark(activeType, inlineResult[2]);
+            return;
+          }
+          if (activeType) mark(activeType, line);
+        });
+      }
+
+      const table = element?.table;
+      if (!Array.isArray(table?.tableRows)) return;
+      table.tableRows.forEach((row) => {
+        const cells = Array.isArray(row?.tableCells) ? row.tableCells : [];
+        const values = cells.map((cell) => extractGoogleSlidesTableCellText(cell));
+        const labelIndex = values.findIndex((value) => /\b(html|css)(?:\s+(?:validation|check|results?))?\b/i.test(value));
+        if (labelIndex < 0) return;
+        const type = /\bhtml\b/i.test(values[labelIndex]) ? "html" : "css";
+        const labelResponse = values[labelIndex].replace(/^.*?\b(?:html|css)(?:\s+(?:validation|check|results?))?\b\s*[:\-]?\s*/i, "");
+        mark(type, [labelResponse, ...values.filter((_, index) => index !== labelIndex)].join(" "));
+      });
+    });
+  });
+
+  result.complete = result.htmlComplete && result.cssComplete;
+  return result;
+}
+
 function extractGoogleSlidesUXPrincipleResponses(presentation) {
   const fixedTemplateCopy = [
     /user experience \(ux\) principles/gi,
@@ -8398,6 +8455,64 @@ function extractGoogleSlidesUXPrincipleResponses(presentation) {
     areas,
     filled: uniqueResponses.length >= 3 && responseText.length >= 80
   };
+}
+
+function extractGoogleSlidesWebIntegrityEvidence(presentation) {
+  const result = { htmlComplete: false, cssComplete: false, complete: false };
+  const isSubstantiveResponse = (value) => {
+    const text = String(value || "").replace(/\s+/g, " ").trim();
+    if (text.length < 6) return false;
+    if (/^(?:html|css|file|file link|validation|validation result|validation results|results?|errors?|warnings?|status|notes?|url|link|tbd|n\/a)(?:\s*[:\-].*)?$/i.test(text)) return false;
+    if (/^(?:enter|paste|insert|add|record|write|run|fix|open|use|save|link|check|note|validate)\b/i.test(text)) return false;
+    return /\b(?:w3c|validator|validat(?:e|ed|ion|or)|pass(?:ed|es)?|fail(?:ed|s)?|errors?|warnings?|issues?|no\s+(?:errors?|issues?))\b/i.test(text);
+  };
+  const mark = (type, value) => {
+    if (type && isSubstantiveResponse(value)) result[`${type}Complete`] = true;
+  };
+  const slides = Array.isArray(presentation?.slides) ? presentation.slides : [];
+
+  slides.forEach((slide) => {
+    let activeType = "";
+    (Array.isArray(slide?.pageElements) ? slide.pageElements : []).forEach((element) => {
+      const shapeText = element?.shape?.text?.textElements;
+      if (Array.isArray(shapeText)) {
+        const lines = shapeText.map((entry) => String(entry?.textRun?.content || "")).join("").split(/\r?\n/);
+        lines.forEach((line) => {
+          const text = line.trim();
+          const section = text.match(/^(html|css)(?:\s+(?:file|validation|results?))?\s*[:\-]?\s*(.*)$/i);
+          if (section) {
+            activeType = section[1].toLowerCase();
+            mark(activeType, section[2]);
+            return;
+          }
+          const inlineResult = text.match(/\b(html|css)\s+(?:validation|results?)\s*[:\-]\s*(.+)$/i);
+          if (inlineResult) {
+            activeType = inlineResult[1].toLowerCase();
+            mark(activeType, inlineResult[2]);
+          } else if (activeType) {
+            mark(activeType, text);
+          }
+        });
+      }
+
+      const rows = Array.isArray(element?.table?.tableRows) ? element.table.tableRows : [];
+      rows.forEach((row) => {
+        const cells = Array.isArray(row?.tableCells) ? row.tableCells : [];
+        const values = cells.map((cell) => extractGoogleSlidesTableCellText(cell));
+        const labelIndex = values.findIndex((value) => /\b(html|css)(?:\s+(?:file|validation|results?))?\b/i.test(value));
+        if (labelIndex < 0) return;
+        const type = /\bhtml\b/i.test(values[labelIndex]) ? "html" : "css";
+        const labelResponse = values[labelIndex].replace(/^.*?\b(?:html|css)(?:\s+(?:file|validation|results?))?\b\s*[:\-]?\s*/i, "");
+        values.forEach((value, index) => {
+          if (index !== labelIndex) mark(type, value);
+        });
+        mark(type, labelResponse);
+      });
+    });
+  });
+
+  result.complete = result.htmlComplete && result.cssComplete;
+  return result;
 }
 
 function extractGoogleSlidesDevelopmentRows(presentation) {
@@ -10440,6 +10555,7 @@ const TEMPLATE_ID_FROM_TITLE_PATTERNS = [
   { pattern: /^(?:.*\s+)?tools?\s*(?:&|and)\s*techniques?(?:\s*-\s*.+)?$/i, id: "tools-and-techniques", title: "Tools & Techniques" },
   { pattern: /^triall?ing\s+components(?:\s*-\s*.+)?$/i, id: "trialling-components", title: "Trialling Components" },
   { pattern: /^trailing\s+comp(?:onents|onets|onets)?(?:\s*-\s*.+)?$/i, id: "trialling-components", title: "Trialling Components" },
+  { pattern: /^(?:markup\s+validation|integrity\s*&\s*validation\s*\(web\))(?:\s*-\s*.+)?$/i, id: "testing-functions-markup-validation", title: "Markup Validation" },
   { pattern: /^testing\s+functions(?:\s*-\s*.+)?$/i, id: "testing-functions", title: "Testing Functions" },
   { pattern: /^conventions(?:\s*-\s*.+)?$/i, id: "relevant-digimed-conventions", title: "Relevant DigiMed Conventions" },
   { pattern: /^(?:afull\s*-\s*)?relevant\s+(?:digimed\s+)?conventions(?:\s+template)?(?:\s*-\s*.+)?$/i, id: "relevant-digimed-conventions", title: "Relevant DigiMed Conventions" },
@@ -10811,6 +10927,22 @@ app.post("/api/student/drive-setup/read-relevant-conventions", async (req, res) 
     res.json({ ok: true, presentationId, areas, syncedAt: new Date().toISOString() });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not read the Relevant DigiMed Conventions slideshow." });
+  }
+});
+
+app.post("/api/student/drive-setup/read-web-integrity", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email) { res.status(401).json({ error: "Sign in is required." }); return; }
+  const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
+  const presentationId = String(req.body?.presentationId || "").trim();
+  if (!driveAccessToken) { res.status(400).json({ error: "driveAccessToken is required." }); return; }
+  if (!/^[A-Za-z0-9_-]{10,}$/.test(presentationId)) { res.status(400).json({ error: "A valid Google Slides presentation ID is required." }); return; }
+
+  try {
+    const presentation = await googleSlidesApiRequest(presentationId, driveAccessToken);
+    res.json({ ok: true, presentationId, ...extractGoogleSlidesWebIntegrityEvidence(presentation), syncedAt: new Date().toISOString() });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not read the Integrity & Validation slideshow." });
   }
 });
 

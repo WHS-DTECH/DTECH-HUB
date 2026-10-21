@@ -3809,6 +3809,68 @@ async function syncDigiMedUXPrinciplesFromSlide(projectId, email, taskTopicTitle
     return { ...payload, linked: true, syncedAt: String(payload?.syncedAt || "").trim() };
 }
 
+async function resolveDigiMedWebIntegritySlideUrl(projectId, email, taskTopicTitle) {
+    const templateId = "testing-functions-markup-validation";
+    const storedUrl = readStoredTaskTopicSlideSyncEntryByTemplateId(projectId, email, templateId)?.url;
+    if (storedUrl) return storedUrl;
+
+    try {
+        const evidenceRows = await fetchEvidenceRowsEnsuringAllocation(projectId, email);
+        for (const standard of ["91893", "91903"]) {
+            const submission = parseTaskTopicSubmissionFromEvidenceRows(
+                evidenceRows,
+                buildTaskTopicSubmissionStandardKey(taskTopicTitle, standard)
+            );
+            const evidenceUrl = toSafeExternalUrl(submission.googleSlidesUrl || submission.evidenceLink);
+            if (evidenceUrl) return evidenceUrl;
+        }
+    } catch (_error) {
+    }
+
+    const storedCopyUrl = getDbTemplateCopyUrlById(await fetchDbTemplateCopies(projectId), templateId);
+    if (storedCopyUrl) return storedCopyUrl;
+
+    const driveAccessToken = readStoredHubDriveAccessToken();
+    if (!driveAccessToken) return "";
+    try {
+        const response = await fetch(`/api/activities/${encodeURIComponent(projectId)}/sync-drive-templates`, {
+            method: "POST",
+            headers: buildWriteHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ driveAccessToken })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) return "";
+        const copy = (Array.isArray(payload?.template_copies) ? payload.template_copies : [])
+            .find((entry) => String(entry?.templateId || "").trim().toLowerCase() === templateId);
+        const discoveredUrl = toSafeExternalUrl(copy?.fileUrl || "");
+        if (discoveredUrl) dbTemplateCopiesCache.set(String(projectId || "").trim(), payload.template_copies);
+        return discoveredUrl;
+    } catch (_error) {
+        return "";
+    }
+}
+
+async function syncDigiMedWebIntegrityFromSlide(projectId, email, taskTopicTitle) {
+    const slideUrl = await resolveDigiMedWebIntegritySlideUrl(projectId, email, taskTopicTitle);
+    const presentationId = extractSlidesIdFromValue(slideUrl);
+    const driveAccessToken = readStoredHubDriveAccessToken();
+    if (!presentationId) return { complete: false, status: "No personal Integrity & Validation slide is linked yet." };
+    if (!driveAccessToken) return { complete: false, status: "Connect Google Drive to read your Integrity & Validation slide." };
+
+    const response = await fetch("/api/student/drive-setup/read-web-integrity", {
+        method: "POST",
+        headers: buildWriteHeaders(),
+        body: JSON.stringify({ driveAccessToken, presentationId })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload?.error || "Could not read the Integrity & Validation slideshow.");
+
+    await persistDigiMedLocalState(projectId, email, "web-integrity", {
+        "html-css-results": Boolean(payload?.complete)
+    });
+    return { ...payload, syncedAt: String(payload?.syncedAt || "").trim() };
+}
+
 function upsertTaskTopicSubmissionEvidenceRows(rows, standardKey, payload) {
     const existingSubmission = parseTaskTopicSubmissionFromEvidenceRows(rows, standardKey);
     const sourceRows = normalizeEvidenceSteps(rows).filter(
@@ -10594,6 +10656,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                     <section class="proposal-section task-topic-guide-panel">
                         <p class="task-topic-guide-eyebrow">Topic Tasks</p>
                         <h2>Validation &amp; Technical Health Tracker</h2>
+                        <p class="task-topic-submission-note" id="web-integrity-slide-status" role="status">Checking your Integrity &amp; Validation slide...</p>
+                        <p class="task-topic-submission-note" id="web-integrity-slide-status" role="status">Checking your Integrity &amp; Validation slide...</p>
                         <div id="task-topic-technical-health-slot"></div>
                     </section>
                     ` : ""}
@@ -13592,6 +13656,22 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
         renderCodeValidationSyncPanel(host, projectId, email, "html");
         renderCodeValidationSyncPanel(host, projectId, email, "css");
         renderCodeValidationTechnicalHealthTracker(host, backendGithubRepoLink || githubRepoLibrary[0]?.url || "");
+        if (!isTeacher) {
+            const syncWebIntegritySlide = () => syncDigiMedWebIntegrityFromSlide(projectId, email, selectedTaskTopic)
+                .then((result) => {
+                    const status = host.querySelector("#web-integrity-slide-status");
+                    if (!status || !result) return;
+                    status.textContent = result.syncedAt
+                        ? `Integrity & Validation slide checked: HTML ${result.htmlComplete ? "complete" : "missing"}, CSS ${result.cssComplete ? "complete" : "missing"}.`
+                        : result.status || "Integrity & Validation slide sync unavailable.";
+                })
+                .catch((error) => {
+                    const status = host.querySelector("#web-integrity-slide-status");
+                    if (status) status.textContent = error?.message || "Could not read the Integrity & Validation slide.";
+                });
+            void syncWebIntegritySlide();
+            window.addEventListener("focus", () => { void syncWebIntegritySlide(); }, { once: true });
+        }
     }
 
     // Toggle interest button handler

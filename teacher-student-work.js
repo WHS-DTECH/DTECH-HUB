@@ -741,7 +741,7 @@ function hasDigitalMediaCriterionEvidence(taskTopic, evidenceRows) {
         });
         return areas.size >= 3;
     }
-    if (/data integrity and testing/.test(text)) return hasPersistedDigiMedState(evidenceRows, ["image-integrity", "video-integrity"]);
+    if (/data integrity and testing/.test(text)) return hasPersistedDigiMedState(evidenceRows, ["web-integrity", "image-integrity", "video-integrity"]);
     if (/using information from testing procedures/.test(text)) {
         return hasEvidenceStepMatching(evidenceRows, /^TESTING_FUNCTIONS_COUNT\|(?:[1-9]\d*)\|\d+$/)
             || hasEvidenceStepMatching(evidenceRows, /^TESTING_FUNCTIONS_COUNT\|\d+\|(?:[1-9]\d*)$/);
