@@ -2838,9 +2838,6 @@ function renderChecklistCards(detail, allItems) {
                                 const isInformationalRow = isInformationalCriteriaRow(standard, level, stepText);
                                 const managementKind = getStepAutoManagementKind(standard, step?.text || "");
                                 const needsEvidence = !isInformationalRow && managementKind === "manual";
-                                const isRowChecked = managementKind === "auto"
-                                    ? Boolean(step?.done)
-                                    : Boolean(taskListState.sessionTicks[getSessionTickKey(standard, index)]);
                                 const is91893ToolsAndTechniquesRow = /using appropriate tools and techniques for the purpose and end users|applying appropriate tools and techniques to meet the purpose and end-user requirements/i.test(stepText);
                                 const isUseOfToolsTechniquesRequirement = isUseOfToolsTechniquesRequirementStep(standard, step?.text || "");
                                 const is91893ConventionsRow = /using relevant conventions for the media type|applying relevant conventions to improve the quality of the outcome/i.test(stepText);
@@ -2865,6 +2862,11 @@ function renderChecklistCards(detail, allItems) {
                                 const isImageMedia = digitalMediaType === "image" || digitalMediaType === "graphics" || digitalMediaType === "vector";
                                 const toolsAndTechniquesLabel = isVideoMedia ? "Tools & Techniques (VIDEO)" : isImageMedia ? "Tools & Techniques (IMAGE)" : "Tools & Techniques (WEB)";
                                 const conventionsSubtask = is91893ConventionsRow ? getDigiMedConventionsSubtask(taskListState.fullEvidenceState, digitalMediaType) : null;
+                                const isRowChecked = isWebConventionsRequirement
+                                    ? getDigiMedConventionsAcknowledgementCount(taskListState.selectedId, getTaskListEmail(), taskListState.fullEvidenceState) >= 3
+                                    : managementKind === "auto"
+                                        ? Boolean(step?.done)
+                                        : Boolean(taskListState.sessionTicks[getSessionTickKey(standard, index)]);
                                 const uxPrinciplesSubtask = is91903UXPrinciplesRow ? getDigiMedUXPrinciplesSubtask(taskListState.fullEvidenceState, digitalMediaType) : null;
                                 const integrityTestingIsVideo = is91893IntegrityTestingRow && isVideoMedia;
                                 const integrityTestingIsImage = is91893IntegrityTestingRow && isImageMedia;

@@ -150,6 +150,10 @@ assert.match(activityDetail, /sync-drive-templates[\s\S]*?relevant-digimed-conve
     "Conventions slide lookup scans the student's Drive task folder when stored links are missing");
 assert.match(taskList, /autoChangedChecklistConventions = autoTickWebConventionsRequirement/,
     "Task List applies convention evidence during load");
+assert.match(taskList, /const isRowChecked = isWebConventionsRequirement[\s\S]*?getDigiMedConventionsAcknowledgementCount\(taskListState\.selectedId, getTaskListEmail\(\), taskListState\.fullEvidenceState\) >= 3/,
+    "The visible conventions tick uses the same count shown beside it");
+assert.match(taskList, /isUseOfToolsTechniquesRequirement \|\| isUXPrinciplesRequirement \|\| isWebConventionsRequirement \? "is-auto-complete"/,
+    "The auto-managed conventions tick uses the blue completion style");
 
 const uxCountStart = taskList.indexOf("function getDigiMedUXPrinciplesAcknowledgementCount(");
 const uxCountEnd = taskList.indexOf("\nfunction getDigiMedUXPrinciplesSubtask", uxCountStart);
