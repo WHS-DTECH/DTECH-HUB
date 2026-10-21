@@ -125,6 +125,7 @@ assert.ok(webIntegrityAutoStart >= 0 && webIntegrityAutoEnd > webIntegrityAutoSt
     "Web Integrity requirement and auto-tick helpers are present");
 let webIntegrityMediaType = "web";
 const webIntegrityTaskContext = vm.createContext({
+    taskListState: { templateCopies: [] },
     getAllocatedDigitalMediaType: () => webIntegrityMediaType,
     getStepLevel: (text) => String(text || "").split(":")[0].trim(),
     stripStepLevel: (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim(),
@@ -156,24 +157,37 @@ assert.equal(webIntegrityTaskContext.getStepAutoManagementKind("91893", integrit
 assert.equal(webIntegrityTaskContext.getStepAutoManagementKind("91903", integrityCriteria[1].text), "auto");
 assert.equal(webIntegrityTaskContext.autoTickWebIntegrityRequirement(webIntegrityTaskState), false,
     "A missing Web Integrity slide does not tick either standard");
-webIntegrityTaskState["digimed-local-state:web-integrity"] = [{
-    text: "DIGIMED_STATE|web-integrity|html-css-results|true", done: true
-}];
+webIntegrityTaskContext.taskListState.templateCopies = [{ templateId: "testing-functions-markup-validation" }];
 assert.equal(webIntegrityTaskContext.autoTickWebIntegrityRequirement(webIntegrityTaskState), true);
 assert.ok(integrityCriteria.every((criterion) => webIntegrityTaskState[criterion.standard][0].done),
-    "Completed HTML and CSS slide results tick both 91893 and 91903");
-webIntegrityTaskState["digimed-local-state:web-integrity"] = [];
+    "Using the Integrity & Validation template ticks both 91893 and 91903");
+webIntegrityTaskContext.taskListState.templateCopies = [];
 assert.equal(webIntegrityTaskContext.autoTickWebIntegrityRequirement(webIntegrityTaskState), true);
 assert.ok(integrityCriteria.every((criterion) => !webIntegrityTaskState[criterion.standard][0].done),
-    "Removing Web Integrity slide evidence clears both ticks");
+    "Removing the Integrity & Validation template record clears both ticks");
 webIntegrityMediaType = "video";
 assert.equal(webIntegrityTaskContext.isWebIntegrityRequirementStep("91903", integrityCriteria[1].text), false,
     "Web slide completion does not manage Video Integrity checklists");
 assert.match(taskList, /const isWebIntegrityComplete = isWebIntegrityRequirement && hasCompletedWebIntegritySlide\(taskListState\.fullEvidenceState\)/);
 assert.match(taskList, /const isRowChecked = isWebIntegrityRequirement\s*\? isWebIntegrityComplete/,
     "The visible Web Integrity checkbox follows the saved completed-slide marker");
-assert.match(taskList, /isWebIntegrityRequirement \? integrityTestingCategoryCount : integrityTestingCategoryCount \|\| "-"/,
-    "The Web Integrity subtask shows 0/1 until both validation results are present");
+assert.doesNotMatch(taskList, /integrityTestingCategoryCount/,
+    "Integrity & Validation has no numeric counter");
+assert.doesNotMatch(taskList, /isLinkedIntegrityTestingRow/,
+    "Integrity & Validation does not receive purple linked-row shading");
+const integrityLinkStart = taskList.indexOf("function getTaskTopicHrefForStep(");
+const integrityLinkEnd = taskList.indexOf("\nconst DECOMPOSITION_CATEGORY_COVERAGE_STORAGE_PREFIX", integrityLinkStart);
+assert.ok(integrityLinkStart >= 0 && integrityLinkEnd > integrityLinkStart);
+const integrityLinkContext = vm.createContext({
+    taskListState: { selectedId: "activity-1" },
+    buildCustomActivityLink: (_activityId, title, shortName, templateId) => `${title}|${shortName}|${templateId}`
+});
+vm.runInContext(taskList.slice(integrityLinkStart, integrityLinkEnd), integrityLinkContext);
+for (const standard of ["91893", "91903"]) {
+    assert.equal(integrityLinkContext.getTaskTopicHrefForStep(standard, "Achieved", integrityCriteria[0].text),
+        "Integrity & Validation (WEB)|Integrity & Validation (WEB)|code-validation",
+        `${standard} Integrity criterion links to the same Web page as its subtask`);
+}
 assert.match(activityDetail, /syncDigiMedWebIntegrityFromSlide\(projectId, email, selectedTaskTopic\)/,
     "Opening the Code Validation page reads the linked Integrity & Validation slide");
 assert.match(activityDetail, /read-web-integrity/,

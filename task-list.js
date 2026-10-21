@@ -1045,7 +1045,7 @@ function getTaskTopicHrefForStep(standard, level, text) {
 
     if ((String(standard) === "91893" || String(standard) === "91903")
         && /applying appropriate data integrity and testing procedures/i.test(normalized)) {
-        return buildCustomActivityLink(taskListState.selectedId, "Testing that the digital technologies outcome functions as intended.", "Testing Functions", "testing-functions");
+        return buildCustomActivityLink(taskListState.selectedId, "Integrity & Validation (WEB)", "Integrity & Validation (WEB)", "code-validation");
     }
 
     if ((String(standard) === "91897" || String(standard) === "91907")
@@ -2267,11 +2267,8 @@ function isWebIntegrityRequirementStep(standard, text) {
 }
 
 function hasCompletedWebIntegritySlide(stateMap) {
-    return Object.values(stateMap || {}).some((steps) =>
-        (Array.isArray(steps) ? steps : []).some((step) =>
-            /^DIGIMED_STATE\|web-integrity\|html-css-results\|true$/i.test(String(step?.text || "").trim())
-        )
-    );
+    return (Array.isArray(taskListState.templateCopies) ? taskListState.templateCopies : [])
+        .some((copy) => String(copy?.templateId || "").trim().toLowerCase() === "testing-functions-markup-validation");
 }
 
 function autoTickWebIntegrityRequirement(stateMap) {
@@ -2926,7 +2923,6 @@ function renderChecklistCards(detail, allItems) {
                                 const isWebIntegrityComplete = isWebIntegrityRequirement && hasCompletedWebIntegritySlide(taskListState.fullEvidenceState);
                                 const isNonTickableIntegrityTestingRow = is91893IntegrityTestingRow && !isWebIntegrityRequirement
                                     && (String(standard) === "91893" || String(standard) === "91903");
-                                const isLinkedIntegrityTestingRow = String(standard) === "91893" && is91893IntegrityTestingRow;
                                 const isLinkedTestingImprovementRow = (String(standard) === "91893" || String(standard) === "91903")
                                     && /using information from testing procedures to improve the quality of the (?:digital media )?outcome/i.test(stepText);
                                 const isDigitalMediaIterativeImprovementRow = (String(standard) === "91893" || String(standard) === "91903")
@@ -2963,7 +2959,6 @@ function renderChecklistCards(detail, allItems) {
                                     : integrityTestingIsImage
                                         ? buildCustomActivityLink(taskListState.selectedId, "Integrity & Validation (IMAGE)", "Integrity & Validation (IMAGE)", "image-integrity-testing")
                                         : buildCustomActivityLink(taskListState.selectedId, "Integrity & Validation (WEB)", "Integrity & Validation (WEB)", "code-validation");
-                                const integrityTestingCategoryCount = isWebIntegrityRequirement ? (isWebIntegrityComplete ? 1 : 0) : 0;
                                 const testingFunctionsSubtasks = isLinkedTestingImprovementRow
                                     ? getTestingFunctionsSubtasks(taskListState.fullEvidenceState)
                                     : [];
@@ -2973,9 +2968,9 @@ function renderChecklistCards(detail, allItems) {
                                         ? `<a class="task-list-step-link" href="${escapeTaskListHtml(href)}">${escapeTaskListHtml(stepText)}</a>`
                                         : `<span class="task-list-step-text">${escapeTaskListHtml(stepText)}</span>`);
                                 return `
-                                <div class="task-list-step-row ${isInformationalRow ? "is-informational" : ""} ${isLinkedRelevantImplicationsRow || isLinkedIntegrityTestingRow || isLinkedTestingImprovementRow || isApplyingRelevantConventionsRow || isNonTickableUXPrinciplesMeritRow ? "is-linked-relevant-implications" : ""} ${is91893EfficientToolsRow ? "is-linked-efficient-tools" : ""} ${needsEvidence ? "is-needs-evidence" : ""}">
+                                <div class="task-list-step-row ${isInformationalRow ? "is-informational" : ""} ${isLinkedRelevantImplicationsRow || isLinkedTestingImprovementRow || isApplyingRelevantConventionsRow || isNonTickableUXPrinciplesMeritRow ? "is-linked-relevant-implications" : ""} ${is91893EfficientToolsRow ? "is-linked-efficient-tools" : ""} ${needsEvidence ? "is-needs-evidence" : ""}">
                                     <label class="task-list-step-check-wrap">
-                                        ${isInformationalRow || isNonTickableRelevantImplicationsRow91893 || isApplyingRelevantConventionsRow || isNonTickableIntegrityTestingRow || isNonTickableUXPrinciplesMeritRow ? "" : `<input type="checkbox" class="${isUseOfToolsTechniquesRequirement || isUXPrinciplesRequirement || isWebConventionsRequirement || isWebIntegrityRequirement ? "is-auto-complete" : ""}" ${isRowChecked ? "checked" : ""} ${isUseOfToolsTechniquesRequirement ? "disabled title=\"Requires at least three checked subtasks and Use of Tools & Techniques template\"" : isUXPrinciplesRequirement ? "disabled title=\"Requires at least three UX principles to be identified and applied\"" : isWebConventionsRequirement ? "disabled title=\"Requires at least three web conventions to be applied\"" : isWebIntegrityRequirement ? "disabled title=\"Requires HTML and CSS validation results in the Integrity & Validation slide\"" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">`}
+                                        ${isInformationalRow || isNonTickableRelevantImplicationsRow91893 || isApplyingRelevantConventionsRow || isNonTickableIntegrityTestingRow || isNonTickableUXPrinciplesMeritRow ? "" : `<input type="checkbox" class="${isUseOfToolsTechniquesRequirement || isUXPrinciplesRequirement || isWebConventionsRequirement || isWebIntegrityRequirement ? "is-auto-complete" : ""}" ${isRowChecked ? "checked" : ""} ${isUseOfToolsTechniquesRequirement ? "disabled title=\"Requires at least three checked subtasks and Use of Tools & Techniques template\"" : isUXPrinciplesRequirement ? "disabled title=\"Requires at least three UX principles to be identified and applied\"" : isWebConventionsRequirement ? "disabled title=\"Requires at least three web conventions to be applied\"" : isWebIntegrityRequirement ? "disabled title=\"Automatically checked when the Integrity & Validation template has been used\"" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">`}
                                         ${rowText}
                                     </label>
                                     ${is91893ToolsAndTechniquesRow ? `
@@ -3024,11 +3019,10 @@ function renderChecklistCards(detail, allItems) {
                                     ${is91893IntegrityTestingRow ? `
                                         <div class="task-list-decomposition-subtasks">
                                             <p class="task-list-system-title">SUBTASKS</p>
-                                            <p class="task-list-achieved-note">${isWebIntegrityRequirement ? `Complete the Integrity &amp; Validation slide with both HTML and CSS results (${isWebIntegrityComplete ? "1" : "0"}/1).` : "Files identified for validation."}</p>
+                                            <p class="task-list-achieved-note">${isWebIntegrityRequirement ? "Use the Integrity &amp; Validation template." : "Files identified for validation."}</p>
                                             <div class="task-list-decomposition-category-list">
                                                 <a class="task-list-decomposition-category ${isWebIntegrityRequirement ? (isWebIntegrityComplete ? "is-covered" : "") : "is-covered"}" href="${escapeTaskListHtml(integrityTestingHref)}">
                                                     <span class="task-list-decomposition-category-label">${escapeTaskListHtml(integrityTestingTitle)}</span>
-                                                    <span class="task-list-decomposition-category-count">${isWebIntegrityRequirement ? integrityTestingCategoryCount : integrityTestingCategoryCount || "-"}</span>
                                                 </a>
                                             </div>
                                         </div>
@@ -3690,6 +3684,7 @@ async function loadChecklistForTask(taskId) {
         renderSavedFullSlideSet(nextCopies);
 
         const checklistChanged = [
+            autoTickWebIntegrityRequirement(taskListState.checklistState),
             autoTickTestingFunctionsRequirement(taskListState.checklistState, taskListState.fullEvidenceState, selected.id, signedInEmail),
             autoTickUseOfToolsTechniquesRequirement(taskListState.checklistState, nextCopies),
             autoTickDigitalOutcomeRequirements(taskListState.checklistState, selected.id, signedInEmail),
@@ -3697,6 +3692,7 @@ async function loadChecklistForTask(taskId) {
             autoTickRelevantImplicationsRequirements(taskListState.checklistState, selected.id, signedInEmail)
         ].some(Boolean);
         const evidenceChanged = [
+            autoTickWebIntegrityRequirement(taskListState.fullEvidenceState),
             autoTickTestingFunctionsRequirement(taskListState.fullEvidenceState, taskListState.fullEvidenceState, selected.id, signedInEmail),
             autoTickUseOfToolsTechniquesRequirement(taskListState.fullEvidenceState, nextCopies),
             autoTickDigitalOutcomeRequirements(taskListState.fullEvidenceState, selected.id, signedInEmail),
@@ -4328,11 +4324,13 @@ async function runTaskListTrelloSync() {
 
             const digitalOutcomeChecklistChanged = autoTickDigitalOutcomeRequirements(taskListState.checklistState, taskListState.selectedId, getTaskListEmail());
             const digitalOutcomeEvidenceChanged = autoTickDigitalOutcomeRequirements(taskListState.fullEvidenceState, taskListState.selectedId, getTaskListEmail());
+            const integrityChecklistChanged = autoTickWebIntegrityRequirement(taskListState.checklistState);
+            const integrityEvidenceChanged = autoTickWebIntegrityRequirement(taskListState.fullEvidenceState);
 
             autoTickRelevantImplicationsRequirements(taskListState.checklistState, taskListState.selectedId, getTaskListEmail());
             autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, taskListState.selectedId, getTaskListEmail());
 
-            if (repairedChecklist || repairedEvidence || checklistMultipleComponentsChanged || evidenceMultipleComponentsChanged || checklistTriallingChanged || evidenceTriallingChanged || digitalOutcomeChecklistChanged || digitalOutcomeEvidenceChanged) {
+            if (repairedChecklist || repairedEvidence || checklistMultipleComponentsChanged || evidenceMultipleComponentsChanged || checklistTriallingChanged || evidenceTriallingChanged || digitalOutcomeChecklistChanged || digitalOutcomeEvidenceChanged || integrityChecklistChanged || integrityEvidenceChanged) {
                 const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
                 await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});
             }
