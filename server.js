@@ -8182,6 +8182,91 @@ async function googleSlidesApiRequest(presentationId, accessToken) {
   return payload;
 }
 
+async function googleSlidesApiBatchUpdate(presentationId, requests, accessToken) {
+  const response = await fetch(`https://slides.googleapis.com/v1/presentations/${encodeURIComponent(presentationId)}:batchUpdate`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ requests: Array.isArray(requests) ? requests : [] })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(String(payload?.error?.message || `Google Slides update error (${response.status})`));
+    error.status = response.status;
+    throw error;
+  }
+  return payload;
+}
+
+async function createGoogleSlidesPresentation(title, accessToken) {
+  const response = await fetch("https://slides.googleapis.com/v1/presentations", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ title })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload?.presentationId) {
+    throw new Error(String(payload?.error?.message || "Could not create the Google Slides presentation."));
+  }
+  return payload;
+}
+
+function buildClientPresentationSlideRequests(presentation) {
+  const slideContent = [
+    { title: "Final Client Presentation", body: "Digital outcome: [project name]\nPresenter: [your name]\nClient: [client name]\nDate: [presentation date]" },
+    { title: "Client need and purpose", body: "Who is the client or intended end user?\nWhat need or problem does the outcome address?\nWhat will the client be able to do with it?" },
+    { title: "The final digital outcome", body: "Demonstrate the finished outcome.\nShow the key features in context.\nExplain how the outcome responds to the client need." },
+    { title: "Design and development decisions", body: "Highlight important design choices.\nExplain tools or techniques that shaped the outcome.\nConnect decisions to the client and end users." },
+    { title: "Testing, feedback and refinement", body: "Summarise testing and client or user feedback.\nShow what you changed or refined.\nExplain how the changes improved the outcome." },
+    { title: "Client response and next steps", body: "Invite questions and feedback.\nRecord any agreed next steps.\nThank the client for their time." }
+  ];
+  const existingSlides = Array.isArray(presentation?.slides) ? presentation.slides : [];
+  const firstSlideId = String(existingSlides[0]?.objectId || "").trim();
+  const suffix = Date.now().toString(36);
+  const requests = [];
+  if (firstSlideId) {
+    (Array.isArray(existingSlides[0]?.pageElements) ? existingSlides[0].pageElements : []).forEach((element) => {
+      if (element?.objectId) requests.push({ deleteObject: { objectId: element.objectId } });
+    });
+  }
+
+  slideContent.forEach((content, index) => {
+    const slideId = index === 0 && firstSlideId ? firstSlideId : `clientdeck${suffix}slide${index}`;
+    if (!(index === 0 && firstSlideId)) {
+      requests.push({ createSlide: { objectId: slideId, slideLayoutReference: { predefinedLayout: "BLANK" } } });
+    }
+    const titleId = `clientdeck${suffix}title${index}`;
+    const bodyId = `clientdeck${suffix}body${index}`;
+    const shape = (objectId, x, y, width, height) => ({
+      createShape: {
+        objectId,
+        shapeType: "TEXT_BOX",
+        elementProperties: {
+          pageObjectId: slideId,
+          size: { width: { magnitude: width, unit: "PT" }, height: { magnitude: height, unit: "PT" } },
+          transform: { scaleX: 1, scaleY: 1, translateX: x, translateY: y, unit: "PT" }
+        }
+      }
+    });
+    requests.push(shape(titleId, 42, 34, 636, 48));
+    requests.push({ insertText: { objectId: titleId, insertionIndex: 0, text: content.title } });
+    requests.push({ updateTextStyle: {
+      objectId: titleId, textRange: { type: "ALL" },
+      style: { fontFamily: "Arial", fontSize: { magnitude: 26, unit: "PT" }, bold: true,
+        foregroundColor: { opaqueColor: { rgbColor: { red: 0.12, green: 0.24, blue: 0.38 } } } },
+      fields: "fontFamily,fontSize,bold,foregroundColor"
+    } });
+    requests.push(shape(bodyId, 48, 110, 624, 245));
+    requests.push({ insertText: { objectId: bodyId, insertionIndex: 0, text: content.body } });
+    requests.push({ updateTextStyle: {
+      objectId: bodyId, textRange: { type: "ALL" },
+      style: { fontFamily: "Arial", fontSize: { magnitude: 18, unit: "PT" },
+        foregroundColor: { opaqueColor: { rgbColor: { red: 0.12, green: 0.18, blue: 0.24 } } } },
+      fields: "fontFamily,fontSize,foregroundColor"
+    } });
+  });
+  return requests;
+}
+
 async function driveDownloadExportedFile(fileId, mimeType, accessToken) {
   const response = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/export?mimeType=${encodeURIComponent(mimeType)}`, {
     headers: { Authorization: `Bearer ${accessToken}` }
@@ -10416,6 +10501,110 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
     res.json({ ok: true, alreadyExists: false, populated: populated.updated, populatedCount: populated.count, populatedImplicationsCount: populated.implicationsCount || 0, populationWarning: populated.warning || "", fileId: copied.id, fileUrl: copied.webViewLink || `https://docs.google.com/presentation/d/${copied.id}/edit`, fileName: copied.name, destinationFolderId: folderId, destinationSubfolderName: subfolderName || "" });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not copy template." });
+  }
+});
+
+app.post("/api/student/drive-setup/create-client-presentation", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email || !email.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
+    res.status(401).json({ error: "School sign-in required." }); return;
+  }
+  const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
+  const activityId = String(req.body?.activityId || "").trim();
+  const taskName = String(req.body?.taskName || "").replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 70);
+  if (!driveAccessToken) { res.status(400).json({ error: "Google Drive permission is required." }); return; }
+  if (!activityId) { res.status(400).json({ error: "A task is required." }); return; }
+
+  try {
+    const programmeFolder = await getStudentProgrammeFolder(email);
+    if (programmeFolder !== "SeniorDTECH") {
+      res.status(403).json({ error: "The Client Presentation card is for SeniorDTECH Digital Media tasks." }); return;
+    }
+    await verifyDriveTokenForStudent(driveAccessToken, email);
+
+    const result = await withResearchReportLock(`${email}:${activityId}:client-presentation`, async () => {
+      const seniorFolder = await driveEnsureFolder("root", "SeniorDTECH", driveAccessToken);
+      if (!seniorFolder?.id) throw new Error("Could not find or create the SeniorDTECH folder.");
+      const processAssessmentFolder = await driveEnsureFolder(String(seniorFolder.id), "Process Assessment", driveAccessToken);
+      if (!processAssessmentFolder?.id) throw new Error("Could not find or create the Process Assessment folder.");
+      await saveStudentDriveSetup(email, String(processAssessmentFolder.id));
+
+      const folderUrl = String(processAssessmentFolder.webViewLink
+        || buildDriveFolderUrlFromId(processAssessmentFolder.id)).trim();
+      const titleSuffix = taskName || "Digital Outcome";
+      const presentationName = `Final Client Presentation - ${titleSuffix}`;
+      const templateId = "final-client-presentation";
+      let savedCopy = null;
+
+      if (hasDatabase) {
+        await ensureProjectInterestsSchema();
+        const saved = await pool.query(
+          "SELECT template_copies FROM project_interests WHERE project_id = $1 AND student_email = $2 LIMIT 1",
+          [activityId, email]
+        );
+        savedCopy = (Array.isArray(saved.rows?.[0]?.template_copies) ? saved.rows[0].template_copies : [])
+          .find((copy) => String(copy?.templateId || "").trim() === templateId) || null;
+      }
+
+      let file = null;
+      const savedFileId = extractSlidesFileId(savedCopy?.fileUrl || "");
+      if (savedFileId) {
+        try {
+          const savedFile = await driveApiRequest(`/files/${encodeURIComponent(savedFileId)}`, {
+            accessToken: driveAccessToken,
+            queryParams: { fields: "id,name,webViewLink,parents,trashed", supportsAllDrives: true }
+          });
+          if (savedFile?.id && !savedFile.trashed) file = savedFile;
+        } catch (error) {
+          if (Number(error?.status) !== 404) throw error;
+        }
+      }
+      if (!file) file = await driveFindFileByNameInFolder(String(processAssessmentFolder.id), presentationName, driveAccessToken);
+      const alreadyExists = Boolean(file?.id);
+
+      if (!file?.id) {
+        const presentation = await createGoogleSlidesPresentation(presentationName, driveAccessToken);
+        const presentationId = String(presentation.presentationId || "").trim();
+        if (!presentationId) throw new Error("Google Slides did not return a presentation ID.");
+        await googleSlidesApiBatchUpdate(presentationId, buildClientPresentationSlideRequests(presentation), driveAccessToken);
+
+        const createdFile = await driveApiRequest(`/files/${encodeURIComponent(presentationId)}`, {
+          accessToken: driveAccessToken,
+          queryParams: { fields: "id,name,parents", supportsAllDrives: true }
+        });
+        const currentParents = Array.isArray(createdFile?.parents) ? createdFile.parents : [];
+        file = await driveApiRequest(`/files/${encodeURIComponent(presentationId)}`, {
+          accessToken: driveAccessToken,
+          method: "PATCH",
+          queryParams: {
+            addParents: String(processAssessmentFolder.id),
+            removeParents: currentParents.join(","),
+            fields: "id,name,webViewLink,parents",
+            supportsAllDrives: true
+          },
+          body: { name: presentationName }
+        });
+      }
+
+      const fileUrl = String(file.webViewLink
+        || `https://docs.google.com/presentation/d/${encodeURIComponent(file.id)}/edit`).trim();
+      const copyEntry = {
+        templateId,
+        templateTitle: "Final Client Presentation",
+        fileUrl,
+        fileName: String(file.name || presentationName).trim(),
+        processAssessmentFolderUrl: folderUrl,
+        destinationFolderUrl: folderUrl,
+        destinationFolderId: String(processAssessmentFolder.id),
+        copiedAt: new Date().toISOString()
+      };
+      await recordTemplateCopyInDb(activityId, email, copyEntry);
+      return { ...copyEntry, folderUrl, alreadyExists };
+    });
+
+    res.json({ ok: true, ...result });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not create your client presentation." });
   }
 });
 

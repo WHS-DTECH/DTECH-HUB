@@ -19,6 +19,56 @@
             gap: 18px;
         }
 
+        .task-list-workspace {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+            gap: 16px;
+            align-items: start;
+        }
+
+        .task-list-workspace.has-client-presentation {
+            grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+        }
+
+        .task-list-main-column {
+            min-width: 0;
+            display: grid;
+            gap: 16px;
+        }
+
+        .task-list-client-presentation-card {
+            position: sticky;
+            top: 16px;
+            border-top: 4px solid #24845d;
+        }
+
+        .task-list-client-presentation-card h2 {
+            margin-bottom: 8px;
+        }
+
+        .task-list-client-presentation-status {
+            min-height: 1.4em;
+            margin: 8px 0;
+            color: #35526f;
+            font-size: 0.84rem;
+        }
+
+        .task-list-client-presentation-outline {
+            margin: 12px 0;
+            padding-left: 20px;
+            display: grid;
+            gap: 8px;
+            color: #294968;
+            font-size: 0.86rem;
+        }
+
+        .task-list-client-presentation-folder {
+            display: inline-flex;
+            margin-top: 8px;
+            color: #174c3a;
+            font-weight: 700;
+        }
+
         .task-list-hero-wrap {
             padding: 0 0 8px;
         }
@@ -926,6 +976,14 @@
         }
 
         @media (max-width: 820px) {
+            .task-list-workspace.has-client-presentation {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
+            .task-list-client-presentation-card {
+                position: static;
+            }
+
             .task-list-link-card {
                 flex-direction: column;
                 align-items: flex-start;
@@ -971,6 +1029,22 @@
                         </div>
                     </section>
 
+                    <div class="task-list-workspace" id="task-list-workspace">
+                    <aside class="task-list-card task-list-client-presentation-card" id="task-list-client-presentation-card" hidden>
+                        <p class="section-kicker">FINAL STAGE</p>
+                        <h2>Present to your client</h2>
+                        <p class="task-list-link-meta">Prepare a clear walkthrough of your finished digital outcome for your client.</p>
+                        <ol class="task-list-client-presentation-outline">
+                            <li>Introduce the client need and purpose.</li>
+                            <li>Demonstrate the finished outcome and key features.</li>
+                            <li>Explain important design decisions, testing, and refinements.</li>
+                            <li>Invite client questions and feedback.</li>
+                        </ol>
+                        <button type="button" class="detail-action detail-action-primary" id="task-list-client-presentation-action">Create presentation</button>
+                        <p class="task-list-client-presentation-status" id="task-list-client-presentation-status" role="status" aria-live="polite"></p>
+                        <a class="task-list-client-presentation-folder" id="task-list-client-presentation-folder" href="#" target="_blank" rel="noopener" hidden>Open Process Assessment folder</a>
+                    </aside>
+                    <div class="task-list-main-column">
                     <section class="task-list-card" id="task-list-checklist-card" hidden>
                         <div class="section-heading">
                             <div>
@@ -996,6 +1070,8 @@
                         </details>
                         <div id="task-list-checklist" class="task-list-checklist-grid"></div>
                     </section>
+                    </div>
+                    </div>
                 </section>
             </div>
         </main>

@@ -2624,6 +2624,38 @@ function renderSavedFullSlideSet(copies) {
     }
 }
 
+function isSeniorDigitalMediaTask(item) {
+    const standards = `${String(item?.standard_1 || "")} ${String(item?.standard_2 || "")}`;
+    return taskListState.course === "SeniorDTECH" && /\b(?:91893|91903)\b/.test(standards);
+}
+
+function renderFinalClientPresentationCard(item) {
+    const workspace = document.querySelector("#task-list-workspace");
+    const card = document.querySelector("#task-list-client-presentation-card");
+    if (!workspace || !card) return;
+
+    const eligible = isSeniorDigitalMediaTask(item);
+    workspace.classList.toggle("has-client-presentation", eligible);
+    card.hidden = !eligible;
+    if (!eligible) return;
+
+    const entry = taskListState.templateCopies.find((copy) =>
+        String(copy?.templateId || "").trim().toLowerCase() === "final-client-presentation"
+    );
+    const action = card.querySelector("#task-list-client-presentation-action");
+    const folderLink = card.querySelector("#task-list-client-presentation-folder");
+    const status = card.querySelector("#task-list-client-presentation-status");
+    if (action) action.textContent = entry?.fileUrl ? "Open presentation" : "Create presentation";
+    const folderUrl = String(entry?.processAssessmentFolderUrl || entry?.destinationFolderUrl || "").trim();
+    if (folderLink) {
+        folderLink.hidden = !folderUrl;
+        if (folderUrl) folderLink.href = folderUrl;
+    }
+    if (status) status.textContent = entry?.fileUrl
+        ? "Your client presentation is saved in SeniorDTECH / Process Assessment."
+        : "Create a guided Google Slides deck for your client walkthrough.";
+}
+
 async function fetchMyEvidence(projectId) {
     if (!projectId) return [];
     const payload = await loadJson(`/api/activities/${encodeURIComponent(projectId)}/my-evidence`, { headers: buildTaskListHeaders({}) });
@@ -3585,6 +3617,7 @@ async function loadChecklistForTask(taskId) {
         ).catch(() => ({ template_copies: [] }))
     ]);
     taskListState.templateCopies = Array.isArray(templateCopiesPayload?.template_copies) ? templateCopiesPayload.template_copies : [];
+    renderFinalClientPresentationCard(selected);
     const templateCopySyncPromise = autoSyncToolsAndTechniquesTemplateCopy(
         taskListState.selectedId,
         signedInEmail,
@@ -4094,6 +4127,68 @@ async function runTaskListTrelloSync() {
         const assetManagerBtn = event.target?.closest?.("#task-list-open-asset-manager");
         if (!assetManagerBtn || !taskListState.selectedId) return;
         window.open(`asset-manager.html?id=${encodeURIComponent(taskListState.selectedId)}`, "_blank", "noopener");
+    });
+
+    document.addEventListener("click", async (event) => {
+        const presentationButton = event.target?.closest?.("#task-list-client-presentation-action");
+        if (!presentationButton) return;
+        const selected = taskListState.allItems.find((item) => String(item?.id || "") === String(taskListState.selectedId));
+        if (!isSeniorDigitalMediaTask(selected)) return;
+
+        const savedCopy = taskListState.templateCopies.find((copy) =>
+            String(copy?.templateId || "").trim().toLowerCase() === "final-client-presentation"
+        );
+        if (savedCopy?.fileUrl) {
+            window.open(savedCopy.fileUrl, "_blank", "noopener,noreferrer");
+            return;
+        }
+
+        const status = document.querySelector("#task-list-client-presentation-status");
+        presentationButton.disabled = true;
+        presentationButton.textContent = "Creating presentation...";
+        if (status) status.textContent = "Requesting Google Drive access...";
+        try {
+            if (typeof requestHubDriveAccessToken !== "function") {
+                throw new Error("Google Drive access is not available on this page. Reload and try again.");
+            }
+            const tokenResponse = await requestHubDriveAccessToken({ forceConsent: false });
+            if (tokenResponse?.error || !tokenResponse?.access_token) {
+                throw new Error("Google Drive permission is required to create your client presentation.");
+            }
+            const payload = await loadJson("/api/student/drive-setup/create-client-presentation", {
+                method: "POST",
+                headers: buildTaskListHeaders({ "Content-Type": "application/json" }),
+                body: JSON.stringify({
+                    driveAccessToken: tokenResponse.access_token,
+                    activityId: String(selected.id),
+                    taskName: String(selected.name || "Digital Media")
+                })
+            });
+            const copy = {
+                templateId: "final-client-presentation",
+                templateTitle: "Final Client Presentation",
+                fileUrl: String(payload?.fileUrl || "").trim(),
+                fileName: String(payload?.fileName || "Final Client Presentation").trim(),
+                processAssessmentFolderUrl: String(payload?.folderUrl || "").trim(),
+                destinationFolderUrl: String(payload?.folderUrl || "").trim()
+            };
+            if (!copy.fileUrl) throw new Error("The presentation was created but Google Drive did not return its link.");
+            taskListState.templateCopies = [
+                ...taskListState.templateCopies.filter((entry) => String(entry?.templateId || "").trim().toLowerCase() !== copy.templateId),
+                copy
+            ];
+            renderFinalClientPresentationCard(selected);
+            if (status) status.textContent = payload?.alreadyExists
+                ? "Your existing client presentation is ready to continue."
+                : "Client presentation created in SeniorDTECH / Process Assessment.";
+        } catch (error) {
+            if (status) status.textContent = error?.message || "Could not create your client presentation.";
+        } finally {
+            presentationButton.disabled = false;
+            if (!taskListState.templateCopies.some((copy) => String(copy?.templateId || "").trim().toLowerCase() === "final-client-presentation")) {
+                presentationButton.textContent = "Create presentation";
+            }
+        }
     });
 
     document.addEventListener("click", async (event) => {

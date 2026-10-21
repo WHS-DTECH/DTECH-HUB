@@ -255,6 +255,45 @@ assert.match(taskList, /isWebConventionsRequirement\s*\?\s*getDigiMedConventions
 assert.match(taskList, /isUseOfToolsTechniquesRequirement \|\| isUXPrinciplesRequirement \|\| isWebConventionsRequirement \|\| isWebIntegrityRequirement \? "is-auto-complete"/,
     "The auto-managed conventions tick uses the blue completion style");
 
+const clientDeckHelperStart = server.indexOf("function buildClientPresentationSlideRequests(");
+const clientDeckHelperEnd = server.indexOf("\nasync function driveDownloadExportedFile", clientDeckHelperStart);
+assert.ok(clientDeckHelperStart >= 0 && clientDeckHelperEnd > clientDeckHelperStart,
+    "Client presentation starter-deck builder is present");
+const clientDeckContext = vm.createContext({});
+vm.runInContext(server.slice(clientDeckHelperStart, clientDeckHelperEnd), clientDeckContext);
+const clientDeckRequests = JSON.parse(JSON.stringify(clientDeckContext.buildClientPresentationSlideRequests({
+    slides: [{ objectId: "existing-slide", pageElements: [{ objectId: "default-title" }] }]
+})));
+assert.equal(clientDeckRequests.filter((request) => request.createSlide).length, 5,
+    "A new starter deck fills the default slide and creates five more");
+assert.ok(clientDeckRequests.some((request) => request.insertText?.text === "Final Client Presentation"));
+assert.ok(clientDeckRequests.some((request) => request.insertText?.text === "The final digital outcome"));
+assert.ok(clientDeckRequests.some((request) => request.insertText?.text === "Testing, feedback and refinement"));
+assert.ok(clientDeckRequests.some((request) => request.insertText?.text === "Client response and next steps"));
+const clientDeckRouteStart = server.indexOf('app.post("/api/student/drive-setup/create-client-presentation"');
+const clientDeckRouteEnd = server.indexOf("\nfunction findBestStudentTaskTopicSlide", clientDeckRouteStart);
+const clientDeckRoute = server.slice(clientDeckRouteStart, clientDeckRouteEnd);
+assert.ok(clientDeckRouteStart >= 0 && clientDeckRouteEnd > clientDeckRouteStart);
+assert.match(clientDeckRoute, /programmeFolder !== "SeniorDTECH"/);
+assert.match(clientDeckRoute, /driveEnsureFolder\("root", "SeniorDTECH"/);
+assert.match(clientDeckRoute, /driveEnsureFolder\(String\(seniorFolder\.id\), "Process Assessment"/);
+assert.match(clientDeckRoute, /driveFindFileByNameInFolder[\s\S]*?createGoogleSlidesPresentation/,
+    "The endpoint reopens an existing deck before creating another");
+assert.match(clientDeckRoute, /recordTemplateCopyInDb\(activityId, email, copyEntry\)/,
+    "The deck URL is saved with the assessment for future visits");
+
+const clientPresentationEligibilityStart = taskList.indexOf("function isSeniorDigitalMediaTask(");
+const clientPresentationEligibilityEnd = taskList.indexOf("\nfunction renderFinalClientPresentationCard", clientPresentationEligibilityStart);
+assert.ok(clientPresentationEligibilityStart >= 0 && clientPresentationEligibilityEnd > clientPresentationEligibilityStart);
+const clientPresentationContext = vm.createContext({ taskListState: { course: "SeniorDTECH" } });
+vm.runInContext(taskList.slice(clientPresentationEligibilityStart, clientPresentationEligibilityEnd), clientPresentationContext);
+assert.equal(clientPresentationContext.isSeniorDigitalMediaTask({ standard_1: "91897", standard_2: "91903" }), true);
+assert.equal(clientPresentationContext.isSeniorDigitalMediaTask({ standard_1: "91897", standard_2: "91907" }), false);
+clientPresentationContext.taskListState.course = "MiddleDTECH";
+assert.equal(clientPresentationContext.isSeniorDigitalMediaTask({ standard_1: "91897", standard_2: "91903" }), false);
+assert.match(html, /id="task-list-workspace"[\s\S]*id="task-list-client-presentation-card"[\s\S]*id="task-list-checklist-card"/,
+    "The client presentation card sits beside the existing checklist workspace");
+
 const uxCountStart = taskList.indexOf("function getDigiMedUXPrinciplesAcknowledgementCount(");
 const uxCountEnd = taskList.indexOf("\nfunction getDigiMedUXPrinciplesSubtask", uxCountStart);
 const uxAutoTickStart = taskList.indexOf("function isUXPrinciplesRequirementStep(");
