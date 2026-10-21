@@ -1198,10 +1198,18 @@ function finalizeStudentSummaryBucket(bucket) {
 }
 
 // One row per student, one column per criteria group, sourced entirely from the records already built for the task cards.
+function isWrittenImplicationsGuidance(record) {
+    const standard = normalizeTrackerStandardValue(record?.processStandard);
+    const topic = stripTaskTopicLevel(record?.taskTopic || "").trim().replace(/\s+/g, " ");
+    return ["91907", "91897", "91903", "91893"].includes(standard)
+        && /^address(?:ing)? relevant implications?\.?$/i.test(topic);
+}
+
 function buildStudentSummaryRows(sourceRecords = workState.records) {
     const byStudent = new Map();
 
     (Array.isArray(sourceRecords) ? sourceRecords : []).forEach((record) => {
+        if (isWrittenImplicationsGuidance(record)) return;
         const email = record.studentEmail;
         if (!email) return;
         if (!byStudent.has(email)) {

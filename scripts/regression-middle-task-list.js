@@ -15,6 +15,59 @@ const activityDetail = fs.readFileSync(path.join(root, "ProjectPages", "activity
 const teacherStudentWork = fs.readFileSync(path.join(root, "teacher-student-work.js"), "utf8");
 const standardCard = fs.readFileSync(path.join(root, "assessment-standard-card.js"), "utf8");
 
+const implicationsSummaryStart = teacherStudentWork.indexOf("function createStudentSummaryBucket(");
+const implicationsSummaryEnd = teacherStudentWork.indexOf("\nfunction getStudentSummaryChipClass", implicationsSummaryStart);
+assert.ok(implicationsSummaryStart >= 0 && implicationsSummaryEnd > implicationsSummaryStart);
+const implicationsSummaryContext = vm.createContext({
+    normalizeTrackerStandardValue: (value) => String(value || "").trim(),
+    stripTaskTopicLevel: (value) => String(value || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim(),
+    getTaskTopicGroup: (value) => String(value || "").split(":")[0].trim().toLowerCase(),
+    getStudentSummaryStandardNumber: (record) => record.processStandard,
+    getStudentSummarySectionLabel: () => "Section",
+    toSafeExternalUrl: (value) => String(value || "")
+});
+vm.runInContext(teacherStudentWork.slice(implicationsSummaryStart, implicationsSummaryEnd), implicationsSummaryContext);
+for (const standard of ["91907", "91897", "91903", "91893"]) {
+    for (const guidance of ["Achieved: Address relevant implications.", "Achieved: Addressing relevant implication.", "Merit: Addressing relevant implications."]) {
+        const topics = [
+            "Achieved: Project management.", "Achieved: Decomposition.", "Achieved: Trialling.",
+            "Achieved: Testing.", "Achieved: Explaining relevant implications."
+        ];
+        const records = topics.map((taskTopic) => ({
+            studentEmail: "otto@example.test", studentName: "Otto", processStandard: standard,
+            taskTopic, acknowledged: true
+        }));
+        records.push({ ...records[0], taskTopic: guidance, acknowledged: false });
+        const originalRecords = JSON.stringify(records);
+        const student = implicationsSummaryContext.buildStudentSummaryRows(records)[0];
+        assert.equal(student.groups.get("achieved").total, 5, `${standard} excludes written implications guidance from Achieved totals`);
+        assert.equal(student.groups.get("achieved").submittedCount, 5);
+        assert.equal(student.groups.get("overall").total, 5, `${standard} also corrects the Overall total and report records`);
+        assert.ok(student.groups.get("overall").records.some((record) => /Explaining relevant implications/.test(record.taskTopic)));
+        assert.equal(JSON.stringify(records), originalRecords, "Summary filtering never changes the student's written evidence records");
+    }
+}
+assert.equal(implicationsSummaryContext.isWrittenImplicationsGuidance({
+    processStandard: "92005", taskTopic: "Achieved: Addressing relevant implications."
+}), false, "Unrelated standards are unchanged");
+const checklistSummaryStart = taskList.indexOf("function summarizeChecklistCriteria(");
+const checklistSummaryEnd = taskList.indexOf("\nfunction renderAllocationLists", checklistSummaryStart);
+assert.ok(checklistSummaryStart >= 0 && checklistSummaryEnd > checklistSummaryStart);
+const checklistSummaryContext = vm.createContext({
+    stripStepLevel: (value) => String(value || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim()
+});
+vm.runInContext(taskList.slice(checklistSummaryStart, checklistSummaryEnd), checklistSummaryContext);
+for (const standard of ["91907", "91897", "91903", "91893"]) {
+    const summary = checklistSummaryContext.summarizeChecklistCriteria({ [standard]: [
+        { text: "Achieved: Explaining relevant implications.", done: true },
+        { text: "Achieved: Addressing relevant implications.", done: false },
+        { text: "Merit: Address relevant implications.", done: true }
+    ] });
+    assert.equal(summary.totalCount, 1, `${standard} Task List does not count written implications guidance`);
+    assert.equal(summary.metCount, 1);
+    assert.equal(summary.unresolvedCount, 0);
+}
+
 const uxSlideReaderStart = server.indexOf("function extractGoogleSlidesUXPrincipleResponses(");
 const uxSlideReaderEnd = server.indexOf("\nfunction extractGoogleSlidesDevelopmentRows", uxSlideReaderStart);
 assert.ok(uxSlideReaderStart >= 0 && uxSlideReaderEnd > uxSlideReaderStart,

@@ -2753,7 +2753,12 @@ function renderHeader(summary) {
 }
 
 function summarizeChecklistCriteria(stateMap) {
-    const rows = Object.values(stateMap || {}).flatMap((value) => Array.isArray(value) ? value : []);
+    const rows = Object.entries(stateMap || {}).flatMap(([standard, value]) =>
+        (Array.isArray(value) ? value : []).filter((row) =>
+            !(["91907", "91897", "91903", "91893"].includes(standard)
+                && /^address(?:ing)? relevant implications?\.?$/i.test(stripStepLevel(row?.text || "").trim().replace(/\s+/g, " ")))
+        )
+    );
     const mainRows = rows.filter((row) => String(row?.text || "").trim().length > 0);
     const metCount = mainRows.filter((row) => Boolean(row?.done)).length;
     const unresolvedCount = Math.max(0, mainRows.length - metCount);
