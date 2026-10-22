@@ -268,6 +268,7 @@ const taskListState = {
     finalOutcome: null,
     finalOutcomeBusy: false,
     githubZipSize: null,
+    slideshowPdfBusy: { client: false, documentation: false },
     trelloReport: null,
     trelloReportBusy: false,
     decompositionCoverage: null,
@@ -2660,6 +2661,7 @@ function renderFinalClientPresentationCard(item) {
     if (status) status.textContent = entry?.fileUrl
         ? "Your client presentation is saved in SeniorDTECH / Process Assessment."
         : "Create a guided Google Slides deck for your client walkthrough.";
+    renderSlideshowPdfState("client", entry?.fileUrl || "");
 }
 
 function buildDocumentationTopicOrder(links, origin, copies = []) {
@@ -2708,6 +2710,64 @@ function renderDocumentationDeckState(deck, message = "") {
         deck?.documentation?.partial ? "Some slides remain. Use Add missing slides to continue." : "",
         missing.length ? `Missing evidence: ${missing.join(", ")}.` : ""
     ].filter(Boolean).join(" ");
+    renderSlideshowPdfState("documentation", fileUrl);
+}
+
+function renderSlideshowPdfState(kind, sourceUrl) {
+    const prefix = kind === "client" ? "task-list-client-pdf" : "task-list-documentation-pdf";
+    const button = document.querySelector(`#${prefix}-convert`);
+    const link = document.querySelector(`#${prefix}-open`);
+    const status = document.querySelector(`#${prefix}-status`);
+    if (!button || !link || !status) return;
+    const sourceId = String(sourceUrl || "").match(/^https:\/\/docs\.google\.com\/presentation\/d\/([A-Za-z0-9_-]+)(?:\/|$)/)?.[1] || "";
+    const templateId = kind === "client" ? "client-presentation-pdf" : "submission-documentation-pdf";
+    const saved = taskListState.templateCopies.find((entry) => entry?.templateId === templateId);
+    const matching = Boolean(sourceId && saved?.pdfExport?.sourcePresentationId === sourceId);
+    const fileUrl = /^https:\/\/drive\.google\.com\/file\/d\/[A-Za-z0-9_-]+\/view$/.test(String(saved?.fileUrl || "")) ? saved.fileUrl : "";
+    button.disabled = !sourceId || Boolean(taskListState.slideshowPdfBusy?.[kind]);
+    link.hidden = !matching || !fileUrl;
+    if (matching && fileUrl) link.href = fileUrl;
+    const exportedAt = new Date(saved?.pdfExport?.exportedAt || "");
+    status.textContent = matching && fileUrl
+        ? `PDF saved in SeniorDTECH / Process Assessment${Number.isFinite(exportedAt.getTime()) ? ` / ${exportedAt.toLocaleString("en-NZ", { timeZone: "Pacific/Auckland" })}` : ""}`
+        : saved && sourceId ? "The saved PDF belongs to a previously linked slideshow." : "";
+}
+
+async function handleSlideshowPdfExport(kind) {
+    if (!["client", "documentation"].includes(kind)) return;
+    const selected = taskListState.allItems.find((item) => String(item.id) === taskListState.selectedId);
+    if (!isSeniorDigitalMediaTask(selected) || taskListState.slideshowPdfBusy[kind]) return;
+    const activityId = String(selected.id);
+    const source = kind === "client" ? taskListState.templateCopies.find((entry) => entry?.templateId === "final-client-presentation") : taskListState.documentationDeck;
+    const sourceUrl = String(source?.fileUrl || "");
+    const sourceId = sourceUrl.match(/^https:\/\/docs\.google\.com\/presentation\/d\/([A-Za-z0-9_-]+)(?:\/|$)/)?.[1] || "";
+    if (!sourceId) return;
+    const status = document.querySelector(kind === "client" ? "#task-list-client-pdf-status" : "#task-list-documentation-pdf-status");
+    taskListState.slideshowPdfBusy[kind] = true;
+    renderSlideshowPdfState(kind, sourceUrl);
+    if (status) status.textContent = "Converting slideshow and saving the PDF to Google Drive...";
+    let message = "";
+    try {
+        const token = await requestHubDriveAccessToken({ forceConsent: false });
+        if (taskListState.selectedId !== activityId) return;
+        if (token?.error || !token?.access_token) throw new Error("Google Drive permission is required. Allow access and try again.");
+        const payload = await loadJson(`/api/activities/${encodeURIComponent(activityId)}/slideshow-pdf`, {
+            method: "POST", headers: buildTaskListHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ kind, sourcePresentationId: sourceId, driveAccessToken: token.access_token })
+        });
+        if (taskListState.selectedId !== activityId) return;
+        taskListState.templateCopies = taskListState.templateCopies.filter((entry) => entry?.templateId !== payload.saved.templateId).concat(payload.saved);
+        message = "PDF saved to SeniorDTECH / Process Assessment. The slideshow and earlier PDFs are unchanged.";
+    } catch (error) {
+        message = error?.message || "Could not convert and save your slideshow PDF.";
+    } finally {
+        taskListState.slideshowPdfBusy[kind] = false;
+        if (taskListState.selectedId === activityId) {
+            const currentSource = kind === "client" ? taskListState.templateCopies.find((entry) => entry?.templateId === "final-client-presentation") : taskListState.documentationDeck;
+            renderSlideshowPdfState(kind, currentSource?.fileUrl || "");
+            if (status && message) status.textContent = message;
+        }
+    }
 }
 
 async function loadDocumentationDeck(item) {
@@ -4539,6 +4599,11 @@ async function runTaskListTrelloSync() {
         if (event.target?.closest?.("[data-documentation-merge]")) void handleDocumentationAction("merge");
         else if (event.target?.closest?.("[data-documentation-add]")) void handleDocumentationAction("add");
         else if (event.target?.closest?.("[data-documentation-sync]")) void handleDocumentationAction("sync");
+    });
+
+    document.addEventListener("click", (event) => {
+        const button = event.target?.closest?.("[data-slideshow-pdf]");
+        if (button) void handleSlideshowPdfExport(button.getAttribute("data-slideshow-pdf"));
     });
 
     document.addEventListener("click", (event) => {

@@ -1,6 +1,6 @@
 const path = require("path");
 const fs = require("fs");
-const { createHash } = require("node:crypto");
+const { createHash, randomUUID } = require("node:crypto");
 const express = require("express");
 const multer = require("multer");
 const mammoth = require("mammoth");
@@ -6377,6 +6377,18 @@ async function recordTemplateCopyInDb(projectId, studentEmail, entry) {
     processAssessmentFolderUrl: String(entry?.processAssessmentFolderUrl || "").trim(),
     destinationFolderUrl: String(entry?.destinationFolderUrl || "").trim(),
     destinationFolderId: String(entry?.destinationFolderId || "").trim(),
+    ...(["client-presentation-pdf", "submission-documentation-pdf"].includes(entry?.templateId) ? {
+      pdfExport: {
+        kind: entry?.pdfExport?.kind === "client" ? "client" : "documentation",
+        sourcePresentationId: String(entry?.pdfExport?.sourcePresentationId || ""),
+        sourceUrl: String(entry?.pdfExport?.sourceUrl || ""),
+        sourceName: String(entry?.pdfExport?.sourceName || "").slice(0, 512),
+        sourceModifiedTime: String(entry?.pdfExport?.sourceModifiedTime || ""),
+        sourceVersion: String(entry?.pdfExport?.sourceVersion || ""),
+        exportedAt: String(entry?.pdfExport?.exportedAt || ""),
+        bytes: Number(entry?.pdfExport?.bytes || 0)
+      }
+    } : {}),
     ...(entry?.templateId === "final-digital-outcome-zip" ? {
       finalOutcome: {
         repositoryUrl: String(entry?.finalOutcome?.repositoryUrl || ""),
@@ -17902,6 +17914,64 @@ async function loadFinalOutcomeContext(req) {
   const saved = copies.find((entry) => entry?.templateId === "final-digital-outcome-zip") || null;
   return { email, activityId, repositories, saved, evidence, copies };
 }
+
+app.post("/api/activities/:id/slideshow-pdf", async (req, res) => {
+  try {
+    const context = await loadFinalOutcomeContext(req);
+    const { email, activityId } = context;
+    const kind = String(req.body?.kind || "");
+    if (!["client", "documentation"].includes(kind)) throw Object.assign(new Error("Choose the client presentation or documentation deck."), { status: 400 });
+    const token = String(req.body?.driveAccessToken || "").trim();
+    if (!token) throw Object.assign(new Error("Google Drive permission is required."), { status: 400 });
+    await verifyDriveTokenForStudent(token, email);
+    const result = await withFinalOutcomeLock(`${email}:${activityId}:slideshow-pdf:${kind}`, async () => {
+      const source = kind === "client"
+        ? context.copies.find((entry) => entry?.templateId === "final-client-presentation")
+        : getDocumentationRecord(context.copies);
+      const sourceId = documentationPresentationId(source?.fileUrl);
+      if (!sourceId) throw Object.assign(new Error(kind === "client" ? "Create your client presentation first." : "Merge or Google Sync your documentation deck first."), { status: 409 });
+      if (req.body?.sourcePresentationId && String(req.body.sourcePresentationId) !== sourceId) {
+        throw Object.assign(new Error("The saved slideshow link has changed. Reload the Task List before exporting."), { status: 409 });
+      }
+      const folderId = await resolveOwnedFinalPreparationFolder(email, token);
+      const metadataOptions = { accessToken: token, queryParams: { fields: "id,name,mimeType,trashed,modifiedTime,version" } };
+      const file = await driveApiRequest(`/files/${encodeURIComponent(sourceId)}`, metadataOptions);
+      if (file.trashed || file.mimeType !== "application/vnd.google-apps.presentation") {
+        throw Object.assign(new Error("The saved slideshow is unavailable or is not a Google Slides presentation."), { status: 409 });
+      }
+      const buffer = await driveDownloadExportedFile(sourceId, "application/pdf", token);
+      if (buffer.length > 10 * 1024 * 1024) throw Object.assign(new Error("This PDF exceeds Google's 10 MB Slides export limit."), { status: 413 });
+      if (buffer.length < 5 || buffer.subarray(0, 5).toString() !== "%PDF-") throw Object.assign(new Error("Google did not return a valid slideshow PDF. No file was saved."), { status: 502 });
+      const after = await driveApiRequest(`/files/${encodeURIComponent(sourceId)}`, metadataOptions);
+      if (after.trashed || String(after.version || "") !== String(file.version || "") || String(after.modifiedTime || "") !== String(file.modifiedTime || "")) {
+        throw Object.assign(new Error("The slideshow changed during export. Convert it again to capture the current version."), { status: 409 });
+      }
+      const latest = await loadFinalOutcomeContext(req);
+      const latestSource = kind === "client" ? latest.copies.find((entry) => entry?.templateId === "final-client-presentation") : getDocumentationRecord(latest.copies);
+      if (documentationPresentationId(latestSource?.fileUrl) !== sourceId) {
+        throw Object.assign(new Error("The saved slideshow link changed during export. Convert the new slideshow instead."), { status: 409 });
+      }
+      const exportedAt = new Date().toISOString();
+      const prefix = kind === "client" ? "Client-Presentation" : "Submission-Documentation";
+      const fileName = `${prefix}-${activityId}-${exportedAt.replace(/[:.]/g, "-")}-${randomUUID()}.pdf`;
+      const uploaded = await driveUploadBinaryFile({ accessToken: token, folderId, fileName, mimeType: "application/pdf", buffer });
+      const saved = {
+        templateId: kind === "client" ? "client-presentation-pdf" : "submission-documentation-pdf",
+        templateTitle: kind === "client" ? "Client Presentation PDF" : "Submission Documentation PDF",
+        fileUrl: `https://drive.google.com/file/d/${encodeURIComponent(uploaded.id)}/view`, fileName,
+        processAssessmentFolderUrl: buildDriveFolderUrlFromId(folderId),
+        pdfExport: { kind, sourcePresentationId: sourceId, sourceUrl: source.fileUrl,
+          sourceName: String(file.name || source.fileName || prefix), sourceModifiedTime: String(file.modifiedTime || ""),
+          sourceVersion: String(file.version || ""), exportedAt, bytes: buffer.length }
+      };
+      await recordTemplateCopyInDb(activityId, email, saved);
+      return { saved };
+    });
+    res.set("Cache-Control", "no-store").json(result);
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not convert and save your slideshow PDF." });
+  }
+});
 
 app.get("/api/activities/:id/github-zip-size", async (req, res) => {
   try {

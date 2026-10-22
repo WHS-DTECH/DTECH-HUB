@@ -67,7 +67,8 @@
         }
 
         #task-list-documentation-open:not([hidden]),
-        #task-list-trello-report-open:not([hidden]) {
+        #task-list-trello-report-open:not([hidden]),
+        .task-list-slideshow-pdf-open:not([hidden]) {
             display: flex;
             align-items: center;
             justify-content: center;
@@ -85,12 +86,14 @@
         }
 
         #task-list-documentation-open:hover,
-        #task-list-trello-report-open:hover {
+        #task-list-trello-report-open:hover,
+        .task-list-slideshow-pdf-open:hover {
             background: #195675;
         }
 
         #task-list-documentation-open:focus-visible,
-        #task-list-trello-report-open:focus-visible {
+        #task-list-trello-report-open:focus-visible,
+        .task-list-slideshow-pdf-open:focus-visible {
             outline: 3px solid #236b91;
             outline-offset: 3px;
         }
@@ -104,9 +107,15 @@
         }
 
         .task-list-documentation-card button,
-        .task-list-documentation-card a {
+        .task-list-documentation-card a,
+        .task-list-client-presentation-card button,
+        .task-list-client-presentation-card a {
             white-space: normal;
             overflow-wrap: anywhere;
+        }
+
+        [data-slideshow-pdf] {
+            min-height: 40px;
         }
 
         .task-list-documentation-ready {
@@ -1190,6 +1199,11 @@
                         <button type="button" class="detail-action detail-action-primary" id="task-list-client-presentation-action">Create presentation</button>
                         <p class="task-list-client-presentation-status" id="task-list-client-presentation-status" role="status" aria-live="polite"></p>
                         <a class="task-list-client-presentation-folder" id="task-list-client-presentation-folder" href="#" target="_blank" rel="noopener" hidden>Open Process Assessment folder</a>
+                        <div class="task-list-documentation-actions">
+                            <button type="button" class="task-list-sync-drive-btn" id="task-list-client-pdf-convert" data-slideshow-pdf="client" disabled>Convert slideshow to PDF</button>
+                            <a class="task-list-slideshow-pdf-open" id="task-list-client-pdf-open" target="_blank" rel="noopener noreferrer" hidden>Open client presentation PDF</a>
+                        </div>
+                        <p id="task-list-client-pdf-status" class="task-list-client-presentation-status" role="status" aria-live="polite"></p>
                     </aside>
                     <aside class="task-list-documentation-card" aria-labelledby="task-list-documentation-title">
                         <p class="section-kicker">STAGE 1</p>
@@ -1200,6 +1214,8 @@
                             <a id="task-list-documentation-open" target="_blank" rel="noopener noreferrer" hidden>Open documentation deck</a>
                             <a id="task-list-documentation-original" target="_blank" rel="noopener noreferrer" hidden>Open original documentation deck (unchanged)</a>
                             <button type="button" class="task-list-sync-drive-btn" data-documentation-add hidden>Add missing slides</button>
+                            <button type="button" class="task-list-sync-drive-btn" id="task-list-documentation-pdf-convert" data-slideshow-pdf="documentation" disabled>Convert slideshow to PDF</button>
+                            <a class="task-list-slideshow-pdf-open" id="task-list-documentation-pdf-open" target="_blank" rel="noopener noreferrer" hidden>Open documentation PDF</a>
                         </div>
                         <details id="task-list-documentation-existing">
                             <summary>Google Sync an existing deck</summary>
@@ -1208,6 +1224,7 @@
                             <button type="button" class="task-list-sync-drive-btn" data-documentation-sync>Google Sync</button>
                         </details>
                         <p id="task-list-documentation-status" role="status" aria-live="polite"></p>
+                        <p id="task-list-documentation-pdf-status" role="status" aria-live="polite"></p>
                         <p id="task-list-documentation-ready" class="task-list-documentation-ready" hidden>Documentation deck ready for Stage 3</p>
                     </aside>
                     <hr class="task-list-final-divider">

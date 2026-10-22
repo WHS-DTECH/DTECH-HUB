@@ -13,6 +13,34 @@ student and selected assessment. Previously linked full slide sets are recognise
 as existing documentation. They are not automatically rebuilt. A manually
 assembled deck cannot be used as the target of Add missing slides.
 
+## Slideshow PDF Exports
+
+The client-presentation and Stage 1 documentation cards each offer Convert
+slideshow to PDF. The source must already be saved on the selected assessment;
+the endpoint does not accept arbitrary slideshow URLs. Export uses the student's
+existing Google Drive permission and Google's Slides-to-PDF export, independently
+of the linked-merge Apps Script configuration. The source slideshow is not edited,
+moved, or replaced, and no sharing permissions are changed.
+
+Each action validates the student's allocation, token identity, and owned
+`SeniorDTECH/Process Assessment` destination, checks the slideshow's version and
+modified time before/after export, and rejects a changed source or replaced
+assessment link. Google Drive's PDF export limit is 10 MB; oversized or invalid
+responses fail without a PDF upload. Every successful conversion creates a new
+dated file. The latest PDF link, source identity/version and export time persist
+against the assessment; previous PDFs remain in Drive.
+
+The saved-PDF link is shown only for the same linked slideshow. Export is a
+snapshot of that slideshow's current content, not proof of completed answers or
+grading. For generated linked decks, update linked slides in Google Slides before
+exporting if their source content has changed; exporting does not refresh links.
+Live source changes after conversion require another PDF conversion.
+
+`node scripts/regression-documentation-deck.js` tests both PDF kinds, source
+and destination checks, immutable versions, invalid exports, changed-source
+rejection, saved-link reloads and UI controls. A school-account smoke test is
+still needed to confirm live Google export and Drive upload permissions.
+
 ## One-time school setup for linked merging
 
 The Node Slides REST API does not expose linked slide import. The provided Apps
