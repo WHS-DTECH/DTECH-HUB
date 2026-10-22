@@ -42,6 +42,8 @@ async function main() {
     assert.equal((nodes.get("ps-stamp-list").innerHTML.match(/is-earned/g) || []).length, 1);
     assert.match(nodes.get("ps-stamp-list").innerHTML, /kit=kit-login/);
     assert.match(nodes.get("ps-stamp-list").innerHTML, /View certificate/);
+    assert.match(nodes.get("ps-stamp-list").innerHTML, /href="\.\/typing-kit\.html"[^>]*>.*Typing Kit/);
+    assert.match(nodes.get("ps-licence-progress-count").textContent, /\/ 3 stamps/, "Typing Kit log does not change the stamp count");
     assert.match(nodes.get("ps-next-link").href, /kit-google-search/);
     assert.match(nodes.get("ps-badge-list").innerHTML, /First Kit/);
     assert.equal(requests[0].options.headers.Authorization, "Bearer test-token");

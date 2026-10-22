@@ -168,7 +168,7 @@
             const copy = `<span class="licence-stamp-icon" aria-hidden="true">${kit.icon}</span><strong>${escapeHtml(kit.title)}</strong><span>${earned ? "STAMP EARNED" : loaded ? "Stamp to collect" : "Waiting for you"}</span>`;
             return earned ? `<a class="licence-stamp is-earned" href="${href}" aria-label="${escapeHtml(kit.title)} stamp earned - view certificate">${copy}<span class="stamp-certificate">View certificate &rarr;</span></a>`
                 : `<div class="licence-stamp">${copy}</div>`;
-        }).join("");
+        }).join("") + `<a class="licence-stamp is-log" href="./typing-kit.html" aria-label="Typing Kit - open your seven-week practice log"><span class="licence-stamp-icon" aria-hidden="true">&#9000;</span><strong>Typing Kit</strong><span>7-WEEK PRACTICE LOG</span><span class="stamp-certificate">Open log &rarr;</span></a>`;
         const next = loaded ? kitDefinitions.find((kit) => !kitsById.get(kit.id)?.isComplete) : null;
         const nextPanel = document.getElementById("ps-next-step");
         nextPanel.hidden = !loaded;

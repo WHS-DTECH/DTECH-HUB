@@ -27,11 +27,13 @@
 #ps-licence-progress::-webkit-progress-bar { background: #dbe6e8; }
 #ps-licence-progress::-webkit-progress-value { background: #248355; border-radius: 20px; }
 #ps-licence-progress::-moz-progress-bar { background: #248355; border-radius: 20px; }
-.licence-stamps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 24px; }
+.licence-stamps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin-top: 24px; }
 .licence-stamp { display: flex; flex-direction: column; gap: 8px; align-items: center; justify-content: center; text-align: center; padding: 20px 12px; border: 2px dashed #a4b7c0; border-radius: 18px; background: #f1f5f7; color: #425b6b; min-height: 175px; text-decoration: none; }
 .licence-stamp > span:not(.licence-stamp-icon) { font-size: .8rem; }
 .licence-stamp.is-earned { background: #e7f7eb; color: #185b37; border: 3px double #248355; box-shadow: 0 4px 0 #cbe5d2; }
 .licence-stamp.is-earned:hover { background: #d8f0e0; }
+.licence-stamp.is-log { background: #eef6ff; color: #1d4f7a; border: 2px solid #5b8fc0; }
+.licence-stamp.is-log:hover { background: #e0eefc; }
 .licence-stamp-icon { font-size: 2.4rem; line-height: 1.2; }
 .stamp-certificate { font-weight: 800; text-decoration: underline; }
 .licence-card-footnote { margin-bottom: 0; color: #496071; font-size: .9rem; }
@@ -73,6 +75,7 @@
 .student-licence[hidden], .licence-next-step[hidden] { display: none; }
 @media (max-width: 800px) {
     .ps-kit-list { grid-template-columns: minmax(0, 1fr); }
+    .licence-stamps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .licence-next-step { flex-direction: column; align-items: stretch; }
 }
 @media (max-width: 560px) {
