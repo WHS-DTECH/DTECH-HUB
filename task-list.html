@@ -111,9 +111,58 @@
             font-weight: 700;
         }
 
+        .task-list-final-divider {
+            width: 100%;
+            border: 0;
+            border-top: 1px solid #a8bccd;
+            margin: 0;
+        }
+
+        .task-list-outcome-card select {
+            width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+            padding: 8px;
+            margin: 8px 0 12px;
+        }
+
+        .task-list-outcome-confirm {
+            display: flex;
+            gap: 8px;
+            align-items: flex-start;
+            font-size: 0.84rem;
+        }
+
+        .task-list-outcome-confirm input {
+            flex: 0 0 auto;
+        }
+
+        .task-list-outcome-card p {
+            font-size: 0.84rem;
+            overflow-wrap: anywhere;
+        }
+
+        .task-list-outcome-card button {
+            min-height: 40px;
+        }
+
+        .task-list-outcome-card button:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+
+        #task-list-outcome-open:not([hidden]) {
+            display: block;
+            border: 1px solid #236b91;
+            border-radius: 6px;
+            padding: 10px;
+            font-weight: 700;
+            text-align: center;
+            color: #195675;
+            background: #edf6fc;
+        }
+
         .task-list-client-presentation-card {
-            position: sticky;
-            top: 16px;
             border-top: 4px solid #24845d;
         }
 
@@ -1138,6 +1187,22 @@
                         </details>
                         <p id="task-list-documentation-status" role="status" aria-live="polite"></p>
                         <p id="task-list-documentation-ready" class="task-list-documentation-ready" hidden>Documentation deck ready for Stage 3</p>
+                    </aside>
+                    <hr class="task-list-final-divider">
+                    <aside class="task-list-documentation-card task-list-outcome-card" aria-labelledby="task-list-outcome-title">
+                        <p class="section-kicker">STAGE 2</p>
+                        <h2 id="task-list-outcome-title">Final Digital Outcome</h2>
+                        <label for="task-list-outcome-repository">GitHub repository</label>
+                        <select id="task-list-outcome-repository" disabled><option value="">Loading repositories...</option></select>
+                        <label class="task-list-outcome-confirm"><input id="task-list-outcome-pushed" type="checkbox">I have pushed my final changes to GitHub.</label>
+                        <div class="task-list-documentation-actions">
+                            <button type="button" class="task-list-sync-drive-btn" id="task-list-outcome-download" disabled>Download latest ZIP</button>
+                            <button type="button" class="task-list-sync-drive-btn" id="task-list-outcome-save" disabled>Save ZIP to Google Drive</button>
+                            <a id="task-list-outcome-open" target="_blank" rel="noopener noreferrer" hidden>Open saved ZIP in Google Drive</a>
+                        </div>
+                        <p id="task-list-outcome-version"></p>
+                        <p id="task-list-outcome-saved-version"></p>
+                        <p id="task-list-outcome-status" role="status" aria-live="polite"></p>
                     </aside>
                     </div>
                     <div class="task-list-main-column">

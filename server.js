@@ -1,5 +1,6 @@
 const path = require("path");
 const fs = require("fs");
+const { createHash } = require("node:crypto");
 const express = require("express");
 const multer = require("multer");
 const mammoth = require("mammoth");
@@ -11,6 +12,7 @@ const { SEARCH_RESEARCH_REPORT_FILE_NAME, resolveResearchReportTemplateId, getRe
 const { gradeLoginSites } = require("./practical-skills-assessment");
 const { validateLoginSites, publicLoginSites, visibleLoginSites } = require("./login-sites-config");
 const { DOCUMENTATION_TEMPLATE_ID, documentationPresentationId, buildDocumentationMergePlan } = require("./documentation-deck");
+const { outcomeRepositories, createOutcomeArchiveStore } = require("./github-outcome");
 
 const SEARCH_PENGUIN_MISSIONS_ID = "search-penguin-missions-v1";
 const SEARCH_KEYWORD_CHALLENGE_ID = "search-keyword-challenge-v1";
@@ -6374,6 +6376,16 @@ async function recordTemplateCopyInDb(projectId, studentEmail, entry) {
     processAssessmentFolderUrl: String(entry?.processAssessmentFolderUrl || "").trim(),
     destinationFolderUrl: String(entry?.destinationFolderUrl || "").trim(),
     destinationFolderId: String(entry?.destinationFolderId || "").trim(),
+    ...(entry?.templateId === "final-digital-outcome-zip" ? {
+      finalOutcome: {
+        repositoryUrl: String(entry?.finalOutcome?.repositoryUrl || ""),
+        branch: String(entry?.finalOutcome?.branch || ""),
+        commitSha: String(entry?.finalOutcome?.commitSha || ""),
+        commitDate: String(entry?.finalOutcome?.commitDate || ""),
+        bytes: Number(entry?.finalOutcome?.bytes || 0),
+        preparedAt: String(entry?.finalOutcome?.preparedAt || "")
+      }
+    } : {}),
     ...(entry?.templateId === DOCUMENTATION_TEMPLATE_ID ? {
       documentation: {
         mode: entry?.documentation?.mode === "linked" ? "linked" : "existing",
@@ -17739,6 +17751,123 @@ async function validateRawFileViaW3C(rawUrl, type) {
     return { checked: false, passed: false, errorCount: 0, warningCount: 0 };
   }
 }
+
+const outcomeArchiveStore = createOutcomeArchiveStore({ githubApiRequest });
+
+async function withFinalOutcomeLock(key, task) {
+  const result = await withResearchReportLock(key, async () => {
+    try {
+      return { value: await task() };
+    } catch (error) {
+      return { error };
+    }
+  });
+  if (result.error) throw result.error;
+  return result.value;
+}
+
+async function loadFinalOutcomeContext(req) {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email || !email.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) throw Object.assign(new Error("School sign-in required."), { status: 401 });
+  const activityId = String(req.params.id || "");
+  if (!/^[A-Za-z0-9_-]{1,100}$/.test(activityId)) throw Object.assign(new Error("A valid assessment is required."), { status: 400 });
+  if (await getStudentProgrammeFolder(email) !== "SeniorDTECH") throw Object.assign(new Error("This stage is for SeniorDTECH."), { status: 403 });
+  if (!hasDatabase) throw Object.assign(new Error("Final outcome ZIPs require the assessment database."), { status: 503 });
+  const result = await pool.query(
+    "SELECT standard_1, standard_2, evidence_steps, template_copies FROM project_interests WHERE project_id = $1 AND student_email = $2 LIMIT 1",
+    [activityId, email]
+  );
+  const allocation = result.rows?.[0];
+  if (!allocation) throw Object.assign(new Error("Student assessment allocation not found."), { status: 404 });
+  if (!/\b(?:91893|91903)\b/.test(`${allocation.standard_1 || ""} ${allocation.standard_2 || ""}`)) {
+    throw Object.assign(new Error("Select your digital media outcome assessment."), { status: 403 });
+  }
+  const repositories = outcomeRepositories(normalizeEvidenceStepsPayload(allocation.evidence_steps));
+  const saved = (Array.isArray(allocation.template_copies) ? allocation.template_copies : []).find((entry) => entry?.templateId === "final-digital-outcome-zip") || null;
+  return { email, activityId, repositories, saved };
+}
+
+app.get("/api/activities/:id/final-outcome", async (req, res) => {
+  try {
+    const context = await loadFinalOutcomeContext(req);
+    res.set("Cache-Control", "no-store").json({ repositories: context.repositories, saved: context.saved, configured: Boolean(GITHUB_TOKEN) });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not load your final outcome." });
+  }
+});
+
+app.post("/api/activities/:id/final-outcome", async (req, res) => {
+  try {
+    const context = await loadFinalOutcomeContext(req);
+    const { email, activityId, repositories } = context;
+    const action = String(req.body?.action || "");
+    res.set("Cache-Control", "no-store");
+    if (action === "prepare") {
+      const repository = repositories.find((item) => item.url.toLowerCase() === String(req.body?.repositoryUrl || "").toLowerCase());
+      if (!repository) throw Object.assign(new Error("Select a GitHub repository saved on this assessment first."), { status: 400 });
+      const snapshot = await withFinalOutcomeLock("final-outcome-archive-build", () => outcomeArchiveStore.prepare({ email, activityId, repositoryUrl: repository.url }));
+      res.json({ snapshot });
+      return;
+    }
+    if (!["download", "save"].includes(action)) throw Object.assign(new Error("Choose download or save."), { status: 400 });
+    const archive = outcomeArchiveStore.read(req.body?.snapshotId, email, activityId);
+    if (!repositories.some((item) => item.url.toLowerCase() === archive.repositoryUrl.toLowerCase())) {
+      throw Object.assign(new Error("This repository is no longer linked to this assessment."), { status: 409 });
+    }
+    if (action === "download") {
+      res.set("Content-Disposition", `attachment; filename="${archive.fileName}"`);
+      res.type("application/zip").send(archive.buffer);
+      return;
+    }
+    const token = String(req.body?.driveAccessToken || "").trim();
+    if (!token) throw Object.assign(new Error("Google Drive permission is required."), { status: 400 });
+    await verifyDriveTokenForStudent(token, email);
+    const result = await withFinalOutcomeLock(`${email}:${activityId}:final-outcome-save`, async () => {
+      const setup = await resolveStudentDriveSetupState(email, token);
+      if (!setup?.processAssessmentFolderId) throw Object.assign(new Error("Confirm your Process Assessment folder with Drive Ready first."), { status: 409 });
+      const folderId = setup.processAssessmentFolderId;
+      const folder = await driveApiRequest(`/files/${encodeURIComponent(folderId)}`, {
+        accessToken: token, queryParams: { fields: "id,name,mimeType,trashed,owners(emailAddress),parents" }
+      });
+      if (folder.trashed || folder.name !== "Process Assessment" || folder.mimeType !== "application/vnd.google-apps.folder"
+        || !folder.owners?.some((owner) => normalizeEmail(owner.emailAddress) === email)) {
+        throw Object.assign(new Error("Use your own SeniorDTECH/Process Assessment folder."), { status: 409 });
+      }
+      const parents = await Promise.all((folder.parents || []).slice(0, 10).map((id) => driveApiRequest(`/files/${encodeURIComponent(id)}`, {
+        accessToken: token, queryParams: { fields: "id,name,trashed" }
+      })));
+      if (!parents.some((parent) => parent.name === "SeniorDTECH" && !parent.trashed)) {
+        throw Object.assign(new Error("The Process Assessment folder must be inside SeniorDTECH."), { status: 409 });
+      }
+      let file = await driveFindFileByNameInFolder(folderId, archive.fileName, token);
+      const reused = Boolean(file);
+      if (file) {
+        const metadata = await driveApiRequest(`/files/${encodeURIComponent(file.id)}`, {
+          accessToken: token, queryParams: { fields: "id,mimeType,size,md5Checksum,trashed" }
+        });
+        if (metadata.trashed || metadata.mimeType !== "application/zip" || Number(metadata.size) !== archive.buffer.length
+          || metadata.md5Checksum !== createHash("md5").update(archive.buffer).digest("hex")) {
+          throw Object.assign(new Error("A different file already uses this ZIP filename. Rename that Drive file before retrying; it has not been changed."), { status: 409 });
+        }
+      }
+      if (!file) file = await driveUploadBinaryFile({ accessToken: token, folderId, fileName: archive.fileName, mimeType: "application/zip", buffer: archive.buffer });
+      const entry = {
+        templateId: "final-digital-outcome-zip", templateTitle: "Final Digital Outcome ZIP",
+        fileUrl: `https://drive.google.com/file/d/${encodeURIComponent(file.id)}/view`, fileName: archive.fileName,
+        processAssessmentFolderUrl: buildDriveFolderUrlFromId(folderId),
+        finalOutcome: {
+          repositoryUrl: archive.repositoryUrl, branch: archive.branch, commitSha: archive.commitSha,
+          commitDate: archive.commitDate, bytes: archive.bytes, preparedAt: archive.preparedAt
+        }
+      };
+      await recordTemplateCopyInDb(activityId, email, entry);
+      return { saved: entry, reused };
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not package your final outcome." });
+  }
+});
 
 // Public-repo-only analysis: no OAuth required, just the repo's public tree/commit/file data.
 app.get("/api/integrations/github/repo-analysis", async (req, res) => {

@@ -265,6 +265,8 @@ const taskListState = {
     templateCopies: [],
     documentationDeck: null,
     documentationBusy: false,
+    finalOutcome: null,
+    finalOutcomeBusy: false,
     decompositionCoverage: null,
     identifiedComponentsCount: null,
     // Planning ticks for criteria with no automatic evidence source. In-memory only, never sent to the server.
@@ -2775,6 +2777,119 @@ async function handleDocumentationAction(action) {
     }
 }
 
+function renderFinalOutcomeState() {
+    const state = taskListState.finalOutcome;
+    const select = document.querySelector("#task-list-outcome-repository");
+    if (!state || !select) return;
+    select.replaceChildren();
+    const repositories = state.repositories || [];
+    if (repositories.length > 1) {
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = "Select repository";
+        select.append(placeholder);
+    }
+    const options = repositories.length ? repositories : [{ url: "", owner: "No saved GitHub repository", repo: "" }];
+    options.forEach((repository) => {
+        const option = document.createElement("option");
+        option.value = repository.url;
+        option.textContent = repository.repo ? `${repository.owner}/${repository.repo}` : repository.owner;
+        select.append(option);
+    });
+    select.value = state.repositoryUrl || "";
+    select.disabled = taskListState.finalOutcomeBusy || !repositories.length;
+    const confirmed = document.querySelector("#task-list-outcome-pushed").checked;
+    document.querySelector("#task-list-outcome-download").disabled = taskListState.finalOutcomeBusy || !confirmed || !state.repositoryUrl || !state.configured;
+    document.querySelector("#task-list-outcome-save").disabled = taskListState.finalOutcomeBusy || !confirmed || !state.snapshot || state.snapshot.expiresAt <= Date.now();
+    const version = document.querySelector("#task-list-outcome-version");
+    version.textContent = state.snapshot
+        ? `Prepared ZIP: ${state.snapshot.branch} / ${state.snapshot.commitSha.slice(0, 12)} / ${(state.snapshot.bytes / 1048576).toFixed(2)} MB`
+        : "";
+    const saved = state.saved;
+    const link = document.querySelector("#task-list-outcome-open");
+    const safeUrl = /^https:\/\/drive\.google\.com\/file\/d\/[A-Za-z0-9_-]+\/view$/.test(String(saved?.fileUrl || "")) ? saved.fileUrl : "";
+    link.hidden = !safeUrl;
+    if (safeUrl) link.href = safeUrl;
+    document.querySelector("#task-list-outcome-saved-version").textContent = safeUrl
+        ? `Saved in SeniorDTECH / Process Assessment${saved.finalOutcome?.commitSha ? ` / ${saved.finalOutcome.commitSha.slice(0, 12)}` : ""}` : "";
+    document.querySelector("#task-list-outcome-status").textContent = state.message || "";
+}
+
+async function loadFinalOutcome(item) {
+    if (!isSeniorDigitalMediaTask(item)) return;
+    const state = { activityId: String(item.id), repositories: [], repositoryUrl: "", saved: null, snapshot: null, configured: false, message: "Checking saved GitHub repositories..." };
+    taskListState.finalOutcome = state;
+    document.querySelector("#task-list-outcome-pushed").checked = false;
+    renderFinalOutcomeState();
+    try {
+        const payload = await loadJson(`/api/activities/${encodeURIComponent(state.activityId)}/final-outcome`, { headers: buildTaskListHeaders({}), cache: "no-store" });
+        if (taskListState.finalOutcome !== state || taskListState.selectedId !== state.activityId) return;
+        state.repositories = Array.isArray(payload.repositories) ? payload.repositories : [];
+        state.repositoryUrl = state.repositories.length === 1 ? state.repositories[0].url : "";
+        state.saved = payload.saved || null;
+        state.configured = Boolean(payload.configured);
+        state.message = !state.configured ? "GitHub packaging needs the school's GitHub access configuration."
+            : !state.repositories.length ? "No GitHub repository is saved on this assessment."
+                : state.repositories.length > 1 ? "Select your final outcome repository." : "";
+    } catch (error) {
+        state.message = error?.message || "Could not load your saved repository.";
+    }
+    if (taskListState.finalOutcome === state) renderFinalOutcomeState();
+}
+
+async function handleFinalOutcomeAction(action) {
+    const state = taskListState.finalOutcome;
+    const selected = taskListState.allItems.find((item) => String(item.id) === taskListState.selectedId);
+    if (!state || !isSeniorDigitalMediaTask(selected) || state.activityId !== taskListState.selectedId || taskListState.finalOutcomeBusy) return;
+    if (!document.querySelector("#task-list-outcome-pushed").checked || !state.repositoryUrl) return;
+    const active = () => taskListState.finalOutcome === state && taskListState.selectedId === state.activityId;
+    const endpoint = `/api/activities/${encodeURIComponent(state.activityId)}/final-outcome`;
+    const post = (body) => loadJson(endpoint, { method: "POST", headers: buildTaskListHeaders({ "Content-Type": "application/json" }), body: JSON.stringify(body) });
+    taskListState.finalOutcomeBusy = true;
+    state.message = action === "download" ? "Packaging the latest pushed commit..." : "Saving the prepared ZIP to Google Drive...";
+    renderFinalOutcomeState();
+    try {
+        if (action === "download") {
+            state.snapshot = null;
+            const payload = await post({ action: "prepare", repositoryUrl: state.repositoryUrl });
+            if (!active()) return;
+            state.snapshot = payload.snapshot;
+            const response = await fetch(endpoint, { method: "POST", headers: buildTaskListHeaders({ "Content-Type": "application/json" }),
+                body: JSON.stringify({ action: "download", snapshotId: state.snapshot.snapshotId }) });
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(error.error || "Could not download the ZIP.");
+            }
+            const blob = await response.blob();
+            if (!active()) return;
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = state.snapshot.fileName;
+            document.body.append(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 60000);
+            state.message = "ZIP download started. This version is ready to save to Google Drive.";
+        } else {
+            if (!state.snapshot || state.snapshot.expiresAt <= Date.now()) throw new Error("The prepared ZIP has expired. Download the latest ZIP again.");
+            const token = await requestHubDriveAccessToken({ forceConsent: false });
+            if (!active()) return;
+            if (token?.error || !token?.access_token) throw new Error("Google Drive permission is required. Allow access and try again.");
+            const payload = await post({ action: "save", snapshotId: state.snapshot.snapshotId, driveAccessToken: token.access_token });
+            if (!active()) return;
+            state.saved = payload.saved;
+            state.message = payload.reused ? "This commit's ZIP is already saved. No duplicate was created."
+                : "ZIP saved. Earlier versions and repository files are unchanged.";
+        }
+    } catch (error) {
+        state.message = error?.message || "Could not package your final outcome.";
+    } finally {
+        taskListState.finalOutcomeBusy = false;
+        renderFinalOutcomeState();
+    }
+}
+
 async function fetchMyEvidence(projectId) {
     if (!projectId) return [];
     const payload = await loadJson(`/api/activities/${encodeURIComponent(projectId)}/my-evidence`, { headers: buildTaskListHeaders({}) });
@@ -3740,6 +3855,7 @@ async function loadChecklistForTask(taskId) {
     taskListState.templateCopies = Array.isArray(templateCopiesPayload?.template_copies) ? templateCopiesPayload.template_copies : [];
     renderFinalClientPresentationCard(selected);
     void loadDocumentationDeck(selected);
+    void loadFinalOutcome(selected);
     const templateCopySyncPromise = autoSyncToolsAndTechniquesTemplateCopy(
         taskListState.selectedId,
         signedInEmail,
@@ -4257,6 +4373,21 @@ async function runTaskListTrelloSync() {
         if (event.target?.closest?.("[data-documentation-merge]")) void handleDocumentationAction("merge");
         else if (event.target?.closest?.("[data-documentation-add]")) void handleDocumentationAction("add");
         else if (event.target?.closest?.("[data-documentation-sync]")) void handleDocumentationAction("sync");
+    });
+
+    document.addEventListener("click", (event) => {
+        if (event.target?.closest?.("#task-list-outcome-download")) void handleFinalOutcomeAction("download");
+        else if (event.target?.closest?.("#task-list-outcome-save")) void handleFinalOutcomeAction("save");
+    });
+
+    document.addEventListener("change", (event) => {
+        if (event.target?.id === "task-list-outcome-repository" && taskListState.finalOutcome && !taskListState.finalOutcomeBusy) {
+            taskListState.finalOutcome.repositoryUrl = event.target.value;
+            taskListState.finalOutcome.snapshot = null;
+            taskListState.finalOutcome.message = "";
+            document.querySelector("#task-list-outcome-pushed").checked = false;
+            renderFinalOutcomeState();
+        } else if (event.target?.id === "task-list-outcome-pushed") renderFinalOutcomeState();
     });
 
     document.addEventListener("click", async (event) => {

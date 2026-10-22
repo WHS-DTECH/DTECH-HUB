@@ -70,7 +70,48 @@ tokens are not stored in the documentation record or Apps Script properties.
   can be continued through Add missing slides. Linking an existing assembled
   deck marks it ready after link/file validation, not content grading.
 
-## Verification
+## Final Digital Outcome ZIP
+
+The Stage 2 card below the divider packages the default branch's latest pushed
+GitHub commit for the selected assessment. It does not access local or unpushed
+work, run build commands, export a hosted website, or certify assessment completion.
+The student must confirm that final changes are pushed before downloading.
+
+Repositories must be saved as `GITHUB_REPO_URL|...` in that student's assessment
+evidence, and a matching SeniorDTECH digital media allocation (91893 or 91903)
+must exist. When there are several saved repositories the student selects one.
+This confirms the saved assessment association, not GitHub account ownership.
+Public repositories only are supported; the existing server `GITHUB_TOKEN` must
+be configured for GitHub metadata requests. It is never sent to archive hosts.
+Drive save uses the student's existing Google Drive permission, independently of
+the Slides Apps Script deployment. No extra ZIP library or Apps Script is needed.
+
+Download latest ZIP pins a commit, validates its tree, and obtains GitHub's archive
+for that exact commit. Save ZIP to Google Drive uploads those same cached bytes
+to the student's owned `SeniorDTECH/Process Assessment` folder, after checking
+its name, ownership and parent. No permissions are changed by these new endpoints.
+The ZIP includes repository content, not a generated production build or external
+assets. Submodules, Git LFS rules, export exclusions, truncated trees, and archives
+over 25 MB are rejected to avoid incomplete outcomes. These need manual packaging.
+
+Prepared ZIPs expire after 15 minutes, on server restart, or on bounded-cache
+eviction. Download a fresh ZIP before saving if it expires. Cache limits are
+50 MB per server process, with archive builds serialised per process; multi-instance
+hosting may require shared snapshot storage or session affinity. Tokens are not
+stored. The latest saved file link and full commit metadata persist in the
+assessment's template-copy record. Earlier ZIP files remain in Drive; deterministic
+repository/assessment/full-commit filenames make repeat saves reuse the same
+version instead of replacing or duplicating it. Students should keep a repository
+and its assets reasonably sized and check their final downloaded outcome.
+
+Run `node scripts/regression-final-outcome-zip.js` for mocked archive, access,
+destination ownership, expiration, missing-content, and duplicate-save checks.
+Before rollout, test a student download and Drive save against a public repository,
+then push a new commit and check both Drive versions remain available. Verify
+that download contents include the intended source files and assets. Download
+initiation does not prove the browser has saved the file successfully.
+
+## Linked Merge Verification
 
 Run `node scripts/regression-documentation-deck.js` and
 `node scripts/regression-middle-task-list.js` locally. The documentation suite
