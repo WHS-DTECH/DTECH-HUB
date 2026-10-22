@@ -7,7 +7,7 @@ const vm = require("node:vm");
 const { createHash } = require("node:crypto");
 const { PDFParse } = require("pdf-parse");
 const report = require("../trello-report");
-const { outcomeRepositories, createOutcomeArchiveStore } = require("../github-outcome");
+const { outcomeRepositories, createOutcomeArchiveStore, createGithubZipSizeReader } = require("../github-outcome");
 
 const email = "student@westlandhigh.school.nz";
 const board = { id: "board12345678", name: "VP-TaskList - DTECH26", url: "https://trello.com/b/abcdefgh" };
@@ -65,7 +65,7 @@ async function testEndpoints() {
   const uploads = [];
   const records = [];
   const context = vm.createContext({
-    ...report, outcomeRepositories, createOutcomeArchiveStore, createHash,
+    ...report, outcomeRepositories, createOutcomeArchiveStore, createGithubZipSizeReader, createHash,
     GITHUB_TOKEN: "configured", SCHOOL_EMAIL_DOMAIN: "westlandhigh.school.nz", hasDatabase: true,
     normalizeEmail: (value) => String(value || "").trim().toLowerCase(), getRequestUserEmail: (req) => req.email,
     getStudentProgrammeFolder: async () => "SeniorDTECH", normalizeEvidenceStepsPayload: (value) => value,

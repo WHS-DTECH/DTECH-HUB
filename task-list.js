@@ -267,6 +267,7 @@ const taskListState = {
     documentationBusy: false,
     finalOutcome: null,
     finalOutcomeBusy: false,
+    githubZipSize: null,
     trelloReport: null,
     trelloReportBusy: false,
     decompositionCoverage: null,
@@ -2779,6 +2780,38 @@ async function handleDocumentationAction(action) {
     }
 }
 
+function renderGithubZipSize() {
+    const state = taskListState.githubZipSize;
+    if (!state || state.activityId !== taskListState.selectedId) return;
+    document.querySelectorAll("[data-github-zip-size]").forEach((element) => {
+        element.textContent = state.text;
+        element.title = state.title || "";
+        element.classList.toggle("is-over-limit", Boolean(state.exceedsLimit));
+    });
+}
+
+async function loadGithubZipSize(activityId, repositoryUrl) {
+    const state = { activityId: String(activityId), repositoryUrl, text: repositoryUrl ? "ZIP: checking..." : "ZIP: no repository selected", title: "", exceedsLimit: false };
+    taskListState.githubZipSize = state;
+    renderGithubZipSize();
+    if (!repositoryUrl) return;
+    try {
+        const payload = await loadJson(`/api/activities/${encodeURIComponent(state.activityId)}/github-zip-size?repositoryUrl=${encodeURIComponent(repositoryUrl)}`, {
+            headers: buildTaskListHeaders({}), cache: "no-store"
+        });
+        if (taskListState.githubZipSize !== state || taskListState.selectedId !== state.activityId) return;
+        const measurement = payload.measurement;
+        if (!Number.isFinite(measurement?.bytes) || measurement.bytes < 0 || !/^[a-f0-9]{40}$/i.test(String(measurement.commitSha || ""))) throw new Error("GitHub did not return a valid ZIP measurement.");
+        state.exceedsLimit = Boolean(measurement.exceedsLimit);
+        state.text = `ZIP: ${measurement.exact ? "" : "over "}${(measurement.bytes / 1048576).toFixed(2)} MiB${state.exceedsLimit ? " (over 25 MiB limit)" : ""}`;
+        state.title = `${measurement.repositoryUrl} | ${measurement.branch} | ${measurement.commitSha.slice(0, 12)} | Measured ${measurement.measuredAt}`;
+    } catch (error) {
+        state.text = "ZIP: unavailable";
+        state.title = error?.message || "Could not measure the repository ZIP.";
+    }
+    if (taskListState.githubZipSize === state) renderGithubZipSize();
+}
+
 function renderFinalOutcomeState() {
     const state = taskListState.finalOutcome;
     const select = document.querySelector("#task-list-outcome-repository");
@@ -2837,7 +2870,10 @@ async function loadFinalOutcome(item) {
     } catch (error) {
         state.message = error?.message || "Could not load your saved repository.";
     }
-    if (taskListState.finalOutcome === state) renderFinalOutcomeState();
+    if (taskListState.finalOutcome === state) {
+        renderFinalOutcomeState();
+        void loadGithubZipSize(state.activityId, state.repositoryUrl);
+    }
 }
 
 async function handleFinalOutcomeAction(action) {
@@ -3626,9 +3662,10 @@ function renderChecklistCards(detail, allItems) {
                                             <p class="task-list-achieved-note">Complete Trello + at least one other.</p>
                                             <div class="task-list-decomposition-subtask-list">
                                                 ${projectManagementSubtasks.map((subtask) => `
-                                                    <label class="task-list-decomposition-subtask ${subtask.done ? "is-complete" : ""}">
+                                                    <label class="task-list-decomposition-subtask ${subtask.done ? "is-complete" : ""} ${subtask.label === "GitHub" ? "has-github-zip-size" : ""}">
                                                         <input type="checkbox" disabled ${subtask.done ? "checked" : ""}>
                                                         <a href="${escapeTaskListHtml(subtask.href)}">${getProjectManagementSystemLogo(subtask.label)}${escapeTaskListHtml(subtask.label)}${subtask.countText ? ` - ${escapeTaskListHtml(subtask.countText)}` : ""}</a>
+                                                        ${subtask.label === "GitHub" ? `<span class="task-list-github-zip-size ${taskListState.githubZipSize?.activityId === taskListState.selectedId && taskListState.githubZipSize?.exceedsLimit ? "is-over-limit" : ""}" data-github-zip-size role="status" title="${escapeTaskListHtml(taskListState.githubZipSize?.activityId === taskListState.selectedId ? taskListState.githubZipSize.title || "" : "")}">${escapeTaskListHtml(taskListState.githubZipSize?.activityId === taskListState.selectedId ? taskListState.githubZipSize.text : "ZIP: not checked")}</span>` : ""}
                                                     </label>
                                                 `).join("")}
                                             </div>
@@ -4483,6 +4520,7 @@ async function runTaskListTrelloSync() {
             }
             setStatus(`GitHub sync complete. Checked ${Number(payload?.file_count || 0)} file(s) across ${Number(payload?.commit_count || 0)} commit(s).`);
             renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);
+            void loadGithubZipSize(taskListState.selectedId, taskListState.finalOutcome?.repositoryUrl || repoUrl);
         } catch (error) {
             setStatus(error?.message || "Could not sync from GitHub.", true);
         } finally {
@@ -4530,6 +4568,7 @@ async function runTaskListTrelloSync() {
             taskListState.finalOutcome.message = "";
             document.querySelector("#task-list-outcome-pushed").checked = false;
             renderFinalOutcomeState();
+            void loadGithubZipSize(taskListState.selectedId, taskListState.finalOutcome.repositoryUrl);
         } else if (event.target?.id === "task-list-outcome-pushed") renderFinalOutcomeState();
     });
 

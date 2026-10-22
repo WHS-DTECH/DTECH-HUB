@@ -117,4 +117,64 @@ function createOutcomeArchiveStore({ githubApiRequest, fetchArchive = fetch, now
   };
 }
 
-module.exports = { parseOutcomeRepository, outcomeRepositories, createOutcomeArchiveStore };
+function createGithubZipSizeReader({ githubApiRequest, fetchArchive = fetch, now = Date.now,
+  maxBytes = 200 * 1024 * 1024, ttlMs = 300000, maxEntries = 128 } = {}) {
+  const measured = new Map();
+  const pending = new Map();
+  return {
+    async measure(repositoryUrl) {
+      const repository = parseOutcomeRepository(repositoryUrl);
+      if (!repository) throw outcomeError("Select a saved GitHub repository.");
+      const base = `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.repo)}`;
+      const metadata = await githubApiRequest(base);
+      if (metadata.private !== false) throw outcomeError("ZIP size checks currently support public repositories only.");
+      const branch = String(metadata.default_branch || "");
+      if (!branch) throw outcomeError("This repository has no default branch yet.");
+      const commit = await githubApiRequest(`${base}/commits/${encodeURIComponent(branch)}`);
+      const commitSha = String(commit.sha || "");
+      if (!/^[a-f0-9]{40}$/i.test(commitSha)) throw outcomeError("GitHub did not return a valid commit.", 502);
+      const key = `${repository.url.toLowerCase()}:${commitSha}`;
+      for (const [id, value] of measured) if (value.expiresAt <= now()) measured.delete(id);
+      if (measured.has(key)) return measured.get(key).value;
+      if (pending.has(key)) return pending.get(key);
+      const request = (async () => {
+        const response = await fetchArchive(`https://codeload.github.com/${repository.owner}/${repository.repo}/zip/${commitSha}`, {
+          headers: { "User-Agent": "DTECH-HUB" }, redirect: "error", signal: AbortSignal.timeout(120000)
+        });
+        if (!response.ok || !response.body) throw outcomeError("GitHub could not supply the ZIP size. Try Sync from GitHub again later.", 502);
+        const reader = response.body.getReader();
+        let bytes = 0;
+        let signature = Buffer.alloc(0);
+        let exact = true;
+        try {
+          while (true) {
+            const chunk = await reader.read();
+            if (chunk.done) break;
+            bytes += chunk.value.byteLength;
+            if (signature.length < 4) signature = Buffer.concat([signature, Buffer.from(chunk.value).subarray(0, 4 - signature.length)]);
+            if (bytes > maxBytes) { bytes = maxBytes; exact = false; break; }
+          }
+        } finally {
+          await reader.cancel().catch(() => {});
+        }
+        if (signature.length < 4 || signature.readUInt32LE(0) !== 0x04034b50) throw outcomeError("GitHub returned an invalid ZIP archive.", 502);
+        const value = {
+          repositoryUrl: repository.url, branch, commitSha, bytes, exact,
+          limitBytes: 25 * 1024 * 1024, exceedsLimit: bytes > 25 * 1024 * 1024 || (!exact && bytes >= 25 * 1024 * 1024),
+          measuredAt: new Date(now()).toISOString()
+        };
+        while (measured.size >= maxEntries) measured.delete(measured.keys().next().value);
+        measured.set(key, { value, expiresAt: now() + ttlMs });
+        return value;
+      })();
+      pending.set(key, request);
+      try {
+        return await request;
+      } finally {
+        pending.delete(key);
+      }
+    }
+  };
+}
+
+module.exports = { parseOutcomeRepository, outcomeRepositories, createOutcomeArchiveStore, createGithubZipSizeReader };

@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 const { createHash } = require("node:crypto");
-const { parseOutcomeRepository, outcomeRepositories, createOutcomeArchiveStore } = require("../github-outcome");
+const { parseOutcomeRepository, outcomeRepositories, createOutcomeArchiveStore, createGithubZipSizeReader } = require("../github-outcome");
 
 const email = "student@westlandhigh.school.nz";
 const repositoryUrl = "https://github.com/student/outcome";
@@ -71,6 +71,51 @@ async function testArchiveStore() {
   assert.deepEqual(bounded.read(second.snapshotId, email, "49").buffer, zip);
 }
 
+async function testZipSizeReader() {
+  let currentSha = sha;
+  let clock = 100;
+  let archiveRequests = 0;
+  const api = async (url) => url.includes("/commits/") ? { sha: currentSha } : { private: false, default_branch: "main", size: 999999 };
+  const reader = createGithubZipSizeReader({ githubApiRequest: api, now: () => clock, ttlMs: 10,
+    fetchArchive: async (url, options) => {
+      archiveRequests += 1;
+      assert.ok(url.endsWith(currentSha));
+      assert.equal(options.headers.Authorization, undefined);
+      assert.equal(options.redirect, "error");
+      return new Response(zip);
+    }
+  });
+  const measured = await reader.measure(repositoryUrl);
+  assert.equal(measured.bytes, zip.length, "Size is compressed ZIP bytes, not GitHub repository storage metadata");
+  assert.equal(measured.exact, true);
+  assert.equal(measured.exceedsLimit, false);
+  await reader.measure(repositoryUrl);
+  assert.equal(archiveRequests, 1, "The same commit reuses its cached measurement");
+  currentSha = "b".repeat(40);
+  await reader.measure(repositoryUrl);
+  assert.equal(archiveRequests, 2, "A new pushed commit is measured rather than reusing the old size");
+  clock += 11;
+  await reader.measure(repositoryUrl);
+  assert.equal(archiveRequests, 3, "Expired measurements are refreshed");
+  const block = Buffer.alloc(1048576);
+  zip.copy(block);
+  let cancelled = false;
+  const streamArchive = (count = 26) => {
+    let remaining = count;
+    return new Response(new ReadableStream({ pull(controller) { if (remaining-- > 0) controller.enqueue(block); else controller.close(); }, cancel() { cancelled = true; } }));
+  };
+  const large = await createGithubZipSizeReader({ githubApiRequest: api, fetchArchive: async () => streamArchive() }).measure(repositoryUrl);
+  assert.equal(large.bytes, 26 * 1048576);
+  assert.equal(large.exceedsLimit, true);
+  const bounded = await createGithubZipSizeReader({ githubApiRequest: api, maxBytes: 25 * 1048576, fetchArchive: async () => streamArchive(30) }).measure(repositoryUrl);
+  assert.equal(bounded.exact, false);
+  assert.equal(bounded.bytes, 25 * 1048576);
+  assert.equal(bounded.exceedsLimit, true);
+  assert.equal(cancelled, true, "Oversized archives are cancelled at the measurement cap");
+  await assert.rejects(createGithubZipSizeReader({ githubApiRequest: api, fetchArchive: async () => new Response("not a ZIP") }).measure(repositoryUrl), /invalid ZIP/);
+  await assert.rejects(createGithubZipSizeReader({ githubApiRequest: async () => ({ private: true }) }).measure(repositoryUrl), /public repositories/);
+}
+
 async function testEndpoints() {
   const source = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
   const start = source.indexOf("const outcomeArchiveStore = ");
@@ -88,6 +133,7 @@ async function testEndpoints() {
   const context = vm.createContext({
     createHash,
     createOutcomeArchiveStore: () => store, githubApiRequest() {}, outcomeRepositories,
+    createGithubZipSizeReader: () => ({ measure: async (url) => { assert.equal(url, repositoryUrl); return { repositoryUrl: url, bytes: zip.length, exact: true, exceedsLimit: false }; } }),
     GITHUB_TOKEN: "configured", SCHOOL_EMAIL_DOMAIN: "westlandhigh.school.nz", hasDatabase: true,
     normalizeEmail: (value) => String(value || "").trim().toLowerCase(), getRequestUserEmail: (req) => req.email,
     getStudentProgrammeFolder: async () => course,
@@ -111,10 +157,10 @@ async function testEndpoints() {
   const lockEnd = source.indexOf('\napp.get(', lockStart);
   vm.runInContext(source.slice(lockStart, lockEnd), context);
   vm.runInContext(source.slice(start, end), context);
-  const request = async (method, body = {}, identity = email) => {
+  const request = async (method, body = {}, identity = email, endpoint = "final-outcome", query = {}) => {
     const res = { statusCode: 200, headers: {}, set(key, value) { this.headers[key] = value; return this; }, status(code) { this.statusCode = code; return this; },
       json(value) { this.body = value; return this; }, type(value) { this.contentType = value; return this; }, send(value) { this.body = value; return this; } };
-    await handlers.get(`${method} /api/activities/:id/final-outcome`)({ email: identity, params: { id: "49" }, body }, res);
+    await handlers.get(`${method} /api/activities/:id/${endpoint}`)({ email: identity, params: { id: "49" }, body, query }, res);
     return res;
   };
   assert.equal((await request("GET", {}, "")).statusCode, 401);
@@ -125,6 +171,10 @@ async function testEndpoints() {
   assert.equal((await request("GET")).statusCode, 403);
   allocation.standard_2 = "91893";
   assert.equal((await request("GET")).body.repositories[0].url, repositoryUrl);
+  const measurement = await request("GET", {}, email, "github-zip-size", { repositoryUrl });
+  assert.equal(measurement.body.measurement.bytes, zip.length);
+  assert.equal((await request("GET", {}, email, "github-zip-size", { repositoryUrl: "https://github.com/stranger/outcome" })).statusCode, 400);
+  assert.equal((await request("GET", {}, "", "github-zip-size", { repositoryUrl })).statusCode, 401);
   assert.equal((await request("POST", { action: "prepare", repositoryUrl: "https://github.com/stranger/outcome" })).statusCode, 400);
   const prepared = await request("POST", { action: "prepare", repositoryUrl });
   assert.equal(prepared.statusCode, 200);
@@ -161,9 +211,11 @@ async function testFrontend() {
   const source = fs.readFileSync(path.join(__dirname, "..", "task-list.js"), "utf8");
   const elements = new Map();
   const makeElement = () => ({ disabled: false, checked: false, value: "", hidden: false, children: [], textContent: "",
+    classList: { toggle() {} },
     replaceChildren() { this.children = []; }, append(child) { this.children.push(child); }, click() { this.clicked = true; }, remove() {} });
   const document = {
     querySelector: (selector) => { if (!elements.has(selector)) elements.set(selector, makeElement()); return elements.get(selector); },
+    querySelectorAll: () => [document.querySelector("[data-github-zip-size]")],
     createElement: () => makeElement(), body: makeElement()
   };
   const snapshot = { snapshotId: "snapshot", repositoryUrl, branch: "main", commitSha: sha, fileName: "outcome.zip", bytes: 32, expiresAt: Date.now() + 900000 };
@@ -172,10 +224,16 @@ async function testFrontend() {
   const actions = [];
   let failSave = false;
   let denyPermission = false;
+  let sizeMeasurement = { repositoryUrl, bytes: 11274839, exact: true, exceedsLimit: false, commitSha: sha, branch: "main", measuredAt: "2026-10-22T00:00:00Z" };
+  let failMeasurement = false;
   const taskListState = { selectedId: "49", allItems: [{ id: "49" }], finalOutcomeBusy: false };
   const context = vm.createContext({
     taskListState, document, isSeniorDigitalMediaTask: () => true, buildTaskListHeaders: (headers) => headers,
     loadJson: async (_url, options = {}) => {
+      if (_url.includes("/github-zip-size")) {
+        if (failMeasurement) throw new Error("GitHub rate limited");
+        return { measurement: sizeMeasurement };
+      }
       const body = options.body ? JSON.parse(options.body) : {};
       if (body.action) actions.push(body.action);
       if (body.action === "prepare") return { snapshot };
@@ -197,7 +255,7 @@ async function testFrontend() {
       return denyPermission ? { error: "access_denied" } : { access_token: "student-token" };
     }
   });
-  const start = source.indexOf("function renderFinalOutcomeState(");
+  const start = source.indexOf("function renderGithubZipSize(");
   const end = source.indexOf("async function fetchMyEvidence(", start);
   assert.ok(start > 0 && end > start);
   vm.runInContext(source.slice(start, end), context);
@@ -241,10 +299,29 @@ async function testFrontend() {
   taskListState.finalOutcome.saved = { fileUrl: "https://evil.test/file" };
   context.renderFinalOutcomeState();
   assert.equal(document.querySelector("#task-list-outcome-open").hidden, true);
+  await context.loadGithubZipSize("49", repositoryUrl);
+  assert.equal(document.querySelector("[data-github-zip-size]").textContent, "ZIP: 10.75 MiB");
+  sizeMeasurement = { ...sizeMeasurement, bytes: 26 * 1048576, exceedsLimit: true };
+  await context.loadGithubZipSize("49", repositoryUrl);
+  assert.match(document.querySelector("[data-github-zip-size]").textContent, /26.00 MiB \(over 25 MiB limit\)/);
+  sizeMeasurement = { ...sizeMeasurement, bytes: 200 * 1048576, exact: false };
+  await context.loadGithubZipSize("49", repositoryUrl);
+  assert.match(document.querySelector("[data-github-zip-size]").textContent, /over 200.00 MiB/);
+  failMeasurement = true;
+  await context.loadGithubZipSize("49", repositoryUrl);
+  assert.equal(document.querySelector("[data-github-zip-size]").textContent, "ZIP: unavailable");
+  assert.equal(document.querySelector("[data-github-zip-size]").title, "GitHub rate limited");
+  failMeasurement = false;
+  const stale = context.loadGithubZipSize("49", repositoryUrl);
+  const loadingText = document.querySelector("[data-github-zip-size]").textContent;
+  taskListState.selectedId = "50";
+  await stale;
+  assert.equal(document.querySelector("[data-github-zip-size]").textContent, loadingText, "Late responses do not update a different selected assessment");
 }
 
 async function main() {
   await testArchiveStore();
+  await testZipSizeReader();
   await testEndpoints();
   await testFrontend();
   console.log("Final outcome ZIP regressions passed.");

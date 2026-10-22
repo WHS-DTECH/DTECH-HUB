@@ -114,6 +114,25 @@ then push a new commit and check both Drive versions remain available. Verify
 that download contents include the intended source files and assets. Download
 initiation does not prove the browser has saved the file successfully.
 
+### ZIP Size in Project Management
+
+The Project Management GitHub tile also shows the compressed ZIP size of the
+repository selected in Stage 2. A size check runs when its saved repository is
+loaded, when the selection changes, and after Sync from GitHub. It does not alter
+checkboxes, assessment completion, repository files, or Drive files. Multiple
+saved repositories need an explicit Stage 2 selection. The hover title identifies
+the repository, branch, commit and measurement time. Sizes use MiB (1,048,576 bytes),
+so the automatic packaging threshold is 25 MiB.
+
+Size checks stream GitHub's commit-pinned archive without retaining its bytes.
+Measurements are cached per repository/commit for five minutes, with at most 128
+results per process. The current default-branch commit is checked before reusing
+a cached measurement. Reads stop at 200 MiB and display a lower bound rather
+than an invented exact size. Size checks time out after two minutes; unavailable
+sizes show an error in their hover title and can be retried with GitHub sync.
+This is distinct from GitHub's repository-storage size and is not a guarantee
+that a repository has no submodules, Git LFS files, or missing external assets.
+
 ## Stage 3 Trello Report
 
 The Trello Report card uses the student's existing Trello connection and the

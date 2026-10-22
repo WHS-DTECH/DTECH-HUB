@@ -12,7 +12,7 @@ const { SEARCH_RESEARCH_REPORT_FILE_NAME, resolveResearchReportTemplateId, getRe
 const { gradeLoginSites } = require("./practical-skills-assessment");
 const { validateLoginSites, publicLoginSites, visibleLoginSites } = require("./login-sites-config");
 const { DOCUMENTATION_TEMPLATE_ID, documentationPresentationId, buildDocumentationMergePlan } = require("./documentation-deck");
-const { outcomeRepositories, createOutcomeArchiveStore } = require("./github-outcome");
+const { outcomeRepositories, createOutcomeArchiveStore, createGithubZipSizeReader } = require("./github-outcome");
 const { trelloReportSources, resolveReportBoards, createTrelloReportPdf, createTrelloReportStore } = require("./trello-report");
 
 const SEARCH_PENGUIN_MISSIONS_ID = "search-penguin-missions-v1";
@@ -17846,6 +17846,7 @@ app.post("/api/activities/:id/trello-report", async (req, res) => {
 });
 
 const outcomeArchiveStore = createOutcomeArchiveStore({ githubApiRequest });
+const githubZipSizeReader = createGithubZipSizeReader({ githubApiRequest });
 
 async function withFinalOutcomeLock(key, task) {
   const result = await withResearchReportLock(key, async () => {
@@ -17901,6 +17902,19 @@ async function loadFinalOutcomeContext(req) {
   const saved = copies.find((entry) => entry?.templateId === "final-digital-outcome-zip") || null;
   return { email, activityId, repositories, saved, evidence, copies };
 }
+
+app.get("/api/activities/:id/github-zip-size", async (req, res) => {
+  try {
+    const context = await loadFinalOutcomeContext(req);
+    const requested = String(req.query?.repositoryUrl || "").trim().toLowerCase();
+    const repository = context.repositories.find((item) => item.url.toLowerCase() === requested);
+    if (!repository) throw Object.assign(new Error("Select a GitHub repository saved on this assessment."), { status: 400 });
+    const measurement = await withFinalOutcomeLock("github-zip-size-measurement", () => githubZipSizeReader.measure(repository.url));
+    res.set("Cache-Control", "no-store").json({ measurement });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not measure the repository ZIP." });
+  }
+});
 
 app.get("/api/activities/:id/final-outcome", async (req, res) => {
   try {
