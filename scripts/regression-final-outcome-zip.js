@@ -303,7 +303,7 @@ async function testFrontend() {
   assert.equal(document.querySelector("[data-github-zip-size]").textContent, "ZIP: 10.75 MiB");
   sizeMeasurement = { ...sizeMeasurement, bytes: 26 * 1048576, exceedsLimit: true };
   await context.loadGithubZipSize("49", repositoryUrl);
-  assert.match(document.querySelector("[data-github-zip-size]").textContent, /26.00 MiB \(over 25 MiB limit\)/);
+  assert.equal(document.querySelector("[data-github-zip-size]").textContent, "ZIP: 26.00 MiB", "Students see only the ZIP size, not the internal packaging limit");
   sizeMeasurement = { ...sizeMeasurement, bytes: 200 * 1048576, exact: false };
   await context.loadGithubZipSize("49", repositoryUrl);
   assert.match(document.querySelector("[data-github-zip-size]").textContent, /over 200.00 MiB/);

@@ -2846,12 +2846,11 @@ function renderGithubZipSize() {
     document.querySelectorAll("[data-github-zip-size]").forEach((element) => {
         element.textContent = state.text;
         element.title = state.title || "";
-        element.classList.toggle("is-over-limit", Boolean(state.exceedsLimit));
     });
 }
 
 async function loadGithubZipSize(activityId, repositoryUrl) {
-    const state = { activityId: String(activityId), repositoryUrl, text: repositoryUrl ? "ZIP: checking..." : "ZIP: no repository selected", title: "", exceedsLimit: false };
+    const state = { activityId: String(activityId), repositoryUrl, text: repositoryUrl ? "ZIP: checking..." : "ZIP: no repository selected", title: "" };
     taskListState.githubZipSize = state;
     renderGithubZipSize();
     if (!repositoryUrl) return;
@@ -2862,8 +2861,7 @@ async function loadGithubZipSize(activityId, repositoryUrl) {
         if (taskListState.githubZipSize !== state || taskListState.selectedId !== state.activityId) return;
         const measurement = payload.measurement;
         if (!Number.isFinite(measurement?.bytes) || measurement.bytes < 0 || !/^[a-f0-9]{40}$/i.test(String(measurement.commitSha || ""))) throw new Error("GitHub did not return a valid ZIP measurement.");
-        state.exceedsLimit = Boolean(measurement.exceedsLimit);
-        state.text = `ZIP: ${measurement.exact ? "" : "over "}${(measurement.bytes / 1048576).toFixed(2)} MiB${state.exceedsLimit ? " (over 25 MiB limit)" : ""}`;
+        state.text = `ZIP: ${measurement.exact ? "" : "over "}${(measurement.bytes / 1048576).toFixed(2)} MiB`;
         state.title = `${measurement.repositoryUrl} | ${measurement.branch} | ${measurement.commitSha.slice(0, 12)} | Measured ${measurement.measuredAt}`;
     } catch (error) {
         state.text = "ZIP: unavailable";
@@ -3725,7 +3723,7 @@ function renderChecklistCards(detail, allItems) {
                                                     <label class="task-list-decomposition-subtask ${subtask.done ? "is-complete" : ""} ${subtask.label === "GitHub" ? "has-github-zip-size" : ""}">
                                                         <input type="checkbox" disabled ${subtask.done ? "checked" : ""}>
                                                         <a href="${escapeTaskListHtml(subtask.href)}">${getProjectManagementSystemLogo(subtask.label)}${escapeTaskListHtml(subtask.label)}${subtask.countText ? ` - ${escapeTaskListHtml(subtask.countText)}` : ""}</a>
-                                                        ${subtask.label === "GitHub" ? `<span class="task-list-github-zip-size ${taskListState.githubZipSize?.activityId === taskListState.selectedId && taskListState.githubZipSize?.exceedsLimit ? "is-over-limit" : ""}" data-github-zip-size role="status" title="${escapeTaskListHtml(taskListState.githubZipSize?.activityId === taskListState.selectedId ? taskListState.githubZipSize.title || "" : "")}">${escapeTaskListHtml(taskListState.githubZipSize?.activityId === taskListState.selectedId ? taskListState.githubZipSize.text : "ZIP: not checked")}</span>` : ""}
+                                                        ${subtask.label === "GitHub" ? `<span class="task-list-github-zip-size" data-github-zip-size role="status" title="${escapeTaskListHtml(taskListState.githubZipSize?.activityId === taskListState.selectedId ? taskListState.githubZipSize.title || "" : "")}">${escapeTaskListHtml(taskListState.githubZipSize?.activityId === taskListState.selectedId ? taskListState.githubZipSize.text : "ZIP: not checked")}</span>` : ""}
                                                     </label>
                                                 `).join("")}
                                             </div>
