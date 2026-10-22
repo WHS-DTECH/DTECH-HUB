@@ -169,21 +169,33 @@ async function testFrontend() {
   const snapshot = { snapshotId: "snapshot", repositoryUrl, branch: "main", commitSha: sha, fileName: "outcome.zip", bytes: 32, expiresAt: Date.now() + 900000 };
   const saved = { fileUrl: "https://drive.google.com/file/d/saved-zip/view", fileName: "outcome.zip", finalOutcome: { commitSha: sha } };
   let repositories = [{ url: repositoryUrl, owner: "student", repo: "outcome" }];
+  const actions = [];
+  let failSave = false;
+  let denyPermission = false;
   const taskListState = { selectedId: "49", allItems: [{ id: "49" }], finalOutcomeBusy: false };
   const context = vm.createContext({
     taskListState, document, isSeniorDigitalMediaTask: () => true, buildTaskListHeaders: (headers) => headers,
     loadJson: async (_url, options = {}) => {
       const body = options.body ? JSON.parse(options.body) : {};
+      if (body.action) actions.push(body.action);
       if (body.action === "prepare") return { snapshot };
-      if (body.action === "save") { assert.equal(body.snapshotId, snapshot.snapshotId); return { saved }; }
+      if (body.action === "save") {
+        assert.equal(body.snapshotId, snapshot.snapshotId);
+        if (failSave) throw new Error("Drive upload unavailable");
+        return { saved };
+      }
       return { repositories, configured: true, saved };
     },
     fetch: async (_url, options) => {
+      actions.push("download");
       assert.equal(JSON.parse(options.body).snapshotId, snapshot.snapshotId);
       return { ok: true, blob: async () => zip };
     },
     URL: { createObjectURL: (bytes) => { assert.deepEqual(bytes, zip); return "blob:prepared-zip"; }, revokeObjectURL() {} },
-    setTimeout: (callback) => callback(), requestHubDriveAccessToken: async () => ({ access_token: "student-token" })
+    setTimeout: (callback) => callback(), requestHubDriveAccessToken: async () => {
+      actions.push("permission");
+      return denyPermission ? { error: "access_denied" } : { access_token: "student-token" };
+    }
   });
   const start = source.indexOf("function renderFinalOutcomeState(");
   const end = source.indexOf("async function fetchMyEvidence(", start);
@@ -196,12 +208,29 @@ async function testFrontend() {
   context.renderFinalOutcomeState();
   assert.equal(document.querySelector("#task-list-outcome-download").disabled, false);
   await context.handleFinalOutcomeAction("download");
+  assert.deepEqual(actions, ["permission", "prepare", "download", "save"], "A single download action automatically saves exactly that ZIP to Drive");
   assert.equal(document.body.children[0].clicked, true, "The download link is activated");
   assert.equal(document.body.children[0].download, snapshot.fileName);
-  assert.equal(document.querySelector("#task-list-outcome-save").disabled, false);
+  assert.equal(document.querySelector("#task-list-outcome-save").hidden, true, "No separate save click is required on success");
+  assert.match(taskListState.finalOutcome.message, /ZIP saved to SeniorDTECH/);
+  actions.length = 0;
+  failSave = true;
+  await context.handleFinalOutcomeAction("download");
+  assert.equal(document.querySelector("#task-list-outcome-save").hidden, false, "Offer a retry when only the Drive upload fails");
+  assert.match(taskListState.finalOutcome.message, /download started, but Google Drive save failed/);
+  actions.length = 0;
+  failSave = false;
   await context.handleFinalOutcomeAction("save");
+  assert.deepEqual(actions, ["permission", "save"], "Retry uploads the same snapshot without downloading or packaging another ZIP");
+  assert.equal(document.querySelector("#task-list-outcome-save").hidden, true);
   assert.equal(taskListState.finalOutcome.saved.fileUrl, saved.fileUrl);
   assert.equal(taskListState.finalOutcomeBusy, false);
+  actions.length = 0;
+  denyPermission = true;
+  await context.handleFinalOutcomeAction("download");
+  assert.deepEqual(actions, ["permission"], "Request permission before a long archive preparation can lose the popup gesture");
+  assert.match(taskListState.finalOutcome.message, /Google Drive permission is required/);
+  denyPermission = false;
   taskListState.finalOutcome.snapshot = { ...snapshot, expiresAt: Date.now() - 1 };
   context.renderFinalOutcomeState();
   assert.equal(document.querySelector("#task-list-outcome-save").disabled, true, "Expired snapshots cannot be saved");

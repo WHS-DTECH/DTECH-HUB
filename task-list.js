@@ -2800,6 +2800,7 @@ function renderFinalOutcomeState() {
     select.disabled = taskListState.finalOutcomeBusy || !repositories.length;
     const confirmed = document.querySelector("#task-list-outcome-pushed").checked;
     document.querySelector("#task-list-outcome-download").disabled = taskListState.finalOutcomeBusy || !confirmed || !state.repositoryUrl || !state.configured;
+    document.querySelector("#task-list-outcome-save").hidden = !state.retryDriveSave;
     document.querySelector("#task-list-outcome-save").disabled = taskListState.finalOutcomeBusy || !confirmed || !state.snapshot || state.snapshot.expiresAt <= Date.now();
     const version = document.querySelector("#task-list-outcome-version");
     version.textContent = state.snapshot
@@ -2845,12 +2846,19 @@ async function handleFinalOutcomeAction(action) {
     const active = () => taskListState.finalOutcome === state && taskListState.selectedId === state.activityId;
     const endpoint = `/api/activities/${encodeURIComponent(state.activityId)}/final-outcome`;
     const post = (body) => loadJson(endpoint, { method: "POST", headers: buildTaskListHeaders({ "Content-Type": "application/json" }), body: JSON.stringify(body) });
+    let downloadStarted = false;
     taskListState.finalOutcomeBusy = true;
-    state.message = action === "download" ? "Packaging the latest pushed commit..." : "Saving the prepared ZIP to Google Drive...";
+    state.message = "Connecting to Google Drive...";
     renderFinalOutcomeState();
     try {
+        const token = await requestHubDriveAccessToken({ forceConsent: false });
+        if (!active()) return;
+        if (token?.error || !token?.access_token) throw new Error("Google Drive permission is required. Allow access and try again.");
         if (action === "download") {
             state.snapshot = null;
+            state.retryDriveSave = false;
+            state.message = "Packaging the latest pushed commit...";
+            renderFinalOutcomeState();
             const payload = await post({ action: "prepare", repositoryUrl: state.repositoryUrl });
             if (!active()) return;
             state.snapshot = payload.snapshot;
@@ -2870,20 +2878,21 @@ async function handleFinalOutcomeAction(action) {
             link.click();
             link.remove();
             setTimeout(() => URL.revokeObjectURL(url), 60000);
-            state.message = "ZIP download started. This version is ready to save to Google Drive.";
-        } else {
-            if (!state.snapshot || state.snapshot.expiresAt <= Date.now()) throw new Error("The prepared ZIP has expired. Download the latest ZIP again.");
-            const token = await requestHubDriveAccessToken({ forceConsent: false });
-            if (!active()) return;
-            if (token?.error || !token?.access_token) throw new Error("Google Drive permission is required. Allow access and try again.");
-            const payload = await post({ action: "save", snapshotId: state.snapshot.snapshotId, driveAccessToken: token.access_token });
-            if (!active()) return;
-            state.saved = payload.saved;
-            state.message = payload.reused ? "This commit's ZIP is already saved. No duplicate was created."
-                : "ZIP saved. Earlier versions and repository files are unchanged.";
+            downloadStarted = true;
         }
+        if (!state.snapshot || state.snapshot.expiresAt <= Date.now()) throw new Error("The prepared ZIP has expired. Download the latest ZIP again.");
+        state.message = downloadStarted ? "ZIP download started. Saving the same ZIP to Google Drive..." : "Saving the prepared ZIP to Google Drive...";
+        renderFinalOutcomeState();
+        const payload = await post({ action: "save", snapshotId: state.snapshot.snapshotId, driveAccessToken: token.access_token });
+        if (!active()) return;
+        state.saved = payload.saved;
+        state.retryDriveSave = false;
+        state.message = `${downloadStarted ? "ZIP download started. " : ""}${payload.reused
+            ? "This commit's ZIP is already in SeniorDTECH / Process Assessment. No duplicate was created."
+            : "ZIP saved to SeniorDTECH / Process Assessment. Earlier versions are unchanged."}`;
     } catch (error) {
-        state.message = error?.message || "Could not package your final outcome.";
+        if (downloadStarted) state.retryDriveSave = true;
+        state.message = `${downloadStarted ? "ZIP download started, but Google Drive save failed: " : ""}${error?.message || "Could not package your final outcome."}`;
     } finally {
         taskListState.finalOutcomeBusy = false;
         renderFinalOutcomeState();
@@ -4384,6 +4393,7 @@ async function runTaskListTrelloSync() {
         if (event.target?.id === "task-list-outcome-repository" && taskListState.finalOutcome && !taskListState.finalOutcomeBusy) {
             taskListState.finalOutcome.repositoryUrl = event.target.value;
             taskListState.finalOutcome.snapshot = null;
+            taskListState.finalOutcome.retryDriveSave = false;
             taskListState.finalOutcome.message = "";
             document.querySelector("#task-list-outcome-pushed").checked = false;
             renderFinalOutcomeState();

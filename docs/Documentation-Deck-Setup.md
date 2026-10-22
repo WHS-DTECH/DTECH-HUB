@@ -86,10 +86,13 @@ be configured for GitHub metadata requests. It is never sent to archive hosts.
 Drive save uses the student's existing Google Drive permission, independently of
 the Slides Apps Script deployment. No extra ZIP library or Apps Script is needed.
 
-Download latest ZIP pins a commit, validates its tree, and obtains GitHub's archive
-for that exact commit. Save ZIP to Google Drive uploads those same cached bytes
+Download latest ZIP requests Google Drive permission first, pins a commit,
+validates its tree, and obtains GitHub's archive for that exact commit. The same
+action starts the browser download and automatically uploads those cached bytes
 to the student's owned `SeniorDTECH/Process Assessment` folder, after checking
-its name, ownership and parent. No permissions are changed by these new endpoints.
+its name, ownership and parent. A failed upload is reported separately from the
+download, with Retry Google Drive save available for the same prepared ZIP.
+No permissions are changed by these new endpoints.
 The ZIP includes repository content, not a generated production build or external
 assets. Submodules, Git LFS rules, export exclusions, truncated trees, and archives
 over 25 MB are rejected to avoid incomplete outcomes. These need manual packaging.
