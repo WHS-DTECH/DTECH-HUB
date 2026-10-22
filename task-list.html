@@ -36,6 +36,55 @@
             gap: 16px;
         }
 
+        .task-list-final-stages {
+            display: grid;
+            gap: 16px;
+            min-width: 0;
+        }
+
+        .task-list-final-stages[hidden] {
+            display: none;
+        }
+
+        .task-list-documentation-card {
+            border: 1px solid #c8d8e6;
+            border-top: 4px solid #236b91;
+            border-radius: 8px;
+            background: #f8fbff;
+            padding: 16px;
+            min-width: 0;
+        }
+
+        .task-list-documentation-card h2 {
+            font-size: 1.1rem;
+            margin: 0 0 12px;
+        }
+
+        .task-list-documentation-actions {
+            display: grid;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .task-list-documentation-card input[type="url"] {
+            width: 100%;
+            box-sizing: border-box;
+            min-width: 0;
+            padding: 8px;
+            margin: 8px 0;
+        }
+
+        .task-list-documentation-card button,
+        .task-list-documentation-card a {
+            white-space: normal;
+            overflow-wrap: anywhere;
+        }
+
+        .task-list-documentation-ready {
+            color: #14633f;
+            font-weight: 700;
+        }
+
         .task-list-client-presentation-card {
             position: sticky;
             top: 16px;
@@ -1030,6 +1079,7 @@
                     </section>
 
                     <div class="task-list-workspace" id="task-list-workspace">
+                    <div class="task-list-final-stages" id="task-list-final-stages" hidden>
                     <aside class="task-list-card task-list-client-presentation-card" id="task-list-client-presentation-card" hidden>
                         <p class="section-kicker">FINAL STAGE</p>
                         <h2>Present to your client</h2>
@@ -1044,6 +1094,25 @@
                         <p class="task-list-client-presentation-status" id="task-list-client-presentation-status" role="status" aria-live="polite"></p>
                         <a class="task-list-client-presentation-folder" id="task-list-client-presentation-folder" href="#" target="_blank" rel="noopener" hidden>Open Process Assessment folder</a>
                     </aside>
+                    <aside class="task-list-documentation-card" aria-labelledby="task-list-documentation-title">
+                        <p class="section-kicker">STAGE 1</p>
+                        <h2 id="task-list-documentation-title">Preparing for Final Submission</h2>
+                        <h3>Merge documentation</h3>
+                        <div class="task-list-documentation-actions">
+                            <button type="button" class="task-list-sync-drive-btn" data-documentation-merge>Merge Documentation Deck</button>
+                            <a id="task-list-documentation-open" target="_blank" rel="noopener noreferrer" hidden>Open documentation deck</a>
+                            <button type="button" class="task-list-sync-drive-btn" data-documentation-add hidden>Add missing slides</button>
+                        </div>
+                        <details id="task-list-documentation-existing">
+                            <summary>Google Sync an existing deck</summary>
+                            <label for="task-list-documentation-url">Documentation slideshow link</label>
+                            <input id="task-list-documentation-url" type="url" placeholder="https://docs.google.com/presentation/d/...">
+                            <button type="button" class="task-list-sync-drive-btn" data-documentation-sync>Google Sync</button>
+                        </details>
+                        <p id="task-list-documentation-status" role="status" aria-live="polite"></p>
+                        <p id="task-list-documentation-ready" class="task-list-documentation-ready" hidden>Documentation deck ready for Stage 3</p>
+                    </aside>
+                    </div>
                     <div class="task-list-main-column">
                     <section class="task-list-card" id="task-list-checklist-card" hidden>
                         <div class="section-heading">

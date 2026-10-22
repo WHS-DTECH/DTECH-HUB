@@ -10,6 +10,7 @@ const { LEARNING_SITES_ID, getHuntProfile, gradeLearningSites, getCourseProgramm
 const { SEARCH_RESEARCH_REPORT_FILE_NAME, resolveResearchReportTemplateId, getResearchReportProgrammeFolder, buildResearchReportReplacements, applyResearchReportReplacements, gradeResearchReport } = require("./research-report");
 const { gradeLoginSites } = require("./practical-skills-assessment");
 const { validateLoginSites, publicLoginSites, visibleLoginSites } = require("./login-sites-config");
+const { DOCUMENTATION_TEMPLATE_ID, documentationPresentationId, buildDocumentationMergePlan } = require("./documentation-deck");
 
 const SEARCH_PENGUIN_MISSIONS_ID = "search-penguin-missions-v1";
 const SEARCH_KEYWORD_CHALLENGE_ID = "search-keyword-challenge-v1";
@@ -203,6 +204,7 @@ const memoryToolsTechniquesKeywords = new Map();
 const memoryDecompositionCoverage = new Map();
 const memoryTriallingComponents = new Map();
 const memoryDigiMedEfficientTools = new Map();
+const memoryDocumentationDecks = new Map();
 const memoryExternalAssessmentAllocations = new Map();
 const memoryExternalExamIntentions = new Map();
 const memoryStudentTrackerComments = new Map();
@@ -6372,6 +6374,15 @@ async function recordTemplateCopyInDb(projectId, studentEmail, entry) {
     processAssessmentFolderUrl: String(entry?.processAssessmentFolderUrl || "").trim(),
     destinationFolderUrl: String(entry?.destinationFolderUrl || "").trim(),
     destinationFolderId: String(entry?.destinationFolderId || "").trim(),
+    ...(entry?.templateId === DOCUMENTATION_TEMPLATE_ID ? {
+      documentation: {
+        mode: entry?.documentation?.mode === "linked" ? "linked" : "existing",
+        readyForStage3: Boolean(entry?.documentation?.readyForStage3),
+        missingTopics: (Array.isArray(entry?.documentation?.missingTopics) ? entry.documentation.missingTopics : []).slice(0, 100).map((topic) => String(topic).slice(0, 200)),
+        slideCount: Number(entry?.documentation?.slideCount || 0),
+        partial: Boolean(entry?.documentation?.partial)
+      }
+    } : {}),
     copiedAt: new Date().toISOString()
   };
   if (!safeEntry.templateId) return;
@@ -10969,6 +10980,136 @@ app.post("/api/activities/:id/sync-slide-set", async (req, res) => {
     });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not sync the full slide set." });
+  }
+});
+
+async function loadDocumentationCopies(activityId, email) {
+  if (!hasDatabase) {
+    const saved = memoryDocumentationDecks.get(`${email}:${activityId}`);
+    return saved ? [saved] : [];
+  }
+  await ensureProjectInterestsSchema();
+  const result = await pool.query("SELECT template_copies FROM project_interests WHERE project_id = $1 AND student_email = $2 LIMIT 1", [activityId, email]);
+  return Array.isArray(result.rows?.[0]?.template_copies) ? result.rows[0].template_copies : [];
+}
+
+function getDocumentationRecord(copies) {
+  const saved = copies.find((copy) => copy?.templateId === DOCUMENTATION_TEMPLATE_ID);
+  if (saved) return saved;
+  const existing = copies.find((copy) => copy?.templateId === "assessment-full-slide-set");
+  return existing ? {
+    ...existing,
+    templateId: DOCUMENTATION_TEMPLATE_ID,
+    documentation: { mode: "existing", readyForStage3: true, missingTopics: [], partial: false }
+  } : null;
+}
+
+async function saveDocumentationRecord(activityId, email, entry) {
+  await recordTemplateCopyInDb(activityId, email, entry);
+  if (!hasDatabase) memoryDocumentationDecks.set(`${email}:${activityId}`, entry);
+}
+
+app.get("/api/activities/:id/documentation-deck", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email || !email.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) { res.status(401).json({ error: "School sign-in required." }); return; }
+  const activityId = String(req.params.id || "").trim();
+  if (!/^[A-Za-z0-9_-]+$/.test(activityId)) { res.status(400).json({ error: "A valid assessment ID is required." }); return; }
+  try {
+    if (await getStudentProgrammeFolder(email) !== "SeniorDTECH") { res.status(403).json({ error: "This stage is for SeniorDTECH." }); return; }
+    res.json({ deck: getDocumentationRecord(await loadDocumentationCopies(activityId, email)), mergeConfigured: Boolean(process.env.DOCUMENTATION_MERGE_SCRIPT_ID) });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not load your documentation deck." });
+  }
+});
+
+app.post("/api/activities/:id/documentation-deck", async (req, res) => {
+  const email = normalizeEmail(getRequestUserEmail(req));
+  if (!email || !email.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) { res.status(401).json({ error: "School sign-in required." }); return; }
+  const activityId = String(req.params.id || "").trim();
+  const action = String(req.body?.action || "");
+  const token = String(req.body?.driveAccessToken || "").trim();
+  if (!/^[A-Za-z0-9_-]+$/.test(activityId) || !["sync", "merge", "add"].includes(action) || !token) {
+    res.status(400).json({ error: "A valid assessment, action and Google Drive access token are required." }); return;
+  }
+  try {
+    if (await getStudentProgrammeFolder(email) !== "SeniorDTECH") { res.status(403).json({ error: "This stage is for SeniorDTECH." }); return; }
+    await verifyDriveTokenForStudent(token, email);
+    const result = await withResearchReportLock(`${email}:${activityId}:documentation`, async () => {
+      const copies = await loadDocumentationCopies(activityId, email);
+      const saved = getDocumentationRecord(copies);
+      if (action === "merge" && saved) return { deck: saved, reopened: true };
+      if (action === "add" && saved?.documentation?.mode !== "linked") {
+        const error = new Error("Only generated linked masters support Add missing slides. Your existing deck has not been changed.");
+        error.status = 409;
+        throw error;
+      }
+
+      if (action === "sync") {
+        const fileId = documentationPresentationId(req.body?.presentationUrl);
+        if (!fileId) { const error = new Error("Paste a valid Google Slides documentation link."); error.status = 400; throw error; }
+        if (copies.some((copy) => copy?.templateId === "final-client-presentation" && documentationPresentationId(copy.fileUrl) === fileId)) {
+          const error = new Error("Keep the client presentation separate. Link your written documentation deck instead."); error.status = 400; throw error;
+        }
+        const file = await driveApiRequest(`/files/${encodeURIComponent(fileId)}`, {
+          accessToken: token, queryParams: { fields: "id,name,mimeType,trashed,webViewLink", supportsAllDrives: true }
+        });
+        if (file?.trashed || file?.mimeType !== "application/vnd.google-apps.presentation") {
+          const error = new Error("The link must open a live Google Slides presentation."); error.status = 400; throw error;
+        }
+        const presentation = await googleSlidesApiRequest(fileId, token);
+        if (!presentation?.slides?.length) { const error = new Error("The documentation deck has no slides yet."); error.status = 400; throw error; }
+        const sameGeneratedDeck = saved?.documentation?.mode === "linked" && documentationPresentationId(saved.fileUrl) === fileId;
+        const entry = {
+          templateId: DOCUMENTATION_TEMPLATE_ID, templateTitle: "Submission Documentation",
+          fileUrl: file.webViewLink || `https://docs.google.com/presentation/d/${fileId}/edit`, fileName: String(file.name || "Documentation"),
+          documentation: sameGeneratedDeck ? saved.documentation : {
+            mode: "existing", readyForStage3: true, missingTopics: [], slideCount: presentation.slides.length, partial: false
+          }
+        };
+        await saveDocumentationRecord(activityId, email, entry);
+        return { deck: entry };
+      }
+
+      const scriptId = String(process.env.DOCUMENTATION_MERGE_SCRIPT_ID || "").trim();
+      if (!scriptId) {
+        const error = new Error("Automatic linked merging needs the school Apps Script deployment. Google Sync an existing documentation deck is available meanwhile.");
+        error.status = 503; throw error;
+      }
+      const setup = await resolveStudentDriveSetupState(email, token);
+      if (!setup?.processAssessmentFolderId) { const error = new Error("Confirm your SeniorDTECH/Process Assessment folder with Drive Ready first."); error.status = 409; throw error; }
+      const inventory = await driveListSlidesInProcessAssessmentTree(setup.processAssessmentFolderId, token);
+      const files = inventory.map((file) => ({ ...file, templateId: inferTemplateCopyFromFileName(file.name)?.templateId || "" }));
+      const plan = buildDocumentationMergePlan({ topics: Array.isArray(req.body?.topics) ? req.body.topics : [], copies, files });
+      if (!plan.sources.length) { const error = new Error("No matching written-evidence decks were found in your Process Assessment folder. Link an existing deck or sync your evidence first."); error.status = 400; throw error; }
+      const response = await fetch(`https://script.googleapis.com/v1/scripts/${encodeURIComponent(scriptId)}:run`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ function: "mergeDocumentationDeck", devMode: false, parameters: [{
+          email, activityId, folderId: setup.processAssessmentFolderId,
+          destinationId: saved ? documentationPresentationId(saved.fileUrl) : "", sources: plan.sources
+        }] })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.error) {
+        throw new Error(payload?.error?.details?.[0]?.errorMessage || payload?.error?.message || "The linked merge could not run. Check Apps Script deployment and Google permissions.");
+      }
+      const merged = payload?.response?.result;
+      if (!documentationPresentationId(merged?.fileUrl)) throw new Error("The merger did not return a valid deck link. Retry to recover the same master.");
+      const entry = {
+        templateId: DOCUMENTATION_TEMPLATE_ID, templateTitle: "Submission Documentation",
+        fileUrl: merged.fileUrl, fileName: String(merged.fileName || "Submission Documentation"),
+        processAssessmentFolderUrl: buildDriveFolderUrlFromId(setup.processAssessmentFolderId),
+        documentation: {
+          mode: "linked", readyForStage3: !merged.partial && plan.missingTopics.length === 0,
+          missingTopics: plan.missingTopics, slideCount: Number(merged.slideCount || 0), partial: Boolean(merged.partial)
+        }
+      };
+      await saveDocumentationRecord(activityId, email, entry);
+      return { deck: entry, addedSlides: Number(merged.addedSlides || 0) };
+    });
+    res.json({ ok: true, ...result });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not prepare your documentation deck." });
   }
 });
 

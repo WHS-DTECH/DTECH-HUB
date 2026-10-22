@@ -263,6 +263,8 @@ const taskListState = {
     checklistStandards: [],
     taskTopic: "",
     templateCopies: [],
+    documentationDeck: null,
+    documentationBusy: false,
     decompositionCoverage: null,
     identifiedComponentsCount: null,
     // Planning ticks for criteria with no automatic evidence source. In-memory only, never sent to the server.
@@ -2634,6 +2636,8 @@ function renderFinalClientPresentationCard(item) {
     const eligible = isSeniorDigitalMediaTask(item);
     workspace.classList.toggle("has-client-presentation", eligible);
     card.hidden = !eligible;
+    const finalStages = document.querySelector("#task-list-final-stages");
+    if (finalStages) finalStages.hidden = !eligible;
     if (!eligible) return;
 
     const entry = taskListState.templateCopies.find((copy) =>
@@ -2651,6 +2655,120 @@ function renderFinalClientPresentationCard(item) {
     if (status) status.textContent = entry?.fileUrl
         ? "Your client presentation is saved in SeniorDTECH / Process Assessment."
         : "Create a guided Google Slides deck for your client walkthrough.";
+}
+
+function buildDocumentationTopicOrder(links, origin, copies = []) {
+    const topics = [];
+    const seen = new Set();
+    const aliases = { "code-validation": "testing-functions-markup-validation", "success-criteria": "project-success-criteria" };
+    const add = (templateId, label) => {
+        const id = aliases[templateId] || templateId;
+        if (!id || seen.has(id) || ["final-client-presentation", "submission-documentation-deck", "assessment-full-slide-set"].includes(id)) return;
+        seen.add(id);
+        topics.push({ templateId: id, label: String(label || id).trim() });
+    };
+    (Array.isArray(links) ? links : []).forEach((link) => {
+        try {
+            const url = new URL(link.href, origin);
+            if (url.origin === origin) add(String(url.searchParams.get("templateId") || ""), link.label);
+            else copies.filter((copy) => copy?.fileUrl && new URL(copy.fileUrl).pathname === url.pathname)
+                .forEach((copy) => add(String(copy.templateId || ""), link.label));
+        } catch (_error) {
+        }
+    });
+    return topics;
+}
+
+function renderDocumentationDeckState(deck, message = "") {
+    taskListState.documentationDeck = deck || null;
+    const link = document.querySelector("#task-list-documentation-open");
+    const ready = document.querySelector("#task-list-documentation-ready");
+    const merge = document.querySelector("[data-documentation-merge]");
+    const add = document.querySelector("[data-documentation-add]");
+    const input = document.querySelector("#task-list-documentation-url");
+    const status = document.querySelector("#task-list-documentation-status");
+    const fileUrl = /^https:\/\/docs\.google\.com\/presentation\/d\/[A-Za-z0-9_-]+(?:\/|$)/.test(String(deck?.fileUrl || "")) ? deck.fileUrl : "";
+    if (link) { link.hidden = !fileUrl; if (fileUrl) link.href = fileUrl; }
+    if (ready) ready.hidden = !(fileUrl && deck?.documentation?.readyForStage3);
+    if (merge) merge.hidden = Boolean(fileUrl);
+    if (add) add.hidden = !fileUrl || deck?.documentation?.mode !== "linked";
+    if (input) input.value = fileUrl;
+    const missing = Array.isArray(deck?.documentation?.missingTopics) ? deck.documentation.missingTopics : [];
+    if (status) status.textContent = [
+        message,
+        deck?.documentation?.partial ? "Some slides remain. Use Add missing slides to continue." : "",
+        missing.length ? `Missing evidence: ${missing.join(", ")}.` : ""
+    ].filter(Boolean).join(" ");
+}
+
+async function loadDocumentationDeck(item) {
+    if (!isSeniorDigitalMediaTask(item)) return;
+    const activityId = String(item.id);
+    renderDocumentationDeckState(null, "Checking saved documentation...");
+    try {
+        const payload = await loadJson(`/api/activities/${encodeURIComponent(activityId)}/documentation-deck`, {
+            headers: buildTaskListHeaders({}), cache: "no-store"
+        });
+        if (taskListState.selectedId !== activityId) return;
+        renderDocumentationDeckState(payload.deck, !payload.deck && !payload.mergeConfigured
+            ? "Linked merging requires school Apps Script setup. You can Google Sync an existing deck now." : "");
+    } catch (error) {
+        if (taskListState.selectedId === activityId) renderDocumentationDeckState(null, error?.message || "Could not load documentation.");
+    }
+}
+
+function requestDocumentationMergeToken() {
+    return new Promise((resolve) => {
+        if (!window.google?.accounts?.oauth2 || !getTaskListGoogleClientId()) {
+            resolve({ error: "Google sign-in is not ready. Reload and try again." }); return;
+        }
+        const client = window.google.accounts.oauth2.initTokenClient({
+            client_id: getTaskListGoogleClientId(),
+            scope: "openid email profile https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/presentations",
+            include_granted_scopes: true,
+            hint: getTaskListEmail(),
+            callback: resolve,
+            error_callback: () => resolve({ error: "Google permission was cancelled or blocked." })
+        });
+        client.requestAccessToken({ prompt: "" });
+    });
+}
+
+async function handleDocumentationAction(action) {
+    const item = taskListState.allItems.find((candidate) => String(candidate.id) === taskListState.selectedId);
+    if (!isSeniorDigitalMediaTask(item) || taskListState.documentationBusy) return;
+    const activityId = String(item.id);
+    const presentationUrl = String(document.querySelector("#task-list-documentation-url")?.value || "").trim();
+    const topics = buildDocumentationTopicOrder(Array.from(document.querySelectorAll("#task-list-checklist a[href]"))
+        .map((link) => ({ href: link.getAttribute("href"), label: link.textContent })), window.location.origin, taskListState.templateCopies);
+    const status = document.querySelector("#task-list-documentation-status");
+    const buttons = Array.from(document.querySelectorAll("[data-documentation-merge], [data-documentation-sync], [data-documentation-add]"));
+    taskListState.documentationBusy = true;
+    buttons.forEach((button) => { button.disabled = true; });
+    if (status) status.textContent = action === "sync" ? "Checking your existing documentation deck..." : "Preparing linked documentation slides...";
+    try {
+        if (action === "sync" && !/^https:\/\/docs\.google\.com\/presentation\/d\/[A-Za-z0-9_-]+(?:\/|$)/.test(presentationUrl)) {
+            throw new Error("Paste a valid Google Slides link first.");
+        }
+        const token = action === "sync"
+            ? await requestHubDriveAccessToken({ forceConsent: false })
+            : await requestDocumentationMergeToken();
+        if (token?.error || !token?.access_token) throw new Error("Google Drive permission is required. Allow access and try again.");
+        if (taskListState.selectedId !== activityId) return;
+        const payload = await loadJson(`/api/activities/${encodeURIComponent(activityId)}/documentation-deck`, {
+            method: "POST", headers: buildTaskListHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ action, presentationUrl, topics, driveAccessToken: token.access_token })
+        });
+        if (taskListState.selectedId !== activityId) return;
+        renderDocumentationDeckState(payload.deck, action === "sync"
+            ? "Existing documentation linked. Its contents have not been changed."
+            : `${Number(payload.addedSlides || 0)} linked slides added. Originals are unchanged.`);
+    } catch (error) {
+        if (status && taskListState.selectedId === activityId) status.textContent = error?.message || "Could not prepare documentation.";
+    } finally {
+        taskListState.documentationBusy = false;
+        buttons.forEach((button) => { button.disabled = false; });
+    }
 }
 
 async function fetchMyEvidence(projectId) {
@@ -3617,6 +3735,7 @@ async function loadChecklistForTask(taskId) {
     ]);
     taskListState.templateCopies = Array.isArray(templateCopiesPayload?.template_copies) ? templateCopiesPayload.template_copies : [];
     renderFinalClientPresentationCard(selected);
+    void loadDocumentationDeck(selected);
     const templateCopySyncPromise = autoSyncToolsAndTechniquesTemplateCopy(
         taskListState.selectedId,
         signedInEmail,
@@ -4128,6 +4247,12 @@ async function runTaskListTrelloSync() {
         const assetManagerBtn = event.target?.closest?.("#task-list-open-asset-manager");
         if (!assetManagerBtn || !taskListState.selectedId) return;
         window.open(`asset-manager.html?id=${encodeURIComponent(taskListState.selectedId)}`, "_blank", "noopener");
+    });
+
+    document.addEventListener("click", (event) => {
+        if (event.target?.closest?.("[data-documentation-merge]")) void handleDocumentationAction("merge");
+        else if (event.target?.closest?.("[data-documentation-add]")) void handleDocumentationAction("add");
+        else if (event.target?.closest?.("[data-documentation-sync]")) void handleDocumentationAction("sync");
     });
 
     document.addEventListener("click", async (event) => {
