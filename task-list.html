@@ -151,7 +151,8 @@
             cursor: not-allowed;
         }
 
-        #task-list-outcome-open:not([hidden]) {
+        #task-list-outcome-open:not([hidden]),
+        #task-list-trello-report-open:not([hidden]) {
             display: block;
             border: 1px solid #236b91;
             border-radius: 6px;
@@ -1203,6 +1204,21 @@
                         <p id="task-list-outcome-version"></p>
                         <p id="task-list-outcome-saved-version"></p>
                         <p id="task-list-outcome-status" role="status" aria-live="polite"></p>
+                    </aside>
+                    <hr class="task-list-final-divider">
+                    <aside class="task-list-documentation-card task-list-outcome-card" aria-labelledby="task-list-trello-report-title">
+                        <p class="section-kicker">STAGE 3</p>
+                        <h2 id="task-list-trello-report-title">Trello Report</h2>
+                        <label for="task-list-trello-report-board">Trello board</label>
+                        <select id="task-list-trello-report-board" disabled><option value="">Loading boards...</option></select>
+                        <div class="task-list-documentation-actions">
+                            <button type="button" class="task-list-sync-drive-btn" id="task-list-trello-report-connect" hidden>Connect Trello Account</button>
+                            <button type="button" class="task-list-sync-drive-btn" id="task-list-trello-report-generate" disabled>Download Trello report</button>
+                            <button type="button" class="task-list-sync-drive-btn" id="task-list-trello-report-retry" hidden disabled>Retry Google Drive save</button>
+                            <a id="task-list-trello-report-open" target="_blank" rel="noopener noreferrer" hidden>Open saved Trello report</a>
+                        </div>
+                        <p id="task-list-trello-report-version"></p>
+                        <p id="task-list-trello-report-status" role="status" aria-live="polite"></p>
                     </aside>
                     </div>
                     <div class="task-list-main-column">

@@ -13,6 +13,7 @@ const { gradeLoginSites } = require("./practical-skills-assessment");
 const { validateLoginSites, publicLoginSites, visibleLoginSites } = require("./login-sites-config");
 const { DOCUMENTATION_TEMPLATE_ID, documentationPresentationId, buildDocumentationMergePlan } = require("./documentation-deck");
 const { outcomeRepositories, createOutcomeArchiveStore } = require("./github-outcome");
+const { trelloReportSources, resolveReportBoards, createTrelloReportPdf, createTrelloReportStore } = require("./trello-report");
 
 const SEARCH_PENGUIN_MISSIONS_ID = "search-penguin-missions-v1";
 const SEARCH_KEYWORD_CHALLENGE_ID = "search-keyword-challenge-v1";
@@ -6384,6 +6385,15 @@ async function recordTemplateCopyInDb(projectId, studentEmail, entry) {
         commitDate: String(entry?.finalOutcome?.commitDate || ""),
         bytes: Number(entry?.finalOutcome?.bytes || 0),
         preparedAt: String(entry?.finalOutcome?.preparedAt || "")
+      }
+    } : {}),
+    ...(entry?.templateId === "submission-trello-report" ? {
+      trelloReport: {
+        boardId: String(entry?.trelloReport?.boardId || ""),
+        boardName: String(entry?.trelloReport?.boardName || "").slice(0, 512),
+        boardUrl: String(entry?.trelloReport?.boardUrl || ""),
+        generatedAt: String(entry?.trelloReport?.generatedAt || ""),
+        bytes: Number(entry?.trelloReport?.bytes || 0)
       }
     } : {}),
     ...(entry?.templateId === DOCUMENTATION_TEMPLATE_ID ? {
@@ -17752,6 +17762,89 @@ async function validateRawFileViaW3C(rawUrl, type) {
   }
 }
 
+const trelloReportStore = createTrelloReportStore();
+
+async function loadFinalTrelloContext(req) {
+  const context = await loadFinalOutcomeContext(req);
+  const sources = trelloReportSources(context.evidence);
+  const connection = await getStoredTrelloConnection(context.email);
+  const saved = context.copies.find((entry) => entry?.templateId === "submission-trello-report") || null;
+  const connected = Boolean(connection?.trello_token);
+  const boards = connected && sources.length ? await resolveReportBoards(sources, connection.trello_token, trelloApiRequest) : [];
+  return { ...context, boards, connected, saved, token: connection?.trello_token || "" };
+}
+
+app.get("/api/activities/:id/trello-report", async (req, res) => {
+  try {
+    const context = await loadFinalTrelloContext(req);
+    res.set("Cache-Control", "no-store").json({ boards: context.boards, connected: context.connected, saved: context.saved });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not load your Trello report." });
+  }
+});
+
+app.post("/api/activities/:id/trello-report", async (req, res) => {
+  try {
+    const context = await loadFinalTrelloContext(req);
+    const { email, activityId } = context;
+    if (!context.connected) throw Object.assign(new Error("Connect your Trello account first."), { status: 409 });
+    const action = String(req.body?.action || "");
+    res.set("Cache-Control", "no-store");
+    if (action === "prepare") {
+      const board = context.boards.find((item) => item.id === String(req.body?.boardId || ""));
+      if (!board) throw Object.assign(new Error("Select a Trello board saved on this assessment."), { status: 400 });
+      const snapshot = await withFinalOutcomeLock("trello-final-report-build", async () => {
+        const options = { token: context.token, query: { filter: "all", fields: "id,name,closed,pos" } };
+        const lists = await trelloApiRequest(`/boards/${encodeURIComponent(board.id)}/lists`, options);
+        const cards = await trelloApiRequest(`/boards/${encodeURIComponent(board.id)}/cards`, {
+          token: context.token, query: { filter: "all", fields: "id,idList,name,desc,url,pos,closed,due,dueComplete,start,dateLastActivity,labels" }
+        });
+        const generatedAt = new Date().toISOString();
+        const buffer = await createTrelloReportPdf({ board, lists, cards, email, activityId, generatedAt });
+        return trelloReportStore.save({ email, activityId, board, buffer, generatedAt });
+      });
+      res.json({ snapshot });
+      return;
+    }
+    if (!["download", "save"].includes(action)) throw Object.assign(new Error("Choose a valid report action."), { status: 400 });
+    const report = trelloReportStore.read(req.body?.snapshotId, email, activityId);
+    if (!context.boards.some((board) => board.id === report.boardId)) throw Object.assign(new Error("This board is no longer linked to your assessment."), { status: 409 });
+    if (action === "download") {
+      res.set("Content-Disposition", `attachment; filename="${report.fileName}"`).type("application/pdf").send(report.buffer);
+      return;
+    }
+    const token = String(req.body?.driveAccessToken || "").trim();
+    if (!token) throw Object.assign(new Error("Google Drive permission is required."), { status: 400 });
+    await verifyDriveTokenForStudent(token, email);
+    const result = await withFinalOutcomeLock(`${email}:${activityId}:trello-report-save`, async () => {
+      const folderId = await resolveOwnedFinalPreparationFolder(email, token);
+      let file = await driveFindFileByNameInFolder(folderId, report.fileName, token);
+      const reused = Boolean(file);
+      if (file) {
+        const metadata = await driveApiRequest(`/files/${encodeURIComponent(file.id)}`, {
+          accessToken: token, queryParams: { fields: "id,mimeType,size,md5Checksum,trashed" }
+        });
+        if (metadata.trashed || metadata.mimeType !== "application/pdf" || Number(metadata.size) !== report.buffer.length
+          || metadata.md5Checksum !== createHash("md5").update(report.buffer).digest("hex")) {
+          throw Object.assign(new Error("A different file already uses this report filename. Rename it in Drive before retrying; it has not been changed."), { status: 409 });
+        }
+      }
+      if (!file) file = await driveUploadBinaryFile({ accessToken: token, folderId, fileName: report.fileName, mimeType: "application/pdf", buffer: report.buffer });
+      const saved = {
+        templateId: "submission-trello-report", templateTitle: "Trello Board Report", fileName: report.fileName,
+        fileUrl: `https://drive.google.com/file/d/${encodeURIComponent(file.id)}/view`,
+        processAssessmentFolderUrl: buildDriveFolderUrlFromId(folderId),
+        trelloReport: { boardId: report.boardId, boardName: report.boardName, boardUrl: report.boardUrl, generatedAt: report.generatedAt, bytes: report.bytes }
+      };
+      await recordTemplateCopyInDb(activityId, email, saved);
+      return { saved, reused };
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not create your Trello report." });
+  }
+});
+
 const outcomeArchiveStore = createOutcomeArchiveStore({ githubApiRequest });
 
 async function withFinalOutcomeLock(key, task) {
@@ -17766,13 +17859,33 @@ async function withFinalOutcomeLock(key, task) {
   return result.value;
 }
 
+async function resolveOwnedFinalPreparationFolder(email, token) {
+  const setup = await resolveStudentDriveSetupState(email, token);
+  if (!setup?.processAssessmentFolderId) throw Object.assign(new Error("Confirm your Process Assessment folder with Drive Ready first."), { status: 409 });
+  const folderId = setup.processAssessmentFolderId;
+  const folder = await driveApiRequest(`/files/${encodeURIComponent(folderId)}`, {
+    accessToken: token, queryParams: { fields: "id,name,mimeType,trashed,owners(emailAddress),parents" }
+  });
+  if (folder.trashed || folder.name !== "Process Assessment" || folder.mimeType !== "application/vnd.google-apps.folder"
+    || !folder.owners?.some((owner) => normalizeEmail(owner.emailAddress) === email)) {
+    throw Object.assign(new Error("Use your own SeniorDTECH/Process Assessment folder."), { status: 409 });
+  }
+  const parents = await Promise.all((folder.parents || []).slice(0, 10).map((id) => driveApiRequest(`/files/${encodeURIComponent(id)}`, {
+    accessToken: token, queryParams: { fields: "id,name,trashed" }
+  })));
+  if (!parents.some((parent) => parent.name === "SeniorDTECH" && !parent.trashed)) {
+    throw Object.assign(new Error("The Process Assessment folder must be inside SeniorDTECH."), { status: 409 });
+  }
+  return folderId;
+}
+
 async function loadFinalOutcomeContext(req) {
   const email = normalizeEmail(getRequestUserEmail(req));
   if (!email || !email.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) throw Object.assign(new Error("School sign-in required."), { status: 401 });
   const activityId = String(req.params.id || "");
   if (!/^[A-Za-z0-9_-]{1,100}$/.test(activityId)) throw Object.assign(new Error("A valid assessment is required."), { status: 400 });
   if (await getStudentProgrammeFolder(email) !== "SeniorDTECH") throw Object.assign(new Error("This stage is for SeniorDTECH."), { status: 403 });
-  if (!hasDatabase) throw Object.assign(new Error("Final outcome ZIPs require the assessment database."), { status: 503 });
+  if (!hasDatabase) throw Object.assign(new Error("Final submission preparation requires the assessment database."), { status: 503 });
   const result = await pool.query(
     "SELECT standard_1, standard_2, evidence_steps, template_copies FROM project_interests WHERE project_id = $1 AND student_email = $2 LIMIT 1",
     [activityId, email]
@@ -17782,9 +17895,11 @@ async function loadFinalOutcomeContext(req) {
   if (!/\b(?:91893|91903)\b/.test(`${allocation.standard_1 || ""} ${allocation.standard_2 || ""}`)) {
     throw Object.assign(new Error("Select your digital media outcome assessment."), { status: 403 });
   }
-  const repositories = outcomeRepositories(normalizeEvidenceStepsPayload(allocation.evidence_steps));
-  const saved = (Array.isArray(allocation.template_copies) ? allocation.template_copies : []).find((entry) => entry?.templateId === "final-digital-outcome-zip") || null;
-  return { email, activityId, repositories, saved };
+  const evidence = normalizeEvidenceStepsPayload(allocation.evidence_steps);
+  const repositories = outcomeRepositories(evidence);
+  const copies = Array.isArray(allocation.template_copies) ? allocation.template_copies : [];
+  const saved = copies.find((entry) => entry?.templateId === "final-digital-outcome-zip") || null;
+  return { email, activityId, repositories, saved, evidence, copies };
 }
 
 app.get("/api/activities/:id/final-outcome", async (req, res) => {
@@ -17823,22 +17938,7 @@ app.post("/api/activities/:id/final-outcome", async (req, res) => {
     if (!token) throw Object.assign(new Error("Google Drive permission is required."), { status: 400 });
     await verifyDriveTokenForStudent(token, email);
     const result = await withFinalOutcomeLock(`${email}:${activityId}:final-outcome-save`, async () => {
-      const setup = await resolveStudentDriveSetupState(email, token);
-      if (!setup?.processAssessmentFolderId) throw Object.assign(new Error("Confirm your Process Assessment folder with Drive Ready first."), { status: 409 });
-      const folderId = setup.processAssessmentFolderId;
-      const folder = await driveApiRequest(`/files/${encodeURIComponent(folderId)}`, {
-        accessToken: token, queryParams: { fields: "id,name,mimeType,trashed,owners(emailAddress),parents" }
-      });
-      if (folder.trashed || folder.name !== "Process Assessment" || folder.mimeType !== "application/vnd.google-apps.folder"
-        || !folder.owners?.some((owner) => normalizeEmail(owner.emailAddress) === email)) {
-        throw Object.assign(new Error("Use your own SeniorDTECH/Process Assessment folder."), { status: 409 });
-      }
-      const parents = await Promise.all((folder.parents || []).slice(0, 10).map((id) => driveApiRequest(`/files/${encodeURIComponent(id)}`, {
-        accessToken: token, queryParams: { fields: "id,name,trashed" }
-      })));
-      if (!parents.some((parent) => parent.name === "SeniorDTECH" && !parent.trashed)) {
-        throw Object.assign(new Error("The Process Assessment folder must be inside SeniorDTECH."), { status: 409 });
-      }
+      const folderId = await resolveOwnedFinalPreparationFolder(email, token);
       let file = await driveFindFileByNameInFolder(folderId, archive.fileName, token);
       const reused = Boolean(file);
       if (file) {

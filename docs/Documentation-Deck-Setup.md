@@ -4,7 +4,7 @@ The Task List's Preparing for Final Submission card is separate from the client
 presentation. It offers linked merging or Google Sync for an existing written
 documentation deck. Linking an existing deck does not move or edit its slides.
 Deck-ready state is preparation for Stage 3, not a final submission or an
-assessment grade. Stage 3 itself is not implemented by this change.
+assessment grade. Preparing these files does not perform final submission.
 
 ## Existing decks
 
@@ -113,6 +113,43 @@ Before rollout, test a student download and Drive save against a public reposito
 then push a new commit and check both Drive versions remain available. Verify
 that download contents include the intended source files and assets. Download
 initiation does not prove the browser has saved the file successfully.
+
+## Stage 3 Trello Report
+
+The Trello Report card uses the student's existing Trello connection and the
+`TRELLO_CARD_URL|...` links saved on the selected assessment. Card links resolve
+to their boards; duplicate boards are deduplicated. Multiple boards require an
+explicit selection. Access is checked using that student's Trello token on
+generation, download and save. The token is never returned to the browser or
+included in the report. This uses the existing `TRELLO_API_KEY`; there is no new
+Trello credential or Apps Script deployment to configure.
+
+Download Trello report requests Drive permission, reads live Trello data, creates
+a PDF, starts its download and automatically saves the same bytes directly in
+`SeniorDTECH/Process Assessment`. The sample `TeacherFiles/VP-TaskList - DTECH26.pdf`
+informs the cover, summary counts, and card-detail structure. The report includes
+board/student/export details, list and card totals, due-date counts, list names,
+card names and descriptions, labels, dates, archived status, and Trello links.
+Open and archived cards/lists are included, with list/card order preserved.
+Comments, attachment contents and checklist items are not exported. It is a
+current board snapshot, not an audit trail, evidence of authorship, or a grade.
+Nothing is written to Trello.
+
+The report is limited to 500 cards, 100 lists, 500,000 card-text characters and
+10 MB. Oversized boards fail clearly instead of producing partial reports.
+Prepared PDFs expire after 15 minutes/restart or bounded-cache eviction (20 MB
+per server process). The same single-instance/shared-cache considerations as
+the ZIP workflow apply. Each generation has a unique filename and retains older
+reports in Drive. Retrying an upload reuses that same generated snapshot and
+checksums any existing file before reusing it. Latest saved metadata persists
+against the assessment and the saved link returns on reload.
+
+Run `node scripts/regression-trello-report.js` for PDF text/pagination, source
+selection, access, upload identity, saved state and frontend retry checks.
+Before rollout, use a school student account to connect Trello, generate a
+report, check descriptions and dates against the board, and confirm the Drive
+file and downloaded PDF match. Live Trello/Drive authorisation is not covered
+by mocked endpoint tests.
 
 ## Linked Merge Verification
 

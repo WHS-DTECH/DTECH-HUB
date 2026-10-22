@@ -267,6 +267,8 @@ const taskListState = {
     documentationBusy: false,
     finalOutcome: null,
     finalOutcomeBusy: false,
+    trelloReport: null,
+    trelloReportBusy: false,
     decompositionCoverage: null,
     identifiedComponentsCount: null,
     // Planning ticks for criteria with no automatic evidence source. In-memory only, never sent to the server.
@@ -2899,6 +2901,120 @@ async function handleFinalOutcomeAction(action) {
     }
 }
 
+function renderTrelloReportState() {
+    const state = taskListState.trelloReport;
+    const select = document.querySelector("#task-list-trello-report-board");
+    if (!state || !select) return;
+    select.replaceChildren();
+    if (state.boards.length !== 1) {
+        const option = document.createElement("option");
+        option.value = "";
+        option.textContent = state.boards.length ? "Select board" : "No saved Trello board";
+        select.append(option);
+    }
+    state.boards.forEach((board) => {
+        const option = document.createElement("option");
+        option.value = board.id;
+        option.textContent = board.name;
+        select.append(option);
+    });
+    select.value = state.boardId;
+    select.disabled = taskListState.trelloReportBusy || !state.boards.length;
+    document.querySelector("#task-list-trello-report-connect").hidden = state.connected;
+    document.querySelector("#task-list-trello-report-generate").disabled = taskListState.trelloReportBusy || !state.connected || !state.boardId;
+    const retry = document.querySelector("#task-list-trello-report-retry");
+    retry.hidden = !state.retryDriveSave;
+    retry.disabled = taskListState.trelloReportBusy || !state.snapshot || state.snapshot.expiresAt <= Date.now();
+    const link = document.querySelector("#task-list-trello-report-open");
+    const safeUrl = /^https:\/\/drive\.google\.com\/file\/d\/[A-Za-z0-9_-]+\/view$/.test(String(state.saved?.fileUrl || "")) ? state.saved.fileUrl : "";
+    link.hidden = !safeUrl;
+    if (safeUrl) link.href = safeUrl;
+    const metadata = state.saved?.trelloReport;
+    const exportedAt = new Date(metadata?.generatedAt || "");
+    document.querySelector("#task-list-trello-report-version").textContent = metadata && safeUrl
+        ? `Saved in SeniorDTECH / Process Assessment: ${metadata.boardName}${Number.isFinite(exportedAt.getTime()) ? ` / ${exportedAt.toLocaleString("en-NZ", { timeZone: "Pacific/Auckland" })}` : ""}` : "";
+    document.querySelector("#task-list-trello-report-status").textContent = state.message || "";
+}
+
+async function loadTrelloReport(item) {
+    if (!isSeniorDigitalMediaTask(item)) return;
+    const state = { activityId: String(item.id), boards: [], boardId: "", connected: true, saved: null, snapshot: null, retryDriveSave: false, message: "Checking saved Trello boards..." };
+    taskListState.trelloReport = state;
+    renderTrelloReportState();
+    try {
+        const payload = await loadJson(`/api/activities/${encodeURIComponent(state.activityId)}/trello-report`, { headers: buildTaskListHeaders({}), cache: "no-store" });
+        if (taskListState.trelloReport !== state || taskListState.selectedId !== state.activityId) return;
+        state.boards = Array.isArray(payload.boards) ? payload.boards : [];
+        state.connected = Boolean(payload.connected);
+        state.boardId = state.boards.length === 1 ? state.boards[0].id : "";
+        state.saved = payload.saved || null;
+        state.message = !state.connected ? "Connect your Trello account to create the report."
+            : !state.boards.length ? "No Trello board link is saved on this assessment."
+                : state.boards.length > 1 ? "Select the board for your report." : "";
+    } catch (error) {
+        state.message = error?.message || "Could not load Trello boards.";
+    }
+    if (taskListState.trelloReport === state) renderTrelloReportState();
+}
+
+async function handleTrelloReportAction(action) {
+    const state = taskListState.trelloReport;
+    const selected = taskListState.allItems.find((item) => String(item.id) === taskListState.selectedId);
+    if (!state || !isSeniorDigitalMediaTask(selected) || state.activityId !== taskListState.selectedId || taskListState.trelloReportBusy || !state.boardId) return;
+    const active = () => taskListState.trelloReport === state && taskListState.selectedId === state.activityId;
+    const endpoint = `/api/activities/${encodeURIComponent(state.activityId)}/trello-report`;
+    const post = (body) => loadJson(endpoint, { method: "POST", headers: buildTaskListHeaders({ "Content-Type": "application/json" }), body: JSON.stringify(body) });
+    let downloadStarted = false;
+    taskListState.trelloReportBusy = true;
+    state.message = "Connecting to Google Drive...";
+    renderTrelloReportState();
+    try {
+        const token = await requestHubDriveAccessToken({ forceConsent: false });
+        if (!active()) return;
+        if (token?.error || !token?.access_token) throw new Error("Google Drive permission is required. Allow access and try again.");
+        if (action === "generate") {
+            state.snapshot = null;
+            state.retryDriveSave = false;
+            state.message = "Reading live Trello cards and creating the PDF...";
+            renderTrelloReportState();
+            const payload = await post({ action: "prepare", boardId: state.boardId });
+            if (!active()) return;
+            state.snapshot = payload.snapshot;
+            const response = await fetch(endpoint, { method: "POST", headers: buildTaskListHeaders({ "Content-Type": "application/json" }),
+                body: JSON.stringify({ action: "download", snapshotId: state.snapshot.snapshotId }) });
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                throw new Error(error.error || "Could not download the report.");
+            }
+            const blob = await response.blob();
+            if (!active()) return;
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = state.snapshot.fileName;
+            document.body.append(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 60000);
+            downloadStarted = true;
+        }
+        if (!state.snapshot || state.snapshot.expiresAt <= Date.now()) throw new Error("The prepared PDF has expired. Generate a new report.");
+        state.message = "Saving the Trello PDF to SeniorDTECH / Process Assessment...";
+        renderTrelloReportState();
+        const payload = await post({ action: "save", snapshotId: state.snapshot.snapshotId, driveAccessToken: token.access_token });
+        if (!active()) return;
+        state.saved = payload.saved;
+        state.retryDriveSave = false;
+        state.message = `${downloadStarted ? "Report download started. " : ""}${payload.reused ? "This report is already saved." : "Report saved to SeniorDTECH / Process Assessment. Earlier reports are unchanged."}`;
+    } catch (error) {
+        if (downloadStarted) state.retryDriveSave = true;
+        state.message = `${downloadStarted ? "PDF download started, but Google Drive save failed: " : ""}${error?.message || "Could not create your Trello report."}`;
+    } finally {
+        taskListState.trelloReportBusy = false;
+        renderTrelloReportState();
+    }
+}
+
 async function fetchMyEvidence(projectId) {
     if (!projectId) return [];
     const payload = await loadJson(`/api/activities/${encodeURIComponent(projectId)}/my-evidence`, { headers: buildTaskListHeaders({}) });
@@ -3865,6 +3981,7 @@ async function loadChecklistForTask(taskId) {
     renderFinalClientPresentationCard(selected);
     void loadDocumentationDeck(selected);
     void loadFinalOutcome(selected);
+    void loadTrelloReport(selected);
     const templateCopySyncPromise = autoSyncToolsAndTechniquesTemplateCopy(
         taskListState.selectedId,
         signedInEmail,
@@ -4307,7 +4424,7 @@ async function runTaskListTrelloSync() {
     });
 
     document.addEventListener("click", async (event) => {
-        const connectBtn = event.target?.closest?.("#task-list-connect-trello");
+        const connectBtn = event.target?.closest?.("#task-list-connect-trello, #task-list-trello-report-connect");
         if (!connectBtn) return;
 
         connectBtn.disabled = true;
@@ -4326,6 +4443,8 @@ async function runTaskListTrelloSync() {
             setStatus("Trello connected! Syncing your board\u2026");
             connectBtn.hidden = true;
             await runTaskListTrelloSync();
+            const selected = taskListState.allItems.find((item) => String(item.id) === taskListState.selectedId);
+            if (selected) void loadTrelloReport(selected);
         } catch (error) {
             setStatus(error?.message || "Could not connect Trello.", true);
         } finally {
@@ -4387,6 +4506,20 @@ async function runTaskListTrelloSync() {
     document.addEventListener("click", (event) => {
         if (event.target?.closest?.("#task-list-outcome-download")) void handleFinalOutcomeAction("download");
         else if (event.target?.closest?.("#task-list-outcome-save")) void handleFinalOutcomeAction("save");
+    });
+
+    document.addEventListener("click", (event) => {
+        if (event.target?.closest?.("#task-list-trello-report-generate")) void handleTrelloReportAction("generate");
+        else if (event.target?.closest?.("#task-list-trello-report-retry")) void handleTrelloReportAction("retry");
+    });
+
+    document.addEventListener("change", (event) => {
+        if (event.target?.id !== "task-list-trello-report-board" || !taskListState.trelloReport || taskListState.trelloReportBusy) return;
+        taskListState.trelloReport.boardId = event.target.value;
+        taskListState.trelloReport.snapshot = null;
+        taskListState.trelloReport.retryDriveSave = false;
+        taskListState.trelloReport.message = "";
+        renderTrelloReportState();
     });
 
     document.addEventListener("change", (event) => {
