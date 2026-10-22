@@ -6380,7 +6380,11 @@ async function recordTemplateCopyInDb(projectId, studentEmail, entry) {
         readyForStage3: Boolean(entry?.documentation?.readyForStage3),
         missingTopics: (Array.isArray(entry?.documentation?.missingTopics) ? entry.documentation.missingTopics : []).slice(0, 100).map((topic) => String(topic).slice(0, 200)),
         slideCount: Number(entry?.documentation?.slideCount || 0),
-        partial: Boolean(entry?.documentation?.partial)
+        partial: Boolean(entry?.documentation?.partial),
+        existingDeck: entry?.documentation?.existingDeck && documentationPresentationId(entry.documentation.existingDeck.fileUrl) ? {
+          fileUrl: String(entry.documentation.existingDeck.fileUrl),
+          fileName: String(entry.documentation.existingDeck.fileName || "Documentation").slice(0, 200)
+        } : null
       }
     } : {}),
     copiedAt: new Date().toISOString()
@@ -11037,7 +11041,7 @@ app.post("/api/activities/:id/documentation-deck", async (req, res) => {
     const result = await withResearchReportLock(`${email}:${activityId}:documentation`, async () => {
       const copies = await loadDocumentationCopies(activityId, email);
       const saved = getDocumentationRecord(copies);
-      if (action === "merge" && saved) return { deck: saved, reopened: true };
+      if (action === "merge" && saved?.documentation?.mode === "linked") return { deck: saved, reopened: true };
       if (action === "add" && saved?.documentation?.mode !== "linked") {
         const error = new Error("Only generated linked masters support Add missing slides. Your existing deck has not been changed.");
         error.status = 409;
@@ -11086,7 +11090,7 @@ app.post("/api/activities/:id/documentation-deck", async (req, res) => {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ function: "mergeDocumentationDeck", devMode: false, parameters: [{
           email, activityId, folderId: setup.processAssessmentFolderId,
-          destinationId: saved ? documentationPresentationId(saved.fileUrl) : "", sources: plan.sources
+          destinationId: saved?.documentation?.mode === "linked" ? documentationPresentationId(saved.fileUrl) : "", sources: plan.sources
         }] })
       });
       const payload = await response.json().catch(() => ({}));
@@ -11101,7 +11105,10 @@ app.post("/api/activities/:id/documentation-deck", async (req, res) => {
         processAssessmentFolderUrl: buildDriveFolderUrlFromId(setup.processAssessmentFolderId),
         documentation: {
           mode: "linked", readyForStage3: !merged.partial && plan.missingTopics.length === 0,
-          missingTopics: plan.missingTopics, slideCount: Number(merged.slideCount || 0), partial: Boolean(merged.partial)
+          missingTopics: plan.missingTopics, slideCount: Number(merged.slideCount || 0), partial: Boolean(merged.partial),
+          existingDeck: saved?.documentation?.mode === "existing"
+            ? { fileUrl: saved.fileUrl, fileName: saved.fileName }
+            : saved?.documentation?.existingDeck || null
         }
       };
       await saveDocumentationRecord(activityId, email, entry);

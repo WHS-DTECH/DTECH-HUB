@@ -160,6 +160,7 @@ async function testDocumentationEndpoints() {
   assert.ok(start >= 0 && end > start);
   const handlers = new Map();
   const driveCalls = [];
+  let mergeRequestBody = null;
   let programme = "SeniorDTECH";
   const endpointContext = vm.createContext({
     hasDatabase: false, memoryDocumentationDecks: new Map(),
@@ -182,9 +183,12 @@ async function testDocumentationEndpoints() {
     driveListSlidesInProcessAssessmentTree: async () => [{ id: "audience", name: "Target Audience" }],
     inferTemplateCopyFromFileName: () => ({ templateId: "target-audience" }),
     buildDriveFolderUrlFromId: (id) => `https://drive.google.com/drive/folders/${id}`,
-    fetch: async () => ({ ok: true, json: async () => ({ response: { result: {
-      fileUrl: slideUrl("merged"), fileName: "Submission Documentation", slideCount: 2, addedSlides: 2, partial: false
-    } } }) })
+    fetch: async (_url, options) => {
+      mergeRequestBody = JSON.parse(options.body);
+      return { ok: true, json: async () => ({ response: { result: {
+        fileUrl: slideUrl("merged"), fileName: "Submission Documentation", slideCount: 2, addedSlides: 2, partial: false
+      } } }) };
+    }
   });
   vm.runInContext(server.slice(start, end), endpointContext);
   const requestEndpoint = async (method, body = {}, email = studentEmail) => {
@@ -203,16 +207,19 @@ async function testDocumentationEndpoints() {
   assert.equal(driveCalls.length, 1);
   assert.ok(driveCalls.every((call) => !call.options.method), "Syncing an existing deck makes no Drive write requests");
   assert.equal((await requestEndpoint("GET")).body.deck.fileUrl, slideUrl("existing"), "Existing-deck ready state survives reloads");
-  assert.equal((await requestEndpoint("POST", { action: "merge", driveAccessToken: "student-token" })).body.reopened, true,
-    "Repeat merge clicks reuse the saved deck");
+  assert.equal((await requestEndpoint("POST", { action: "merge", driveAccessToken: "student-token" })).code, 503,
+    "A synced existing deck does not masquerade as a generated merge master");
   assert.equal((await requestEndpoint("POST", { action: "add", driveAccessToken: "student-token" })).code, 409,
     "Add missing slides never overwrites a manually assembled documentation deck");
-  endpointContext.memoryDocumentationDecks.clear();
   endpointContext.process.env.DOCUMENTATION_MERGE_SCRIPT_ID = "configured-script";
   const merged = await requestEndpoint("POST", { action: "merge", driveAccessToken: "student-token", topics: [topics[0]] });
   assert.equal(merged.code, 200);
   assert.equal(merged.body.deck.documentation.readyForStage3, true);
   assert.equal(merged.body.deck.documentation.mode, "linked");
+  assert.equal(mergeRequestBody.parameters[0].destinationId, "", "The synced existing deck is never passed as a merge target");
+  assert.equal(merged.body.deck.documentation.existingDeck.fileUrl, slideUrl("existing"), "The original deck remains separately linked");
+  const reopened = await requestEndpoint("POST", { action: "merge", driveAccessToken: "student-token" });
+  assert.equal(reopened.body.reopened, true, "Repeat merge clicks reopen only the generated linked master");
   const incomplete = await requestEndpoint("POST", { action: "add", driveAccessToken: "student-token", topics: topics.slice(0, 2) });
   assert.equal(incomplete.body.deck.documentation.readyForStage3, false, "Missing evidence never yields a false ready state");
   assert.ok(incomplete.body.deck.documentation.missingTopics.includes("Development"));

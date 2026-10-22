@@ -2682,6 +2682,7 @@ function buildDocumentationTopicOrder(links, origin, copies = []) {
 function renderDocumentationDeckState(deck, message = "") {
     taskListState.documentationDeck = deck || null;
     const link = document.querySelector("#task-list-documentation-open");
+    const originalLink = document.querySelector("#task-list-documentation-original");
     const ready = document.querySelector("#task-list-documentation-ready");
     const merge = document.querySelector("[data-documentation-merge]");
     const add = document.querySelector("[data-documentation-add]");
@@ -2689,8 +2690,11 @@ function renderDocumentationDeckState(deck, message = "") {
     const status = document.querySelector("#task-list-documentation-status");
     const fileUrl = /^https:\/\/docs\.google\.com\/presentation\/d\/[A-Za-z0-9_-]+(?:\/|$)/.test(String(deck?.fileUrl || "")) ? deck.fileUrl : "";
     if (link) { link.hidden = !fileUrl; if (fileUrl) link.href = fileUrl; }
+    const originalUrl = /^https:\/\/docs\.google\.com\/presentation\/d\/[A-Za-z0-9_-]+(?:\/|$)/.test(String(deck?.documentation?.existingDeck?.fileUrl || ""))
+        ? deck.documentation.existingDeck.fileUrl : "";
+    if (originalLink) { originalLink.hidden = !originalUrl; if (originalUrl) originalLink.href = originalUrl; }
     if (ready) ready.hidden = !(fileUrl && deck?.documentation?.readyForStage3);
-    if (merge) merge.hidden = Boolean(fileUrl);
+    if (merge) merge.hidden = Boolean(fileUrl && deck?.documentation?.mode === "linked");
     if (add) add.hidden = !fileUrl || deck?.documentation?.mode !== "linked";
     if (input) input.value = fileUrl;
     const missing = Array.isArray(deck?.documentation?.missingTopics) ? deck.documentation.missingTopics : [];
@@ -2710,8 +2714,8 @@ async function loadDocumentationDeck(item) {
             headers: buildTaskListHeaders({}), cache: "no-store"
         });
         if (taskListState.selectedId !== activityId) return;
-        renderDocumentationDeckState(payload.deck, !payload.deck && !payload.mergeConfigured
-            ? "Linked merging requires school Apps Script setup. You can Google Sync an existing deck now." : "");
+        renderDocumentationDeckState(payload.deck, !payload.mergeConfigured
+            ? "Linked merging and Add missing slides require the school's Apps Script setup." : "");
     } catch (error) {
         if (taskListState.selectedId === activityId) renderDocumentationDeckState(null, error?.message || "Could not load documentation.");
     }
