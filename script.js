@@ -2669,6 +2669,11 @@ async function loadAndRenderSidebarAllocations(panel) {
         if (hasExternalExamAllocation && !externalExamIntention) {
             showExternalExamIntentionReminder(email);
         }
+        const hasInternalAssessment = assessments.length > 0
+            || (Array.isArray(data.allocated_standards) && data.allocated_standards.length > 0);
+        if (hasInternalAssessment) {
+            showInternalAssessmentDeadlineReminder(email);
+        }
 
         const profileDetails = computeHubSidebarProfileDetails([...assessments, ...projects]);
         panel.dataset.allocationCourse = getTaskListCourseFromAllocations([...assessments, ...projects]);
@@ -2742,6 +2747,83 @@ function showExternalExamIntentionReminder(email) {
     document.body.appendChild(dialog);
     if (typeof dialog.showModal === "function") dialog.showModal();
     else dialog.setAttribute("open", "");
+}
+
+const INTERNAL_ASSESSMENT_DEADLINE = "2026-10-29";
+const INTERNAL_ASSESSMENT_DEADLINE_LABEL = "Thursday 29 October";
+const INTERNAL_ASSESSMENT_REMINDER_WEEKDAYS = ["Mon", "Wed"];
+
+function getNzDateParts(now = new Date()) {
+    const parts = {};
+    new Intl.DateTimeFormat("en-NZ", {
+        timeZone: "Pacific/Auckland", year: "numeric", month: "2-digit", day: "2-digit", weekday: "short"
+    }).formatToParts(now).forEach((part) => { parts[part.type] = part.value; });
+    return { isoDate: `${parts.year}-${parts.month}-${parts.day}`, weekday: parts.weekday };
+}
+
+function shouldShowInternalAssessmentDeadlineReminder(now = new Date()) {
+    const { isoDate, weekday } = getNzDateParts(now);
+    return isoDate <= INTERNAL_ASSESSMENT_DEADLINE && INTERNAL_ASSESSMENT_REMINDER_WEEKDAYS.includes(weekday);
+}
+
+function showInternalAssessmentDeadlineReminder(email, now = new Date()) {
+    const safeEmail = normalizeEmail(email);
+    if (!safeEmail || typeof document.createElement !== "function") return;
+    if (!shouldShowInternalAssessmentDeadlineReminder(now)) return;
+    const reminderKey = `hub_internal_deadline_reminder_dismissed_v1:${safeEmail}:${getNzDateParts(now).isoDate}`;
+    try {
+        if (localStorage.getItem(reminderKey)) return;
+    } catch (_error) {
+    }
+    if (document.querySelector(".hub-internal-deadline-reminder")) return;
+
+    const examReminder = document.querySelector("dialog.hub-external-exam-reminder");
+    if (examReminder) {
+        examReminder.addEventListener("close", () => showInternalAssessmentDeadlineReminder(email, now), { once: true });
+        return;
+    }
+
+    const dialog = document.createElement("dialog");
+    dialog.className = "hub-internal-deadline-reminder";
+    dialog.setAttribute("aria-labelledby", "hub-internal-deadline-reminder-title");
+    dialog.setAttribute("aria-describedby", "hub-internal-deadline-reminder-summary");
+    dialog.innerHTML = `
+        <div class="hub-internal-deadline-reminder-band">
+            <div class="hub-internal-deadline-reminder-date" aria-hidden="true">
+                <span>Oct</span><strong>29</strong><span>Thu</span>
+            </div>
+            <div>
+                <p class="hub-internal-deadline-reminder-kicker">Important date</p>
+                <h2 id="hub-internal-deadline-reminder-title">All internal assessment is due by ${INTERNAL_ASSESSMENT_DEADLINE_LABEL}</h2>
+            </div>
+            <button type="button" class="hub-internal-deadline-reminder-close" data-internal-deadline-dismiss aria-label="Close reminder">&times;</button>
+        </div>
+        <div class="hub-internal-deadline-reminder-content">
+            <p id="hub-internal-deadline-reminder-summary">Your internal assessment work <strong>must be completed and submitted no later than ${INTERNAL_ASSESSMENT_DEADLINE_LABEL}</strong>.</p>
+            <ul class="hub-internal-deadline-reminder-steps">
+                <li><span aria-hidden="true">&#9989;</span> Finish each part of your work.</li>
+                <li><span aria-hidden="true">&#128228;</span> Submit it, then check it has been handed in.</li>
+                <li><span aria-hidden="true">&#128075;</span> Stuck? Ask your teacher early &mdash; we are here to help.</li>
+            </ul>
+            <div class="hub-internal-deadline-reminder-actions">
+                <button type="button" data-internal-deadline-dismiss>Got it, thanks</button>
+            </div>
+        </div>
+    `;
+    dialog.querySelectorAll("[data-internal-deadline-dismiss]").forEach((button) => {
+        button.addEventListener("click", () => dialog.close());
+    });
+    dialog.addEventListener("close", () => {
+        try {
+            localStorage.setItem(reminderKey, "1");
+        } catch (_error) {
+        }
+        dialog.remove();
+    }, { once: true });
+    document.body.appendChild(dialog);
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "");
+    dialog.querySelector(".hub-internal-deadline-reminder-actions button")?.focus();
 }
 
 function renderHubPracticalSkillsMenu(yearGroup) {

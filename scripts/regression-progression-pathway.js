@@ -217,8 +217,14 @@ async function main() {
         require: () => ({
             registerActivityProgress: (_app, config) => { activityStudents = config.getStudents; },
             registerProgressionPathway: (_app, config) => { directoryAdapter = config.getStudents; },
-            registerCommentBank: () => {}
+            registerCommentBank: () => {},
+            registerCertificateCatchup: () => {}
         }),
+        registerTypingKit: () => {}, canManagePracticalSchedule: () => false,
+        ensurePracticalSkillsProgressSchema: async () => {}, ensureEmailLogsSchema: async () => {},
+        getPracticalSkillsCertificateTeacherRecipients: async () => [], getStoredPracticalSkillsKitContent: async () => ({}),
+        buildKitCertificate: () => ({}), getPracticalSkillsStudentName: async () => "", createKitCertificatePdf: async () => null,
+        sendConfiguredHubEmail: async () => {},
         app: {}, pool: {}, hasDatabase: true, requireActivityWriteAccess: () => {}, requireAdminAccess: () => {},
         getRequestUserEmail: () => "", SCHOOL_EMAIL_DOMAIN: "example.test", getStaffMembers: async () => [],
         getStudentDirectoryRows: async () => [

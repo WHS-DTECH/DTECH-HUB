@@ -815,6 +815,133 @@ a {
     color: #24506f;
 }
 
+.hub-internal-deadline-reminder {
+    width: min(520px, calc(100vw - 32px));
+    max-width: none;
+    padding: 0;
+    border: 4px solid #f59e0b;
+    border-radius: 18px;
+    background: #fffdf5;
+    color: #1f2937;
+    box-shadow: 0 20px 55px rgba(60, 30, 5, 0.3);
+    overflow: hidden;
+    font-size: 1rem;
+    line-height: 1.6;
+}
+.hub-internal-deadline-reminder::backdrop {
+    background: rgba(30, 20, 45, 0.6);
+}
+.hub-internal-deadline-reminder-band {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px 22px;
+    background: linear-gradient(135deg, #fde047 0%, #fbbf24 55%, #fb923c 100%);
+    color: #1f1300;
+}
+.hub-internal-deadline-reminder-date {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 74px;
+    padding: 6px 10px 8px;
+    border: 3px solid #1f1300;
+    border-radius: 12px;
+    background: #ffffff;
+    line-height: 1.1;
+    text-transform: uppercase;
+    font-weight: 800;
+    font-size: 0.78rem;
+}
+.hub-internal-deadline-reminder-date strong {
+    font-size: 2.1rem;
+    color: #b42318;
+}
+.hub-internal-deadline-reminder-kicker {
+    margin: 0 0 4px;
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+.hub-internal-deadline-reminder h2 {
+    margin: 0;
+    font-size: 1.3rem;
+    line-height: 1.3;
+    color: #1f1300;
+}
+.hub-internal-deadline-reminder-close {
+    align-self: flex-start;
+    margin-left: auto;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 auto;
+    border: 2px solid #1f1300;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.85);
+    color: #1f1300;
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+}
+.hub-internal-deadline-reminder-content {
+    padding: 20px 22px 22px;
+}
+.hub-internal-deadline-reminder-content > p {
+    margin: 0;
+    font-size: 1rem;
+}
+.hub-internal-deadline-reminder-steps {
+    display: grid;
+    gap: 8px;
+    margin: 14px 0 0;
+    padding: 0;
+    list-style: none;
+}
+.hub-internal-deadline-reminder-steps li {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 9px 12px;
+    border-radius: 10px;
+    background: #fef3c7;
+}
+.hub-internal-deadline-reminder-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 18px;
+}
+.hub-internal-deadline-reminder-actions button {
+    min-height: 44px;
+    padding: 10px 20px;
+    border: 0;
+    border-radius: 10px;
+    background: #6d28d9;
+    color: #ffffff;
+    font: inherit;
+    font-weight: 800;
+    cursor: pointer;
+}
+.hub-internal-deadline-reminder button:focus-visible {
+    outline: 3px solid #1d4ed8;
+    outline-offset: 3px;
+}
+@media (prefers-reduced-motion: no-preference) {
+    .hub-internal-deadline-reminder[open] {
+        animation: hub-internal-deadline-reminder-in 220ms ease-out;
+    }
+}
+@keyframes hub-internal-deadline-reminder-in {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: none; }
+}
+@media (max-width: 480px) {
+    .hub-internal-deadline-reminder-band { flex-wrap: wrap; }
+    .hub-internal-deadline-reminder h2 { font-size: 1.15rem; }
+    .hub-internal-deadline-reminder-actions button { width: 100%; }
+}
+
 .hub-sidebar-alloc-section {
     margin-top: 14px;
 }
