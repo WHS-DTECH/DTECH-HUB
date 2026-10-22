@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
+const { withTypingKitCard } = require("../practical-skills/typing-kit-store");
 
 const root = path.join(__dirname, "..");
 const serverSource = fs.readFileSync(path.join(root, "server.js"), "utf8");
@@ -136,6 +137,7 @@ async function main() {
     const queries = [];
     const seedCards = [{ id: "kit-login", title: "Login Kit" }];
     const storeContext = vm.createContext({
+        withTypingKitCard,
         hasDatabase: true,
         PRACTICAL_SKILLS_LIBRARY_FILE: "library.json",
         fs: { promises: {
@@ -159,12 +161,12 @@ async function main() {
     });
     vm.runInContext(serverSource.slice(storeStart, storeEnd) + serverSource.slice(buildStart, buildEnd), storeContext);
     const firstRead = await storeContext.readPracticalSkillsLibraryFile();
-    assert.deepEqual(firstRead.map((card) => card.id), ["kit-login", "kit-minecraft"], "First read seeds from file and restores missing saved kits");
-    assert.equal(firstRead[1].area, "Application Kits");
-    assert.deepEqual(dbCards.map((card) => card.id), ["kit-login", "kit-minecraft"], "Seeded library is persisted in the database");
+    assert.deepEqual(firstRead.map((card) => card.id), ["kit-login", "kit-typing", "kit-minecraft"], "First read seeds the Typing Kit and restores missing saved kits");
+    assert.equal(firstRead.find((card) => card.id === "kit-minecraft").area, "Application Kits");
+    assert.deepEqual(dbCards.map((card) => card.id), ["kit-login", "kit-typing", "kit-minecraft"], "Seeded library is persisted in the database");
     dbCards = [{ id: "kit-login", title: "Login Kit" }];
     const laterRead = await storeContext.readPracticalSkillsLibraryFile();
-    assert.deepEqual(laterRead.map((card) => card.id), ["kit-login"], "Stored library is the source of truth after seeding (removed cards stay removed)");
+    assert.deepEqual(laterRead.map((card) => card.id), ["kit-login", "kit-typing"], "Existing libraries receive the specialised Typing Kit; removed ordinary cards stay removed");
     await storeContext.writePracticalSkillsLibraryFile([{ id: "kit-login", title: "Login Kit" }, { id: "kit-minecraft", title: "Minecraft Builder Kit" }]);
     assert.equal(dbCards.length, 2, "Saving the library writes to the database");
 

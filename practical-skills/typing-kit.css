@@ -1,0 +1,42 @@
+.typing-kit-page { --worksheet-theme-color: #246b51; }
+.typing-kit-page [hidden] { display: none !important; }
+.typing-intro, .typing-settings, .typing-week, .typing-daily, .typing-copy, .typing-archive {
+    margin: 18px 0;
+    padding: 20px;
+    background: #fff;
+    border: 2px solid #e5dcc9;
+    border-radius: 18px;
+}
+.typing-week { border-color: #2f8f61; box-shadow: 0 4px 0 #eae0ce; }
+.typing-week h3, .typing-daily h2, .typing-settings h2 { margin-top: 0; }
+.typing-week.is-current { outline: 3px solid #ffd166; outline-offset: 3px; }
+.typing-week-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px; }
+.typing-week-heading p { margin-top: 0; }
+.typing-periods { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.typing-period { padding: 16px; border-radius: 12px; background: #f6f5f0; }
+.typing-period.has-results { background: #edf8f0; }
+.typing-period h4 { margin: 0 0 8px; }
+.typing-period p { margin: 8px 0; }
+.typing-kit-page .worksheet-btn { display: inline-block; text-decoration: none; text-align: center; }
+.typing-kit-page input { font: inherit; border: 1px solid #817865; border-radius: 8px; padding: 10px; max-width: 100%; }
+.typing-kit-page label { display: block; font-weight: 700; margin: 12px 0 8px; }
+.typing-result-input { width: 100%; }
+.typing-submit-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; align-items: center; }
+.typing-table-wrap { overflow-x: auto; }
+.typing-kit-page table { border-collapse: collapse; width: 100%; margin-top: 14px; }
+.typing-kit-page caption { text-align: left; font-weight: 700; padding: 8px 0; }
+.typing-kit-page th, .typing-kit-page td { text-align: left; padding: 12px 10px; border-bottom: 1px solid #e5dcc9; vertical-align: top; }
+.typing-kit-page th { background: #edf5ef; }
+.typing-copy { background: #edf8f0; border-color: #246b51; }
+.typing-copy strong { display: block; font-size: 1.15rem; }
+.typing-note { font-size: .9rem; line-height: 1.6; }
+.typing-settings { background: #fff8e1; }
+.typing-kit-page a:focus-visible, .typing-kit-page button:focus-visible, .typing-kit-page input:focus-visible {
+    outline: 3px solid #173858; outline-offset: 3px;
+}
+.typing-kit-page .is-error { color: #9b2923; }
+@media (max-width: 600px) {
+    .typing-periods { grid-template-columns: 1fr; }
+    .typing-week, .typing-daily { padding: 14px; }
+    .kit-worksheet-topbar-links { flex-wrap: wrap; }
+}

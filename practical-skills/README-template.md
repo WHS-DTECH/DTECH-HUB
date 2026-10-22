@@ -7,11 +7,90 @@ This folder is the reusable Practical Skills module for HUB sites.
 - `index.html` - Practical Skills homepage (student-facing card library)
 - `app.js` - Homepage rendering logic and API calls
 - `checklist.html` - Standalone Practical Skills Checklist page
-- `checklist.js` - Kit progression and scoreboard logic (local storage)
+- `checklist.js` - Kit progression and scoreboard loaded from server-saved progress
 - `checklist.css` - Checklist page styling
 - `library.json` - Source-of-truth library card data persisted by admin save
 - `admin.html` - Admin management UI for Practical Skills cards
 - `admin.js` - Admin add/edit/delete/publish logic
+- `typing-kit.html`, `typing-kit.js`, `typing-kit.css` - Typing Kit dashboard and daily period records
+- `typing-kit-store.js` - Typing result validation, calendar and append-only attempt storage
+
+## Typing Kit
+
+Open **Typing Kit** from My Licence or the Licence Library. Its seven calendar
+weeks initially start on Monday **26 October 2026** and finish on Sunday
+**13 December 2026**. Each week has Period 1 and Period 2, linking to fourteen
+daily records. Every submitted attempt is retained; the dashboard shows the
+latest WPM/accuracy and attempt count for each period. All scores and times
+remain available on the underlying daily page.
+
+Students use their existing Hub school Google identity. They launch a public
+one-minute TypingTest.com test in a new tab, complete it, paste the results page
+URL, save, then copy the saved result into their exercise book for a handwritten
+teacher signature. Returning to the kit prompts for the link, but does not claim
+to detect completion. No scraping, TypingTest.com login, electronic teacher
+approval, certificate, points or 24-hour completion timer is involved.
+
+The server accepts completed 60-second HTTPS TypingTest.com results links,
+validates score fields, and extracts net/gross WPM, accuracy and duration.
+These are **student-submitted**, not verified scores. Timestamps record submission,
+not the time of the test, and are displayed in New Zealand time. A submission ID
+prevents network retries from creating duplicate attempts. Explicitly submitting
+the same results link again is a new attempt, not proof of a separate test.
+
+Teaching staff can expand **Teacher calendar settings** on the dashboard to change
+the Monday starting Week 1. This is one shared calendar for all Typing Kit users,
+not a per-class schedule. Previous results remain attached to their original
+calendar week and period; those outside the new calendar are accessible through
+**Earlier / other dated records**. Periods are chosen by the student; their actual
+lesson day is not preset. Changing the calendar never renumbers stored results.
+
+Storage requires PostgreSQL (`DATABASE_URL`). The module creates
+`typing_kit_settings` and `typing_kit_attempts` on first use. Without database
+storage it explicitly refuses to save, rather than using temporary in-memory
+results. Student reads/writes are scoped to the authenticated school account;
+calendar edits use the existing teaching-staff permission check.
+
+The Typing Kit card is supplied for both seeded and already-published libraries
+without changing the original three kits' scoring, stamps or certificates.
+The ID `kit-typing` is reserved for this specialised log; creating an ordinary
+kit with that name uses a different ID. Its calendar is managed on its own page,
+not through the generic activity builder.
+
+- `GET /api/practical-skills/typing-kit` - Own saved attempts, current calendar and calendar-edit permission
+- `POST /api/practical-skills/typing-kit/attempts` - Append an attempt for a current calendar week and period
+- `PUT /api/practical-skills/typing-kit/settings` - Teaching-staff-only shared start-date update
+
+Validate with `node --test scripts/regression-typing-kit.js` and
+`node scripts/regression-licence-dashboard.js`.
+
+## Teacher certificate email catch-up
+
+On the admin **Email Log**, use **Check missing teacher copies** to cross-match
+completed Login/Search Kits against successful email logs. Matching requires
+the student, kit subject (including previous Login/Search names) and current
+DTECH Lead Teacher recipient. A student-only email or the
+`certificate_emailed_at` flag alone does not prove that a teacher received it.
+
+**Send missing teacher copies** sends an individual PDF certificate to each
+missing teacher recipient only. It never re-emails students or alters their kit
+completion. A durable per-student/kit/teacher reservation prevents repeats;
+uncertain or interrupted deliveries require manual review rather than automatic
+retry. The sender shares a database lock with ordinary certificate email sends
+to avoid racing with a student's automatic email. Later student certificate
+emails omit teachers already handled by catch-up.
+
+PostgreSQL and configured SMTP are required. The catch-up creates
+`kit_teacher_certificate_deliveries`, recording reservation and sent timestamps.
+Existing untracked mail outside the Hub cannot be inferred from the database.
+The preview reports completed records whose certificate is no longer available
+under current activity requirements, rather than assuming they can be emailed.
+
+- `GET /api/admin/practical-skills/certificate-catchup` - Admin-only preview
+- `POST /api/admin/practical-skills/certificate-catchup` - Admin-only send for one previewed student/kit
+
+Validate with `node --test scripts/regression-certificate-catchup.js` and
+`node scripts/regression-kit-certificate.js`.
 
 ## API Endpoints Used
 

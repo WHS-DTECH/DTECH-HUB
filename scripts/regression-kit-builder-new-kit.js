@@ -42,6 +42,8 @@ async function main() {
     assert.equal(registry.PRACTICAL_SKILLS_KIT_DEFINITIONS.length, 3, "Points and every-kit badges still use the built-in kits only");
     assert.equal(registry.createCustomPracticalSkillsKitId("Robots"), "kit-robots-2", "New IDs never collide with existing kits");
     assert.equal(registry.createCustomPracticalSkillsKitId("Login"), "kit-login-2", "New kits never overwrite built-in kits");
+    assert.equal(registry.createCustomPracticalSkillsKitId("Typing"), "kit-typing-2", "The specialised typing log keeps its reserved ID");
+    assert.equal(registry.registerCustomPracticalSkillsKit("kit-typing"), null, "Ordinary kits cannot replace the typing log");
     assert.equal(registry.createCustomPracticalSkillsKitId("Café & 3D Printing!"), "kit-cafe-3d-printing");
     assert.equal(registry.createCustomPracticalSkillsKitId("Kit: Drones"), "kit-drones");
     assert.equal(registry.createCustomPracticalSkillsKitId("!!!"), "kit-new");

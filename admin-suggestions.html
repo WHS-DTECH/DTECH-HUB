@@ -50,6 +50,15 @@
                 <a class="button button-secondary" href="admin-menu.html">Back to Admin Menu</a>
             </header>
 
+            <section class="admin-panel" aria-labelledby="certificate-catchup-heading">
+                <h2 id="certificate-catchup-heading">Missing teacher certificate emails</h2>
+                <p>Cross-match completed Login and Search Kits with previous teacher recipients. Send only missing teacher copies; students are not emailed again.</p>
+                <button id="certificate-catchup-preview" class="button button-secondary" type="button">Check missing teacher copies</button>
+                <button id="certificate-catchup-send" class="button button-primary" type="button" hidden>Send missing teacher copies</button>
+                <p id="certificate-catchup-status" class="upload-status" role="status" aria-live="polite"></p>
+                <div id="certificate-catchup-results" class="admin-table-wrap"></div>
+            </section>
+
             <section class="admin-panel">
                 <div class="admin-table-wrap">
                     <table class="admin-table" id="suggestions-table">

@@ -223,6 +223,16 @@
             list.appendChild(item);
         });
 
+        const typingKit = document.createElement("article");
+        typingKit.className = "ps-kit-item kit-green";
+        typingKit.innerHTML = `
+            <div class="ps-kit-heading"><span class="ps-kit-icon" aria-hidden="true">&#9000;</span><div><p class="kit-step-label">Your ongoing practice log</p><h3>Typing Kit</h3></div></div>
+            <p>Seven weeks, two periods each week. Save every typing attempt, then copy your result into your exercise book.</p>
+            <div class="ps-kit-meta"><span class="ps-kit-pill">7-week log</span><span class="ps-kit-pill">14 period records</span></div>
+            <div class="ps-kit-actions"><a class="button button-primary" href="./typing-kit.html">Open Typing Kit &rarr;</a></div>
+        `;
+        list.appendChild(typingKit);
+
         renderBadges(snapshot.badges);
 
         list.querySelectorAll("[data-action]").forEach((button) => {

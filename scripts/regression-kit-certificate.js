@@ -26,6 +26,7 @@ async function main() {
     const sent = [];
     const queries = [];
     const context = vm.createContext({
+        withKitCertificateEmailLock: async (_pool, _hasDatabase, _email, _kitId, callback) => callback(),
         ...certificateTools, ...assessment, ...loginSites,
         app: Object.fromEntries(["get", "post", "put"].map((method) => [method, (url, handler) => { handlers[`${method} ${url}`] = handler; }])),
         requireAdminAccess: () => {},

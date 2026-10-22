@@ -45,8 +45,10 @@ async function main() {
     assert.match(nodes.get("ps-next-link").href, /kit-google-search/);
     assert.match(nodes.get("ps-badge-list").innerHTML, /First Kit/);
     assert.equal(requests[0].options.headers.Authorization, "Bearer test-token");
-    assert.equal(nodes.get("ps-kit-list").children.length, 3, "All kits remain accessible");
+    assert.equal(nodes.get("ps-kit-list").children.length, 4, "Original kits and the ongoing Typing Kit remain accessible");
     assert.match(nodes.get("ps-kit-list").children[0].innerHTML, /Manage progress/);
+    assert.match(nodes.get("ps-kit-list").children[3].innerHTML, /typing-kit\.html/);
+    assert.doesNotMatch(nodes.get("ps-kit-list").children[3].innerHTML, /data-action|certificate/, "Typing history has no completion, reset or certificate actions");
 
     snapshot = { ...snapshot, completedCount: 3, kits: ["kit-login", "kit-google-search", "kit-minecraft"].map((id) => ({ id, isComplete: true })) };
     events["hub-auth-state-changed"]();

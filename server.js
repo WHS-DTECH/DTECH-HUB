@@ -16,6 +16,8 @@ const { outcomeRepositories, createOutcomeArchiveStore, createGithubZipSizeReade
 const { createDriveResumableUploader } = require("./drive-resumable-upload");
 const { submissionSummary, inspectSubmissionPackage, createSubmissionZipResponse } = require("./submission-package");
 const { trelloReportSources, resolveReportBoards, createTrelloReportPdf, createTrelloReportStore } = require("./trello-report");
+const { registerTypingKit, withTypingKitCard } = require("./practical-skills/typing-kit-store");
+const { withKitCertificateEmailLock } = require("./practical-skills/certificate-catchup");
 
 const SEARCH_PENGUIN_MISSIONS_ID = "search-penguin-missions-v1";
 const SEARCH_KEYWORD_CHALLENGE_ID = "search-keyword-challenge-v1";
@@ -252,7 +254,7 @@ function getPracticalSkillsKitDefinition(kitId) {
 
 function registerCustomPracticalSkillsKit(kitId) {
   const safeKitId = String(kitId || "").trim();
-  if (!/^kit-[a-z0-9-]{1,60}$/.test(safeKitId) || PRACTICAL_SKILLS_KIT_DEFINITIONS.some((kit) => kit.id === safeKitId)) return null;
+  if (safeKitId === "kit-typing" || !/^kit-[a-z0-9-]{1,60}$/.test(safeKitId) || PRACTICAL_SKILLS_KIT_DEFINITIONS.some((kit) => kit.id === safeKitId)) return null;
   const definition = { id: safeKitId, points: 100, timeframeHours: 24, custom: true };
   customPracticalSkillsKits.set(safeKitId, definition);
   return definition;
@@ -282,7 +284,7 @@ function createCustomPracticalSkillsKitId(name) {
   const base = `kit-${slugifyPracticalSkillsKitName(name).replace(/^kit-/, "")}`;
   for (let suffix = 1; suffix < 1000; suffix += 1) {
     const candidate = suffix === 1 ? base : `${base}-${suffix}`;
-    if (!getPracticalSkillsKitDefinition(candidate)) return candidate;
+    if (candidate !== "kit-typing" && !getPracticalSkillsKitDefinition(candidate)) return candidate;
   }
   return `${base}-${Date.now()}`;
 }
@@ -6262,6 +6264,15 @@ require("./learning-pathways/progression-store").registerProgressionPathway(app,
 require("./learning-pathways/comment-bank-store").registerCommentBank(app, {
   pool, hasDatabase, requireTeacherAccess: requireActivityWriteAccess, requireAdminAccess
 });
+registerTypingKit(app, {
+  pool, hasDatabase, getRequestUserEmail, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN, canManagePracticalSchedule
+});
+require("./practical-skills/certificate-catchup").registerCertificateCatchup(app, {
+  pool, hasDatabase, requireAdminAccess, ensurePracticalSkillsProgressSchema, ensureEmailLogsSchema,
+  getPracticalSkillsCertificateTeacherRecipients, getStoredPracticalSkillsKitContent, buildKitCertificate,
+  getPracticalSkillsStudentName, createKitCertificatePdf, sendConfiguredHubEmail,
+  emailConfigured: () => Boolean(smtpTransporter && SMTP_FROM)
+});
 app.use(express.static(__dirname));
 
 function normalizeEvidenceStepsPayload(value) {
@@ -6568,9 +6579,9 @@ async function readPracticalSkillsLibrarySeedFile() {
 
   const parsed = JSON.parse(raw);
   if (!Array.isArray(parsed)) throw new Error("Practical Skills library must contain a JSON array.");
-  return parsed
+  return withTypingKitCard(parsed
     .map((item, index) => normalizePracticalSkillLibraryItem(item, index))
-    .filter(Boolean);
+    .filter(Boolean));
 }
 
 async function ensurePracticalSkillsLibrarySchema() {
@@ -6592,9 +6603,9 @@ async function readPracticalSkillsLibraryFile() {
   const result = await pool.query(`SELECT cards FROM practical_skills_library_store WHERE id = 'default' LIMIT 1`);
   const stored = result.rows?.[0]?.cards;
   if (Array.isArray(stored)) {
-    return stored
+    return withTypingKitCard(stored
       .map((item, index) => normalizePracticalSkillLibraryItem(item, index))
-      .filter(Boolean);
+      .filter(Boolean));
   }
 
   const cards = await readPracticalSkillsLibrarySeedFile();
@@ -15337,10 +15348,16 @@ app.get("/api/practical-skills/progress/:kitId", async (req, res) => {
 const certificateEmailCooldowns = new Map();
 
 async function sendKitCertificateEmail(studentEmail, kitId, certificate) {
+  return withKitCertificateEmailLock(pool, hasDatabase, studentEmail, kitId, async () => {
   const buffer = await createKitCertificatePdf(certificate);
   const safe = (value) => String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
-  const teacherRecipients = (await getPracticalSkillsCertificateTeacherRecipients())
+  let teacherRecipients = (await getPracticalSkillsCertificateTeacherRecipients())
     .filter((email) => email !== normalizeEmail(studentEmail));
+  if (hasDatabase && (await pool.query("SELECT to_regclass('kit_teacher_certificate_deliveries') AS delivery_table")).rows[0]?.delivery_table) {
+    const deliveries = await pool.query(`SELECT teacher_email FROM kit_teacher_certificate_deliveries WHERE student_email = $1 AND kit_id = $2`, [normalizeEmail(studentEmail), kitId]);
+    const handled = new Set(deliveries.rows.map((row) => normalizeEmail(row.teacher_email)));
+    teacherRecipients = teacherRecipients.filter((email) => !handled.has(normalizeEmail(email)));
+  }
   await sendConfiguredHubEmail({
     to: studentEmail,
     cc: teacherRecipients,
@@ -15348,6 +15365,7 @@ async function sendKitCertificateEmail(studentEmail, kitId, certificate) {
     html: `<div style="font-family:Arial,sans-serif;color:#173858;"><h2>Certificate of Completion</h2><p>Kia ora ${safe(certificate.studentName)},</p><p>Ka pai! You completed all ${certificate.activityCount} activities in <strong>${safe(certificate.kitTitle)}</strong> on ${safe(certificate.completedDate)}.</p><p>Your landscape PDF certificate is attached. You can save, print or forward it to share your achievement.</p><p>${safe(certificate.issuer)}</p></div>`,
     attachment: { buffer, originalname: `${kitId}-certificate.pdf`, mimetype: "application/pdf" },
     emailType: "kit_certificate"
+  });
   });
 }
 
