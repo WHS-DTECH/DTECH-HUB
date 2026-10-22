@@ -1,6 +1,30 @@
 "use strict";
 
-const { randomUUID } = require("node:crypto");
+const { randomUUID, createHash } = require("node:crypto");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const { Readable, Transform } = require("node:stream");
+const { pipeline } = require("node:stream/promises");
+
+let temporaryFilesChecked = false;
+
+function removeAbandonedOutcomeFiles() {
+  if (temporaryFilesChecked) return;
+  temporaryFilesChecked = true;
+  for (const entry of fs.readdirSync(os.tmpdir(), { withFileTypes: true })) {
+    if (!entry.isDirectory() || !entry.name.startsWith("dtech-hub-outcomes-")) continue;
+    const directory = path.join(os.tmpdir(), entry.name);
+    const owner = entry.name.match(/^dtech-hub-outcomes-(\d+)-/);
+    try {
+      if (owner) {
+        if (Number(owner[1]) === process.pid) continue;
+        try { process.kill(Number(owner[1]), 0); continue; } catch (error) { if (error.code !== "ESRCH") continue; }
+      } else if (fs.statSync(directory).mtimeMs > Date.now() - 86400000) continue;
+      fs.rmSync(directory, { recursive: true, force: true });
+    } catch (_error) {}
+  }
+}
 
 function outcomeError(message, status = 400) {
   return Object.assign(new Error(message), { status });
@@ -32,14 +56,34 @@ function outcomeRepositories(evidence) {
 }
 
 function createOutcomeArchiveStore({ githubApiRequest, fetchArchive = fetch, now = Date.now,
-  maxBytes = 25 * 1024 * 1024, maxCacheBytes = 50 * 1024 * 1024, ttlMs = 15 * 60 * 1000 } = {}) {
+  maxBytes = 512 * 1024 * 1024, maxCacheBytes = 1024 * 1024 * 1024, ttlMs = 60 * 60 * 1000 } = {}) {
   const archives = new Map();
-  const prune = () => {
-    for (const [id, entry] of archives) if (entry.expiresAt <= now()) archives.delete(id);
+  removeAbandonedOutcomeFiles();
+  let directory = "";
+  let preparing = false;
+  let closed = false;
+  const remove = (id, archive) => {
+    if (archive.users) return;
+    fs.rmSync(archive.filePath, { force: true });
+    archives.delete(id);
   };
+  const prune = () => {
+    for (const [id, entry] of archives) if (closed || entry.expiresAt <= now()) remove(id, entry);
+    if (!archives.size && !preparing && directory) {
+      fs.rmSync(directory, { recursive: true, force: true });
+      directory = "";
+    }
+  };
+  const timer = setInterval(() => { try { prune(); } catch (_error) {} }, 60000);
+  timer.unref();
   return {
     async prepare({ email, activityId, repositoryUrl }) {
+      if (closed || preparing) throw outcomeError("The ZIP service is busy. Please retry shortly.", 503);
       prune();
+      preparing = true;
+      let partialPath = "";
+      let filePath = "";
+      try {
       const repository = parseOutcomeRepository(repositoryUrl);
       if (!repository) throw outcomeError("Select a saved GitHub repository.");
       const base = `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.repo)}`;
@@ -67,52 +111,81 @@ function createOutcomeArchiveStore({ githubApiRequest, fetchArchive = fetch, now
         }
       }
       const response = await fetchArchive(`https://codeload.github.com/${repository.owner}/${repository.repo}/zip/${sha}`, {
-        headers: { "User-Agent": "DTECH-HUB" }, redirect: "error", signal: AbortSignal.timeout(90000)
+        headers: { "User-Agent": "DTECH-HUB" }, redirect: "error", signal: AbortSignal.timeout(300000)
       });
       if (!response.ok || !response.body) throw outcomeError("GitHub could not supply the ZIP. Try again later.", 502);
-      if (Number(response.headers.get("content-length")) > maxBytes) {
+      const expectedBytes = Number(response.headers.get("content-length")) || 0;
+      if (expectedBytes > maxBytes) {
         await response.body.cancel();
-        throw outcomeError("This ZIP exceeds the 25 MB automatic packaging limit.", 413);
+        throw outcomeError("This repository is too large for automatic packaging. Ask your teacher for help.", 413);
       }
-      const reader = response.body.getReader();
-      const chunks = [];
+      let cacheBytes = Array.from(archives.values()).reduce((total, archive) => total + archive.bytes, 0);
+      const reservation = Math.min(expectedBytes || maxBytes, maxBytes);
+      for (const [id, archive] of archives) {
+        if (cacheBytes + reservation <= maxCacheBytes) break;
+        if (archive.users) continue;
+        cacheBytes -= archive.bytes;
+        remove(id, archive);
+      }
+      if (cacheBytes + reservation > maxCacheBytes) {
+        await response.body.cancel();
+        throw outcomeError("Temporary ZIP storage is busy. Please retry after other downloads finish.", 503);
+      }
+      if (!directory) directory = fs.mkdtempSync(path.join(os.tmpdir(), `dtech-hub-outcomes-${process.pid}-`));
+      const snapshotId = randomUUID();
+      filePath = path.join(directory, `${snapshotId}.zip`);
+      partialPath = `${filePath}.part`;
       let size = 0;
-      try {
-        while (true) {
-          const chunk = await reader.read();
-          if (chunk.done) break;
-          size += chunk.value.byteLength;
-          if (size > maxBytes) throw outcomeError("This ZIP exceeds the 25 MB automatic packaging limit.", 413);
-          chunks.push(Buffer.from(chunk.value));
-        }
-      } finally {
-        await reader.cancel().catch(() => {});
-      }
-      const buffer = Buffer.concat(chunks);
-      if (buffer.length < 4 || buffer.readUInt32LE(0) !== 0x04034b50) throw outcomeError("GitHub returned an invalid ZIP archive.", 502);
-      prune();
-      let cacheBytes = Array.from(archives.values()).reduce((total, archive) => total + archive.buffer.length, 0);
-      while (archives.size && cacheBytes + size > maxCacheBytes) {
-        const oldest = archives.keys().next().value;
-        cacheBytes -= archives.get(oldest).buffer.length;
-        archives.delete(oldest);
-      }
+      let signature = Buffer.alloc(0);
+      const checksum = createHash("md5");
+      const counter = new Transform({ transform(chunk, _encoding, callback) {
+        size += chunk.length;
+        if (size > maxBytes) { callback(outcomeError("This repository is too large for automatic packaging. Ask your teacher for help.", 413)); return; }
+        if (cacheBytes + size > maxCacheBytes) { callback(outcomeError("Temporary ZIP storage is busy. Please retry shortly.", 503)); return; }
+        if (signature.length < 4) signature = Buffer.concat([signature, chunk.subarray(0, 4 - signature.length)]);
+        checksum.update(chunk);
+        callback(null, chunk);
+      } });
+      await pipeline(Readable.fromWeb(response.body), counter, fs.createWriteStream(partialPath, { flags: "wx", mode: 0o600 }));
+      if (signature.length < 4 || signature.readUInt32LE(0) !== 0x04034b50) throw outcomeError("GitHub returned an invalid ZIP archive.", 502);
+      if (expectedBytes && expectedBytes !== size) throw outcomeError("GitHub's ZIP transfer was incomplete. Try again.", 502);
+      await fs.promises.rename(partialPath, filePath);
       const snapshot = {
-        snapshotId: randomUUID(), repositoryUrl: repository.url, branch, commitSha: sha,
+        snapshotId, repositoryUrl: repository.url, branch, commitSha: sha,
         commitDate: String(commit.commit?.committer?.date || ""),
         fileName: `Final-Outcome-${activityId}-${repository.owner}-${repository.repo}-${sha}.zip`,
         bytes: size, preparedAt: new Date(now()).toISOString(), expiresAt: now() + ttlMs
       };
-      archives.set(snapshot.snapshotId, { ...snapshot, email, activityId, buffer });
+      archives.set(snapshot.snapshotId, { ...snapshot, email, activityId, filePath, md5Checksum: checksum.digest("hex"), users: 0 });
       return snapshot;
+      } catch (error) {
+        if (partialPath) fs.rmSync(partialPath, { force: true });
+        if (filePath) fs.rmSync(filePath, { force: true });
+        if (error.code === "ENOSPC") throw outcomeError("Temporary storage is full. Please retry later.", 503);
+        throw error;
+      } finally {
+        preparing = false;
+        prune();
+      }
     },
     read(snapshotId, email, activityId) {
       prune();
       const archive = archives.get(String(snapshotId || ""));
-      if (!archive || archive.email !== email || archive.activityId !== activityId) {
+      if (!archive || archive.expiresAt <= now() || archive.email !== email || archive.activityId !== activityId || !fs.existsSync(archive.filePath)) {
         throw outcomeError("This ZIP preview has expired. Download the latest ZIP again before saving it.", 410);
       }
       return archive;
+    },
+    acquire(snapshotId, email, activityId) {
+      const archive = this.read(snapshotId, email, activityId);
+      archive.users += 1;
+      let released = false;
+      return { archive, release() { if (!released) { released = true; archive.users -= 1; prune(); } } };
+    },
+    close() {
+      closed = true;
+      clearInterval(timer);
+      prune();
     }
   };
 }
@@ -160,7 +233,7 @@ function createGithubZipSizeReader({ githubApiRequest, fetchArchive = fetch, now
         if (signature.length < 4 || signature.readUInt32LE(0) !== 0x04034b50) throw outcomeError("GitHub returned an invalid ZIP archive.", 502);
         const value = {
           repositoryUrl: repository.url, branch, commitSha, bytes, exact,
-          limitBytes: 25 * 1024 * 1024, exceedsLimit: bytes > 25 * 1024 * 1024 || (!exact && bytes >= 25 * 1024 * 1024),
+          limitBytes: 512 * 1024 * 1024, exceedsLimit: exact ? bytes > 512 * 1024 * 1024 : bytes >= 512 * 1024 * 1024 ? true : null,
           measuredAt: new Date(now()).toISOString()
         };
         while (measured.size >= maxEntries) measured.delete(measured.keys().next().value);

@@ -13,6 +13,7 @@ const { gradeLoginSites } = require("./practical-skills-assessment");
 const { validateLoginSites, publicLoginSites, visibleLoginSites } = require("./login-sites-config");
 const { DOCUMENTATION_TEMPLATE_ID, documentationPresentationId, buildDocumentationMergePlan } = require("./documentation-deck");
 const { outcomeRepositories, createOutcomeArchiveStore, createGithubZipSizeReader } = require("./github-outcome");
+const { createDriveResumableUploader } = require("./drive-resumable-upload");
 const { trelloReportSources, resolveReportBoards, createTrelloReportPdf, createTrelloReportStore } = require("./trello-report");
 
 const SEARCH_PENGUIN_MISSIONS_ID = "search-penguin-missions-v1";
@@ -17858,6 +17859,7 @@ app.post("/api/activities/:id/trello-report", async (req, res) => {
 });
 
 const outcomeArchiveStore = createOutcomeArchiveStore({ githubApiRequest });
+const outcomeDriveUploader = createDriveResumableUploader();
 const githubZipSizeReader = createGithubZipSizeReader({ githubApiRequest });
 
 async function withFinalOutcomeLock(key, task) {
@@ -18014,27 +18016,34 @@ app.post("/api/activities/:id/final-outcome", async (req, res) => {
       throw Object.assign(new Error("This repository is no longer linked to this assessment."), { status: 409 });
     }
     if (action === "download") {
-      res.set("Content-Disposition", `attachment; filename="${archive.fileName}"`);
-      res.type("application/zip").send(archive.buffer);
+      const lease = outcomeArchiveStore.acquire(archive.snapshotId, email, activityId);
+      try {
+        await new Promise((resolve, reject) => res.download(archive.filePath, archive.fileName, (error) => error ? reject(error) : resolve()));
+      } finally {
+        lease.release();
+      }
       return;
     }
     const token = String(req.body?.driveAccessToken || "").trim();
     if (!token) throw Object.assign(new Error("Google Drive permission is required."), { status: 400 });
     await verifyDriveTokenForStudent(token, email);
+    const lease = outcomeArchiveStore.acquire(archive.snapshotId, email, activityId);
     const result = await withFinalOutcomeLock(`${email}:${activityId}:final-outcome-save`, async () => {
       const folderId = await resolveOwnedFinalPreparationFolder(email, token);
-      let file = await driveFindFileByNameInFolder(folderId, archive.fileName, token);
+      const uploadOptions = { accessToken: token, folderId, fileName: archive.fileName, mimeType: "application/zip",
+        filePath: archive.filePath, bytes: archive.bytes, md5Checksum: archive.md5Checksum };
+      let file = outcomeDriveUploader.hasSession(uploadOptions) ? null : await driveFindFileByNameInFolder(folderId, archive.fileName, token);
       const reused = Boolean(file);
       if (file) {
         const metadata = await driveApiRequest(`/files/${encodeURIComponent(file.id)}`, {
           accessToken: token, queryParams: { fields: "id,mimeType,size,md5Checksum,trashed" }
         });
-        if (metadata.trashed || metadata.mimeType !== "application/zip" || Number(metadata.size) !== archive.buffer.length
-          || metadata.md5Checksum !== createHash("md5").update(archive.buffer).digest("hex")) {
+        if (metadata.trashed || metadata.mimeType !== "application/zip" || Number(metadata.size) !== archive.bytes
+          || metadata.md5Checksum !== archive.md5Checksum) {
           throw Object.assign(new Error("A different file already uses this ZIP filename. Rename that Drive file before retrying; it has not been changed."), { status: 409 });
         }
       }
-      if (!file) file = await driveUploadBinaryFile({ accessToken: token, folderId, fileName: archive.fileName, mimeType: "application/zip", buffer: archive.buffer });
+      if (!file) file = await outcomeDriveUploader.upload(uploadOptions);
       const entry = {
         templateId: "final-digital-outcome-zip", templateTitle: "Final Digital Outcome ZIP",
         fileUrl: `https://drive.google.com/file/d/${encodeURIComponent(file.id)}/view`, fileName: archive.fileName,
@@ -18046,9 +18055,10 @@ app.post("/api/activities/:id/final-outcome", async (req, res) => {
       };
       await recordTemplateCopyInDb(activityId, email, entry);
       return { saved: entry, reused };
-    });
+    }).finally(() => lease.release());
     res.json(result);
   } catch (error) {
+    if (res.headersSent) { res.destroy(); return; }
     res.status(error.status || 500).json({ error: error.message || "Could not package your final outcome." });
   }
 });

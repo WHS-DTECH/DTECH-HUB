@@ -116,27 +116,49 @@ the Slides Apps Script deployment. No extra ZIP library or Apps Script is needed
 
 Download latest ZIP requests Google Drive permission first, pins a commit,
 validates its tree, and obtains GitHub's archive for that exact commit. The same
-action starts the browser download and automatically uploads those cached bytes
+action starts the browser download and automatically uploads those prepared bytes
 to the student's owned `SeniorDTECH/Process Assessment` folder, after checking
 its name, ownership and parent. A failed upload is reported separately from the
 download, with Retry Google Drive save available for the same prepared ZIP.
 No permissions are changed by these new endpoints.
 The ZIP includes repository content, not a generated production build or external
-assets. Submodules, Git LFS rules, export exclusions, truncated trees, and archives
-over 25 MB are rejected to avoid incomplete outcomes. These need manual packaging.
+assets. Submodules, Git LFS rules, export exclusions, and truncated trees are
+rejected to avoid incomplete outcomes. These need manual packaging.
 
-Prepared ZIPs expire after 15 minutes, on server restart, or on bounded-cache
-eviction. Download a fresh ZIP before saving if it expires. Cache limits are
-50 MB per server process, with archive builds serialised per process; multi-instance
-hosting may require shared snapshot storage or session affinity. Tokens are not
-stored. The latest saved file link and full commit metadata persist in the
+Prepared ZIPs are streamed to private temporary files, not whole-archive buffers.
+The per-ZIP safety cap is 512 MiB and the per-process temporary-file budget is
+1 GiB; Otto's measured 169.14 MiB archive fits within these bounds. Preparation
+has a five-minute archive-transfer timeout. Builds are serialised per process.
+Active download/upload leases protect files from eviction and expiry cleanup.
+Idle files expire after one hour and are also evicted to make room. Periodic
+cleanup removes expired files; partial files are deleted after failed preparation,
+and startup cleanup removes app-owned files left by dead processes. Disk-full
+errors are reported without recording a successful package.
+
+ZIP downloads stream directly from disk through Express. The browser still
+obtains a Blob for its local download, so client disk/memory capacity also matters.
+Google Drive uploads use resumable sessions and 8 MiB chunks, never multipart
+bodies containing the entire archive. A retry probes the server-acknowledged offset
+before continuing the same file, including when the response to an accepted chunk
+was lost. Completion requires a matching size and MD5 checksum. Session URLs are
+kept in bounded process memory, not sent to the browser or logged; OAuth tokens
+are supplied per request and are not stored in the session. A server restart loses
+prepared snapshots/sessions: download a fresh ZIP; completed Drive files are
+recognised by name and checksum rather than overwritten. Partial Google upload
+sessions eventually expire on Google's side.
+
+Multi-instance hosting requires shared temporary storage/session state or session
+affinity. Monitor available ephemeral disk space, concurrent lease use, upload
+duration and host/proxy request timeouts for the deployment. The latest saved
+file link and full commit metadata persist in the
 assessment's template-copy record. Earlier ZIP files remain in Drive; deterministic
 repository/assessment/full-commit filenames make repeat saves reuse the same
 version instead of replacing or duplicating it. Students should keep a repository
 and its assets reasonably sized and check their final downloaded outcome.
 
 Run `node scripts/regression-final-outcome-zip.js` for mocked archive, access,
-destination ownership, expiration, missing-content, and duplicate-save checks.
+destination ownership, expiration, missing-content, duplicate-save, disk-backed
+170 MiB preparation, cleanup, resumable-offset, lost-response, and retry checks.
 Before rollout, test a student download and Drive save against a public repository,
 then push a new commit and check both Drive versions remain available. Verify
 that download contents include the intended source files and assets. Download
@@ -149,8 +171,8 @@ repository selected in Stage 2. A size check runs when its saved repository is
 loaded, when the selection changes, and after Sync from GitHub. It does not alter
 checkboxes, assessment completion, repository files, or Drive files. Multiple
 saved repositories need an explicit Stage 2 selection. The hover title identifies
-the repository, branch, commit and measurement time. Sizes use MiB (1,048,576 bytes),
-so the automatic packaging threshold is 25 MiB.
+the repository, branch, commit and measurement time. Sizes use MiB (1,048,576 bytes).
+The student tile displays size only, without packaging-limit warnings.
 
 Size checks stream GitHub's commit-pinned archive without retaining its bytes.
 Measurements are cached per repository/commit for five minutes, with at most 128
