@@ -77,13 +77,19 @@ function createOutcomeArchiveStore({ githubApiRequest, fetchArchive = fetch, now
   const timer = setInterval(() => { try { prune(); } catch (_error) {} }, 60000);
   timer.unref();
   return {
-    async prepare({ email, activityId, repositoryUrl }) {
+    async prepare({ email, activityId, repositoryUrl, streamSource = null }) {
       if (closed || preparing) throw outcomeError("The ZIP service is busy. Please retry shortly.", 503);
       prune();
       preparing = true;
       let partialPath = "";
       let filePath = "";
       try {
+      let details;
+      let response;
+      if (streamSource) {
+        details = streamSource.metadata;
+        response = await streamSource.open();
+      } else {
       const repository = parseOutcomeRepository(repositoryUrl);
       if (!repository) throw outcomeError("Select a saved GitHub repository.");
       const base = `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.repo)}`;
@@ -110,9 +116,13 @@ function createOutcomeArchiveStore({ githubApiRequest, fetchArchive = fetch, now
           throw outcomeError("This repository uses Git LFS or export exclusions. Package the complete outcome manually to avoid missing files.");
         }
       }
-      const response = await fetchArchive(`https://codeload.github.com/${repository.owner}/${repository.repo}/zip/${sha}`, {
+      response = await fetchArchive(`https://codeload.github.com/${repository.owner}/${repository.repo}/zip/${sha}`, {
         headers: { "User-Agent": "DTECH-HUB" }, redirect: "error", signal: AbortSignal.timeout(300000)
       });
+      details = { repositoryUrl: repository.url, branch, commitSha: sha,
+        commitDate: String(commit.commit?.committer?.date || ""),
+        fileName: `Final-Outcome-${activityId}-${repository.owner}-${repository.repo}-${sha}.zip` };
+      }
       if (!response.ok || !response.body) throw outcomeError("GitHub could not supply the ZIP. Try again later.", 502);
       const expectedBytes = Number(response.headers.get("content-length")) || 0;
       if (expectedBytes > maxBytes) {
@@ -151,9 +161,7 @@ function createOutcomeArchiveStore({ githubApiRequest, fetchArchive = fetch, now
       if (expectedBytes && expectedBytes !== size) throw outcomeError("GitHub's ZIP transfer was incomplete. Try again.", 502);
       await fs.promises.rename(partialPath, filePath);
       const snapshot = {
-        snapshotId, repositoryUrl: repository.url, branch, commitSha: sha,
-        commitDate: String(commit.commit?.committer?.date || ""),
-        fileName: `Final-Outcome-${activityId}-${repository.owner}-${repository.repo}-${sha}.zip`,
+        ...details, snapshotId,
         bytes: size, preparedAt: new Date(now()).toISOString(), expiresAt: now() + ttlMs
       };
       archives.set(snapshot.snapshotId, { ...snapshot, email, activityId, filePath, md5Checksum: checksum.digest("hex"), users: 0 });
@@ -167,6 +175,14 @@ function createOutcomeArchiveStore({ githubApiRequest, fetchArchive = fetch, now
         preparing = false;
         prune();
       }
+    },
+    prepareStream({ email, activityId, metadata, open }) {
+      return this.prepare({ email, activityId, streamSource: { metadata, open } });
+    },
+    discard(snapshotId, email, activityId) {
+      const archive = this.read(snapshotId, email, activityId);
+      archive.expiresAt = 0;
+      prune();
     },
     read(snapshotId, email, activityId) {
       prune();

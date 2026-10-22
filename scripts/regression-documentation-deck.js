@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
-const { randomUUID } = require("node:crypto");
+const { randomUUID, createHash } = require("node:crypto");
 const { buildDocumentationMergePlan, documentationPresentationId } = require("../documentation-deck");
 const { outcomeRepositories } = require("../github-outcome");
 
@@ -250,7 +250,7 @@ async function testSlideshowPdfEndpoints() {
   let trashed = false;
   const context = vm.createContext({
     SCHOOL_EMAIL_DOMAIN: "westlandhigh.school.nz", DOCUMENTATION_TEMPLATE_ID: "submission-documentation-deck",
-    hasDatabase: true, randomUUID, documentationPresentationId, outcomeRepositories,
+    hasDatabase: true, randomUUID, createHash, documentationPresentationId, outcomeRepositories,
     normalizeEmail: (value) => String(value || "").trim().toLowerCase(), getRequestUserEmail: (req) => req.email,
     getStudentProgrammeFolder: async () => "SeniorDTECH", normalizeEvidenceStepsPayload: (value) => value,
     pool: { query: async () => ({ rows: [allocation] }) },

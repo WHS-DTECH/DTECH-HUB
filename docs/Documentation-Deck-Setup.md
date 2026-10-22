@@ -220,6 +220,61 @@ report, check descriptions and dates against the board, and confirm the Drive
 file and downloaded PDF match. Live Trello/Drive authorisation is not covered
 by mocked endpoint tests.
 
+## Submission Stage
+
+The final Submission Stage card packages exactly these saved assessment artifacts:
+
+1. `01-Client-Presentation.pdf`
+2. `02-Documentation.pdf`
+3. `03-Digital-Outcome.zip`
+4. `04-Trello-Report.pdf`
+
+Check files requests the student's existing Google Drive permission and validates
+the four Drive files (type, owner, folder, size and checksum). It checks that each
+file matches its generated checksum; older records without a checksum must have
+a saved timestamp proving the Drive file has not changed, or need regeneration.
+It also checks that each
+PDF belongs to the currently linked slideshow and matches that source's version
+and modified time. A partial/missing-evidence documentation merge is not ready.
+The GitHub ZIP must belong to a saved assessment repository and match its current
+default-branch commit. The Trello report must belong to a linked board and be no
+older than its last activity. Trello comments or other board activity can therefore
+require regenerating the report, even if card names are unchanged.
+
+Build submission ZIP is enabled only after a successful check. The server repeats
+validation before packaging, after assembly, before upload, and after upload.
+Missing/stale files block the package rather than being skipped. Version changes
+during a long build require another check/build. Files are streamed from Google
+Drive into the ZIP with byte-count, file-signature and MD5 verification. The inner
+GitHub ZIP remains intact; all four entries use ZIP store mode rather than
+recompressing already compressed files. No repository, board, slideshow or source
+artifact is modified by building a package.
+
+The streaming ZIP uses the same bounded temporary-file store and resumable Drive
+uploader as Stage 2, including its 512 MiB archive cap, shared 1 GiB per-process disk
+budget, one-hour expiry, leases, interruption recovery and multi-instance caveats.
+A failed or changed-input build discards its temporary output. Every successful
+build has a dated unique filename in `SeniorDTECH/Process Assessment`, retaining
+earlier packages. Retry Google Drive save continues that same prepared package;
+same-name complete files require matching checksums before reuse. Latest saved
+package metadata persists with the exact four-file manifest and source versions.
+If inputs change during upload, an older snapshot may remain in Drive but is not
+recorded as the current saved package.
+
+The saved link returns after reload; checks must be run again before building.
+Saving new earlier-stage artifacts resets the local checked state. The result is
+**package ready, not assessment submitted**. No school submission workflow, grade,
+or completion tick is automatically changed. Linked Slides must still be updated
+in Google Slides before exporting if their source content changed; the package
+check cannot verify content that was never refreshed into the documentation deck.
+
+Run `node scripts/regression-submission-package.js` for readiness, staleness,
+exact archive entries, unchanged inner ZIP, corrupt-input rejection, authenticated
+endpoint, saved-state, upload retry and 170 MiB streaming-package checks. A live
+school-account check/build/upload is still needed before rollout. The ZIP writer
+is the production `archiver` dependency; `jszip` is used only to inspect small test
+archives, not for production package assembly.
+
 ## Linked Merge Verification
 
 Run `node scripts/regression-documentation-deck.js` and

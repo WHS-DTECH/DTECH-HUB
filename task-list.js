@@ -271,6 +271,8 @@ const taskListState = {
     slideshowPdfBusy: { client: false, documentation: false },
     trelloReport: null,
     trelloReportBusy: false,
+    submissionStage: null,
+    submissionBusy: false,
     decompositionCoverage: null,
     identifiedComponentsCount: null,
     // Planning ticks for criteria with no automatic evidence source. In-memory only, never sent to the server.
@@ -2758,6 +2760,7 @@ async function handleSlideshowPdfExport(kind) {
         if (taskListState.selectedId !== activityId) return;
         taskListState.templateCopies = taskListState.templateCopies.filter((entry) => entry?.templateId !== payload.saved.templateId).concat(payload.saved);
         message = "PDF saved to SeniorDTECH / Process Assessment. The slideshow and earlier PDFs are unchanged.";
+        void loadSubmissionStage(selected);
     } catch (error) {
         message = error?.message || "Could not convert and save your slideshow PDF.";
     } finally {
@@ -2832,6 +2835,7 @@ async function handleDocumentationAction(action) {
         renderDocumentationDeckState(payload.deck, action === "sync"
             ? "Existing documentation linked. Its contents have not been changed."
             : `${Number(payload.addedSlides || 0)} linked slides added. Originals are unchanged.`);
+        void loadSubmissionStage(item);
     } catch (error) {
         if (status && taskListState.selectedId === activityId) status.textContent = error?.message || "Could not prepare documentation.";
     } finally {
@@ -2986,6 +2990,7 @@ async function handleFinalOutcomeAction(action) {
         state.message = `${downloadStarted ? "ZIP download started. " : ""}${payload.reused
             ? "This commit's ZIP is already in SeniorDTECH / Process Assessment. No duplicate was created."
             : "ZIP saved to SeniorDTECH / Process Assessment. Earlier versions are unchanged."}`;
+        void loadSubmissionStage(selected);
     } catch (error) {
         if (downloadStarted) state.retryDriveSave = true;
         state.message = `${downloadStarted ? "ZIP download started, but Google Drive save failed: " : ""}${error?.message || "Could not package your final outcome."}`;
@@ -3100,12 +3105,141 @@ async function handleTrelloReportAction(action) {
         state.saved = payload.saved;
         state.retryDriveSave = false;
         state.message = `${downloadStarted ? "Report download started. " : ""}${payload.reused ? "This report is already saved." : "Report saved to SeniorDTECH / Process Assessment. Earlier reports are unchanged."}`;
+        void loadSubmissionStage(selected);
     } catch (error) {
         if (downloadStarted) state.retryDriveSave = true;
         state.message = `${downloadStarted ? "PDF download started, but Google Drive save failed: " : ""}${error?.message || "Could not create your Trello report."}`;
     } finally {
         taskListState.trelloReportBusy = false;
         renderTrelloReportState();
+    }
+}
+
+function renderSubmissionStage() {
+    const state = taskListState.submissionStage;
+    const list = document.querySelector("#task-list-submission-files");
+    if (!state || !list) return;
+    list.replaceChildren();
+    const labels = { ready: "Ready", unchecked: "Not checked", missing: "Missing", "needs-update": "Needs update" };
+    state.components.forEach((component) => {
+        const row = document.createElement("li");
+        const label = document.createElement("span");
+        label.textContent = component.label;
+        label.title = component.entryName || "";
+        const status = document.createElement("span");
+        status.className = `task-list-submission-file-status${component.status === "ready" ? " is-ready" : component.status === "needs-update" ? " needs-update" : ""}`;
+        status.textContent = labels[component.status] || "Not checked";
+        row.append(label, status);
+        if (component.message && component.message !== "Ready") {
+            const detail = document.createElement("span");
+            detail.className = "task-list-submission-file-status";
+            detail.textContent = component.message;
+            row.append(detail);
+        }
+        list.append(row);
+    });
+    document.querySelector("#task-list-submission-check").disabled = taskListState.submissionBusy;
+    document.querySelector("#task-list-submission-build").disabled = taskListState.submissionBusy || !state.ready;
+    const retry = document.querySelector("#task-list-submission-retry");
+    retry.hidden = !state.retryDriveSave;
+    retry.disabled = taskListState.submissionBusy || !state.snapshot || state.snapshot.expiresAt <= Date.now();
+    const link = document.querySelector("#task-list-submission-open");
+    const url = /^https:\/\/drive\.google\.com\/file\/d\/[A-Za-z0-9_-]+\/view$/.test(String(state.saved?.fileUrl || "")) ? state.saved.fileUrl : "";
+    link.hidden = !url;
+    if (url) link.href = url;
+    const date = new Date(state.saved?.submissionPackage?.builtAt || "");
+    document.querySelector("#task-list-submission-saved").textContent = url && Number.isFinite(date.getTime())
+        ? `Saved package: ${date.toLocaleString("en-NZ", { timeZone: "Pacific/Auckland" })}` : "";
+    document.querySelector("#task-list-submission-status").textContent = state.message || "";
+}
+
+async function loadSubmissionStage(item) {
+    if (!isSeniorDigitalMediaTask(item)) return;
+    const state = { activityId: String(item.id), components: [
+        { key: "client", label: "Client presentation PDF", status: "unchecked" },
+        { key: "documentation", label: "Documentation PDF", status: "unchecked" },
+        { key: "outcome", label: "GitHub outcome ZIP", status: "unchecked" },
+        { key: "trello", label: "Trello report PDF", status: "unchecked" }
+    ], ready: false, manifestHash: "", snapshot: null, saved: null, retryDriveSave: false, message: "Checking saved submission files..." };
+    taskListState.submissionStage = state;
+    renderSubmissionStage();
+    try {
+        const payload = await loadJson(`/api/activities/${encodeURIComponent(state.activityId)}/submission-package`, { headers: buildTaskListHeaders({}), cache: "no-store" });
+        if (taskListState.submissionStage !== state || taskListState.selectedId !== state.activityId) return;
+        if (Array.isArray(payload.components)) state.components = payload.components;
+        state.saved = payload.saved || null;
+        state.message = "Files not yet verified.";
+    } catch (error) {
+        state.message = error?.message || "Could not load the submission files.";
+    }
+    if (taskListState.submissionStage === state) renderSubmissionStage();
+}
+
+async function handleSubmissionStageAction(action) {
+    const state = taskListState.submissionStage;
+    const item = taskListState.allItems.find((candidate) => String(candidate.id) === taskListState.selectedId);
+    if (!state || !isSeniorDigitalMediaTask(item) || state.activityId !== taskListState.selectedId || taskListState.submissionBusy) return;
+    if (action === "build" && !state.ready) return;
+    const active = () => taskListState.submissionStage === state && taskListState.selectedId === state.activityId;
+    taskListState.submissionBusy = true;
+    state.message = "Connecting to Google Drive...";
+    renderSubmissionStage();
+    try {
+        const token = await requestHubDriveAccessToken({ forceConsent: false });
+        if (!active()) return;
+        if (token?.error || !token?.access_token) throw new Error("Google Drive permission is required. Allow access and try again.");
+        const post = async (body) => {
+            const response = await fetch(`/api/activities/${encodeURIComponent(state.activityId)}/submission-package`, {
+                method: "POST", headers: buildTaskListHeaders({ "Content-Type": "application/json" }),
+                body: JSON.stringify({ ...body, driveAccessToken: token.access_token })
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) throw Object.assign(new Error(payload.error || "Could not prepare the submission ZIP."), { status: response.status, payload });
+            return payload;
+        };
+        if (action === "check") {
+            state.ready = false;
+            state.snapshot = null;
+            state.retryDriveSave = false;
+            state.message = "Verifying the saved files and current sources...";
+            renderSubmissionStage();
+            const checked = await post({ action: "check" });
+            if (!active()) return;
+            state.components = Array.isArray(checked.components) ? checked.components : state.components;
+            state.manifestHash = String(checked.manifestHash || "");
+            state.ready = Boolean(checked.ready && /^[a-f0-9]{64}$/.test(state.manifestHash));
+            state.message = state.ready ? "All four files are ready to package." : "Some files are missing or need updating.";
+            return;
+        }
+        if (action === "build") {
+            state.snapshot = null;
+            state.retryDriveSave = false;
+            state.message = "Building the four-file submission ZIP...";
+            renderSubmissionStage();
+            const prepared = await post({ action: "prepare", manifestHash: state.manifestHash });
+            if (!active()) return;
+            state.snapshot = prepared.snapshot;
+        }
+        if (!state.snapshot || state.snapshot.expiresAt <= Date.now()) throw Object.assign(new Error("The prepared package has expired. Check files and build it again."), { status: 410 });
+        state.message = "Saving the submission ZIP to SeniorDTECH / Process Assessment...";
+        renderSubmissionStage();
+        const saved = await post({ action: "save", snapshotId: state.snapshot.snapshotId });
+        if (!active()) return;
+        state.saved = saved.saved;
+        state.retryDriveSave = false;
+        state.message = "Submission ZIP saved in SeniorDTECH / Process Assessment. No assessment was submitted.";
+    } catch (error) {
+        if (error.status === 409 || error.status === 410) {
+            state.ready = false;
+            state.manifestHash = "";
+            state.snapshot = null;
+            state.retryDriveSave = false;
+            if (Array.isArray(error.payload?.components)) state.components = error.payload.components;
+        } else if (state.snapshot) state.retryDriveSave = true;
+        state.message = error?.message || "Could not build and save the submission ZIP.";
+    } finally {
+        taskListState.submissionBusy = false;
+        renderSubmissionStage();
     }
 }
 
@@ -4077,6 +4211,7 @@ async function loadChecklistForTask(taskId) {
     void loadDocumentationDeck(selected);
     void loadFinalOutcome(selected);
     void loadTrelloReport(selected);
+    void loadSubmissionStage(selected);
     const templateCopySyncPromise = autoSyncToolsAndTechniquesTemplateCopy(
         taskListState.selectedId,
         signedInEmail,
@@ -4612,6 +4747,12 @@ async function runTaskListTrelloSync() {
     document.addEventListener("click", (event) => {
         if (event.target?.closest?.("#task-list-trello-report-generate")) void handleTrelloReportAction("generate");
         else if (event.target?.closest?.("#task-list-trello-report-retry")) void handleTrelloReportAction("retry");
+    });
+
+    document.addEventListener("click", (event) => {
+        if (event.target?.closest?.("#task-list-submission-check")) void handleSubmissionStageAction("check");
+        else if (event.target?.closest?.("#task-list-submission-build")) void handleSubmissionStageAction("build");
+        else if (event.target?.closest?.("#task-list-submission-retry")) void handleSubmissionStageAction("retry");
     });
 
     document.addEventListener("change", (event) => {

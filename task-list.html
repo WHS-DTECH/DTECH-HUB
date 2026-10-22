@@ -68,6 +68,7 @@
 
         #task-list-documentation-open:not([hidden]),
         #task-list-trello-report-open:not([hidden]),
+        #task-list-submission-open:not([hidden]),
         .task-list-slideshow-pdf-open:not([hidden]) {
             display: flex;
             align-items: center;
@@ -87,12 +88,14 @@
 
         #task-list-documentation-open:hover,
         #task-list-trello-report-open:hover,
+        #task-list-submission-open:hover,
         .task-list-slideshow-pdf-open:hover {
             background: #195675;
         }
 
         #task-list-documentation-open:focus-visible,
         #task-list-trello-report-open:focus-visible,
+        #task-list-submission-open:focus-visible,
         .task-list-slideshow-pdf-open:focus-visible {
             outline: 3px solid #236b91;
             outline-offset: 3px;
@@ -128,6 +131,35 @@
             border: 0;
             border-top: 1px solid #a8bccd;
             margin: 0;
+        }
+
+        .task-list-submission-files {
+            list-style: none;
+            padding: 0;
+            margin: 12px 0;
+            display: grid;
+            gap: 12px;
+        }
+
+        .task-list-submission-files li {
+            display: grid;
+            gap: 3px;
+            font-size: 0.82rem;
+            overflow-wrap: anywhere;
+        }
+
+        .task-list-submission-file-status {
+            color: #526772;
+            font-size: 0.76rem;
+        }
+
+        .task-list-submission-file-status.is-ready {
+            color: #14633f;
+            font-weight: 700;
+        }
+
+        .task-list-submission-file-status.needs-update {
+            color: #963f2c;
         }
 
         .task-list-outcome-card select {
@@ -1252,6 +1284,20 @@
                         </div>
                         <p id="task-list-trello-report-version"></p>
                         <p id="task-list-trello-report-status" role="status" aria-live="polite"></p>
+                    </aside>
+                    <hr class="task-list-final-divider">
+                    <aside class="task-list-documentation-card task-list-outcome-card" aria-labelledby="task-list-submission-title">
+                        <p class="section-kicker">FINAL PACKAGE</p>
+                        <h2 id="task-list-submission-title">Submission Stage</h2>
+                        <ul id="task-list-submission-files" class="task-list-submission-files" aria-label="Submission files"></ul>
+                        <div class="task-list-documentation-actions">
+                            <button type="button" class="task-list-sync-drive-btn" id="task-list-submission-check">Check files</button>
+                            <button type="button" class="task-list-sync-drive-btn" id="task-list-submission-build" disabled>Build submission ZIP</button>
+                            <button type="button" class="task-list-sync-drive-btn" id="task-list-submission-retry" hidden disabled>Retry Google Drive save</button>
+                            <a id="task-list-submission-open" target="_blank" rel="noopener noreferrer" hidden>Open saved submission ZIP</a>
+                        </div>
+                        <p id="task-list-submission-saved"></p>
+                        <p id="task-list-submission-status" role="status" aria-live="polite"></p>
                     </aside>
                     </div>
                     <div class="task-list-main-column">

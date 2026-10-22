@@ -14,6 +14,7 @@ const { validateLoginSites, publicLoginSites, visibleLoginSites } = require("./l
 const { DOCUMENTATION_TEMPLATE_ID, documentationPresentationId, buildDocumentationMergePlan } = require("./documentation-deck");
 const { outcomeRepositories, createOutcomeArchiveStore, createGithubZipSizeReader } = require("./github-outcome");
 const { createDriveResumableUploader } = require("./drive-resumable-upload");
+const { submissionSummary, inspectSubmissionPackage, createSubmissionZipResponse } = require("./submission-package");
 const { trelloReportSources, resolveReportBoards, createTrelloReportPdf, createTrelloReportStore } = require("./trello-report");
 
 const SEARCH_PENGUIN_MISSIONS_ID = "search-penguin-missions-v1";
@@ -6378,6 +6379,18 @@ async function recordTemplateCopyInDb(projectId, studentEmail, entry) {
     processAssessmentFolderUrl: String(entry?.processAssessmentFolderUrl || "").trim(),
     destinationFolderUrl: String(entry?.destinationFolderUrl || "").trim(),
     destinationFolderId: String(entry?.destinationFolderId || "").trim(),
+    ...(entry?.templateId === "final-submission-package" ? {
+      submissionPackage: {
+        manifestHash: String(entry?.submissionPackage?.manifestHash || ""),
+        builtAt: String(entry?.submissionPackage?.builtAt || ""), bytes: Number(entry?.submissionPackage?.bytes || 0),
+        components: (Array.isArray(entry?.submissionPackage?.components) ? entry.submissionPackage.components : []).slice(0, 4).map((component) => ({
+          key: String(component.key || ""), entryName: String(component.entryName || ""), fileId: String(component.fileId || ""),
+          bytes: Number(component.bytes || 0), md5Checksum: String(component.md5Checksum || ""), modifiedTime: String(component.modifiedTime || ""),
+          source: Object.fromEntries(["presentationId", "version", "modifiedTime", "repositoryUrl", "commitSha", "boardId", "lastActivity", "exportedAt"]
+            .filter((key) => component.source?.[key] !== undefined).map((key) => [key, String(component.source[key])]))
+        }))
+      }
+    } : {}),
     ...(["client-presentation-pdf", "submission-documentation-pdf"].includes(entry?.templateId) ? {
       pdfExport: {
         kind: entry?.pdfExport?.kind === "client" ? "client" : "documentation",
@@ -6387,6 +6400,7 @@ async function recordTemplateCopyInDb(projectId, studentEmail, entry) {
         sourceModifiedTime: String(entry?.pdfExport?.sourceModifiedTime || ""),
         sourceVersion: String(entry?.pdfExport?.sourceVersion || ""),
         exportedAt: String(entry?.pdfExport?.exportedAt || ""),
+        md5Checksum: String(entry?.pdfExport?.md5Checksum || ""),
         bytes: Number(entry?.pdfExport?.bytes || 0)
       }
     } : {}),
@@ -6397,7 +6411,8 @@ async function recordTemplateCopyInDb(projectId, studentEmail, entry) {
         commitSha: String(entry?.finalOutcome?.commitSha || ""),
         commitDate: String(entry?.finalOutcome?.commitDate || ""),
         bytes: Number(entry?.finalOutcome?.bytes || 0),
-        preparedAt: String(entry?.finalOutcome?.preparedAt || "")
+        preparedAt: String(entry?.finalOutcome?.preparedAt || ""),
+        md5Checksum: String(entry?.finalOutcome?.md5Checksum || "")
       }
     } : {}),
     ...(entry?.templateId === "submission-trello-report" ? {
@@ -6406,6 +6421,7 @@ async function recordTemplateCopyInDb(projectId, studentEmail, entry) {
         boardName: String(entry?.trelloReport?.boardName || "").slice(0, 512),
         boardUrl: String(entry?.trelloReport?.boardUrl || ""),
         generatedAt: String(entry?.trelloReport?.generatedAt || ""),
+        md5Checksum: String(entry?.trelloReport?.md5Checksum || ""),
         bytes: Number(entry?.trelloReport?.bytes || 0)
       }
     } : {}),
@@ -17807,12 +17823,12 @@ app.post("/api/activities/:id/trello-report", async (req, res) => {
       const board = context.boards.find((item) => item.id === String(req.body?.boardId || ""));
       if (!board) throw Object.assign(new Error("Select a Trello board saved on this assessment."), { status: 400 });
       const snapshot = await withFinalOutcomeLock("trello-final-report-build", async () => {
+        const generatedAt = new Date().toISOString();
         const options = { token: context.token, query: { filter: "all", fields: "id,name,closed,pos" } };
         const lists = await trelloApiRequest(`/boards/${encodeURIComponent(board.id)}/lists`, options);
         const cards = await trelloApiRequest(`/boards/${encodeURIComponent(board.id)}/cards`, {
           token: context.token, query: { filter: "all", fields: "id,idList,name,desc,url,pos,closed,due,dueComplete,start,dateLastActivity,labels" }
         });
-        const generatedAt = new Date().toISOString();
         const buffer = await createTrelloReportPdf({ board, lists, cards, email, activityId, generatedAt });
         return trelloReportStore.save({ email, activityId, board, buffer, generatedAt });
       });
@@ -17847,7 +17863,7 @@ app.post("/api/activities/:id/trello-report", async (req, res) => {
         templateId: "submission-trello-report", templateTitle: "Trello Board Report", fileName: report.fileName,
         fileUrl: `https://drive.google.com/file/d/${encodeURIComponent(file.id)}/view`,
         processAssessmentFolderUrl: buildDriveFolderUrlFromId(folderId),
-        trelloReport: { boardId: report.boardId, boardName: report.boardName, boardUrl: report.boardUrl, generatedAt: report.generatedAt, bytes: report.bytes }
+        trelloReport: { boardId: report.boardId, boardName: report.boardName, boardUrl: report.boardUrl, generatedAt: report.generatedAt, bytes: report.bytes, md5Checksum: createHash("md5").update(report.buffer).digest("hex") }
       };
       await recordTemplateCopyInDb(activityId, email, saved);
       return { saved, reused };
@@ -17855,6 +17871,94 @@ app.post("/api/activities/:id/trello-report", async (req, res) => {
     res.json(result);
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not create your Trello report." });
+  }
+});
+
+function publicSubmissionPlan(plan) {
+  return { ready: plan.ready, manifestHash: plan.manifestHash, checkedAt: plan.checkedAt,
+    components: plan.components.map(({ key, label, entryName, status, message, bytes }) => ({ key, label, entryName, status, message, bytes })) };
+}
+
+async function checkSubmissionInputs(context, token) {
+  const folderId = await resolveOwnedFinalPreparationFolder(context.email, token);
+  const plan = await inspectSubmissionPackage({ context, token, folderId, documentationSource: getDocumentationRecord(context.copies),
+    driveApiRequest, githubApiRequest, trelloApiRequest, getStoredTrelloConnection });
+  return { plan, folderId };
+}
+
+app.get("/api/activities/:id/submission-package", async (req, res) => {
+  try {
+    const context = await loadFinalOutcomeContext(req);
+    const saved = context.copies.find((copy) => copy?.templateId === "final-submission-package") || null;
+    res.set("Cache-Control", "no-store").json({ components: submissionSummary(context.copies), ready: false, saved });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not load your submission package." });
+  }
+});
+
+app.post("/api/activities/:id/submission-package", async (req, res) => {
+  try {
+    const context = await loadFinalOutcomeContext(req);
+    const { email, activityId } = context;
+    const action = String(req.body?.action || "");
+    const token = String(req.body?.driveAccessToken || "").trim();
+    if (!["check", "prepare", "save"].includes(action) || !token) throw Object.assign(new Error("Choose a valid package action and allow Google Drive access."), { status: 400 });
+    await verifyDriveTokenForStudent(token, email);
+    const { plan } = await checkSubmissionInputs(context, token);
+    if (action === "check") { res.set("Cache-Control", "no-store").json(publicSubmissionPlan(plan)); return; }
+    if (!plan.ready) { res.status(409).json({ error: "Update the missing or outdated files before building your submission ZIP.", ...publicSubmissionPlan(plan) }); return; }
+    if (action === "prepare") {
+      if (req.body?.manifestHash !== plan.manifestHash) throw Object.assign(new Error("The final files changed. Check files again before building."), { status: 409 });
+      const snapshot = await withFinalOutcomeLock("final-outcome-archive-build", async () => {
+        const builtAt = new Date().toISOString();
+        const prepared = await outcomeArchiveStore.prepareStream({ email, activityId,
+          metadata: { fileName: `Submission-${activityId}-${builtAt.replace(/[:.]/g, "-")}-${randomUUID()}.zip`,
+            submission: { manifestHash: plan.manifestHash, builtAt, components: plan.manifest } },
+          open: () => createSubmissionZipResponse({ components: plan.components, token }) });
+        try {
+          const current = await checkSubmissionInputs(await loadFinalOutcomeContext(req), token);
+          if (!current.plan.ready || current.plan.manifestHash !== plan.manifestHash) throw Object.assign(new Error("A final file changed while the package was being built. Check files again."), { status: 409 });
+          return prepared;
+        } catch (error) {
+          outcomeArchiveStore.discard(prepared.snapshotId, email, activityId);
+          throw error;
+        }
+      });
+      res.set("Cache-Control", "no-store").json({ snapshot });
+      return;
+    }
+    const lease = outcomeArchiveStore.acquire(req.body?.snapshotId, email, activityId);
+    let result;
+    try {
+      const archive = lease.archive;
+      if (!archive.submission || archive.submission.manifestHash !== plan.manifestHash) throw Object.assign(new Error("The final files changed. Check files and rebuild the submission ZIP."), { status: 409 });
+      result = await withFinalOutcomeLock(`${email}:${activityId}:submission-package-save`, async () => {
+        const current = await checkSubmissionInputs(await loadFinalOutcomeContext(req), token);
+        if (!current.plan.ready || current.plan.manifestHash !== archive.submission.manifestHash) throw Object.assign(new Error("The final files changed. Check files and rebuild the submission ZIP."), { status: 409 });
+        const folderId = current.folderId;
+        const uploadOptions = { accessToken: token, folderId, fileName: archive.fileName, filePath: archive.filePath,
+          bytes: archive.bytes, md5Checksum: archive.md5Checksum, mimeType: "application/zip" };
+        let file = outcomeDriveUploader.hasSession(uploadOptions) ? null : await driveFindFileByNameInFolder(folderId, archive.fileName, token);
+        const reused = Boolean(file);
+        if (file) {
+          const metadata = await driveApiRequest(`/files/${encodeURIComponent(file.id)}`, { accessToken: token, queryParams: { fields: "id,mimeType,size,md5Checksum,trashed" } });
+          if (metadata.trashed || metadata.mimeType !== "application/zip" || Number(metadata.size) !== archive.bytes || metadata.md5Checksum !== archive.md5Checksum) {
+            throw Object.assign(new Error("A different file uses this package filename. Rename it in Drive before retrying; it has not been changed."), { status: 409 });
+          }
+        }
+        if (!file) file = await outcomeDriveUploader.upload(uploadOptions);
+        const final = await checkSubmissionInputs(await loadFinalOutcomeContext(req), token);
+        if (!final.plan.ready || final.plan.manifestHash !== archive.submission.manifestHash) throw Object.assign(new Error("The source files changed during upload. An older snapshot may be in Drive; check files and build a new package."), { status: 409 });
+        const saved = { templateId: "final-submission-package", templateTitle: "Submission ZIP", fileName: archive.fileName,
+          fileUrl: `https://drive.google.com/file/d/${encodeURIComponent(file.id)}/view`, processAssessmentFolderUrl: buildDriveFolderUrlFromId(folderId),
+          submissionPackage: { ...archive.submission, bytes: archive.bytes } };
+        await recordTemplateCopyInDb(activityId, email, saved);
+        return { saved, reused };
+      });
+    } finally { lease.release(); }
+    res.set("Cache-Control", "no-store").json(result);
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not build and save your submission ZIP." });
   }
 });
 
@@ -17964,7 +18068,7 @@ app.post("/api/activities/:id/slideshow-pdf", async (req, res) => {
         processAssessmentFolderUrl: buildDriveFolderUrlFromId(folderId),
         pdfExport: { kind, sourcePresentationId: sourceId, sourceUrl: source.fileUrl,
           sourceName: String(file.name || source.fileName || prefix), sourceModifiedTime: String(file.modifiedTime || ""),
-          sourceVersion: String(file.version || ""), exportedAt, bytes: buffer.length }
+          sourceVersion: String(file.version || ""), exportedAt, bytes: buffer.length, md5Checksum: createHash("md5").update(buffer).digest("hex") }
       };
       await recordTemplateCopyInDb(activityId, email, saved);
       return { saved };
@@ -18050,7 +18154,7 @@ app.post("/api/activities/:id/final-outcome", async (req, res) => {
         processAssessmentFolderUrl: buildDriveFolderUrlFromId(folderId),
         finalOutcome: {
           repositoryUrl: archive.repositoryUrl, branch: archive.branch, commitSha: archive.commitSha,
-          commitDate: archive.commitDate, bytes: archive.bytes, preparedAt: archive.preparedAt
+          commitDate: archive.commitDate, bytes: archive.bytes, preparedAt: archive.preparedAt, md5Checksum: archive.md5Checksum
         }
       };
       await recordTemplateCopyInDb(activityId, email, entry);
