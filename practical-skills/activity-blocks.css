@@ -7,7 +7,9 @@
 .block-editor-heading h3 { margin: 0; }
 .block-editor-heading button { padding: 8px; margin: 2px; cursor: pointer; }
 .block-editor-message { white-space: pre-wrap; color: #173858; }
-.activity-content-block h2 { margin: 0 0 14px; font-size: 1.3rem; }
+.activity-content-block h2 { margin: 0 0 14px; font-size: 1.3rem; font-weight: 700; }
+.activity-content-block input[type=url] { display: block; width: 100%; min-width: 0; padding: 10px; font: inherit; border: 1px solid #8b9fad; border-radius: 8px; box-sizing: border-box; }
+.activity-content-block input[aria-invalid=true] { border-color: #a52626; }
 .activity-block-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
 .activity-content-block img { max-width: 100%; height: auto; border-radius: 8px; }
 .activity-content-block textarea { display: block; width: 100%; min-height: 80px; padding: 10px; font: inherit; border-radius: 8px; border: 1px solid #8b9fad; }

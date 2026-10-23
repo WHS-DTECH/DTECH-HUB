@@ -5,10 +5,10 @@
     "use strict";
     const types = {
         text: "Text / Instructions", image: "Image", tasks: "Task List", question: "Question",
-        link: "Website Link", resource: "Resource File", checkbox: "Checkbox", table: "Table",
+        link: "Website Link", studentlink: "Student Add a Link", resource: "Resource File", checkbox: "Checkbox", table: "Table",
         wordsearch: "Word Search", document: "Create Document", crossword: "Crossword"
     };
-    const interactive = ["question", "checkbox", "wordsearch", "crossword", "document", "table"];
+    const interactive = ["question", "checkbox", "wordsearch", "crossword", "document", "table", "studentlink"];
     const escape = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     function safeUrl(value) {
         try {
@@ -19,6 +19,9 @@
     function specialised(activity) {
         return Boolean(activity?.assessmentId || activity?.assessment || activity?.identityLessonVersion ||
             activity?.questionAutoMarkAssessmentId || activity?.researchReport || activity?.loginSites);
+    }
+    function studentUrl(value) {
+        return typeof value === "string" && value.trim().length <= 5000 ? safeUrl(value.trim()) : "";
     }
     function initialBlocks(activity, index, content) {
         if (Array.isArray(activity.blocks)) return activity.blocks;
@@ -111,7 +114,7 @@
             for (const key of ["title", "text", "url", "alt", "caption", "attribution", "entries", "fileName", "responseKey"]) {
                 if (b[key] !== undefined && (typeof b[key] !== "string" || b[key].length > (key === "text" ? 20000 : 5000))) throw new Error(`${types[b.kind]}: ${key} must be text within the size limit.`);
             }
-            for (const key of ["required", "editable"]) if (b[key] !== undefined && typeof b[key] !== "boolean") throw new Error("Block options must be true or false.");
+            for (const key of ["required", "editable", "numbered"]) if (b[key] !== undefined && typeof b[key] !== "boolean") throw new Error("Block options must be true or false.");
             if (["link", "resource", "image"].includes(b.kind) && !safeUrl(b.url)) throw new Error(`${types[b.kind]}: enter a full HTTPS link.`);
             if (b.kind === "image" && !String(b.alt || "").trim()) throw new Error("Images need alternative text.");
             if (b.kind === "document" && (!safeUrl(b.url) || !/^https:\/\/docs\.google\.com\/document\/(?:u\/\d+\/)?d\/[a-zA-Z0-9_-]{20,}(?:[/?#]|$)/.test(b.url || ""))) throw new Error("Create Document needs a Google Docs template link.");
@@ -139,7 +142,7 @@
         }
         if (activity.completionMode === "auto" && !specialised(activity) &&
             !activity.blocks.some((b) => b.required && interactive.includes(b.kind) && (b.kind !== "table" || b.editable))) {
-            throw new Error("Automatic tick needs at least one required question, checkbox, puzzle, editable table or document block.");
+            throw new Error("Automatic tick needs at least one required question, checkbox, puzzle, editable table, document or student link block.");
         }
     }
     function grade(activity, answers, documents = {}) {
@@ -147,6 +150,7 @@
         const results = required.map((b) => {
             const value = answers?.[b.id];
             let passed = false;
+            if (b.kind === "studentlink") passed = Boolean(studentUrl(value));
             if (b.kind === "checkbox") passed = value === true;
             if (b.kind === "question") passed = b.questionType === "checklist"
                 ? Array.isArray(value) && b.options.every((option) => value.includes(option))
@@ -178,5 +182,5 @@
         });
         return { passed: required.length > 0 && results.every((r) => r.passed), results };
     }
-    return { types, interactive, escape, safeUrl, specialised, initialBlocks, savedAnswers, entries, puzzle, validate, grade };
+    return { types, interactive, escape, safeUrl, studentUrl, specialised, initialBlocks, savedAnswers, entries, puzzle, validate, grade };
 });

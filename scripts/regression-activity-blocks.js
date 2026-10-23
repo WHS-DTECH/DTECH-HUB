@@ -24,23 +24,62 @@ const sampleBlocks = () => [
     block("checkbox", { required: true }), block("table", { text: "File | Folder", rows: 2, editable: true, required: true }),
     block("wordsearch", { entries: "FILE\nFOLDER\nSAVE", required: true }),
     block("crossword", { entries: "FILE | A saved item\nFOLDER | Stores files\nSAVE | Keep your work", required: true }),
-    block("document", { url: docUrl, required: true })
+    block("document", { url: docUrl, required: true }),
+    block("studentlink", { required: true })
 ];
 
-test("all eleven types validate and required interactive blocks govern automatic completion", () => {
+test("all twelve types validate and required interactive blocks govern automatic completion", () => {
     const activity = { completionMode: "auto", blocks: sampleBlocks() };
     B.validate(activity);
-    assert.equal(activity.blocks.length, 11);
+    assert.equal(activity.blocks.length, 12);
     const answers = { question: "Any written response", checkbox: true, table: [["A", "B"], ["C", "D"]],
-        wordsearch: puzzleAnswer(activity.blocks[8]), crossword: puzzleAnswer(activity.blocks[9]), document: true };
+        wordsearch: puzzleAnswer(activity.blocks[8]), crossword: puzzleAnswer(activity.blocks[9]), document: true, studentlink: docUrl };
     assert.equal(B.grade(activity, answers).passed, false, "A client cannot invent a document receipt");
     assert.equal(B.grade(activity, answers, { document: true }).passed, true);
-    for (const id of ["question", "checkbox", "table", "wordsearch", "crossword"]) {
+    for (const id of ["question", "checkbox", "table", "wordsearch", "crossword", "studentlink"]) {
         assert.equal(B.grade(activity, { ...answers, [id]: undefined }, { document: true }).passed, false, id);
     }
     assert.equal(B.grade(activity, { ...answers, question: "  " }, { document: true }).passed, false);
     assert.equal(B.grade(activity, { ...answers, table: [["A", ""], ["C", "D"]] }, { document: true }).passed, false);
     assert.equal(B.grade(activity, { ...answers, checkbox: "true" }, { document: true }).passed, false);
+});
+
+test("numbered text restarts per block, ignores empty lines and preserves existing plain text", () => {
+    const context = vm.createContext({ window: { ActivityBlocks: B }, structuredClone });
+    vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "practical-skills", "activity-block-view.js"), "utf8"), context);
+    const markup = context.window.ActivityBlockView.markup([
+        block("text", { id: "first", title: "Browser", numbered: true, text: "1. Create it\r\n\r\n2) Name it" }),
+        block("text", { id: "second", title: "Windows", numbered: true, text: " 1. Download it\nOpen <Word>" }),
+        block("text", { id: "old", text: "Existing\nplain instructions" }),
+        block("text", { id: "off", numbered: false, text: "Not\nnumbered" })
+    ], {}, true);
+    assert.equal((markup.match(/<ol>/g) || []).length, 2);
+    assert.equal((markup.match(/<li /g) || []).length, 4);
+    assert.match(markup, /<h2>Browser<\/h2><ol>/);
+    assert.match(markup, /<h2>Windows<\/h2><ol>/);
+    assert.match(markup, /<li class="activity-block-text">Create it<\/li>/);
+    assert.match(markup, /Open &lt;Word&gt;/);
+    assert.match(markup, /<p class="activity-block-text">Existing\nplain instructions<\/p>/);
+    assert.doesNotMatch(markup, />1\. Create|>2\) Name|start="/);
+    assert.throws(() => B.validate({ blocks: [block("text", { numbered: "true" })] }), /true or false/);
+});
+
+test("student links require a safe HTTPS string and cannot earn ticks with unsafe or missing URLs", () => {
+    const activity = { completionMode: "auto", blocks: [block("studentlink", { required: true })] };
+    B.validate(activity);
+    assert.equal(B.grade(activity, { studentlink: `  ${docUrl}  ` }).passed, true);
+    for (const value of ["", " ", "example.org", "http://example.org", "javascript:alert(1)", "data:text/html,test",
+        "https://user:pass@example.org", "https://example.org/" + "x".repeat(5000), true, {}, [docUrl]]) {
+        assert.equal(B.grade(activity, { studentlink: value }).passed, false, JSON.stringify(value).slice(0, 100));
+    }
+    const context = vm.createContext({ window: { ActivityBlocks: B }, structuredClone });
+    vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "practical-skills", "activity-block-view.js"), "utf8"), context);
+    const render = (value) => context.window.ActivityBlockView.markup(activity.blocks, { studentlink: value }, true);
+    assert.match(render(docUrl), /type="url"[^>]* disabled/);
+    assert.match(render(docUrl), /data-open-student-link href="https:\/\/docs\.google\.com/);
+    assert.match(render('javascript:" onfocus="bad'), /data-open-student-link hidden/);
+    assert.doesNotMatch(render('javascript:" onfocus="bad'), /href="javascript| onfocus="bad/);
+    assert.match(render("not a URL"), /Enter a full HTTPS link/);
 });
 
 test("question choices and checklists are presence checks, not answer-key marking", () => {
@@ -248,6 +287,28 @@ test("document API verifies identity, reuses copies concurrently and isolates st
     assert.deepEqual([...f.files.values()].map((file) => file.folder), [`${f.emails.student}-KITS`, `${f.emails.other}-KITS`]);
     f.content.activities[0].blocks[1].url = "https://evil.example/document/d/1234567890123456789012345";
     assert.equal((await f.request("/documents/document", payload)).status, 500);
+});
+
+test("student links persist through API save/reload and required auto ticks reject invalid replacements", async (t) => {
+    const f = await fixture(t);
+    f.content.activities[0].blocks = [block("studentlink", { required: true })];
+    let result = await f.request("/check", { answers: { studentlink: docUrl } });
+    assert.equal(result.body.passed, true);
+    assert.equal(result.body.completedActivities[0], "saved");
+    const saved = f.rows.get(`${f.emails.student}:kit-test`).responses;
+    assert.equal(B.savedAnswers(f.content.activities[0], 0, saved).studentlink, docUrl);
+    for (const url of ["", "http://example.org", "javascript:alert(1)"]) {
+        result = await f.request("/check", { answers: { studentlink: url } });
+        assert.equal(result.body.passed, false);
+        assert.equal(result.body.completedActivities[0], undefined);
+        assert.equal(f.rows.get(`${f.emails.student}:kit-test`).responses["0-blocks"].studentlink, url);
+    }
+    f.content.activities[0].completionMode = "manual";
+    result = await f.request("/check", { answers: { studentlink: docUrl } });
+    assert.equal(result.body.completedActivities[0], undefined, "Link saves must not override manual mode");
+    result = await f.request("/check", { answers: { studentlink: "https://example.org/student-b" } }, f.emails.other);
+    assert.equal(f.rows.get(`${f.emails.student}:kit-test`).responses["0-blocks"].studentlink, docUrl);
+    assert.equal(f.rows.get(`${f.emails.other}:kit-test`).responses["0-blocks"].studentlink, "https://example.org/student-b");
 });
 
 test("resource uploads enforce admin, file type, 15 MB, account identity and explicit sharing failures", async (t) => {

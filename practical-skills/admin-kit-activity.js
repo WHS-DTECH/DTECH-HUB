@@ -187,7 +187,7 @@
             mode.disabled = specialised;
             document.querySelector("#activity-block-completion-help").textContent = specialised
                 ? "This activity keeps its existing specialised assessment and completion rules. Added blocks are extra learning content."
-                : "Automatic mode checks written answers for presence, not correctness. Required checkboxes, tables and puzzles must be completed. Document blocks confirm only creation of a copy.";
+                : "Automatic mode checks written answers for presence, not correctness. Required checkboxes, tables and puzzles must be completed. Student links need a valid HTTPS URL, not verified work. Document blocks confirm only creation of a copy.";
             blockEditor?.destroy();
             blockEditor = window.ActivityBlockEditor.mount(document.querySelector("#activity-block-editor"), {
                 blocks: blockApi.initialBlocks(activity, activityIndex, content), onChange: queuePreviewUpdate,

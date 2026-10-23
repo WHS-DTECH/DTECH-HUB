@@ -28,8 +28,11 @@
                         <button type="button" data-remove-block aria-label="Remove block ${i + 1}">Remove</button>
                     </div></div>
                     ${field("title", "Heading / label (optional)", b.title, 1)}
-                    ${["text", "tasks", "question", "checkbox", "table"].includes(b.kind) ? field("text",
-                        b.kind === "tasks" ? "Tasks — one per line" : b.kind === "question" ? "Question prompt" : b.kind === "table" ? "Table — first row is headings; separate cells with |" : "Text / instructions", b.text) : ""}
+                    ${["text", "tasks", "question", "checkbox", "table", "studentlink"].includes(b.kind) ? field("text",
+                        b.kind === "studentlink" ? "Instructions for the student (optional)" : b.kind === "tasks" ? "Tasks — one per line" : b.kind === "question" ? "Question prompt" : b.kind === "table" ? "Table — first row is headings; separate cells with |" : "Text / instructions", b.text) : ""}
+                    ${b.kind === "text" ? `<label><input type="checkbox" data-field="numbered" ${b.numbered === true ? "checked" : ""}> Number each line</label><p>Each non-empty line becomes a numbered step. Numbering restarts at 1 beneath this block's bold heading.</p>` : ""}
+                    ${b.kind === "link" ? "<p>You supply this website link for students to open. Use Student Add a Link when students should submit their own link.</p>" : ""}
+                    ${b.kind === "studentlink" ? "<p>Students paste one HTTPS link. Their link is saved with their answers. Required automatic completion checks only that the URL is valid, not access to the file or the work inside it.</p>" : ""}
                     ${["image", "resource", "link", "document"].includes(b.kind) ? field("url",
                         b.kind === "document" ? "Google Docs template link — shared with students" : "Full HTTPS link", b.url, 2) : ""}
                     ${b.kind === "resource" ? `<label>Upload resource from your computer (max 15 MB)<input type="file" data-resource-upload accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.csv,.png,.jpg,.jpeg,.webp"></label><p>Uploads go to your Google Drive and are shared read-only with school accounts. Only upload resources you have permission to share. Save Activity Details after uploading.</p>` : ""}
@@ -75,7 +78,8 @@
             read();
             if (button.dataset.addBlock) {
                 const kind = button.dataset.addBlock;
-                draft.push({ id: `b-${crypto.randomUUID()}`, kind, title: "", text: "", questionType: "short-answer", options: [], required: B.interactive.includes(kind) });
+                draft.push({ id: `b-${crypto.randomUUID()}`, kind, title: "", text: "", questionType: "short-answer", options: [], required: B.interactive.includes(kind),
+                    ...(kind === "text" ? { numbered: true } : {}) });
             } else {
                 const card = button.closest("[data-block-id]");
                 if (!card) return;

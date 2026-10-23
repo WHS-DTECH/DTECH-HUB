@@ -7,8 +7,15 @@
             const disabled = readOnly ? "disabled" : "";
             const link = B.safeUrl(b.url);
             let body = "";
-            if (b.kind === "text") body = `<p class="activity-block-text">${e(b.text)}</p>`;
-            if (b.kind === "tasks") body = `<ol>${String(b.text || "").split(/\r?\n/).filter((s) => s.trim()).map((s) => `<li class="activity-block-text">${e(s.replace(/^\d+[.)]\s+/, ""))}</li>`).join("")}</ol>`;
+            if (b.kind === "text" && b.numbered !== true) body = `<p class="activity-block-text">${e(b.text)}</p>`;
+            if (b.kind === "tasks" || (b.kind === "text" && b.numbered === true)) body = `<ol>${String(b.text || "").split(/\r?\n/).filter((s) => s.trim()).map((s) => `<li class="activity-block-text">${e(s.trim().replace(/^\d+[.)]\s+/, ""))}</li>`).join("")}</ol>`;
+            if (b.kind === "studentlink") {
+                const studentLink = B.studentUrl(value);
+                body = `${b.text ? `<p class="activity-block-text">${e(b.text)}</p>` : ""}
+                    <label>Your link<input type="url" data-student-link maxlength="5000" aria-invalid="${Boolean(typeof value === "string" && value.trim()) && !studentLink}" placeholder="https://..." value="${e(typeof value === "string" ? value : "")}" ${disabled}></label>
+                    <p class="activity-block-status" data-link-status role="status">${value && !studentLink ? "Enter a full HTTPS link, without a username or password in the URL." : "Paste one HTTPS link. This checks the URL only, not sharing permissions or completed work."}</p>
+                    <a class="worksheet-btn worksheet-btn-secondary" data-open-student-link ${studentLink ? `href="${e(studentLink)}"` : "hidden"} target="_blank" rel="noopener noreferrer">Open Link &#8599;</a>`;
+            }
             if (b.kind === "image") body = link ? (renderImage ? renderImage(b) : `<figure><img src="${e(link)}" alt="${e(b.alt)}" loading="lazy"><figcaption>${e(b.caption)}${b.attribution ? `<br>${e(b.attribution)}` : ""}</figcaption></figure>`) : "<p>Enter an HTTPS image link to preview.</p>";
             if (["link", "resource"].includes(b.kind)) body = link
                 ? `<a class="worksheet-btn worksheet-btn-secondary" href="${e(link)}" target="_blank" rel="noopener noreferrer">${e(b.title || (b.kind === "resource" ? "Open resource" : "Open website"))} &#8599;</a>`
@@ -61,6 +68,17 @@
                     const rows = Array.from({ length: Math.min(15, Math.max(1, Number(b.rows) || 3)) }, (_, r) =>
                         [...section.querySelectorAll(`input[data-row="${r}"]`)].map((cell) => cell.value));
                     changed(b, rows);
+                } else if (b.kind === "studentlink" && input.matches("[data-student-link]")) {
+                    const url = B.studentUrl(input.value);
+                    const open = section.querySelector("[data-open-student-link]");
+                    open.hidden = !url;
+                    if (url) open.href = url;
+                    else open.removeAttribute("href");
+                    input.setAttribute("aria-invalid", String(Boolean(input.value.trim()) && !url));
+                    section.querySelector("[data-link-status]").textContent = input.value.trim() && !url
+                        ? "Enter a full HTTPS link, without a username or password in the URL."
+                        : "Paste one HTTPS link. This checks the URL only, not sharing permissions or completed work.";
+                    changed(b, input.value);
                 } else if (b.kind === "checkbox") changed(b, input.checked);
                 else if (b.kind === "question") {
                     const value = b.questionType === "checklist" ? [...section.querySelectorAll("[data-option]:checked")].map((n) => b.options[Number(n.dataset.option)])
