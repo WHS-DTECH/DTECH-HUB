@@ -83,6 +83,8 @@ test("activity task brief loads, saves, reloads and preserves other activity det
 });
 
 test("student task briefs render numbered tasks safely and omit empty sections", () => {
+    const editorHtml = fs.readFileSync(path.join(root, "admin-kit-activity.html"), "utf8");
+    assert.ok(editorHtml.indexOf('class="activity-preview-frame"') > editorHtml.indexOf('id="activity-save"'), "Preview appears below all editing and save controls");
     const start = renderSource.indexOf("    function renderTaskBrief(");
     const end = renderSource.indexOf("\n    function renderWorksheet(", start);
     const context = vm.createContext({
