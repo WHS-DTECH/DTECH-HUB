@@ -495,7 +495,7 @@
     async function refreshKitCatalog() {
         try {
             const payload = await loadJson("/api/admin/practical-skills/kits", { headers: withAdminAuthHeaders() });
-            if (Array.isArray(payload?.kits) && payload.kits.length) {
+            if (Array.isArray(payload?.kits)) {
                 KIT_CATALOG = payload.kits.map((kit) => ({ id: String(kit.id), title: String(kit.title || kit.id), custom: Boolean(kit.custom) }));
             }
         } catch (_error) {

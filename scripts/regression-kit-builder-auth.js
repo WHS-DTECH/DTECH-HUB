@@ -12,6 +12,8 @@ function editor() {
     let session = null;
     let canAdmin = true;
     let failSave = false;
+    let confirmDelete = false;
+    let deleted = false;
     function element() {
         const children = [];
         const fields = new Map();
@@ -42,18 +44,23 @@ function editor() {
         localStorage: { getItem: () => session }, sessionStorage: { getItem: () => null },
         window: {
             location: { search: "" }, clearTimeout() {}, setTimeout() { return 1; },
+            confirm() { return confirmDelete; },
             addEventListener(name, handler) { events[name] = handler; }
         },
         URLSearchParams,
         fetch: async (url, options = {}) => {
             requests.push({ url, options });
             if (url.startsWith("/api/auth/")) return { ok: true, json: async () => ({ can_admin: canAdmin }) };
+            if (options.method === "DELETE") {
+                deleted = true;
+                return { ok: true, json: async () => ({ message: "Kit removed. Student progress retained." }) };
+            }
             if (options.method === "POST") {
                 if (failSave) return { ok: false, json: async () => ({ error: "Database unavailable. Retry saving." }) };
                 const content = JSON.parse(options.body).content;
                 return { ok: true, json: async () => ({ kitId: "kit-files", content }) };
             }
-            return { ok: true, json: async () => ({ kits: [{ id: "kit-files", title: "Files & Folders" }] }) };
+            return { ok: true, json: async () => ({ kits: deleted ? [] : [{ id: "kit-files", title: "Files & Folders", custom: true }] }) };
         }
     });
     vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "practical-skills", "admin-kits.js"), "utf8"), context);
@@ -62,7 +69,8 @@ function editor() {
         signIn() { session = JSON.stringify({ expiresAt: Date.now() + 60000, profile: { email: "teacher@school.nz" } }); events["hub-auth-state-changed"](); },
         signOut() { session = null; events["hub-auth-state-changed"](); },
         denyAdmin() { canAdmin = false; },
-        failSave() { failSave = true; }
+        failSave() { failSave = true; },
+        confirmDeletion() { confirmDelete = true; }
     };
 }
 const settle = () => new Promise((resolve) => setImmediate(resolve));
@@ -102,6 +110,24 @@ test("buttons work after delayed sign-in without clearing draft fields or duplic
     await settle();
     assert.equal(ui.requests.filter(({ options }) => options.method === "PUT").length, 0);
     assert.match(ui.get("#kit-builder-status").textContent, /Sign in/);
+});
+
+test("custom kit deletion requires confirmation and leaves a blank editor after removal", async () => {
+    const ui = editor();
+    ui.signIn();
+    await settle();
+    ui.get("#kit-name").value = "Files & Folders";
+    ui.get("#kit-save-content").handlers.click();
+    await settle();
+    assert.equal(ui.get("#kit-delete").hidden, false);
+    await ui.get("#kit-delete").handlers.click();
+    assert.equal(ui.requests.filter(({ options }) => options.method === "DELETE").length, 0);
+    ui.confirmDeletion();
+    await ui.get("#kit-delete").handlers.click();
+    assert.equal(ui.requests.filter(({ options }) => options.method === "DELETE").length, 1);
+    assert.equal(ui.get("#kit-delete").hidden, true);
+    assert.equal(ui.get("#kit-name").value, "");
+    assert.match(ui.get("#kit-save-status").textContent, /Student progress retained/);
 });
 
 test("permission and save failures are explicit and retain the draft", async () => {

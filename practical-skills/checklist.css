@@ -1,18 +1,18 @@
 .licence-dashboard { background: #f4f8fa; color: #173858; }
-.licence-dashboard .page-shell { max-width: 1400px; margin: auto; }
+.licence-dashboard .page-shell { max-width: 1400px; margin: auto; padding-bottom: 0; }
 .licence-dashboard .practical-skills-hero { min-height: 0; background: linear-gradient(120deg, #143c51, #1f6452); }
 .licence-dashboard .practical-skills-panel { display: none; }
 .licence-dashboard .hero-copy { max-width: 780px; }
 .licence-dashboard .hero-copy h1 { font-family: Manrope, sans-serif; font-size: clamp(2rem, 5vw, 3.6rem); max-width: none; line-height: 1.15; }
 .licence-dashboard .hero-text { max-width: 620px; font-size: 1.05rem; }
-.licence-dashboard .home-grid { width: min(1120px, calc(100% - 32px)); margin: 16px auto 24px; padding: 0; display: grid; gap: 14px; }
+.licence-dashboard .home-grid { width: min(1120px, calc(100% - 32px)); margin: 12px auto; padding: 0; display: grid; gap: 12px; }
 .licence-dashboard .panel-section { width: 100%; max-width: none; margin: 0; background: #fff; border: 1px solid #d6e1e8; border-radius: 20px; padding: 24px; box-shadow: 0 5px 0 #e1e9ee; }
 .licence-dashboard h2, .licence-dashboard h3 { font-family: Manrope, sans-serif; }
 .licence-dashboard .section-kicker { color: #286552; }
 .licence-dashboard .button { font-size: .9rem; text-transform: none; letter-spacing: 0; min-height: 44px; border-radius: 12px; padding: 10px 18px; }
 .licence-dashboard .button-primary { background: #173858; color: #fff; border: 2px solid #173858; }
 .licence-dashboard .button-primary:hover { background: #0d253c; }
-.licence-dashboard a:focus-visible, .licence-dashboard button:focus-visible { outline: 3px solid #ad6200; outline-offset: 4px; }
+.licence-dashboard a:focus-visible, .licence-dashboard button:focus-visible, .licence-dashboard summary:focus-visible { outline: 3px solid #ad6200; outline-offset: 4px; }
 .student-licence { background: linear-gradient(135deg, #fffdf4, #fff); border: 2px solid #173858; border-radius: 20px; padding: 18px 22px; box-shadow: 0 5px 0 #d6e3e8; }
 .licence-card-heading { display: flex; gap: 12px; align-items: center; border-bottom: 1px solid #d9e5dd; padding-bottom: 10px; }
 .licence-card-heading img { width: 44px; height: 44px; object-fit: contain; border-radius: 50%; }
