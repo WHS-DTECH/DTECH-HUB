@@ -18,6 +18,11 @@
 .typing-period h4 { margin: 0 0 8px; }
 .typing-period p { margin: 8px 0; }
 .typing-kit-page .worksheet-btn { display: inline-block; text-decoration: none; text-align: center; }
+.typing-launch-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.typing-kit-page .typing-launch-easy { background: #246b51; color: #fff; }
+.typing-kit-page .typing-launch-medium { background: #245b96; color: #fff; }
+.typing-kit-page .typing-launch-hard { background: #71429a; color: #fff; }
+.typing-launch-actions .worksheet-btn:hover { filter: brightness(.9); }
 .typing-kit-page input { font: inherit; border: 1px solid #817865; border-radius: 8px; padding: 10px; max-width: 100%; }
 .typing-kit-page label { display: block; font-weight: 700; margin: 12px 0 8px; }
 .typing-result-input { width: 100%; }

@@ -102,6 +102,11 @@ Strict cutover checklist (go/no-go):
 - The MiddleDTECH Digital Outcome Topic hides the separate success-measurement and tools-identification prompts. Digital Media shows the appropriate-tools criterion and its subtasks above the existing efficient-tools criterion and subtasks.
 - This is a display-only change: saved checklist rows and evidence remain intact, and rendered checkboxes retain their original storage indexes. SeniorDTECH criteria are unchanged. Covered by `node scripts/regression-middle-task-list.js`.
 
+### Typing Kit difficulty launch buttons
+- Daily records offer three one-click, new-tab links: Easy (green), Medium (blue), Hard (purple), each fixed at one minute. The links use TypingTest.com's own `/test.php` parameters: `minutes=1`, `textfile=easyText.txt` / `mediumText.txt` / `difficultText.txt`, `mode=sent`, `result_url=/result.php`.
+- Return prompts, result-link saving, attempt history and exercise-book sign-off are unchanged. Difficulty is a launch choice; this change does not add a verified difficulty field to saved scores.
+- Run `node scripts/regression-typing-kit.js` to check launch parameters, all three return prompts, text contrast and existing record-saving behaviour.
+
 ## 6) HTTPS Responsibility
 - HTTPS/TLS termination is currently handled by Render-managed certificates.
 - The app itself runs as a standard Node web service behind Render's HTTPS edge.

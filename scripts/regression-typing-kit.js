@@ -237,7 +237,7 @@ test("daily page saves before asking for book copying, keeps repeated attempts, 
     assert.doesNotMatch(ui.get("typing-content").innerHTML, /Latest saved result/);
     ui.events.focus();
     assert.equal(ui.get("typing-return-prompt").textContent, "");
-    ui.get("typing-launch").handlers.click();
+    ui.get("typing-launch-easy").handlers.click();
     ui.events.focus();
     assert.match(ui.get("typing-return-prompt").textContent, /Finished your test\?/);
     ui.get("typing-result-url").value = resultUrl;
@@ -252,6 +252,40 @@ test("daily page saves before asking for book copying, keeps repeated attempts, 
     assert.equal(postBodies.length, 2);
     assert.notEqual(postBodies[0].submissionId, postBodies[1].submissionId);
     assert.equal((ui.get("typing-content").innerHTML.match(/Results link \(new tab\)/g) || []).length, 2);
+});
+
+test("three coloured difficulty buttons directly launch one-minute tests and retain return prompts", async () => {
+    const files = { easy: "easyText.txt", medium: "mediumText.txt", hard: "difficultText.txt" };
+    const css = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "typing-kit.css"), "utf8");
+    const colours = [];
+    for (const [difficulty, file] of Object.entries(files)) {
+        const ui = frontend({ search: "?week=2026-10-26&period=1" });
+        await settle();
+        const html = ui.get("typing-content").innerHTML;
+        assert.equal((html.match(/id="typing-launch-(?:easy|medium|hard)"/g) || []).length, 3);
+        const anchor = html.match(new RegExp(`<a id="typing-launch-${difficulty}"[^>]+>`))?.[0];
+        assert.ok(anchor);
+        const url = new URL(anchor.match(/href="([^"]+)"/)[1].replace(/&amp;/g, "&"));
+        assert.equal(url.origin, "https://www.typingtest.com");
+        assert.equal(url.pathname, "/test.php");
+        assert.equal(url.searchParams.get("minutes"), "1");
+        assert.equal(url.searchParams.get("textfile"), file);
+        assert.equal(url.searchParams.get("mode"), "sent");
+        assert.equal(url.searchParams.get("result_url"), "/result.php");
+        assert.match(anchor, /target="_blank" rel="noopener noreferrer"/);
+        assert.match(html, /Each button opens a new tab/);
+        ui.get(`typing-launch-${difficulty}`).handlers.click();
+        ui.events.focus();
+        assert.match(ui.get("typing-return-prompt").textContent, /Finished your test\?/);
+        const style = css.match(new RegExp(`\\.typing-launch-${difficulty} \\{ background: (#[0-9a-f]+); color: #fff; \\}`));
+        assert.ok(style, "Each level has a distinct colour and white text");
+        colours.push(style[1]);
+        const channels = style[1].slice(1).match(/../g).map((hex) => parseInt(hex, 16) / 255)
+            .map((value) => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4);
+        const luminance = channels[0] * .2126 + channels[1] * .7152 + channels[2] * .0722;
+        assert.ok(1.05 / (luminance + .05) >= 4.5, "Button text meets WCAG AA contrast");
+    }
+    assert.equal(new Set(colours).size, 3);
 });
 
 test("archived dated records remain reachable and are read-only; invalid daily routes are rejected", async () => {

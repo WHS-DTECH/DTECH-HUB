@@ -130,7 +130,12 @@
                     <li>Paste the link and save your result.</li>
                     <li>Copy the saved result into your exercise book for your teacher to sign.</li>
                 </ol>
-                <a id="typing-launch" class="worksheet-btn worksheet-btn-primary" href="https://www.typingtest.com/test/one-minute-typing-test" target="_blank" rel="noopener noreferrer">Launch 1-minute typing test (new tab)</a>
+                <p id="typing-launch-label"><strong>Choose your one-minute test. Each button opens a new tab.</strong></p>
+                <div class="typing-launch-actions" role="group" aria-labelledby="typing-launch-label">
+                    <a id="typing-launch-easy" class="worksheet-btn typing-launch-easy" href="https://www.typingtest.com/test.php?minutes=1&amp;textfile=easyText.txt&amp;mode=sent&amp;result_url=%2Fresult.php" target="_blank" rel="noopener noreferrer">Easy &mdash; 1 minute &#8599;</a>
+                    <a id="typing-launch-medium" class="worksheet-btn typing-launch-medium" href="https://www.typingtest.com/test.php?minutes=1&amp;textfile=mediumText.txt&amp;mode=sent&amp;result_url=%2Fresult.php" target="_blank" rel="noopener noreferrer">Medium &mdash; 1 minute &#8599;</a>
+                    <a id="typing-launch-hard" class="worksheet-btn typing-launch-hard" href="https://www.typingtest.com/test.php?minutes=1&amp;textfile=difficultText.txt&amp;mode=sent&amp;result_url=%2Fresult.php" target="_blank" rel="noopener noreferrer">Hard &mdash; 1 minute &#8599;</a>
+                </div>
                 <p id="typing-return-prompt" class="typing-note" role="status">No TypingTest.com account is needed. Return here after completing your test.</p>
                 <form id="typing-result-form">
                     <label for="typing-result-url">Paste your TypingTest.com results page link</label>
@@ -148,9 +153,11 @@
                 <p class="typing-note">Student-submitted results, not independently verified. Times show when you submitted each link, not when you took the test. Your teacher signs your exercise book, not this log.</p>
             </section>`;
         state.launched = false;
-        document.getElementById("typing-launch")?.addEventListener("click", () => {
-            state.launched = true;
-            document.getElementById("typing-return-prompt").textContent = "When you have finished, return here and paste your results page link.";
+        ["easy", "medium", "hard"].forEach((difficulty) => {
+            document.getElementById(`typing-launch-${difficulty}`)?.addEventListener("click", () => {
+                state.launched = true;
+                document.getElementById("typing-return-prompt").textContent = "When you have finished, return here and paste your results page link.";
+            });
         });
         document.getElementById("typing-result-form")?.addEventListener("submit", async (event) => {
             event.preventDefault();
