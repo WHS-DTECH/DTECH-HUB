@@ -73,7 +73,7 @@ function parseTypingResult(value) {
     return { accuracy, netWpm, grossWpm, durationSeconds, sourceUrl: source.href };
 }
 
-function registerTypingKit(app, { pool, hasDatabase, getRequestUserEmail, normalizeEmail, schoolDomain, canManagePracticalSchedule }) {
+function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomain, canManagePracticalSchedule }) {
     let schemaReady;
     async function ensureSchema() {
         if (!hasDatabase) {
@@ -99,7 +99,12 @@ function registerTypingKit(app, { pool, hasDatabase, getRequestUserEmail, normal
         await schemaReady;
     }
     const identity = (req, res) => {
-        const email = normalizeEmail(getRequestUserEmail(req));
+        res.set("Cache-Control", "no-store");
+        if (req.auth_identity?.verified !== true || req.auth_identity.source !== "google_id_token") {
+            res.status(401).json({ error: "A verified Google sign-in is required. Sign out, then sign in with your school Google account again." });
+            return "";
+        }
+        const email = normalizeEmail(req.auth_identity.email);
         if (!email || !email.endsWith(`@${schoolDomain}`)) {
             res.status(401).json({ error: "Sign in with your school Google account to use your Typing Kit." });
             return "";

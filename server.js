@@ -6265,7 +6265,7 @@ require("./learning-pathways/comment-bank-store").registerCommentBank(app, {
   pool, hasDatabase, requireTeacherAccess: requireActivityWriteAccess, requireAdminAccess
 });
 registerTypingKit(app, {
-  pool, hasDatabase, getRequestUserEmail, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN, canManagePracticalSchedule
+  pool, hasDatabase, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN, canManagePracticalSchedule
 });
 require("./practical-skills/certificate-catchup").registerCertificateCatchup(app, {
   pool, hasDatabase, requireAdminAccess, ensurePracticalSkillsProgressSchema, ensureEmailLogsSchema,

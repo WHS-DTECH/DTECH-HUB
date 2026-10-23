@@ -45,9 +45,15 @@ async function fixture(t, options = {}) {
     const db = options.db || database();
     const app = express();
     app.use(express.json());
+    // Simulate the server's already-verified Google middleware identity, never a client email claim.
+    app.use((req, _res, next) => {
+        const verifiedEmail = req.headers["x-test-verified-email"];
+        if (verifiedEmail) req.auth_identity = { verified: true, source: "google_id_token", email: verifiedEmail };
+        else if (req.headers.authorization) req.auth_identity = { verified: false, source: "none", error: "token_verification_failed" };
+        next();
+    });
     registerTypingKit(app, {
         pool: db.pool, hasDatabase: options.hasDatabase !== false,
-        getRequestUserEmail: (req) => req.headers["x-test-email"] || "",
         normalizeEmail: (value) => String(value || "").toLowerCase(),
         schoolDomain: "school.nz",
         canManagePracticalSchedule: async (email) => email === teacher
@@ -56,9 +62,11 @@ async function fixture(t, options = {}) {
         const listener = app.listen(0, "127.0.0.1", () => resolve(listener));
     });
     t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); }));
-    async function call(route = "", { method = "GET", email = student, body } = {}) {
+    async function call(route = "", { method = "GET", email = student, body, verified = true, claimedEmail = email, bearer = "" } = {}) {
         const response = await fetch(`http://127.0.0.1:${server.address().port}/api/practical-skills/typing-kit${route}`, {
-            method, headers: { "Content-Type": "application/json", "x-test-email": email },
+            method, headers: { "Content-Type": "application/json", "x-user-email": claimedEmail,
+                ...(verified ? { "x-test-verified-email": email } : {}),
+                ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}) },
             body: body === undefined ? undefined : JSON.stringify(body)
         });
         return { status: response.status, body: await response.json(), headers: response.headers };
@@ -138,6 +146,36 @@ test("school identity, staff settings, input validation and explicit database fa
     assert.match(write.body.error, /database storage/);
     assert.equal(noStorage.data.attempts.length, 0);
     assert.equal(errors.mock.calls.length, 3, "Database errors are logged as well as surfaced to the student");
+});
+
+test("all Typing Kit endpoints require verified Google identity and ignore spoofed email claims", async (t) => {
+    const { call, data } = await fixture(t);
+    const cases = [
+        ["", { method: "GET" }],
+        ["/attempts", { method: "POST", body: { weekStart: DEFAULT_START_DATE, period: 1, submissionId: randomUUID(), resultUrl } }],
+        ["/settings", { method: "PUT", body: { startDate: "2026-11-02" } }]
+    ];
+    for (const [route, options] of cases) {
+        for (const email of [student, teacher]) {
+            const denied = await call(route, { ...options, email, verified: false });
+            assert.equal(denied.status, 401, "An email header alone must never authenticate");
+            assert.match(denied.body.error, /verified Google sign-in/);
+            assert.equal(denied.headers.get("cache-control"), "no-store");
+            assert.equal((await call(route, { ...options, email, verified: false, bearer: "invalid-or-expired" })).status, 401);
+        }
+    }
+    assert.equal(data.queries.length, 0, "Reject unverified requests before any database access");
+    const snapshot = await call("", { email: student, claimedEmail: teacher });
+    assert.equal(snapshot.status, 200);
+    assert.equal(snapshot.body.canManage, false, "A student cannot become staff via an email header");
+    assert.equal((await call("/settings", { method: "PUT", email: student, claimedEmail: teacher,
+        body: { startDate: "2026-11-02" } })).status, 403);
+    await call("/attempts", { method: "POST", email: student, claimedEmail: teacher,
+        body: { weekStart: DEFAULT_START_DATE, period: 1, submissionId: randomUUID(), resultUrl } });
+    assert.equal(data.attempts[0].student_email, student, "Results belong only to the verified Google account");
+    assert.equal((await call("", { email: teacher, claimedEmail: student })).body.attempts.length, 0);
+    assert.equal((await call("/settings", { method: "PUT", email: teacher, claimedEmail: student,
+        body: { startDate: "2026-11-02" } })).status, 200, "Verified staff can still manage the calendar");
 });
 
 test("all attempts retained, identity isolated, retries idempotent, dated history survives calendar changes and module reload", async (t) => {
