@@ -53,6 +53,8 @@ const workState = {
     digitalMediaStudentSearch: "",
     digitalMediaStandardSearch: "",
     commentStudentSearch: "",
+    studentCourseFilter: "",
+    studentCourseByEmail: new Map(),
     studentTrackerEmailStatus: new Map(),
     externalAssessmentAllocations: new Map(),
     externalAssessmentStudents: [],
@@ -88,6 +90,8 @@ const studentTrackerCommentsGrid = document.querySelector("#student-tracker-comm
 const printStudentCommentsButton = document.querySelector("#print-student-comments-button");
 const exportStudentCommentsButton = document.querySelector("#export-student-comments-button");
 const commentStudentSearchInput = document.querySelector("#comment-student-search-input");
+const studentCourseFilterSelect = document.querySelector("#student-course-filter");
+const studentNameOptions = document.querySelector("#student-name-options");
 
 function isTaskDetailPage() {
     const path = String(window.location.pathname || "").toLowerCase();
@@ -167,6 +171,41 @@ function buildStudentNameMap(students) {
     });
 
     return map;
+}
+
+function getCourseFromYearLevel(yearLevel) {
+    const year = Number.parseInt(String(yearLevel || "").replace(/[^0-9]/g, ""), 10);
+    if ([11, 12, 13].includes(year)) return "SeniorDTECH";
+    if ([9, 10].includes(year)) return "MiddleDTECH";
+    return "";
+}
+
+function buildStudentCourseMap(students) {
+    const map = new Map();
+    (Array.isArray(students) ? students : []).forEach((student) => {
+        const course = getCourseFromYearLevel(student?.year_level);
+        if (!course) return;
+        (Array.isArray(student?.linked_emails) ? student.linked_emails : [])
+            .map((email) => normalizeEmail(email))
+            .filter(Boolean)
+            .forEach((email) => map.set(email, course));
+    });
+    return map;
+}
+
+function studentMatchesCourseFilter(student) {
+    const course = String(workState.studentCourseFilter || "");
+    return !course || workState.studentCourseByEmail.get(normalizeEmail(student?.studentEmail || "")) === course;
+}
+
+function renderStudentNameOptions() {
+    if (!studentNameOptions) return;
+    const byEmail = new Map();
+    [...buildProcessSummaryRows(), ...buildDigitalMediaSummaryRows()]
+        .filter(studentMatchesCourseFilter)
+        .forEach((student) => byEmail.set(student.studentEmail, student.studentName));
+    const names = Array.from(new Set(byEmail.values())).filter(Boolean).sort((a, b) => a.localeCompare(b));
+    studentNameOptions.innerHTML = names.map((name) => `<option value="${escapeHtml(name)}"></option>`).join("");
 }
 
 function readStoredAuthRaw() {
@@ -1435,7 +1474,7 @@ function renderDigitalMediaSummaryGrid() {
     const standardQuery = String(workState.digitalMediaStandardSearch || "").trim().toLowerCase();
     const filteredRows = rows.filter((student) => {
         const nameMatches = !nameQuery || `${student.studentName} ${student.studentEmail}`.toLowerCase().includes(nameQuery);
-        return nameMatches && studentMatchesStandardSearch(student, standardQuery);
+        return nameMatches && studentMatchesCourseFilter(student) && studentMatchesStandardSearch(student, standardQuery);
     });
     if (!filteredRows.length) {
         host.innerHTML = `<div class="work-empty">No Digital Media students match that search.</div>`;
@@ -1537,7 +1576,7 @@ function getFilteredProcessSummaryRows() {
     const standardQuery = String(workState.standardSearch || "").trim().toLowerCase();
     return rows.filter((student) => {
         const nameMatches = !nameQuery || `${student.studentName} ${student.studentEmail}`.toLowerCase().includes(nameQuery);
-        return nameMatches && studentMatchesStandardSearch(student, standardQuery);
+        return nameMatches && studentMatchesCourseFilter(student) && studentMatchesStandardSearch(student, standardQuery);
     });
 }
 
@@ -1819,6 +1858,13 @@ function wireStudentTrackerComments() {
     commentStudentSearchInput?.addEventListener("input", () => {
         syncStudentNameFilters(commentStudentSearchInput.value);
     });
+    studentCourseFilterSelect?.addEventListener("change", () => {
+        workState.studentCourseFilter = String(studentCourseFilterSelect.value || "");
+        renderStudentNameOptions();
+        renderStudentSummaryGrid();
+        renderStudentTrackerComments();
+        renderDigitalMediaSummaryGrid();
+    });
 }
 
 function syncStudentNameFilters(value) {
@@ -1915,9 +1961,9 @@ function renderStudentSummaryGrid() {
 
     const searchText = String(workState.studentSearch || "").trim().toLowerCase();
     const standardSearchText = String(workState.standardSearch || "").trim().toLowerCase();
-    const visibleRows = searchText
+    const visibleRows = (searchText
         ? rows.filter((student) => `${student.studentName} ${student.studentEmail}`.toLowerCase().includes(searchText))
-        : rows;
+        : rows).filter(studentMatchesCourseFilter);
     const filteredRows = visibleRows.filter((student) => studentMatchesStandardSearch(student, standardSearchText));
 
     if (!filteredRows.length) {
@@ -2588,6 +2634,7 @@ async function init() {
 
         const activityRows = Array.isArray(activities) ? activities : [];
         workState.studentNameByEmail = buildStudentNameMap(classManagementPayload?.students);
+        workState.studentCourseByEmail = buildStudentCourseMap(classManagementPayload?.students);
         workState.externalAssessmentStudents = buildExternalAssessmentStudents(classManagementPayload?.students);
         const assessmentActivities = activityRows.filter((activity) => String(activity?.activity_category || activity?.category || "").toLowerCase().includes("assessment"));
         const interestRows = await Promise.all(
@@ -2639,6 +2686,7 @@ async function init() {
         wireExternalAssessmentEvents();
 
         await loadStudentTrackerComments();
+        renderStudentNameOptions();
         renderStudentSummaryGrid();
         renderStudentTrackerComments();
         renderDigitalMediaSummaryGrid();

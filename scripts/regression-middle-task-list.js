@@ -1165,6 +1165,36 @@ assert.equal(seniorDestination.folderName, "Process Assessment");
         "Where slides were actually copied wins over the stored Process Assessment setup (MiddleDTECH uses MDTECH Project)");
 }
 
+{
+    const courseStart = teacherStudentWork.indexOf("function getCourseFromYearLevel(");
+    const courseEnd = teacherStudentWork.indexOf("\nfunction renderStudentNameOptions", courseStart);
+    assert.ok(courseStart >= 0 && courseEnd > courseStart, "Teacher course filter helpers are present");
+    const courseContext = vm.createContext({
+        normalizeEmail: (value) => String(value || "").trim().toLowerCase(),
+        workState: { studentCourseFilter: "", studentCourseByEmail: new Map() }
+    });
+    vm.runInContext(teacherStudentWork.slice(courseStart, courseEnd), courseContext);
+    const courseMap = courseContext.buildStudentCourseMap([
+        { year_level: "10", linked_emails: ["B_Provis@school.nz"] },
+        { year_level: "Year 12", linked_emails: ["senior@school.nz"] },
+        { year_level: "8", linked_emails: ["junior@school.nz"] }
+    ]);
+    assert.equal(courseMap.get("b_provis@school.nz"), "MiddleDTECH");
+    assert.equal(courseMap.get("senior@school.nz"), "SeniorDTECH");
+    assert.equal(courseMap.has("junior@school.nz"), false);
+    courseContext.workState.studentCourseByEmail = courseMap;
+    courseContext.workState.studentCourseFilter = "MiddleDTECH";
+    assert.equal(courseContext.studentMatchesCourseFilter({ studentEmail: "b_provis@school.nz" }), true);
+    assert.equal(courseContext.studentMatchesCourseFilter({ studentEmail: "senior@school.nz" }), false);
+    courseContext.workState.studentCourseFilter = "";
+    assert.equal(courseContext.studentMatchesCourseFilter({ studentEmail: "unknown@school.nz" }), true, "All courses shows everyone");
+    const workHtml = fs.readFileSync(path.join(root, "teacher-student-work.html"), "utf8");
+    assert.match(workHtml, /id="student-course-filter"[\s\S]*?value="SeniorDTECH"[\s\S]*?value="MiddleDTECH"/);
+    assert.equal((workHtml.match(/list="student-name-options"/g) || []).length, 3, "All three name boxes offer the student list and still accept typing");
+    assert.equal((teacherStudentWork.match(/studentMatchesCourseFilter\(student\)|\.filter\(studentMatchesCourseFilter\)/g) || []).length >= 3, true,
+        "Course filter applies to Process, Digital Media and comments tables");
+}
+
 async function runFolderRouteRegression() {
     const folderHelperStart = server.indexOf("async function getStudentTaskListDriveFolder(email)");
     const folderHelperEnd = server.indexOf('app.get("/api/template-library"', folderHelperStart);

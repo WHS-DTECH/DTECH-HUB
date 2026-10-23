@@ -155,6 +155,12 @@
       margin-left: 8px;
     }
 
+    .student-tracker-comments-toolbar .student-course-filter {
+      width: auto;
+      min-width: 150px;
+      cursor: pointer;
+    }
+
     body.process-tracker-embed .hero,
     body.process-tracker-embed .work-header,
     body.process-tracker-embed #digital-media-summary-heading,
@@ -810,7 +816,13 @@
         <div class="student-tracker-comments" id="student-tracker-comments">
           <div class="student-summary-toolbar student-tracker-comments-toolbar">
             <strong>Student comments</strong>
-            <input id="comment-student-search-input" class="student-summary-search" type="search" placeholder="Filter comments by student name" autocomplete="off" aria-label="Filter comments by student name">
+            <select id="student-course-filter" class="student-summary-search student-course-filter" aria-label="Filter students by course">
+              <option value="">All courses</option>
+              <option value="SeniorDTECH">SeniorDTECH</option>
+              <option value="MiddleDTECH">MiddleDTECH</option>
+            </select>
+            <input id="comment-student-search-input" class="student-summary-search" type="search" list="student-name-options" placeholder="Type or pick a student" autocomplete="off" aria-label="Filter comments by student name">
+            <datalist id="student-name-options"></datalist>
             <div class="student-summary-actions" aria-label="Student comments actions">
               <button id="print-student-comments-button" class="student-summary-action" type="button">Print ALL Comments</button>
               <button id="export-student-comments-button" class="student-summary-action" type="button">Export Comments CSV</button>
@@ -819,7 +831,7 @@
           <div id="student-tracker-comments-grid" aria-live="polite"></div>
         </div>
         <div class="student-summary-toolbar" id="process-summary-toolbar">
-          <input id="student-search-input" class="student-summary-search" type="search" placeholder="Filter by student name" autocomplete="off" aria-label="Filter students by name">
+          <input id="student-search-input" class="student-summary-search" type="search" list="student-name-options" placeholder="Type or pick a student" autocomplete="off" aria-label="Filter students by name">
           <input id="standard-search-input" class="student-summary-search" type="search" placeholder="Filter by process standard" autocomplete="off" aria-label="Filter students by process standard number">
           <div class="student-summary-actions" aria-label="Progress summary actions">
             <button id="generate-individual-summary-button" class="student-summary-action" type="button">Generate Individual PDF</button>
@@ -830,7 +842,7 @@
         <div id="student-summary-grid" aria-live="polite"></div>
         <h3 class="student-summary-heading" id="digital-media-summary-heading">Digital Media Assessment</h3>
         <div class="student-summary-toolbar" id="digital-media-summary-toolbar">
-          <input id="digital-media-student-search-input" class="student-summary-search" type="search" placeholder="Filter by student name" autocomplete="off" aria-label="Filter Digital Media students by name">
+          <input id="digital-media-student-search-input" class="student-summary-search" type="search" list="student-name-options" placeholder="Type or pick a student" autocomplete="off" aria-label="Filter Digital Media students by name">
           <input id="digital-media-standard-search-input" class="student-summary-search" type="search" placeholder="Filter by Digital Media standard" autocomplete="off" aria-label="Filter Digital Media students by standard number">
           <div class="student-summary-actions" aria-label="Digital Media progress summary actions">
             <button id="generate-digital-media-individual-button" class="student-summary-action" type="button">Generate Individual PDF</button>
