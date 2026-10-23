@@ -289,7 +289,10 @@ function getTaskListCourseFromAllocations(items) {
 
 function getMiddleDtechChecklistRows(standard, rows) {
     const safeRows = Array.isArray(rows) ? rows : [];
-    if (standard === "digital-outcome") return safeRows;
+    if (standard === "digital-outcome") {
+        return safeRows.filter((step) => !/^(?:state how success will be measured or evaluated|identify tools and techniques for this outcome|what tools and techniques will be used)[.?]?$/i
+            .test(stripStepLevel(step?.text || "").trim()));
+    }
     if (standard === "91897" || standard === "91907") {
         return safeRows.filter((step) => {
             if (getStepLevel(step?.text) !== "Achieved") return false;
@@ -301,8 +304,13 @@ function getMiddleDtechChecklistRows(standard, rows) {
         });
     }
     if (standard === "91893" || standard === "91903") {
-        return safeRows.filter((step) => getStepLevel(step?.text) === "Excellence"
-            && /using efficient tools and techniques in the outcome.?s production/i.test(stripStepLevel(step?.text || "")));
+        return safeRows.filter((step) => {
+            const text = stripStepLevel(step?.text || "");
+            return (getStepLevel(step?.text) === "Achieved"
+                && /^(?:using appropriate tools and techniques for the purpose and end users|applying appropriate tools and techniques to meet the purpose and end-user requirements)\.?$/i.test(text))
+                || (getStepLevel(step?.text) === "Excellence"
+                    && /using efficient tools and techniques in the outcome.?s production/i.test(text));
+        });
     }
     return [];
 }
@@ -3487,11 +3495,12 @@ function renderChecklistCards(detail, allItems) {
                 ${levels.map((level) => `
                     <section class="task-list-level-group">
                         ${isMiddleDtech ? "" : `<h4>${level}</h4>`}
-                        ${level === "Achieved" ? `<p class="task-list-achieved-subheading">Section 1: Digital Media</p>` : ""}
+                        ${level === "Achieved" && !isMiddleDtech ? `<p class="task-list-achieved-subheading">Section 1: Digital Media</p>` : ""}
                         ${level === "Merit" ? `<p class="task-list-merit-trello-note">${escapeTaskListHtml(TASK_LIST_MERIT_TRELLO_NOTE)}</p>` : ""}
                         ${level === "Excellence" && !isMiddleDtech ? `<p class="task-list-merit-trello-note">${escapeTaskListHtml(TASK_LIST_EXCELLENCE_TRELLO_NOTE)}</p>` : ""}
                         <div class="task-list-step-list">
-                            ${safeRows.map((step, index) => {
+                            ${safeRows.map((step) => {
+                                const index = allRows.indexOf(step);
                                 if (getStepLevel(step?.text) !== level) return "";
                                 const stepText = stripStepLevel(step?.text || "");
                                 const isLinkedRelevantImplicationsRow = /^(?:explain(?:ing)?|address(?:ing)?) relevant implications\.?$/i.test(stepText);
@@ -3691,7 +3700,8 @@ function renderChecklistCards(detail, allItems) {
         if (String(standard) !== "91897" && String(standard) !== "91907" && String(standard) !== "91893" && String(standard) !== "91903") {
             return `
                 <div class="task-list-step-list">
-                    ${safeRows.map((step, index) => {
+                    ${safeRows.map((step) => {
+                        const index = allRows.indexOf(step);
                         const stepText = String(step?.text || "");
                         const managementKind = getStepAutoManagementKind(standard, stepText);
                         const needsEvidence = managementKind === "manual";
@@ -3721,7 +3731,7 @@ function renderChecklistCards(detail, allItems) {
         );
         return levels.map((level) => {
             const levelRows = safeRows
-                .map((step, index) => ({ ...step, _index: index }))
+                .map((step) => ({ ...step, _index: allRows.indexOf(step) }))
                 .filter((step) => getStepLevel(step?.text) === level);
             const renderedAchievedSections = new Set();
             const relevantCategoryRows = levelRows.filter((step) => level === "Achieved" && isRelevantImplicationsCategoryStep(step?.text));

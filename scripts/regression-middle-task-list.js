@@ -1028,12 +1028,15 @@ assert.doesNotMatch(taskList, /driveDeleteFile|DELETE.*drive\.googleapis/i,
 
 const digitalOutcomeRows = [
     { text: "Describe the digital outcome" },
-    { text: "Identify the target audience" }
+    { text: "Identify the target audience" },
+    { text: "State how success will be measured or evaluated.", done: true },
+    { text: "Identify Tools and Techniques for this outcome.", done: true },
+    { text: "What Tools and Techniques will be used?", done: true }
 ];
 assert.deepEqual(
     JSON.parse(JSON.stringify(context.getMiddleDtechChecklistRows("digital-outcome", digitalOutcomeRows))),
-    digitalOutcomeRows,
-    "MiddleDTECH keeps the Digital Outcome Topic checklist"
+    digitalOutcomeRows.slice(0, 2),
+    "MiddleDTECH hides success criteria and the separate tools prompt without deleting saved rows"
 );
 
 const projectRows = [
@@ -1051,14 +1054,23 @@ assert.deepEqual(
 );
 
 const mediaRows = [
-    { text: "Achieved: Use appropriate tools and techniques for the purpose and end users." },
+    { text: "Achieved: Using appropriate tools and techniques for the purpose and end users.", done: true },
     { text: "Excellence: Using efficient tools and techniques in the outcome's production." },
     { text: "Excellence: Iterative improvement throughout the design and development process." }
 ];
 assert.deepEqual(
     JSON.parse(JSON.stringify(context.getMiddleDtechChecklistRows("91893", mediaRows))),
-    [mediaRows[1]],
-    "MiddleDTECH keeps the efficient-tools item without the other digital media criteria"
+    mediaRows.slice(0, 2),
+    "MiddleDTECH includes appropriate tools above efficient tools, preserving their saved ticks"
+);
+const level3MediaRows = [
+    { text: "Achieved: Applying appropriate tools and techniques to meet the purpose and end-user requirements.", done: true },
+    ...mediaRows.slice(1)
+];
+assert.deepEqual(
+    JSON.parse(JSON.stringify(context.getMiddleDtechChecklistRows("91903", level3MediaRows))),
+    level3MediaRows.slice(0, 2),
+    "The equivalent Level 3 tools criterion is retained too"
 );
 assert.deepEqual(
     JSON.parse(JSON.stringify(context.getMiddleDtechChecklistRows("unrelated-standard", projectRows))),
@@ -1111,6 +1123,39 @@ const renderContext = vm.createContext({
 const renderStart = taskList.indexOf("function renderChecklistCards(");
 const renderEnd = taskList.indexOf("function getStandardCodes(", renderStart);
 vm.runInContext(taskList.slice(renderStart, renderEnd), renderContext);
+Object.assign(renderContext, {
+    getStepLevel: context.getStepLevel,
+    stripStepLevel: context.stripStepLevel,
+    getTaskTopicHrefForStep: () => "/tools",
+    isInformationalCriteriaRow: () => false,
+    getStepAutoManagementKind: () => "auto",
+    isUseOfToolsTechniquesRequirementStep: () => true,
+    isWebConventionsRequirementStep: () => false,
+    isUXPrinciplesRequirementStep: () => false,
+    isWebIntegrityRequirementStep: () => false,
+    buildCustomActivityLink: () => "/tools",
+    getSessionTickKey: (standard, index) => `${standard}:${index}`,
+    DIGIMED_EFFICIENT_TOOLS_SUBTASKS: ["Using stylesheets"],
+    DIGIMED_TOOLS_TECHNIQUES_SUBTASKS: ["Creating scripts"],
+    readDigiMedToolsTechniquesState: () => ({ "Creating scripts": true }),
+    readDigiMedEfficientToolsState: () => ({ "Using stylesheets": true })
+});
+const storedMediaRows = [
+    { text: "Achieved: Applying appropriate data integrity and testing procedures.", done: false },
+    ...mediaRows
+];
+renderState.checklistState = { "digital-outcome": digitalOutcomeRows, "91893": storedMediaRows };
+const storedStateBeforeRender = JSON.stringify(renderState.checklistState);
+renderContext.renderChecklistCards({ name: "My Project" }, []);
+assert.ok(checklistHost.innerHTML.indexOf("Using appropriate tools and techniques") <
+    checklistHost.innerHTML.indexOf("Using efficient tools and techniques"), "Appropriate tools render above efficient tools in Digital Media");
+assert.match(checklistHost.innerHTML, /data-digimed-tools-technique="Creating scripts" checked/);
+assert.match(checklistHost.innerHTML, /data-digimed-efficient-tool="Using stylesheets" checked/);
+assert.match(checklistHost.innerHTML, /checked[^>]+data-step-check="91893:1"/,
+    "The moved tools criterion retains its checked state and original storage index");
+assert.doesNotMatch(checklistHost.innerHTML, /State how success will be measured|Identify Tools and Techniques for this outcome|Section 1: Digital Media/);
+assert.equal(JSON.stringify(renderState.checklistState), storedStateBeforeRender, "Presentation changes never delete saved checklist rows");
+renderState.checklistState = {};
 renderContext.renderChecklistCards({ name: "My Project" }, []);
 assert.match(checklistHost.innerHTML, /Project Development/);
 assert.match(checklistHost.innerHTML, /Digital Media/);

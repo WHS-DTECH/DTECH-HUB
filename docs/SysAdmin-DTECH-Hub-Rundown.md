@@ -98,6 +98,10 @@ Strict cutover checklist (go/no-go):
 - Saved results are snapshots, not a background sync. Reload shows saved checks; refresh after students edit slides or teachers add comments. API/access failures show **Unable to check**, never a negative writing/comment result. **No linked description** is not proof that no file exists.
 - Implementation: [server integration](../student-class-tracker.js), [tab UI](../teacher-my-class.js), [styles](../teacher-my-class.css). Run `node scripts/regression-my-class.js` and `node scripts/regression-middle-task-list.js` for focused regression checks.
 
+### MDTECH Task List presentation
+- The MiddleDTECH Digital Outcome Topic hides the separate success-measurement and tools-identification prompts. Digital Media shows the appropriate-tools criterion and its subtasks above the existing efficient-tools criterion and subtasks.
+- This is a display-only change: saved checklist rows and evidence remain intact, and rendered checkboxes retain their original storage indexes. SeniorDTECH criteria are unchanged. Covered by `node scripts/regression-middle-task-list.js`.
+
 ## 6) HTTPS Responsibility
 - HTTPS/TLS termination is currently handled by Render-managed certificates.
 - The app itself runs as a standard Node web service behind Render's HTTPS edge.
