@@ -1150,6 +1150,21 @@ const seniorDestination = destinationContext.getTemplateDestination({
 assert.equal(seniorDestination.folderId, "senior-process-id");
 assert.equal(seniorDestination.folderName, "Process Assessment");
 
+{
+    const helperStart = teacherStudentWork.indexOf("function getProcessFolderUrlFromTemplateCopies(");
+    const helperEnd = teacherStudentWork.indexOf("\nfunction getDigitalOutcomeTemplateId", helperStart);
+    assert.ok(helperStart >= 0 && helperEnd > helperStart, "Teacher process-folder helper is present");
+    const helperContext = vm.createContext({ toSafeExternalUrl: (value) => /^https:\/\//.test(String(value || "")) ? String(value) : "" });
+    vm.runInContext(teacherStudentWork.slice(helperStart, helperEnd), helperContext);
+    assert.equal(helperContext.getProcessFolderUrlFromTemplateCopies([
+        { copiedAt: "2026-09-01T00:00:00Z", processAssessmentFolderUrl: "https://drive.google.com/drive/folders/old-process" },
+        { copiedAt: "2026-10-20T00:00:00Z", processAssessmentFolderUrl: "https://drive.google.com/drive/folders/mdtech-project" }
+    ]), "https://drive.google.com/drive/folders/mdtech-project", "Teacher link follows the folder of the latest copied slide");
+    assert.match(teacherStudentWork,
+        /const processFolderUrl = getProcessFolderUrlFromTemplateCopies\([^)]*\)\s*\|\| toSafeExternalUrl\(student\?\.process_assessment_folder_url/,
+        "Where slides were actually copied wins over the stored Process Assessment setup (MiddleDTECH uses MDTECH Project)");
+}
+
 async function runFolderRouteRegression() {
     const folderHelperStart = server.indexOf("async function getStudentTaskListDriveFolder(email)");
     const folderHelperEnd = server.indexOf('app.get("/api/template-library"', folderHelperStart);
