@@ -6265,7 +6265,8 @@ require("./learning-pathways/comment-bank-store").registerCommentBank(app, {
   pool, hasDatabase, requireTeacherAccess: requireActivityWriteAccess, requireAdminAccess
 });
 registerTypingKit(app, {
-  pool, hasDatabase, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN, canManagePracticalSchedule
+  pool, hasDatabase, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN, canManagePracticalSchedule,
+  verifyGoogleAccessTokenAndExtractIdentity
 });
 require("./practical-skills/certificate-catchup").registerCertificateCatchup(app, {
   pool, hasDatabase, requireAdminAccess, ensurePracticalSkillsProgressSchema, ensureEmailLogsSchema,
@@ -7054,6 +7055,33 @@ async function verifyGoogleIdTokenAndExtractIdentity(idToken) {
   } catch (_error) {
     return { ok: false, error: "token_verification_failed" };
   }
+}
+
+async function verifyGoogleAccessTokenAndExtractIdentity(accessToken) {
+  if (!googleAuthClient || !GOOGLE_ID_TOKEN_AUDIENCES.length) {
+    return { ok: false, error: "Google identity verification is not configured." };
+  }
+  let info;
+  try {
+    info = await googleAuthClient.getTokenInfo(accessToken);
+  } catch (_error) {
+    return { ok: false, error: "Google sign-in expired or could not be verified. Please sign in again." };
+  }
+  if (!GOOGLE_ID_TOKEN_AUDIENCES.includes(String(info.aud || ""))
+      || !Number.isFinite(info.expiry_date) || info.expiry_date <= Date.now()) {
+    return { ok: false, error: "Google sign-in was not issued to this app or has expired." };
+  }
+  const response = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(10000)
+  });
+  if (!response.ok) return { ok: false, error: "Google account identity could not be verified. Please sign in again." };
+  const profile = await response.json();
+  const email = normalizeEmail(profile.email);
+  if (profile.email_verified !== true || !isSchoolEmail(email)) {
+    return { ok: false, error: "A verified school Google account is required." };
+  }
+  return { ok: true, email };
 }
 
 function getRequestUserEmail(req) {

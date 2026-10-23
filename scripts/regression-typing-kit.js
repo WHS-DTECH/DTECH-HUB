@@ -55,6 +55,7 @@ async function fixture(t, options = {}) {
     registerTypingKit(app, {
         pool: db.pool, hasDatabase: options.hasDatabase !== false,
         normalizeEmail: (value) => String(value || "").toLowerCase(),
+        verifyGoogleAccessTokenAndExtractIdentity: options.verifyAccessToken,
         schoolDomain: "school.nz",
         canManagePracticalSchedule: async (email) => email === teacher
     });
@@ -176,6 +177,50 @@ test("all Typing Kit endpoints require verified Google identity and ignore spoof
     assert.equal((await call("", { email: teacher, claimedEmail: student })).body.attempts.length, 0);
     assert.equal((await call("/settings", { method: "PUT", email: teacher, claimedEmail: student,
         body: { startDate: "2026-11-02" } })).status, 200, "Verified staff can still manage the calendar");
+});
+
+test("Google-validated OAuth identities work without trusting header emails", async (t) => {
+    const { call, data } = await fixture(t, {
+        verifyAccessToken: async (token) => token === "google-validated-token"
+            ? { ok: true, email: student } : { ok: false }
+    });
+    const options = { verified: false, bearer: "google-validated-token", claimedEmail: teacher };
+    assert.equal((await call("", options)).status, 200);
+    assert.equal((await call("", options)).body.canManage, false);
+    assert.equal((await call("/settings", { ...options, method: "PUT", body: { startDate: DEFAULT_START_DATE } })).status, 403);
+    assert.equal((await call("/attempts", { ...options, method: "POST",
+        body: { weekStart: DEFAULT_START_DATE, period: 1, submissionId: randomUUID(), resultUrl } })).status, 201);
+    assert.equal(data.attempts[0].student_email, student);
+    assert.equal((await call("", { ...options, bearer: "untrusted-token" })).status, 401);
+});
+
+test("OAuth verification requires this app's audience, a live token and a Google-verified school email", async () => {
+    const source = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
+    const start = source.indexOf("async function verifyGoogleAccessTokenAndExtractIdentity(");
+    const end = source.indexOf("\nfunction getRequestUserEmail(", start);
+    let info = { aud: "our-client", expiry_date: Date.now() + 60000 };
+    let profile = { email: student, email_verified: true };
+    let fail = false;
+    const context = vm.createContext({
+        googleAuthClient: { getTokenInfo: async () => { if (fail) throw new Error("Invalid token"); return info; } },
+        GOOGLE_ID_TOKEN_AUDIENCES: ["our-client"], Date, Number, String, AbortSignal,
+        normalizeEmail: (value) => String(value || "").toLowerCase(),
+        isSchoolEmail: (email) => email.endsWith("@school.nz"),
+        fetch: async () => ({ ok: true, json: async () => profile })
+    });
+    vm.runInContext(source.slice(start, end), context);
+    assert.equal((await context.verifyGoogleAccessTokenAndExtractIdentity("token")).email, student);
+    info = { aud: "another-app", expiry_date: Date.now() + 60000 };
+    assert.equal((await context.verifyGoogleAccessTokenAndExtractIdentity("token")).ok, false);
+    info = { aud: "our-client", expiry_date: Date.now() - 1 };
+    assert.equal((await context.verifyGoogleAccessTokenAndExtractIdentity("token")).ok, false);
+    info = { aud: "our-client", expiry_date: Date.now() + 60000 };
+    profile = { email: teacher, email_verified: false };
+    assert.equal((await context.verifyGoogleAccessTokenAndExtractIdentity("token")).ok, false);
+    profile = { email: "other@example.org", email_verified: true };
+    assert.equal((await context.verifyGoogleAccessTokenAndExtractIdentity("token")).ok, false);
+    fail = true;
+    assert.equal((await context.verifyGoogleAccessTokenAndExtractIdentity("token")).ok, false);
 });
 
 test("all attempts retained, identity isolated, retries idempotent, dated history survives calendar changes and module reload", async (t) => {

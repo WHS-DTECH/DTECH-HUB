@@ -73,7 +73,7 @@ function parseTypingResult(value) {
     return { accuracy, netWpm, grossWpm, durationSeconds, sourceUrl: source.href };
 }
 
-function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomain, canManagePracticalSchedule }) {
+function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomain, canManagePracticalSchedule, verifyGoogleAccessTokenAndExtractIdentity }) {
     let schemaReady;
     async function ensureSchema() {
         if (!hasDatabase) {
@@ -98,13 +98,27 @@ function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomai
         }
         await schemaReady;
     }
-    const identity = (req, res) => {
+    const identity = async (req, res) => {
         res.set("Cache-Control", "no-store");
-        if (req.auth_identity?.verified !== true || req.auth_identity.source !== "google_id_token") {
+        let email = req.auth_identity?.verified === true && req.auth_identity.source === "google_id_token"
+            ? normalizeEmail(req.auth_identity.email) : "";
+        if (!email && verifyGoogleAccessTokenAndExtractIdentity) {
+            const token = String(req.headers?.authorization || "").match(/^Bearer\s+(\S+)$/i)?.[1];
+            if (token) {
+                try {
+                    const verified = await verifyGoogleAccessTokenAndExtractIdentity(token);
+                    if (verified.ok) email = normalizeEmail(verified.email);
+                } catch (error) {
+                    console.error("[typing-kit] Google identity check failed:", error.message);
+                    res.status(503).json({ error: "Google identity verification is temporarily unavailable. Please retry." });
+                    return "";
+                }
+            }
+        }
+        if (!email) {
             res.status(401).json({ error: "A verified Google sign-in is required. Sign out, then sign in with your school Google account again." });
             return "";
         }
-        const email = normalizeEmail(req.auth_identity.email);
         if (!email || !email.endsWith(`@${schoolDomain}`)) {
             res.status(401).json({ error: "Sign in with your school Google account to use your Typing Kit." });
             return "";
@@ -126,7 +140,7 @@ function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomai
     }
 
     app.get("/api/practical-skills/typing-kit", async (req, res) => {
-        const email = identity(req, res);
+        const email = await identity(req, res);
         if (!email) return;
         res.set("Cache-Control", "no-store");
         try {
@@ -141,7 +155,7 @@ function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomai
     });
 
     app.put("/api/practical-skills/typing-kit/settings", async (req, res) => {
-        const email = identity(req, res);
+        const email = await identity(req, res);
         if (!email) return;
         try {
             if (!(await canManagePracticalSchedule(email))) return res.status(403).json({ error: "Only teaching staff can change the Typing Kit start date." });
@@ -156,7 +170,7 @@ function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomai
     });
 
     app.post("/api/practical-skills/typing-kit/attempts", async (req, res) => {
-        const email = identity(req, res);
+        const email = await identity(req, res);
         if (!email) return;
         const { weekStart, period, submissionId } = req.body || {};
         if (!isMonday(weekStart) || ![1, 2].includes(period)
