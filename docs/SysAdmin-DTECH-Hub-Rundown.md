@@ -102,6 +102,12 @@ Strict cutover checklist (go/no-go):
 - The MiddleDTECH Digital Outcome Topic hides the separate success-measurement and tools-identification prompts. Digital Media shows the appropriate-tools criterion and its subtasks above the existing efficient-tools criterion and subtasks.
 - This is a display-only change: saved checklist rows and evidence remain intact, and rendered checkboxes retain their original storage indexes. SeniorDTECH criteria are unchanged. Covered by `node scripts/regression-middle-task-list.js`.
 
+### Kit Content Builder sign-in readiness
+
+- Editor buttons and the blank draft initialise before the asynchronous Google sign-in check. Adding worksheets works while sign-in is pending; saving rechecks admin access and shows errors beside the Save button as well as at the top.
+- The builder retries access checks on `hub-auth-state-changed` without resetting a new kit's draft or registering duplicate click handlers. Existing-kit content is loaded after access is confirmed.
+- Run `node --test scripts/regression-kit-builder-auth.js scripts/regression-kit-builder-new-kit.js scripts/regression-kit-builder-year-level.js scripts/regression-kit-worksheet-removal.js`.
+
 ### Typing Kit difficulty launch buttons
 
 - Daily records display the latest saved attempt in a three-circle scorecard: gross typing speed, accuracy and net speed. Values come directly from the saved attempt, not a recalculation or a personal-best comparison. A highlighted exercise-book panel provides the week/period and scores to copy, followed by a physical teacher-signature reminder. Attempt history and saving behaviour are unchanged.

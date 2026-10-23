@@ -23,6 +23,8 @@
 
     const state = {
         isAdmin: false,
+        initialized: false,
+        authRevision: 0,
         kitId: NEW_KIT_ID,
         content: null,
         previewTimerId: 0
@@ -107,6 +109,13 @@
     }
 
     function setStatus(message, isError = false) {
+        const saveStatus = document.querySelector("#kit-save-status");
+        if (saveStatus) {
+            saveStatus.hidden = !message;
+            saveStatus.textContent = message || "";
+            saveStatus.classList.toggle("is-error", isError);
+            saveStatus.classList.toggle("is-success", !isError);
+        }
         if (!statusHost) return;
         if (!message) {
             statusHost.hidden = true;
@@ -367,6 +376,7 @@
     }
 
     async function saveKitContent() {
+        if (!(await verifyAdminAccess())) return;
         const draft = readFormIntoContent();
         if (state.kitId === NEW_KIT_ID) {
             await createKit(draft);
@@ -432,8 +442,7 @@
         });
 
         addWorksheetBtn.addEventListener("click", () => {
-            state.content = state.content || {};
-            state.content.worksheets = readFormIntoContent().worksheets;
+            state.content = readFormIntoContent();
             state.content.worksheets.push(createDefaultWorksheet(state.content.worksheets.length + 1));
             renderWorksheetList();
             queuePreviewUpdate();
@@ -479,14 +488,24 @@
     }
 
     async function init() {
+        const revision = ++state.authRevision;
         const allowed = await verifyAdminAccess();
-        if (!allowed) return;
+        if (revision !== state.authRevision) return;
+        state.isAdmin = allowed;
+        kitSelect.disabled = !allowed;
+        if (!allowed || state.initialized) return;
+        state.initialized = true;
 
-        state.kitId = new URLSearchParams(window.location.search).get("kit") || NEW_KIT_ID;
         await refreshKitCatalog();
-        wireFormEvents();
-        await loadKitContent(state.kitId);
+        if (state.kitId !== NEW_KIT_ID) await loadKitContent(state.kitId);
+        else setStatus("New blank kit. Fill in the details, then Save Kit Content to create it.");
     }
 
+    state.kitId = new URLSearchParams(window.location.search).get("kit") || NEW_KIT_ID;
+    state.content = createBlankKitContent();
+    populateKitSelect();
+    renderForm();
+    wireFormEvents();
+    window.addEventListener("hub-auth-state-changed", () => { void init(); });
     void init();
 })();
