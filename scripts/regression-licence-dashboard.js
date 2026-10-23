@@ -63,6 +63,26 @@ async function main() {
     await tick();
     assert.match(nodes.get("ps-badge-list").innerHTML, /&lt;script&gt;/);
 
+    snapshot = { ...snapshot,
+        customKits: [
+            { id: "kit-files", title: "Files & Folders", icon: "<img>", description: "Create. Save. Find.", custom: true, isComplete: true },
+            { id: "kit-management", title: "File Management", icon: "F", description: "Organise files.", custom: true, isComplete: false }
+        ],
+        kits: [...snapshot.kits, { id: "kit-files", isComplete: true }, { id: "kit-management", isComplete: false }],
+        stampCompletedCount: 4, stampTotalKits: 5
+    };
+    events["hub-auth-state-changed"]();
+    await tick();
+    assert.match(nodes.get("ps-stamp-list").innerHTML, /Files &amp; Folders/);
+    assert.match(nodes.get("ps-stamp-list").innerHTML, /kit=kit-files/);
+    assert.match(nodes.get("ps-stamp-list").innerHTML, /&lt;img&gt;/);
+    assert.equal(nodes.get("ps-licence-progress-count").textContent, "4 / 5 stamps");
+    assert.match(nodes.get("ps-next-link").href, /kit-management/);
+    const customCard = nodes.get("ps-kit-list").children.at(-3);
+    assert.match(customCard.innerHTML, /Files &amp; Folders/);
+    assert.match(customCard.innerHTML, /View kit & certificate/);
+    assert.doesNotMatch(customCard.innerHTML, /Target window|Points:/);
+
     fail = true;
     events["hub-auth-state-changed"]();
     await tick();

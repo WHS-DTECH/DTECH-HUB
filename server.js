@@ -392,7 +392,7 @@ async function getAllPracticalSkillsProgressRows(studentEmail) {
   if (!email) return [];
 
   if (!hasDatabase) {
-    return PRACTICAL_SKILLS_KIT_DEFINITIONS
+    return [...PRACTICAL_SKILLS_KIT_DEFINITIONS, ...customPracticalSkillsKits.values()]
       .map((kit) => memoryPracticalSkillsProgress.get(`${email}:${kit.id}`))
       .filter(Boolean);
   }
@@ -15281,6 +15281,34 @@ async function getPracticalSkillsStudentName(req) {
   return verifiedName || schoolName || email;
 }
 
+async function buildPracticalSkillsLicenceSnapshot(rows) {
+  const snapshot = computePracticalSkillsSnapshot(rows);
+  const customKits = await Promise.all([...customPracticalSkillsKits.values()].map(async (kit) => {
+    const content = await getStoredPracticalSkillsKitContent(kit.id);
+    const row = rows.find((entry) => entry.kit_id === kit.id);
+    return {
+      id: kit.id,
+      title: content.identity?.name || content.bannerTitle || kit.id,
+      description: content.bannerSubtitle || `Explore ${content.identity?.name || content.bannerTitle || "this kit"} and complete its activities.`,
+      icon: content.theme?.icon || "\ud83d\udcc1",
+      custom: true,
+      status: content.identity?.status || "active",
+      isComplete: Boolean(row?.completed),
+      startedAt: row?.started_at || null,
+      completedAt: row?.completed_at || null,
+      score: 0
+    };
+  }));
+  const visibleCustomKits = customKits.filter((kit) => kit.status === "active");
+  return {
+    ...snapshot,
+    kits: [...snapshot.kits, ...customKits],
+    customKits: visibleCustomKits,
+    stampCompletedCount: snapshot.completedCount + visibleCustomKits.filter((kit) => kit.isComplete).length,
+    stampTotalKits: snapshot.totalKits + visibleCustomKits.length
+  };
+}
+
 app.get("/api/practical-skills/my-progress", async (req, res) => {
   const studentEmail = normalizeEmail(getRequestUserEmail(req));
   if (!studentEmail || !studentEmail.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) {
@@ -15289,11 +15317,12 @@ app.get("/api/practical-skills/my-progress", async (req, res) => {
   }
 
   try {
-    await Promise.all(PRACTICAL_SKILLS_KIT_DEFINITIONS.map((kit) => ensurePracticalSkillsProgressRow(studentEmail, kit.id)));
+    const definitions = [...PRACTICAL_SKILLS_KIT_DEFINITIONS, ...customPracticalSkillsKits.values()];
+    await Promise.all(definitions.map((kit) => ensurePracticalSkillsProgressRow(studentEmail, kit.id)));
     await refreshLearningSitesCheckIn(studentEmail);
-    await Promise.all(PRACTICAL_SKILLS_KIT_DEFINITIONS.map((kit) => syncPracticalSkillsKitCompletion(studentEmail, kit.id)));
+    await Promise.all(definitions.map((kit) => syncPracticalSkillsKitCompletion(studentEmail, kit.id)));
     const rows = await getAllPracticalSkillsProgressRows(studentEmail);
-    res.json({ ...computePracticalSkillsSnapshot(rows), student: { name: await getPracticalSkillsStudentName(req), email: studentEmail } });
+    res.json({ ...await buildPracticalSkillsLicenceSnapshot(rows), student: { name: await getPracticalSkillsStudentName(req), email: studentEmail } });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not load Practical Skills progress." });
   }
@@ -15320,7 +15349,7 @@ app.post("/api/practical-skills/progress/:kitId/complete", async (req, res) => {
     await setPracticalSkillsKitCompletion(studentEmail, kitId, true);
     void autoEmailKitCertificate(req, kitId);
     const rows = await getAllPracticalSkillsProgressRows(studentEmail);
-    res.json(computePracticalSkillsSnapshot(rows));
+    res.json(await buildPracticalSkillsLicenceSnapshot(rows));
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not save Practical Skills progress." });
   }
@@ -15341,7 +15370,7 @@ app.post("/api/practical-skills/progress/:kitId/reset", async (req, res) => {
   try {
     await setPracticalSkillsKitCompletion(studentEmail, kitId, false);
     const rows = await getAllPracticalSkillsProgressRows(studentEmail);
-    res.json(computePracticalSkillsSnapshot(rows));
+    res.json(await buildPracticalSkillsLicenceSnapshot(rows));
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not reset Practical Skills progress." });
   }
@@ -15364,7 +15393,7 @@ app.get("/api/practical-skills/progress/:kitId", async (req, res) => {
     const certificate = await getPracticalSkillsCertificate(req, kitId);
     const certificateEmailed = await autoEmailKitCertificate(req, kitId, certificate);
     const rows = await getAllPracticalSkillsProgressRows(studentEmail);
-    const snapshot = computePracticalSkillsSnapshot(rows);
+    const snapshot = await buildPracticalSkillsLicenceSnapshot(rows);
     const row = rows.find((entry) => String(entry?.kit_id || "").trim() === kitId);
     res.json({
       kit: snapshot.kits.find((entry) => entry.id === kitId) || null,

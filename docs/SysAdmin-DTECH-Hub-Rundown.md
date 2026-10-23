@@ -104,6 +104,10 @@ Strict cutover checklist (go/no-go):
 
 ### Kit Content Builder sign-in readiness
 
+- Saving an active custom kit also makes it available on My Licence in both the stamp collection and Your Kit Collection, including existing custom kits. Name, icon and subtitle come from saved kit content. Completed activities earn the kit's stamp and certificate through the existing completion flow.
+- Planning/archived custom kits are excluded from these collections; their saved progress remains available. Active custom kits increase the stamp total but do not alter the original three-kit points, tiers or badge rules. Typing remains a separate practice log, not a stamp.
+- Licence coverage: `node --test scripts/regression-licence-custom-kits.js scripts/regression-licence-dashboard.js scripts/regression-kit-certificate.js scripts/regression-kit-builder-new-kit.js`.
+
 - Editor buttons and the blank draft initialise before the asynchronous Google sign-in check. Adding worksheets works while sign-in is pending; saving rechecks admin access and shows errors beside the Save button as well as at the top.
 - The builder retries access checks on `hub-auth-state-changed` without resetting a new kit's draft or registering duplicate click handlers. Existing-kit content is loaded after access is confirmed.
 - Run `node --test scripts/regression-kit-builder-auth.js scripts/regression-kit-builder-new-kit.js scripts/regression-kit-builder-year-level.js scripts/regression-kit-worksheet-removal.js`.

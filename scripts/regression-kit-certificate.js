@@ -48,6 +48,7 @@ async function main() {
         buildStudentClassManagementRow: (entry) => entry,
         dedupeToLatestStudentRows: (entries) => entries,
         ensurePracticalSkillsProgressSchema: async () => {},
+        customPracticalSkillsKits: new Map(),
         computePracticalSkillsSnapshot: (rows) => ({ kits: rows.map((row) => ({ id: row.kit_id, isComplete: row.completed, completedAt: row.completed_at })), badges: [] }),
         smtpTransporter: {}, SMTP_FROM: "hub@example.school.nz",
         sendConfiguredHubEmail: async (options) => { sent.push(options); },

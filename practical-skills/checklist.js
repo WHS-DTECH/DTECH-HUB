@@ -149,10 +149,11 @@
         const list = document.getElementById("ps-kit-list");
         if (!list) return;
         const snapshot = state.snapshot;
+        const licenceKits = [...kitDefinitions, ...(snapshot?.customKits || []).map((kit) => ({ ...kit, colour: "green" }))];
         const loaded = Boolean(state.email && snapshot);
         const kitsById = new Map((snapshot?.kits || []).map((kit) => [kit.id, kit]));
-        const completed = loaded ? Number(snapshot.completedCount || 0) : 0;
-        const total = loaded ? Number(snapshot.totalKits || kitDefinitions.length) : kitDefinitions.length;
+        const completed = loaded ? Number(snapshot.stampCompletedCount ?? snapshot.completedCount ?? 0) : 0;
+        const total = loaded ? Number(snapshot.stampTotalKits ?? snapshot.totalKits ?? kitDefinitions.length) : kitDefinitions.length;
         document.getElementById("ps-student-name").textContent = loaded ? snapshot.student?.name || state.email : state.email ? "Loading your licence..." : "Your name belongs here";
         document.getElementById("ps-student-email").textContent = state.email || "Sign in with your school account to start collecting stamps.";
         document.getElementById("ps-total-points").textContent = loaded ? String(snapshot.totalPoints || 0) : "\u2014";
@@ -162,14 +163,14 @@
         progress.max = total;
         progress.value = completed;
         document.getElementById("ps-licence-progress-count").textContent = loaded ? `${completed} / ${total} stamps` : state.email ? "Loading..." : "Sign in to view";
-        document.getElementById("ps-stamp-list").innerHTML = kitDefinitions.map((kit) => {
+        document.getElementById("ps-stamp-list").innerHTML = licenceKits.map((kit) => {
             const earned = loaded && kitsById.get(kit.id)?.isComplete;
             const href = `./kit-worksheet.html?kit=${encodeURIComponent(kit.id)}`;
-            const copy = `<span class="licence-stamp-icon" aria-hidden="true">${kit.icon}</span><strong>${escapeHtml(kit.title)}</strong><span>${earned ? "STAMP EARNED" : loaded ? "Stamp to collect" : "Waiting for you"}</span>`;
+            const copy = `<span class="licence-stamp-icon" aria-hidden="true">${escapeHtml(kit.icon)}</span><strong>${escapeHtml(kit.title)}</strong><span>${earned ? "STAMP EARNED" : loaded ? "Stamp to collect" : "Waiting for you"}</span>`;
             return earned ? `<a class="licence-stamp is-earned" href="${href}" aria-label="${escapeHtml(kit.title)} stamp earned - view certificate">${copy}<span class="stamp-certificate">View certificate &rarr;</span></a>`
                 : `<div class="licence-stamp">${copy}</div>`;
         }).join("") + `<a class="licence-stamp is-log" href="./typing-kit.html" aria-label="Typing Kit - open your seven-week practice log"><span class="licence-stamp-icon" aria-hidden="true">&#9000;</span><strong>Typing Kit</strong><span>7-WEEK PRACTICE LOG</span><span class="stamp-certificate">Open log &rarr;</span></a>`;
-        const next = loaded ? kitDefinitions.find((kit) => !kitsById.get(kit.id)?.isComplete) : null;
+        const next = loaded ? licenceKits.find((kit) => !kitsById.get(kit.id)?.isComplete) : null;
         const nextPanel = document.getElementById("ps-next-step");
         nextPanel.hidden = !loaded;
         if (loaded) {
@@ -193,7 +194,7 @@
 
         list.innerHTML = "";
 
-        kitDefinitions.forEach((kit) => {
+        licenceKits.forEach((kit) => {
             const progress = kitsById.get(kit.id) || { isComplete: false, onTime: false, score: 0 };
 
             const item = document.createElement("article");
@@ -205,12 +206,12 @@
                 : `Target window: ${kit.timeframeHours}h`;
 
             item.innerHTML = `
-                <div class="ps-kit-heading"><span class="ps-kit-icon" aria-hidden="true">${kit.icon}</span><div><p class="kit-step-label">${progress.isComplete ? "Stamp collected" : next?.id === kit.id ? "Your next stamp" : "Another skill to explore"}</p><h3>${escapeHtml(kit.title)}</h3></div></div>
+                <div class="ps-kit-heading"><span class="ps-kit-icon" aria-hidden="true">${escapeHtml(kit.icon)}</span><div><p class="kit-step-label">${progress.isComplete ? "Stamp collected" : next?.id === kit.id ? "Your next stamp" : "Another skill to explore"}</p><h3>${escapeHtml(kit.title)}</h3></div></div>
                 <p>${escapeHtml(kit.description)}</p>
                 <div class="ps-kit-meta">
                     <span class="ps-kit-pill">${statusLabel}</span>
-                    <span class="ps-kit-pill">Points: ${Number(progress.score || 0)}</span>
-                    <span class="ps-kit-pill">${timeLabel}</span>
+                    ${kit.custom ? '<span class="ps-kit-pill">Stamp &amp; certificate kit</span>' : `<span class="ps-kit-pill">Points: ${Number(progress.score || 0)}</span>
+                    <span class="ps-kit-pill">${timeLabel}</span>`}
                 </div>
                 <div class="ps-kit-actions">
                     <a class="button button-primary" href="./kit-worksheet.html?kit=${encodeURIComponent(kit.id)}">${progress.isComplete ? "View kit & certificate" : "Open kit"} &rarr;</a>
