@@ -11,6 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="teacher-my-class.css?v=1">
   <style>
     .work-page {
       width: min(1500px, calc(100% - 28px));
@@ -810,7 +811,12 @@
         <p id="work-status" class="work-status" aria-live="polite"></p>
       </section>
 
-      <section class="panel-section">
+      <section class="panel-section student-tracker-pages">
+        <div class="student-tracker-tabs" role="tablist" aria-label="Student tracker pages">
+          <button id="my-students-tab" type="button" role="tab" aria-selected="true" aria-controls="my-students-panel">My Students</button>
+          <button id="my-class-tab" type="button" role="tab" aria-selected="false" aria-controls="my-class-panel" tabindex="-1">My Class</button>
+        </div>
+        <div id="my-students-panel" role="tabpanel" aria-labelledby="my-students-tab">
         <h2>My Students</h2>
         <p class="section-copy">Each row is one student; each column summarises acknowledged/total criteria for that group. Expand a count to see what is complete and what still needs evidence.</p>
         <div class="student-tracker-comments" id="student-tracker-comments">
@@ -872,6 +878,46 @@
           <p class="external-assessment-status" id="external-assessment-status" aria-live="polite"></p>
           <div id="external-assessment-grid" aria-live="polite"></div>
         </section>
+        </div>
+        <div id="my-class-panel" role="tabpanel" aria-labelledby="my-class-tab" hidden>
+          <h2>My Class</h2>
+          <p class="section-copy">Your class list and latest Digital Outcome Description checks. These are progress indicators, not assessment sign-offs.</p>
+          <div class="my-class-layout">
+            <aside class="my-class-roster" aria-label="Class selector">
+              <label for="my-class-course">Course</label>
+              <select id="my-class-course">
+                <option value="JuniorDTECH">JuniorDTECH</option>
+                <option value="MiddleDTECH" selected>MiddleDTECH</option>
+                <option value="SeniorDTECH">SeniorDTECH</option>
+              </select>
+              <label for="my-class-search">Find a student</label>
+              <input id="my-class-search" type="search" placeholder="Type a student name" autocomplete="off">
+              <div class="my-class-list-card">
+                <h3>Class list <span id="my-class-count"></span></h3>
+                <div id="my-class-students"></div>
+              </div>
+            </aside>
+            <section class="my-class-progress" aria-labelledby="my-class-progress-heading">
+              <div class="my-class-actions">
+                <h3 id="my-class-progress-heading">Digital Outcome Description</h3>
+                <button id="my-class-refresh" class="student-summary-action" type="button" disabled>Refresh whole MiddleDTECH class</button>
+                <button id="my-class-reload" class="student-summary-action" type="button">Reload class list</button>
+              </div>
+              <p id="my-class-note" class="section-copy">Refresh reads Google Slides and your Google comments, including resolved threads. It does not edit slides. Saved checks show their checked date; refresh after new writing or comments.</p>
+              <label class="my-class-attention" for="my-class-attention">Show
+                <select id="my-class-attention">
+                  <option value="">All students</option>
+                  <option value="not-linked">No linked description</option>
+                  <option value="no-writing">No writing on first slide</option>
+                  <option value="not-commented">Not commented</option>
+                  <option value="needs-check">Not checked / unable to check</option>
+                </select>
+              </label>
+              <p id="my-class-status" class="work-status" role="status" aria-live="polite"></p>
+              <div id="my-class-table"></div>
+            </section>
+          </div>
+        </div>
       </section>
 
       <section class="panel-section" id="criteria-library-section">
@@ -885,5 +931,6 @@
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="script.js"></script>
   <script src="teacher-student-work.js"></script>
+  <script src="teacher-my-class.js?v=1"></script>
 </body>
 </html>

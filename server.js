@@ -13580,6 +13580,13 @@ app.put("/api/external-assessment-allocations/:studentEmail", requireActivityWri
   }
 });
 
+require("./student-class-tracker").registerStudentClassTracker(app, {
+  pool, hasDatabase, requireActivityWriteAccess, getStudentDirectoryRows,
+  buildStudentClassManagementRow, dedupeToLatestStudentRows, getStudentIdentityKey,
+  listTemplateLibraryEntries, googleSlidesApiRequest, driveApiRequest,
+  verifyDriveTokenForStudent, getStudentDriveSetup, driveFindFolderByName
+});
+
 app.get("/api/student-tracker/comments", requireActivityWriteAccess, async (_req, res) => {
   if (!hasDatabase) {
     res.json({ comments: Array.from(memoryStudentTrackerComments.values()) });

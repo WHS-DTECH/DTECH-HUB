@@ -87,6 +87,17 @@ Strict cutover checklist (go/no-go):
 - PostgreSQL (configured through `DATABASE_URL`).
 - If `DATABASE_URL` is missing, some memory-backed fallback behavior exists for selected features.
 
+### My Class description tracker (October 2026)
+- The [Student Work Tracker](../teacher-student-work.html) has **My Students** and **My Class** tabs. Existing embedded assessment trackers keep their previous view without tabs.
+- My Class uses the current DTECH class-management roster, including students with no recorded assessment activity. Years 7-8 / 9-10 / 11-13 select JuniorDTECH / MiddleDTECH / SeniorDTECH. Description checks are configured for MiddleDTECH only.
+- **Refresh whole MiddleDTECH class** reads, but never edits, linked Digital Outcome Description slides. It can also find descriptions in students' recorded MDTECH Project folders when no link was recorded.
+- First-slide writing means added words relative to the **current** library template, excluding formatting, prompt order and deletions. It is not proof of a login, authorship, completion or quality. Older template versions may need manual checking.
+- Google Drive comments are paginated and matched to the signed-in teacher, including their replies in other people's threads and resolved threads. Deleted comments are omitted. Expand a thread to read the comments and reply context.
+- Teacher-only endpoints: `GET /api/student-tracker/my-class` and `POST /api/student-tracker/my-class/check` (up to five roster IDs per request). Refresh verifies that the Google Drive token belongs to the signed-in teacher. Existing Google Drive consent is reused.
+- `student_class_description_checks` is created on first use. It stores each teacher's latest per-student JSON result and checked time, including comment text, scoped by `(teacher_email, student_key)`. OAuth access tokens are not stored in these results. The database is required; save failures are reported, not replaced with a memory-only success.
+- Saved results are snapshots, not a background sync. Reload shows saved checks; refresh after students edit slides or teachers add comments. API/access failures show **Unable to check**, never a negative writing/comment result. **No linked description** is not proof that no file exists.
+- Implementation: [server integration](../student-class-tracker.js), [tab UI](../teacher-my-class.js), [styles](../teacher-my-class.css). Run `node scripts/regression-my-class.js` and `node scripts/regression-middle-task-list.js` for focused regression checks.
+
 ## 6) HTTPS Responsibility
 - HTTPS/TLS termination is currently handled by Render-managed certificates.
 - The app itself runs as a standard Node web service behind Render's HTTPS edge.
