@@ -5674,6 +5674,9 @@ async function savePracticalSkillsKitContent(kitId, content, updatedByEmail) {
   }
 
   const safeContent = normalizePracticalSkillsKitContentForStorage(safeKitId, { ...content, kitId: safeKitId });
+  for (const activity of safeContent.activities || []) {
+    if (activity?.taskBrief) delete activity.taskBrief.tasks;
+  }
 
   if (!hasDatabase) {
     memoryPracticalSkillsKitContent.set(safeKitId, safeContent);

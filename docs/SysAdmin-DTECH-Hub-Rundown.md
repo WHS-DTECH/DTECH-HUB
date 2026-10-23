@@ -108,9 +108,9 @@ Strict cutover checklist (go/no-go):
 - My Licence uses a compact, clickable stamp/kit grid as its primary launch area. Stats, badges and the detailed kit collection remain available in the collapsed "My achievements, stats & kit details" section. The Typing log stays separate from earned stamps.
 - The current six launch cards were checked at a 1366 x 650 browser viewport (100% zoom), including space for a 96px navigation bar. Larger future collections and expanded details can scroll normally; content is never clipped to force a fixed-height screen.
 
-- Activity Details supports an optional activity-specific challenge, tasks (one per line, automatically numbered), key skill and evidence instructions. Students see these in a task panel above images/questions; a task-only activity does not display the empty-questions message. These fields do not add file upload or automatic evidence checking, and do not change completion rules.
+- Activity Details supports an optional activity-specific challenge, key skill and evidence instructions. The old "Your tasks (one step per line)" field is removed, and its legacy instructions are no longer displayed; saving kit content deletes those old task values, including saves from older editors. Use separate Task List blocks for instructions with bold headings and numbering restarted at 1. Challenge, key skill, evidence and existing Task List blocks are retained. The brief fields do not add file upload or automatic evidence checking, and do not change completion rules.
 - A read-only Live Preview below Activity Details uses the student worksheet renderer and updates after edits or question/image additions and removals. Previewing does not save content or student progress.
-- `node --test scripts/regression-activity-task-brief.js` covers editor save/reload, task numbering, preserved activity details and escaped student output.
+- `node --test scripts/regression-activity-task-brief.js` covers editor save/reload, removal of legacy task instructions, preserved activity details/blocks and escaped student output.
 
 ### Activity Content Block Builder
 

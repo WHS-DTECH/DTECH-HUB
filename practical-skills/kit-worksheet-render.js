@@ -729,13 +729,11 @@
     }
 
     function renderTaskBrief(brief) {
-        const tasks = Array.isArray(brief?.tasks) ? brief.tasks.filter((task) => String(task || "").trim()) : [];
-        if (!brief?.challenge && !tasks.length && !brief?.keySkill && !brief?.evidenceRequired) return "";
+        if (!brief?.challenge && !brief?.keySkill && !brief?.evidenceRequired) return "";
         return `<section class="worksheet-task-brief" aria-labelledby="worksheet-challenge-title">
             <p class="worksheet-task-eyebrow">Your activity challenge</p>
             <h2 id="worksheet-challenge-title">Time to put your skills into action</h2>
             ${brief.challenge ? `<p class="worksheet-task-text"><strong>Challenge:</strong> ${escapeHtml(brief.challenge)}</p>` : ""}
-            ${tasks.length ? `<h3>Your tasks</h3><ol class="worksheet-task-steps">${tasks.map((task) => `<li>${escapeHtml(task)}</li>`).join("")}</ol>` : ""}
             ${brief.keySkill ? `<div class="worksheet-task-skill"><strong>Key skill</strong><p class="worksheet-task-text">${escapeHtml(brief.keySkill)}</p></div>` : ""}
             ${brief.evidenceRequired ? `<div class="worksheet-task-evidence"><strong>Evidence required</strong><p class="worksheet-task-text">${escapeHtml(brief.evidenceRequired)}</p></div>` : ""}
         </section>`;

@@ -8,7 +8,6 @@
     const titleInput = document.querySelector("#activity-title");
     const establishesInput = document.querySelector("#activity-establishes");
     const challengeInput = document.querySelector("#activity-challenge");
-    const tasksInput = document.querySelector("#activity-tasks");
     const keySkillInput = document.querySelector("#activity-key-skill");
     const evidenceInput = document.querySelector("#activity-evidence-required");
     const questionList = document.querySelector("#activity-question-list");
@@ -142,7 +141,6 @@
             ...existing, number: activityIndex + 1, title: titleInput.value, establishes: establishesInput.value,
             taskBrief: {
                 challenge: challengeInput.value,
-                tasks: tasksInput.value.split(/\r?\n/).map((line) => line.trim().replace(/^\d+[.)]\s+/, "")).filter(Boolean),
                 keySkill: keySkillInput.value,
                 evidenceRequired: evidenceInput.value
             },
@@ -158,7 +156,6 @@
         titleInput.value = activity.title || worksheet.activity || `Activity ${activityIndex + 1}`;
         establishesInput.value = activity.establishes || worksheet.establishes || "";
         challengeInput.value = activity.taskBrief?.challenge || "";
-        tasksInput.value = (activity.taskBrief?.tasks || []).join("\n");
         keySkillInput.value = activity.taskBrief?.keySkill || "";
         evidenceInput.value = activity.taskBrief?.evidenceRequired || "";
         document.querySelector("#activity-page-title").textContent = `Activity Details: ${titleInput.value}`;
