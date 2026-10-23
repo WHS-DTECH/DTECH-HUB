@@ -279,6 +279,7 @@
 
     function renderForm() {
         const content = state.content || {};
+        document.querySelector("#kit-delete").hidden = !KIT_CATALOG.find((kit) => kit.id === state.kitId)?.custom;
         nameInput.value = content.identity?.name || content.bannerTitle || "";
         updateKitOptionTitle(state.kitId, nameInput.value);
         skillAreaInput.value = normaliseSkillArea(content.identity?.skillArea);
@@ -403,6 +404,23 @@
     }
 
     function wireFormEvents() {
+        document.querySelector("#kit-delete").addEventListener("click", async () => {
+            if (!(await verifyAdminAccess())) return;
+            if (!window.confirm(`Delete "${state.content?.identity?.name || state.kitId}" from the library and My Licence? Saved student work and kit content will be retained, not permanently erased.`)) return;
+            const button = document.querySelector("#kit-delete");
+            button.disabled = true;
+            try {
+                const payload = await loadJson(`/api/admin/practical-skills/kits/${encodeURIComponent(state.kitId)}`, {
+                    method: "DELETE", headers: withAdminAuthHeaders()
+                });
+                state.kitId = NEW_KIT_ID;
+                await refreshKitCatalog();
+                await loadKitContent(NEW_KIT_ID);
+                setStatus(payload.message);
+            } catch (error) {
+                setStatus(error.message || "Could not delete kit.", true);
+            } finally { button.disabled = false; }
+        });
         [nameInput, skillAreaInput, kitStatusInput, yearLevelInput, bannerSubtitleInput, instructionsInput, teacherNotesInput, whatStudentsWillLearnInput, whyThisMattersInput, keyVocabularyInput, evidenceRequiredInput, successCriteriaInput, extensionChallengeInput, iconInput, themeColorInput, accentColorInput].forEach((input) => {
             input.addEventListener("input", queuePreviewUpdate);
         });
@@ -478,7 +496,7 @@
         try {
             const payload = await loadJson("/api/admin/practical-skills/kits", { headers: withAdminAuthHeaders() });
             if (Array.isArray(payload?.kits) && payload.kits.length) {
-                KIT_CATALOG = payload.kits.map((kit) => ({ id: String(kit.id), title: String(kit.title || kit.id) }));
+                KIT_CATALOG = payload.kits.map((kit) => ({ id: String(kit.id), title: String(kit.title || kit.id), custom: Boolean(kit.custom) }));
             }
         } catch (_error) {
             // Keep the built-in list if the catalog cannot be loaded.

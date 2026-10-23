@@ -99,7 +99,7 @@ async function main() {
     assert.ok(routeStart >= 0 && routeEnd > routeStart, "Kit content admin route exists");
     const routes = {};
     const routeContext = vm.createContext({
-        app: { put: (url, auth, handler) => { routes[url] = handler; }, get() {}, post() {} },
+        app: { put: (url, auth, handler) => { routes[url] = handler; }, get() {}, post() {}, delete() {} },
         requireAdminAccess() {},
         getPracticalSkillsKitDefinition: () => true,
         customPracticalSkillsKits: new Map(),

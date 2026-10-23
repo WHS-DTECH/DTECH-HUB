@@ -41,7 +41,8 @@ async function main() {
     assert.equal(nodes.get("ps-licence-progress").value, 1);
     assert.equal((nodes.get("ps-stamp-list").innerHTML.match(/is-earned/g) || []).length, 1);
     assert.match(nodes.get("ps-stamp-list").innerHTML, /kit=kit-login/);
-    assert.match(nodes.get("ps-stamp-list").innerHTML, /View certificate/);
+    assert.match(nodes.get("ps-stamp-list").innerHTML, /Open kit & certificate/);
+    assert.match(nodes.get("ps-stamp-list").innerHTML, /<a class="licence-stamp" href="\.\/kit-worksheet.html\?kit=kit-minecraft"/, "Unearned stamps open their kits too");
     assert.match(nodes.get("ps-stamp-list").innerHTML, /href="\.\/typing-kit\.html"[^>]*>.*Typing Kit/);
     assert.match(nodes.get("ps-licence-progress-count").textContent, /\/ 3 stamps/, "Typing Kit log does not change the stamp count");
     assert.match(nodes.get("ps-next-link").href, /kit-google-search/);

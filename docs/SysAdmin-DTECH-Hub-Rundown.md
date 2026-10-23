@@ -104,6 +104,9 @@ Strict cutover checklist (go/no-go):
 
 ### Kit Content Builder sign-in readiness
 
+- Uploaded kits have an admin-only Delete Kit button with confirmation. Removal archives the saved kit with a deletion timestamp and removes its library card; kit content and student progress are retained. Built-in kits cannot be deleted, and stale editors cannot republish deleted kits.
+- My Licence uses a compact, clickable stamp/kit grid as its primary launch area. Stats, badges and the detailed kit collection remain available in the collapsed "My achievements, stats & kit details" section. The Typing log stays separate from earned stamps.
+
 - Activity Details supports an optional activity-specific challenge, tasks (one per line, automatically numbered), key skill and evidence instructions. Students see these in a task panel above images/questions; a task-only activity does not display the empty-questions message. These fields do not add file upload or automatic evidence checking, and do not change completion rules.
 - A read-only Live Preview below Activity Details uses the student worksheet renderer and updates after edits or question/image additions and removals. Previewing does not save content or student progress.
 - `node --test scripts/regression-activity-task-brief.js` covers editor save/reload, task numbering, preserved activity details and escaped student output.

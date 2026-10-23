@@ -6613,6 +6613,7 @@ async function readPracticalSkillsLibraryFile() {
   await ensurePracticalSkillsKitContentSchema();
   const kitRows = await pool.query(`SELECT kit_id, content FROM practical_skills_kit_content ORDER BY kit_id`);
   for (const row of kitRows.rows || []) {
+    if (row.content?.deletedAt) continue;
     if (cards.some((card) => card.id === row.kit_id)) continue;
     const card = buildPracticalSkillsKitLibraryCard(row.kit_id, row.content);
     if (card) cards.push(card);
@@ -6673,7 +6674,7 @@ function buildPracticalSkillsKitLibraryCard(kitId, content) {
     summary: content.bannerSubtitle || content.learning?.whatStudentsWillLearn || `Explore the ${title} kit and complete its activities.`,
     yearLevel: content.identity?.yearLevel || "All Years",
     area: content.identity?.skillArea || "Practical Skills",
-    status: content.identity?.status || "active",
+    status: content.deletedAt ? "deleted" : content.identity?.status || "active",
     href: `/practical-skills/kit-worksheet.html?kit=${encodeURIComponent(safeKitId)}`,
     visual: { icon: content.theme?.icon || "PS" }
   });
@@ -16161,6 +16162,9 @@ app.put("/api/admin/practical-skills/kit-content/:kitId", requireAdminAccess, as
   }
 
   try {
+    if (customPracticalSkillsKits.has(kitId) && (await getStoredPracticalSkillsKitContent(kitId)).deletedAt) {
+      return res.status(409).json({ error: "This kit has been deleted. Create a new kit rather than saving this old editor." });
+    }
     const saved = await savePracticalSkillsKitContent(kitId, customPracticalSkillsKits.has(kitId) ? { ...content, customKit: true } : content, requesterEmail);
     let libraryCard;
     try {
@@ -16182,12 +16186,30 @@ app.get("/api/admin/practical-skills/kits", requireAdminAccess, async (_req, res
     const ids = [...PRACTICAL_SKILLS_KIT_DEFINITIONS.map((kit) => kit.id), ...customPracticalSkillsKits.keys()];
     const kits = await Promise.all(ids.map(async (id) => {
       const content = await getStoredPracticalSkillsKitContent(id);
+      if (content.deletedAt) return null;
       const title = String(content?.identity?.name || content?.bannerTitle || "").trim() || id;
       return { id, title, custom: customPracticalSkillsKits.has(id) };
     }));
-    res.json({ kits });
+    res.json({ kits: kits.filter(Boolean) });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not load kits." });
+  }
+});
+
+app.delete("/api/admin/practical-skills/kits/:kitId", requireAdminAccess, async (req, res) => {
+  const kitId = String(req.params.kitId || "").trim();
+  if (!customPracticalSkillsKits.has(kitId)) return res.status(403).json({ error: "Only uploaded custom kits can be deleted. Built-in kits are protected." });
+  try {
+    const content = await getStoredPracticalSkillsKitContent(kitId);
+    await savePracticalSkillsKitContent(kitId, {
+      ...content, customKit: true, deletedAt: content.deletedAt || new Date().toISOString(),
+      identity: { ...content.identity, status: "archive" }
+    }, normalizeEmail(getRequestUserEmail(req)));
+    const cards = await readPracticalSkillsLibraryFile();
+    await writePracticalSkillsLibraryFile(cards.filter((card) => card.id !== kitId));
+    res.json({ ok: true, message: "Kit removed from the library and My Licence. Saved content and student progress are retained." });
+  } catch (error) {
+    res.status(500).json({ error: `Could not finish removing this kit. Retry Delete Kit to complete removal. ${error.message || ""}`.trim() });
   }
 });
 

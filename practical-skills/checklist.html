@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../styles.css">
-    <link rel="stylesheet" href="./checklist.css">
+    <link rel="stylesheet" href="./checklist.css?v=2">
 </head>
 <body class="licence-dashboard">
     <div class="page-shell">
@@ -60,11 +60,14 @@
                 <p class="licence-name-label">Licence holder</p>
                 <h3 id="ps-student-name">Your name belongs here</h3>
                 <p id="ps-student-email">Sign in with your school account to start collecting stamps.</p>
-                <div class="licence-progress-heading"><strong id="ps-licence-progress-label">Your stamp collection</strong><span id="ps-licence-progress-count">Sign in to view</span></div>
+                <div class="licence-progress-heading"><strong id="ps-licence-progress-label">Choose a kit to open</strong><span id="ps-licence-progress-count">Sign in to view</span></div>
                 <progress id="ps-licence-progress" max="3" value="0" aria-label="Completed licence kits"></progress>
                 <div id="ps-stamp-list" class="licence-stamps" aria-label="Kit stamps"></div>
-                <p class="licence-card-footnote">Each completed kit earns a stamp and its own certificate. The Typing Kit is your ongoing 7-week practice log. Keep building your digital confidence!</p>
+                <p class="licence-card-footnote">Click any kit above to start or continue. Green means your stamp is earned. Typing is your practice log.</p>
             </section>
+            <details class="licence-more">
+                <summary>My achievements, stats &amp; kit details</summary>
+                <div class="licence-more-content">
             <section id="ps-next-step" class="licence-next-step" aria-labelledby="ps-next-title" hidden>
                 <div><p class="section-kicker">Your next move</p><h2 id="ps-next-title"></h2><p id="ps-next-description"></p></div>
                 <a id="ps-next-link" class="button button-primary" href="./kit-worksheet.html?kit=kit-login">Open kit &rarr;</a>
@@ -111,11 +114,13 @@
                 </div>
                 <div id="ps-kit-list" class="ps-kit-list" aria-live="polite"></div>
             </section>
+                </div>
+            </details>
         </main>
     </div>
 
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="../script.js"></script>
-    <script src="./checklist.js?v=2"></script>
+    <script src="./checklist.js?v=3"></script>
 </body>
 </html>

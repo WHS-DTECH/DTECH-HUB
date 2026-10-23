@@ -55,7 +55,8 @@ async function main() {
         app: {
             get: (url, _auth, handler) => { routes[`GET ${url}`] = handler; },
             post: (url, _auth, handler) => { routes[`POST ${url}`] = handler; },
-            put: (url, _auth, handler) => { routes[`PUT ${url}`] = handler; }
+            put: (url, _auth, handler) => { routes[`PUT ${url}`] = handler; },
+            delete: (url, _auth, handler) => { routes[`DELETE ${url}`] = handler; }
         },
         requireAdminAccess() {},
         PRACTICAL_SKILLS_KIT_DEFINITIONS: builtIns,
