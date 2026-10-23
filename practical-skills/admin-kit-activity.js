@@ -15,6 +15,32 @@
     const imageList = document.querySelector("#activity-image-list");
     const statusHost = document.querySelector("#activity-status");
     let content = null;
+    let previewTimerId = 0;
+
+    function renderPreview() {
+        if (!content) return;
+        const host = document.querySelector("#activity-preview-host");
+        if (!window.KitWorksheetRender) {
+            host.textContent = "The preview renderer could not load. Refresh this page to retry.";
+            return;
+        }
+        const activity = readActivity();
+        try {
+            window.KitWorksheetRender.renderWorksheet(host, {
+                ...content,
+                ...activity,
+                bannerTitle: activity.title,
+                bannerSubtitle: activity.establishes
+            }, { readOnly: true, eyebrow: content.bannerTitle || "" });
+        } catch (error) {
+            host.textContent = `Could not render the preview: ${error.message}`;
+        }
+    }
+
+    function queuePreviewUpdate() {
+        window.clearTimeout(previewTimerId);
+        previewTimerId = window.setTimeout(renderPreview, 200);
+    }
 
     function getAuthHeaders(headers = {}) {
         try {
@@ -153,6 +179,7 @@
         document.querySelector("#activity-research-report").hidden = !activity.researchReport;
         document.querySelector("#activity-research-template").value = activity.researchReport?.templateId || "";
         document.querySelector("#activity-research-minimum").value = activity.researchReport?.minimumWords || 25;
+        renderPreview();
     }
 
     async function save() {
@@ -200,6 +227,8 @@
     document.querySelector("#activity-add-question").addEventListener("click", () => { const activity = readActivity(); activity.questions.push(createQuestion()); content.activities = content.activities || []; content.activities[activityIndex] = activity; renderQuestions(activity.questions); });
     document.querySelector("#activity-add-image").addEventListener("click", () => { const activity = readActivity(); activity.images.push(createImage()); content.activities = content.activities || []; content.activities[activityIndex] = activity; renderImages(activity.images); });
     document.querySelector("#activity-save").addEventListener("click", () => { void save().catch((error) => setStatus(error.message || "Could not save activity details.", true)); });
+    const editorFields = document.querySelector("#activity-editor-fields");
+    ["input", "change", "click"].forEach((eventName) => editorFields.addEventListener(eventName, queuePreviewUpdate));
 
     async function init() {
         if (!kitId) { setStatus("A kit is required.", true); return; }

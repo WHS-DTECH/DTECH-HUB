@@ -27,9 +27,16 @@ test("activity task brief loads, saves, reloads and preserves other activity det
         }, { title: "Other activity", questions: [] }]
     };
     let fail = false;
+    const previews = [];
+    let previewTimer;
     const context = vm.createContext({
         document: { querySelector: get },
-        window: { location: { search: "?kit=kit-files&activity=0" } },
+        window: {
+            location: { search: "?kit=kit-files&activity=0" },
+            clearTimeout() { previewTimer = null; },
+            setTimeout(callback) { previewTimer = callback; return 1; },
+            KitWorksheetRender: { renderWorksheet(_host, draft, options) { previews.push({ draft, options }); } }
+        },
         URLSearchParams,
         localStorage: { getItem: () => null }, sessionStorage: { getItem: () => null },
         fetch: async (_url, options = {}) => {
@@ -44,10 +51,20 @@ test("activity task brief loads, saves, reloads and preserves other activity det
     await tick();
     assert.equal(get("#activity-challenge").value, "Create your document.");
     assert.equal(get("#activity-tasks").value, "Name it.\nSave it.");
+    assert.equal(previews.at(-1).draft.bannerTitle, "Rattlesnakes");
+    assert.equal(previews.at(-1).options.readOnly, true);
     get("#activity-challenge").value = "Create a Rattlesnakes document.";
     get("#activity-tasks").value = "1. Name the document.\r\n\r\n2) Download as .docx.\nMove it into Documents.";
     get("#activity-key-skill").value = "I can organise and retrieve documents.";
     get("#activity-evidence-required").value = "Upload Rattlesnakes.docx.";
+    get("#activity-editor-fields").handlers.input();
+    previewTimer();
+    assert.equal(previews.at(-1).draft.taskBrief.challenge, "Create a Rattlesnakes document.");
+    assert.equal(stored.activities[0].taskBrief.challenge, "Create your document.", "Preview must not save draft content");
+    for (const event of ["change", "click"]) {
+        get("#activity-editor-fields").handlers[event]();
+        assert.equal(typeof previewTimer, "function", "Question/image structural edits refresh the preview");
+    }
     get("#activity-save").handlers.click();
     await tick();
     assert.deepEqual(stored.activities[0].taskBrief.tasks, ["Name the document.", "Download as .docx.", "Move it into Documents."]);

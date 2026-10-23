@@ -105,6 +105,7 @@ Strict cutover checklist (go/no-go):
 ### Kit Content Builder sign-in readiness
 
 - Activity Details supports an optional activity-specific challenge, tasks (one per line, automatically numbered), key skill and evidence instructions. Students see these in a task panel above images/questions; a task-only activity does not display the empty-questions message. These fields do not add file upload or automatic evidence checking, and do not change completion rules.
+- A read-only Live Preview below Activity Details uses the student worksheet renderer and updates after edits or question/image additions and removals. Previewing does not save content or student progress.
 - `node --test scripts/regression-activity-task-brief.js` covers editor save/reload, task numbering, preserved activity details and escaped student output.
 
 - Saving an active custom kit also makes it available on My Licence in both the stamp collection and Your Kit Collection, including existing custom kits. Name, icon and subtitle come from saved kit content. Completed activities earn the kit's stamp and certificate through the existing completion flow.
