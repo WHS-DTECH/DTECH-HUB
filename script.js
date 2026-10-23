@@ -2810,16 +2810,21 @@ function showInternalAssessmentDeadlineReminder(email, now = new Date()) {
             </div>
         </div>
     `;
-    dialog.querySelectorAll("[data-internal-deadline-dismiss]").forEach((button) => {
-        button.addEventListener("click", () => dialog.close());
-    });
-    dialog.addEventListener("close", () => {
+    let dismissed = false;
+    const dismiss = () => {
+        if (dismissed) return;
+        dismissed = true;
         try {
             localStorage.setItem(reminderKey, "1");
         } catch (_error) {
         }
+        if (dialog.open && typeof dialog.close === "function") dialog.close();
         dialog.remove();
-    }, { once: true });
+    };
+    dialog.querySelectorAll("[data-internal-deadline-dismiss]").forEach((button) => {
+        button.addEventListener("click", dismiss);
+    });
+    dialog.addEventListener("close", dismiss, { once: true });
     document.body.appendChild(dialog);
     if (typeof dialog.showModal === "function") dialog.showModal();
     else dialog.setAttribute("open", "");

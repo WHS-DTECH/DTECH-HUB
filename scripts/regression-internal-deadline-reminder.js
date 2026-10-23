@@ -32,7 +32,8 @@ function makeDom() {
             querySelector: () => buttons[buttons.length - 1],
             addEventListener(type, fn) { (listeners[type] ||= []).push(fn); },
             showModal() { this.open = true; },
-            close() { this.open = false; (listeners.close || []).splice(0).forEach((fn) => fn()); },
+            close() { this.open = false; },
+            fireClose() { this.open = false; (listeners.close || []).splice(0).forEach((fn) => fn()); },
             remove() { this.removed = true; dialogs.splice(dialogs.indexOf(this), 1); },
             buttons
         };
@@ -89,6 +90,9 @@ assert.equal(context.shouldShowInternalAssessmentDeadlineReminder(new Date("2026
     assert.equal(dialogs.length, 0, "Stays dismissed for the rest of the day");
     ctx.showInternalAssessmentDeadlineReminder("student@whs.nz", nz("2026-10-28"));
     assert.equal(dialogs.length, 1, "Returns on Wednesday");
+    dialogs[0].fireClose();
+    assert.equal(dialogs.length, 0, "Esc (native close) also dismisses");
+    assert.ok(store.has("hub_internal_deadline_reminder_dismissed_v1:student@whs.nz:2026-10-28"));
     ctx.showInternalAssessmentDeadlineReminder("", nz("2026-10-28"));
 }
 
