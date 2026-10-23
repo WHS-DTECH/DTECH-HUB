@@ -32,8 +32,51 @@
 .typing-kit-page caption { text-align: left; font-weight: 700; padding: 8px 0; }
 .typing-kit-page th, .typing-kit-page td { text-align: left; padding: 12px 10px; border-bottom: 1px solid #e5dcc9; vertical-align: top; }
 .typing-kit-page th { background: #edf5ef; }
-.typing-copy { background: #edf8f0; border-color: #246b51; }
-.typing-copy strong { display: block; font-size: 1.15rem; }
+.typing-copy {
+    background: linear-gradient(135deg, #f0faf5, #eef5ff);
+    border-color: #246b51;
+    box-shadow: 0 8px 0 #d9e9df, 0 16px 30px #17385812;
+    padding: clamp(16px, 4vw, 32px);
+}
+.typing-result-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.typing-result-heading h2 { margin: 0; font-size: clamp(1.5rem, 4vw, 2rem); }
+.typing-result-eyebrow, .typing-book-eyebrow { margin: 0 0 4px; font-size: .8rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.typing-result-eyebrow { color: #246b51; }
+.typing-test-badge { border: 1px solid #c6dfd2; border-radius: 999px; background: #fff; padding: 6px 14px; font-weight: 700; color: #246b51; }
+.typing-scoreboard { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 28px 0 18px; }
+.typing-metric { --score-accent: #245b96; --score-tint: #edf5ff; display: flex; flex-direction: column; align-items: center; text-align: center; min-width: 0; }
+.typing-metric-accuracy { --score-accent: #71429a; --score-tint: #f7f0ff; }
+.typing-metric-net { --score-accent: #246b51; --score-tint: #edf8f0; }
+.typing-metric dt { order: 1; margin-top: 14px; font-weight: 800; font-size: 1.1rem; color: var(--score-accent); }
+.typing-metric dd:not(.typing-metric-note) {
+    margin: 0;
+    width: min(100%, 170px);
+    aspect-ratio: 1;
+    box-sizing: border-box;
+    border-radius: 50%;
+    border: 5px solid var(--score-accent);
+    background: radial-gradient(circle at 35% 25%, #fff, var(--score-tint));
+    box-shadow: 0 6px 0 #17385814, inset 0 0 0 5px #fff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    color: var(--score-accent);
+}
+.typing-metric-net dd:not(.typing-metric-note) { background: #246b51; color: #fff; box-shadow: 0 6px 0 #17385824, inset 0 0 0 5px #ffffff26; }
+.typing-score-value { font-family: "Baloo 2", sans-serif; font-size: clamp(1.65rem, 7vw, 3.4rem); font-weight: 800; line-height: 1.1; }
+.typing-score-percent { font-size: .55em; }
+.typing-score-unit { font-size: .8rem; font-weight: 700; }
+.typing-metric-note { order: 2; margin: 4px 0 0; font-size: .8rem; color: #495a65; }
+.typing-result-meta { text-align: center; font-size: .9rem; color: #495a65; }
+.typing-book-prompt { display: flex; align-items: flex-start; gap: 16px; margin-top: 24px; padding: 22px; background: #fff8e1; border: 2px solid #c28b22; border-radius: 14px; color: #513b16; }
+.typing-book-icon { display: grid; place-items: center; flex: 0 0 44px; height: 44px; background: #ffe5a0; border-radius: 12px; font-size: 2rem; }
+.typing-book-content { min-width: 0; flex: 1; }
+.typing-book-content h3 { margin: 0 0 8px; font-size: 1.35rem; }
+.typing-book-content p { margin: 8px 0; }
+.typing-book-content .typing-book-eyebrow { margin-top: 0; }
+.typing-book-record { padding: 10px 16px; margin: 14px 0; border-left: 4px solid #c28b22; border-radius: 0 8px 8px 0; background: #fff; line-height: 1.8; }
+.typing-book-record p { margin: 4px 0; }
+.typing-book-signoff { font-size: .95rem; }
 .typing-note { font-size: .9rem; line-height: 1.6; }
 .typing-settings { background: #fff8e1; }
 .typing-kit-page a:focus-visible, .typing-kit-page button:focus-visible, .typing-kit-page input:focus-visible {
@@ -44,4 +87,12 @@
     .typing-periods { grid-template-columns: 1fr; }
     .typing-week, .typing-daily { padding: 14px; }
     .kit-worksheet-topbar-links { flex-wrap: wrap; }
+}
+@media (max-width: 420px) {
+    .typing-scoreboard { gap: 8px; }
+    .typing-metric dd:not(.typing-metric-note) { border-width: 3px; }
+    .typing-metric dt { font-size: .9rem; }
+    .typing-score-unit { font-size: .65rem; }
+    .typing-book-prompt { padding: 14px; gap: 10px; }
+    .typing-book-icon { display: none; }
 }

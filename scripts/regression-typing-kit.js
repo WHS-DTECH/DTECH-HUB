@@ -338,6 +338,35 @@ test("daily page saves before asking for book copying, keeps repeated attempts, 
     assert.equal((ui.get("typing-content").innerHTML.match(/Results link \(new tab\)/g) || []).length, 2);
 });
 
+test("latest scorecard shows saved gross speed, accuracy and net speed with an exercise-book record", async () => {
+    for (const saved of [
+        { grossWpm: 37, accuracy: 97, netWpm: 36 },
+        { grossWpm: 0, accuracy: 0, netWpm: 0 },
+        { grossWpm: 123.5, accuracy: 98.5, netWpm: 121.6 }
+    ]) {
+        const ui = frontend({ search: "?week=2026-10-26&period=1", snapshot: {
+            startDate: DEFAULT_START_DATE, canManage: false, attempts: [
+                { ...result, netWpm: 200, weekStart: DEFAULT_START_DATE, period: 1, submittedAt: "2026-10-26T00:00:00Z" },
+                { ...result, ...saved, weekStart: DEFAULT_START_DATE, period: 1, submittedAt: "2026-10-26T01:00:00Z" }
+            ]
+        } });
+        await settle();
+        const html = ui.get("typing-content").innerHTML;
+        assert.match(html, /<dl class="typing-scoreboard">/);
+        assert.equal((html.match(/class="typing-score-value"/g) || []).length, 3);
+        assert.ok(html.includes(`class="typing-score-value">${saved.grossWpm}</span>`));
+        assert.ok(html.includes(`class="typing-score-value">${saved.accuracy}<span`));
+        assert.ok(html.includes(`class="typing-score-value">${saved.netWpm}</span>`));
+        assert.ok(html.includes(`Net speed: <b>${saved.netWpm} WPM</b>`));
+        assert.ok(html.includes(`Accuracy: <b>${saved.accuracy}%</b>`));
+        assert.match(html, /Week 1.*Period 1<\/b>.*Week of 26 Oct 2026/);
+        assert.match(html, /Then show your teacher/);
+        assert.match(html, /ask them to sign your exercise book/);
+        assert.match(html, /200<\/td>/, "Earlier attempts remain in the history");
+        assert.doesNotMatch(html, /typos|personal best|new record/i);
+    }
+});
+
 test("three coloured difficulty buttons directly launch one-minute tests and retain return prompts", async () => {
     const files = { easy: "easyText.txt", medium: "mediumText.txt", hard: "difficultText.txt" };
     const css = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "typing-kit.css"), "utf8");

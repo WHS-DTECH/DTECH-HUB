@@ -145,10 +145,43 @@
                     <div class="typing-submit-actions"><button class="worksheet-btn worksheet-btn-primary" type="submit">Save result</button></div>
                 </form>` : "<p>This record is outside the current calendar. Its saved attempts are kept here for reference.</p>"}
             </section>
-            ${latest ? `<section class="typing-copy" aria-labelledby="typing-copy-heading"><h2 id="typing-copy-heading">Latest saved result</h2>
-                <strong>${score(latest)} &middot; 1-minute test</strong>
-                <p>Submitted ${escapeHtml(timeLabel(latest.submittedAt))} &middot; ${title}</p>
-                <p>Now copy this result into your exercise book for your teacher to sign.</p>
+            ${latest ? `<section class="typing-copy" aria-labelledby="typing-copy-heading">
+                <div class="typing-result-heading"><div>
+                    <p class="typing-result-eyebrow">Your typing scorecard</p>
+                    <h2 id="typing-copy-heading">Latest saved result</h2>
+                </div><span class="typing-test-badge">1-minute test</span></div>
+                <dl class="typing-scoreboard">
+                    <div class="typing-metric typing-metric-speed">
+                        <dt>Typing speed</dt>
+                        <dd><span class="typing-score-value">${latest.grossWpm}</span><span class="typing-score-unit">WPM</span></dd>
+                        <dd class="typing-metric-note">Before accuracy adjustment</dd>
+                    </div>
+                    <div class="typing-metric typing-metric-accuracy">
+                        <dt>Accuracy</dt>
+                        <dd><span class="typing-score-value">${latest.accuracy}<span class="typing-score-percent">%</span></span><span class="typing-score-unit">Accuracy</span></dd>
+                        <dd class="typing-metric-note">Make every keystroke count</dd>
+                    </div>
+                    <div class="typing-metric typing-metric-net">
+                        <dt>Net speed</dt>
+                        <dd><span class="typing-score-value">${latest.netWpm}</span><span class="typing-score-unit">WPM</span></dd>
+                        <dd class="typing-metric-note">Your final typing speed</dd>
+                    </div>
+                </dl>
+                <p class="typing-result-meta">Submitted ${escapeHtml(timeLabel(latest.submittedAt))} &middot; ${title}</p>
+                <aside class="typing-book-prompt" aria-labelledby="typing-book-heading">
+                    <div class="typing-book-icon" aria-hidden="true">&#9998;</div>
+                    <div class="typing-book-content">
+                        <p class="typing-book-eyebrow">Next step &middot; Pen + exercise book</p>
+                        <h3 id="typing-book-heading">Make it a page in your progress story!</h3>
+                        <p>Now copy this result into your exercise book using the record below.</p>
+                        <div class="typing-book-record">
+                            <p><b>${title}</b> &middot; Week of ${dateLabel(weekStart)}</p>
+                            <p>Net speed: <b>${latest.netWpm} WPM</b> &middot; Accuracy: <b>${latest.accuracy}%</b></p>
+                            <p>Typing speed (gross): <b>${latest.grossWpm} WPM</b> &middot; Test: <b>1 minute</b></p>
+                        </div>
+                        <p class="typing-book-signoff"><b>Then show your teacher</b> and ask them to sign your exercise book.</p>
+                    </div>
+                </aside>
             </section>` : ""}
             <section class="typing-daily"><h2>Daily record details</h2>${dailyTable(rows)}
                 <p class="typing-note">Student-submitted results, not independently verified. Times show when you submitted each link, not when you took the test. Your teacher signs your exercise book, not this log.</p>
