@@ -5,6 +5,18 @@ const { getCourseProgrammeFolder } = require("./learning-sites-assessment");
 const DESCRIPTION_ID = "digital-outcome-description";
 const cleanEmail = (value) => String(value || "").trim().toLowerCase();
 
+async function retryGoogleRead(request, pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms))) {
+    for (let attempt = 0; ; attempt++) {
+        try {
+            return await request();
+        } catch (error) {
+            const temporary = [429, 500, 502, 503, 504].includes(error.status);
+            if (!temporary || attempt >= 2) throw error;
+            await pause(250 * (2 ** attempt));
+        }
+    }
+}
+
 function presentationId(value) {
     return String(value || "").match(/^https:\/\/docs\.google\.com\/presentation\/d\/([A-Za-z0-9_-]+)(?:[/?#]|$)/i)?.[1] || "";
 }
@@ -101,9 +113,11 @@ function registerStudentClassTracker(app, deps) {
     const {
         pool, hasDatabase, requireActivityWriteAccess, getStudentDirectoryRows,
         buildStudentClassManagementRow, dedupeToLatestStudentRows, getStudentIdentityKey,
-        listTemplateLibraryEntries, googleSlidesApiRequest, driveApiRequest,
+        listTemplateLibraryEntries, googleSlidesApiRequest: slidesRequest, driveApiRequest: driveRequest,
         verifyDriveTokenForStudent, getStudentDriveSetup, driveFindFolderByName
     } = deps;
+    const googleSlidesApiRequest = (...args) => retryGoogleRead(() => slidesRequest(...args));
+    const driveApiRequest = (...args) => retryGoogleRead(() => driveRequest(...args));
     let schemaReady;
     function ensureSchema() {
         if (!hasDatabase) {
@@ -160,7 +174,7 @@ function registerStudentClassTracker(app, deps) {
             const setup = await getStudentDriveSetup(email);
             const root = String(setup?.mdtechProjectFolderId || "");
             if (!root) continue;
-            const folder = await driveFindFolderByName(root, "Digital Outcome Details", token);
+            const folder = await retryGoogleRead(() => driveFindFolderByName(root, "Digital Outcome Details", token));
             const folderIds = [...new Set([root, folder?.id].filter(Boolean))];
             const candidates = [];
             for (const folderId of folderIds) {
@@ -283,4 +297,4 @@ function registerStudentClassTracker(app, deps) {
     });
 }
 
-module.exports = { presentationId, firstSlideText, hasAddedWriting, findDescriptionCopy, teacherCommentThreads, readTeacherComments, registerStudentClassTracker };
+module.exports = { retryGoogleRead, presentationId, firstSlideText, hasAddedWriting, findDescriptionCopy, teacherCommentThreads, readTeacherComments, registerStudentClassTracker };

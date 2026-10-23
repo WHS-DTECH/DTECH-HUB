@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const {
-    presentationId, firstSlideText, hasAddedWriting, findDescriptionCopy,
+    retryGoogleRead, presentationId, firstSlideText, hasAddedWriting, findDescriptionCopy,
     teacherCommentThreads, readTeacherComments, registerStudentClassTracker
 } = require("../student-class-tracker");
 
@@ -16,6 +16,24 @@ const pupil = { emailAddress: "student@school.nz", displayName: "Student" };
 const comment = { id: "c1", content: "Please explain your client.", author: teacher, resolved: true, createdTime: "2026-10-23T01:00:00Z" };
 
 async function main() {
+    let attempts = 0;
+    const waits = [];
+    assert.equal(await retryGoogleRead(async () => {
+        attempts++;
+        if (attempts < 3) { const error = new Error("Temporary Google outage"); error.status = 503; throw error; }
+        return "recovered";
+    }, async (ms) => waits.push(ms)), "recovered");
+    assert.deepEqual(waits, [250, 500]);
+    for (const status of [401, 403, 404, 503]) {
+        attempts = 0;
+        await assert.rejects(retryGoogleRead(async () => {
+            attempts++;
+            const error = new Error("Google read failed");
+            error.status = status;
+            throw error;
+        }, async () => {}), /Google read failed/);
+        assert.equal(attempts, status === 503 ? 3 : 1, "Retry only temporary errors, with a strict bound");
+    }
     assert.equal(presentationId(url("slide_1")), "slide_1");
     assert.equal(presentationId("https://example.com/presentation/d/no/edit"), "");
     assert.equal(presentationId("https://docs.google.com.evil.test/presentation/d/no/edit"), "");
