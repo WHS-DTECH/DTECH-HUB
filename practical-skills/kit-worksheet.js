@@ -15,6 +15,8 @@
         actionsWired: false,
         signInWatcherId: 0,
         saveTimerId: 0,
+        blockSaveTimerId: 0,
+        blockRevision: 0,
         searchAutoMarkTimerId: 0,
         searchChoiceCheckTimers: {},
         searchChoiceCheckRevisions: {},
@@ -157,6 +159,7 @@
         const siteQuestions = window.KitWorksheetRender.visibleLoginSites(activity?.loginSites, state.huntProfile).some((site) => site.readinessQuestion);
         const selfMarking = Boolean(activity?.assessment || activity?.identityLessonVersion ||
             activity?.questionAutoMarkAssessmentId || activity?.researchReport || siteQuestions);
+        const autoBlocks = activity?.completionMode === "auto" && !window.ActivityBlocks.specialised(activity);
         pill.textContent = completed ? "Completed" : "Not Completed";
         pill.classList.toggle("is-complete", completed);
         if (completed) {
@@ -168,9 +171,51 @@
             pill.removeAttribute("aria-label");
             pill.removeAttribute("title");
         }
-        button.textContent = completed ? "Undo Completion" : siteQuestions ? "Check Activity Completion" : "Mark Activity Complete";
+        button.textContent = autoBlocks ? "Check & Save Activity" : completed ? "Undo Completion" : siteQuestions ? "Check Activity Completion" : "Mark Activity Complete";
         button.disabled = !state.progressLoaded;
         button.hidden = selfMarking && !siteQuestions && !completed;
+    }
+
+    function blockPath(index) {
+        return `/api/practical-skills/blocks/${encodeURIComponent(state.kitId)}/${index}`;
+    }
+
+    async function checkBlockAnswers(index) {
+        if (!state.progressLoaded) throw new Error("Your progress has not loaded. Refresh and try again.");
+        const email = state.email;
+        const revision = state.blockRevision;
+        return queueProgressWrite(async () => {
+            if (getSignedInEmail() !== email) throw new Error("Your signed-in account changed. Reopen this activity.");
+            await saveResponses(state.kitId, state.responses);
+            if (getSignedInEmail() !== email) throw new Error("Your signed-in account changed. Reopen this activity.");
+            const result = await loadJson(`${blockPath(index)}/check`, {
+                method: "POST", headers: withAuthHeaders({ "Content-Type": "application/json" }),
+                body: JSON.stringify({ answers: state.responses[`${index}-blocks`] || {} })
+            });
+            if (getSignedInEmail() !== email || revision !== state.blockRevision) return result;
+            state.completedActivities = result.completedActivities;
+            updateActivityCompleteBar();
+            const auto = state.content.activities[index].completionMode === "auto" && !window.ActivityBlocks.specialised(state.content.activities[index]);
+            showStatusMessage(auto
+                ? result.passed ? "Activity complete! Your answers and automatic tick are saved."
+                    : `Answers saved. Complete ${result.results.filter((r) => !r.passed).length} remaining required block(s) to earn your tick.`
+                : "Your activity answers are saved.");
+            return result;
+        });
+    }
+
+    function queueBlockAnswerSave(index) {
+        window.clearTimeout(state.blockSaveTimerId);
+        state.blockRevision += 1;
+        const activity = state.content.activities[index];
+        if (activity.completionMode === "auto" && !window.ActivityBlocks.specialised(activity)) {
+            delete state.completedActivities[index];
+            updateActivityCompleteBar();
+        }
+        showStatusMessage("Saving activity answers...");
+        state.blockSaveTimerId = window.setTimeout(() => {
+            checkBlockAnswers(index).catch((error) => showStatusMessage(error.message, true));
+        }, RESPONSE_SAVE_DEBOUNCE_MS);
     }
 
     async function checkLoginSiteCompletion(index, answers) {
@@ -485,6 +530,9 @@
                 questions,
                 images,
                 taskBrief: activity?.taskBrief,
+                blocks: activity?.blocks,
+                completionMode: activity?.completionMode,
+                assessmentId: activity?.assessmentId,
                 questionAutoMarkAssessmentId: activity?.questionAutoMarkAssessmentId,
                 information: activity?.information,
                 loginSites: activity?.loginSites,
@@ -497,6 +545,29 @@
             window.KitWorksheetRender.renderWorksheet(host, activityContent, {
                 responses: state.responses,
                 readOnly: !state.email,
+                blocksReadOnly: !state.progressLoaded,
+                blockAnswers: state.responses[`${activityIndex}-blocks`] || {},
+                onBlockChange: (answers) => {
+                    state.responses[`${activityIndex}-blocks`] = answers;
+                    queueBlockAnswerSave(activityIndex);
+                },
+                onBlockLegacyChange: (key, value) => { state.responses[key] = value; },
+                onBlockDocument: async (blockId) => {
+                    if (!state.progressLoaded) throw new Error("Your progress has not loaded. Refresh and retry.");
+                    const email = state.email;
+                    state.driveSetupInProgress = true;
+                    try {
+                        const token = await getResearchReportDriveToken();
+                        if (getSignedInEmail() !== email) throw new Error("Your account changed. Reopen this activity.");
+                        const result = await loadJson(`${blockPath(activityIndex)}/documents/${encodeURIComponent(blockId)}`, {
+                            method: "POST", headers: withAuthHeaders({ "Content-Type": "application/json" }),
+                            body: JSON.stringify({ driveAccessToken: token })
+                        });
+                        if (getSignedInEmail() !== email) throw new Error("Your account changed. Reopen this activity.");
+                        await checkBlockAnswers(activityIndex);
+                        return result;
+                    } finally { state.driveSetupInProgress = false; }
+                },
                 eyebrow: isActivity ? state.content.bannerTitle : "",
                 identityVerified: Boolean(JSON.parse(getStoredAuthRaw() || "{}").idToken),
                 driveSetup: state.driveSetup,
@@ -655,6 +726,12 @@
             activityCompleteBtn.disabled = true;
             try {
                 window.clearTimeout(state.saveTimerId);
+                window.clearTimeout(state.blockSaveTimerId);
+                const activity = state.content?.activities?.[index];
+                if (activity?.completionMode === "auto" && !window.ActivityBlocks.specialised(activity)) {
+                    await checkBlockAnswers(index);
+                    return;
+                }
                 const sites = state.content?.activities?.[index]?.loginSites;
                 if (completed && window.KitWorksheetRender.visibleLoginSites(sites, state.huntProfile).some((site) => site.readinessQuestion)) {
                     const answers = { ...state.responses[`${index}-login-sites-readiness-v1`] };
@@ -738,8 +815,10 @@
 
         resetBtn?.addEventListener("click", async () => {
             resetBtn.disabled = true;
+            window.clearTimeout(state.blockSaveTimerId);
+            state.blockRevision += 1;
             try {
-                const snapshot = await resetKit(state.kitId);
+                const snapshot = await queueProgressWrite(() => resetKit(state.kitId));
                 state.completedActivities = {};
                 state.certificate = null;
                 renderPage();
@@ -776,6 +855,9 @@
         try {
             const progressPayload = await fetchKitProgress(state.kitId);
             state.responses = { ...progressPayload?.responses, ...identityDraft };
+            (state.content.activities || []).forEach((activity, index) => {
+                if (activity?.blocks) state.responses[`${index}-blocks`] = window.ActivityBlocks.savedAnswers(activity, index, state.responses);
+            });
             state.completedActivities = progressPayload?.completedActivities || {};
             state.certificate = progressPayload?.certificate || null;
             state.progressLoaded = true;
@@ -833,6 +915,8 @@
                 });
             }
             window.clearTimeout(state.saveTimerId);
+            window.clearTimeout(state.blockSaveTimerId);
+            state.blockRevision += 1;
             state.progressLoaded = false;
             state.responses = {};
             state.completedActivities = {};

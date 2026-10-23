@@ -3,6 +3,7 @@ const fs = require("fs");
 const { createHash, randomUUID } = require("node:crypto");
 const express = require("express");
 const multer = require("multer");
+const ActivityBlocks = require("./practical-skills/activity-blocks");
 const mammoth = require("mammoth");
 const nodemailer = require("nodemailer");
 const { Pool } = require("pg");
@@ -5666,6 +5667,11 @@ async function getStoredPracticalSkillsKitContent(kitId) {
 async function savePracticalSkillsKitContent(kitId, content, updatedByEmail) {
   const safeKitId = String(kitId || "").trim();
   if (!safeKitId) return null;
+  for (const activity of content?.activities || []) {
+    if (!activity) continue;
+    try { ActivityBlocks.validate(activity); }
+    catch (error) { error.status = 400; throw error; }
+  }
 
   const safeContent = normalizePracticalSkillsKitContentForStorage(safeKitId, { ...content, kitId: safeKitId });
 
@@ -15229,8 +15235,18 @@ app.put("/api/admin/practical-skills/library", requireAdminAccess, async (req, r
 async function syncPracticalSkillsKitCompletion(studentEmail, kitId, content = null) {
   const kitContent = content || await getStoredPracticalSkillsKitContent(kitId);
   const indexes = visibleActivityIndexes(kitContent);
-  const row = await ensurePracticalSkillsProgressRow(studentEmail, kitId);
+  let row = await ensurePracticalSkillsProgressRow(studentEmail, kitId);
   if (!row) throw new Error("Kit progress could not be loaded.");
+  for (const index of indexes) {
+    const activity = kitContent.activities?.[Number(index)];
+    if (activity?.completionMode !== "auto" || ActivityBlocks.specialised(activity)) continue;
+    const documents = {};
+    for (const block of (activity.blocks || []).filter((b) => b.kind === "document" && b.required)) {
+      documents[block.id] = Boolean((await getStudentKitDocument(studentEmail, kitId, `block-${index}-${block.id}`))?.document_id);
+    }
+    const grade = ActivityBlocks.grade(activity, ActivityBlocks.savedAnswers(activity, index, row.responses), documents);
+    if (grade.passed !== Boolean(row.completed_activities?.[index])) row = await setPracticalSkillsActivityCompletion(studentEmail, kitId, Number(index), grade.passed);
+  }
   if (!indexes.length) return row;
   if (!hasDatabase) {
     const completed = allActivitiesComplete(kitContent, row);
@@ -15532,6 +15548,8 @@ app.post("/api/practical-skills/progress/:kitId/responses", async (req, res) => 
 
   try {
     const saved = await savePracticalSkillsKitResponses(studentEmail, kitId, req.body?.responses);
+    const content = await getStoredPracticalSkillsKitContent(kitId);
+    if (content.activities?.some((a) => a?.completionMode === "auto")) await syncPracticalSkillsKitCompletion(studentEmail, kitId, content);
     res.json({ ok: true, responses: saved?.responses || {} });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not save responses." });
@@ -15569,7 +15587,7 @@ app.put("/api/practical-skills/progress/:kitId/activities/:activityIndex", async
     const siteQuestions = req.body.completed && activity?.loginSites &&
       visibleLoginSites(activity.loginSites, await getLearningSitesStudentProfile(studentEmail)).some((site) => site.readinessQuestion);
     if (req.body.completed && (activity?.assessmentId || activity?.identityLessonVersion ||
-        activity?.questionAutoMarkAssessmentId || activity?.researchReport || siteQuestions)) {
+        activity?.questionAutoMarkAssessmentId || activity?.researchReport || siteQuestions || activity?.completionMode === "auto")) {
       res.status(409).json({ error: "Complete the activity tasks, then check your answers to earn this activity tick." });
       return;
     }
@@ -16016,7 +16034,9 @@ async function ensureStudentResearchReport(email, kitId, report, driveAccessToke
 function withResearchReportLock(key, task) {
   const previous = researchReportLocks.get(key) || Promise.resolve();
   const next = previous.catch(() => {}).then(task);
-  const tracked = next.finally(() => { if (researchReportLocks.get(key) === tracked) researchReportLocks.delete(key); });
+  const cleanup = () => { if (researchReportLocks.get(key) === tracked) researchReportLocks.delete(key); };
+  // Return the original rejection to the caller, but keep the cleanup promise settled.
+  const tracked = next.then(cleanup, cleanup);
   researchReportLocks.set(key, tracked);
   return next;
 }
@@ -16102,6 +16122,16 @@ app.get("/api/practical-skills/kit-content/:kitId", async (req, res) => {
   }
 });
 
+require("./practical-skills/activity-block-store").registerActivityBlocks(app, {
+  requireAdminAccess, getRequestUserEmail, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN,
+  getPracticalSkillsKitDefinition, getStoredPracticalSkillsKitContent, getAllPracticalSkillsProgressRows,
+  savePracticalSkillsKitResponses, setPracticalSkillsActivityCompletion, syncPracticalSkillsKitCompletion,
+  autoEmailKitCertificate, getStudentKitDocument, saveStudentKitDocument, getStudentProgrammeFolder, ensureStudentCourseFolders,
+  driveGetLiveFile, driveFindFileByNameInFolder, driveCopyFile, verifyDriveTokenForStudent,
+  withResearchReportLock, driveEnsureFolder, driveUploadBinaryFile, driveApiRequest,
+  upload: multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 1, fieldSize: 32768 } })
+});
+
 app.get("/api/admin/practical-skills/kit-content/:kitId", requireAdminAccess, async (req, res) => {
   const kitId = String(req.params.kitId || "").trim();
   if (!getPracticalSkillsKitDefinition(kitId)) {
@@ -16177,7 +16207,7 @@ app.put("/api/admin/practical-skills/kit-content/:kitId", requireAdminAccess, as
     }
     res.json({ ok: true, content: saved, libraryCard });
   } catch (error) {
-    res.status(500).json({ error: error.message || "Could not save kit content." });
+    res.status(error.status || 500).json({ error: error.message || "Could not save kit content." });
   }
 });
 
@@ -16229,7 +16259,7 @@ app.post("/api/admin/practical-skills/kits", requireAdminAccess, async (req, res
     saved = await savePracticalSkillsKitContent(kitId, { ...content, customKit: true }, requesterEmail);
   } catch (error) {
     customPracticalSkillsKits.delete(kitId);
-    res.status(500).json({ error: error.message || "Could not create kit." });
+    res.status(error.status || 500).json({ error: error.message || "Could not create kit." });
     return;
   }
   try {

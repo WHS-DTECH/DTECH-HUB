@@ -16,6 +16,8 @@
     const statusHost = document.querySelector("#activity-status");
     let content = null;
     let previewTimerId = 0;
+    let blockEditor = null;
+    const blockApi = window.ActivityBlocks;
 
     function renderPreview() {
         if (!content) return;
@@ -29,6 +31,7 @@
             window.KitWorksheetRender.renderWorksheet(host, {
                 ...content,
                 ...activity,
+                ...(Array.isArray(activity.blocks) && !blockApi.specialised(activity) ? { questions: [], images: [] } : {}),
                 bannerTitle: activity.title,
                 bannerSubtitle: activity.establishes
             }, { readOnly: true, eyebrow: content.bannerTitle || "" });
@@ -143,7 +146,9 @@
                 keySkill: keySkillInput.value,
                 evidenceRequired: evidenceInput.value
             },
-            questions, images, ...(researchReport ? { researchReport } : {})
+            questions, images, ...(researchReport ? { researchReport } : {}),
+            ...(blockEditor ? { blocks: blockEditor.read(),
+                completionMode: blockApi.specialised(existing) ? existing.completionMode : document.querySelector("#activity-completion-mode").value } : {})
         };
     }
 
@@ -176,6 +181,22 @@
         });
         renderQuestions(activity.questions || []);
         renderImages(activity.images || []);
+        if (blockApi && window.ActivityBlockEditor) {
+            document.querySelector("#activity-content-builder").hidden = false;
+            const specialised = blockApi.specialised(activity);
+            document.querySelector("#activity-legacy-content").hidden = !specialised;
+            const mode = document.querySelector("#activity-completion-mode");
+            mode.value = activity.completionMode || "manual";
+            mode.disabled = specialised;
+            document.querySelector("#activity-block-completion-help").textContent = specialised
+                ? "This activity keeps its existing specialised assessment and completion rules. Added blocks are extra learning content."
+                : "Automatic mode checks written answers for presence, not correctness. Required checkboxes, tables and puzzles must be completed. Document blocks confirm only creation of a copy.";
+            blockEditor?.destroy();
+            blockEditor = window.ActivityBlockEditor.mount(document.querySelector("#activity-block-editor"), {
+                blocks: blockApi.initialBlocks(activity, activityIndex, content), onChange: queuePreviewUpdate,
+                onUpload: uploadBlockResource
+            });
+        }
         document.querySelector("#activity-research-report").hidden = !activity.researchReport;
         document.querySelector("#activity-research-template").value = activity.researchReport?.templateId || "";
         document.querySelector("#activity-research-minimum").value = activity.researchReport?.minimumWords || 25;
@@ -183,7 +204,10 @@
     }
 
     async function save() {
+        if (!content) throw new Error("Load a valid activity before saving.");
+        if (blockEditor?.isUploading()) throw new Error("Wait for the resource upload to finish before saving.");
         const activity = readActivity();
+        blockApi?.validate(activity);
         const worksheets = Array.isArray(content.worksheets) ? content.worksheets.slice() : [];
         while (worksheets.length <= activityIndex) worksheets.push({ number: worksheets.length + 1, activity: "", establishes: "" });
         worksheets[activityIndex] = { ...worksheets[activityIndex], number: activity.number, activity: activity.title, establishes: activity.establishes };
@@ -193,6 +217,17 @@
         await request(`/api/admin/practical-skills/kit-content/${encodeURIComponent(kitId)}`, { method: "PUT", headers: getAuthHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ content }) });
         setStatus("Activity details saved.");
         render();
+    }
+
+    async function uploadBlockResource(file) {
+        if (!file || file.size > 15 * 1024 * 1024) throw new Error("Choose a resource file up to 15 MB.");
+        if (!window.requestHubDriveAccessToken) throw new Error("Google Drive sign-in is not ready. Wait a moment and retry.");
+        const token = await window.requestHubDriveAccessToken();
+        if (!token?.access_token) throw new Error("Google Drive permission was not granted.");
+        const body = new FormData();
+        body.append("driveAccessToken", token.access_token);
+        body.append("file", file);
+        return request("/api/admin/practical-skills/block-resource", { method: "POST", headers: getAuthHeaders(), body });
     }
 
     questionList.addEventListener("click", (event) => {

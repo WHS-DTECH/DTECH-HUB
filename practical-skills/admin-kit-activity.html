@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="../styles.css">
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&amp;family=Quicksand:wght@500;600;700&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./kit-worksheet.css?v=2">
+  <link rel="stylesheet" href="./activity-blocks.css?v=1">
   <style>
     .activity-editor { width: min(920px, calc(100% - 28px)); margin: 24px auto 60px; }
     .activity-editor-field { display: grid; gap: 6px; margin-bottom: 14px; }
@@ -82,12 +83,27 @@
             <input id="activity-research-minimum" type="number" min="1" max="1000" step="1">
           </div>
         </section>
-        <h2>Questions</h2>
-        <div id="activity-question-list"></div>
-        <button id="activity-add-question" class="button button-secondary" type="button">Add Question</button>
-        <h2>Images</h2>
-        <div id="activity-image-list"></div>
-        <button id="activity-add-image" class="button button-secondary" type="button">Add Image</button>
+        <section id="activity-content-builder" hidden aria-labelledby="activity-block-heading">
+          <h2 id="activity-block-heading">Activity Content Block Builder</h2>
+          <p>Add any combination of blocks. Use Up / Down to change their order. Save Activity Details to publish your changes.</p>
+          <div class="activity-editor-field">
+            <label for="activity-completion-mode">Activity completion</label>
+            <select id="activity-completion-mode">
+              <option value="manual">Student marks complete</option>
+              <option value="auto">Automatic tick — all required interactive blocks</option>
+            </select>
+            <p id="activity-block-completion-help">Automatic mode checks written answers for presence, not correctness. Required checkboxes, tables and puzzles must be completed. Document blocks confirm only creation of a copy.</p>
+          </div>
+          <div id="activity-block-editor"></div>
+        </section>
+        <div id="activity-legacy-content">
+          <h2>Questions</h2>
+          <div id="activity-question-list"></div>
+          <button id="activity-add-question" class="button button-secondary" type="button">Add Question</button>
+          <h2>Images</h2>
+          <div id="activity-image-list"></div>
+          <button id="activity-add-image" class="button button-secondary" type="button">Add Image</button>
+        </div>
         <div class="activity-editor-actions">
           <button id="activity-save" class="button button-primary" type="button">Save Activity Details</button>
         </div>
@@ -101,7 +117,10 @@
   </div>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="../script.js"></script>
-  <script src="./kit-worksheet-render.js?v=2"></script>
-  <script src="./admin-kit-activity.js?v=3"></script>
+  <script src="./activity-blocks.js?v=1"></script>
+  <script src="./activity-block-editor.js?v=1"></script>
+  <script src="./activity-block-view.js?v=1"></script>
+  <script src="./kit-worksheet-render.js?v=3"></script>
+  <script src="./admin-kit-activity.js?v=4"></script>
 </body>
 </html>

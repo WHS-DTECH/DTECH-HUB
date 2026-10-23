@@ -747,8 +747,14 @@
         const responses = options.responses || {};
         const readOnly = Boolean(options.readOnly);
         const theme = content?.theme || {};
-        const questions = content?.loginSites ? [] : Array.isArray(content?.questions) ? content.questions : [];
-        const images = Array.isArray(content?.images) ? content.images : [];
+        const blocks = Array.isArray(content?.blocks) ? content.blocks : null;
+        const replacesLegacy = blocks && window.ActivityBlocks && !window.ActivityBlocks.specialised(content);
+        const questions = content?.loginSites || replacesLegacy ? [] : Array.isArray(content?.questions) ? content.questions : [];
+        const images = replacesLegacy ? [] : Array.isArray(content?.images) ? content.images : [];
+        const blockAnswers = { ...options.blockAnswers };
+        (blocks || []).forEach((block) => {
+            if (block.responseKey && blockAnswers[block.id] === undefined) blockAnswers[block.id] = responses[block.responseKey];
+        });
         const imageInformationLayout = Boolean(content?.information && images.length);
         const juniorLoginSites = [7, 8].includes(options.huntProfile?.year);
         const siteLevel = options.huntProfile?.courseIds?.includes("STAFF") ? "staff" : juniorLoginSites ? "junior"
@@ -776,6 +782,14 @@
                 </div>
             ` : ""}
             ${renderTaskBrief(content?.taskBrief)}
+            ${blocks && window.ActivityBlockView ? `
+                <p class="activity-block-completion">${window.ActivityBlocks.specialised(content)
+                    ? "Completion: this activity keeps its specialised assessment rules."
+                    : content.completionMode === "auto"
+                        ? "Automatic tick: complete all required interactive blocks. Written answers are checked for presence, not correctness. A document copy confirms creation only."
+                        : "Completion: when you have finished the activity, choose Mark Activity Complete below."}</p>
+                <div class="activity-content-blocks">${window.ActivityBlockView.markup(blocks, blockAnswers, readOnly || options.blocksReadOnly, { renderImage: (image) => renderWorksheetImage(image) })}</div>
+            ` : ""}
             ${imageInformationLayout ? `<div class="worksheet-image-information-layout">` : ""}
             ${images.length ? `
                 <div class="worksheet-image-panel">
@@ -859,11 +873,15 @@
                             ${content?.identityLessonVersion ? `<p class="worksheet-assessment-feedback" data-identity-feedback="${escapeHtml(question.id)}" role="status" aria-live="polite">Type your answer. We will check it against your school Google account.</p>` : ""}
                         </div>
                     </article>
-                `).join("") : content?.assessment || content?.loginSites || content?.researchReport || renderTaskBrief(content?.taskBrief) ? "" : `<p class="worksheet-empty-note">This kit does not have any questions yet.</p>`}
+                `).join("") : blocks || content?.assessment || content?.loginSites || content?.researchReport || renderTaskBrief(content?.taskBrief) ? "" : `<p class="worksheet-empty-note">This kit does not have any questions yet.</p>`}
             </div>
             ${content?.identityLessonVersion ? `<p class="worksheet-assessment-result" id="identity-result" role="status" aria-live="polite">${options.identityVerified ? "Google sign-in is ready. Click Check your answers to mark all four answers." : "Complete questions 1-4, verify your school email in step 5, then click Check your answers."}</p><button type="button" class="worksheet-btn worksheet-btn-primary" id="identity-retry" ${readOnly ? "disabled" : ""}>Check your answers</button>` : ""}
         `;
 
+        if (blocks && window.ActivityBlockView) window.ActivityBlockView.bind(host, blocks, {
+            answers: blockAnswers, readOnly: readOnly || options.blocksReadOnly,
+            onChange: options.onBlockChange, onDocument: options.onBlockDocument, onLegacyChange: options.onBlockLegacyChange
+        });
         if (content?.assessment?.id === "learning-sites-treasure-v1") {
             wireLearningSites(host, content.assessment, { ...options, readOnly });
             if (readOnly) return;
