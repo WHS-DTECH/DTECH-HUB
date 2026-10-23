@@ -104,6 +104,7 @@ Strict cutover checklist (go/no-go):
 
 ### Typing Kit difficulty launch buttons
 - All three Typing Kit API endpoints (read log, save attempt, update calendar) require the Google ID-token identity verified by server middleware, even while the rest of the application remains in hybrid mode. Email headers and request-body email claims cannot authenticate these routes or select another student's log. Missing, invalid or expired tokens return HTTP 401 with a sign-in-again message; the frontend already sends its Google ID token.
+- The Typing Kit displays the existing Google Identity Services verification widget until a log loads successfully. This provides an ID-token sign-in path for older OAuth/Drive-only sessions; the normal top-bar button may grant Drive access without an ID token.
 - Daily records offer three one-click, new-tab links: Easy (green), Medium (blue), Hard (purple), each fixed at one minute. The links use TypingTest.com's own `/test.php` parameters: `minutes=1`, `textfile=easyText.txt` / `mediumText.txt` / `difficultText.txt`, `mode=sent`, `result_url=/result.php`.
 - Return prompts, result-link saving, attempt history and exercise-book sign-off are unchanged. Difficulty is a launch choice; this change does not add a verified difficulty field to saved scores.
 - Run `node scripts/regression-typing-kit.js` to check launch parameters, all three return prompts, text contrast and existing record-saving behaviour.

@@ -33,11 +33,17 @@
             </div>
         </div>
         <p id="typing-status" class="worksheet-status-message" role="status" aria-live="polite"></p>
+        <section id="typing-identity-verification" class="typing-intro" aria-labelledby="typing-identity-heading">
+            <h2 id="typing-identity-heading">Verify your school Google account</h2>
+            <p>Use the Google button below to securely open your saved typing log. Choose your school account. No extra account or password is needed.</p>
+            <div id="hub-google-verify-button"></div>
+            <p id="hub-google-verify-status" class="typing-note" role="status">Loading Google account verification...</p>
+        </section>
         <button id="typing-retry" class="worksheet-btn worksheet-btn-secondary" type="button" hidden>Retry loading my log</button>
         <div id="typing-content"></div>
     </main>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="../script.js"></script>
-    <script src="./typing-kit.js?v=2"></script>
+    <script src="./typing-kit.js?v=3"></script>
 </body>
 </html>

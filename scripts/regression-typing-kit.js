@@ -263,6 +263,7 @@ test("dashboard renders exactly seven dated weeks and fourteen daily record link
     assert.match(html, /26 Oct 2026/);
     assert.match(html, /13 Dec 2026/);
     assert.match(html, /0 \/ 14 period records started/);
+    assert.equal(ui.get("typing-identity-verification").hidden, true);
     assert.match(html, /week=2026-12-07&amp;period=2|week=2026-12-07&period=2/);
     assert.doesNotMatch(html, /typing-settings-form|certificate|Mark Complete/);
     assert.equal(ui.requests[0].options.headers.Authorization, "Bearer test-token");
@@ -348,6 +349,7 @@ test("sign-out clears history and ignores outstanding responses", async () => {
     const ui = frontend({ deferred });
     await settle();
     ui.signOut();
+    assert.equal(ui.get("typing-identity-verification").hidden, false, "Google verification remains available after sign-out");
     deferred.resolve({ ok: true, json: async () => ({ startDate: DEFAULT_START_DATE, attempts: [], canManage: false }) });
     await settle();
     assert.equal(ui.get("typing-content").innerHTML, "");

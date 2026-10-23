@@ -212,6 +212,7 @@
         state.pendingUrl = "";
         content.innerHTML = "";
         retry.hidden = true;
+        document.getElementById("typing-identity-verification").hidden = false;
         try {
             state.email = auth()?.profile.email.toLowerCase() || "";
             if (!state.email) {
@@ -222,6 +223,7 @@
             const snapshot = await request();
             if (revision !== state.revision) return;
             state.snapshot = snapshot;
+            document.getElementById("typing-identity-verification").hidden = true;
             message("");
             render();
         } catch (error) {
