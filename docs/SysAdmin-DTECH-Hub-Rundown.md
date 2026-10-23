@@ -104,6 +104,9 @@ Strict cutover checklist (go/no-go):
 
 ### Kit Content Builder sign-in readiness
 
+- Activity Details supports an optional activity-specific challenge, tasks (one per line, automatically numbered), key skill and evidence instructions. Students see these in a task panel above images/questions; a task-only activity does not display the empty-questions message. These fields do not add file upload or automatic evidence checking, and do not change completion rules.
+- `node --test scripts/regression-activity-task-brief.js` covers editor save/reload, task numbering, preserved activity details and escaped student output.
+
 - Saving an active custom kit also makes it available on My Licence in both the stamp collection and Your Kit Collection, including existing custom kits. Name, icon and subtitle come from saved kit content. Completed activities earn the kit's stamp and certificate through the existing completion flow.
 - Planning/archived custom kits are excluded from these collections; their saved progress remains available. Active custom kits increase the stamp total but do not alter the original three-kit points, tiers or badge rules. Typing remains a separate practice log, not a stamp.
 - Licence coverage: `node --test scripts/regression-licence-custom-kits.js scripts/regression-licence-dashboard.js scripts/regression-kit-certificate.js scripts/regression-kit-builder-new-kit.js`.

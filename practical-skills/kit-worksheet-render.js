@@ -728,6 +728,19 @@
         });
     }
 
+    function renderTaskBrief(brief) {
+        const tasks = Array.isArray(brief?.tasks) ? brief.tasks.filter((task) => String(task || "").trim()) : [];
+        if (!brief?.challenge && !tasks.length && !brief?.keySkill && !brief?.evidenceRequired) return "";
+        return `<section class="worksheet-task-brief" aria-labelledby="worksheet-challenge-title">
+            <p class="worksheet-task-eyebrow">Your activity challenge</p>
+            <h2 id="worksheet-challenge-title">Time to put your skills into action</h2>
+            ${brief.challenge ? `<p class="worksheet-task-text"><strong>Challenge:</strong> ${escapeHtml(brief.challenge)}</p>` : ""}
+            ${tasks.length ? `<h3>Your tasks</h3><ol class="worksheet-task-steps">${tasks.map((task) => `<li>${escapeHtml(task)}</li>`).join("")}</ol>` : ""}
+            ${brief.keySkill ? `<div class="worksheet-task-skill"><strong>Key skill</strong><p class="worksheet-task-text">${escapeHtml(brief.keySkill)}</p></div>` : ""}
+            ${brief.evidenceRequired ? `<div class="worksheet-task-evidence"><strong>Evidence required</strong><p class="worksheet-task-text">${escapeHtml(brief.evidenceRequired)}</p></div>` : ""}
+        </section>`;
+    }
+
     function renderWorksheet(host, content, options = {}) {
         if (!host) return;
 
@@ -762,6 +775,7 @@
                    <div class="worksheet-instructions-copy">${renderInstructions(content.instructions)}</div>
                 </div>
             ` : ""}
+            ${renderTaskBrief(content?.taskBrief)}
             ${imageInformationLayout ? `<div class="worksheet-image-information-layout">` : ""}
             ${images.length ? `
                 <div class="worksheet-image-panel">
@@ -845,7 +859,7 @@
                             ${content?.identityLessonVersion ? `<p class="worksheet-assessment-feedback" data-identity-feedback="${escapeHtml(question.id)}" role="status" aria-live="polite">Type your answer. We will check it against your school Google account.</p>` : ""}
                         </div>
                     </article>
-                `).join("") : content?.assessment || content?.loginSites || content?.researchReport ? "" : `<p class="worksheet-empty-note">This kit does not have any questions yet.</p>`}
+                `).join("") : content?.assessment || content?.loginSites || content?.researchReport || renderTaskBrief(content?.taskBrief) ? "" : `<p class="worksheet-empty-note">This kit does not have any questions yet.</p>`}
             </div>
             ${content?.identityLessonVersion ? `<p class="worksheet-assessment-result" id="identity-result" role="status" aria-live="polite">${options.identityVerified ? "Google sign-in is ready. Click Check your answers to mark all four answers." : "Complete questions 1-4, verify your school email in step 5, then click Check your answers."}</p><button type="button" class="worksheet-btn worksheet-btn-primary" id="identity-retry" ${readOnly ? "disabled" : ""}>Check your answers</button>` : ""}
         `;

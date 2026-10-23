@@ -37,6 +37,26 @@
           <label for="activity-establishes">What it establishes</label>
           <textarea id="activity-establishes" rows="3"></textarea>
         </div>
+        <h2>Activity challenge &amp; tasks</h2>
+        <p>These details appear on this activity's student page, above the questions and images. Leave fields blank when they are not needed.</p>
+        <div class="activity-editor-field">
+          <label for="activity-challenge">Challenge</label>
+          <textarea id="activity-challenge" rows="3" placeholder="Create your Rattlesnakes document in Google Docs using the supplied exercise."></textarea>
+        </div>
+        <div class="activity-editor-field">
+          <label for="activity-tasks">Your tasks (one step per line)</label>
+          <textarea id="activity-tasks" rows="10" aria-describedby="activity-tasks-help" placeholder="Name your document Rattlesnakes.&#10;Open Google Drive on a Windows computer."></textarea>
+          <small id="activity-tasks-help">Paste or type one task on each line. Students see an automatically numbered list; you do not need to type the numbers.</small>
+        </div>
+        <div class="activity-editor-field">
+          <label for="activity-key-skill">Key skill</label>
+          <textarea id="activity-key-skill" rows="2" placeholder="I can download, organise and retrieve a document using Windows File Explorer."></textarea>
+        </div>
+        <div class="activity-editor-field">
+          <label for="activity-evidence-required">Evidence required</label>
+          <textarea id="activity-evidence-required" rows="2" placeholder="Upload Rattlesnakes.docx."></textarea>
+          <small>Instructions only. This field does not add a file-upload control or automatically check submitted work.</small>
+        </div>
         <p id="activity-assessment-note" hidden>This activity includes the built-in Year 7/8 Password Detective matching task and quiz. Students earn their tick when all ten answers are correct. Saving this page keeps the self-marking task; questions added below are extra practice, not part of its score.</p>
         <p id="activity-apps-note" hidden>This activity includes the Google/Microsoft apps word search and WHS-DTECH-only Drive setup. Students earn a tick by finding all eight apps, completing Google Drive setup and confirming their school Microsoft OneDrive sign-in. Microsoft sign-in is student-confirmed, not automatically verified. Saving preserves the built-in activity; extra questions are not scored. The homepage senior Drive Ready setup is unchanged.</p>
         <p id="activity-hunt-note" hidden>This activity includes the Learning Sites pirate treasure hunt: Science, Mrs O'Malley's English, Food &amp; Hospitality, PE and DTECH. Course selection is checked against the student's latest linked timetable profile, then two course-specific clues are marked. All eight answers earn a saved tick. Missing or ambiguous profiles require teacher help. Clues were reviewed on 9 October 2026 and should be reviewed when linked pages change; extra questions below are not scored.</p>
@@ -73,6 +93,6 @@
   </div>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="../script.js"></script>
-  <script src="./admin-kit-activity.js"></script>
+  <script src="./admin-kit-activity.js?v=2"></script>
 </body>
 </html>

@@ -484,6 +484,7 @@
                 bannerSubtitle: worksheet.establishes || activity?.establishes || "",
                 questions,
                 images,
+                taskBrief: activity?.taskBrief,
                 questionAutoMarkAssessmentId: activity?.questionAutoMarkAssessmentId,
                 information: activity?.information,
                 loginSites: activity?.loginSites,

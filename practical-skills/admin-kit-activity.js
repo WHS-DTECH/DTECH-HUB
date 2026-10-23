@@ -7,6 +7,10 @@
     const activityIndex = Math.max(0, Number.parseInt(params.get("activity"), 10) || 0);
     const titleInput = document.querySelector("#activity-title");
     const establishesInput = document.querySelector("#activity-establishes");
+    const challengeInput = document.querySelector("#activity-challenge");
+    const tasksInput = document.querySelector("#activity-tasks");
+    const keySkillInput = document.querySelector("#activity-key-skill");
+    const evidenceInput = document.querySelector("#activity-evidence-required");
     const questionList = document.querySelector("#activity-question-list");
     const imageList = document.querySelector("#activity-image-list");
     const statusHost = document.querySelector("#activity-status");
@@ -105,7 +109,16 @@
             templateId: document.querySelector("#activity-research-template").value.trim(),
             minimumWords: Math.max(1, Math.min(1000, Math.round(Number(document.querySelector("#activity-research-minimum").value) || existing.researchReport.minimumWords || 25)))
         } : undefined;
-        return { ...existing, number: activityIndex + 1, title: titleInput.value, establishes: establishesInput.value, questions, images, ...(researchReport ? { researchReport } : {}) };
+        return {
+            ...existing, number: activityIndex + 1, title: titleInput.value, establishes: establishesInput.value,
+            taskBrief: {
+                challenge: challengeInput.value,
+                tasks: tasksInput.value.split(/\r?\n/).map((line) => line.trim().replace(/^\d+[.)]\s+/, "")).filter(Boolean),
+                keySkill: keySkillInput.value,
+                evidenceRequired: evidenceInput.value
+            },
+            questions, images, ...(researchReport ? { researchReport } : {})
+        };
     }
 
     function render() {
@@ -113,6 +126,10 @@
         const activity = content.activities?.[activityIndex] || (activityIndex === 0 ? { questions: content.questions || [], images: content.images || [] } : {});
         titleInput.value = activity.title || worksheet.activity || `Activity ${activityIndex + 1}`;
         establishesInput.value = activity.establishes || worksheet.establishes || "";
+        challengeInput.value = activity.taskBrief?.challenge || "";
+        tasksInput.value = (activity.taskBrief?.tasks || []).join("\n");
+        keySkillInput.value = activity.taskBrief?.keySkill || "";
+        evidenceInput.value = activity.taskBrief?.evidenceRequired || "";
         document.querySelector("#activity-page-title").textContent = `Activity Details: ${titleInput.value}`;
         document.querySelector("#activity-page-summary").textContent = establishesInput.value || "Configure the student tasks and supporting images for this worksheet.";
         const assessmentNote = document.querySelector("#activity-assessment-note");

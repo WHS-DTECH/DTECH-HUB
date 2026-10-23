@@ -7,6 +7,18 @@
     --worksheet-accent-color: #ffd166;
 }
 
+.worksheet-task-brief { margin: 24px 0; padding: clamp(18px, 4vw, 30px); background: #fff; border: 2px solid #c9ded2; border-top: 6px solid var(--worksheet-theme-color); border-radius: 18px; box-shadow: 0 5px 0 #eae0ce; }
+.worksheet-task-eyebrow { margin: 0 0 6px; color: #246b51; font-size: .8rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.worksheet-task-brief h2 { margin: 0 0 16px; font-family: 'Baloo 2', sans-serif; line-height: 1.25; }
+.worksheet-task-brief h3 { margin: 22px 0 10px; }
+.worksheet-task-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
+.worksheet-task-steps { padding-left: 2rem; margin: 10px 0 22px; }
+.worksheet-task-steps li { padding-left: 8px; margin: 12px 0; line-height: 1.7; overflow-wrap: anywhere; }
+.worksheet-task-steps li::marker { color: #246b51; font-weight: 800; }
+.worksheet-task-skill, .worksheet-task-evidence { padding: 14px 18px; margin-top: 14px; border-radius: 10px; background: #edf8f0; border-left: 4px solid #246b51; }
+.worksheet-task-evidence { background: #fff8e1; border-color: #ad6200; }
+.worksheet-task-skill p, .worksheet-task-evidence p { margin: 6px 0 0; }
+
 .worksheet-certificate { margin-top: 28px; }
 .certificate-sheet { position: relative; border: 5px solid #1f5b3a; outline: 1px solid #c49a36; outline-offset: -14px; background: #fffaf0; color: #173858; padding: 42px 32px; text-align: center; border-radius: 8px; }
 .certificate-logo { position: absolute; top: 28px; left: 28px; width: 80px; height: 80px; object-fit: contain; border-radius: 50%; }
