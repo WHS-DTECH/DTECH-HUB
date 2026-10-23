@@ -78,6 +78,12 @@
 .ps-kit-list > .ps-signin-note { grid-column: 1 / -1; }
 #ps-status { margin: 0; }
 .student-licence[hidden], .licence-next-step[hidden] { display: none; }
+@media (min-width: 900px) and (max-height: 720px) {
+    .student-licence { padding: 14px 20px; }
+    .licence-stamp { min-height: 104px; padding: 8px 12px; }
+    .licence-stamps { gap: 10px; margin-top: 10px; }
+    .licence-stamp-icon { font-size: 1.4rem; }
+}
 @media (max-width: 800px) {
     .ps-kit-list { grid-template-columns: minmax(0, 1fr); }
     .licence-stamps { grid-template-columns: repeat(2, minmax(0, 1fr)); }

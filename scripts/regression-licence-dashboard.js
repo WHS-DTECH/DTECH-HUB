@@ -7,6 +7,10 @@ const source = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "c
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 
 async function main() {
+    const html = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "checklist.html"), "utf8");
+    assert.match(html, /<details class="licence-more">/, "Stats and detailed collection are collapsed by default");
+    assert.ok(html.indexOf('id="ps-stamp-list"') < html.indexOf('<details class="licence-more">'));
+    assert.ok(html.indexOf('id="ps-kit-list"') > html.indexOf('<details class="licence-more">'));
     const nodes = new Map();
     const events = {};
     const requests = [];

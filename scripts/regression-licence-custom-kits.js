@@ -11,7 +11,8 @@ test("saved custom kits populate licence stamps without changing existing points
         "kit-files": { identity: { name: "Files & Folders", status: "active" }, bannerSubtitle: "Create. Save. Find.", theme: { icon: "F" } },
         "kit-empty": { identity: { name: "New Kit" } },
         "kit-planned": { identity: { name: "Planning", status: "planning" } },
-        "kit-archived": { identity: { name: "Archived", status: "archive" } }
+        "kit-archived": { identity: { name: "Archived", status: "archive" } },
+        "kit-deleted": { identity: { name: "Deleted", status: "active" }, deletedAt: "2026-10-24T00:00:00Z" }
     };
     const base = { kits: [{ id: "kit-login", isComplete: true }], completedCount: 1, totalKits: 3, totalPoints: 100, badges: [{ id: "first-kit" }] };
     const context = vm.createContext({

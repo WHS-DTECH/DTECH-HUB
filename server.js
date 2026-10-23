@@ -6674,7 +6674,7 @@ function buildPracticalSkillsKitLibraryCard(kitId, content) {
     summary: content.bannerSubtitle || content.learning?.whatStudentsWillLearn || `Explore the ${title} kit and complete its activities.`,
     yearLevel: content.identity?.yearLevel || "All Years",
     area: content.identity?.skillArea || "Practical Skills",
-    status: content.deletedAt ? "deleted" : content.identity?.status || "active",
+    status: content.deletedAt ? "archive" : content.identity?.status || "active",
     href: `/practical-skills/kit-worksheet.html?kit=${encodeURIComponent(safeKitId)}`,
     visual: { icon: content.theme?.icon || "PS" }
   });
@@ -15293,7 +15293,7 @@ async function buildPracticalSkillsLicenceSnapshot(rows) {
       description: content.bannerSubtitle || `Explore ${content.identity?.name || content.bannerTitle || "this kit"} and complete its activities.`,
       icon: content.theme?.icon || "\ud83d\udcc1",
       custom: true,
-      status: content.identity?.status || "active",
+      status: content.deletedAt ? "deleted" : content.identity?.status || "active",
       isComplete: Boolean(row?.completed),
       startedAt: row?.started_at || null,
       completedAt: row?.completed_at || null,
