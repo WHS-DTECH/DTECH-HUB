@@ -1065,13 +1065,14 @@
             ` : ""}
             ${options.minecraftExports ? `
                 <section class="worksheet-assessment-intro worksheet-minecraft-exports" aria-labelledby="minecraft-exports-title" data-minecraft-exports>
-                    <h2 id="minecraft-exports-title">\ud83d\udcc1 Set up your Minecraft Exports folder</h2>
-                    <p>Before you start building, make a safe place in Google Drive to keep your exported worlds, screenshots, Portfolio and videos.</p>
+                    <h2 id="minecraft-exports-title">\ud83d\udcc1 Keep a copy of your Minecraft evidence</h2>
+                    <p>First follow the Google Drive for Desktop and Videos setup instructions above. Your synced <strong>Videos</strong> folder is your Windows working location for Minecraft and Unity. This separate <strong>Minecraft Exports</strong> folder holds the Minecraft evidence you submit for your kit.</p>
                     <ol>
                         <li>Click <strong>Create &amp; Open My Minecraft Exports Folder</strong>. Your folder opens in a new tab: <strong>WHS-DTECH \u2192 your course \u2192 KITS \u2192 Minecraft Exports</strong>.</li>
                         <li>In Minecraft Education, go to <strong>Play \u2192 View My Worlds</strong>, click the pencil \u270f\ufe0f next to your world, then <strong>Export World</strong>.</li>
-                        <li>Check where the <strong>.mcworld</strong> file saves. If you're not sure, look in your <strong>Downloads</strong> folder.</li>
-                        <li>Drag the <strong>.mcworld</strong> file into your Minecraft Exports tab. Do this at the end of every lesson so your work is safe.</li>
+                        <li>In the save window, choose your local <strong>Videos \u2192 Minecraft</strong> folder and give the <strong>.mcworld</strong> export a clear name and date. Export your Portfolio and save screenshots there too. Minecraft's automatic world save is not the same as exporting a <strong>.mcworld</strong> file.</li>
+                        <li><strong>Copy</strong> the exported world, Portfolio and required screenshots from <strong>Videos \u2192 Minecraft</strong> into your Minecraft Exports browser tab. Keep the originals in Videos; do not move or delete them to submit evidence.</li>
+                        <li>At the end of each lesson, close your work and check that Drive for Desktop has finished syncing with no errors before you sign out of Windows. Confirm that your evidence upload has finished in the Minecraft Exports tab too. Opening this folder does not check your work or complete an activity.</li>
                     </ol>
                     <div class="worksheet-research-report-actions">
                         <button type="button" class="worksheet-btn worksheet-btn-primary" data-minecraft-exports-open ${options.readOnly ? "disabled" : ""}>Create &amp; Open My Minecraft Exports Folder</button>
@@ -1131,7 +1132,7 @@
                 if (!folder?.folderUrl) throw new Error("Your Minecraft Exports folder could not be opened. Please try again.");
                 if (folderTab && !folderTab.closed) folderTab.location.replace(folder.folderUrl);
                 else window.open(folder.folderUrl, "_blank", "noopener");
-                setStatus(`Your folder is open in a new tab: ${(folder.path || []).join(" \u2192 ")}. Drag your exported .mcworld files into it.`);
+                setStatus(`Your evidence folder is open in a new tab: ${(folder.path || []).join(" \u2192 ")}. Copy your exported .mcworld, Portfolio and required screenshots from Videos \u2192 Minecraft into it. Keep the originals in Videos and wait for sync and uploads to finish.`);
             } catch (error) {
                 if (folderTab && !folderTab.closed) folderTab.close();
                 setStatus(error?.message || "Could not open your Minecraft Exports folder. Please try again.", true);
