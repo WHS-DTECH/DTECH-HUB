@@ -57,7 +57,11 @@ test("teacher preview loads only authenticated content, hides progress and keeps
         assert.equal(f.node("worksheet-activity-complete-bar").hidden, true);
         assert.equal(f.node("worksheet-certificate").hidden, true);
         if (activity) assert.match(f.node("worksheet-back-link").href, /&preview=1$/);
-        else assert.equal(f.renders[0].preview, true);
+        else {
+            assert.equal(f.renders[0].preview, true);
+            assert.equal(f.renders[0].minecraftExports, undefined, "Minecraft overview does not show the redundant evidence panel");
+            assert.equal(f.renders[0].onMinecraftExportsOpen, undefined);
+        }
     }
     const context = vm.createContext({ window: {} });
     vm.runInContext(fs.readFileSync(path.join(root, "kit-worksheet-render.js"), "utf8"), context);

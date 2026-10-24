@@ -90,7 +90,7 @@ assert.ok(host.innerHTML.indexOf("worksheet-instructions") < host.innerHTML.inde
     assert.match(route, /ensureStudentCourseFolders\(email, programmeFolder, driveAccessToken\)/);
     assert.match(route, /driveEnsureFolder\(kits\.id, MINECRAFT_EXPORTS_FOLDER_NAME/);
     assert.doesNotMatch(route, /method: "(DELETE|PATCH|PUT)"|trashed: true/, "Folder setup never deletes or edits Drive files");
-    assert.match(worksheetSource, /minecraftExports: state\.kitId === "kit-minecraft"/, "Only the Minecraft kit shows the box");
+    assert.doesNotMatch(worksheetSource, /minecraftExports:|onMinecraftExportsOpen:/, "Kit overview no longer enables the redundant exports panel or its folder action");
     console.log("Minecraft Exports folder regressions passed.");
 })().catch((error) => { console.error(error); process.exitCode = 1; });
 const kitContent = {

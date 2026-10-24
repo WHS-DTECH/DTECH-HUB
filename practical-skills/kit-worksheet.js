@@ -505,13 +505,7 @@
                 kitId: state.kitId,
                 preview,
                 completedActivities: state.completedActivities,
-                readOnly: preview || !state.email,
-                minecraftExports: state.kitId === "kit-minecraft",
-                onMinecraftExportsOpen: async () => loadJson("/api/practical-skills/minecraft-exports-folder", {
-                    method: "POST",
-                    headers: withAuthHeaders({ "Content-Type": "application/json" }),
-                    body: JSON.stringify({ driveAccessToken: await getResearchReportDriveToken() })
-                })
+                readOnly: preview || !state.email
             });
         } else {
             const worksheet = activityIndex === null ? null : worksheets[activityIndex];
