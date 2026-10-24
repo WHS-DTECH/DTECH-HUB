@@ -14,6 +14,7 @@ const panel = { querySelector: (selector) => ({
     "#hub-sidebar-kit-open": open, "#hub-sidebar-kit-retry": retry
 })[selector] };
 const context = vm.createContext({
+    document: { body: { dataset: {} } },
     hubAuthState: { profile: { email: "student@example.test" } },
     normalizeEmail: (value) => String(value || "").trim().toLowerCase(),
     withHubAuthHeaders: (_headers, email) => ({ "x-user-email": email }),

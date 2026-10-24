@@ -2481,6 +2481,13 @@ async function loadAndRenderSidebarKit(panel) {
     const open = panel.querySelector("#hub-sidebar-kit-open");
     const retry = panel.querySelector("#hub-sidebar-kit-retry");
     if (!title || !description || !open || !retry) return;
+    if (document.body.dataset.hubReadOnly === "true") {
+        title.textContent = "Read-only kit review";
+        description.textContent = "Student completion is not recalculated on this page.";
+        open.hidden = true;
+        retry.hidden = true;
+        return;
+    }
     const email = normalizeEmail(hubAuthState.profile?.email || "");
     const requestId = String(Number(title.dataset.requestId || 0) + 1);
     title.dataset.requestId = requestId;

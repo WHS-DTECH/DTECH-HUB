@@ -2,6 +2,9 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const express = require("express");
+const fs = require("node:fs");
+const path = require("node:path");
+const vm = require("node:vm");
 const { registerTeacherResults } = require("../practical-skills/teacher-results-store");
 
 async function fixture(t) {
@@ -69,4 +72,23 @@ test("missing document storage is reported and database outages fail explicitly"
     const response = await f.read();
     assert.equal(response.status, 503);
     assert.match((await response.json()).error, /No results have been changed/);
+});
+
+test("read-only review suppresses the shared sidebar's mutating progress fetch", async () => {
+    const root = path.join(__dirname, "..");
+    const html = fs.readFileSync(path.join(root, "practical-skills", "teacher-results.html"), "utf8");
+    assert.match(html, /data-hub-read-only="true"/);
+    const source = fs.readFileSync(path.join(root, "script.js"), "utf8");
+    const start = source.indexOf("async function loadAndRenderSidebarKit(panel)");
+    const end = source.indexOf("\nfunction routeHubCourseHomepage(", start);
+    assert.ok(start >= 0 && end > start);
+    const elements = {};
+    const context = vm.createContext({
+        document: { body: { dataset: { hubReadOnly: "true" } } },
+        fetch() { assert.fail("Read-only page must not fetch student progress"); }
+    });
+    vm.runInContext(source.slice(start, end), context);
+    await context.loadAndRenderSidebarKit({ querySelector: (key) => (elements[key] ||= {}) });
+    assert.equal(elements["#hub-sidebar-kit-title"].textContent, "Read-only kit review");
+    assert.equal(elements["#hub-sidebar-kit-open"].hidden, true);
 });
