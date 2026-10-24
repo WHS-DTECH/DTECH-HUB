@@ -1044,7 +1044,8 @@
         const activities = Array.isArray(content?.activities) ? content.activities : [];
         const completedActivities = options.completedActivities || {};
         const visibleWorksheets = worksheets.map((worksheet, index) => ({ worksheet, index }))
-            .filter(({ worksheet }) => worksheet.mergedInto === undefined && !worksheet.hidden && !worksheet.libraryOnly);
+            .filter(({ worksheet }) => worksheet.mergedInto === undefined && !worksheet.hidden && !worksheet.libraryOnly)
+            .sort((a, b) => Number(b.worksheet.startHere === true) - Number(a.worksheet.startHere === true));
         const completedCount = visibleWorksheets.filter(({ index }) => Boolean(completedActivities[index])).length;
 
         host.style.setProperty("--worksheet-theme-color", theme.color || "#2f8f61");
@@ -1066,14 +1067,7 @@
             ${options.minecraftExports ? `
                 <section class="worksheet-assessment-intro worksheet-minecraft-exports" aria-labelledby="minecraft-exports-title" data-minecraft-exports>
                     <h2 id="minecraft-exports-title">\ud83d\udcc1 Keep a copy of your Minecraft evidence</h2>
-                    <p>First follow the Google Drive for Desktop and Videos setup instructions above. Your synced <strong>Videos</strong> folder is your Windows working location for Minecraft and Unity. This separate <strong>Minecraft Exports</strong> folder holds the Minecraft evidence you submit for your kit.</p>
-                    <ol>
-                        <li>Click <strong>Create &amp; Open My Minecraft Exports Folder</strong>. Your folder opens in a new tab: <strong>WHS-DTECH \u2192 your course \u2192 KITS \u2192 Minecraft Exports</strong>.</li>
-                        <li>In Minecraft Education, go to <strong>Play \u2192 View My Worlds</strong>, click the pencil \u270f\ufe0f next to your world, then <strong>Export World</strong>.</li>
-                        <li>In the save window, choose your local <strong>Videos \u2192 Minecraft</strong> folder and give the <strong>.mcworld</strong> export a clear name and date. Export your Portfolio and save screenshots there too. Minecraft's automatic world save is not the same as exporting a <strong>.mcworld</strong> file.</li>
-                        <li><strong>Copy</strong> the exported world, Portfolio and required screenshots from <strong>Videos \u2192 Minecraft</strong> into your Minecraft Exports browser tab. Keep the originals in Videos; do not move or delete them to submit evidence.</li>
-                        <li>At the end of each lesson, close your work and check that Drive for Desktop has finished syncing with no errors before you sign out of Windows. Confirm that your evidence upload has finished in the Minecraft Exports tab too. Opening this folder does not check your work or complete an activity.</li>
-                    </ol>
+                    <p>Start with <strong>Google Drive Setup</strong> in the activity list. When an activity asks for evidence, use this button to open your separate <strong>Minecraft Exports</strong> folder and copy your files into it.</p>
                     <div class="worksheet-research-report-actions">
                         <button type="button" class="worksheet-btn worksheet-btn-primary" data-minecraft-exports-open ${options.readOnly ? "disabled" : ""}>Create &amp; Open My Minecraft Exports Folder</button>
                     </div>

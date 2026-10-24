@@ -18,15 +18,21 @@ test("Minecraft distinguishes synced Videos working storage from evidence copies
         worksheets: [{ activity: "My First Build" }], activities: []
     }, { minecraftExports: true, readOnly: true });
     assert.match(host.innerHTML, /Keep a copy of your Minecraft evidence/);
-    assert.match(host.innerHTML, /Videos<\/strong> folder is your Windows working location for Minecraft and Unity/);
-    assert.match(host.innerHTML, /Videos \u2192 Minecraft/);
-    assert.match(host.innerHTML, /automatic world save is not the same as exporting/);
-    assert.match(host.innerHTML, /Keep the originals in Videos/);
-    assert.match(host.innerHTML, /finished syncing with no errors before you sign out of Windows/);
-    assert.match(host.innerHTML, /does not check your work or complete an activity/);
+    assert.match(host.innerHTML, /Start with <strong>Google Drive Setup/);
+    assert.match(host.innerHTML, /separate <strong>Minecraft Exports/);
+    assert.doesNotMatch(host.innerHTML, /Unity|<ol>\s*<li>/);
     assert.match(host.innerHTML, /data-minecraft-exports-open disabled/);
     assert.doesNotMatch(host.innerHTML, /Downloads<\/strong> folder/);
     assert.match(host.innerHTML, /My First Build/);
+});
+test("start-here activity appears first without changing existing activity indexes", () => {
+    const { renderer, host } = fixture();
+    renderer.renderKitOverview(host, {
+        worksheets: [{ activity: "Original build" }, { activity: "Google Drive Setup", startHere: true }]
+    }, { kitId: "kit-minecraft", preview: true });
+    assert.ok(host.innerHTML.indexOf("Google Drive Setup") < host.innerHTML.indexOf("Original build"));
+    assert.match(host.innerHTML, /activity=1&amp;preview=1/);
+    assert.match(host.innerHTML, /activity=0&amp;preview=1/);
 });
 test("other kits do not receive Minecraft or Windows Desktop instructions", () => {
     const { renderer, host } = fixture();
