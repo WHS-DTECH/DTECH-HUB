@@ -115,6 +115,7 @@ async function main() {
     assert.equal(sent[0].to, email);
     assert.deepEqual(sent[0].cc, ["lead@example.school.nz"], "Automatic certificate email CCs the DTECH Lead Teacher");
     assert.equal(sent[0].emailType, "kit_certificate");
+    assert.equal(sent[0].subject, "[DTECH HUB] Login Kit - Certificate of Completion - M\u0101ia Student");
     assert.ok(context.memoryPracticalSkillsProgress.get(`${email}:kit-login`).certificate_emailed_at);
     await call("get", "");
     await call("get", "");
@@ -166,6 +167,7 @@ async function main() {
     assert.equal(sent[1].attachment.mimetype, "application/pdf");
     assert.ok(sent[1].attachment.buffer.length > 1000);
     assert.equal(sent[1].emailType, "kit_certificate");
+    assert.equal(sent[1].subject, "[DTECH HUB] Login Kit - Certificate of Completion - M\u0101ia Student", "Manual resend uses the same server-derived student name");
     assert.equal((await call("post", "/certificate/email")).code, 429, "Repeated sends are throttled");
     assert.equal((await call("get", "", { auth_identity: { verified: false, givenName: "Spoof" } })).body.certificate.studentName, email);
     context.memoryStaffDirectory = new Map([[email, { email_school: email, first_name: "Vanessa", last_name: "Pringle" }]]);

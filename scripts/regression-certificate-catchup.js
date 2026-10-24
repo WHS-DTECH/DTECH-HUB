@@ -11,6 +11,11 @@ test("teacher matching requires the same student, kit and teacher, including leg
     assert.equal(teacherAlreadyEmailed([log], "student@school.nz", "kit-google-search", "teacher@school.nz"), false);
     assert.equal(teacherAlreadyEmailed([{ ...log, recipients: ["student@school.nz"] }], "student@school.nz", "kit-login", "teacher@school.nz"), false);
     assert.equal(teacherAlreadyEmailed([{ ...log, subject: "[DTECH HUB] Google Search - Certificate of Completion" }], "student@school.nz", "kit-google-search", "teacher@school.nz"), true);
+    const named = { ...log, subject: `${log.subject} - Alex Student` };
+    assert.equal(teacherAlreadyEmailed([named], "student@school.nz", "kit-login", "teacher@school.nz"), true);
+    assert.equal(teacherAlreadyEmailed([named], "other@school.nz", "kit-login", "teacher@school.nz"), false);
+    assert.equal(teacherAlreadyEmailed([named], "student@school.nz", "kit-google-search", "teacher@school.nz"), false);
+    assert.equal(teacherAlreadyEmailed([{ ...log, subject: `${log.subject} (unrelated)` }], "student@school.nz", "kit-login", "teacher@school.nz"), false);
 });
 
 test("preview excludes prior teacher copies; sends only missing teacher copies; ambiguous deliveries are not retried", async (t) => {
@@ -92,6 +97,7 @@ test("preview excludes prior teacher copies; sends only missing teacher copies; 
     assert.equal(sent.length, 2);
     assert.equal(sent.every((mail) => mail.to === "teacher@school.nz" && !mail.cc), true);
     assert.equal(sent.every((mail) => mail.attachment.buffer.length && mail.emailType === "kit_certificate_teacher_catchup"), true);
+    assert.equal(sent.every((mail) => mail.subject.includes(" - Certificate of Completion - missing@school.nz (teacher catch-up:")), true);
     const uncertain = { studentEmail: "uncertain@school.nz", kitId: "kit-login" };
     assert.deepEqual((await call(uncertain)).body.uncertainTeachers, ["teacher@school.nz"]);
     assert.equal((await call(uncertain)).body.skipped, true);

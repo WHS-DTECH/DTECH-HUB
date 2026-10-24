@@ -8,7 +8,7 @@ function teacherAlreadyEmailed(logs, studentEmail, kitId, teacherEmail) {
     return logs.some((log) => {
         const recipients = (Array.isArray(log.recipients) ? log.recipients : []).flatMap((value) => String(value).split(",")).map(normalize);
         return recipients.includes(normalize(studentEmail)) && recipients.includes(normalize(teacherEmail))
-            && subjects.includes(normalize(log.subject));
+            && subjects.some((subject) => normalize(log.subject) === subject || normalize(log.subject).startsWith(`${subject} - `));
     });
 }
 
@@ -107,7 +107,7 @@ function registerCertificateCatchup(app, dependencies) {
                     const safe = (value) => String(value || "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
                     await sendConfiguredHubEmail({
                         to: teacher,
-                        subject: `[DTECH HUB] ${certificate.kitTitle} - Certificate of Completion (teacher catch-up: ${row.studentEmail})`,
+                        subject: `[DTECH HUB] ${certificate.kitTitle} - Certificate of Completion - ${certificate.studentName} (teacher catch-up: ${row.studentEmail})`,
                         html: `<h2>Previously completed kit: teacher copy</h2><p>${safe(certificate.studentName)} (${safe(row.studentEmail)}) completed <strong>${safe(certificate.kitTitle)}</strong> on ${safe(certificate.completedDate)}.</p><p>No earlier teacher copy was found in the Hub email records. The certificate is attached. No email has been resent to the student.</p>`,
                         attachment: { buffer, originalname: `${kitId}-certificate.pdf`, mimetype: "application/pdf" },
                         emailType: "kit_certificate_teacher_catchup"

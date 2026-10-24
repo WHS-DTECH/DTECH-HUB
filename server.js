@@ -15456,7 +15456,7 @@ async function sendKitCertificateEmail(studentEmail, kitId, certificate) {
   await sendConfiguredHubEmail({
     to: studentEmail,
     cc: teacherRecipients,
-    subject: `[DTECH HUB] ${certificate.kitTitle} - Certificate of Completion`,
+    subject: `[DTECH HUB] ${certificate.kitTitle} - Certificate of Completion - ${certificate.studentName}`,
     html: `<div style="font-family:Arial,sans-serif;color:#173858;"><h2>Certificate of Completion</h2><p>Kia ora ${safe(certificate.studentName)},</p><p>Ka pai! You completed all ${certificate.activityCount} activities in <strong>${safe(certificate.kitTitle)}</strong> on ${safe(certificate.completedDate)}.</p><p>Your landscape PDF certificate is attached. You can save, print or forward it to share your achievement.</p><p>${safe(certificate.issuer)}</p></div>`,
     attachment: { buffer, originalname: `${kitId}-certificate.pdf`, mimetype: "application/pdf" },
     emailType: "kit_certificate"

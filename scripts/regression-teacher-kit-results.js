@@ -87,8 +87,26 @@ test("read-only review suppresses the shared sidebar's mutating progress fetch",
         document: { body: { dataset: { hubReadOnly: "true" } } },
         fetch() { assert.fail("Read-only page must not fetch student progress"); }
     });
+
     vm.runInContext(source.slice(start, end), context);
     await context.loadAndRenderSidebarKit({ querySelector: (key) => (elements[key] ||= {}) });
     assert.equal(elements["#hub-sidebar-kit-title"].textContent, "Read-only kit review");
     assert.equal(elements["#hub-sidebar-kit-open"].hidden, true);
+});
+
+test("Licence menu links to Teacher Review with the same admin gate as Upload Kits", () => {
+    const root = path.join(__dirname, "..");
+    const source = fs.readFileSync(path.join(root, "script.js"), "utf8");
+    assert.match(source, /id="hub-teacher-review-link" role="menuitem" href="\/practical-skills\/teacher-results\.html" hidden>Teacher Review/);
+    const start = source.indexOf("    if (hubTeacherReviewLink) {");
+    const end = source.indexOf("\n    if (hubSettingsLink)", start);
+    const context = vm.createContext({ hubTeacherReviewLink: {}, canAdmin: false });
+    const gate = source.slice(start, end);
+    vm.runInContext(gate, context);
+    assert.equal(context.hubTeacherReviewLink.hidden, true);
+    context.canAdmin = true;
+    vm.runInContext(gate, context);
+    assert.equal(context.hubTeacherReviewLink.hidden, false);
+    const teacherView = fs.readFileSync(path.join(root, "teacher-view.html"), "utf8");
+    assert.match(teacherView, /script\.js\?v=teacher-review-1/);
 });

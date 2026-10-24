@@ -96,6 +96,8 @@ Strict cutover checklist (go/no-go):
 - The report shows saved completion/timestamps, original answer keys/values, current activity definitions and document-copy receipts. Current definitions are not historical versions, and stored ticks or certificates do not establish that practical evidence exists or meets the tasks.
 - `GET /api/admin/kit-results/:kitId?emails=...` uses parameterised SELECT queries only. It does not call student progress/completion/email handlers, initialise schemas or open/modify Drive files. Access failures are explicit and responses use `private, no-store`.
 - A kit with worksheet titles but no activity definitions permits manual completion ticks; the report warns about this rather than presenting certificates as verified work.
+- Admin users can also open **Licence > Teacher Review** in Teacher View. The menu uses the same admin permission as Upload Kits; the report endpoint still enforces admin access.
+- Future completion-certificate subjects include the student's certificate name, e.g. `[DTECH HUB] Minecraft Builder Kit - Certificate of Completion - Alex Student`, including teacher catch-up copies. Existing sent mail is unchanged; legacy and named subjects are both recognised when checking prior teacher deliveries.
 
 ### My Class description tracker (October 2026)
 - The [Student Work Tracker](../teacher-student-work.html) has **My Students** and **My Class** tabs. Existing embedded assessment trackers keep their previous view without tabs.
