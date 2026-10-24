@@ -83,3 +83,20 @@ test("import evidence requires a screenshot link and all import screenshots exis
         assert.equal(file.subarray(1, 4).toString(), "PNG");
     }
 });
+test("shared hosting evidence requires a world link and Cloud Champions screenshots exist", () => {
+    const activity = { completionMode: "auto", blocks: [
+        { id: "cloud-world-link", kind: "studentlink", title: "Latest shared world file link", required: true }
+    ] };
+    blocks.validate(activity);
+    assert.equal(blocks.grade(activity, {}).passed, false);
+    for (const value of ["cookie book cake book", "minecraft://join", "http://drive.google.com/file/d/example/view"]) {
+        assert.equal(blocks.grade(activity, { "cloud-world-link": value }).passed, false);
+    }
+    assert.equal(blocks.grade(activity, {
+        "cloud-world-link": "https://drive.google.com/file/d/example/view"
+    }).passed, true);
+    for (const name of ["lesson-card", "launch-world", "download-world", "join-code"]) {
+        const file = fs.readFileSync(path.join(__dirname, "..", "images", "activities", "minecraft-cloud-champions", `${name}.png`));
+        assert.equal(file.subarray(1, 4).toString(), "PNG");
+    }
+});
