@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
+const blocks = require("../practical-skills/activity-blocks");
 const source = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "kit-worksheet-render.js"), "utf8");
 function fixture() {
     const context = vm.createContext({ window: {} });
@@ -38,4 +39,17 @@ test("other kits do not receive Minecraft or Windows Desktop instructions", () =
     const { renderer, host } = fixture();
     renderer.renderKitOverview(host, { bannerTitle: "Other", worksheets: [] }, {});
     assert.doesNotMatch(host.innerHTML, /Minecraft Exports|Videos|Unity/);
+});
+test("a required setup folder link must be supplied before automatic completion", () => {
+    const activity = {
+        completionMode: "auto",
+        blocks: [{ id: "videos-folder-link", kind: "studentlink", title: "Your Videos folder link", required: true }]
+    };
+    blocks.validate(activity);
+    for (const value of [undefined, "", "not a link", "http://drive.google.com/drive/folders/example"]) {
+        assert.equal(blocks.grade(activity, { "videos-folder-link": value }).passed, false);
+    }
+    assert.equal(blocks.grade(activity, {
+        "videos-folder-link": "https://drive.google.com/drive/folders/example?usp=sharing"
+    }).passed, true);
 });
