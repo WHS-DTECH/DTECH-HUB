@@ -91,6 +91,12 @@ Strict cutover checklist (go/no-go):
 - Kit registry queries refresh from PostgreSQL on later requests (concurrent callers share an in-flight load). Kit APIs/library responses are not cached, and Practical Skills static assets must revalidate so older Licence renderers cannot indefinitely hide custom cards or show obsolete totals.
 - This change does not move every other subsystem's filesystem assets into PostgreSQL, nor recover records previously lost from a no-database deployment.
 
+### Read-only kit results review
+- Open **Review student kit results (read-only)** from the Kit Content Builder. Admin sign-in is required; enter a kit ID and up to 20 school email addresses identified in the email log.
+- The report shows saved completion/timestamps, original answer keys/values, current activity definitions and document-copy receipts. Current definitions are not historical versions, and stored ticks or certificates do not establish that practical evidence exists or meets the tasks.
+- `GET /api/admin/kit-results/:kitId?emails=...` uses parameterised SELECT queries only. It does not call student progress/completion/email handlers, initialise schemas or open/modify Drive files. Access failures are explicit and responses use `private, no-store`.
+- A kit with worksheet titles but no activity definitions permits manual completion ticks; the report warns about this rather than presenting certificates as verified work.
+
 ### My Class description tracker (October 2026)
 - The [Student Work Tracker](../teacher-student-work.html) has **My Students** and **My Class** tabs. Existing embedded assessment trackers keep their previous view without tabs.
 - My Class uses the current DTECH class-management roster, including students with no recorded assessment activity. Years 7-8 / 9-10 / 11-13 select JuniorDTECH / MiddleDTECH / SeniorDTECH. Description checks are configured for MiddleDTECH only.

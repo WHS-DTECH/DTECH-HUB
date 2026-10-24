@@ -1,0 +1,7 @@
+.results-warning { padding: 14px; background: #fff3d6; border-left: 5px solid #b87800; color: #573a00; }
+.results-saved { white-space: pre-wrap; overflow-wrap: anywhere; }
+.results-tree { margin: 8px 0 8px 18px; padding-left: 14px; }
+.results-tree li { padding: 4px 0; overflow-wrap: anywhere; }
+.results-activity { border-top: 1px solid #c9d4e2; padding: 10px 0; }
+#results-status.is-error { color: #a4342f; font-weight: 700; }
+.sites-card summary { cursor: pointer; font-weight: 700; padding: 10px 0; }

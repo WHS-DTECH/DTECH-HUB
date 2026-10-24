@@ -15184,6 +15184,10 @@ app.get("/api/practical-skills/library", async (_req, res) => {
   }
 });
 
+require("./practical-skills/teacher-results-store").registerTeacherResults(app, {
+  pool, requireAdminAccess, schoolDomain: SCHOOL_EMAIL_DOMAIN, getDefaultPracticalSkillsKitContent
+});
+
 app.get("/api/admin/practical-skills/preview-users", requireAdminAccess, async (_req, res) => {
   try {
     const [studentRows, staffRows] = await Promise.all([getStudentDirectoryRows(), getStaffDirectoryRows()]);

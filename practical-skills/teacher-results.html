@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="hub-google-client-id" content="239433605438-ur2omagmkluhhn7i319g0i82l4l5l1j8.apps.googleusercontent.com">
+  <meta name="hub-google-allowed-domain" content="westlandhigh.school.nz">
+  <title>Kit Results | Teacher Review</title>
+  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="./teacher-login-sites.css">
+  <link rel="stylesheet" href="./teacher-results.css">
+</head>
+<body>
+  <main class="sites-editor">
+    <h1>Kit results: read-only teacher review</h1>
+    <nav class="sites-actions" aria-label="Staff sign-in">
+      <button id="hub-google-signin" class="google-signin-button" type="button">Sign in with Google</button>
+      <button id="hub-google-signout" class="button button-secondary" type="button" hidden>Sign out</button>
+      <button id="hub-user-badge" class="user-badge" type="button" hidden aria-label="Open profile" aria-haspopup="true" aria-expanded="false"></button>
+      <a class="button button-secondary" href="./admin-kits.html">Kit Content Builder</a>
+    </nav>
+    <p>Admin access required. Reading this page never changes answers, completion ticks or certificate status, and never sends emails.</p>
+    <form id="results-form" class="sites-card">
+      <label class="sites-field">Kit ID<input id="results-kit" value="kit-minecraft" required pattern="kit-[a-z0-9-]+"></label>
+      <label class="sites-field">Student school emails (up to 20, one per line)<textarea id="results-emails" rows="6" required></textarea></label>
+      <button class="button button-primary" type="submit">Read saved results</button>
+    </form>
+    <p id="results-status" role="status" aria-live="polite">Enter student emails from the email log to review their records.</p>
+    <div id="results-output"></div>
+  </main>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="../script.js"></script>
+  <script src="./teacher-results.js?v=1"></script>
+</body>
+</html>
