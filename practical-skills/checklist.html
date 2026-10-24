@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../styles.css">
-    <link rel="stylesheet" href="./checklist.css?v=3">
+    <link rel="stylesheet" href="./checklist.css?v=4">
 </head>
 <body class="licence-dashboard">
     <div class="page-shell">
@@ -62,7 +62,9 @@
                 <p id="ps-student-email">Sign in with your school account to start collecting stamps.</p>
                 <div class="licence-progress-heading"><strong id="ps-licence-progress-label">Choose a kit to open</strong><span id="ps-licence-progress-count">Sign in to view</span></div>
                 <progress id="ps-licence-progress" max="3" value="0" aria-label="Completed licence kits"></progress>
-                <div id="ps-stamp-list" class="licence-stamps" aria-label="Kit stamps"></div>
+                <h2 class="licence-skill-heading" id="licence-skills-title">Skill Kits</h2>
+                <div id="ps-stamp-list" class="licence-stamps" aria-labelledby="licence-skills-title"></div>
+                <div id="ps-application-kits" hidden></div>
                 <p class="licence-card-footnote">Click any kit above to start or continue. Green means your stamp is earned. Typing is your practice log.</p>
             </section>
             <details class="licence-more">
@@ -121,6 +123,6 @@
 
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="../script.js"></script>
-    <script src="./checklist.js?v=7"></script>
+    <script src="./checklist.js?v=8"></script>
 </body>
 </html>

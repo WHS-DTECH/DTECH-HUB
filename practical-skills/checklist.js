@@ -25,10 +25,12 @@
         },
         {
             id: "kit-minecraft",
-            title: "Minecraft",
+            title: "Minecraft Player Kit",
+            skillArea: "Application Kits",
+            application: "Minecraft",
             icon: "\ud83e\uddf1",
             colour: "orange",
-            description: "Complete the Minecraft practical task and demonstrate the required build or design outcome.",
+            description: "Set up Google Drive, export, import and share Minecraft worlds with your team.",
             timeframeHours: 24
         }
     ];
@@ -149,9 +151,14 @@
         const list = document.getElementById("ps-kit-list");
         if (!list) return;
         const snapshot = state.snapshot;
-        const licenceKits = snapshot?.licenceKits
+        const catalogue = snapshot?.licenceKits
             ? snapshot.licenceKits.map((kit) => ({ colour: "green", ...kit }))
             : [...kitDefinitions, ...(snapshot?.customKits || []).map((kit) => ({ ...kit, colour: "green" }))];
+        const skillRank = (kit) => kit.id === "kit-login" ? 0 : kit.id === "kit-google-search" ? 1 : 2;
+        const skillKits = catalogue.filter((kit) => kit.skillArea !== "Application Kits")
+            .sort((a, b) => skillRank(a) - skillRank(b));
+        const applicationKits = catalogue.filter((kit) => kit.skillArea === "Application Kits");
+        const licenceKits = [...skillKits, ...applicationKits];
         const loaded = Boolean(state.email && snapshot);
         const typingVisible = snapshot?.canManageKits || snapshot?.typingKit?.live !== false;
         const typingPaused = snapshot?.typingKit?.live === false;
@@ -168,7 +175,7 @@
         progress.max = total;
         progress.value = completed;
         document.getElementById("ps-licence-progress-count").textContent = loaded ? `${completed} / ${total} stamps` : state.email ? "Loading..." : "Sign in to view";
-        document.getElementById("ps-stamp-list").innerHTML = licenceKits.map((kit) => {
+        function renderStamp(kit) {
             const earned = loaded && kitsById.get(kit.id)?.isComplete;
             const href = snapshot?.canManageKits && kit.live === false
                 ? `./kit-worksheet.html?kit=${encodeURIComponent(kit.id)}&preview=1`
@@ -176,7 +183,24 @@
             const copy = `<span class="licence-stamp-icon" aria-hidden="true">${escapeHtml(kit.icon)}</span><strong>${escapeHtml(kit.title)}</strong><span>${earned ? "STAMP EARNED" : loaded ? "Stamp to collect" : "Waiting for you"}</span>`;
             const stamp = `<a class="licence-stamp${earned ? " is-earned" : ""}" href="${href}" aria-label="${kit.live === false ? "Preview" : "Open"} ${escapeHtml(kit.title)}${earned ? ' and certificate' : ''}">${copy}<span class="stamp-certificate">${kit.live === false ? "Preview Not Live kit" : earned ? "Open kit & certificate" : "Open kit"} &rarr;</span></a>`;
             return snapshot?.canManageKits ? `<div class="licence-teacher-kit">${stamp}<button type="button" role="switch" aria-checked="${kit.live !== false}" aria-label="${escapeHtml(kit.title)} live for students" class="licence-live-pill${kit.live === false ? " is-not-live" : ""}" data-publication="${escapeHtml(kit.id)}" data-live="${kit.live !== false}">${kit.live === false ? "Not Live" : "Live"}</button><a class="licence-edit-link" href="./admin-kits.html?kit=${encodeURIComponent(kit.id)}">Edit kit</a></div>` : stamp;
-        }).join("") + (snapshot?.canManageKits ? `<div class="licence-teacher-kit">${typingCard}<button type="button" role="switch" aria-checked="${!typingPaused}" aria-label="Typing Kit live for students" class="licence-live-pill${typingPaused ? " is-not-live" : ""}" data-publication="kit-typing" data-live="${!typingPaused}">${typingPaused ? "Not Live" : "Live"}</button></div>` : typingCard);
+        }
+        const typingStamp = snapshot?.canManageKits ? `<div class="licence-teacher-kit">${typingCard}<button type="button" role="switch" aria-checked="${!typingPaused}" aria-label="Typing Kit live for students" class="licence-live-pill${typingPaused ? " is-not-live" : ""}" data-publication="kit-typing" data-live="${!typingPaused}">${typingPaused ? "Not Live" : "Live"}</button></div>` : typingCard;
+        const skillCards = skillKits.map((kit) => renderStamp(kit));
+        skillCards.splice(skillKits.some((kit) => kit.id === "kit-login") ? 1 : 0, 0, typingStamp);
+        document.getElementById("ps-stamp-list").innerHTML = skillCards.join("");
+        const groups = new Map();
+        for (const kit of applicationKits) {
+            const application = kit.application || "";
+            if (!groups.has(application)) groups.set(application, []);
+            groups.get(application).push(kit);
+        }
+        const applications = document.getElementById("ps-application-kits");
+        applications.hidden = !applicationKits.length;
+        applications.innerHTML = [...groups].map(([application, kits]) => `
+            <section class="licence-application-group" aria-label="${escapeHtml(application || "Application Kits")}">
+                <h2>${application ? `Application = ${escapeHtml(application)}` : "Application Kits"}</h2>
+                <div class="licence-stamps licence-application-stamps">${kits.map(renderStamp).join("")}</div>
+            </section>`).join("");
         document.querySelectorAll("[data-publication]").forEach((button) => {
             button.addEventListener("click", async () => {
                 const live = button.dataset.live !== "true";

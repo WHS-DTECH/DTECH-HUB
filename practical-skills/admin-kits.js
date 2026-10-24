@@ -247,6 +247,7 @@
             ...(state.content || {}),
             kitId: state.kitId,
             identity: {
+                ...state.content?.identity,
                 name: nameInput.value,
                 skillArea: skillAreaInput.value,
                 status: kitStatusInput.value,

@@ -9,7 +9,7 @@ const { createKitPublication } = require("../practical-skills/kit-publication");
 
 async function fixture(t) {
     const saved = [
-        { kit_id: "kit-minecraft", content: { bannerTitle: "Minecraft", worksheets: [{ activity: "Build" }] } },
+        { kit_id: "kit-minecraft", content: { bannerTitle: "Minecraft", identity: { skillArea: "Application Kits", application: "Minecraft" }, worksheets: [{ activity: "Build" }] } },
         { kit_id: "kit-files", content: { identity: { name: "Files & Folders", status: "planning" }, worksheets: [{}] } },
         { kit_id: "kit-deleted", content: { deletedAt: "2026-10-20", worksheets: [{}] } }
     ];
@@ -66,6 +66,8 @@ test("teacher catalog includes database kits without requiring custom marker or 
     const teacher = await f.service.filterSnapshot(snapshot, true);
     assert.deepEqual(teacher.licenceKits.map((kit) => kit.id), ["kit-minecraft", "kit-files"]);
     assert.equal(teacher.licenceKits[1].live, false);
+    assert.equal(teacher.licenceKits[0].skillArea, "Application Kits");
+    assert.equal(teacher.licenceKits[0].application, "Minecraft");
     assert.equal(teacher.stampTotalKits, 2);
     assert.equal((await f.service.filterSnapshot(snapshot)).stampTotalKits, 1);
     assert.equal(teacher.totalPoints, 100);

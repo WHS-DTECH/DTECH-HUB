@@ -47,7 +47,10 @@ async function main() {
     assert.equal((nodes.get("ps-stamp-list").innerHTML.match(/is-earned/g) || []).length, 1);
     assert.match(nodes.get("ps-stamp-list").innerHTML, /kit=kit-login/);
     assert.match(nodes.get("ps-stamp-list").innerHTML, /Open kit & certificate/);
-    assert.match(nodes.get("ps-stamp-list").innerHTML, /<a class="licence-stamp" href="\.\/kit-worksheet.html\?kit=kit-minecraft"/, "Unearned stamps open their kits too");
+    assert.match(nodes.get("ps-application-kits").innerHTML, /<a class="licence-stamp" href="\.\/kit-worksheet.html\?kit=kit-minecraft"/, "Application stamps open their kits too");
+    assert.doesNotMatch(nodes.get("ps-stamp-list").innerHTML, /kit=kit-minecraft/, "Applications are separate from the large skill cards");
+    assert.match(nodes.get("ps-application-kits").innerHTML, /Application = Minecraft/);
+    assert.ok(nodes.get("ps-stamp-list").innerHTML.indexOf("typing-kit.html") < nodes.get("ps-stamp-list").innerHTML.indexOf("kit=kit-google-search"), "Typing follows Login, before Search");
     assert.match(nodes.get("ps-stamp-list").innerHTML, /href="\.\/typing-kit\.html"[^>]*>.*Typing Kit/);
     assert.match(nodes.get("ps-licence-progress-count").textContent, /\/ 3 stamps/, "Typing Kit log does not change the stamp count");
     assert.match(nodes.get("ps-next-link").href, /kit-google-search/);
@@ -79,7 +82,7 @@ async function main() {
     await tick();
     assert.equal(nodes.get("ps-next-link").hidden, true);
     assert.match(nodes.get("ps-next-title").textContent, /Every stamp collected/);
-    assert.equal((nodes.get("ps-stamp-list").innerHTML.match(/is-earned/g) || []).length, 3);
+    assert.equal(((nodes.get("ps-stamp-list").innerHTML + nodes.get("ps-application-kits").innerHTML).match(/is-earned/g) || []).length, 3);
     snapshot = { ...snapshot, badges: [{ title: "<script>", description: "<img>" }] };
     events["hub-auth-state-changed"]();
     await tick();
@@ -100,7 +103,7 @@ async function main() {
     assert.match(nodes.get("ps-stamp-list").innerHTML, /&lt;img&gt;/);
     assert.equal(nodes.get("ps-licence-progress-count").textContent, "4 / 5 stamps");
     assert.match(nodes.get("ps-next-link").href, /kit-management/);
-    const customCard = nodes.get("ps-kit-list").children.at(-3);
+    const customCard = nodes.get("ps-kit-list").children.find((item) => /Files &amp; Folders/.test(item.innerHTML));
     assert.match(customCard.innerHTML, /Files &amp; Folders/);
     assert.match(customCard.innerHTML, /View kit & certificate/);
     assert.doesNotMatch(customCard.innerHTML, /Target window|Points:/);
@@ -116,6 +119,21 @@ async function main() {
     assert.match(nodes.get("ps-stamp-list").innerHTML, /role="switch" aria-checked="false"/);
     assert.doesNotMatch(nodes.get("ps-stamp-list").innerHTML, /kit=kit-minecraft/, "Server catalog is authoritative, not the old fixed three-kit list");
     assert.equal(nodes.get("ps-licence-progress-count").textContent, "1 / 2 stamps");
+    assert.equal(nodes.get("ps-application-kits").hidden, true, "No empty application headings when none are visible");
+
+    snapshot = { ...snapshot, licenceKits: [...snapshot.licenceKits,
+        { id: "kit-minecraft", title: "Minecraft Player Kit", live: true, skillArea: "Application Kits", application: "Minecraft" },
+        { id: "kit-minecraft-builder", title: "Minecraft Builder Kit", live: false, skillArea: "Application Kits", application: "Minecraft" },
+        { id: "kit-minecraft-coder", title: "Minecraft Coder Kit", live: false, skillArea: "Application Kits", application: "Minecraft" }
+    ] };
+    events["hub-auth-state-changed"]();
+    await tick();
+    const applicationCards = nodes.get("ps-application-kits").innerHTML;
+    assert.equal(nodes.get("ps-application-kits").hidden, false);
+    assert.equal((applicationCards.match(/class="licence-application-group"/g) || []).length, 1);
+    assert.match(applicationCards, /kit=kit-minecraft-builder&preview=1/);
+    assert.match(applicationCards, /data-publication="kit-minecraft-coder" data-live="false"/);
+    assert.doesNotMatch(nodes.get("ps-stamp-list").innerHTML, /Minecraft/);
 
     fail = true;
     events["hub-auth-state-changed"]();
