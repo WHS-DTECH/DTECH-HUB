@@ -194,7 +194,7 @@
                 } finally { button.disabled = false; }
             });
         });
-        const next = loaded ? licenceKits.find((kit) => !kitsById.get(kit.id)?.isComplete) : null;
+        const next = loaded ? licenceKits.find((kit) => kit.live !== false && !kitsById.get(kit.id)?.isComplete) : null;
         const nextPanel = document.getElementById("ps-next-step");
         nextPanel.hidden = !loaded;
         if (loaded) {

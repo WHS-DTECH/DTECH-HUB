@@ -27,6 +27,7 @@ async function main() {
         if (url.endsWith("my-progress")) {
             assert.equal(options.headers["x-user-email"], "student@example.test");
             return { ok: true, json: async () => ({ kits: [
+                { id: "kit-paused", isComplete: false, live: false },
                 { id: "kit-login", isComplete: true }, { id: "kit-minecraft", isComplete: false },
                 { id: "kit-search", isComplete: false }
             ] }) };

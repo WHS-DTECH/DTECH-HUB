@@ -2512,7 +2512,7 @@ async function loadAndRenderSidebarKit(panel) {
             throw new Error("Licence progress response is invalid.");
         }
         if (!current()) return;
-        const next = snapshot.kits.find((kit) => !kit.isComplete);
+        const next = snapshot.kits.find((kit) => kit.live !== false && !kit.isComplete);
         if (!next) {
             title.textContent = "All kits completed";
             description.textContent = "View your Licence to see your stamps and certificates.";
