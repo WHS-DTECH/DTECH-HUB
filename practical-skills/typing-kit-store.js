@@ -150,7 +150,8 @@ function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomai
                 pool.query(`SELECT * FROM typing_kit_attempts WHERE student_email = $1 ORDER BY submitted_at, id`, [email]),
                 canManagePracticalSchedule(email)
             ]);
-            res.json({ startDate, weekCount: WEEK_COUNT, periodsPerWeek: PERIOD_COUNT, canManage, attempts: rows.rows.map(shape) });
+            res.json({ startDate, weekCount: WEEK_COUNT, periodsPerWeek: PERIOD_COUNT, canManage,
+                readOnly: res.locals.kitPreview === true, attempts: rows.rows.map(shape) });
         } catch (error) { failure(res, error); }
     });
 

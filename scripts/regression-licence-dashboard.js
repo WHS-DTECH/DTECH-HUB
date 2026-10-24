@@ -24,7 +24,8 @@ async function main() {
     let fail = false;
     let deferred;
     function node() {
-        return { textContent: "", innerHTML: "", hidden: false, classList: { add() {}, remove() {} },
+        return { textContent: "", html: "", get innerHTML() { return this.html; },
+            set innerHTML(value) { this.html = value; this.children = []; }, hidden: false, classList: { add() {}, remove() {} },
             children: [], appendChild(item) { this.children.push(item); }, querySelectorAll() { return []; } };
     }
     const context = vm.createContext({
@@ -56,6 +57,22 @@ async function main() {
     assert.match(nodes.get("ps-kit-list").children[0].innerHTML, /Manage progress/);
     assert.match(nodes.get("ps-kit-list").children[3].innerHTML, /typing-kit\.html/);
     assert.doesNotMatch(nodes.get("ps-kit-list").children[3].innerHTML, /data-action|certificate/, "Typing history has no completion, reset or certificate actions");
+
+    snapshot = { ...snapshot, typingKit: { id: "kit-typing", live: false } };
+    events["hub-auth-state-changed"]();
+    await tick();
+    assert.doesNotMatch(nodes.get("ps-stamp-list").innerHTML, /typing-kit\.html/, "Paused typing is hidden from student cards");
+    assert.equal(nodes.get("ps-kit-list").children.length, 3, "Paused typing is also hidden from detailed collection");
+    snapshot = { ...snapshot, canManageKits: true };
+    events["hub-auth-state-changed"]();
+    await tick();
+    assert.match(nodes.get("ps-stamp-list").innerHTML, /data-publication="kit-typing" data-live="false"/);
+    assert.match(nodes.get("ps-stamp-list").innerHTML, /Preview Not Live log/);
+    snapshot = { ...snapshot, typingKit: { id: "kit-typing", live: true } };
+    events["hub-auth-state-changed"]();
+    await tick();
+    assert.match(nodes.get("ps-stamp-list").innerHTML, /data-publication="kit-typing" data-live="true"/);
+    snapshot = { ...snapshot, canManageKits: false };
 
     snapshot = { ...snapshot, completedCount: 3, kits: ["kit-login", "kit-google-search", "kit-minecraft"].map((id) => ({ id, isComplete: true })) };
     events["hub-auth-state-changed"]();

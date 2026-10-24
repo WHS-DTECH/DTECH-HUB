@@ -43,13 +43,14 @@ async function fixture(t) {
     };
     const pool = { query, connect: async () => ({ query, release() { queries.push({ sql: "RELEASE" }); } }) };
     const deps = { pool, builtIns: [{ id: "kit-minecraft" }], getDefaultContent: () => ({}), schoolDomain: "school.nz",
-        getRequestUserEmail: () => "teacher@school.nz", canManage: async (email) => email === "teacher@school.nz" };
+        getRequestUserEmail: (req) => req.headers?.["x-admin"] === "yes" ? "teacher@school.nz" : "student@school.nz",
+        canManage: async (email) => email === "teacher@school.nz" };
     const service = createKitPublication(deps);
     const app = express();
     app.use(express.json());
     service.register(app, (req, res, next) => req.headers["x-admin"] === "yes" ? next() : res.status(403).json({ error: "Admin required" }));
     app.use(service.gate);
-    app.all(/^\/api\/practical-skills\//, (_req, res) => res.json({ reached: true }));
+    app.all(/^\/api\/practical-skills\//, (_req, res) => res.json({ reached: true, readOnly: res.locals.kitPreview === true }));
     const server = await new Promise((resolve) => { const s = app.listen(0, "127.0.0.1", () => resolve(s)); });
     t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); }));
     const base = `http://127.0.0.1:${server.address().port}`;
@@ -73,6 +74,58 @@ test("teacher catalog includes database kits without requiring custom marker or 
     f.saved[0].content = { bannerTitle: "Edited in an old builder" };
     assert.equal(await f.service.available("kit-minecraft"), false, "Editing kit content cannot silently republish it");
     assert.equal((await f.service.filterSnapshot(snapshot)).licenceKits.length, 0);
+});
+
+test("Typing publication persists, blocks student reads and all paused writes, and leaves stamp counts unchanged", async (t) => {
+    const f = await fixture(t);
+    assert.equal(await f.service.available("kit-typing"), true, "Existing access stays Live until explicitly changed");
+    const catalog = await (await f.call("/api/admin/kit-publication")).json();
+    assert.equal(catalog.kits.find((kit) => kit.id === "kit-typing").title, "Typing Kit");
+    assert.equal((await f.call("/api/admin/kit-publication/kit-typing", "PUT", { live: false }, false)).status, 403);
+    assert.equal((await f.call("/api/admin/kit-publication/kit-typing", "PUT", { live: false })).status, 200);
+    assert.equal(await createKitPublication(f.deps).available("kit-typing"), false);
+    assert.equal((await f.call("/api/practical-skills/typing-kit", "GET", undefined, false)).status, 403);
+    for (const admin of [true, false]) {
+        for (const [route, method] of [["/attempts", "POST"], ["/settings", "PUT"]]) {
+            assert.equal((await f.call(`/api/practical-skills/typing-kit${route}`, method, {}, admin)).status, 403);
+        }
+    }
+    assert.equal((await (await f.call("/api/practical-skills/typing-kit")).json()).readOnly, true);
+    const snapshot = await f.service.filterSnapshot({ kits: [{ id: "kit-minecraft", isComplete: true }] }, true);
+    assert.equal(snapshot.typingKit.live, false);
+    assert.equal(snapshot.stampTotalKits, 2);
+    assert.equal(snapshot.stampCompletedCount, 1);
+    assert.equal(snapshot.licenceKits.some((kit) => kit.id === "kit-typing"), false);
+    assert.equal((await f.call("/api/admin/kit-publication/kit-typing", "PUT", { live: true })).status, 200);
+    assert.equal((await f.call("/api/practical-skills/typing-kit", "GET", undefined, false)).status, 200);
+    assert.equal((await f.call("/api/practical-skills/typing-kit/attempts", "POST", {})).status, 200);
+    assert.equal(f.queries.some(({ sql }) => /DELETE.*typing_kit|UPDATE typing_kit_attempts/.test(sql)), false);
+});
+
+test("both student library routes hide paused Typing without hiding unrelated resources", async () => {
+    const source = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
+    for (const route of ["/practical-skills/library.json", "/api/practical-skills/library"]) {
+        const start = source.indexOf(`app.get("${route}"`);
+        const end = source.indexOf("\n});", start) + 4;
+        const handlers = new Map();
+        let live = false;
+        const context = vm.createContext({
+            app: { get(name, handler) { handlers.set(name, handler); } },
+            kitPublication: { catalog: async () => [{ id: "kit-typing", live }] },
+            ensureCustomPracticalSkillsKitsLoaded: async () => {},
+            readPracticalSkillsLibraryFile: async () => [{ id: "kit-typing" }, { id: "unrelated-resource" }],
+            getPracticalSkillsKitDefinition: () => null,
+            buildPracticalSkillsActivityLibraryCards: async () => []
+        });
+        vm.runInContext(source.slice(start, end), context);
+        let body;
+        const response = { set() {}, json(value) { body = value; }, status(code) { throw new Error(`Library failed: ${code}`); } };
+        await handlers.get(route)({}, response);
+        assert.deepEqual(Array.from(body, (card) => card.id), ["unrelated-resource"]);
+        live = true;
+        await handlers.get(route)({}, response);
+        assert.deepEqual(Array.from(body, (card) => card.id), ["kit-typing", "unrelated-resource"]);
+    }
 });
 
 test("Not Live blocks direct content, responses, completion, certificates and documents, including for signed-in teachers", async (t) => {

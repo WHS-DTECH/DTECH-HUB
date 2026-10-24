@@ -1,4 +1,5 @@
 "use strict";
+const { TYPING_KIT_CARD } = require("./typing-kit-store");
 
 function createKitPublication({ pool, builtIns, getDefaultContent, schoolDomain, getRequestUserEmail, canManage }) {
     let schema;
@@ -16,21 +17,23 @@ function createKitPublication({ pool, builtIns, getDefaultContent, schoolDomain,
         await ensureSchema();
         const stored = await pool.query("SELECT kit_id, content FROM practical_skills_kit_content");
         const publication = await pool.query("SELECT kit_id, live FROM practical_skills_kit_publication");
-        const ids = new Set([...builtIns.map((kit) => kit.id), ...stored.rows.map((row) => row.kit_id)]);
-        return [...ids].filter((id) => /^kit-[a-z0-9-]{1,60}$/.test(id) && id !== "kit-typing").map((id) => {
-            const content = stored.rows.find((row) => row.kit_id === id)?.content || getDefaultContent(id);
+        const ids = new Set([...builtIns.map((kit) => kit.id), ...stored.rows.map((row) => row.kit_id), "kit-typing"]);
+        return [...ids].filter((id) => /^kit-[a-z0-9-]{1,60}$/.test(id)).map((id) => {
+            const content = id === "kit-typing" ? {
+                bannerTitle: TYPING_KIT_CARD.title, bannerSubtitle: TYPING_KIT_CARD.summary,
+                theme: { icon: TYPING_KIT_CARD.visual.icon }
+            } : stored.rows.find((row) => row.kit_id === id)?.content || getDefaultContent(id);
             const explicit = publication.rows.find((row) => row.kit_id === id)?.live;
             return {
                 id, title: content.identity?.name || content.bannerTitle || id,
                 icon: content.theme?.icon || "\ud83d\udcc1", description: content.bannerSubtitle || "",
                 status: content.deletedAt ? "deleted" : content.identity?.status || "active",
                 live: !content.deletedAt && (explicit ?? (content.publicationLive !== false && (content.identity?.status || "active") === "active")),
-                custom: !builtIns.some((kit) => kit.id === id)
+                custom: id !== "kit-typing" && !builtIns.some((kit) => kit.id === id)
             };
         });
     }
     async function available(kitId) {
-        if (kitId === "kit-typing") return true;
         return Boolean((await catalog()).find((kit) => kit.id === kitId)?.live);
     }
     async function setLive(kitId, live, email) {
@@ -43,7 +46,8 @@ function createKitPublication({ pool, builtIns, getDefaultContent, schoolDomain,
         const path = req.path;
         const match = path.match(/^\/api\/practical-skills\/(?:progress|kit-content|research-report)\/(kit-[a-z0-9-]+)/)
             || path.match(/^\/api\/practical-skills\/blocks\/(kit-[a-z0-9-]+)/);
-        const kitId = match?.[1] || (path === "/api/practical-skills/minecraft-exports-folder" ? "kit-minecraft" : null);
+        const kitId = match?.[1] || (path === "/api/practical-skills/minecraft-exports-folder" ? "kit-minecraft"
+            : /^\/api\/practical-skills\/typing-kit(?:\/|$)/.test(path) ? "kit-typing" : null);
         if (!kitId) return next();
         try {
             if (req.method === "GET" && path.startsWith("/api/practical-skills/kit-content/") && req.query?.preview === "1") {
@@ -52,6 +56,11 @@ function createKitPublication({ pool, builtIns, getDefaultContent, schoolDomain,
                 return res.status(403).json({ error: "Kit preview is only available to teachers who manage kits." });
             }
             if (await available(kitId)) return next();
+            if (kitId === "kit-typing" && path === "/api/practical-skills/typing-kit" && req.method === "GET"
+                && await canManage(getRequestUserEmail(req))) {
+                res.locals.kitPreview = true;
+                return next();
+            }
             const preview = req.method === "GET" && /\/(?:kit-content|research-report)\//.test(path)
                 && await canManage(getRequestUserEmail(req));
             if (preview) return next();
@@ -63,13 +72,14 @@ function createKitPublication({ pool, builtIns, getDefaultContent, schoolDomain,
     }
     async function filterSnapshot(snapshot, manager = false) {
         const all = (await catalog()).filter((kit) => kit.status !== "deleted");
-        const visible = all.filter((kit) => manager || kit.live);
+        const visible = all.filter((kit) => kit.id !== "kit-typing" && (manager || kit.live));
         const byId = new Map(snapshot.kits.map((kit) => [kit.id, kit]));
         const kits = visible.map((kit) => ({ ...byId.get(kit.id), ...kit }));
         return {
             ...snapshot, kits, customKits: kits.filter((kit) => kit.custom), licenceKits: kits,
             stampTotalKits: kits.length, stampCompletedCount: kits.filter((kit) => kit.isComplete).length,
-            canManageKits: manager
+            canManageKits: manager,
+            typingKit: all.find((kit) => kit.id === "kit-typing")
         };
     }
     function register(app, requireAdminAccess) {

@@ -271,7 +271,8 @@ function frontend({ search = "", snapshot, deferred, failFirstPost = false } = {
         const input = { value: "", disabled: false };
         return { innerHTML: "", textContent: "", hidden: false, disabled: false, value: "",
             classList: { toggle() {} }, handlers, addEventListener(name, callback) { handlers[name] = callback; },
-            querySelector: (selector) => selector === "button" ? button : input, scrollIntoView() {} };
+            querySelector: (selector) => selector === "button" ? button : input,
+            querySelectorAll: () => [button, input], scrollIntoView() {} };
     }
     const get = (id) => { if (!nodes.has(id)) nodes.set(id, node()); return nodes.get(id); };
     const base = snapshot || { startDate: DEFAULT_START_DATE, canManage: false, attempts: [] };
@@ -312,6 +313,18 @@ test("dashboard renders exactly seven dated weeks and fourteen daily record link
     assert.match(html, /week=2026-12-07&amp;period=2|week=2026-12-07&period=2/);
     assert.doesNotMatch(html, /typing-settings-form|certificate|Mark Complete/);
     assert.equal(ui.requests[0].options.headers.Authorization, "Bearer test-token");
+});
+
+test("paused teacher typing preview displays the log but disables submission and calendar controls", async () => {
+    for (const search of ["", "?week=2026-10-26&period=1"]) {
+        const ui = frontend({ search, snapshot: { startDate: DEFAULT_START_DATE, canManage: true, attempts: [], readOnly: true } });
+        await settle();
+        assert.match(ui.get("typing-status").textContent, /Teacher preview.*Not Live/);
+        const controls = ui.get("typing-content").querySelectorAll();
+        assert.ok(controls.every((control) => control.disabled));
+        assert.equal(ui.requests.length, 1);
+        assert.equal(ui.get("typing-identity-verification").hidden, true);
+    }
 });
 
 test("daily page saves before asking for book copying, keeps repeated attempts, and prompts only after launch", async () => {

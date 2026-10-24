@@ -153,6 +153,9 @@
             ? snapshot.licenceKits.map((kit) => ({ colour: "green", ...kit }))
             : [...kitDefinitions, ...(snapshot?.customKits || []).map((kit) => ({ ...kit, colour: "green" }))];
         const loaded = Boolean(state.email && snapshot);
+        const typingVisible = snapshot?.canManageKits || snapshot?.typingKit?.live !== false;
+        const typingPaused = snapshot?.typingKit?.live === false;
+        const typingCard = typingVisible ? `<a class="licence-stamp is-log" href="./typing-kit.html" aria-label="Typing Kit - open your seven-week practice log"><span class="licence-stamp-icon" aria-hidden="true">&#9000;</span><strong>Typing Kit</strong><span>7-WEEK PRACTICE LOG</span><span class="stamp-certificate">${typingPaused ? "Preview Not Live log" : "Open log"} &rarr;</span></a>` : "";
         const kitsById = new Map((snapshot?.kits || []).map((kit) => [kit.id, kit]));
         const completed = loaded ? Number(snapshot.stampCompletedCount ?? snapshot.completedCount ?? 0) : 0;
         const total = loaded ? Number(snapshot.stampTotalKits ?? snapshot.totalKits ?? kitDefinitions.length) : kitDefinitions.length;
@@ -173,11 +176,15 @@
             const copy = `<span class="licence-stamp-icon" aria-hidden="true">${escapeHtml(kit.icon)}</span><strong>${escapeHtml(kit.title)}</strong><span>${earned ? "STAMP EARNED" : loaded ? "Stamp to collect" : "Waiting for you"}</span>`;
             const stamp = `<a class="licence-stamp${earned ? " is-earned" : ""}" href="${href}" aria-label="${kit.live === false ? "Preview" : "Open"} ${escapeHtml(kit.title)}${earned ? ' and certificate' : ''}">${copy}<span class="stamp-certificate">${kit.live === false ? "Preview Not Live kit" : earned ? "Open kit & certificate" : "Open kit"} &rarr;</span></a>`;
             return snapshot?.canManageKits ? `<div class="licence-teacher-kit">${stamp}<button type="button" role="switch" aria-checked="${kit.live !== false}" aria-label="${escapeHtml(kit.title)} live for students" class="licence-live-pill${kit.live === false ? " is-not-live" : ""}" data-publication="${escapeHtml(kit.id)}" data-live="${kit.live !== false}">${kit.live === false ? "Not Live" : "Live"}</button><a class="licence-edit-link" href="./admin-kits.html?kit=${encodeURIComponent(kit.id)}">Edit kit</a></div>` : stamp;
-        }).join("") + `<a class="licence-stamp is-log" href="./typing-kit.html" aria-label="Typing Kit - open your seven-week practice log"><span class="licence-stamp-icon" aria-hidden="true">&#9000;</span><strong>Typing Kit</strong><span>7-WEEK PRACTICE LOG</span><span class="stamp-certificate">Open log &rarr;</span></a>`;
+        }).join("") + (snapshot?.canManageKits ? `<div class="licence-teacher-kit">${typingCard}<button type="button" role="switch" aria-checked="${!typingPaused}" aria-label="Typing Kit live for students" class="licence-live-pill${typingPaused ? " is-not-live" : ""}" data-publication="kit-typing" data-live="${!typingPaused}">${typingPaused ? "Not Live" : "Live"}</button></div>` : typingCard);
         document.querySelectorAll("[data-publication]").forEach((button) => {
             button.addEventListener("click", async () => {
                 const live = button.dataset.live !== "true";
-                if (!window.confirm(live ? "Make this kit Live? Students will be able to open it and earn certificates." : "Make this kit Not Live? It will be hidden and student access, completion and certificates will be blocked.")) return;
+                const typing = button.dataset.publication === "kit-typing";
+                const confirmation = typing
+                    ? live ? "Make Typing Kit Live? Students will be able to open their logs and save new attempts." : "Make Typing Kit Not Live? Student access and new attempts will be paused. Existing results will be kept."
+                    : live ? "Make this kit Live? Students will be able to open it and earn certificates." : "Make this kit Not Live? It will be hidden and student access, completion and certificates will be blocked.";
+                if (!window.confirm(confirmation)) return;
                 const revision = state.revision;
                 button.disabled = true;
                 try {
@@ -188,7 +195,7 @@
                     if (revision !== state.revision) return;
                     state.snapshot = refreshed;
                     render();
-                    showStatus(live ? "Kit is now Live for students." : "Kit is now Not Live. Student access and certificates are paused.");
+                    showStatus(live ? "Kit is now Live for students." : typing ? "Typing Kit is now Not Live. Student access and new attempts are paused; saved results are kept." : "Kit is now Not Live. Student access and certificates are paused.");
                 } catch (error) {
                     if (revision === state.revision) showStatus(error.message || "Publication change was not confirmed. Reload to check.", true);
                 } finally { button.disabled = false; }
@@ -254,9 +261,9 @@
             <div class="ps-kit-heading"><span class="ps-kit-icon" aria-hidden="true">&#9000;</span><div><p class="kit-step-label">Your ongoing practice log</p><h3>Typing Kit</h3></div></div>
             <p>Seven weeks, two periods each week. Save every typing attempt, then copy your result into your exercise book.</p>
             <div class="ps-kit-meta"><span class="ps-kit-pill">7-week log</span><span class="ps-kit-pill">14 period records</span></div>
-            <div class="ps-kit-actions"><a class="button button-primary" href="./typing-kit.html">Open Typing Kit &rarr;</a></div>
+            <div class="ps-kit-actions"><a class="button button-primary" href="./typing-kit.html">${typingPaused ? "Preview Not Live log" : "Open Typing Kit"} &rarr;</a></div>
         `;
-        list.appendChild(typingKit);
+        if (typingVisible) list.appendChild(typingKit);
 
         renderBadges(snapshot.badges);
 

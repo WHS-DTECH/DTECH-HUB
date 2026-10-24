@@ -6236,7 +6236,7 @@ app.get("/practical-skills/library.json", async (_req, res) => {
     await ensureCustomPracticalSkillsKitsLoaded();
     const liveIds = new Set((await kitPublication.catalog()).filter((kit) => kit.live).map((kit) => kit.id));
     const kitCards = (await readPracticalSkillsLibraryFile())
-      .filter((card) => !getPracticalSkillsKitDefinition(card.id) || liveIds.has(card.id))
+      .filter((card) => (!getPracticalSkillsKitDefinition(card.id) && card.id !== "kit-typing") || liveIds.has(card.id))
       .map((card) => getPracticalSkillsKitDefinition(card.id)
         ? {
             ...card,
@@ -15188,7 +15188,7 @@ app.get("/api/practicals/events", async (_req, res) => {
 app.get("/api/practical-skills/library", async (_req, res) => {
   try {
     const liveIds = new Set((await kitPublication.catalog()).filter((kit) => kit.live).map((kit) => kit.id));
-    const rows = (await readPracticalSkillsLibraryFile()).filter((card) => !getPracticalSkillsKitDefinition(card.id) || liveIds.has(card.id))
+    const rows = (await readPracticalSkillsLibraryFile()).filter((card) => (!getPracticalSkillsKitDefinition(card.id) && card.id !== "kit-typing") || liveIds.has(card.id))
       .map((card) => liveIds.has(card.id) ? { ...card, status: "active" } : card);
     res.json(rows);
   } catch (_error) {

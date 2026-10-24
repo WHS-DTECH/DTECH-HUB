@@ -24,6 +24,9 @@
         status.classList.toggle("is-error", error);
     }
     async function request(path = "", options = {}) {
+        if (state.snapshot?.readOnly && options.method && options.method !== "GET") {
+            throw new Error("Typing Kit is Not Live. This teacher preview is read-only.");
+        }
         const session = auth();
         if (!session || session.profile.email.toLowerCase() !== state.email) throw new Error("Sign in with your school Google account again.");
         const headers = { "Content-Type": "application/json", "x-user-email": state.email };
@@ -260,6 +263,10 @@
             document.getElementById("typing-identity-verification").hidden = true;
             message("");
             render();
+            if (snapshot.readOnly) {
+                content.querySelectorAll("form input, form button, button[id^='typing-launch-']").forEach((field) => { field.disabled = true; });
+                message("Teacher preview: Typing Kit is Not Live. Saved results are view-only; new attempts and calendar changes are paused.");
+            }
         } catch (error) {
             if (revision !== state.revision) return;
             message(error.message || "Could not load your typing log.", true);
