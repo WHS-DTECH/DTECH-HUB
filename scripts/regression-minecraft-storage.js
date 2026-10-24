@@ -67,3 +67,19 @@ test("export submission requires a link and supplied screenshots exist", () => {
         assert.equal(file.subarray(1, 4).toString(), "PNG", `${name} is a PNG screenshot`);
     }
 });
+test("import evidence requires a screenshot link and all import screenshots exist", () => {
+    const activity = { completionMode: "auto", blocks: [
+        { id: "interceptors-screenshot-link", kind: "studentlink", title: "My Worlds screenshot link", required: true }
+    ] };
+    blocks.validate(activity);
+    for (const value of ["", "not a link", "http://drive.google.com/file/d/example/view"]) {
+        assert.equal(blocks.grade(activity, { "interceptors-screenshot-link": value }).passed, false);
+    }
+    assert.equal(blocks.grade(activity, {
+        "interceptors-screenshot-link": "https://drive.google.com/file/d/example/view"
+    }).passed, true);
+    for (const name of ["download-world", "downloaded-file", "videos-minecraft", "import-button", "imported-world", "play-button"]) {
+        const file = fs.readFileSync(path.join(__dirname, "..", "images", "activities", "minecraft-interceptors", `${name}.png`));
+        assert.equal(file.subarray(1, 4).toString(), "PNG");
+    }
+});
