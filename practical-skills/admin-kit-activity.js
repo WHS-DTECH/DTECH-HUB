@@ -49,7 +49,9 @@
             const raw = localStorage.getItem(AUTH_STORAGE_KEY) || sessionStorage.getItem(AUTH_STORAGE_KEY);
             const auth = raw ? JSON.parse(raw) : null;
             const email = String(auth?.profile?.email || "").trim().toLowerCase();
-            const token = String(auth?.idToken || auth?.accessToken || "").trim();
+            const token = typeof window.getActiveHubBearerToken === "function"
+                ? window.getActiveHubBearerToken()
+                : Number(auth?.expiresAt) > Date.now() ? String(auth?.idToken || auth?.accessToken || "").trim() : "";
             const next = email ? { ...headers, "x-user-email": email } : { ...headers };
             if (token.startsWith("eyJ") && token.split(".").length === 3) next.Authorization = `Bearer ${token}`;
             return next;

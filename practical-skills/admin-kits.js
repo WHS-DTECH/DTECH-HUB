@@ -86,6 +86,7 @@
     }
 
     function getSignedInAccessToken() {
+        if (typeof window.getActiveHubBearerToken === "function") return window.getActiveHubBearerToken();
         const raw = getStoredAuthRaw();
         if (!raw) return "";
         try {

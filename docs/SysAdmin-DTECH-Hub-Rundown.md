@@ -92,6 +92,8 @@ Strict cutover checklist (go/no-go):
 - This change does not move every other subsystem's filesystem assets into PostgreSQL, nor recover records previously lost from a no-database deployment.
 
 ### Read-only kit results review
+- Google token expiry no longer erases a remembered account during navigation, and failed Google/Drive refreshes retain the current session instead of clearing it. Remembered profile data is not a verified token: expired JWTs are never extended, and API permissions remain server-enforced. Interactive Google verification/Drive consent may still be needed.
+- ID-token expiry is read independently of the OAuth Drive lifetime. Same-account ID verification preserves an unexpired Drive grant; changing OAuth accounts clears the old ID token. Kit and Activity editors use the shared expiry-aware bearer selector. Refreshing the same account does not remount the kit draft.
 - The teacher Licence dashboard lists all non-deleted database kits, including planning/Not Live kits, and has a confirmed Live/Not Live pill on each certificate kit. Typing remains a separate practice log.
 - Publication is stored separately in `practical_skills_kit_publication`, so saving an old builder draft cannot remove the switch setting. Newly created kits start Not Live; existing active kits retain Live until explicitly changed. Planning/archived kits default Not Live.
 - Not Live hides the kit from student Licence/library listings and blocks direct content access, answers, document creation, completion and certificate endpoints. Teachers may preview content; student completion/certificate actions remain blocked even for teacher accounts. Turning Live on is an explicit publication action, not a validation of activity quality.

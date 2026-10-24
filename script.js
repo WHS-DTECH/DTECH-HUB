@@ -1728,10 +1728,8 @@ function getActiveHubEmail() {
 }
 
 function getActiveHubBearerToken() {
-    const fromState = String(hubAuthState.idToken || hubAuthState.accessToken || "").trim();
-    if (fromState && Number(hubAuthState.expiresAt || 0) > Date.now()) {
-        return fromState;
-    }
+    const fromState = getUsableHubBearerToken(hubAuthState);
+    if (fromState) return fromState;
 
     const raw = getHubStoredAuthRaw();
     if (!raw) {
@@ -1740,13 +1738,24 @@ function getActiveHubBearerToken() {
 
     try {
         const parsed = JSON.parse(raw);
-        if (!parsed?.expiresAt || Number(parsed.expiresAt) <= Date.now()) {
-            return "";
-        }
-        return String(parsed?.idToken || parsed?.accessToken || "").trim();
+        return getUsableHubBearerToken(parsed);
     } catch (_error) {
         return "";
     }
+}
+
+function getUsableHubBearerToken(auth) {
+    const token = String(auth?.idToken || "").trim();
+    if (token) {
+        try {
+            const expiresAt = Number(parseJwtPayload(token).exp) * 1000;
+            if (expiresAt > Date.now()) return token;
+        } catch (_error) {
+            // Older sessions sometimes stored an opaque OAuth token in idToken.
+            if (token.split(".").length !== 3 && Number(auth?.expiresAt) > Date.now()) return token;
+        }
+    }
+    return Number(auth?.expiresAt) > Date.now() ? String(auth?.accessToken || "").trim() : "";
 }
 
 function getActiveHubAccessToken() {
@@ -3020,8 +3029,7 @@ function renderHubSidebarProfileCard(panel, details = {}) {
 }
 
 function saveHubAuthState() {
-    const bearerToken = String(hubAuthState.idToken || hubAuthState.accessToken || "").trim();
-    if (!bearerToken || !hubAuthState.profile) {
+    if (!hubAuthState.profile?.email) {
         clearHubStoredAuthRaw();
         return;
     }
@@ -3106,12 +3114,12 @@ function loadHubAuthState() {
 
     try {
         const parsed = JSON.parse(raw);
-        const parsedBearer = String(parsed?.idToken || parsed?.accessToken || "").trim();
+        const parsedBearer = getUsableHubBearerToken(parsed);
         const hasProfile = Boolean(parsed.profile?.email);
-        const tokenIsValid = Boolean(parsedBearer && parsed.expiresAt && parsed.expiresAt > Date.now());
+        const tokenIsValid = Boolean(parsedBearer);
 
         if (tokenIsValid) {
-            hubAuthState.idToken = parsedBearer;
+            hubAuthState.idToken = parsed.idToken || null;
             hubAuthState.accessToken = parsed.accessToken || null;
             hubAuthState.grantedScopes = String(parsed?.grantedScopes || "").trim();
             hubAuthState.expiresAt = parsed.expiresAt;
@@ -3352,10 +3360,13 @@ async function handleHubGoogleCredential(credentialResponse) {
     }
 
     const expSeconds = Number(payload?.exp || 0);
+    const keepDriveToken = normalizeEmail(hubAuthState.profile?.email) === profile.email && Boolean(getActiveHubAccessToken());
     hubAuthState.idToken = idToken;
-    hubAuthState.accessToken = null;
-    hubAuthState.grantedScopes = "";
-    hubAuthState.expiresAt = expSeconds > 0 ? expSeconds * 1000 : Date.now() + 60 * 60 * 1000;
+    if (!keepDriveToken) {
+        hubAuthState.accessToken = null;
+        hubAuthState.grantedScopes = "";
+        hubAuthState.expiresAt = expSeconds > 0 ? expSeconds * 1000 : 0;
+    }
     hubAuthState.profile = profile;
     saveHubAuthState();
     await resolveHubAccessState();
@@ -3373,6 +3384,8 @@ async function handleHubGoogleToken(tokenResponse) {
         throw new Error("This Google account is not allowed for this hub.");
     }
 
+    if (normalizeEmail(hubAuthState.profile?.email) !== profile.email) hubAuthState.idToken = null;
+    else if (hubAuthState.idToken && getUsableHubBearerToken({ idToken: hubAuthState.idToken }) !== hubAuthState.idToken) hubAuthState.idToken = null;
     hubAuthState.accessToken = tokenResponse.access_token;
     hubAuthState.grantedScopes = String(tokenResponse.scope || hubAuthState.grantedScopes || "").trim();
     hubAuthState.expiresAt = Date.now() + (Number(tokenResponse.expires_in) || 3600) * 1000;
@@ -3599,7 +3612,7 @@ function initHubGoogleAuth() {
                     try {
                         await handleHubGoogleCredential(credentialResponse);
                     } catch (error) {
-                        clearHubAuthState();
+                        console.error("[google-auth] Account verification failed; existing session retained:", error.message);
                         renderHubAuthUi();
                         alert(error.message || "Google sign-in failed.");
                     }
@@ -3657,7 +3670,7 @@ function initHubGoogleAuth() {
                         await handleHubGoogleToken(tokenResponse);
                     } catch (error) {
                         hubAuthState.autoPromptInFlight = false;
-                        clearHubAuthState();
+                        console.error("[google-auth] Token refresh failed; existing session retained:", error.message);
                         renderHubAuthUi();
                         pendingResolvers.forEach((resolve) => resolve({ error: error?.message || "Google sign-in failed." }));
                         alert(error.message || "Google sign-in failed.");
