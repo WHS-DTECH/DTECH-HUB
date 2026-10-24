@@ -29,6 +29,7 @@ function createKitPublication({ pool, builtIns, getDefaultContent, schoolDomain,
                 icon: content.theme?.icon || "\ud83d\udcc1", description: content.bannerSubtitle || "",
                 skillArea: content.identity?.skillArea || "Skill Kits",
                 application: content.identity?.application || "",
+                applicationOrder: Number.isFinite(content.identity?.applicationOrder) ? content.identity.applicationOrder : 0,
                 status: content.deletedAt ? "deleted" : content.identity?.status || "active",
                 live: !content.deletedAt && (explicit ?? (content.publicationLive !== false && (content.identity?.status || "active") === "active")),
                 custom: id !== "kit-typing" && !builtIns.some((kit) => kit.id === id)

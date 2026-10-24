@@ -157,7 +157,8 @@
         const skillRank = (kit) => kit.id === "kit-login" ? 0 : kit.id === "kit-google-search" ? 1 : 2;
         const skillKits = catalogue.filter((kit) => kit.skillArea !== "Application Kits")
             .sort((a, b) => skillRank(a) - skillRank(b));
-        const applicationKits = catalogue.filter((kit) => kit.skillArea === "Application Kits");
+        const applicationKits = catalogue.filter((kit) => kit.skillArea === "Application Kits")
+            .sort((a, b) => (a.applicationOrder || 0) - (b.applicationOrder || 0));
         const licenceKits = [...skillKits, ...applicationKits];
         const loaded = Boolean(state.email && snapshot);
         const typingVisible = snapshot?.canManageKits || snapshot?.typingKit?.live !== false;

@@ -122,9 +122,9 @@ async function main() {
     assert.equal(nodes.get("ps-application-kits").hidden, true, "No empty application headings when none are visible");
 
     snapshot = { ...snapshot, licenceKits: [...snapshot.licenceKits,
-        { id: "kit-minecraft", title: "Minecraft Player Kit", live: true, skillArea: "Application Kits", application: "Minecraft" },
-        { id: "kit-minecraft-builder", title: "Minecraft Builder Kit", live: false, skillArea: "Application Kits", application: "Minecraft" },
-        { id: "kit-minecraft-coder", title: "Minecraft Coder Kit", live: false, skillArea: "Application Kits", application: "Minecraft" }
+        { id: "kit-minecraft-coder", title: "Minecraft Coder Kit", live: false, skillArea: "Application Kits", application: "Minecraft", applicationOrder: 2 },
+        { id: "kit-minecraft", title: "Minecraft Player Kit", live: true, skillArea: "Application Kits", application: "Minecraft", applicationOrder: 0 },
+        { id: "kit-minecraft-builder", title: "Minecraft Builder Kit", live: false, skillArea: "Application Kits", application: "Minecraft", applicationOrder: 1 }
     ] };
     events["hub-auth-state-changed"]();
     await tick();
@@ -134,6 +134,8 @@ async function main() {
     assert.match(applicationCards, /kit=kit-minecraft-builder&preview=1/);
     assert.match(applicationCards, /data-publication="kit-minecraft-coder" data-live="false"/);
     assert.doesNotMatch(nodes.get("ps-stamp-list").innerHTML, /Minecraft/);
+    assert.ok(applicationCards.indexOf("Minecraft Player Kit") < applicationCards.indexOf("Minecraft Builder Kit"));
+    assert.ok(applicationCards.indexOf("Minecraft Builder Kit") < applicationCards.indexOf("Minecraft Coder Kit"));
 
     fail = true;
     events["hub-auth-state-changed"]();
