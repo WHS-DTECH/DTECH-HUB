@@ -85,7 +85,11 @@ Strict cutover checklist (go/no-go):
 
 ## 5) Database Used
 - PostgreSQL (configured through `DATABASE_URL`).
-- If `DATABASE_URL` is missing, some memory-backed fallback behavior exists for selected features.
+- `DATABASE_URL` is mandatory: startup fails explicitly if it is absent or blank. The running application cannot enter the legacy in-memory mode. Database/schema initialization must succeed before the HTTP listener starts; database errors are not retried through temporary storage.
+- `/health` reports `hasDatabase`; the live service was checked on 24 October 2026 and returned `true`. This is a configuration indicator, not a backup guarantee or a continuous connectivity check.
+- Kit/activity content is saved in `practical_skills_kit_content`, student answers/completions in `practical_skills_progress`, the published library in `practical_skills_library_store`, and document-copy receipts in `student_kit_documents`. Binary resource files and actual Google Docs remain in Google Drive; their URLs/receipts belong in PostgreSQL.
+- Kit registry queries refresh from PostgreSQL on later requests (concurrent callers share an in-flight load). Kit APIs/library responses are not cached, and Practical Skills static assets must revalidate so older Licence renderers cannot indefinitely hide custom cards or show obsolete totals.
+- This change does not move every other subsystem's filesystem assets into PostgreSQL, nor recover records previously lost from a no-database deployment.
 
 ### My Class description tracker (October 2026)
 - The [Student Work Tracker](../teacher-student-work.html) has **My Students** and **My Class** tabs. Existing embedded assessment trackers keep their previous view without tabs.

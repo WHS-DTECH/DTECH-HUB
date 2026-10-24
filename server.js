@@ -1,3 +1,4 @@
+const hasDatabase = require("./database-required").requireDatabaseUrl(process.env.DATABASE_URL);
 const path = require("path");
 const fs = require("fs");
 const { createHash, randomUUID } = require("node:crypto");
@@ -169,7 +170,6 @@ try {
 const app = express();
 const PORT = process.env.PORT || 3000;
 const SERVER_STARTED_AT = new Date().toISOString();
-const hasDatabase = Boolean(process.env.DATABASE_URL);
 const RELIEF_PLAN_BASE_URL = "https://tech-learningsites.onrender.com";
 const RELIEF_PLAN_ACCESS_KEY = String(process.env.RELIEF_PLAN_ACCESS_KEY || "").trim();
 const TRELLO_API_KEY = String(process.env.TRELLO_API_KEY || "").trim();
@@ -245,6 +245,7 @@ const PRACTICAL_SKILLS_BADGE_DEFINITIONS = [
 // but are not added to PRACTICAL_SKILLS_KIT_DEFINITIONS, so existing points and "every kit" badges are unchanged.
 const customPracticalSkillsKits = new Map();
 let customPracticalSkillsKitsLoad = null;
+let customPracticalSkillsKitSchemaReady = false;
 
 function getPracticalSkillsKitDefinition(kitId) {
   const safeKitId = String(kitId || "").trim();
@@ -265,13 +266,13 @@ function ensureCustomPracticalSkillsKitsLoaded() {
   if (!hasDatabase) return Promise.resolve();
   if (!customPracticalSkillsKitsLoad) {
     customPracticalSkillsKitsLoad = (async () => {
-      await ensurePracticalSkillsKitContentSchema();
+      if (!customPracticalSkillsKitSchemaReady) {
+        await ensurePracticalSkillsKitContentSchema();
+        customPracticalSkillsKitSchemaReady = true;
+      }
       const result = await pool.query(`SELECT kit_id FROM practical_skills_kit_content WHERE content ->> 'customKit' = 'true'`);
       for (const row of result.rows || []) registerCustomPracticalSkillsKit(row.kit_id);
-    })().catch((error) => {
-      customPracticalSkillsKitsLoad = null;
-      throw error;
-    });
+    })().finally(() => { customPracticalSkillsKitsLoad = null; });
   }
   return customPracticalSkillsKitsLoad;
 }
@@ -6213,6 +6214,7 @@ app.use(async (req, _res, next) => {
   next();
 });
 app.use(/^\/api\/(admin\/)?practical-skills\//, async (_req, res, next) => {
+  res.set("Cache-Control", "private, no-store");
   try {
     await ensureCustomPracticalSkillsKitsLoaded();
     next();
@@ -6223,6 +6225,7 @@ app.use(/^\/api\/(admin\/)?practical-skills\//, async (_req, res, next) => {
 app.use("/images/activities", express.static(path.join(__dirname, "images", "activities")));
 app.use("/images/activities", express.static(path.join(__dirname, "public", "images", "activities")));
 app.get("/practical-skills/library.json", async (_req, res) => {
+  res.set("Cache-Control", "no-store");
   try {
     await ensureCustomPracticalSkillsKitsLoaded();
     const kitCards = (await readPracticalSkillsLibraryFile())
@@ -6282,6 +6285,10 @@ require("./practical-skills/certificate-catchup").registerCertificateCatchup(app
   getPracticalSkillsCertificateTeacherRecipients, getStoredPracticalSkillsKitContent, buildKitCertificate,
   getPracticalSkillsStudentName, createKitCertificatePdf, sendConfiguredHubEmail,
   emailConfigured: () => Boolean(smtpTransporter && SMTP_FROM)
+});
+app.use("/practical-skills", (_req, res, next) => {
+  res.set("Cache-Control", "no-cache");
+  next();
 });
 app.use(express.static(__dirname));
 

@@ -19,11 +19,14 @@ async function main() {
     const builtIns = [{ id: "kit-login" }, { id: "kit-google-search" }, { id: "kit-minecraft" }];
     let storedRows = [{ kit_id: "kit-robots" }, { kit_id: "kit-login" }, { kit_id: "../bad" }];
     let loadQueries = 0;
+    let schemaCalls = 0;
+    let loadFails = false;
     const registry = vm.createContext({
         PRACTICAL_SKILLS_KIT_DEFINITIONS: builtIns,
         hasDatabase: true,
-        ensurePracticalSkillsKitContentSchema: async () => {},
+        ensurePracticalSkillsKitContentSchema: async () => { schemaCalls += 1; },
         pool: { query: async (sql) => {
+            if (loadFails) throw new Error("Database unavailable");
             loadQueries += 1;
             assert.match(sql, /content ->> 'customKit' = 'true'/, "Only kits created in the builder are registered");
             return { rows: storedRows };
@@ -33,9 +36,20 @@ async function main() {
     vm.runInContext(slice(serverSource, "// Kits created in the Kit Content Builder.", "\nfunction getPracticalSkillsTier(")
         .replace(/^const (customPracticalSkillsKits)/m, "var $1").replace(/^let (customPracticalSkillsKitsLoad)/m, "var $1"), registry);
 
+    await Promise.all([registry.ensureCustomPracticalSkillsKitsLoaded(), registry.ensureCustomPracticalSkillsKitsLoaded()]);
+    assert.equal(loadQueries, 1, "Concurrent requests share one database load");
+    storedRows.push({ kit_id: "kit-files-folders" });
     await registry.ensureCustomPracticalSkillsKitsLoaded();
+    assert.equal(loadQueries, 2, "Later requests refresh the database catalog instead of using a process-lifetime snapshot");
+    assert.ok(registry.getPracticalSkillsKitDefinition("kit-files-folders"), "A custom kit added by another app process becomes visible");
+    registry.customPracticalSkillsKits.delete("kit-files-folders");
+    loadFails = true;
+    await assert.rejects(registry.ensureCustomPracticalSkillsKitsLoaded(), /Database unavailable/, "A failed refresh cannot silently serve stale memory data");
+    loadFails = false;
     await registry.ensureCustomPracticalSkillsKitsLoaded();
-    assert.equal(loadQueries, 1, "Saved custom kits are loaded once");
+    assert.ok(registry.getPracticalSkillsKitDefinition("kit-files-folders"), "Database refresh retries after a transient outage");
+    assert.equal(schemaCalls, 1, "Refreshing the catalog does not rerun schema DDL on every request");
+    registry.customPracticalSkillsKits.delete("kit-files-folders");
     assert.equal(registry.getPracticalSkillsKitDefinition("kit-robots").custom, true, "Saved custom kits survive restarts");
     assert.equal(registry.getPracticalSkillsKitDefinition("kit-login").custom, undefined, "Built-in kits are not replaced");
     assert.equal(registry.getPracticalSkillsKitDefinition("../bad"), null, "Unsafe IDs are ignored");
