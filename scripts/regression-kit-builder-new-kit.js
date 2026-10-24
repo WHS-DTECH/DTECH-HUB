@@ -76,12 +76,13 @@ async function main() {
     });
     vm.runInContext(slice(serverSource, 'app.put("/api/admin/practical-skills/kit-content/:kitId"', '\napp.post("/api/practicals/events"'), routeContext);
     const call = async (key, req) => {
-        const res = { code: 200, status(code) { this.code = code; return this; }, json(body) { this.body = body; return this; } };
+        const res = { code: 200, headers: {}, set(key, value) { this.headers[key] = value; return this; }, status(code) { this.code = code; return this; }, json(body) { this.body = body; return this; } };
         await routes[key]({ params: {}, ...req }, res);
         return res;
     };
 
     const listed = await call("GET /api/admin/practical-skills/kits", {});
+    assert.equal(listed.headers["Cache-Control"], "no-store", "The saved kit dropdown must not use a cached built-in-only response");
     assert.deepEqual(JSON.parse(JSON.stringify(listed.body.kits.map((kit) => [kit.id, kit.title, kit.custom]))), [
         ["kit-login", "Login Kit", false], ["kit-google-search", "kit-google-search", false],
         ["kit-minecraft", "kit-minecraft", false], ["kit-robots", "Robots", true]

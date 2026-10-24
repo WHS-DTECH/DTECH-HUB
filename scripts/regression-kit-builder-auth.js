@@ -14,6 +14,8 @@ function editor() {
     let failSave = false;
     let confirmDelete = false;
     let deleted = false;
+    let catalogFailure = false;
+    let catalogMalformed = false;
     function element() {
         const children = [];
         const fields = new Map();
@@ -60,6 +62,8 @@ function editor() {
                 const content = JSON.parse(options.body).content;
                 return { ok: true, json: async () => ({ kitId: "kit-files", content }) };
             }
+            if (catalogFailure) return { ok: false, json: async () => ({ error: "Catalog temporarily unavailable." }) };
+            if (catalogMalformed) return { ok: true, json: async () => ({}) };
             return { ok: true, json: async () => ({ kits: deleted ? [] : [{ id: "kit-files", title: "Files & Folders", custom: true }] }) };
         }
     });
@@ -70,7 +74,11 @@ function editor() {
         signOut() { session = null; events["hub-auth-state-changed"](); },
         denyAdmin() { canAdmin = false; },
         failSave() { failSave = true; },
-        confirmDeletion() { confirmDelete = true; }
+        confirmDeletion() { confirmDelete = true; },
+        failCatalog() { catalogFailure = true; },
+        malformedCatalog() { catalogMalformed = true; },
+        restoreCatalog() { catalogFailure = false; catalogMalformed = false; },
+        refreshCatalog() { const button = get("#kit-refresh-list"); return button.handlers.click({ currentTarget: button }); }
     };
 }
 const settle = () => new Promise((resolve) => setImmediate(resolve));
@@ -110,6 +118,45 @@ test("buttons work after delayed sign-in without clearing draft fields or duplic
     await settle();
     assert.equal(ui.requests.filter(({ options }) => options.method === "PUT").length, 0);
     assert.match(ui.get("#kit-builder-status").textContent, /Sign in/);
+});
+
+test("direct builder lists saved custom kits and refresh preserves an unsaved draft", async () => {
+    const ui = editor();
+    ui.signIn();
+    await settle();
+    assert.ok(ui.get("#kit-select").options.some((option) => option.value === "kit-files"));
+    assert.equal(ui.requests.find((request) => request.url === "/api/admin/practical-skills/kits").options.cache, "no-store");
+    ui.get("#kit-name").value = "Unsaved new kit";
+    ui.get("#kit-add-worksheet").handlers.click();
+    const row = ui.get("#kit-worksheet-list").children[0];
+    ui.failCatalog();
+    await ui.refreshCatalog();
+    assert.match(ui.get("#kit-builder-status").textContent, /Could not refresh.*Catalog temporarily unavailable/);
+    assert.equal(ui.get("#kit-name").value, "Unsaved new kit");
+    ui.restoreCatalog();
+    await ui.refreshCatalog();
+    assert.equal(ui.get("#kit-name").value, "Unsaved new kit");
+    assert.equal(ui.get("#kit-worksheet-list").children[0], row);
+    assert.equal(ui.get("#kit-refresh-list").disabled, false);
+    assert.match(ui.get("#kit-builder-status").textContent, /draft is unchanged/);
+});
+
+test("failed initial catalog loading is explicit and retries without clearing a draft", async () => {
+    const ui = editor();
+    ui.failCatalog();
+    ui.get("#kit-name").value = "Keep my draft";
+    ui.signIn();
+    await settle();
+    assert.match(ui.get("#kit-builder-status").textContent, /Could not load your saved kit list.*Refresh kit list/);
+    assert.equal(ui.get("#kit-name").value, "Keep my draft");
+    ui.restoreCatalog();
+    ui.signIn();
+    await settle();
+    assert.ok(ui.get("#kit-select").options.some((option) => option.value === "kit-files"));
+    assert.equal(ui.get("#kit-name").value, "Keep my draft");
+    ui.malformedCatalog();
+    await ui.refreshCatalog();
+    assert.match(ui.get("#kit-builder-status").textContent, /saved kit list was not returned/);
 });
 
 test("custom kit deletion requires confirmation and leaves a blank editor after removal", async () => {

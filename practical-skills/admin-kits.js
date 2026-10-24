@@ -3,7 +3,7 @@
 
     const AUTH_STORAGE_KEY = "hub_google_auth_v1";
 
-    // Built-in fallback; the dropdown is refreshed from /api/admin/practical-skills/kits, which also lists created kits.
+    // Initial list; the authenticated catalog also includes saved custom kits.
     let KIT_CATALOG = [
         { id: "kit-login", title: "Login" },
         { id: "kit-google-search", title: "Search Kit" },
@@ -493,15 +493,14 @@
     }
 
     async function refreshKitCatalog() {
-        try {
-            const payload = await loadJson("/api/admin/practical-skills/kits", { headers: withAdminAuthHeaders() });
-            if (Array.isArray(payload?.kits)) {
-                KIT_CATALOG = payload.kits.map((kit) => ({ id: String(kit.id), title: String(kit.title || kit.id), custom: Boolean(kit.custom) }));
-            }
-        } catch (_error) {
-            // Keep the built-in list if the catalog cannot be loaded.
+        const payload = await loadJson("/api/admin/practical-skills/kits", { headers: withAdminAuthHeaders(), cache: "no-store" });
+        if (!Array.isArray(payload?.kits) || payload.kits.some((kit) => !kit || typeof kit.id !== "string" || !kit.id)) {
+            throw new Error("The saved kit list was not returned. Use Refresh kit list to retry.");
         }
-        if (state.kitId !== NEW_KIT_ID && !KIT_CATALOG.some((kit) => kit.id === state.kitId)) state.kitId = NEW_KIT_ID;
+        KIT_CATALOG = payload.kits.map((kit) => ({ id: kit.id, title: String(kit.title || kit.id), custom: Boolean(kit.custom) }));
+        if (state.kitId !== NEW_KIT_ID && !KIT_CATALOG.some((kit) => kit.id === state.kitId)) {
+            throw new Error("The selected kit is missing from the saved kit list. Use Refresh kit list to retry; your draft has not been cleared.");
+        }
         populateKitSelect();
     }
 
@@ -512,11 +511,15 @@
         state.isAdmin = allowed;
         kitSelect.disabled = !allowed;
         if (!allowed || state.initialized) return;
-        state.initialized = true;
-
-        await refreshKitCatalog();
-        if (state.kitId !== NEW_KIT_ID) await loadKitContent(state.kitId);
-        else setStatus("New blank kit. Fill in the details, then Save Kit Content to create it.");
+        try {
+            await refreshKitCatalog();
+            if (revision !== state.authRevision) return;
+            state.initialized = true;
+            if (state.kitId !== NEW_KIT_ID) await loadKitContent(state.kitId);
+            else setStatus("New blank kit. Fill in the details, then Save Kit Content to create it.");
+        } catch (error) {
+            if (revision === state.authRevision) setStatus(`Could not load your saved kit list. ${error.message} Use Refresh kit list to retry.`, true);
+        }
     }
 
     state.kitId = new URLSearchParams(window.location.search).get("kit") || NEW_KIT_ID;
@@ -524,6 +527,20 @@
     populateKitSelect();
     renderForm();
     wireFormEvents();
+    document.querySelector("#kit-refresh-list").addEventListener("click", async (event) => {
+        const button = event.currentTarget;
+        button.disabled = true;
+        try {
+            if (!(await verifyAdminAccess())) return;
+            if (!state.initialized) await init();
+            else {
+                await refreshKitCatalog();
+                setStatus("Kit list refreshed. Your current draft is unchanged.");
+            }
+        } catch (error) {
+            setStatus(`Could not refresh the saved kit list. ${error.message}`, true);
+        } finally { button.disabled = false; }
+    });
     window.addEventListener("hub-auth-state-changed", () => { void init(); });
     void init();
 })();

@@ -16215,6 +16215,7 @@ app.put("/api/admin/practical-skills/kit-content/:kitId", requireAdminAccess, as
 });
 
 app.get("/api/admin/practical-skills/kits", requireAdminAccess, async (_req, res) => {
+  res.set("Cache-Control", "no-store");
   try {
     const ids = [...PRACTICAL_SKILLS_KIT_DEFINITIONS.map((kit) => kit.id), ...customPracticalSkillsKits.keys()];
     const kits = await Promise.all(ids.map(async (id) => {

@@ -104,6 +104,8 @@ Strict cutover checklist (go/no-go):
 
 ### Kit Content Builder sign-in readiness
 
+- The builder loads its saved kit dropdown with caching disabled; the admin catalog response also uses `Cache-Control: no-store`. Catalog failures are shown explicitly rather than silently presenting only built-ins. **Refresh kit list** retries without clearing the current draft, and failed initial catalog loads can retry after Google auth becomes ready. A selected kit missing from the catalog is reported instead of silently switching to a blank kit.
+
 - Uploaded kits have an admin-only Delete Kit button with confirmation. Removal archives the saved kit with a deletion timestamp and removes its library card; kit content and student progress are retained. Built-in kits cannot be deleted, and stale editors cannot republish deleted kits.
 - My Licence uses a compact, clickable stamp/kit grid as its primary launch area. Stats, badges and the detailed kit collection remain available in the collapsed "My achievements, stats & kit details" section. The Typing log stays separate from earned stamps.
 - The current six launch cards were checked at a 1366 x 650 browser viewport (100% zoom), including space for a 96px navigation bar. Larger future collections and expanded details can scroll normally; content is never clipped to force a fixed-height screen.
