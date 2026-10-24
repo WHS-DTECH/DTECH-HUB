@@ -1,4 +1,10 @@
 .licence-dashboard { background: #f4f8fa; color: #173858; }
+.licence-teacher-kit { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; min-width: 0; }
+.licence-teacher-kit .licence-stamp { width: 100%; flex: 1 0 100%; box-sizing: border-box; }
+.licence-live-pill { border: 2px solid #217347; border-radius: 999px; background: #dff5e7; color: #155331; padding: 5px 16px; font: inherit; font-weight: 700; cursor: pointer; }
+.licence-live-pill.is-not-live { background: #fff0d6; border-color: #986100; color: #704600; }
+.licence-live-pill:disabled { opacity: .6; cursor: wait; }
+.licence-edit-link { font-size: .8rem; padding: 5px; }
 .licence-dashboard .page-shell { max-width: 1400px; margin: auto; padding-bottom: 0; }
 .licence-dashboard .practical-skills-hero { min-height: 0; background: linear-gradient(120deg, #143c51, #1f6452); }
 .licence-dashboard .practical-skills-panel { display: none; }

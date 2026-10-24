@@ -18,6 +18,8 @@ test("saved custom kits populate licence stamps without changing existing points
     const context = vm.createContext({
         computePracticalSkillsSnapshot: () => structuredClone(base),
         customPracticalSkillsKits: new Map(Object.keys(content).map((id) => [id, { id }])),
+        ensureCustomPracticalSkillsKitsLoaded: async () => {},
+        kitPublication: { filterSnapshot: async (snapshot) => snapshot },
         getStoredPracticalSkillsKitContent: async (id) => content[id]
     });
     const start = source.indexOf("async function buildPracticalSkillsLicenceSnapshot(");
@@ -46,7 +48,7 @@ test("licence progress loads and syncs all registered kits, with matching action
     const routes = source.slice(start, end);
     assert.match(routes, /const definitions = \[\.\.\.PRACTICAL_SKILLS_KIT_DEFINITIONS, \.\.\.customPracticalSkillsKits\.values\(\)\]/);
     assert.match(routes, /definitions\.map\(\(kit\) => syncPracticalSkillsKitCompletion/);
-    assert.equal((routes.match(/await buildPracticalSkillsLicenceSnapshot\(rows\)/g) || []).length, 4);
+    assert.equal((routes.match(/await buildPracticalSkillsLicenceSnapshot\(rows(?:, manager)?\)/g) || []).length, 4);
     const memoryStart = source.indexOf("async function getAllPracticalSkillsProgressRows(");
     const memoryEnd = source.indexOf("\nasync function setPracticalSkillsKitCompletion(", memoryStart);
     const progressContext = vm.createContext({

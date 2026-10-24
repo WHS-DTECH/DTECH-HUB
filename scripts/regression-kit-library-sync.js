@@ -28,6 +28,7 @@ const libraryRoutes = {};
 const libraryRouteContext = vm.createContext({
     app: { get: (url, handler) => { libraryRoutes[url] = handler; } },
     ensureCustomPracticalSkillsKitsLoaded: async () => {},
+    kitPublication: { catalog: async () => [{ id: "kit-login", live: true }] },
     readPracticalSkillsLibraryFile: async () => [
         { id: "kit-login", title: "Login Kit", visual: { icon: "🔐", palette: "old kit palette" } },
         { id: "teacher-card", title: "Teacher Card", visual: { icon: "T", palette: "teacher palette" } }

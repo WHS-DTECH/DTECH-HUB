@@ -270,7 +270,7 @@ function ensureCustomPracticalSkillsKitsLoaded() {
         await ensurePracticalSkillsKitContentSchema();
         customPracticalSkillsKitSchemaReady = true;
       }
-      const result = await pool.query(`SELECT kit_id FROM practical_skills_kit_content WHERE content ->> 'customKit' = 'true'`);
+      const result = await pool.query(`SELECT kit_id FROM practical_skills_kit_content`);
       for (const row of result.rows || []) registerCustomPracticalSkillsKit(row.kit_id);
     })().finally(() => { customPracticalSkillsKitsLoad = null; });
   }
@@ -6213,7 +6213,7 @@ app.use(async (req, _res, next) => {
 
   next();
 });
-app.use(/^\/api\/(admin\/)?practical-skills\//, async (_req, res, next) => {
+app.use(["/api/practical-skills", "/api/admin/practical-skills"], async (_req, res, next) => {
   res.set("Cache-Control", "private, no-store");
   try {
     await ensureCustomPracticalSkillsKitsLoaded();
@@ -6223,15 +6223,24 @@ app.use(/^\/api\/(admin\/)?practical-skills\//, async (_req, res, next) => {
   }
 });
 app.use("/images/activities", express.static(path.join(__dirname, "images", "activities")));
+const kitPublication = require("./practical-skills/kit-publication").createKitPublication({
+  pool, builtIns: PRACTICAL_SKILLS_KIT_DEFINITIONS, getDefaultContent: getDefaultPracticalSkillsKitContent,
+  schoolDomain: SCHOOL_EMAIL_DOMAIN, getRequestUserEmail, canManage: canManagePracticalSchedule
+});
+app.use(kitPublication.gate);
+kitPublication.register(app, requireAdminAccess);
 app.use("/images/activities", express.static(path.join(__dirname, "public", "images", "activities")));
 app.get("/practical-skills/library.json", async (_req, res) => {
   res.set("Cache-Control", "no-store");
   try {
     await ensureCustomPracticalSkillsKitsLoaded();
+    const liveIds = new Set((await kitPublication.catalog()).filter((kit) => kit.live).map((kit) => kit.id));
     const kitCards = (await readPracticalSkillsLibraryFile())
+      .filter((card) => !getPracticalSkillsKitDefinition(card.id) || liveIds.has(card.id))
       .map((card) => getPracticalSkillsKitDefinition(card.id)
         ? {
             ...card,
+            status: "active",
             cardLabel: "LICENCE KIT",
             visual: {
               ...card.visual,
@@ -6284,7 +6293,8 @@ require("./practical-skills/certificate-catchup").registerCertificateCatchup(app
   pool, hasDatabase, requireAdminAccess, ensurePracticalSkillsProgressSchema, ensureEmailLogsSchema,
   getPracticalSkillsCertificateTeacherRecipients, getStoredPracticalSkillsKitContent, buildKitCertificate,
   getPracticalSkillsStudentName, createKitCertificatePdf, sendConfiguredHubEmail,
-  emailConfigured: () => Boolean(smtpTransporter && SMTP_FROM)
+  emailConfigured: () => Boolean(smtpTransporter && SMTP_FROM),
+  kitAvailable: (kitId) => kitPublication.available(kitId)
 });
 app.use("/practical-skills", (_req, res, next) => {
   res.set("Cache-Control", "no-cache");
@@ -15177,7 +15187,9 @@ app.get("/api/practicals/events", async (_req, res) => {
 
 app.get("/api/practical-skills/library", async (_req, res) => {
   try {
-    const rows = await readPracticalSkillsLibraryFile();
+    const liveIds = new Set((await kitPublication.catalog()).filter((kit) => kit.live).map((kit) => kit.id));
+    const rows = (await readPracticalSkillsLibraryFile()).filter((card) => !getPracticalSkillsKitDefinition(card.id) || liveIds.has(card.id))
+      .map((card) => liveIds.has(card.id) ? { ...card, status: "active" } : card);
     res.json(rows);
   } catch (_error) {
     res.status(500).json({ error: "Could not load Practical Skills library" });
@@ -15251,6 +15263,7 @@ async function syncPracticalSkillsKitCompletion(studentEmail, kitId, content = n
   const indexes = visibleActivityIndexes(kitContent);
   let row = await ensurePracticalSkillsProgressRow(studentEmail, kitId);
   if (!row) throw new Error("Kit progress could not be loaded.");
+  if (!(await kitPublication.available(kitId))) return row;
   for (const index of indexes) {
     const activity = kitContent.activities?.[Number(index)];
     if (activity?.completionMode !== "auto" || ActivityBlocks.specialised(activity)) continue;
@@ -15285,6 +15298,7 @@ async function syncPracticalSkillsKitCompletion(studentEmail, kitId, content = n
 }
 
 async function getPracticalSkillsCertificate(req, kitId) {
+  if (!(await kitPublication.available(kitId))) return null;
   const email = normalizeEmail(getRequestUserEmail(req));
   const content = await getStoredPracticalSkillsKitContent(kitId);
   const row = await syncPracticalSkillsKitCompletion(email, kitId, content);
@@ -15312,7 +15326,8 @@ async function getPracticalSkillsStudentName(req) {
   return verifiedName || schoolName || email;
 }
 
-async function buildPracticalSkillsLicenceSnapshot(rows) {
+async function buildPracticalSkillsLicenceSnapshot(rows, manager = false) {
+  await ensureCustomPracticalSkillsKitsLoaded();
   const snapshot = computePracticalSkillsSnapshot(rows);
   const customKits = await Promise.all([...customPracticalSkillsKits.values()].map(async (kit) => {
     const content = await getStoredPracticalSkillsKitContent(kit.id);
@@ -15331,13 +15346,13 @@ async function buildPracticalSkillsLicenceSnapshot(rows) {
     };
   }));
   const visibleCustomKits = customKits.filter((kit) => kit.status === "active");
-  return {
+  return kitPublication.filterSnapshot({
     ...snapshot,
     kits: [...snapshot.kits, ...customKits],
     customKits: visibleCustomKits,
     stampCompletedCount: snapshot.completedCount + visibleCustomKits.filter((kit) => kit.isComplete).length,
     stampTotalKits: snapshot.totalKits + visibleCustomKits.length
-  };
+  }, manager);
 }
 
 app.get("/api/practical-skills/my-progress", async (req, res) => {
@@ -15348,12 +15363,14 @@ app.get("/api/practical-skills/my-progress", async (req, res) => {
   }
 
   try {
-    const definitions = [...PRACTICAL_SKILLS_KIT_DEFINITIONS, ...customPracticalSkillsKits.values()];
+    const manager = await canManagePracticalSchedule(studentEmail);
+    const liveIds = new Set((await kitPublication.catalog()).filter((kit) => kit.live).map((kit) => kit.id));
+    const definitions = [...PRACTICAL_SKILLS_KIT_DEFINITIONS, ...customPracticalSkillsKits.values()].filter((kit) => liveIds.has(kit.id));
     await Promise.all(definitions.map((kit) => ensurePracticalSkillsProgressRow(studentEmail, kit.id)));
     await refreshLearningSitesCheckIn(studentEmail);
     await Promise.all(definitions.map((kit) => syncPracticalSkillsKitCompletion(studentEmail, kit.id)));
     const rows = await getAllPracticalSkillsProgressRows(studentEmail);
-    res.json({ ...await buildPracticalSkillsLicenceSnapshot(rows), student: { name: await getPracticalSkillsStudentName(req), email: studentEmail } });
+    res.json({ ...await buildPracticalSkillsLicenceSnapshot(rows, manager), student: { name: await getPracticalSkillsStudentName(req), email: studentEmail } });
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not load Practical Skills progress." });
   }
@@ -15444,6 +15461,9 @@ const certificateEmailCooldowns = new Map();
 
 async function sendKitCertificateEmail(studentEmail, kitId, certificate) {
   return withKitCertificateEmailLock(pool, hasDatabase, studentEmail, kitId, async () => {
+  if (!(await kitPublication.available(kitId))) throw Object.assign(new Error("This kit is Not Live. Certificates are paused."), { status: 409 });
+  const current = await pool.query("SELECT completed FROM practical_skills_progress WHERE student_email=$1 AND kit_id=$2", [studentEmail, kitId]);
+  if (!current.rows[0]?.completed) throw Object.assign(new Error("This kit completion has been reset. No certificate was sent."), { status: 409 });
   const buffer = await createKitCertificatePdf(certificate);
   const safe = (value) => String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
   let teacherRecipients = (await getPracticalSkillsCertificateTeacherRecipients())
@@ -16228,6 +16248,7 @@ app.put("/api/admin/practical-skills/kit-content/:kitId", requireAdminAccess, as
 app.get("/api/admin/practical-skills/kits", requireAdminAccess, async (_req, res) => {
   res.set("Cache-Control", "no-store");
   try {
+    await ensureCustomPracticalSkillsKitsLoaded();
     const ids = [...PRACTICAL_SKILLS_KIT_DEFINITIONS.map((kit) => kit.id), ...customPracticalSkillsKits.keys()];
     const kits = await Promise.all(ids.map(async (id) => {
       const content = await getStoredPracticalSkillsKitContent(id);
@@ -16271,7 +16292,8 @@ app.post("/api/admin/practical-skills/kits", requireAdminAccess, async (req, res
   registerCustomPracticalSkillsKit(kitId);
   let saved;
   try {
-    saved = await savePracticalSkillsKitContent(kitId, { ...content, customKit: true }, requesterEmail);
+    await kitPublication.setLive(kitId, false, requesterEmail);
+    saved = await savePracticalSkillsKitContent(kitId, { ...content, customKit: true, publicationLive: false }, requesterEmail);
   } catch (error) {
     customPracticalSkillsKits.delete(kitId);
     res.status(error.status || 500).json({ error: error.message || "Could not create kit." });

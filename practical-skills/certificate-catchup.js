@@ -28,7 +28,7 @@ async function withKitCertificateEmailLock(pool, hasDatabase, studentEmail, kitI
 function registerCertificateCatchup(app, dependencies) {
     const { pool, hasDatabase, requireAdminAccess, ensurePracticalSkillsProgressSchema, ensureEmailLogsSchema,
         getPracticalSkillsCertificateTeacherRecipients, getStoredPracticalSkillsKitContent, buildKitCertificate,
-        getPracticalSkillsStudentName, createKitCertificatePdf, sendConfiguredHubEmail, emailConfigured } = dependencies;
+        getPracticalSkillsStudentName, createKitCertificatePdf, sendConfiguredHubEmail, emailConfigured, kitAvailable } = dependencies;
     let schema;
     async function ensureSchema() {
         if (!hasDatabase) throw new Error("Catch-up requires the production database; no emails were sent.");
@@ -56,7 +56,7 @@ function registerCertificateCatchup(app, dependencies) {
         for (const progressRow of progress.rows) {
             const email = normalize(progressRow.student_email);
             const content = await getStoredPracticalSkillsKitContent(progressRow.kit_id);
-            const certificate = buildKitCertificate(content, progressRow, email);
+            const certificate = await kitAvailable(progressRow.kit_id) ? buildKitCertificate(content, progressRow, email) : null;
             const relevantTeachers = teachers.filter((teacher) => teacher !== email);
             const pendingTeachers = relevantTeachers.filter((teacher) =>
                 !teacherAlreadyEmailed(emails.rows, email, progressRow.kit_id, teacher)
@@ -89,6 +89,7 @@ function registerCertificateCatchup(app, dependencies) {
             if (!row || !row.ready) return res.status(409).json({ error: "This completed certificate is not available. Refresh the preview." });
             if (!row.pendingTeachers.length) return res.json({ sent: [], skipped: true, uncertainTeachers: row.uncertainTeachers });
             if (!snapshot.emailConfigured) return res.status(503).json({ error: "Hub email is not configured. No emails were sent." });
+            if (!(await kitAvailable(kitId))) return res.status(409).json({ error: "This kit is Not Live. No certificates were sent." });
             const content = await getStoredPracticalSkillsKitContent(kitId);
             const progress = (await pool.query(`SELECT * FROM practical_skills_progress WHERE student_email = $1 AND kit_id = $2 AND completed = TRUE`, [row.studentEmail, kitId])).rows[0];
             const name = await getPracticalSkillsStudentName({ auth_identity: null, authenticated_email: row.studentEmail, headers: { "x-user-email": row.studentEmail } });

@@ -57,6 +57,7 @@ test("preview excludes prior teacher copies; sends only missing teacher copies; 
     app.use(express.json());
     registerCertificateCatchup(app, {
         pool, hasDatabase: true,
+        kitAvailable: async () => true,
         requireAdminAccess: (req, res, next) => req.headers["x-test-admin"] === "yes" ? next() : res.status(403).json({ error: "Admin required" }),
         ensurePracticalSkillsProgressSchema: async () => {}, ensureEmailLogsSchema: async () => {},
         getPracticalSkillsCertificateTeacherRecipients: async () => ["teacher@school.nz"],

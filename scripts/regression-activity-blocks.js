@@ -341,6 +341,7 @@ test("server completion guards prevent bypass and recompute stale automatic tick
     let row = { responses: { "0-blocks": { checkbox: false } }, completed_activities: { 0: "old tick" } };
     const context = vm.createContext({
         ActivityBlocks: B, visibleActivityIndexes: () => ["0"], hasDatabase: false,
+        kitPublication: { available: async () => true },
         ensurePracticalSkillsProgressRow: async () => row,
         normalizeEmail: (v) => v, memoryPracticalSkillsProgress: new Map(),
         allActivitiesComplete: (_content, value) => Boolean(value.completed_activities[0]),

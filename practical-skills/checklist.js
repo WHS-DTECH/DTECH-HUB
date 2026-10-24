@@ -149,7 +149,9 @@
         const list = document.getElementById("ps-kit-list");
         if (!list) return;
         const snapshot = state.snapshot;
-        const licenceKits = [...kitDefinitions, ...(snapshot?.customKits || []).map((kit) => ({ ...kit, colour: "green" }))];
+        const licenceKits = snapshot?.licenceKits
+            ? snapshot.licenceKits.map((kit) => ({ colour: "green", ...kit }))
+            : [...kitDefinitions, ...(snapshot?.customKits || []).map((kit) => ({ ...kit, colour: "green" }))];
         const loaded = Boolean(state.email && snapshot);
         const kitsById = new Map((snapshot?.kits || []).map((kit) => [kit.id, kit]));
         const completed = loaded ? Number(snapshot.stampCompletedCount ?? snapshot.completedCount ?? 0) : 0;
@@ -165,10 +167,33 @@
         document.getElementById("ps-licence-progress-count").textContent = loaded ? `${completed} / ${total} stamps` : state.email ? "Loading..." : "Sign in to view";
         document.getElementById("ps-stamp-list").innerHTML = licenceKits.map((kit) => {
             const earned = loaded && kitsById.get(kit.id)?.isComplete;
-            const href = `./kit-worksheet.html?kit=${encodeURIComponent(kit.id)}`;
+            const href = snapshot?.canManageKits && kit.live === false
+                ? `./admin-kits.html?kit=${encodeURIComponent(kit.id)}`
+                : `./kit-worksheet.html?kit=${encodeURIComponent(kit.id)}`;
             const copy = `<span class="licence-stamp-icon" aria-hidden="true">${escapeHtml(kit.icon)}</span><strong>${escapeHtml(kit.title)}</strong><span>${earned ? "STAMP EARNED" : loaded ? "Stamp to collect" : "Waiting for you"}</span>`;
-            return `<a class="licence-stamp${earned ? " is-earned" : ""}" href="${href}" aria-label="Open ${escapeHtml(kit.title)}${earned ? ' and certificate' : ''}">${copy}<span class="stamp-certificate">${earned ? "Open kit & certificate" : "Open kit"} &rarr;</span></a>`;
+            const stamp = `<a class="licence-stamp${earned ? " is-earned" : ""}" href="${href}" aria-label="Open ${escapeHtml(kit.title)}${earned ? ' and certificate' : ''}">${copy}<span class="stamp-certificate">${kit.live === false ? "Edit Not Live kit" : earned ? "Open kit & certificate" : "Open kit"} &rarr;</span></a>`;
+            return snapshot?.canManageKits ? `<div class="licence-teacher-kit">${stamp}<button type="button" role="switch" aria-checked="${kit.live !== false}" aria-label="${escapeHtml(kit.title)} live for students" class="licence-live-pill${kit.live === false ? " is-not-live" : ""}" data-publication="${escapeHtml(kit.id)}" data-live="${kit.live !== false}">${kit.live === false ? "Not Live" : "Live"}</button><a class="licence-edit-link" href="./admin-kits.html?kit=${encodeURIComponent(kit.id)}">Edit kit</a></div>` : stamp;
         }).join("") + `<a class="licence-stamp is-log" href="./typing-kit.html" aria-label="Typing Kit - open your seven-week practice log"><span class="licence-stamp-icon" aria-hidden="true">&#9000;</span><strong>Typing Kit</strong><span>7-WEEK PRACTICE LOG</span><span class="stamp-certificate">Open log &rarr;</span></a>`;
+        document.querySelectorAll("[data-publication]").forEach((button) => {
+            button.addEventListener("click", async () => {
+                const live = button.dataset.live !== "true";
+                if (!window.confirm(live ? "Make this kit Live? Students will be able to open it and earn certificates." : "Make this kit Not Live? It will be hidden and student access, completion and certificates will be blocked.")) return;
+                const revision = state.revision;
+                button.disabled = true;
+                try {
+                    await loadJson(`/api/admin/kit-publication/${encodeURIComponent(button.dataset.publication)}`, {
+                        method: "PUT", headers: withAuthHeaders({ "Content-Type": "application/json" }), body: JSON.stringify({ live })
+                    });
+                    const refreshed = await fetchSnapshot();
+                    if (revision !== state.revision) return;
+                    state.snapshot = refreshed;
+                    render();
+                    showStatus(live ? "Kit is now Live for students." : "Kit is now Not Live. Student access and certificates are paused.");
+                } catch (error) {
+                    if (revision === state.revision) showStatus(error.message || "Publication change was not confirmed. Reload to check.", true);
+                } finally { button.disabled = false; }
+            });
+        });
         const next = loaded ? licenceKits.find((kit) => !kitsById.get(kit.id)?.isComplete) : null;
         const nextPanel = document.getElementById("ps-next-step");
         nextPanel.hidden = !loaded;
@@ -213,7 +238,7 @@
                     <span class="ps-kit-pill">${timeLabel}</span>`}
                 </div>
                 <div class="ps-kit-actions">
-                    <a class="button button-primary" href="./kit-worksheet.html?kit=${encodeURIComponent(kit.id)}">${progress.isComplete ? "View kit & certificate" : "Open kit"} &rarr;</a>
+                    <a class="button button-primary" href="./${kit.live === false ? "admin-kits" : "kit-worksheet"}.html?kit=${encodeURIComponent(kit.id)}">${kit.live === false ? "Edit Not Live kit" : progress.isComplete ? "View kit & certificate" : "Open kit"} &rarr;</a>
                     <details class="ps-kit-manage"><summary>Manage progress</summary>
                         <button type="button" class="button button-secondary" data-kit="${kit.id}" data-action="complete" ${progress.isComplete ? "disabled" : ""}>Mark Complete</button>
                         <button type="button" class="button button-secondary" data-kit="${kit.id}" data-action="reset">Reset</button>

@@ -28,7 +28,7 @@ async function main() {
         pool: { query: async (sql) => {
             if (loadFails) throw new Error("Database unavailable");
             loadQueries += 1;
-            assert.match(sql, /content ->> 'customKit' = 'true'/, "Only kits created in the builder are registered");
+            assert.equal(sql, "SELECT kit_id FROM practical_skills_kit_content", "Saved kit IDs are authoritative even when an old editor omitted the custom marker");
             return { rows: storedRows };
         } },
         Promise, Date
@@ -73,6 +73,8 @@ async function main() {
             delete: (url, _auth, handler) => { routes[`DELETE ${url}`] = handler; }
         },
         requireAdminAccess() {},
+        ensureCustomPracticalSkillsKitsLoaded: async () => {},
+        kitPublication: { setLive: async () => {} },
         PRACTICAL_SKILLS_KIT_DEFINITIONS: builtIns,
         customPracticalSkillsKits: registry.customPracticalSkillsKits,
         getPracticalSkillsKitDefinition: registry.getPracticalSkillsKitDefinition,
@@ -127,7 +129,7 @@ async function main() {
     assert.equal(failed.code, 500);
     assert.equal(registry.getPracticalSkillsKitDefinition("kit-lost-kit"), null, "A failed create does not leave a phantom kit");
 
-    assert.match(serverSource, /app\.use\(\/\^\\\/api\\\/\(admin\\\/\)\?practical-skills\\\/\/, async[\s\S]*?ensureCustomPracticalSkillsKitsLoaded\(\)/,
+    assert.match(serverSource, /app\.use\(\["\/api\/practical-skills", "\/api\/admin\/practical-skills"\], async[\s\S]*?ensureCustomPracticalSkillsKitsLoaded\(\)/,
         "Practical skills APIs wait for created kits to load");
     assert.ok(serverSource.indexOf("ensureCustomPracticalSkillsKitsLoaded();\n    next();") < serverSource.indexOf('app.get("/api/practical-skills/library"'),
         "The loader runs before every practical skills route");

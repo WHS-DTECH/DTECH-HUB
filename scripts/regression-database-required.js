@@ -59,12 +59,12 @@ test("kit and activity content survive fresh server storage contexts and databas
 });
 
 test("Licence APIs and static assets cannot indefinitely serve stale mixed collections", () => {
-    assert.match(source, /app\.use\(\/\^\\\/api\\\/\(admin\\\/\)\?practical-skills\\\/\/, async[\s\S]*?res\.set\("Cache-Control", "private, no-store"\)/);
+    assert.match(source, /app\.use\(\["\/api\/practical-skills", "\/api\/admin\/practical-skills"\], async[\s\S]*?res\.set\("Cache-Control", "private, no-store"\)/);
     const header = source.indexOf('app.use("/practical-skills", (_req, res, next) =>');
     assert.ok(header > 0 && header < source.indexOf("app.use(express.static(__dirname));"));
     assert.match(source.slice(header, header + 160), /"Cache-Control", "no-cache"/);
     const html = fs.readFileSync(path.join(root, "practical-skills", "checklist.html"), "utf8");
-    assert.match(html, /checklist\.js\?v=4/);
+    assert.match(html, /checklist\.js\?v=5/);
     const renderer = fs.readFileSync(path.join(root, "practical-skills", "checklist.js"), "utf8");
     assert.match(renderer, /licenceKits\.map/);
     assert.match(renderer, /licenceKits\.forEach/);

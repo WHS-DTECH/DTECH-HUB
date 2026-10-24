@@ -28,7 +28,7 @@ async function main() {
             children: [], appendChild(item) { this.children.push(item); }, querySelectorAll() { return []; } };
     }
     const context = vm.createContext({
-        document: { getElementById(id) { if (!nodes.has(id)) nodes.set(id, node()); return nodes.get(id); }, createElement: node },
+        document: { getElementById(id) { if (!nodes.has(id)) nodes.set(id, node()); return nodes.get(id); }, createElement: node, querySelectorAll: () => [] },
         localStorage: { getItem: () => auth }, sessionStorage: { getItem: () => null },
         window: { addEventListener: (name, handler) => { events[name] = handler; }, setInterval: () => 1, clearInterval() {} },
         fetch: async (url, options) => {
@@ -87,6 +87,18 @@ async function main() {
     assert.match(customCard.innerHTML, /Files &amp; Folders/);
     assert.match(customCard.innerHTML, /View kit & certificate/);
     assert.doesNotMatch(customCard.innerHTML, /Target window|Points:/);
+
+    snapshot = { ...snapshot, canManageKits: true, licenceKits: [
+        { id: "kit-files", title: "Files & Folders", live: false, custom: true, icon: "F" },
+        { id: "kit-login", title: "Login Kit", live: true, icon: "L" }
+    ], stampTotalKits: 2, stampCompletedCount: 1 };
+    events["hub-auth-state-changed"]();
+    await tick();
+    assert.match(nodes.get("ps-stamp-list").innerHTML, /Files &amp; Folders/);
+    assert.match(nodes.get("ps-stamp-list").innerHTML, /data-publication="kit-files" data-live="false">Not Live/);
+    assert.match(nodes.get("ps-stamp-list").innerHTML, /role="switch" aria-checked="false"/);
+    assert.doesNotMatch(nodes.get("ps-stamp-list").innerHTML, /kit=kit-minecraft/, "Server catalog is authoritative, not the old fixed three-kit list");
+    assert.equal(nodes.get("ps-licence-progress-count").textContent, "1 / 2 stamps");
 
     fail = true;
     events["hub-auth-state-changed"]();
