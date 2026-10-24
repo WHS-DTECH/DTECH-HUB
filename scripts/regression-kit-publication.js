@@ -120,6 +120,25 @@ test("publication and reset require admin; audited reset preserves answers and u
     assert.ok(f.queries.filter(({ sql }) => /UPDATE practical_skills_progress/.test(sql)).every(({ params }) => params[0] === "kit-minecraft"));
 });
 
+test("explicit preview requires kit-management permission even for Live kits and never grants progress access", async (t) => {
+    const f = await fixture(t);
+    assert.equal((await f.call("/api/practical-skills/kit-content/kit-minecraft?preview=1")).status, 200);
+    await f.service.setLive("kit-minecraft", false, "teacher@school.nz");
+    const response = await f.call("/api/practical-skills/kit-content/kit-minecraft?preview=1");
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("cache-control"), "private, no-store");
+    assert.equal((await f.call("/api/practical-skills/progress/kit-minecraft?preview=1")).status, 403);
+    const student = createKitPublication({ ...f.deps, canManage: async () => false });
+    for (const live of [true, false]) {
+        await f.service.setLive("kit-minecraft", live, "teacher@school.nz");
+        let passed = false;
+        await student.gate({ path: "/api/practical-skills/kit-content/kit-minecraft", method: "GET", query: { preview: "1" } }, {
+            set() {}, status(code) { assert.equal(code, 403); return this; }, json() {}
+        }, () => { passed = true; });
+        assert.equal(passed, false);
+    }
+});
+
 test("reset rolls back and reports failure instead of claiming success", async (t) => {
     const f = await fixture(t);
     f.failUpdate();

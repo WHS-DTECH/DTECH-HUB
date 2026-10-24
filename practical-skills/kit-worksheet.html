@@ -36,6 +36,10 @@
     </nav>
 
     <main class="worksheet-shell">
+        <section id="worksheet-preview-banner" class="worksheet-assessment-intro" hidden aria-label="Teacher preview">
+            <h2>Teacher preview</h2>
+            <p>View the kit and open its activities without publishing it. This is a read-only preview: answers, Drive actions, completion stamps and certificates are disabled. Students still cannot access Not Live kits.</p>
+        </section>
         <div id="worksheet-host"></div>
 
         <section id="worksheet-google-verification" class="worksheet-question worksheet-identity-guide" hidden aria-labelledby="worksheet-google-verification-title">
@@ -88,10 +92,15 @@
     </main>
 
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+        if (new URLSearchParams(window.location.search).get("preview") === "1") {
+            document.body.dataset.hubReadOnly = "true";
+        }
+    </script>
     <script src="../script.js"></script>
     <script src="./activity-blocks.js?v=2"></script>
     <script src="./activity-block-view.js?v=2"></script>
-    <script src="./kit-worksheet-render.js?v=5"></script>
-    <script src="./kit-worksheet.js?v=3"></script>
+    <script src="./kit-worksheet-render.js?v=6"></script>
+    <script src="./kit-worksheet.js?v=4"></script>
 </body>
 </html>

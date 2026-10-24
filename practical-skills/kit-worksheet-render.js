@@ -1089,7 +1089,7 @@
                             const activity = activities[index] || {};
                             const title = activity.title || worksheet.activity || `Activity ${index + 1}`;
                             const establishes = activity.establishes || worksheet.establishes || "";
-                            const href = `./kit-worksheet.html?kit=${encodeURIComponent(options.kitId || "")}&activity=${index}`;
+                            const href = `./kit-worksheet.html?kit=${encodeURIComponent(options.kitId || "")}&activity=${index}${options.preview ? "&preview=1" : ""}`;
                             const completed = Boolean(completedActivities[index]);
                             return `
                                 <li class="worksheet-activity-card ${completed ? "is-complete" : ""}">

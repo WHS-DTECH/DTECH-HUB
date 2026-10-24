@@ -3,6 +3,7 @@
 
     const AUTH_STORAGE_KEY = "hub_google_auth_v1";
     const RESPONSE_SAVE_DEBOUNCE_MS = 800;
+    const preview = new URLSearchParams(window.location.search || "").get("preview") === "1";
 
     const state = {
         email: "",
@@ -109,7 +110,9 @@
     }
 
     function fetchKitContent(kitId) {
-        return loadJson(`/api/practical-skills/kit-content/${encodeURIComponent(kitId)}`);
+        return loadJson(`/api/practical-skills/kit-content/${encodeURIComponent(kitId)}${preview ? "?preview=1" : ""}`, {
+            headers: withAuthHeaders()
+        });
     }
 
     function fetchKitProgress(kitId) {
@@ -153,7 +156,7 @@
         const pill = document.getElementById("worksheet-activity-status-pill");
         const button = document.getElementById("worksheet-activity-complete-btn");
         const index = getCurrentActivityIndex();
-        bar.hidden = !state.email || index === null;
+        bar.hidden = preview || !state.email || index === null;
         const completed = Boolean(state.completedActivities[index]);
         const activity = state.content?.activities?.[index];
         const siteQuestions = window.KitWorksheetRender.visibleLoginSites(activity?.loginSites, state.huntProfile).some((site) => site.readinessQuestion);
@@ -424,7 +427,7 @@
         const resetBtn = document.getElementById("worksheet-reset-btn");
         if (!bar || !pill || !completeBtn || !resetBtn) return;
 
-        if (!state.email) {
+        if (preview || !state.email) {
             bar.hidden = true;
             updateCertificate();
             return;
@@ -443,7 +446,7 @@
         const host = document.getElementById("worksheet-certificate");
         if (!host) return;
         const certificate = state.certificate;
-        host.hidden = !state.email || !certificate || getCurrentActivityIndex() !== null;
+        host.hidden = preview || !state.email || !certificate || getCurrentActivityIndex() !== null;
         if (host.hidden) return;
         const fields = {
             "certificate-student-name": certificate.studentName,
@@ -488,20 +491,21 @@
         const showingActivity = activityIndex !== null && Boolean(worksheets[activityIndex]);
         if (backLink) {
             backLink.href = showingActivity
-                ? `./kit-worksheet.html?kit=${encodeURIComponent(state.kitId)}`
+                ? `./kit-worksheet.html?kit=${encodeURIComponent(state.kitId)}${preview ? "&preview=1" : ""}`
                 : "/practical-skills/checklist.html";
             backLink.textContent = showingActivity ? "\u2190 Back to Kit Activity List" : "\u2190 Back to My Licence";
         }
         const verification = document.getElementById("worksheet-google-verification");
         if (verification) {
             host.after(verification);
-            verification.hidden = !state.content.activities?.[activityIndex]?.identityLessonVersion;
+            verification.hidden = preview || !state.content.activities?.[activityIndex]?.identityLessonVersion;
         }
         if (worksheets.length && (activityIndex === null || !worksheets[activityIndex])) {
             window.KitWorksheetRender.renderKitOverview(host, state.content, {
                 kitId: state.kitId,
+                preview,
                 completedActivities: state.completedActivities,
-                readOnly: !state.email,
+                readOnly: preview || !state.email,
                 minecraftExports: state.kitId === "kit-minecraft",
                 onMinecraftExportsOpen: async () => loadJson("/api/practical-skills/minecraft-exports-folder", {
                     method: "POST",
@@ -544,7 +548,7 @@
 
             window.KitWorksheetRender.renderWorksheet(host, activityContent, {
                 responses: state.responses,
-                readOnly: !state.email,
+                readOnly: preview || !state.email,
                 blocksReadOnly: !state.progressLoaded,
                 blockAnswers: state.responses[`${activityIndex}-blocks`] || {},
                 onBlockChange: (answers) => {
@@ -669,7 +673,7 @@
                     state.responses[questionId] = value;
                     queueResponseSave();
                     scheduleSearchChoiceCheck(activityIndex, activity?.questionAutoMarkAssessmentId, questionId);
-                    if (["search-penguin-missions-v1", "search-keyword-challenge-v1", "search-results-detective-v1", "search-and-find-v1"].includes(activity?.questionAutoMarkAssessmentId)) {
+                    if (!preview && ["search-penguin-missions-v1", "search-keyword-challenge-v1", "search-results-detective-v1", "search-and-find-v1"].includes(activity?.questionAutoMarkAssessmentId)) {
                         scheduleSearchActivityAutoMark(activityIndex, activity.questionAutoMarkAssessmentId);
                     }
                 }
@@ -687,7 +691,7 @@
 
         updateActivityCompleteBar();
         showStatusMessage(
-            state.email ? "" : "Sign in with your school Google account (top right) to save your answers and mark this kit complete."
+            preview ? "" : state.email ? "" : "Sign in with your school Google account (top right) to save your answers and mark this kit complete."
         );
     }
 
@@ -836,12 +840,28 @@
     async function init(identityDraft = {}) {
         state.kitId = getKitIdFromUrl();
         state.email = getSignedInEmail();
+        if (preview) {
+            document.getElementById("worksheet-host").innerHTML = "";
+            document.getElementById("worksheet-preview-banner").hidden = true;
+            if (!state.email) {
+                showStatusMessage("Sign in with your school teacher account to preview this kit.");
+                startSignInWatcher();
+                return;
+            }
+        }
 
         try {
             const contentPayload = await fetchKitContent(state.kitId);
             state.content = contentPayload?.content || null;
         } catch (error) {
             showStatusMessage(error?.message || "Could not load this kit.", true);
+            return;
+        }
+
+        if (preview) {
+            document.getElementById("worksheet-preview-banner").hidden = false;
+            renderPage();
+            updateCompleteBar(null);
             return;
         }
 

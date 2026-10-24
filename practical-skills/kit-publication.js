@@ -46,6 +46,11 @@ function createKitPublication({ pool, builtIns, getDefaultContent, schoolDomain,
         const kitId = match?.[1] || (path === "/api/practical-skills/minecraft-exports-folder" ? "kit-minecraft" : null);
         if (!kitId) return next();
         try {
+            if (req.method === "GET" && path.startsWith("/api/practical-skills/kit-content/") && req.query?.preview === "1") {
+                res.set("Cache-Control", "private, no-store");
+                if (await canManage(getRequestUserEmail(req))) return next();
+                return res.status(403).json({ error: "Kit preview is only available to teachers who manage kits." });
+            }
             if (await available(kitId)) return next();
             const preview = req.method === "GET" && /\/(?:kit-content|research-report)\//.test(path)
                 && await canManage(getRequestUserEmail(req));

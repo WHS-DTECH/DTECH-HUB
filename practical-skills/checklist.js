@@ -168,10 +168,10 @@
         document.getElementById("ps-stamp-list").innerHTML = licenceKits.map((kit) => {
             const earned = loaded && kitsById.get(kit.id)?.isComplete;
             const href = snapshot?.canManageKits && kit.live === false
-                ? `./admin-kits.html?kit=${encodeURIComponent(kit.id)}`
+                ? `./kit-worksheet.html?kit=${encodeURIComponent(kit.id)}&preview=1`
                 : `./kit-worksheet.html?kit=${encodeURIComponent(kit.id)}`;
             const copy = `<span class="licence-stamp-icon" aria-hidden="true">${escapeHtml(kit.icon)}</span><strong>${escapeHtml(kit.title)}</strong><span>${earned ? "STAMP EARNED" : loaded ? "Stamp to collect" : "Waiting for you"}</span>`;
-            const stamp = `<a class="licence-stamp${earned ? " is-earned" : ""}" href="${href}" aria-label="Open ${escapeHtml(kit.title)}${earned ? ' and certificate' : ''}">${copy}<span class="stamp-certificate">${kit.live === false ? "Edit Not Live kit" : earned ? "Open kit & certificate" : "Open kit"} &rarr;</span></a>`;
+            const stamp = `<a class="licence-stamp${earned ? " is-earned" : ""}" href="${href}" aria-label="${kit.live === false ? "Preview" : "Open"} ${escapeHtml(kit.title)}${earned ? ' and certificate' : ''}">${copy}<span class="stamp-certificate">${kit.live === false ? "Preview Not Live kit" : earned ? "Open kit & certificate" : "Open kit"} &rarr;</span></a>`;
             return snapshot?.canManageKits ? `<div class="licence-teacher-kit">${stamp}<button type="button" role="switch" aria-checked="${kit.live !== false}" aria-label="${escapeHtml(kit.title)} live for students" class="licence-live-pill${kit.live === false ? " is-not-live" : ""}" data-publication="${escapeHtml(kit.id)}" data-live="${kit.live !== false}">${kit.live === false ? "Not Live" : "Live"}</button><a class="licence-edit-link" href="./admin-kits.html?kit=${encodeURIComponent(kit.id)}">Edit kit</a></div>` : stamp;
         }).join("") + `<a class="licence-stamp is-log" href="./typing-kit.html" aria-label="Typing Kit - open your seven-week practice log"><span class="licence-stamp-icon" aria-hidden="true">&#9000;</span><strong>Typing Kit</strong><span>7-WEEK PRACTICE LOG</span><span class="stamp-certificate">Open log &rarr;</span></a>`;
         document.querySelectorAll("[data-publication]").forEach((button) => {
@@ -238,7 +238,7 @@
                     <span class="ps-kit-pill">${timeLabel}</span>`}
                 </div>
                 <div class="ps-kit-actions">
-                    <a class="button button-primary" href="./${kit.live === false ? "admin-kits" : "kit-worksheet"}.html?kit=${encodeURIComponent(kit.id)}">${kit.live === false ? "Edit Not Live kit" : progress.isComplete ? "View kit & certificate" : "Open kit"} &rarr;</a>
+                    <a class="button button-primary" href="./kit-worksheet.html?kit=${encodeURIComponent(kit.id)}${kit.live === false ? "&preview=1" : ""}">${kit.live === false ? "Preview Not Live kit" : progress.isComplete ? "View kit & certificate" : "Open kit"} &rarr;</a>
                     <details class="ps-kit-manage"><summary>Manage progress</summary>
                         <button type="button" class="button button-secondary" data-kit="${kit.id}" data-action="complete" ${progress.isComplete ? "disabled" : ""}>Mark Complete</button>
                         <button type="button" class="button button-secondary" data-kit="${kit.id}" data-action="reset">Reset</button>
