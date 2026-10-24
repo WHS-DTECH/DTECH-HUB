@@ -53,3 +53,17 @@ test("a required setup folder link must be supplied before automatic completion"
         "videos-folder-link": "https://drive.google.com/drive/folders/example?usp=sharing"
     }).passed, true);
 });
+test("export submission requires a link and supplied screenshots exist", () => {
+    const activity = {
+        completionMode: "auto",
+        blocks: [{ id: "network-world-link", kind: "studentlink", title: "Your exported world link", required: true }]
+    };
+    blocks.validate(activity);
+    assert.equal(blocks.grade(activity, {}).passed, false);
+    assert.equal(blocks.grade(activity, { "network-world-link": "not a link" }).passed, false);
+    assert.equal(blocks.grade(activity, { "network-world-link": "https://drive.google.com/file/d/example/view?usp=sharing" }).passed, true);
+    for (const name of ["open-minecraft", "create-world", "my-worlds", "choose-world", "manage", "export", "save-world", "synced-world"]) {
+        const file = fs.readFileSync(path.join(__dirname, "..", "images", "activities", "minecraft-network-heroes", `${name}.png`));
+        assert.equal(file.subarray(1, 4).toString(), "PNG", `${name} is a PNG screenshot`);
+    }
+});
