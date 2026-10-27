@@ -39,7 +39,8 @@ async function fixture() {
       { templateId: "client-presentation-pdf", fileUrl: fileUrl("client-pdf"), pdfExport: { sourcePresentationId: "client-slides", sourceVersion: "3", sourceModifiedTime: date, bytes: binaries.get("client-pdf").length } },
       { templateId: "submission-documentation-pdf", fileUrl: fileUrl("documentation-pdf"), pdfExport: { sourcePresentationId: "documentation-slides", sourceVersion: "5", sourceModifiedTime: date, bytes: binaries.get("documentation-pdf").length } },
       { templateId: "final-digital-outcome-zip", fileUrl: fileUrl("outcome-zip"), finalOutcome: { repositoryUrl, commitSha: sha, bytes: binaries.get("outcome-zip").length } },
-      { templateId: "submission-trello-report", fileUrl: fileUrl("trello-pdf"), trelloReport: { boardId: "board12345678", generatedAt: date, bytes: binaries.get("trello-pdf").length } }
+      { templateId: "submission-trello-report", fileUrl: fileUrl("trello-pdf"), trelloReport: { boardId: "board12345678", generatedAt: date, bytes: binaries.get("trello-pdf").length } },
+      { templateId: "submission-additional-slideshows-answer", additionalSlideshows: { answer: "no" } }
     ] };
   context.copies.forEach((record) => {
     const id = submission.submissionDriveFileId(record.fileUrl);
@@ -69,9 +70,16 @@ async function testPlanAndArchive() {
   const plan = await data.inspect();
   assert.equal(plan.ready, true);
   assert.equal(plan.manifest.length, 4);
+  assert.equal(plan.components.find((entry) => entry.key === "additional-slideshows-answer").displayStatus, "No");
+  assert.equal(plan.components.find((entry) => entry.key === "additional-slideshows-pdf").displayStatus, "Not needed");
+  data.context.copies = data.context.copies.filter((copy) => copy.templateId !== "submission-additional-slideshows-answer");
+  const unanswered = await data.inspect();
+  assert.equal(unanswered.ready, false, "The Final Package requires an explicit Stage 6 answer");
+  assert.equal(unanswered.components.find((entry) => entry.key === "additional-slideshows-answer").displayStatus, "Choose Yes or No");
+  data.context.copies.push({ templateId: "submission-additional-slideshows-answer", additionalSlideshows: { answer: "no" } });
   const response = await submission.createSubmissionZipResponse({ components: plan.components, token: "student-token", fetchRequest: data.fetchBinary });
   const archive = await JSZip.loadAsync(await response.arrayBuffer());
-  assert.deepEqual(Object.keys(archive.files).sort(), submission.SUBMISSION_COMPONENTS.map((entry) => entry.entryName).sort(), "The submission contains exactly the four agreed files");
+  assert.deepEqual(Object.keys(archive.files).sort(), plan.manifest.map((entry) => entry.entryName).sort(), "The submission contains exactly the files in the checked manifest");
   assert.deepEqual(await archive.file("03-Digital-Outcome.zip").async("nodebuffer"), data.binaries.get("outcome-zip"), "The GitHub ZIP is kept intact, not unpacked or recompressed");
   assert.equal((await data.inspect()).manifestHash, plan.manifestHash);
   const originalChecksum = data.files.get("outcome-zip").md5Checksum;
@@ -120,11 +128,13 @@ async function testAdditionalSlideshowPackage() {
     parents: ["folder"], owners: [{ emailAddress: email }], size: String(pdfBytes.length),
     md5Checksum: md5(pdfBytes), modifiedTime: date
   });
+  data.context.copies = data.context.copies.filter((copy) => copy.templateId !== "submission-additional-slideshows-answer");
   data.context.copies.push(
+    { templateId: "submission-additional-slideshows-answer", additionalSlideshows: { answer: "yes" } },
     { templateId: additionalSlideshowPdfTemplateId(slideshowId), fileName: "Additional-Slideshow.pdf", fileUrl: fileUrl(pdfId),
       pdfExport: { sourcePresentationId: sourceId, sourceVersion: "7", sourceModifiedTime: date, bytes: pdfBytes.length, md5Checksum: md5(pdfBytes) } }
   );
-  assert.equal(submission.submissionSummary(data.context.copies).length, 5);
+  assert.equal(submission.submissionSummary(data.context.copies).length, 6);
   const orphaned = await data.inspect();
   assert.equal(orphaned.ready, false, "A saved Stage 6 PDF without its linked source is not silently omitted");
   data.context.copies.push(
@@ -133,11 +143,11 @@ async function testAdditionalSlideshowPackage() {
   const plan = await data.inspect();
   assert.equal(plan.ready, true);
   assert.equal(plan.manifest.length, 5);
-  assert.equal(plan.components[4].entryName, `05-Additional-Slideshow-${slideshowId}.pdf`);
+  assert.equal(plan.components.find((entry) => entry.key === `additional-${slideshowId}`).entryName, `05-Additional-Slideshow-${slideshowId}.pdf`);
   const response = await submission.createSubmissionZipResponse({ components: plan.components, token: "student-token", fetchRequest: data.fetchBinary });
   const archive = await JSZip.loadAsync(await response.arrayBuffer());
-  assert.deepEqual(Object.keys(archive.files).sort(), plan.components.map((entry) => entry.entryName).sort());
-  assert.deepEqual(await archive.file(plan.components[4].entryName).async("nodebuffer"), pdfBytes);
+  assert.deepEqual(Object.keys(archive.files).sort(), plan.manifest.map((entry) => entry.entryName).sort());
+  assert.deepEqual(await archive.file(`05-Additional-Slideshow-${slideshowId}.pdf`).async("nodebuffer"), pdfBytes);
   data.files.get(pdfId).md5Checksum = "b".repeat(32);
   assert.equal((await data.inspect()).ready, false, "A changed additional PDF blocks the package");
   data.files.get(pdfId).md5Checksum = md5(pdfBytes);
@@ -213,7 +223,7 @@ async function testEndpoints() {
   };
   try {
     assert.equal((await request("GET", {}, "")).statusCode, 401);
-    assert.equal((await request("GET")).body.components.length, 4);
+    assert.equal((await request("GET")).body.components.length, 6);
     assert.equal((await request("POST", { action: "check" })).statusCode, 400);
     const checked = await request("POST", { action: "check", driveAccessToken: "student-token" });
     assert.equal(checked.body.ready, true);
@@ -245,7 +255,7 @@ async function testFrontend() {
     if (!elements.has(selector)) elements.set(selector, makeElement());
     return elements.get(selector);
   } };
-  const components = submission.SUBMISSION_COMPONENTS.map(({ key, label, entryName }) => ({ key, label, entryName, status: "ready", message: "Ready" }));
+  const components = submission.submissionSummary([]).map((component) => ({ ...component, status: "ready", message: "Ready" }));
   const saved = { fileUrl: fileUrl("submission-zip"), submissionPackage: { builtAt: date } };
   const state = { selectedId: "49", allItems: [{ id: "49" }], submissionBusy: false };
   const actions = [];
@@ -271,7 +281,7 @@ async function testFrontend() {
   const end = source.indexOf("async function fetchMyEvidence(", start);
   vm.runInContext(source.slice(start, end), context);
   await context.loadSubmissionStage({ id: "49" });
-  assert.equal(document.querySelector("#task-list-submission-files").children.length, 4);
+  assert.equal(document.querySelector("#task-list-submission-files").children.length, 6);
   assert.equal(document.querySelector("#task-list-submission-build").disabled, true);
   assert.equal(document.querySelector("#task-list-submission-open").hidden, false, "Saved package link survives reload without claiming freshness");
   await context.handleSubmissionStageAction("build");

@@ -6430,6 +6430,12 @@ async function recordTemplateCopyInDb(projectId, studentEmail, entry) {
         }))
       }
     } : {}),
+    ...(entry?.templateId === "submission-additional-slideshows-answer" ? {
+      additionalSlideshows: {
+        answer: ["yes", "no"].includes(String(entry?.additionalSlideshows?.answer || "").toLowerCase())
+          ? String(entry.additionalSlideshows.answer).toLowerCase() : ""
+      }
+    } : {}),
     ...(["client-presentation-pdf", "submission-documentation-pdf"].includes(entry?.templateId)
       || additionalSlideshowId(entry?.templateId, "submission-extra-slideshow-pdf-") ? {
       pdfExport: {
@@ -18050,7 +18056,7 @@ app.post("/api/activities/:id/trello-report", async (req, res) => {
 
 function publicSubmissionPlan(plan) {
   return { ready: plan.ready, manifestHash: plan.manifestHash, checkedAt: plan.checkedAt,
-    components: plan.components.map(({ key, label, entryName, status, message, bytes }) => ({ key, label, entryName, status, message, bytes })) };
+    components: plan.components.map(({ key, label, entryName, displayStatus, status, message, bytes }) => ({ key, label, entryName, displayStatus, status, message, bytes })) };
 }
 
 async function checkSubmissionInputs(context, token) {
@@ -18257,16 +18263,42 @@ app.post("/api/activities/:id/submission-slideshows", async (req, res) => {
   try {
     const context = await loadFinalOutcomeContext(req);
     const action = String(req.body?.action || "");
+    const token = String(req.body?.driveAccessToken || "").trim();
+    if (action === "answer") {
+      const answer = String(req.body?.answer || "").toLowerCase();
+      if (!["yes", "no"].includes(answer) || !token) {
+        throw Object.assign(new Error("Choose Yes or No and allow Google Drive access to save your answer."), { status: 400 });
+      }
+      await verifyDriveTokenForStudent(token, context.email);
+      const result = await withFinalOutcomeLock(`${context.email}:${context.activityId}:additional-slideshows`, async () => {
+        const latest = await loadFinalOutcomeContext(req);
+        if (answer === "no" && latest.copies.some((entry) =>
+          additionalSlideshowId(entry?.templateId) || additionalSlideshowId(entry?.templateId, "submission-extra-slideshow-pdf-"))) {
+          throw Object.assign(new Error("A slideshow is already linked. Choose Yes so its PDF can be included in the Final Package."), { status: 409 });
+        }
+        const saved = {
+          templateId: "submission-additional-slideshows-answer",
+          templateTitle: "Additional Slideshows Answer",
+          additionalSlideshows: { answer }
+        };
+        await recordTemplateCopyInDb(context.activityId, context.email, saved);
+        return { saved };
+      });
+      res.set("Cache-Control", "no-store").json(result);
+      return;
+    }
     const slideshowId = String(req.body?.slideshowId || "").toLowerCase();
     const sourceTemplateId = additionalSlideshowTemplateId(slideshowId);
     const pdfTemplateId = additionalSlideshowPdfTemplateId(slideshowId);
-    const token = String(req.body?.driveAccessToken || "").trim();
     if (!["sync", "pdf"].includes(action) || !sourceTemplateId || !pdfTemplateId || !token) {
       throw Object.assign(new Error("A valid slideshow, action and Google Drive permission are required."), { status: 400 });
     }
     await verifyDriveTokenForStudent(token, context.email);
-    const result = await withFinalOutcomeLock(`${context.email}:${context.activityId}:additional-slideshow:${slideshowId}`, async () => {
+    const result = await withFinalOutcomeLock(`${context.email}:${context.activityId}:additional-slideshows`, async () => {
       const latest = await loadFinalOutcomeContext(req);
+      const answer = String(latest.copies.find((entry) => entry?.templateId === "submission-additional-slideshows-answer")
+        ?.additionalSlideshows?.answer || "").toLowerCase();
+      if (answer !== "yes") throw Object.assign(new Error("Choose Yes in Stage 6 before adding or converting a slideshow."), { status: 409 });
       if (action === "sync") {
         const sourceId = documentationPresentationId(req.body?.presentationUrl);
         if (!sourceId) throw Object.assign(new Error("Paste a valid Google Slides presentation link."), { status: 400 });

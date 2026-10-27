@@ -272,6 +272,8 @@ const taskListState = {
     additionalSlideshows: [],
     additionalSlideshowTaskId: "",
     additionalSlideshowBusy: {},
+    additionalSlideshowAnswer: "",
+    additionalSlideshowAnswerBusy: false,
     trelloReport: null,
     trelloReportBusy: false,
     submissionStage: null,
@@ -2765,6 +2767,9 @@ function loadAdditionalSlideshowCards(copies = taskListState.templateCopies) {
         ? (taskListState.additionalSlideshows || []).filter((slot) => !slot.synced)
         : [];
     taskListState.additionalSlideshowTaskId = taskId;
+    taskListState.additionalSlideshowAnswer = String((Array.isArray(copies) ? copies : [])
+        .find((copy) => copy?.templateId === "submission-additional-slideshows-answer")
+        ?.additionalSlideshows?.answer || "").toLowerCase();
     const sources = (Array.isArray(copies) ? copies : [])
         .filter((copy) => /^submission-extra-slideshow-[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(copy?.templateId || "")));
     taskListState.additionalSlideshows = sources.map((source) => {
@@ -2784,11 +2789,23 @@ function loadAdditionalSlideshowCards(copies = taskListState.templateCopies) {
 function renderAdditionalSlideshows() {
     const host = document.querySelector("#task-list-additional-slideshow-list");
     const add = document.querySelector("#task-list-additional-slideshow-add");
-    if (!host || !add) return;
+    const answer = document.querySelector("#task-list-additional-slideshow-answer");
+    const status = document.querySelector("#task-list-additional-slideshow-status");
+    if (!host || !add || !answer) return;
     const selected = taskListState.allItems.find((item) => String(item.id) === taskListState.selectedId);
     const eligible = isSeniorDigitalMediaTask(selected);
     host.replaceChildren();
-    add.disabled = !eligible;
+    answer.disabled = !eligible || taskListState.additionalSlideshowAnswerBusy;
+    answer.value = taskListState.additionalSlideshowAnswer;
+    add.disabled = !eligible || taskListState.additionalSlideshowAnswer !== "yes";
+    if (status && !taskListState.additionalSlideshowAnswerBusy) {
+        status.textContent = taskListState.additionalSlideshowAnswer === "yes"
+            ? "Yes selected. Add each slideshow and save its PDF for the Final Package."
+            : taskListState.additionalSlideshowAnswer === "no"
+                ? "No selected. No additional slideshow PDFs will be expected."
+                : "Choose Yes or No before adding slideshows.";
+    }
+    const canEdit = eligible && taskListState.additionalSlideshowAnswer === "yes";
     for (const slot of taskListState.additionalSlideshows || []) {
         const sourceId = getAdditionalSlideshowSourceId(slot.sourceUrl);
         const pdfMatches = Boolean(slot.pdf?.pdfExport?.sourcePresentationId === sourceId
@@ -2801,16 +2818,62 @@ function renderAdditionalSlideshows() {
             <label for="task-list-extra-slideshow-url-${slot.id}">Google Slides link</label>
             <input id="task-list-extra-slideshow-url-${slot.id}" type="url" inputmode="url"
                 data-extra-slideshow-url="${slot.id}" value="${escapeTaskListHtml(slot.sourceUrl)}"
-                placeholder="https://docs.google.com/presentation/d/..." ${busy ? "disabled" : ""}>
+                placeholder="https://docs.google.com/presentation/d/..." ${busy || !canEdit ? "disabled" : ""}>
             <div class="task-list-documentation-actions">
-                <button type="button" class="task-list-sync-drive-btn" data-extra-slideshow-sync="${slot.id}" ${busy ? "disabled" : ""}>${slot.synced ? "Sync slideshow link" : "Sync slideshow"}</button>
-                <button type="button" class="task-list-sync-drive-btn" data-extra-slideshow-pdf="${slot.id}" ${!slot.synced || busy ? "disabled" : ""}>Convert to PDF</button>
-                ${slot.synced ? "" : `<button type="button" class="task-list-sync-drive-btn" data-extra-slideshow-remove="${slot.id}" ${busy ? "disabled" : ""}>Remove this card</button>`}
+                <button type="button" class="task-list-sync-drive-btn" data-extra-slideshow-sync="${slot.id}" ${busy || !canEdit ? "disabled" : ""}>${slot.synced ? "Sync slideshow link" : "Sync slideshow"}</button>
+                <button type="button" class="task-list-sync-drive-btn" data-extra-slideshow-pdf="${slot.id}" ${!slot.synced || busy || !canEdit ? "disabled" : ""}>Convert to PDF</button>
+                ${slot.synced ? "" : `<button type="button" class="task-list-sync-drive-btn" data-extra-slideshow-remove="${slot.id}" ${busy || !canEdit ? "disabled" : ""}>Remove this card</button>`}
                 ${slot.synced ? `<a href="${escapeTaskListHtml(slot.sourceUrl)}" target="_blank" rel="noopener noreferrer">Open linked slideshow</a>` : ""}
                 ${pdfMatches ? `<a class="task-list-slideshow-pdf-open" href="${escapeTaskListHtml(slot.pdf.fileUrl)}" target="_blank" rel="noopener noreferrer">Open saved PDF</a>` : ""}
             </div>
             <p role="status" aria-live="polite">${escapeTaskListHtml(slot.message || (pdfMatches ? "PDF saved in SeniorDTECH / Process Assessment." : ""))}</p>`;
         host.append(card);
+    }
+}
+
+async function handleAdditionalSlideshowAnswerChange(answer) {
+    if (!["yes", "no"].includes(answer) || taskListState.additionalSlideshowAnswerBusy) return;
+    const item = taskListState.allItems.find((candidate) => String(candidate.id) === taskListState.selectedId);
+    if (!isSeniorDigitalMediaTask(item)) return;
+    const activityId = String(item.id);
+    const previousAnswer = taskListState.additionalSlideshowAnswer;
+    let failureMessage = "";
+    taskListState.additionalSlideshowAnswerBusy = true;
+    renderAdditionalSlideshows();
+    const status = document.querySelector("#task-list-additional-slideshow-status");
+    if (status) status.textContent = "Saving your answer...";
+    try {
+        const token = await requestHubDriveAccessToken({ forceConsent: false });
+        if (taskListState.selectedId !== activityId) return;
+        if (token?.error || !token?.access_token) throw new Error("Google Drive permission is required to save your answer.");
+        const response = await fetch(`/api/activities/${encodeURIComponent(activityId)}/submission-slideshows`, {
+            method: "POST", headers: buildTaskListHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ action: "answer", answer, driveAccessToken: token.access_token })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || "Could not save your Stage 6 answer.");
+        if (taskListState.selectedId !== activityId) return;
+        taskListState.templateCopies = taskListState.templateCopies
+            .filter((copy) => copy?.templateId !== "submission-additional-slideshows-answer")
+            .concat(payload.saved);
+        taskListState.additionalSlideshowAnswer = answer;
+    } catch (error) {
+        taskListState.additionalSlideshowAnswer = previousAnswer;
+        failureMessage = error?.message || "Could not save your Stage 6 answer.";
+    } finally {
+        taskListState.additionalSlideshowAnswerBusy = false;
+        if (taskListState.selectedId === activityId) {
+            renderAdditionalSlideshows();
+            const currentStatus = document.querySelector("#task-list-additional-slideshow-status");
+            if (currentStatus && failureMessage) {
+                currentStatus.textContent = failureMessage;
+            } else if (currentStatus && taskListState.additionalSlideshowAnswer === answer) {
+                currentStatus.textContent = answer === "yes"
+                    ? "Answer saved: Yes. Add each slideshow and save its PDF for the Final Package."
+                    : "Answer saved: No. No additional slideshow PDFs will be expected.";
+            }
+            void loadSubmissionStage(item);
+        }
     }
 }
 
@@ -3260,7 +3323,7 @@ function renderSubmissionStage() {
         label.title = component.entryName || "";
         const status = document.createElement("span");
         status.className = `task-list-submission-file-status${component.status === "ready" ? " is-ready" : component.status === "needs-update" ? " needs-update" : ""}`;
-        status.textContent = labels[component.status] || "Not checked";
+        status.textContent = component.displayStatus || labels[component.status] || "Not checked";
         row.append(label, status);
         if (component.message && component.message !== "Ready") {
             const detail = document.createElement("span");
@@ -4901,6 +4964,12 @@ async function runTaskListTrelloSync() {
         if (sync) void handleAdditionalSlideshowAction("sync", sync.getAttribute("data-extra-slideshow-sync"));
         const pdf = event.target?.closest?.("[data-extra-slideshow-pdf]");
         if (pdf) void handleAdditionalSlideshowAction("pdf", pdf.getAttribute("data-extra-slideshow-pdf"));
+    });
+
+    document.addEventListener("change", (event) => {
+        if (event.target?.matches?.("#task-list-additional-slideshow-answer")) {
+            void handleAdditionalSlideshowAnswerChange(String(event.target.value || "").toLowerCase());
+        }
     });
 
     document.addEventListener("click", (event) => {

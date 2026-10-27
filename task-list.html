@@ -61,6 +61,30 @@
             gap: 12px;
         }
 
+        .task-list-additional-slideshow-question {
+            border: 2px solid #236b91;
+            border-radius: 8px;
+            background: #edf6fc;
+            margin: 14px 0;
+            padding: 14px;
+        }
+
+        .task-list-additional-slideshow-question legend {
+            color: #173d5b;
+            font-weight: 800;
+            font-size: 1.05rem;
+            padding: 0 6px;
+        }
+
+        .task-list-additional-slideshow-question select {
+            width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+            margin-top: 8px;
+            padding: 10px;
+            font: inherit;
+        }
+
         .task-list-additional-slideshow input[type="url"] {
             width: 100%;
             min-width: 0;
@@ -1315,7 +1339,16 @@
                     <aside class="task-list-documentation-card" aria-labelledby="task-list-additional-slideshows-title">
                         <p class="section-kicker">STAGE 6</p>
                         <h2 id="task-list-additional-slideshows-title">Additional Slideshows</h2>
-                        <p>Do you have additional slideshows to include? Add one for each Google Slides presentation. Link the existing slideshow in place, then save its PDF separately in Process Assessment. Saved additional PDFs are included in the Final Package after you check the files.</p>
+                        <fieldset class="task-list-additional-slideshow-question">
+                            <legend>Do you have additional slideshows to include in your Final Package?</legend>
+                            <label for="task-list-additional-slideshow-answer">Choose Yes or No</label>
+                            <select id="task-list-additional-slideshow-answer">
+                                <option value="">Select an answer</option>
+                                <option value="yes">Yes</option>
+                                <option value="no">No</option>
+                            </select>
+                            <p>Choose Yes to add each Google Slides presentation, then save its PDF. Those PDFs will be checked and listed in the Final Package.</p>
+                        </fieldset>
                         <div id="task-list-additional-slideshow-list" class="task-list-additional-slideshow-list"></div>
                         <button type="button" class="task-list-sync-drive-btn" id="task-list-additional-slideshow-add">＋ Add slideshow</button>
                         <p id="task-list-additional-slideshow-status" role="status" aria-live="polite"></p>

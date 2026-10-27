@@ -45,6 +45,10 @@ assessment in place; it neither copies, moves nor edits the source. The student
 then converts that linked presentation into a new PDF saved separately in their
 owned `SeniorDTECH/Process Assessment` folder. Each saved additional PDF is
 included in the Final Package after its files are checked.
+The student must select Yes or No before the Final Package can be checked.
+Yes requires a saved PDF for every linked additional slideshow; No is recorded
+as Not needed when no additional slideshow has been linked. A No answer cannot
+be saved after a slideshow has already been linked.
 
 Each card has its own persistent source/PDF records, so cards remain available
 across devices and reloads. A PDF link is shown only when its saved source

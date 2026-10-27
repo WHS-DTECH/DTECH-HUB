@@ -5,7 +5,7 @@ const { Readable } = require("node:stream");
 const { documentationPresentationId } = require("./documentation-deck");
 const { parseOutcomeRepository } = require("./github-outcome");
 const { trelloReportSources, resolveReportBoards } = require("./trello-report");
-const { additionalSlideshowPdfs } = require("./submission-slideshows");
+const { additionalSlideshowCopies, additionalSlideshowPdfs } = require("./submission-slideshows");
 
 const SUBMISSION_COMPONENTS = [
   { key: "client", templateId: "client-presentation-pdf", label: "Client presentation PDF", entryName: "01-Client-Presentation.pdf", mimeType: "application/pdf" },
@@ -27,12 +27,42 @@ function submissionSummary(copies) {
     key: definition.key, label: definition.label, entryName: definition.entryName,
     status: copies.some((copy) => copy?.templateId === definition.templateId && submissionDriveFileId(copy.fileUrl)) ? "unchecked" : "missing"
   }));
-  const additional = additionalSlideshowPdfs(copies).map(({ id, source, pdf }, index) => ({
-    key: `additional-${id}`,
-    label: `Additional slideshow PDF: ${source?.fileName || pdf.pdfExport?.sourceName || index + 1}`,
-    entryName: `05-Additional-Slideshow-${id}.pdf`,
-    status: submissionDriveFileId(pdf.fileUrl) ? "unchecked" : "missing"
+  const answer = String(copies.find((copy) => copy?.templateId === "submission-additional-slideshows-answer")
+    ?.additionalSlideshows?.answer || "").toLowerCase();
+  const hasSources = additionalSlideshowCopies(copies).length > 0;
+  const pdfs = additionalSlideshowPdfs(copies);
+  const sourcePdfs = additionalSlideshowCopies(copies).map(({ id, source, pdf }) => ({
+    id, source, pdf, expected: true
   }));
+  const orphanPdfs = pdfs.filter(({ id }) => !sourcePdfs.some((entry) => entry.id === id))
+    .map((entry) => ({ ...entry, expected: false }));
+  const packagePdfs = sourcePdfs.concat(orphanPdfs);
+  const additional = [{
+    key: "additional-slideshows-answer",
+    label: "Additional Slideshows?",
+    displayStatus: answer === "yes" ? "Yes" : answer === "no" ? "No" : "Choose Yes or No",
+    status: answer === "yes" || answer === "no" ? "ready" : "missing"
+  }];
+  if (!packagePdfs.length) {
+    additional.push({
+      key: "additional-slideshows-pdf",
+      label: "Additional Slideshows PDF",
+      displayStatus: answer === "no" ? "Not needed" : "Missing",
+      status: answer === "no" && !hasSources ? "ready" : "missing"
+    });
+  } else {
+    packagePdfs.forEach(({ id, source, pdf, expected }) => {
+      const name = source?.fileName || pdf?.pdfExport?.sourceName || "additional slideshow";
+      const label = `Additional Slideshows PDF - ${name}`;
+      additional.push({
+        key: `additional-${id}`,
+        label,
+        entryName: `05-Additional-Slideshow-${id}.pdf`,
+        displayStatus: !pdf ? "Missing" : answer === "no" || !expected ? "Needs update" : "Not checked",
+        status: !pdf ? "missing" : answer === "no" || !expected ? "needs-update" : "unchecked"
+      });
+    });
+  }
   return required.concat(additional);
 }
 
@@ -111,11 +141,41 @@ async function inspectSubmissionPackage({ context, documentationSource, folderId
       component.message = error.message || "Could not verify this file.";
     }
   }
-  const additional = additionalSlideshowPdfs(context.copies);
-  for (const { id, source: sourceRecord, pdf } of additional) {
+  const answer = String(context.copies.find((copy) => copy?.templateId === "submission-additional-slideshows-answer")
+    ?.additionalSlideshows?.answer || "").toLowerCase();
+  components.push({
+    key: "additional-slideshows-answer",
+    label: "Additional Slideshows?",
+    displayStatus: answer === "yes" ? "Yes" : answer === "no" ? "No" : "Choose Yes or No",
+    status: answer === "yes" || answer === "no" ? "ready" : "needs-update",
+    message: answer === "yes" || answer === "no" ? "Ready" : "Choose Yes or No in Stage 6."
+  });
+  const sourcePdfs = additionalSlideshowCopies(context.copies).map((entry) => ({ ...entry, expected: true }));
+  const orphanPdfs = additionalSlideshowPdfs(context.copies)
+    .filter(({ id }) => !sourcePdfs.some((entry) => entry.id === id))
+    .map((entry) => ({ ...entry, expected: false }));
+  const additional = sourcePdfs.concat(orphanPdfs);
+  if (!additional.length && answer === "no") {
+    components.push({
+      key: "additional-slideshows-pdf", label: "Additional Slideshows PDF",
+      displayStatus: "Not needed", status: "ready", message: "No additional slideshow PDFs were selected."
+    });
+  } else if (!additional.length && answer === "yes") {
+    components.push({
+      key: "additional-slideshows-pdf", label: "Additional Slideshows PDF",
+      entryName: "05-Additional-Slideshow.pdf", displayStatus: "Missing",
+      status: "missing", message: "Add at least one slideshow and save its PDF in Stage 6."
+    });
+  } else if (!additional.length) {
+    components.push({
+      key: "additional-slideshows-pdf", label: "Additional Slideshows PDF",
+      displayStatus: "Missing", status: "missing", message: "Choose Yes or No in Stage 6."
+    });
+  }
+  for (const { id, source: sourceRecord, pdf, expected } of additional) {
     const component = {
       key: `additional-${id}`,
-      label: `Additional slideshow PDF: ${String(sourceRecord?.fileName || pdf.pdfExport?.sourceName || "Google Slides presentation")}`,
+      label: `Additional Slideshows PDF - ${String(sourceRecord?.fileName || pdf?.pdfExport?.sourceName || "Google Slides presentation")}`,
       entryName: `05-Additional-Slideshow-${id}.pdf`,
       mimeType: "application/pdf",
       status: "missing",
@@ -123,6 +183,9 @@ async function inspectSubmissionPackage({ context, documentationSource, folderId
     };
     components.push(component);
     try {
+      if (answer !== "yes") throw new Error("Stage 6 must be set to Yes to include additional slideshow PDFs.");
+      if (!expected || !sourceRecord) throw new Error("The Stage 6 source slideshow link is missing. Relink it in Stage 6.");
+      if (!pdf) throw new Error("Convert this slideshow and save its PDF in Stage 6.");
       const fileId = submissionDriveFileId(pdf.fileUrl);
       if (!fileId) throw new Error("The saved PDF link is invalid. Convert the slideshow again.");
       const file = await metadata(fileId);
@@ -159,7 +222,8 @@ async function inspectSubmissionPackage({ context, documentationSource, folderId
     }
   }
   const ready = components.every((component) => component.status === "ready");
-  const manifest = ready ? components.map(({ key, entryName, fileId, bytes, md5Checksum, modifiedTime, source }) => ({ key, entryName, fileId, bytes, md5Checksum, modifiedTime, source })) : [];
+  const manifest = ready ? components.filter((component) => component.fileId)
+    .map(({ key, entryName, fileId, bytes, md5Checksum, modifiedTime, source }) => ({ key, entryName, fileId, bytes, md5Checksum, modifiedTime, source })) : [];
   const manifestHash = ready ? createHash("sha256").update(JSON.stringify(manifest)).digest("hex") : "";
   return { ready, components, manifest, manifestHash, checkedAt: new Date().toISOString() };
 }
@@ -170,7 +234,7 @@ async function createSubmissionZipResponse({ components, token, fetchRequest = f
   const inputs = [];
   archive.on("warning", (error) => archive.destroy(error));
   archive.once("close", () => inputs.forEach((stream) => stream.destroy()));
-  for (const component of components) {
+  for (const component of components.filter((entry) => entry?.fileId)) {
     const stream = Readable.from((async function* () {
       const response = await fetchRequest(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(component.fileId)}?alt=media`, {
         headers: { Authorization: `Bearer ${token}` }, redirect: "error", signal: AbortSignal.timeout(300000)
