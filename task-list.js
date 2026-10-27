@@ -269,6 +269,9 @@ const taskListState = {
     finalOutcomeBusy: false,
     githubZipSize: null,
     slideshowPdfBusy: { client: false, documentation: false },
+    additionalSlideshows: [],
+    additionalSlideshowTaskId: "",
+    additionalSlideshowBusy: {},
     trelloReport: null,
     trelloReportBusy: false,
     submissionStage: null,
@@ -2743,6 +2746,127 @@ function renderSlideshowPdfState(kind, sourceUrl) {
         : saved && sourceId ? "The saved PDF belongs to a previously linked slideshow." : "";
 }
 
+function additionalSlideshowTemplateId(id) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(id || ""))
+        ? `submission-extra-slideshow-${String(id).toLowerCase()}` : "";
+}
+
+function additionalSlideshowPdfTemplateId(id) {
+    return additionalSlideshowTemplateId(id)?.replace("submission-extra-slideshow-", "submission-extra-slideshow-pdf-") || "";
+}
+
+function getAdditionalSlideshowSourceId(url) {
+    return String(url || "").match(/^https:\/\/docs\.google\.com\/presentation\/d\/([A-Za-z0-9_-]+)(?:\/|$)/)?.[1] || "";
+}
+
+function loadAdditionalSlideshowCards(copies = taskListState.templateCopies) {
+    const taskId = String(taskListState.selectedId || "");
+    const unsynced = taskListState.additionalSlideshowTaskId === taskId
+        ? (taskListState.additionalSlideshows || []).filter((slot) => !slot.synced)
+        : [];
+    taskListState.additionalSlideshowTaskId = taskId;
+    const sources = (Array.isArray(copies) ? copies : [])
+        .filter((copy) => /^submission-extra-slideshow-[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(copy?.templateId || "")));
+    taskListState.additionalSlideshows = sources.map((source) => {
+        const id = String(source.templateId).slice("submission-extra-slideshow-".length).toLowerCase();
+        return {
+            id,
+            sourceUrl: String(source.fileUrl || ""),
+            sourceName: String(source.fileName || "Google Slides presentation"),
+            synced: true,
+            pdf: copies.find((copy) => copy?.templateId === additionalSlideshowPdfTemplateId(id)) || null,
+            message: ""
+        };
+    }).concat(unsynced);
+    renderAdditionalSlideshows();
+}
+
+function renderAdditionalSlideshows() {
+    const host = document.querySelector("#task-list-additional-slideshow-list");
+    const add = document.querySelector("#task-list-additional-slideshow-add");
+    if (!host || !add) return;
+    const selected = taskListState.allItems.find((item) => String(item.id) === taskListState.selectedId);
+    const eligible = isSeniorDigitalMediaTask(selected);
+    host.replaceChildren();
+    add.disabled = !eligible;
+    for (const slot of taskListState.additionalSlideshows || []) {
+        const sourceId = getAdditionalSlideshowSourceId(slot.sourceUrl);
+        const pdfMatches = Boolean(slot.pdf?.pdfExport?.sourcePresentationId === sourceId
+            && /^https:\/\/drive\.google\.com\/file\/d\/[A-Za-z0-9_-]+\/view$/.test(String(slot.pdf.fileUrl || "")));
+        const busy = Boolean(taskListState.additionalSlideshowBusy?.[slot.id]);
+        const card = document.createElement("section");
+        card.className = "task-list-additional-slideshow";
+        card.innerHTML = `
+            <h3>${escapeTaskListHtml(slot.sourceName || "Additional slideshow")}</h3>
+            <label for="task-list-extra-slideshow-url-${slot.id}">Google Slides link</label>
+            <input id="task-list-extra-slideshow-url-${slot.id}" type="url" inputmode="url"
+                data-extra-slideshow-url="${slot.id}" value="${escapeTaskListHtml(slot.sourceUrl)}"
+                placeholder="https://docs.google.com/presentation/d/..." ${busy ? "disabled" : ""}>
+            <div class="task-list-documentation-actions">
+                <button type="button" class="task-list-sync-drive-btn" data-extra-slideshow-sync="${slot.id}" ${busy ? "disabled" : ""}>${slot.synced ? "Sync slideshow link" : "Sync slideshow"}</button>
+                <button type="button" class="task-list-sync-drive-btn" data-extra-slideshow-pdf="${slot.id}" ${!slot.synced || busy ? "disabled" : ""}>Convert to PDF</button>
+                ${slot.synced ? "" : `<button type="button" class="task-list-sync-drive-btn" data-extra-slideshow-remove="${slot.id}" ${busy ? "disabled" : ""}>Remove this card</button>`}
+                ${slot.synced ? `<a href="${escapeTaskListHtml(slot.sourceUrl)}" target="_blank" rel="noopener noreferrer">Open linked slideshow</a>` : ""}
+                ${pdfMatches ? `<a class="task-list-slideshow-pdf-open" href="${escapeTaskListHtml(slot.pdf.fileUrl)}" target="_blank" rel="noopener noreferrer">Open saved PDF</a>` : ""}
+            </div>
+            <p role="status" aria-live="polite">${escapeTaskListHtml(slot.message || (pdfMatches ? "PDF saved in SeniorDTECH / Process Assessment." : ""))}</p>`;
+        host.append(card);
+    }
+}
+
+async function handleAdditionalSlideshowAction(action, id) {
+    if (!["sync", "pdf"].includes(action) || !additionalSlideshowTemplateId(id)) return;
+    const item = taskListState.allItems.find((candidate) => String(candidate.id) === taskListState.selectedId);
+    const slot = taskListState.additionalSlideshows.find((entry) => entry.id === String(id).toLowerCase());
+    if (!slot || !isSeniorDigitalMediaTask(item) || taskListState.additionalSlideshowBusy[id]) return;
+    const input = document.querySelector(`[data-extra-slideshow-url="${id}"]`);
+    const presentationUrl = String(input?.value || slot.sourceUrl || "").trim();
+    if (action === "sync" && !getAdditionalSlideshowSourceId(presentationUrl)) {
+        slot.message = "Paste a valid Google Slides presentation link first.";
+        renderAdditionalSlideshows();
+        return;
+    }
+    if (action === "pdf" && !slot.synced) return;
+    const activityId = String(item.id);
+    const active = () => taskListState.selectedId === activityId && taskListState.additionalSlideshows.includes(slot);
+    taskListState.additionalSlideshowBusy[id] = true;
+    slot.message = action === "sync" ? "Checking and linking your Google Slides presentation..." : "Converting and saving the PDF...";
+    renderAdditionalSlideshows();
+    try {
+        const token = await requestHubDriveAccessToken({ forceConsent: false });
+        if (!active()) return;
+        if (token?.error || !token?.access_token) throw new Error("Google Drive permission is required. Allow access and try again.");
+        const response = await fetch(`/api/activities/${encodeURIComponent(activityId)}/submission-slideshows`, {
+            method: "POST", headers: buildTaskListHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ action, slideshowId: id, presentationUrl: action === "sync" ? presentationUrl : undefined, driveAccessToken: token.access_token })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || "Could not sync or convert this slideshow.");
+        if (!active()) return;
+        const saved = action === "sync" ? payload.saved : payload.saved;
+        const templateId = action === "sync" ? additionalSlideshowTemplateId(id) : additionalSlideshowPdfTemplateId(id);
+        taskListState.templateCopies = taskListState.templateCopies.filter((copy) => copy?.templateId !== templateId).concat(saved);
+        if (action === "sync") {
+            slot.sourceUrl = saved.fileUrl;
+            slot.sourceName = saved.fileName || "Google Slides presentation";
+            slot.synced = true;
+            slot.message = "Linked in place. The original slideshow has not been moved or changed.";
+        } else {
+            slot.pdf = saved;
+            slot.message = "PDF saved separately in SeniorDTECH / Process Assessment. It is not part of the submission ZIP.";
+        }
+        renderAdditionalSlideshows();
+    } catch (error) {
+        if (active()) {
+            slot.message = error?.message || "Could not sync or convert this slideshow.";
+            renderAdditionalSlideshows();
+        }
+    } finally {
+        delete taskListState.additionalSlideshowBusy[id];
+        if (taskListState.selectedId === activityId) renderAdditionalSlideshows();
+    }
+}
+
 async function handleSlideshowPdfExport(kind) {
     if (!["client", "documentation"].includes(kind)) return;
     const selected = taskListState.allItems.find((item) => String(item.id) === taskListState.selectedId);
@@ -4217,6 +4341,7 @@ async function loadChecklistForTask(taskId) {
         ).catch(() => ({ template_copies: [] }))
     ]);
     taskListState.templateCopies = Array.isArray(templateCopiesPayload?.template_copies) ? templateCopiesPayload.template_copies : [];
+    loadAdditionalSlideshowCards(taskListState.templateCopies);
     renderFinalClientPresentationCard(selected);
     void loadDocumentationDeck(selected);
     void loadFinalOutcome(selected);
@@ -4291,6 +4416,7 @@ async function loadChecklistForTask(taskId) {
         const nextCopies = Array.isArray(templateCopies) ? templateCopies : [];
         if (JSON.stringify(nextCopies) === JSON.stringify(taskListState.templateCopies)) return;
         taskListState.templateCopies = nextCopies;
+        loadAdditionalSlideshowCards(nextCopies);
         renderSavedFullSlideSet(nextCopies);
 
         const checklistChanged = [
@@ -4747,6 +4873,34 @@ async function runTaskListTrelloSync() {
     document.addEventListener("click", (event) => {
         const button = event.target?.closest?.("[data-slideshow-pdf]");
         if (button) void handleSlideshowPdfExport(button.getAttribute("data-slideshow-pdf"));
+    });
+
+    document.addEventListener("click", (event) => {
+        if (event.target?.closest?.("#task-list-additional-slideshow-add")) {
+            const randomUUID = window.crypto?.randomUUID?.bind(window.crypto);
+            if (!randomUUID) {
+                const status = document.querySelector("#task-list-additional-slideshow-status");
+                if (status) status.textContent = "This browser cannot create a secure slideshow ID. Update the browser and try again.";
+                return;
+            }
+            taskListState.additionalSlideshows.push({
+                id: randomUUID(), sourceUrl: "", sourceName: "", synced: false, pdf: null, message: ""
+            });
+            renderAdditionalSlideshows();
+            return;
+        }
+        const remove = event.target?.closest?.("[data-extra-slideshow-remove]");
+        if (remove) {
+            const id = remove.getAttribute("data-extra-slideshow-remove");
+            taskListState.additionalSlideshows = taskListState.additionalSlideshows
+                .filter((slot) => slot.id !== String(id).toLowerCase() || slot.synced);
+            renderAdditionalSlideshows();
+            return;
+        }
+        const sync = event.target?.closest?.("[data-extra-slideshow-sync]");
+        if (sync) void handleAdditionalSlideshowAction("sync", sync.getAttribute("data-extra-slideshow-sync"));
+        const pdf = event.target?.closest?.("[data-extra-slideshow-pdf]");
+        if (pdf) void handleAdditionalSlideshowAction("pdf", pdf.getAttribute("data-extra-slideshow-pdf"));
     });
 
     document.addEventListener("click", (event) => {

@@ -42,6 +42,32 @@
             min-width: 0;
         }
 
+        .task-list-additional-slideshow {
+            border: 1px solid #c8d8e6;
+            border-radius: 6px;
+            background: #f8fbff;
+            padding: 14px;
+            display: grid;
+            gap: 10px;
+        }
+
+        .task-list-additional-slideshow h3,
+        .task-list-additional-slideshow p {
+            margin: 0;
+        }
+
+        .task-list-additional-slideshow-list {
+            display: grid;
+            gap: 12px;
+        }
+
+        .task-list-additional-slideshow input[type="url"] {
+            width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+            padding: 9px;
+        }
+
         .task-list-final-stages[hidden] {
             display: none;
         }
@@ -1298,6 +1324,15 @@
                         </div>
                         <p id="task-list-submission-saved"></p>
                         <p id="task-list-submission-status" role="status" aria-live="polite"></p>
+                    </aside>
+                    <hr class="task-list-final-divider">
+                    <aside class="task-list-documentation-card" aria-labelledby="task-list-additional-slideshows-title">
+                        <p class="section-kicker">STAGE 6</p>
+                        <h2 id="task-list-additional-slideshows-title">Additional Slideshows</h2>
+                        <p>Do you have additional slideshows to include? Add one for each Google Slides presentation. Link the existing slideshow in place, then save its PDF separately in Process Assessment. These PDFs are not added to the submission ZIP.</p>
+                        <div id="task-list-additional-slideshow-list" class="task-list-additional-slideshow-list"></div>
+                        <button type="button" class="task-list-sync-drive-btn" id="task-list-additional-slideshow-add">＋ Add slideshow</button>
+                        <p id="task-list-additional-slideshow-status" role="status" aria-live="polite"></p>
                     </aside>
                     </div>
                     <div class="task-list-main-column">

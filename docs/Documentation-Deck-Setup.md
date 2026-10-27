@@ -36,10 +36,32 @@ grading. For generated linked decks, update linked slides in Google Slides befor
 exporting if their source content has changed; exporting does not refresh links.
 Live source changes after conversion require another PDF conversion.
 
+## Stage 6: Additional Slideshows
+
+The final stage lets a SeniorDTECH student add as many additional Google Slides
+presentations as needed (usually one or two). Each **+ Add slideshow** card
+links an existing, accessible Google Slides presentation to the current
+assessment in place; it neither copies, moves nor edits the source. The student
+then converts that linked presentation into a new PDF saved separately in their
+owned `SeniorDTECH/Process Assessment` folder. This stage does not add files to
+or rebuild the existing four-file submission ZIP.
+
+Each card has its own persistent source/PDF records, so cards remain available
+across devices and reloads. A PDF link is shown only when its saved source
+presentation still matches that card. Converting again creates a new dated PDF;
+older PDFs are left untouched in Drive. Students need access to the source
+presentation and their normal Google Drive permission. No sharing permissions
+are changed. The Stage 6 action validates a school assessment, student token,
+live Google Slides type, and source version during export before saving a PDF.
+
 `node scripts/regression-documentation-deck.js` tests both PDF kinds, source
 and destination checks, immutable versions, invalid exports, changed-source
 rejection, saved-link reloads and UI controls. A school-account smoke test is
 still needed to confirm live Google export and Drive upload permissions.
+
+`node scripts/regression-additional-slideshows.js` checks unique repeatable
+slideshow IDs, saved card/PDF matching, link-in-place sync, separate PDF output
+and the additional-card controls.
 
 ## One-time school setup for linked merging
 

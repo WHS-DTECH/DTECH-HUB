@@ -17,6 +17,7 @@ const { DOCUMENTATION_TEMPLATE_ID, documentationPresentationId, buildDocumentati
 const { outcomeRepositories, createOutcomeArchiveStore, createGithubZipSizeReader } = require("./github-outcome");
 const { createDriveResumableUploader } = require("./drive-resumable-upload");
 const { submissionSummary, inspectSubmissionPackage, createSubmissionZipResponse } = require("./submission-package");
+const { additionalSlideshowId, additionalSlideshowTemplateId, additionalSlideshowPdfTemplateId } = require("./submission-slideshows");
 const { trelloReportSources, resolveReportBoards, createTrelloReportPdf, createTrelloReportStore } = require("./trello-report");
 const { registerTypingKit, withTypingKitCard } = require("./practical-skills/typing-kit-store");
 const { withKitCertificateEmailLock } = require("./practical-skills/certificate-catchup");
@@ -6429,9 +6430,11 @@ async function recordTemplateCopyInDb(projectId, studentEmail, entry) {
         }))
       }
     } : {}),
-    ...(["client-presentation-pdf", "submission-documentation-pdf"].includes(entry?.templateId) ? {
+    ...(["client-presentation-pdf", "submission-documentation-pdf"].includes(entry?.templateId)
+      || additionalSlideshowId(entry?.templateId, "submission-extra-slideshow-pdf-") ? {
       pdfExport: {
-        kind: entry?.pdfExport?.kind === "client" ? "client" : "documentation",
+        kind: ["client", "documentation", "additional"].includes(entry?.pdfExport?.kind) ? entry.pdfExport.kind : "documentation",
+        slideshowId: additionalSlideshowId(entry?.templateId, "submission-extra-slideshow-pdf-"),
         sourcePresentationId: String(entry?.pdfExport?.sourcePresentationId || ""),
         sourceUrl: String(entry?.pdfExport?.sourceUrl || ""),
         sourceName: String(entry?.pdfExport?.sourceName || "").slice(0, 512),
@@ -18247,6 +18250,91 @@ app.post("/api/activities/:id/slideshow-pdf", async (req, res) => {
     res.set("Cache-Control", "no-store").json(result);
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not convert and save your slideshow PDF." });
+  }
+});
+
+app.post("/api/activities/:id/submission-slideshows", async (req, res) => {
+  try {
+    const context = await loadFinalOutcomeContext(req);
+    const action = String(req.body?.action || "");
+    const slideshowId = String(req.body?.slideshowId || "").toLowerCase();
+    const sourceTemplateId = additionalSlideshowTemplateId(slideshowId);
+    const pdfTemplateId = additionalSlideshowPdfTemplateId(slideshowId);
+    const token = String(req.body?.driveAccessToken || "").trim();
+    if (!["sync", "pdf"].includes(action) || !sourceTemplateId || !pdfTemplateId || !token) {
+      throw Object.assign(new Error("A valid slideshow, action and Google Drive permission are required."), { status: 400 });
+    }
+    await verifyDriveTokenForStudent(token, context.email);
+    const result = await withFinalOutcomeLock(`${context.email}:${context.activityId}:additional-slideshow:${slideshowId}`, async () => {
+      const latest = await loadFinalOutcomeContext(req);
+      if (action === "sync") {
+        const sourceId = documentationPresentationId(req.body?.presentationUrl);
+        if (!sourceId) throw Object.assign(new Error("Paste a valid Google Slides presentation link."), { status: 400 });
+        const duplicate = latest.copies.some((entry) => entry?.templateId !== sourceTemplateId
+          && additionalSlideshowId(entry?.templateId)
+          && documentationPresentationId(entry.fileUrl) === sourceId);
+        if (duplicate) throw Object.assign(new Error("This slideshow is already linked in another Stage 6 card."), { status: 409 });
+        const file = await driveApiRequest(`/files/${encodeURIComponent(sourceId)}`, {
+          accessToken: token, queryParams: { fields: "id,name,mimeType,trashed,webViewLink", supportsAllDrives: true }
+        });
+        if (file?.trashed || file?.mimeType !== "application/vnd.google-apps.presentation") {
+          throw Object.assign(new Error("The link must open a live Google Slides presentation you can access."), { status: 400 });
+        }
+        const presentation = await googleSlidesApiRequest(sourceId, token);
+        if (!presentation?.slides?.length) throw Object.assign(new Error("This slideshow has no slides yet."), { status: 400 });
+        const saved = {
+          templateId: sourceTemplateId, templateTitle: `Additional Slideshow ${slideshowId}`,
+          fileUrl: `https://docs.google.com/presentation/d/${encodeURIComponent(sourceId)}/edit`,
+          fileName: String(file.name || "Additional slideshow")
+        };
+        await recordTemplateCopyInDb(context.activityId, context.email, saved);
+        return { saved };
+      }
+
+      const source = latest.copies.find((entry) => entry?.templateId === sourceTemplateId);
+      const sourceId = documentationPresentationId(source?.fileUrl);
+      if (!sourceId) throw Object.assign(new Error("Sync a Google Slides link before converting it."), { status: 409 });
+      const metadataOptions = { accessToken: token, queryParams: { fields: "id,name,mimeType,trashed,modifiedTime,version", supportsAllDrives: true } };
+      const file = await driveApiRequest(`/files/${encodeURIComponent(sourceId)}`, metadataOptions);
+      if (file?.trashed || file?.mimeType !== "application/vnd.google-apps.presentation") {
+        throw Object.assign(new Error("The linked slideshow is unavailable or is not a Google Slides presentation."), { status: 409 });
+      }
+      const folderId = await resolveOwnedFinalPreparationFolder(context.email, token);
+      const buffer = await driveDownloadExportedFile(sourceId, "application/pdf", token);
+      if (buffer.length > 10 * 1024 * 1024) throw Object.assign(new Error("This PDF exceeds Google's 10 MB Slides export limit."), { status: 413 });
+      if (buffer.length < 5 || buffer.subarray(0, 5).toString() !== "%PDF-") {
+        throw Object.assign(new Error("Google did not return a valid slideshow PDF. No file was saved."), { status: 502 });
+      }
+      const after = await driveApiRequest(`/files/${encodeURIComponent(sourceId)}`, metadataOptions);
+      if (after?.trashed || String(after.version || "") !== String(file.version || "")
+        || String(after.modifiedTime || "") !== String(file.modifiedTime || "")) {
+        throw Object.assign(new Error("The slideshow changed during export. Convert it again to capture the current version."), { status: 409 });
+      }
+      const current = await loadFinalOutcomeContext(req);
+      const currentSource = current.copies.find((entry) => entry?.templateId === sourceTemplateId);
+      if (documentationPresentationId(currentSource?.fileUrl) !== sourceId) {
+        throw Object.assign(new Error("The linked slideshow changed during export. Sync it again before converting."), { status: 409 });
+      }
+      const exportedAt = new Date().toISOString();
+      const fileName = `Additional-Slideshow-${context.activityId}-${slideshowId}-${randomUUID()}.pdf`;
+      const uploaded = await driveUploadBinaryFile({
+        accessToken: token, folderId, fileName, mimeType: "application/pdf", buffer
+      });
+      const saved = {
+        templateId: pdfTemplateId, templateTitle: `Additional Slideshow PDF ${slideshowId}`,
+        fileUrl: `https://drive.google.com/file/d/${encodeURIComponent(uploaded.id)}/view`, fileName,
+        processAssessmentFolderUrl: buildDriveFolderUrlFromId(folderId),
+        pdfExport: { kind: "additional", slideshowId, sourcePresentationId: sourceId, sourceUrl: currentSource.fileUrl,
+          sourceName: String(file.name || currentSource.fileName || "Additional slideshow"),
+          sourceModifiedTime: String(file.modifiedTime || ""), sourceVersion: String(file.version || ""),
+          exportedAt, bytes: buffer.length, md5Checksum: createHash("md5").update(buffer).digest("hex") }
+      };
+      await recordTemplateCopyInDb(context.activityId, context.email, saved);
+      return { saved };
+    });
+    res.set("Cache-Control", "no-store").json(result);
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not sync or convert the additional slideshow." });
   }
 });
 
