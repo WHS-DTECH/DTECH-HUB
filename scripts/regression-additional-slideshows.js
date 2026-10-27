@@ -28,10 +28,15 @@ async function main() {
     assert.equal(slideshows.additionalSlideshowCopies([
         { templateId: pdfTemplateId, fileUrl: pdfUrl }
     ]).length, 0, "A PDF record alone is not a linked source slideshow");
+    assert.equal(submissionSummary([{ templateId: sourceTemplateId, fileUrl: sourceUrl }]).length, 4,
+        "A linked slideshow without a saved PDF does not add a package entry");
     assert.equal(submissionSummary([
         { templateId: sourceTemplateId, fileUrl: sourceUrl },
         { templateId: pdfTemplateId, fileUrl: pdfUrl }
-    ]).length, 4, "Additional PDFs do not change the existing four-file submission ZIP");
+    ]).length, 5, "A saved Stage 6 PDF adds an entry after the four required files");
+    assert.equal(submissionSummary([
+        { templateId: pdfTemplateId, fileUrl: pdfUrl }
+    ]).length, 5, "An orphaned saved PDF is surfaced instead of silently skipped");
 
     const host = { children: [], replaceChildren() { this.children = []; }, append(card) { this.children.push(card); } };
     const add = { disabled: false };

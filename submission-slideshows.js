@@ -28,7 +28,19 @@ function additionalSlideshowCopies(copies) {
   }));
 }
 
+function additionalSlideshowPdfs(copies) {
+  const records = Array.isArray(copies) ? copies : [];
+  return records
+    .map((pdf) => ({ pdf, id: additionalSlideshowId(pdf?.templateId, PDF_PREFIX) }))
+    .filter(({ id }) => id)
+    .map(({ pdf, id }) => ({
+      id,
+      pdf,
+      source: records.find((copy) => copy?.templateId === additionalSlideshowTemplateId(id)) || null
+    }));
+}
+
 module.exports = {
   SOURCE_PREFIX, PDF_PREFIX, additionalSlideshowId,
-  additionalSlideshowTemplateId, additionalSlideshowPdfTemplateId, additionalSlideshowCopies
+  additionalSlideshowTemplateId, additionalSlideshowPdfTemplateId, additionalSlideshowCopies, additionalSlideshowPdfs
 };

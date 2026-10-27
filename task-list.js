@@ -2853,7 +2853,7 @@ async function handleAdditionalSlideshowAction(action, id) {
             slot.message = "Linked in place. The original slideshow has not been moved or changed.";
         } else {
             slot.pdf = saved;
-            slot.message = "PDF saved separately in SeniorDTECH / Process Assessment. It is not part of the submission ZIP.";
+            slot.message = "PDF saved in SeniorDTECH / Process Assessment. It will be included in the Final Package after you check the files.";
         }
         renderAdditionalSlideshows();
     } catch (error) {
@@ -3340,13 +3340,13 @@ async function handleSubmissionStageAction(action) {
             state.components = Array.isArray(checked.components) ? checked.components : state.components;
             state.manifestHash = String(checked.manifestHash || "");
             state.ready = Boolean(checked.ready && /^[a-f0-9]{64}$/.test(state.manifestHash));
-            state.message = state.ready ? "All four files are ready to package." : "Some files are missing or need updating.";
+            state.message = state.ready ? `All ${state.components.length} files are ready to package.` : "Some files are missing or need updating.";
             return;
         }
         if (action === "build") {
             state.snapshot = null;
             state.retryDriveSave = false;
-            state.message = "Building the four-file submission ZIP...";
+            state.message = "Building the submission ZIP...";
             renderSubmissionStage();
             const prepared = await post({ action: "prepare", manifestHash: state.manifestHash });
             if (!active()) return;

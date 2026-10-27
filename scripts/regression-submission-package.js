@@ -8,6 +8,7 @@ const { createHash, randomUUID } = require("node:crypto");
 const JSZip = require("jszip");
 const submission = require("../submission-package");
 const { createOutcomeArchiveStore } = require("../github-outcome");
+const { additionalSlideshowTemplateId, additionalSlideshowPdfTemplateId } = require("../submission-slideshows");
 
 const email = "student@westlandhigh.school.nz";
 const repositoryUrl = "https://github.com/student/outcome";
@@ -102,6 +103,46 @@ async function testPlanAndArchive() {
   await assert.rejects(corrupt.arrayBuffer(), /integrity|changed|aborted/i, "A corrupt input must abort the package rather than omit a file");
   data.context.copies = data.context.copies.filter((copy) => copy.templateId !== "submission-trello-report");
   assert.equal((await data.inspect()).components.find((entry) => entry.key === "trello").status, "missing");
+}
+
+async function testAdditionalSlideshowPackage() {
+  const data = await fixture();
+  const slideshowId = "550e8400-e29b-41d4-a716-446655440000";
+  const sourceId = "additional-slides";
+  const pdfId = "additional-pdf";
+  const pdfBytes = Buffer.from("%PDF-additional slideshow");
+  data.binaries.set(pdfId, pdfBytes);
+  data.files.set(sourceId, {
+    id: sourceId, mimeType: "application/vnd.google-apps.presentation", version: "7", modifiedTime: date
+  });
+  data.files.set(pdfId, {
+    id: pdfId, name: "Additional-Slideshow.pdf", mimeType: "application/pdf",
+    parents: ["folder"], owners: [{ emailAddress: email }], size: String(pdfBytes.length),
+    md5Checksum: md5(pdfBytes), modifiedTime: date
+  });
+  data.context.copies.push(
+    { templateId: additionalSlideshowPdfTemplateId(slideshowId), fileName: "Additional-Slideshow.pdf", fileUrl: fileUrl(pdfId),
+      pdfExport: { sourcePresentationId: sourceId, sourceVersion: "7", sourceModifiedTime: date, bytes: pdfBytes.length, md5Checksum: md5(pdfBytes) } }
+  );
+  assert.equal(submission.submissionSummary(data.context.copies).length, 5);
+  const orphaned = await data.inspect();
+  assert.equal(orphaned.ready, false, "A saved Stage 6 PDF without its linked source is not silently omitted");
+  data.context.copies.push(
+    { templateId: additionalSlideshowTemplateId(slideshowId), fileName: "Extra evidence", fileUrl: slideUrl(sourceId) }
+  );
+  const plan = await data.inspect();
+  assert.equal(plan.ready, true);
+  assert.equal(plan.manifest.length, 5);
+  assert.equal(plan.components[4].entryName, `05-Additional-Slideshow-${slideshowId}.pdf`);
+  const response = await submission.createSubmissionZipResponse({ components: plan.components, token: "student-token", fetchRequest: data.fetchBinary });
+  const archive = await JSZip.loadAsync(await response.arrayBuffer());
+  assert.deepEqual(Object.keys(archive.files).sort(), plan.components.map((entry) => entry.entryName).sort());
+  assert.deepEqual(await archive.file(plan.components[4].entryName).async("nodebuffer"), pdfBytes);
+  data.files.get(pdfId).md5Checksum = "b".repeat(32);
+  assert.equal((await data.inspect()).ready, false, "A changed additional PDF blocks the package");
+  data.files.get(pdfId).md5Checksum = md5(pdfBytes);
+  data.files.get(sourceId).version = "8";
+  assert.equal((await data.inspect()).ready, false, "A changed additional slideshow requires a fresh PDF");
 }
 
 async function testLargePackage() {
@@ -264,6 +305,7 @@ async function testFrontend() {
 
 async function main() {
   await testPlanAndArchive();
+  await testAdditionalSlideshowPackage();
   await testLargePackage();
   await testEndpoints();
   await testFrontend();

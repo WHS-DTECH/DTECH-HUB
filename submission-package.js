@@ -5,6 +5,7 @@ const { Readable } = require("node:stream");
 const { documentationPresentationId } = require("./documentation-deck");
 const { parseOutcomeRepository } = require("./github-outcome");
 const { trelloReportSources, resolveReportBoards } = require("./trello-report");
+const { additionalSlideshowPdfs } = require("./submission-slideshows");
 
 const SUBMISSION_COMPONENTS = [
   { key: "client", templateId: "client-presentation-pdf", label: "Client presentation PDF", entryName: "01-Client-Presentation.pdf", mimeType: "application/pdf" },
@@ -22,10 +23,17 @@ function submissionDriveFileId(value) {
 }
 
 function submissionSummary(copies) {
-  return SUBMISSION_COMPONENTS.map((definition) => ({
+  const required = SUBMISSION_COMPONENTS.map((definition) => ({
     key: definition.key, label: definition.label, entryName: definition.entryName,
     status: copies.some((copy) => copy?.templateId === definition.templateId && submissionDriveFileId(copy.fileUrl)) ? "unchecked" : "missing"
   }));
+  const additional = additionalSlideshowPdfs(copies).map(({ id, source, pdf }, index) => ({
+    key: `additional-${id}`,
+    label: `Additional slideshow PDF: ${source?.fileName || pdf.pdfExport?.sourceName || index + 1}`,
+    entryName: `05-Additional-Slideshow-${id}.pdf`,
+    status: submissionDriveFileId(pdf.fileUrl) ? "unchecked" : "missing"
+  }));
+  return required.concat(additional);
 }
 
 async function inspectSubmissionPackage({ context, documentationSource, folderId, token,
@@ -101,6 +109,53 @@ async function inspectSubmissionPackage({ context, documentationSource, folderId
     } catch (error) {
       component.status = "needs-update";
       component.message = error.message || "Could not verify this file.";
+    }
+  }
+  const additional = additionalSlideshowPdfs(context.copies);
+  for (const { id, source: sourceRecord, pdf } of additional) {
+    const component = {
+      key: `additional-${id}`,
+      label: `Additional slideshow PDF: ${String(sourceRecord?.fileName || pdf.pdfExport?.sourceName || "Google Slides presentation")}`,
+      entryName: `05-Additional-Slideshow-${id}.pdf`,
+      mimeType: "application/pdf",
+      status: "missing",
+      message: "Create and save this PDF in Stage 6 first."
+    };
+    components.push(component);
+    try {
+      const fileId = submissionDriveFileId(pdf.fileUrl);
+      if (!fileId) throw new Error("The saved PDF link is invalid. Convert the slideshow again.");
+      const file = await metadata(fileId);
+      if (file.trashed || file.mimeType !== "application/pdf" || !file.parents?.includes(folderId)
+        || !file.owners?.some((owner) => String(owner.emailAddress || "").toLowerCase() === context.email)) {
+        throw new Error("Save your own additional slideshow PDF directly in SeniorDTECH / Process Assessment.");
+      }
+      const bytes = Number(file.size);
+      const checksum = String(file.md5Checksum || "").toLowerCase();
+      if (!Number.isSafeInteger(bytes) || bytes < 5 || !/^[a-f0-9]{32}$/.test(checksum)
+        || Number(pdf.pdfExport?.bytes) !== bytes || String(pdf.pdfExport?.md5Checksum || "").toLowerCase() !== checksum) {
+        throw new Error("The saved PDF has changed or could not be verified. Convert it again.");
+      }
+      const sourceId = documentationPresentationId(sourceRecord?.fileUrl);
+      if (!sourceId || sourceId !== pdf.pdfExport?.sourcePresentationId) {
+        throw new Error("The PDF does not match the linked Stage 6 slideshow. Convert it again.");
+      }
+      const live = await metadata(sourceId);
+      if (live.trashed || live.mimeType !== "application/vnd.google-apps.presentation") {
+        throw new Error("The linked slideshow is unavailable.");
+      }
+      if (!pdf.pdfExport?.sourceVersion || !pdf.pdfExport?.sourceModifiedTime
+        || String(live.version) !== pdf.pdfExport.sourceVersion || live.modifiedTime !== pdf.pdfExport.sourceModifiedTime) {
+        throw new Error("The slideshow has changed. Convert it to PDF again.");
+      }
+      Object.assign(component, {
+        status: "ready", message: "Ready", fileId, fileName: String(file.name || pdf.fileName || component.entryName),
+        bytes, md5Checksum: checksum, modifiedTime: file.modifiedTime,
+        source: { presentationId: sourceId, version: String(live.version), modifiedTime: live.modifiedTime }
+      });
+    } catch (error) {
+      component.status = "needs-update";
+      component.message = error.message || "Could not verify this additional slideshow PDF.";
     }
   }
   const ready = components.every((component) => component.status === "ready");

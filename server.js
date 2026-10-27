@@ -6422,7 +6422,7 @@ async function recordTemplateCopyInDb(projectId, studentEmail, entry) {
       submissionPackage: {
         manifestHash: String(entry?.submissionPackage?.manifestHash || ""),
         builtAt: String(entry?.submissionPackage?.builtAt || ""), bytes: Number(entry?.submissionPackage?.bytes || 0),
-        components: (Array.isArray(entry?.submissionPackage?.components) ? entry.submissionPackage.components : []).slice(0, 4).map((component) => ({
+        components: (Array.isArray(entry?.submissionPackage?.components) ? entry.submissionPackage.components : []).map((component) => ({
           key: String(component.key || ""), entryName: String(component.entryName || ""), fileId: String(component.fileId || ""),
           bytes: Number(component.bytes || 0), md5Checksum: String(component.md5Checksum || ""), modifiedTime: String(component.modifiedTime || ""),
           source: Object.fromEntries(["presentationId", "version", "modifiedTime", "repositoryUrl", "commitSha", "boardId", "lastActivity", "exportedAt"]

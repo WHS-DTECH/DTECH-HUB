@@ -43,8 +43,8 @@ presentations as needed (usually one or two). Each **+ Add slideshow** card
 links an existing, accessible Google Slides presentation to the current
 assessment in place; it neither copies, moves nor edits the source. The student
 then converts that linked presentation into a new PDF saved separately in their
-owned `SeniorDTECH/Process Assessment` folder. This stage does not add files to
-or rebuild the existing four-file submission ZIP.
+owned `SeniorDTECH/Process Assessment` folder. Each saved additional PDF is
+included in the Final Package after its files are checked.
 
 Each card has its own persistent source/PDF records, so cards remain available
 across devices and reloads. A PDF link is shown only when its saved source
@@ -244,15 +244,21 @@ by mocked endpoint tests.
 
 ## Submission Stage
 
-The final Submission Stage card packages exactly these saved assessment artifacts:
+The final Submission Stage card always packages these four required assessment artifacts:
 
 1. `01-Client-Presentation.pdf`
 2. `02-Documentation.pdf`
 3. `03-Digital-Outcome.zip`
 4. `04-Trello-Report.pdf`
 
+It also includes every saved PDF from Stage 6 as a separate
+`05-Additional-Slideshow-<id>.pdf` entry. Stage 6 PDFs are optional, but when
+present they are checked and included; an outdated or unverifiable saved PDF
+blocks the package until it is regenerated.
+
 Check files requests the student's existing Google Drive permission and validates
-the four Drive files (type, owner, folder, size and checksum). It checks that each
+the four required Drive files and any saved Stage 6 PDFs (type, owner, folder,
+size and checksum). It checks that each
 file matches its generated checksum; older records without a checksum must have
 a saved timestamp proving the Drive file has not changed, or need regeneration.
 It also checks that each
@@ -268,7 +274,7 @@ validation before packaging, after assembly, before upload, and after upload.
 Missing/stale files block the package rather than being skipped. Version changes
 during a long build require another check/build. Files are streamed from Google
 Drive into the ZIP with byte-count, file-signature and MD5 verification. The inner
-GitHub ZIP remains intact; all four entries use ZIP store mode rather than
+GitHub ZIP remains intact; all entries use ZIP store mode rather than
 recompressing already compressed files. No repository, board, slideshow or source
 artifact is modified by building a package.
 
@@ -279,7 +285,7 @@ A failed or changed-input build discards its temporary output. Every successful
 build has a dated unique filename in `SeniorDTECH/Process Assessment`, retaining
 earlier packages. Retry Google Drive save continues that same prepared package;
 same-name complete files require matching checksums before reuse. Latest saved
-package metadata persists with the exact four-file manifest and source versions.
+package metadata persists with the exact package manifest and source versions.
 If inputs change during upload, an older snapshot may remain in Drive but is not
 recorded as the current saved package.
 
