@@ -1439,6 +1439,7 @@ function renderGlobalNavbar() {
                 <a role="menuitem" href="/practical-skills/">Licence Library</a>
                 <a id="hub-upload-kits-link" role="menuitem" href="/practical-skills/admin-kits.html" hidden>Upload Kits</a>
                 <a id="hub-teacher-review-link" role="menuitem" href="/practical-skills/teacher-results.html" hidden>Teacher Review</a>
+                <a id="hub-licence-setup-link" role="menuitem" href="/practical-skills/licence-kit-setup.html" hidden>Licence Kit Setup</a>
             </div>
         </details>
     `;
@@ -1627,6 +1628,8 @@ const hubUploadMenu = document.querySelector("#hub-upload-menu");
 const hubPracticalSkillsMenu = document.querySelector("#hub-practical-skills-menu");
 const hubUploadKitsLink = document.querySelector("#hub-upload-kits-link");
 const hubTeacherReviewLink = document.querySelector("#hub-teacher-review-link");
+const hubLicenceSetupLink = document.querySelector("#hub-licence-setup-link");
+const worksheetLicenceSetupLink = document.querySelector("#worksheet-licence-setup-link");
 const hubSeniorTaskListLink = document.querySelector("#hub-senior-task-list-link");
 const hubStudentWorkMenu = document.querySelector("#hub-student-work-menu");
 const hubTemplateLibraryLink = document.querySelector("#hub-browse-template-library-link");
@@ -3225,6 +3228,8 @@ function renderHubAuthUi() {
     if (hubTeacherReviewLink) {
         hubTeacherReviewLink.hidden = !canAdmin;
     }
+    if (hubLicenceSetupLink) hubLicenceSetupLink.hidden = !canAdmin;
+    if (worksheetLicenceSetupLink) worksheetLicenceSetupLink.hidden = !canAdmin;
     if (hubSettingsLink) {
         hubSettingsLink.hidden = !canAdmin;
     }

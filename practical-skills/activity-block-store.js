@@ -8,7 +8,7 @@ function registerActivityBlocks(app, deps) {
         setPracticalSkillsActivityCompletion, syncPracticalSkillsKitCompletion, autoEmailKitCertificate,
         getStudentKitDocument, saveStudentKitDocument, getStudentProgrammeFolder, ensureStudentCourseFolders,
         driveGetLiveFile, driveFindFileByNameInFolder, driveCopyFile, verifyDriveTokenForStudent, withResearchReportLock,
-        driveEnsureFolder, driveUploadBinaryFile, driveApiRequest, upload
+        driveEnsureFolder, driveUploadBinaryFile, driveApiRequest, upload, savePracticalSkillsKitContent
     } = deps;
     function email(req, res) {
         const value = normalizeEmail(getRequestUserEmail(req));
@@ -31,6 +31,49 @@ function registerActivityBlocks(app, deps) {
         return B.grade(activity, answers, documents);
     }
     const base = "/api/practical-skills/blocks/:kitId/:activityIndex";
+    async function schoolLicenceSettings(req) {
+        if (!getPracticalSkillsKitDefinition(req.params.kitId)) {
+            throw Object.assign(new Error("Choose a Unity Setup kit."), { status: 404 });
+        }
+        const content = await getStoredPracticalSkillsKitContent(req.params.kitId);
+        if (content?.deletedAt ||
+            !/unity\s+setup/i.test(String(content?.identity?.name || content?.bannerTitle || ""))) {
+            throw Object.assign(new Error("Choose a Unity Setup kit."), { status: 404 });
+        }
+        const activity = content.activities?.find((entry) => entry?.blocks?.some((block) => block.kind === "schoollicence"));
+        const block = activity?.blocks.find((entry) => entry.kind === "schoollicence");
+        if (!block) throw Object.assign(new Error("Unity school licence viewer not found. Open Activity 1 in the Kit Content Builder first."), { status: 404 });
+        return { content, activity, block };
+    }
+    const settingsPath = "/api/admin/practical-skills/kit-licence/:kitId";
+    app.get(settingsPath, requireAdminAccess, async (req, res) => {
+        res.set("Cache-Control", "private, no-store");
+        try {
+            const { block } = await schoolLicenceSettings(req);
+            res.json({ activationMethod: block.activationMethod, licenceValue: block.licenceValue || "" });
+        } catch (error) {
+            console.error("[school-licence] Could not load teacher settings:", error.message);
+            res.status(error.status || 500).json({ error: error.message || "Could not load school licence settings." });
+        }
+    });
+    app.put(settingsPath, requireAdminAccess, async (req, res) => {
+        res.set("Cache-Control", "private, no-store");
+        try {
+            const { activationMethod, licenceValue } = req.body || {};
+            try { B.validate({ blocks: [{ id: "school", kind: "schoollicence", activationMethod, licenceValue }] }); }
+            catch (error) { return res.status(400).json({ error: error.message }); }
+            if (typeof licenceValue !== "string") return res.status(400).json({ error: "School licence information must be text." });
+            const { content, activity, block } = await schoolLicenceSettings(req);
+            const updated = { ...content, activities: content.activities.map((entry) => entry === activity
+                ? { ...entry, blocks: entry.blocks.map((item) => item === block ? { ...item, activationMethod, licenceValue } : item) }
+                : entry) };
+            await savePracticalSkillsKitContent(req.params.kitId, updated, normalizeEmail(getRequestUserEmail(req)));
+            res.json({ saved: true });
+        } catch (error) {
+            console.error("[school-licence] Could not save teacher settings:", error.message);
+            res.status(error.status || 500).json({ error: "School licence save was not confirmed. Reload before retrying." });
+        }
+    });
     app.get(`${base}/licences/:blockId`, async (req, res) => {
         res.set("Cache-Control", "private, no-store");
         const student = email(req, res);

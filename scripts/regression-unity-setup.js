@@ -274,6 +274,111 @@ test("licence viewer fetches current teacher configuration with verified identit
     assert.match(fs.readFileSync(path.join(root, "practical-skills", "kit-publication.js"), "utf8"), /practical-skills\\\/blocks/);
 });
 
+test("Licence Kit Setup restricts settings to admins and updates only the current Unity school licence", async (t) => {
+    let content = withUnityHubLicence(baseContent());
+    const original = structuredClone(content);
+    let fail = false;
+    let savedBy;
+    const app = express();
+    app.use(express.json());
+    registerActivityBlocks(app, {
+        requireAdminAccess: (req, res, next) => req.headers["x-user-email"] === "teacher@school.nz"
+            ? next() : res.status(403).json({ error: "Admin required." }),
+        getRequestUserEmail: (req) => req.headers["x-user-email"] || "",
+        normalizeEmail: (value) => value.toLowerCase(), schoolDomain: "school.nz",
+        getPracticalSkillsKitDefinition: (id) => id === "kit-unity-setup",
+        getStoredPracticalSkillsKitContent: async () => content,
+        savePracticalSkillsKitContent: async (_kit, updated, email) => {
+            if (fail) throw new Error("Database unavailable");
+            savedBy = email;
+            content = structuredClone(updated);
+        }
+    });
+    const server = await new Promise((resolve) => { const s = app.listen(0, "127.0.0.1", () => resolve(s)); });
+    t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); }));
+    const url = `http://127.0.0.1:${server.address().port}/api/admin/practical-skills/kit-licence/kit-unity-setup`;
+    const headers = { "x-user-email": "teacher@school.nz", "Content-Type": "application/json" };
+    const save = (data, customHeaders = headers) => fetch(url, { method: "PUT", headers: customHeaders, body: JSON.stringify(data) });
+    assert.equal((await fetch(url)).status, 403);
+    assert.equal((await save({ activationMethod: "serial", licenceValue: mockLicence },
+        { ...headers, "x-user-email": "student@school.nz" })).status, 403);
+    const first = await fetch(url, { headers });
+    assert.equal(first.headers.get("cache-control"), "private, no-store");
+    assert.deepEqual(await first.json(), { activationMethod: "instructions", licenceValue: "" });
+    for (const data of [{ activationMethod: "other", licenceValue: "" }, { activationMethod: "serial", licenceValue: {} },
+        { activationMethod: "serial" }, { activationMethod: "serial", licenceValue: "x".repeat(10001) }]) {
+        assert.equal((await save(data)).status, 400);
+    }
+    assert.equal((await save({ activationMethod: "serial", licenceValue: mockLicence })).status, 200);
+    assert.equal(savedBy, "teacher@school.nz");
+    assert.equal(content.activities[0].blocks[2].licenceValue, mockLicence);
+    assert.deepEqual(content.activities.slice(1), original.activities.slice(1));
+    assert.deepEqual(content.worksheets, original.worksheets);
+    const reloaded = await (await fetch(url, { headers })).json();
+    assert.equal(reloaded.licenceValue, mockLicence);
+    const beforeFailure = structuredClone(content);
+    fail = true;
+    assert.equal((await save({ activationMethod: "instructions", licenceValue: "Unsaved" })).status, 500);
+    assert.deepEqual(content, beforeFailure);
+    fail = false;
+    assert.equal((await save({ activationMethod: "instructions", licenceValue: "" })).status, 200);
+    assert.equal((await (await fetch(url, { headers })).json()).licenceValue, "");
+    assert.equal((await fetch(url.replace("kit-unity-setup", "kit-other"), { headers })).status, 404);
+    const nav = fs.readFileSync(path.join(root, "script.js"), "utf8");
+    assert.match(nav, /hub-licence-setup-link[^>]+hidden>Licence Kit Setup/);
+    assert.match(nav, /hubLicenceSetupLink\.hidden = !canAdmin/);
+});
+
+test("Licence Kit Setup loads, saves and clears the teacher licence on account changes", async () => {
+    const nodes = new Map();
+    const get = (id) => {
+        if (!nodes.has(id)) nodes.set(id, {
+            value: "", handlers: {}, classList: { toggle() {} },
+            addEventListener(name, fn) { this.handlers[name] = fn; },
+            replaceChildren() { this.value = ""; },
+            appendChild(option) { this.value = option.value; }
+        });
+        return nodes.get(id);
+    };
+    const events = {};
+    let signedIn = true;
+    let stored = { activationMethod: "instructions", licenceValue: "" };
+    let fail = false;
+    const ctx = vm.createContext({
+        document: { getElementById: get, createElement: () => ({}) },
+        window: { addEventListener(name, fn) { events[name] = fn; } },
+        localStorage: { getItem: () => signedIn ? JSON.stringify({ profile: { email: "teacher@school.nz" }, idToken: "test-token" }) : null },
+        sessionStorage: { getItem: () => null },
+        fetch: async (url, options) => {
+            if (!signedIn) return { ok: false, json: async () => ({ error: "Admin access required." }) };
+            if (fail) return { ok: false, json: async () => ({ error: "Save failed." }) };
+            if (options.method === "PUT") stored = JSON.parse(options.body);
+            return { ok: true, json: async () => url.endsWith("/kits")
+                ? { kits: [{ id: "kit-unity-setup", title: "Unity Setup kit" }, { id: "kit-other", title: "Other kit" }] }
+                : stored };
+        }
+    });
+    vm.runInContext(fs.readFileSync(path.join(root, "practical-skills", "licence-kit-setup.js"), "utf8"), ctx);
+    const tick = () => new Promise((resolve) => setImmediate(resolve));
+    await tick();
+    assert.equal(get("setup-form").hidden, false);
+    assert.equal(get("setup-fields").disabled, false);
+    get("setup-method").value = "serial";
+    get("setup-value").value = mockLicence;
+    await get("setup-form").handlers.submit({ preventDefault() {} });
+    assert.equal(stored.licenceValue, mockLicence);
+    assert.match(get("setup-status").textContent, /Unity licence saved/);
+    fail = true;
+    await get("setup-form").handlers.submit({ preventDefault() {} });
+    assert.match(get("setup-status").textContent, /Save failed/);
+    assert.equal(get("setup-fields").disabled, false);
+    signedIn = false;
+    events["hub-auth-state-changed"]();
+    await tick();
+    assert.equal(get("setup-form").hidden, true);
+    assert.equal(get("setup-value").value, "");
+});
+
 function viewerFixture() {
     function element() {
         return { hidden: false, disabled: false, isConnected: true, textContent: "", events: {}, attrs: {},

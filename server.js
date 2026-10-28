@@ -16244,7 +16244,7 @@ require("./practical-skills/activity-block-store").registerActivityBlocks(app, {
   requireAdminAccess, getRequestUserEmail, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN,
   getPracticalSkillsKitDefinition, getStoredPracticalSkillsKitContent, getAllPracticalSkillsProgressRows,
   savePracticalSkillsKitResponses, setPracticalSkillsActivityCompletion, syncPracticalSkillsKitCompletion,
-  autoEmailKitCertificate, getStudentKitDocument, saveStudentKitDocument, getStudentProgrammeFolder, ensureStudentCourseFolders,
+  autoEmailKitCertificate, getStudentKitDocument, saveStudentKitDocument, getStudentProgrammeFolder, ensureStudentCourseFolders, savePracticalSkillsKitContent,
   driveGetLiveFile, driveFindFileByNameInFolder, driveCopyFile, verifyDriveTokenForStudent,
   withResearchReportLock, driveEnsureFolder, driveUploadBinaryFile, driveApiRequest,
   upload: multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 1, fieldSize: 32768 } })

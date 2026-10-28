@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="hub-google-client-id" content="239433605438-ur2omagmkluhhn7i319g0i82l4l5l1j8.apps.googleusercontent.com">
+  <meta name="hub-google-allowed-domain" content="westlandhigh.school.nz">
+  <title>Licence Kit Setup | DTECH-HUB</title>
+  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="./teacher-login-sites.css">
+  <style>#setup-status.is-error { color: #a4342f; font-weight: 700; }</style>
+</head>
+<body data-hub-read-only="true">
+  <nav class="topbar" aria-label="Primary">
+    <a class="brand" href="/index.html">Computer Lab</a>
+    <div class="topbar-right">
+      <div class="topbar-links"></div>
+      <div class="utility-actions" aria-label="Utility actions">
+        <button id="hub-google-signin" class="google-signin-button" type="button">Sign in with Google</button>
+        <button id="hub-google-signout" type="button" hidden>Sign out</button>
+        <button id="hub-user-badge" class="user-badge" type="button" hidden aria-label="Open profile" aria-haspopup="true" aria-expanded="false"></button>
+      </div>
+    </div>
+  </nav>
+  <main class="sites-editor">
+    <h1>Licence Kit Setup</h1>
+    <nav class="sites-actions" aria-label="Teacher tools">
+      <a class="button button-secondary" href="./teacher-results.html">Teacher Review</a>
+      <a class="button button-secondary" href="./admin-kits.html">Kit Content Builder</a>
+    </nav>
+    <p>Teacher/admin access required. Configure the Unity school licence used by Activity 1 - Unity Hub &amp; Licence. Students can view it but cannot edit it.</p>
+    <p id="setup-status" role="status" aria-live="polite">Sign in with your school teacher/admin account.</p>
+    <form id="setup-form" class="sites-card" hidden>
+      <h2>Unity Licence Loader</h2>
+      <label class="sites-field">Unity Setup Kit<select id="setup-kit" required></select></label>
+      <fieldset id="setup-fields" disabled>
+        <legend>School Unity licence</legend>
+        <label class="sites-field">Activation method
+          <select id="setup-method">
+            <option value="instructions">Activation instructions (no copy button)</option>
+            <option value="serial">Serial number (show Copy Licence)</option>
+          </select>
+        </label>
+        <label class="sites-field">School licence information / serial number
+          <textarea id="setup-value" rows="6" maxlength="10000"></textarea>
+        </label>
+        <p>Paste school-authorised licence information intended for students. Save to update the existing View School Licence button in Activity 1. The value is not displayed in the collapsed student view.</p>
+        <p>Leave blank to show: "School licence information is not yet available. Please ask your teacher."</p>
+        <button class="button button-primary" type="submit">Save Unity Licence</button>
+      </fieldset>
+    </form>
+  </main>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="../script.js?v=licence-setup-1"></script>
+  <script src="./licence-kit-setup.js?v=1"></script>
+</body>
+</html>
