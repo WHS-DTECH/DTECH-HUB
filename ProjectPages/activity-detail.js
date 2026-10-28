@@ -9804,7 +9804,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         "video-integrity-testing": "video-integrity-testing",
         "image-integrity-testing": "image-integrity-testing",
         "video-ux-principles": "video-ux-principles",
-        "video-conventions": "video-conventions",
+        // Media-specific checklists share the published Conventions template.
+        "video-conventions": "relevant-digimed-conventions",
         "tools-and-techniques": "tools-and-techniques",
         "use-of-tools-and-techniques": "use-of-tools-and-techniques",
         "code-validation": "testing-functions-markup-validation",
@@ -9835,7 +9836,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             "project-management": "Project Management",
             "digital-outcome-description": DIGITAL_OUTCOME_DESCRIPTION_TITLE
         };
-        const topicDisplayName = digitalOutcomeTopicKey === "relevant-digimed-conventions"
+        const topicDisplayName = (digitalOutcomeTopicKey === "relevant-digimed-conventions" || digitalOutcomeTopicKey === "video-conventions")
             ? "Conventions" : topicDisplayNames[preferredTemplateId] || DIGITAL_OUTCOME_DESCRIPTION_TITLE;
         templateLibraryParams.set("preFilterTopic", topicDisplayName);
         if (digitalOutcomeTopicKey === "relevant-digimed-conventions") {
@@ -9849,13 +9850,16 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         readStoredTaskTopicSlideSyncEntryByShortName(id, viewerEmail, resolvedTaskShortName),
         readStoredTaskTopicSlideSyncEntryByShortName(id, viewerEmail, displayTitle),
         readStoredTaskTopicSlideSyncEntry(id, viewerEmail, taskTopicTitle, displayTitle),
-        readStoredTaskTopicSlideSyncEntryByTemplateId(id, viewerEmail, preferredTemplateId)
+        readStoredTaskTopicSlideSyncEntryByTemplateId(id, viewerEmail, preferredTemplateId),
+        ...(digitalOutcomeTopicKey === "video-conventions"
+            ? [readStoredTaskTopicSlideSyncEntryByTemplateId(id, viewerEmail, "video-conventions")] : [])
     ].filter((entry) => {
         if (!toSafeExternalUrl(entry?.url || "")) return false;
         // Discard entries whose templateId belongs to a different topic to prevent cross-topic bleed
         const entryTemplateId = String(entry?.templateId || "").trim().toLowerCase();
         if (!entryTemplateId || !preferredTemplateId) return true;
         return entryTemplateId === preferredTemplateId
+            || (digitalOutcomeTopicKey === "video-conventions" && entryTemplateId === "video-conventions")
             || ((preferredTemplateId === "tools-and-techniques"
                 || preferredTemplateId === "testing-functions"
                 || preferredTemplateId === "relevant-implications")
@@ -9953,8 +9957,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                     ? "Development Steps"
                     : (digitalOutcomeTopicKey === "success-criteria"
                         ? "Success Criteria"
-                        : (digitalOutcomeTopicKey === "relevant-digimed-conventions"
-                            ? "Relevant DigiMed Conventions"
+                        : (digitalOutcomeTopicKey === "relevant-digimed-conventions" || digitalOutcomeTopicKey === "video-conventions"
+                            ? displayTitle
                         : (digitalOutcomeTopicKey === "user-experience-principles"
                             ? "User Experience (UX) Principles"
                         : (digitalOutcomeTopicKey === "relevant-implications"
@@ -9983,7 +9987,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         }
 
         if (isDigitalOutcomeTopic) {
-            if (digitalOutcomeTopicKey === "relevant-digimed-conventions") {
+            if (digitalOutcomeTopicKey === "relevant-digimed-conventions" || digitalOutcomeTopicKey === "video-conventions") {
                 return [
                     "Create a Google Slideshow for this topic.",
                     "Use the conventions table below to check your digital media outcome.",
@@ -10103,9 +10107,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         }
 
         if (isDigitalOutcomeTopic) {
-            if (digitalOutcomeTopicKey === "relevant-digimed-conventions") {
+            if (digitalOutcomeTopicKey === "relevant-digimed-conventions" || digitalOutcomeTopicKey === "video-conventions") {
                 return [
-                    "Relevant DigiMed Conventions - Google Slides: Use the table to review conventions for your media type.",
+                    `${displayTitle} - Google Slides: Use the table to review conventions for your media type.`,
                     "Explain which conventions are most important for your outcome.",
                     "Record evidence of how your design and development follow the selected conventions."
                 ];
@@ -10277,6 +10281,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         if (!isDigitalOutcomeTopic) {
             return "Use this guide to complete the Submission Tasks correctly.";
         }
+        if (digitalOutcomeTopicKey === "relevant-digimed-conventions" || digitalOutcomeTopicKey === "video-conventions") {
+            return "Use this guide to identify conventions for your media type and record how your outcome applies them.";
+        }
         if (digitalOutcomeTopicKey === "target-audience") {
             return "Use this guide to define your project's target audience clearly and justify why they are the right users to design for.";
         }
@@ -10309,6 +10316,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         }
         if (!isDigitalOutcomeTopic) {
             return "Task List";
+        }
+        if (digitalOutcomeTopicKey === "relevant-digimed-conventions" || digitalOutcomeTopicKey === "video-conventions") {
+            return `${displayTitle} - Google Slides`;
         }
         if (digitalOutcomeTopicKey === "target-audience") {
             return "Target Audience - Google Slides";
@@ -11022,7 +11032,8 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             const isRelevantImplicationsTopic = isDigitalOutcomeRelevantImplicationsCriterion(taskTopicTitle, resolvedTaskShortName)
                 || keywordMatchedTopicKey === "relevant-implications";
             const isRelevantDigiMedConventionsTopic = isDigitalOutcomeRelevantDigiMedConventionsCriterion(taskTopicTitle, resolvedTaskShortName)
-                || keywordMatchedTopicKey === "relevant-digimed-conventions";
+                || keywordMatchedTopicKey === "relevant-digimed-conventions"
+                || digitalOutcomeTopicKey === "video-conventions";
             const isUXPrinciplesTopic = isDigitalOutcomeUXPrinciplesCriterion(taskTopicTitle, resolvedTaskShortName)
                 || keywordMatchedTopicKey === "user-experience-principles";
 
@@ -11942,6 +11953,7 @@ async function initDetail() {
             : (/triall?ing\s+components|trailing\s+components|trailing\s+comonents/i.test(templateTopicText)
             ? "trialling-components"
             : (isDigitalOutcomeRelevantDigiMedConventionsCriterion(selectedTaskTopic, selectedTaskShortName)
+                || isDigitalOutcomeVideoConventionsCriterion(selectedTaskTopic, selectedTaskShortName)
             ? "relevant-digimed-conventions"
             : (/markup\s+validation|code\s+validation/i.test(templateTopicText)
             ? "testing-functions-markup-validation"

@@ -37,7 +37,8 @@ const standardCard = fs.readFileSync(path.join(root, "assessment-standard-card.j
         extractFunction(taskList, "getDigiMedConventionsSubtask"),
         extractFunction(taskList, "getTaskTopicHrefForStep"),
         extractFunction(activityDetail, "getConventionsMediaType"),
-        extractFunction(activityDetail, "isDigitalOutcomeRelevantDigiMedConventionsCriterion")
+        extractFunction(activityDetail, "isDigitalOutcomeRelevantDigiMedConventionsCriterion"),
+        extractFunction(activityDetail, "isDigitalOutcomeVideoConventionsCriterion")
     ].join("\n"), context);
     for (const type of ["image", "graphics", "vector", "web", "video"]) {
         mediaType = type;
@@ -47,7 +48,7 @@ const standardCard = fs.readFileSync(path.join(root, "assessment-standard-card.j
         assert.equal(href, subtask.href, "Main criterion and subtask open the same media-specific page");
         const params = new URLSearchParams(href.split("?")[1]);
         assert.equal(params.get("taskShortName"), `Conventions (${expected.toUpperCase()})`);
-        assert.equal(params.get("templateId"), type === "video" ? "video-conventions" : "relevant-digimed-conventions");
+        assert.equal(params.get("templateId"), "relevant-digimed-conventions");
         if (type !== "video") {
             assert.equal(context.isDigitalOutcomeRelevantDigiMedConventionsCriterion("", params.get("taskShortName")), true);
         }
@@ -75,8 +76,67 @@ const standardCard = fs.readFileSync(path.join(root, "assessment-standard-card.j
     context.selectedTaskTopic = "Conventions (IMAGE)";
     context.selectedTaskShortName = "Conventions (IMAGE)";
     context.templateTopicText = "Conventions (IMAGE)";
-    assert.equal(vm.runInContext(`${activityDetail.slice(teacherLookupStart, teacherLookupEnd)}\nteacherTemplateId`, context),
+    assert.equal(vm.runInContext(`(() => { ${activityDetail.slice(teacherLookupStart, teacherLookupEnd)}\nreturn teacherTemplateId; })()`, context),
         "relevant-digimed-conventions", "Image links resolve the existing template hero rather than falling through");
+    context.DIGITAL_OUTCOME_VIDEO_CONVENTIONS_TITLE = "Conventions (VIDEO)";
+    context.selectedTaskTopic = "Video Conventions";
+    context.selectedTaskShortName = "Conventions (VIDEO)";
+    context.templateTopicText = "Conventions (VIDEO)";
+    assert.equal(vm.runInContext(`(() => { ${activityDetail.slice(teacherLookupStart, teacherLookupEnd)}\nreturn teacherTemplateId; })()`, context),
+        "relevant-digimed-conventions", "Video links resolve the same published Conventions template");
+
+    context.digitalOutcomeTopicKey = "video-conventions";
+    context.useProjectManagementTemplateHero = false;
+    context.useDigitalOutcomeTemplateHero = true;
+    context.templateLibraryParams = new URLSearchParams({
+        activityId: "49", taskTopic: "Video Conventions", taskShortName: "Conventions (VIDEO)"
+    });
+    for (const match of activityDetail.matchAll(/const (DIGITAL_OUTCOME_\w+_TITLE|USE_OF_TOOLS_TECHNIQUES_TEMPLATE_TITLE) = "([^"]*)";/g)) {
+        context[match[1]] = match[2];
+    }
+    const templateParamsStart = activityDetail.indexOf("    const preferredTemplateIds =");
+    const templateParamsEnd = activityDetail.indexOf("    const viewerEmail =", templateParamsStart);
+    const libraryUrl = vm.runInContext(`${activityDetail.slice(templateParamsStart, templateParamsEnd)}\nslideshowTemplateLibraryUrl`, context);
+    const libraryParams = new URLSearchParams(libraryUrl.split("?")[1]);
+    assert.equal(libraryParams.get("templateId"), "relevant-digimed-conventions");
+    assert.equal(libraryParams.get("preFilterTopic"), "Conventions", "Video must not filter the library to Description");
+    assert.equal(libraryParams.get("taskShortName"), "Conventions (VIDEO)");
+
+    context.viewerEmail = "student@example.test";
+    context.displayTitle = "Conventions (VIDEO)";
+    context.toSafeExternalUrl = (value) => String(value || "");
+    context.readStoredTaskTopicSlideSyncEntry = () => ({ templateId: "digital-outcome-description", url: "https://example.test/description" });
+    context.readStoredTaskTopicSlideSyncEntryByShortName = () => ({});
+    context.readStoredTaskTopicSlideSyncEntryByTemplateId = (_id, _email, templateId) =>
+        templateId === "video-conventions" ? { templateId, url: "https://example.test/existing-video-evidence" } : {};
+    const savedCandidatesStart = activityDetail.indexOf("    const syncedTaskTopicEntryCandidates =");
+    const savedCandidatesEnd = activityDetail.indexOf("    const taskTopicSyncedSlideThumbnail =", savedCandidatesStart);
+    const savedCopy = vm.runInContext(`${activityDetail.slice(savedCandidatesStart, savedCandidatesEnd)}\nsyncedTaskTopicEntry`, context);
+    assert.equal(savedCopy.url, "https://example.test/existing-video-evidence",
+        "Existing Video template copies stay discoverable; Description copies cannot bleed into Conventions");
+
+    context.isProjectManagementTopic = false;
+    context.isDecompositionTopic = false;
+    context.isDigitalOutcomeTopic = true;
+    context.displayTitle = "Conventions (VIDEO)";
+    const guidanceStart = activityDetail.indexOf("    const topicGuideTitle =");
+    const guidanceEnd = activityDetail.indexOf("    const relevantDigiMedConventionsTableHtml =", guidanceStart);
+    assert.ok(guidanceEnd > guidanceStart);
+    // Evaluate each guidance declaration without executing the intervening media checklist builders.
+    const declarations = [
+        ["topicGuideTitle", "topicGuideInstructions"],
+        ["topicGuideInstructions", "topicGuideTaskItems"],
+        ["topicGuideTaskItems", null],
+        ["topicGuideIntroText", "topicGuideTaskHeading"],
+        ["topicGuideTaskHeading", "githubGuideTitle"]
+    ];
+    for (const [name, next] of declarations) {
+        const start = activityDetail.indexOf(`    const ${name} =`, guidanceStart);
+        const end = next ? activityDetail.indexOf(`    const ${next} =`, start) : activityDetail.indexOf("\n    const ", start + 1);
+        const value = vm.runInContext(`${activityDetail.slice(start, end)}\n${name}`, context);
+        assert.doesNotMatch(JSON.stringify(value), /Digital Outcome Description|describes the digital outcome|Description - Google Slides/);
+        assert.match(JSON.stringify(value), /[Cc]onventions/);
+    }
 }
 
 const implicationsSummaryStart = teacherStudentWork.indexOf("function createStudentSummaryBucket(");

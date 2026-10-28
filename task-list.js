@@ -1818,7 +1818,7 @@ function getDigiMedConventionsSubtask(stateMap = {}, digitalMediaType = "") {
     return {
         label: isVideo ? "Conventions (VIDEO)" : isImage ? "Conventions (IMAGE)" : "Conventions (WEB)",
         href: isVideo
-            ? buildCustomActivityLink(activityId, "Video Conventions", "Conventions (VIDEO)", "video-conventions")
+            ? buildCustomActivityLink(activityId, "Video Conventions", "Conventions (VIDEO)", "relevant-digimed-conventions")
             : buildCustomActivityLink(activityId, "Using relevant conventions for the media type.", isImage ? "Conventions (IMAGE)" : "Conventions (WEB)", "relevant-digimed-conventions"),
         count: isImage ? imageCount : getDigiMedConventionsAcknowledgementCount(activityId, getTaskListEmail(), stateMap)
     };
