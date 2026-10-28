@@ -14,10 +14,12 @@
 
     const KIT_COLOUR_SCHEMES = {
         "Skill Kits": { color: "#2f8f61", accent: "#ffd166" },
-        "Application Kits": { color: "#2b87b6", accent: "#66fff5" }
+        "Application Kits": { color: "#2b87b6", accent: "#66fff5" },
+        "Application Setups": { color: "#2b87b6", accent: "#66fff5" }
     };
 
     function normaliseSkillArea(value) {
+        if (String(value || "").trim() === "Application Setups") return "Application Setups";
         return /^\s*application/i.test(String(value || "")) ? "Application Kits" : "Skill Kits";
     }
 

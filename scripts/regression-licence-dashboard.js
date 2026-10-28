@@ -61,7 +61,19 @@ async function main() {
     assert.match(nodes.get("ps-kit-list").children[3].innerHTML, /typing-kit\.html/);
     assert.doesNotMatch(nodes.get("ps-kit-list").children[3].innerHTML, /data-action|certificate/, "Typing history has no completion, reset or certificate actions");
 
-    snapshot = { ...snapshot, typingKit: { id: "kit-typing", live: false } };
+    snapshot = { ...snapshot, customKits: [
+        { id: "kit-unity-setup", title: "Unity Setup", skillArea: "Application Setups", custom: true },
+        { id: "kit-other-setup", title: "Other Setup", skillArea: "Application Setups", custom: true }
+    ] };
+    events["hub-auth-state-changed"]();
+    await tick();
+    assert.doesNotMatch(nodes.get("ps-stamp-list").innerHTML, /kit-unity-setup|kit-other-setup/);
+    assert.match(nodes.get("ps-application-kits").innerHTML, /<h2>Application Setups<\/h2>/);
+    assert.match(nodes.get("ps-application-kits").innerHTML, /kit-unity-setup/);
+    assert.match(nodes.get("ps-application-kits").innerHTML, /kit-other-setup/);
+    assert.match(nodes.get("ps-application-kits").innerHTML, /Application = Minecraft/);
+    assert.ok(nodes.get("ps-kit-list").children.some((item) => /Unity Setup/.test(item.innerHTML)));
+    snapshot = { ...snapshot, customKits: [], typingKit: { id: "kit-typing", live: false } };
     events["hub-auth-state-changed"]();
     await tick();
     assert.doesNotMatch(nodes.get("ps-stamp-list").innerHTML, /typing-kit\.html/, "Paused typing is hidden from student cards");

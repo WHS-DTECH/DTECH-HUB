@@ -23,6 +23,7 @@ test("Unity preset builds four steps without answers and preserves the other set
     const before = JSON.stringify(original);
     const content = withUnityHubLicence(original);
     assert.equal(JSON.stringify(original), before);
+    assert.equal(content.identity.skillArea, "Application Setups");
     assert.equal(content.activities[3].unityDriveBackupVersion, 1);
     const activity = content.activities[0];
     assert.equal(activity.title, "Unity Hub & Licence");

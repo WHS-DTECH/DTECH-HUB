@@ -155,11 +155,13 @@
             ? snapshot.licenceKits.map((kit) => ({ colour: "green", ...kit }))
             : [...kitDefinitions, ...(snapshot?.customKits || []).map((kit) => ({ ...kit, colour: "green" }))];
         const skillRank = (kit) => kit.id === "kit-login" ? 0 : kit.id === "kit-google-search" ? 1 : 2;
-        const skillKits = catalogue.filter((kit) => kit.skillArea !== "Application Kits")
+        const skillKits = catalogue.filter((kit) => !["Application Kits", "Application Setups"].includes(kit.skillArea))
             .sort((a, b) => skillRank(a) - skillRank(b));
         const applicationKits = catalogue.filter((kit) => kit.skillArea === "Application Kits")
             .sort((a, b) => (a.applicationOrder || 0) - (b.applicationOrder || 0));
-        const licenceKits = [...skillKits, ...applicationKits];
+        const setupKits = catalogue.filter((kit) => kit.skillArea === "Application Setups")
+            .sort((a, b) => (a.applicationOrder || 0) - (b.applicationOrder || 0));
+        const licenceKits = [...skillKits, ...applicationKits, ...setupKits];
         const loaded = Boolean(state.email && snapshot);
         const typingVisible = snapshot?.canManageKits || snapshot?.typingKit?.live !== false;
         const typingPaused = snapshot?.typingKit?.live === false;
@@ -196,12 +198,16 @@
             groups.get(application).push(kit);
         }
         const applications = document.getElementById("ps-application-kits");
-        applications.hidden = !applicationKits.length;
+        applications.hidden = !applicationKits.length && !setupKits.length;
         applications.innerHTML = [...groups].map(([application, kits]) => `
             <section class="licence-application-group" aria-label="${escapeHtml(application || "Application Kits")}">
                 <h2>${application ? `Application = ${escapeHtml(application)}` : "Application Kits"}</h2>
                 <div class="licence-stamps licence-application-stamps">${kits.map(renderStamp).join("")}</div>
-            </section>`).join("");
+            </section>`).join("") + (setupKits.length ? `
+            <section class="licence-application-group" aria-label="Application Setups">
+                <h2>Application Setups</h2>
+                <div class="licence-stamps licence-application-stamps">${setupKits.map(renderStamp).join("")}</div>
+            </section>` : "");
         document.querySelectorAll("[data-publication]").forEach((button) => {
             button.addEventListener("click", async () => {
                 const live = button.dataset.live !== "true";

@@ -6,6 +6,10 @@ function withUnityHubLicence(content) {
     if (index < 0) return content;
     const activities = [...(content.activities || [])];
     let changed = false;
+    if (content.unitySetupCategoryVersion !== 1) {
+        content = { ...content, identity: { ...content.identity, skillArea: "Application Setups" }, unitySetupCategoryVersion: 1 };
+        changed = true;
+    }
     if (activities[index]?.unityHubLicenceVersion !== 1) changed = true;
     if (activities[index]?.unityHubLicenceVersion !== 1) activities[index] = {
         ...activities[index],

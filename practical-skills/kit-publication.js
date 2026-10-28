@@ -1,5 +1,6 @@
 "use strict";
 const { TYPING_KIT_CARD } = require("./typing-kit-store");
+const { withUnityHubLicence } = require("./unity-setup");
 
 function createKitPublication({ pool, builtIns, getDefaultContent, schoolDomain, getRequestUserEmail, canManage }) {
     let schema;
@@ -19,10 +20,10 @@ function createKitPublication({ pool, builtIns, getDefaultContent, schoolDomain,
         const publication = await pool.query("SELECT kit_id, live FROM practical_skills_kit_publication");
         const ids = new Set([...builtIns.map((kit) => kit.id), ...stored.rows.map((row) => row.kit_id), "kit-typing"]);
         return [...ids].filter((id) => /^kit-[a-z0-9-]{1,60}$/.test(id)).map((id) => {
-            const content = id === "kit-typing" ? {
+            const content = withUnityHubLicence(id === "kit-typing" ? {
                 bannerTitle: TYPING_KIT_CARD.title, bannerSubtitle: TYPING_KIT_CARD.summary,
                 theme: { icon: TYPING_KIT_CARD.visual.icon }
-            } : stored.rows.find((row) => row.kit_id === id)?.content || getDefaultContent(id);
+            } : stored.rows.find((row) => row.kit_id === id)?.content || getDefaultContent(id));
             const explicit = publication.rows.find((row) => row.kit_id === id)?.live;
             return {
                 id, title: content.identity?.name || content.bannerTitle || id,

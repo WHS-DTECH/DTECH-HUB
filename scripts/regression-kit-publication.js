@@ -60,6 +60,16 @@ async function fixture(t) {
         }) };
 }
 
+test("Unity category is available from the saved catalogue before opening the worksheet", async (t) => {
+    const f = await fixture(t);
+    const content = { identity: { name: "Unity Setup kit", skillArea: "Skill Kits" },
+        worksheets: [{ activity: "Unity Hub & Licence" }], activities: [{}] };
+    f.saved.push({ kit_id: "kit-unity-setup", content });
+    const catalog = await f.service.catalog();
+    assert.equal(catalog.find((kit) => kit.id === "kit-unity-setup").skillArea, "Application Setups");
+    assert.equal(content.identity.skillArea, "Skill Kits", "Reading the catalogue does not mutate stored objects");
+});
+
 test("teacher catalog includes database kits without requiring custom marker or prior library navigation; flags survive fresh services", async (t) => {
     const f = await fixture(t);
     const snapshot = { kits: [{ id: "kit-minecraft", isComplete: true }, { id: "kit-files", isComplete: false }], totalPoints: 100 };
