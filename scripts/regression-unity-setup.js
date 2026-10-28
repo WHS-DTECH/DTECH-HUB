@@ -23,7 +23,7 @@ test("Unity preset builds four steps without answers and preserves the other set
     const before = JSON.stringify(original);
     const content = withUnityHubLicence(original);
     assert.equal(JSON.stringify(original), before);
-    assert.equal(content.activities[2], original.activities[2]);
+    assert.equal(content.activities[3], original.activities[3]);
     const activity = content.activities[0];
     assert.equal(activity.title, "Unity Hub & Licence");
     assert.equal(activity.completionMode, "manual");
@@ -83,7 +83,7 @@ test("Unity Editor migrates once, renders current teacher settings and accepts f
     const content = withUnityHubLicence(previous);
     const activity = content.activities[1];
     assert.equal(content.activities[0], previous.activities[0], "Activity 1 and its licence remain unchanged");
-    assert.equal(content.activities[2], previous.activities[2]);
+    assert.equal(content.activities[3], previous.activities[3]);
     assert.equal(activity.title, "Unity Editor");
     assert.equal(activity.completionMode, "manual");
     assert.deepEqual(activity.questions, []);
@@ -119,22 +119,60 @@ test("Unity Editor migrates once, renders current teacher settings and accepts f
     assert.match(activity.blocks[3].text, /Activity 3 - Unity Project Folder/);
 });
 
-test("Unity Editor manual completion saves its tick and directs students to Activity 3", async () => {
+test("Unity Project Folder renders four safe setup steps and preserves teacher edits on reopening", () => {
+    const previous = withUnityHubLicence(baseContent());
+    delete previous.activities[2].unityProjectFolderVersion;
+    previous.activities[0].blocks[2].licenceValue = mockLicence;
+    previous.activities[1].unityEditor.version = "6000.5.2f1";
+    const content = withUnityHubLicence(previous);
+    const activity = content.activities[2];
+    assert.equal(content.activities[0], previous.activities[0]);
+    assert.equal(content.activities[1], previous.activities[1]);
+    assert.equal(content.activities[3], previous.activities[3]);
+    assert.equal(content.activities[4], previous.activities[4]);
+    assert.equal(activity.title, "Unity Project Folder");
+    assert.equal(activity.completionMode, "manual");
+    assert.deepEqual(activity.questions, []);
+    assert.deepEqual(activity.images, []);
+    assert.equal(activity.blocks.length, 4);
+    B.validate(activity);
+    const ctx = vm.createContext({ window: { ActivityBlocks: B }, structuredClone });
+    for (const file of ["activity-block-view.js", "kit-worksheet-render.js"]) {
+        vm.runInContext(fs.readFileSync(path.join(root, "practical-skills", file), "utf8"), ctx);
+    }
+    const host = { style: { setProperty() {} }, innerHTML: "", querySelectorAll: () => [] };
+    ctx.window.KitWorksheetRender.renderWorksheet(host, { ...activity, bannerTitle: activity.title }, { readOnly: true });
+    assert.equal((host.innerHTML.match(/class="activity-content-block"/g) || []).length, 4);
+    assert.match(host.innerHTML, /Videos\n\u2514\u2500\u2500 Unity/);
+    assert.match(host.innerHTML, /Videos\\Unity/);
+    assert.match(host.innerHTML, /not a folder in Downloads or Documents/);
+    assert.match(host.innerHTML, /use that existing folder/);
+    assert.match(host.innerHTML, /Do not click Create project/);
+    assert.match(host.innerHTML, /Activity 5/);
+    assert.match(host.innerHTML, /Activity 4 - Google Drive Backup/);
+    assert.doesNotMatch(host.innerHTML, /<input|<textarea|type="file"|C:\\Users\\/);
+    activity.blocks[0].text = "Teacher-edited folder instructions.";
+    assert.equal(withUnityHubLicence(content), content);
+    assert.equal(content.activities[2].blocks[0].text, "Teacher-edited folder instructions.");
+});
+
+test("Unity Editor and Project Folder manual completion save ticks and direct students to the next activity", async () => {
     const controller = fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet.js"), "utf8");
     const start = controller.indexOf('        activityCompleteBtn.addEventListener("click",');
     const end = controller.indexOf("\n        });", start) + "\n        });".length;
     let click;
     let message;
+    let index = 1;
     const state = { progressLoaded: true, completedActivities: {}, responses: {}, kitId: "kit-unity-setup",
         content: withUnityHubLicence(baseContent()) };
     const ctx = vm.createContext({
         state, activityCompleteBtn: { addEventListener(_name, fn) { click = fn; } },
-        getCurrentActivityIndex: () => 1,
+        getCurrentActivityIndex: () => index,
         window: { clearTimeout() {}, ActivityBlocks: B, KitWorksheetRender: { visibleLoginSites: () => [] } },
         queueProgressWrite: (fn) => fn(), saveResponses: async () => {}, withAuthHeaders: (headers) => headers,
         loadJson: async (_url, options) => {
             const { completed } = JSON.parse(options.body);
-            return { completedActivities: completed ? { 1: "saved" } : {} };
+            return { completedActivities: completed ? { [index]: "saved" } : {} };
         },
         showStatusMessage: (value) => { message = value; }, updateActivityCompleteBar() {}
     });
@@ -142,6 +180,13 @@ test("Unity Editor manual completion saves its tick and directs students to Acti
     await click();
     assert.equal(state.completedActivities[1], "saved");
     assert.match(message, /Activity 3 - Unity Project Folder/);
+    await click();
+    assert.deepEqual(state.completedActivities, {});
+    assert.equal(message, "Activity completion removed.");
+    index = 2;
+    await click();
+    assert.equal(state.completedActivities[2], "saved");
+    assert.match(message, /Activity 4 - Google Drive Backup/);
     await click();
     assert.deepEqual(state.completedActivities, {});
     assert.equal(message, "Activity completion removed.");
@@ -236,6 +281,9 @@ test("Unity instructions and teacher licence settings persist in database conten
     const reopened = await ctx().getStoredPracticalSkillsKitContent("kit-unity-setup");
     assert.equal(reopened.activities[0].blocks[2].licenceValue, mockLicence);
     assert.deepEqual(reopened.activities[1].unityEditor, first.activities[1].unityEditor);
+    assert.equal(reopened.activities[2].unityProjectFolderVersion, 1);
+    assert.equal(reopened.activities[2].completionMode, "manual");
+    assert.match(reopened.activities[2].blocks[2].text, /Videos\\Unity/);
     assert.equal(writes.length, 2, "Reopening does not overwrite the teacher configuration");
 });
 

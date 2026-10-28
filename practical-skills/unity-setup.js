@@ -57,6 +57,32 @@ function withUnityHubLicence(content) {
             ]
         };
     }
+    const folderIndex = content.worksheets.findIndex((worksheet) => /^unity\s+project\s+folder$/i.test(String(worksheet?.activity || "").trim()));
+    if (folderIndex >= 0 && activities[folderIndex]?.unityProjectFolderVersion !== 1) {
+        changed = true;
+        activities[folderIndex] = {
+            ...activities[folderIndex],
+            title: "Unity Project Folder",
+            unityProjectFolderVersion: 1,
+            completionMode: "manual",
+            questions: [],
+            images: [],
+            taskBrief: {
+                challenge: "Create a local folder for your Unity projects and select it as the project location in Unity Hub.",
+                evidenceRequired: "No screenshots, file uploads or written answers are required. Once your Unity folder exists inside Videos and the correct project location is selected, choose Mark Activity Complete. Then continue to Activity 4 - Google Drive Backup. Reopen these instructions whenever you change computers."
+            },
+            blocks: [
+                { id: "unity-folder-videos", kind: "tasks", title: "Step 1 - Find Your Videos Folder",
+                    text: "Open Windows File Explorer from the taskbar or Start menu.\nSelect This PC, then open Videos.\nUse the Windows Videos folder, not a folder in Downloads or Documents." },
+                { id: "unity-folder-create", kind: "text", numbered: false, title: "Step 2 - Create Your Unity Folder",
+                    text: "Inside Videos, right-click an empty space and choose New > Folder. Name the folder Unity and press Enter.\nIf Unity already exists inside Videos, use that existing folder rather than creating another.\n\nYour folder structure should look like this:\nVideos\n\u2514\u2500\u2500 Unity" },
+                { id: "unity-folder-location", kind: "tasks", title: "Step 3 - Set Your Unity Project Location",
+                    text: "Open Unity Hub and select Projects.\nSelect New project to open the setup screen only.\nFind the Location field and use its folder icon to select Videos\\Unity.\nDo not click Create project. Do not create a Unity project during this activity; the test project will be created in Activity 5." },
+                { id: "unity-folder-check", kind: "text", numbered: false, title: "Step 4 - Check Your Folder Location",
+                    text: "Confirm that Unity Hub displays your Unity folder inside Videos as the project location. Your Windows username and full path may differ from other students' paths; you do not need to type or submit a fixed username or full file path.\nAfter checking the location, leave the setup screen without creating a project. You will create the test project in Activity 5.\nMark this activity complete, then continue to Activity 4 - Google Drive Backup." }
+            ]
+        };
+    }
     const finalIndex = content.worksheets.findIndex((worksheet) => /^unity\s*test\s+project$/i.test(String(worksheet?.activity || "").trim()));
     if (finalIndex >= 0 && !activities[finalIndex]?.blocks?.some((block) => block.id === "unitytest-project-link")) {
         changed = true;
