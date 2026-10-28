@@ -49,8 +49,10 @@ function registerActivityBlocks(app, deps) {
     app.get(settingsPath, requireAdminAccess, async (req, res) => {
         res.set("Cache-Control", "private, no-store");
         try {
-            const { block } = await schoolLicenceSettings(req);
-            res.json({ activationMethod: block.activationMethod, licenceValue: block.licenceValue || "" });
+            const { content, block } = await schoolLicenceSettings(req);
+            const editor = content.activities.find((entry) => entry?.unityEditor);
+            if (!editor) return res.status(404).json({ error: "Unity Editor configuration not found. Open Activity 2 in the Kit Content Builder first." });
+            res.json({ activationMethod: block.activationMethod, licenceValue: block.licenceValue || "", unityEditor: editor.unityEditor });
         } catch (error) {
             console.error("[school-licence] Could not load teacher settings:", error.message);
             res.status(error.status || 500).json({ error: error.message || "Could not load school licence settings." });
@@ -59,13 +61,18 @@ function registerActivityBlocks(app, deps) {
     app.put(settingsPath, requireAdminAccess, async (req, res) => {
         res.set("Cache-Control", "private, no-store");
         try {
-            const { activationMethod, licenceValue } = req.body || {};
-            try { B.validate({ blocks: [{ id: "school", kind: "schoollicence", activationMethod, licenceValue }] }); }
+            const { activationMethod, licenceValue, unityEditor } = req.body || {};
+            try { B.validate({ blocks: [{ id: "school", kind: "schoollicence", activationMethod, licenceValue }], unityEditor }); }
             catch (error) { return res.status(400).json({ error: error.message }); }
             if (typeof licenceValue !== "string") return res.status(400).json({ error: "School licence information must be text." });
             const { content, activity, block } = await schoolLicenceSettings(req);
+            const editor = content.activities.find((entry) => entry?.unityEditor);
+            if (unityEditor !== undefined && !editor) return res.status(404).json({ error: "Unity Editor configuration not found." });
             const updated = { ...content, activities: content.activities.map((entry) => entry === activity
                 ? { ...entry, blocks: entry.blocks.map((item) => item === block ? { ...item, activationMethod, licenceValue } : item) }
+                : entry === editor && unityEditor !== undefined ? { ...entry, unityEditor: {
+                    version: unityEditor.version.trim(), modules: unityEditor.modules || "", notes: unityEditor.notes || ""
+                } }
                 : entry) };
             await savePracticalSkillsKitContent(req.params.kitId, updated, normalizeEmail(getRequestUserEmail(req)));
             res.json({ saved: true });

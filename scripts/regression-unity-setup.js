@@ -388,7 +388,7 @@ test("Licence Kit Setup restricts settings to admins and updates only the curren
         { ...headers, "x-user-email": "student@school.nz" })).status, 403);
     const first = await fetch(url, { headers });
     assert.equal(first.headers.get("cache-control"), "private, no-store");
-    assert.deepEqual(await first.json(), { activationMethod: "instructions", licenceValue: "" });
+    assert.deepEqual(await first.json(), { activationMethod: "instructions", licenceValue: "", unityEditor: original.activities[1].unityEditor });
     for (const data of [{ activationMethod: "other", licenceValue: "" }, { activationMethod: "serial", licenceValue: {} },
         { activationMethod: "serial" }, { activationMethod: "serial", licenceValue: "x".repeat(10001) }]) {
         assert.equal((await save(data)).status, 400);
@@ -400,6 +400,15 @@ test("Licence Kit Setup restricts settings to admins and updates only the curren
     assert.deepEqual(content.worksheets, original.worksheets);
     const reloaded = await (await fetch(url, { headers })).json();
     assert.equal(reloaded.licenceValue, mockLicence);
+    const editorConfig = { version: "6000.5.2f1", modules: "Windows Build Support\nWeb Build Support", notes: "Use the school network." };
+    for (const invalid of [{ version: "" }, { version: 6000.5 }, { version: "6000.5", modules: [] }]) {
+        assert.equal((await save({ activationMethod: "serial", licenceValue: mockLicence, unityEditor: invalid })).status, 400);
+    }
+    assert.equal((await save({ activationMethod: "serial", licenceValue: mockLicence, unityEditor: editorConfig })).status, 200);
+    assert.deepEqual((await (await fetch(url, { headers })).json()).unityEditor, editorConfig);
+    assert.equal(content.activities[0].blocks[2].licenceValue, mockLicence);
+    assert.deepEqual(content.activities[1].blocks, original.activities[1].blocks);
+    assert.deepEqual(content.activities.slice(2), original.activities.slice(2));
     const beforeFailure = structuredClone(content);
     fail = true;
     assert.equal((await save({ activationMethod: "instructions", licenceValue: "Unsaved" })).status, 500);
@@ -456,7 +465,7 @@ test("Licence Kit Setup loads, saves and clears the teacher licence on account c
     };
     const events = {};
     let signedIn = true;
-    let stored = { activationMethod: "instructions", licenceValue: "" };
+    let stored = { activationMethod: "instructions", licenceValue: "", unityEditor: { version: "6000.5", modules: "", notes: "" } };
     let fail = false;
     const ctx = vm.createContext({
         document: { getElementById: get, createElement: () => ({}) },
@@ -478,11 +487,22 @@ test("Licence Kit Setup loads, saves and clears the teacher licence on account c
     await tick();
     assert.equal(get("setup-form").hidden, false);
     assert.equal(get("setup-fields").disabled, false);
+    assert.equal(get("setup-editor-version").value, "6000.5");
     get("setup-method").value = "serial";
     get("setup-value").value = mockLicence;
+    get("setup-editor-version").value = "6000.5.2f1";
+    get("setup-editor-modules").value = "Web Build Support";
+    get("setup-editor-notes").value = "Keep Unity Hub open.";
     await get("setup-form").handlers.submit({ preventDefault() {} });
     assert.equal(stored.licenceValue, mockLicence);
-    assert.match(get("setup-status").textContent, /Unity licence saved/);
+    assert.equal(stored.unityEditor.version, "6000.5.2f1");
+    assert.equal(stored.unityEditor.modules, "Web Build Support");
+    assert.equal(stored.unityEditor.notes, "Keep Unity Hub open.");
+    assert.match(get("setup-status").textContent, /Unity settings saved/);
+    events["hub-auth-state-changed"]();
+    await tick();
+    assert.equal(get("setup-editor-version").value, "6000.5.2f1");
+    assert.equal(get("setup-value").value, mockLicence);
     fail = true;
     await get("setup-form").handlers.submit({ preventDefault() {} });
     assert.match(get("setup-status").textContent, /Save failed/);
@@ -492,6 +512,8 @@ test("Licence Kit Setup loads, saves and clears the teacher licence on account c
     await tick();
     assert.equal(get("setup-form").hidden, true);
     assert.equal(get("setup-value").value, "");
+    assert.equal(get("setup-editor-version").value, "");
+    assert.equal(get("setup-editor-modules").value, "");
 });
 
 function viewerFixture() {

@@ -28,13 +28,14 @@
       <a class="button button-secondary" href="./teacher-results.html">Teacher Review</a>
       <a class="button button-secondary" href="./admin-kits.html">Kit Content Builder</a>
     </nav>
-    <p>Teacher/admin access required. Configure the Unity school licence used by Activity 1 - Unity Hub &amp; Licence. Students can view it but cannot edit it.</p>
+    <p>Teacher/admin access required. Configure the school licence for Activity 1 and the required Unity Editor version for Activity 2. Students can view these settings but cannot edit them.</p>
     <p id="setup-status" role="status" aria-live="polite">Sign in with your school teacher/admin account.</p>
     <form id="setup-form" class="sites-card" hidden>
-      <h2>Unity Licence Loader</h2>
+      <h2>Unity Setup</h2>
       <label class="sites-field">Unity Setup Kit<select id="setup-kit" required></select></label>
       <fieldset id="setup-fields" disabled>
-        <legend>School Unity licence</legend>
+        <legend>Unity licence and Editor settings</legend>
+        <h3>Unity Licence Loader - Activity 1</h3>
         <label class="sites-field">Activation method
           <select id="setup-method">
             <option value="instructions">Activation instructions (no copy button)</option>
@@ -46,12 +47,24 @@
         </label>
         <p>Paste school-authorised licence information intended for students. Save to update the existing View School Licence button in Activity 1. The value is not displayed in the collapsed student view.</p>
         <p>Leave blank to show: "School licence information is not yet available. Please ask your teacher."</p>
-        <button class="button button-primary" type="submit">Save Unity Licence</button>
+        <h3>Unity Editor - Activity 2</h3>
+        <label class="sites-field">Required Unity Editor Version
+          <input id="setup-editor-version" type="text" required maxlength="200" placeholder="6000.5">
+        </label>
+        <p>Full identifiers are supported, including patch and release suffixes, for example 6000.5.0f1. This updates the prominent version shown in Step 2.</p>
+        <label class="sites-field">Required Installation Modules (optional, one per line)
+          <textarea id="setup-editor-modules" rows="3" maxlength="10000"></textarea>
+        </label>
+        <label class="sites-field">Additional installation notes (optional)
+          <textarea id="setup-editor-notes" rows="3" maxlength="10000"></textarea>
+        </label>
+        <p>Saved Editor settings appear when students open or reload Activity 2. These are the same settings available in Activity 2 Details in the Kit Content Builder.</p>
+        <button class="button button-primary" type="submit">Save Unity Settings</button>
       </fieldset>
     </form>
   </main>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="../script.js?v=licence-setup-1"></script>
-  <script src="./licence-kit-setup.js?v=2"></script>
+  <script src="./licence-kit-setup.js?v=3"></script>
 </body>
 </html>
