@@ -768,7 +768,9 @@
                         ? "Unity Editor activity completed! Your tick is saved. Continue to Activity 3 - Unity Project Folder from the Kit Activity List."
                         : activity?.unityProjectFolderVersion
                             ? "Unity Project Folder activity completed! Your tick is saved. Continue to Activity 4 - Google Drive Backup from the Kit Activity List."
-                        : "Activity completed! Your tick is saved. Return to the Kit Activity List to see your progress."
+                            : activity?.unityDriveBackupVersion
+                                ? "Google Drive Backup activity completed! Your tick is saved. Continue to Activity 5 - Unity Test Project from the Kit Activity List."
+                                : "Activity completed! Your tick is saved. Return to the Kit Activity List to see your progress."
                     : "Activity completion removed.");
             } catch (error) {
                 showStatusMessage(error?.message || "Could not save activity completion.", true);

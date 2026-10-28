@@ -83,6 +83,34 @@ function withUnityHubLicence(content) {
             ]
         };
     }
+    const backupIndex = content.worksheets.findIndex((worksheet) => /^google\s+drive\s+backup$/i.test(String(worksheet?.activity || "").trim()));
+    if (backupIndex >= 0 && activities[backupIndex]?.unityDriveBackupVersion !== 1) {
+        changed = true;
+        activities[backupIndex] = {
+            ...activities[backupIndex],
+            title: "Google Drive Backup",
+            unityDriveBackupVersion: 1,
+            completionMode: "manual",
+            questions: [],
+            images: [],
+            taskBrief: {
+                challenge: "Connect your Windows Videos folder to Google Drive for desktop so Unity projects saved in Videos\\Unity can be backed up to your school Google Drive.",
+                evidenceRequired: "No screenshots, uploads or written answers are required. Once Videos is connected to Google Drive with synchronisation enabled, choose Mark Activity Complete, then continue to Activity 5 - Unity Test Project. You can reopen these instructions whenever you need to configure another computer."
+            },
+            blocks: [
+                { id: "unity-backup-find", kind: "tasks", title: "Step 1 - Find Google Drive for desktop",
+                    text: "Click the Windows Start button.\nSearch for Google Drive.\nOpen Google Drive for desktop.\nLook for the Google Drive icon in the Windows system tray near the clock." },
+                { id: "unity-backup-signin", kind: "tasks", title: "Step 2 - Sign In",
+                    text: "Click Sign in with browser if prompted.\nSelect your WHS school Google account, not a personal Google account.\nComplete the sign-in process and return to Google Drive for desktop.\nIf you are already signed in, check that it is your WHS school account before continuing." },
+                { id: "unity-backup-preferences", kind: "tasks", title: "Step 3 - Open Google Drive Preferences",
+                    text: "Click the Google Drive icon in the Windows system tray. If it is hidden, open the tray's hidden icons.\nSelect Settings (gear icon).\nSelect Preferences.\nFind Folders from your computer." },
+                { id: "unity-backup-connect", kind: "tasks", title: "Step 4 - Connect Your Videos Folder",
+                    text: "If Videos is already configured for syncing, use the existing connection; do not add it again.\nOtherwise, under Folders from your computer, select Add folder.\nChoose your Windows Videos folder, not a similarly named folder inside Google Drive.\nEnable Sync with Google Drive, then click Done and Save if prompted.\nKeep your Unity folder in Videos\\Unity. Do not move the Unity project folder into the Google Drive virtual drive." },
+                { id: "unity-backup-check", kind: "tasks", title: "Step 5 - Check Your Backup Connection",
+                    text: "Return to Google Drive Preferences.\nConfirm Videos appears under Folders from your computer with Sync with Google Drive enabled.\nCheck the Google Drive activity window for sync errors. If Google Drive reports a sync error, resolve it before relying on the backup; ask your teacher for help if needed.\nAllow synchronisation to finish before changing computers. Your Unity projects are included when saved inside Videos\\Unity.\nMark this activity complete, then continue to Activity 5 - Unity Test Project." }
+            ]
+        };
+    }
     const finalIndex = content.worksheets.findIndex((worksheet) => /^unity\s*test\s+project$/i.test(String(worksheet?.activity || "").trim()));
     if (finalIndex >= 0 && !activities[finalIndex]?.blocks?.some((block) => block.id === "unitytest-project-link")) {
         changed = true;

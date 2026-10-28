@@ -23,7 +23,7 @@ test("Unity preset builds four steps without answers and preserves the other set
     const before = JSON.stringify(original);
     const content = withUnityHubLicence(original);
     assert.equal(JSON.stringify(original), before);
-    assert.equal(content.activities[3], original.activities[3]);
+    assert.equal(content.activities[3].unityDriveBackupVersion, 1);
     const activity = content.activities[0];
     assert.equal(activity.title, "Unity Hub & Licence");
     assert.equal(activity.completionMode, "manual");
@@ -156,7 +156,49 @@ test("Unity Project Folder renders four safe setup steps and preserves teacher e
     assert.equal(content.activities[2].blocks[0].text, "Teacher-edited folder instructions.");
 });
 
-test("Unity Editor and Project Folder manual completion save ticks and direct students to the next activity", async () => {
+test("Google Drive Backup migrates once and renders five steps without evidence inputs", () => {
+    const previous = withUnityHubLicence(baseContent());
+    delete previous.activities[3].unityDriveBackupVersion;
+    const before = JSON.stringify(previous);
+    const content = withUnityHubLicence(previous);
+    assert.equal(JSON.stringify(previous), before, "Migration does not mutate the existing content");
+    for (const index of [0, 1, 2, 4]) assert.equal(content.activities[index], previous.activities[index]);
+    const activity = content.activities[3];
+    assert.equal(activity.title, "Google Drive Backup");
+    assert.equal(activity.completionMode, "manual");
+    assert.deepEqual(activity.questions, []);
+    assert.deepEqual(activity.images, []);
+    assert.deepEqual(activity.blocks.map((block) => block.title), [
+        "Step 1 - Find Google Drive for desktop", "Step 2 - Sign In",
+        "Step 3 - Open Google Drive Preferences", "Step 4 - Connect Your Videos Folder",
+        "Step 5 - Check Your Backup Connection"
+    ]);
+    B.validate(activity);
+    const ctx = vm.createContext({ window: { ActivityBlocks: B }, structuredClone });
+    for (const file of ["activity-block-view.js", "kit-worksheet-render.js"]) {
+        vm.runInContext(fs.readFileSync(path.join(root, "practical-skills", file), "utf8"), ctx);
+    }
+    const host = { style: { setProperty() {} }, innerHTML: "", querySelectorAll: () => [] };
+    ctx.window.KitWorksheetRender.renderWorksheet(host, { ...activity, bannerTitle: activity.title }, { readOnly: true });
+    assert.equal((host.innerHTML.match(/class="activity-content-block"/g) || []).length, 5);
+    for (const instruction of [
+        /Windows Start/, /WHS school Google account, not a personal/,
+        /system tray/, /Settings \(gear icon\)/, /Preferences/,
+        /Folders from your computer/, /Add folder/, /Sync with Google Drive/,
+        /Done and Save/, /not a similarly named folder inside Google Drive/,
+        /already configured for syncing/, /do not add it again/,
+        /Do not move the Unity project folder into the Google Drive virtual drive/,
+        /resolve it before relying on the backup/,
+        /Allow synchronisation to finish before changing computers/,
+        /Videos\\Unity/, /Activity 5 - Unity Test Project/, /configure another computer/
+    ]) assert.match(host.innerHTML, instruction);
+    assert.doesNotMatch(host.innerHTML, /<input|<textarea|type="file"/);
+    activity.blocks[0].text = "Teacher-edited backup instructions.";
+    assert.equal(withUnityHubLicence(content), content);
+    assert.equal(content.activities[3].blocks[0].text, "Teacher-edited backup instructions.");
+});
+
+test("Unity setup manual completion saves ticks and directs students to the next activity", async () => {
     const controller = fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet.js"), "utf8");
     const start = controller.indexOf('        activityCompleteBtn.addEventListener("click",');
     const end = controller.indexOf("\n        });", start) + "\n        });".length;
@@ -187,6 +229,13 @@ test("Unity Editor and Project Folder manual completion save ticks and direct st
     await click();
     assert.equal(state.completedActivities[2], "saved");
     assert.match(message, /Activity 4 - Google Drive Backup/);
+    await click();
+    assert.deepEqual(state.completedActivities, {});
+    assert.equal(message, "Activity completion removed.");
+    index = 3;
+    await click();
+    assert.equal(state.completedActivities[3], "saved");
+    assert.match(message, /Activity 5 - Unity Test Project/);
     await click();
     assert.deepEqual(state.completedActivities, {});
     assert.equal(message, "Activity completion removed.");
@@ -284,6 +333,9 @@ test("Unity instructions and teacher licence settings persist in database conten
     assert.equal(reopened.activities[2].unityProjectFolderVersion, 1);
     assert.equal(reopened.activities[2].completionMode, "manual");
     assert.match(reopened.activities[2].blocks[2].text, /Videos\\Unity/);
+    assert.equal(reopened.activities[3].unityDriveBackupVersion, 1);
+    assert.equal(reopened.activities[3].completionMode, "manual");
+    assert.match(reopened.activities[3].blocks[3].text, /Sync with Google Drive/);
     assert.equal(writes.length, 2, "Reopening does not overwrite the teacher configuration");
 });
 
