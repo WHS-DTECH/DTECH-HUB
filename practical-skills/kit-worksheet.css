@@ -1339,6 +1339,20 @@ body.kit-worksheet-page {
     font-size: 1.15rem;
 }
 
+.treasure-map-search kbd {
+    display: inline-block;
+    padding: 3px 10px;
+    margin: 3px 2px;
+    border: 2px solid #20374a;
+    border-bottom-width: 5px;
+    border-radius: 6px;
+    background: #fff;
+    color: #20374a;
+    font: inherit;
+    font-size: 1.3em;
+    font-weight: 800;
+}
+
 .treasure-map-search .treasure-map-search-keywords {
     display: inline-block;
     padding: 10px 16px;
