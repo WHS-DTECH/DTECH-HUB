@@ -15251,11 +15251,7 @@ require("./practical-skills/teacher-results-store").registerTeacherResults(app, 
       .map((row) => {
         const email = normalizeEmail(row.linked_emails?.[0] || "");
         const year = String(row.year_level || "").match(/(?:year\s*)?(\d{1,2})/i)?.[1] || "";
-        const yearNumber = Number(year);
-        const course = getResearchReportProgrammeFolder(getHuntProfile(row))
-          || (yearNumber > 0 && yearNumber <= 8 ? "JuniorDTECH"
-            : yearNumber <= 10 && yearNumber >= 9 ? "MiddleDTECH"
-              : yearNumber >= 11 ? "SeniorDTECH" : "");
+        const course = require("./practical-skills/teacher-results-store").getTeacherKitCourse(getHuntProfile(row));
         return {
           name: String(row.student_name || "").trim() || email,
           email,

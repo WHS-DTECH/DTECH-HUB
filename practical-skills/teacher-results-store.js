@@ -1,5 +1,13 @@
 "use strict";
 
+function getTeacherKitCourse(profile) {
+    const courseIds = Array.isArray(profile?.courseIds) ? profile.courseIds : [];
+    if (courseIds.some((id) => /^(?:7|8)DTECH$/.test(id))) return "JuniorDTECH";
+    if (courseIds.some((id) => /^(?:9|10)MDTECH$/.test(id))) return "MiddleDTECH";
+    if (courseIds.some((id) => /^(?:SENIORDTECH|(?:11|12|13)(?:DTECH|COMP))$/.test(id))) return "SeniorDTECH";
+    return "";
+}
+
 async function ensureTeacherKitChocolateSchema(pool) {
     await pool.query(`
         CREATE TABLE IF NOT EXISTS practical_skills_chocolate (
@@ -121,4 +129,4 @@ function registerTeacherResults(app, { pool, requireAdminAccess, schoolDomain, g
     });
 }
 
-module.exports = { registerTeacherResults, ensureTeacherKitChocolateSchema };
+module.exports = { registerTeacherResults, ensureTeacherKitChocolateSchema, getTeacherKitCourse };

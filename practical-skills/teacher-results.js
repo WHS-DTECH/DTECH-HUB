@@ -181,7 +181,7 @@
                     return { ...student, name: profile.name || student.name || student.email,
                         whanau: String(profile.homeroom || student.homeroom || "").trim(),
                         homeroom: String(student.timetableClass || "").trim().toUpperCase(),
-                        course: profile.course || student.course || "" };
+                        course: student.course || "" };
                 })
             };
             populateWhanau(classData.students);

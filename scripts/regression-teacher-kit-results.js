@@ -5,7 +5,34 @@ const express = require("express");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
-const { registerTeacherResults, ensureTeacherKitChocolateSchema } = require("../practical-skills/teacher-results-store");
+const { registerTeacherResults, ensureTeacherKitChocolateSchema, getTeacherKitCourse } = require("../practical-skills/teacher-results-store");
+const { getHuntProfile } = require("../learning-sites-assessment");
+
+test("teacher course groups require enrolment, not just a year-level folder", () => {
+    for (const year of [9, 10]) {
+        for (const programs of [[], ["COMP"], ["MPROG"], ["DTECH"]]) {
+            const student = { year_level: String(year), programs };
+            const before = JSON.stringify(student);
+            assert.equal(getTeacherKitCourse(getHuntProfile(student)), "",
+                `Year ${year} ${programs.join(",") || "without enrolment"} is not MDTECH`);
+            assert.equal(JSON.stringify(student), before);
+        }
+        assert.equal(getTeacherKitCourse(getHuntProfile({ year_level: String(year), programs: ["MDTECH", "DTECH"] })), "MiddleDTECH");
+    }
+    assert.equal(getTeacherKitCourse(getHuntProfile({ year_level: "7", timetable_class: "JPI" })), "JuniorDTECH");
+    assert.equal(getTeacherKitCourse(getHuntProfile({ year_level: "8", programs: [] })), "");
+    for (const year of [11, 12, 13]) {
+        for (const program of ["DTECH", "COMP"]) {
+            assert.equal(getTeacherKitCourse(getHuntProfile({ year_level: String(year), programs: [program] })), "SeniorDTECH");
+        }
+        assert.equal(getTeacherKitCourse(getHuntProfile({ year_level: String(year), programs: [] })), "");
+    }
+    assert.equal(getTeacherKitCourse(null), "");
+    const source = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
+    const provider = source.slice(source.indexOf('require("./practical-skills/teacher-results-store").registerTeacherResults'), source.indexOf('app.get("/api/admin/practical-skills/preview-users"'));
+    assert.match(provider, /getTeacherKitCourse\(getHuntProfile\(row\)\)/);
+    assert.doesNotMatch(provider, /getResearchReportProgrammeFolder|yearNumber/);
+});
 
 async function fixture(t) {
     const app = express();
@@ -226,7 +253,7 @@ test("class review keeps whānau and timetable homerooms separate and combines f
             kitProgress: { "kit-login": { started: true }, "kit-search": { completed: true } } },
         { name: "Cara", email: "cara@school.nz", homeroom: "7WHAU", timetableClass: "JVE", course: "JuniorDTECH",
             kitProgress: { "kit-login": { started: false, completed: false } } },
-        { name: "Dan", email: "dan@school.nz", homeroom: "JPI", timetableClass: "", course: "JuniorDTECH" }
+        { name: "Dan", email: "dan@school.nz", homeroom: "JPI", timetableClass: "", course: "" }
     ];
     const source = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "teacher-results.js"), "utf8");
     let kits = [{ id: "kit-login", title: "Login Kit" }, { id: "kit-search", title: "Search Kit" }];
@@ -246,7 +273,7 @@ test("class review keeps whānau and timetable homerooms separate and combines f
             return {
                 ok: true,
                 json: async () => url.includes("preview-users")
-                    ? { users: [] }
+                    ? { users: [{ type: "Student", email: "dan@school.nz", course: "MiddleDTECH" }] }
                     : { students, kits, reviewedAt: "2026-10-28" }
             };
         }
@@ -258,6 +285,12 @@ test("class review keeps whānau and timetable homerooms separate and combines f
     assert.deepEqual(names(), ["Ana", "Ben", "Cara", "Dan"]);
     assert.equal(rows()[0].children[1].textContent, "7WHAU");
     assert.equal(rows()[0].children[2].textContent, "JPI");
+    assert.equal(rows()[3].children[3].textContent, "Not assigned", "Year-based preview course cannot override enrolment");
+    el("class-course-filter").value = "MiddleDTECH";
+    el("class-course-filter").events.change();
+    assert.match(el("class-progress-status").textContent, /No students match/);
+    el("class-course-filter").value = "";
+    el("class-course-filter").events.change();
     const header = el("class-progress-table-host").children[0].children[0].children[0];
     assert.deepEqual(header.children.map((cell) => cell.textContent),
         ["Student", "Whānau", "Homeroom", "Course", "Login Kit", "Chocolate", "Search Kit", "Chocolate"]);
