@@ -8,18 +8,18 @@
   <title>Kit Results | Teacher Review</title>
   <link rel="stylesheet" href="../styles.css">
   <link rel="stylesheet" href="./teacher-login-sites.css">
-  <link rel="stylesheet" href="./teacher-results.css?v=2">
+  <link rel="stylesheet" href="./teacher-results.css?v=3">
 </head>
 <body data-hub-read-only="true">
   <main class="sites-editor">
-    <h1>Kit results: read-only teacher review</h1>
+    <h1>Kit results: teacher review</h1>
     <nav class="sites-actions" aria-label="Staff sign-in">
       <button id="hub-google-signin" class="google-signin-button" type="button">Sign in with Google</button>
       <button id="hub-google-signout" class="button button-secondary" type="button" hidden>Sign out</button>
       <button id="hub-user-badge" class="user-badge" type="button" hidden aria-label="Open profile" aria-haspopup="true" aria-expanded="false"></button>
       <a class="button button-secondary" href="./admin-kits.html">Kit Content Builder</a>
     </nav>
-    <p>Admin access required. Reading this page never changes answers, completion ticks or certificate status, and never sends emails.</p>
+    <p>Admin access required. Kit results are read-only: answers, completion ticks and certificate status never change here, and no emails are sent. Chocolate checkboxes are saved separately when you change them.</p>
     <div class="teacher-results-tabs" role="tablist" aria-label="Teacher review pages">
       <button id="class-progress-tab" type="button" role="tab" aria-selected="true" aria-controls="class-progress-panel">Class Kit Progress</button>
       <button id="student-review-tab" type="button" role="tab" aria-selected="false" aria-controls="student-review-panel" tabindex="-1">Student Review</button>
@@ -29,7 +29,7 @@
         <div class="class-progress-heading">
           <div>
             <h2>Class Kit Completion</h2>
-            <p>See which active Licence Kits students have completed.</p>
+            <p>See which active Licence Kits students have completed. Tick Chocolate when given; unchecked means No. Changes save automatically.</p>
           </div>
           <button id="class-progress-refresh" class="button button-primary" type="button">Refresh list</button>
         </div>
@@ -62,6 +62,7 @@
           </label>
         </div>
         <p id="class-progress-status" role="status" aria-live="polite">Sign in with an admin account to load the class list.</p>
+        <p id="chocolate-status" role="status" aria-live="polite"></p>
         <div id="class-progress-table-host" class="class-progress-table-host"></div>
       </div>
     </section>
@@ -77,6 +78,6 @@
   </main>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="../script.js?v=kit-results-1"></script>
-  <script src="./teacher-results.js?v=3"></script>
+  <script src="./teacher-results.js?v=4"></script>
 </body>
 </html>

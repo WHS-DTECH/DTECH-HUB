@@ -72,7 +72,8 @@
     padding: 9px;
 }
 
-#class-progress-status.is-error {
+#class-progress-status.is-error,
+#chocolate-status.is-error {
     color: #a4342f;
     font-weight: 700;
 }

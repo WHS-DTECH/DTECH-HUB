@@ -6022,6 +6022,7 @@ async function ensureSchema() {
   await ensureCourseOutlinesSchema();
   await ensurePracticalSkillsProgressSchema();
   await ensurePracticalSkillsKitContentSchema();
+  if (hasDatabase) await require("./practical-skills/teacher-results-store").ensureTeacherKitChocolateSchema(pool);
   await seedOzoneLayerReliefLesson();
   const seededProcessAssessmentAllocations = await backfillProcessAssessmentAllocations();
   if (seededProcessAssessmentAllocations > 0) {

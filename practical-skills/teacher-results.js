@@ -4,6 +4,9 @@
     const output = document.getElementById("results-output");
     const status = document.getElementById("results-status");
     const classStatus = document.getElementById("class-progress-status");
+    const chocolateStatus = document.getElementById("chocolate-status");
+    const refreshButton = document.getElementById("class-progress-refresh");
+    const pendingChocolate = new Set();
     const classTableHost = document.getElementById("class-progress-table-host");
     const courseFilter = document.getElementById("class-course-filter");
     const whanauFilter = document.getElementById("class-whanau-filter");
@@ -45,6 +48,37 @@
         const key = courseKey(value);
         return key === "JuniorDTECH" ? "Junior DTECH" : key || "Not assigned";
     }
+    async function saveChocolate(student, kit, checked) {
+        const data = classData;
+        const key = `${student.email}:${kit.id}`;
+        if (pendingChocolate.size) return;
+        pendingChocolate.add(key);
+        refreshButton.disabled = true;
+        chocolateStatus.classList.remove("is-error");
+        chocolateStatus.textContent = `Saving Chocolate for ${student.name} - ${kit.title}...`;
+        renderClassProgress();
+        try {
+            const response = await fetch(`/api/admin/kit-chocolate/${encodeURIComponent(kit.id)}`, {
+                method: "PUT",
+                headers: { ...adminHeaders(), "Content-Type": "application/json" },
+                body: JSON.stringify({ email: student.email, chocolate: checked })
+            });
+            const saved = await response.json();
+            if (!response.ok) throw new Error(saved.error || `Could not save Chocolate (${response.status}).`);
+            if (typeof saved.chocolate !== "boolean") throw new Error("The server did not confirm the Chocolate value. Refresh the class list.");
+            if (classData !== data) return;
+            student.chocolate = { ...student.chocolate, [kit.id]: saved.chocolate };
+            chocolateStatus.textContent = `Saved Chocolate: ${saved.chocolate ? "Yes" : "No"} for ${student.name} - ${kit.title}.`;
+        } catch (error) {
+            if (classData !== data) return;
+            chocolateStatus.textContent = `${student.name} - ${kit.title}: ${error.message || "Could not save Chocolate. Refresh the class list before trying again."}`;
+            chocolateStatus.classList.add("is-error");
+        } finally {
+            pendingChocolate.delete(key);
+            refreshButton.disabled = pendingChocolate.size > 0;
+            if (classData === data) renderClassProgress();
+        }
+    }
     function renderClassProgress() {
         if (!classData || !classTableHost) return;
         const selectedCourse = courseFilter.value;
@@ -66,7 +100,7 @@
         const table = node("table", undefined, classTableHost, "class-progress-table");
         const head = node("thead", undefined, table);
         const header = node("tr", undefined, head);
-        ["Student", "Whānau", "Homeroom", "Course", ...classData.kits.map((kit) => kit.title)].forEach((label) => {
+        ["Student", "Whānau", "Homeroom", "Course", ...classData.kits.flatMap((kit) => [kit.title, "Chocolate"])].forEach((label) => {
             node("th", label, header);
         });
         const body = node("tbody", undefined, table);
@@ -81,6 +115,15 @@
                 const cell = node("td", undefined, row, progress?.completed ? "class-progress-complete" : "class-progress-incomplete");
                 cell.textContent = progress?.completed ? "Complete" : progress?.started ? "In progress" : "Not started";
                 if (progress?.completedAt) cell.title = `Completed ${date(progress.completedAt)}`;
+                const chocolateCell = node("td", undefined, row);
+                const label = node("label", undefined, chocolateCell);
+                const checkbox = node("input", undefined, label);
+                checkbox.type = "checkbox";
+                checkbox.checked = student.chocolate?.[kit.id] === true;
+                checkbox.disabled = pendingChocolate.size > 0;
+                checkbox.setAttribute("aria-label", `Chocolate for ${student.name} - ${kit.title}`);
+                node("span", checkbox.checked ? " Yes" : " No", label);
+                checkbox.addEventListener("change", () => saveChocolate(student, kit, checkbox.checked));
             }
         }
         classStatus.classList.remove("is-error");
@@ -240,6 +283,8 @@
         revision += 1;
         classRevision += 1;
         classData = null;
+        chocolateStatus.textContent = "";
+        chocolateStatus.classList.remove("is-error");
         output.replaceChildren();
         status.textContent = "Sign-in changed. Read the records again with the current admin account.";
         classTableHost.replaceChildren();
