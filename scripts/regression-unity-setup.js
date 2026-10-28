@@ -239,6 +239,90 @@ test("Unity instructions and teacher licence settings persist in database conten
     assert.equal(writes.length, 2, "Reopening does not overwrite the teacher configuration");
 });
 
+test("licence reads verify OAuth sign-in before the publication gate without enabling OAuth on other routes", async (t) => {
+    const app = express();
+    const middlewares = [];
+    const licencePath = "/api/practical-skills/blocks/kit-unity-setup/0/licences/unity-school-licence";
+    const ctx = vm.createContext({
+        app: { use: (fn) => middlewares.push(fn) }, effectiveAuthMode: "strict",
+        extractBearerToken: (req) => String(req.headers.authorization || "").replace(/^Bearer /, ""),
+        verifyGoogleIdTokenAndExtractIdentity: async (token) => token === "eyJheader.payload.signature"
+            ? { ok: true, email: "student@school.nz" } : { ok: false, error: "token_verification_failed" },
+        verifyGoogleAccessTokenAndExtractIdentity: async (token) => {
+            if (token === "network-failure") throw new Error("Identity service unavailable");
+            return token === "valid-oauth" ? { ok: true, email: "student@school.nz" }
+                : { ok: false, error: "Expired or wrong-audience OAuth token" };
+        },
+        console: { error() {} }
+    });
+    const start = source.lastIndexOf("app.use(", source.indexOf("  req.auth_identity = {"));
+    const end = source.indexOf('\napp.use(["/api/practical-skills"', start);
+    assert.ok(start >= 0 && end > start);
+    vm.runInContext(source.slice(start, end), ctx);
+    app.use(middlewares[0]);
+    app.use((req, res) => res.json({ verified: req.auth_identity.verified,
+        source: req.auth_identity.source, email: req.authenticated_email || "", error: req.auth_identity.error }));
+    const server = await new Promise((resolve) => { const s = app.listen(0, "127.0.0.1", () => resolve(s)); });
+    t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); }));
+    const call = async (token, url = licencePath, method = "GET") => (await fetch(
+        `http://127.0.0.1:${server.address().port}${url}`, { method, headers: token ? { Authorization: `Bearer ${token}` } : {} })).json();
+    let result = await call("valid-oauth");
+    assert.equal(result.verified, true);
+    assert.equal(result.email, "student@school.nz", "Verified identity is available before publication/preview authorization");
+    assert.equal(result.source, "google_access_token");
+    assert.equal((await call("eyJheader.payload.signature")).source, "google_id_token");
+    for (const token of ["", "expired-oauth", "wrong-audience", "eyJinvalid.payload.signature", "network-failure"]) {
+        assert.equal((await call(token)).verified, false);
+    }
+    assert.equal((await call("valid-oauth", "/api/practical-skills/progress/kit-unity-setup")).verified, false);
+    assert.equal((await call("valid-oauth", licencePath, "PUT")).verified, false);
+});
+
+test("the reused OAuth verifier rejects expired, wrong-app and non-school identities", async () => {
+    let info = { aud: "school-app", expiry_date: Date.now() + 60000 };
+    let profile = { email: "student@school.nz", email_verified: true };
+    let userinfoCalls = 0;
+    const ctx = vm.createContext({
+        GOOGLE_ID_TOKEN_AUDIENCES: ["school-app"],
+        googleAuthClient: { getTokenInfo: async () => info },
+        normalizeEmail: (value) => String(value || "").toLowerCase(),
+        isSchoolEmail: (value) => value.endsWith("@school.nz"),
+        AbortSignal,
+        fetch: async () => { userinfoCalls++; return { ok: true, json: async () => profile }; }
+    });
+    const start = source.indexOf("async function verifyGoogleAccessTokenAndExtractIdentity(");
+    const end = source.indexOf("\nfunction getRequestUserEmail(", start);
+    vm.runInContext(source.slice(start, end), ctx);
+    assert.equal((await ctx.verifyGoogleAccessTokenAndExtractIdentity("oauth")).email, "student@school.nz");
+    info = { ...info, aud: "another-app" };
+    assert.equal((await ctx.verifyGoogleAccessTokenAndExtractIdentity("oauth")).ok, false);
+    assert.equal(userinfoCalls, 1);
+    info = { aud: "school-app", expiry_date: 1 };
+    assert.equal((await ctx.verifyGoogleAccessTokenAndExtractIdentity("oauth")).ok, false);
+    info.expiry_date = Date.now() + 60000;
+    profile = { email: "outsider@example.org", email_verified: true };
+    assert.equal((await ctx.verifyGoogleAccessTokenAndExtractIdentity("oauth")).ok, false);
+    profile = { email: "student@school.nz", email_verified: false };
+    assert.equal((await ctx.verifyGoogleAccessTokenAndExtractIdentity("oauth")).ok, false);
+});
+
+test("licence requests send the active OAuth token only to the verified read endpoint, not general worksheet APIs", () => {
+    const controller = fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet.js"), "utf8");
+    const start = controller.indexOf("    function withAuthHeaders(");
+    const end = controller.indexOf("\n    function showStatusMessage(", start);
+    for (const active of ["valid-oauth", "eyJheader.payload.signature", ""]) {
+        const ctx = vm.createContext({
+            state: { email: "student@school.nz" },
+            window: { getActiveHubBearerToken: () => active },
+            getStoredAuthRaw: () => JSON.stringify({ idToken: "expired-token", accessToken: "valid-oauth", expiresAt: Date.now() + 60000 })
+        });
+        vm.runInContext(controller.slice(start, end), ctx);
+        assert.equal(ctx.withAuthHeaders({}, true).Authorization, active ? `Bearer ${active}` : undefined);
+        assert.equal(ctx.withAuthHeaders().Authorization, active.startsWith("eyJ") ? `Bearer ${active}` : undefined);
+    }
+    assert.match(controller, /onSchoolLicence:[\s\S]*?headers: withAuthHeaders\(\{\}, true\), cache: "no-store"/);
+});
+
 test("licence viewer fetches current teacher configuration with verified identity, never saves progress and has no student write route", async (t) => {
     const content = withUnityHubLicence(baseContent());
     const block = content.activities[0].blocks[2];

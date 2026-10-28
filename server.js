@@ -6205,7 +6205,20 @@ app.use(async (req, _res, next) => {
   }
 
   req.auth_identity.token_present = true;
-  const verification = await verifyGoogleIdTokenAndExtractIdentity(bearerToken);
+  const licenceAccessToken = req.method === "GET" &&
+    /^\/api\/practical-skills\/blocks\/kit-[a-z0-9-]+\/\d+\/licences\/[a-zA-Z0-9_-]+$/.test(req.path) &&
+    bearerToken.split(".").length !== 3;
+  let verification;
+  try {
+    verification = licenceAccessToken
+      ? await verifyGoogleAccessTokenAndExtractIdentity(bearerToken)
+      : await verifyGoogleIdTokenAndExtractIdentity(bearerToken);
+  } catch (error) {
+    console.error("[school-licence] Google identity verification unavailable:", error.message);
+    req.auth_identity.error = "Google sign-in verification is unavailable. Please retry.";
+    next();
+    return;
+  }
   if (!verification.ok) {
     req.auth_identity.error = verification.error || "token_verification_failed";
     next();
@@ -6213,7 +6226,7 @@ app.use(async (req, _res, next) => {
   }
 
   req.auth_identity.verified = true;
-  req.auth_identity.source = "google_id_token";
+  req.auth_identity.source = licenceAccessToken ? "google_access_token" : "google_id_token";
   req.auth_identity.email = verification.email;
   req.auth_identity.subject = verification.subject;
   req.auth_identity.givenName = verification.givenName;

@@ -76,12 +76,17 @@
         }
     }
 
-    function withAuthHeaders(headers = {}) {
+    function withAuthHeaders(headers = {}, allowAccessToken = false) {
         const next = state.email ? { ...headers, "x-user-email": state.email } : { ...headers };
         const raw = getStoredAuthRaw();
         if (raw) {
             const auth = JSON.parse(raw);
-            if (auth.idToken) next.Authorization = `Bearer ${auth.idToken}`;
+            const token = typeof window.getActiveHubBearerToken === "function"
+                ? window.getActiveHubBearerToken()
+                : Number(auth.expiresAt) > Date.now() ? String(auth.idToken || auth.accessToken || "").trim() : "";
+            if (token && (allowAccessToken || token.startsWith("eyJ") && token.split(".").length === 3)) {
+                next.Authorization = `Bearer ${token}`;
+            }
         }
         return next;
     }
@@ -555,7 +560,7 @@
                 onSchoolLicence: async (blockId) => {
                     const email = state.email;
                     const licence = await loadJson(`${blockPath(activityIndex)}/licences/${encodeURIComponent(blockId)}${preview ? "?preview=1" : ""}`, {
-                        headers: withAuthHeaders(), cache: "no-store"
+                        headers: withAuthHeaders({}, true), cache: "no-store"
                     });
                     if (getSignedInEmail() !== email) throw new Error("Your signed-in account changed. Reopen this activity.");
                     return licence;
