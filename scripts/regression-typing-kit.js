@@ -315,6 +315,22 @@ test("dashboard renders exactly seven dated weeks and fourteen daily record link
     assert.equal(ui.requests[0].options.headers.Authorization, "Bearer test-token");
 });
 
+test("saved result shows a fourth date circle using the saved timestamp in New Zealand time", async () => {
+    const ui = frontend({ search: "?week=2026-10-26&period=1", snapshot: {
+        startDate: DEFAULT_START_DATE, canManage: false, attempts: [
+            { ...result, weekStart: DEFAULT_START_DATE, period: 1, submittedAt: "2026-10-26T12:30:00Z" }
+        ]
+    } });
+    await settle();
+    const html = ui.get("typing-content").innerHTML;
+    assert.match(html, /typing-metric-date/);
+    assert.match(html, /<dt>Date saved<\/dt>/);
+    assert.match(html, /datetime="2026-10-26T12:30:00Z">27 Oct 2026<\/time>/);
+    assert.equal((html.match(/class="typing-metric typing-metric-/g) || []).length, 4);
+    assert.match(html, /When your result was saved/);
+    assert.doesNotMatch(html, /<dt>Test date<\/dt>/);
+});
+
 test("paused teacher typing preview displays the log but disables submission and calendar controls", async () => {
     for (const search of ["", "?week=2026-10-26&period=1"]) {
         const ui = frontend({ search, snapshot: { startDate: DEFAULT_START_DATE, canManage: true, attempts: [], readOnly: true } });

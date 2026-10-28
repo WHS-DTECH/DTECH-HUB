@@ -154,6 +154,11 @@
                     <h2 id="typing-copy-heading">Latest saved result</h2>
                 </div><span class="typing-test-badge">1-minute test</span></div>
                 <dl class="typing-scoreboard">
+                    <div class="typing-metric typing-metric-date">
+                        <dt>Date saved</dt>
+                        <dd><time class="typing-score-date" datetime="${escapeHtml(latest.submittedAt)}">${escapeHtml(new Intl.DateTimeFormat("en-NZ", { day: "numeric", month: "short", year: "numeric", timeZone: "Pacific/Auckland" }).format(new Date(latest.submittedAt)))}</time><span class="typing-score-unit">NZ date</span></dd>
+                        <dd class="typing-metric-note">When your result was saved</dd>
+                    </div>
                     <div class="typing-metric typing-metric-speed">
                         <dt>Typing speed</dt>
                         <dd><span class="typing-score-value">${latest.grossWpm}</span><span class="typing-score-unit">WPM</span></dd>
