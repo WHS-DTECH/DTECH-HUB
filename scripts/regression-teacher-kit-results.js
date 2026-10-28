@@ -220,12 +220,16 @@ test("class review keeps whānau and timetable homerooms separate and combines f
         return elements.get(id);
     };
     const students = [
-        { name: "Ana", email: "ana@school.nz", homeroom: "7WHAU", timetableClass: " jpi ", course: "JuniorDTECH" },
-        { name: "Ben", email: "ben@school.nz", homeroom: "8WPAPA", timetableClass: "JPI", course: "JuniorDTECH" },
-        { name: "Cara", email: "cara@school.nz", homeroom: "7WHAU", timetableClass: "JVE", course: "JuniorDTECH" },
+        { name: "Ana", email: "ana@school.nz", homeroom: "7WHAU", timetableClass: " jpi ", course: "JuniorDTECH",
+            kitProgress: { "kit-login": { completed: true, started: false }, "kit-search": { started: true } } },
+        { name: "Ben", email: "ben@school.nz", homeroom: "8WPAPA", timetableClass: "JPI", course: "JuniorDTECH",
+            kitProgress: { "kit-login": { started: true }, "kit-search": { completed: true } } },
+        { name: "Cara", email: "cara@school.nz", homeroom: "7WHAU", timetableClass: "JVE", course: "JuniorDTECH",
+            kitProgress: { "kit-login": { started: false, completed: false } } },
         { name: "Dan", email: "dan@school.nz", homeroom: "JPI", timetableClass: "", course: "JuniorDTECH" }
     ];
     const source = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "teacher-results.js"), "utf8");
+    let kits = [{ id: "kit-login", title: "Login Kit" }, { id: "kit-search", title: "Search Kit" }];
     let failSave = false;
     const savedRequests = [];
     const context = vm.createContext({
@@ -243,7 +247,7 @@ test("class review keeps whānau and timetable homerooms separate and combines f
                 ok: true,
                 json: async () => url.includes("preview-users")
                     ? { users: [] }
-                    : { students, kits: [{ id: "kit-login", title: "Login Kit" }, { id: "kit-search", title: "Search Kit" }], reviewedAt: "2026-10-28" }
+                    : { students, kits, reviewedAt: "2026-10-28" }
             };
         }
     });
@@ -275,6 +279,54 @@ test("class review keeps whānau and timetable homerooms separate and combines f
     chocolateCheckbox().checked = false;
     await chocolateCheckbox().events.change();
     assert.equal(chocolateCheckbox().checked, false);
+    const select = (id, value) => {
+        el(id).value = value;
+        el(id).events.change();
+    };
+    assert.equal(el("class-status-filter").disabled, true, "Status needs a selected kit");
+    assert.deepEqual(el("class-kit-filter").options.map((option) => option.value), ["", "kit-login", "kit-search"]);
+    select("class-kit-filter", "kit-login");
+    assert.equal(el("class-status-filter").disabled, false);
+    select("class-status-filter", "completed");
+    assert.deepEqual(names(), ["Ana"], "Completed takes priority over started");
+    assert.equal(rows()[0].children.length, 8, "All kit and Chocolate columns stay visible");
+    select("class-status-filter", "in-progress");
+    assert.deepEqual(names(), ["Ben"]);
+    select("class-status-filter", "not-started");
+    assert.deepEqual(names(), ["Cara", "Dan"], "Missing and explicitly unstarted progress both match");
+    select("class-status-filter", "");
+    assert.deepEqual(names(), ["Ana", "Ben", "Cara", "Dan"]);
+    select("class-kit-filter", "kit-search");
+    select("class-status-filter", "completed");
+    assert.deepEqual(names(), ["Ben"], "Only the selected kit determines status");
+    select("class-homeroom-filter", "JPI");
+    select("class-whanau-filter", "8WPAPA");
+    select("class-course-filter", "JuniorDTECH");
+    el("class-student-filter").value = "ben";
+    el("class-student-filter").events.input();
+    assert.deepEqual(names(), ["Ben"], "All six filters combine");
+    await el("class-progress-refresh").events.click();
+    assert.equal(el("class-kit-filter").value, "kit-search");
+    assert.equal(el("class-status-filter").value, "completed");
+    assert.deepEqual(names(), ["Ben"], "Refresh preserves filters");
+    const beforeFiltering = JSON.stringify(students);
+    kits = kits.filter((kit) => kit.id !== "kit-search");
+    await el("class-progress-refresh").events.click();
+    assert.equal(el("class-kit-filter").value, "");
+    assert.equal(el("class-status-filter").value, "");
+    assert.equal(el("class-status-filter").disabled, true, "Removed kits cannot leave a hidden status filter active");
+    kits.push({ id: "kit-search", title: "Search Kit" });
+    select("class-kit-filter", "kit-login");
+    select("class-status-filter", "completed");
+    assert.match(el("class-progress-status").textContent, /No students match/);
+    select("class-kit-filter", "");
+    assert.equal(el("class-status-filter").value, "", "All kits clears the kit-specific status");
+    assert.equal(el("class-status-filter").disabled, true);
+    assert.equal(JSON.stringify(students), beforeFiltering, "Filtering never changes saved progress");
+    assert.equal(savedRequests.length, 3, "Filtering and refresh do not save Chocolate or progress");
+    select("class-whanau-filter", "");
+    select("class-course-filter", "");
+    el("class-student-filter").value = "";
     el("class-homeroom-filter").value = "JPI";
     el("class-homeroom-filter").events.change();
     assert.deepEqual(names(), ["Ana", "Ben"], "Whānau must not be used to guess missing timetable membership");

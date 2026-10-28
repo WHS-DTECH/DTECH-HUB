@@ -12,6 +12,8 @@
     const whanauFilter = document.getElementById("class-whanau-filter");
     const homeroomFilter = document.getElementById("class-homeroom-filter");
     const studentFilter = document.getElementById("class-student-filter");
+    const kitFilter = document.getElementById("class-kit-filter");
+    const statusFilter = document.getElementById("class-status-filter");
     const classTab = document.getElementById("class-progress-tab");
     const studentTab = document.getElementById("student-review-tab");
     const classPanel = document.getElementById("class-progress-panel");
@@ -47,6 +49,9 @@
     function courseLabel(value) {
         const key = courseKey(value);
         return key === "JuniorDTECH" ? "Junior DTECH" : key || "Not assigned";
+    }
+    function kitStatus(progress) {
+        return progress?.completed ? "completed" : progress?.started ? "in-progress" : "not-started";
     }
     async function saveChocolate(student, kit, checked) {
         const data = classData;
@@ -84,11 +89,14 @@
         const selectedCourse = courseFilter.value;
         const selectedWhanau = whanauFilter.value;
         const selectedHomeroom = homeroomFilter.value;
+        const selectedKit = kitFilter.value;
+        const selectedStatus = statusFilter.value;
         const query = studentFilter.value.trim().toLowerCase();
         const students = classData.students.filter((student) =>
             (!selectedCourse || courseKey(student.course) === selectedCourse)
             && (!selectedWhanau || student.whanau === selectedWhanau)
             && (!selectedHomeroom || student.homeroom === selectedHomeroom)
+            && (!selectedKit || !selectedStatus || kitStatus(student.kitProgress?.[selectedKit]) === selectedStatus)
             && (!query || `${student.name} ${student.email}`.toLowerCase().includes(query)))
             .sort((a, b) => a.name.localeCompare(b.name));
         classTableHost.replaceChildren();
@@ -137,6 +145,17 @@
             .forEach((whanau) => whanauFilter.add(new Option(whanau, whanau)));
         whanauFilter.value = [...whanauFilter.options].some((option) => option.value === previous) ? previous : "";
     }
+    function updateStatusFilter() {
+        statusFilter.disabled = !kitFilter.value;
+        if (statusFilter.disabled) statusFilter.value = "";
+    }
+    function populateKits(kits) {
+        const previous = kitFilter.value;
+        kitFilter.replaceChildren(new Option("All kits", ""));
+        kits.forEach((kit) => kitFilter.add(new Option(kit.title, kit.id)));
+        kitFilter.value = kits.some((kit) => kit.id === previous) ? previous : "";
+        updateStatusFilter();
+    }
     async function loadClassProgress() {
         const current = ++classRevision;
         classStatus.classList.remove("is-error");
@@ -166,6 +185,7 @@
                 })
             };
             populateWhanau(classData.students);
+            populateKits(classData.kits);
             renderClassProgress();
         } catch (error) {
             if (current !== classRevision) return;
@@ -193,7 +213,11 @@
         selected.focus();
     });
     document.getElementById("class-progress-refresh").addEventListener("click", loadClassProgress);
-    [courseFilter, whanauFilter, homeroomFilter].forEach((filter) => filter.addEventListener("change", renderClassProgress));
+    [courseFilter, whanauFilter, homeroomFilter, statusFilter].forEach((filter) => filter.addEventListener("change", renderClassProgress));
+    kitFilter.addEventListener("change", () => {
+        updateStatusFilter();
+        renderClassProgress();
+    });
     studentFilter.addEventListener("input", renderClassProgress);
     void loadClassProgress();
     function values(value, parent) {

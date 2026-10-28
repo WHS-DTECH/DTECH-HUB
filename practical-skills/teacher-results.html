@@ -68,7 +68,19 @@
           <label class="sites-field">Student name
             <input id="class-student-filter" type="search" autocomplete="off" placeholder="Search student name">
           </label>
+          <label class="sites-field">Kit
+            <select id="class-kit-filter"><option value="">All kits</option></select>
+          </label>
+          <label class="sites-field">Status
+            <select id="class-status-filter" disabled aria-describedby="class-status-filter-help">
+              <option value="">All statuses</option>
+              <option value="completed">Completed</option>
+              <option value="in-progress">In Progress</option>
+              <option value="not-started">Not Started</option>
+            </select>
+          </label>
         </div>
+        <p id="class-status-filter-help">Choose a kit to filter students by its status. All kit columns stay visible for comparison.</p>
         <p id="class-progress-status" role="status" aria-live="polite">Sign in with an admin account to load the class list.</p>
         <p id="chocolate-status" role="status" aria-live="polite"></p>
         <div id="class-progress-table-host" class="class-progress-table-host"></div>
@@ -86,6 +98,6 @@
   </main>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="../script.js?v=kit-results-2"></script>
-  <script src="./teacher-results.js?v=4"></script>
+  <script src="./teacher-results.js?v=5"></script>
 </body>
 </html>
