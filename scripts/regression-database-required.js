@@ -36,6 +36,7 @@ test("kit and activity content survive fresh server storage contexts and databas
     const context = () => {
         const ctx = vm.createContext({
             hasDatabase: true, pool, ActivityBlocks: require("../practical-skills/activity-blocks"),
+            ...require("../practical-skills/unity-setup"),
             normalizeEmail: (value) => value,
             ensurePracticalSkillsKitContentSchema: async () => {},
             normalizePracticalSkillsKitContentForStorage: (_id, content) => structuredClone(content),

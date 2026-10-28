@@ -5,6 +5,7 @@ const { createHash, randomUUID } = require("node:crypto");
 const express = require("express");
 const multer = require("multer");
 const ActivityBlocks = require("./practical-skills/activity-blocks");
+const { withUnityHubLicence } = require("./practical-skills/unity-setup");
 const mammoth = require("mammoth");
 const nodemailer = require("nodemailer");
 const { Pool } = require("pg");
@@ -5558,7 +5559,7 @@ function addSearchKitPenguinMission(content) {
 }
 
 function normalizePracticalSkillsKitContentForStorage(kitId, content) {
-  const safeContent = withShortLoginKit(kitId, withLearningSitesActivity(kitId, withLoginAppsActivity(kitId, withLoginIdentityActivity(kitId, withPasswordProblemsActivity(kitId, content && typeof content === "object" ? content : {})))));
+  const safeContent = withUnityHubLicence(withShortLoginKit(kitId, withLearningSitesActivity(kitId, withLoginAppsActivity(kitId, withLoginIdentityActivity(kitId, withPasswordProblemsActivity(kitId, content && typeof content === "object" ? content : {}))))));
   if (String(kitId || "").trim() !== "kit-login") {
     return safeContent;
   }
@@ -5583,7 +5584,7 @@ function normalizePracticalSkillsKitContentForDisplay(kitId, content) {
   return {
     ...studentContent,
     activities: Array.isArray(studentContent.activities) ? studentContent.activities.map((activity) =>
-      activity ? { ...activity, ...(activity.loginSites ? { loginSites: publicLoginSites(activity.loginSites) } : {}), assessment: getStudentAssessment(activity.assessmentId) } : activity
+      activity ? { ...ActivityBlocks.publicActivity(activity), ...(activity.loginSites ? { loginSites: publicLoginSites(activity.loginSites) } : {}), assessment: getStudentAssessment(activity.assessmentId) } : activity
     ) : []
   };
 }
@@ -5637,7 +5638,7 @@ async function getStoredPracticalSkillsKitContent(kitId) {
       content = addSearchKitPenguinMission(content);
       if (stored) memoryPracticalSkillsKitContent.set(safeKitId, content);
     }
-    return withShortLoginKit(safeKitId, withLearningSitesActivity(safeKitId, withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, content)))));
+    return withUnityHubLicence(withShortLoginKit(safeKitId, withLearningSitesActivity(safeKitId, withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, content))))));
   }
 
   await ensurePracticalSkillsKitContentSchema();
@@ -5646,7 +5647,7 @@ async function getStoredPracticalSkillsKitContent(kitId) {
   const defaults = getDefaultPracticalSkillsKitContent(safeKitId);
   if (!stored || !Object.keys(stored).length) {
     const content = safeKitId === "kit-google-search" ? addSearchKitPenguinMission(defaults) : defaults;
-    return withShortLoginKit(safeKitId, withLearningSitesActivity(safeKitId, withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, content)))));
+    return withUnityHubLicence(withShortLoginKit(safeKitId, withLearningSitesActivity(safeKitId, withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, content))))));
   }
 
   let merged = { ...defaults, ...stored };
@@ -5662,6 +5663,14 @@ async function getStoredPracticalSkillsKitContent(kitId) {
         [JSON.stringify(merged), safeKitId]
       );
     }
+  }
+  const unityContent = withUnityHubLicence(merged);
+  if (unityContent !== merged) {
+    merged = unityContent;
+    await pool.query(
+      `UPDATE practical_skills_kit_content SET content = $1::jsonb, updated_at = NOW() WHERE kit_id = $2`,
+      [JSON.stringify(merged), safeKitId]
+    );
   }
   return withShortLoginKit(safeKitId, withLearningSitesActivity(safeKitId, withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, merged)))));
 }

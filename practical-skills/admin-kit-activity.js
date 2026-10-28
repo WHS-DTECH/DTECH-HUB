@@ -33,7 +33,14 @@
                 ...(Array.isArray(activity.blocks) && !blockApi.specialised(activity) ? { questions: [], images: [] } : {}),
                 bannerTitle: activity.title,
                 bannerSubtitle: activity.establishes
-            }, { readOnly: true, eyebrow: content.bannerTitle || "" });
+            }, {
+                readOnly: true, eyebrow: content.bannerTitle || "",
+                onSchoolLicence: async (blockId) => {
+                    const block = activity.blocks?.find((block) => block.id === blockId && block.kind === "schoollicence");
+                    if (!block) throw new Error("School licence viewer not found.");
+                    return { activationMethod: block.activationMethod, value: block.licenceValue || "" };
+                }
+            });
         } catch (error) {
             host.textContent = `Could not render the preview: ${error.message}`;
         }

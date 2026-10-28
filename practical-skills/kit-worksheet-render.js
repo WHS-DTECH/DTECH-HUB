@@ -887,7 +887,8 @@
 
         if (blocks && window.ActivityBlockView) window.ActivityBlockView.bind(host, blocks, {
             answers: blockAnswers, readOnly: readOnly || options.blocksReadOnly,
-            onChange: options.onBlockChange, onDocument: options.onBlockDocument, onLegacyChange: options.onBlockLegacyChange
+            onChange: options.onBlockChange, onDocument: options.onBlockDocument, onLegacyChange: options.onBlockLegacyChange,
+            onSchoolLicence: options.onSchoolLicence
         });
         if (content?.assessment?.id === "learning-sites-treasure-v1") {
             wireLearningSites(host, content.assessment, { ...options, readOnly });

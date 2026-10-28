@@ -28,11 +28,17 @@
                         <button type="button" data-remove-block aria-label="Remove block ${i + 1}">Remove</button>
                     </div></div>
                     ${field("title", "Heading / label (optional)", b.title, 1)}
-                    ${["text", "tasks", "question", "checkbox", "table", "studentlink"].includes(b.kind) ? field("text",
+                    ${["text", "tasks", "question", "checkbox", "table", "studentlink", "schoollicence"].includes(b.kind) ? field("text",
                         b.kind === "studentlink" ? "Instructions for the student (optional)" : b.kind === "tasks" ? "Tasks — one per line" : b.kind === "question" ? "Question prompt" : b.kind === "table" ? "Table — first row is headings; separate cells with |" : "Text / instructions", b.text) : ""}
                     ${b.kind === "text" ? `<label><input type="checkbox" data-field="numbered" ${b.numbered === true ? "checked" : ""}> Number each line</label><p>Each non-empty line becomes a numbered step. Numbering restarts at 1 beneath this block's bold heading.</p>` : ""}
                     ${b.kind === "link" ? "<p>You supply this website link for students to open. Use Student Add a Link when students should submit their own link.</p>" : ""}
                     ${b.kind === "studentlink" ? "<p>Students paste one HTTPS link. Their link is saved with their answers. Required automatic completion checks only that the URL is valid, not access to the file or the work inside it.</p>" : ""}
+                    ${b.kind === "studentlink" && b.driveOnly ? "<p>This submission requires a Google Drive or Google Docs link.</p>" : ""}
+                    ${b.kind === "schoollicence" ? `<label>School licence activation method<select data-field="activationMethod">
+                        <option value="instructions" ${b.activationMethod !== "serial" ? "selected" : ""}>Activation instructions (no copy button)</option>
+                        <option value="serial" ${b.activationMethod === "serial" ? "selected" : ""}>Serial number (show Copy Licence)</option>
+                    </select></label>${field("licenceValue", "Teacher-managed school licence information", b.licenceValue, 4)}
+                    <p>Save Activity Details to update the school licence. Students can only view it; it is loaded when they choose View School Licence. Leave blank to show the ask-your-teacher message. Only enter school-authorised licence information intended for students.</p>` : ""}
                     ${["image", "resource", "link", "document"].includes(b.kind) ? field("url",
                         b.kind === "document" ? "Google Docs template link — shared with students" : "Full HTTPS link", b.url, 2) : ""}
                     ${b.kind === "resource" ? `<label>Upload resource from your computer (max 15 MB)<input type="file" data-resource-upload accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.csv,.png,.jpg,.jpeg,.webp"></label><p>Uploads go to your Google Drive and are shared read-only with school accounts. Only upload resources you have permission to share. Save Activity Details after uploading.</p>` : ""}
@@ -79,6 +85,7 @@
             if (button.dataset.addBlock) {
                 const kind = button.dataset.addBlock;
                 draft.push({ id: `b-${crypto.randomUUID()}`, kind, title: "", text: "", questionType: "short-answer", options: [], required: B.interactive.includes(kind),
+                    ...(kind === "schoollicence" ? { activationMethod: "instructions", licenceValue: "" } : {}),
                     ...(kind === "text" ? { numbered: true } : {}) });
             } else {
                 const card = button.closest("[data-block-id]");

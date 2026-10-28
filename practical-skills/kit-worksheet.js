@@ -550,6 +550,14 @@
                     queueBlockAnswerSave(activityIndex);
                 },
                 onBlockLegacyChange: (key, value) => { state.responses[key] = value; },
+                onSchoolLicence: async (blockId) => {
+                    const email = state.email;
+                    const licence = await loadJson(`${blockPath(activityIndex)}/licences/${encodeURIComponent(blockId)}${preview ? "?preview=1" : ""}`, {
+                        headers: withAuthHeaders(), cache: "no-store"
+                    });
+                    if (getSignedInEmail() !== email) throw new Error("Your signed-in account changed. Reopen this activity.");
+                    return licence;
+                },
                 onBlockDocument: async (blockId) => {
                     if (!state.progressLoaded) throw new Error("Your progress has not loaded. Refresh and retry.");
                     const email = state.email;

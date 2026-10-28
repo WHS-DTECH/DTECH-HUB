@@ -31,6 +31,23 @@ function registerActivityBlocks(app, deps) {
         return B.grade(activity, answers, documents);
     }
     const base = "/api/practical-skills/blocks/:kitId/:activityIndex";
+    app.get(`${base}/licences/:blockId`, async (req, res) => {
+        res.set("Cache-Control", "private, no-store");
+        const student = email(req, res);
+        if (!student) return;
+        if (!req.auth_identity?.verified || normalizeEmail(req.auth_identity.email) !== student) {
+            return res.status(401).json({ error: "Verify your school Google sign-in to view the school licence." });
+        }
+        try {
+            const { activity } = await load(req);
+            const block = activity.blocks.find((block) => block.id === req.params.blockId && block.kind === "schoollicence");
+            if (!block) return res.status(404).json({ error: "School licence viewer not found." });
+            res.json({ activationMethod: block.activationMethod, value: block.licenceValue || "" });
+        } catch (error) {
+            console.error("[school-licence] Could not load school licence:", error.message);
+            res.status(error.status || 500).json({ error: "Could not load school licence information. Please retry or ask your teacher." });
+        }
+    });
     app.post(`${base}/check`, async (req, res) => {
         const student = email(req, res);
         if (!student) return;

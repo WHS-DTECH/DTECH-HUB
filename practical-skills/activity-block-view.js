@@ -10,10 +10,10 @@
             if (b.kind === "text" && b.numbered !== true) body = `<p class="activity-block-text">${e(b.text)}</p>`;
             if (b.kind === "tasks" || (b.kind === "text" && b.numbered === true)) body = `<ol>${String(b.text || "").split(/\r?\n/).filter((s) => s.trim()).map((s) => `<li class="activity-block-text">${e(s.trim().replace(/^\d+[.)]\s+/, ""))}</li>`).join("")}</ol>`;
             if (b.kind === "studentlink") {
-                const studentLink = B.studentUrl(value);
+                const studentLink = B.studentUrl(value, b.driveOnly);
                 body = `${b.text ? `<p class="activity-block-text">${e(b.text)}</p>` : ""}
                     <label>Your link<input type="url" data-student-link maxlength="5000" aria-invalid="${Boolean(typeof value === "string" && value.trim()) && !studentLink}" placeholder="https://..." value="${e(typeof value === "string" ? value : "")}" ${disabled}></label>
-                    <p class="activity-block-status" data-link-status role="status">${value && !studentLink ? "Enter a full HTTPS link, without a username or password in the URL." : "Paste one HTTPS link. This checks the URL only, not sharing permissions or completed work."}</p>
+                    <p class="activity-block-status" data-link-status role="status">${b.driveOnly ? "Paste a Google Drive or Google Docs HTTPS link. This checks the URL only, not sharing permissions or completed work." : value && !studentLink ? "Enter a full HTTPS link, without a username or password in the URL." : "Paste one HTTPS link. This checks the URL only, not sharing permissions or completed work."}</p>
                     <a class="worksheet-btn worksheet-btn-secondary" data-open-student-link ${studentLink ? `href="${e(studentLink)}"` : "hidden"} target="_blank" rel="noopener noreferrer">Open Link &#8599;</a>`;
             }
             if (b.kind === "image") body = link ? (renderImage ? renderImage(b) : `<figure><img src="${e(link)}" alt="${e(b.alt)}" loading="lazy"><figcaption>${e(b.caption)}${b.attribution ? `<br>${e(b.attribution)}` : ""}</figcaption></figure>`) : "<p>Enter an HTTPS image link to preview.</p>";
@@ -21,6 +21,14 @@
                 ? `<a class="worksheet-btn worksheet-btn-secondary" href="${e(link)}" target="_blank" rel="noopener noreferrer">${e(b.title || (b.kind === "resource" ? "Open resource" : "Open website"))} &#8599;</a>`
                 : "<p>Enter an HTTPS link to preview.</p>";
             if (b.kind === "checkbox") body = `<label><input type="checkbox" data-answer ${value === true ? "checked" : ""} ${disabled}> ${e(b.text)}</label>`;
+            if (b.kind === "schoollicence") body = `<p class="activity-block-text">${e(b.text)}</p>
+                <button type="button" class="worksheet-btn worksheet-btn-secondary" data-view-school-licence aria-expanded="false" aria-controls="licence-${e(b.id)}">View School Licence</button>
+                <div id="licence-${e(b.id)}" data-school-licence-viewer hidden>
+                    <p class="activity-block-text" data-school-licence-value></p>
+                    <button type="button" class="worksheet-btn worksheet-btn-secondary" data-copy-school-licence hidden>Copy Licence</button>
+                    <button type="button" class="worksheet-btn worksheet-btn-secondary" data-hide-school-licence>Hide School Licence</button>
+                </div>
+                <p class="activity-block-status" data-school-licence-status role="status"></p>`;
             if (b.kind === "question") {
                 body = `<p class="activity-block-text">${e(b.text)}</p>`;
                 if (b.questionType === "short-answer" || !b.questionType) body += `<label>Your answer<textarea data-answer ${disabled}>${e(value || "")}</textarea></label>`;
@@ -58,7 +66,59 @@
         function changed(b, value) { answers[b.id] = value; options.onChange?.(structuredClone(answers)); }
         blocks.forEach((b) => {
             const section = [...host.querySelectorAll("[data-content-block]")].find((node) => node.dataset.contentBlock === b.id);
-            if (!section || options.readOnly) return;
+            if (!section) return;
+            if (b.kind === "schoollicence") {
+                const view = section.querySelector("[data-view-school-licence]");
+                const viewer = section.querySelector("[data-school-licence-viewer]");
+                const value = section.querySelector("[data-school-licence-value]");
+                const copy = section.querySelector("[data-copy-school-licence]");
+                const status = section.querySelector("[data-school-licence-status]");
+                let revision = 0;
+                let serial = "";
+                view.addEventListener("click", async () => {
+                    if (!viewer.hidden) return;
+                    const current = ++revision;
+                    view.disabled = true;
+                    status.textContent = "Loading school licence...";
+                    try {
+                        if (!options.onSchoolLicence) throw new Error("Open the activity from the kit to view the current school licence.");
+                        const licence = await options.onSchoolLicence(b.id);
+                        if (current !== revision || !section.isConnected) return;
+                        serial = licence.activationMethod === "serial" ? licence.value || "" : "";
+                        value.textContent = licence.value || "School licence information is not yet available. Please ask your teacher.";
+                        copy.hidden = !serial;
+                        viewer.hidden = false;
+                        view.hidden = true;
+                        view.setAttribute("aria-expanded", "true");
+                        status.textContent = "";
+                    } catch (error) {
+                        if (current === revision && section.isConnected) status.textContent = error.message || "Could not load school licence information. Please retry.";
+                    } finally { if (current === revision) view.disabled = false; }
+                });
+                section.querySelector("[data-hide-school-licence]").addEventListener("click", () => {
+                    revision += 1;
+                    serial = "";
+                    value.textContent = "";
+                    copy.hidden = true;
+                    viewer.hidden = true;
+                    view.hidden = false;
+                    view.setAttribute("aria-expanded", "false");
+                    status.textContent = "";
+                    view.focus();
+                });
+                copy.addEventListener("click", async () => {
+                    const current = revision;
+                    try {
+                        if (!serial) return;
+                        await navigator.clipboard.writeText(serial);
+                        if (current === revision) status.textContent = "Licence copied. Paste it into Unity Hub to activate.";
+                    } catch (error) {
+                        if (current === revision) status.textContent = "Could not copy the licence. Select the displayed serial number and copy it manually.";
+                    }
+                });
+                return;
+            }
+            if (options.readOnly) return;
             section.addEventListener("input", (event) => {
                 const input = event.target;
                 if (b.kind === "crossword" && input.matches("input[data-cell]")) {
@@ -69,15 +129,17 @@
                         [...section.querySelectorAll(`input[data-row="${r}"]`)].map((cell) => cell.value));
                     changed(b, rows);
                 } else if (b.kind === "studentlink" && input.matches("[data-student-link]")) {
-                    const url = B.studentUrl(input.value);
+                    const url = B.studentUrl(input.value, b.driveOnly);
                     const open = section.querySelector("[data-open-student-link]");
                     open.hidden = !url;
                     if (url) open.href = url;
                     else open.removeAttribute("href");
                     input.setAttribute("aria-invalid", String(Boolean(input.value.trim()) && !url));
-                    section.querySelector("[data-link-status]").textContent = input.value.trim() && !url
-                        ? "Enter a full HTTPS link, without a username or password in the URL."
-                        : "Paste one HTTPS link. This checks the URL only, not sharing permissions or completed work.";
+                    section.querySelector("[data-link-status]").textContent = b.driveOnly
+                        ? "Paste a Google Drive or Google Docs HTTPS link. This checks the URL only, not sharing permissions or completed work."
+                        : input.value.trim() && !url
+                            ? "Enter a full HTTPS link, without a username or password in the URL."
+                            : "Paste one HTTPS link. This checks the URL only, not sharing permissions or completed work.";
                     changed(b, input.value);
                 } else if (b.kind === "checkbox") changed(b, input.checked);
                 else if (b.kind === "question") {

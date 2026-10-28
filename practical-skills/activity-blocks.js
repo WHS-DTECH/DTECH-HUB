@@ -6,7 +6,7 @@
     const types = {
         text: "Text / Instructions", image: "Image", tasks: "Task List", question: "Question",
         link: "Website Link", studentlink: "Student Add a Link", resource: "Resource File", checkbox: "Checkbox", table: "Table",
-        wordsearch: "Word Search", document: "Create Document", crossword: "Crossword"
+        wordsearch: "Word Search", document: "Create Document", crossword: "Crossword", schoollicence: "School Licence Viewer"
     };
     const interactive = ["question", "checkbox", "wordsearch", "crossword", "document", "table", "studentlink"];
     const escape = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -20,8 +20,9 @@
         return Boolean(activity?.assessmentId || activity?.assessment || activity?.identityLessonVersion ||
             activity?.questionAutoMarkAssessmentId || activity?.researchReport || activity?.loginSites);
     }
-    function studentUrl(value) {
-        return typeof value === "string" && value.trim().length <= 5000 ? safeUrl(value.trim()) : "";
+    function studentUrl(value, driveOnly = false) {
+        const url = typeof value === "string" && value.trim().length <= 5000 ? safeUrl(value.trim()) : "";
+        return url && (!driveOnly || ["drive.google.com", "docs.google.com"].includes(new URL(url).hostname)) ? url : "";
     }
     function initialBlocks(activity, index, content) {
         if (Array.isArray(activity.blocks)) return activity.blocks;
@@ -47,6 +48,14 @@
             if (b.responseKey && answers[b.id] === undefined && responses?.[b.responseKey] !== undefined) answers[b.id] = responses[b.responseKey];
         }
         return answers;
+    }
+    function publicActivity(activity) {
+        if (!activity || !Array.isArray(activity.blocks)) return activity;
+        return { ...activity, blocks: activity.blocks.map((block) => {
+            if (block.kind !== "schoollicence") return block;
+            const { licenceValue, ...visible } = block;
+            return visible;
+        }) };
     }
     function puzzle(block) {
         const words = entries(block);
@@ -111,10 +120,14 @@
             if (!b || typeof b.kind !== "string" || !Object.hasOwn(types, b.kind) || typeof b.id !== "string" || !/^[a-zA-Z0-9_-]{1,90}$/.test(b.id) ||
                 ["__proto__", "constructor", "prototype"].includes(b.id) || ids.has(b.id)) throw new Error("Content blocks need unique valid IDs and supported types.");
             ids.add(b.id);
+            if (b.kind === "schoollicence") {
+                if (!["serial", "instructions"].includes(b.activationMethod)) throw new Error("Choose serial number or activation instructions for the school licence.");
+                if (b.licenceValue !== undefined && (typeof b.licenceValue !== "string" || b.licenceValue.length > 10000)) throw new Error("School licence information must be text of at most 10,000 characters.");
+            }
             for (const key of ["title", "text", "url", "alt", "caption", "attribution", "entries", "fileName", "responseKey"]) {
                 if (b[key] !== undefined && (typeof b[key] !== "string" || b[key].length > (key === "text" ? 20000 : 5000))) throw new Error(`${types[b.kind]}: ${key} must be text within the size limit.`);
             }
-            for (const key of ["required", "editable", "numbered"]) if (b[key] !== undefined && typeof b[key] !== "boolean") throw new Error("Block options must be true or false.");
+            for (const key of ["required", "editable", "numbered", "driveOnly"]) if (b[key] !== undefined && typeof b[key] !== "boolean") throw new Error("Block options must be true or false.");
             if (["link", "resource", "image"].includes(b.kind) && !safeUrl(b.url)) throw new Error(`${types[b.kind]}: enter a full HTTPS link.`);
             if (b.kind === "image" && !String(b.alt || "").trim()) throw new Error("Images need alternative text.");
             if (b.kind === "document" && (!safeUrl(b.url) || !/^https:\/\/docs\.google\.com\/document\/(?:u\/\d+\/)?d\/[a-zA-Z0-9_-]{20,}(?:[/?#]|$)/.test(b.url || ""))) throw new Error("Create Document needs a Google Docs template link.");
@@ -150,7 +163,7 @@
         const results = required.map((b) => {
             const value = answers?.[b.id];
             let passed = false;
-            if (b.kind === "studentlink") passed = Boolean(studentUrl(value));
+            if (b.kind === "studentlink") passed = Boolean(studentUrl(value, b.driveOnly));
             if (b.kind === "checkbox") passed = value === true;
             if (b.kind === "question") passed = b.questionType === "checklist"
                 ? Array.isArray(value) && b.options.every((option) => value.includes(option))
@@ -182,5 +195,5 @@
         });
         return { passed: required.length > 0 && results.every((r) => r.passed), results };
     }
-    return { types, interactive, escape, safeUrl, studentUrl, specialised, initialBlocks, savedAnswers, entries, puzzle, validate, grade };
+    return { types, interactive, escape, safeUrl, studentUrl, specialised, initialBlocks, savedAnswers, publicActivity, entries, puzzle, validate, grade };
 });

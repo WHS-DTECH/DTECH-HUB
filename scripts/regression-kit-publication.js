@@ -183,6 +183,11 @@ test("explicit preview requires kit-management permission even for Live kits and
     assert.equal(response.status, 200);
     assert.equal(response.headers.get("cache-control"), "private, no-store");
     assert.equal((await f.call("/api/practical-skills/progress/kit-minecraft?preview=1")).status, 403);
+    const licencePath = "/api/practical-skills/blocks/kit-minecraft/0/licences/school";
+    assert.equal((await f.call(`${licencePath}?preview=1`)).status, 200, "Teachers can read licences in a paused-kit preview");
+    assert.equal((await f.call(`${licencePath}?preview=1`, "GET", undefined, false)).status, 403);
+    assert.equal((await f.call(`${licencePath}?preview=1`, "PUT")).status, 403, "Preview never permits licence writes");
+    assert.equal((await f.call(licencePath)).status, 403, "Paused licence reads still require explicit teacher preview");
     const student = createKitPublication({ ...f.deps, canManage: async () => false });
     for (const live of [true, false]) {
         await f.service.setLive("kit-minecraft", live, "teacher@school.nz");

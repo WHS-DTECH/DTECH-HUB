@@ -82,6 +82,7 @@ async function main() {
     let writes = 0;
     const context = vm.createContext({
         ...assessment, ...config, app: { get: (url, fn) => { handlers[`GET ${url}`] = fn; }, put: (url, fn) => { handlers[`PUT ${url}`] = fn; } },
+        ...require("../practical-skills/unity-setup"), ActivityBlocks: require("../practical-skills/activity-blocks"),
         normalizeEmail: (email) => String(email || "").toLowerCase(), getRequestUserEmail: (req) => req.email,
         canManagePracticalSchedule: async (email) => email === "staff@school.nz",
         getStoredPracticalSkillsKitContent: async () => structuredClone(stored),

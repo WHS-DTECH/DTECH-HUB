@@ -53,7 +53,8 @@ function createKitPublication({ pool, builtIns, getDefaultContent, schoolDomain,
             : /^\/api\/practical-skills\/typing-kit(?:\/|$)/.test(path) ? "kit-typing" : null);
         if (!kitId) return next();
         try {
-            if (req.method === "GET" && path.startsWith("/api/practical-skills/kit-content/") && req.query?.preview === "1") {
+            const licencePreview = /^\/api\/practical-skills\/blocks\/kit-[a-z0-9-]+\/\d+\/licences\/[a-zA-Z0-9_-]+$/.test(path);
+            if (req.method === "GET" && (path.startsWith("/api/practical-skills/kit-content/") || licencePreview) && req.query?.preview === "1") {
                 res.set("Cache-Control", "private, no-store");
                 if (await canManage(getRequestUserEmail(req))) return next();
                 return res.status(403).json({ error: "Kit preview is only available to teachers who manage kits." });
