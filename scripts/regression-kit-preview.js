@@ -54,7 +54,12 @@ test("teacher preview loads only authenticated content, hides progress and keeps
         assert.equal(f.renders[0].readOnly, true);
         assert.equal(f.node("worksheet-preview-banner").hidden, false);
         assert.equal(f.node("worksheet-complete-bar").hidden, true);
-        assert.equal(f.node("worksheet-activity-complete-bar").hidden, true);
+        assert.equal(f.node("worksheet-activity-complete-bar").hidden, !activity);
+        if (activity) {
+            assert.equal(f.node("worksheet-activity-status-pill").textContent, "Not Completed");
+            assert.equal(f.node("worksheet-activity-complete-btn").disabled, true);
+            assert.equal(f.node("worksheet-activity-preview-note").hidden, false);
+        }
         assert.equal(f.node("worksheet-certificate").hidden, true);
         if (activity) assert.match(f.node("worksheet-back-link").href, /&preview=1$/);
         else {

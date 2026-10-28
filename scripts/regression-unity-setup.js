@@ -367,7 +367,10 @@ test("Unity final Completed button validates the saved link and opens the certif
     assert.equal(node("worksheet-activity-complete-btn").hidden, false);
     ctx.preview = true;
     ctx.updateActivityCompleteBar();
-    assert.equal(node("worksheet-activity-complete-bar").hidden, true);
+    assert.equal(node("worksheet-activity-complete-bar").hidden, false);
+    assert.equal(node("worksheet-activity-status-pill").textContent, "Not Completed");
+    assert.equal(node("worksheet-activity-complete-btn").disabled, true);
+    assert.equal(node("worksheet-activity-preview-note").hidden, false);
 });
 
 test("teachers preview, save and reopen Editor configuration without changing the school licence", async () => {

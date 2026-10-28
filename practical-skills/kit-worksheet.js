@@ -161,8 +161,10 @@
         const pill = document.getElementById("worksheet-activity-status-pill");
         const button = document.getElementById("worksheet-activity-complete-btn");
         const index = getCurrentActivityIndex();
-        bar.hidden = preview || !state.email || index === null;
-        const completed = Boolean(state.completedActivities[index]);
+        bar.hidden = !state.email || index === null;
+        const previewNote = document.getElementById("worksheet-activity-preview-note");
+        previewNote.hidden = !preview;
+        const completed = !preview && Boolean(state.completedActivities[index]);
         const activity = state.content?.activities?.[index];
         const siteQuestions = window.KitWorksheetRender.visibleLoginSites(activity?.loginSites, state.huntProfile).some((site) => site.readinessQuestion);
         const selfMarking = Boolean(activity?.assessment || activity?.identityLessonVersion ||
@@ -180,8 +182,8 @@
             pill.removeAttribute("title");
         }
         button.textContent = activity?.unityTestProjectVersion ? "Completed" : autoBlocks ? "Check & Save Activity" : completed ? "Undo Completion" : siteQuestions ? "Check Activity Completion" : "Mark Activity Complete";
-        button.disabled = !state.progressLoaded;
-        button.hidden = selfMarking && !siteQuestions && !completed;
+        button.disabled = preview || !state.progressLoaded;
+        button.hidden = !preview && selfMarking && !siteQuestions && !completed;
     }
 
     function blockPath(index) {
