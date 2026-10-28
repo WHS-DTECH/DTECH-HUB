@@ -173,6 +173,34 @@ test("teacher review presents accessible tabs and all requested class filters", 
     assert.match(script, /student\.name\} \$\{student\.email/);
 });
 
+test("teacher review uses the shared main navbar without duplicate sign-in controls", () => {
+    const root = path.join(__dirname, "..");
+    const html = fs.readFileSync(path.join(root, "practical-skills", "teacher-results.html"), "utf8");
+    assert.match(html, /<nav class="topbar" aria-label="Primary">/);
+    assert.match(html, /class="brand" href="\/index.html"/);
+    for (const id of ["hub-google-signin", "hub-google-signout", "hub-user-badge"]) {
+        assert.equal(html.split(`id="${id}"`).length - 1, 1);
+        assert.ok(html.indexOf(`id="${id}"`) < html.indexOf("<main"));
+    }
+    const source = fs.readFileSync(path.join(root, "script.js"), "utf8");
+    const start = source.indexOf("function renderGlobalNavbar()");
+    const end = source.indexOf("\nrenderGlobalNavbar();", start);
+    const topbar = {
+        dataset: {}, innerHTML: "",
+        setAttribute() {},
+        querySelectorAll: () => []
+    };
+    const context = vm.createContext({
+        document: { querySelector: () => topbar, addEventListener() {} }
+    });
+    vm.runInContext(source.slice(start, end), context);
+    context.renderGlobalNavbar();
+    assert.equal(topbar.dataset.globalNavbar, "true");
+    for (const label of ["Browse", "Upload", "Licence", "Student Work", "Settings", "Admin Menu"]) {
+        assert.ok(topbar.innerHTML.includes(label), `Shared navbar contains ${label}`);
+    }
+});
+
 test("class review keeps whānau and timetable homerooms separate and combines filters", async () => {
     function element() {
         return {
