@@ -329,6 +329,36 @@ test("Licence Kit Setup restricts settings to admins and updates only the curren
     assert.match(nav, /hubLicenceSetupLink\.hidden = !canAdmin/);
 });
 
+test("Licence Kit Setup uses the shared active token and never presents opaque or expired tokens as ID tokens", async () => {
+    const source = fs.readFileSync(path.join(root, "practical-skills", "licence-kit-setup.js"), "utf8");
+    const start = source.indexOf("    async function request(");
+    const end = source.indexOf("\n    function path(", start);
+    const jwt = "eyJheader.payload.signature";
+    for (const scenario of [
+        { stored: { accessToken: "opaque-drive-token", expiresAt: Date.now() + 60000 } },
+        { stored: { idToken: "opaque-legacy-token", expiresAt: Date.now() + 60000 } },
+        { stored: { idToken: jwt, expiresAt: 1 } },
+        { stored: { idToken: jwt, expiresAt: Date.now() + 60000 }, expected: `Bearer ${jwt}` },
+        { stored: { idToken: "stale-token" }, active: jwt, expected: `Bearer ${jwt}` },
+        { stored: { idToken: jwt, expiresAt: Date.now() + 60000 }, active: "opaque-drive-token" }
+    ]) {
+        let sentHeaders;
+        const ctx = vm.createContext({
+            window: scenario.active === undefined ? {} : { getActiveHubBearerToken: () => scenario.active },
+            localStorage: { getItem: () => JSON.stringify({ ...scenario.stored, profile: { email: "teacher@school.nz" } }) },
+            sessionStorage: { getItem: () => null },
+            fetch: async (_url, options) => {
+                sentHeaders = options.headers;
+                return { ok: true, json: async () => ({}) };
+            }
+        });
+        vm.runInContext(source.slice(start, end), ctx);
+        await ctx.request("/api/admin/practical-skills/kits");
+        assert.equal(sentHeaders.Authorization, scenario.expected);
+        assert.equal(sentHeaders["x-user-email"], "teacher@school.nz");
+    }
+});
+
 test("Licence Kit Setup loads, saves and clears the teacher licence on account changes", async () => {
     const nodes = new Map();
     const get = (id) => {
@@ -347,9 +377,10 @@ test("Licence Kit Setup loads, saves and clears the teacher licence on account c
     const ctx = vm.createContext({
         document: { getElementById: get, createElement: () => ({}) },
         window: { addEventListener(name, fn) { events[name] = fn; } },
-        localStorage: { getItem: () => signedIn ? JSON.stringify({ profile: { email: "teacher@school.nz" }, idToken: "test-token" }) : null },
+        localStorage: { getItem: () => signedIn ? JSON.stringify({ profile: { email: "teacher@school.nz" }, accessToken: "opaque-drive-token", expiresAt: Date.now() + 60000 }) : null },
         sessionStorage: { getItem: () => null },
         fetch: async (url, options) => {
+            assert.equal(options.headers.Authorization, undefined, "Opaque OAuth tokens must not be sent as Google ID tokens");
             if (!signedIn) return { ok: false, json: async () => ({ error: "Admin access required." }) };
             if (fail) return { ok: false, json: async () => ({ error: "Save failed." }) };
             if (options.method === "PUT") stored = JSON.parse(options.body);

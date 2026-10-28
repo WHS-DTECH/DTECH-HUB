@@ -15,8 +15,10 @@
     async function request(url, options = {}) {
         const auth = JSON.parse(localStorage.getItem("hub_google_auth_v1") || sessionStorage.getItem("hub_google_auth_v1") || "{}");
         const headers = { "Content-Type": "application/json", "x-user-email": auth.profile?.email || "" };
-        const token = auth.idToken || auth.accessToken || "";
-        if (token) headers.Authorization = `Bearer ${token}`;
+        const token = typeof window.getActiveHubBearerToken === "function"
+            ? window.getActiveHubBearerToken()
+            : Number(auth.expiresAt) > Date.now() ? String(auth.idToken || auth.accessToken || "").trim() : "";
+        if (token.startsWith("eyJ") && token.split(".").length === 3) headers.Authorization = `Bearer ${token}`;
         const response = await fetch(url, { ...options, headers, cache: "no-store" });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || `Request failed (${response.status}).`);
