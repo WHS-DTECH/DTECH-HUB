@@ -530,6 +530,7 @@
                 taskBrief: activity?.taskBrief,
                 blocks: activity?.blocks,
                 completionMode: activity?.completionMode,
+                unityEditor: activity?.unityEditor,
                 assessmentId: activity?.assessmentId,
                 questionAutoMarkAssessmentId: activity?.questionAutoMarkAssessmentId,
                 information: activity?.information,
@@ -756,7 +757,11 @@
                     });
                     state.completedActivities = payload.completedActivities;
                 });
-                showStatusMessage(completed ? "Activity completed! Your tick is saved. Return to the Kit Activity List to see your progress." : "Activity completion removed.");
+                showStatusMessage(completed
+                    ? activity?.unityEditor
+                        ? "Unity Editor activity completed! Your tick is saved. Continue to Activity 3 - Unity Project Folder from the Kit Activity List."
+                        : "Activity completed! Your tick is saved. Return to the Kit Activity List to see your progress."
+                    : "Activity completion removed.");
             } catch (error) {
                 showStatusMessage(error?.message || "Could not save activity completion.", true);
             } finally {

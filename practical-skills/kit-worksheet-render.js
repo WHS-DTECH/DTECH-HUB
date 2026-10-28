@@ -795,7 +795,7 @@
                     : content.completionMode === "auto"
                         ? "Automatic tick: complete all required interactive blocks. Written answers are checked for presence, not correctness. A document copy confirms creation only."
                         : "Completion: when you have finished the activity, choose Mark Activity Complete below."}</p>
-                <div class="activity-content-blocks">${window.ActivityBlockView.markup(blocks, blockAnswers, readOnly || options.blocksReadOnly, { renderImage: (image) => renderWorksheetImage(image) })}</div>
+                <div class="activity-content-blocks">${window.ActivityBlockView.markup(blocks, blockAnswers, readOnly || options.blocksReadOnly, { renderImage: (image) => renderWorksheetImage(image), unityEditor: content.unityEditor })}</div>
             ` : ""}
             ${imageInformationLayout ? `<div class="worksheet-image-information-layout">` : ""}
             ${images.length ? `

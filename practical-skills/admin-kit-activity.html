@@ -79,6 +79,23 @@
             <input id="activity-research-minimum" type="number" min="1" max="1000" step="1">
           </div>
         </section>
+        <section id="activity-unity-editor" hidden aria-labelledby="activity-unity-editor-heading">
+          <h2 id="activity-unity-editor-heading">Unity Setup Kit - teacher Editor configuration</h2>
+          <p>Save Activity Details to update the version, modules and notes shown to students when they open or reload Unity Editor. Students cannot edit these settings.</p>
+          <div class="activity-editor-field">
+            <label for="activity-unity-version">Required Unity Editor Version</label>
+            <input id="activity-unity-version" type="text" maxlength="200" placeholder="6000.5">
+            <small>Enter the complete identifier when needed, including patch and release suffix, for example 6000.5.0f1.</small>
+          </div>
+          <div class="activity-editor-field">
+            <label for="activity-unity-modules">Required Installation Modules (optional, one per line)</label>
+            <textarea id="activity-unity-modules" rows="3" maxlength="10000"></textarea>
+          </div>
+          <div class="activity-editor-field">
+            <label for="activity-unity-notes">Additional installation notes (optional)</label>
+            <textarea id="activity-unity-notes" rows="3" maxlength="10000"></textarea>
+          </div>
+        </section>
         <section id="activity-content-builder" hidden aria-labelledby="activity-block-heading">
           <h2 id="activity-block-heading">Activity Content Block Builder</h2>
           <p>Add any combination of blocks. Use Up / Down to change their order. Save Activity Details to publish your changes.</p>
@@ -114,10 +131,10 @@
   </div>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="../script.js?v=auth-session-1"></script>
-  <script src="./activity-blocks.js?v=3"></script>
+  <script src="./activity-blocks.js?v=4"></script>
   <script src="./activity-block-editor.js?v=3"></script>
-  <script src="./activity-block-view.js?v=3"></script>
-  <script src="./kit-worksheet-render.js?v=9"></script>
-  <script src="./admin-kit-activity.js?v=8"></script>
+  <script src="./activity-block-view.js?v=4"></script>
+  <script src="./kit-worksheet-render.js?v=10"></script>
+  <script src="./admin-kit-activity.js?v=9"></script>
 </body>
 </html>

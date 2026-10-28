@@ -1,7 +1,7 @@
 (() => {
     "use strict";
     const B = window.ActivityBlocks, e = B.escape;
-    function markup(blocks, answers, readOnly, { renderImage } = {}) {
+    function markup(blocks, answers, readOnly, { renderImage, unityEditor } = {}) {
         return blocks.map((b) => {
             const value = answers[b.id];
             const disabled = readOnly ? "disabled" : "";
@@ -9,6 +9,18 @@
             let body = "";
             if (b.kind === "text" && b.numbered !== true) body = `<p class="activity-block-text">${e(b.text)}</p>`;
             if (b.kind === "tasks" || (b.kind === "text" && b.numbered === true)) body = `<ol>${String(b.text || "").split(/\r?\n/).filter((s) => s.trim()).map((s) => `<li class="activity-block-text">${e(s.trim().replace(/^\d+[.)]\s+/, ""))}</li>`).join("")}</ol>`;
+            if (unityEditor && b.id === "unity-editor-version") body += `
+                <aside aria-label="Teacher-managed Unity Editor version">
+                    <p>Required Unity Editor Version <small>(Teacher managed)</small></p>
+                    <p class="activity-block-text"><strong style="font-size:1.5em">${e(unityEditor.version)}</strong></p>
+                    <p>Always select the version displayed here.</p>
+                    ${unityEditor.notes?.trim() ? `<h3>Additional installation notes</h3><p class="activity-block-text">${e(unityEditor.notes)}</p>` : ""}
+                </aside>`;
+            if (unityEditor && b.id === "unity-editor-modules") body += `
+                <aside aria-label="Teacher-managed installation modules">
+                    <h3>Required Installation Modules <small>(Teacher managed)</small></h3>
+                    <p class="activity-block-text">${e(unityEditor.modules?.trim() || "No additional modules specified by your teacher.")}</p>
+                </aside>`;
             if (b.kind === "studentlink") {
                 const studentLink = B.studentUrl(value, b.driveOnly);
                 body = `${b.text ? `<p class="activity-block-text">${e(b.text)}</p>` : ""}

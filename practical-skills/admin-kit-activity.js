@@ -154,6 +154,11 @@
                 evidenceRequired: evidenceInput.value
             },
             questions, images, ...(researchReport ? { researchReport } : {}),
+            ...(existing?.unityEditor ? { unityEditor: {
+                version: document.querySelector("#activity-unity-version").value.trim(),
+                modules: document.querySelector("#activity-unity-modules").value,
+                notes: document.querySelector("#activity-unity-notes").value
+            } } : {}),
             ...(blockEditor ? { blocks: blockEditor.read(),
                 completionMode: blockApi.specialised(existing) ? existing.completionMode : document.querySelector("#activity-completion-mode").value } : {})
         };
@@ -167,6 +172,10 @@
         challengeInput.value = activity.taskBrief?.challenge || "";
         keySkillInput.value = activity.taskBrief?.keySkill || "";
         evidenceInput.value = activity.taskBrief?.evidenceRequired || "";
+        document.querySelector("#activity-unity-editor").hidden = !activity.unityEditor;
+        document.querySelector("#activity-unity-version").value = activity.unityEditor?.version || "";
+        document.querySelector("#activity-unity-modules").value = activity.unityEditor?.modules || "";
+        document.querySelector("#activity-unity-notes").value = activity.unityEditor?.notes || "";
         document.querySelector("#activity-page-title").textContent = `Activity Details: ${titleInput.value}`;
         document.querySelector("#activity-page-summary").textContent = establishesInput.value || "Configure the student tasks and supporting images for this worksheet.";
         const assessmentNote = document.querySelector("#activity-assessment-note");

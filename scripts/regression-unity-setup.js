@@ -23,7 +23,7 @@ test("Unity preset builds four steps without answers and preserves the other set
     const before = JSON.stringify(original);
     const content = withUnityHubLicence(original);
     assert.equal(JSON.stringify(original), before);
-    assert.equal(content.activities[1], original.activities[1]);
+    assert.equal(content.activities[2], original.activities[2]);
     const activity = content.activities[0];
     assert.equal(activity.title, "Unity Hub & Licence");
     assert.equal(activity.completionMode, "manual");
@@ -76,6 +76,132 @@ test("the complete student worksheet renders all four steps without questions, u
     assert.match(host.innerHTML, /final activity/);
 });
 
+test("Unity Editor migrates once, renders current teacher settings and accepts full version identifiers", () => {
+    const previous = withUnityHubLicence(baseContent());
+    delete previous.activities[1].unityEditorVersion;
+    previous.activities[0].blocks[2].licenceValue = mockLicence;
+    const content = withUnityHubLicence(previous);
+    const activity = content.activities[1];
+    assert.equal(content.activities[0], previous.activities[0], "Activity 1 and its licence remain unchanged");
+    assert.equal(content.activities[2], previous.activities[2]);
+    assert.equal(activity.title, "Unity Editor");
+    assert.equal(activity.completionMode, "manual");
+    assert.deepEqual(activity.questions, []);
+    assert.deepEqual(activity.images, []);
+    assert.equal(activity.unityEditor.version, "6000.5");
+    assert.equal(activity.blocks.length, 4);
+    assert.match(activity.blocks[0].text, /already installed/);
+    const ctx = vm.createContext({ window: { ActivityBlocks: B }, structuredClone });
+    for (const file of ["activity-block-view.js", "kit-worksheet-render.js"]) {
+        vm.runInContext(fs.readFileSync(path.join(root, "practical-skills", file), "utf8"), ctx);
+    }
+    const host = { style: { setProperty() {} }, innerHTML: "", querySelectorAll: () => [] };
+    const render = () => ctx.window.KitWorksheetRender.renderWorksheet(host, activity, { readOnly: true });
+    render();
+    assert.equal((host.innerHTML.match(/class="activity-content-block"/g) || []).length, 4);
+    assert.match(host.innerHTML, /font-size:1.5em">6000\.5/);
+    assert.match(host.innerHTML, /No additional modules specified by your teacher\./);
+    assert.doesNotMatch(host.innerHTML, /<input|<textarea|Additional installation notes/);
+    for (const version of ["6000.5.0f1", "6000.5.1b12", "6000.5.0a3"]) {
+        activity.unityEditor = { version, modules: "Windows Build Support\nWeb Build Support", notes: "<script>unsafe</script>" };
+        B.validate(activity);
+        render();
+        assert.ok(host.innerHTML.includes(version));
+        assert.match(host.innerHTML, /Windows Build Support\nWeb Build Support/);
+        assert.match(host.innerHTML, /&lt;script&gt;unsafe&lt;\/script&gt;/);
+        assert.doesNotMatch(host.innerHTML, /<script>/);
+        assert.equal(withUnityHubLicence(content), content, "Reopening never resets teacher configuration");
+    }
+    for (const config of [null, [], { version: "" }, { version: 6000.5 }, { version: "6000.5", modules: [] }]) {
+        assert.throws(() => B.validate({ ...activity, unityEditor: config }), /Unity Editor settings/);
+    }
+    assert.match(activity.taskBrief.evidenceRequired, /do not need to reinstall/);
+    assert.match(activity.blocks[3].text, /Activity 3 - Unity Project Folder/);
+});
+
+test("Unity Editor manual completion saves its tick and directs students to Activity 3", async () => {
+    const controller = fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet.js"), "utf8");
+    const start = controller.indexOf('        activityCompleteBtn.addEventListener("click",');
+    const end = controller.indexOf("\n        });", start) + "\n        });".length;
+    let click;
+    let message;
+    const state = { progressLoaded: true, completedActivities: {}, responses: {}, kitId: "kit-unity-setup",
+        content: withUnityHubLicence(baseContent()) };
+    const ctx = vm.createContext({
+        state, activityCompleteBtn: { addEventListener(_name, fn) { click = fn; } },
+        getCurrentActivityIndex: () => 1,
+        window: { clearTimeout() {}, ActivityBlocks: B, KitWorksheetRender: { visibleLoginSites: () => [] } },
+        queueProgressWrite: (fn) => fn(), saveResponses: async () => {}, withAuthHeaders: (headers) => headers,
+        loadJson: async (_url, options) => {
+            const { completed } = JSON.parse(options.body);
+            return { completedActivities: completed ? { 1: "saved" } : {} };
+        },
+        showStatusMessage: (value) => { message = value; }, updateActivityCompleteBar() {}
+    });
+    vm.runInContext(controller.slice(start, end), ctx);
+    await click();
+    assert.equal(state.completedActivities[1], "saved");
+    assert.match(message, /Activity 3 - Unity Project Folder/);
+    await click();
+    assert.deepEqual(state.completedActivities, {});
+    assert.equal(message, "Activity completion removed.");
+    assert.match(controller, /unityEditor: activity\?\.unityEditor/);
+});
+
+test("teachers preview, save and reopen Editor configuration without changing the school licence", async () => {
+    let stored = withUnityHubLicence(baseContent());
+    stored.activities[0].blocks[2].licenceValue = mockLicence;
+    const nodes = new Map();
+    const get = (selector) => {
+        if (!nodes.has(selector)) nodes.set(selector, {
+            value: "", children: [], handlers: {}, classList: { toggle() {} },
+            replaceChildren() { this.children = []; },
+            addEventListener(name, fn) { this.handlers[name] = fn; }
+        });
+        return nodes.get(selector);
+    };
+    let preview;
+    let timer;
+    const ctx = vm.createContext({
+        document: { querySelector: get }, URLSearchParams,
+        window: {
+            location: { search: "?kit=kit-unity-setup&activity=1" }, ActivityBlocks: B,
+            clearTimeout() {}, setTimeout(fn) { timer = fn; },
+            ActivityBlockEditor: { mount(_host, options) {
+                return { read: () => options.blocks, destroy() {}, isUploading: () => false };
+            } },
+            KitWorksheetRender: { renderWorksheet(_host, draft) { preview = draft; } }
+        },
+        localStorage: { getItem: () => null }, sessionStorage: { getItem: () => null },
+        fetch: async (_url, options = {}) => {
+            if (options.method === "PUT") stored = JSON.parse(options.body).content;
+            return { ok: true, json: async () => ({ content: structuredClone(stored) }) };
+        }
+    });
+    const admin = fs.readFileSync(path.join(root, "practical-skills", "admin-kit-activity.js"), "utf8");
+    const tick = () => new Promise((resolve) => setImmediate(resolve));
+    vm.runInContext(admin, ctx);
+    await tick();
+    assert.equal(get("#activity-unity-editor").hidden, false);
+    assert.equal(get("#activity-unity-version").value, "6000.5");
+    get("#activity-unity-version").value = "6000.5.2f1";
+    get("#activity-unity-modules").value = "Windows Build Support";
+    get("#activity-unity-notes").value = "Keep Unity Hub open.";
+    get("#activity-editor-fields").handlers.input();
+    timer();
+    assert.equal(preview.unityEditor.version, "6000.5.2f1");
+    assert.equal(stored.activities[1].unityEditor.version, "6000.5", "Preview is not a save");
+    get("#activity-save").handlers.click();
+    await tick();
+    assert.equal(stored.activities[1].unityEditor.modules, "Windows Build Support");
+    assert.equal(stored.activities[1].unityEditor.notes, "Keep Unity Hub open.");
+    assert.equal(stored.activities[0].blocks[2].licenceValue, mockLicence);
+    vm.runInContext(admin, ctx);
+    await tick();
+    assert.equal(get("#activity-unity-version").value, "6000.5.2f1");
+    assert.equal(get("#activity-unity-modules").value, "Windows Build Support");
+});
+
 test("Unity instructions and teacher licence settings persist in database content across fresh server contexts", async () => {
     let stored = baseContent();
     const writes = [];
@@ -105,9 +231,11 @@ test("Unity instructions and teacher licence settings persist in database conten
     assert.equal(writes.length, 1, "The existing Unity kit is configured once, not on every page load");
     first.activities[0].blocks[2].activationMethod = "serial";
     first.activities[0].blocks[2].licenceValue = mockLicence;
+    first.activities[1].unityEditor = { version: "6000.5.1f1", modules: "Windows Build Support", notes: "Use the school network." };
     await ctx().savePracticalSkillsKitContent("kit-unity-setup", first, "teacher@school.nz");
     const reopened = await ctx().getStoredPracticalSkillsKitContent("kit-unity-setup");
     assert.equal(reopened.activities[0].blocks[2].licenceValue, mockLicence);
+    assert.deepEqual(reopened.activities[1].unityEditor, first.activities[1].unityEditor);
     assert.equal(writes.length, 2, "Reopening does not overwrite the teacher configuration");
 });
 
