@@ -179,7 +179,7 @@
             pill.removeAttribute("aria-label");
             pill.removeAttribute("title");
         }
-        button.textContent = autoBlocks ? "Check & Save Activity" : completed ? "Undo Completion" : siteQuestions ? "Check Activity Completion" : "Mark Activity Complete";
+        button.textContent = activity?.unityTestProjectVersion ? "Completed" : autoBlocks ? "Check & Save Activity" : completed ? "Undo Completion" : siteQuestions ? "Check Activity Completion" : "Mark Activity Complete";
         button.disabled = !state.progressLoaded;
         button.hidden = selfMarking && !siteQuestions && !completed;
     }
@@ -733,6 +733,7 @@
         const activityCompleteBtn = document.getElementById("worksheet-activity-complete-btn");
 
         activityCompleteBtn.addEventListener("click", async () => {
+            if (preview) return;
             const index = getCurrentActivityIndex();
             if (index === null || !state.progressLoaded) return;
             const completed = !state.completedActivities[index];
@@ -742,7 +743,23 @@
                 window.clearTimeout(state.blockSaveTimerId);
                 const activity = state.content?.activities?.[index];
                 if (activity?.completionMode === "auto" && !window.ActivityBlocks.specialised(activity)) {
-                    await checkBlockAnswers(index);
+                    const email = state.email;
+                    const revision = state.blockRevision;
+                    const result = await checkBlockAnswers(index);
+                    if (activity.unityTestProjectVersion && result.passed &&
+                        email === getSignedInEmail() && revision === state.blockRevision) {
+                        const remaining = state.content.worksheets.filter((worksheet, activityIndex) =>
+                            worksheet && !worksheet.hidden && worksheet.mergedInto === undefined &&
+                            !state.completedActivities[activityIndex]);
+                        if (remaining.length) {
+                            showStatusMessage("Your project link is saved. Complete all earlier activities before receiving your Unity Setup certificate.", true);
+                        } else {
+                            await queueProgressWrite(() => completeKit(state.kitId));
+                            if (email === getSignedInEmail() && revision === state.blockRevision) {
+                                window.location.href = `./kit-worksheet.html?kit=${encodeURIComponent(state.kitId)}`;
+                            }
+                        }
+                    }
                     return;
                 }
                 const sites = state.content?.activities?.[index]?.loginSites;

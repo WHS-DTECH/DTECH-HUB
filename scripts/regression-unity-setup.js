@@ -257,7 +257,7 @@ test("Unity setup manual completion saves ticks and directs students to the next
     const state = { progressLoaded: true, completedActivities: {}, responses: {}, kitId: "kit-unity-setup",
         content: withUnityHubLicence(baseContent()) };
     const ctx = vm.createContext({
-        state, activityCompleteBtn: { addEventListener(_name, fn) { click = fn; } },
+        state, preview: false, activityCompleteBtn: { addEventListener(_name, fn) { click = fn; } },
         getCurrentActivityIndex: () => index,
         window: { clearTimeout() {}, ActivityBlocks: B, KitWorksheetRender: { visibleLoginSites: () => [] } },
         queueProgressWrite: (fn) => fn(), saveResponses: async () => {}, withAuthHeaders: (headers) => headers,
@@ -289,6 +289,85 @@ test("Unity setup manual completion saves ticks and directs students to the next
     assert.deepEqual(state.completedActivities, {});
     assert.equal(message, "Activity completion removed.");
     assert.match(controller, /unityEditor: activity\?\.unityEditor/);
+});
+
+test("Unity final Completed button validates the saved link and opens the certificate menu only after all activities", async () => {
+    const controller = fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet.js"), "utf8");
+    const start = controller.indexOf('        activityCompleteBtn.addEventListener("click",');
+    const end = controller.indexOf("\n        });", start) + "\n        });".length;
+    let click;
+    let message;
+    let fail = false;
+    let stale = false;
+    let checks = 0;
+    let completedKits = 0;
+    const state = { email: "student@school.nz", progressLoaded: true, blockRevision: 0,
+        completedActivities: {}, responses: {}, kitId: "kit-unity-setup", content: withUnityHubLicence(baseContent()) };
+    const window = { clearTimeout() {}, location: { href: "" }, ActivityBlocks: B };
+    const ctx = vm.createContext({
+        state, window, preview: false, activityCompleteBtn: { addEventListener(_name, fn) { click = fn; } },
+        getCurrentActivityIndex: () => 4, getSignedInEmail: () => state.email,
+        queueProgressWrite: (fn) => fn(),
+        completeKit: async (kitId) => { assert.equal(kitId, state.kitId); completedKits++; },
+        showStatusMessage: (value) => { message = value; }, updateActivityCompleteBar() {},
+        checkBlockAnswers: async (index) => {
+            checks++;
+            if (fail) throw new Error("Could not save your project link.");
+            const grade = B.grade(state.content.activities[index], state.responses[`${index}-blocks`] || {});
+            if (grade.passed) state.completedActivities[index] = "saved";
+            else delete state.completedActivities[index];
+            if (stale) state.blockRevision++;
+            return grade;
+        }
+    });
+    vm.runInContext(controller.slice(start, end), ctx);
+    await click();
+    assert.equal(window.location.href, "", "An empty link cannot finish the kit");
+    state.responses["4-blocks"] = { "unitytest-project-link": "https://drive.google.com/file/d/scene/view" };
+    await click();
+    assert.equal(window.location.href, "", "A file link cannot finish the kit");
+    state.responses["4-blocks"] = { "unitytest-project-link": "https://drive.google.com/drive/folders/project-id" };
+    await click();
+    assert.match(message, /Complete all earlier activities/);
+    assert.equal(window.location.href, "");
+    for (const index of [0, 1, 2, 3]) state.completedActivities[index] = "saved";
+    fail = true;
+    await click();
+    assert.match(message, /Could not save your project link/);
+    assert.equal(window.location.href, "");
+    fail = false;
+    stale = true;
+    await click();
+    assert.equal(window.location.href, "", "An outdated check cannot navigate away from new edits");
+    assert.equal(completedKits, 0);
+    stale = false;
+    await click();
+    assert.equal(window.location.href, "./kit-worksheet.html?kit=kit-unity-setup");
+    assert.equal(completedKits, 1, "The button uses the standard kit completion and certificate endpoint");
+    ctx.preview = true;
+    window.location.href = "";
+    const previousChecks = checks;
+    await click();
+    assert.equal(checks, previousChecks, "Teacher preview must not save or complete");
+    assert.equal(window.location.href, "");
+
+    const nodes = new Map();
+    const node = (id) => {
+        if (!nodes.has(id)) nodes.set(id, { classList: { toggle() {} }, setAttribute() {}, removeAttribute() {} });
+        return nodes.get(id);
+    };
+    ctx.document = { getElementById: node };
+    ctx.window.KitWorksheetRender = { visibleLoginSites: () => [] };
+    const barStart = controller.indexOf("    function updateActivityCompleteBar()");
+    const barEnd = controller.indexOf("    function blockPath(", barStart);
+    vm.runInContext(controller.slice(barStart, barEnd), ctx);
+    ctx.preview = false;
+    ctx.updateActivityCompleteBar();
+    assert.equal(node("worksheet-activity-complete-btn").textContent, "Completed");
+    assert.equal(node("worksheet-activity-complete-btn").hidden, false);
+    ctx.preview = true;
+    ctx.updateActivityCompleteBar();
+    assert.equal(node("worksheet-activity-complete-bar").hidden, true);
 });
 
 test("teachers preview, save and reopen Editor configuration without changing the school licence", async () => {
