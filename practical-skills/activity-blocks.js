@@ -20,8 +20,13 @@
         return Boolean(activity?.assessmentId || activity?.assessment || activity?.identityLessonVersion ||
             activity?.questionAutoMarkAssessmentId || activity?.researchReport || activity?.loginSites);
     }
-    function studentUrl(value, driveOnly = false) {
+    function studentUrl(value, driveOnly = false, driveFolderOnly = false) {
         const url = typeof value === "string" && value.trim().length <= 5000 ? safeUrl(value.trim()) : "";
+        if (url && driveFolderOnly) {
+            const parsed = new URL(url);
+            return parsed.origin === "https://drive.google.com" &&
+                /^\/drive\/(?:u\/\d+\/)?folders\/[A-Za-z0-9_-]+\/?$/.test(parsed.pathname) ? url : "";
+        }
         return url && (!driveOnly || ["drive.google.com", "docs.google.com"].includes(new URL(url).hostname)) ? url : "";
     }
     function initialBlocks(activity, index, content) {
@@ -173,7 +178,7 @@
             for (const key of ["title", "text", "url", "alt", "caption", "attribution", "entries", "fileName", "responseKey"]) {
                 if (b[key] !== undefined && (typeof b[key] !== "string" || b[key].length > (key === "text" ? 20000 : 5000))) throw new Error(`${types[b.kind]}: ${key} must be text within the size limit.`);
             }
-            for (const key of ["required", "editable", "numbered", "driveOnly"]) if (b[key] !== undefined && typeof b[key] !== "boolean") throw new Error("Block options must be true or false.");
+            for (const key of ["required", "editable", "numbered", "driveOnly", "driveFolderOnly"]) if (b[key] !== undefined && typeof b[key] !== "boolean") throw new Error("Block options must be true or false.");
             if (["link", "resource", "image"].includes(b.kind) && !safeUrl(b.url)) throw new Error(`${types[b.kind]}: enter a full HTTPS link.`);
             if (b.kind === "image" && !String(b.alt || "").trim()) throw new Error("Images need alternative text.");
             if (b.kind === "document" && (!safeUrl(b.url) || !/^https:\/\/docs\.google\.com\/document\/(?:u\/\d+\/)?d\/[a-zA-Z0-9_-]{20,}(?:[/?#]|$)/.test(b.url || ""))) throw new Error("Create Document needs a Google Docs template link.");
@@ -210,7 +215,7 @@
             const value = answers?.[b.id];
             let passed = false;
             let message;
-            if (b.kind === "studentlink") passed = Boolean(studentUrl(value, b.driveOnly));
+            if (b.kind === "studentlink") passed = Boolean(studentUrl(value, b.driveOnly, b.driveFolderOnly));
             if (b.kind === "studentlink" && passed && activity.uniqueDocumentLinks) {
                 const key = documentLinkKey(value);
                 const duplicateHere = (activity.blocks || []).some((other) =>

@@ -112,17 +112,39 @@ function withUnityHubLicence(content) {
         };
     }
     const finalIndex = content.worksheets.findIndex((worksheet) => /^unity\s*test\s+project$/i.test(String(worksheet?.activity || "").trim()));
-    if (finalIndex >= 0 && !activities[finalIndex]?.blocks?.some((block) => block.id === "unitytest-project-link")) {
+    if (finalIndex >= 0 && activities[finalIndex]?.unityTestProjectVersion !== 1) {
         changed = true;
         const finalActivity = activities[finalIndex] || {};
         activities[finalIndex] = {
             ...finalActivity,
+            title: "Unity Test Project",
+            unityTestProjectVersion: 1,
             completionMode: "auto",
+            questions: [],
+            images: [],
+            taskBrief: {
+                challenge: "Demonstrate that Unity is operational: create and save UnityTest, then back up the complete project using Google Drive for desktop. This is the only activity requiring submitted evidence.",
+                evidenceRequired: "Submit one Google Drive folder link below. No screenshots, written explanations or additional uploads are required. A valid folder URL completes this activity automatically; it does not verify the project contents or sharing permissions. The Unity Setup Licence follows the kit's existing process and requires all activities to be complete."
+            },
             blocks: [
-                ...(finalActivity.blocks || []),
-                { id: "unitytest-project-link", kind: "studentlink", title: "Submit your completed UnityTest project",
-                    text: "Paste the Google Drive link to your completed UnityTest project. This is the required practical evidence for the Unity Setup Licence. Make sure your teacher can access it. Submitting a link does not verify the project contents.",
-                    required: true, driveOnly: true }
+                { id: "unitytest-create", kind: "tasks", title: "Step 1 - Create a New Unity Project",
+                    text: "Open Unity Hub and select Projects > New project.\nSelect the required Unity Editor version from Activity 2.\nChoose the Universal 3D (URP) template. If it is unavailable, ask your teacher which 3D template to use.\nName the project UnityTest.\nSet the Location to Videos\\Unity so the project folder will be Videos\\Unity\\UnityTest.\nClick Create project and wait for Unity Editor to open." },
+                { id: "unitytest-cube", kind: "tasks", title: "Step 2 - Add a Cube",
+                    text: "In Unity Editor, find the Hierarchy window.\nRight-click inside the Hierarchy and select 3D Object > Cube.\nConfirm the Cube appears in your scene." },
+                { id: "unitytest-scene", kind: "tasks", title: "Step 3 - Save Your Scene",
+                    text: "Select File > Save As or Save Scene As.\nSave the scene as TestScene inside this project's Assets folder.\nConfirm TestScene appears in the Project window. The saved scene is Assets\\TestScene.unity.\nYour complete UnityTest project must include Assets, Packages and ProjectSettings; do not back up only the scene file." },
+                { id: "unitytest-backup", kind: "tasks", title: "Step 4 - Check Your Google Drive Backup",
+                    text: "Save your work and close Unity Editor.\nWait for Google Drive for desktop to finish syncing. Resolve any sync errors before relying on the backup.\nOpen Google Drive in your browser using your WHS school account.\nSelect Computers, choose the computer containing your backup, then open Videos > Unity > UnityTest.\nConfirm the essential project folders Assets, Packages and ProjectSettings are present, including Assets\\TestScene.unity." },
+                { id: "unitytest-share", kind: "tasks", title: "Step 5 - Share Your Unity Project",
+                    text: "In Google Drive, right-click the backed-up UnityTest folder and select Share.\nGive your teacher access using your school's sharing permissions.\nSelect Copy link and paste it into My Unity Test Project below.\nSubmit the folder link, not a screenshot, an individual scene file or a link to the local Google Drive virtual drive." },
+                { id: "unitytest-success", kind: "text", numbered: false, title: "Success criteria",
+                    text: "UnityTest is created using the required Unity Editor from Activity 2.\nTestScene is saved with a Cube.\nThe UnityTest folder is present in Google Drive.\nThe shared folder link is submitted successfully." },
+                { ...(finalActivity.blocks || []).find((block) => block.id === "unitytest-project-link"),
+                    id: "unitytest-project-link", kind: "studentlink", title: "My Unity Test Project",
+                    text: "Paste the Google Drive share link to your complete backed-up UnityTest folder. Make sure your teacher can access it. This saves the link for teacher review; it does not verify the project contents or sharing permissions.",
+                    required: true, driveOnly: true, driveFolderOnly: true },
+                { id: "unitytest-return", kind: "text", numbered: false, title: "Optional reference - Returning to another computer",
+                    text: "This reference is optional and is not required for Licence completion.\nIn your school Google Drive, open Computers > your backed-up computer > Videos > Unity > UnityTest. Download the complete UnityTest folder; if downloaded as a ZIP, extract it first.\nCopy the complete project into the new computer's Videos\\Unity folder. Confirm Assets, Packages and ProjectSettings are inside UnityTest.\nIn Unity Hub, select Add project from disk (or Open), choose Videos\\Unity\\UnityTest and open it with the required Editor version. Open TestScene from Assets.\nConfigure Videos backup on the new computer using Activity 4. Keep one current working copy and let syncing finish before changing computers." }
             ]
         };
     }

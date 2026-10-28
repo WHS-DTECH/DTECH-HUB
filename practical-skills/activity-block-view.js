@@ -22,10 +22,10 @@
                     <p class="activity-block-text">${e(unityEditor.modules?.trim() || "No additional modules specified by your teacher.")}</p>
                 </aside>`;
             if (b.kind === "studentlink") {
-                const studentLink = B.studentUrl(value, b.driveOnly);
+                const studentLink = B.studentUrl(value, b.driveOnly, b.driveFolderOnly);
                 body = `${b.text ? `<p class="activity-block-text">${e(b.text)}</p>` : ""}
-                    <label>Your link<input type="url" data-student-link maxlength="5000" aria-invalid="${Boolean(typeof value === "string" && value.trim()) && !studentLink}" placeholder="https://..." value="${e(typeof value === "string" ? value : "")}" ${disabled}></label>
-                    <p class="activity-block-status" data-link-status role="status">${b.driveOnly ? "Paste a Google Drive or Google Docs HTTPS link. This checks the URL only, not sharing permissions or completed work." : value && !studentLink ? "Enter a full HTTPS link, without a username or password in the URL." : "Paste one HTTPS link. This checks the URL only, not sharing permissions or completed work."}</p>
+                    <label>${b.driveFolderOnly ? e(b.title) : "Your link"}<input type="url" data-student-link maxlength="5000" aria-invalid="${Boolean(typeof value === "string" && value.trim()) && !studentLink}" placeholder="${b.driveFolderOnly ? "https://drive.google.com/drive/folders/..." : "https://..."}" value="${e(typeof value === "string" ? value : "")}" ${disabled}></label>
+                    <p class="activity-block-status" data-link-status role="status">${b.driveFolderOnly ? "Paste a Google Drive folder HTTPS link, not a file link. This checks the URL only, not sharing permissions or project contents." : b.driveOnly ? "Paste a Google Drive or Google Docs HTTPS link. This checks the URL only, not sharing permissions or completed work." : value && !studentLink ? "Enter a full HTTPS link, without a username or password in the URL." : "Paste one HTTPS link. This checks the URL only, not sharing permissions or completed work."}</p>
                     <a class="worksheet-btn worksheet-btn-secondary" data-open-student-link ${studentLink ? `href="${e(studentLink)}"` : "hidden"} target="_blank" rel="noopener noreferrer">Open Link &#8599;</a>`;
             }
             if (b.kind === "image") body = link ? (renderImage ? renderImage(b) : `<figure><img src="${e(link)}" alt="${e(b.alt)}" loading="lazy"><figcaption>${e(b.caption)}${b.attribution ? `<br>${e(b.attribution)}` : ""}</figcaption></figure>`) : "<p>Enter an HTTPS image link to preview.</p>";
@@ -141,13 +141,15 @@
                         [...section.querySelectorAll(`input[data-row="${r}"]`)].map((cell) => cell.value));
                     changed(b, rows);
                 } else if (b.kind === "studentlink" && input.matches("[data-student-link]")) {
-                    const url = B.studentUrl(input.value, b.driveOnly);
+                    const url = B.studentUrl(input.value, b.driveOnly, b.driveFolderOnly);
                     const open = section.querySelector("[data-open-student-link]");
                     open.hidden = !url;
                     if (url) open.href = url;
                     else open.removeAttribute("href");
                     input.setAttribute("aria-invalid", String(Boolean(input.value.trim()) && !url));
-                    section.querySelector("[data-link-status]").textContent = b.driveOnly
+                    section.querySelector("[data-link-status]").textContent = b.driveFolderOnly
+                        ? "Paste a Google Drive folder HTTPS link, not a file link. This checks the URL only, not sharing permissions or project contents."
+                        : b.driveOnly
                         ? "Paste a Google Drive or Google Docs HTTPS link. This checks the URL only, not sharing permissions or completed work."
                         : input.value.trim() && !url
                             ? "Enter a full HTTPS link, without a username or password in the URL."

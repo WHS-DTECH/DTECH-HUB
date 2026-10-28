@@ -33,7 +33,7 @@
                     ${b.kind === "text" ? `<label><input type="checkbox" data-field="numbered" ${b.numbered === true ? "checked" : ""}> Number each line</label><p>Each non-empty line becomes a numbered step. Numbering restarts at 1 beneath this block's bold heading.</p>` : ""}
                     ${b.kind === "link" ? "<p>You supply this website link for students to open. Use Student Add a Link when students should submit their own link.</p>" : ""}
                     ${b.kind === "studentlink" ? "<p>Students paste one HTTPS link. Their link is saved with their answers. Required automatic completion checks only that the URL is valid, not access to the file or the work inside it.</p>" : ""}
-                    ${b.kind === "studentlink" && b.driveOnly ? "<p>This submission requires a Google Drive or Google Docs link.</p>" : ""}
+                    ${b.kind === "studentlink" && b.driveFolderOnly ? "<p>This submission requires a Google Drive folder link, not a file or scene link.</p>" : b.kind === "studentlink" && b.driveOnly ? "<p>This submission requires a Google Drive or Google Docs link.</p>" : ""}
                     ${b.kind === "schoollicence" ? `<label>School licence activation method<select data-field="activationMethod">
                         <option value="instructions" ${b.activationMethod !== "serial" ? "selected" : ""}>Activation instructions (no copy button)</option>
                         <option value="serial" ${b.activationMethod === "serial" ? "selected" : ""}>Serial number (show Copy Licence)</option>

@@ -198,6 +198,55 @@ test("Google Drive Backup migrates once and renders five steps without evidence 
     assert.equal(content.activities[3].blocks[0].text, "Teacher-edited backup instructions.");
 });
 
+test("Unity Test Project replaces legacy evidence with five steps, one folder link and optional return instructions", () => {
+    const previous = withUnityHubLicence(baseContent());
+    delete previous.activities[4].unityTestProjectVersion;
+    previous.activities[4].blocks.find((block) => block.id === "unitytest-project-link").responseKey = "saved-project";
+    const content = withUnityHubLicence(previous);
+    for (const index of [0, 1, 2, 3]) assert.equal(content.activities[index], previous.activities[index]);
+    const activity = content.activities[4];
+    assert.equal(activity.title, "Unity Test Project");
+    assert.equal(activity.completionMode, "auto");
+    assert.deepEqual(activity.questions, []);
+    assert.deepEqual(activity.images, []);
+    assert.equal(activity.blocks.filter((block) => block.kind === "tasks").length, 5);
+    assert.equal(activity.blocks.filter((block) => B.interactive.includes(block.kind)).length, 1);
+    const link = activity.blocks.find((block) => block.kind === "studentlink");
+    assert.equal(link.id, "unitytest-project-link");
+    assert.equal(link.responseKey, "saved-project");
+    assert.equal(link.title, "My Unity Test Project");
+    assert.equal(link.required, true);
+    assert.equal(link.driveFolderOnly, true);
+    B.validate(activity);
+    const ctx = vm.createContext({ window: { ActivityBlocks: B }, structuredClone });
+    for (const file of ["activity-block-view.js", "kit-worksheet-render.js"]) {
+        vm.runInContext(fs.readFileSync(path.join(root, "practical-skills", file), "utf8"), ctx);
+    }
+    const host = { style: { setProperty() {} }, innerHTML: "", querySelectorAll: () => [] };
+    ctx.window.KitWorksheetRender.renderWorksheet(host, { ...activity, bannerTitle: activity.title }, { readOnly: true });
+    for (const instruction of [
+        /Universal 3D \(URP\)/, /required Unity Editor version from Activity 2/,
+        /Videos\\Unity\\UnityTest/, /3D Object &gt; Cube/, /Assets\\TestScene.unity/,
+        /Assets, Packages and ProjectSettings/, /close Unity Editor/, /finish syncing/,
+        /Computers/, /Give your teacher access/, /My Unity Test Project/,
+        /Success criteria/, /does not verify the project contents/,
+        /requires all activities to be complete/, /Optional reference/,
+        /not required for Licence completion/, /extract it first/, /Add project from disk/
+    ]) assert.match(host.innerHTML, instruction);
+    assert.equal((host.innerHTML.match(/<input/g) || []).length, 1);
+    assert.doesNotMatch(host.innerHTML, /<textarea|type="file"|type="checkbox"/);
+    for (const value of ["", "http://drive.google.com/drive/folders/id", "https://docs.google.com/document/d/id/edit",
+        "https://drive.google.com/file/d/id/view", "https://drive.google.com/drive/folders/",
+        "https://drive.google.com.evil.test/drive/folders/id", "https://drive.google.com/drive/my-drive"]) {
+        assert.equal(B.grade(activity, { [link.id]: value }).passed, false, value);
+    }
+    for (const value of ["https://drive.google.com/drive/folders/project-id?usp=sharing",
+        "https://drive.google.com/drive/u/0/folders/project_id"]) {
+        assert.equal(B.grade(activity, { [link.id]: value }).passed, true, value);
+    }
+    assert.equal(withUnityHubLicence(content), content);
+});
+
 test("Unity setup manual completion saves ticks and directs students to the next activity", async () => {
     const controller = fs.readFileSync(path.join(root, "practical-skills", "kit-worksheet.js"), "utf8");
     const start = controller.indexOf('        activityCompleteBtn.addEventListener("click",');
@@ -336,6 +385,8 @@ test("Unity instructions and teacher licence settings persist in database conten
     assert.equal(reopened.activities[3].unityDriveBackupVersion, 1);
     assert.equal(reopened.activities[3].completionMode, "manual");
     assert.match(reopened.activities[3].blocks[3].text, /Sync with Google Drive/);
+    assert.equal(reopened.activities[4].unityTestProjectVersion, 1);
+    assert.equal(reopened.activities[4].blocks.find((block) => block.id === "unitytest-project-link").driveFolderOnly, true);
     assert.equal(writes.length, 2, "Reopening does not overwrite the teacher configuration");
 });
 
@@ -700,7 +751,12 @@ test("Unity Hub manual tick does not award the kit; final practical link is requ
     assert.equal(row.completed_activities[4], undefined);
     row.responses["4-blocks"] = { "unitytest-project-link": "https://example.test/not-a-drive-project" };
     assert.equal((await sync()).completed, false, "The final evidence must be a Google Drive link");
+    row.responses["4-blocks"] = { "unitytest-project-link": "https://drive.google.com/file/d/scene-file/view" };
+    assert.equal((await sync()).completed, false, "A scene or file link cannot complete the final activity");
     row.responses["4-blocks"] = { "unitytest-project-link": "https://drive.google.com/drive/folders/test-project" };
+    delete row.completed_activities[3];
+    assert.equal((await sync()).completed, false, "A valid folder link cannot bypass another incomplete activity");
+    row.completed_activities[3] = "saved";
     const completed = await sync();
     assert.equal(completed.completed, true);
     assert.ok(certificate.buildKitCertificate(content, completed, "Student"));
