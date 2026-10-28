@@ -8975,7 +8975,15 @@ function isDigitalOutcomeRelevantDigiMedConventionsCriterion(taskTopicTitle, tas
     const topicText = String(taskTopicTitle || "").trim().toLowerCase();
     const shortNameText = String(taskShortName || "").trim().toLowerCase();
     if (/relevant\s+(?:digimed\s+)?conventions|relevant\s+conventions\s+for\s+the\s+media\s+type/.test(topicText)) return true;
-    return shortNameText === DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE.toLowerCase();
+    return /^conventions\s*\((?:web|image|graphics|vector)\)$/.test(shortNameText)
+        || /^conventions\s*\((?:web|image|graphics|vector)\)$/.test(topicText);
+}
+
+function getConventionsMediaType(allocation, taskTopicTitle = "", taskShortName = "") {
+    const allocated = String(allocation?.digital_media_type || "").trim().toLowerCase();
+    const requested = `${taskTopicTitle} ${taskShortName}`.match(/conventions\s*\((web|image|graphics|vector)\)/i)?.[1]?.toLowerCase();
+    const type = allocated || requested || "web";
+    return ["image", "graphics", "vector"].includes(type) ? "image" : type;
 }
 
 function isDigitalOutcomeUXPrinciplesCriterion(taskTopicTitle, taskShortName = "") {
@@ -9624,7 +9632,7 @@ function defaultDetailShape(id, data) {
     };
 }
 
-function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selectedTaskShortName = "") {
+function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selectedTaskShortName = "", conventionsMediaType = "") {
     const normalizedCategory = normalizeCardCategory(data?.activityCategory, "Activity");
     const isAssessmentTask = normalizedCategory === "Assessment Task";
     const canConvertCategory = canEdit && !selectedTaskTopic && Boolean(String(id || "").match(/^\d+$/));
@@ -9713,7 +9721,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         "target-audience": DIGITAL_OUTCOME_TARGET_AUDIENCE_TITLE,
         "trialling-components": DIGITAL_OUTCOME_TRIALLING_COMPONENTS_TITLE,
         "testing-functions": DIGITAL_OUTCOME_TESTING_FUNCTIONS_TITLE,
-        "relevant-digimed-conventions": DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE,
+        "relevant-digimed-conventions": getConventionsMediaType(
+            conventionsMediaType ? { digital_media_type: conventionsMediaType } : null,
+            taskTopicTitle, resolvedTaskShortName) === "image" ? "Conventions (IMAGE)" : DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE,
         "user-experience-principles": DIGITAL_OUTCOME_UX_PRINCIPLES_TITLE,
         "video-integrity-testing": DIGITAL_OUTCOME_VIDEO_INTEGRITY_TITLE,
         "image-integrity-testing": DIGITAL_OUTCOME_IMAGE_INTEGRITY_TITLE,
@@ -9825,8 +9835,12 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
             "project-management": "Project Management",
             "digital-outcome-description": DIGITAL_OUTCOME_DESCRIPTION_TITLE
         };
-        const topicDisplayName = topicDisplayNames[preferredTemplateId] || DIGITAL_OUTCOME_DESCRIPTION_TITLE;
+        const topicDisplayName = digitalOutcomeTopicKey === "relevant-digimed-conventions"
+            ? "Conventions" : topicDisplayNames[preferredTemplateId] || DIGITAL_OUTCOME_DESCRIPTION_TITLE;
         templateLibraryParams.set("preFilterTopic", topicDisplayName);
+        if (digitalOutcomeTopicKey === "relevant-digimed-conventions") {
+            templateLibraryParams.set("taskShortName", displayTitle);
+        }
     }
     const slideshowTemplateLibraryUrl = `slideshow-template-library.html?${templateLibraryParams.toString()}`;
     const viewerEmail = readStoredHubEmail();
@@ -10183,6 +10197,10 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
         : (isDigitalOutcomeTopic ? slideshowTemplateLibraryUrl : "");
     const relevantDigiMedConventionsTableHtml = digitalOutcomeTopicKey === "relevant-digimed-conventions"
         ? (() => {
+            if (getConventionsMediaType(conventionsMediaType ? { digital_media_type: conventionsMediaType } : null,
+                taskTopicTitle, resolvedTaskShortName) === "image") {
+                return buildDigiMedImageConventionsTable(id, readStoredHubEmail());
+            }
             const acknowledgements = readDigiMedConventionsAcknowledgements(id, readStoredHubEmail());
             const rows = [
                 ["Navigation", "Consistent navigation, recognisable menu, logo/home link, descriptive links"],
@@ -10805,6 +10823,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     `;
 
     if (digitalOutcomeTopicKey === "relevant-digimed-conventions") {
+        bindDigiMedImageConventionAcknowledgements(host, id, readStoredHubEmail());
         const acknowledgements = readDigiMedConventionsAcknowledgements(id, readStoredHubEmail());
         host.querySelectorAll("[data-digimed-convention-ack]").forEach((checkbox) => {
             checkbox.addEventListener("change", () => {
@@ -10814,7 +10833,9 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 writeDigiMedConventionsAcknowledgements(id, readStoredHubEmail(), acknowledgements);
             });
         });
-        if (!canEdit && readStoredHubEmail()) {
+        if (!canEdit && readStoredHubEmail() && getConventionsMediaType(
+            conventionsMediaType ? { digital_media_type: conventionsMediaType } : null,
+            taskTopicTitle, resolvedTaskShortName) !== "image") {
             const syncConventionsSlide = () => syncDigiMedConventionsFromSlide(id, readStoredHubEmail(), taskTopicTitle)
                 .then((result) => {
                     if (!result) return;
@@ -11027,7 +11048,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                 "development-steps": DIGITAL_OUTCOME_DEVELOPMENT_TOOLS_TITLE,
                 "project-success-criteria": DIGITAL_OUTCOME_SUCCESS_CRITERIA_TITLE,
                 "relevant-implications": DIGITAL_OUTCOME_RELEVANT_IMPLICATIONS_TITLE,
-                "relevant-digimed-conventions": DIGITAL_OUTCOME_RELEVANT_DIGIMED_CONVENTIONS_TITLE,
+                "relevant-digimed-conventions": displayTitle,
                 "user-experience-principles": DIGITAL_OUTCOME_UX_PRINCIPLES_TITLE,
                 "digital-outcome-description": "Digital Outcome: Description"
             };
@@ -11072,7 +11093,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                     draft.cardColor = getDefaultCardColorForCategory(targetCategory);
                     const saved = await saveDetails(id, draft);
                     DETAIL_DATA[id] = saved;
-                    renderDetailView(host, id, saved, canEdit, selectedTaskTopic, selectedTaskShortName);
+                    renderDetailView(host, id, saved, canEdit, selectedTaskTopic, selectedTaskShortName, conventionsMediaType);
                 } catch (error) {
                     setConvertDisabled(false);
                     if (editButton) editButton.disabled = false;
@@ -11101,7 +11122,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
                     draft.cardColor = targetColor;
                     const saved = await saveDetails(id, draft);
                     DETAIL_DATA[id] = saved;
-                    renderDetailView(host, id, saved, canEdit, selectedTaskTopic, selectedTaskShortName);
+                    renderDetailView(host, id, saved, canEdit, selectedTaskTopic, selectedTaskShortName, conventionsMediaType);
                 } catch (error) {
                     setConvertDisabled(false);
                     if (editButton) editButton.disabled = false;
@@ -11920,7 +11941,7 @@ async function initDetail() {
             ? "project-success-criteria"
             : (/triall?ing\s+components|trailing\s+components|trailing\s+comonents/i.test(templateTopicText)
             ? "trialling-components"
-            : (/relevant.*conventions/i.test(templateTopicText)
+            : (isDigitalOutcomeRelevantDigiMedConventionsCriterion(selectedTaskTopic, selectedTaskShortName)
             ? "relevant-digimed-conventions"
             : (/markup\s+validation|code\s+validation/i.test(templateTopicText)
             ? "testing-functions-markup-validation"
@@ -11949,18 +11970,34 @@ async function initDetail() {
     const canEditRole = await canEditDetails();
     const isTeacher = resolveDetailTeacherMode(canEditRole);
 
+    let conventionsInterestData = null;
+    if (/^\d+$/.test(String(id)) && isDigitalOutcomeRelevantDigiMedConventionsCriterion(selectedTaskTopic, selectedTaskShortName)) {
+        try {
+            const response = await fetch(`/api/activities/${encodeURIComponent(id)}/interests`, { headers: buildAuthHeaders({}) });
+            if (!response.ok) throw new Error(`Could not load your allocated media type (${response.status}).`);
+            conventionsInterestData = await response.json();
+        } catch (error) {
+            console.error("[conventions] Could not load allocated media type:", error);
+            host.textContent = "Could not load your media type. Refresh the page to open the correct conventions. No records have been changed.";
+            return;
+        }
+    }
+    const conventionsMediaType = getConventionsMediaType(conventionsInterestData?.my_allocation, selectedTaskTopic, selectedTaskShortName);
     document.title = `${titleOverride || selectedTaskShortName || selectedTaskTopic || pageData.title} | Computer Lab`;
+    if (isDigitalOutcomeRelevantDigiMedConventionsCriterion(selectedTaskTopic, selectedTaskShortName)) {
+        document.title = `Conventions (${conventionsMediaType.toUpperCase()}) | Computer Lab`;
+    }
 
     // In student view mode, teachers should see the same page experience as students.
-    renderDetailView(host, id, pageData, isTeacher, selectedTaskTopic, selectedTaskShortName);
+    renderDetailView(host, id, pageData, isTeacher, selectedTaskTopic, selectedTaskShortName, conventionsMediaType);
 
     // Load interest section only for backend-stored items (numeric IDs)
     if (String(id).match(/^\d+$/)) {
-        await loadAndRenderInterestSection(host, id, isTeacher, pageData);
+        await loadAndRenderInterestSection(host, id, isTeacher, pageData, conventionsInterestData);
     }
 }
 
-async function loadAndRenderInterestSection(host, projectId, isTeacher, detailData) {
+async function loadAndRenderInterestSection(host, projectId, isTeacher, detailData, loadedInterestData = null) {
     installCloudSyncDelegatedFallbackHandlers();
 
     const existingSection = host.querySelector("#interest-section");
@@ -11977,19 +12014,12 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
 
     const fetchHeaders = buildAuthHeaders({});
 
-    let interestData = { count: 0, my_interest: false, emails: [], confirmed: [], my_allocation: null };
-    try {
-        const resp = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interests`, { headers: fetchHeaders });
-        if (resp.ok) interestData = await resp.json();
-    } catch (_err) {}
-
-    const currentMediaType = String(interestData?.my_allocation?.digital_media_type || "").trim().toLowerCase();
-    if (currentMediaType === "image") {
-        const conventionsTable = host.querySelector("#digimed-conventions-table");
-        if (conventionsTable) {
-            conventionsTable.outerHTML = buildDigiMedImageConventionsTable(projectId, email);
-            bindDigiMedImageConventionAcknowledgements(host, projectId, email);
-        }
+    let interestData = loadedInterestData || { count: 0, my_interest: false, emails: [], confirmed: [], my_allocation: null };
+    if (!loadedInterestData) {
+        try {
+            const resp = await fetch(`/api/activities/${encodeURIComponent(projectId)}/interests`, { headers: fetchHeaders });
+            if (resp.ok) interestData = await resp.json();
+        } catch (_err) {}
     }
 
     const section = document.createElement("section");

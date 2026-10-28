@@ -15,6 +15,70 @@ const activityDetail = fs.readFileSync(path.join(root, "ProjectPages", "activity
 const teacherStudentWork = fs.readFileSync(path.join(root, "teacher-student-work.js"), "utf8");
 const standardCard = fs.readFileSync(path.join(root, "assessment-standard-card.js"), "utf8");
 
+{
+    const extractFunction = (source, name) => {
+        const start = source.indexOf(`function ${name}(`);
+        const end = source.indexOf("\nfunction ", start + 1);
+        assert.ok(start >= 0 && end > start, `Find ${name}`);
+        return source.slice(start, end);
+    };
+    let mediaType = "image";
+    const context = vm.createContext({
+        URLSearchParams,
+        taskListState: { selectedId: "49" },
+        getAllocatedDigitalMediaType: () => mediaType,
+        getTaskListEmail: () => "student@example.test",
+        getDigiMedConventionsAcknowledgementCount: () => 2,
+        DIGIMED_IMAGE_CONVENTIONS_ACK_STORAGE_PREFIX: "image-evidence",
+        localStorage: { getItem: () => null }
+    });
+    vm.runInContext([
+        extractFunction(taskList, "buildCustomActivityLink"),
+        extractFunction(taskList, "getDigiMedConventionsSubtask"),
+        extractFunction(taskList, "getTaskTopicHrefForStep"),
+        extractFunction(activityDetail, "getConventionsMediaType"),
+        extractFunction(activityDetail, "isDigitalOutcomeRelevantDigiMedConventionsCriterion")
+    ].join("\n"), context);
+    for (const type of ["image", "graphics", "vector", "web", "video"]) {
+        mediaType = type;
+        const expected = ["graphics", "vector"].includes(type) ? "image" : type;
+        const subtask = context.getDigiMedConventionsSubtask({}, type);
+        const href = context.getTaskTopicHrefForStep("91893", "Achieved", "Using relevant conventions for the media type.");
+        assert.equal(href, subtask.href, "Main criterion and subtask open the same media-specific page");
+        const params = new URLSearchParams(href.split("?")[1]);
+        assert.equal(params.get("taskShortName"), `Conventions (${expected.toUpperCase()})`);
+        assert.equal(params.get("templateId"), type === "video" ? "video-conventions" : "relevant-digimed-conventions");
+        if (type !== "video") {
+            assert.equal(context.isDigitalOutcomeRelevantDigiMedConventionsCriterion("", params.get("taskShortName")), true);
+        }
+    }
+    assert.equal(context.getConventionsMediaType({ digital_media_type: "image" }, "", "Conventions (WEB)"), "image",
+        "Allocation overrides legacy WEB links");
+    assert.equal(context.getConventionsMediaType({ digital_media_type: "web" }, "", "Conventions (IMAGE)"), "web");
+    assert.equal(context.getConventionsMediaType(null, "", "Conventions (IMAGE)"), "image",
+        "Explicit Image links work for teachers without an allocation");
+    assert.equal(context.getConventionsMediaType(null), "web", "Existing Web fallback is preserved");
+    context.digitalOutcomeTopicKey = "relevant-digimed-conventions";
+    context.conventionsMediaType = "image";
+    context.taskTopicTitle = "Using relevant conventions for the media type.";
+    context.resolvedTaskShortName = "Conventions (WEB)";
+    context.id = "49";
+    context.readStoredHubEmail = () => "student@example.test";
+    context.buildDigiMedImageConventionsTable = () => "<h3>Conventions (IMAGE)</h3>";
+    context.readDigiMedConventionsAcknowledgements = () => { throw new Error("Image must not read Web acknowledgements"); };
+    const tableStart = activityDetail.indexOf("    const relevantDigiMedConventionsTableHtml =");
+    const tableEnd = activityDetail.indexOf("    const uxPrinciplesTableHtml =", tableStart);
+    assert.match(vm.runInContext(`${activityDetail.slice(tableStart, tableEnd)}\nrelevantDigiMedConventionsTableHtml`, context),
+        /Conventions \(IMAGE\)/);
+    const teacherLookupStart = activityDetail.indexOf("    const teacherTemplateId =");
+    const teacherLookupEnd = activityDetail.indexOf("    const teacherTemplate =", teacherLookupStart);
+    context.selectedTaskTopic = "Conventions (IMAGE)";
+    context.selectedTaskShortName = "Conventions (IMAGE)";
+    context.templateTopicText = "Conventions (IMAGE)";
+    assert.equal(vm.runInContext(`${activityDetail.slice(teacherLookupStart, teacherLookupEnd)}\nteacherTemplateId`, context),
+        "relevant-digimed-conventions", "Image links resolve the existing template hero rather than falling through");
+}
+
 const implicationsSummaryStart = teacherStudentWork.indexOf("function createStudentSummaryBucket(");
 const implicationsSummaryEnd = teacherStudentWork.indexOf("\nfunction getStudentSummaryChipClass", implicationsSummaryStart);
 assert.ok(implicationsSummaryStart >= 0 && implicationsSummaryEnd > implicationsSummaryStart);

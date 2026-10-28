@@ -1054,6 +1054,10 @@ function getTaskTopicHrefForStep(standard, level, text) {
         return buildCustomActivityLink(taskListState.selectedId, "Addressing relevant implications.", "Relevant Implications", "relevant-implications");
     }
 
+    if (["91893", "91903"].includes(String(standard)) && normalized.includes("relevant conventions")) {
+        return getDigiMedConventionsSubtask({}, getAllocatedDigitalMediaType(standard)).href;
+    }
+
     if ((String(standard) === "91893" || String(standard) === "91903")
         && /(?:using appropriate tools and techniques for the purpose and end users|applying appropriate tools and techniques to meet the purpose and end-user requirements)/i.test(normalized)) {
         const useToolsMediaType = String(getAllocatedDigitalMediaType(standard) || "").trim().toUpperCase();
@@ -1800,7 +1804,7 @@ function getDigiMedConventionsSubtask(stateMap = {}, digitalMediaType = "") {
     const activityId = taskListState.selectedId;
     const mediaType = String(digitalMediaType || "").trim().toLowerCase();
     const isVideo = mediaType === "video";
-    const isImage = mediaType === "image";
+    const isImage = ["image", "graphics", "vector"].includes(mediaType);
     const imageCount = (() => {
         if (!isImage) return 0;
         try {
@@ -1815,7 +1819,7 @@ function getDigiMedConventionsSubtask(stateMap = {}, digitalMediaType = "") {
         label: isVideo ? "Conventions (VIDEO)" : isImage ? "Conventions (IMAGE)" : "Conventions (WEB)",
         href: isVideo
             ? buildCustomActivityLink(activityId, "Video Conventions", "Conventions (VIDEO)", "video-conventions")
-            : buildCustomActivityLink(activityId, "Using relevant conventions for the media type.", "Conventions (WEB)", "relevant-digimed-conventions"),
+            : buildCustomActivityLink(activityId, "Using relevant conventions for the media type.", isImage ? "Conventions (IMAGE)" : "Conventions (WEB)", "relevant-digimed-conventions"),
         count: isImage ? imageCount : getDigiMedConventionsAcknowledgementCount(activityId, getTaskListEmail(), stateMap)
     };
 }
