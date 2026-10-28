@@ -4,6 +4,7 @@ services:
     runtime: node
     repo: https://github.com/WHS-DTECH/DTECH-HUB
     branch: main
+    # Native Node version is pinned in .node-version; a dashboard NODE_VERSION overrides it.
     buildCommand: npm install
     startCommand: npm start
     envVars:
