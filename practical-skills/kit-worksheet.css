@@ -1312,6 +1312,15 @@ body.kit-worksheet-page {
     }
 }
 
+.treasure-map-highlight {
+    background: #ffe16b;
+    color: #382400;
+    border: 2px solid #925c00;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-weight: 800;
+}
+
 .treasure-map-search {
     display: grid;
     gap: 12px;

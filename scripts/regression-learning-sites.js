@@ -245,6 +245,20 @@ async function main() {
     context.savePracticalSkillsAssessment = async () => { throw new Error("Database unavailable"); };
     assert.equal((await request(checkUrl)).code, 500);
     const rendererSource = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "kit-worksheet-render.js"), "utf8");
+    const renderContext = vm.createContext({
+        escapeHtml: (value) => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
+    });
+    vm.runInContext(rendererSource.slice(rendererSource.indexOf("    function renderLearningSites("),
+        rendererSource.indexOf("    function wireLearningSites(")), renderContext);
+    const huntHtml = renderContext.renderLearningSites(publicHunt, {}, false);
+    const scienceHtml = huntHtml.slice(huntHtml.indexOf('data-hunt-island="science"'), huntHtml.indexOf('data-hunt-island="english"'));
+    assert.match(scienceHtml, /<mark class="treasure-map-highlight">respect for<\/mark>/);
+    assert.match(scienceHtml, /<kbd>Ctrl<\/kbd> \+ <kbd>F<\/kbd>/);
+    assert.match(scienceHtml, /Switch to the <strong>Science Learning Site<\/strong> tab/);
+    assert.match(scienceHtml, /aria-describedby="hunt-science-find-tip hunt-feedback-science"/);
+    assert.doesNotMatch(scienceHtml, /evidence/i, "The tip teaches Find without revealing the answer");
+    assert.equal((huntHtml.match(/id="hunt-science-find-tip"/g) || []).length, 1);
+    assert.match(renderContext.renderLearningSites(publicHunt, {}, true), /<fieldset class="worksheet-assessment-inputs" disabled>/);
     assert.match(rendererSource, /id === "course" && courseSelect\.value/);
     assert.match(rendererSource, /huntProfile\.courseIds\.includes\(courseSelect\.value\)/);
     assert.match(rendererSource, /<ol class="treasure-map-pathway" aria-label="Pathway to Learning Sites">/);
@@ -268,6 +282,7 @@ async function main() {
     ]) {
         const link = {};
         vm.runInNewContext(worksheetSource.slice(navigationStart, navigationEnd), {
+            preview: false,
             getActivityIndexFromUrl: () => activityIndex,
             state: { kitId: "kit-login", content: { worksheets: [{ activity: "First activity" }] } },
             document: { getElementById: () => link }

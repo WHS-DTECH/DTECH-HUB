@@ -201,8 +201,17 @@
 
     function renderLearningSites(assessment, answers, readOnly) {
         const clueInput = (clue) => `
-            <label for="hunt-${escapeHtml(clue.id)}">${escapeHtml(clue.prompt)}</label>
-            <input id="hunt-${escapeHtml(clue.id)}" data-hunt-answer="${escapeHtml(clue.id)}" maxlength="200" value="${escapeHtml(answers[clue.id] || "")}" autocomplete="off" aria-describedby="hunt-feedback-${escapeHtml(clue.id)}">
+            <label for="hunt-${escapeHtml(clue.id)}">${clue.id === "science"
+                ? escapeHtml(clue.prompt).replace(/respect for/i, '<mark class="treasure-map-highlight">$&</mark>')
+                : escapeHtml(clue.prompt)}</label>
+            ${clue.id === "science" ? `
+                <aside class="treasure-map-search" id="hunt-science-find-tip" aria-label="Find the Science clue">
+                    <h4>Tip: use Find on the Science Learning Site</h4>
+                    <p>Switch to the <strong>Science Learning Site</strong> tab. Press <kbd>Ctrl</kbd> + <kbd>F</kbd> to open Find, then type <strong>respect for</strong>.</p>
+                    <p>Read the sentence around the highlighted words to find the answer. Then return to this tab and enter your answer below.</p>
+                </aside>
+            ` : ""}
+            <input id="hunt-${escapeHtml(clue.id)}" data-hunt-answer="${escapeHtml(clue.id)}" maxlength="200" value="${escapeHtml(answers[clue.id] || "")}" autocomplete="off" aria-describedby="${clue.id === "science" ? "hunt-science-find-tip " : ""}hunt-feedback-${escapeHtml(clue.id)}">
             <p id="hunt-feedback-${escapeHtml(clue.id)}" data-hunt-feedback="${escapeHtml(clue.id)}" class="worksheet-assessment-feedback" hidden></p>
         `;
         return `
