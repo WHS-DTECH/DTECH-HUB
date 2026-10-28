@@ -8,7 +8,7 @@
   <title>Kit Results | Teacher Review</title>
   <link rel="stylesheet" href="../styles.css">
   <link rel="stylesheet" href="./teacher-login-sites.css">
-  <link rel="stylesheet" href="./teacher-results.css">
+  <link rel="stylesheet" href="./teacher-results.css?v=2">
 </head>
 <body data-hub-read-only="true">
   <main class="sites-editor">
@@ -20,16 +20,51 @@
       <a class="button button-secondary" href="./admin-kits.html">Kit Content Builder</a>
     </nav>
     <p>Admin access required. Reading this page never changes answers, completion ticks or certificate status, and never sends emails.</p>
-    <form id="results-form" class="sites-card">
-      <label class="sites-field">Kit ID<input id="results-kit" value="kit-minecraft" required pattern="kit-[a-z0-9\-]+"></label>
-      <label class="sites-field">Student school emails (up to 20, one per line)<textarea id="results-emails" rows="6" required></textarea></label>
-      <button class="button button-primary" type="submit">Read saved results</button>
-    </form>
-    <p id="results-status" role="status" aria-live="polite">Enter student emails from the email log to review their records.</p>
-    <div id="results-output"></div>
+    <div class="teacher-results-tabs" role="tablist" aria-label="Teacher review pages">
+      <button id="class-progress-tab" type="button" role="tab" aria-selected="true" aria-controls="class-progress-panel">Class Kit Progress</button>
+      <button id="student-review-tab" type="button" role="tab" aria-selected="false" aria-controls="student-review-panel" tabindex="-1">Student Review</button>
+    </div>
+    <section id="class-progress-panel" class="teacher-results-panel" role="tabpanel" aria-labelledby="class-progress-tab">
+      <div class="sites-card">
+        <div class="class-progress-heading">
+          <div>
+            <h2>Class Kit Completion</h2>
+            <p>See which active Licence Kits students have completed.</p>
+          </div>
+          <button id="class-progress-refresh" class="button button-primary" type="button">Refresh list</button>
+        </div>
+        <div class="class-progress-filters">
+          <label class="sites-field">Course
+            <select id="class-course-filter">
+              <option value="">All courses</option>
+              <option value="JuniorDTECH">Junior DTECH</option>
+              <option value="MiddleDTECH">MiddleDTECH</option>
+              <option value="SeniorDTECH">SeniorDTECH</option>
+            </select>
+          </label>
+          <label class="sites-field">Homeroom
+            <select id="class-homeroom-filter"><option value="">All homerooms</option></select>
+          </label>
+          <label class="sites-field">Student name
+            <input id="class-student-filter" type="search" autocomplete="off" placeholder="Search student name">
+          </label>
+        </div>
+        <p id="class-progress-status" role="status" aria-live="polite">Sign in with an admin account to load the class list.</p>
+        <div id="class-progress-table-host" class="class-progress-table-host"></div>
+      </div>
+    </section>
+    <section id="student-review-panel" class="teacher-results-panel" role="tabpanel" aria-labelledby="student-review-tab" hidden>
+      <form id="results-form" class="sites-card">
+        <label class="sites-field">Kit ID<input id="results-kit" value="kit-minecraft" required pattern="kit-[a-z0-9\-]+"></label>
+        <label class="sites-field">Student school emails (up to 20, one per line)<textarea id="results-emails" rows="6" required></textarea></label>
+        <button class="button button-primary" type="submit">Read saved results</button>
+      </form>
+      <p id="results-status" role="status" aria-live="polite">Enter student emails from the email log to review their records.</p>
+      <div id="results-output"></div>
+    </section>
   </main>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="../script.js?v=kit-results-1"></script>
-  <script src="./teacher-results.js?v=1"></script>
+  <script src="./teacher-results.js?v=2"></script>
 </body>
 </html>

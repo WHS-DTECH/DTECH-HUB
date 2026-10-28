@@ -15206,7 +15206,37 @@ app.get("/api/practical-skills/library", async (_req, res) => {
 });
 
 require("./practical-skills/teacher-results-store").registerTeacherResults(app, {
-  pool, requireAdminAccess, schoolDomain: SCHOOL_EMAIL_DOMAIN, getDefaultPracticalSkillsKitContent
+  pool, requireAdminAccess, schoolDomain: SCHOOL_EMAIL_DOMAIN, getDefaultPracticalSkillsKitContent,
+  getClassData: async () => {
+    const [studentRows, kitCards] = await Promise.all([
+      getStudentDirectoryRows(),
+      readPracticalSkillsLibraryFile()
+    ]);
+    const students = dedupeToLatestStudentRows(studentRows.map(buildStudentClassManagementRow))
+      .filter((row) => String(row.status || "").toLowerCase() !== "not current")
+      .map((row) => {
+        const email = normalizeEmail(row.linked_emails?.[0] || "");
+        const year = String(row.year_level || "").match(/(?:year\s*)?(\d{1,2})/i)?.[1] || "";
+        const yearNumber = Number(year);
+        const course = getResearchReportProgrammeFolder(getHuntProfile(row))
+          || (yearNumber > 0 && yearNumber <= 8 ? "JuniorDTECH"
+            : yearNumber <= 10 && yearNumber >= 9 ? "MiddleDTECH"
+              : yearNumber >= 11 ? "SeniorDTECH" : "");
+        return {
+          name: String(row.student_name || "").trim() || email,
+          email,
+          yearLevel: year,
+          homeroom: String(row.form_class || "").trim(),
+          course
+        };
+      })
+      .filter((student) => student.email && student.email.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`));
+    const kits = kitCards
+      .filter((kit) => /^kit-[a-z0-9-]{1,60}$/.test(String(kit.id || ""))
+        && ["active", "live"].includes(String(kit.status || "").toLowerCase()))
+      .map((kit) => ({ id: kit.id, title: String(kit.title || kit.id) }));
+    return { students, kits };
+  }
 });
 
 app.get("/api/admin/practical-skills/preview-users", requireAdminAccess, async (_req, res) => {

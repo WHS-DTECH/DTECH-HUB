@@ -1,6 +1,44 @@
 "use strict";
 
-function registerTeacherResults(app, { pool, requireAdminAccess, schoolDomain, getDefaultPracticalSkillsKitContent }) {
+function registerTeacherResults(app, { pool, requireAdminAccess, schoolDomain, getDefaultPracticalSkillsKitContent, getClassData }) {
+    if (getClassData) {
+        app.get("/api/admin/kit-class-progress", requireAdminAccess, async (_req, res) => {
+            res.set("Cache-Control", "private, no-store");
+            try {
+                const { students, kits } = await getClassData();
+                const emails = students.map((student) => student.email);
+                const kitIds = kits.map((kit) => kit.id);
+                if (!emails.length || !kitIds.length) {
+                    return res.json({ reviewedAt: new Date().toISOString(), students, kits });
+                }
+                const progress = await pool.query(
+                    "SELECT student_email, kit_id, started_at, completed, completed_at FROM practical_skills_progress WHERE student_email = ANY($1::text[]) AND kit_id = ANY($2::text[])",
+                    [emails, kitIds]);
+                const progressByStudent = new Map();
+                for (const row of progress.rows) {
+                    const email = String(row.student_email || "").toLowerCase();
+                    if (!progressByStudent.has(email)) progressByStudent.set(email, {});
+                    progressByStudent.get(email)[row.kit_id] = {
+                        started: Boolean(row.started_at),
+                        completed: Boolean(row.completed),
+                        completedAt: row.completed_at || null
+                    };
+                }
+                res.json({
+                    reviewedAt: new Date().toISOString(),
+                    kits,
+                    students: students.map((student) => ({
+                        ...student,
+                        kitProgress: progressByStudent.get(student.email.toLowerCase()) || {}
+                    }))
+                });
+            } catch (error) {
+                console.error("[teacher-kit-results] Could not read class kit progress:", error.message);
+                res.status(503).json({ error: "Could not read the class kit completion list. No results have been changed." });
+            }
+        });
+    }
+
     app.get("/api/admin/kit-results/:kitId", requireAdminAccess, async (req, res) => {
         res.set("Cache-Control", "private, no-store");
         const kitId = String(req.params.kitId || "");

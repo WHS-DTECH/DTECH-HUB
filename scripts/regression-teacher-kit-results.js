@@ -12,6 +12,7 @@ async function fixture(t) {
     const queries = [];
     let fail = false;
     let documentsExist = true;
+    const classProgress = [{ student_email: "student@school.nz", kit_id: "kit-minecraft", started_at: "2026-10-19", completed: true, completed_at: "2026-10-20" }];
     const row = { student_email: "student@school.nz", completed: true, completed_activities: { "0": "2026-10-20" }, responses: { "0-answer": "Saved answer" } };
     const content = { identity: { name: "Minecraft" }, worksheets: [{ activity: "First build" }], activities: [] };
     registerTeacherResults(app, {
@@ -23,17 +24,25 @@ async function fixture(t) {
             queries.push({ sql, params });
             if (fail) throw new Error("Database unavailable");
             if (sql.includes("FROM practical_skills_kit_content")) return { rows: [{ content }] };
-            if (sql.includes("FROM practical_skills_progress")) return { rows: [row] };
+            if (sql.includes("FROM practical_skills_progress")) return { rows: sql.includes("kit_id = ANY") ? classProgress : [row] };
             if (sql.includes("to_regclass")) return { rows: [{ documents_table: documentsExist ? "student_kit_documents" : null }] };
             if (sql.includes("FROM student_kit_documents")) return { rows: [{ student_email: row.student_email, document_id: "doc123" }] };
             throw new Error("Unexpected SQL");
-        } }
+        } },
+        getClassData: async () => ({
+        students: [
+            { name: "Student One", email: "student@school.nz", homeroom: "7A", course: "JuniorDTECH" },
+            { name: "Student Two", email: "other@school.nz", homeroom: "8B", course: "JuniorDTECH" }
+        ],
+        kits: [{ id: "kit-minecraft", title: "Minecraft Player Kit" }]
+        })
     });
     const server = await new Promise((resolve) => { const instance = app.listen(0, "127.0.0.1", () => resolve(instance)); });
     t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); }));
     const url = `http://127.0.0.1:${server.address().port}/api/admin/kit-results/kit-minecraft`;
     return { queries, row, content, setFail: (value) => { fail = value; }, setDocuments: (value) => { documentsExist = value; },
-        read: (emails = "student@school.nz,missing@school.nz", admin = true) => fetch(`${url}?emails=${encodeURIComponent(emails)}`, { headers: admin ? { "x-test-admin": "yes" } : {} }) };
+        read: (emails = "student@school.nz,missing@school.nz", admin = true) => fetch(`${url}?emails=${encodeURIComponent(emails)}`, { headers: admin ? { "x-test-admin": "yes" } : {} }),
+        readClass: (admin = true) => fetch(`${url.replace(/\/api\/admin\/kit-results\/kit-minecraft$/, "")}/api/admin/kit-class-progress`, { headers: admin ? { "x-test-admin": "yes" } : {} }) };
 }
 
 test("only admins can review; invalid inputs never query records", async (t) => {
@@ -72,6 +81,36 @@ test("missing document storage is reported and database outages fail explicitly"
     const response = await f.read();
     assert.equal(response.status, 503);
     assert.match((await response.json()).error, /No results have been changed/);
+});
+
+test("class progress is admin-only and read-only with completion by kit", async (t) => {
+    const f = await fixture(t);
+    assert.equal((await f.readClass(false)).status, 403);
+    const response = await f.readClass();
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("cache-control"), "private, no-store");
+    const data = await response.json();
+    assert.equal(data.kits[0].title, "Minecraft Player Kit");
+    assert.deepEqual(data.students[0].kitProgress["kit-minecraft"], {
+        started: true, completed: true, completedAt: "2026-10-20"
+    });
+    assert.deepEqual(data.students[1].kitProgress, {});
+    assert.match(f.queries.at(-1).sql, /^SELECT /);
+});
+
+test("teacher review presents accessible tabs and all requested class filters", () => {
+    const root = path.join(__dirname, "..");
+    const html = fs.readFileSync(path.join(root, "practical-skills", "teacher-results.html"), "utf8");
+    assert.match(html, /role="tablist" aria-label="Teacher review pages"/);
+    assert.match(html, /id="class-progress-tab"[^>]+aria-controls="class-progress-panel"/);
+    assert.match(html, /id="student-review-tab"[^>]+aria-controls="student-review-panel"/);
+    assert.match(html, /id="class-course-filter"/);
+    assert.match(html, /id="class-homeroom-filter"/);
+    assert.match(html, /id="class-student-filter"/);
+    const script = fs.readFileSync(path.join(root, "practical-skills", "teacher-results.js"), "utf8");
+    assert.match(script, /courseKey\(student\.course\) === selectedCourse/);
+    assert.match(script, /student\.homeroom === selectedHomeroom/);
+    assert.match(script, /student\.name\} \$\{student\.email/);
 });
 
 test("read-only review suppresses the shared sidebar's mutating progress fetch", async () => {
