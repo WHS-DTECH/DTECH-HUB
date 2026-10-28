@@ -5559,7 +5559,7 @@ function addSearchKitPenguinMission(content) {
 }
 
 function normalizePracticalSkillsKitContentForStorage(kitId, content) {
-  const safeContent = withUnityHubLicence(withShortLoginKit(kitId, withLearningSitesActivity(kitId, withLoginAppsActivity(kitId, withLoginIdentityActivity(kitId, withPasswordProblemsActivity(kitId, content && typeof content === "object" ? content : {}))))));
+  const safeContent = ActivityBlocks.withFilesFoldersLinks(withUnityHubLicence(withShortLoginKit(kitId, withLearningSitesActivity(kitId, withLoginAppsActivity(kitId, withLoginIdentityActivity(kitId, withPasswordProblemsActivity(kitId, content && typeof content === "object" ? content : {})))))));
   if (String(kitId || "").trim() !== "kit-login") {
     return safeContent;
   }
@@ -5638,7 +5638,7 @@ async function getStoredPracticalSkillsKitContent(kitId) {
       content = addSearchKitPenguinMission(content);
       if (stored) memoryPracticalSkillsKitContent.set(safeKitId, content);
     }
-    return withUnityHubLicence(withShortLoginKit(safeKitId, withLearningSitesActivity(safeKitId, withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, content))))));
+    return ActivityBlocks.withFilesFoldersLinks(withUnityHubLicence(withShortLoginKit(safeKitId, withLearningSitesActivity(safeKitId, withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, content)))))));
   }
 
   await ensurePracticalSkillsKitContentSchema();
@@ -5647,7 +5647,7 @@ async function getStoredPracticalSkillsKitContent(kitId) {
   const defaults = getDefaultPracticalSkillsKitContent(safeKitId);
   if (!stored || !Object.keys(stored).length) {
     const content = safeKitId === "kit-google-search" ? addSearchKitPenguinMission(defaults) : defaults;
-    return withUnityHubLicence(withShortLoginKit(safeKitId, withLearningSitesActivity(safeKitId, withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, content))))));
+    return ActivityBlocks.withFilesFoldersLinks(withUnityHubLicence(withShortLoginKit(safeKitId, withLearningSitesActivity(safeKitId, withLoginAppsActivity(safeKitId, withLoginIdentityActivity(safeKitId, withPasswordProblemsActivity(safeKitId, content)))))));
   }
 
   let merged = { ...defaults, ...stored };
@@ -5664,7 +5664,7 @@ async function getStoredPracticalSkillsKitContent(kitId) {
       );
     }
   }
-  const unityContent = withUnityHubLicence(merged);
+  const unityContent = ActivityBlocks.withFilesFoldersLinks(withUnityHubLicence(merged));
   if (unityContent !== merged) {
     merged = unityContent;
     await pool.query(
@@ -15350,7 +15350,8 @@ async function syncPracticalSkillsKitCompletion(studentEmail, kitId, content = n
     for (const block of (activity.blocks || []).filter((b) => b.kind === "document" && b.required)) {
       documents[block.id] = Boolean((await getStudentKitDocument(studentEmail, kitId, `block-${index}-${block.id}`))?.document_id);
     }
-    const grade = ActivityBlocks.grade(activity, ActivityBlocks.savedAnswers(activity, index, row.responses), documents);
+    const grade = ActivityBlocks.grade(activity, ActivityBlocks.savedAnswers(activity, index, row.responses), documents,
+      { content: kitContent, index, responses: row.responses });
     if (grade.passed !== Boolean(row.completed_activities?.[index])) row = await setPracticalSkillsActivityCompletion(studentEmail, kitId, Number(index), grade.passed);
   }
   if (!indexes.length) return row;

@@ -23,12 +23,12 @@ function registerActivityBlocks(app, deps) {
         if (!content.worksheets?.[Number(activityIndex)] || !Array.isArray(activity?.blocks)) throw Object.assign(new Error("This activity has no content blocks."), { status: 404 });
         return { content, activity };
     }
-    async function check(student, kitId, index, activity, answers) {
+    async function check(student, kitId, index, activity, answers, content, responses) {
         const documents = {};
         for (const b of activity.blocks.filter((b) => b.kind === "document" && b.required)) {
             documents[b.id] = Boolean((await getStudentKitDocument(student, kitId, `block-${index}-${b.id}`))?.document_id);
         }
-        return B.grade(activity, answers, documents);
+        return B.grade(activity, answers, documents, { content, index, responses });
     }
     const base = "/api/practical-skills/blocks/:kitId/:activityIndex";
     async function schoolLicenceSettings(req) {
@@ -105,11 +105,13 @@ function registerActivityBlocks(app, deps) {
             }
             const effectiveAnswers = B.savedAnswers(activity, activityIndex, { ...row?.responses, [key]: answers });
             await savePracticalSkillsKitResponses(student, kitId, { ...row?.responses, [key]: effectiveAnswers });
-            const grade = await check(student, kitId, activityIndex, activity, effectiveAnswers);
+            const grade = await check(student, kitId, activityIndex, activity, effectiveAnswers, content,
+                { ...row?.responses, [key]: effectiveAnswers });
             let saved;
             if (activity.completionMode === "auto" && !B.specialised(activity)) {
                 saved = await setPracticalSkillsActivityCompletion(student, kitId, Number(activityIndex), grade.passed);
-                await syncPracticalSkillsKitCompletion(student, kitId, content);
+                const synced = await syncPracticalSkillsKitCompletion(student, kitId, content);
+                if (synced) saved = synced;
                 if (grade.passed) void autoEmailKitCertificate(req, kitId);
             }
             res.json({ ...grade, completedActivities: saved?.completed_activities || row?.completed_activities || {} });

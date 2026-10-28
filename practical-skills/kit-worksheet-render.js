@@ -793,7 +793,9 @@
                 <p class="activity-block-completion">${window.ActivityBlocks.specialised(content)
                     ? "Completion: this activity keeps its specialised assessment rules."
                     : content.completionMode === "auto"
-                        ? "Automatic tick: complete all required interactive blocks. Written answers are checked for presence, not correctness. A document copy confirms creation only."
+                        ? content.uniqueDocumentLinks
+                            ? "Auto-Completed: submit the required HTTPS sharing link to your document or PDF. Use a different file for every activity. Duplicate files do not earn ticks. Links are checked, not file contents or sharing permissions."
+                            : "Automatic tick: complete all required interactive blocks. Written answers are checked for presence, not correctness. A document copy confirms creation only."
                         : "Completion: when you have finished the activity, choose Mark Activity Complete below."}</p>
                 <div class="activity-content-blocks">${window.ActivityBlockView.markup(blocks, blockAnswers, readOnly || options.blocksReadOnly, { renderImage: (image) => renderWorksheetImage(image), unityEditor: content.unityEditor })}</div>
             ` : ""}

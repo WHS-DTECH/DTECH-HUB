@@ -163,7 +163,7 @@
         const selfMarking = Boolean(activity?.assessment || activity?.identityLessonVersion ||
             activity?.questionAutoMarkAssessmentId || activity?.researchReport || siteQuestions);
         const autoBlocks = activity?.completionMode === "auto" && !window.ActivityBlocks.specialised(activity);
-        pill.textContent = completed ? "Completed" : "Not Completed";
+        pill.textContent = completed ? autoBlocks ? "Auto-Completed" : "Completed" : "Not Completed";
         pill.classList.toggle("is-complete", completed);
         if (completed) {
             pill.setAttribute("href", `./kit-worksheet.html?kit=${encodeURIComponent(state.kitId)}`);
@@ -201,7 +201,7 @@
             const auto = state.content.activities[index].completionMode === "auto" && !window.ActivityBlocks.specialised(state.content.activities[index]);
             showStatusMessage(auto
                 ? result.passed ? "Activity complete! Your answers and automatic tick are saved."
-                    : `Answers saved. Complete ${result.results.filter((r) => !r.passed).length} remaining required block(s) to earn your tick.`
+                    : result.results.find((r) => r.message)?.message || `Answers saved. Complete ${result.results.filter((r) => !r.passed).length} remaining required block(s) to earn your tick.`
                 : "Your activity answers are saved.");
             return result;
         });
@@ -530,6 +530,7 @@
                 taskBrief: activity?.taskBrief,
                 blocks: activity?.blocks,
                 completionMode: activity?.completionMode,
+                uniqueDocumentLinks: activity?.uniqueDocumentLinks,
                 unityEditor: activity?.unityEditor,
                 assessmentId: activity?.assessmentId,
                 questionAutoMarkAssessmentId: activity?.questionAutoMarkAssessmentId,

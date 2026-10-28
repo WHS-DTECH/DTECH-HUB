@@ -49,6 +49,43 @@
         }
         return answers;
     }
+    function withFilesFoldersLinks(content) {
+        if (!/files\s*(?:&|and)\s*folders/i.test(String(content?.identity?.name || content?.bannerTitle || ""))) return content;
+        let changed = false;
+        const activities = [...(content.activities || [])];
+        (content.worksheets || []).forEach((worksheet, index) => {
+            if (!worksheet || worksheet.hidden || worksheet.mergedInto !== undefined) return;
+            const activity = activities[index] || {};
+            let blocks = initialBlocks(activity, index, content);
+            if (!blocks.some((b) => b.kind === "studentlink")) blocks = [...blocks, {
+                id: `files-folders-link-${index}`, kind: "studentlink", required: true,
+                title: `Share your link for ${worksheet.activity || activity.title || `Activity ${index + 1}`}`,
+                text: "Paste the HTTPS sharing link to your document or PDF, not a local Windows file path. Share it so your teacher can open it. Use a different file for each activity."
+            }];
+            blocks = blocks.map((b) => b.kind === "studentlink" && !b.required ? { ...b, required: true } : b);
+            if (activity.completionMode !== "auto" || activity.uniqueDocumentLinks !== true ||
+                !activity.blocks || blocks.length !== activity.blocks.length || blocks.some((b, i) => b !== activity.blocks[i])) {
+                changed = true;
+                activities[index] = { ...activity, blocks, completionMode: "auto", uniqueDocumentLinks: true };
+            }
+        });
+        return changed ? { ...content, activities } : content;
+    }
+    function documentLinkKey(value) {
+        const safe = studentUrl(value);
+        if (!safe) return "";
+        const url = new URL(safe);
+        if (["docs.google.com", "drive.google.com"].includes(url.hostname)) {
+            const id = url.pathname.match(/\/d\/([a-zA-Z0-9_-]+)(?:\/|$)/)?.[1] ||
+                (/^\/(?:open|uc)$/.test(url.pathname) ? url.searchParams.get("id") : "");
+            if (id) return `google-file:${id}`;
+        }
+        if (url.hostname.endsWith(".sharepoint.com") || ["onedrive.live.com", "1drv.ms"].includes(url.hostname)) {
+            const id = url.searchParams.get("sourcedoc") || url.searchParams.get("resid") || url.searchParams.get("id");
+            if (id) return `${url.hostname}:file:${id.toLowerCase().replace(/[{}]/g, "")}`;
+        }
+        return `${url.origin}${url.pathname.replace(/\/+$/, "")}`;
+    }
     function publicActivity(activity) {
         if (!activity || !Array.isArray(activity.blocks)) return activity;
         return { ...activity, blocks: activity.blocks.map((block) => {
@@ -167,12 +204,29 @@
             throw new Error("Automatic tick needs at least one required question, checkbox, puzzle, editable table, document or student link block.");
         }
     }
-    function grade(activity, answers, documents = {}) {
+    function grade(activity, answers, documents = {}, context = {}) {
         const required = (activity.blocks || []).filter((b) => b.required && interactive.includes(b.kind) && (b.kind !== "table" || b.editable));
         const results = required.map((b) => {
             const value = answers?.[b.id];
             let passed = false;
+            let message;
             if (b.kind === "studentlink") passed = Boolean(studentUrl(value, b.driveOnly));
+            if (b.kind === "studentlink" && passed && activity.uniqueDocumentLinks) {
+                const key = documentLinkKey(value);
+                const duplicateHere = (activity.blocks || []).some((other) =>
+                    other.kind === "studentlink" && other.id !== b.id && documentLinkKey(answers?.[other.id]) === key);
+                const duplicateElsewhere = (context.content?.activities || []).some((other, index) => {
+                    const worksheet = context.content.worksheets?.[index];
+                    if (!other || index === Number(context.index) || !worksheet || worksheet.hidden || worksheet.mergedInto !== undefined) return false;
+                    const saved = savedAnswers(other, index, context.responses);
+                    return (other?.blocks || []).some((link) => link.kind === "studentlink" && documentLinkKey(saved[link.id]) === key);
+                });
+                if (!context.content || duplicateHere || duplicateElsewhere) {
+                    passed = false;
+                    message = !context.content ? "The whole kit must be checked before awarding this tick."
+                        : "This file is also linked in another activity. Submit a different document or PDF for each activity.";
+                }
+            }
             if (b.kind === "checkbox") passed = value === true;
             if (b.kind === "question") passed = b.questionType === "checklist"
                 ? Array.isArray(value) && b.options.every((option) => value.includes(option))
@@ -200,9 +254,10 @@
                     return text === word || [...text].reverse().join("") === word;
                 }));
             }
-            return { id: b.id, passed };
+            return { id: b.id, passed, ...(message ? { message } : {}) };
         });
         return { passed: required.length > 0 && results.every((r) => r.passed), results };
     }
-    return { types, interactive, escape, safeUrl, studentUrl, specialised, initialBlocks, savedAnswers, publicActivity, entries, puzzle, validate, grade };
+    return { types, interactive, escape, safeUrl, studentUrl, specialised, initialBlocks, savedAnswers, publicActivity, entries, puzzle, validate, grade,
+        withFilesFoldersLinks, documentLinkKey };
 });

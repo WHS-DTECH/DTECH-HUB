@@ -202,9 +202,11 @@
             document.querySelector("#activity-legacy-content").hidden = !specialised;
             const mode = document.querySelector("#activity-completion-mode");
             mode.value = activity.completionMode || "manual";
-            mode.disabled = specialised;
+            mode.disabled = specialised || Boolean(activity.uniqueDocumentLinks);
             document.querySelector("#activity-block-completion-help").textContent = specialised
                 ? "This activity keeps its existing specialised assessment and completion rules. Added blocks are extra learning content."
+                : activity.uniqueDocumentLinks
+                    ? "Files & Folders activities are automatically completed after required links are saved. Every activity must link a different file; duplicate documents remove the automatic ticks. Link checks do not verify sharing permissions or work inside the file."
                 : "Automatic mode checks written answers for presence, not correctness. Required checkboxes, tables and puzzles must be completed. Student links need a valid HTTPS URL, not verified work. Document blocks confirm only creation of a copy.";
             blockEditor?.destroy();
             blockEditor = window.ActivityBlockEditor.mount(document.querySelector("#activity-block-editor"), {
