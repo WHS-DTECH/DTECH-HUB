@@ -6,6 +6,7 @@
     const classStatus = document.getElementById("class-progress-status");
     const classTableHost = document.getElementById("class-progress-table-host");
     const courseFilter = document.getElementById("class-course-filter");
+    const whanauFilter = document.getElementById("class-whanau-filter");
     const homeroomFilter = document.getElementById("class-homeroom-filter");
     const studentFilter = document.getElementById("class-student-filter");
     const classTab = document.getElementById("class-progress-tab");
@@ -47,10 +48,12 @@
     function renderClassProgress() {
         if (!classData || !classTableHost) return;
         const selectedCourse = courseFilter.value;
+        const selectedWhanau = whanauFilter.value;
         const selectedHomeroom = homeroomFilter.value;
         const query = studentFilter.value.trim().toLowerCase();
         const students = classData.students.filter((student) =>
             (!selectedCourse || courseKey(student.course) === selectedCourse)
+            && (!selectedWhanau || student.whanau === selectedWhanau)
             && (!selectedHomeroom || student.homeroom === selectedHomeroom)
             && (!query || `${student.name} ${student.email}`.toLowerCase().includes(query)))
             .sort((a, b) => a.name.localeCompare(b.name));
@@ -63,13 +66,14 @@
         const table = node("table", undefined, classTableHost, "class-progress-table");
         const head = node("thead", undefined, table);
         const header = node("tr", undefined, head);
-        ["Student", "Homeroom", "Course", ...classData.kits.map((kit) => kit.title)].forEach((label) => {
+        ["Student", "Whānau", "Homeroom", "Course", ...classData.kits.map((kit) => kit.title)].forEach((label) => {
             node("th", label, header);
         });
         const body = node("tbody", undefined, table);
         for (const student of students) {
             const row = node("tr", undefined, body);
             node("th", student.name, row);
+            node("td", student.whanau || "Not recorded", row);
             node("td", student.homeroom || "Not recorded", row);
             node("td", courseLabel(student.course), row);
             for (const kit of classData.kits) {
@@ -82,13 +86,13 @@
         classStatus.classList.remove("is-error");
         classStatus.textContent = `Showing ${students.length} of ${classData.students.length} students and ${classData.kits.length} active kits. Read at ${date(classData.reviewedAt)}.`;
     }
-    function populateHomerooms(students) {
-        const previous = homeroomFilter.value;
-        homeroomFilter.replaceChildren(new Option("All homerooms", ""));
-        [...new Set(students.map((student) => String(student.homeroom || "").trim()).filter(Boolean))]
+    function populateWhanau(students) {
+        const previous = whanauFilter.value;
+        whanauFilter.replaceChildren(new Option("All whānau", ""));
+        [...new Set(students.map((student) => String(student.whanau || "").trim()).filter(Boolean))]
             .sort((a, b) => a.localeCompare(b))
-            .forEach((homeroom) => homeroomFilter.add(new Option(homeroom, homeroom)));
-        homeroomFilter.value = [...homeroomFilter.options].some((option) => option.value === previous) ? previous : "";
+            .forEach((whanau) => whanauFilter.add(new Option(whanau, whanau)));
+        whanauFilter.value = [...whanauFilter.options].some((option) => option.value === previous) ? previous : "";
     }
     async function loadClassProgress() {
         const current = ++classRevision;
@@ -113,11 +117,12 @@
                 students: (Array.isArray(progress.students) ? progress.students : []).map((student) => {
                     const profile = profiles.get(String(student.email || "").toLowerCase()) || {};
                     return { ...student, name: profile.name || student.name || student.email,
-                        homeroom: profile.homeroom || student.homeroom || "",
+                        whanau: String(profile.homeroom || student.homeroom || "").trim(),
+                        homeroom: String(student.timetableClass || "").trim().toUpperCase(),
                         course: profile.course || student.course || "" };
                 })
             };
-            populateHomerooms(classData.students);
+            populateWhanau(classData.students);
             renderClassProgress();
         } catch (error) {
             if (current !== classRevision) return;
@@ -145,7 +150,7 @@
         selected.focus();
     });
     document.getElementById("class-progress-refresh").addEventListener("click", loadClassProgress);
-    [courseFilter, homeroomFilter].forEach((filter) => filter.addEventListener("change", renderClassProgress));
+    [courseFilter, whanauFilter, homeroomFilter].forEach((filter) => filter.addEventListener("change", renderClassProgress));
     studentFilter.addEventListener("input", renderClassProgress);
     void loadClassProgress();
     function values(value, parent) {

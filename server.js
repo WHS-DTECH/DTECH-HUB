@@ -15227,6 +15227,7 @@ require("./practical-skills/teacher-results-store").registerTeacherResults(app, 
           email,
           yearLevel: year,
           homeroom: String(row.form_class || "").trim(),
+          timetableClass: String(row.timetable_class || "").trim(),
           course
         };
       })

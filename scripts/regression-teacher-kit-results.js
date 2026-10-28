@@ -31,7 +31,7 @@ async function fixture(t) {
         } },
         getClassData: async () => ({
         students: [
-            { name: "Student One", email: "student@school.nz", homeroom: "7A", course: "JuniorDTECH" },
+            { name: "Student One", email: "student@school.nz", homeroom: "7A", timetableClass: "JPI", course: "JuniorDTECH" },
             { name: "Student Two", email: "other@school.nz", homeroom: "8B", course: "JuniorDTECH" }
         ],
         kits: [{ id: "kit-minecraft", title: "Minecraft Player Kit" }]
@@ -91,6 +91,8 @@ test("class progress is admin-only and read-only with completion by kit", async 
     assert.equal(response.headers.get("cache-control"), "private, no-store");
     const data = await response.json();
     assert.equal(data.kits[0].title, "Minecraft Player Kit");
+    assert.equal(data.students[0].homeroom, "7A");
+    assert.equal(data.students[0].timetableClass, "JPI");
     assert.deepEqual(data.students[0].kitProgress["kit-minecraft"], {
         started: true, completed: true, completedAt: "2026-10-20"
     });
@@ -106,11 +108,74 @@ test("teacher review presents accessible tabs and all requested class filters", 
     assert.match(html, /id="student-review-tab"[^>]+aria-controls="student-review-panel"/);
     assert.match(html, /id="class-course-filter"/);
     assert.match(html, /id="class-homeroom-filter"/);
+    assert.match(html, /Whānau\s*<select id="class-whanau-filter"/);
+    for (const code of ["JPI", "JVE", "JMM", "JSR", "JSD", "8S", "7S"]) {
+        assert.ok(html.includes(`<option value="${code}">${code}</option>`));
+    }
     assert.match(html, /id="class-student-filter"/);
     const script = fs.readFileSync(path.join(root, "practical-skills", "teacher-results.js"), "utf8");
     assert.match(script, /courseKey\(student\.course\) === selectedCourse/);
     assert.match(script, /student\.homeroom === selectedHomeroom/);
+    assert.match(script, /student\.whanau === selectedWhanau/);
     assert.match(script, /student\.name\} \$\{student\.email/);
+});
+
+test("class review keeps whānau and timetable homerooms separate and combines filters", async () => {
+    function element() {
+        return {
+            value: "", children: [], events: {}, textContent: "",
+            classList: { add() {}, remove() {} },
+            append(child) { this.children.push(child); },
+            replaceChildren(...children) { this.children = children; },
+            add(child) { this.append(child); },
+            get options() { return this.children; },
+            addEventListener(type, handler) { this.events[type] = handler; }
+        };
+    }
+    const elements = new Map();
+    const el = (id) => {
+        if (!elements.has(id)) elements.set(id, element());
+        return elements.get(id);
+    };
+    const students = [
+        { name: "Ana", email: "ana@school.nz", homeroom: "7WHAU", timetableClass: " jpi ", course: "JuniorDTECH" },
+        { name: "Ben", email: "ben@school.nz", homeroom: "8WPAPA", timetableClass: "JPI", course: "JuniorDTECH" },
+        { name: "Cara", email: "cara@school.nz", homeroom: "7WHAU", timetableClass: "JVE", course: "JuniorDTECH" },
+        { name: "Dan", email: "dan@school.nz", homeroom: "JPI", timetableClass: "", course: "JuniorDTECH" }
+    ];
+    const source = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "teacher-results.js"), "utf8");
+    const context = vm.createContext({
+        document: { getElementById: el, querySelector: el, createElement: element },
+        window: { addEventListener() {} },
+        localStorage: { getItem: () => JSON.stringify({ profile: { email: "admin@school.nz" } }) },
+        Option: function (text, value) { return { textContent: text, value }; },
+        fetch: async (url) => ({
+            ok: true,
+            json: async () => url.includes("preview-users")
+                ? { users: [] }
+                : { students, kits: [], reviewedAt: "2026-10-28" }
+        })
+    });
+    vm.runInContext(source, context);
+    await el("class-progress-refresh").events.click();
+    const rows = () => el("class-progress-table-host").children[0].children[1].children;
+    const names = () => rows().map((row) => row.children[0].textContent);
+    assert.deepEqual(names(), ["Ana", "Ben", "Cara", "Dan"]);
+    assert.equal(rows()[0].children[1].textContent, "7WHAU");
+    assert.equal(rows()[0].children[2].textContent, "JPI");
+    el("class-homeroom-filter").value = "JPI";
+    el("class-homeroom-filter").events.change();
+    assert.deepEqual(names(), ["Ana", "Ben"], "Whānau must not be used to guess missing timetable membership");
+    el("class-whanau-filter").value = "7WHAU";
+    el("class-whanau-filter").events.change();
+    assert.deepEqual(names(), ["Ana"]);
+    el("class-student-filter").value = "Ben";
+    el("class-student-filter").events.input();
+    assert.match(el("class-progress-status").textContent, /No students match/);
+    el("class-student-filter").value = "";
+    el("class-course-filter").value = "SeniorDTECH";
+    el("class-course-filter").events.change();
+    assert.match(el("class-progress-status").textContent, /No students match/);
 });
 
 test("read-only review suppresses the shared sidebar's mutating progress fetch", async () => {
