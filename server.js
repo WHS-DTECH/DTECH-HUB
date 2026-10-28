@@ -150,7 +150,7 @@ function gradeSearchResultsDetective(answers, activityIndex) {
   };
 }
 
-const { visibleActivityIndexes, allActivitiesComplete, buildKitCertificate, createKitCertificatePdf } = require("./practical-skills-certificate");
+const { visibleActivityIndexes, allActivitiesComplete, buildKitCertificate, buildTypingKitCertificate, createKitCertificatePdf } = require("./practical-skills-certificate");
 
 let OAuth2Client = null;
 try {
@@ -6289,7 +6289,40 @@ require("./learning-pathways/comment-bank-store").registerCommentBank(app, {
 });
 registerTypingKit(app, {
   pool, hasDatabase, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN, canManagePracticalSchedule,
-  verifyGoogleAccessTokenAndExtractIdentity
+  verifyGoogleAccessTokenAndExtractIdentity,
+  certificates: {
+    // Records Typing Kit completion only when the store says Week 7 has ended; certificates are dated that Friday.
+    async get(req, studentEmail, { eligible, issuedOn }) {
+      const email = normalizeEmail(studentEmail);
+      await ensurePracticalSkillsProgressSchema();
+      if (eligible) {
+        await ensurePracticalSkillsProgressRow(email, "kit-typing");
+        await pool.query(
+          `UPDATE practical_skills_progress SET completed = TRUE, completed_at = COALESCE(completed_at, $2::timestamptz), updated_at = NOW()
+           WHERE student_email = $1 AND kit_id = 'kit-typing' AND completed = FALSE`,
+          [email, `${issuedOn}T00:00:00Z`]
+        );
+      }
+      const row = (await pool.query(`SELECT * FROM practical_skills_progress WHERE student_email = $1 AND kit_id = 'kit-typing'`, [email])).rows[0];
+      return row?.completed ? buildTypingKitCertificate(row, await getPracticalSkillsStudentName(req, email)) : null;
+    },
+    async autoEmail(studentEmail, certificate) {
+      try {
+        if (!smtpTransporter || !SMTP_FROM) return false;
+        return await emailKitCertificateOnce(normalizeEmail(studentEmail), "kit-typing", certificate);
+      } catch (error) {
+        console.error("[kit-certificate-email] Could not automatically email Typing Kit certificate:", error);
+        return false;
+      }
+    },
+    async send(studentEmail, certificate) {
+      await sendKitCertificateEmail(normalizeEmail(studentEmail), "kit-typing", certificate);
+      await claimKitCertificateAutoEmail(studentEmail, "kit-typing").catch(() => false);
+    },
+    createPdf: (certificate) => createKitCertificatePdf(certificate),
+    emailConfigured: () => Boolean(smtpTransporter && SMTP_FROM),
+    emailErrorMessage: (error) => getHubEmailErrorMessage(error)
+  }
 });
 require("./practical-skills/certificate-catchup").registerCertificateCatchup(app, {
   pool, hasDatabase, requireAdminAccess, ensurePracticalSkillsProgressSchema, ensureEmailLogsSchema,
@@ -15347,8 +15380,8 @@ async function getPracticalSkillsCertificate(req, kitId) {
   return buildKitCertificate(content, row, name);
 }
 
-async function getPracticalSkillsStudentName(req) {
-  const email = normalizeEmail(getRequestUserEmail(req));
+async function getPracticalSkillsStudentName(req, studentEmail = "") {
+  const email = normalizeEmail(studentEmail || getRequestUserEmail(req));
   const identity = req.auth_identity;
   const verifiedName = identity?.verified && normalizeEmail(identity.email) === email
     && identity.givenName && identity.familyName
@@ -15518,7 +15551,7 @@ async function sendKitCertificateEmail(studentEmail, kitId, certificate) {
     to: studentEmail,
     cc: teacherRecipients,
     subject: `[DTECH HUB] ${certificate.kitTitle} - Certificate of Completion - ${certificate.studentName}`,
-    html: `<div style="font-family:Arial,sans-serif;color:#173858;"><h2>Certificate of Completion</h2><p>Kia ora ${safe(certificate.studentName)},</p><p>Ka pai! You completed all ${certificate.activityCount} activities in <strong>${safe(certificate.kitTitle)}</strong> on ${safe(certificate.completedDate)}.</p><p>Your landscape PDF certificate is attached. You can save, print or forward it to share your achievement.</p><p>${safe(certificate.issuer)}</p></div>`,
+    html: `<div style="font-family:Arial,sans-serif;color:#173858;"><h2>Certificate of Completion</h2><p>Kia ora ${safe(certificate.studentName)},</p><p>${certificate.emailSummary ? safe(certificate.emailSummary) : `Ka pai! You completed all ${certificate.activityCount} activities in <strong>${safe(certificate.kitTitle)}</strong> on ${safe(certificate.completedDate)}.`}</p><p>Your landscape PDF certificate is attached. You can save, print or forward it to share your achievement.</p><p>${safe(certificate.issuer)}</p></div>`,
     attachment: { buffer, originalname: `${kitId}-certificate.pdf`, mimetype: "application/pdf" },
     emailType: "kit_certificate"
   });
@@ -15550,17 +15583,22 @@ async function autoEmailKitCertificate(req, kitId, certificate = undefined) {
   try {
     if (!studentEmail || !smtpTransporter || !SMTP_FROM) return false;
     const ready = certificate === undefined ? await getPracticalSkillsCertificate(req, kitId) : certificate;
-    if (!ready || !await claimKitCertificateAutoEmail(studentEmail, kitId)) return false;
-    try {
-      await sendKitCertificateEmail(studentEmail, kitId, ready);
-      return true;
-    } catch (error) {
-      await claimKitCertificateAutoEmail(studentEmail, kitId, false).catch(() => {});
-      throw error;
-    }
+    return await emailKitCertificateOnce(studentEmail, kitId, ready);
   } catch (error) {
     console.error("[kit-certificate-email] Could not automatically email certificate:", error);
     return false;
+  }
+}
+
+// Throws on send failure after releasing the claim so a later visit can retry.
+async function emailKitCertificateOnce(studentEmail, kitId, certificate) {
+  if (!certificate || !await claimKitCertificateAutoEmail(studentEmail, kitId)) return false;
+  try {
+    await sendKitCertificateEmail(studentEmail, kitId, certificate);
+    return true;
+  } catch (error) {
+    await claimKitCertificateAutoEmail(studentEmail, kitId, false).catch(() => {});
+    throw error;
   }
 }
 

@@ -80,6 +80,7 @@
 .typing-book-record p { margin: 4px 0; }
 .typing-book-signoff { font-size: .95rem; }
 .typing-note { font-size: .9rem; line-height: 1.6; }
+.typing-certificate-note { border-left: 5px solid #c49a36; background: #fff8e6; padding: .6rem .9rem; border-radius: 8px; }
 .typing-settings { background: #fff8e1; }
 .typing-kit-page a:focus-visible, .typing-kit-page button:focus-visible, .typing-kit-page input:focus-visible {
     outline: 3px solid #173858; outline-offset: 3px;

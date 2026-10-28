@@ -36,6 +36,25 @@ function addDays(value, days) {
     return date.toISOString().slice(0, 10);
 }
 
+// Final Typing Kit classes are on Friday of Week 7, so the certificate unlocks then (NZ time), not per session.
+const CERTIFICATE_UNLOCK_OFFSET_DAYS = (WEEK_COUNT - 1) * 7 + 4;
+
+function certificateUnlockDate(startDate) {
+    return addDays(startDate, CERTIFICATE_UNLOCK_OFFSET_DAYS);
+}
+
+function nzDate(now = new Date()) {
+    const parts = Object.fromEntries(new Intl.DateTimeFormat("en-NZ", { timeZone: "Pacific/Auckland", year: "numeric", month: "2-digit", day: "2-digit" })
+        .formatToParts(now).map((part) => [part.type, part.value]));
+    return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function typingCertificateEligible(startDate, attempts, now = new Date()) {
+    const lastWeek = addDays(startDate, (WEEK_COUNT - 1) * 7);
+    return nzDate(now) >= certificateUnlockDate(startDate)
+        && attempts.some((row) => row.week_start >= startDate && row.week_start <= lastWeek);
+}
+
 function parseTypingResult(value) {
     if (typeof value !== "string" || value.length > 4096) throw new Error("Paste the complete TypingTest.com results link.");
     let url;
@@ -73,8 +92,10 @@ function parseTypingResult(value) {
     return { accuracy, netWpm, grossWpm, durationSeconds, sourceUrl: source.href };
 }
 
-function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomain, canManagePracticalSchedule, verifyGoogleAccessTokenAndExtractIdentity }) {
+function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomain, canManagePracticalSchedule, verifyGoogleAccessTokenAndExtractIdentity,
+    certificates = null, now = () => new Date() }) {
     let schemaReady;
+    const certificateEmailCooldowns = new Map();
     async function ensureSchema() {
         if (!hasDatabase) {
             const error = new Error("The Typing Kit needs database storage. Results cannot be saved until the database is configured.");
@@ -138,6 +159,28 @@ function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomai
         console.error("[typing-kit]", error);
         res.status(error.status || 500).json({ error: error.status ? error.message : "Could not access the typing log. Please try again; no results have been removed." });
     }
+    // Issues the completion record only from Friday of Week 7; earlier log sessions never create a certificate.
+    async function certificateFor(req, email, startDate, attempts) {
+        if (!certificates) return null;
+        return certificates.get(req, email, {
+            eligible: typingCertificateEligible(startDate, attempts, now()),
+            issuedOn: certificateUnlockDate(startDate)
+        });
+    }
+    async function loadAttempts(email) {
+        return (await pool.query(`SELECT * FROM typing_kit_attempts WHERE student_email = $1 ORDER BY submitted_at, id`, [email])).rows;
+    }
+    async function requiredCertificate(req, res, email) {
+        await ensureSchema();
+        const startDate = await settings();
+        const certificate = await certificateFor(req, email, startDate, await loadAttempts(email));
+        if (!certificate) {
+            const unlock = new Intl.DateTimeFormat("en-NZ", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })
+                .format(new Date(`${certificateUnlockDate(startDate)}T00:00:00Z`));
+            res.status(409).json({ error: `Your Typing Kit certificate unlocks at the end of Week 7 (${unlock}) once you have saved a result.` });
+        }
+        return certificate;
+    }
 
     app.get("/api/practical-skills/typing-kit", async (req, res) => {
         const email = await identity(req, res);
@@ -145,14 +188,57 @@ function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomai
         res.set("Cache-Control", "no-store");
         try {
             await ensureSchema();
-            const [startDate, rows, canManage] = await Promise.all([
-                settings(),
-                pool.query(`SELECT * FROM typing_kit_attempts WHERE student_email = $1 ORDER BY submitted_at, id`, [email]),
-                canManagePracticalSchedule(email)
-            ]);
+            const [startDate, attempts, canManage] = await Promise.all([settings(), loadAttempts(email), canManagePracticalSchedule(email)]);
+            const readOnly = res.locals.kitPreview === true;
+            let certificate = null;
+            let certificateEmailed = false;
+            if (!readOnly) {
+                try {
+                    certificate = await certificateFor(req, email, startDate, attempts);
+                    if (certificate) certificateEmailed = await certificates.autoEmail(email, certificate);
+                } catch (error) {
+                    console.error("[typing-kit] Certificate check failed; the log is still available:", error);
+                }
+            }
             res.json({ startDate, weekCount: WEEK_COUNT, periodsPerWeek: PERIOD_COUNT, canManage,
-                readOnly: res.locals.kitPreview === true, attempts: rows.rows.map(shape) });
+                readOnly, attempts: attempts.map(shape),
+                certificateUnlockDate: certificateUnlockDate(startDate), certificate, certificateEmailed });
         } catch (error) { failure(res, error); }
+    });
+
+    app.get("/api/practical-skills/typing-kit/certificate.pdf", async (req, res) => {
+        const email = await identity(req, res);
+        if (!email) return;
+        try {
+            const certificate = await requiredCertificate(req, res, email);
+            if (!certificate) return;
+            const buffer = await certificates.createPdf(certificate);
+            res.set("Cache-Control", "private, no-store");
+            res.type("application/pdf").attachment("kit-typing-certificate.pdf").send(buffer);
+        } catch (error) { failure(res, error); }
+    });
+
+    app.post("/api/practical-skills/typing-kit/certificate/email", async (req, res) => {
+        const email = await identity(req, res);
+        if (!email) return;
+        if (!certificates?.emailConfigured()) {
+            return res.status(503).json({ error: "Email is not configured on the hub. You can still download or print your certificate." });
+        }
+        for (const [entry, expires] of certificateEmailCooldowns) {
+            if (expires <= Date.now()) certificateEmailCooldowns.delete(entry);
+        }
+        if (certificateEmailCooldowns.has(email)) return res.status(429).json({ error: "Please wait a minute before emailing another copy." });
+        certificateEmailCooldowns.set(email, Date.now() + 60000);
+        try {
+            const certificate = await requiredCertificate(req, res, email);
+            if (!certificate) return certificateEmailCooldowns.delete(email);
+            await certificates.send(email, certificate);
+            res.json({ sent: true, recipient: email });
+        } catch (error) {
+            certificateEmailCooldowns.delete(email);
+            console.error("[typing-kit] Could not email certificate:", error);
+            res.status(error.status || 500).json({ error: certificates.emailErrorMessage?.(error) || "Could not email your certificate." });
+        }
     });
 
     app.put("/api/practical-skills/typing-kit/settings", async (req, res) => {
@@ -208,4 +294,5 @@ function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomai
     });
 }
 
-module.exports = { DEFAULT_START_DATE, WEEK_COUNT, PERIOD_COUNT, TYPING_KIT_CARD, withTypingKitCard, isMonday, addDays, parseTypingResult, registerTypingKit };
+module.exports = { DEFAULT_START_DATE, WEEK_COUNT, PERIOD_COUNT, TYPING_KIT_CARD, withTypingKitCard, isMonday, addDays, parseTypingResult,
+    certificateUnlockDate, typingCertificateEligible, registerTypingKit };

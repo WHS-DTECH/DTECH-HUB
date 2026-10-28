@@ -6,7 +6,7 @@ const express = require("express");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
-const { DEFAULT_START_DATE, WEEK_COUNT, PERIOD_COUNT, withTypingKitCard, isMonday, addDays, parseTypingResult, registerTypingKit } = require("../practical-skills/typing-kit-store");
+const { DEFAULT_START_DATE, WEEK_COUNT, PERIOD_COUNT, withTypingKitCard, isMonday, addDays, parseTypingResult, certificateUnlockDate, typingCertificateEligible, registerTypingKit } = require("../practical-skills/typing-kit-store");
 
 const resultUrl = "https://www.typingtest.com/result.php?acc=97&nwpm=35&gwpm=36&ncpm=175&gcpm=180&dur=60&time=60&chksum=16988&unit=wpm&kh=998&td=null&err=1&hits=180&textfile=mediumText.txt&mobile=0&TIPS=RSHIFT#goog_game_inter";
 const student = "student@school.nz";
@@ -46,10 +46,11 @@ async function fixture(t, options = {}) {
     const app = express();
     app.use(express.json());
     // Simulate the server's already-verified Google middleware identity, never a client email claim.
-    app.use((req, _res, next) => {
+    app.use((req, res, next) => {
         const verifiedEmail = req.headers["x-test-verified-email"];
         if (verifiedEmail) req.auth_identity = { verified: true, source: "google_id_token", email: verifiedEmail };
         else if (req.headers.authorization) req.auth_identity = { verified: false, source: "none", error: "token_verification_failed" };
+        if (options.preview) res.locals.kitPreview = true;
         next();
     });
     registerTypingKit(app, {
@@ -57,7 +58,9 @@ async function fixture(t, options = {}) {
         normalizeEmail: (value) => String(value || "").toLowerCase(),
         verifyGoogleAccessTokenAndExtractIdentity: options.verifyAccessToken,
         schoolDomain: "school.nz",
-        canManagePracticalSchedule: async (email) => email === teacher
+        canManagePracticalSchedule: async (email) => email === teacher,
+        certificates: options.certificates || null,
+        now: options.now
     });
     const server = await new Promise((resolve) => {
         const listener = app.listen(0, "127.0.0.1", () => resolve(listener));
@@ -70,7 +73,7 @@ async function fixture(t, options = {}) {
                 ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}) },
             body: body === undefined ? undefined : JSON.stringify(body)
         });
-        return { status: response.status, body: await response.json(), headers: response.headers };
+        return { status: response.status, body: response.headers.get("content-type")?.includes("json") ? await response.json() : await response.text(), headers: response.headers };
     }
     return { ...db, call };
 }
@@ -474,4 +477,107 @@ test("a failed submission keeps its input and reuses the submission ID on retry"
     assert.equal(writes.length, 2);
     assert.equal(writes[0].submissionId, writes[1].submissionId, "A retry must not add another attempt if the original reached the server");
     assert.match(ui.get("typing-status").textContent, /Result saved/);
+});
+
+function certificateMock() {
+    const calls = { get: [], autoEmail: [], send: [] };
+    let issued = false;
+    return { calls, api: {
+        async get(_req, email, info) {
+            calls.get.push({ email, ...info });
+            if (info.eligible) issued = true;
+            return issued ? { studentName: "Student", kitTitle: "Typing Kit", detailText: `Seven-week typing practice log | ${info.issuedOn}`, issuer: "WHS" } : null;
+        },
+        async autoEmail(email) { calls.autoEmail.push(email); return true; },
+        async send(email) { calls.send.push(email); },
+        createPdf: async () => Buffer.from("%PDF-typing"),
+        emailConfigured: () => true
+    } };
+}
+
+test("certificate unlocks on Friday of Week 7 in NZ time, only with a result in the seven-week calendar", () => {
+    assert.equal(certificateUnlockDate(DEFAULT_START_DATE), "2026-12-11");
+    const attempt = [{ week_start: "2026-11-02" }];
+    assert.equal(typingCertificateEligible(DEFAULT_START_DATE, attempt, new Date("2026-12-10T10:59:59Z")), false, "Thursday 11:59pm NZDT is still before the final Friday");
+    assert.equal(typingCertificateEligible(DEFAULT_START_DATE, attempt, new Date("2026-12-10T11:00:00Z")), true, "Friday 12:00am NZDT unlocks the certificate");
+    assert.equal(typingCertificateEligible(DEFAULT_START_DATE, [], new Date("2026-12-20T00:00:00Z")), false);
+    assert.equal(typingCertificateEligible(DEFAULT_START_DATE, [{ week_start: "2026-10-19" }], new Date("2026-12-20T00:00:00Z")), false);
+});
+
+test("saving log sessions never issues a certificate; the first load from Friday of Week 7 issues and emails it once", async (t) => {
+    let clock = new Date("2026-11-02T01:00:00Z");
+    const certificates = certificateMock();
+    const { call, data } = await fixture(t, { certificates: certificates.api, now: () => clock });
+    const save = await call("/attempts", { method: "POST", body: { weekStart: "2026-11-02", period: 1, resultUrl, submissionId: randomUUID() } });
+    assert.equal(save.status, 201);
+    assert.equal(save.body.certificate, undefined, "Saving a session returns only the attempt");
+    const early = await call();
+    assert.equal(early.body.certificate, null);
+    assert.equal(early.body.certificateUnlockDate, "2026-12-11");
+    assert.equal(certificates.calls.get.at(-1).eligible, false);
+    assert.equal(certificates.calls.autoEmail.length, 0);
+    assert.equal((await call("/certificate.pdf")).status, 409);
+    assert.equal((await call("/certificate/email", { method: "POST" })).status, 409);
+    assert.equal(certificates.calls.send.length, 0);
+
+    clock = new Date("2026-12-10T20:00:00Z");
+    const issued = await call();
+    assert.equal(issued.body.certificate.kitTitle, "Typing Kit");
+    assert.equal(issued.body.certificateEmailed, true);
+    assert.deepEqual(certificates.calls.get.at(-1), { email: student, eligible: true, issuedOn: "2026-12-11" });
+    assert.deepEqual(certificates.calls.autoEmail, [student]);
+    const pdf = await call("/certificate.pdf");
+    assert.equal(pdf.status, 200);
+    assert.match(pdf.headers.get("content-type"), /application\/pdf/);
+    assert.match(pdf.body, /%PDF-typing/);
+    assert.equal((await call("/certificate/email", { method: "POST" })).body.sent, true);
+    assert.equal((await call("/certificate/email", { method: "POST" })).status, 429);
+    assert.equal(data.attempts.length, 1, "Certificate checks never change saved attempts");
+    assert.equal(data.queries.some(({ sql }) => /DELETE|UPDATE typing_kit_attempts/.test(sql)), false);
+});
+
+test("Not Live teacher preview and certificate failures never issue a certificate or block the log", async (t) => {
+    const certificates = certificateMock();
+    const preview = await fixture(t, { certificates: certificates.api, preview: true, now: () => new Date("2026-12-12T00:00:00Z") });
+    const body = (await preview.call("", { email: teacher })).body;
+    assert.equal(body.readOnly, true);
+    assert.equal(body.certificate, null);
+    assert.equal(certificates.calls.get.length, 0);
+    const errors = t.mock.method(console, "error", () => {});
+    const broken = await fixture(t, { certificates: { ...certificates.api, get: async () => { throw new Error("progress table unavailable"); } } });
+    const loaded = await broken.call();
+    assert.equal(loaded.status, 200);
+    assert.equal(loaded.body.certificate, null);
+    assert.ok(errors.mock.callCount() >= 1);
+});
+
+test("dashboard explains the end-of-Week-7 certificate and shows an issued certificate only on the dashboard", async () => {
+    const pending = frontend({ snapshot: { startDate: DEFAULT_START_DATE, canManage: false, attempts: [], certificateUnlockDate: "2026-12-11", certificate: null } });
+    await settle();
+    assert.match(pending.get("typing-content").innerHTML, /issued at the end of Week 7 \(Friday 11 Dec 2026\)/);
+    assert.equal(pending.get("worksheet-certificate").hidden, true);
+    const certificate = { studentName: "Student Name", detailText: "Seven-week typing practice log | 11 December 2026", issuer: "Westland High School | DTECH-HUB" };
+    const issued = frontend({ snapshot: { startDate: DEFAULT_START_DATE, canManage: false, attempts: [], certificateUnlockDate: "2026-12-11", certificate, certificateEmailed: true } });
+    await settle();
+    assert.match(issued.get("typing-content").innerHTML, /Certificate issued/);
+    assert.equal(issued.get("worksheet-certificate").hidden, false);
+    assert.equal(issued.get("certificate-student-name").textContent, "Student Name");
+    assert.match(issued.get("certificate-status").textContent, /emailed/);
+    const daily = frontend({ search: "?week=2026-10-26&period=1", snapshot: { startDate: DEFAULT_START_DATE, canManage: false, attempts: [], certificate } });
+    await settle();
+    assert.equal(daily.get("worksheet-certificate").hidden, true, "Daily log sessions never display the certificate");
+});
+
+test("server records Typing Kit completion only when eligible and reuses the email-once certificate flow", () => {
+    const source = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
+    const wiring = source.slice(source.indexOf("registerTypingKit(app, {"), source.indexOf("require(\"./practical-skills/certificate-catchup\").registerCertificateCatchup"));
+    assert.match(wiring, /if \(eligible\) \{[\s\S]*ensurePracticalSkillsProgressRow\(email, "kit-typing"\)[\s\S]*completed = FALSE/);
+    assert.match(wiring, /emailKitCertificateOnce\(normalizeEmail\(studentEmail\), "kit-typing", certificate\)/);
+    assert.match(wiring, /buildTypingKitCertificate\(row, await getPracticalSkillsStudentName\(req, email\)\)/);
+    const { buildTypingKitCertificate } = require("../practical-skills-certificate");
+    assert.equal(buildTypingKitCertificate({ completed: false, completed_at: null }, "A"), null);
+    const built = buildTypingKitCertificate({ completed: true, completed_at: "2026-12-11T00:00:00Z", student_email: student }, "Student Name");
+    assert.equal(built.completedDate, "11 December 2026");
+    assert.equal(built.kitTitle, "Typing Kit");
+    assert.match(built.detailText, /Seven-week typing practice log/);
 });

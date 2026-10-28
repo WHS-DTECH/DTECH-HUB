@@ -27,6 +27,24 @@ function buildKitCertificate(content, row, studentName) {
   };
 }
 
+function buildTypingKitCertificate(row, studentName) {
+  if (!row?.completed || !row.completed_at) return null;
+  const completedDate = new Date(row.completed_at).toLocaleDateString("en-NZ", { day: "numeric", month: "long", year: "numeric", timeZone: "Pacific/Auckland" });
+  return {
+    title: "Certificate of Completion",
+    studentName: studentName || row.student_email,
+    studentEmail: row.student_email,
+    kitTitle: "Typing Kit",
+    completedAt: new Date(row.completed_at).toISOString(),
+    completedDate,
+    activityCount: 0,
+    achievementText: "for successfully completing the seven-week",
+    detailText: `Seven-week typing practice log | ${completedDate}`,
+    emailSummary: `Ka pai! You completed the seven-week Typing Kit practice log on ${completedDate}.`,
+    issuer: "Westland High School | DTECH-HUB"
+  };
+}
+
 function createKitCertificatePdf(certificate) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", layout: "landscape", margin: 0, info: { Title: `${certificate.kitTitle} - Certificate of Completion`, Author: certificate.issuer } });
@@ -56,9 +74,9 @@ function createKitCertificatePdf(certificate) {
       text(certificate.title, 140, 32, "certificate-bold");
       text("This certificate is proudly presented to", 208, 14);
       fittedText(certificate.studentName, 247, 32);
-      text("for successfully completing all activities in", 339, 14);
+      text(certificate.achievementText || "for successfully completing all activities in", 339, 14);
       fittedText(certificate.kitTitle, 372, 25);
-      text(`${certificate.activityCount} activities completed | ${certificate.completedDate}`, 437, 13);
+      text(certificate.detailText || `${certificate.activityCount} activities completed | ${certificate.completedDate}`, 437, 13);
       text("Ka pai! Ready for the next step in your learning.", 477, 14, "certificate-bold", "#1f5b3a");
       text(certificate.issuer, 526, 10);
       doc.end();
@@ -69,4 +87,4 @@ function createKitCertificatePdf(certificate) {
   });
 }
 
-module.exports = { visibleActivityIndexes, allActivitiesComplete, buildKitCertificate, createKitCertificatePdf };
+module.exports = { visibleActivityIndexes, allActivitiesComplete, buildKitCertificate, buildTypingKitCertificate, createKitCertificatePdf };

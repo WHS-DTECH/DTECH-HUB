@@ -33,9 +33,32 @@
         const googleToken = session.idToken || session.accessToken;
         if (googleToken) headers.Authorization = `Bearer ${googleToken}`;
         const response = await fetch(`/api/practical-skills/typing-kit${path}`, { ...options, headers, cache: "no-store" });
+        if (options.raw && response.ok) return response;
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || `Request failed (${response.status}). Please try again.`);
         return payload;
+    }
+    function certificateStatus(text, error = false) {
+        const host = document.getElementById("certificate-status");
+        if (!host) return;
+        host.textContent = text;
+        host.classList.toggle("is-error", error);
+    }
+    function updateCertificate(show) {
+        const host = document.getElementById("worksheet-certificate");
+        if (!host) return;
+        const certificate = state.snapshot?.certificate;
+        host.hidden = !show || !certificate;
+        if (host.hidden) return;
+        document.getElementById("certificate-student-name").textContent = certificate.studentName;
+        document.getElementById("certificate-completion-details").textContent = certificate.detailText;
+        document.getElementById("certificate-issuer").textContent = certificate.issuer;
+        if (state.snapshot.certificateEmailed) certificateStatus("Your certificate has been emailed to your school account.");
+    }
+    function certificateNotice() {
+        if (state.snapshot.certificate) return '<p class="typing-certificate-note"><strong>Certificate issued.</strong> Your Typing Kit certificate is below.</p>';
+        const unlock = state.snapshot.certificateUnlockDate;
+        return unlock ? `<p class="typing-certificate-note">Your Typing Kit certificate is issued at the end of Week 7 (Friday ${dateLabel(unlock)}). It is not issued after each session.</p>` : "";
     }
     function weeks() {
         return Array.from({ length: 7 }, (_, index) => addDays(state.snapshot.startDate, index * 7));
@@ -70,6 +93,7 @@
                 <h2>Typing Kit Dashboard</h2>
                 <p>${dateLabel(starts[0])} &ndash; ${dateLabel(addDays(starts[6], 6))}</p>
                 <p><strong>${recorded} / 14 period records started</strong> &middot; All attempts are kept.</p>
+                ${certificateNotice()}
                 <p>Open your week and period. Complete a one-minute test, paste the results link here, save it, then copy your saved result into your exercise book for your teacher to sign.</p>
                 <p class="typing-note">This is your electronic log, not an electronic sign-off. Scores are student-submitted. Submission dates do not verify when a test was taken.</p>
             </section>
@@ -234,7 +258,9 @@
     }
     function render() {
         const params = new URLSearchParams(window.location.search);
-        if (!params.has("week") && !params.has("period")) return renderOverview();
+        const overview = !params.has("week") && !params.has("period");
+        updateCertificate(overview);
+        if (overview) return renderOverview();
         const weekStart = params.get("week");
         const period = Number(params.get("period"));
         const valid = /^\d{4}-\d{2}-\d{2}$/.test(weekStart || "") && [1, 2].includes(period)
@@ -254,6 +280,8 @@
         state.pendingUrl = "";
         content.innerHTML = "";
         retry.hidden = true;
+        updateCertificate(false);
+        certificateStatus("");
         document.getElementById("typing-identity-verification").hidden = false;
         try {
             state.email = auth()?.profile.email.toLowerCase() || "";
@@ -287,5 +315,42 @@
     document.addEventListener("visibilitychange", promptOnReturn);
     window.addEventListener("hub-auth-state-changed", () => { void load(); });
     retry.addEventListener("click", () => { void load(); });
+    document.getElementById("certificate-print")?.addEventListener("click", () => {
+        if (!state.snapshot?.certificate) return;
+        document.body.classList.add("printing-certificate");
+        try { window.print(); }
+        finally { document.body.classList.remove("printing-certificate"); }
+    });
+    document.getElementById("certificate-download")?.addEventListener("click", async () => {
+        const button = document.getElementById("certificate-download");
+        const revision = state.revision;
+        button.disabled = true;
+        certificateStatus("Preparing your PDF...");
+        try {
+            const response = await request("/certificate.pdf", { raw: true });
+            if (revision !== state.revision) return;
+            const url = URL.createObjectURL(await response.blob());
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = "kit-typing-certificate.pdf";
+            link.click();
+            window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+            certificateStatus("Your landscape PDF has been downloaded.");
+        } catch (error) {
+            if (revision === state.revision) certificateStatus(error.message || "Could not download your certificate.", true);
+        } finally { button.disabled = false; }
+    });
+    document.getElementById("certificate-email")?.addEventListener("click", async () => {
+        const button = document.getElementById("certificate-email");
+        const revision = state.revision;
+        button.disabled = true;
+        certificateStatus("Sending your certificate...");
+        try {
+            const payload = await request("/certificate/email", { method: "POST" });
+            if (revision === state.revision) certificateStatus(`Certificate sent to ${payload.recipient}. You can forward the email to share it.`);
+        } catch (error) {
+            if (revision === state.revision) certificateStatus(error.message || "Could not email your certificate.", true);
+        } finally { button.disabled = false; }
+    });
     void load();
 })();
