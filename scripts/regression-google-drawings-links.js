@@ -37,10 +37,9 @@ test("all three drawings gain saved required links without replacing instruction
         assert.equal(activity.blocks.filter((block) => block.required).length, 1);
         assert.equal(activity.blocks.find((block) => block.required).kind, "studentlink");
     });
-    assert.equal(content.activities[0].blocks[0], original.activities[0].blocks[0]);
+    assert.equal(content.activities[0].blocks.find((block) => block.id === "guide"), original.activities[0].blocks[0]);
     assert.equal(content.activities[0].information, original.activities[0].information);
-    assert.equal(content.activities[0].blocks[1].id, "old-link");
-    assert.equal(content.activities[0].blocks[1].responseKey, "ship-url");
+    assert.equal(content.activities[0].blocks.find((block) => block.id === "old-link").responseKey, "ship-url");
     assert.equal(B.savedAnswers(content.activities[0], 0, { "ship-url": link(0) })["old-link"], link(0));
     assert.equal(content.activities[1].blocks[0].responseKey, "1-legacy");
     assert.equal(B.withFilesFoldersLinks(content), content, "Normalization is idempotent");
@@ -57,6 +56,31 @@ test("only the requested kit and visible drawing activities are changed", () => 
     assert.equal(content.activities[1], kit.activities[1]);
     assert.equal(content.activities[2], undefined);
     assert.equal(content.activities[3], undefined);
+});
+
+test("Ship renders the supplied reference and shape instructions once, without changing link-only completion", () => {
+    const kit = B.withGoogleDrawingsLinks(base()), ship = kit.activities[0];
+    const image = ship.blocks.find((block) => block.id === "ship-shapes-reference");
+    const instructions = ship.blocks.find((block) => block.id === "ship-shapes-instructions");
+    assert.equal(image.kind, "image");
+    assert.match(image.url, /\/practical-skills\/images\/ship-reference\.png$/);
+    const bytes = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "images", "ship-reference.png"));
+    assert.equal(bytes.subarray(1, 4).toString(), "PNG");
+    assert.match(instructions.text, /Insert > Shape/);
+    assert.match(instructions.text, /Line tool only/);
+    assert.match(instructions.text, /separate, editable shapes/);
+    assert.match(instructions.text, /saved link only/);
+    assert.equal(B.grade(ship, answer(kit, 0, link(0))).passed, true);
+    assert.equal(kit.activities[1].shipShapesReferenceVersion, undefined);
+    assert.equal(kit.activities[2].shipShapesReferenceVersion, undefined);
+    assert.equal(B.withGoogleDrawingsLinks(kit), kit);
+    const ctx = vm.createContext({ window: { ActivityBlocks: B } });
+    vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "practical-skills", "activity-block-view.js"), "utf8"), ctx);
+    const markup = ctx.window.ActivityBlockView.markup(ship.blocks, {}, true);
+    assert.match(markup, /<img src="https:\/\/dtech-hub2\.onrender\.com\/practical-skills\/images\/ship-reference\.png"/);
+    assert.match(markup, /Insert &gt; Shape/);
+    assert.match(markup, /disabled/);
+    assert.equal((markup.match(/ship-reference\.png/g) || []).length, 1);
 });
 
 test("a valid share link alone earns each tick; blank, local and unsafe links do not", () => {
@@ -87,7 +111,7 @@ test("saved definitions normalize persistently once, preserving existing teacher
     vm.runInContext(source.slice(start, source.indexOf("\nasync function savePracticalSkillsKitContent(", start)), ctx);
     const first = await ctx.getStoredPracticalSkillsKitContent("kit-google-drawings");
     assert.equal(writes, 1);
-    assert.equal(first.activities[0].blocks[1].id, "old-link");
+    assert.ok(first.activities[0].blocks.some((block) => block.id === "old-link"));
     await ctx.getStoredPracticalSkillsKitContent("kit-google-drawings");
     assert.equal(writes, 1);
 });

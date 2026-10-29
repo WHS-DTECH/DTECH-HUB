@@ -90,6 +90,16 @@
                 !/^(?:ship|tv|flower pot)$/i.test(String(worksheet.activity || "").trim())) return;
             const activity = activities[index] || {};
             let blocks = initialBlocks(activity, index, content);
+            const ship = /^ship$/i.test(String(worksheet.activity).trim()) && !activity.shipShapesReferenceVersion;
+            if (ship) blocks = [
+                { id: "ship-shapes-reference", kind: "image", title: "Ship reference picture",
+                    url: "https://dtech-hub2.onrender.com/practical-skills/images/ship-reference.png",
+                    alt: "A sailing ship with a dark hull, two masts, several sails, a flag, lightning bolts and a starburst-shaped sea.",
+                    caption: "Use this ship as your reference. Create your own similar drawing using Insert > Shape." },
+                { id: "ship-shapes-instructions", kind: "tasks", title: "Build your ship with shapes",
+                    text: "Open Google Drawings and create your own ship similar to the reference picture.\nUse Insert > Shape to build the main parts: the hull, sails, masts, flag and sea. Resize, rotate and layer the shapes to fit your design.\nUse fill colours and borders to make the ship clear. You can use lines for extra details, but do not build the whole picture with the Line tool only.\nDo not paste the reference picture as your finished work. Your drawing should contain your own separate, editable shapes.\nCheck that your picture looks like a sailing ship with a hull, masts and sails. It does not need to be an exact copy.\nShare your finished drawing so your teacher can open it, then paste its Share Link below. The automatic tick confirms a saved link only; your teacher may review the drawing and its shapes." },
+                ...blocks
+            ];
             if (!blocks.some((block) => block.kind === "studentlink")) blocks = [...blocks, {
                 id: `google-drawings-share-link-${index}`, kind: "studentlink", required: true,
                 title: `${worksheet.activity} Share Link`,
@@ -99,9 +109,10 @@
                 const required = block.kind === "studentlink";
                 return Boolean(block.required) === required ? block : { ...block, required };
             });
-            if (activity.completionMode !== "auto" || activity.shareLinkCompletion !== true ||
+            if (ship || activity.completionMode !== "auto" || activity.shareLinkCompletion !== true ||
                 !activity.blocks || blocks.length !== activity.blocks.length || blocks.some((block, i) => block !== activity.blocks[i])) {
-                activities[index] = { ...activity, blocks, completionMode: "auto", shareLinkCompletion: true };
+                activities[index] = { ...activity, blocks, completionMode: "auto", shareLinkCompletion: true,
+                    ...(ship ? { shipShapesReferenceVersion: 1 } : {}) };
                 changed = true;
             }
         });

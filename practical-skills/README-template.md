@@ -73,6 +73,11 @@ Link checks do not verify drawing contents or teacher sharing access.
 Existing link IDs and response keys are retained. The usual all-activities
 certificate process applies, and the kit stays Not Live until explicitly
 published. Teacher preview remains read-only and cannot save links or ticks.
+Ship also includes the supplied reference picture and instructions to build a
+similar ship from separate editable Insert > Shape objects. Lines may add
+details, but line-only artwork or a pasted reference image does not meet the
+task instructions. This is teacher-reviewable guidance, not an automated shape
+or visual-similarity check; link-only completion is unchanged.
 
 Validate with `node --test scripts/regression-google-drawings-links.js`.
 
