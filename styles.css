@@ -1394,9 +1394,20 @@ a {
 .hero-deadline-layout .hero-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
-.hub-deadline-card {
-    background: linear-gradient(135deg, #fff4bf, #ffcb73);
-    color: #281b08;
+.stat-card.hub-deadline-card {
+    background: #fffdf5;
+    border: 3px solid #f59e0b;
+    color: #1f2937;
+    overflow: hidden;
+}
+.hub-deadline-card .stat-label {
+    margin: -14px -16px 0;
+    padding: 14px 16px;
+    background: linear-gradient(135deg, #fde047 0%, #fbbf24 55%, #fb923c 100%);
+    color: #1f1300;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
 }
 .hub-deadline-edit {
     display: grid;
@@ -1411,7 +1422,7 @@ a {
     cursor: pointer;
 }
 .hub-deadline-edit:disabled { opacity: 1; cursor: default; }
-.hub-deadline-edit strong { font-size: 1.25rem; }
+.hub-deadline-card .hub-deadline-edit strong { font-size: 1.25rem; color: #b42318; }
 .hub-deadline-edit span { font-size: 0.8rem; }
 .hub-deadline-editor { width: min(440px, calc(100% - 32px)); border-radius: 16px; padding: 24px; }
 .hub-deadline-editor::backdrop { background: rgba(0, 0, 0, 0.5); }
