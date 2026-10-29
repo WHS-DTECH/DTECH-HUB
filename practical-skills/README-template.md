@@ -78,6 +78,8 @@ similar ship from separate editable Insert > Shape objects. Lines may add
 details, but line-only artwork or a pasted reference image does not meet the
 task instructions. This is teacher-reviewable guidance, not an automated shape
 or visual-similarity check; link-only completion is unchanged.
+TV includes the supplied retro television reference picture. This is added once
+without replacing existing instructions or saved Share Links.
 The Upload menu, Kit Content Builder and Licence Kit Setup links are hidden in
 Student View, including for staff previewing that view. In Teacher View, upload
 tools remain available to staff and builder/setup links require admin access.

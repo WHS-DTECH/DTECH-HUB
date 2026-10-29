@@ -41,7 +41,7 @@ test("all three drawings gain saved required links without replacing instruction
     assert.equal(content.activities[0].information, original.activities[0].information);
     assert.equal(content.activities[0].blocks.find((block) => block.id === "old-link").responseKey, "ship-url");
     assert.equal(B.savedAnswers(content.activities[0], 0, { "ship-url": link(0) })["old-link"], link(0));
-    assert.equal(content.activities[1].blocks[0].responseKey, "1-legacy");
+    assert.ok(content.activities[1].blocks.some((block) => block.responseKey === "1-legacy"));
     assert.equal(B.withFilesFoldersLinks(content), content, "Normalization is idempotent");
 });
 
@@ -81,6 +81,37 @@ test("Ship renders the supplied reference and shape instructions once, without c
     assert.match(markup, /Insert &gt; Shape/);
     assert.match(markup, /disabled/);
     assert.equal((markup.match(/ship-reference\.png/g) || []).length, 1);
+});
+
+test("TV gains its supplied reference once while preserving existing content and link-only completion", () => {
+    const original = B.withGoogleDrawingsLinks(base());
+    const existing = original.activities[1].blocks.filter((block) => block.id !== "tv-reference");
+    const before = {
+        ...original,
+        activities: original.activities.map((activity, index) => index === 1
+            ? { ...activity, blocks: existing, tvReferenceVersion: undefined } : activity)
+    };
+    const kit = B.withGoogleDrawingsLinks(before);
+    const tv = kit.activities[1];
+    const image = tv.blocks[0];
+    assert.equal(image.id, "tv-reference");
+    assert.equal(image.kind, "image");
+    assert.match(image.url, /\/practical-skills\/images\/tv-reference\.png$/);
+    const bytes = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "images", "tv-reference.png"));
+    assert.equal(bytes.subarray(1, 4).toString(), "PNG");
+    assert.deepEqual(tv.blocks.slice(1), existing, "Existing blocks and saved-answer keys are retained");
+    assert.equal(tv.tvReferenceVersion, 1);
+    assert.equal(kit.publicationLive, false);
+    assert.equal(kit.activities[0], before.activities[0]);
+    assert.equal(kit.activities[2], before.activities[2]);
+    assert.equal(B.grade(tv, answer(kit, 1, link(1))).passed, true);
+    assert.equal(B.withGoogleDrawingsLinks(kit), kit);
+    B.validate(tv);
+    const ctx = vm.createContext({ window: { ActivityBlocks: B } });
+    vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "practical-skills", "activity-block-view.js"), "utf8"), ctx);
+    const markup = ctx.window.ActivityBlockView.markup(tv.blocks, {}, true);
+    assert.match(markup, /<img src="https:\/\/dtech-hub2\.onrender\.com\/practical-skills\/images\/tv-reference\.png"/);
+    assert.equal((markup.match(/tv-reference\.png/g) || []).length, 1);
 });
 
 test("a valid share link alone earns each tick; blank, local and unsafe links do not", () => {
