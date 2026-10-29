@@ -64,6 +64,18 @@ not through the generic activity builder.
 Validate with `node --test scripts/regression-typing-kit.js` and
 `node scripts/regression-licence-dashboard.js`.
 
+## Google Drawings share links
+
+Ship, TV and Flower Pot in the Google Drawings Kit each have a required saved
+Share Link field. A valid HTTPS link automatically earns the activity tick;
+other instructions/questions remain available but are not completion gates.
+Link checks do not verify drawing contents or teacher sharing access.
+Existing link IDs and response keys are retained. The usual all-activities
+certificate process applies, and the kit stays Not Live until explicitly
+published. Teacher preview remains read-only and cannot save links or ticks.
+
+Validate with `node --test scripts/regression-google-drawings-links.js`.
+
 ## Search Kit progress safeguards
 
 Search answer autosaves send only fields edited since that tab loaded or last

@@ -656,6 +656,7 @@
                 blocks: activity?.blocks,
                 completionMode: activity?.completionMode,
                 uniqueDocumentLinks: activity?.uniqueDocumentLinks,
+                shareLinkCompletion: activity?.shareLinkCompletion,
                 documentCheck: activity?.documentCheck,
                 unityEditor: activity?.unityEditor,
                 assessmentId: activity?.assessmentId,

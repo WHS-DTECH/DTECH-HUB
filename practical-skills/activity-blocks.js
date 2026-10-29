@@ -55,6 +55,7 @@
         return answers;
     }
     function withFilesFoldersLinks(content) {
+        content = withGoogleDrawingsLinks(content);
         if (!/files\s*(?:&|and)\s*folders/i.test(String(content?.identity?.name || content?.bannerTitle || ""))) return content;
         let changed = false;
         const activities = [...(content.activities || [])];
@@ -76,6 +77,32 @@
                 changed = true;
                 activities[index] = { ...activity, blocks, completionMode: "auto", uniqueDocumentLinks: true,
                     ...(documentCheck ? { documentCheck } : {}) };
+            }
+        });
+        return changed ? { ...content, activities } : content;
+    }
+    function withGoogleDrawingsLinks(content) {
+        if (!/^google\s+drawings\s+kit$/i.test(String(content?.identity?.name || content?.bannerTitle || "").trim())) return content;
+        const activities = [...(content.activities || [])];
+        let changed = false;
+        (content.worksheets || []).forEach((worksheet, index) => {
+            if (!worksheet || worksheet.hidden || worksheet.mergedInto !== undefined ||
+                !/^(?:ship|tv|flower pot)$/i.test(String(worksheet.activity || "").trim())) return;
+            const activity = activities[index] || {};
+            let blocks = initialBlocks(activity, index, content);
+            if (!blocks.some((block) => block.kind === "studentlink")) blocks = [...blocks, {
+                id: `google-drawings-share-link-${index}`, kind: "studentlink", required: true,
+                title: `${worksheet.activity} Share Link`,
+                text: "Paste the HTTPS sharing link to your finished drawing. Set sharing so your teacher can open it. Your link is saved and the activity ticks automatically. This checks the link, not the drawing contents or sharing permissions."
+            }];
+            blocks = blocks.map((block) => {
+                const required = block.kind === "studentlink";
+                return Boolean(block.required) === required ? block : { ...block, required };
+            });
+            if (activity.completionMode !== "auto" || activity.shareLinkCompletion !== true ||
+                !activity.blocks || blocks.length !== activity.blocks.length || blocks.some((block, i) => block !== activity.blocks[i])) {
+                activities[index] = { ...activity, blocks, completionMode: "auto", shareLinkCompletion: true };
+                changed = true;
             }
         });
         return changed ? { ...content, activities } : content;
@@ -276,5 +303,5 @@
         return { passed: required.length > 0 && results.every((r) => r.passed), results };
     }
     return { types, interactive, escape, safeUrl, studentUrl, specialised, initialBlocks, savedAnswers, publicActivity, entries, puzzle, validate, grade,
-        withFilesFoldersLinks, documentLinkKey };
+        withFilesFoldersLinks, withGoogleDrawingsLinks, documentLinkKey };
 });
