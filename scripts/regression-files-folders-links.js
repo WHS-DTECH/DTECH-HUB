@@ -22,6 +22,7 @@ const base = () => ({
 const link = (index) => `https://docs.google.com/document/d/unique-file-${index}/edit?usp=sharing`;
 const answer = (content, index, url) => ({ [content.activities[index].blocks.find((b) => b.kind === "studentlink").id]: url });
 const responses = (content) => Object.fromEntries(content.activities.map((_a, i) => [`${i}-blocks`, answer(content, i, link(i))]));
+const verified = () => ({ policy: "rattlesnakes-v1", passed: true, documentKey: B.documentLinkKey(link(0)) });
 
 test("Files & Folders requires all existing links, adds missing submissions and preserves instructions, IDs and other kits", () => {
     const original = base(), before = JSON.stringify(original);
@@ -32,6 +33,7 @@ test("Files & Folders requires all existing links, adds missing submissions and 
         B.validate(activity);
         assert.equal(activity.completionMode, "auto");
         assert.equal(activity.uniqueDocumentLinks, true);
+        assert.equal(activity.documentCheck, index === 0 ? "rattlesnakes-v1" : undefined);
         assert.equal(activity.blocks.filter((b) => b.kind === "studentlink" && b.required).length, 1);
         if (index < 4) assert.equal(activity.blocks[0], original.activities[index].blocks[0]);
         if (index < 3) assert.equal(activity.blocks[1].id, "link");
@@ -65,7 +67,7 @@ test("file identity catches Google sharing/export URLs, Microsoft IDs and query/
 test("unique links earn individual ticks, duplicates fail both activities and resolving them restores eligibility", () => {
     const content = B.withFilesFoldersLinks(base());
     const saved = responses(content);
-    const grade = (index) => B.grade(content.activities[index], saved[`${index}-blocks`], {}, { content, index, responses: saved });
+    const grade = (index) => B.grade(content.activities[index], saved[`${index}-blocks`], {}, { content, index, responses: saved, documentVerification: verified() });
     content.activities.forEach((_a, i) => assert.equal(grade(i).passed, true));
     saved["1-blocks"] = answer(content, 1, "https://drive.google.com/open?id=unique-file-0");
     assert.equal(grade(0).passed, false);
@@ -88,6 +90,7 @@ test("server recalculation revokes stale/manual ticks and certificate eligibilit
     const ctx = vm.createContext({
         ...certificates, ActivityBlocks: B, hasDatabase: false, normalizeEmail: (value) => value,
         memoryPracticalSkillsProgress: new Map(), kitPublication: { available: async () => true },
+        documentVerification: { get: async () => verified() },
         ensurePracticalSkillsProgressRow: async () => row,
         setPracticalSkillsActivityCompletion: async (_email, _kit, index, complete) => {
             if (complete) row.completed_activities[index] = "saved"; else delete row.completed_activities[index];
@@ -163,7 +166,7 @@ test("student completion bar shows Auto-Completed only after the saved automatic
     vm.runInContext(`function getCurrentActivityIndex() { return 0; }\n${controller.slice(start, end)}`, ctx);
     ctx.updateActivityCompleteBar();
     assert.equal(get("worksheet-activity-status-pill").textContent, "Not Completed");
-    assert.equal(get("worksheet-activity-complete-btn").textContent, "Check & Save Activity");
+    assert.equal(get("worksheet-activity-complete-btn").textContent, "Check my document");
     state.completedActivities[0] = "saved";
     ctx.updateActivityCompleteBar();
     assert.equal(get("worksheet-activity-status-pill").textContent, "Auto-Completed");
@@ -184,6 +187,7 @@ test("block save API rejects duplicates, returns all recalculated ticks and acce
         normalizeEmail: (value) => value || "", getRequestUserEmail: () => row.student_email, schoolDomain: "school.nz",
         getPracticalSkillsKitDefinition: () => true, getStoredPracticalSkillsKitContent: async () => content,
         getAllPracticalSkillsProgressRows: async () => [row],
+        documentVerification: { get: async () => verified() },
         savePracticalSkillsKitResponses: async (_email, _kit, saved) => { row.responses = saved; },
         setPracticalSkillsActivityCompletion: async (_email, _kit, index, complete) => {
             if (complete) row.completed_activities[index] = "saved"; else delete row.completed_activities[index];
@@ -191,7 +195,7 @@ test("block save API rejects duplicates, returns all recalculated ticks and acce
         },
         syncPracticalSkillsKitCompletion: async () => {
             for (let i = 0; i < 5; i++) {
-                const grade = B.grade(content.activities[i], row.responses[`${i}-blocks`], {}, { content, index: i, responses: row.responses });
+                const grade = B.grade(content.activities[i], row.responses[`${i}-blocks`], {}, { content, index: i, responses: row.responses, documentVerification: verified() });
                 if (grade.passed) row.completed_activities[i] = "saved"; else delete row.completed_activities[i];
             }
             return row;

@@ -8342,7 +8342,7 @@ async function deleteTemplateLibraryEntriesBySourceFolder(sourceFolderId) {
   return { deleted: Number(result?.rowCount || 0) };
 }
 
-async function driveApiRequest(pathname, { accessToken, method = "GET", queryParams = {}, body = null } = {}) {
+async function driveApiRequest(pathname, { accessToken, method = "GET", queryParams = {}, body = null, signal } = {}) {
   const params = new URLSearchParams();
   Object.entries(queryParams || {}).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "") params.set(key, String(value));
@@ -8355,7 +8355,8 @@ async function driveApiRequest(pathname, { accessToken, method = "GET", queryPar
       Authorization: `Bearer ${accessToken}`,
       ...(body ? { "Content-Type": "application/json" } : {})
     },
-    body: body ? JSON.stringify(body) : undefined
+    body: body ? JSON.stringify(body) : undefined,
+    signal
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -15366,8 +15367,10 @@ async function syncPracticalSkillsKitCompletion(studentEmail, kitId, content = n
     for (const block of (activity.blocks || []).filter((b) => b.kind === "document" && b.required)) {
       documents[block.id] = Boolean((await getStudentKitDocument(studentEmail, kitId, `block-${index}-${block.id}`))?.document_id);
     }
+    const verification = activity.documentCheck
+      ? await documentVerification.get(normalizeEmail(studentEmail), kitId, index, activity, row.responses) : null;
     const grade = ActivityBlocks.grade(activity, ActivityBlocks.savedAnswers(activity, index, row.responses), documents,
-      { content: kitContent, index, responses: row.responses });
+      { content: kitContent, index, responses: row.responses, documentVerification: verification });
     if (grade.passed !== Boolean(row.completed_activities?.[index])) row = await setPracticalSkillsActivityCompletion(studentEmail, kitId, Number(index), grade.passed);
   }
   if (!indexes.length) return row;
@@ -16257,13 +16260,20 @@ app.get("/api/practical-skills/kit-content/:kitId", async (req, res) => {
   }
 });
 
+const documentVerification = require("./practical-skills/document-verification").createDocumentVerification({
+  pool, getDefaultPracticalSkillsKitContent, syncCompletion: syncPracticalSkillsKitCompletion,
+  getRequestUserEmail, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN,
+  verifyDriveTokenForStudent, driveApiRequest, requireAdminAccess, autoEmailKitCertificate, canReview: canManagePracticalSchedule
+});
+documentVerification.register(app);
+
 require("./practical-skills/activity-block-store").registerActivityBlocks(app, {
   requireAdminAccess, getRequestUserEmail, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN,
   getPracticalSkillsKitDefinition, getStoredPracticalSkillsKitContent, getAllPracticalSkillsProgressRows,
   savePracticalSkillsKitResponses, setPracticalSkillsActivityCompletion, syncPracticalSkillsKitCompletion,
   autoEmailKitCertificate, getStudentKitDocument, saveStudentKitDocument, getStudentProgrammeFolder, ensureStudentCourseFolders, savePracticalSkillsKitContent,
   driveGetLiveFile, driveFindFileByNameInFolder, driveCopyFile, verifyDriveTokenForStudent,
-  withResearchReportLock, driveEnsureFolder, driveUploadBinaryFile, driveApiRequest,
+  withResearchReportLock, driveEnsureFolder, driveUploadBinaryFile, driveApiRequest, documentVerification,
   upload: multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024, files: 1, fieldSize: 32768 } })
 });
 

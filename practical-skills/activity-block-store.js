@@ -8,7 +8,7 @@ function registerActivityBlocks(app, deps) {
         setPracticalSkillsActivityCompletion, syncPracticalSkillsKitCompletion, autoEmailKitCertificate,
         getStudentKitDocument, saveStudentKitDocument, getStudentProgrammeFolder, ensureStudentCourseFolders,
         driveGetLiveFile, driveFindFileByNameInFolder, driveCopyFile, verifyDriveTokenForStudent, withResearchReportLock,
-        driveEnsureFolder, driveUploadBinaryFile, driveApiRequest, upload, savePracticalSkillsKitContent
+        driveEnsureFolder, driveUploadBinaryFile, driveApiRequest, upload, savePracticalSkillsKitContent, documentVerification
     } = deps;
     function email(req, res) {
         const value = normalizeEmail(getRequestUserEmail(req));
@@ -28,7 +28,9 @@ function registerActivityBlocks(app, deps) {
         for (const b of activity.blocks.filter((b) => b.kind === "document" && b.required)) {
             documents[b.id] = Boolean((await getStudentKitDocument(student, kitId, `block-${index}-${b.id}`))?.document_id);
         }
-        return B.grade(activity, answers, documents, { content, index, responses });
+        const verification = activity.documentCheck
+            ? await documentVerification.get(student, kitId, index, activity, responses) : null;
+        return B.grade(activity, answers, documents, { content, index, responses, documentVerification: verification });
     }
     const base = "/api/practical-skills/blocks/:kitId/:activityIndex";
     async function schoolLicenceSettings(req) {

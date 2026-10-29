@@ -24,7 +24,8 @@
         driveSetup: null,
         huntProfile: null,
         certificate: null,
-        driveSetupInProgress: false
+        driveSetupInProgress: false,
+        documentCheckInProgress: false
     };
 
     function normalizeEmail(value) {
@@ -181,8 +182,8 @@
             pill.removeAttribute("aria-label");
             pill.removeAttribute("title");
         }
-        button.textContent = activity?.unityTestProjectVersion ? "Completed" : autoBlocks ? "Check & Save Activity" : completed ? "Undo Completion" : siteQuestions ? "Check Activity Completion" : "Mark Activity Complete";
-        button.disabled = preview || !state.progressLoaded;
+        button.textContent = activity?.documentCheck ? "Check my document" : activity?.unityTestProjectVersion ? "Completed" : autoBlocks ? "Check & Save Activity" : completed ? "Undo Completion" : siteQuestions ? "Check Activity Completion" : "Mark Activity Complete";
+        button.disabled = preview || !state.progressLoaded || Boolean(state.documentCheckInProgress);
         button.hidden = !preview && selfMarking && !siteQuestions && !completed;
     }
 
@@ -223,9 +224,99 @@
             updateActivityCompleteBar();
         }
         showStatusMessage("Saving activity answers...");
+        const documentStatus = document.getElementById("worksheet-document-check-status");
+        if (documentStatus) documentStatus.textContent = "Answers changed. Save them and check the current document before relying on an earlier result.";
         state.blockSaveTimerId = window.setTimeout(() => {
             checkBlockAnswers(index).catch((error) => showStatusMessage(error.message, true));
         }, RESPONSE_SAVE_DEBOUNCE_MS);
+    }
+
+    function showDocumentVerification(verification) {
+        const host = document.getElementById("worksheet-document-check-status");
+        if (!host) return;
+        host.textContent = verification
+            ? `${verification.passed ? verification.method === "teacher" ? "Teacher approved" : "Text check passed" : "Not yet passed"} - ${new Date(verification.checkedAt).toLocaleString("en-NZ")}. ${verification.feedback.message}`
+            : "No saved text check or teacher approval for this link yet.";
+    }
+
+    async function checkMyDocument(index) {
+        if (preview || !state.progressLoaded) throw new Error("Open the live activity after your progress has loaded.");
+        if (state.documentCheckInProgress) throw new Error("A document check is already running. Please wait for its result.");
+        const email = state.email;
+        const revision = state.blockRevision;
+        window.clearTimeout(state.blockSaveTimerId);
+        window.clearTimeout(state.saveTimerId);
+        state.driveSetupInProgress = true;
+        state.documentCheckInProgress = true;
+        updateActivityCompleteBar();
+        try {
+            const activity = state.content.activities[index];
+            const block = activity.blocks.find((block) => block.kind === "studentlink");
+            const documentKey = window.ActivityBlocks.documentLinkKey(
+                window.ActivityBlocks.savedAnswers(activity, index, state.responses)[block.id]);
+            if (!documentKey.startsWith("google-file:")) {
+                await checkBlockAnswers(index);
+                throw new Error(documentKey
+                    ? "Link saved. Automatic checking supports Google Docs and Word (.docx) in Google Drive. Ask your teacher to review other links."
+                    : "Answers saved. Add a valid HTTPS document sharing link first.");
+            }
+            const permission = getResearchReportDriveToken().then(
+                (token) => ({ token }), (error) => ({ error }));
+            await checkBlockAnswers(index);
+            const access = await permission;
+            if (access.error) throw access.error;
+            const token = access.token;
+            if (getSignedInEmail() !== email || revision !== state.blockRevision) throw new Error("Your account or answers changed. Check the current document again.");
+            return await queueProgressWrite(async () => {
+                if (getSignedInEmail() !== email || revision !== state.blockRevision) throw new Error("Your account or answers changed. Check the current document again.");
+                showStatusMessage("Reading your saved document and checking the Rattlesnakes text...");
+                const result = await loadJson(`${blockPath(index)}/document-check`, {
+                    method: "POST", headers: withAuthHeaders({ "Content-Type": "application/json" }),
+                    body: JSON.stringify({ driveAccessToken: token })
+                });
+                if (getSignedInEmail() !== email || revision !== state.blockRevision) return result;
+                state.completedActivities = result.completedActivities;
+                updateActivityCompleteBar();
+                showDocumentVerification(result.verification);
+                showStatusMessage(result.verification.passed
+                    ? state.completedActivities[index] ? "Text check passed and your activity tick is saved."
+                        : "Text check passed. Complete the other required blocks and use a different document for each activity to earn the tick."
+                    : result.verification.feedback.message, !result.verification.passed);
+                return result;
+            });
+        } finally {
+            state.driveSetupInProgress = false;
+            state.documentCheckInProgress = false;
+            updateActivityCompleteBar();
+        }
+    }
+
+    function renderDocumentCheck(host, index) {
+        const section = document.createElement("section");
+        section.className = "sites-card";
+        const title = document.createElement("h3");
+        title.textContent = "Finish your Rattlesnakes document";
+        const help = document.createElement("p");
+        help.textContent = "Save your document and its sharing link, then use Check my document below. Google Docs and Word (.docx) files in Google Drive can be checked automatically. For other file types or OneDrive, ask your teacher to open the link and approve the completed text in Teacher Review.";
+        const note = document.createElement("p");
+        note.textContent = "This checks that the expected passage is substantially present. It cannot prove you typed it yourself, check formatting, or confirm your teacher's sharing access. A saved result is a check at that time, not continuous monitoring. After editing the document, check again.";
+        const status = document.createElement("p");
+        status.id = "worksheet-document-check-status";
+        status.setAttribute("role", "status");
+        section.append(title, help, note, status);
+        host.append(section);
+        if (preview || !state.email || !state.progressLoaded) {
+            status.textContent = "Document checking is available only in the live activity after signing in.";
+            return;
+        }
+        const email = state.email, revision = state.blockRevision;
+        loadJson(`${blockPath(index)}/document-check`, { headers: withAuthHeaders(), cache: "no-store" })
+            .then((result) => {
+                if (status.isConnected && email === getSignedInEmail() && revision === state.blockRevision) showDocumentVerification(result.verification);
+            })
+            .catch((error) => {
+                if (status.isConnected && email === getSignedInEmail()) status.textContent = `Could not read the saved check: ${error.message}`;
+            });
     }
 
     async function checkLoginSiteCompletion(index, answers) {
@@ -538,6 +629,7 @@
                 blocks: activity?.blocks,
                 completionMode: activity?.completionMode,
                 uniqueDocumentLinks: activity?.uniqueDocumentLinks,
+                documentCheck: activity?.documentCheck,
                 unityEditor: activity?.unityEditor,
                 assessmentId: activity?.assessmentId,
                 questionAutoMarkAssessmentId: activity?.questionAutoMarkAssessmentId,
@@ -689,6 +781,7 @@
                     }
                 }
             });
+            if (activity?.documentCheck) renderDocumentCheck(host, activityIndex);
             if (["search-penguin-missions-v1", "search-keyword-challenge-v1", "search-results-detective-v1", "search-and-find-v1"].includes(activity?.questionAutoMarkAssessmentId)) {
                 scheduleSearchActivityAutoMark(activityIndex, activity.questionAutoMarkAssessmentId);
             }
@@ -744,6 +837,10 @@
                 window.clearTimeout(state.saveTimerId);
                 window.clearTimeout(state.blockSaveTimerId);
                 const activity = state.content?.activities?.[index];
+                if (activity?.documentCheck) {
+                    await checkMyDocument(index);
+                    return;
+                }
                 if (activity?.completionMode === "auto" && !window.ActivityBlocks.specialised(activity)) {
                     const email = state.email;
                     const revision = state.blockRevision;

@@ -64,6 +64,53 @@ not through the generic activity builder.
 Validate with `node --test scripts/regression-typing-kit.js` and
 `node scripts/regression-licence-dashboard.js`.
 
+## Rattlesnakes text-completion pilot
+
+The Files & Folders kit's **Rattlesnakes** activity now needs both a valid saved
+document link and a server-owned text-check receipt or explicit teacher approval.
+Existing instructions, link block IDs, answers and files are preserved. Other
+activities retain their existing rules. Old Rattlesnakes ticks without a receipt
+are recalculated as incomplete on the next progress/completion check.
+
+Students save their work and use **Check my document**. With Google Drive
+permission for their own school account, the server exports Google Docs text or
+reads a Word `.docx` file in Drive. It never fetches an arbitrary sharing URL.
+PDFs, images and other providers (including OneDrive) need teacher review.
+Automatic checks require at least 95% ordered word coverage overall and 90% in
+each of the four reference paragraphs. Punctuation, spacing and minor spelling
+differences are tolerated; a title, repeated paragraph or missing paragraph
+cannot pass. Formatting, file location, manual typing versus pasting and teacher
+sharing permissions are **not** verified.
+
+On **Teacher Review > Student Review**, read the Files & Folders
+kit's saved results, open the current submitted document, tick the review
+confirmation and choose **Approve reviewed document**. Approval records the
+teacher and timestamp; removing approval requires another successful check or
+review. These controls require verified Google sign-in and the existing
+admin-review and server-side teaching-staff permissions. Reading results alone
+does not mutate progress or send certificates.
+
+PostgreSQL table `practical_skills_document_checks` is created on first write.
+Receipts store the account, kit/activity, canonical file identity, reference
+version, result, method and check/reviewer timestamps, not access tokens or
+document contents. They apply only to that submitted file and are snapshots,
+not continuous monitoring. Changing to another file or resetting progress
+requires a new check. After editing a checked file, students should check again.
+If a document cannot be read, the error is shown; an earlier saved check is
+not represented as a new successful check.
+
+Every automatic completion and certificate recalculation uses the trusted
+receipt. Client answer fields cannot invent approval. The distinct-document
+rule and all-five-activities certificate requirement remain in force, including
+after teacher approval. Teacher approval recalculates completion without
+emailing a certificate as the teacher; the student's normal kit/certificate
+workflow remains responsible for delivery.
+
+- `GET/POST /api/practical-skills/blocks/:kitId/:activityIndex/document-check`
+- `GET/PUT /api/admin/kit-document-review/:kitId/:activityIndex`
+
+Validate with `node --test scripts/regression-document-verification.js scripts/regression-files-folders-links.js`.
+
 ## Teacher certificate email catch-up
 
 On the admin **Email Log**, use **Check missing teacher copies** to cross-match

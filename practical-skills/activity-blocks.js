@@ -68,10 +68,14 @@
                 text: "Paste the HTTPS sharing link to your document or PDF, not a local Windows file path. Share it so your teacher can open it. Use a different file for each activity."
             }];
             blocks = blocks.map((b) => b.kind === "studentlink" && !b.required ? { ...b, required: true } : b);
+            const documentCheck = /^rattlesnakes$/i.test(String(worksheet.activity || activity.title || "").trim())
+                ? "rattlesnakes-v1" : activity.documentCheck;
             if (activity.completionMode !== "auto" || activity.uniqueDocumentLinks !== true ||
+                activity.documentCheck !== documentCheck ||
                 !activity.blocks || blocks.length !== activity.blocks.length || blocks.some((b, i) => b !== activity.blocks[i])) {
                 changed = true;
-                activities[index] = { ...activity, blocks, completionMode: "auto", uniqueDocumentLinks: true };
+                activities[index] = { ...activity, blocks, completionMode: "auto", uniqueDocumentLinks: true,
+                    ...(documentCheck ? { documentCheck } : {}) };
             }
         });
         return changed ? { ...content, activities } : content;
@@ -231,6 +235,14 @@
                     message = !context.content ? "The whole kit must be checked before awarding this tick."
                         : "This file is also linked in another activity. Submit a different document or PDF for each activity.";
                 }
+            }
+            if (b.kind === "studentlink" && passed && activity.documentCheck &&
+                b === activity.blocks.find((block) => block.kind === "studentlink")) {
+                const receipt = context.documentVerification;
+                passed = receipt?.passed === true && receipt.policy === activity.documentCheck &&
+                    receipt.documentKey === documentLinkKey(value);
+                if (!passed) message = receipt?.feedback?.message ||
+                    "Link saved. Use Check my document to check the Rattlesnakes text, or ask your teacher to review it.";
             }
             if (b.kind === "checkbox") passed = value === true;
             if (b.kind === "question") passed = b.questionType === "checklist"
