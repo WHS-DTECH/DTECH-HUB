@@ -10573,7 +10573,9 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
     }
 
     const existing = await driveFindTemplateInFolder(folderId, templateTitle, driveAccessToken);
-    const populateCopiedTemplateData = async (targetFileId) => {
+    const populateCopiedTemplateData = async (targetFileId, newlyCreated = false) => {
+      // Testing slides become student evidence after creation; reopening must never repopulate their cells.
+      if (isTestingFunctionsTemplate && !newlyCreated) return { updated: false, count: 0 };
       const isSuccessCriteria = templateId.toLowerCase() === "project-success-criteria"
         || /success\s+criteria/i.test(templateTitle);
       const isDevelopmentSteps = templateId.toLowerCase() === "development-steps"
@@ -10677,7 +10679,7 @@ app.post("/api/student/drive-setup/copy-template", async (req, res) => {
     const formattedFirstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
     const copyName = `${templateTitle} - ${formattedFirstName}`;
     const copied = await driveCopyFile(templateFileId, folderId, copyName, driveAccessToken);
-    const populated = await populateCopiedTemplateData(copied.id);
+    const populated = await populateCopiedTemplateData(copied.id, true);
 
     // Record template copy in DB so task list can track it reliably across devices
     if (hasDatabase && templateId) {
