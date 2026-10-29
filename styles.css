@@ -1388,6 +1388,43 @@ a {
     align-content: start;
 }
 
+.hero-deadline-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+}
+.hero-deadline-layout .hero-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.hub-deadline-card {
+    background: linear-gradient(135deg, #fff4bf, #ffcb73);
+    color: #281b08;
+}
+.hub-deadline-edit {
+    display: grid;
+    gap: 10px;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+}
+.hub-deadline-edit:disabled { opacity: 1; cursor: default; }
+.hub-deadline-edit strong { font-size: 1.25rem; }
+.hub-deadline-edit span { font-size: 0.8rem; }
+.hub-deadline-editor { width: min(440px, calc(100% - 32px)); border-radius: 16px; padding: 24px; }
+.hub-deadline-editor::backdrop { background: rgba(0, 0, 0, 0.5); }
+.hub-deadline-editor label { display: grid; gap: 8px; margin: 16px 0; }
+.hub-deadline-editor input { padding: 10px; font: inherit; }
+.hub-deadline-editor-actions { display: flex; justify-content: flex-end; gap: 12px; }
+@media (max-width: 1000px) {
+    .hero-deadline-layout { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+    .hero-deadline-layout .hero-stats { grid-template-columns: 1fr; }
+}
+
 .stat-card {
     padding: 14px 16px;
     border-radius: var(--radius-md);

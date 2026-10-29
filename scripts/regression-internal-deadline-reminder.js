@@ -7,7 +7,7 @@ const root = path.join(__dirname, "..");
 const script = fs.readFileSync(path.join(root, "script.js"), "utf8");
 const styles = fs.readFileSync(path.join(root, "styles.css"), "utf8");
 
-const start = script.indexOf("const INTERNAL_ASSESSMENT_DEADLINE =");
+const start = script.indexOf("let INTERNAL_ASSESSMENT_DEADLINE =");
 const end = script.indexOf("function renderHubPracticalSkillsMenu(");
 assert.ok(start > 0 && end > start, "Reminder source block found");
 
@@ -85,14 +85,14 @@ assert.equal(context.shouldShowInternalAssessmentDeadlineReminder(new Date("2026
     assert.equal(dialogs.length, 1, "Does not stack duplicates");
     dialog.buttons[0].click();
     assert.ok(dialog.removed, "Close button dismisses");
-    assert.ok(store.has("hub_internal_deadline_reminder_dismissed_v1:student@whs.nz:2026-10-26"));
+    assert.ok(store.has("hub_internal_deadline_reminder_dismissed_v1:student@whs.nz:2026-10-26:2026-10-29"));
     ctx.showInternalAssessmentDeadlineReminder("student@whs.nz", nz("2026-10-26"));
     assert.equal(dialogs.length, 0, "Stays dismissed for the rest of the day");
     ctx.showInternalAssessmentDeadlineReminder("student@whs.nz", nz("2026-10-28"));
     assert.equal(dialogs.length, 1, "Returns on Wednesday");
     dialogs[0].fireClose();
     assert.equal(dialogs.length, 0, "Esc (native close) also dismisses");
-    assert.ok(store.has("hub_internal_deadline_reminder_dismissed_v1:student@whs.nz:2026-10-28"));
+    assert.ok(store.has("hub_internal_deadline_reminder_dismissed_v1:student@whs.nz:2026-10-28:2026-10-29"));
     ctx.showInternalAssessmentDeadlineReminder("", nz("2026-10-28"));
 }
 
@@ -109,7 +109,16 @@ assert.equal(context.shouldShowInternalAssessmentDeadlineReminder(new Date("2026
     assert.equal(dialogs[0].className, "hub-internal-deadline-reminder", "Shows after the exam reminder closes");
 }
 
-assert.match(script, /if \(hasInternalAssessment\) \{\s*showInternalAssessmentDeadlineReminder\(email\);/,
+{
+    const { context: ctx, dialogs } = makeContext();
+    vm.runInContext('INTERNAL_ASSESSMENT_DEADLINE = "2026-11-05";', ctx);
+    ctx.showInternalAssessmentDeadlineReminder("student@whs.nz", nz("2026-11-02"));
+    assert.equal(dialogs.length, 1, "An extended due date extends the reminder schedule");
+    assert.match(dialogs[0].innerHTML, /Thursday 5 November/);
+    assert.match(dialogs[0].innerHTML, /<span>Nov<\/span><strong>5<\/strong><span>Thu<\/span>/);
+}
+
+assert.match(script, /if \(hasInternalAssessment\) \{[\s\S]*?await loadInternalAssessmentDeadline\(email\);[\s\S]*?showInternalAssessmentDeadlineReminder\(email\);/,
     "Only students with internal assessment get the reminder");
 assert.match(styles, /@media \(prefers-reduced-motion: no-preference\)[\s\S]*?hub-internal-deadline-reminder\[open\]/,
     "Motion only runs when the student allows it");

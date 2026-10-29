@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=internal-deadline-1">
 </head>
 <body>
     <div class="page-shell">
@@ -53,7 +53,7 @@
                 <button id="hub-startup-signin-cta" type="button" class="hub-startup-signin-cta">Sign in now</button>
             </div>
 
-            <div class="hero-panel">
+            <div class="hero-panel hero-deadline-layout">
                 <div class="hero-copy">
                     <p class="eyebrow">WESTLAND HIGH SCHOOL | DIGITAL TECHNOLOGIES</p>
                     <div class="hero-title-row">
@@ -66,6 +66,16 @@
                 </div>
 
                 <aside class="hero-stats" aria-label="New this week summary">
+                    <section id="hub-internal-deadline-card" class="stat-card hub-deadline-card" hidden aria-labelledby="hub-deadline-card-title">
+                        <button type="button" id="hub-deadline-edit" class="hub-deadline-edit" disabled>
+                            <span class="stat-label" id="hub-deadline-card-title">Internal Due Date</span>
+                            <strong id="hub-deadline-card-date">Loading...</strong>
+                            <span>Complete and submit all internal assessment work.</span>
+                            <span id="hub-deadline-edit-hint" hidden>Click to change the date</span>
+                        </button>
+                        <p id="hub-deadline-card-status" role="status" aria-live="polite"></p>
+                        <button type="button" id="hub-deadline-retry" hidden>Retry</button>
+                    </section>
                     <div class="stat-card new-week-panel">
                         <div class="new-week-header">
                             <span class="stat-label">New This Week</span>
@@ -195,6 +205,6 @@
     </div>
 
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="script.js"></script>
+    <script src="script.js?v=internal-deadline-1"></script>
 </body>
 </html>

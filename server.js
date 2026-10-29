@@ -6,6 +6,7 @@ const express = require("express");
 const multer = require("multer");
 const ActivityBlocks = require("./practical-skills/activity-blocks");
 const { withUnityHubLicence } = require("./practical-skills/unity-setup");
+const { registerInternalDeadline } = require("./internal-deadline");
 const mammoth = require("mammoth");
 const nodemailer = require("nodemailer");
 const { Pool } = require("pg");
@@ -16279,6 +16280,10 @@ app.get("/api/admin/practical-skills/kit-content/:kitId", requireAdminAccess, as
   } catch (error) {
     res.status(500).json({ error: error.message || "Could not load kit content." });
   }
+});
+
+registerInternalDeadline(app, {
+  pool, getRequestUserEmail, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN, canManage: canManagePracticalSchedule
 });
 
 app.get("/api/practical-skills/login-sites/settings", async (req, res) => {
