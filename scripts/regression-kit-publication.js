@@ -26,7 +26,7 @@ async function fixture(t) {
             if (sql === "ROLLBACK") rows.splice(0, rows.length, ...snapshot);
             return { rows: [] };
         }
-        if (sql.startsWith("CREATE TABLE")) return { rows: [] };
+        if (sql.startsWith("CREATE TABLE") || sql.startsWith("ALTER TABLE")) return { rows: [] };
         if (sql === "SELECT kit_id, content FROM practical_skills_kit_content") return { rows: saved };
         if (sql === "SELECT kit_id, live FROM practical_skills_kit_publication") return { rows: [...flags].map(([kit_id, live]) => ({ kit_id, live })) };
         if (sql.includes("INSERT INTO practical_skills_kit_publication")) { flags.set(params[0], params[1]); return { rows: [] }; }

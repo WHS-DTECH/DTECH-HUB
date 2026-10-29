@@ -113,6 +113,7 @@ function createKitPublication({ pool, builtIns, getDefaultContent, schoolDomain,
             let client;
             try {
                 if (!(await catalog()).some((kit) => kit.id === req.params.kitId)) return res.status(404).json({ error: "Unknown kit." });
+                await pool.query("ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS search_tick_recovery_version INTEGER NOT NULL DEFAULT 0");
                 client = await pool.connect();
                 await client.query("BEGIN");
                 for (const email of [...emails].sort()) await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`kit-certificate:${email}:${req.params.kitId}`]);
@@ -121,7 +122,8 @@ function createKitPublication({ pool, builtIns, getDefaultContent, schoolDomain,
                     (kit_id, student_email, reset_by_email, previous_progress) VALUES ($1,$2,$3,$4::jsonb)`,
                 [req.params.kitId, row.student_email, getRequestUserEmail(req), JSON.stringify(row)]);
                 const result = await client.query(`UPDATE practical_skills_progress SET completed=FALSE, completed_at=NULL,
-                    completed_activities='{}'::jsonb, certificate_emailed_at=NULL, started_at=NOW(), updated_at=NOW()
+                    completed_activities='{}'::jsonb, certificate_emailed_at=NULL, started_at=NOW(), updated_at=NOW(),
+                    search_tick_recovery_version=CASE WHEN kit_id='kit-google-search' THEN 1 ELSE search_tick_recovery_version END
                     WHERE kit_id=$1 AND student_email=ANY($2::text[]) RETURNING student_email, completed, completed_activities, certificate_emailed_at`,
                 [req.params.kitId, emails]);
                 await client.query("COMMIT");

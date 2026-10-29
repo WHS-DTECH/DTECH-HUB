@@ -87,7 +87,8 @@
     function updateKit(kitId, action) {
         return loadJson(`/api/practical-skills/progress/${encodeURIComponent(kitId)}/${action}`, {
             method: "POST",
-            headers: withAuthHeaders()
+            headers: withAuthHeaders({ "Content-Type": "application/json" }),
+            ...(action === "reset" ? { body: JSON.stringify({ confirmReset: true }) } : {})
         });
     }
 
@@ -302,6 +303,7 @@
             button.addEventListener("click", async () => {
                 const revision = state.revision;
                 const action = button.getAttribute("data-action");
+                if (action === "reset" && !window.confirm("Reset this kit? This clears ALL activity ticks and certificate eligibility. Your saved answers and Drive files will be kept.")) return;
                 button.disabled = true;
                 try {
                     await updateKit(button.getAttribute("data-kit"), action);

@@ -425,6 +425,7 @@ async function setPracticalSkillsKitCompletion(studentEmail, kitId, completed) {
       completed: Boolean(completed),
       completed_at: completed ? existing.completed_at || nowIso : null,
       completed_activities: completed ? existing.completed_activities || {} : {},
+      search_tick_recovery_version: safeKitId === "kit-google-search" && !completed ? 1 : existing.search_tick_recovery_version || 0,
       certificate_emailed_at: completed ? existing.certificate_emailed_at || null : null,
       started_at: completed ? existing.started_at : nowIso,
       updated_at: nowIso
@@ -441,7 +442,9 @@ async function setPracticalSkillsKitCompletion(studentEmail, kitId, completed) {
         [email, safeKitId]
       )
     : await pool.query(
-        `UPDATE practical_skills_progress SET completed = FALSE, completed_at = NULL, completed_activities = '{}'::jsonb, certificate_emailed_at = NULL, started_at = NOW(), updated_at = NOW()
+        `UPDATE practical_skills_progress SET completed = FALSE, completed_at = NULL, completed_activities = '{}'::jsonb, certificate_emailed_at = NULL,
+         search_tick_recovery_version = CASE WHEN kit_id = 'kit-google-search' THEN 1 ELSE search_tick_recovery_version END,
+         started_at = NOW(), updated_at = NOW()
          WHERE student_email = $1 AND kit_id = $2 RETURNING *`,
         [email, safeKitId]
       );
@@ -4666,6 +4669,7 @@ async function ensurePracticalSkillsProgressSchema() {
   await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS responses JSONB NOT NULL DEFAULT '{}'::jsonb`);
   await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS completed_activities JSONB NOT NULL DEFAULT '{}'::jsonb`);
   await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS certificate_emailed_at TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE practical_skills_progress ADD COLUMN IF NOT EXISTS search_tick_recovery_version INTEGER NOT NULL DEFAULT 0`);
 }
 
 // Starter drafts only — teachers edit the real content via the Kit Content Builder admin page.
@@ -5719,14 +5723,16 @@ async function savePracticalSkillsKitResponses(studentEmail, kitId, responses) {
   if (!hasDatabase) {
     const key = `${email}:${safeKitId}`;
     const existing = memoryPracticalSkillsProgress.get(key) || {};
-    const next = { ...existing, responses: safeResponses, updated_at: new Date().toISOString() };
+    const next = { ...existing, responses: safeKitId === "kit-google-search"
+      ? { ...existing.responses, ...safeResponses } : safeResponses, updated_at: new Date().toISOString() };
     memoryPracticalSkillsProgress.set(key, next);
     return next;
   }
 
   await ensurePracticalSkillsProgressSchema();
   const result = await pool.query(
-    `UPDATE practical_skills_progress SET responses = $1::jsonb, updated_at = NOW()
+    `UPDATE practical_skills_progress
+     SET responses = CASE WHEN kit_id = 'kit-google-search' THEN responses || $1::jsonb ELSE $1::jsonb END, updated_at = NOW()
      WHERE student_email = $2 AND kit_id = $3 RETURNING *`,
     [JSON.stringify(safeResponses), email, safeKitId]
   );
@@ -5776,6 +5782,9 @@ async function savePracticalSkillsAssessment(studentEmail, kitId, activityIndex,
     grade.assessmentId === "search-keyword-challenge-v1" ||
     grade.assessmentId === SEARCH_RESULTS_DETECTIVE_ID ||
     grade.assessmentId === SEARCH_AND_FIND_ID;
+  const answers = mergeQuestionAnswers
+    ? Object.fromEntries(grade.results.map(({ id }) => [id, grade.answers[id] ?? grade.answers[id.replace(/^\d+-/, "")] ?? ""]))
+    : grade.answers;
   const completedAt = new Date().toISOString();
 
   if (!hasDatabase) {
@@ -5783,9 +5792,9 @@ async function savePracticalSkillsAssessment(studentEmail, kitId, activityIndex,
     const existing = memoryPracticalSkillsProgress.get(key);
     const next = {
       ...existing,
-      responses: grade.identityLesson || mergeQuestionAnswers ? { ...existing.responses, ...grade.answers } : {
+      responses: grade.identityLesson || mergeQuestionAnswers ? { ...existing.responses, ...answers } : {
         ...existing.responses,
-        [responseKey]: mergeSiteAnswers ? { ...existing.responses?.[responseKey], ...grade.answers } : grade.answers
+        [responseKey]: mergeSiteAnswers ? { ...existing.responses?.[responseKey], ...answers } : answers
       },
       completed_activities: {
         ...existing.completed_activities,
@@ -5807,7 +5816,7 @@ async function savePracticalSkillsAssessment(studentEmail, kitId, activityIndex,
            ELSE completed_activities END,
          updated_at = NOW()
      WHERE student_email = $6 AND kit_id = $7 RETURNING *`,
-    [responseKey, JSON.stringify(grade.answers), activityKey, completedAt, grade.passed, email, kitId, Boolean(grade.identityLesson), mergeSiteAnswers, mergeQuestionAnswers]
+    [responseKey, JSON.stringify(answers), activityKey, completedAt, grade.passed, email, kitId, Boolean(grade.identityLesson), mergeSiteAnswers, mergeQuestionAnswers]
   );
   if (!result.rows?.[0]) throw new Error("Activity progress could not be saved.");
   return result.rows[0];
@@ -15354,12 +15363,41 @@ app.put("/api/admin/practical-skills/library", requireAdminAccess, async (req, r
   }
 });
 
+async function recoverSearchKitCompletion(studentEmail, kitId, content, row) {
+  if (Number(row.search_tick_recovery_version) >= 1) return row;
+  const recovered = {};
+  const graders = {
+    "search-penguin-missions-v1": gradeSearchPenguinMissions,
+    "search-keyword-challenge-v1": gradeSearchKeywordChallenge,
+    "search-results-detective-v1": gradeSearchResultsDetective,
+    "search-and-find-v1": gradeSearchAndFind
+  };
+  for (const index of visibleActivityIndexes(content)) {
+    if (row.completed_activities?.[index]) continue;
+    const grader = graders[content.activities?.[Number(index)]?.questionAutoMarkAssessmentId];
+    if (grader?.(row.responses || {}, Number(index)).passed) recovered[index] = new Date().toISOString();
+  }
+  if (!hasDatabase) {
+    const next = { ...row, completed_activities: { ...recovered, ...row.completed_activities }, search_tick_recovery_version: 1 };
+    memoryPracticalSkillsProgress.set(`${normalizeEmail(studentEmail)}:${kitId}`, next);
+    return next;
+  }
+  const result = await pool.query(`UPDATE practical_skills_progress
+    SET completed_activities = $3::jsonb || completed_activities, search_tick_recovery_version = 1
+    WHERE student_email = $1 AND kit_id = $2 AND search_tick_recovery_version = 0 RETURNING *`,
+  [normalizeEmail(studentEmail), kitId, JSON.stringify(recovered)]);
+  const saved = result.rows[0] || await ensurePracticalSkillsProgressRow(studentEmail, kitId);
+  if (!saved) throw new Error("Search Kit recovery could not be saved.");
+  return saved;
+}
+
 async function syncPracticalSkillsKitCompletion(studentEmail, kitId, content = null) {
   const kitContent = content || await getStoredPracticalSkillsKitContent(kitId);
   const indexes = visibleActivityIndexes(kitContent);
   let row = await ensurePracticalSkillsProgressRow(studentEmail, kitId);
   if (!row) throw new Error("Kit progress could not be loaded.");
   if (!(await kitPublication.available(kitId))) return row;
+  if (kitId === "kit-google-search") row = await recoverSearchKitCompletion(studentEmail, kitId, kitContent, row);
   for (const index of indexes) {
     const activity = kitContent.activities?.[Number(index)];
     if (activity?.completionMode !== "auto" || ActivityBlocks.specialised(activity)) continue;
@@ -15512,6 +15550,9 @@ app.post("/api/practical-skills/progress/:kitId/reset", async (req, res) => {
   if (!getPracticalSkillsKitDefinition(kitId)) {
     res.status(404).json({ error: "Unknown kit." });
     return;
+  }
+  if (kitId === "kit-google-search" && req.body?.confirmReset !== true) {
+    return res.status(409).json({ error: "Reset clears all Search Kit activity ticks and certificate eligibility. Reload the page and explicitly confirm Reset to continue." });
   }
 
   try {
@@ -15682,6 +15723,13 @@ app.post("/api/practical-skills/progress/:kitId/responses", async (req, res) => 
   if (!getPracticalSkillsKitDefinition(kitId)) {
     res.status(404).json({ error: "Unknown kit." });
     return;
+  }
+  if (kitId === "kit-google-search" && req.body?.responseMode !== "merge") {
+    return res.status(409).json({ error: "This Search Kit tab is out of date. Reload it before saving so newer answers are not overwritten." });
+  }
+  if (kitId === "kit-google-search" && (!req.body?.responses || typeof req.body.responses !== "object" ||
+      Array.isArray(req.body.responses) || JSON.stringify(req.body.responses).length > 200000)) {
+    return res.status(400).json({ error: "Valid Search Kit answer changes are required (up to 200 KB)." });
   }
 
   try {

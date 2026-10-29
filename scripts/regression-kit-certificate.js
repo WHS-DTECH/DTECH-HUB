@@ -278,7 +278,7 @@ async function main() {
             } };
         },
         window: {
-            location: { search: "?kit=kit-login" }, clearTimeout() {}, setTimeout() {},
+            location: { search: "?kit=kit-login" }, clearTimeout() {}, setTimeout() {}, confirm: () => true,
             KitWorksheetRender: { renderKitOverview() {}, visibleLoginSites: () => [] },
             print: () => { assert.ok(classes.has("printing-certificate")); printCalled = true; }
         }
@@ -303,6 +303,10 @@ async function main() {
     await events["certificate-email:click"]();
     assert.equal(nodes.get("certificate-status").textContent, "Mail unavailable");
     assert.equal(nodes.get("certificate-email").disabled, false);
+    browser.window.confirm = () => false;
+    await events["worksheet-reset-btn:click"]();
+    assert.equal(nodes.get("worksheet-certificate").hidden, false, "Cancelling Reset preserves completion and certificate");
+    browser.window.confirm = () => true;
     await events["worksheet-reset-btn:click"]();
     assert.equal(nodes.get("worksheet-certificate").hidden, true, "Reset removes the certificate");
     console.log("Kit auto-completion, certificate PDF and email regression checks passed.");

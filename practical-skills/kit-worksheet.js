@@ -12,6 +12,8 @@
         responses: {},
         completedActivities: {},
         progressLoaded: false,
+        sessionRevision: 0,
+        savedSearchResponses: {},
         progressWritePromise: Promise.resolve(),
         actionsWired: false,
         signInWatcherId: 0,
@@ -107,8 +109,13 @@
     }
 
     async function loadJson(url, options = {}) {
+        const email = getSignedInEmail();
+        const revision = state.sessionRevision;
         const response = await fetch(url, options);
         const payload = await response.json().catch(() => ({}));
+        if (email !== getSignedInEmail() || revision !== state.sessionRevision) {
+            throw new Error("Your signed-in account changed. Reopen this activity before saving.");
+        }
         if (!response.ok) {
             throw new Error(payload?.error || `Request failed (${response.status})`);
         }
@@ -135,20 +142,34 @@
     function resetKit(kitId) {
         return loadJson(`/api/practical-skills/progress/${encodeURIComponent(kitId)}/reset`, {
             method: "POST",
-            headers: withAuthHeaders()
+            headers: withAuthHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify({ confirmReset: true })
         });
     }
 
-    function saveResponses(kitId, responses) {
-        return loadJson(`/api/practical-skills/progress/${encodeURIComponent(kitId)}/responses`, {
+    async function saveResponses(kitId, responses) {
+        const search = kitId === "kit-google-search";
+        const submitted = search ? Object.fromEntries(Object.entries(responses).filter(([key, value]) =>
+            JSON.stringify(value) !== JSON.stringify(state.savedSearchResponses[key]))) : responses;
+        const saved = await loadJson(`/api/practical-skills/progress/${encodeURIComponent(kitId)}/responses`, {
             method: "POST",
             headers: withAuthHeaders({ "Content-Type": "application/json" }),
-            body: JSON.stringify({ responses })
+            body: JSON.stringify({ responses: submitted, ...(search ? { responseMode: "merge" } : {}) })
         });
+        if (search) Object.assign(state.savedSearchResponses, JSON.parse(JSON.stringify(submitted)));
+        return saved;
     }
 
     function queueProgressWrite(write) {
-        state.progressWritePromise = state.progressWritePromise.then(write, write);
+        const email = state.email;
+        const revision = state.sessionRevision;
+        const guarded = () => {
+            if (email !== getSignedInEmail() || revision !== state.sessionRevision) {
+                throw new Error("Your signed-in account changed. Reopen this activity before saving.");
+            }
+            return write();
+        };
+        state.progressWritePromise = state.progressWritePromise.then(guarded, guarded);
         return state.progressWritePromise;
     }
 
@@ -347,8 +368,10 @@
 
     function queueResponseSave() {
         if (!state.email) return;
+        const email = state.email, session = state.sessionRevision;
         window.clearTimeout(state.saveTimerId);
         state.saveTimerId = window.setTimeout(() => {
+            if (email !== getSignedInEmail() || session !== state.sessionRevision) return;
             queueProgressWrite(() => saveResponses(state.kitId, state.responses)).catch(() => {
                 showStatusMessage("Could not save your answers. Check your connection and try again.", true);
             });
@@ -402,10 +425,12 @@
         }
 
         const revision = (state.searchChoiceCheckRevisions[questionId] || 0) + 1;
+        const email = state.email, session = state.sessionRevision;
         state.searchChoiceCheckRevisions[questionId] = revision;
         window.clearTimeout(state.searchChoiceCheckTimers[questionId]);
         if (!isTypedAnswer) setSearchChoiceFeedback(questionId, "Checking your choice...", "is-pending");
         state.searchChoiceCheckTimers[questionId] = window.setTimeout(() => {
+            if (email !== getSignedInEmail() || session !== state.sessionRevision) return;
             if (isTypedAnswer) setSearchChoiceFeedback(questionId, "Checking your answer...", "is-pending");
             const answers = { ...state.responses };
             queueProgressWrite(async () => {
@@ -493,7 +518,9 @@
         if (questionIds.some((id) => !String(state.responses[id] || "").trim())) return;
 
         window.clearTimeout(state.searchAutoMarkTimerId);
+        const email = state.email, session = state.sessionRevision;
         state.searchAutoMarkTimerId = window.setTimeout(() => {
+            if (email !== getSignedInEmail() || session !== state.sessionRevision) return;
             window.clearTimeout(state.saveTimerId);
             const answers = Object.fromEntries(questionIds.map((id) => [id, state.responses[id]]));
             queueProgressWrite(async () => {
@@ -951,6 +978,7 @@
         });
 
         resetBtn?.addEventListener("click", async () => {
+            if (!window.confirm("Reset this kit? This clears ALL activity ticks and certificate eligibility. Your saved answers and Drive files will be kept.")) return;
             resetBtn.disabled = true;
             window.clearTimeout(state.blockSaveTimerId);
             state.blockRevision += 1;
@@ -971,8 +999,13 @@
     }
 
     async function init(identityDraft = {}) {
+        const session = ++state.sessionRevision;
         state.kitId = getKitIdFromUrl();
         state.email = getSignedInEmail();
+        state.progressLoaded = false;
+        document.getElementById("worksheet-host").textContent = "Loading your saved kit progress...";
+        document.getElementById("worksheet-activity-complete-bar").hidden = true;
+        document.getElementById("worksheet-complete-bar").hidden = true;
         if (preview) {
             document.getElementById("worksheet-host").innerHTML = "";
             document.getElementById("worksheet-preview-banner").hidden = true;
@@ -985,8 +1018,10 @@
 
         try {
             const contentPayload = await fetchKitContent(state.kitId);
+            if (session !== state.sessionRevision) return;
             state.content = contentPayload?.content || null;
         } catch (error) {
+            if (session !== state.sessionRevision) return;
             showStatusMessage(error?.message || "Could not load this kit.", true);
             return;
         }
@@ -1007,7 +1042,13 @@
 
         try {
             const progressPayload = await fetchKitProgress(state.kitId);
+            if (session !== state.sessionRevision) return;
+            if (!progressPayload?.responses || typeof progressPayload.responses !== "object" || Array.isArray(progressPayload.responses) ||
+                !progressPayload.completedActivities || typeof progressPayload.completedActivities !== "object" || Array.isArray(progressPayload.completedActivities)) {
+                throw new Error("The server did not return valid saved progress. Retry before continuing.");
+            }
             state.responses = { ...progressPayload?.responses, ...identityDraft };
+            state.savedSearchResponses = JSON.parse(JSON.stringify(progressPayload?.responses || {}));
             (state.content.activities || []).forEach((activity, index) => {
                 if (activity?.blocks) state.responses[`${index}-blocks`] = window.ActivityBlocks.savedAnswers(activity, index, state.responses);
             });
@@ -1027,6 +1068,7 @@
             }
             renderPage();
             updateCompleteBar(progressPayload?.kit);
+            if (state.kitId === "kit-google-search" && Object.keys(identityDraft).length) queueResponseSave();
             if (progressPayload?.certificateEmailed && state.certificate) {
                 certificateStatus(`Ka pai! A copy of your certificate has been emailed to ${state.email}.`);
             }
@@ -1043,11 +1085,25 @@
                         if (link && setup.ready) { link.href = setup.folderUrl; link.hidden = false; }
                     }
                 } catch (error) {
+                    if (session !== state.sessionRevision) return;
                     if (state.email === email) showStatusMessage(error.message || "Could not load your WHS-DTECH setup. Use the setup button to retry.", true);
                 }
             }
         } catch (error) {
-            renderPage();
+            if (session !== state.sessionRevision) return;
+            state.progressLoaded = false;
+            const host = document.getElementById("worksheet-host");
+            host.replaceChildren();
+            const note = document.createElement("p");
+            note.textContent = "Your saved progress could not be loaded. This is not a reset, and no completion ticks have been changed by this page.";
+            const retry = document.createElement("button");
+            retry.type = "button";
+            retry.className = "worksheet-btn worksheet-btn-primary";
+            retry.textContent = "Retry loading saved progress";
+            retry.addEventListener("click", () => { void init(identityDraft); });
+            host.append(note, retry);
+            document.getElementById("worksheet-activity-complete-bar").hidden = true;
+            document.getElementById("worksheet-complete-bar").hidden = true;
             showStatusMessage(error?.message || "Could not load your saved progress.", true);
         }
 
@@ -1062,6 +1118,11 @@
             previousAuth = nextAuth;
             if (state.driveSetupInProgress && getSignedInEmail() === state.email) return;
             const identityDraft = {};
+            if (getSignedInEmail() === state.email && state.kitId === "kit-google-search") {
+                for (const [key, value] of Object.entries(state.responses)) {
+                    if (JSON.stringify(value) !== JSON.stringify(state.savedSearchResponses[key])) identityDraft[key] = value;
+                }
+            }
             if (getSignedInEmail() === state.email && state.content?.activities?.[getCurrentActivityIndex()]?.identityLessonVersion) {
                 document.querySelectorAll("#worksheet-host .worksheet-answer-input").forEach((input) => {
                     identityDraft[input.getAttribute("data-question-id")] = input.value;
@@ -1069,6 +1130,10 @@
             }
             window.clearTimeout(state.saveTimerId);
             window.clearTimeout(state.blockSaveTimerId);
+            window.clearTimeout(state.searchAutoMarkTimerId);
+            Object.values(state.searchChoiceCheckTimers).forEach((timer) => window.clearTimeout(timer));
+            state.searchChoiceCheckTimers = {};
+            state.searchChoiceCheckRevisions = {};
             state.blockRevision += 1;
             state.progressLoaded = false;
             state.responses = {};

@@ -64,6 +64,34 @@ not through the generic activity builder.
 Validate with `node --test scripts/regression-typing-kit.js` and
 `node scripts/regression-licence-dashboard.js`.
 
+## Search Kit progress safeguards
+
+Search answer autosaves send only fields edited since that tab loaded or last
+saved, and PostgreSQL merges those fields atomically. An older activity tab
+cannot replace the entire kit's answers with its stale snapshot. Each Search
+assessment saves only its own graded question IDs, never unrelated answers
+included in a client snapshot. Obsolete clients submitting replacement-style
+Search saves receive an explicit reload error.
+
+Queued saves, marking timers and in-flight reads are scoped to the current
+account/session. Changing accounts cancels Search timers and rejects stale
+results. A failed progress read shows an error and retry control, not a misleading
+empty activity list. Reset requires a warning/confirmation on both the worksheet
+and Licence page; Search reset requests also require explicit confirmation on
+the server. Intentional resets still retain answers and Drive files.
+
+On the next Search progress/certificate read, a one-time additive recovery
+rechecks saved answers for the four question-based activities. It restores only
+missing ticks that pass the existing server graders, preserves earned ticks and
+timestamps, and does not infer a research-report pass from client-editable answer
+data. If that final tick is missing, the student must recheck the existing report;
+they do not need to recreate it. The `search_tick_recovery_version` progress
+column records recovery and prevents it from undoing a later intentional reset.
+No other kits or student documents are migrated by this recovery.
+
+Validate with `node --test scripts/regression-search-progress-preservation.js`
+and `node scripts/regression-search-penguin-mission.js`.
+
 ## Rattlesnakes text-completion pilot
 
 The Files & Folders kit's **Rattlesnakes** activity now needs both a valid saved
