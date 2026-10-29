@@ -62,7 +62,7 @@ async function main() {
     const context = vm.createContext({
         taskListState: state,
         document: { querySelector: (selector) => elements.get(selector) || null, createElement: () => ({ innerHTML: "", className: "" }) },
-        window: {}, isSeniorDigitalMediaTask: () => true,
+        window: {}, isSeniorSubmissionTask: () => true,
         renderAdditionalSlideshows: () => {},
         loadSubmissionStage: async () => {},
         escapeTaskListHtml: (value) => String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char])),

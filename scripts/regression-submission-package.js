@@ -263,7 +263,7 @@ async function testFrontend() {
   let outdated = false;
   let ready = true;
   const context = vm.createContext({
-    document, taskListState: state, isSeniorDigitalMediaTask: () => true, buildTaskListHeaders: (headers) => headers,
+    document, taskListState: state, isSeniorSubmissionTask: () => true, buildTaskListHeaders: (headers) => headers,
     loadJson: async () => ({ components: components.map((component) => ({ ...component, status: "unchecked" })), saved }),
     requestHubDriveAccessToken: async () => { actions.push("permission"); return { access_token: "student-token" }; },
     fetch: async (_url, options) => {

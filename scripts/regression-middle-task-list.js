@@ -473,15 +473,57 @@ assert.match(clientDeckRoute, /driveFindFileByNameInFolder[\s\S]*?createGoogleSl
 assert.match(clientDeckRoute, /recordTemplateCopyInDb\(activityId, email, copyEntry\)/,
     "The deck URL is saved with the assessment for future visits");
 
-const clientPresentationEligibilityStart = taskList.indexOf("function isSeniorDigitalMediaTask(");
+const clientPresentationEligibilityStart = taskList.indexOf("function isSeniorSubmissionTask(");
 const clientPresentationEligibilityEnd = taskList.indexOf("\nfunction renderFinalClientPresentationCard", clientPresentationEligibilityStart);
 assert.ok(clientPresentationEligibilityStart >= 0 && clientPresentationEligibilityEnd > clientPresentationEligibilityStart);
 const clientPresentationContext = vm.createContext({ taskListState: { course: "SeniorDTECH" } });
 vm.runInContext(taskList.slice(clientPresentationEligibilityStart, clientPresentationEligibilityEnd), clientPresentationContext);
-assert.equal(clientPresentationContext.isSeniorDigitalMediaTask({ standard_1: "91897", standard_2: "91903" }), true);
-assert.equal(clientPresentationContext.isSeniorDigitalMediaTask({ standard_1: "91897", standard_2: "91907" }), false);
+assert.equal(clientPresentationContext.isSeniorSubmissionTask({ standard_1: "91897", standard_2: "91903" }), true);
+assert.equal(clientPresentationContext.isSeniorSubmissionTask({ standard_1: "91897", standard_2: "91907" }), true);
+assert.equal(clientPresentationContext.isSeniorSubmissionTask({ standard_1: "", standard_2: "" }), true,
+    "Senior projects without allocated standards still show submission preparation");
+assert.equal(clientPresentationContext.isSeniorSubmissionTask(null), false);
 clientPresentationContext.taskListState.course = "MiddleDTECH";
-assert.equal(clientPresentationContext.isSeniorDigitalMediaTask({ standard_1: "91897", standard_2: "91903" }), false);
+assert.equal(clientPresentationContext.isSeniorSubmissionTask({ standard_1: "91897", standard_2: "91903" }), false);
+const submissionElements = new Map();
+const submissionClasses = new Set();
+const submissionNode = (selector) => {
+    if (!submissionElements.has(selector)) submissionElements.set(selector, {
+        hidden: true, textContent: "", href: "",
+        classList: { toggle(name, enabled) { if (enabled) submissionClasses.add(name); else submissionClasses.delete(name); } },
+        querySelector: submissionNode
+    });
+    return submissionElements.get(selector);
+};
+clientPresentationContext.document = { querySelector: submissionNode };
+clientPresentationContext.taskListState.templateCopies = [];
+clientPresentationContext.renderSlideshowPdfState = () => {};
+const clientPresentationRenderEnd = taskList.indexOf("\nfunction buildDocumentationTopicOrder", clientPresentationEligibilityEnd);
+vm.runInContext(taskList.slice(clientPresentationEligibilityEnd, clientPresentationRenderEnd), clientPresentationContext);
+clientPresentationContext.taskListState.course = "SeniorDTECH";
+for (const item of [
+    { id: "project", standard_1: "", standard_2: "" },
+    { id: "assessment", standard_1: "91897", standard_2: "91907" },
+    { id: "media", standard_1: "91897", standard_2: "91893" },
+    { id: "media-l3", standard_1: "91907", standard_2: "91903" }
+]) {
+    const before = JSON.stringify(item);
+    clientPresentationContext.renderFinalClientPresentationCard(item);
+    assert.equal(submissionNode("#task-list-final-stages").hidden, false,
+        "All selected SeniorDTECH tasks expose the complete submission column");
+    assert.equal(submissionNode("#task-list-client-presentation-card").hidden, false);
+    assert.equal(submissionClasses.has("has-client-presentation"), true);
+    assert.equal(JSON.stringify(item), before, "Visibility never edits assessment allocations");
+}
+for (const course of ["MiddleDTECH", "JuniorDTECH", ""]) {
+    clientPresentationContext.taskListState.course = course;
+    clientPresentationContext.renderFinalClientPresentationCard({ standard_2: "91893" });
+    assert.equal(submissionNode("#task-list-final-stages").hidden, true);
+    assert.equal(submissionClasses.has("has-client-presentation"), false);
+}
+clientPresentationContext.taskListState.course = "SeniorDTECH";
+clientPresentationContext.renderFinalClientPresentationCard(null);
+assert.equal(submissionNode("#task-list-final-stages").hidden, true);
 assert.match(html, /id="task-list-workspace"[\s\S]*id="task-list-client-presentation-card"[\s\S]*id="task-list-checklist-card"/,
     "The client presentation card sits beside the existing checklist workspace");
 

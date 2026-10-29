@@ -152,7 +152,7 @@ async function testFrontend() {
   const actions = [];
   const taskListState = { selectedId: "49", allItems: [{ id: "49" }], trelloReportBusy: false };
   const context = vm.createContext({
-    taskListState, document, isSeniorDigitalMediaTask: () => true, buildTaskListHeaders: (headers) => headers,
+    taskListState, document, isSeniorSubmissionTask: () => true, buildTaskListHeaders: (headers) => headers,
     loadJson: async (_url, options = {}) => {
       const body = options.body ? JSON.parse(options.body) : {};
       if (body.action) actions.push(body.action);

@@ -10715,7 +10715,7 @@ app.post("/api/student/drive-setup/create-client-presentation", async (req, res)
   try {
     const programmeFolder = await getStudentProgrammeFolder(email);
     if (programmeFolder !== "SeniorDTECH") {
-      res.status(403).json({ error: "The Client Presentation card is for SeniorDTECH Digital Media tasks." }); return;
+      res.status(403).json({ error: "The Client Presentation card is for SeniorDTECH tasks." }); return;
     }
     await verifyDriveTokenForStudent(driveAccessToken, email);
 

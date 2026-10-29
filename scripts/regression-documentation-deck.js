@@ -340,7 +340,7 @@ async function testSlideshowPdfFrontend() {
   let denyPermission = false;
   let calls = 0;
   const context = vm.createContext({
-    taskListState, document, isSeniorDigitalMediaTask: () => true, buildTaskListHeaders: (headers) => headers,
+    taskListState, document, isSeniorSubmissionTask: () => true, buildTaskListHeaders: (headers) => headers,
     requestHubDriveAccessToken: async () => denyPermission ? { error: "access_denied" } : { access_token: "student-token" },
     loadJson: async (_url, options) => {
       calls += 1;

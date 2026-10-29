@@ -331,7 +331,7 @@ async function testFrontend() {
   let failMeasurement = false;
   const taskListState = { selectedId: "49", allItems: [{ id: "49" }], finalOutcomeBusy: false };
   const context = vm.createContext({
-    taskListState, document, isSeniorDigitalMediaTask: () => true, buildTaskListHeaders: (headers) => headers,
+    taskListState, document, isSeniorSubmissionTask: () => true, buildTaskListHeaders: (headers) => headers,
     loadJson: async (_url, options = {}) => {
       if (_url.includes("/github-zip-size")) {
         if (failMeasurement) throw new Error("GitHub rate limited");

@@ -2648,9 +2648,9 @@ function renderSavedFullSlideSet(copies) {
     }
 }
 
-function isSeniorDigitalMediaTask(item) {
-    const standards = `${String(item?.standard_1 || "")} ${String(item?.standard_2 || "")}`;
-    return taskListState.course === "SeniorDTECH" && /\b(?:91893|91903)\b/.test(standards);
+function isSeniorSubmissionTask(item) {
+    // Submission preparation belongs to every selected SeniorDTECH task, not just Digital Media standards.
+    return taskListState.course === "SeniorDTECH" && Boolean(item);
 }
 
 function renderFinalClientPresentationCard(item) {
@@ -2658,7 +2658,7 @@ function renderFinalClientPresentationCard(item) {
     const card = document.querySelector("#task-list-client-presentation-card");
     if (!workspace || !card) return;
 
-    const eligible = isSeniorDigitalMediaTask(item);
+    const eligible = isSeniorSubmissionTask(item);
     workspace.classList.toggle("has-client-presentation", eligible);
     card.hidden = !eligible;
     const finalStages = document.querySelector("#task-list-final-stages");
@@ -2797,7 +2797,7 @@ function renderAdditionalSlideshows() {
     const status = document.querySelector("#task-list-additional-slideshow-status");
     if (!host || !add || !answer) return;
     const selected = taskListState.allItems.find((item) => String(item.id) === taskListState.selectedId);
-    const eligible = isSeniorDigitalMediaTask(selected);
+    const eligible = isSeniorSubmissionTask(selected);
     host.replaceChildren();
     answer.disabled = !eligible || taskListState.additionalSlideshowAnswerBusy;
     answer.value = taskListState.additionalSlideshowAnswer;
@@ -2838,7 +2838,7 @@ function renderAdditionalSlideshows() {
 async function handleAdditionalSlideshowAnswerChange(answer) {
     if (!["yes", "no"].includes(answer) || taskListState.additionalSlideshowAnswerBusy) return;
     const item = taskListState.allItems.find((candidate) => String(candidate.id) === taskListState.selectedId);
-    if (!isSeniorDigitalMediaTask(item)) return;
+    if (!isSeniorSubmissionTask(item)) return;
     const activityId = String(item.id);
     const previousAnswer = taskListState.additionalSlideshowAnswer;
     let failureMessage = "";
@@ -2885,7 +2885,7 @@ async function handleAdditionalSlideshowAction(action, id) {
     if (!["sync", "pdf"].includes(action) || !additionalSlideshowTemplateId(id)) return;
     const item = taskListState.allItems.find((candidate) => String(candidate.id) === taskListState.selectedId);
     const slot = taskListState.additionalSlideshows.find((entry) => entry.id === String(id).toLowerCase());
-    if (!slot || !isSeniorDigitalMediaTask(item) || taskListState.additionalSlideshowBusy[id]) return;
+    if (!slot || !isSeniorSubmissionTask(item) || taskListState.additionalSlideshowBusy[id]) return;
     const input = document.querySelector(`[data-extra-slideshow-url="${id}"]`);
     const presentationUrl = String(input?.value || slot.sourceUrl || "").trim();
     if (action === "sync" && !getAdditionalSlideshowSourceId(presentationUrl)) {
@@ -2937,7 +2937,7 @@ async function handleAdditionalSlideshowAction(action, id) {
 async function handleSlideshowPdfExport(kind) {
     if (!["client", "documentation"].includes(kind)) return;
     const selected = taskListState.allItems.find((item) => String(item.id) === taskListState.selectedId);
-    if (!isSeniorDigitalMediaTask(selected) || taskListState.slideshowPdfBusy[kind]) return;
+    if (!isSeniorSubmissionTask(selected) || taskListState.slideshowPdfBusy[kind]) return;
     const activityId = String(selected.id);
     const source = kind === "client" ? taskListState.templateCopies.find((entry) => entry?.templateId === "final-client-presentation") : taskListState.documentationDeck;
     const sourceUrl = String(source?.fileUrl || "");
@@ -2973,7 +2973,7 @@ async function handleSlideshowPdfExport(kind) {
 }
 
 async function loadDocumentationDeck(item) {
-    if (!isSeniorDigitalMediaTask(item)) return;
+    if (!isSeniorSubmissionTask(item)) return;
     const activityId = String(item.id);
     renderDocumentationDeckState(null, "Checking saved documentation...");
     try {
@@ -3007,7 +3007,7 @@ function requestDocumentationMergeToken() {
 
 async function handleDocumentationAction(action) {
     const item = taskListState.allItems.find((candidate) => String(candidate.id) === taskListState.selectedId);
-    if (!isSeniorDigitalMediaTask(item) || taskListState.documentationBusy) return;
+    if (!isSeniorSubmissionTask(item) || taskListState.documentationBusy) return;
     const activityId = String(item.id);
     const presentationUrl = String(document.querySelector("#task-list-documentation-url")?.value || "").trim();
     const topics = buildDocumentationTopicOrder(Array.from(document.querySelectorAll("#task-list-checklist a[href]"))
@@ -3113,7 +3113,7 @@ function renderFinalOutcomeState() {
 }
 
 async function loadFinalOutcome(item) {
-    if (!isSeniorDigitalMediaTask(item)) return;
+    if (!isSeniorSubmissionTask(item)) return;
     const state = { activityId: String(item.id), repositories: [], repositoryUrl: "", saved: null, snapshot: null, configured: false, message: "Checking saved GitHub repositories..." };
     taskListState.finalOutcome = state;
     document.querySelector("#task-list-outcome-pushed").checked = false;
@@ -3140,7 +3140,7 @@ async function loadFinalOutcome(item) {
 async function handleFinalOutcomeAction(action) {
     const state = taskListState.finalOutcome;
     const selected = taskListState.allItems.find((item) => String(item.id) === taskListState.selectedId);
-    if (!state || !isSeniorDigitalMediaTask(selected) || state.activityId !== taskListState.selectedId || taskListState.finalOutcomeBusy) return;
+    if (!state || !isSeniorSubmissionTask(selected) || state.activityId !== taskListState.selectedId || taskListState.finalOutcomeBusy) return;
     if (!document.querySelector("#task-list-outcome-pushed").checked || !state.repositoryUrl) return;
     const active = () => taskListState.finalOutcome === state && taskListState.selectedId === state.activityId;
     const endpoint = `/api/activities/${encodeURIComponent(state.activityId)}/final-outcome`;
@@ -3235,7 +3235,7 @@ function renderTrelloReportState() {
 }
 
 async function loadTrelloReport(item) {
-    if (!isSeniorDigitalMediaTask(item)) return;
+    if (!isSeniorSubmissionTask(item)) return;
     const state = { activityId: String(item.id), boards: [], boardId: "", connected: true, saved: null, snapshot: null, retryDriveSave: false, message: "Checking saved Trello boards..." };
     taskListState.trelloReport = state;
     renderTrelloReportState();
@@ -3258,7 +3258,7 @@ async function loadTrelloReport(item) {
 async function handleTrelloReportAction(action) {
     const state = taskListState.trelloReport;
     const selected = taskListState.allItems.find((item) => String(item.id) === taskListState.selectedId);
-    if (!state || !isSeniorDigitalMediaTask(selected) || state.activityId !== taskListState.selectedId || taskListState.trelloReportBusy || !state.boardId) return;
+    if (!state || !isSeniorSubmissionTask(selected) || state.activityId !== taskListState.selectedId || taskListState.trelloReportBusy || !state.boardId) return;
     const active = () => taskListState.trelloReport === state && taskListState.selectedId === state.activityId;
     const endpoint = `/api/activities/${encodeURIComponent(state.activityId)}/trello-report`;
     const post = (body) => loadJson(endpoint, { method: "POST", headers: buildTaskListHeaders({ "Content-Type": "application/json" }), body: JSON.stringify(body) });
@@ -3353,7 +3353,7 @@ function renderSubmissionStage() {
 }
 
 async function loadSubmissionStage(item) {
-    if (!isSeniorDigitalMediaTask(item)) return;
+    if (!isSeniorSubmissionTask(item)) return;
     const state = { activityId: String(item.id), components: [
         { key: "client", label: "Client presentation PDF", status: "unchecked" },
         { key: "documentation", label: "Documentation PDF", status: "unchecked" },
@@ -3377,7 +3377,7 @@ async function loadSubmissionStage(item) {
 async function handleSubmissionStageAction(action) {
     const state = taskListState.submissionStage;
     const item = taskListState.allItems.find((candidate) => String(candidate.id) === taskListState.selectedId);
-    if (!state || !isSeniorDigitalMediaTask(item) || state.activityId !== taskListState.selectedId || taskListState.submissionBusy) return;
+    if (!state || !isSeniorSubmissionTask(item) || state.activityId !== taskListState.selectedId || taskListState.submissionBusy) return;
     if (action === "build" && !state.ready) return;
     const active = () => taskListState.submissionStage === state && taskListState.selectedId === state.activityId;
     taskListState.submissionBusy = true;
@@ -5017,7 +5017,7 @@ async function runTaskListTrelloSync() {
         const presentationButton = event.target?.closest?.("#task-list-client-presentation-action");
         if (!presentationButton) return;
         const selected = taskListState.allItems.find((item) => String(item?.id || "") === String(taskListState.selectedId));
-        if (!isSeniorDigitalMediaTask(selected)) return;
+        if (!isSeniorSubmissionTask(selected)) return;
 
         const savedCopy = taskListState.templateCopies.find((copy) =>
             String(copy?.templateId || "").trim().toLowerCase() === "final-client-presentation"
