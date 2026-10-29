@@ -3354,24 +3354,24 @@ function renderHubAuthUi() {
         }
     }
     if (hubTeacherDashboardLink) {
-        hubTeacherDashboardLink.hidden = !canAdmin;
+        hubTeacherDashboardLink.hidden = !(canAdmin && inTeacherMode);
     }
     if (hubAdminLink) {
         hubAdminLink.hidden = !canAdmin;
     }
     if (hubUploadKitsLink) {
-        hubUploadKitsLink.hidden = !canAdmin;
+        hubUploadKitsLink.hidden = !(canAdmin && inTeacherMode);
     }
     if (hubTeacherReviewLink) {
         hubTeacherReviewLink.hidden = !canAdmin;
     }
-    if (hubLicenceSetupLink) hubLicenceSetupLink.hidden = !canAdmin;
-    if (worksheetLicenceSetupLink) worksheetLicenceSetupLink.hidden = !canAdmin;
+    if (hubLicenceSetupLink) hubLicenceSetupLink.hidden = !(canAdmin && inTeacherMode);
+    if (worksheetLicenceSetupLink) worksheetLicenceSetupLink.hidden = !(canAdmin && inTeacherMode);
     if (hubSettingsLink) {
         hubSettingsLink.hidden = !canAdmin;
     }
     if (hubUploadMenu) {
-        hubUploadMenu.hidden = !(canAdmin || (canTeacherView && inTeacherMode));
+        hubUploadMenu.hidden = !inTeacherMode;
         if (hubUploadMenu.hidden) {
             hubUploadMenu.open = false;
         }

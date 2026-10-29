@@ -653,7 +653,7 @@ test("Licence Kit Setup restricts settings to admins and updates only the curren
     assert.equal((await fetch(url.replace("kit-unity-setup", "kit-other"), { headers })).status, 404);
     const nav = fs.readFileSync(path.join(root, "script.js"), "utf8");
     assert.match(nav, /hub-licence-setup-link[^>]+hidden>Licence Kit Setup/);
-    assert.match(nav, /hubLicenceSetupLink\.hidden = !canAdmin/);
+    assert.match(nav, /hubLicenceSetupLink\.hidden = !\(canAdmin && inTeacherMode\)/);
 });
 
 test("Licence Kit Setup uses the shared active token and never presents opaque or expired tokens as ID tokens", async () => {
