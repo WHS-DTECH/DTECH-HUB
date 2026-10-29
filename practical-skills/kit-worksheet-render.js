@@ -793,7 +793,9 @@
                 <p class="activity-block-completion">${window.ActivityBlocks.specialised(content)
                     ? "Completion: this activity keeps its specialised assessment rules."
                     : content.completionMode === "auto"
-                        ? content.shareLinkCompletion
+                        ? content.documentCheck === "google-drawing-shapes-v1"
+                            ? "Auto-Completed: save your Google Drawing's sharing link, then use Check my drawing. It needs at least 8 filled shapes and no inserted pictures, or explicit teacher approval. Use a different drawing for each activity. A link alone does not earn this tick."
+                            : content.shareLinkCompletion
                             ? "Auto-Completed: paste your finished drawing's HTTPS Share Link. The link saves automatically and earns your activity tick. Drawing contents and sharing permissions are not checked."
                             : content.documentCheck
                             ? "Auto-Completed: save your document sharing link, then use Check my document. The Rattlesnakes text must pass a check or be explicitly approved by your teacher. Use a different file for each activity. A link alone does not earn this tick."

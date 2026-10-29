@@ -64,22 +64,27 @@ not through the generic activity builder.
 Validate with `node --test scripts/regression-typing-kit.js` and
 `node scripts/regression-licence-dashboard.js`.
 
-## Google Drawings share links
+## Google Drawings shape checks
 
-Ship, TV and Flower Pot in the Google Drawings Kit each have a required saved
-Share Link field. A valid HTTPS link automatically earns the activity tick;
-other instructions/questions remain available but are not completion gates.
-Link checks do not verify drawing contents or teacher sharing access.
-Existing link IDs and response keys are retained. The usual all-activities
-certificate process applies, and the kit stays Not Live until explicitly
-published. Teacher preview remains read-only and cannot save links or ticks.
-Ship also includes the supplied reference picture and instructions to build a
-similar ship from separate editable Insert > Shape objects. Lines may add
-details, but line-only artwork or a pasted reference image does not meet the
-task instructions. This is teacher-reviewable guidance, not an automated shape
-or visual-similarity check; link-only completion is unchanged.
-TV includes the supplied retro television reference picture. This is added once
-without replacing existing instructions or saved Share Links.
+Ship, TV and Flower Pot in the Google Drawings Kit each show the supplied
+reference picture and instructions to build a similar picture from separate,
+filled Insert > Shape objects, then a required Share Link field.
+A saved link alone does not earn the tick. The student chooses
+**Check my drawing**; the server confirms their Google account, reads the
+Drive file (it must be a Google Drawing), exports it as SVG and stores a
+receipt (`google-drawing-shapes-v1`) when it finds at least 8 filled shapes and
+no inserted or pasted pictures. Line-only and outline-only artwork does not
+pass. Each activity needs a different drawing. Receipts are tied to the current
+link and progress reset, and editing the drawing later needs a new check.
+Teachers can open the drawing in Results and approve or revoke completion.
+The check cannot judge visual similarity to the reference or prove the exact
+menu used; filled text or a filled background may count as shapes, so teacher
+review remains the fallback. Existing link IDs and response keys are retained;
+the one-time upgrade (`drawingCheckVersion: 1`) replaces the shape instructions
+by ID, adds images only if they were never added before, and leaves later
+teacher edits alone. Existing link-only ticks are recalculated and need a check
+or approval. The usual all-activities certificate process applies, and the kit
+stays Not Live until explicitly published. Teacher preview remains read-only.
 The Upload menu, Kit Content Builder and Licence Kit Setup links are hidden in
 Student View, including for staff previewing that view. In Teacher View, upload
 tools remain available to staff and builder/setup links require admin access.

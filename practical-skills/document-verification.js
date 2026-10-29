@@ -1,7 +1,9 @@
 "use strict";
 const B = require("./activity-blocks");
-const { POLICY, checkRattlesnakes } = require("./rattlesnakes-check");
+const { POLICY: RATTLESNAKES_POLICY, checkRattlesnakes } = require("./rattlesnakes-check");
+const { POLICY: DRAWING_POLICY, checkGoogleDrawingSvg } = require("./drawing-check");
 const mammoth = require("mammoth");
+const POLICIES = new Set([RATTLESNAKES_POLICY, DRAWING_POLICY]);
 
 function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
     syncCompletion, getRequestUserEmail, normalizeEmail, schoolDomain, verifyDriveTokenForStudent,
@@ -23,7 +25,8 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
         return { url, documentKey: B.documentLinkKey(url) };
     }
     async function get(student, kit, index, activity, responses) {
-        if (activity?.documentCheck !== POLICY) return null;
+        const policy = activity?.documentCheck;
+        if (!POLICIES.has(policy)) return null;
         const { documentKey } = submission(activity, index, responses);
         if (!documentKey) return null;
         if (!(await pool.query("SELECT to_regclass('practical_skills_document_checks') AS checks_table")).rows[0]?.checks_table) return null;
@@ -31,12 +34,12 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
             FROM practical_skills_document_checks WHERE student_email = $1 AND kit_id = $2 AND activity_index = $3
             AND document_key = $4 AND policy = $5
             AND checked_at >= COALESCE((SELECT started_at FROM practical_skills_progress
-                WHERE student_email = $1 AND kit_id = $2), '-infinity'::timestamptz)`, [student, kit, index, documentKey, POLICY]);
+                WHERE student_email = $1 AND kit_id = $2), '-infinity'::timestamptz)`, [student, kit, index, documentKey, policy]);
         const row = result.rows[0];
         return row ? { documentKey: row.document_key, policy: row.policy, passed: row.passed,
             method: row.method, feedback: row.feedback, reviewedBy: row.reviewed_by, checkedAt: row.checked_at } : null;
     }
-    async function save(student, kit, index, documentKey, passed, method, feedback, reviewer = null) {
+    async function save(student, kit, index, documentKey, policy, passed, method, feedback, reviewer = null) {
         await ensureSchema();
         await pool.query(`INSERT INTO practical_skills_document_checks
             (student_email, kit_id, activity_index, document_key, policy, passed, method, feedback, reviewed_by)
@@ -44,7 +47,7 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
             ON CONFLICT (student_email, kit_id, activity_index, document_key, policy)
             DO UPDATE SET passed = EXCLUDED.passed, method = EXCLUDED.method, feedback = EXCLUDED.feedback,
             reviewed_by = EXCLUDED.reviewed_by, checked_at = NOW()`,
-        [student, kit, index, documentKey, POLICY, passed, method, JSON.stringify(feedback), reviewer]);
+        [student, kit, index, documentKey, policy, passed, method, JSON.stringify(feedback), reviewer]);
     }
     async function load(req, student) {
         const kit = String(req.params.kitId || "");
@@ -56,11 +59,11 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
         const content = B.withFilesFoldersLinks(stored.rows[0]?.content || getDefaultPracticalSkillsKitContent(kit));
         const activity = content.activities?.[index];
         if (content.deletedAt || !content.worksheets?.[index] || content.worksheets[index].hidden ||
-            content.worksheets[index].mergedInto !== undefined || activity?.documentCheck !== POLICY) {
+            content.worksheets[index].mergedInto !== undefined || !POLICIES.has(activity?.documentCheck)) {
             throw Object.assign(new Error("This activity does not support a document check."), { status: 404 });
         }
         const row = (await pool.query("SELECT responses FROM practical_skills_progress WHERE student_email = $1 AND kit_id = $2", [student, kit])).rows[0] || { responses: {} };
-        return { kit, index, content, activity, row, ...submission(activity, index, row.responses) };
+        return { kit, index, content, activity, policy: activity.documentCheck, row, ...submission(activity, index, row.responses) };
     }
     async function readBytes(url, token, limit) {
         const response = await fetchFile(url, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(30000) });
@@ -117,7 +120,10 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
             if (!email) return;
             try {
                 const item = await load(req, email);
-                if (!item.documentKey.startsWith("google-file:")) throw Object.assign(new Error("Automatic checking supports Google Docs and Word (.docx) files in Google Drive. For OneDrive or other links, ask your teacher to review the document."), { status: 422 });
+                const drawing = item.policy === DRAWING_POLICY;
+                if (!item.documentKey.startsWith("google-file:")) throw Object.assign(new Error(drawing
+                    ? "Automatic checking supports Google Drawings links. For other links, ask your teacher to review the drawing."
+                    : "Automatic checking supports Google Docs and Word (.docx) files in Google Drive. For OneDrive or other links, ask your teacher to review the document."), { status: 422 });
                 const token = String(req.body?.driveAccessToken || "");
                 if (!token) throw Object.assign(new Error("Google Drive permission is required to read your document."), { status: 400 });
                 await verifyDriveTokenForStudent(token, email);
@@ -128,8 +134,12 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                 });
                 const before = await metadata();
                 if (before.trashed) throw Object.assign(new Error("This document is in the bin. Restore it or submit the correct link."), { status: 422 });
-                let text;
-                if (before.mimeType === "application/vnd.google-apps.document") {
+                let text, result;
+                if (drawing) {
+                    if (before.mimeType !== "application/vnd.google-apps.drawing") throw Object.assign(new Error("Submit the Share Link to your Google Drawing, not an image, PDF, document or folder. Your teacher can review other files."), { status: 422 });
+                    const svg = await readBytes(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}/export?mimeType=image%2Fsvg%2Bxml`, token, 5 * 1024 * 1024);
+                    result = checkGoogleDrawingSvg(svg.toString("utf8"));
+                } else if (before.mimeType === "application/vnd.google-apps.document") {
                     text = (await readBytes(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}/export?mimeType=text%2Fplain`, token, 2 * 1024 * 1024)).toString("utf8");
                 } else if (before.mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
                     if (Number(before.size) > 5 * 1024 * 1024) throw Object.assign(new Error("The Word document is too large for automatic checking. Ask your teacher to review it."), { status: 422 });
@@ -141,13 +151,13 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                         throw Object.assign(new Error("This Word file could not be read. Save it as .docx again, or ask your teacher to review it."), { status: 422 });
                     }
                 } else throw Object.assign(new Error("Submit the typed Google Doc or Word (.docx) document, not a PDF, image, folder or scene file. Your teacher can review unsupported files."), { status: 422 });
-                const result = checkRattlesnakes(text);
+                if (!drawing) result = checkRattlesnakes(text);
                 const after = await metadata();
                 const current = await load(req, email);
                 if (!before.modifiedTime || after.trashed || before.modifiedTime !== after.modifiedTime || item.documentKey !== current.documentKey) {
                     throw Object.assign(new Error("The document or submitted link changed during checking. Save your changes and check again."), { status: 409 });
                 }
-                await save(email, item.kit, item.index, item.documentKey, result.passed, "automatic",
+                await save(email, item.kit, item.index, item.documentKey, item.policy, result.passed, "automatic",
                     { ...result, modifiedTime: after.modifiedTime });
                 const synced = await syncCompletion(email, item.kit, item.content);
                 if (synced.completed) void autoEmailKitCertificate(req, item.kit);
@@ -175,8 +185,11 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
             try {
                 const item = await load(req, email);
                 if (!item.documentKey || req.body.documentKey !== item.documentKey) throw Object.assign(new Error("The submitted link changed. Reload the review before approving."), { status: 409 });
-                await save(email, item.kit, item.index, item.documentKey, req.body.approved, "teacher",
-                    { message: req.body.approved ? "Teacher reviewed the document and approved text completion." : "Teacher approval removed. Check the document again or request another review." },
+                const drawing = item.policy === DRAWING_POLICY;
+                await save(email, item.kit, item.index, item.documentKey, item.policy, req.body.approved, "teacher",
+                    { message: req.body.approved
+                        ? drawing ? "Teacher reviewed the drawing and approved shape completion." : "Teacher reviewed the document and approved text completion."
+                        : drawing ? "Teacher approval removed. Check the drawing again or request another review." : "Teacher approval removed. Check the document again or request another review." },
                     normalizeEmail(getRequestUserEmail(req)));
                 const synced = await syncCompletion(email, item.kit, item.content);
                 res.json({ verification: await get(email, item.kit, item.index, item.activity, item.row.responses),

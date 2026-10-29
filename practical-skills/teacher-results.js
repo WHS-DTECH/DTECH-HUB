@@ -241,18 +241,22 @@
             link.rel = "noopener noreferrer";
         } else node("span", text, parent, "results-saved");
     }
-    function renderDocumentReview(parent, kit, index, email, tick) {
+    function renderDocumentReview(parent, kit, index, email, tick, drawing = false) {
         const section = node("section", undefined, parent, "sites-card");
-        node("h4", "Rattlesnakes text completion", section);
-        node("p", "Open the current submitted document and review its text before approving. This approval replaces the automatic text check only; it does not bypass other required blocks or the different-document rule.", section);
+        node("h4", drawing ? "Google Drawing shape completion" : "Rattlesnakes text completion", section);
+        node("p", drawing
+            ? "Open the current submitted drawing and review it before approving. Check that it resembles the reference picture and is built from filled Insert > Shape objects, not only lines or pasted pictures. This approval replaces the automatic drawing check only; it does not bypass other required blocks or the different-drawing rule."
+            : "Open the current submitted document and review its text before approving. This approval replaces the automatic text check only; it does not bypass other required blocks or the different-document rule.", section);
         const linkHost = node("p", undefined, section);
         const feedback = node("p", "Reading the current link and saved check...", section);
         feedback.setAttribute("role", "status");
         const label = node("label", undefined, section);
         const reviewed = node("input", undefined, label);
         reviewed.type = "checkbox";
-        label.append(document.createTextNode(" I have opened this student's current linked document and confirmed that the Rattlesnakes passage is substantially complete."));
-        const approve = node("button", "Approve reviewed document", section, "button button-primary");
+        label.append(document.createTextNode(drawing
+            ? " I have opened this student's current linked drawing and confirmed that it is a similar picture built with shapes."
+            : " I have opened this student's current linked document and confirmed that the Rattlesnakes passage is substantially complete."));
+        const approve = node("button", drawing ? "Approve reviewed drawing" : "Approve reviewed document", section, "button button-primary");
         const revoke = node("button", "Remove approval / require another check", section, "button");
         const refresh = node("button", "Reload current link and check", section, "button");
         for (const button of [approve, revoke, refresh]) button.type = "button";
@@ -270,8 +274,8 @@
         reviewed.addEventListener("change", buttons);
         function show(verification) {
             feedback.textContent = verification
-                ? `${verification.passed ? verification.method === "teacher" ? "Teacher approved" : "Automatic text check passed" : "Not yet passed"}: ${date(verification.checkedAt)}${verification.reviewedBy ? ` by ${verification.reviewedBy}` : ""}. ${verification.feedback.message}`
-                : "No saved text check or teacher approval for the current link.";
+                ? `${verification.passed ? verification.method === "teacher" ? "Teacher approved" : drawing ? "Automatic drawing check passed" : "Automatic text check passed" : "Not yet passed"}: ${date(verification.checkedAt)}${verification.reviewedBy ? ` by ${verification.reviewedBy}` : ""}. ${verification.feedback.message}`
+                : drawing ? "No saved drawing check or teacher approval for the current link." : "No saved text check or teacher approval for the current link.";
         }
         async function reload() {
             busy = true;
@@ -285,11 +289,11 @@
                 reviewed.checked = false;
                 linkHost.replaceChildren();
                 if (documentKey) {
-                    const link = node("a", "Open current submitted document", linkHost);
+                    const link = node("a", drawing ? "Open current submitted drawing" : "Open current submitted document", linkHost);
                     link.href = data.url;
                     link.target = "_blank";
                     link.rel = "noopener noreferrer";
-                } else linkHost.textContent = "No valid document sharing link has been saved.";
+                } else linkHost.textContent = drawing ? "No valid drawing sharing link has been saved." : "No valid document sharing link has been saved.";
                 show(data.verification);
             } catch (error) {
                 if (live()) {
@@ -310,7 +314,7 @@
                 if (!response.ok) throw new Error(data.error || "Approval was not confirmed. Reload before retrying.");
                 if (!live()) return;
                 show(data.verification);
-                tick.textContent = `Tick: ${date(data.completedActivities?.[index])} | Completion rule: Automatic with text check or teacher approval`;
+                tick.textContent = `Tick: ${date(data.completedActivities?.[index])} | Completion rule: Automatic with ${drawing ? "drawing" : "text"} check or teacher approval`;
                 reviewed.checked = false;
                 status.textContent = "Document review saved and kit completion recalculated. Refresh class progress to see the updated status. The student can reopen their kit for its certificate.";
             } catch (error) {
@@ -326,7 +330,7 @@
     function render(data) {
         output.replaceChildren();
         node("h2", data.content.identity?.name || data.content.bannerTitle || data.kitId, output);
-        node("p", "A saved completion tick alone is not teacher verification. Reading this report does not inspect files or change progress. Rattlesnakes review controls below let you explicitly approve text completion after opening the student's document.", output, "results-warning");
+        node("p", "A saved completion tick alone is not teacher verification. Reading this report does not inspect files or change progress. Rattlesnakes and Google Drawings review controls below let you explicitly approve completion after opening the student's file.", output, "results-warning");
         for (const warning of data.warnings) node("p", warning, output, "results-warning");
         const worksheets = data.content.worksheets.filter((worksheet) => worksheet.mergedInto === undefined);
         if (!data.content.activities?.some(Boolean)) node("p", "This kit has worksheet titles but no configured activity questions or automatic checks. Students can mark its activities complete manually.", output, "results-warning");
@@ -342,7 +346,9 @@
                 const section = node("section", undefined, card, "results-activity");
                 node("h3", `${index + 1}. ${worksheet.activity}`, section);
                 const tick = node("p", `Tick: ${date(progress.completed_activities?.[index])} | Completion rule: ${activity?.completionMode === "auto" ? "Automatic" : "Manual / specialised activity"}`, section);
-                if (activity?.documentCheck === "rattlesnakes-v1" ||
+                if (activity?.documentCheck === "google-drawing-shapes-v1") {
+                    renderDocumentReview(section, data.kitId, index, student.email, tick, true);
+                } else if (activity?.documentCheck === "rattlesnakes-v1" ||
                     /^rattlesnakes$/i.test(String(worksheet.activity || "").trim()) &&
                     /files\s*(?:&|and)\s*folders/i.test(data.content.identity?.name || data.content.bannerTitle || "")) {
                     renderDocumentReview(section, data.kitId, index, student.email, tick);

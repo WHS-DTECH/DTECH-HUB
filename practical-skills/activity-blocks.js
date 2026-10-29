@@ -81,47 +81,73 @@
         });
         return changed ? { ...content, activities } : content;
     }
+    const GOOGLE_DRAWING_POLICY = "google-drawing-shapes-v1";
+    const asset = (name) => `https://dtech-hub2.onrender.com/practical-skills/images/${name}`;
+    const drawingGuides = {
+        ship: { flag: "shipShapesReferenceVersion", subject: "ship", similar: "a sailing ship with a hull, masts and sails",
+            parts: "the hull, sails, masts, flag and sea",
+            image: { id: "ship-shapes-reference", kind: "image", title: "Ship reference picture", url: asset("ship-reference.png"),
+                alt: "A sailing ship with a dark hull, two masts, several sails, a flag, lightning bolts and a starburst-shaped sea.",
+                caption: "Use this ship as your reference. Create your own similar drawing using Insert > Shape." },
+            tasks: { id: "ship-shapes-instructions", title: "Build your ship with shapes" } },
+        tv: { flag: "tvReferenceVersion", subject: "TV", similar: "a retro TV with a screen, aerials, controls and a stand",
+            parts: "the TV body, screen, aerials, buttons, screen picture, cabinet doors and stand",
+            image: { id: "tv-reference", kind: "image", title: "TV reference picture", url: asset("tv-reference.png"),
+                alt: "A black-and-white retro television with two aerials, control buttons and a cabinet stand. The screen shows three camels in a desert scene.",
+                caption: "Use this TV picture as the reference for your Google Drawing." },
+            tasks: { id: "tv-shapes-instructions", title: "Build your TV with shapes" } },
+        "flower pot": { flag: "flowerPotReferenceVersion", subject: "flower pot", similar: "a pot of flowers with stems and petals",
+            parts: "the pot, saucer, stems, leaves, petals, flower centres, bee and caterpillar",
+            image: { id: "flower-pot-reference", kind: "image", title: "Flower Pot reference picture", url: asset("flower-pot-reference.png"),
+                alt: "A black-and-white drawing of a dark flower pot holding many daisy-like flowers, with a small bee and a smiling caterpillar.",
+                caption: "Use this flower pot as the reference for your Google Drawing." },
+            tasks: { id: "flower-pot-shapes-instructions", title: "Build your flower pot with shapes" } }
+    };
+    function drawingTasks(guide) {
+        return { ...guide.tasks, kind: "tasks", text: [
+            `Open Google Drawings and create your own ${guide.subject} similar to the reference picture.`,
+            `Use Insert > Shape to build the main parts: ${guide.parts}. Resize, rotate and layer the shapes to fit your design.`,
+            "Give your shapes fill colours. You can use lines for extra details, but do not build the whole picture with the Line tool only.",
+            "Do not paste or insert the reference picture or any other image. Your drawing must contain your own separate, editable shapes.",
+            `Make it look like ${guide.similar}. It does not need to be an exact copy.`,
+            "Share your finished Google Drawing so your teacher can open it, paste its Share Link below, then choose Check my drawing. The check needs at least 8 filled shapes and no inserted pictures. It cannot judge how similar your picture is, so your teacher may review it."
+        ].join("\n") };
+    }
     function withGoogleDrawingsLinks(content) {
         if (!/^google\s+drawings\s+kit$/i.test(String(content?.identity?.name || content?.bannerTitle || "").trim())) return content;
         const activities = [...(content.activities || [])];
         let changed = false;
         (content.worksheets || []).forEach((worksheet, index) => {
-            if (!worksheet || worksheet.hidden || worksheet.mergedInto !== undefined ||
-                !/^(?:ship|tv|flower pot)$/i.test(String(worksheet.activity || "").trim())) return;
+            const guide = drawingGuides[String(worksheet?.activity || "").trim().toLowerCase().replace(/\s+/g, " ")];
+            if (!guide || worksheet.hidden || worksheet.mergedInto !== undefined) return;
             const activity = activities[index] || {};
             let blocks = initialBlocks(activity, index, content);
-            const ship = /^ship$/i.test(String(worksheet.activity).trim()) && !activity.shipShapesReferenceVersion;
-            if (ship) blocks = [
-                { id: "ship-shapes-reference", kind: "image", title: "Ship reference picture",
-                    url: "https://dtech-hub2.onrender.com/practical-skills/images/ship-reference.png",
-                    alt: "A sailing ship with a dark hull, two masts, several sails, a flag, lightning bolts and a starburst-shaped sea.",
-                    caption: "Use this ship as your reference. Create your own similar drawing using Insert > Shape." },
-                { id: "ship-shapes-instructions", kind: "tasks", title: "Build your ship with shapes",
-                    text: "Open Google Drawings and create your own ship similar to the reference picture.\nUse Insert > Shape to build the main parts: the hull, sails, masts, flag and sea. Resize, rotate and layer the shapes to fit your design.\nUse fill colours and borders to make the ship clear. You can use lines for extra details, but do not build the whole picture with the Line tool only.\nDo not paste the reference picture as your finished work. Your drawing should contain your own separate, editable shapes.\nCheck that your picture looks like a sailing ship with a hull, masts and sails. It does not need to be an exact copy.\nShare your finished drawing so your teacher can open it, then paste its Share Link below. The automatic tick confirms a saved link only; your teacher may review the drawing and its shapes." },
-                ...blocks
-            ];
-            const tv = /^tv$/i.test(String(worksheet.activity).trim()) && !activity.tvReferenceVersion;
-            if (tv) blocks = [
-                { id: "tv-reference", kind: "image", title: "TV reference picture",
-                    url: "https://dtech-hub2.onrender.com/practical-skills/images/tv-reference.png",
-                    alt: "A black-and-white retro television with two aerials, control buttons and a cabinet stand. The screen shows three camels in a desert scene.",
-                    caption: "Use this TV picture as the reference for your Google Drawing." },
-                ...blocks
-            ];
+            const upgrade = activity.drawingCheckVersion !== 1;
+            if (upgrade) {
+                if (!activity[guide.flag] && !blocks.some((block) => block.id === guide.image.id)) blocks = [guide.image, ...blocks];
+                const tasks = drawingTasks(guide);
+                const existing = blocks.findIndex((block) => block.id === tasks.id);
+                if (existing >= 0) blocks = blocks.map((block, i) => i === existing ? { ...block, ...tasks } : block);
+                else {
+                    const after = blocks.findIndex((block) => block.id === guide.image.id) + 1;
+                    blocks = [...blocks.slice(0, after), tasks, ...blocks.slice(after)];
+                }
+            }
             if (!blocks.some((block) => block.kind === "studentlink")) blocks = [...blocks, {
                 id: `google-drawings-share-link-${index}`, kind: "studentlink", required: true,
                 title: `${worksheet.activity} Share Link`,
-                text: "Paste the HTTPS sharing link to your finished drawing. Set sharing so your teacher can open it. Your link is saved and the activity ticks automatically. This checks the link, not the drawing contents or sharing permissions."
+                text: "Paste the HTTPS sharing link to your finished Google Drawing. Set sharing so your teacher can open it, then use Check my drawing. Use a different drawing for each activity."
             }];
             blocks = blocks.map((block) => {
                 const required = block.kind === "studentlink";
                 return Boolean(block.required) === required ? block : { ...block, required };
             });
-            if (ship || tv || activity.completionMode !== "auto" || activity.shareLinkCompletion !== true ||
+            if (upgrade || activity.completionMode !== "auto" || activity.documentCheck !== GOOGLE_DRAWING_POLICY ||
+                activity.uniqueDocumentLinks !== true || activity.shareLinkCompletion !== undefined || activity[guide.flag] !== 1 ||
                 !activity.blocks || blocks.length !== activity.blocks.length || blocks.some((block, i) => block !== activity.blocks[i])) {
-                activities[index] = { ...activity, blocks, completionMode: "auto", shareLinkCompletion: true,
-                    ...(ship ? { shipShapesReferenceVersion: 1 } : {}),
-                    ...(tv ? { tvReferenceVersion: 1 } : {}) };
+                const { shareLinkCompletion: _linkOnly, ...rest } = activity;
+                activities[index] = { ...rest, blocks, completionMode: "auto", documentCheck: GOOGLE_DRAWING_POLICY,
+                    uniqueDocumentLinks: true, drawingCheckVersion: 1, [guide.flag]: 1 };
                 changed = true;
             }
         });
@@ -289,7 +315,9 @@
                 passed = receipt?.passed === true && receipt.policy === activity.documentCheck &&
                     receipt.documentKey === documentLinkKey(value);
                 if (!passed) message = receipt?.feedback?.message ||
-                    "Link saved. Use Check my document to check the Rattlesnakes text, or ask your teacher to review it.";
+                    (activity.documentCheck === GOOGLE_DRAWING_POLICY
+                        ? "Link saved. Use Check my drawing to check its shapes, or ask your teacher to review it."
+                        : "Link saved. Use Check my document to check the Rattlesnakes text, or ask your teacher to review it.");
             }
             if (b.kind === "checkbox") passed = value === true;
             if (b.kind === "question") passed = b.questionType === "checklist"
@@ -323,5 +351,5 @@
         return { passed: required.length > 0 && results.every((r) => r.passed), results };
     }
     return { types, interactive, escape, safeUrl, studentUrl, specialised, initialBlocks, savedAnswers, publicActivity, entries, puzzle, validate, grade,
-        withFilesFoldersLinks, withGoogleDrawingsLinks, documentLinkKey };
+        withFilesFoldersLinks, withGoogleDrawingsLinks, documentLinkKey, GOOGLE_DRAWING_POLICY };
 });

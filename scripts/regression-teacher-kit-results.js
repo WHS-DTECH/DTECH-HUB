@@ -401,7 +401,7 @@ test("Licence menu links to Teacher Review with the same admin gate as Upload Ki
     assert.match(source, /id="hub-teacher-review-link" role="menuitem" href="\/practical-skills\/teacher-results\.html" hidden>Teacher Review/);
     const start = source.indexOf("    if (hubTeacherReviewLink) {");
     const end = source.indexOf("\n    if (hubSettingsLink)", start);
-    const context = vm.createContext({ hubTeacherReviewLink: {}, hubLicenceSetupLink: {}, worksheetLicenceSetupLink: {}, canAdmin: false });
+    const context = vm.createContext({ hubTeacherReviewLink: {}, hubLicenceSetupLink: {}, worksheetLicenceSetupLink: {}, canAdmin: false, inTeacherMode: true });
     const gate = source.slice(start, end);
     vm.runInContext(gate, context);
     assert.equal(context.hubTeacherReviewLink.hidden, true);
@@ -412,6 +412,10 @@ test("Licence menu links to Teacher Review with the same admin gate as Upload Ki
     assert.equal(context.hubTeacherReviewLink.hidden, false);
     assert.equal(context.hubLicenceSetupLink.hidden, false);
     assert.equal(context.worksheetLicenceSetupLink.hidden, false);
+    context.inTeacherMode = false;
+    vm.runInContext(gate, context);
+    assert.equal(context.hubLicenceSetupLink.hidden, true, "Setup links are hidden in Student View");
+    assert.equal(context.worksheetLicenceSetupLink.hidden, true);
     const teacherView = fs.readFileSync(path.join(root, "teacher-view.html"), "utf8");
-    assert.match(teacherView, /script\.js\?v=licence-setup-1/);
+    assert.match(teacherView, /script\.js\?v=student-tools-1/);
 });

@@ -205,6 +205,8 @@
             mode.disabled = specialised || Boolean(activity.uniqueDocumentLinks);
             document.querySelector("#activity-block-completion-help").textContent = specialised
                 ? "This activity keeps its existing specialised assessment and completion rules. Added blocks are extra learning content."
+                : activity.documentCheck === blockApi.GOOGLE_DRAWING_POLICY
+                    ? "Google Drawings activities complete after the student's Check my drawing passes (at least 8 filled shapes, no inserted pictures) or a teacher approves the reviewed drawing. Every activity must link a different drawing. Visual similarity is not checked automatically."
                 : activity.uniqueDocumentLinks
                     ? "Files & Folders activities are automatically completed after required links are saved. Every activity must link a different file; duplicate documents remove the automatic ticks. Link checks do not verify sharing permissions or work inside the file."
                 : "Automatic mode checks written answers for presence, not correctness. Required checkboxes, tables and puzzles must be completed. Student links need a valid HTTPS URL, not verified work. Document blocks confirm only creation of a copy.";
