@@ -16308,10 +16308,30 @@ app.get("/api/practical-skills/kit-content/:kitId", async (req, res) => {
   }
 });
 
+// Emails DTECH-HUB Lead Teachers a Teacher Review link when a student submits a teacher-ticked activity.
+async function notifyKitSubmission({ studentEmail, kitId, url, subject }) {
+  if (!smtpTransporter || !SMTP_FROM) return false;
+  const recipients = (await getPracticalSkillsCertificateTeacherRecipients()).filter((email) => email !== normalizeEmail(studentEmail));
+  if (!recipients.length) return false;
+  const { studentName } = await getResearchReportStudentDetails(studentEmail).catch(() => ({ studentName: "" }));
+  const name = studentName || studentEmail;
+  const safe = (value) => String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
+  const base = String(process.env.HUB_PUBLIC_URL || "https://dtech-hub2.onrender.com").replace(/\/+$/, "");
+  const review = `${base}/practical-skills/teacher-results.html?kit=${encodeURIComponent(kitId)}&student=${encodeURIComponent(studentEmail)}`;
+  await sendConfiguredHubEmail({
+    to: recipients,
+    subject: `${String(subject).replace(/[\r\n]+/g, " ")} - ${String(name).replace(/[\r\n]+/g, " ")}`,
+    html: `<div style="font-family:Arial,sans-serif;color:#173858;"><p><strong>${safe(name)}</strong> (${safe(studentEmail)}) submitted <strong>${safe(subject)}</strong>.</p><p><a href="${safe(url)}">Open the submitted drawing</a></p><p><a href="${safe(review)}">Open Teacher Review</a> to tick Completed in the Class Kit Completion submissions list.</p></div>`,
+    emailType: "kit_submission"
+  });
+  return true;
+}
+
 const documentVerification = require("./practical-skills/document-verification").createDocumentVerification({
   pool, getDefaultPracticalSkillsKitContent, syncCompletion: syncPracticalSkillsKitCompletion,
   getRequestUserEmail, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN,
-  verifyDriveTokenForStudent, driveApiRequest, requireAdminAccess, autoEmailKitCertificate, canReview: canManagePracticalSchedule
+  verifyDriveTokenForStudent, driveApiRequest, requireAdminAccess, autoEmailKitCertificate, canReview: canManagePracticalSchedule,
+  notifySubmission: notifyKitSubmission
 });
 documentVerification.register(app);
 

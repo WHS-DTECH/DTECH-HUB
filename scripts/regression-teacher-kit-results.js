@@ -261,10 +261,12 @@ test("class review keeps whānau and timetable homerooms separate and combines f
     const savedRequests = [];
     const context = vm.createContext({
         document: { getElementById: el, querySelector: el, createElement: element },
-        window: { addEventListener() {} },
+        window: { addEventListener() {}, location: { search: "" } },
+        URLSearchParams,
         localStorage: { getItem: () => JSON.stringify({ profile: { email: "admin@school.nz" } }) },
         Option: function (text, value) { return { textContent: text, value }; },
         fetch: async (url, options) => {
+            if (url.includes("kit-submissions")) return { ok: true, json: async () => ({ kits: [] }) };
             if (options?.method === "PUT") {
                 savedRequests.push(JSON.parse(options.body));
                 return { ok: !failSave, json: async () => failSave
@@ -373,6 +375,81 @@ test("class review keeps whānau and timetable homerooms separate and combines f
     el("class-course-filter").value = "SeniorDTECH";
     el("class-course-filter").events.change();
     assert.match(el("class-progress-status").textContent, /No students match/);
+});
+
+test("submissions list follows the class filters, links drawings and saves teacher Completed ticks", async () => {
+    function element() {
+        return {
+            value: "", children: [], events: {}, textContent: "",
+            classList: { add() {}, remove() {} },
+            append(child) { this.children.push(child); },
+            replaceChildren(...children) { this.children = children; },
+            add(child) { this.append(child); },
+            setAttribute() {},
+            get options() { return this.children; },
+            addEventListener(type, handler) { this.events[type] = handler; }
+        };
+    }
+    const elements = new Map();
+    const el = (id) => {
+        if (!elements.has(id)) elements.set(id, element());
+        return elements.get(id);
+    };
+    const students = [
+        { name: "Ana", email: "ana@school.nz", timetableClass: "JPI", course: "JuniorDTECH", kitProgress: {} },
+        { name: "Ben", email: "ben@school.nz", timetableClass: "JVE", course: "JuniorDTECH", kitProgress: {} }
+    ];
+    const kits = [{ id: "kit-login", title: "Login Kit" }, { id: "kit-google-drawings", title: "Google Drawings Kit" }];
+    const drawing = "https://docs.google.com/drawings/d/ana-ship/edit";
+    const submissions = { kits: [{ id: "kit-google-drawings", activities: [{ index: 0, title: "Ship" }, { index: 1, title: "TV" }],
+        students: { "ana@school.nz": { 0: { url: drawing, documentKey: "google-file:ana-ship", submittedAt: "2026-05-01T00:00:00Z", completed: false },
+            1: { url: "", documentKey: "", submittedAt: null, completed: false } } } }] };
+    const puts = [];
+    const context = vm.createContext({
+        document: { getElementById: el, querySelector: el, createElement: element },
+        window: { addEventListener() {}, location: { search: "?kit=kit-google-drawings&student=ana%40school.nz" } },
+        URLSearchParams,
+        localStorage: { getItem: () => JSON.stringify({ profile: { email: "admin@school.nz" } }) },
+        Option: function (text, value) { return { textContent: text, value }; },
+        fetch: async (url, options) => {
+            if (options?.method === "PUT") {
+                puts.push({ url, body: JSON.parse(options.body) });
+                return { ok: true, json: async () => ({ verification: { passed: JSON.parse(options.body).approved }, completedActivities: {} }) };
+            }
+            return { ok: true, json: async () => url.includes("kit-submissions") ? submissions
+                : url.includes("preview-users") ? { users: [] } : { students, kits } };
+        }
+    });
+    vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "practical-skills", "teacher-results.js"), "utf8"), context);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.equal(el("results-kit").value, "kit-google-drawings", "Emailed link presets Student Review");
+    assert.equal(el("results-emails").value, "ana@school.nz");
+    assert.equal(el("class-kit-filter").value, "kit-google-drawings", "Emailed link presets the kit filter");
+    assert.equal(el("class-student-filter").value, "ana@school.nz");
+    const host = el("class-submissions-host");
+    assert.match(host.children[0].textContent, /Google Drawings Kit - Submissions/);
+    const table = host.children[1].children[0];
+    assert.deepEqual(table.children[0].children[0].children.map((cell) => cell.textContent),
+        ["Student", "Homeroom", "Ship", "Completed", "TV", "Completed"]);
+    const rows = () => host.children[1].children[0].children[1].children;
+    assert.deepEqual(rows().map((row) => row.children[0].textContent), ["Ana"], "Uses the same filtered students as the class table");
+    const shipCell = rows()[0].children[2];
+    assert.equal(shipCell.children[0].href, drawing);
+    assert.equal(shipCell.children[0].target, "_blank");
+    assert.match(shipCell.children[1].textContent, /^Submitted /);
+    assert.equal(rows()[0].children[4].children[0].textContent, "No link");
+    assert.equal(rows()[0].children[5].children[0].children[0].disabled, true, "Nothing to tick without a link");
+    const tick = rows()[0].children[3].children[0].children[0];
+    assert.equal(tick.checked, false);
+    tick.checked = true;
+    await tick.events.change();
+    assert.deepEqual(puts, [{ url: "/api/admin/kit-document-review/kit-google-drawings/0",
+        body: { email: "ana@school.nz", documentKey: "google-file:ana-ship", approved: true } }]);
+    assert.equal(rows()[0].children[3].children[0].children[0].checked, true);
+    assert.match(el("submission-status").textContent, /Ticked Completed for Ana - Ship/);
+    el("class-kit-filter").value = "kit-login";
+    el("class-kit-filter").events.change();
+    assert.equal(host.children.length, 0, "Submissions follow the kit filter");
 });
 
 test("read-only review suppresses the shared sidebar's mutating progress fetch", async () => {

@@ -1,14 +1,17 @@
 "use strict";
 const B = require("./activity-blocks");
 const { POLICY: RATTLESNAKES_POLICY, checkRattlesnakes } = require("./rattlesnakes-check");
-const { POLICY: DRAWING_POLICY, checkGoogleDrawingSvg } = require("./drawing-check");
 const mammoth = require("mammoth");
+const DRAWING_POLICY = B.GOOGLE_DRAWING_POLICY;
 const POLICIES = new Set([RATTLESNAKES_POLICY, DRAWING_POLICY]);
+// Policies that only a teacher can pass; students Submit instead of running an automatic check.
+const TEACHER_ONLY = new Set([DRAWING_POLICY]);
 
 function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
     syncCompletion, getRequestUserEmail, normalizeEmail, schoolDomain, verifyDriveTokenForStudent,
-    driveApiRequest, requireAdminAccess, canReview, autoEmailKitCertificate, fetchFile = fetch }) {
-    let schema;
+    driveApiRequest, requireAdminAccess, canReview, autoEmailKitCertificate, notifySubmission = async () => false,
+    fetchFile = fetch }) {
+    let schema, submissionSchema;
     async function ensureSchema() {
         if (!schema) schema = pool.query(`CREATE TABLE IF NOT EXISTS practical_skills_document_checks (
             student_email TEXT NOT NULL, kit_id TEXT NOT NULL, activity_index INTEGER NOT NULL,
@@ -18,6 +21,25 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
             PRIMARY KEY (student_email, kit_id, activity_index, document_key, policy)
         )`).catch((error) => { schema = null; throw error; });
         await schema;
+    }
+    async function ensureSubmissionSchema() {
+        if (!submissionSchema) submissionSchema = pool.query(`CREATE TABLE IF NOT EXISTS practical_skills_submissions (
+            student_email TEXT NOT NULL, kit_id TEXT NOT NULL, activity_index INTEGER NOT NULL,
+            document_key TEXT NOT NULL, url TEXT NOT NULL, submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            notified_document_key TEXT,
+            PRIMARY KEY (student_email, kit_id, activity_index)
+        )`).catch((error) => { submissionSchema = null; throw error; });
+        await submissionSchema;
+    }
+    // Submission for the student's current link only; a changed link means not yet submitted.
+    async function getSubmission(student, kit, index, documentKey) {
+        if (!documentKey) return null;
+        if (!(await pool.query("SELECT to_regclass('practical_skills_submissions') AS submissions_table")).rows[0]?.submissions_table) return null;
+        const row = (await pool.query(`SELECT document_key, submitted_at FROM practical_skills_submissions
+            WHERE student_email = $1 AND kit_id = $2 AND activity_index = $3 AND document_key = $4
+            AND submitted_at >= COALESCE((SELECT started_at FROM practical_skills_progress
+                WHERE student_email = $1 AND kit_id = $2), '-infinity'::timestamptz)`, [student, kit, index, documentKey])).rows[0];
+        return row ? { documentKey: row.document_key, submittedAt: row.submitted_at } : null;
     }
     function submission(activity, index, responses) {
         const block = activity.blocks.find((block) => block.kind === "studentlink");
@@ -49,14 +71,17 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
             reviewed_by = EXCLUDED.reviewed_by, checked_at = NOW()`,
         [student, kit, index, documentKey, policy, passed, method, JSON.stringify(feedback), reviewer]);
     }
+    async function loadContent(kit) {
+        const stored = await pool.query("SELECT content FROM practical_skills_kit_content WHERE kit_id = $1", [kit]);
+        return B.withFilesFoldersLinks(stored.rows[0]?.content || getDefaultPracticalSkillsKitContent(kit));
+    }
     async function load(req, student) {
         const kit = String(req.params.kitId || "");
         if (!/^kit-[a-z0-9-]{1,60}$/.test(kit) || !/^\d+$/.test(req.params.activityIndex)) {
             throw Object.assign(new Error("Choose a valid kit activity."), { status: 400 });
         }
         const index = Number(req.params.activityIndex);
-        const stored = await pool.query("SELECT content FROM practical_skills_kit_content WHERE kit_id = $1", [kit]);
-        const content = B.withFilesFoldersLinks(stored.rows[0]?.content || getDefaultPracticalSkillsKitContent(kit));
+        const content = await loadContent(kit);
         const activity = content.activities?.[index];
         if (content.deletedAt || !content.worksheets?.[index] || content.worksheets[index].hidden ||
             content.worksheets[index].mergedInto !== undefined || !POLICIES.has(activity?.documentCheck)) {
@@ -111,8 +136,85 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
             if (!email) return;
             try {
                 const item = await load(req, email);
-                res.json({ verification: await get(email, item.kit, item.index, item.activity, item.row.responses) });
+                res.json({ verification: await get(email, item.kit, item.index, item.activity, item.row.responses),
+                    submission: TEACHER_ONLY.has(item.policy) ? await getSubmission(email, item.kit, item.index, item.documentKey) : null });
             } catch (error) { failure(res, error); }
+        });
+        app.post("/api/practical-skills/blocks/:kitId/:activityIndex/submit", async (req, res) => {
+            res.set("Cache-Control", "private, no-store");
+            const email = student(req, res);
+            if (!email) return;
+            try {
+                const item = await load(req, email);
+                if (!TEACHER_ONLY.has(item.policy)) throw Object.assign(new Error("This activity uses its own completion check."), { status: 404 });
+                const answers = B.savedAnswers(item.activity, item.index, item.row.responses);
+                // A stand-in teacher receipt checks everything except the teacher's tick (valid link, other blocks, different file).
+                const ready = B.grade(item.activity, answers, {}, { content: item.content, index: item.index, responses: item.row.responses,
+                    documentVerification: { passed: true, policy: item.policy, documentKey: item.documentKey } });
+                if (!item.documentKey || !ready.passed) {
+                    throw Object.assign(new Error(ready.results.find((result) => !result.passed && result.message)?.message ||
+                        "Save a valid HTTPS sharing link to your Google Drawing before submitting."), { status: 422 });
+                }
+                await ensureSubmissionSchema();
+                const previous = (await pool.query(`SELECT notified_document_key FROM practical_skills_submissions
+                    WHERE student_email = $1 AND kit_id = $2 AND activity_index = $3`, [email, item.kit, item.index])).rows[0];
+                await pool.query(`INSERT INTO practical_skills_submissions (student_email, kit_id, activity_index, document_key, url)
+                    VALUES ($1,$2,$3,$4,$5) ON CONFLICT (student_email, kit_id, activity_index)
+                    DO UPDATE SET document_key = EXCLUDED.document_key, url = EXCLUDED.url, submitted_at = NOW()`,
+                [email, item.kit, item.index, item.documentKey, item.url]);
+                let emailed = false;
+                if (previous?.notified_document_key !== item.documentKey) {
+                    try {
+                        emailed = await notifySubmission({ studentEmail: email, kitId: item.kit, index: item.index, url: item.url,
+                            subject: item.activity.submissionSubject || item.content.worksheets[item.index].activity || `Activity ${item.index + 1}` });
+                        if (emailed) await pool.query(`UPDATE practical_skills_submissions SET notified_document_key = $4
+                            WHERE student_email = $1 AND kit_id = $2 AND activity_index = $3`, [email, item.kit, item.index, item.documentKey]);
+                    } catch (error) {
+                        console.error("[kit-submission] Could not email teacher:", error.message);
+                    }
+                }
+                res.json({ submission: await getSubmission(email, item.kit, item.index, item.documentKey), emailed,
+                    verification: await get(email, item.kit, item.index, item.activity, item.row.responses) });
+            } catch (error) { failure(res, error); }
+        });
+        app.get("/api/admin/kit-submissions", requireAdminAccess, async (req, res) => {
+            res.set("Cache-Control", "private, no-store");
+            const kits = [...new Set(String(req.query.kits || "").split(","))].filter((kit) => /^kit-[a-z0-9-]{1,60}$/.test(kit)).slice(0, 40);
+            try {
+                const result = [];
+                for (const kit of kits) {
+                    const content = await loadContent(kit);
+                    const activities = (content.worksheets || []).map((worksheet, index) => ({ worksheet, index, activity: content.activities?.[index] }))
+                        .filter(({ worksheet, activity }) => worksheet && !worksheet.hidden && worksheet.mergedInto === undefined && TEACHER_ONLY.has(activity?.documentCheck));
+                    if (content.deletedAt || !activities.length) continue;
+                    const progress = (await pool.query("SELECT student_email, started_at, responses FROM practical_skills_progress WHERE kit_id = $1", [kit])).rows;
+                    const tables = (await pool.query(`SELECT to_regclass('practical_skills_document_checks') AS checks_table,
+                        to_regclass('practical_skills_submissions') AS submissions_table`)).rows[0] || {};
+                    const checks = tables.checks_table ? (await pool.query(`SELECT student_email, activity_index, document_key, policy, passed, checked_at
+                        FROM practical_skills_document_checks WHERE kit_id = $1`, [kit])).rows : [];
+                    const submissions = tables.submissions_table ? (await pool.query(`SELECT student_email, activity_index, document_key, submitted_at
+                        FROM practical_skills_submissions WHERE kit_id = $1`, [kit])).rows : [];
+                    const current = (row, email, started) => normalizeEmail(row.student_email) === email &&
+                        (!started || new Date(row.checked_at || row.submitted_at) >= new Date(started));
+                    const students = {};
+                    for (const row of progress) {
+                        const email = normalizeEmail(row.student_email);
+                        students[email] = Object.fromEntries(activities.map(({ index, activity }) => {
+                            const { url, documentKey } = submission(activity, index, row.responses || {});
+                            const mine = (list) => list.find((entry) => current(entry, email, row.started_at) &&
+                                Number(entry.activity_index) === index && entry.document_key === documentKey && documentKey);
+                            const check = mine(checks.filter((entry) => entry.policy === activity.documentCheck));
+                            return [index, { url: documentKey ? url : "", documentKey, submittedAt: mine(submissions)?.submitted_at || null,
+                                completed: check?.passed === true }];
+                        }));
+                    }
+                    result.push({ id: kit, activities: activities.map(({ worksheet, index }) => ({ index, title: worksheet.activity || `Activity ${index + 1}` })), students });
+                }
+                res.json({ kits: result });
+            } catch (error) {
+                console.error("[kit-submission] Could not read submissions:", error.message);
+                res.status(503).json({ error: "Could not read submitted links. No results have been changed." });
+            }
         });
         app.post(base, async (req, res) => {
             res.set("Cache-Control", "private, no-store");
@@ -120,10 +222,9 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
             if (!email) return;
             try {
                 const item = await load(req, email);
-                const drawing = item.policy === DRAWING_POLICY;
-                if (!item.documentKey.startsWith("google-file:")) throw Object.assign(new Error(drawing
-                    ? "Automatic checking supports Google Drawings links. For other links, ask your teacher to review the drawing."
-                    : "Automatic checking supports Google Docs and Word (.docx) files in Google Drive. For OneDrive or other links, ask your teacher to review the document."), { status: 422 });
+                if (TEACHER_ONLY.has(item.policy)) throw Object.assign(new Error("Press Submit. Your teacher reviews this activity and marks it Completed."), { status: 409 });
+                if (!item.documentKey.startsWith("google-file:")) throw Object.assign(new Error(
+                    "Automatic checking supports Google Docs and Word (.docx) files in Google Drive. For OneDrive or other links, ask your teacher to review the document."), { status: 422 });
                 const token = String(req.body?.driveAccessToken || "");
                 if (!token) throw Object.assign(new Error("Google Drive permission is required to read your document."), { status: 400 });
                 await verifyDriveTokenForStudent(token, email);
@@ -134,12 +235,8 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                 });
                 const before = await metadata();
                 if (before.trashed) throw Object.assign(new Error("This document is in the bin. Restore it or submit the correct link."), { status: 422 });
-                let text, result;
-                if (drawing) {
-                    if (before.mimeType !== "application/vnd.google-apps.drawing") throw Object.assign(new Error("Submit the Share Link to your Google Drawing, not an image, PDF, document or folder. Your teacher can review other files."), { status: 422 });
-                    const svg = await readBytes(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}/export?mimeType=image%2Fsvg%2Bxml`, token, 5 * 1024 * 1024);
-                    result = checkGoogleDrawingSvg(svg.toString("utf8"));
-                } else if (before.mimeType === "application/vnd.google-apps.document") {
+                let text;
+                if (before.mimeType === "application/vnd.google-apps.document") {
                     text = (await readBytes(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}/export?mimeType=text%2Fplain`, token, 2 * 1024 * 1024)).toString("utf8");
                 } else if (before.mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
                     if (Number(before.size) > 5 * 1024 * 1024) throw Object.assign(new Error("The Word document is too large for automatic checking. Ask your teacher to review it."), { status: 422 });
@@ -151,7 +248,7 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                         throw Object.assign(new Error("This Word file could not be read. Save it as .docx again, or ask your teacher to review it."), { status: 422 });
                     }
                 } else throw Object.assign(new Error("Submit the typed Google Doc or Word (.docx) document, not a PDF, image, folder or scene file. Your teacher can review unsupported files."), { status: 422 });
-                if (!drawing) result = checkRattlesnakes(text);
+                const result = checkRattlesnakes(text);
                 const after = await metadata();
                 const current = await load(req, email);
                 if (!before.modifiedTime || after.trashed || before.modifiedTime !== after.modifiedTime || item.documentKey !== current.documentKey) {
@@ -188,9 +285,15 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                 const drawing = item.policy === DRAWING_POLICY;
                 await save(email, item.kit, item.index, item.documentKey, item.policy, req.body.approved, "teacher",
                     { message: req.body.approved
-                        ? drawing ? "Teacher reviewed the drawing and approved shape completion." : "Teacher reviewed the document and approved text completion."
-                        : drawing ? "Teacher approval removed. Check the drawing again or request another review." : "Teacher approval removed. Check the document again or request another review." },
+                        ? drawing ? "Teacher reviewed the drawing and marked it Completed." : "Teacher reviewed the document and approved text completion."
+                        : drawing ? "Teacher removed the Completed tick. Update your drawing and press Submit again." : "Teacher approval removed. Check the document again or request another review." },
                     normalizeEmail(getRequestUserEmail(req)));
+                if (TEACHER_ONLY.has(item.policy) && !req.body.approved) {
+                    // Lets the student Submit the same link again once fixed, which re-emails the teacher.
+                    await ensureSubmissionSchema();
+                    await pool.query(`DELETE FROM practical_skills_submissions WHERE student_email = $1 AND kit_id = $2 AND activity_index = $3`,
+                        [email, item.kit, item.index]);
+                }
                 const synced = await syncCompletion(email, item.kit, item.content);
                 res.json({ verification: await get(email, item.kit, item.index, item.activity, item.row.responses),
                     completedActivities: synced.completed_activities });

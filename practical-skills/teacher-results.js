@@ -7,6 +7,11 @@
     const chocolateStatus = document.getElementById("chocolate-status");
     const refreshButton = document.getElementById("class-progress-refresh");
     const pendingChocolate = new Set();
+    const pendingSubmissions = new Set();
+    const submissionsHost = document.getElementById("class-submissions-host");
+    const submissionStatus = document.getElementById("submission-status") || { classList: { add() {}, remove() {} } };
+    const linkParams = new URLSearchParams(window.location.search);
+    let pendingLinkFilters = { kit: linkParams.get("kit") || "", student: linkParams.get("student") || "" };
     const classTableHost = document.getElementById("class-progress-table-host");
     const courseFilter = document.getElementById("class-course-filter");
     const whanauFilter = document.getElementById("class-whanau-filter");
@@ -84,21 +89,97 @@
             if (classData === data) renderClassProgress();
         }
     }
-    function renderClassProgress() {
-        if (!classData || !classTableHost) return;
+    function filteredStudents() {
         const selectedCourse = courseFilter.value;
         const selectedWhanau = whanauFilter.value;
         const selectedHomeroom = homeroomFilter.value;
         const selectedKit = kitFilter.value;
         const selectedStatus = statusFilter.value;
         const query = studentFilter.value.trim().toLowerCase();
-        const students = classData.students.filter((student) =>
+        return classData.students.filter((student) =>
             (!selectedCourse || courseKey(student.course) === selectedCourse)
             && (!selectedWhanau || student.whanau === selectedWhanau)
             && (!selectedHomeroom || student.homeroom === selectedHomeroom)
             && (!selectedKit || !selectedStatus || kitStatus(student.kitProgress?.[selectedKit]) === selectedStatus)
             && (!query || `${student.name} ${student.email}`.toLowerCase().includes(query)))
             .sort((a, b) => a.name.localeCompare(b.name));
+    }
+    async function saveSubmissionCompleted(student, kit, activity, entry, checked) {
+        const data = classData;
+        if (pendingSubmissions.size) return;
+        const key = `${student.email}:${kit.id}:${activity.index}`;
+        pendingSubmissions.add(key);
+        submissionStatus.classList.remove("is-error");
+        submissionStatus.textContent = `Saving Completed for ${student.name} - ${activity.title}...`;
+        renderSubmissions(filteredStudents());
+        try {
+            const response = await fetch(`/api/admin/kit-document-review/${encodeURIComponent(kit.id)}/${activity.index}`, {
+                method: "PUT",
+                headers: { ...adminHeaders(), "Content-Type": "application/json" },
+                body: JSON.stringify({ email: student.email, documentKey: entry.documentKey, approved: checked })
+            });
+            const saved = await response.json();
+            if (!response.ok) throw new Error(saved.error || `Could not save Completed (${response.status}).`);
+            if (classData !== data) return;
+            entry.completed = saved.verification?.passed === true;
+            submissionStatus.textContent = `${entry.completed ? "Ticked" : "Removed"} Completed for ${student.name} - ${activity.title}. Refresh the list to update kit completion.`;
+        } catch (error) {
+            if (classData !== data) return;
+            submissionStatus.textContent = `${student.name} - ${activity.title}: ${error.message || "Could not save Completed. Refresh the list before trying again."}`;
+            submissionStatus.classList.add("is-error");
+        } finally {
+            pendingSubmissions.delete(key);
+            if (classData === data) renderSubmissions(filteredStudents());
+        }
+    }
+    function renderSubmissions(students) {
+        if (!submissionsHost) return;
+        submissionsHost.replaceChildren();
+        const kits = (classData?.submissions || []).filter((kit) => !kitFilter.value || kit.id === kitFilter.value);
+        for (const kit of kits) {
+            const title = classData.kits.find((entry) => entry.id === kit.id)?.title || kit.id;
+            node("h3", `${title} - Submissions`, submissionsHost);
+            if (!students.length) {
+                node("p", "No students match these filters.", submissionsHost);
+                continue;
+            }
+            const wrap = node("div", undefined, submissionsHost, "class-progress-table-host");
+            const table = node("table", undefined, wrap, "class-progress-table class-submissions-table");
+            const header = node("tr", undefined, node("thead", undefined, table));
+            ["Student", "Homeroom", ...kit.activities.flatMap((activity) => [activity.title, "Completed"])].forEach((label) => node("th", label, header));
+            const body = node("tbody", undefined, table);
+            for (const student of students) {
+                const row = node("tr", undefined, body);
+                node("th", student.name, row);
+                node("td", student.homeroom || "Not recorded", row);
+                for (const activity of kit.activities) {
+                    const entry = kit.students?.[String(student.email || "").toLowerCase()]?.[activity.index];
+                    const linkCell = node("td", undefined, row);
+                    if (entry?.url) {
+                        const link = node("a", `Open ${activity.title}`, linkCell);
+                        link.href = entry.url;
+                        link.target = "_blank";
+                        link.rel = "noopener noreferrer";
+                        node("div", entry.submittedAt ? `Submitted ${date(entry.submittedAt)}` : "Link saved, not submitted", linkCell,
+                            entry.submittedAt ? "submission-submitted" : "submission-note");
+                    } else node("span", "No link", linkCell, "submission-note");
+                    const tickCell = node("td", undefined, row, entry?.completed ? "class-progress-complete" : undefined);
+                    const label = node("label", undefined, tickCell);
+                    const checkbox = node("input", undefined, label);
+                    checkbox.type = "checkbox";
+                    checkbox.checked = entry?.completed === true;
+                    checkbox.disabled = !entry?.documentKey || pendingSubmissions.size > 0;
+                    checkbox.setAttribute("aria-label", `Completed for ${student.name} - ${activity.title}`);
+                    node("span", checkbox.checked ? " Completed" : " No", label);
+                    checkbox.addEventListener("change", () => saveSubmissionCompleted(student, { id: kit.id }, activity, entry, checkbox.checked));
+                }
+            }
+        }
+    }
+    function renderClassProgress() {
+        if (!classData || !classTableHost) return;
+        const students = filteredStudents();
+        renderSubmissions(students);
         classTableHost.replaceChildren();
         if (!students.length) {
             node("p", "No students match these filters.", classTableHost);
@@ -161,6 +242,9 @@
         classStatus.classList.remove("is-error");
         classStatus.textContent = "Loading students and kit completion...";
         classTableHost.replaceChildren();
+        submissionsHost?.replaceChildren();
+        submissionStatus.classList.remove("is-error");
+        submissionStatus.textContent = "";
         try {
             const headers = adminHeaders();
             const [usersResponse, progressResponse] = await Promise.all([
@@ -186,7 +270,29 @@
             };
             populateWhanau(classData.students);
             populateKits(classData.kits);
+            if (pendingLinkFilters) {
+                if (classData.kits.some((kit) => kit.id === pendingLinkFilters.kit)) {
+                    kitFilter.value = pendingLinkFilters.kit;
+                    updateStatusFilter();
+                }
+                if (pendingLinkFilters.student) studentFilter.value = pendingLinkFilters.student;
+                pendingLinkFilters = null;
+            }
             renderClassProgress();
+            const kitIds = classData.kits.map((kit) => kit.id).join(",");
+            if (!kitIds) return;
+            try {
+                const response = await fetch(`/api/admin/kit-submissions?kits=${encodeURIComponent(kitIds)}`, { headers, cache: "no-store" });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || `Could not load submitted links (${response.status}).`);
+                if (current !== classRevision) return;
+                classData.submissions = Array.isArray(data.kits) ? data.kits : [];
+                renderClassProgress();
+            } catch (error) {
+                if (current !== classRevision) return;
+                submissionStatus.textContent = error.message || "Could not load submitted links.";
+                submissionStatus.classList.add("is-error");
+            }
         } catch (error) {
             if (current !== classRevision) return;
             classStatus.textContent = error.message || "Could not load class kit progress.";
@@ -219,6 +325,10 @@
         renderClassProgress();
     });
     studentFilter.addEventListener("input", renderClassProgress);
+    if (/^kit-[a-z0-9-]+$/.test(pendingLinkFilters.kit) && pendingLinkFilters.student) {
+        document.getElementById("results-kit").value = pendingLinkFilters.kit;
+        document.getElementById("results-emails").value = pendingLinkFilters.student;
+    }
     void loadClassProgress();
     function values(value, parent) {
         if (value && typeof value === "object") {
@@ -243,9 +353,9 @@
     }
     function renderDocumentReview(parent, kit, index, email, tick, drawing = false) {
         const section = node("section", undefined, parent, "sites-card");
-        node("h4", drawing ? "Google Drawing shape completion" : "Rattlesnakes text completion", section);
+        node("h4", drawing ? "Google Drawing - teacher Completed tick" : "Rattlesnakes text completion", section);
         node("p", drawing
-            ? "Open the current submitted drawing and review it before approving. Check that it resembles the reference picture and is built from filled Insert > Shape objects, not only lines or pasted pictures. This approval replaces the automatic drawing check only; it does not bypass other required blocks or the different-drawing rule."
+            ? "Open the current submitted drawing and review it before ticking Completed. Check that it resembles the reference picture and is built from filled Insert > Shape objects, not only lines or pasted pictures. Only your tick completes this activity. You can also tick Completed in the Submissions list on the Class Kit Progress tab."
             : "Open the current submitted document and review its text before approving. This approval replaces the automatic text check only; it does not bypass other required blocks or the different-document rule.", section);
         const linkHost = node("p", undefined, section);
         const feedback = node("p", "Reading the current link and saved check...", section);
@@ -256,8 +366,8 @@
         label.append(document.createTextNode(drawing
             ? " I have opened this student's current linked drawing and confirmed that it is a similar picture built with shapes."
             : " I have opened this student's current linked document and confirmed that the Rattlesnakes passage is substantially complete."));
-        const approve = node("button", drawing ? "Approve reviewed drawing" : "Approve reviewed document", section, "button button-primary");
-        const revoke = node("button", "Remove approval / require another check", section, "button");
+        const approve = node("button", drawing ? "Tick Completed" : "Approve reviewed document", section, "button button-primary");
+        const revoke = node("button", drawing ? "Remove Completed tick" : "Remove approval / require another check", section, "button");
         const refresh = node("button", "Reload current link and check", section, "button");
         for (const button of [approve, revoke, refresh]) button.type = "button";
         approve.disabled = revoke.disabled = true;
@@ -274,8 +384,8 @@
         reviewed.addEventListener("change", buttons);
         function show(verification) {
             feedback.textContent = verification
-                ? `${verification.passed ? verification.method === "teacher" ? "Teacher approved" : drawing ? "Automatic drawing check passed" : "Automatic text check passed" : "Not yet passed"}: ${date(verification.checkedAt)}${verification.reviewedBy ? ` by ${verification.reviewedBy}` : ""}. ${verification.feedback.message}`
-                : drawing ? "No saved drawing check or teacher approval for the current link." : "No saved text check or teacher approval for the current link.";
+                ? `${verification.passed ? verification.method === "teacher" ? drawing ? "Completed by teacher" : "Teacher approved" : "Automatic text check passed" : "Not yet passed"}: ${date(verification.checkedAt)}${verification.reviewedBy ? ` by ${verification.reviewedBy}` : ""}. ${verification.feedback.message}`
+                : drawing ? "Not ticked Completed for the current link yet." : "No saved text check or teacher approval for the current link.";
         }
         async function reload() {
             busy = true;
@@ -314,7 +424,7 @@
                 if (!response.ok) throw new Error(data.error || "Approval was not confirmed. Reload before retrying.");
                 if (!live()) return;
                 show(data.verification);
-                tick.textContent = `Tick: ${date(data.completedActivities?.[index])} | Completion rule: Automatic with ${drawing ? "drawing" : "text"} check or teacher approval`;
+                tick.textContent = `Tick: ${date(data.completedActivities?.[index])} | Completion rule: ${drawing ? "Student submits; teacher ticks Completed" : "Automatic with text check or teacher approval"}`;
                 reviewed.checked = false;
                 status.textContent = "Document review saved and kit completion recalculated. Refresh class progress to see the updated status. The student can reopen their kit for its certificate.";
             } catch (error) {
@@ -346,7 +456,7 @@
                 const section = node("section", undefined, card, "results-activity");
                 node("h3", `${index + 1}. ${worksheet.activity}`, section);
                 const tick = node("p", `Tick: ${date(progress.completed_activities?.[index])} | Completion rule: ${activity?.completionMode === "auto" ? "Automatic" : "Manual / specialised activity"}`, section);
-                if (activity?.documentCheck === "google-drawing-shapes-v1") {
+                if (activity?.documentCheck === "google-drawing-teacher-v1") {
                     renderDocumentReview(section, data.kitId, index, student.email, tick, true);
                 } else if (activity?.documentCheck === "rattlesnakes-v1" ||
                     /^rattlesnakes$/i.test(String(worksheet.activity || "").trim()) &&

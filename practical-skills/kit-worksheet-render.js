@@ -793,8 +793,8 @@
                 <p class="activity-block-completion">${window.ActivityBlocks.specialised(content)
                     ? "Completion: this activity keeps its specialised assessment rules."
                     : content.completionMode === "auto"
-                        ? content.documentCheck === "google-drawing-shapes-v1"
-                            ? "Auto-Completed: save your Google Drawing's sharing link, then use Check my drawing. It needs at least 8 filled shapes and no inserted pictures, or explicit teacher approval. Use a different drawing for each activity. A link alone does not earn this tick."
+                        ? content.documentCheck === "google-drawing-teacher-v1"
+                            ? "Teacher-Completed: save your Google Drawing's sharing link, then press Submit. Your teacher is emailed the link, reviews your drawing and ticks Completed. Use a different drawing for each activity."
                             : content.shareLinkCompletion
                             ? "Auto-Completed: paste your finished drawing's HTTPS Share Link. The link saves automatically and earns your activity tick. Drawing contents and sharing permissions are not checked."
                             : content.documentCheck

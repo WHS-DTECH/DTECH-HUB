@@ -64,27 +64,35 @@ not through the generic activity builder.
 Validate with `node --test scripts/regression-typing-kit.js` and
 `node scripts/regression-licence-dashboard.js`.
 
-## Google Drawings shape checks
+## Google Drawings submissions and teacher ticks
 
 Ship, TV and Flower Pot in the Google Drawings Kit each show the supplied
 reference picture and instructions to build a similar picture from separate,
 filled Insert > Shape objects, then a required Share Link field.
-A saved link alone does not earn the tick. The student chooses
-**Check my drawing**; the server confirms their Google account, reads the
-Drive file (it must be a Google Drawing), exports it as SVG and stores a
-receipt (`google-drawing-shapes-v1`) when it finds at least 8 filled shapes and
-no inserted or pasted pictures. Line-only and outline-only artwork does not
-pass. Each activity needs a different drawing. Receipts are tied to the current
-link and progress reset, and editing the drawing later needs a new check.
-Teachers can open the drawing in Results and approve or revoke completion.
-The check cannot judge visual similarity to the reference or prove the exact
-menu used; filled text or a filled background may count as shapes, so teacher
-review remains the fallback. Existing link IDs and response keys are retained;
-the one-time upgrade (`drawingCheckVersion: 1`) replaces the shape instructions
-by ID, adds images only if they were never added before, and leaves later
-teacher edits alone. Existing link-only ticks are recalculated and need a check
-or approval. The usual all-activities certificate process applies, and the kit
-stays Not Live until explicitly published. Teacher preview remains read-only.
+A saved link alone does not earn the tick. The student presses **Submit**
+(amber); the server validates the link (each activity needs a different
+drawing), records the submission in `practical_skills_submissions`, and the
+pill and button change to amber **Submitted**. The first submission of each
+link emails the Lead Teachers (the certificate CC recipients) with the subject
+`Google Drawing - <Activity> - <Student name>` and a link to Teacher Review
+(`HUB_PUBLIC_URL` optional; SMTP must be configured). Changing to a new link
+needs Submit again and emails again. An email failure does not block the
+submission.
+
+Only a teacher completes these activities (policy
+`google-drawing-teacher-v1`). On Class Kit Progress, the Submissions list under
+the table follows the same filters, links each student's current drawing and
+has a **Completed** checkbox that saves through
+`PUT /api/admin/kit-document-review/:kitId/:activityIndex` and recalculates
+ticks and the certificate. Student Review offers the same tick. The emailed
+link (`teacher-results.html?kit=&student=`) presets the kit and student
+filters. `GET /api/admin/kit-submissions?kits=` returns the list data.
+Ticks are tied to the current link and progress reset. There is no automatic
+shape check. Existing link IDs and response keys are retained; the upgrade
+(`drawingCheckVersion: 2`) replaces the shape instructions by ID, adds images
+only if they were never added before, and leaves later teacher edits alone.
+The usual all-activities certificate process applies, and the kit stays Not
+Live until explicitly published. Teacher preview remains read-only.
 The Upload menu, Kit Content Builder and Licence Kit Setup links are hidden in
 Student View, including for staff previewing that view. In Teacher View, upload
 tools remain available to staff and builder/setup links require admin access.

@@ -831,6 +831,22 @@ body.kit-worksheet-page {
     color: #ffffff;
 }
 
+.worksheet-status-pill.is-submitted {
+    background: #f59e0b;
+    color: #3b2300;
+}
+
+#worksheet-activity-complete-btn.is-submit {
+    background: #f59e0b;
+    border-color: #d97706;
+    color: #3b2300;
+}
+
+#worksheet-activity-complete-btn.is-submit:disabled {
+    opacity: 0.85;
+    cursor: default;
+}
+
 .worksheet-status-pill[href] {
     text-decoration: none;
     cursor: pointer;

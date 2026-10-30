@@ -8,7 +8,7 @@
   <title>Kit Results | Teacher Review</title>
   <link rel="stylesheet" href="../styles.css">
   <link rel="stylesheet" href="./teacher-login-sites.css">
-  <link rel="stylesheet" href="./teacher-results.css?v=3">
+  <link rel="stylesheet" href="./teacher-results.css?v=4">
 </head>
 <body data-hub-read-only="true">
   <nav class="topbar" aria-label="Primary">
@@ -28,7 +28,7 @@
       <a class="button button-secondary" href="./admin-kits.html">Kit Content Builder</a>
       <a class="button button-secondary" href="./licence-kit-setup.html">Licence Kit Setup</a>
     </nav>
-    <p>Admin access required. Reading saved results does not change answers, completion or certificates, and sends no emails. Chocolate checkboxes save separately. In Student Review, verified teaching staff can explicitly approve Rattlesnakes text completion after opening the student's document; this recalculates its activity tick and kit completion.</p>
+    <p>Admin access required. Reading saved results does not change answers, completion or certificates, and sends no emails. Chocolate and submission Completed checkboxes save separately. In Student Review, verified teaching staff can explicitly approve Rattlesnakes text completion after opening the student's document; this recalculates its activity tick and kit completion.</p>
     <div class="teacher-results-tabs" role="tablist" aria-label="Teacher review pages">
       <button id="class-progress-tab" type="button" role="tab" aria-selected="true" aria-controls="class-progress-panel">Class Kit Progress</button>
       <button id="student-review-tab" type="button" role="tab" aria-selected="false" aria-controls="student-review-panel" tabindex="-1">Student Review</button>
@@ -38,7 +38,7 @@
         <div class="class-progress-heading">
           <div>
             <h2>Class Kit Completion</h2>
-            <p>See which active Licence Kits students have completed. Tick Chocolate when given; unchecked means No. Changes save automatically.</p>
+            <p>See which active Licence Kits students have completed. Tick Chocolate when given; unchecked means No. Changes save automatically. Submitted drawings are listed under the table: open each link and tick Completed when the work is done.</p>
           </div>
           <button id="class-progress-refresh" class="button button-primary" type="button">Refresh list</button>
         </div>
@@ -85,6 +85,8 @@
         <p id="class-progress-status" role="status" aria-live="polite">Sign in with an admin account to load the class list.</p>
         <p id="chocolate-status" role="status" aria-live="polite"></p>
         <div id="class-progress-table-host" class="class-progress-table-host"></div>
+        <p id="submission-status" role="status" aria-live="polite"></p>
+        <div id="class-submissions-host" class="class-submissions-host"></div>
       </div>
     </section>
     <section id="student-review-panel" class="teacher-results-panel" role="tabpanel" aria-labelledby="student-review-tab" hidden>
@@ -99,6 +101,6 @@
   </main>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="../script.js?v=licence-setup-1"></script>
-  <script src="./teacher-results.js?v=8"></script>
+  <script src="./teacher-results.js?v=9"></script>
 </body>
 </html>

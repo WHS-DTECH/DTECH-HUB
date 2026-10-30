@@ -27,7 +27,8 @@
         huntProfile: null,
         certificate: null,
         driveSetupInProgress: false,
-        documentCheckInProgress: false
+        documentCheckInProgress: false,
+        submissions: {}
     };
 
     function normalizeEmail(value) {
@@ -192,8 +193,14 @@
         const selfMarking = Boolean(activity?.assessment || activity?.identityLessonVersion ||
             activity?.questionAutoMarkAssessmentId || activity?.researchReport || siteQuestions);
         const autoBlocks = activity?.completionMode === "auto" && !window.ActivityBlocks.specialised(activity);
-        pill.textContent = completed ? autoBlocks ? "Auto-Completed" : "Completed" : "Not Completed";
+        const teacherReview = activity?.documentCheck === "google-drawing-teacher-v1";
+        const linkBlock = teacherReview ? activity.blocks?.find((block) => block.kind === "studentlink") : null;
+        const currentKey = linkBlock ? window.ActivityBlocks.documentLinkKey(
+            window.ActivityBlocks.savedAnswers(activity, index, state.responses)[linkBlock.id]) : "";
+        const submitted = !preview && Boolean(currentKey) && state.submissions?.[index]?.documentKey === currentKey;
+        pill.textContent = completed ? autoBlocks && !teacherReview ? "Auto-Completed" : "Completed" : submitted ? "Submitted" : "Not Completed";
         pill.classList.toggle("is-complete", completed);
+        pill.classList.toggle("is-submitted", !completed && submitted);
         if (completed) {
             pill.setAttribute("href", `./kit-worksheet.html?kit=${encodeURIComponent(state.kitId)}`);
             pill.setAttribute("aria-label", "Completed - return to kit activity menu");
@@ -203,8 +210,9 @@
             pill.removeAttribute("aria-label");
             pill.removeAttribute("title");
         }
-        button.textContent = activity?.documentCheck === "google-drawing-shapes-v1" ? "Check my drawing" : activity?.documentCheck ? "Check my document" : activity?.unityTestProjectVersion ? "Completed" : autoBlocks ? "Check & Save Activity" : completed ? "Undo Completion" : siteQuestions ? "Check Activity Completion" : "Mark Activity Complete";
-        button.disabled = preview || !state.progressLoaded || Boolean(state.documentCheckInProgress);
+        button.textContent = teacherReview ? submitted || completed ? "Submitted" : "Submit" : activity?.documentCheck ? "Check my document" : activity?.unityTestProjectVersion ? "Completed" : autoBlocks ? "Check & Save Activity" : completed ? "Undo Completion" : siteQuestions ? "Check Activity Completion" : "Mark Activity Complete";
+        button.classList.toggle("is-submit", teacherReview);
+        button.disabled = preview || !state.progressLoaded || Boolean(state.documentCheckInProgress) || (teacherReview && (submitted || completed));
         button.hidden = !preview && selfMarking && !siteQuestions && !completed;
     }
 
@@ -246,21 +254,58 @@
         }
         showStatusMessage("Saving activity answers...");
         const documentStatus = document.getElementById("worksheet-document-check-status");
-        if (documentStatus) documentStatus.textContent = isDrawingCheck(activity)
-            ? "Answers changed. Save them and check the current drawing before relying on an earlier result."
+        if (documentStatus) documentStatus.textContent = isTeacherReview(activity)
+            ? "Answers changed. If you changed your Share Link, press Submit again so your teacher sees the new drawing."
             : "Answers changed. Save them and check the current document before relying on an earlier result.";
         state.blockSaveTimerId = window.setTimeout(() => {
             checkBlockAnswers(index).catch((error) => showStatusMessage(error.message, true));
         }, RESPONSE_SAVE_DEBOUNCE_MS);
     }
 
-    function showDocumentVerification(verification) {
+    function showDocumentVerification(verification, submission) {
         const host = document.getElementById("worksheet-document-check-status");
         if (!host) return;
-        const drawing = isDrawingCheck(state.content?.activities?.[getCurrentActivityIndex()]);
+        const when = (value) => new Date(value).toLocaleString("en-NZ");
+        if (isTeacherReview(state.content?.activities?.[getCurrentActivityIndex()])) {
+            host.textContent = verification?.passed ? `Completed - your teacher marked this drawing Completed on ${when(verification.checkedAt)}.`
+                : submission ? `Submitted ${when(submission.submittedAt)}. Your teacher will review your drawing and tick Completed.`
+                    : verification ? `${verification.feedback.message} (${when(verification.checkedAt)})`
+                        : "Not submitted yet. Save your Share Link, then press Submit.";
+            return;
+        }
         host.textContent = verification
-            ? `${verification.passed ? verification.method === "teacher" ? "Teacher approved" : drawing ? "Drawing check passed" : "Text check passed" : "Not yet passed"} - ${new Date(verification.checkedAt).toLocaleString("en-NZ")}. ${verification.feedback.message}`
-            : drawing ? "No saved drawing check or teacher approval for this link yet." : "No saved text check or teacher approval for this link yet.";
+            ? `${verification.passed ? verification.method === "teacher" ? "Teacher approved" : "Text check passed" : "Not yet passed"} - ${when(verification.checkedAt)}. ${verification.feedback.message}`
+            : "No saved text check or teacher approval for this link yet.";
+    }
+
+    async function submitForReview(index) {
+        if (preview || !state.progressLoaded) throw new Error("Open the live activity after your progress has loaded.");
+        if (state.documentCheckInProgress) throw new Error("Your submission is already being sent. Please wait.");
+        const email = state.email;
+        window.clearTimeout(state.blockSaveTimerId);
+        window.clearTimeout(state.saveTimerId);
+        state.documentCheckInProgress = true;
+        updateActivityCompleteBar();
+        try {
+            await checkBlockAnswers(index);
+            const revision = state.blockRevision;
+            return await queueProgressWrite(async () => {
+                if (getSignedInEmail() !== email || revision !== state.blockRevision) throw new Error("Your account or answers changed. Press Submit again.");
+                showStatusMessage("Submitting your drawing to your teacher...");
+                const result = await loadJson(`${blockPath(index)}/submit`, {
+                    method: "POST", headers: withAuthHeaders({ "Content-Type": "application/json" }), body: "{}"
+                });
+                if (getSignedInEmail() !== email || revision !== state.blockRevision) return result;
+                state.submissions[index] = result.submission;
+                updateActivityCompleteBar();
+                showDocumentVerification(result.verification, result.submission);
+                showStatusMessage("Submitted! Your teacher will review your drawing and tick Completed.");
+                return result;
+            });
+        } finally {
+            state.documentCheckInProgress = false;
+            updateActivityCompleteBar();
+        }
     }
 
     async function checkMyDocument(index) {
@@ -275,16 +320,14 @@
         updateActivityCompleteBar();
         try {
             const activity = state.content.activities[index];
-            const drawing = isDrawingCheck(activity);
             const block = activity.blocks.find((block) => block.kind === "studentlink");
             const documentKey = window.ActivityBlocks.documentLinkKey(
                 window.ActivityBlocks.savedAnswers(activity, index, state.responses)[block.id]);
             if (!documentKey.startsWith("google-file:")) {
                 await checkBlockAnswers(index);
                 throw new Error(documentKey
-                    ? drawing ? "Link saved. Automatic checking supports Google Drawings. Ask your teacher to review other links."
-                        : "Link saved. Automatic checking supports Google Docs and Word (.docx) in Google Drive. Ask your teacher to review other links."
-                    : drawing ? "Answers saved. Add a valid HTTPS Google Drawing sharing link first." : "Answers saved. Add a valid HTTPS document sharing link first.");
+                    ? "Link saved. Automatic checking supports Google Docs and Word (.docx) in Google Drive. Ask your teacher to review other links."
+                    : "Answers saved. Add a valid HTTPS document sharing link first.");
             }
             const permission = getResearchReportDriveToken().then(
                 (token) => ({ token }), (error) => ({ error }));
@@ -295,7 +338,7 @@
             if (getSignedInEmail() !== email || revision !== state.blockRevision) throw new Error("Your account or answers changed. Check the current document again.");
             return await queueProgressWrite(async () => {
                 if (getSignedInEmail() !== email || revision !== state.blockRevision) throw new Error("Your account or answers changed. Check the current document again.");
-                showStatusMessage(drawing ? "Reading your saved Google Drawing and checking its shapes..." : "Reading your saved document and checking the Rattlesnakes text...");
+                showStatusMessage("Reading your saved document and checking the Rattlesnakes text...");
                 const result = await loadJson(`${blockPath(index)}/document-check`, {
                     method: "POST", headers: withAuthHeaders({ "Content-Type": "application/json" }),
                     body: JSON.stringify({ driveAccessToken: token })
@@ -305,9 +348,8 @@
                 updateActivityCompleteBar();
                 showDocumentVerification(result.verification);
                 showStatusMessage(result.verification.passed
-                    ? state.completedActivities[index] ? `${drawing ? "Drawing" : "Text"} check passed and your activity tick is saved.`
-                        : drawing ? "Drawing check passed. Complete the other required blocks and use a different drawing for each activity to earn the tick."
-                            : "Text check passed. Complete the other required blocks and use a different document for each activity to earn the tick."
+                    ? state.completedActivities[index] ? "Text check passed and your activity tick is saved."
+                        : "Text check passed. Complete the other required blocks and use a different document for each activity to earn the tick."
                     : result.verification.feedback.message, !result.verification.passed);
                 return result;
             });
@@ -318,23 +360,23 @@
         }
     }
 
-    function isDrawingCheck(activity) {
-        return activity?.documentCheck === "google-drawing-shapes-v1";
+    function isTeacherReview(activity) {
+        return activity?.documentCheck === "google-drawing-teacher-v1";
     }
 
     function renderDocumentCheck(host, index) {
         const section = document.createElement("section");
         section.className = "sites-card";
-        const drawing = isDrawingCheck(state.content.activities[index]);
+        const drawing = isTeacherReview(state.content.activities[index]);
         const title = document.createElement("h3");
-        title.textContent = drawing ? "Check your Google Drawing" : "Finish your Rattlesnakes document";
+        title.textContent = drawing ? "Submit your Google Drawing" : "Finish your Rattlesnakes document";
         const help = document.createElement("p");
         help.textContent = drawing
-            ? "Save your Google Drawing's sharing link, then use Check my drawing below. The check reads the drawing you submitted using your Google account. For other link types, ask your teacher to review and approve the drawing in Teacher Review."
+            ? "Save your Google Drawing's sharing link, then press Submit below. Your teacher is emailed your link, reviews your drawing and ticks Completed."
             : "Save your document and its sharing link, then use Check my document below. Google Docs and Word (.docx) files in Google Drive can be checked automatically. For other file types or OneDrive, ask your teacher to open the link and approve the completed text in Teacher Review.";
         const note = document.createElement("p");
         note.textContent = drawing
-            ? "To pass, the drawing needs at least 8 filled shapes and no inserted or pasted pictures. Line-only drawings do not pass. The check cannot judge how similar your picture is to the reference, and filled text may be counted, so your teacher may still review it. After editing the drawing, check again."
+            ? "Set sharing so your teacher can open the drawing. If you change to a different drawing link, press Submit again."
             : "This checks that the expected passage is substantially present. It cannot prove you typed it yourself, check formatting, or confirm your teacher's sharing access. A saved result is a check at that time, not continuous monitoring. After editing the document, check again.";
         const status = document.createElement("p");
         status.id = "worksheet-document-check-status";
@@ -342,13 +384,19 @@
         section.append(title, help, note, status);
         host.append(section);
         if (preview || !state.email || !state.progressLoaded) {
-            status.textContent = `${drawing ? "Drawing" : "Document"} checking is available only in the live activity after signing in.`;
+            status.textContent = drawing ? "Submitting is available only in the live activity after signing in." : "Document checking is available only in the live activity after signing in.";
             return;
         }
         const email = state.email, revision = state.blockRevision;
         loadJson(`${blockPath(index)}/document-check`, { headers: withAuthHeaders(), cache: "no-store" })
             .then((result) => {
-                if (status.isConnected && email === getSignedInEmail() && revision === state.blockRevision) showDocumentVerification(result.verification);
+                if (!status.isConnected || email !== getSignedInEmail() || revision !== state.blockRevision) return;
+                if (drawing) {
+                    if (result.submission) state.submissions[index] = result.submission;
+                    else delete state.submissions[index];
+                    updateActivityCompleteBar();
+                }
+                showDocumentVerification(result.verification, result.submission);
             })
             .catch((error) => {
                 if (status.isConnected && email === getSignedInEmail()) status.textContent = `Could not read the saved check: ${error.message}`;
@@ -880,6 +928,10 @@
                 window.clearTimeout(state.saveTimerId);
                 window.clearTimeout(state.blockSaveTimerId);
                 const activity = state.content?.activities?.[index];
+                if (activity?.documentCheck === "google-drawing-teacher-v1") {
+                    await submitForReview(index);
+                    return;
+                }
                 if (activity?.documentCheck) {
                     await checkMyDocument(index);
                     return;
@@ -1001,6 +1053,7 @@
             try {
                 const snapshot = await queueProgressWrite(() => resetKit(state.kitId));
                 state.completedActivities = {};
+                state.submissions = {};
                 state.certificate = null;
                 renderPage();
                 const kitEntry = (snapshot.kits || []).find((entry) => entry.id === state.kitId) || null;
@@ -1069,6 +1122,7 @@
                 if (activity?.blocks) state.responses[`${index}-blocks`] = window.ActivityBlocks.savedAnswers(activity, index, state.responses);
             });
             state.completedActivities = progressPayload?.completedActivities || {};
+            state.submissions = {};
             state.certificate = progressPayload?.certificate || null;
             state.progressLoaded = true;
             const currentActivity = state.content?.activities?.[getCurrentActivityIndex()];
@@ -1154,6 +1208,7 @@
             state.progressLoaded = false;
             state.responses = {};
             state.completedActivities = {};
+            state.submissions = {};
             state.driveSetup = null;
             state.huntProfile = null;
             state.certificate = null;

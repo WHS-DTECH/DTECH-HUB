@@ -73,9 +73,30 @@
 }
 
 #class-progress-status.is-error,
-#chocolate-status.is-error {
+#chocolate-status.is-error,
+#submission-status.is-error {
     color: #a4342f;
     font-weight: 700;
+}
+
+.class-submissions-host h3 {
+    margin: 22px 0 8px;
+}
+
+.submission-submitted {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #f59e0b;
+    color: #3b2300;
+    font-size: 0.85em;
+    font-weight: 700;
+}
+
+.submission-note {
+    color: #526772;
+    font-size: 0.9em;
 }
 
 .class-progress-table-host {

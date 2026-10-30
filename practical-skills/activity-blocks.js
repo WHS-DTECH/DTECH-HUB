@@ -81,7 +81,8 @@
         });
         return changed ? { ...content, activities } : content;
     }
-    const GOOGLE_DRAWING_POLICY = "google-drawing-shapes-v1";
+    // Teacher-ticked: students Submit a link; only a teacher approval receipt earns the tick.
+    const GOOGLE_DRAWING_POLICY = "google-drawing-teacher-v1";
     const asset = (name) => `https://dtech-hub2.onrender.com/practical-skills/images/${name}`;
     const drawingGuides = {
         ship: { flag: "shipShapesReferenceVersion", subject: "ship", similar: "a sailing ship with a hull, masts and sails",
@@ -110,9 +111,10 @@
             "Give your shapes fill colours. You can use lines for extra details, but do not build the whole picture with the Line tool only.",
             "Do not paste or insert the reference picture or any other image. Your drawing must contain your own separate, editable shapes.",
             `Make it look like ${guide.similar}. It does not need to be an exact copy.`,
-            "Share your finished Google Drawing so your teacher can open it, paste its Share Link below, then choose Check my drawing. The check needs at least 8 filled shapes and no inserted pictures. It cannot judge how similar your picture is, so your teacher may review it."
+            "Share your finished Google Drawing so your teacher can open it, paste its Share Link below, then press Submit. Your teacher reviews your drawing and marks it Completed."
         ].join("\n") };
     }
+    const DRAWING_LINK_TEXT = "Paste the HTTPS sharing link to your finished Google Drawing. Set sharing so your teacher can open it, then press Submit. Use a different drawing for each activity.";
     function withGoogleDrawingsLinks(content) {
         if (!/^google\s+drawings\s+kit$/i.test(String(content?.identity?.name || content?.bannerTitle || "").trim())) return content;
         const activities = [...(content.activities || [])];
@@ -122,8 +124,10 @@
             if (!guide || worksheet.hidden || worksheet.mergedInto !== undefined) return;
             const activity = activities[index] || {};
             let blocks = initialBlocks(activity, index, content);
-            const upgrade = activity.drawingCheckVersion !== 1;
+            const upgrade = activity.drawingCheckVersion !== 2;
             if (upgrade) {
+                blocks = blocks.map((block) => block.kind === "studentlink" && /Check my drawing/.test(block.text || "")
+                    ? { ...block, text: DRAWING_LINK_TEXT } : block);
                 if (!activity[guide.flag] && !blocks.some((block) => block.id === guide.image.id)) blocks = [guide.image, ...blocks];
                 const tasks = drawingTasks(guide);
                 const existing = blocks.findIndex((block) => block.id === tasks.id);
@@ -135,19 +139,20 @@
             }
             if (!blocks.some((block) => block.kind === "studentlink")) blocks = [...blocks, {
                 id: `google-drawings-share-link-${index}`, kind: "studentlink", required: true,
-                title: `${worksheet.activity} Share Link`,
-                text: "Paste the HTTPS sharing link to your finished Google Drawing. Set sharing so your teacher can open it, then use Check my drawing. Use a different drawing for each activity."
+                title: `${worksheet.activity} Share Link`, text: DRAWING_LINK_TEXT
             }];
             blocks = blocks.map((block) => {
                 const required = block.kind === "studentlink";
                 return Boolean(block.required) === required ? block : { ...block, required };
             });
+            const submissionSubject = `Google Drawing - ${String(worksheet.activity).trim()}`;
             if (upgrade || activity.completionMode !== "auto" || activity.documentCheck !== GOOGLE_DRAWING_POLICY ||
                 activity.uniqueDocumentLinks !== true || activity.shareLinkCompletion !== undefined || activity[guide.flag] !== 1 ||
+                activity.submissionSubject !== submissionSubject ||
                 !activity.blocks || blocks.length !== activity.blocks.length || blocks.some((block, i) => block !== activity.blocks[i])) {
                 const { shareLinkCompletion: _linkOnly, ...rest } = activity;
                 activities[index] = { ...rest, blocks, completionMode: "auto", documentCheck: GOOGLE_DRAWING_POLICY,
-                    uniqueDocumentLinks: true, drawingCheckVersion: 1, [guide.flag]: 1 };
+                    uniqueDocumentLinks: true, drawingCheckVersion: 2, submissionSubject, [guide.flag]: 1 };
                 changed = true;
             }
         });
@@ -316,7 +321,7 @@
                     receipt.documentKey === documentLinkKey(value);
                 if (!passed) message = receipt?.feedback?.message ||
                     (activity.documentCheck === GOOGLE_DRAWING_POLICY
-                        ? "Link saved. Use Check my drawing to check its shapes, or ask your teacher to review it."
+                        ? "Link saved. Press Submit so your teacher can review your drawing and mark it Completed."
                         : "Link saved. Use Check my document to check the Rattlesnakes text, or ask your teacher to review it.");
             }
             if (b.kind === "checkbox") passed = value === true;
