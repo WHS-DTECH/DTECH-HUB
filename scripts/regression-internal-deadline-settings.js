@@ -11,14 +11,17 @@ test("Shared deadline validates real calendar dates and persists across fresh se
     for (const date of ["2026-11-05", "2028-02-29"]) assert.equal(validDeadline(date), true);
     for (const date of ["2026-02-29", "2026-11-31", "", null, "2026-1-2", "2101-01-01"]) assert.equal(validDeadline(date), false);
     let saved;
+    let savedCourses = null;
     let fail = false;
     const writes = [];
+    const courseOf = { "senior@school.nz": "SeniorDTECH", "junior@school.nz": "JuniorDTECH", "student@school.nz": "MiddleDTECH" };
     const pool = { query: async (sql, params) => {
         if (fail) throw new Error("Database unavailable");
-        if (sql.startsWith("CREATE TABLE")) return { rows: [] };
-        if (sql.startsWith("SELECT")) return { rows: saved ? [{ due_date: saved }] : [] };
+        if (sql.startsWith("CREATE TABLE") || sql.startsWith("ALTER TABLE")) return { rows: [] };
+        if (sql.startsWith("SELECT")) return { rows: saved ? [{ due_date: saved, courses: savedCourses }] : [] };
         writes.push(params);
         saved = params[0];
+        savedCourses = params[2];
         return { rows: [] };
     } };
     const start = async () => {
@@ -27,29 +30,44 @@ test("Shared deadline validates real calendar dates and persists across fresh se
         registerInternalDeadline(app, {
             pool, getRequestUserEmail: (req) => req.headers["x-user-email"] || "",
             normalizeEmail: (value) => value.toLowerCase(), schoolDomain: "school.nz",
-            canManage: async (email) => email === "teacher@school.nz"
+            canManage: async (email) => email === "teacher@school.nz",
+            getCourse: async (email) => courseOf[email] || ""
         });
         const server = await new Promise((resolve) => { const s = app.listen(0, "127.0.0.1", () => resolve(s)); });
         t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); }));
-        return (email, date) => fetch(`http://127.0.0.1:${server.address().port}/api/internal-assessment-deadline`, {
+        return (email, date, courses) => fetch(`http://127.0.0.1:${server.address().port}/api/internal-assessment-deadline`, {
             method: date === undefined ? "GET" : "PUT",
             headers: { "Content-Type": "application/json", "x-user-email": email },
-            body: date === undefined ? undefined : JSON.stringify({ date })
+            body: date === undefined ? undefined : JSON.stringify(courses === undefined ? { date } : { date, courses })
         });
     };
+    const all = ["JuniorDTECH", "MiddleDTECH", "SeniorDTECH"];
     const call = await start();
     assert.equal((await call("")).status, 401);
     assert.equal((await call("student@school.nz", "2026-11-05")).status, 403);
     assert.equal((await call("teacher@school.nz", "2026-02-30")).status, 400);
-    assert.deepEqual(await (await call("student@school.nz")).json(), { date: "2026-10-29" });
-    assert.deepEqual(await (await call("teacher@school.nz", "2026-11-05")).json(), { date: "2026-11-05" });
-    assert.deepEqual(writes, [["2026-11-05", "teacher@school.nz"]]);
+    assert.deepEqual(await (await call("student@school.nz")).json(), { date: "2026-10-29", courses: all, visible: true },
+        "Defaults to every course");
+    assert.deepEqual(await (await call("teacher@school.nz", "2026-11-05")).json(), { date: "2026-11-05", courses: all, visible: true });
+    assert.deepEqual(writes, [["2026-11-05", "teacher@school.nz", JSON.stringify(all)]]);
+    for (const bad of [[], ["Year13"], ["SeniorDTECH", "SeniorDTECH"], "SeniorDTECH"]) {
+        assert.equal((await call("teacher@school.nz", "2026-11-05", bad)).status, 400);
+    }
+    assert.deepEqual((await (await call("teacher@school.nz", "2026-11-06", ["SeniorDTECH", "JuniorDTECH"])).json()).courses,
+        ["JuniorDTECH", "SeniorDTECH"]);
+    assert.equal((await (await call("senior@school.nz")).json()).visible, true);
+    assert.equal((await (await call("junior@school.nz")).json()).visible, true);
+    assert.equal((await (await call("student@school.nz")).json()).visible, false, "MiddleDTECH is not ticked");
+    assert.equal((await (await call("unknown@school.nz")).json()).visible, false, "Students without a course only see it for all courses");
+    assert.equal((await (await call("teacher@school.nz")).json()).visible, true, "Teachers always see the card to edit it");
+    assert.deepEqual((await (await call("teacher@school.nz", "2026-11-07")).json()).courses, ["JuniorDTECH", "SeniorDTECH"],
+        "Date-only saves keep the chosen courses");
     const fresh = await start();
-    assert.deepEqual(await (await fresh("student@school.nz")).json(), { date: "2026-11-05" });
+    assert.deepEqual(await (await fresh("senior@school.nz")).json(), { date: "2026-11-07", courses: ["JuniorDTECH", "SeniorDTECH"], visible: true });
     fail = true;
     assert.equal((await call("student@school.nz")).status, 500);
     assert.equal((await call("teacher@school.nz", "2026-12-01")).status, 500);
-    assert.equal(saved, "2026-11-05", "Failed saves cannot report a changed date");
+    assert.equal(saved, "2026-11-07", "Failed saves cannot report a changed date");
 });
 
 test("Homepage deadline and popup share the saved date; edit is Teacher View only and load failures are explicit", async () => {
@@ -96,6 +114,36 @@ test("Homepage deadline and popup share the saved date; edit is Teacher View onl
     assert.match(source, /<span>\$\{due.month\}<\/span><strong>\$\{due.day\}<\/strong>/);
 });
 
+test("Students outside the ticked courses get no due-date card or reminder", async () => {
+    const source = fs.readFileSync(path.join(__dirname, "..", "script.js"), "utf8");
+    const start = source.indexOf("let INTERNAL_ASSESSMENT_DEADLINE =");
+    const end = source.indexOf("function renderHubPracticalSkillsMenu(", start);
+    const nodes = new Map();
+    const node = (selector) => {
+        if (!nodes.has(selector)) nodes.set(selector, { hidden: true, disabled: true, textContent: "" });
+        return nodes.get(selector);
+    };
+    let visible = false;
+    let created = 0;
+    const context = vm.createContext({
+        document: { querySelector: node, createElement: () => { created++; throw new Error("No reminder expected"); } },
+        localStorage: { getItem: () => null }, Intl, Date, console,
+        hubAuthState: { profile: { email: "middle@school.nz" } }, hubAccessState: {},
+        getEffectiveHubViewMode: () => "student", normalizeEmail: (value) => value.toLowerCase(), withHubAuthHeaders: () => ({}),
+        fetch: async () => ({ ok: true, json: async () => ({ date: "2026-11-04", courses: ["SeniorDTECH"], visible }) })
+    });
+    vm.runInContext(source.slice(start, end), context);
+    await context.renderInternalDeadlineCard();
+    assert.equal(node("#hub-internal-deadline-card").hidden, true);
+    context.showInternalAssessmentDeadlineReminder("middle@school.nz", new Date("2026-11-02T12:00:00+13:00"));
+    assert.equal(created, 0, "Reminder popup follows the same course setting");
+    visible = true;
+    context.hubAuthState.profile.email = "senior@school.nz";
+    await context.renderInternalDeadlineCard();
+    assert.equal(node("#hub-internal-deadline-card").hidden, false);
+    assert.equal(node("#hub-deadline-card-status").textContent, "", "Course note is teacher-only");
+});
+
 test("Teacher date editor saves globally, reloads the card and reports failed saves without closing", async () => {
     const source = fs.readFileSync(path.join(__dirname, "..", "script.js"), "utf8");
     const start = source.indexOf("let INTERNAL_ASSESSMENT_DEADLINE =");
@@ -109,6 +157,8 @@ test("Teacher date editor saves globally, reloads the card and reports failed sa
     let saved = "2026-10-29";
     let fail = false;
     let writes = 0;
+    let ticked = [];
+    let savedCourses;
     const context = vm.createContext({
         document: {
             querySelector: (selector) => selector === ".hub-deadline-editor" ? active || null
@@ -124,6 +174,7 @@ test("Teacher date editor saves globally, reloads the card and reports failed sa
                         });
                         return fields.get(selector);
                     },
+                    querySelectorAll: (selector) => selector === 'input[name="courses"]:checked' ? ticked.map((value) => ({ value })) : [],
                     addEventListener(name, fn) { this.listeners[name] = fn; },
                     showModal() {}, close() { this.listeners.close(); }, remove() { active = null; }
                 };
@@ -138,14 +189,20 @@ test("Teacher date editor saves globally, reloads the card and reports failed sa
                 writes++;
                 if (fail) return { ok: false, json: async () => ({ error: "Save was not confirmed." }) };
                 saved = JSON.parse(options.body).date;
+                savedCourses = JSON.parse(options.body).courses;
             }
-            return { ok: true, json: async () => ({ date: saved }) };
+            return { ok: true, json: async () => ({ date: saved, courses: savedCourses, visible: true }) };
         }
     });
     vm.runInContext(source.slice(start, end), context);
     await context.renderInternalDeadlineCard();
     context.openInternalDeadlineEditor();
     assert.ok(active);
+    assert.match(active.innerHTML, /name="courses" value="SeniorDTECH" checked/, "Courses start ticked from the saved setting");
+    await active.querySelector("form").handler({ preventDefault() {} });
+    assert.equal(active.querySelector('[role="status"]').textContent, "Tick at least one course.");
+    assert.equal(writes, 0, "Nothing is saved without a course");
+    ticked = ["SeniorDTECH"];
     fail = true;
     await active.querySelector("form").handler({ preventDefault() {} });
     assert.match(active.querySelector('[role="status"]').textContent, /Save was not confirmed/);
@@ -157,4 +214,6 @@ test("Teacher date editor saves globally, reloads the card and reports failed sa
     assert.equal(node("#hub-deadline-card-date").textContent, "Thursday 12 November");
     assert.equal(context.internalDeadlineDateParts().label, "Thursday 12 November");
     assert.equal(writes, 2);
+    assert.deepEqual(savedCourses, ["SeniorDTECH"]);
+    assert.equal(node("#hub-deadline-card-status").textContent, "Showing for SeniorDTECH", "Teacher sees which courses get the date");
 });

@@ -2776,6 +2776,9 @@ function showExternalExamIntentionReminder(email) {
 }
 
 let INTERNAL_ASSESSMENT_DEADLINE = "2026-10-29";
+const INTERNAL_DEADLINE_COURSE_OPTIONS = ["JuniorDTECH", "MiddleDTECH", "SeniorDTECH"];
+let INTERNAL_DEADLINE_COURSES = INTERNAL_DEADLINE_COURSE_OPTIONS.slice();
+let internalDeadlineVisible = true;
 const INTERNAL_ASSESSMENT_REMINDER_WEEKDAYS = ["Mon", "Wed"];
 let internalDeadlineRequest = null;
 let internalDeadlineEmail = "";
@@ -2809,6 +2812,10 @@ async function loadInternalAssessmentDeadline(email) {
             }
             if (internalDeadlineEmail !== email) return;
             INTERNAL_ASSESSMENT_DEADLINE = payload.date;
+            INTERNAL_DEADLINE_COURSES = Array.isArray(payload.courses)
+                ? INTERNAL_DEADLINE_COURSE_OPTIONS.filter((course) => payload.courses.includes(course))
+                : INTERNAL_DEADLINE_COURSE_OPTIONS.slice();
+            internalDeadlineVisible = payload.visible !== false;
             internalDeadlineLoaded = true;
         })().finally(() => {
             if (internalDeadlineEmail === email) internalDeadlineRequest = null;
@@ -2826,7 +2833,7 @@ async function renderInternalDeadlineCard() {
     const card = document.querySelector("#hub-internal-deadline-card");
     if (!card) return;
     const email = normalizeEmail(hubAuthState.profile?.email || "");
-    card.hidden = !email;
+    card.hidden = !email || (internalDeadlineLoaded && internalDeadlineEmail === email && !internalDeadlineVisible);
     const button = document.querySelector("#hub-deadline-edit");
     const date = document.querySelector("#hub-deadline-card-date");
     const status = document.querySelector("#hub-deadline-card-status");
@@ -2847,8 +2854,10 @@ async function renderInternalDeadlineCard() {
         await loadInternalAssessmentDeadline(email);
         if (normalizeEmail(hubAuthState.profile?.email || "") !== email) return;
         date.textContent = internalDeadlineDateParts().label;
-        status.textContent = "";
+        status.textContent = INTERNAL_DEADLINE_COURSES.length < INTERNAL_DEADLINE_COURSE_OPTIONS.length && canEditInternalDeadline()
+            ? `Showing for ${INTERNAL_DEADLINE_COURSES.join(", ")}` : "";
         retry.hidden = true;
+        card.hidden = !internalDeadlineVisible;
         button.disabled = !canEditInternalDeadline();
     } catch (error) {
         console.error("Could not load internal due date", error);
@@ -2867,8 +2876,10 @@ function openInternalDeadlineEditor() {
     dialog.setAttribute("aria-labelledby", "hub-deadline-editor-title");
     dialog.innerHTML = `<form>
         <h2 id="hub-deadline-editor-title">Internal Due Date</h2>
-        <p>This changes the date for everyone, on the homepage and in the assessment reminder.</p>
+        <p>Students in the ticked courses see this date on the homepage and in the assessment reminder.</p>
         <label>Due date<input name="date" type="date" min="2000-01-01" max="2100-12-31" required value="${INTERNAL_ASSESSMENT_DEADLINE}"></label>
+        <fieldset class="hub-deadline-editor-courses"><legend>Show for</legend>${INTERNAL_DEADLINE_COURSE_OPTIONS.map((course) =>
+            `<label><input type="checkbox" name="courses" value="${course}"${INTERNAL_DEADLINE_COURSES.includes(course) ? " checked" : ""}> ${course}</label>`).join("")}</fieldset>
         <p role="status" aria-live="polite"></p>
         <div class="hub-deadline-editor-actions"><button type="button" data-cancel>Cancel</button><button type="submit">Save date</button></div>
     </form>`;
@@ -2883,12 +2894,17 @@ function openInternalDeadlineEditor() {
             status.textContent = "Your account or view changed. Reopen this editor in Teacher View.";
             return;
         }
+        const courses = Array.from(dialog.querySelectorAll('input[name="courses"]:checked'), (input) => input.value);
+        if (!courses.length) {
+            status.textContent = "Tick at least one course.";
+            return;
+        }
         save.disabled = true;
         status.textContent = "Saving...";
         try {
             const response = await fetch("/api/internal-assessment-deadline", {
                 method: "PUT", headers: withHubAuthHeaders({ "Content-Type": "application/json" }, email),
-                body: JSON.stringify({ date: dialog.querySelector("input").value })
+                body: JSON.stringify({ date: dialog.querySelector('input[name="date"]').value, courses })
             });
             const payload = await response.json();
             if (!response.ok) throw new Error(payload.error || "Could not save the due date.");
@@ -2907,7 +2923,7 @@ function openInternalDeadlineEditor() {
     });
     document.body.appendChild(dialog);
     dialog.showModal();
-    dialog.querySelector("input").focus();
+    dialog.querySelector('input[name="date"]').focus();
 }
 
 function getNzDateParts(now = new Date()) {
@@ -2926,7 +2942,7 @@ function shouldShowInternalAssessmentDeadlineReminder(now = new Date()) {
 function showInternalAssessmentDeadlineReminder(email, now = new Date()) {
     const safeEmail = normalizeEmail(email);
     if (!safeEmail || typeof document.createElement !== "function") return;
-    if (!shouldShowInternalAssessmentDeadlineReminder(now)) return;
+    if (!internalDeadlineVisible || !shouldShowInternalAssessmentDeadlineReminder(now)) return;
     const reminderKey = `hub_internal_deadline_reminder_dismissed_v1:${safeEmail}:${getNzDateParts(now).isoDate}:${INTERNAL_ASSESSMENT_DEADLINE}`;
     try {
         if (localStorage.getItem(reminderKey)) return;

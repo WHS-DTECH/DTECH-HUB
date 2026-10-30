@@ -1428,6 +1428,10 @@ a {
 .hub-deadline-editor::backdrop { background: rgba(0, 0, 0, 0.5); }
 .hub-deadline-editor label { display: grid; gap: 8px; margin: 16px 0; }
 .hub-deadline-editor input { padding: 10px; font: inherit; }
+.hub-deadline-editor-courses { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 0 0 16px; padding: 12px 14px; border: 1px solid #d0d5dd; border-radius: 10px; }
+.hub-deadline-editor-courses legend { padding: 0 6px; font-weight: 600; }
+.hub-deadline-editor .hub-deadline-editor-courses label { display: flex; align-items: center; gap: 6px; margin: 0; }
+.hub-deadline-editor-courses input { padding: 0; width: 18px; height: 18px; }
 .hub-deadline-editor-actions { display: flex; justify-content: flex-end; gap: 12px; }
 @media (max-width: 1000px) {
     .hero-deadline-layout { grid-template-columns: 1fr; }

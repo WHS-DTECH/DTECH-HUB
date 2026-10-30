@@ -16365,7 +16365,8 @@ app.get("/api/admin/practical-skills/kit-content/:kitId", requireAdminAccess, as
 });
 
 registerInternalDeadline(app, {
-  pool, getRequestUserEmail, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN, canManage: canManagePracticalSchedule
+  pool, getRequestUserEmail, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN, canManage: canManagePracticalSchedule,
+  getCourse: async (email) => getResearchReportProgrammeFolder(await getLearningSitesStudentProfile(email))
 });
 
 app.get("/api/practical-skills/login-sites/settings", async (req, res) => {
