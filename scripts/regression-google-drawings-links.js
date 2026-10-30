@@ -206,11 +206,32 @@ test("submission email helper sends the activity subject and student name to Lea
     "No email is attempted without SMTP");
 });
 
+test("a teacher-triggered certificate email is built and sent for the student, not the teacher", async () => {
+    const calls = [];
+    const ctx = vm.createContext({
+        smtpTransporter: {}, SMTP_FROM: "hub@school.nz", console,
+        normalizeEmail: (value) => String(value || "").trim().toLowerCase(),
+        getRequestUserEmail: () => "teacher@school.nz",
+        kitPublication: { available: async () => true },
+        getStoredPracticalSkillsKitContent: async () => ({ id: "content" }),
+        syncPracticalSkillsKitCompletion: async (email) => { calls.push(["sync", email]); return { completed: true }; },
+        getPracticalSkillsStudentName: async (_req, email) => { calls.push(["name", email]); return "Aroha Smith"; },
+        buildKitCertificate: (_content, _row, name) => ({ name }),
+        emailKitCertificateOnce: async (email, kitId, certificate) => { calls.push(["email", email, kitId, certificate.name]); return true; }
+    });
+    const slice = (name, end) => { const start = source.indexOf(`async function ${name}(`); return source.slice(start, source.indexOf(end, start)); };
+    vm.runInContext(slice("getPracticalSkillsCertificate", "\nasync function getPracticalSkillsStudentName(") +
+        slice("autoEmailKitCertificate", "\n// Throws on send failure"), ctx);
+    assert.equal(await ctx.autoEmailKitCertificate({}, "kit-google-drawings", undefined, "Student@school.nz"), true);
+    assert.deepEqual(calls, [["sync", "student@school.nz"], ["name", "student@school.nz"],
+        ["email", "student@school.nz", "kit-google-drawings", "Aroha Smith"]]);
+});
+
 async function fixture(t) {
     const kit = B.withFilesFoldersLinks(base()), email = "student@school.nz", kitId = "kit-google-drawings";
     const progress = { student_email: email, kit_id: kitId, completed: false, completed_activities: {}, started_at: null,
         responses: Object.fromEntries([0, 1, 2].map((i) => [`${i}-blocks`, answer(kit, i, link(i))])) };
-    const checks = new Map(), submissions = new Map(), notices = [];
+    const checks = new Map(), submissions = new Map(), notices = [], certificateEmails = [];
     let tables = false, emailFails = false;
     const key = (params) => JSON.stringify([params[0], params[1], Number(params[2]), params[3], params[4]]);
     const subKey = (params) => JSON.stringify([params[0], params[1], Number(params[2])]);
@@ -265,7 +286,9 @@ async function fixture(t) {
         verifyDriveTokenForStudent: async () => { throw new Error("Drawings are never downloaded"); },
         driveApiRequest: async () => { throw new Error("Drawings are never downloaded"); },
         fetchFile: async () => { throw new Error("Drawings are never downloaded"); },
-        autoEmailKitCertificate: async () => {},
+        autoEmailKitCertificate: async (req, kitId, certificate, studentEmail) => {
+            certificateEmails.push({ requester: req.headers["x-user-email"], kitId, certificate, studentEmail });
+        },
         notifySubmission: async (notice) => {
             notices.push(notice);
             if (emailFails) throw new Error("SMTP down");
@@ -294,7 +317,7 @@ async function fixture(t) {
     };
     const teacherHeaders = { "x-teacher": "yes", "x-user-email": "teacher@school.nz" };
     return {
-        kit, progress, sync, request, notices, failEmail: (value) => { emailFails = value; },
+        kit, progress, sync, request, notices, certificateEmails, failEmail: (value) => { emailFails = value; },
         setLink: (i, url) => { progress.responses[`${i}-blocks`] = answer(kit, i, url); },
         submit: (i) => request(`/api/practical-skills/blocks/${kitId}/${i}/submit`, "POST", {}),
         status: (i) => request(`/api/practical-skills/blocks/${kitId}/${i}/document-check`),
@@ -369,7 +392,11 @@ test("teacher submissions list and Completed ticks drive kit completion and the 
     }
     assert.equal((await f.list()).data.kits[0].students["student@school.nz"][0].completed, true);
     assert.equal((await f.approve(2, true, link(9))).status, 409, "A stale link cannot be ticked");
-    await f.approve(2);
+    assert.equal(f.certificateEmails.length, 0, "No certificate email until every activity is Completed");
+    const last = await f.approve(2);
+    assert.equal(last.data.kitCompleted, true);
+    assert.deepEqual(f.certificateEmails, [{ requester: "teacher@school.nz", kitId: "kit-google-drawings",
+        certificate: undefined, studentEmail: "student@school.nz" }], "The final teacher tick emails the student's certificate");
     await f.sync();
     assert.equal(f.progress.completed, true);
     assert.equal(certificates.buildKitCertificate(f.kit, f.progress, "Student").activityCount, 3);
@@ -377,6 +404,7 @@ test("teacher submissions list and Completed ticks drive kit completion and the 
     assert.match(removed.data.verification.feedback.message, /press Submit again/);
     await f.sync();
     assert.equal(f.progress.completed, false, "Removing the Completed tick removes the activity tick");
+    assert.equal(f.certificateEmails.length, 1, "Removing a tick never emails a certificate");
     assert.equal((await f.status(0)).data.submission, null, "The student can Submit the same link again after a removed tick");
     assert.equal((await f.submit(0)).data.emailed, true, "Resubmitting after a removed tick emails the teacher");
 });

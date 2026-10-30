@@ -15434,12 +15434,12 @@ async function syncPracticalSkillsKitCompletion(studentEmail, kitId, content = n
   return result.rows[0];
 }
 
-async function getPracticalSkillsCertificate(req, kitId) {
+async function getPracticalSkillsCertificate(req, kitId, studentEmail = "") {
   if (!(await kitPublication.available(kitId))) return null;
-  const email = normalizeEmail(getRequestUserEmail(req));
+  const email = normalizeEmail(studentEmail || getRequestUserEmail(req));
   const content = await getStoredPracticalSkillsKitContent(kitId);
   const row = await syncPracticalSkillsKitCompletion(email, kitId, content);
-  const name = row.completed ? await getPracticalSkillsStudentName(req) : email;
+  const name = row.completed ? await getPracticalSkillsStudentName(req, email) : email;
   return buildKitCertificate(content, row, name);
 }
 
@@ -15644,12 +15644,13 @@ async function claimKitCertificateAutoEmail(studentEmail, kitId, claim = true) {
 }
 
 // Emails the certificate the first time a kit is completed. Never throws; returns true when an email was sent.
-async function autoEmailKitCertificate(req, kitId, certificate = undefined) {
-  const studentEmail = normalizeEmail(getRequestUserEmail(req));
+// studentEmail lets a teacher action (e.g. ticking the last activity Completed) email the student's certificate.
+async function autoEmailKitCertificate(req, kitId, certificate = undefined, studentEmail = "") {
+  const email = normalizeEmail(studentEmail || getRequestUserEmail(req));
   try {
-    if (!studentEmail || !smtpTransporter || !SMTP_FROM) return false;
-    const ready = certificate === undefined ? await getPracticalSkillsCertificate(req, kitId) : certificate;
-    return await emailKitCertificateOnce(studentEmail, kitId, ready);
+    if (!email || !smtpTransporter || !SMTP_FROM) return false;
+    const ready = certificate === undefined ? await getPracticalSkillsCertificate(req, kitId, email) : certificate;
+    return await emailKitCertificateOnce(email, kitId, ready);
   } catch (error) {
     console.error("[kit-certificate-email] Could not automatically email certificate:", error);
     return false;

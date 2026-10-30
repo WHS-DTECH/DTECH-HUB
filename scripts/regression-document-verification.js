@@ -84,6 +84,7 @@ async function fixture(t) {
     const checks = new Map(), queries = [], downloads = [];
     let table = false, fail = false, text = paragraphs.join("\n\n"), binary, readStatus = 200;
     let mimeType = "application/vnd.google-apps.document", changed = false, mutateLink = false, fileCalls = 0, emails = 0;
+    const certificateTargets = [];
     const key = (params) => JSON.stringify([params[0], params[1], Number(params[2]), params[3], params[4]]);
     const pool = { async query(sql, params) {
         queries.push(sql);
@@ -141,7 +142,7 @@ async function fixture(t) {
             if (mutateLink) progress.responses["0-blocks"].link = link(9);
             return new Response(binary || text, { status: readStatus });
         },
-        autoEmailKitCertificate: async () => { emails++; }
+        autoEmailKitCertificate: async (_req, _kit, _certificate, studentEmail) => { emails++; certificateTargets.push(studentEmail); }
     };
     const verification = createDocumentVerification(deps);
     ctx.documentVerification = verification;
@@ -182,7 +183,7 @@ async function fixture(t) {
         setText: (value) => { text = value; }, setBinary: (value) => { binary = value; },
         setMime: (value) => { mimeType = value; }, setChanged: () => { changed = true; },
         setLinkMutation: () => { mutateLink = true; }, setReadStatus: (value) => { readStatus = value; },
-        setFail: () => { fail = true; }, emails: () => emails
+        setFail: () => { fail = true; }, emails: () => emails, certificateTargets: () => certificateTargets
     };
 }
 
@@ -299,7 +300,9 @@ test("teacher reads are SELECT-only; approval is explicit, audited and bound to 
     assert.equal(approved.data.verification.reviewedBy, "teacher@school.nz");
     assert.equal(approved.data.verification.passed, true);
     assert.equal(f.progress.completed, true);
-    assert.equal(f.emails(), 0, "Teacher action must not email a certificate under the teacher's identity");
+    assert.equal(f.emails(), 1, "Teacher approval that completes the kit emails the certificate");
+    assert.deepEqual(f.certificateTargets(), ["student@school.nz"],
+        "The certificate email targets the student, never the teacher's identity");
     const revoked = await f.approve(undefined, false);
     assert.equal(revoked.data.verification.passed, false);
     assert.equal(f.progress.completed, false);

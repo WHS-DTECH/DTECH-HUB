@@ -122,7 +122,9 @@
             if (!response.ok) throw new Error(saved.error || `Could not save Completed (${response.status}).`);
             if (classData !== data) return;
             entry.completed = saved.verification?.passed === true;
-            submissionStatus.textContent = `${entry.completed ? "Ticked" : "Removed"} Completed for ${student.name} - ${activity.title}. Refresh the list to update kit completion.`;
+            submissionStatus.textContent = saved.kitCompleted && entry.completed
+                ? `Ticked Completed for ${student.name} - ${activity.title}. All activities are complete: the kit is marked complete and the certificate is emailed as normal.`
+                : `${entry.completed ? "Ticked" : "Removed"} Completed for ${student.name} - ${activity.title}. Refresh the list to update kit completion.`;
         } catch (error) {
             if (classData !== data) return;
             submissionStatus.textContent = `${student.name} - ${activity.title}: ${error.message || "Could not save Completed. Refresh the list before trying again."}`;

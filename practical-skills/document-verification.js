@@ -295,8 +295,9 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                         [email, item.kit, item.index]);
                 }
                 const synced = await syncCompletion(email, item.kit, item.content);
+                if (synced.completed && req.body.approved) void autoEmailKitCertificate(req, item.kit, undefined, email);
                 res.json({ verification: await get(email, item.kit, item.index, item.activity, item.row.responses),
-                    completedActivities: synced.completed_activities });
+                    completedActivities: synced.completed_activities, kitCompleted: Boolean(synced.completed) });
             } catch (error) { failure(res, error); }
         });
     }

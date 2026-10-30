@@ -84,7 +84,9 @@ Only a teacher completes these activities (policy
 the table follows the same filters, links each student's current drawing and
 has a **Completed** checkbox that saves through
 `PUT /api/admin/kit-document-review/:kitId/:activityIndex` and recalculates
-ticks and the certificate. Student Review offers the same tick. The emailed
+ticks and the certificate. When the teacher's tick completes the final
+activity, the kit is marked complete and the student's certificate is emailed
+automatically (once, same as a student-completed kit). Student Review offers the same tick. The emailed
 link (`teacher-results.html?kit=&student=`) presets the kit and student
 filters. `GET /api/admin/kit-submissions?kits=` returns the list data.
 Ticks are tied to the current link and progress reset. There is no automatic
