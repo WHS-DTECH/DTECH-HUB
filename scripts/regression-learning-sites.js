@@ -16,6 +16,29 @@ const between = (start, end) => {
 };
 
 async function main() {
+    {
+        // A student's email can live only on an older upload snapshot while the latest snapshot holds their year.
+        const ctx = vm.createContext({ ...hunt, normalizeEmail: (e) => String(e || "").trim().toLowerCase(),
+            canManagePracticalSchedule: async () => false, buildStudentClassManagementRow: (row) => row });
+        vm.runInContext(between("function mergeUniqueStrings(", "\nfunction collectStudentLinkedEmails("), ctx);
+        vm.runInContext(between("function getStudentIdentityKey(", "\nconst suggestionNotificationFallback"), ctx);
+        vm.runInContext(between("async function getLearningSitesStudentProfile(", "\nasync function getSavedLearningSitesCheckIn("), ctx);
+        const email = "a_student@example.school.nz";
+        const rows = [
+            { id_number: "77", student_name: "Student, A", year_level: "6", homeroom: "6WPAPA", timetable_class: "", programs: [],
+                linked_emails: [email], timetable: [], dtech_timetable: [], status: "Current", upload_year: "2025", upload_term: "Term 4" },
+            { id_number: "77", student_name: "Student, A", year_level: "7", homeroom: "7WPAPA", timetable_class: "JSR", programs: [],
+                linked_emails: [], timetable: [], dtech_timetable: [], status: "Current", upload_year: "2026", upload_term: "Term 4" }
+        ];
+        const merged = await ctx.getLearningSitesStudentProfile(email, rows);
+        assert.equal(merged.available, true, merged.message);
+        assert.equal(merged.year, 7);
+        assert.deepEqual(Array.from(merged.courseIds), ["7DTECH"], "Login Kit matches the merged Year 7 JuniorDTECH profile");
+        const notCurrent = await ctx.getLearningSitesStudentProfile(email, [rows[0], { ...rows[1], status: "Not current" }]);
+        assert.equal(notCurrent.available, false, "A latest Not current snapshot still blocks the tick");
+        const twoStudents = await ctx.getLearningSitesStudentProfile(email, [rows[0], { ...rows[1], id_number: "78", linked_emails: [email] }]);
+        assert.match(twoStudents.message, /More than one student profile/);
+    }
     const content = { worksheets: [{ activity: "Other" }, { activity: "Open DTECH Learning Site" }], activities: [null, { questions: [{ id: "teacher" }], images: [{ url: "test.png" }] }] };
     const enhanced = hunt.withLearningSitesActivity("kit-login", content);
     assert.equal(enhanced.activities[1].assessmentId, hunt.LEARNING_SITES_ID);
@@ -171,6 +194,11 @@ async function main() {
         buildStudentClassManagementRow: (row) => row,
         getStudentIdentityKey: (row) => row.id_number,
         shouldReplaceStudentSnapshot: (a, b) => b.upload_year > a.upload_year,
+        dedupeToLatestStudentRows: (rows) => Array.from(rows.reduce((map, row) => {
+            const current = map.get(row.id_number);
+            if (!current || row.upload_year > current.upload_year) map.set(row.id_number, row);
+            return map;
+        }, new Map()).values()),
         getPracticalSkillsKitDefinition: (id) => id === "kit-login",
         getStoredPracticalSkillsKitContent: async () => enhanced,
         savePracticalSkillsAssessment: async (_email, _kit, _index, grade) => ({ completed_activities: grade.passed ? { 1: "saved" } : {} })

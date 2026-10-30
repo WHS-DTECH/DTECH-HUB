@@ -15791,12 +15791,14 @@ app.put("/api/practical-skills/progress/:kitId/activities/:activityIndex", async
 async function getLearningSitesStudentProfile(email, directoryRows = null) {
   if (await canManagePracticalSchedule(email)) return getHuntProfile(null, { isStaff: true });
   const sourceRows = Array.isArray(directoryRows) ? directoryRows : await getStudentDirectoryRows();
-  const rows = sourceRows.map(buildStudentClassManagementRow)
-    .filter((row) => row.linked_emails.some((linkedEmail) => normalizeEmail(linkedEmail) === email));
+  // Merge each student's upload snapshots first (as Class Kit Progress does), so an email or year
+  // recorded only on an older snapshot still reaches the latest profile.
+  const rows = dedupeToLatestStudentRows(sourceRows.map(buildStudentClassManagementRow))
+    .filter((row) => (row.linked_emails || []).some((linkedEmail) => normalizeEmail(linkedEmail) === email));
   if (new Set(rows.map(getStudentIdentityKey)).size > 1) {
     return { available: false, courseIds: [], message: "More than one student profile is linked to your account. Ask your teacher to check your profile before completing this hunt." };
   }
-  const latest = rows.reduce((current, row) => !current || shouldReplaceStudentSnapshot(current, row) ? row : current, null);
+  const latest = rows[0] || null;
   return getHuntProfile(latest?.status?.toLowerCase() === "not current" ? null : latest);
 }
 
