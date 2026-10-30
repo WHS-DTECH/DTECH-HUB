@@ -510,6 +510,12 @@ test("licence reads verify OAuth sign-in before the publication gate without ena
     }
     assert.equal((await call("valid-oauth", "/api/practical-skills/progress/kit-unity-setup")).verified, false);
     assert.equal((await call("valid-oauth", licencePath, "PUT")).verified, false);
+    const reviewPath = "/api/admin/kit-document-review/kit-google-drawings/0";
+    assert.equal((await call("valid-oauth", reviewPath, "PUT")).source, "google_access_token", "Teacher Completed ticks accept OAuth sign-in");
+    assert.equal((await call("valid-oauth", reviewPath)).verified, true);
+    assert.equal((await call("expired-oauth", reviewPath, "PUT")).verified, false);
+    assert.equal((await call("valid-oauth", reviewPath, "DELETE")).verified, false);
+    assert.equal((await call("valid-oauth", "/api/admin/kit-submissions")).verified, false);
 });
 
 test("the reused OAuth verifier rejects expired, wrong-app and non-school identities", async () => {

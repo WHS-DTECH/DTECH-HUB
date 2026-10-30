@@ -405,15 +405,18 @@ test("submissions list follows the class filters, links drawings and saves teach
         students: { "ana@school.nz": { 0: { url: drawing, documentKey: "google-file:ana-ship", submittedAt: "2026-05-01T00:00:00Z", completed: false },
             1: { url: "", documentKey: "", submittedAt: null, completed: false } } } }] };
     const puts = [];
+    const auths = [];
     const context = vm.createContext({
         document: { getElementById: el, querySelector: el, createElement: element },
         window: { addEventListener() {}, location: { search: "?kit=kit-google-drawings&student=ana%40school.nz" } },
         URLSearchParams,
-        localStorage: { getItem: () => JSON.stringify({ profile: { email: "admin@school.nz" } }) },
+        localStorage: { getItem: () => JSON.stringify({ profile: { email: "admin@school.nz" }, idToken: null,
+            accessToken: "oauth-teacher", expiresAt: Date.now() + 60000 }) },
         Option: function (text, value) { return { textContent: text, value }; },
         fetch: async (url, options) => {
             if (options?.method === "PUT") {
                 puts.push({ url, body: JSON.parse(options.body) });
+                auths.push(options.headers.Authorization);
                 return { ok: true, json: async () => ({ verification: { passed: JSON.parse(options.body).approved }, completedActivities: {} }) };
             }
             return { ok: true, json: async () => url.includes("kit-submissions") ? submissions
@@ -445,6 +448,7 @@ test("submissions list follows the class filters, links drawings and saves teach
     await tick.events.change();
     assert.deepEqual(puts, [{ url: "/api/admin/kit-document-review/kit-google-drawings/0",
         body: { email: "ana@school.nz", documentKey: "google-file:ana-ship", approved: true } }]);
+    assert.deepEqual(auths, ["Bearer oauth-teacher"], "Popup (OAuth) sign-in can tick Completed");
     assert.equal(rows()[0].children[3].children[0].children[0].checked, true);
     assert.match(el("submission-status").textContent, /Ticked Completed for Ana - Ship/);
     el("class-kit-filter").value = "kit-login";

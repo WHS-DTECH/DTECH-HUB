@@ -36,13 +36,20 @@
     function date(value) {
         return value ? new Date(value).toLocaleString("en-NZ", { timeZone: "Pacific/Auckland" }) : "Not recorded";
     }
-    function adminHeaders() {
+    function adminHeaders(allowAccessToken = false) {
         const raw = localStorage.getItem("hub_google_auth_v1") || sessionStorage.getItem("hub_google_auth_v1") || "";
         const auth = raw ? JSON.parse(raw) : null;
         if (!auth?.profile?.email) throw new Error("Sign in with your admin school account first.");
         const headers = { "x-user-email": auth.profile.email };
-        const token = auth.idToken || auth.accessToken || "";
-        if (token.startsWith("eyJ") && token.split(".").length === 3) headers.Authorization = `Bearer ${token}`;
+        const idToken = String(auth.idToken || "").trim();
+        let idTokenLive = false;
+        try {
+            idTokenLive = idToken.split(".").length === 3 &&
+                Number(JSON.parse(atob(idToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).exp) * 1000 > Date.now();
+        } catch (_error) { idTokenLive = false; }
+        const accessToken = allowAccessToken && Number(auth.expiresAt) > Date.now() ? String(auth.accessToken || "").trim() : "";
+        const token = idTokenLive ? idToken : accessToken;
+        if (token) headers.Authorization = `Bearer ${token}`;
         return headers;
     }
     function courseKey(value) {
@@ -115,7 +122,7 @@
         try {
             const response = await fetch(`/api/admin/kit-document-review/${encodeURIComponent(kit.id)}/${activity.index}`, {
                 method: "PUT",
-                headers: { ...adminHeaders(), "Content-Type": "application/json" },
+                headers: { ...adminHeaders(true), "Content-Type": "application/json" },
                 body: JSON.stringify({ email: student.email, documentKey: entry.documentKey, approved: checked })
             });
             const saved = await response.json();
@@ -393,7 +400,7 @@
             busy = true;
             buttons();
             try {
-                const response = await fetch(`${path}?email=${encodeURIComponent(email)}`, { headers: adminHeaders(), cache: "no-store" });
+                const response = await fetch(`${path}?email=${encodeURIComponent(email)}`, { headers: adminHeaders(true), cache: "no-store" });
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.error || "Could not read the document review.");
                 if (!live()) return;
@@ -419,7 +426,7 @@
             buttons();
             try {
                 const response = await fetch(path, {
-                    method: "PUT", headers: { ...adminHeaders(), "Content-Type": "application/json" },
+                    method: "PUT", headers: { ...adminHeaders(true), "Content-Type": "application/json" },
                     body: JSON.stringify({ email, documentKey, approved })
                 });
                 const data = await response.json();
