@@ -18441,6 +18441,20 @@ app.post("/api/activities/:id/slideshow-pdf", async (req, res) => {
   }
 });
 
+app.get("/api/activities/:id/submission-slideshows", async (req, res) => {
+  try {
+    const context = await loadFinalOutcomeContext(req);
+    res.set("Cache-Control", "no-store").json({
+      template_copies: context.copies.filter((entry) =>
+        entry?.templateId === "submission-additional-slideshows-answer"
+        || additionalSlideshowId(entry?.templateId)
+        || additionalSlideshowId(entry?.templateId, "submission-extra-slideshow-pdf-"))
+    });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: error.message || "Could not load saved additional slideshow cards. Please retry." });
+  }
+});
+
 app.post("/api/activities/:id/submission-slideshows", async (req, res) => {
   try {
     const context = await loadFinalOutcomeContext(req);
@@ -18484,10 +18498,16 @@ app.post("/api/activities/:id/submission-slideshows", async (req, res) => {
       if (action === "sync") {
         const sourceId = documentationPresentationId(req.body?.presentationUrl);
         if (!sourceId) throw Object.assign(new Error("Paste a valid Google Slides presentation link."), { status: 400 });
-        const duplicate = latest.copies.some((entry) => entry?.templateId !== sourceTemplateId
+        const duplicate = latest.copies.find((entry) => entry?.templateId !== sourceTemplateId
           && additionalSlideshowId(entry?.templateId)
           && documentationPresentationId(entry.fileUrl) === sourceId);
-        if (duplicate) throw Object.assign(new Error("This slideshow is already linked in another Stage 6 card."), { status: 409 });
+        if (duplicate) {
+          return {
+            saved: duplicate, recovered: true,
+            pdf: latest.copies.find((entry) =>
+              entry?.templateId === additionalSlideshowPdfTemplateId(additionalSlideshowId(duplicate.templateId))) || null
+          };
+        }
         const file = await driveApiRequest(`/files/${encodeURIComponent(sourceId)}`, {
           accessToken: token, queryParams: { fields: "id,name,mimeType,trashed,webViewLink", supportsAllDrives: true }
         });

@@ -81,7 +81,9 @@ function syncContext() {
     const listenerStart = source.lastIndexOf('    document.addEventListener("click", async (event) => {', start);
     const listenerEnd = source.indexOf('\n    document.addEventListener("change", async (event) => {', start);
     vm.runInContext(source.slice(listenerStart, listenerEnd), context);
-    return { context, state, button, statuses, calls, saved, timeouts, click: () => handler({ target: { closest: () => button } }) };
+    return { context, state, button, statuses, calls, saved, timeouts, click: () => handler({ target: {
+        closest: (selector) => selector === "#task-list-sync-drive" ? button : null
+    } }) };
 }
 
 test("Drive sync replaces stale user-testing counts and persists them for reloads", async () => {

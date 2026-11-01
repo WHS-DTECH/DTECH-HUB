@@ -2790,6 +2790,44 @@ function getAdditionalSlideshowSourceId(url) {
     return String(url || "").match(/^https:\/\/docs\.google\.com\/presentation\/d\/([A-Za-z0-9_-]+)(?:\/|$)/)?.[1] || "";
 }
 
+function isAdditionalSlideshowRecord(copy) {
+    return copy?.templateId === "submission-additional-slideshows-answer"
+        || /^submission-extra-slideshow-(?:pdf-)?[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(copy?.templateId || ""));
+}
+
+async function refreshAdditionalSlideshowCards() {
+    const activityId = String(taskListState.selectedId || "");
+    const item = taskListState.allItems.find((candidate) => String(candidate.id) === activityId);
+    if (!isSeniorSubmissionTask(item)) return;
+    const initialCopies = taskListState.templateCopies;
+    const status = document.querySelector("#task-list-additional-slideshow-status");
+    if (taskListState.additionalSlideshowAnswerBusy || Object.values(taskListState.additionalSlideshowBusy || {}).some(Boolean)) {
+        if (status) status.textContent = "Wait for the current slideshow save to finish, then refresh saved cards.";
+        return;
+    }
+    if (status) status.textContent = "Loading saved slideshow cards...";
+    try {
+        const payload = await loadJson(`/api/activities/${encodeURIComponent(activityId)}/submission-slideshows`, {
+            headers: buildTaskListHeaders({}), cache: "no-store", signal: AbortSignal.timeout(30000)
+        });
+        if (taskListState.selectedId !== activityId) return;
+        if (taskListState.additionalSlideshowAnswerBusy || Object.values(taskListState.additionalSlideshowBusy || {}).some(Boolean)) return;
+        if (!Array.isArray(payload.template_copies)) throw new Error("The saved slideshow card response is invalid. Please retry.");
+        // A completed sync/conversion must win over a read started before it.
+        const changed = taskListState.templateCopies.filter((copy) =>
+            isAdditionalSlideshowRecord(copy) && !initialCopies.includes(copy));
+        const records = payload.template_copies.filter((copy) =>
+            !changed.some((entry) => entry.templateId === copy.templateId)).concat(changed);
+        taskListState.templateCopies = taskListState.templateCopies.filter((copy) =>
+            !isAdditionalSlideshowRecord(copy)).concat(records);
+        loadAdditionalSlideshowCards(taskListState.templateCopies);
+    } catch (error) {
+        if (taskListState.selectedId !== activityId) return;
+        console.error("Could not load additional slideshow cards", error);
+        if (status) status.textContent = `${error.message || "Could not load saved cards."} Use Refresh saved cards to retry. Existing slideshows are unchanged.`;
+    }
+}
+
 function loadAdditionalSlideshowCards(copies = taskListState.templateCopies) {
     const taskId = String(taskListState.selectedId || "");
     const unsynced = taskListState.additionalSlideshowTaskId === taskId
@@ -2811,7 +2849,9 @@ function loadAdditionalSlideshowCards(copies = taskListState.templateCopies) {
             pdf: copies.find((copy) => copy?.templateId === additionalSlideshowPdfTemplateId(id)) || null,
             message: ""
         };
-    }).concat(unsynced);
+    }).concat(unsynced.filter((slot) => !sources.some((source) =>
+        getAdditionalSlideshowSourceId(source.fileUrl) === getAdditionalSlideshowSourceId(slot.sourceUrl)
+        && getAdditionalSlideshowSourceId(slot.sourceUrl))));
     renderAdditionalSlideshows();
 }
 
@@ -2935,7 +2975,19 @@ async function handleAdditionalSlideshowAction(action, id) {
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(payload.error || "Could not sync or convert this slideshow.");
         if (!active()) return;
-        const saved = action === "sync" ? payload.saved : payload.saved;
+        const saved = payload.saved;
+        if (payload.recovered) {
+            taskListState.templateCopies = taskListState.templateCopies
+                .filter((copy) => copy?.templateId !== saved.templateId && copy?.templateId !== payload.pdf?.templateId)
+                .concat(saved, payload.pdf ? [payload.pdf] : []);
+            taskListState.additionalSlideshows = taskListState.additionalSlideshows.filter((entry) => entry !== slot);
+            loadAdditionalSlideshowCards();
+            const recovered = taskListState.additionalSlideshows.find((entry) =>
+                additionalSlideshowTemplateId(entry.id) === saved.templateId);
+            if (recovered) recovered.message = "Recovered your existing saved card. Convert to PDF here to update the Final Package.";
+            renderAdditionalSlideshows();
+            return;
+        }
         const templateId = action === "sync" ? additionalSlideshowTemplateId(id) : additionalSlideshowPdfTemplateId(id);
         taskListState.templateCopies = taskListState.templateCopies.filter((copy) => copy?.templateId !== templateId).concat(saved);
         if (action === "sync") {
@@ -4434,6 +4486,7 @@ async function loadChecklistForTask(taskId) {
     ]);
     taskListState.templateCopies = Array.isArray(templateCopiesPayload?.template_copies) ? templateCopiesPayload.template_copies : [];
     loadAdditionalSlideshowCards(taskListState.templateCopies);
+    void refreshAdditionalSlideshowCards();
     renderFinalClientPresentationCard(selected);
     void loadDocumentationDeck(selected);
     void loadFinalOutcome(selected);
@@ -4505,7 +4558,9 @@ async function loadChecklistForTask(taskId) {
 
     void templateCopySyncPromise.then(async (templateCopies) => {
         if (String(taskListState.selectedId) !== String(selected.id)) return;
-        const nextCopies = Array.isArray(templateCopies) ? templateCopies : [];
+        const nextCopies = (Array.isArray(templateCopies) ? templateCopies : [])
+            .filter((copy) => !isAdditionalSlideshowRecord(copy))
+            .concat(taskListState.templateCopies.filter(isAdditionalSlideshowRecord));
         if (JSON.stringify(nextCopies) === JSON.stringify(taskListState.templateCopies)) return;
         taskListState.templateCopies = nextCopies;
         loadAdditionalSlideshowCards(nextCopies);
@@ -5199,6 +5254,10 @@ async function runTaskListTrelloSync() {
     });
 
     document.addEventListener("click", async (event) => {
+        if (event.target?.closest?.("#task-list-additional-slideshow-refresh")) {
+            await refreshAdditionalSlideshowCards();
+            return;
+        }
         const syncBtn = event.target?.closest?.("#task-list-sync-drive");
         if (!syncBtn || !taskListState.selectedId) return;
 

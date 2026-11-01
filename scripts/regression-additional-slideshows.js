@@ -63,6 +63,11 @@ async function main() {
         taskListState: state,
         document: { querySelector: (selector) => elements.get(selector) || null, createElement: () => ({ innerHTML: "", className: "" }) },
         window: {}, isSeniorSubmissionTask: () => true,
+        AbortSignal, console,
+        loadJson: async () => ({ template_copies: [
+            yes, { templateId: sourceTemplateId, fileUrl: sourceUrl, fileName: "Recovered slideshow" },
+            { templateId: pdfTemplateId, fileUrl: pdfUrl, pdfExport: { sourcePresentationId: "presentation-123" } }
+        ] }),
         renderAdditionalSlideshows: () => {},
         loadSubmissionStage: async () => {},
         escapeTaskListHtml: (value) => String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char])),
@@ -107,6 +112,41 @@ async function main() {
     assert.equal(calls[2].action, "pdf");
     assert.equal(state.additionalSlideshows[0].pdf.fileUrl, pdfUrl);
     assert.match(host.children[0].innerHTML, /Open saved PDF/);
+
+    state.templateCopies = [];
+    state.additionalSlideshows = [];
+    await context.refreshAdditionalSlideshowCards();
+    assert.equal(state.additionalSlideshows.length, 1, "Reload restores the saved card independently of the general template list");
+    assert.equal(state.additionalSlideshows[0].id, id);
+    assert.equal(state.additionalSlideshows[0].pdf.fileUrl, pdfUrl);
+    assert.match(host.children[0].innerHTML, /Convert to PDF/);
+    context.loadJson = async () => { throw new Error("Database unavailable"); };
+    await context.refreshAdditionalSlideshowCards();
+    assert.equal(state.additionalSlideshows.length, 1, "Failed refresh does not erase saved cards");
+    assert.match(status.textContent, /Database unavailable.*Refresh saved cards/);
+
+    context.fetch = async () => ({ ok: true, json: async () => ({
+        recovered: true,
+        saved: { templateId: sourceTemplateId, fileUrl: sourceUrl, fileName: "Recovered slideshow" },
+        pdf: { templateId: pdfTemplateId, fileUrl: pdfUrl, pdfExport: { sourcePresentationId: "presentation-123" } }
+    }) });
+    const newId = "550e8400-e29b-41d4-a716-446655440001";
+    state.additionalSlideshows.push({ id: newId, sourceUrl, synced: false, message: "" });
+    await context.handleAdditionalSlideshowAction("sync", newId);
+    assert.equal(state.additionalSlideshows.length, 1, "Adding the same link recovers the original card without duplicating it");
+    assert.match(state.additionalSlideshows[0].message, /Recovered your existing saved card/);
+
+    let finishRead;
+    context.loadJson = () => new Promise((resolve) => { finishRead = resolve; });
+    const reading = context.refreshAdditionalSlideshowCards();
+    const newerPdf = { templateId: pdfTemplateId, fileUrl: "https://drive.google.com/file/d/new-pdf/view",
+        pdfExport: { sourcePresentationId: "presentation-123" } };
+    state.templateCopies = state.templateCopies.filter((copy) => copy.templateId !== pdfTemplateId).concat(newerPdf);
+    finishRead({ template_copies: [yes, { templateId: sourceTemplateId, fileUrl: sourceUrl },
+        { templateId: pdfTemplateId, fileUrl: pdfUrl }] });
+    await reading;
+    assert.equal(state.additionalSlideshows[0].pdf.fileUrl, newerPdf.fileUrl,
+        "A delayed read must not replace a newly converted PDF with the older record");
 
     await testAnswerEndpoint(id);
     console.log("Additional slideshow regressions passed.");
@@ -157,6 +197,22 @@ async function testAnswerEndpoint(id) {
     const rejected = await request({ action: "answer", answer: "no", driveAccessToken: "student-token" });
     assert.equal(rejected.statusCode, 409);
     assert.match(rejected.body.error, /Choose Yes/);
+    const recovered = await request({
+        action: "sync", slideshowId: "550e8400-e29b-41d4-a716-446655440001",
+        presentationUrl: sourceUrl, driveAccessToken: "student-token"
+    });
+    assert.equal(recovered.statusCode, 200);
+    assert.equal(recovered.body.recovered, true, "Duplicate links return the existing source without rewriting or duplicating it");
+    assert.equal(recovered.body.saved.templateId, additionalSlideshowTemplateId(id));
+    assert.equal(assessment.copies.length, 2);
+
+    let getHandler;
+    context.app.get = (_path, handler) => { getHandler = handler; };
+    const getStart = server.indexOf('app.get("/api/activities/:id/submission-slideshows"');
+    vm.runInContext(server.slice(getStart, start), context);
+    const res = { status(code) { this.statusCode = code; return this; }, set() { return this; }, json(body) { this.body = body; } };
+    await getHandler({}, res);
+    assert.equal(res.body.template_copies.length, 2, "Saved card read uses the same authoritative records as the submission package");
 }
 
 main().catch((error) => { console.error(error); process.exitCode = 1; });

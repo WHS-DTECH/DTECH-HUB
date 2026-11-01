@@ -1347,10 +1347,11 @@
                                 <option value="yes">Yes</option>
                                 <option value="no">No</option>
                             </select>
-                            <p>Choose Yes to add each Google Slides presentation, then save its PDF. Those PDFs will be checked and listed in the Final Package.</p>
+                            <p>Choose Yes to add each Google Slides presentation, then save its PDF. Those PDFs will be checked and listed in the Final Package. If a saved card is missing, use Refresh saved cards. Convert its PDF again when the slideshow changes, then Check files.</p>
                         </fieldset>
                         <div id="task-list-additional-slideshow-list" class="task-list-additional-slideshow-list"></div>
                         <button type="button" class="task-list-sync-drive-btn" id="task-list-additional-slideshow-add">＋ Add slideshow</button>
+                        <button type="button" class="task-list-sync-drive-btn" id="task-list-additional-slideshow-refresh">Refresh saved cards</button>
                         <p id="task-list-additional-slideshow-status" role="status" aria-live="polite"></p>
                     </aside>
                     <hr class="task-list-final-divider">
@@ -1403,6 +1404,6 @@
 
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="script.js"></script>
-    <script src="task-list.js?v=testing-drive-sync-1"></script>
+    <script src="task-list.js?v=additional-slideshow-recovery-1"></script>
 </body>
 </html>

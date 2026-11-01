@@ -281,7 +281,7 @@ async function testSlideshowPdfEndpoints() {
   const docEnd = source.indexOf("async function saveDocumentationRecord(", docStart);
   vm.runInContext(source.slice(docStart, docEnd), context);
   const start = source.indexOf("async function withFinalOutcomeLock(");
-  const end = source.indexOf('app.get("/api/activities/:id/github-zip-size"', start);
+  const end = source.indexOf('app.get("/api/activities/:id/submission-slideshows"', start);
   vm.runInContext(source.slice(start, end), context);
   const request = async (body, email = studentEmail) => {
     const res = { statusCode: 200, status(value) { this.statusCode = value; return this; }, set() { return this; }, json(value) { this.body = value; return this; } };
