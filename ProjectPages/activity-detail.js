@@ -10272,7 +10272,7 @@ function renderDetailView(host, id, data, canEdit, selectedTaskTopic = "", selec
     const videoConventionsChecklistHtml = digitalOutcomeTopicKey === "video-conventions"
         ? (() => {
             const checks = readDigiMedVideoConventionsChecks(id, readStoredHubEmail());
-            return `<section class="task-topic-guide-block"><h3>Conventions (VIDEO)</h3><p class="task-topic-submission-note">Review the conventions that apply to your video outcome and tick each one you have addressed.</p><div class="task-list-decomposition-subtask-list">
+            return `<section class="task-topic-guide-block"><h3>Conventions (VIDEO)</h3><p class="task-topic-submission-note">Review the conventions that apply to your video outcome and tick each one you have addressed. At least 3 ticked conventions complete the Task List criterion; linking the slideshow alone does not complete it.</p><div class="task-list-decomposition-subtask-list">
                 ${DIGIMED_VIDEO_CONVENTION_CHECKS.map(([convention, examples]) => `<label class="task-list-decomposition-subtask ${checks[convention] ? "is-complete" : ""}"><input type="checkbox" data-digimed-video-convention-check="${escapeHtml(convention)}" ${checks[convention] ? "checked" : ""}><span><strong>${escapeHtml(convention)}</strong> - ${escapeHtml(examples)}</span></label>`).join("")}
             </div></section>`;
         })()

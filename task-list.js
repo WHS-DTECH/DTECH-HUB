@@ -1803,21 +1803,24 @@ function getTestingFunctionsSubtasks(stateMap) {
     ];
 }
 
-function getDigiMedConventionsAcknowledgementCount(activityId, email, stateMap = {}) {
+function getDigiMedConventionsAcknowledgementCount(activityId, email, stateMap = {}, digitalMediaType = "web") {
+    const isVideo = String(digitalMediaType || "").trim().toLowerCase() === "video";
+    const stateKind = isVideo ? "video-conventions" : "conventions";
     const databaseAreas = new Set();
     Object.values(stateMap || {}).forEach((steps) => {
         (Array.isArray(steps) ? steps : []).forEach((step) => {
             const text = String(step?.text || "").trim();
-            const conventionAck = text.match(/^CONVENTION_ACK\|(.+)\|true$/i);
-            const persistedState = text.match(/^DIGIMED_STATE\|conventions\|(.+)\|true$/i);
+            const conventionAck = !isVideo && text.match(/^CONVENTION_ACK\|(.+)\|true$/i);
+            const persistedState = text.match(new RegExp(`^DIGIMED_STATE\\|${stateKind}\\|(.+)\\|true$`, "i"));
             const area = conventionAck?.[1] || persistedState?.[1] || "";
             if (area) databaseAreas.add(area.trim());
         });
     });
-    if (databaseAreas.size) return databaseAreas.size;
+    if (databaseAreas.size || Array.isArray(stateMap?.[`digimed-local-state:${stateKind}`])) return databaseAreas.size;
 
     try {
-        const key = `${DIGIMED_CONVENTIONS_ACK_STORAGE_PREFIX}:${String(activityId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
+        const prefix = isVideo ? DIGIMED_VIDEO_CONVENTIONS_ACK_STORAGE_PREFIX : DIGIMED_CONVENTIONS_ACK_STORAGE_PREFIX;
+        const key = `${prefix}:${String(activityId || "").trim()}:${String(email || "").trim().toLowerCase()}`;
         const saved = JSON.parse(localStorage.getItem(key) || "{}");
         return Object.values(saved || {}).filter(Boolean).length;
     } catch (_error) {
@@ -1845,27 +1848,28 @@ function getDigiMedConventionsSubtask(stateMap = {}, digitalMediaType = "") {
         href: isVideo
             ? buildCustomActivityLink(activityId, "Video Conventions", "Conventions (VIDEO)", "relevant-digimed-conventions")
             : buildCustomActivityLink(activityId, "Using relevant conventions for the media type.", isImage ? "Conventions (IMAGE)" : "Conventions (WEB)", "relevant-digimed-conventions"),
-        count: isImage ? imageCount : getDigiMedConventionsAcknowledgementCount(activityId, getTaskListEmail(), stateMap)
+        count: isImage ? imageCount : getDigiMedConventionsAcknowledgementCount(activityId, getTaskListEmail(), stateMap, mediaType),
+        total: isVideo ? 11 : 12
     };
 }
 
 function isWebConventionsRequirementStep(standard, text) {
     const safeStandard = String(standard || "").trim();
     const digitalMediaType = String(getAllocatedDigitalMediaType(safeStandard) || "web").trim().toLowerCase();
-    const isVideo = digitalMediaType === "video";
     const isImage = ["image", "graphics", "vector"].includes(digitalMediaType);
     const normalizedText = stripStepLevel(text || "").toLowerCase().replace(/\s+/g, " ").trim();
     return ["91893", "91903"].includes(safeStandard)
         && getStepLevel(text) === "Achieved"
-        && !isVideo && !isImage
+        && !isImage
         && /^using relevant conventions for the media type\.?$/.test(normalizedText);
 }
 
-function autoTickWebConventionsRequirement(stateMap, activityId, email) {
-    const shouldBeDone = getDigiMedConventionsAcknowledgementCount(activityId, email, stateMap) >= 3;
+function autoTickWebConventionsRequirement(stateMap, activityId, email, countStateMap = stateMap) {
     let changed = false;
 
     ["91893", "91903"].forEach((standard) => {
+        const shouldBeDone = getDigiMedConventionsAcknowledgementCount(
+            activityId, email, countStateMap, getAllocatedDigitalMediaType(standard)) >= 3;
         const rows = Array.isArray(stateMap?.[standard]) ? stateMap[standard] : [];
         rows.forEach((row) => {
             if (!isWebConventionsRequirementStep(standard, row?.text || "")) return;
@@ -3808,7 +3812,7 @@ function renderChecklistCards(detail, allItems) {
                                 const isRowChecked = isWebIntegrityRequirement
                                     ? isWebIntegrityComplete
                                     : isWebConventionsRequirement
-                                        ? getDigiMedConventionsAcknowledgementCount(taskListState.selectedId, getTaskListEmail(), taskListState.fullEvidenceState) >= 3
+                                        ? getDigiMedConventionsAcknowledgementCount(taskListState.selectedId, getTaskListEmail(), taskListState.fullEvidenceState, getAllocatedDigitalMediaType(standard)) >= 3
                                     : managementKind === "auto"
                                         ? Boolean(step?.done)
                                         : Boolean(taskListState.sessionTicks[getSessionTickKey(standard, index)]);
@@ -3842,7 +3846,7 @@ function renderChecklistCards(detail, allItems) {
                                 return `
                                 <div class="task-list-step-row ${isInformationalRow ? "is-informational" : ""} ${isLinkedRelevantImplicationsRow || isLinkedTestingImprovementRow || isApplyingRelevantConventionsRow || isNonTickableUXPrinciplesMeritRow ? "is-linked-relevant-implications" : ""} ${is91893EfficientToolsRow ? "is-linked-efficient-tools" : ""} ${needsEvidence ? "is-needs-evidence" : ""}">
                                     <label class="task-list-step-check-wrap">
-                                        ${isInformationalRow || isNonTickableRelevantImplicationsRow91893 || isApplyingRelevantConventionsRow || isNonTickableIntegrityTestingRow || isNonTickableUXPrinciplesMeritRow ? "" : `<input type="checkbox" class="${isUseOfToolsTechniquesRequirement || isUXPrinciplesRequirement || isWebConventionsRequirement || isWebIntegrityRequirement ? "is-auto-complete" : ""}" ${isRowChecked ? "checked" : ""} ${isUseOfToolsTechniquesRequirement ? "disabled title=\"Requires at least three checked subtasks and Use of Tools & Techniques template\"" : isUXPrinciplesRequirement ? "disabled title=\"Requires at least three UX principles to be identified and applied\"" : isWebConventionsRequirement ? "disabled title=\"Requires at least three web conventions to be applied\"" : isWebIntegrityRequirement ? "disabled title=\"Automatically checked when the Integrity & Validation template has been used\"" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">`}
+                                        ${isInformationalRow || isNonTickableRelevantImplicationsRow91893 || isApplyingRelevantConventionsRow || isNonTickableIntegrityTestingRow || isNonTickableUXPrinciplesMeritRow ? "" : `<input type="checkbox" class="${isUseOfToolsTechniquesRequirement || isUXPrinciplesRequirement || isWebConventionsRequirement || isWebIntegrityRequirement ? "is-auto-complete" : ""}" ${isRowChecked ? "checked" : ""} ${isUseOfToolsTechniquesRequirement ? "disabled title=\"Requires at least three checked subtasks and Use of Tools & Techniques template\"" : isUXPrinciplesRequirement ? "disabled title=\"Requires at least three UX principles to be identified and applied\"" : isWebConventionsRequirement ? "disabled title=\"Requires at least three conventions for your media type to be applied\"" : isWebIntegrityRequirement ? "disabled title=\"Automatically checked when the Integrity & Validation template has been used\"" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">`}
                                         ${rowText}
                                     </label>
                                     ${is91893ToolsAndTechniquesRow ? `
@@ -3935,7 +3939,7 @@ function renderChecklistCards(detail, allItems) {
                                         <div class="task-list-decomposition-subtasks">
                                             <p class="task-list-system-title">SUBTASKS</p>
                                             <p class="task-list-achieved-note">Convention areas applied on your ${escapeTaskListHtml(conventionsSubtask.label)} page.</p>
-                                            <p class="task-list-achieved-note">You need to apply at least 3 conventions (${conventionsSubtask.count}/12).</p>
+                                            <p class="task-list-achieved-note">You need to apply at least 3 conventions (${conventionsSubtask.count}/${conventionsSubtask.total}).</p>
                                             <div class="task-list-decomposition-category-list">
                                                 <a class="task-list-decomposition-category is-covered" href="${escapeTaskListHtml(conventionsSubtask.href)}">
                                                     <span class="task-list-decomposition-category-label">${escapeTaskListHtml(conventionsSubtask.label).toUpperCase()}</span>
@@ -4502,7 +4506,7 @@ async function loadChecklistForTask(taskId) {
     const autoChangedChecklistPM = autoTickProjectManagementRequirement(taskListState.checklistState);
     const autoChangedChecklistDecomposition = autoTickDecompositionRequirement(taskListState.checklistState, taskListState.selectedId, signedInEmail);
     const autoChangedChecklistUX = autoTickUXPrinciplesRequirement(taskListState.checklistState, taskListState.selectedId, signedInEmail);
-    const autoChangedChecklistConventions = autoTickWebConventionsRequirement(taskListState.checklistState, taskListState.selectedId, signedInEmail);
+    const autoChangedChecklistConventions = autoTickWebConventionsRequirement(taskListState.checklistState, taskListState.selectedId, signedInEmail, taskListState.fullEvidenceState);
     const autoChangedChecklistWebIntegrity = autoTickWebIntegrityRequirement(taskListState.checklistState);
     const autoChangedChecklistTesting = autoTickTestingFunctionsRequirement(
         taskListState.checklistState, taskListState.fullEvidenceState, taskListState.selectedId, signedInEmail
