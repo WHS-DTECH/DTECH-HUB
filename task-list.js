@@ -339,20 +339,18 @@ function requestTaskListDriveToken() {
             resolve({ error: "google_unavailable" });
             return;
         }
-        if (!taskListDriveState.tokenClient) {
-            taskListDriveState.tokenClient = window.google.accounts.oauth2.initTokenClient({
-                client_id: clientId,
-                scope: TASK_LIST_DRIVE_SCOPE,
-                callback: (response) => {
-                    if (!response.error && response.access_token) {
-                        taskListDriveState.accessToken = response.access_token;
-                        taskListDriveState.tokenExpiry = Date.now() + (Number(response.expires_in) || 3600) * 1000;
-                    }
-                    resolve(response);
-                },
-                error_callback: (err) => resolve({ error: err?.type || "access_denied" })
-            });
-        }
+        taskListDriveState.tokenClient = window.google.accounts.oauth2.initTokenClient({
+            client_id: clientId,
+            scope: TASK_LIST_DRIVE_SCOPE,
+            callback: (response) => {
+                if (!response.error && response.access_token) {
+                    taskListDriveState.accessToken = response.access_token;
+                    taskListDriveState.tokenExpiry = Date.now() + (Number(response.expires_in) || 3600) * 1000;
+                }
+                resolve(response);
+            },
+            error_callback: (err) => resolve({ error: err?.type || "access_denied" })
+        });
         taskListDriveState.tokenClient.requestAccessToken();
     });
 }
@@ -1648,18 +1646,20 @@ function getDigitalOutcomeToolsTechniquesSubtask() {
     };
 }
 
-async function loadIdentifiedComponentsCount(projectId, email) {
+async function loadIdentifiedComponentsCount(projectId, email, signal) {
     try {
         const stored = await loadJson(
             `/api/students/trialling-components?activity_id=${encodeURIComponent(projectId)}`,
-            { headers: buildTaskListHeaders({}) }
+            { headers: buildTaskListHeaders({}), signal }
         );
+        if (signal && taskListState.selectedId !== projectId) return null;
         // "found: false" is a definitive DB answer (no record), not an unknown state — treat as 0
         // so a stale tick from a prior session/device is corrected instead of left dangling.
         taskListState.identifiedComponentsCount = stored?.found
             ? Math.max(0, Number.parseInt(stored.component_count, 10) || 0)
             : 0;
-    } catch (_error) {
+    } catch (error) {
+        if (signal) throw error;
     }
 
     const triallingComponentsUrl = getStoredTriallingComponentsUrl(projectId, email);
@@ -1675,15 +1675,17 @@ async function loadIdentifiedComponentsCount(projectId, email) {
         const payload = await loadJson("/api/student/drive-setup/read-trialling-components", {
             method: "POST",
             headers: buildTaskListHeaders({ "Content-Type": "application/json" }),
-            body: JSON.stringify({ driveAccessToken, presentationId: triallingComponentsId, activityId: projectId })
+            body: JSON.stringify({ driveAccessToken, presentationId: triallingComponentsId, activityId: projectId }), signal
         });
+        if (signal && taskListState.selectedId !== projectId) return null;
         const rows = Array.isArray(payload?.rows) ? payload.rows : [];
         const components = rows.length
             ? rows.filter((row) => String(row?.component || "").trim())
             : (Array.isArray(payload?.components) ? payload.components.filter((component) => String(component || "").trim()) : []);
         taskListState.identifiedComponentsCount = Math.max(0, Number.parseInt(payload?.component_count, 10) || components.length);
         return taskListState.identifiedComponentsCount;
-    } catch (_error) {
+    } catch (error) {
+        if (signal) throw error;
         return Number.isFinite(taskListState.identifiedComponentsCount)
             ? taskListState.identifiedComponentsCount
             : null;
@@ -1754,6 +1756,29 @@ function readTestingFunctionsListCounts(activityId, email, stateMap = {}) {
     } catch (_error) {
         return { functionalCount: 0, userCount: 0 };
     }
+}
+
+async function refreshTaskListTestingCounts(activityId, driveAccessToken, signal) {
+    const copy = taskListState.templateCopies.find((entry) =>
+        String(entry?.templateId || "").trim().toLowerCase() === "testing-functions");
+    if (!copy) return false;
+    const presentationId = String(copy.fileUrl || "").match(/docs\.google\.com\/presentation\/d\/([A-Za-z0-9_-]+)/i)?.[1];
+    if (!presentationId) throw new Error("The saved Testing Functions slideshow link is invalid. Link it again before syncing.");
+    const payload = await loadJson("/api/student/drive-setup/read-testing-functions", {
+        method: "POST", headers: buildTaskListHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ driveAccessToken, presentationId }), signal: signal || AbortSignal.timeout(30000)
+    });
+    if (!Array.isArray(payload.functionalTesting) || !Array.isArray(payload.userTesting)) {
+        throw new Error("The Testing Functions response is invalid. Retry the Drive sync.");
+    }
+    if (taskListState.selectedId !== activityId) return false;
+    const functionalCount = payload.functionalTesting.length;
+    const userCount = payload.userTesting.length;
+    taskListState.fullEvidenceState["testing-functions-counts"] = [{
+        text: `TESTING_FUNCTIONS_COUNT|${functionalCount}|${userCount}`,
+        done: functionalCount + userCount > 0
+    }];
+    return true;
 }
 
 function getTestingFunctionsSubtasks(stateMap) {
@@ -3448,11 +3473,11 @@ async function fetchMyEvidence(projectId) {
     return normalizeEvidenceSteps(payload?.evidence_steps);
 }
 
-async function saveMyEvidence(projectId, rows) {
+async function saveMyEvidence(projectId, rows, signal) {
     return loadJson(`/api/activities/${encodeURIComponent(projectId)}/my-evidence`, {
         method: "PATCH",
         headers: buildTaskListHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ evidence_steps: normalizeEvidenceSteps(rows) })
+        body: JSON.stringify({ evidence_steps: normalizeEvidenceSteps(rows) }), signal
     });
 }
 
@@ -5180,28 +5205,32 @@ async function runTaskListTrelloSync() {
         syncBtn.disabled = true;
         syncBtn.textContent = "Requesting Drive access\u2026";
 
-        const tokenResponse = await requestTaskListDriveToken();
-        if (tokenResponse.error) {
-            syncBtn.disabled = false;
-            syncBtn.textContent = "\u21bb Sync from Google Drive";
-            setStatus("Drive access was not granted.", true);
-            return;
-        }
-
-        syncBtn.textContent = "Scanning\u2026";
+        const activityId = taskListState.selectedId;
         try {
+            const tokenResponse = await requestTaskListDriveToken();
+            if (tokenResponse.error || !tokenResponse.access_token) {
+                throw new Error("Drive access was not granted. Please try again.");
+            }
+            syncBtn.textContent = "Scanning\u2026";
+            const signal = AbortSignal.timeout(60000);
             const payload = await loadJson(
-                `/api/activities/${encodeURIComponent(taskListState.selectedId)}/sync-drive-templates`,
+                `/api/activities/${encodeURIComponent(activityId)}/sync-drive-templates`,
                 {
                     method: "POST",
                     headers: buildTaskListHeaders({ "Content-Type": "application/json" }),
-                    body: JSON.stringify({ driveAccessToken: tokenResponse.access_token })
+                    body: JSON.stringify({ driveAccessToken: tokenResponse.access_token }),
+                    signal
                 }
             );
 
-            taskListState.templateCopies = Array.isArray(payload?.template_copies) ? payload.template_copies : [];
+            if (taskListState.selectedId !== activityId) return;
+            if (!Array.isArray(payload?.template_copies)) throw new Error("Drive returned an invalid template list. Please retry.");
+            taskListState.templateCopies = payload.template_copies;
+            const testingCountsChanged = await refreshTaskListTestingCounts(activityId, tokenResponse.access_token, signal);
+            if (taskListState.selectedId !== activityId) return;
 
-            const componentCount = await loadIdentifiedComponentsCount(taskListState.selectedId, getTaskListEmail());
+            const componentCount = await loadIdentifiedComponentsCount(activityId, getTaskListEmail(), signal);
+            if (taskListState.selectedId !== activityId) return;
             const checklistMultipleComponentsChanged = autoTickMultipleComponentsRequirement(taskListState.checklistState, componentCount);
             const evidenceMultipleComponentsChanged = autoTickMultipleComponentsRequirement(taskListState.fullEvidenceState, componentCount);
             const checklistTriallingChanged = autoTickTriallingComponentsRequirement(taskListState.checklistState, componentCount);
@@ -5214,20 +5243,30 @@ async function runTaskListTrelloSync() {
             const digitalOutcomeEvidenceChanged = autoTickDigitalOutcomeRequirements(taskListState.fullEvidenceState, taskListState.selectedId, getTaskListEmail());
             const integrityChecklistChanged = autoTickWebIntegrityRequirement(taskListState.checklistState);
             const integrityEvidenceChanged = autoTickWebIntegrityRequirement(taskListState.fullEvidenceState);
+            const testingChecklistChanged = autoTickTestingFunctionsRequirement(
+                taskListState.checklistState, taskListState.fullEvidenceState, activityId, getTaskListEmail());
+            const testingEvidenceChanged = autoTickTestingFunctionsRequirement(
+                taskListState.fullEvidenceState, taskListState.fullEvidenceState, activityId, getTaskListEmail());
 
             autoTickRelevantImplicationsRequirements(taskListState.checklistState, taskListState.selectedId, getTaskListEmail());
             autoTickRelevantImplicationsRequirements(taskListState.fullEvidenceState, taskListState.selectedId, getTaskListEmail());
 
-            if (repairedChecklist || repairedEvidence || checklistMultipleComponentsChanged || evidenceMultipleComponentsChanged || checklistTriallingChanged || evidenceTriallingChanged || digitalOutcomeChecklistChanged || digitalOutcomeEvidenceChanged || integrityChecklistChanged || integrityEvidenceChanged) {
+            if (testingCountsChanged || testingChecklistChanged || testingEvidenceChanged || repairedChecklist || repairedEvidence || checklistMultipleComponentsChanged || evidenceMultipleComponentsChanged || checklistTriallingChanged || evidenceTriallingChanged || digitalOutcomeChecklistChanged || digitalOutcomeEvidenceChanged || integrityChecklistChanged || integrityEvidenceChanged) {
                 const allStandards = Array.from(new Set(Object.keys(taskListState.fullEvidenceState)));
-                await saveMyEvidence(taskListState.selectedId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards)).catch(() => {});
+                await saveMyEvidence(activityId, evidenceMapToRows(taskListState.fullEvidenceState, allStandards), signal);
             }
 
+            if (taskListState.selectedId !== activityId) return;
             const synced = Number(payload?.synced || 0);
             setStatus(`Drive sync complete. Found ${synced} template file${synced === 1 ? "" : "s"}.`);
             renderChecklistCards({ name: taskListState.taskTopic }, taskListState.allItems);
         } catch (error) {
-            setStatus(error?.message || "Could not sync from Drive.", true);
+            setStatus(error?.name === "TimeoutError"
+                ? "Google Drive took too long to respond. Please retry the sync."
+                : error?.message || "Could not sync from Drive.", true);
+        } finally {
+            syncBtn.disabled = false;
+            syncBtn.textContent = "\u21bb Sync from Google Drive";
             const btn = document.querySelector("#task-list-sync-drive");
             if (btn) { btn.disabled = false; btn.textContent = "\u21bb Sync from Google Drive"; }
         }

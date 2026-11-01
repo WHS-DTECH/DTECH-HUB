@@ -9359,12 +9359,12 @@ async function populateUseOfToolsTechniques(presentationId, activityId, studentE
   return { updated: true, count: filled };
 }
 
-async function driveFindFolderByName(parentFolderId, folderName, accessToken) {
+async function driveFindFolderByName(parentFolderId, folderName, accessToken, signal) {
   const safeName = folderName.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
   const safeParent = parentFolderId.replace(/'/g, "\\'");
   const q = `name = '${safeName}' and mimeType = 'application/vnd.google-apps.folder' and '${safeParent}' in parents and trashed = false`;
   const result = await driveApiRequest("/files", {
-    accessToken,
+    accessToken, signal,
     queryParams: {
       q,
       fields: "files(id,name,webViewLink)",
@@ -9525,11 +9525,11 @@ function resolveProcessAssessmentSubfolderName(templateId, templateTitle) {
   return "";
 }
 
-async function driveListSlidesInProcessAssessmentTree(processAssessmentFolderId, accessToken) {
+async function driveListSlidesInProcessAssessmentTree(processAssessmentFolderId, accessToken, signal) {
   const rootFolderId = String(processAssessmentFolderId || "").trim();
   if (!rootFolderId) return [];
 
-  const rootSlides = await driveListSlidesInFolder(rootFolderId, accessToken);
+  const rootSlides = await driveListSlidesInFolder(rootFolderId, accessToken, signal);
   const subfolderNames = [
     PROCESS_ASSESSMENT_DIGITAL_OUTCOME_FOLDER_NAME,
     PROCESS_ASSESSMENT_TRIALLING_COMPONENTS_FOLDER_NAME,
@@ -9541,13 +9541,13 @@ async function driveListSlidesInProcessAssessmentTree(processAssessmentFolderId,
 
   const nestedSlides = [];
   for (const subfolderName of subfolderNames) {
-    const folder = await driveFindFolderByName(rootFolderId, subfolderName, accessToken);
+    const folder = await driveFindFolderByName(rootFolderId, subfolderName, accessToken, signal);
     const subfolderId = String(folder?.id || "").trim();
     if (!subfolderId) {
       continue;
     }
 
-    const subfolderSlides = await driveListSlidesInFolder(subfolderId, accessToken);
+    const subfolderSlides = await driveListSlidesInFolder(subfolderId, accessToken, signal);
     subfolderSlides.forEach((file) => {
       nestedSlides.push({ ...file, processAssessmentSubfolder: subfolderName });
     });
@@ -9622,12 +9622,12 @@ async function driveUploadBinaryFile({ accessToken, folderId, fileName, mimeType
   return payload;
 }
 
-async function driveListSlidesInFolder(folderId, accessToken) {
+async function driveListSlidesInFolder(folderId, accessToken, signal) {
   const safeFolder = String(folderId || "").trim().replace(/'/g, "\\'");
   if (!safeFolder) return [];
   const q = `'${safeFolder}' in parents and mimeType = 'application/vnd.google-apps.presentation' and trashed = false`;
   const result = await driveApiRequest("/files", {
-    accessToken,
+    accessToken, signal,
     queryParams: {
       q,
       fields: "files(id,name,webViewLink,thumbnailLink,modifiedTime)",
@@ -11079,7 +11079,7 @@ app.post("/api/activities/:id/sync-drive-templates", async (req, res) => {
       return;
     }
 
-    const slides = await driveListSlidesInProcessAssessmentTree(folderId, driveAccessToken);
+    const slides = await driveListSlidesInProcessAssessmentTree(folderId, driveAccessToken, AbortSignal.timeout(45000));
     const inferred = [];
 
     for (const file of slides) {
@@ -11092,7 +11092,7 @@ app.post("/api/activities/:id/sync-drive-templates", async (req, res) => {
 
     if (hasDatabase && inferred.length > 0) {
       for (const entry of inferred) {
-        await recordTemplateCopyInDb(projectId, requesterEmail, entry).catch(() => {});
+        await recordTemplateCopyInDb(projectId, requesterEmail, entry);
       }
     }
 
@@ -11108,7 +11108,10 @@ app.post("/api/activities/:id/sync-drive-templates", async (req, res) => {
 
     res.json({ ok: true, synced: inferred.length, template_copies: allCopies });
   } catch (error) {
-    res.status(error.status || 500).json({ error: error.message || "Could not sync from Drive." });
+    res.status(error.name === "TimeoutError" ? 504 : error.status || 500).json({
+      error: error.name === "TimeoutError" ? "Google Drive took too long to respond. Please retry the sync."
+        : error.message || "Could not sync from Drive."
+    });
   }
 });
 
