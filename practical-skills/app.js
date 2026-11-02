@@ -84,8 +84,30 @@
         });
     }
 
+    const dtechBands = {
+        "Junior DTECH": ["Junior DTECH", "Year 7 DTECH", "Year 8 DTECH"],
+        "Middle DTECH": ["Middle DTECH", "Year 9 DTECH", "Year 10 DTECH"],
+        "Senior DTECH": ["Senior DTECH", "Year 11 DTECH", "Year 12 DTECH", "Year 13 DTECH"]
+    };
+
+    function getYearOptions() {
+        const values = getUniqueValues("yearLevel");
+        if (isPathways) return values;
+        const fixed = ["All", "All Years", ...Object.keys(dtechBands)];
+        return [...fixed, ...values.filter((value) => !fixed.includes(value))];
+    }
+
+    function matchesYear(item) {
+        if (state.year === "All") return true;
+        const yearLevel = String(item.yearLevel || "");
+        if (!isPathways && dtechBands[state.year]) {
+            return yearLevel === "All Years" || dtechBands[state.year].includes(yearLevel);
+        }
+        return yearLevel === state.year;
+    }
+
     function populateFilters() {
-        renderPillGroup(yearPillsContainer, getUniqueValues("yearLevel"), state.year, (value) => {
+        renderPillGroup(yearPillsContainer, getYearOptions(), state.year, (value) => {
             state.year = value;
         });
         renderPillGroup(statusPillsContainer, getUniqueValues("status"), state.status, (value) => {
@@ -108,7 +130,7 @@
         const query = state.search.trim().toLowerCase();
 
         return items.filter((item) => {
-            if (state.year !== "All" && String(item.yearLevel || "") !== state.year) return false;
+            if (!matchesYear(item)) return false;
             if (state.status !== "All" && String(item.status || "") !== state.status) return false;
             if (state.category === "Licence Kit" && item.cardLabel !== "LICENCE KIT") return false;
             if (state.category !== "All" && state.category !== "Licence Kit" && String(item.area || "") !== state.category) return false;
@@ -285,6 +307,9 @@
             const payload = await response.json();
             if (!Array.isArray(payload)) throw new Error("The library response must be a card list.");
             library = payload.filter((item) => isPathways || String(item?.id || "") !== featuredChecklistId);
+            if (!isPathways && !requestedCategory && library.some((item) => item.cardLabel === "LICENCE KIT")) {
+                state.category = "Licence Kit";
+            }
         } catch (error) {
             console.error(`Could not load ${libraryName}`, error);
             if (meta) meta.textContent = "Library could not be loaded.";
