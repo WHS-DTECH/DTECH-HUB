@@ -818,6 +818,31 @@ a {
     background: #ffffff;
     color: #24506f;
 }
+.hub-external-exam-reminder-actions .hub-drawing-filing-move {
+    background: #216c9f;
+    color: #ffffff;
+}
+.hub-drawing-filing-move:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+.hub-drawing-filing-list {
+    margin: 12px 0 0;
+    padding-left: 20px;
+    color: #173858;
+    font-size: 0.88rem;
+    font-weight: 700;
+}
+.hub-drawing-filing-list:empty {
+    display: none;
+}
+.hub-drawing-filing-reminder p.hub-drawing-filing-status {
+    margin-top: 10px;
+    font-weight: 700;
+}
+.hub-drawing-filing-status:empty {
+    display: none;
+}
 
 .hub-internal-deadline-reminder {
     width: min(520px, calc(100vw - 32px));

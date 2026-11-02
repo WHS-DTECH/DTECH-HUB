@@ -16348,11 +16348,18 @@ async function fileKitDrawingSubmission({ studentEmail, documentKey, activityTit
   const fileId = String(documentKey || "").match(/^google-file:([a-zA-Z0-9_-]+)$/)?.[1];
   if (!fileId || !driveAccessToken) return { filed: false, reason: "no-permission" };
   const identity = await verifyDriveTokenForStudent(driveAccessToken, email);
-  const file = await driveApiRequest(`/files/${encodeURIComponent(fileId)}`, {
-    accessToken: driveAccessToken,
-    queryParams: { fields: "id,name,mimeType,parents,ownedByMe,trashed", supportsAllDrives: true }
-  });
-  if (!file?.id || file.trashed || file.mimeType !== "application/vnd.google-apps.drawing") return { filed: false, reason: "not-drawing" };
+  let file;
+  try {
+    file = await driveApiRequest(`/files/${encodeURIComponent(fileId)}`, {
+      accessToken: driveAccessToken,
+      queryParams: { fields: "id,name,mimeType,parents,ownedByMe,trashed", supportsAllDrives: true }
+    });
+  } catch (error) {
+    if ([403, 404].includes(Number(error?.status))) return { filed: false, reason: "missing" };
+    throw error;
+  }
+  if (!file?.id || file.trashed) return { filed: false, reason: "missing" };
+  if (file.mimeType !== "application/vnd.google-apps.drawing") return { filed: false, reason: "not-drawing" };
   if (!file.ownedByMe) return { filed: false, reason: "not-owner" };
   const programmeFolder = await getStudentProgrammeFolder(email);
   const { kits } = await ensureStudentCourseFolders(email, programmeFolder, driveAccessToken);

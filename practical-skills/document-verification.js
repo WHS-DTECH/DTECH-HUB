@@ -28,9 +28,35 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
             document_key TEXT NOT NULL, url TEXT NOT NULL, submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
             notified_document_key TEXT,
             PRIMARY KEY (student_email, kit_id, activity_index)
-        )`).catch((error) => { submissionSchema = null; throw error; });
+        )`).then(() => pool.query("ALTER TABLE practical_skills_submissions ADD COLUMN IF NOT EXISTS filed_document_key TEXT"))
+            .catch((error) => { submissionSchema = null; throw error; });
         await submissionSchema;
     }
+    // Outcomes the student can't fix by retrying (moved, someone else's file, not a drawing, deleted) stop the filing reminder.
+    const FILING_RESOLVED = new Set(["not-owner", "not-drawing", "missing"]);
+    async function markFiled(student, kit, index, documentKey, filing) {
+        if (!filing?.filed && !FILING_RESOLVED.has(filing?.reason)) return;
+        await pool.query(`UPDATE practical_skills_submissions SET filed_document_key = $4
+            WHERE student_email = $1 AND kit_id = $2 AND activity_index = $3 AND document_key = $4`, [student, kit, index, documentKey]);
+    }
+    async function pendingFiling(student) {
+        await ensureSubmissionSchema();
+        const rows = (await pool.query(`SELECT kit_id, activity_index, document_key FROM practical_skills_submissions
+            WHERE student_email = $1 AND document_key LIKE 'google-file:%' AND filed_document_key IS DISTINCT FROM document_key
+            ORDER BY kit_id, activity_index`, [student])).rows;
+        const contents = new Map();
+        const pending = [];
+        for (const row of rows) {
+            if (!contents.has(row.kit_id)) contents.set(row.kit_id, await loadContent(row.kit_id).catch(() => null));
+            const content = contents.get(row.kit_id);
+            const index = Number(row.activity_index);
+            const worksheet = content?.worksheets?.[index];
+            if (!worksheet || content.deletedAt || !TEACHER_ONLY.has(content.activities?.[index]?.documentCheck)) continue;
+            pending.push({ kitId: row.kit_id, index, documentKey: row.document_key, title: worksheet.activity || `Activity ${index + 1}` });
+        }
+        return pending;
+    }
+    const publicPending = (items) => items.map(({ kitId, index, title }) => ({ kitId, index, title }));
     // Submission for the student's current link only; a changed link means not yet submitted.
     async function getSubmission(student, kit, index, documentKey) {
         if (!documentKey) return null;
@@ -168,6 +194,7 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                 if (driveAccessToken) {
                     try {
                         filing = await fileSubmission({ studentEmail: email, documentKey: item.documentKey, activityTitle, driveAccessToken });
+                        await markFiled(email, item.kit, item.index, item.documentKey, filing);
                     } catch (error) {
                         console.error("[kit-submission] Could not file drawing:", error.message);
                         filing = { filed: false, reason: "error" };
@@ -186,6 +213,40 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                 }
                 res.json({ submission: await getSubmission(email, item.kit, item.index, item.documentKey), emailed, filing,
                     verification: await get(email, item.kit, item.index, item.activity, item.row.responses) });
+            } catch (error) { failure(res, error); }
+        });
+        // Submitted drawings not yet moved into the student's DTECH folder (e.g. submitted before auto-filing, or permission declined).
+        const filingPath = "/api/practical-skills/drawing-filing";
+        app.get(filingPath, async (req, res) => {
+            res.set("Cache-Control", "private, no-store");
+            const email = student(req, res);
+            if (!email) return;
+            try {
+                res.json({ pending: publicPending(await pendingFiling(email)) });
+            } catch (error) { failure(res, error); }
+        });
+        app.post(filingPath, async (req, res) => {
+            res.set("Cache-Control", "private, no-store");
+            const email = student(req, res);
+            if (!email) return;
+            try {
+                const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
+                if (!driveAccessToken) throw Object.assign(new Error("Google Drive permission is required."), { status: 400 });
+                await verifyDriveTokenForStudent(driveAccessToken, email);
+                const results = [];
+                for (const item of await pendingFiling(email)) {
+                    let filing;
+                    try {
+                        filing = await fileSubmission({ studentEmail: email, documentKey: item.documentKey, activityTitle: item.title, driveAccessToken });
+                    } catch (error) {
+                        console.error("[kit-submission] Could not file drawing:", error.message);
+                        filing = { filed: false, reason: "error" };
+                    }
+                    await markFiled(email, item.kitId, item.index, item.documentKey, filing);
+                    results.push({ kitId: item.kitId, index: item.index, title: item.title, filed: Boolean(filing.filed),
+                        reason: filing.reason || "", path: Array.isArray(filing.path) ? filing.path : null });
+                }
+                res.json({ results, pending: publicPending(await pendingFiling(email)) });
             } catch (error) { failure(res, error); }
         });
         app.get("/api/admin/kit-submissions", requireAdminAccess, async (req, res) => {

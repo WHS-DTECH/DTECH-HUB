@@ -232,11 +232,21 @@ async function fixture(t) {
     const progress = { student_email: email, kit_id: kitId, completed: false, completed_activities: {}, started_at: null,
         responses: Object.fromEntries([0, 1, 2].map((i) => [`${i}-blocks`, answer(kit, i, link(i))])) };
     const checks = new Map(), submissions = new Map(), notices = [], certificateEmails = [], filings = [];
-    let tables = false, emailFails = false, fileFails = false;
+    let tables = false, emailFails = false, fileFails = false, fileReason = "";
     const key = (params) => JSON.stringify([params[0], params[1], Number(params[2]), params[3], params[4]]);
     const subKey = (params) => JSON.stringify([params[0], params[1], Number(params[2])]);
     const pool = { async query(sql, params) {
         if (sql.startsWith("CREATE TABLE")) { tables = true; return { rows: [] }; }
+        if (sql.startsWith("ALTER TABLE practical_skills_submissions")) return { rows: [] };
+        if (sql.startsWith("SELECT kit_id, activity_index, document_key FROM practical_skills_submissions")) {
+            return { rows: [...submissions.values()].filter((row) => row.student_email === params[0] &&
+                row.document_key.startsWith("google-file:") && row.filed_document_key !== row.document_key) };
+        }
+        if (sql.startsWith("UPDATE practical_skills_submissions SET filed_document_key")) {
+            const row = submissions.get(subKey(params));
+            if (row?.document_key === params[3]) row.filed_document_key = params[3];
+            return { rows: [] };
+        }
         if (sql.startsWith("SELECT to_regclass")) return { rows: [{ checks_table: tables ? "c" : null, submissions_table: tables ? "s" : null }] };
         if (sql.startsWith("SELECT content")) return { rows: [{ content: kit }] };
         if (sql.startsWith("SELECT responses")) return { rows: [{ responses: structuredClone(progress.responses) }] };
@@ -283,7 +293,9 @@ async function fixture(t) {
         getRequestUserEmail: (req) => req.headers["x-user-email"] || email,
         requireAdminAccess(req, res, next) { if (req.headers["x-teacher"] !== "yes") return res.sendStatus(403); next(); },
         canReview: async (who) => who === "teacher@school.nz",
-        verifyDriveTokenForStudent: async () => { throw new Error("Drawings are never downloaded"); },
+        verifyDriveTokenForStudent: async (token) => {
+            if (token !== "student-token") throw Object.assign(new Error("Google sign-in expired. Sign in again and retry."), { status: 401 });
+        },
         driveApiRequest: async () => { throw new Error("Drawings are never downloaded"); },
         fetchFile: async () => { throw new Error("Drawings are never downloaded"); },
         autoEmailKitCertificate: async (req, kitId, certificate, studentEmail) => {
@@ -297,6 +309,7 @@ async function fixture(t) {
         fileSubmission: async (request) => {
             filings.push(request);
             if (fileFails) throw new Error("Drive down");
+            if (fileReason) return { filed: false, reason: fileReason };
             return { filed: true, path: ["WHS-DTECH", "MiddleDTECH", "KITS", "Google Drawings"] };
         }
     };
@@ -324,6 +337,9 @@ async function fixture(t) {
     return {
         kit, progress, sync, request, notices, certificateEmails, filings, failEmail: (value) => { emailFails = value; },
         failFiling: (value) => { fileFails = value; },
+        filingReason: (value) => { fileReason = value; },
+        pendingFiling: () => request("/api/practical-skills/drawing-filing"),
+        fileAll: (body) => request("/api/practical-skills/drawing-filing", "POST", body),
         setLink: (i, url) => { progress.responses[`${i}-blocks`] = answer(kit, i, url); },
         submit: (i, body = {}) => request(`/api/practical-skills/blocks/${kitId}/${i}/submit`, "POST", body),
         status: (i) => request(`/api/practical-skills/blocks/${kitId}/${i}/document-check`),
@@ -435,7 +451,37 @@ test("drawing filing helper moves only owned drawings into KITS > Google Drawing
 
     file = { ...file, ownedByMe: true, mimeType: "application/vnd.google-apps.document" };
     assert.equal((await run()).reason, "not-drawing");
+    file = { ...file, mimeType: "application/vnd.google-apps.drawing", trashed: true };
+    assert.equal((await run()).reason, "missing", "Deleted drawings stop the reminder instead of nagging forever");
     assert.equal((await ctx.fileDrawing({ studentEmail: "s@school.nz", documentKey: "https://example.test/x", driveAccessToken: "tok" })).filed, false);
+});
+
+test("login reminder lists unfiled submitted drawings until the student moves them", async (t) => {
+    const f = await fixture(t);
+    assert.deepEqual((await f.pendingFiling()).data.pending, [], "Nothing submitted, no reminder");
+    await f.submit(0);
+    await f.submit(1);
+    await f.submit(2, { driveAccessToken: "student-token" });
+    const before = await f.pendingFiling();
+    assert.equal(before.status, 200);
+    assert.deepEqual(before.data.pending, [{ kitId: "kit-google-drawings", index: 0, title: "Ship" },
+        { kitId: "kit-google-drawings", index: 1, title: "TV" }], "Drawings filed on Submit are not listed");
+    assert.equal((await f.fileAll({})).status, 400, "Drive permission is required");
+    assert.equal((await f.fileAll({ driveAccessToken: "expired" })).status, 401);
+    f.filings.length = 0;
+    f.failFiling(true);
+    const failed = await f.fileAll({ driveAccessToken: "student-token" });
+    assert.equal(failed.status, 200);
+    assert.equal(failed.data.pending.length, 2, "Temporary Drive errors keep the reminder");
+    f.failFiling(false);
+    f.filingReason("not-owner");
+    await f.submit(0, { driveAccessToken: "student-token" });
+    f.filingReason("");
+    const done = await f.fileAll({ driveAccessToken: "student-token" });
+    assert.equal(done.status, 200);
+    assert.deepEqual(done.data.pending, [], "Once sorted the reminder disappears");
+    assert.deepEqual(done.data.results.map((result) => [result.title, result.filed]), [["TV", true]]);
+    assert.deepEqual((await f.pendingFiling()).data.pending, []);
 });
 
 test("teacher submissions list and Completed ticks drive kit completion and the certificate", async (t) => {

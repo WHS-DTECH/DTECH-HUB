@@ -2482,6 +2482,7 @@ function renderGlobalHubSidebar({ signedIn, canTeacherView, canAdmin }) {
     if (allocationsHost) {
         void loadAndRenderSidebarAllocations(panel);
     }
+    void checkDrawingFilingReminder();
 
     if (!readGlobalSidebarSeenThisSession()) {
         markGlobalSidebarSeenThisSession();
@@ -2778,6 +2779,106 @@ function showExternalExamIntentionReminder(email) {
         </div>
     `;
     dialog.querySelector("[data-external-exam-reminder-dismiss]")?.addEventListener("click", () => dialog.close());
+    dialog.addEventListener("close", () => dialog.remove(), { once: true });
+    document.body.appendChild(dialog);
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "");
+}
+
+const DRAWING_FILING_PATH = "/api/practical-skills/drawing-filing";
+let drawingFilingCheckEmail = "";
+
+// Pops up once per sign-in session while submitted Google Drawings still need moving into the student's DTECH folder.
+async function checkDrawingFilingReminder() {
+    const email = normalizeEmail(hubAuthState.profile?.email || "");
+    if (!email || drawingFilingCheckEmail === email || typeof document.createElement !== "function") return;
+    drawingFilingCheckEmail = email;
+    const reminderKey = `hub_drawing_filing_reminder_v1:${email}`;
+    try {
+        if (sessionStorage.getItem(reminderKey)) return;
+    } catch (_error) {
+    }
+    let pending = [];
+    try {
+        const response = await fetch(DRAWING_FILING_PATH, { headers: withHubAuthHeaders({}, email), cache: "no-store" });
+        if (!response.ok) {
+            drawingFilingCheckEmail = "";
+            return;
+        }
+        pending = (await response.json()).pending;
+    } catch (_error) {
+        drawingFilingCheckEmail = "";
+        return;
+    }
+    if (!Array.isArray(pending) || !pending.length || normalizeEmail(hubAuthState.profile?.email || "") !== email) return;
+    try {
+        sessionStorage.setItem(reminderKey, "1");
+    } catch (_error) {
+    }
+    showDrawingFilingReminder(email, pending);
+}
+
+function showDrawingFilingReminder(email, pending) {
+    const dialog = document.createElement("dialog");
+    dialog.className = "hub-external-exam-reminder hub-drawing-filing-reminder";
+    dialog.setAttribute("aria-labelledby", "hub-drawing-filing-title");
+    dialog.innerHTML = `
+        <div class="hub-external-exam-reminder-content">
+            <p class="hub-external-exam-reminder-kicker">Google Drawings Kit</p>
+            <h2 id="hub-drawing-filing-title">Move your drawings into your DTECH folder</h2>
+            <p>Your submitted drawings are still in My Drive. Give DTECH-HUB permission and we'll move them into <strong>WHS-DTECH &gt; your course &gt; KITS &gt; Google Drawings</strong> and name them for you. Your teacher's link still works.</p>
+            <ul class="hub-drawing-filing-list" data-drawing-filing-list></ul>
+            <p class="hub-drawing-filing-status" data-drawing-filing-status role="status" aria-live="polite"></p>
+            <div class="hub-external-exam-reminder-actions">
+                <button type="button" class="hub-drawing-filing-move" data-drawing-filing-move>Give permission &amp; move my drawings</button>
+                <button type="button" data-drawing-filing-dismiss>Remind me later</button>
+            </div>
+        </div>
+    `;
+    const list = dialog.querySelector("[data-drawing-filing-list]");
+    const status = dialog.querySelector("[data-drawing-filing-status]");
+    const move = dialog.querySelector("[data-drawing-filing-move]");
+    const dismiss = dialog.querySelector("[data-drawing-filing-dismiss]");
+    const renderList = (items) => {
+        list.replaceChildren(...items.map((item) => {
+            const row = document.createElement("li");
+            row.textContent = item.title;
+            return row;
+        }));
+    };
+    renderList(pending);
+    move?.addEventListener("click", async () => {
+        move.disabled = true;
+        status.textContent = "Waiting for Google permission...";
+        try {
+            const token = await requestHubDriveAccessToken();
+            if (token?.error || !token?.access_token) throw new Error(token?.error || "Google Drive permission was not granted.");
+            if (normalizeEmail(hubAuthState.profile?.email || "") !== email) throw new Error("Your signed-in account changed. Sign in again.");
+            status.textContent = "Moving your drawings...";
+            const response = await fetch(DRAWING_FILING_PATH, {
+                method: "POST",
+                headers: withHubAuthHeaders({ "Content-Type": "application/json" }, email),
+                body: JSON.stringify({ driveAccessToken: token.access_token })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(data.error || "Your drawings could not be moved.");
+            const remaining = Array.isArray(data.pending) ? data.pending : [];
+            if (!remaining.length) {
+                const path = (data.results || []).find((result) => Array.isArray(result.path))?.path;
+                renderList([]);
+                status.textContent = path ? `All done! Your drawings are in ${path.join(" > ")}.` : "All done! Your drawings are sorted.";
+                move.hidden = true;
+                dismiss.textContent = "Close";
+                return;
+            }
+            renderList(remaining);
+            status.textContent = "Some drawings couldn't be moved yet. Try again, or ask your teacher for help.";
+        } catch (error) {
+            status.textContent = error?.message || "Your drawings could not be moved. Try again.";
+        }
+        move.disabled = false;
+    });
+    dismiss?.addEventListener("click", () => dialog.close());
     dialog.addEventListener("close", () => dialog.remove(), { once: true });
     document.body.appendChild(dialog);
     if (typeof dialog.showModal === "function") dialog.showModal();

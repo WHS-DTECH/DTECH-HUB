@@ -499,5 +499,5 @@ test("Licence menu links to Teacher Review with the same admin gate as Upload Ki
     assert.equal(context.hubLicenceSetupLink.hidden, true, "Setup links are hidden in Student View");
     assert.equal(context.worksheetLicenceSetupLink.hidden, true);
     const teacherView = fs.readFileSync(path.join(root, "teacher-view.html"), "utf8");
-    assert.match(teacherView, /script\.js\?v=student-tools-1/);
+    assert.match(teacherView, /script\.js\?v=[\w-]+"/, "teacher-view.html cache-busts the shared navigation script");
 });
