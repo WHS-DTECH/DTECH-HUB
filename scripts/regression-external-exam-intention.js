@@ -125,13 +125,13 @@ async function main() {
         "A No response hides external standards without deleting the saved allocation");
     assert.match(server, /has_external_exam_allocation: externalStandardNumbers\.length > 0[\s\S]*?external_exam_intention: externalExamIntention/,
         "Allocation and response status are returned separately to the sidebar");
-    assert.match(script, /externalExamFormLink\.hidden = !hasExternalExamAllocation \|\| externalExamIntention === "no"/,
-        "The sidebar form link is limited to students still proceeding with an allocated external exam");
+    assert.match(script, /link\.hidden = !isSenior \|\| !hasAllocation \|\| intention === "no"/,
+        "The sidebar form link is limited to SeniorDTECH students still proceeding with an allocated external exam");
     assert.ok((script.match(/You have CHOSEN not to continue with the Exam\./g) || []).length >= 2,
         "Students who opt out see the explicit choice reflected in both sidebar and homepage summaries");
     assert.match(script, /hubStudentExternalExamIntention = externalExamIntention/,
         "Homepage summary receives the same synced intention as the sidebar");
-    assert.match(script, /hasExternalExamAllocation && !externalExamIntention/,
+    assert.match(script, /isSenior && hasAllocation && !intention/,
         "Only allocated students with no recorded answer get the login reminder");
 
     console.log("External exam intention webhook and visibility regressions passed.");

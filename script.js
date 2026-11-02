@@ -2617,6 +2617,7 @@ function updateSidebarCourseSections(panel, course = panel.dataset.course || "",
     const summaries = panel.querySelector("#hub-sidebar-summary-cards");
     if (allocations) allocations.hidden = !isSenior;
     if (summaries) summaries.hidden = !isSenior || summaries.dataset.available !== "true";
+    updateSidebarExternalExamForm(panel);
     window.dispatchEvent(new CustomEvent("hub-course-resolved", {
         detail: { course, status }
     }));
@@ -2626,6 +2627,21 @@ window.addEventListener("hub-course-changed", () => {
     const panel = document.querySelector("#hub-global-sidebar");
     if (panel) void loadAndRenderSidebarCourse(panel);
 });
+
+function updateSidebarExternalExamForm(panel) {
+    const link = panel.querySelector("#hub-global-sidebar-external-exam-form");
+    const course = panel.dataset.course || (panel.dataset.courseStatus === "pending" ? "" : panel.dataset.allocationCourse || "");
+    const isSenior = course === "SeniorDTECH";
+    const hasAllocation = panel.dataset.externalExamAllocation === "true";
+    const intention = panel.dataset.externalExamIntention || "";
+    if (link) {
+        link.hidden = !isSenior || !hasAllocation || intention === "no";
+        link.href = SENIOR_EXTERNAL_EXAM_FORM_URL;
+    }
+    if (isSenior && hasAllocation && !intention) {
+        showExternalExamIntentionReminder(normalizeEmail(hubAuthState.profile?.email || ""));
+    }
+}
 
 async function loadAndRenderSidebarCourse(panel) {
     updateSidebarCourseSections(panel, "", "pending");
@@ -2680,16 +2696,9 @@ async function loadAndRenderSidebarAllocations(panel) {
         const data = await resp.json();
         const assessments = Array.isArray(data.assessment_tasks) ? data.assessment_tasks : [];
         const projects = Array.isArray(data.projects) ? data.projects : [];
-        const hasExternalExamAllocation = Boolean(data.has_external_exam_allocation);
         const externalExamIntention = String(data.external_exam_intention || "").trim().toLowerCase();
-        const externalExamFormLink = panel.querySelector("#hub-global-sidebar-external-exam-form");
-        if (externalExamFormLink) {
-            externalExamFormLink.hidden = !hasExternalExamAllocation || externalExamIntention === "no";
-            externalExamFormLink.href = SENIOR_EXTERNAL_EXAM_FORM_URL;
-        }
-        if (hasExternalExamAllocation && !externalExamIntention) {
-            showExternalExamIntentionReminder(email);
-        }
+        panel.dataset.externalExamAllocation = String(Boolean(data.has_external_exam_allocation));
+        panel.dataset.externalExamIntention = externalExamIntention;
         const hasInternalAssessment = assessments.length > 0
             || (Array.isArray(data.allocated_standards) && data.allocated_standards.length > 0);
         if (hasInternalAssessment) {
