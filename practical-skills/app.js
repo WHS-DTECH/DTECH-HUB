@@ -20,7 +20,7 @@
     const requestedParams = new URLSearchParams(pageLocation?.search || "");
     const requestedType = isPathways ? requestedParams.get("type") : null;
     const requestedYear = isPathways ? requestedParams.get("year") : null;
-    const requestedCategory = isPathways ? requestedParams.get("category") : null;
+    const requestedCategory = requestedParams.get("category");
     const requestedCardId = isPathways ? decodeURIComponent(String(pageLocation?.hash || "").replace(/^#card-/, "")) : "";
     let requestedCardShown = false;
 

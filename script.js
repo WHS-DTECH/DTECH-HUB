@@ -1436,7 +1436,7 @@ function renderGlobalNavbar() {
             <summary id="hub-practical-skills-summary">Licence</summary>
             <div class="nav-drawer" role="menu">
                 <a id="hub-practical-skills-link" role="menuitem" href="/practical-skills/checklist.html">My Licence</a>
-                <a role="menuitem" href="/practical-skills/">Licence Library</a>
+                <a role="menuitem" href="/practical-skills/?category=Licence%20Kit">Licence Library</a>
                 <a id="hub-upload-kits-link" role="menuitem" href="/practical-skills/admin-kits.html" hidden>Upload Kits</a>
                 <a id="hub-teacher-review-link" role="menuitem" href="/practical-skills/teacher-results.html" hidden>Teacher Review</a>
                 <a id="hub-licence-setup-link" role="menuitem" href="/practical-skills/licence-kit-setup.html" hidden>Licence Kit Setup</a>
