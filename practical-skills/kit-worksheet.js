@@ -287,19 +287,27 @@
         state.documentCheckInProgress = true;
         updateActivityCompleteBar();
         try {
+            // Started before other awaits so the Google permission popup keeps the Submit click's user gesture.
+            const permission = getResearchReportDriveToken().catch(() => "");
             await checkBlockAnswers(index);
             const revision = state.blockRevision;
+            const driveAccessToken = await permission;
             return await queueProgressWrite(async () => {
                 if (getSignedInEmail() !== email || revision !== state.blockRevision) throw new Error("Your account or answers changed. Press Submit again.");
                 showStatusMessage("Submitting your drawing to your teacher...");
                 const result = await loadJson(`${blockPath(index)}/submit`, {
-                    method: "POST", headers: withAuthHeaders({ "Content-Type": "application/json" }), body: "{}"
+                    method: "POST", headers: withAuthHeaders({ "Content-Type": "application/json" }),
+                    body: JSON.stringify(driveAccessToken ? { driveAccessToken } : {})
                 });
                 if (getSignedInEmail() !== email || revision !== state.blockRevision) return result;
                 state.submissions[index] = result.submission;
                 updateActivityCompleteBar();
                 showDocumentVerification(result.verification, result.submission);
-                showStatusMessage("Submitted! Your teacher will review your drawing and tick Completed.");
+                const filing = result.filing || {};
+                const filed = filing.filed && Array.isArray(filing.path) ? ` Your drawing is saved in ${filing.path.join(" > ")}.`
+                    : filing.reason === "not-owner" ? " This drawing belongs to someone else, so it wasn't moved to your folder."
+                        : " Your drawing couldn't be moved to your DTECH folder - you can move it yourself.";
+                showStatusMessage(`Submitted! Your teacher will review your drawing and tick Completed.${filed}`);
                 return result;
             });
         } finally {

@@ -16335,16 +16335,56 @@ async function notifyKitSubmission({ studentEmail, kitId, url, subject }) {
     to: recipients,
     subject: `${String(subject).replace(/[\r\n]+/g, " ")} - ${String(name).replace(/[\r\n]+/g, " ")}`,
     html: `<div style="font-family:Arial,sans-serif;color:#173858;"><p><strong>${safe(name)}</strong> (${safe(studentEmail)}) submitted <strong>${safe(subject)}</strong>.</p><p><a href="${safe(url)}">Open the submitted drawing</a></p><p><a href="${safe(review)}">Open Teacher Review</a> to tick Completed in the Class Kit Completion submissions list.</p></div>`,
-    emailType: "kit_submission"
+        emailType: "kit_submission"
+      });
+      return true;
+    }
+
+    const KIT_DRAWINGS_FOLDER_NAME = "Google Drawings";
+
+// Moves a submitted Google Drawing the student owns into WHS-DTECH > course > KITS > Google Drawings and names it "<Activity> - <Student>".
+async function fileKitDrawingSubmission({ studentEmail, documentKey, activityTitle, driveAccessToken }) {
+  const email = normalizeEmail(studentEmail);
+  const fileId = String(documentKey || "").match(/^google-file:([a-zA-Z0-9_-]+)$/)?.[1];
+  if (!fileId || !driveAccessToken) return { filed: false, reason: "no-permission" };
+  const identity = await verifyDriveTokenForStudent(driveAccessToken, email);
+  const file = await driveApiRequest(`/files/${encodeURIComponent(fileId)}`, {
+    accessToken: driveAccessToken,
+    queryParams: { fields: "id,name,mimeType,parents,ownedByMe,trashed", supportsAllDrives: true }
   });
-  return true;
+  if (!file?.id || file.trashed || file.mimeType !== "application/vnd.google-apps.drawing") return { filed: false, reason: "not-drawing" };
+  if (!file.ownedByMe) return { filed: false, reason: "not-owner" };
+  const programmeFolder = await getStudentProgrammeFolder(email);
+  const { kits } = await ensureStudentCourseFolders(email, programmeFolder, driveAccessToken);
+  const folder = await withResearchReportLock(`${email}:kit-drawings`,
+    async () => driveEnsureFolder(kits.id, KIT_DRAWINGS_FOLDER_NAME, driveAccessToken));
+  if (!folder?.id) throw new Error(`Could not find or create your ${KIT_DRAWINGS_FOLDER_NAME} folder.`);
+  const { studentName } = await getResearchReportStudentDetails(email, identity?.name).catch(() => ({ studentName: "" }));
+  const name = [String(activityTitle || "").trim(), String(studentName || "").trim()].filter(Boolean).join(" - ").slice(0, 200) || file.name;
+  const parents = Array.isArray(file.parents) ? file.parents : [];
+  const otherParents = parents.filter((parent) => parent !== folder.id);
+  if (parents.includes(folder.id) && !otherParents.length && file.name === name) {
+    return { filed: true, moved: false, path: ["WHS-DTECH", programmeFolder, "KITS", KIT_DRAWINGS_FOLDER_NAME] };
+  }
+  await driveApiRequest(`/files/${encodeURIComponent(fileId)}`, {
+    accessToken: driveAccessToken,
+    method: "PATCH",
+    queryParams: {
+      ...(parents.includes(folder.id) ? {} : { addParents: folder.id }),
+      ...(otherParents.length ? { removeParents: otherParents.join(",") } : {}),
+      fields: "id,name,parents",
+      supportsAllDrives: true
+    },
+    body: { name }
+  });
+  return { filed: true, moved: !parents.includes(folder.id), name, path: ["WHS-DTECH", programmeFolder, "KITS", KIT_DRAWINGS_FOLDER_NAME] };
 }
 
 const documentVerification = require("./practical-skills/document-verification").createDocumentVerification({
   pool, getDefaultPracticalSkillsKitContent, syncCompletion: syncPracticalSkillsKitCompletion,
   getRequestUserEmail, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN,
   verifyDriveTokenForStudent, driveApiRequest, requireAdminAccess, autoEmailKitCertificate, canReview: canManagePracticalSchedule,
-  notifySubmission: notifyKitSubmission
+  notifySubmission: notifyKitSubmission, fileSubmission: fileKitDrawingSubmission
 });
 documentVerification.register(app);
 

@@ -10,7 +10,7 @@ const TEACHER_ONLY = new Set([DRAWING_POLICY]);
 function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
     syncCompletion, getRequestUserEmail, normalizeEmail, schoolDomain, verifyDriveTokenForStudent,
     driveApiRequest, requireAdminAccess, canReview, autoEmailKitCertificate, notifySubmission = async () => false,
-    fetchFile = fetch }) {
+    fileSubmission = async () => ({ filed: false }), fetchFile = fetch }) {
     let schema, submissionSchema;
     async function ensureSchema() {
         if (!schema) schema = pool.query(`CREATE TABLE IF NOT EXISTS practical_skills_document_checks (
@@ -162,18 +162,29 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                     VALUES ($1,$2,$3,$4,$5) ON CONFLICT (student_email, kit_id, activity_index)
                     DO UPDATE SET document_key = EXCLUDED.document_key, url = EXCLUDED.url, submitted_at = NOW()`,
                 [email, item.kit, item.index, item.documentKey, item.url]);
+                const activityTitle = item.content.worksheets[item.index].activity || `Activity ${item.index + 1}`;
+                let filing = { filed: false, reason: "no-permission" };
+                const driveAccessToken = String(req.body?.driveAccessToken || "").trim();
+                if (driveAccessToken) {
+                    try {
+                        filing = await fileSubmission({ studentEmail: email, documentKey: item.documentKey, activityTitle, driveAccessToken });
+                    } catch (error) {
+                        console.error("[kit-submission] Could not file drawing:", error.message);
+                        filing = { filed: false, reason: "error" };
+                    }
+                }
                 let emailed = false;
                 if (previous?.notified_document_key !== item.documentKey) {
                     try {
                         emailed = await notifySubmission({ studentEmail: email, kitId: item.kit, index: item.index, url: item.url,
-                            subject: item.activity.submissionSubject || item.content.worksheets[item.index].activity || `Activity ${item.index + 1}` });
+                            subject: item.activity.submissionSubject || activityTitle });
                         if (emailed) await pool.query(`UPDATE practical_skills_submissions SET notified_document_key = $4
                             WHERE student_email = $1 AND kit_id = $2 AND activity_index = $3`, [email, item.kit, item.index, item.documentKey]);
                     } catch (error) {
                         console.error("[kit-submission] Could not email teacher:", error.message);
                     }
                 }
-                res.json({ submission: await getSubmission(email, item.kit, item.index, item.documentKey), emailed,
+                res.json({ submission: await getSubmission(email, item.kit, item.index, item.documentKey), emailed, filing,
                     verification: await get(email, item.kit, item.index, item.activity, item.row.responses) });
             } catch (error) { failure(res, error); }
         });

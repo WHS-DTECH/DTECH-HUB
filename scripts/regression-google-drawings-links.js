@@ -231,8 +231,8 @@ async function fixture(t) {
     const kit = B.withFilesFoldersLinks(base()), email = "student@school.nz", kitId = "kit-google-drawings";
     const progress = { student_email: email, kit_id: kitId, completed: false, completed_activities: {}, started_at: null,
         responses: Object.fromEntries([0, 1, 2].map((i) => [`${i}-blocks`, answer(kit, i, link(i))])) };
-    const checks = new Map(), submissions = new Map(), notices = [], certificateEmails = [];
-    let tables = false, emailFails = false;
+    const checks = new Map(), submissions = new Map(), notices = [], certificateEmails = [], filings = [];
+    let tables = false, emailFails = false, fileFails = false;
     const key = (params) => JSON.stringify([params[0], params[1], Number(params[2]), params[3], params[4]]);
     const subKey = (params) => JSON.stringify([params[0], params[1], Number(params[2])]);
     const pool = { async query(sql, params) {
@@ -293,6 +293,11 @@ async function fixture(t) {
             notices.push(notice);
             if (emailFails) throw new Error("SMTP down");
             return true;
+        },
+        fileSubmission: async (request) => {
+            filings.push(request);
+            if (fileFails) throw new Error("Drive down");
+            return { filed: true, path: ["WHS-DTECH", "MiddleDTECH", "KITS", "Google Drawings"] };
         }
     };
     const verification = createDocumentVerification(deps);
@@ -317,9 +322,10 @@ async function fixture(t) {
     };
     const teacherHeaders = { "x-teacher": "yes", "x-user-email": "teacher@school.nz" };
     return {
-        kit, progress, sync, request, notices, certificateEmails, failEmail: (value) => { emailFails = value; },
+        kit, progress, sync, request, notices, certificateEmails, filings, failEmail: (value) => { emailFails = value; },
+        failFiling: (value) => { fileFails = value; },
         setLink: (i, url) => { progress.responses[`${i}-blocks`] = answer(kit, i, url); },
-        submit: (i) => request(`/api/practical-skills/blocks/${kitId}/${i}/submit`, "POST", {}),
+        submit: (i, body = {}) => request(`/api/practical-skills/blocks/${kitId}/${i}/submit`, "POST", body),
         status: (i) => request(`/api/practical-skills/blocks/${kitId}/${i}/document-check`),
         check: (i) => request(`/api/practical-skills/blocks/${kitId}/${i}/document-check`, "POST", { driveAccessToken: "student-token" }),
         list: (headers = teacherHeaders) => request(`/api/admin/kit-submissions?kits=${kitId},kit-bad_id`, "GET", undefined, headers),
@@ -365,6 +371,71 @@ test("Submit records the current link and emails the teacher once per link witho
     assert.equal(failed.data.emailed, false);
     f.failEmail(false);
     assert.equal((await f.submit(1)).data.emailed, true, "A failed email is retried on the next Submit");
+});
+
+test("Submit with Drive permission files the drawing, and a filing failure never blocks the submission", async (t) => {
+    const f = await fixture(t);
+    const none = await f.submit(0);
+    assert.equal(none.status, 200);
+    assert.equal(f.filings.length, 0, "Without Drive permission nothing is moved");
+    assert.equal(none.data.filing.filed, false);
+    const filed = await f.submit(1, { driveAccessToken: "student-token" });
+    assert.equal(filed.status, 200);
+    assert.deepEqual({ ...f.filings[0] }, { studentEmail: "student@school.nz", documentKey: B.documentLinkKey(link(1)),
+        activityTitle: "TV", driveAccessToken: "student-token" });
+    assert.deepEqual([...filed.data.filing.path], ["WHS-DTECH", "MiddleDTECH", "KITS", "Google Drawings"]);
+    f.failFiling(true);
+    const failed = await f.submit(2, { driveAccessToken: "student-token" });
+    assert.equal(failed.status, 200, "Drive problems never stop the teacher getting the submission");
+    assert.equal(failed.data.emailed, true);
+    assert.deepEqual({ ...failed.data.filing }, { filed: false, reason: "error" });
+});
+
+test("drawing filing helper moves only owned drawings into KITS > Google Drawings and renames them", async () => {
+    const calls = [];
+    let file;
+    const ctx = vm.createContext({
+        normalizeEmail: (value) => String(value || "").trim().toLowerCase(),
+        verifyDriveTokenForStudent: async (token, email) => { calls.push(["verify", token, email]); return { name: "Google Name" }; },
+        driveApiRequest: async (route, options) => {
+            calls.push([options.method || "GET", route, options.queryParams, options.body]);
+            return options.method === "PATCH" ? { id: "d1" } : file;
+        },
+        getStudentProgrammeFolder: async () => "MiddleDTECH",
+        ensureStudentCourseFolders: async () => ({ kits: { id: "kits" } }),
+        withResearchReportLock: async (_key, run) => run(),
+        driveEnsureFolder: async (parent, name) => { calls.push(["folder", parent, name]); return { id: "drawings" }; },
+        getResearchReportStudentDetails: async () => ({ studentName: "Aroha Smith" })
+    });
+    const start = source.indexOf("const KIT_DRAWINGS_FOLDER_NAME");
+    assert.ok(start > 0);
+    vm.runInContext(`${source.slice(start, source.indexOf("\nconst documentVerification", start))}; this.fileDrawing = fileKitDrawingSubmission;`, ctx);
+    const run = () => ctx.fileDrawing({ studentEmail: "Student@school.nz", documentKey: "google-file:d1", activityTitle: "Ship", driveAccessToken: "tok" });
+
+    file = { id: "d1", name: "Untitled drawing", mimeType: "application/vnd.google-apps.drawing", parents: ["my-drive"], ownedByMe: true };
+    const moved = await run();
+    assert.equal(moved.filed, true);
+    assert.equal(moved.moved, true);
+    assert.deepEqual([...moved.path], ["WHS-DTECH", "MiddleDTECH", "KITS", "Google Drawings"]);
+    assert.deepEqual(calls.find((call) => call[0] === "folder"), ["folder", "kits", "Google Drawings"]);
+    const patch = calls.find((call) => call[0] === "PATCH");
+    assert.equal(patch[2].addParents, "drawings");
+    assert.equal(patch[2].removeParents, "my-drive");
+    assert.deepEqual({ ...patch[3] }, { name: "Ship - Aroha Smith" });
+
+    calls.length = 0;
+    file = { ...file, name: "Ship - Aroha Smith", parents: ["drawings"] };
+    assert.equal((await run()).moved, false);
+    assert.equal(calls.some((call) => call[0] === "PATCH"), false, "An already-filed drawing is left alone");
+
+    calls.length = 0;
+    file = { ...file, parents: ["someone"], ownedByMe: false };
+    assert.equal((await run()).reason, "not-owner");
+    assert.equal(calls.some((call) => call[0] === "PATCH" || call[0] === "folder"), false, "Other people's drawings are never moved");
+
+    file = { ...file, ownedByMe: true, mimeType: "application/vnd.google-apps.document" };
+    assert.equal((await run()).reason, "not-drawing");
+    assert.equal((await ctx.fileDrawing({ studentEmail: "s@school.nz", documentKey: "https://example.test/x", driveAccessToken: "tok" })).filed, false);
 });
 
 test("teacher submissions list and Completed ticks drive kit completion and the certificate", async (t) => {
