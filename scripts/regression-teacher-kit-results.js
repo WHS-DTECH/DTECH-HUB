@@ -495,6 +495,7 @@ test("Licence menu links to Teacher Review with the same admin gate as Upload Ki
     assert.equal(context.worksheetLicenceSetupLink.hidden, false);
     context.inTeacherMode = false;
     vm.runInContext(gate, context);
+    assert.equal(context.hubTeacherReviewLink.hidden, true, "Teacher Review is hidden in Student View");
     assert.equal(context.hubLicenceSetupLink.hidden, true, "Setup links are hidden in Student View");
     assert.equal(context.worksheetLicenceSetupLink.hidden, true);
     const teacherView = fs.readFileSync(path.join(root, "teacher-view.html"), "utf8");

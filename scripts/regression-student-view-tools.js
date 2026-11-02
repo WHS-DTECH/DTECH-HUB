@@ -41,7 +41,7 @@ test("Upload and kit editing links follow view mode as well as permissions on ev
         setHubProfileOpen: noop, renderCurrentWeek: noop, populateHubProfilePanel: noop
     });
     vm.runInContext(source.slice(start, end), context);
-    const adminTools = ["hubTeacherDashboardLink", "hubUploadKitsLink",
+    const adminTools = ["hubTeacherDashboardLink", "hubUploadKitsLink", "hubTeacherReviewLink",
         "hubLicenceSetupLink", "worksheetLicenceSetupLink"];
     const check = (uploadVisible, adminVisible) => {
         context.renderHubAuthUi();
@@ -69,4 +69,19 @@ test("Upload and kit editing links follow view mode as well as permissions on ev
     mode = "student";
     teacherPath = true;
     check(true, true);
+});
+
+test("Shared navigation CSS cannot display hidden menu tools", () => {
+    const styles = fs.readFileSync(path.join(__dirname, "..", "styles.css"), "utf8");
+    assert.match(styles, /\.topbar \[hidden\]\s*\{\s*display:\s*none\s*!important;\s*\}/,
+        "Author display rules for menu links must not override the hidden attribute");
+    const navigationStart = source.indexOf('<details class="nav-dropdown nav-dropdown-practical-skills"');
+    const navigationEnd = source.indexOf("</details>", navigationStart);
+    const menu = source.slice(navigationStart, navigationEnd);
+    for (const id of ["hub-upload-kits-link", "hub-teacher-review-link", "hub-licence-setup-link"]) {
+        assert.match(menu, new RegExp(`<a id="${id}"[^>]+ hidden>`), `${id} must be hidden before authentication resolves`);
+    }
+    for (const label of ["My Licence", "Licence Library"]) {
+        assert.match(menu, new RegExp(`<a [^>]+> *${label}</a>`));
+    }
 });

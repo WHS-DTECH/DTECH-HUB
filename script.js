@@ -3379,7 +3379,7 @@ function renderHubAuthUi() {
         hubUploadKitsLink.hidden = !(canAdmin && inTeacherMode);
     }
     if (hubTeacherReviewLink) {
-        hubTeacherReviewLink.hidden = !canAdmin;
+        hubTeacherReviewLink.hidden = !(canAdmin && inTeacherMode);
     }
     if (hubLicenceSetupLink) hubLicenceSetupLink.hidden = !(canAdmin && inTeacherMode);
     if (worksheetLicenceSetupLink) worksheetLicenceSetupLink.hidden = !(canAdmin && inTeacherMode);

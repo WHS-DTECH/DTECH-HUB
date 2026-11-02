@@ -81,6 +81,10 @@ a {
     position: relative;
 }
 
+.topbar [hidden] {
+    display: none !important;
+}
+
 .nav-dropdown summary {
     list-style: none;
     cursor: pointer;
