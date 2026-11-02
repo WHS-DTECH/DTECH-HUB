@@ -12353,6 +12353,7 @@ app.post("/api/activities/:id/interest", async (req, res) => {
     );
 
     let interested;
+    let confirmed = false;
     if (existing.rows.length) {
       await pool.query(
         "DELETE FROM project_interests WHERE project_id = $1 AND student_email = $2",
@@ -12360,9 +12361,12 @@ app.post("/api/activities/:id/interest", async (req, res) => {
       );
       interested = false;
     } else {
+      const profile = await getLearningSitesStudentProfile(email);
+      confirmed = Boolean(profile.available && !profile.courseIds?.includes("STAFF")
+        && ["MiddleDTECH", "SeniorDTECH"].includes(resolveSidebarCourse(profile, null)));
       await pool.query(
-        "INSERT INTO project_interests (project_id, student_email) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-        [projectId, email]
+        "INSERT INTO project_interests (project_id, student_email, confirmed) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+        [projectId, email, confirmed]
       );
       interested = true;
 
@@ -12381,8 +12385,10 @@ app.post("/api/activities/:id/interest", async (req, res) => {
           const isProjectCategory = rawCat.includes("project") || !rawCat;
           if (isAssessmentCategory || isProjectCategory) {
             await pool.query(
-              "INSERT INTO project_interests (project_id, student_email) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-              [clientProjectsTaskId, email]
+              `INSERT INTO project_interests (project_id, student_email, confirmed) VALUES ($1, $2, $3)
+               ON CONFLICT (project_id, student_email) DO UPDATE
+               SET confirmed = project_interests.confirmed OR EXCLUDED.confirmed`,
+              [clientProjectsTaskId, email, confirmed]
             );
           }
         } catch (_autoAllocErr) {
@@ -12396,7 +12402,7 @@ app.post("/api/activities/:id/interest", async (req, res) => {
       "SELECT COUNT(*)::int AS count FROM project_interests WHERE project_id = $1",
       [projectId]
     );
-    res.json({ interested, count: countResult.rows[0].count });
+    res.json({ interested, confirmed, count: countResult.rows[0].count });
   } catch (error) {
     console.error("Interest toggle error:", error);
     res.status(500).json({ error: "Could not update interest" });

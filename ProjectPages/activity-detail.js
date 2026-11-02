@@ -12124,6 +12124,9 @@ async function loadAndRenderInterestSection(host, projectId, isTeacher, detailDa
             const btnClass = interestData.my_interest ? "detail-action interest-btn is-interested" : "detail-action interest-btn";
             const btnText = interestData.my_interest ? "\u2713 I'm Interested" : "I'm Interested";
             html += `<button type="button" class="${btnClass}" id="interest-toggle-btn">${btnText}</button>`;
+            if (interestData.my_interest && myAllocation?.confirmed) {
+                html += '<p class="interest-count">Confirmed — your selection is allocated.</p>';
+            }
         }
     }
 
