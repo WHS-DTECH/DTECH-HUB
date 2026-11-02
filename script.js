@@ -2562,8 +2562,30 @@ function routeHubCourseHomepage(course) {
     const labHome = pathname === "/" || pathname === "/index.html";
     const pathwaysHome = pathname === "/learning-pathways/" || pathname === "/learning-pathways/index.html";
     if ((labHome && juniorOrMiddle) || (pathwaysHome && course === "SeniorDTECH")) {
+        hubCourseRedirecting = true;
         window.location.replace(destination);
     }
+}
+
+let hubCourseRedirecting = false;
+
+// Resolves once the sidebar course lookup finishes, so popups aren't shown on a page that is about to redirect.
+function waitForHubCourseResolved(timeoutMs = 10000) {
+    const panel = document.querySelector("#hub-global-sidebar");
+    const status = panel?.dataset?.courseStatus;
+    if (status === "ready" || status === "error") return Promise.resolve();
+    return new Promise((resolve) => {
+        const finish = () => {
+            window.clearTimeout(timer);
+            window.removeEventListener("hub-course-resolved", onResolved);
+            resolve();
+        };
+        const onResolved = (event) => {
+            if (event?.detail?.status !== "pending") finish();
+        };
+        const timer = window.setTimeout(finish, timeoutMs);
+        window.addEventListener("hub-course-resolved", onResolved);
+    });
 }
 
 function getTaskListCourseFromAllocations(items) {
@@ -2800,6 +2822,8 @@ async function checkDrawingFilingReminder() {
     }
     let pending = [];
     try {
+        await waitForHubCourseResolved();
+        if (hubCourseRedirecting) return;
         const response = await fetch(DRAWING_FILING_PATH, { headers: withHubAuthHeaders({}, email), cache: "no-store" });
         if (!response.ok) {
             drawingFilingCheckEmail = "";
@@ -2810,15 +2834,12 @@ async function checkDrawingFilingReminder() {
         drawingFilingCheckEmail = "";
         return;
     }
-    if (!Array.isArray(pending) || !pending.length || normalizeEmail(hubAuthState.profile?.email || "") !== email) return;
-    try {
-        sessionStorage.setItem(reminderKey, "1");
-    } catch (_error) {
-    }
-    showDrawingFilingReminder(email, pending);
+    if (hubCourseRedirecting || !Array.isArray(pending) || !pending.length
+        || normalizeEmail(hubAuthState.profile?.email || "") !== email) return;
+    showDrawingFilingReminder(email, pending, reminderKey);
 }
 
-function showDrawingFilingReminder(email, pending) {
+function showDrawingFilingReminder(email, pending, reminderKey = "") {
     const dialog = document.createElement("dialog");
     dialog.className = "hub-external-exam-reminder hub-drawing-filing-reminder";
     dialog.setAttribute("aria-labelledby", "hub-drawing-filing-title");
@@ -2878,7 +2899,20 @@ function showDrawingFilingReminder(email, pending) {
         }
         move.disabled = false;
     });
-    dismiss?.addEventListener("click", () => dialog.close());
+    dismiss?.addEventListener("click", () => {
+        // Only a deliberate close counts as "seen"; a page change mid-load lets it show again on the next page.
+        try {
+            if (reminderKey) sessionStorage.setItem(reminderKey, "1");
+        } catch (_error) {
+        }
+        dialog.close();
+    });
+    dialog.addEventListener("cancel", () => {
+        try {
+            if (reminderKey) sessionStorage.setItem(reminderKey, "1");
+        } catch (_error) {
+        }
+    });
     dialog.addEventListener("close", () => dialog.remove(), { once: true });
     document.body.appendChild(dialog);
     if (typeof dialog.showModal === "function") dialog.showModal();
