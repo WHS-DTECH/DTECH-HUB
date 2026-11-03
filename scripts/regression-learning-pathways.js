@@ -255,7 +255,9 @@ async function testEditor() {
 
 async function main() {
     const seed = normalizeCards(JSON.parse(fs.readFileSync(path.join(root, "learning-pathways/library.json"), "utf8")));
-    const strands = seed.filter((card) => card.cardType === "strand");
+    const allStrands = seed.filter((card) => card.cardType === "strand");
+    const year9Strands = allStrands.filter((card) => card.id.startsWith("year-9-"));
+    const strands = allStrands.filter((card) => !year9Strands.includes(card));
     const units = seed.filter((card) => card.cardType === "unit");
     const lessons = seed.filter((card) => card.cardType === "lesson");
     const activities = seed.filter((card) => card.cardType === "activity");
@@ -265,6 +267,31 @@ async function main() {
     assert.deepEqual(strands.map((card) => card.title), ["Digital systems", "Programming & Algorithms", "Data and Information",
         "Digital citizenship", "Systems and control"]);
     assert.ok(strands.every((card) => card.area === card.title && card.yearLevel === "Junior DTECH"));
+    assert.deepEqual(year9Strands.map((card) => [card.title, card.yearLevel, card.area, card.status, card.href]), [
+        ["Computer science", "MiddleDTECH", "Computer science", "active", "/learning-pathways/year-9-computer-science.html"],
+        ["Programming", "MiddleDTECH", "Programming", "active", "/learning-pathways/year-9-programming.html"],
+        ["Digital media", "MiddleDTECH", "Digital media", "active", "/learning-pathways/year-9-digital-media.html"],
+        ["Responsible practice", "MiddleDTECH", "Responsible practice", "active", "/learning-pathways/year-9-responsible-practice.html"]],
+        "The four Year 9 Digital Technology headings are MiddleDTECH Curriculum Strands");
+    for (const card of year9Strands) {
+        const page = fs.readFileSync(path.join(root, ...card.href.slice(1).split("/")), "utf8");
+        for (const heading of ["Overview", "Official Curriculum Strand", "Design, Make, and Innovate", "Progression Matrix",
+            "Learning Contexts", "Teacher Notes", "Future activities - proposed, not yet added", "Possible evidence - teacher judgement required"]) {
+            assert.ok(page.includes(heading), `${card.id} includes ${heading}`);
+        }
+        assert.match(page, new RegExp(`<h1>${card.title}</h1>`));
+        assert.match(page, /scope="col">Year 9 Knowledge and Practices<\/th><th scope="col">Year 10 Knowledge and Practices/);
+        for (const pattern of [/Proposed curriculum/, /paraphrased/, /p\. 19/, /p\. 24/, /p\. 25/, /class="home-grid single-column curriculum-strand-page"/]) assert.match(page, pattern);
+        assert.match(page, /<details class="curriculum-note">\s*<summary class="curriculum-note-toggle">Note<\/summary>/);
+        assert.equal((page.match(/class="curriculum-table-wrap" tabindex="0"/g) || []).length, 3, "Year 9 pages use all three template tables");
+        assert.match(page, /href="\/learning-pathways\/\?schoolYear=9&amp;type=strand"/, "Back link opens the Year 9 strands");
+        const ids = [...page.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
+        assert.equal(new Set(ids).size, ids.length, "Page IDs are unique");
+        for (const anchor of page.matchAll(/href="#([^"]+)"/g)) assert.ok(ids.includes(anchor[1]), "Section links resolve");
+        for (const link of page.matchAll(/href="(\/learning-pathways\/[^"#?]+\.html)"/g)) {
+            assert.ok(fs.existsSync(path.join(root, ...link[1].slice(1).split("/"))), "Related curriculum page links resolve");
+        }
+    }
     assert.deepEqual(units.map((card) => [card.title, card.strand, card.area]), [
         ["Infrastructure & Networking", "digital-systems", "Digital systems"], ["Binary & Data", "digital-systems", "Digital systems"]]);
     assert.equal(units.find((card) => card.id === "infrastructure-and-networking").href, "", "Infrastructure & Networking stays display-only");
@@ -491,11 +518,12 @@ async function main() {
     const existing = { ...sample, id: "digital-systems", title: "Existing edited systems", href: "/learning-pathways/custom-systems.html" };
     let stored = [existing, sample];
     let seedVersion = 0;
+    let testVersion14 = false;
     const pool = { query: async (sql, params) => {
         assert.match(sql, /learning_pathways_library_store/, "Never writes the Licence Library table");
         if (sql.includes("INSERT INTO") && (stored === null || !sql.includes("DO NOTHING"))) {
             stored = JSON.parse(params[0]);
-            seedVersion = 13;
+            seedVersion = 14;
         }
         if (sql.includes("seed_version < 1") && seedVersion < 1) {
             const starters = JSON.parse(params[0]);
@@ -574,6 +602,12 @@ async function main() {
             stored = [...stored, ...added.filter((card) => !stored.some((old) => old.id === card.id))];
             seedVersion = 13;
         }
+        if (sql.includes("seed_version < 14") && seedVersion < 14 && testVersion14) {
+            const added = JSON.parse(params[0]);
+            assert.deepEqual(added.map((card) => card.id), year9Strands.map((card) => card.id), "Version 14 only adds the Year 9 strands");
+            stored = [...stored, ...added.filter((card) => !stored.some((old) => old.id === card.id))];
+            seedVersion = 14;
+        }
         return { rows: sql.startsWith("SELECT") && stored !== null ? [{ cards: stored }] : [] };
     } };
     const app = express();
@@ -588,11 +622,11 @@ async function main() {
         let response = await fetch(`${base}/learning-pathways/library.json`);
         assert.match(response.headers.get("cache-control"), /no-store/);
         const migrated = await response.json();
-        assert.equal(migrated.length, 20, "One-time preload preserves existing custom cards");
+        assert.equal(migrated.length, 24, "One-time preload preserves existing custom cards");
         assert.equal(migrated.find((card) => card.id === "digital-systems").title, "Existing edited systems",
             "Preload does not overwrite existing cards with the same ID");
         assert.equal(migrated.filter((card) => card.id === "digital-systems").length, 1);
-        assert.equal((await (await fetch(`${base}/learning-pathways/library.json`)).json()).length, 20,
+        assert.equal((await (await fetch(`${base}/learning-pathways/library.json`)).json()).length, 24,
             "Repeated reads do not duplicate starter cards");
         stored = [existing, sample, { ...sample, id: "programming" }, { ...sample, id: "algorithms" }];
         seedVersion = 1;
@@ -692,6 +726,18 @@ async function main() {
         seedVersion = 13;
         assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), normalizeCards([sample]),
             "Version 13 does not restore a deleted Encoding Binary card");
+        testVersion14 = true;
+        const editedYear9 = [sample, { ...year9Strands[1], title: "Edited programming" }];
+        stored = editedYear9;
+        seedVersion = 13;
+        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(),
+            normalizeCards([...editedYear9, year9Strands[0], ...year9Strands.slice(2)]),
+            "Version 14 adds missing Year 9 strands, keeping edits without duplicates");
+        stored = [sample];
+        seedVersion = 14;
+        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), normalizeCards([sample]),
+            "Version 14 does not restore deleted Year 9 strands");
+        testVersion14 = false;
         const blankPiano = { ...lessons[0], href: "", title: "Edited piano" };
         stored = [sample, blankPiano];
         seedVersion = 9;

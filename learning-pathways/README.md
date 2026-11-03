@@ -48,6 +48,14 @@ Routing waits for both course and access resolution, including after refresh.
   statements and school-context extensions are distinguished. Existing kit
   outlines are context opportunities, not proof of curriculum coverage; hidden
   Search/Login worksheets are not assumed to be active.
+- `year-9-computer-science.html`, `year-9-programming.html`,
+  `year-9-digital-media.html` and `year-9-responsible-practice.html`: MiddleDTECH
+  teacher references for the four Year 9–10 Digital Technology headings (p. 24),
+  using the same template with Year 9 vs Year 10 tables, Design, Make, and
+  Innovate (p. 19; p. 5 requires at least two strands) and a progression matrix
+  (p. 25 progress is unfinished). Learning contexts are proposals. They show in
+  the dashboard Year filter under Year 9 and Year 10. Migration v14 adds these
+  four cards once without restoring later deletions.
 - `task-list.html` and `task-list.js`: JuniorDTECH student Task List skeleton.
   The green navbar and sidebar Task List buttons use the resolved actual course:
   JuniorDTECH opens this page, SeniorDTECH retains its existing Task List, and
