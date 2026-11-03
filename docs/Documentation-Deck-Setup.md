@@ -146,6 +146,11 @@ GitHub commit for the selected assessment. It does not access local or unpushed
 work, run build commands, export a hosted website, or certify assessment completion.
 The student must confirm that final changes are pushed before downloading.
 
+Saved repository-root and `/tree/<branch>/<folder>` links both identify the same
+repository. Stage 2 shows its canonical owner/repository and packages the entire
+repository's default branch, not only the linked folder or the linked branch.
+The card explains this scope before the student confirms and downloads.
+
 Repositories must be saved as `GITHUB_REPO_URL|...` in that student's assessment
 evidence, and a matching SeniorDTECH digital media allocation (91893 or 91903)
 must exist. When there are several saved repositories the student selects one.

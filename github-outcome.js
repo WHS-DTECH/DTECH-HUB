@@ -34,7 +34,7 @@ function parseOutcomeRepository(value) {
   try {
     const url = new URL(String(value || ""));
     if (url.protocol !== "https:" || url.hostname !== "github.com" || url.port || url.username || url.password) return null;
-    const match = url.pathname.match(/^\/([A-Za-z0-9-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/);
+    const match = url.pathname.match(/^\/([A-Za-z0-9-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?(?:\/tree\/[^/]+(?:\/[^/]+)*)?\/?$/);
     if (!match || [".", ".."].includes(match[2])) return null;
     return { owner: match[1], repo: match[2], url: `https://github.com/${match[1]}/${match[2]}` };
   } catch (_error) {

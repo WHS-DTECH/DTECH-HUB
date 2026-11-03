@@ -40,11 +40,23 @@ function fixture(options = {}) {
 }
 
 async function testArchiveStore() {
-  for (const url of ["https://evil.test/student/outcome", "https://github.com.evil.test/a/b", "https://github.com/a/b/tree/main", "http://github.com/a/b", "https://user@github.com/a/b"]) {
+  for (const url of ["https://evil.test/student/outcome", "https://github.com.evil.test/a/b", "https://github.com/a/b/tree/", "https://github.com/a/b/issues/1", "https://github.com/a/b/blob/main/file.html", "http://github.com/a/b", "https://user@github.com/a/b"]) {
     assert.equal(parseOutcomeRepository(url), null, url);
   }
   assert.equal(parseOutcomeRepository(`${repositoryUrl}.git`).url, repositoryUrl);
   assert.equal(outcomeRepositories([...evidence, ...evidence]).length, 1);
+  const folderUrl = `${repositoryUrl}/tree/main/Misc/School/Main/AS91903`;
+  for (const url of [`${repositoryUrl}/tree/main`, folderUrl, `${folderUrl}/`]) {
+    assert.deepEqual(parseOutcomeRepository(url), parseOutcomeRepository(repositoryUrl),
+      "Saved branch and assessment-folder links identify the repository, not a scoped ZIP");
+  }
+  assert.deepEqual(outcomeRepositories([{ standard: "github-sync", steps: [{ text: `GITHUB_REPO_URL|${folderUrl}` }] }]),
+    [parseOutcomeRepository(repositoryUrl)], "Folder links saved by GitHub sync must appear in Stage 2");
+  assert.equal(outcomeRepositories([...evidence, { steps: [{ text: `GITHUB_REPO_URL|${folderUrl}` }] }]).length, 1,
+    "Root and folder links for the same repository are deduplicated");
+  const folderSnapshot = await fixture().store.prepare({ email, activityId: "49", repositoryUrl: folderUrl });
+  assert.equal(folderSnapshot.repositoryUrl, repositoryUrl);
+  assert.equal(folderSnapshot.branch, "student-main", "Packaging still uses the repository's default branch");
   let clock = 1000;
   const { store, calls } = fixture({ now: () => clock, ttlMs: 10 });
   const snapshot = await store.prepare({ email, activityId: "49", repositoryUrl });
