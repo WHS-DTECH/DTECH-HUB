@@ -1,9 +1,9 @@
 "use strict";
 const B = require("./activity-blocks");
-const { POLICY: RATTLESNAKES_POLICY, checkRattlesnakes } = require("./rattlesnakes-check");
+const { PASSAGES, checkPassage } = require("./passage-check");
 const mammoth = require("mammoth");
 const DRAWING_POLICY = B.GOOGLE_DRAWING_POLICY;
-const POLICIES = new Set([RATTLESNAKES_POLICY, DRAWING_POLICY]);
+const POLICIES = new Set([...Object.keys(PASSAGES), DRAWING_POLICY]);
 // Policies that only a teacher can pass; students Submit instead of running an automatic check.
 const TEACHER_ONLY = new Set([DRAWING_POLICY]);
 
@@ -346,7 +346,7 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                         throw Object.assign(new Error("This Word file could not be read. Save it as .docx again, or ask your teacher to review it."), { status: 422 });
                     }
                 } else throw Object.assign(new Error("Submit the typed Google Doc or Word (.docx) document, not a PDF, image, folder or scene file. Your teacher can review unsupported files."), { status: 422 });
-                const result = checkRattlesnakes(text);
+                const result = checkPassage(item.policy, text);
                 const after = await metadata();
                 const current = await load(req, email);
                 if (!before.modifiedTime || after.trashed || before.modifiedTime !== after.modifiedTime || item.documentKey !== current.documentKey) {

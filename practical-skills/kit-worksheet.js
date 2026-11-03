@@ -346,7 +346,7 @@
             if (getSignedInEmail() !== email || revision !== state.blockRevision) throw new Error("Your account or answers changed. Check the current document again.");
             return await queueProgressWrite(async () => {
                 if (getSignedInEmail() !== email || revision !== state.blockRevision) throw new Error("Your account or answers changed. Check the current document again.");
-                showStatusMessage("Reading your saved document and checking the Rattlesnakes text...");
+                showStatusMessage("Reading your saved document and checking your typed text...");
                 const result = await loadJson(`${blockPath(index)}/document-check`, {
                     method: "POST", headers: withAuthHeaders({ "Content-Type": "application/json" }),
                     body: JSON.stringify({ driveAccessToken: token })
@@ -377,7 +377,8 @@
         section.className = "sites-card";
         const drawing = isTeacherReview(state.content.activities[index]);
         const title = document.createElement("h3");
-        title.textContent = drawing ? "Submit your Google Drawing" : "Finish your Rattlesnakes document";
+        title.textContent = drawing ? "Submit your Google Drawing"
+            : `Finish your ${state.content.worksheets?.[index]?.activity || "typed"} document`;
         const help = document.createElement("p");
         help.textContent = drawing
             ? "Save your Google Drawing's sharing link, then press Submit below. Your teacher is emailed your link, reviews your drawing and ticks Completed."

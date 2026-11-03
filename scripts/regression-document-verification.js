@@ -7,7 +7,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const JSZip = require("jszip");
 const B = require("../practical-skills/activity-blocks");
-const { POLICY, paragraphs, checkRattlesnakes } = require("../practical-skills/rattlesnakes-check");
+const { POLICY, WEATHERING_POLICY, BIBLIOGRAPHY_POLICY, PASSAGES, paragraphs, checkRattlesnakes, checkPassage } = require("../practical-skills/passage-check");
 const { createDocumentVerification } = require("../practical-skills/document-verification");
 const { registerActivityBlocks } = require("../practical-skills/activity-block-store");
 const certificates = require("../practical-skills-certificate");
@@ -55,6 +55,68 @@ test("matching requires 95% overall and 90% in every paragraph, with ordered wor
     assert.equal(checkRattlesnakes([...paragraphs].reverse().join("\n")).passed, true, "Paragraph layout and formatting are not assessed");
 });
 
+test("Weathering the Storm passes typed as printed or with the proofreading corrections, but not when parts are missing", () => {
+    const printed = `Weathering the Storm
+The blizzard that began yesterday morning had worked itself up in to a raging frenzy by the time we went to bed.
+We lay there listening to the ice and stones being blown against the shakey walls, and felt the lurching of the hut as gusts bigger hit us.
+We could scarcely hear each other speaking as the wind was so ferocious.
+In the early hours of morning the winds hit with such force that the walls flexed inward. we thought through our Emergency Evacuation Plan.
+Surprisingly, when we checked the hut the next morning, everything was fine.
+We were still secured to our rocky perch. The weather station reading showed that we had endured gusts of up to 120 knots.`;
+    const corrected = `WEATHERING THE STORM
+
+The blizzard that began yesterday morning had worked itself up into a raging frenzy by the time we went to bed. We lay there listening to the ice and stones being blown against the walls of the hut, and felt the lurching of the hut as bigger gusts hit us. We could barely hear each other speaking as the wind was so ferocious.
+
+In the early hours of the morning the winds hit with such force that the walls flexed inward. We thought through our emergency evacuation plan.
+
+Surprisingly, when we checked the hut the next morning, everything was fine. We were still secured to our rocky perch. The weather station reading showed that we had endured gusts of up to 120 knots.`;
+    assert.equal(checkPassage(WEATHERING_POLICY, printed).passed, true, "Typed as printed");
+    assert.equal(checkPassage(WEATHERING_POLICY, corrected).passed, true, "Corrections applied");
+    const parts = PASSAGES[WEATHERING_POLICY].paragraphs;
+    for (let missing = 0; missing < parts.length; missing++) {
+        const result = checkPassage(WEATHERING_POLICY, parts.filter((_p, i) => i !== missing).join("\n"));
+        assert.equal(result.passed, false, `Missing part ${missing + 1}`);
+        assert.ok(result.message.includes(parts[missing].split(/\s+/).slice(0, 5).join(" ")), "The message quotes the missing part");
+    }
+    assert.equal(checkPassage(WEATHERING_POLICY, paragraphs.join("\n")).passed, false, "Another activity's passage does not pass");
+});
+
+test("A Bibliography passes when the whole page is typed, including headings and bullets, but not the entries alone", () => {
+    const page = `A BIBLIOGRAPHY
+A bibliography is a systematic description of books, magazines etc.  It is a list of sources where you found information which you have used in your work.
+Adding a Bibliography
+A bibliography is written on a separate sheet of paper, after you have written an essay or assignment.  It lists in alphabetical order all of the books, etc which the writer referred to and used.  When keying in a bibliography please note the following:
+\u2022 Underline the title of each book, magazine, video
+\u2022 Do not use capital letters, unless proper nouns appear in the titles
+\u2022 Use the publisher\u2019s name in its simplest form eg Bushman, not Bushman Press Ltd
+\u2022 The place of publication is the town/city, not country
+\u2022 Page numbers of article must be included
+\u2022 List alphabetically according to the author of a book, periodical, interview or Internet
+\u2022 List alphabetically according to the title of a CD ROM or video/film
+The Format of a Bibliography
+(based on American Psychological Association (APA) format)
+BOOKS
+Hunt, Sam.  (1980).  Sam Hunt Collected Poems.  Middlesex: Penguin.
+Schonauer, B. (1999).  Speechless.  Chicago:  NSDA.
+PERIODICAL ARTICLE
+Philp, M. (1998 November).  NZ Listener, pp. 20-22.
+CD ROM
+Encarta.  (2001).  Microsoft.
+INTERVIEW
+Phillips, T.  (3.5.99).  Telephone interview recorded by K Smith.
+VIDEO/FILM
+The End of the Golden Weather.  (1991).  Auckland: South Pacific Pictures.  [video, 103 min.]
+ELECTRONIC MAIL (Email)
+Jay, Gary  (2001).  \u201ccruising holiday\u201d, email to main@ihug.co.nz, 14 February
+WORLD WIDE WEB PAGE
+Merton, D.  (1998).  Kakapo Update.  http://www.resort.com/~ruhue/kakapo/update98.html`;
+    assert.equal(checkPassage(BIBLIOGRAPHY_POLICY, page).passed, true);
+    const entriesOnly = page.slice(page.indexOf("BOOKS"));
+    assert.equal(checkPassage(BIBLIOGRAPHY_POLICY, entriesOnly).passed, false, "The notes paragraphs and bullets are required too");
+    assert.equal(checkPassage(BIBLIOGRAPHY_POLICY, page.replace(/WORLD WIDE WEB PAGE[\s\S]*$/, "")).passed, false, "A missing entry is caught");
+    assert.throws(() => checkPassage("unknown-v1", page), /does not have an automatic text check/);
+});
+
 test("trusted receipt must match current document and policy; duplicates still fail after approval", () => {
     const kit = content();
     const responses = { "0-blocks": { link: link(), documentVerification: receipt() } };
@@ -86,6 +148,13 @@ async function fixture(t) {
     let mimeType = "application/vnd.google-apps.document", changed = false, mutateLink = false, fileCalls = 0, emails = 0;
     const certificateTargets = [];
     const key = (params) => JSON.stringify([params[0], params[1], Number(params[2]), params[3], params[4]]);
+    // Weathering the Storm and A Bibliography start teacher-approved so these tests focus on activity 0.
+    table = true;
+    for (const index of [1, 2]) {
+        const params = [email, "kit-files", index, B.documentLinkKey(link(index)), kit.activities[index].documentCheck];
+        checks.set(key(params), { student_email: email, kit_id: "kit-files", activity_index: index, document_key: params[3],
+            policy: params[4], passed: true, method: "teacher", feedback: {}, reviewed_by: "teacher@school.nz", checked_at: "2026-01-01T00:00:00Z" });
+    }
     const pool = { async query(sql, params) {
         queries.push(sql);
         if (fail) throw new Error("Database unavailable");
@@ -233,7 +302,7 @@ test("a failed content recheck revokes a previous successful result and returns 
     const result = await f.check();
     assert.equal(result.status, 200);
     assert.equal(result.data.verification.passed, false);
-    assert.match(result.data.verification.feedback.message, /paragraph.*4/);
+    assert.match(result.data.verification.feedback.message, /part 4 \("Rattlesnakes eat small mammals/);
     assert.equal(f.progress.completed, false);
     assert.equal(result.data.completedActivities[0], undefined);
 });
@@ -271,15 +340,20 @@ test("unsupported, inaccessible, oversized and changing documents cannot produce
     f.setText(paragraphs.join("\n\n"));
     f.setChanged();
     assert.equal((await f.check()).status, 409);
-    assert.equal(f.checks.size, 0);
+    assert.equal([...f.checks.values()].filter((entry) => Number(entry.activity_index) === 0).length, 0);
 });
 
 test("link changes while reading are rejected, and other kit activities cannot invoke this pilot", async (t) => {
     const f = await fixture(t);
     f.setLinkMutation();
     assert.equal((await f.check()).status, 409);
-    assert.equal(f.checks.size, 0);
-    assert.equal((await f.request(f.studentPath.replace("/0/", "/1/"), "POST", { driveAccessToken: "student-token" })).status, 404);
+    assert.equal([...f.checks.values()].filter((entry) => Number(entry.activity_index) === 0).length, 0);
+    assert.equal((await f.request(f.studentPath.replace("/0/", "/3/"), "POST", { driveAccessToken: "student-token" })).status, 404);
+    f.setText(paragraphs.join("\n\n"));
+    const weathering = await f.request(f.studentPath.replace("/0/", "/1/"), "POST", { driveAccessToken: "student-token" });
+    assert.equal(weathering.status, 200);
+    assert.equal(weathering.data.verification.policy, "weathering-storm-v1");
+    assert.equal(weathering.data.verification.passed, false, "Each activity is checked against its own passage");
 });
 
 test("teacher reads are SELECT-only; approval is explicit, audited and bound to the current document", async (t) => {

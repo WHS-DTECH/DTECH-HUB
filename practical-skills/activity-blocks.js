@@ -54,6 +54,9 @@
         }
         return answers;
     }
+    // Files & Folders typing passages checked against the worksheet text on the server.
+    const PASSAGE_CHECKS = [[/^rattlesnakes$/i, "rattlesnakes-v1"], [/^weathering the storm$/i, "weathering-storm-v1"],
+        [/^a bibliography$/i, "bibliography-v1"]];
     function withFilesFoldersLinks(content) {
         content = withGoogleDrawingsLinks(content);
         if (!/files\s*(?:&|and)\s*folders/i.test(String(content?.identity?.name || content?.bannerTitle || ""))) return content;
@@ -69,8 +72,8 @@
                 text: "Paste the HTTPS sharing link to your document or PDF, not a local Windows file path. Share it so your teacher can open it. Use a different file for each activity."
             }];
             blocks = blocks.map((b) => b.kind === "studentlink" && !b.required ? { ...b, required: true } : b);
-            const documentCheck = /^rattlesnakes$/i.test(String(worksheet.activity || activity.title || "").trim())
-                ? "rattlesnakes-v1" : activity.documentCheck;
+            const title = String(worksheet.activity || activity.title || "").trim();
+            const documentCheck = PASSAGE_CHECKS.find(([pattern]) => pattern.test(title))?.[1] || activity.documentCheck;
             if (activity.completionMode !== "auto" || activity.uniqueDocumentLinks !== true ||
                 activity.documentCheck !== documentCheck ||
                 !activity.blocks || blocks.length !== activity.blocks.length || blocks.some((b, i) => b !== activity.blocks[i])) {
@@ -322,7 +325,7 @@
                 if (!passed) message = receipt?.feedback?.message ||
                     (activity.documentCheck === GOOGLE_DRAWING_POLICY
                         ? "Link saved. Press Submit so your teacher can review your drawing and mark it Completed."
-                        : "Link saved. Use Check my document to check the Rattlesnakes text, or ask your teacher to review it.");
+                        : "Link saved. Use Check my document to check your typed text, or ask your teacher to review it.");
             }
             if (b.kind === "checkbox") passed = value === true;
             if (b.kind === "question") passed = b.questionType === "checklist"

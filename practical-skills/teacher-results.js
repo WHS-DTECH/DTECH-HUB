@@ -360,9 +360,9 @@
             link.rel = "noopener noreferrer";
         } else node("span", text, parent, "results-saved");
     }
-    function renderDocumentReview(parent, kit, index, email, tick, drawing = false) {
+    function renderDocumentReview(parent, kit, index, email, tick, drawing = false, activityTitle = "Typed") {
         const section = node("section", undefined, parent, "sites-card");
-        node("h4", drawing ? "Google Drawing - teacher Completed tick" : "Rattlesnakes text completion", section);
+        node("h4", drawing ? "Google Drawing - teacher Completed tick" : `${activityTitle} text completion`, section);
         node("p", drawing
             ? "Open the current submitted drawing and review it before ticking Completed. Check that it resembles the reference picture and is built from filled Insert > Shape objects, not only lines or pasted pictures. Only your tick completes this activity. You can also tick Completed in the Submissions list on the Class Kit Progress tab."
             : "Open the current submitted document and review its text before approving. This approval replaces the automatic text check only; it does not bypass other required blocks or the different-document rule.", section);
@@ -374,7 +374,7 @@
         reviewed.type = "checkbox";
         label.append(document.createTextNode(drawing
             ? " I have opened this student's current linked drawing and confirmed that it is a similar picture built with shapes."
-            : " I have opened this student's current linked document and confirmed that the Rattlesnakes passage is substantially complete."));
+            : ` I have opened this student's current linked document and confirmed that the ${activityTitle} passage is substantially complete.`));
         const approve = node("button", drawing ? "Tick Completed" : "Approve reviewed document", section, "button button-primary");
         const revoke = node("button", drawing ? "Remove Completed tick" : "Remove approval / require another check", section, "button");
         const refresh = node("button", "Reload current link and check", section, "button");
@@ -449,7 +449,7 @@
     function render(data) {
         output.replaceChildren();
         node("h2", data.content.identity?.name || data.content.bannerTitle || data.kitId, output);
-        node("p", "A saved completion tick alone is not teacher verification. Reading this report does not inspect files or change progress. Rattlesnakes and Google Drawings review controls below let you explicitly approve completion after opening the student's file.", output, "results-warning");
+        node("p", "A saved completion tick alone is not teacher verification. Reading this report does not inspect files or change progress. Typing-passage and Google Drawings review controls below let you explicitly approve completion after opening the student's file.", output, "results-warning");
         for (const warning of data.warnings) node("p", warning, output, "results-warning");
         const worksheets = data.content.worksheets.filter((worksheet) => worksheet.mergedInto === undefined);
         if (!data.content.activities?.some(Boolean)) node("p", "This kit has worksheet titles but no configured activity questions or automatic checks. Students can mark its activities complete manually.", output, "results-warning");
@@ -467,10 +467,10 @@
                 const tick = node("p", `Tick: ${date(progress.completed_activities?.[index])} | Completion rule: ${activity?.completionMode === "auto" ? "Automatic" : "Manual / specialised activity"}`, section);
                 if (activity?.documentCheck === "google-drawing-teacher-v1") {
                     renderDocumentReview(section, data.kitId, index, student.email, tick, true);
-                } else if (activity?.documentCheck === "rattlesnakes-v1" ||
+                } else if (activity?.documentCheck ||
                     /^rattlesnakes$/i.test(String(worksheet.activity || "").trim()) &&
                     /files\s*(?:&|and)\s*folders/i.test(data.content.identity?.name || data.content.bannerTitle || "")) {
-                    renderDocumentReview(section, data.kitId, index, student.email, tick);
+                    renderDocumentReview(section, data.kitId, index, student.email, tick, false, worksheet.activity || "Typed");
                 }
                 if (activity) {
                     const definition = node("details", undefined, section);
