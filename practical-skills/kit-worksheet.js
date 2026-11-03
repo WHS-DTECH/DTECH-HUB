@@ -728,6 +728,7 @@
                 blocks: activity?.blocks,
                 completionMode: activity?.completionMode,
                 uniqueDocumentLinks: activity?.uniqueDocumentLinks,
+                noGoogleLinks: activity?.noGoogleLinks,
                 shareLinkCompletion: activity?.shareLinkCompletion,
                 documentCheck: activity?.documentCheck,
                 unityEditor: activity?.unityEditor,

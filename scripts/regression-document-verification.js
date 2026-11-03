@@ -12,10 +12,13 @@ const { createDocumentVerification } = require("../practical-skills/document-ver
 const { registerActivityBlocks } = require("../practical-skills/activity-block-store");
 const certificates = require("../practical-skills-certificate");
 const source = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
-const content = () => B.withFilesFoldersLinks({
-    identity: { name: "Files & Folders Kit (Word Processing)" },
+// The passage checks are no longer applied to Files & Folders (it requires OneDrive links), so a separate kit enables them directly.
+const content = () => ({
+    identity: { name: "Typing Passages Kit" },
     worksheets: ["Rattlesnakes", "Weathering the Storm", "A Bibliography", "Fiction Books", "The Dream Survey Makeover"].map((activity) => ({ activity })),
-    activities: [0, 1, 2, 3, 4].map(() => ({ blocks: [{ id: "link", kind: "studentlink", required: true }] }))
+    activities: [0, 1, 2, 3, 4].map((index) => ({ completionMode: "auto", uniqueDocumentLinks: true,
+        blocks: [{ id: "link", kind: "studentlink", required: true }],
+        ...(index < 3 ? { documentCheck: [POLICY, WEATHERING_POLICY, BIBLIOGRAPHY_POLICY][index] } : {}) }))
 });
 const link = (i = 0) => `https://docs.google.com/document/d/file-${i}/edit`;
 const receipt = () => ({ policy: POLICY, passed: true, documentKey: B.documentLinkKey(link()) });

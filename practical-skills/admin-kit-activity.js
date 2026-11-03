@@ -207,6 +207,8 @@
                 ? "This activity keeps its existing specialised assessment and completion rules. Added blocks are extra learning content."
                 : activity.documentCheck === blockApi.GOOGLE_DRAWING_POLICY
                     ? "Google Drawings activities: students save a Share Link and press Submit, which emails the Lead Teachers. Only a teacher's Completed tick (Class Kit Progress > Submissions, or Teacher Review) completes the activity. Every activity must link a different drawing."
+                : activity.uniqueDocumentLinks && activity.noGoogleLinks
+                    ? "Files & Folders activities: students paste the OneDrive sharing link to their document or PDF, and a valid link earns the automatic tick. Google Docs and Google Drive links are rejected because the work must be saved in OneDrive. Every activity must link a different file. Link checks do not open the file or verify sharing permissions."
                 : activity.uniqueDocumentLinks && activity.documentCheck
                     ? "Typing passage: students save a Google Docs or Word (.docx) sharing link and press Check my document. The typed text must substantially match the worksheet passage (small typos allowed, formatting not checked), or a teacher approves it in Teacher Review. Every activity must link a different file."
                 : activity.uniqueDocumentLinks

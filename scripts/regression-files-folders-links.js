@@ -19,7 +19,7 @@ const base = () => ({
         ]
     }))
 });
-const link = (index) => `https://docs.google.com/document/d/unique-file-${index}/edit?usp=sharing`;
+const link = (index) => `https://westland-my.sharepoint.com/:w:/g/personal/student_school_nz/unique-file-${index}?e=abc`;
 const answer = (content, index, url) => ({ [content.activities[index].blocks.find((b) => b.kind === "studentlink").id]: url });
 const responses = (content) => Object.fromEntries(content.activities.map((_a, i) => [`${i}-blocks`, answer(content, i, link(i))]));
 const policies = ["rattlesnakes-v1", "weathering-storm-v1", "bibliography-v1"];
@@ -34,7 +34,8 @@ test("Files & Folders requires all existing links, adds missing submissions and 
         B.validate(activity);
         assert.equal(activity.completionMode, "auto");
         assert.equal(activity.uniqueDocumentLinks, true);
-        assert.equal(activity.documentCheck, ["rattlesnakes-v1", "weathering-storm-v1", "bibliography-v1"][index]);
+        assert.equal(activity.documentCheck, undefined, "Typing passage checks are retired; a OneDrive link earns the tick");
+        assert.equal(activity.noGoogleLinks, true);
         assert.equal(activity.blocks.filter((b) => b.kind === "studentlink" && b.required).length, 1);
         if (index < 4) assert.equal(activity.blocks[0], original.activities[index].blocks[0]);
         if (index < 3) assert.equal(activity.blocks[1].id, "link");
@@ -65,12 +66,39 @@ test("file identity catches Google sharing/export URLs, Microsoft IDs and query/
     }
 });
 
+test("Files & Folders rejects Google Docs and Drive links with OneDrive instructions, and retires stored text checks", () => {
+    const stored = base();
+    stored.activities[0] = { ...stored.activities[0], documentCheck: "rattlesnakes-v1" };
+    stored.activities[1] = { ...stored.activities[1], documentCheck: "weathering-storm-v1" };
+    const content = B.withFilesFoldersLinks(stored);
+    assert.deepEqual(content.activities.map((activity) => activity.documentCheck), [undefined, undefined, undefined, undefined, undefined]);
+    const saved = responses(content);
+    const grade = (index) => B.grade(content.activities[index], saved[`${index}-blocks`], {}, { content, index, responses: saved });
+    content.activities.forEach((_a, i) => assert.equal(grade(i).passed, true, "A OneDrive link alone earns the tick"));
+    for (const google of ["https://docs.google.com/document/d/abc/edit?usp=sharing", "https://drive.google.com/file/d/abc/view",
+        "https://drive.google.com/open?id=abc", "https://DOCS.GOOGLE.COM/document/d/abc/edit", "https://goo.gl/abc"]) {
+        saved["2-blocks"] = answer(content, 2, google);
+        const result = grade(2);
+        assert.equal(result.passed, false, google);
+        assert.equal(result.results[0].message, B.GOOGLE_LINK_MESSAGE);
+        assert.match(result.results[0].message, /OneDrive/);
+    }
+    for (const other of ["https://1drv.ms/w/s!abc", "https://onedrive.live.com/?resid=ABC", "https://westland.sharepoint.com/sites/x/doc.docx",
+        "https://example.test/notgoogle.com/file"]) {
+        saved["2-blocks"] = answer(content, 2, other);
+        assert.equal(grade(2).passed, true, other);
+    }
+    assert.equal(B.isGoogleLink("https://evilgoogle.com/doc"), false, "Only google.com and its subdomains count");
+    const drawings = B.withGoogleDrawingsLinks({ identity: { name: "Google Drawings Kit" }, worksheets: [{ activity: "Ship" }], activities: [] });
+    assert.equal(drawings.activities.some((activity) => activity?.noGoogleLinks), false, "Other kits still accept Google links");
+});
+
 test("unique links earn individual ticks, duplicates fail both activities and resolving them restores eligibility", () => {
     const content = B.withFilesFoldersLinks(base());
     const saved = responses(content);
     const grade = (index) => B.grade(content.activities[index], saved[`${index}-blocks`], {}, { content, index, responses: saved, documentVerification: verified(index) });
     content.activities.forEach((_a, i) => assert.equal(grade(i).passed, true));
-    saved["1-blocks"] = answer(content, 1, "https://drive.google.com/open?id=unique-file-0");
+    saved["1-blocks"] = answer(content, 1, link(0).replace("?e=abc", "?e=other"));
     assert.equal(grade(0).passed, false);
     assert.equal(grade(1).passed, false);
     assert.match(grade(1).results[0].message, /different document/);
@@ -167,7 +195,7 @@ test("student completion bar shows Auto-Completed only after the saved automatic
     vm.runInContext(`function getCurrentActivityIndex() { return 0; }\n${controller.slice(start, end)}`, ctx);
     ctx.updateActivityCompleteBar();
     assert.equal(get("worksheet-activity-status-pill").textContent, "Not Completed");
-    assert.equal(get("worksheet-activity-complete-btn").textContent, "Check my document");
+    assert.equal(get("worksheet-activity-complete-btn").textContent, "Check & Save Activity");
     state.completedActivities[0] = "saved";
     ctx.updateActivityCompleteBar();
     assert.equal(get("worksheet-activity-status-pill").textContent, "Auto-Completed");

@@ -467,9 +467,7 @@
                 const tick = node("p", `Tick: ${date(progress.completed_activities?.[index])} | Completion rule: ${activity?.completionMode === "auto" ? "Automatic" : "Manual / specialised activity"}`, section);
                 if (activity?.documentCheck === "google-drawing-teacher-v1") {
                     renderDocumentReview(section, data.kitId, index, student.email, tick, true);
-                } else if (activity?.documentCheck ||
-                    /^rattlesnakes$/i.test(String(worksheet.activity || "").trim()) &&
-                    /files\s*(?:&|and)\s*folders/i.test(data.content.identity?.name || data.content.bannerTitle || "")) {
+                } else if (activity?.documentCheck) {
                     renderDocumentReview(section, data.kitId, index, student.email, tick, false, worksheet.activity || "Typed");
                 }
                 if (activity) {

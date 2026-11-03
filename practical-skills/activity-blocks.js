@@ -54,9 +54,15 @@
         }
         return answers;
     }
-    // Files & Folders typing passages checked against the worksheet text on the server.
-    const PASSAGE_CHECKS = [[/^rattlesnakes$/i, "rattlesnakes-v1"], [/^weathering the storm$/i, "weathering-storm-v1"],
-        [/^a bibliography$/i, "bibliography-v1"]];
+    // Files & Folders work must be saved in OneDrive; Google Docs/Drive links mean the instructions weren't followed.
+    const RETIRED_PASSAGE_CHECKS = new Set(["rattlesnakes-v1", "weathering-storm-v1", "bibliography-v1"]);
+    const GOOGLE_LINK_MESSAGE = "This is a Google Drive link. Save this document in your OneDrive (Documents > JuniorDTECH > Word Processing) and paste its OneDrive sharing link instead.";
+    function isGoogleLink(value) {
+        const safe = studentUrl(value);
+        if (!safe) return false;
+        const host = new URL(safe).hostname.toLowerCase();
+        return /(^|\.)(google\.com|googleusercontent\.com)$/.test(host) || host === "goo.gl";
+    }
     function withFilesFoldersLinks(content) {
         content = withGoogleDrawingsLinks(content);
         if (!/files\s*(?:&|and)\s*folders/i.test(String(content?.identity?.name || content?.bannerTitle || ""))) return content;
@@ -69,16 +75,16 @@
             if (!blocks.some((b) => b.kind === "studentlink")) blocks = [...blocks, {
                 id: `files-folders-link-${index}`, kind: "studentlink", required: true,
                 title: `Share your link for ${worksheet.activity || activity.title || `Activity ${index + 1}`}`,
-                text: "Paste the HTTPS sharing link to your document or PDF, not a local Windows file path. Share it so your teacher can open it. Use a different file for each activity."
+                text: "Paste the OneDrive sharing link to your document or PDF, not a local Windows file path or a Google Drive link. Share it so your teacher can open it. Use a different file for each activity."
             }];
             blocks = blocks.map((b) => b.kind === "studentlink" && !b.required ? { ...b, required: true } : b);
-            const title = String(worksheet.activity || activity.title || "").trim();
-            const documentCheck = PASSAGE_CHECKS.find(([pattern]) => pattern.test(title))?.[1] || activity.documentCheck;
-            if (activity.completionMode !== "auto" || activity.uniqueDocumentLinks !== true ||
-                activity.documentCheck !== documentCheck ||
+            const { documentCheck: previousCheck, ...rest } = activity;
+            const documentCheck = RETIRED_PASSAGE_CHECKS.has(previousCheck) ? undefined : previousCheck;
+            if (activity.completionMode !== "auto" || activity.uniqueDocumentLinks !== true || activity.noGoogleLinks !== true ||
+                previousCheck !== documentCheck ||
                 !activity.blocks || blocks.length !== activity.blocks.length || blocks.some((b, i) => b !== activity.blocks[i])) {
                 changed = true;
-                activities[index] = { ...activity, blocks, completionMode: "auto", uniqueDocumentLinks: true,
+                activities[index] = { ...rest, blocks, completionMode: "auto", uniqueDocumentLinks: true, noGoogleLinks: true,
                     ...(documentCheck ? { documentCheck } : {}) };
             }
         });
@@ -301,6 +307,10 @@
             let passed = false;
             let message;
             if (b.kind === "studentlink") passed = Boolean(studentUrl(value, b.driveOnly, b.driveFolderOnly));
+            if (b.kind === "studentlink" && passed && activity.noGoogleLinks && isGoogleLink(value)) {
+                passed = false;
+                message = GOOGLE_LINK_MESSAGE;
+            }
             if (b.kind === "studentlink" && passed && activity.uniqueDocumentLinks) {
                 const key = documentLinkKey(value);
                 const duplicateHere = (activity.blocks || []).some((other) =>
@@ -359,5 +369,5 @@
         return { passed: required.length > 0 && results.every((r) => r.passed), results };
     }
     return { types, interactive, escape, safeUrl, studentUrl, specialised, initialBlocks, savedAnswers, publicActivity, entries, puzzle, validate, grade,
-        withFilesFoldersLinks, withGoogleDrawingsLinks, documentLinkKey, GOOGLE_DRAWING_POLICY };
+        withFilesFoldersLinks, withGoogleDrawingsLinks, documentLinkKey, isGoogleLink, GOOGLE_LINK_MESSAGE, GOOGLE_DRAWING_POLICY };
 });
