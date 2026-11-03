@@ -29,7 +29,7 @@ class Element {
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 
 async function testDashboard() {
-    const names = ["grid", "results-meta", "search", "year-pills", "status-pills", "category-pills", "type-pills", "sort"];
+    const names = ["grid", "results-meta", "search", "year-pills", "school-year-pills", "status-pills", "category-pills", "type-pills", "sort"];
     const elements = Object.fromEntries(names.map((name) => [`#practical-skills-${name}`, new Element()]));
     const dashboard = fs.readFileSync(path.join(root, "learning-pathways", "index.html"), "utf8");
     const cardLabel = dashboard.match(/data-library-card-label="([^"]+)"/)?.[1];
@@ -75,6 +75,17 @@ async function testDashboard() {
     years.children.find((pill) => pill.textContent === "Senior DTECH").click();
     assert.equal(grid.children.length, 1);
     years.children[0].click();
+    const schoolYears = elements["#practical-skills-school-year-pills"];
+    assert.deepEqual(schoolYears.children.map((pill) => pill.textContent), ["All", "Year 7", "Year 8", "Year 11", "Year 12", "Year 13"],
+        "Year pills map school years to the DTECH courses that have cards");
+    schoolYears.children.find((pill) => pill.textContent === "Year 8").click();
+    assert.equal(grid.children.length, 1);
+    assert.match(grid.children[0].innerHTML, /Art/);
+    schoolYears.children.find((pill) => pill.textContent === "Year 12").click();
+    assert.equal(grid.children.length, 1);
+    assert.match(grid.children[0].innerHTML, /Web Design/);
+    schoolYears.children[0].click();
+    assert.equal(grid.children.length, 2);
     elements["#practical-skills-sort"].value = "name-desc";
     elements["#practical-skills-sort"].change();
     assert.match(grid.children[0].innerHTML, /Web Design/);

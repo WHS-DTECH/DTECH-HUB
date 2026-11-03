@@ -1,7 +1,9 @@
 # Learning Pathways
 
 A separate library with five pre-loaded Year 7/8 curriculum area cards and the Licence Library's card layout,
-search, year-level/category/status filters and sorting.
+search, year-level/category/status filters and sorting. A **Year** filter (Year 7–13) maps each
+school year to its DTECH course (7–8 Junior, 9–10 Middle, 11–13 Senior); All Years cards show for
+every year, and `?schoolYear=9` preselects a year.
 The footer card type is **Curriculum Strands**: these cards describe teacher
 curriculum requirements, analogous to standards in the SeniorDTECH library.
 This label does not change pathway names or populate the student Task List.

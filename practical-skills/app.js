@@ -10,6 +10,7 @@
     const meta = document.getElementById("practical-skills-results-meta");
     const searchInput = document.getElementById("practical-skills-search");
     const yearPillsContainer = document.getElementById("practical-skills-year-pills");
+    const schoolYearPillsContainer = document.getElementById("practical-skills-school-year-pills");
     const statusPillsContainer = document.getElementById("practical-skills-status-pills");
     const categoryPillsContainer = document.getElementById("practical-skills-category-pills");
     const typePillsContainer = document.getElementById("practical-skills-type-pills");
@@ -20,6 +21,7 @@
     const requestedParams = new URLSearchParams(pageLocation?.search || "");
     const requestedType = isPathways ? requestedParams.get("type") : null;
     const requestedYear = isPathways ? requestedParams.get("year") : null;
+    const requestedSchoolYear = isPathways ? requestedParams.get("schoolYear") : null;
     const requestedCategory = requestedParams.get("category");
     const requestedCardId = isPathways ? decodeURIComponent(String(pageLocation?.hash || "").replace(/^#card-/, "")) : "";
     let requestedCardShown = false;
@@ -28,6 +30,7 @@
     const state = {
         search: "",
         year: requestedYear || "All",
+        schoolYear: /^\d+$/.test(requestedSchoolYear || "") ? `Year ${requestedSchoolYear}` : "All",
         status: "All",
         type: Object.prototype.hasOwnProperty.call(cardTypeNames, requestedType || "") ? cardTypeNames[requestedType] : "All",
         category: requestedCategory || "All",
@@ -106,9 +109,32 @@
         return yearLevel === state.year;
     }
 
+    const schoolYearCourses = { 7: "juniordtech", 8: "juniordtech", 9: "middledtech", 10: "middledtech", 11: "seniordtech", 12: "seniordtech", 13: "seniordtech" };
+    const compact = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+    function inSchoolYear(item, year, includeAllYears = true) {
+        const level = String(item.yearLevel || "");
+        const key = compact(level);
+        if (includeAllYears && (!key || key === "allyears")) return true;
+        return key === schoolYearCourses[year] || new RegExp(`\\byear\\s*${year}\\b`, "i").test(level);
+    }
+
+    function getSchoolYearOptions() {
+        return ["All", ...Object.keys(schoolYearCourses).filter((year) => library.some((item) => inSchoolYear(item, year, false))).map((year) => `Year ${year}`)];
+    }
+
+    function matchesSchoolYear(item) {
+        if (state.schoolYear === "All") return true;
+        return inSchoolYear(item, state.schoolYear.replace(/\D/g, ""));
+    }
+
     function populateFilters() {
         renderPillGroup(yearPillsContainer, getYearOptions(), state.year, (value) => {
             state.year = value;
+        });
+        if (!getSchoolYearOptions().includes(state.schoolYear)) state.schoolYear = "All";
+        renderPillGroup(schoolYearPillsContainer, getSchoolYearOptions(), state.schoolYear, (value) => {
+            state.schoolYear = value;
         });
         renderPillGroup(statusPillsContainer, getUniqueValues("status"), state.status, (value) => {
             state.status = value;
@@ -131,6 +157,7 @@
 
         return items.filter((item) => {
             if (!matchesYear(item)) return false;
+            if (!matchesSchoolYear(item)) return false;
             if (state.status !== "All" && String(item.status || "") !== state.status) return false;
             if (state.category === "Licence Kit" && item.cardLabel !== "LICENCE KIT") return false;
             if (state.category !== "All" && state.category !== "Licence Kit" && String(item.area || "") !== state.category) return false;
