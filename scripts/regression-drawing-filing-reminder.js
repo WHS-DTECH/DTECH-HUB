@@ -12,10 +12,11 @@ const slice = (start, end) => {
     return source.slice(from, source.indexOf(end, from));
 };
 
-function setup({ courseStatus = "pending", pending = [{ kitId: "kit-google-drawings", index: 0, title: "Ship" }] } = {}) {
+function setup({ courseStatus = "pending", pending = [{ kitId: "kit-google-drawings", index: 0, title: "Ship" }], bearer = "", status = 200 } = {}) {
     const listeners = {};
     const storage = new Map();
     const shown = [];
+    const requests = [];
     const panel = { dataset: { courseStatus } };
     const context = vm.createContext({
         console, setTimeout, clearTimeout,
@@ -25,23 +26,32 @@ function setup({ courseStatus = "pending", pending = [{ kitId: "kit-google-drawi
             removeEventListener: (name, fn) => { listeners[name] = (listeners[name] || []).filter((item) => item !== fn); }
         },
         document: { createElement: () => ({}), querySelector: (selector) => selector === "#hub-global-sidebar" ? panel : null },
-        sessionStorage: { getItem: (key) => storage.get(key) || null, setItem: (key, value) => storage.set(key, value) },
+        sessionStorage: {
+            getItem: (key) => storage.get(key) || null, setItem: (key, value) => storage.set(key, value),
+            removeItem: (key) => storage.delete(key), key: (index) => [...storage.keys()][index] ?? null,
+            get length() { return storage.size; }
+        },
         hubAuthState: { profile: { email: "student@school.nz" } },
         normalizeEmail: (value) => String(value || "").toLowerCase(),
-        withHubAuthHeaders: (headers) => headers,
-        fetch: async () => ({ ok: true, json: async () => ({ pending }) })
+        withHubAuthHeaders: (headers, email) => ({ ...headers, "x-user-email": email }),
+        getActiveHubBearerToken: () => bearer,
+        fetch: async (url, options) => {
+            requests.push({ url, headers: options.headers });
+            return { ok: status === 200, json: async () => ({ pending }) };
+        }
     });
     vm.runInContext(`let hubCourseRedirecting = false;
         ${slice("function waitForHubCourseResolved(", "\nfunction getTaskListCourseFromAllocations(")}
         ${slice("const DRAWING_FILING_PATH", "\nfunction showDrawingFilingReminder(")}
         function showDrawingFilingReminder(email, pending, key) { shown.push({ email, pending, key }); }
         this.check = checkDrawingFilingReminder;
+        this.signOut = clearDrawingFilingReminderFlags;
         this.redirect = () => { hubCourseRedirecting = true; };`, Object.assign(context, { shown }));
     const resolve = (status = "ready") => {
         panel.dataset.courseStatus = status;
         (listeners["hub-course-resolved"] || []).slice().forEach((fn) => fn({ detail: { status } }));
     };
-    return { context, shown, storage, resolve };
+    return { context, shown, storage, requests, resolve };
 }
 
 const tick = () => new Promise((resolve) => setImmediate(resolve));
@@ -70,12 +80,36 @@ test("the drawing reminder opens straight away once the course is already known,
     await page.context.check();
     assert.equal(page.shown.length, 1);
     const dismissed = setup({ courseStatus: "ready" });
-    dismissed.storage.set("hub_drawing_filing_reminder_v1:student@school.nz", "1");
+    dismissed.storage.set("hub_drawing_filing_reminder_v2:student@school.nz", "1");
     await dismissed.context.check();
     assert.equal(dismissed.shown.length, 0);
     const empty = setup({ courseStatus: "ready", pending: [] });
     await empty.context.check();
     assert.equal(empty.shown.length, 0, "Students with nothing to move never see it");
+});
+
+test("old 'seen' flags are ignored, signing out clears the flag, and an access-token-only sign-in still works", async () => {
+    const stale = setup({ courseStatus: "ready", bearer: "ya29.opaque-access-token" });
+    stale.storage.set("hub_drawing_filing_reminder_v1:student@school.nz", "1");
+    await stale.context.check();
+    assert.equal(stale.shown.length, 1, "A flag left by the earlier version no longer hides the reminder");
+    assert.equal(stale.requests[0].headers.Authorization, "Bearer ya29.opaque-access-token",
+        "An opaque Google access token is sent so the server can verify the student");
+    stale.storage.set("hub_drawing_filing_reminder_v2:student@school.nz", "1");
+    stale.storage.set("other", "keep");
+    stale.context.signOut();
+    assert.deepEqual([...stale.storage.keys()], ["other"], "Signing out clears only the drawing reminder flags");
+
+    const retry = setup({ courseStatus: "ready", status: 401 });
+    await retry.context.check();
+    assert.equal(retry.shown.length, 0);
+    retry.context.hubAuthState.profile.email = "student@school.nz";
+    await retry.context.check();
+    assert.equal(retry.requests.length, 2, "A failed check is retried on the next page render");
+
+    const server = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
+    assert.match(server, /\["GET", "POST"\]\.includes\(req\.method\) && req\.path === "\/api\/practical-skills\/drawing-filing"/);
+    assert.match(source, /function signOutHubGoogle\(\) \{\s*clearDrawingFilingReminderFlags\(\);/);
 });
 
 test("only Remind me later, Close or Escape mark the reminder as seen", () => {

@@ -6217,6 +6217,7 @@ app.use(async (req, _res, next) => {
   req.auth_identity.token_present = true;
   const licenceAccessToken = bearerToken.split(".").length !== 3 && (
     (req.method === "GET" && /^\/api\/practical-skills\/blocks\/kit-[a-z0-9-]+\/\d+\/licences\/[a-zA-Z0-9_-]+$/.test(req.path)) ||
+    (["GET", "POST"].includes(req.method) && req.path === "/api/practical-skills/drawing-filing") ||
     (["GET", "PUT"].includes(req.method) && /^\/api\/admin\/kit-document-review\/kit-[a-z0-9-]+\/\d+$/.test(req.path))
   );
   let verification;

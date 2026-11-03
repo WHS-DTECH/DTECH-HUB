@@ -2808,14 +2808,34 @@ function showExternalExamIntentionReminder(email) {
 }
 
 const DRAWING_FILING_PATH = "/api/practical-skills/drawing-filing";
+const DRAWING_FILING_REMINDER_PREFIX = "hub_drawing_filing_reminder_v2:";
 let drawingFilingCheckEmail = "";
+
+// The server accepts an ID token or an opaque Google access token for this endpoint, so either sign-in style works.
+function drawingFilingHeaders(headers, email) {
+    const next = withHubAuthHeaders(headers, email);
+    const bearer = getActiveHubBearerToken();
+    if (!next.Authorization && bearer) next.Authorization = `Bearer ${bearer}`;
+    return next;
+}
+
+function clearDrawingFilingReminderFlags() {
+    drawingFilingCheckEmail = "";
+    try {
+        for (let index = sessionStorage.length - 1; index >= 0; index -= 1) {
+            const key = sessionStorage.key(index);
+            if (key && key.startsWith("hub_drawing_filing_reminder_")) sessionStorage.removeItem(key);
+        }
+    } catch (_error) {
+    }
+}
 
 // Pops up once per sign-in session while submitted Google Drawings still need moving into the student's DTECH folder.
 async function checkDrawingFilingReminder() {
     const email = normalizeEmail(hubAuthState.profile?.email || "");
     if (!email || drawingFilingCheckEmail === email || typeof document.createElement !== "function") return;
     drawingFilingCheckEmail = email;
-    const reminderKey = `hub_drawing_filing_reminder_v1:${email}`;
+    const reminderKey = `${DRAWING_FILING_REMINDER_PREFIX}${email}`;
     try {
         if (sessionStorage.getItem(reminderKey)) return;
     } catch (_error) {
@@ -2824,7 +2844,7 @@ async function checkDrawingFilingReminder() {
     try {
         await waitForHubCourseResolved();
         if (hubCourseRedirecting) return;
-        const response = await fetch(DRAWING_FILING_PATH, { headers: withHubAuthHeaders({}, email), cache: "no-store" });
+        const response = await fetch(DRAWING_FILING_PATH, { headers: drawingFilingHeaders({}, email), cache: "no-store" });
         if (!response.ok) {
             drawingFilingCheckEmail = "";
             return;
@@ -2878,7 +2898,7 @@ function showDrawingFilingReminder(email, pending, reminderKey = "") {
             status.textContent = "Moving your drawings...";
             const response = await fetch(DRAWING_FILING_PATH, {
                 method: "POST",
-                headers: withHubAuthHeaders({ "Content-Type": "application/json" }, email),
+                headers: drawingFilingHeaders({ "Content-Type": "application/json" }, email),
                 body: JSON.stringify({ driveAccessToken: token.access_token })
             });
             const data = await response.json().catch(() => ({}));
@@ -3700,6 +3720,7 @@ async function handleHubGoogleToken(tokenResponse) {
 }
 
 function signOutHubGoogle() {
+    clearDrawingFilingReminderFlags();
     if (window.google?.accounts?.oauth2 && hubAuthState.accessToken) {
         window.google.accounts.oauth2.revoke(hubAuthState.accessToken, () => {
             clearHubAuthState();
