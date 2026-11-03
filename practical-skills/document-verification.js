@@ -29,6 +29,9 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
             notified_document_key TEXT,
             PRIMARY KEY (student_email, kit_id, activity_index)
         )`).then(() => pool.query("ALTER TABLE practical_skills_submissions ADD COLUMN IF NOT EXISTS filed_document_key TEXT"))
+            .then(() => pool.query(`CREATE TABLE IF NOT EXISTS practical_skills_filed_drawings (
+                student_email TEXT NOT NULL, document_key TEXT NOT NULL, filed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                PRIMARY KEY (student_email, document_key))`))
             .catch((error) => { submissionSchema = null; throw error; });
         await submissionSchema;
     }
@@ -36,23 +39,46 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
     const FILING_RESOLVED = new Set(["not-owner", "not-drawing", "missing"]);
     async function markFiled(student, kit, index, documentKey, filing) {
         if (!filing?.filed && !FILING_RESOLVED.has(filing?.reason)) return;
+        await ensureSubmissionSchema();
+        await pool.query(`INSERT INTO practical_skills_filed_drawings (student_email, document_key) VALUES ($1,$2)
+            ON CONFLICT (student_email, document_key) DO NOTHING`, [student, documentKey]);
         await pool.query(`UPDATE practical_skills_submissions SET filed_document_key = $4
             WHERE student_email = $1 AND kit_id = $2 AND activity_index = $3 AND document_key = $4`, [student, kit, index, documentKey]);
     }
+    // Every drawing the student has submitted or saved on a teacher-ticked activity, minus those already moved.
     async function pendingFiling(student) {
         await ensureSubmissionSchema();
-        const rows = (await pool.query(`SELECT kit_id, activity_index, document_key FROM practical_skills_submissions
-            WHERE student_email = $1 AND document_key LIKE 'google-file:%' AND filed_document_key IS DISTINCT FROM document_key
-            ORDER BY kit_id, activity_index`, [student])).rows;
+        const submitted = (await pool.query(`SELECT kit_id, activity_index, document_key, filed_document_key
+            FROM practical_skills_submissions WHERE student_email = $1 AND document_key LIKE 'google-file:%'`, [student])).rows;
+        const saved = (await pool.query("SELECT kit_id, responses FROM practical_skills_progress WHERE student_email = $1", [student])).rows;
+        const filed = new Set((await pool.query("SELECT document_key FROM practical_skills_filed_drawings WHERE student_email = $1",
+            [student])).rows.map((row) => row.document_key));
+        submitted.forEach((row) => { if (row.filed_document_key === row.document_key) filed.add(row.document_key); });
         const contents = new Map();
+        const content = async (kit) => {
+            if (!contents.has(kit)) contents.set(kit, await loadContent(kit).catch(() => null));
+            const value = contents.get(kit);
+            return value && !value.deletedAt ? value : null;
+        };
+        const candidates = submitted.map((row) => ({ kitId: row.kit_id, index: Number(row.activity_index), documentKey: row.document_key }));
+        for (const row of saved) {
+            const kit = await content(row.kit_id);
+            (kit?.activities || []).forEach((activity, index) => {
+                if (!TEACHER_ONLY.has(activity?.documentCheck)) return;
+                const { documentKey } = submission(activity, index, row.responses || {});
+                if (documentKey) candidates.push({ kitId: row.kit_id, index, documentKey });
+            });
+        }
         const pending = [];
-        for (const row of rows) {
-            if (!contents.has(row.kit_id)) contents.set(row.kit_id, await loadContent(row.kit_id).catch(() => null));
-            const content = contents.get(row.kit_id);
-            const index = Number(row.activity_index);
-            const worksheet = content?.worksheets?.[index];
-            if (!worksheet || content.deletedAt || !TEACHER_ONLY.has(content.activities?.[index]?.documentCheck)) continue;
-            pending.push({ kitId: row.kit_id, index, documentKey: row.document_key, title: worksheet.activity || `Activity ${index + 1}` });
+        const seen = new Set();
+        for (const item of candidates.sort((a, b) => a.kitId.localeCompare(b.kitId) || a.index - b.index)) {
+            if (!String(item.documentKey).startsWith("google-file:") || filed.has(item.documentKey) || seen.has(item.documentKey)) continue;
+            const kit = await content(item.kitId);
+            const worksheet = kit?.worksheets?.[item.index];
+            if (!worksheet || worksheet.hidden || worksheet.mergedInto !== undefined ||
+                !TEACHER_ONLY.has(kit.activities?.[item.index]?.documentCheck)) continue;
+            seen.add(item.documentKey);
+            pending.push({ kitId: item.kitId, index: item.index, documentKey: item.documentKey, title: worksheet.activity || `Activity ${item.index + 1}` });
         }
         return pending;
     }

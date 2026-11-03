@@ -231,17 +231,23 @@ async function fixture(t) {
     const kit = B.withFilesFoldersLinks(base()), email = "student@school.nz", kitId = "kit-google-drawings";
     const progress = { student_email: email, kit_id: kitId, completed: false, completed_activities: {}, started_at: null,
         responses: Object.fromEntries([0, 1, 2].map((i) => [`${i}-blocks`, answer(kit, i, link(i))])) };
-    const checks = new Map(), submissions = new Map(), notices = [], certificateEmails = [], filings = [];
+    const checks = new Map(), submissions = new Map(), notices = [], certificateEmails = [], filings = [], filedDrawings = new Set();
     let tables = false, emailFails = false, fileFails = false, fileReason = "";
     const key = (params) => JSON.stringify([params[0], params[1], Number(params[2]), params[3], params[4]]);
     const subKey = (params) => JSON.stringify([params[0], params[1], Number(params[2])]);
     const pool = { async query(sql, params) {
         if (sql.startsWith("CREATE TABLE")) { tables = true; return { rows: [] }; }
         if (sql.startsWith("ALTER TABLE practical_skills_submissions")) return { rows: [] };
-        if (sql.startsWith("SELECT kit_id, activity_index, document_key FROM practical_skills_submissions")) {
-            return { rows: [...submissions.values()].filter((row) => row.student_email === params[0] &&
-                row.document_key.startsWith("google-file:") && row.filed_document_key !== row.document_key) };
+        if (sql.startsWith("SELECT kit_id, activity_index, document_key, filed_document_key")) {
+            return { rows: [...submissions.values()].filter((row) => row.student_email === params[0] && row.document_key.startsWith("google-file:")) };
         }
+        if (sql.startsWith("SELECT kit_id, responses FROM practical_skills_progress")) {
+            return { rows: params[0] === email ? [{ kit_id: kitId, responses: structuredClone(progress.responses) }] : [] };
+        }
+        if (sql.startsWith("SELECT document_key FROM practical_skills_filed_drawings")) {
+            return { rows: [...filedDrawings].filter((entry) => entry.startsWith(`${params[0]}|`)).map((entry) => ({ document_key: entry.slice(params[0].length + 1) })) };
+        }
+        if (sql.startsWith("INSERT INTO practical_skills_filed_drawings")) { filedDrawings.add(`${params[0]}|${params[1]}`); return { rows: [] }; }
         if (sql.startsWith("UPDATE practical_skills_submissions SET filed_document_key")) {
             const row = submissions.get(subKey(params));
             if (row?.document_key === params[3]) row.filed_document_key = params[3];
@@ -456,16 +462,22 @@ test("drawing filing helper moves only owned drawings into KITS > Google Drawing
     assert.equal((await ctx.fileDrawing({ studentEmail: "s@school.nz", documentKey: "https://example.test/x", driveAccessToken: "tok" })).filed, false);
 });
 
-test("login reminder lists unfiled submitted drawings until the student moves them", async (t) => {
+test("login reminder lists every saved or submitted drawing, including ones never submitted, until each is moved", async (t) => {
     const f = await fixture(t);
-    assert.deepEqual((await f.pendingFiling()).data.pending, [], "Nothing submitted, no reminder");
-    await f.submit(0);
+    const titles = (items) => items.map((item) => item.title);
+    const saved = await f.pendingFiling();
+    assert.equal(saved.status, 200);
+    assert.deepEqual(saved.data.pending, [{ kitId: "kit-google-drawings", index: 0, title: "Ship" },
+        { kitId: "kit-google-drawings", index: 1, title: "TV" }, { kitId: "kit-google-drawings", index: 2, title: "Flower Pot" }],
+    "Saved-but-not-submitted drawings still need moving");
+    await f.submit(0, { driveAccessToken: "student-token" });
+    assert.deepEqual(titles((await f.pendingFiling()).data.pending), ["TV", "Flower Pot"], "Drawings filed on Submit are not listed");
     await f.submit(1);
-    await f.submit(2, { driveAccessToken: "student-token" });
-    const before = await f.pendingFiling();
-    assert.equal(before.status, 200);
-    assert.deepEqual(before.data.pending, [{ kitId: "kit-google-drawings", index: 0, title: "Ship" },
-        { kitId: "kit-google-drawings", index: 1, title: "TV" }], "Drawings filed on Submit are not listed");
+    f.setLink(1, link(9));
+    assert.deepEqual(titles((await f.pendingFiling()).data.pending), ["TV", "TV", "Flower Pot"],
+        "A replaced submitted drawing and the newly saved one both need moving");
+    f.setLink(1, link(1));
+    assert.deepEqual(titles((await f.pendingFiling()).data.pending), ["TV", "Flower Pot"], "The same drawing is listed once");
     assert.equal((await f.fileAll({})).status, 400, "Drive permission is required");
     assert.equal((await f.fileAll({ driveAccessToken: "expired" })).status, 401);
     f.filings.length = 0;
@@ -475,13 +487,17 @@ test("login reminder lists unfiled submitted drawings until the student moves th
     assert.equal(failed.data.pending.length, 2, "Temporary Drive errors keep the reminder");
     f.failFiling(false);
     f.filingReason("not-owner");
-    await f.submit(0, { driveAccessToken: "student-token" });
+    await f.submit(2, { driveAccessToken: "student-token" });
     f.filingReason("");
+    f.filings.length = 0;
     const done = await f.fileAll({ driveAccessToken: "student-token" });
     assert.equal(done.status, 200);
     assert.deepEqual(done.data.pending, [], "Once sorted the reminder disappears");
     assert.deepEqual(done.data.results.map((result) => [result.title, result.filed]), [["TV", true]]);
+    assert.deepEqual(f.filings.map((request) => request.documentKey), [B.documentLinkKey(link(1))]);
     assert.deepEqual((await f.pendingFiling()).data.pending, []);
+    f.setLink(0, "https://docs.google.com/drawings/d/new-ship/edit");
+    assert.deepEqual(titles((await f.pendingFiling()).data.pending), ["Ship"], "A newly saved drawing brings the reminder back");
 });
 
 test("teacher submissions list and Completed ticks drive kit completion and the certificate", async (t) => {
