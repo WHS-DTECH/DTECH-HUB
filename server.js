@@ -8962,8 +8962,6 @@ function extractGoogleSlidesTestingFunctionLists(presentation) {
     } else if (/^\s*(?:functional\s+testing|testing\s+functions)(?!\s*[-\u2013\u2014]\s*markup\s+validation)\b/im.test(slideText)) {
       currentSection = "functional";
     }
-    if (!currentSection) return;
-
     elements.forEach((element) => {
       const table = element?.table;
       if (!table || !Array.isArray(table.tableRows)) return;
@@ -8972,8 +8970,14 @@ function extractGoogleSlidesTestingFunctionLists(presentation) {
       ));
       const headerRowIndex = rows.findIndex((row) => row.some((text) => /must[- ]do|what\s+.*test/i.test(text)));
       const headerTexts = headerRowIndex >= 0 ? rows[headerRowIndex].map((text) => text.toLowerCase()) : [];
+      const isFunctionalRequirements = /^\s*functional\s+requirements\b/im.test(slideText)
+        && headerTexts.some((text) => /must[- ]do\s*\/\s*requirement/i.test(text))
+        && headerTexts.some((text) => /^success\s+criteri(?:on|a)$/i.test(text))
+        && headerTexts.some((text) => /^how\s+will\s+i\s+know\??$/i.test(text));
+      const section = isFunctionalRequirements ? "functional" : currentSection;
       // Full assessment decks also contain planning, validation and version tables.
-      if (!headerTexts.some((text) => /what\s+.*test|test\s+input|expected\s+result|actual\s+result/i.test(text))) return;
+      if (!section || (!isFunctionalRequirements
+        && !headerTexts.some((text) => /what\s+.*test|test\s+input|expected\s+result|actual\s+result/i.test(text)))) return;
       const testColumnIndex = headerTexts.length
         ? headerTexts.findIndex((text) => /must[- ]do|function|what\s+.*test/i.test(text))
         : -1;
@@ -8984,7 +8988,7 @@ function extractGoogleSlidesTestingFunctionLists(presentation) {
         if (headerRowIndex < 0 && rowIndex === 0 && (rows[0] || []).some((text) => /test/i.test(text))) return;
         const cell = Array.isArray(row?.tableCells) ? row.tableCells[columnIndex] : null;
         const lines = extractGoogleSlidesTableCellLines(cell);
-        (lines.length ? lines : [rows[rowIndex]?.[columnIndex] || ""]).forEach((line) => pushItem(currentSection, line));
+        (lines.length ? lines : [rows[rowIndex]?.[columnIndex] || ""]).forEach((line) => pushItem(section, line));
       });
     });
   });

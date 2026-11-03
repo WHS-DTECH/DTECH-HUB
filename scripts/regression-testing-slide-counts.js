@@ -67,3 +67,30 @@ test("Functional and user rows stay separate, including continuation slides and 
     assert.deepEqual(count([slide("Testing Functions - Markup Validation", [header, ["Validation", "Markup", "", "", ""]])]),
         { functionalTesting: [], userTesting: [] });
 });
+
+test("A combined deck retains five functional requirements alongside five user tests", () => {
+    const requirements = ["View all classes during a period", "Assign teacher aides to classes",
+        "Add and remove teacher aides", "View existing assignments", "Navigate independently"];
+    const heading = "Functional requirements (MUST-DOs) + Relevant implications \u2192 Success criteria";
+    const requirementsSlide = slide(heading, [
+        ["MUST-DO / Requirement", "Success criterion", "How will I know?"],
+        ...requirements.map((requirement) => [requirement, "Meets the requirement", "Test website"])
+    ]);
+    const implicationsSlide = slide(heading, [
+        ["Relevant Implications", "Success criterion", "How will I know?"],
+        ["Usability", "Easy to use", "Feedback meeting"]
+    ]);
+    const userSlide = slide("USER TESTING - Can the intended user use it effectively?", [
+        header, ...requirements.map((requirement) => [requirement, "Check with client", "Input", "Expected", "Pass"])
+    ]);
+    const expected = { functionalTesting: requirements, userTesting: requirements };
+    assert.deepEqual(count([requirementsSlide, implicationsSlide, userSlide]), expected);
+    assert.deepEqual(count([userSlide, requirementsSlide, implicationsSlide]), expected,
+        "A requirements table after user testing still belongs to Functional");
+    assert.deepEqual(count([requirementsSlide, requirementsSlide, userSlide]), expected,
+        "Repeated requirements are not double counted");
+    assert.deepEqual(count([implicationsSlide]), { functionalTesting: [], userTesting: [] });
+    assert.deepEqual(count([slide("Project Success Criteria", requirementsSlide.pageElements[1].table.tableRows
+        .map((row) => row.tableCells.map((cell) => cell.text.textElements[0].textRun.content)))]),
+    { functionalTesting: [], userTesting: [] }, "Unrelated planning headings are not treated as functional requirements");
+});
