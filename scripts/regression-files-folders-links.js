@@ -247,3 +247,18 @@ test("block save API rejects duplicates, returns all recalculated ticks and acce
     assert.equal(result.passed, true);
     assert.equal(Object.keys(result.completedActivities).length, 5);
 });
+
+test("Files & Folders shows a stand-out OneDrive reminder when a Google link is saved and hides it for OneDrive links", () => {
+    const context = vm.createContext({ window: { ActivityBlocks: B }, structuredClone });
+    vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "practical-skills", "activity-block-view.js"), "utf8"), context);
+    const blocks = [{ id: "link", kind: "studentlink", required: true }];
+    const render = (value, noGoogleLinks = true) => context.window.ActivityBlockView.markup(blocks, { link: value }, false, { noGoogleLinks });
+    const google = "https://docs.google.com/document/d/1234567890123456789012345/edit";
+    assert.match(render(google), /data-google-link-warning role="alert" >/);
+    assert.match(render(google), /will NOT earn your tick[\s\S]*OneDrive sharing link instead[\s\S]*Copy link/);
+    assert.match(render(link(0)), /data-google-link-warning role="alert" hidden>/);
+    assert.match(render(""), /data-google-link-warning role="alert" hidden>/);
+    assert.doesNotMatch(render(google, false), /data-google-link-warning/);
+    const render_ = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "kit-worksheet-render.js"), "utf8");
+    assert.match(render_, /noGoogleLinks: content\.noGoogleLinks === true/);
+});

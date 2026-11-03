@@ -1,7 +1,14 @@
 (() => {
     "use strict";
     const B = window.ActivityBlocks, e = B.escape;
-    function markup(blocks, answers, readOnly, { renderImage, unityEditor } = {}) {
+    function googleWarning(value) {
+        return `<div class="activity-block-onedrive-alert" data-google-link-warning role="alert" ${B.isGoogleLink?.(value) ? "" : "hidden"}>
+            <strong>&#9888;&#65039; This is a Google link &mdash; it will NOT earn your tick.</strong>
+            <span>${e(B.GOOGLE_LINK_MESSAGE || "")}</span>
+            <span>In OneDrive: open your document, choose <strong>Share</strong> &rarr; <strong>Copy link</strong>, then paste that link here.</span>
+        </div>`;
+    }
+    function markup(blocks, answers, readOnly, { renderImage, unityEditor, noGoogleLinks } = {}) {
         return blocks.map((b) => {
             const value = answers[b.id];
             const disabled = readOnly ? "disabled" : "";
@@ -26,7 +33,8 @@
                 body = `${b.text ? `<p class="activity-block-text">${e(b.text)}</p>` : ""}
                     <label>${b.driveFolderOnly ? e(b.title) : "Your link"}<input type="url" data-student-link maxlength="5000" aria-invalid="${Boolean(typeof value === "string" && value.trim()) && !studentLink}" placeholder="${b.driveFolderOnly ? "https://drive.google.com/drive/folders/..." : "https://..."}" value="${e(typeof value === "string" ? value : "")}" ${disabled}></label>
                     <p class="activity-block-status" data-link-status role="status">${b.driveFolderOnly ? "Paste a Google Drive folder HTTPS link, not a file link. This checks the URL only, not sharing permissions or project contents." : b.driveOnly ? "Paste a Google Drive or Google Docs HTTPS link. This checks the URL only, not sharing permissions or completed work." : value && !studentLink ? "Enter a full HTTPS link, without a username or password in the URL." : "Paste one HTTPS link. This checks the URL only, not sharing permissions or completed work."}</p>
-                    <a class="worksheet-btn worksheet-btn-secondary" data-open-student-link ${studentLink ? `href="${e(studentLink)}"` : "hidden"} target="_blank" rel="noopener noreferrer">Open Link &#8599;</a>`;
+                                        ${noGoogleLinks ? googleWarning(value) : ""}
+                                        <a class="worksheet-btn worksheet-btn-secondary" data-open-student-link ${studentLink ? `href="${e(studentLink)}"` : "hidden"} target="_blank" rel="noopener noreferrer">Open Link &#8599;</a>`;
             }
             if (b.kind === "image") body = link ? (renderImage ? renderImage(b) : `<figure><img src="${e(link)}" alt="${e(b.alt)}" loading="lazy"><figcaption>${e(b.caption)}${b.attribution ? `<br>${e(b.attribution)}` : ""}</figcaption></figure>`) : "<p>Enter an HTTPS image link to preview.</p>";
             if (["link", "resource"].includes(b.kind)) body = link
@@ -154,6 +162,8 @@
                         : input.value.trim() && !url
                             ? "Enter a full HTTPS link, without a username or password in the URL."
                             : "Paste one HTTPS link. This checks the URL only, not sharing permissions or completed work.";
+                    const warning = section.querySelector("[data-google-link-warning]");
+                    if (warning) warning.hidden = !B.isGoogleLink?.(input.value);
                     changed(b, input.value);
                 } else if (b.kind === "checkbox") changed(b, input.checked);
                 else if (b.kind === "question") {

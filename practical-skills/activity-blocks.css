@@ -31,6 +31,9 @@
 .block-crossword-cell input { padding-top: 6px; border: 1px solid #607b8c; border-radius: 0; text-transform: uppercase; }
 .crossword-blank { background: #dbe5eb; }
 .activity-block-status { font-size: .9rem; line-height: 1.6; }
+.activity-block-onedrive-alert { display: grid; gap: 6px; margin: 10px 0; padding: 14px 16px; background: #fff1e6; border: 2px solid #c2410c; border-left-width: 8px; border-radius: 8px; color: #5a1a00; font-size: 1rem; line-height: 1.5; }
+.activity-block-onedrive-alert strong:first-child { font-size: 1.1rem; color: #9a2d00; }
+.activity-block-onedrive-alert[hidden] { display: none; }
 .activity-block-completion { padding: 12px 16px; background: #edf5ef; border-left: 4px solid #246b51; border-radius: 8px; }
 .activity-content-block a:focus-visible, .activity-content-block button:focus-visible, .activity-content-block input:focus-visible, .activity-content-block textarea:focus-visible { outline: 3px solid #ad6200; outline-offset: 2px; }
 @media(max-width: 560px) { .block-palette { grid-template-columns: 1fr; } .activity-content-block { padding: 14px; } }

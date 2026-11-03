@@ -805,7 +805,7 @@
                             ? "Auto-Completed: submit the required HTTPS sharing link to your document or PDF. Use a different file for every activity. Duplicate files do not earn ticks. Links are checked, not file contents or sharing permissions."
                             : "Automatic tick: complete all required interactive blocks. Written answers are checked for presence, not correctness. A document copy confirms creation only."
                         : "Completion: when you have finished the activity, choose Mark Activity Complete below."}</p>
-                <div class="activity-content-blocks">${window.ActivityBlockView.markup(blocks, blockAnswers, readOnly || options.blocksReadOnly, { renderImage: (image) => renderWorksheetImage(image), unityEditor: content.unityEditor })}</div>
+                <div class="activity-content-blocks">${window.ActivityBlockView.markup(blocks, blockAnswers, readOnly || options.blocksReadOnly, { renderImage: (image) => renderWorksheetImage(image), unityEditor: content.unityEditor, noGoogleLinks: content.noGoogleLinks === true })}</div>
             ` : ""}
             ${imageInformationLayout ? `<div class="worksheet-image-information-layout">` : ""}
             ${images.length ? `
