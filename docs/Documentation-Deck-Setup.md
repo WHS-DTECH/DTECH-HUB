@@ -13,6 +13,18 @@ student and selected assessment. Previously linked full slide sets are recognise
 as existing documentation. They are not automatically rebuilt. A manually
 assembled deck cannot be used as the target of Add missing slides.
 
+### Testing counts in combined decks
+
+Full slide-set sync recognises `USER TESTING` and `FUNCTIONAL TESTING` headings
+(including descriptive subtitles) as the Testing Functions section. Drive sync
+reads the linked full slide set before an older standalone Testing Functions
+copy so that user testing elsewhere in the combined deck is included.
+The reader counts distinct requirements from testing tables under the relevant
+section, not unrelated planning, markup-validation or version-history tables.
+These counts indicate listed evidence, not an assessment judgement or a claim
+that every test passed. After changing a deck, use Sync from Google Drive
+(or re-sync the linked full slide set) to persist refreshed counts.
+
 ## Slideshow PDF Exports
 
 The client-presentation and Stage 1 documentation cards each offer Convert

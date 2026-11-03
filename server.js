@@ -8937,7 +8937,7 @@ function extractGoogleSlidesTestingFunctionLists(presentation) {
   const slides = Array.isArray(presentation?.slides) ? presentation.slides : [];
   const functionalTesting = [];
   const userTesting = [];
-  let currentSection = "functional";
+  let currentSection = null;
 
   const pushItem = (section, value) => {
     const text = String(value || "")
@@ -8957,11 +8957,12 @@ function extractGoogleSlidesTestingFunctionLists(presentation) {
         .map((textElement) => String(textElement?.textRun?.content || ""))
         .join(""))
       .join("\n");
-    if (/user\s+testing/i.test(slideText)) {
+    if (/^\s*user\s+testing\b/im.test(slideText)) {
       currentSection = "user";
-    } else if (/functional\s+testing/i.test(slideText)) {
+    } else if (/^\s*(?:functional\s+testing|testing\s+functions)(?!\s*[-\u2013\u2014]\s*markup\s+validation)\b/im.test(slideText)) {
       currentSection = "functional";
     }
+    if (!currentSection) return;
 
     elements.forEach((element) => {
       const table = element?.table;
@@ -8971,6 +8972,8 @@ function extractGoogleSlidesTestingFunctionLists(presentation) {
       ));
       const headerRowIndex = rows.findIndex((row) => row.some((text) => /must[- ]do|what\s+.*test/i.test(text)));
       const headerTexts = headerRowIndex >= 0 ? rows[headerRowIndex].map((text) => text.toLowerCase()) : [];
+      // Full assessment decks also contain planning, validation and version tables.
+      if (!headerTexts.some((text) => /what\s+.*test|test\s+input|expected\s+result|actual\s+result/i.test(text))) return;
       const testColumnIndex = headerTexts.length
         ? headerTexts.findIndex((text) => /must[- ]do|function|what\s+.*test/i.test(text))
         : -1;
@@ -10957,6 +10960,7 @@ const TEMPLATE_ID_FROM_TITLE_PATTERNS = [
   { pattern: /^triall?ing\s+components(?:\s*-\s*.+)?$/i, id: "trialling-components", title: "Trialling Components" },
   { pattern: /^trailing\s+comp(?:onents|onets|onets)?(?:\s*-\s*.+)?$/i, id: "trialling-components", title: "Trialling Components" },
   { pattern: /^(?:markup\s+validation|integrity\s*&\s*validation\s*\(web\))(?:\s*-\s*.+)?$/i, id: "testing-functions-markup-validation", title: "Markup Validation" },
+  { pattern: /^(?:user|functional)\s+testing\b(?:\s*[-:\u2013\u2014]\s*.*)?$/i, id: "testing-functions", title: "Testing Functions" },
   { pattern: /^testing\s+functions(?:\s*-\s*.+)?$/i, id: "testing-functions", title: "Testing Functions" },
   { pattern: /^conventions(?:\s*-\s*.+)?$/i, id: "relevant-digimed-conventions", title: "Relevant DigiMed Conventions" },
   { pattern: /^(?:afull\s*-\s*)?relevant\s+(?:digimed\s+)?conventions(?:\s+template)?(?:\s*-\s*.+)?$/i, id: "relevant-digimed-conventions", title: "Relevant DigiMed Conventions" },

@@ -1760,7 +1760,9 @@ function readTestingFunctionsListCounts(activityId, email, stateMap = {}) {
 
 async function refreshTaskListTestingCounts(activityId, driveAccessToken, signal) {
     const copy = taskListState.templateCopies.find((entry) =>
-        String(entry?.templateId || "").trim().toLowerCase() === "testing-functions");
+        String(entry?.templateId || "").trim().toLowerCase() === "assessment-full-slide-set")
+        || taskListState.templateCopies.find((entry) =>
+            String(entry?.templateId || "").trim().toLowerCase() === "testing-functions");
     if (!copy) return false;
     const presentationId = String(copy.fileUrl || "").match(/docs\.google\.com\/presentation\/d\/([A-Za-z0-9_-]+)/i)?.[1];
     if (!presentationId) throw new Error("The saved Testing Functions slideshow link is invalid. Link it again before syncing.");

@@ -131,6 +131,18 @@ test("Failed testing reads preserve previous counts and changing task never upda
     assert.equal(env.state.fullEvidenceState["testing-functions-counts"][0].text, "TESTING_FUNCTIONS_COUNT|1|0");
 });
 
+test("Testing counts use the linked full deck rather than an older separate testing or markup deck", async () => {
+    const env = syncContext();
+    env.state.templateCopies = [
+        { templateId: "testing-functions", fileUrl: "https://docs.google.com/presentation/d/old-testing-123/edit" },
+        { templateId: "testing-functions-markup-validation", fileUrl: "https://docs.google.com/presentation/d/markup-slides-123/edit" },
+        { templateId: "assessment-full-slide-set", fileUrl: "https://docs.google.com/presentation/d/full-deck-123/edit" }
+    ];
+    assert.equal(await env.context.refreshTaskListTestingCounts("assessment", "token"), true);
+    assert.equal(JSON.parse(env.calls[0].options.body).presentationId, "full-deck-123");
+    assert.equal(env.state.fullEvidenceState["testing-functions-counts"][0].text, "TESTING_FUNCTIONS_COUNT|1|2");
+});
+
 test("Server Drive scan bounds Google requests and reports failed template saves", async () => {
     const server = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
     const start = server.indexOf('app.post("/api/activities/:id/sync-drive-templates",');
