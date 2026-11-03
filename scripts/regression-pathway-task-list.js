@@ -65,7 +65,8 @@ async function main() {
     const cardParts = (row) => ({ icon: row.children[0].children[0], title: row.children[0].children[1].children[0],
         required: row.children[0].children[1].children[1], state: row.children[0].children[2],
         note: row.children[1].children[0], link: row.children[1].children[1] });
-    assert.deepEqual(titles(), cards.filter((card) => !["unit", "lesson", "activity"].includes(card.cardType)).map((card) => card.title).sort((a, b) => a.localeCompare(b)));
+    assert.deepEqual(titles(), ["Data and Information", "Digital citizenship", "Digital systems", "Programming & Algorithms", "Systems and control"]);
+    assert.ok(strand("Programming & Algorithms"), "Shared Junior/Middle Programming remains in the Junior Task List");
     assert.equal(list.children.length, 5, "Task List shows the five strands, not Unit or Lesson cards");
     assert.equal(list.hidden, false);
     assert.equal(retry.hidden, true);

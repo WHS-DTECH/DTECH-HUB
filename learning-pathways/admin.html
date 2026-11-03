@@ -35,14 +35,15 @@
                         <textarea id="pathways-summary" required maxlength="600" rows="3"></textarea>
                         <label for="pathways-type">Card Type</label>
                         <select id="pathways-type">
-                            <option value="strand">Curriculum Strand</option>
+                            <option value="strand">Curriculum Element</option>
                             <option value="unit">Unit</option>
                             <option value="lesson">Lesson</option>
                             <option value="activity">Lesson Activity</option>
                             <option value="job">Jobs</option>
                         </select>
                         <label for="pathways-year">Year Level / Course</label>
-                        <input id="pathways-year" maxlength="60" placeholder="All Years, Junior DTECH, Middle DTECH, Senior DTECH">
+                        <input id="pathways-year" maxlength="60" placeholder="e.g. Junior DTECH, MiddleDTECH" aria-describedby="pathways-year-help">
+                        <p id="pathways-year-help">Use All Years, a single course, or comma-separated courses for a shared element.</p>
                         <label for="pathways-area">Category</label>
                         <input id="pathways-area" maxlength="60" placeholder="Learning Pathways">
                         <label for="pathways-href">Card Link (optional)</label>
@@ -81,6 +82,6 @@
     </div>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="../script.js"></script>
-    <script src="admin.js"></script>
+    <script src="admin.js?v=curriculum-elements-1"></script>
 </body>
 </html>

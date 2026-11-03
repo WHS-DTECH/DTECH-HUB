@@ -15,7 +15,7 @@
     const categoryPillsContainer = document.getElementById("practical-skills-category-pills");
     const typePillsContainer = document.getElementById("practical-skills-type-pills");
     const sortSelect = document.getElementById("practical-skills-sort");
-    const cardTypeNames = { strand: config.libraryCardLabel || "Curriculum Strands", unit: config.libraryUnitLabel || "Units", lesson: config.libraryLessonLabel || "Lessons", activity: config.libraryActivityLabel || "Lesson Activities", job: config.libraryJobLabel || "Jobs" };
+    const cardTypeNames = { strand: config.libraryCardLabel || "Curriculum Elements", unit: config.libraryUnitLabel || "Units", lesson: config.libraryLessonLabel || "Lessons", activity: config.libraryActivityLabel || "Lesson Activities", job: config.libraryJobLabel || "Jobs" };
     const cardType = (item) => (isPathways && ["unit", "lesson", "activity", "job"].includes(String(item?.cardType || "")) ? String(item.cardType) : "strand");
     const pageLocation = typeof location === "undefined" ? null : location;
     const requestedParams = new URLSearchParams(pageLocation?.search || "");
@@ -93,8 +93,14 @@
         "Senior DTECH": ["Senior DTECH", "Year 11 DTECH", "Year 12 DTECH", "Year 13 DTECH"]
     };
 
+    function cardYearLevels(item) {
+        return String(item.yearLevel || "All Years").split(",").map((level) => level.trim()).filter(Boolean);
+    }
+
     function getYearOptions() {
-        const values = getUniqueValues("yearLevel");
+        const values = isPathways
+            ? ["All", ...new Set(library.flatMap(cardYearLevels))].sort((a, b) => a === "All" ? -1 : b === "All" ? 1 : a.localeCompare(b))
+            : getUniqueValues("yearLevel");
         if (isPathways) return values;
         const fixed = ["All", "All Years", ...Object.keys(dtechBands)];
         return [...fixed, ...values.filter((value) => !fixed.includes(value))];
@@ -106,17 +112,18 @@
         if (!isPathways && dtechBands[state.year]) {
             return yearLevel === "All Years" || dtechBands[state.year].includes(yearLevel);
         }
-        return yearLevel === state.year;
+        return isPathways ? cardYearLevels(item).includes(state.year) : yearLevel === state.year;
     }
 
     const schoolYearCourses = { 7: "juniordtech", 8: "juniordtech", 9: "middledtech", 10: "middledtech", 11: "seniordtech", 12: "seniordtech", 13: "seniordtech" };
     const compact = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
     function inSchoolYear(item, year, includeAllYears = true) {
-        const level = String(item.yearLevel || "");
-        const key = compact(level);
-        if (includeAllYears && (!key || key === "allyears")) return true;
-        return key === schoolYearCourses[year] || new RegExp(`\\byear\\s*${year}\\b`, "i").test(level);
+        return cardYearLevels(item).some((level) => {
+            const key = compact(level);
+            if (includeAllYears && (!key || key === "allyears")) return true;
+            return key === schoolYearCourses[year] || new RegExp(`\\byear\\s*${year}\\b`, "i").test(level);
+        });
     }
 
     function getSchoolYearOptions() {
@@ -248,7 +255,7 @@
                     ${clientDetails}
                 <div class="project-tags">
                     <span class="project-tag status-tag status-${escapeHtml(String(item.status || "active").toLowerCase())}">${escapeHtml(formatStatus(item.status))}</span>
-                    <span class="project-tag">${escapeHtml(item.yearLevel || "All Years")}</span>
+                    ${(isPathways ? cardYearLevels(item) : [item.yearLevel || "All Years"]).map((level) => `<span class="project-tag">${escapeHtml(level)}</span>`).join("")}
                     <span class="project-tag">${escapeHtml(item.area || "Licence")}</span>
                 </div>
                 <div class="project-footer">

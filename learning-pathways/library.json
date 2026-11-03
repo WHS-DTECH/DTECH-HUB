@@ -13,7 +13,7 @@
     "id": "programming-and-algorithms",
     "title": "Programming & Algorithms",
     "summary": "Use programming tools and computational thinking to create purposeful programs. Design and apply step-by-step algorithms to solve problems, find and debug errors, then test and improve your solutions.",
-    "yearLevel": "Junior DTECH",
+    "yearLevel": "Junior DTECH, MiddleDTECH",
     "area": "Programming & Algorithms",
     "status": "active",
     "href": "/learning-pathways/programming-and-algorithms.html",
@@ -58,16 +58,6 @@
     "status": "active",
     "href": "/learning-pathways/year-9-computer-science.html",
     "visual": { "icon": "CS" }
-  },
-  {
-    "id": "year-9-programming",
-    "title": "Programming",
-    "summary": "Design, write, test and debug programs using sequence, selection, iteration, variables and reusable structures, with clear naming, comments and testing evidence.",
-    "yearLevel": "MiddleDTECH",
-    "area": "Programming",
-    "status": "active",
-    "href": "/learning-pathways/year-9-programming.html",
-    "visual": { "icon": "PG" }
   },
   {
     "id": "year-9-digital-media",

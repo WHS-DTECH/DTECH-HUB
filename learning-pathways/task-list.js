@@ -60,7 +60,7 @@ async function renderPathwayTaskList() {
             console.error("Could not load activity progress", error);
         }
         if (request !== pathwayTaskRequest) return;
-        const juniorCards = cards.filter((card) => card.yearLevel === "Junior DTECH" && !["unit", "lesson", "activity"].includes(card.cardType))
+        const juniorCards = cards.filter((card) => card.yearLevel.split(",").some((level) => level.trim() === "Junior DTECH") && !["unit", "lesson", "activity"].includes(card.cardType))
             .sort((left, right) => left.title.localeCompare(right.title));
         let activityCount = 0;
         for (const card of juniorCards) {

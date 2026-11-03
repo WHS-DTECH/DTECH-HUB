@@ -4,7 +4,11 @@ A separate library with five pre-loaded Year 7/8 curriculum area cards and the L
 search, year-level/category/status filters and sorting. A **Year** filter (Year 7–13) maps each
 school year to its DTECH course (7–8 Junior, 9–10 Middle, 11–13 Senior); All Years cards show for
 every year, and `?schoolYear=9` preselects a year.
-The footer card type is **Curriculum Strands**: these cards describe teacher
+Shared cards use comma-separated `yearLevel` courses (e.g. `Junior DTECH, MiddleDTECH`).
+The course and Year filters match each course separately, and cards show individual
+course badges. The admin Course field accepts this format; the Junior Task List
+includes shared Junior cards without showing Middle-only elements.
+The footer card type is **Curriculum Elements**: these cards describe teacher
 curriculum requirements, analogous to standards in the SeniorDTECH library.
 This label does not change pathway names or populate the student Task List.
 
@@ -39,7 +43,18 @@ Routing waits for both course and access resolution, including after refresh.
   The supplied document is proposed; this page does not assert later approval.
   The public reference uses the shared site navigation, not a new admin editor.
   No assessment descriptors or automatic completion rules are introduced.
-- `programming-and-algorithms.html`, `data-and-information.html`,
+- `programming-and-algorithms.html`: one shared Junior/Middle Curriculum Element.
+  Its redesigned detail starts with common themes, followed by four distinct
+  Year 7, 8, 9 and 10 knowledge/practices panels. It maps Years 7-8 to p. 17 and
+  Years 9-10 to the Programming heading on p. 24, keeping the separate Computer
+  science algorithm connection explicit. The source/status notice remains visible:
+  the supplied MOE document is proposed, and summaries are paraphrased.
+  `year-9-programming.html` forwards old links to the shared page's Year 9 section.
+  Migration v15 removes the duplicate once, retaining the established shared ID,
+  order and edited metadata while updating course coverage and the detail link.
+  If only the Middle card remains, it is converted instead; neither card is
+  restored if both have been deleted. Subsequent admin changes are not undone.
+- `data-and-information.html`,
   `digital-citizenship.html` and `systems-and-control.html`: the other four teacher
   references, using the same sections, comparison tables, source/status notice
   and styles as Digital Systems. Systems and Control maps to the official strand
@@ -48,14 +63,14 @@ Routing waits for both course and access resolution, including after refresh.
   statements and school-context extensions are distinguished. Existing kit
   outlines are context opportunities, not proof of curriculum coverage; hidden
   Search/Login worksheets are not assumed to be active.
-- `year-9-computer-science.html`, `year-9-programming.html`,
+- `year-9-computer-science.html`,
   `year-9-digital-media.html` and `year-9-responsible-practice.html`: MiddleDTECH
-  teacher references for the four Year 9–10 Digital Technology headings (p. 24),
+  teacher references for the other three Year 9–10 Digital Technology headings (p. 24),
   using the same template with Year 9 vs Year 10 tables, Design, Make, and
   Innovate (p. 19; p. 5 requires at least two strands) and a progression matrix
   (p. 25 progress is unfinished). Learning contexts are proposals. They show in
   the dashboard Year filter under Year 9 and Year 10. Migration v14 adds these
-  four cards once without restoring later deletions.
+  Year 9 cards once without restoring later deletions (Programming is now shared).
 - `task-list.html` and `task-list.js`: JuniorDTECH student Task List skeleton.
   The green navbar and sidebar Task List buttons use the resolved actual course:
   JuniorDTECH opens this page, SeniorDTECH retains its existing Task List, and
@@ -105,9 +120,9 @@ Version 10 links a still-blank Binary Piano lesson to `lesson-binary-piano.html`
 Version 12 links a still-blank Encoding Binary lesson to `lesson-encoding-binary.html`
 (Lesson 2 page, built from the Lesson 02 PDF, with a Linked Student Activity section).
 
-### Card types: Curriculum Strands, Units, Lessons and Lesson Activities
+### Card types: Curriculum Elements, Units, Lessons and Lesson Activities
 
-Each card has a `cardType` of `strand` (default, footer **Curriculum Strands**,
+Each card has a `cardType` of `strand` (default, footer **Curriculum Elements**,
 Pathways blue) or `unit` (footer **Units**, crimson/coral palette distinct from
 every other library). Unit cards keep an optional `strand` ID naming their parent
 strand; both current units belong to `digital-systems`. The dashboard has a

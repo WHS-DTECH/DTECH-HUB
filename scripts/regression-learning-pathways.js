@@ -33,7 +33,7 @@ async function testDashboard() {
     const elements = Object.fromEntries(names.map((name) => [`#practical-skills-${name}`, new Element()]));
     const dashboard = fs.readFileSync(path.join(root, "learning-pathways", "index.html"), "utf8");
     const cardLabel = dashboard.match(/data-library-card-label="([^"]+)"/)?.[1];
-    assert.equal(cardLabel, "Curriculum Strands");
+    assert.equal(cardLabel, "Curriculum Elements");
     const config = { dataset: { libraryPath: "/learning-pathways/library.json",
         libraryName: "Learning Pathways", libraryCardLabel: cardLabel, libraryIcon: "LP" } };
     let responseCards = [];
@@ -62,7 +62,7 @@ async function testDashboard() {
     fails = false;
     await grid.children[0].children[1].click();
     assert.equal(grid.children.length, 2);
-    assert.match(grid.children[0].innerHTML, /Curriculum Strands/);
+    assert.match(grid.children[0].innerHTML, /Curriculum Elements/);
     assert.equal(grid.children[0].href, sample.href, "Cards retain their configured links");
     const search = elements["#practical-skills-search"];
     search.value = "web design";
@@ -98,7 +98,7 @@ async function testDashboard() {
     await tick();
     assert.equal(grid.children[0].tagName, "article", "Display-only pathways are not links");
     assert.equal(grid.children[0].href, undefined);
-    assert.match(grid.children[0].innerHTML, /Curriculum Strands/, "Display-only cards show the curriculum card type");
+    assert.match(grid.children[0].innerHTML, /Curriculum Elements/, "Display-only cards show the curriculum card type");
     const unitPalette = dashboard.match(/data-library-unit-palette="([^"]+)"/)?.[1];
     assert.match(unitPalette, /#9f1d3a/, "Units use their own crimson palette");
     Object.assign(config.dataset, { libraryUnitLabel: "Units", libraryUnitPalette: unitPalette,
@@ -106,12 +106,12 @@ async function testDashboard() {
     responseCards = [{ ...sample, id: "unit-a", title: "Alpha Unit", cardType: "unit", strand: "web" }, { ...sample, title: "Zeta Strand" }];
     vm.runInContext(fs.readFileSync(path.join(root, "practical-skills/app.js"), "utf8"), context);
     await tick();
-    assert.match(grid.children[0].innerHTML, /Zeta Strand/, "Curriculum Strands appear before Units");
+    assert.match(grid.children[0].innerHTML, /Zeta Strand/, "Curriculum Elements appear before Units");
     assert.match(grid.children[1].innerHTML, /Units/);
     assert.match(grid.children[1].innerHTML, /#9f1d3a/);
     assert.doesNotMatch(grid.children[0].innerHTML, /#9f1d3a/, "Strands keep the Pathways palette");
     const types = elements["#practical-skills-type-pills"];
-    assert.deepEqual(types.children.map((pill) => pill.textContent), ["All", "Curriculum Strands", "Units"]);
+    assert.deepEqual(types.children.map((pill) => pill.textContent), ["All", "Curriculum Elements", "Units"]);
     types.children.find((pill) => pill.textContent === "Units").click();
     assert.equal(grid.children.length, 1);
     assert.match(grid.children[0].innerHTML, /Alpha Unit/);
@@ -138,7 +138,7 @@ async function testDashboard() {
     assert.ok(grid.children[2].classList.contains("pathway-lesson-card"));
     assert.match(grid.children[2].innerHTML, /#a35200/);
     assert.match(grid.children[2].innerHTML, />Lessons</);
-    assert.deepEqual(elements["#practical-skills-type-pills"].children.map((pill) => pill.textContent), ["All", "Curriculum Strands", "Units", "Lessons"]);
+    assert.deepEqual(elements["#practical-skills-type-pills"].children.map((pill) => pill.textContent), ["All", "Curriculum Elements", "Units", "Lessons"]);
     const activityPalette = dashboard.match(/data-library-activity-palette="([^"]+)"/)?.[1];
     assert.match(activityPalette, /#1f6b3a/, "Lesson Activities use their own green palette");
     assert.match(dashboard, /data-library-activity-label="Lesson Activities"/);
@@ -153,7 +153,7 @@ async function testDashboard() {
     assert.ok(grid.children[2].classList.contains("pathway-activity-card"));
     assert.match(grid.children[2].innerHTML, /#1f6b3a/);
     assert.match(grid.children[2].innerHTML, />Lesson Activities</);
-    assert.deepEqual(elements["#practical-skills-type-pills"].children.map((pill) => pill.textContent), ["All", "Curriculum Strands", "Lessons", "Lesson Activities"]);
+    assert.deepEqual(elements["#practical-skills-type-pills"].children.map((pill) => pill.textContent), ["All", "Curriculum Elements", "Lessons", "Lesson Activities"]);
     const jobPalette = dashboard.match(/data-library-job-palette="([^"]+)"/)?.[1];
     assert.match(jobPalette, /#0f5b75/, "Jobs use a distinct cyan-teal palette");
     assert.match(dashboard, /data-library-job-label="Jobs"/);
@@ -168,7 +168,7 @@ async function testDashboard() {
     assert.match(jobElement.innerHTML, />Jobs</);
     assert.match(jobElement.innerHTML, /Kim Client[\s\S]*kim@example\.org[\s\S]*Onsite client/,
         "Jobs cards show the chosen public client details and onsite status");
-    assert.deepEqual(elements["#practical-skills-type-pills"].children.map((pill) => pill.textContent), ["All", "Curriculum Strands", "Jobs"]);
+    assert.deepEqual(elements["#practical-skills-type-pills"].children.map((pill) => pill.textContent), ["All", "Curriculum Elements", "Jobs"]);
     elements["#practical-skills-type-pills"].children.find((pill) => pill.textContent === "Jobs").click();
     assert.equal(grid.children.length, 1, "Jobs type filter hides non-job cards");
     elements["#practical-skills-type-pills"].children[0].click();
@@ -181,6 +181,36 @@ async function testDashboard() {
     await tick();
     assert.equal(grid.children.length, 1, "Jobs upload link opens with MiddleDTECH and Jobs filters applied");
     assert.equal(grid.children[0].id, "card-middle-job-space-project");
+    delete context.location;
+    const sharedProgramming = { ...sample, id: "programming-and-algorithms", title: "Programming & Algorithms",
+        yearLevel: "Junior DTECH, MiddleDTECH", area: "Programming & Algorithms" };
+    responseCards = [sharedProgramming, { ...sample, id: "senior-only", title: "Senior only" }];
+    vm.runInContext(fs.readFileSync(path.join(root, "practical-skills/app.js"), "utf8"), context);
+    await tick();
+    assert.equal(grid.children.filter((card) => card.id === "card-programming-and-algorithms").length, 1);
+    const sharedYears = elements["#practical-skills-year-pills"];
+    assert.deepEqual(sharedYears.children.map((pill) => pill.textContent), ["All", "Junior DTECH", "MiddleDTECH", "Senior DTECH"],
+        "Shared courses create individual pills, not a combined course pill");
+    for (const course of ["Junior DTECH", "MiddleDTECH"]) {
+        sharedYears.children.find((pill) => pill.textContent === course).click();
+        assert.equal(grid.children.length, 1);
+        assert.equal(grid.children[0].id, "card-programming-and-algorithms");
+    }
+    sharedYears.children[0].click();
+    const sharedSchoolYears = elements["#practical-skills-school-year-pills"];
+    for (const year of [7, 8, 9, 10]) {
+        sharedSchoolYears.children.find((pill) => pill.textContent === `Year ${year}`).click();
+        assert.equal(grid.children.length, 1, `Shared programming appears for Year ${year}`);
+        assert.equal(grid.children[0].id, "card-programming-and-algorithms");
+        assert.match(grid.children[0].innerHTML, />Junior DTECH<\/span>[\s\S]*>MiddleDTECH<\/span>/);
+    }
+    sharedSchoolYears.children.find((pill) => pill.textContent === "Year 11").click();
+    assert.equal(grid.children[0].id, "card-senior-only", "Shared programming is not incorrectly included for Senior");
+    context.location = { search: "?schoolYear=9&year=MiddleDTECH&type=strand", hash: "" };
+    vm.runInContext(fs.readFileSync(path.join(root, "practical-skills/app.js"), "utf8"), context);
+    await tick();
+    assert.equal(grid.children.length, 1);
+    assert.equal(grid.children[0].id, "card-programming-and-algorithms", "Combined year/course/type URL filters work together");
     delete context.location;
     config.dataset = {};
     responseCards = [{ ...sample, cardLabel: "LICENCE KIT" }, { ...sample, id: "practical-skills-checklist", title: "Licence" }];
@@ -266,16 +296,17 @@ async function main() {
     const plusUnits = (cards) => plusLessons([...cards, ...units.filter((unit) => !cards.some((card) => card.id === unit.id))]);
     assert.deepEqual(strands.map((card) => card.title), ["Digital systems", "Programming & Algorithms", "Data and Information",
         "Digital citizenship", "Systems and control"]);
-    assert.ok(strands.every((card) => card.area === card.title && card.yearLevel === "Junior DTECH"));
+    assert.ok(strands.every((card) => card.area === card.title && card.yearLevel ===
+        (card.id === "programming-and-algorithms" ? "Junior DTECH, MiddleDTECH" : "Junior DTECH")));
     assert.deepEqual(year9Strands.map((card) => [card.title, card.yearLevel, card.area, card.status, card.href]), [
         ["Computer science", "MiddleDTECH", "Computer science", "active", "/learning-pathways/year-9-computer-science.html"],
-        ["Programming", "MiddleDTECH", "Programming", "active", "/learning-pathways/year-9-programming.html"],
         ["Digital media", "MiddleDTECH", "Digital media", "active", "/learning-pathways/year-9-digital-media.html"],
         ["Responsible practice", "MiddleDTECH", "Responsible practice", "active", "/learning-pathways/year-9-responsible-practice.html"]],
-        "The four Year 9 Digital Technology headings are MiddleDTECH Curriculum Strands");
+        "The three remaining Year 9 elements have distinct MiddleDTECH cards");
+    assert.ok(!seed.some((card) => card.id === "year-9-programming"), "Programming appears only once in the seed");
     for (const card of year9Strands) {
         const page = fs.readFileSync(path.join(root, ...card.href.slice(1).split("/")), "utf8");
-        for (const heading of ["Overview", "Official Curriculum Strand", "Design, Make, and Innovate", "Progression Matrix",
+        for (const heading of ["Overview", "Curriculum mapping", "Design, Make, and Innovate", "Progression Matrix",
             "Learning Contexts", "Teacher Notes", "Future activities - proposed, not yet added", "Possible evidence - teacher judgement required"]) {
             assert.ok(page.includes(heading), `${card.id} includes ${heading}`);
         }
@@ -406,7 +437,7 @@ async function main() {
         'Lesson 1 should link the existing Binary Piano template as a pill');
     assert.match(lessonPage, /<\/div><a class="lesson-activity-pill" href="\/learning-pathways\/activity-build-your-binary-piano\.html">Activity card: Build Your Binary Piano<\/a><\/li>/,
         "The Practical phase shows a right-hand pill linking to its Activity card");
-    assert.equal(normalizeCards([sample])[0].cardType, "strand", "Existing cards default to Curriculum Strands");
+    assert.equal(normalizeCards([sample])[0].cardType, "strand", "Existing cards default to Curriculum Elements");
     assert.deepEqual(normalizeCards([{ ...sample, id: "middle-job-space-project", cardType: "job", yearLevel: "MiddleDTECH", area: "Jobs" }])[0],
         { ...normalizeCards([sample])[0], id: "middle-job-space-project", cardType: "job", yearLevel: "MiddleDTECH", area: "Jobs", client: { enabled: false, name: "", email: "", onsite: true } },
         "Jobs cards retain their dedicated type, course and category through normalization");
@@ -422,10 +453,10 @@ async function main() {
         "digital-citizenship": "/learning-pathways/digital-citizenship.html",
         "systems-and-control": "/learning-pathways/systems-and-control.html"
     };
-    for (const card of strands.filter((card) => card.id !== "digital-systems")) {
+    for (const card of strands.filter((card) => !["digital-systems", "programming-and-algorithms"].includes(card.id))) {
         assert.equal(card.href, curriculumLinks[card.id]);
         const page = fs.readFileSync(path.join(root, ...card.href.slice(1).split("/")), "utf8");
-        for (const heading of ["Overview", "Official Curriculum Strand", "Year 7 Knowledge and Practices",
+        for (const heading of ["Overview", "Curriculum mapping", "Year 7 Knowledge and Practices",
             "Year 8 Knowledge and Practices", "Design, Make, and Innovate", "Progression Matrix", "Learning Contexts", "Teacher Notes"]) {
             assert.ok(page.includes(heading), `${card.id} includes ${heading}`);
         }
@@ -451,8 +482,35 @@ async function main() {
             assert.ok(fs.existsSync(path.join(root, ...link[1].slice(1).split("/"))), "Related curriculum page links resolve");
         }
     }
+    const programmingPage = fs.readFileSync(path.join(root, "learning-pathways/programming-and-algorithms.html"), "utf8");
+    assert.ok(programmingPage.indexOf("What's common?") < programmingPage.indexOf("What's different?"));
+    for (const year of [7, 8, 9, 10]) {
+        const panel = programmingPage.match(new RegExp(`<article id="year-${year}"[\\s\\S]*?</article>`))?.[0];
+        assert.ok(panel, `Year ${year} has a distinct panel`);
+        assert.ok(panel.includes(`Year ${year} Knowledge and Practices`));
+        assert.match(panel, /<h4>Knowledge<\/h4>[\s\S]*<h4>Practices<\/h4>/);
+        assert.match(panel, year < 9 ? /p\. 17/ : /p\. 24: Programming/);
+    }
+    const year7Panel = programmingPage.match(/<article id="year-7"[\s\S]*?<\/article>/)[0];
+    const year8Panel = programmingPage.match(/<article id="year-8"[\s\S]*?<\/article>/)[0];
+    const year9Panel = programmingPage.match(/<article id="year-9"[\s\S]*?<\/article>/)[0];
+    const year10Panel = programmingPage.match(/<article id="year-10"[\s\S]*?<\/article>/)[0];
+    assert.match(year7Panel, /Recognising repeated elements/);
+    assert.match(year8Panel, /Unit testing[\s\S]*functional testing/);
+    assert.match(year9Panel, /flowcharts, pseudocode and trace tables/);
+    assert.match(year10Panel, /functions[\s\S]*modularity[\s\S]*boundary and invalid/);
+    assert.match(year10Panel, /separately placed under Year 10/);
+    assert.match(programmingPage, /Proposed curriculum/);
+    assert.match(programmingPage, /paraphrased/);
+    assert.match(programmingPage, /does <strong>not<\/strong> fulfil the two-strand requirement/);
+    const programmingIds = [...programmingPage.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
+    assert.equal(new Set(programmingIds).size, programmingIds.length);
+    for (const anchor of programmingPage.matchAll(/href="#([^"]+)"/g)) assert.ok(programmingIds.includes(anchor[1]));
+    const oldProgrammingPage = fs.readFileSync(path.join(root, "learning-pathways/year-9-programming.html"), "utf8");
+    assert.match(oldProgrammingPage, /http-equiv="refresh" content="0;url=programming-and-algorithms\.html#year-9"/);
+    assert.match(oldProgrammingPage, /<a href="programming-and-algorithms\.html#year-9">/);
     const curriculumPage = fs.readFileSync(path.join(root, "learning-pathways/digital-systems.html"), "utf8");
-    for (const heading of ["Overview", "Official Curriculum Strand", "Year 7 Knowledge and Practices",
+    for (const heading of ["Overview", "Curriculum mapping", "Year 7 Knowledge and Practices",
         "Year 8 Knowledge and Practices", "Design, Make, and Innovate", "Progression Matrix", "Learning Contexts"]) {
         assert.ok(curriculumPage.includes(heading), `Curriculum page includes ${heading}`);
     }
@@ -519,11 +577,12 @@ async function main() {
     let stored = [existing, sample];
     let seedVersion = 0;
     let testVersion14 = false;
+    let testVersion15 = false;
     const pool = { query: async (sql, params) => {
         assert.match(sql, /learning_pathways_library_store/, "Never writes the Licence Library table");
         if (sql.includes("INSERT INTO") && (stored === null || !sql.includes("DO NOTHING"))) {
             stored = JSON.parse(params[0]);
-            seedVersion = 14;
+            seedVersion = 15;
         }
         if (sql.includes("seed_version < 1") && seedVersion < 1) {
             const starters = JSON.parse(params[0]);
@@ -608,6 +667,26 @@ async function main() {
             stored = [...stored, ...added.filter((card) => !stored.some((old) => old.id === card.id))];
             seedVersion = 14;
         }
+        if (sql.includes("seed_version < 15") && seedVersion < 15 && testVersion15) {
+            assert.match(sql, /WITH ORDINALITY/);
+            assert.match(sql, /ORDER BY item\.ordinality/);
+            const combined = JSON.parse(params[0]);
+            const hasCombined = stored.some((card) => card.id === "programming-and-algorithms");
+            stored = stored.filter((card) => card.id !== "year-9-programming" || !hasCombined).map((card) => {
+                if (card.id === "programming-and-algorithms") {
+                    return { ...card, yearLevel: combined.yearLevel, href: combined.href };
+                }
+                if (card.id === "year-9-programming") {
+                    return { ...card, id: combined.id, title: combined.title, area: combined.area,
+                        yearLevel: combined.yearLevel, href: combined.href };
+                }
+                if (card.cardType === "unit" && card.strand === "year-9-programming") {
+                    return { ...card, strand: combined.id };
+                }
+                return card;
+            });
+            seedVersion = 15;
+        }
         return { rows: sql.startsWith("SELECT") && stored !== null ? [{ cards: stored }] : [] };
     } };
     const app = express();
@@ -622,11 +701,11 @@ async function main() {
         let response = await fetch(`${base}/learning-pathways/library.json`);
         assert.match(response.headers.get("cache-control"), /no-store/);
         const migrated = await response.json();
-        assert.equal(migrated.length, 24, "One-time preload preserves existing custom cards");
+        assert.equal(migrated.length, 23, "One-time preload preserves existing custom cards");
         assert.equal(migrated.find((card) => card.id === "digital-systems").title, "Existing edited systems",
             "Preload does not overwrite existing cards with the same ID");
         assert.equal(migrated.filter((card) => card.id === "digital-systems").length, 1);
-        assert.equal((await (await fetch(`${base}/learning-pathways/library.json`)).json()).length, 24,
+        assert.equal((await (await fetch(`${base}/learning-pathways/library.json`)).json()).length, 23,
             "Repeated reads do not duplicate starter cards");
         stored = [existing, sample, { ...sample, id: "programming" }, { ...sample, id: "algorithms" }];
         seedVersion = 1;
@@ -738,6 +817,34 @@ async function main() {
         assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), normalizeCards([sample]),
             "Version 14 does not restore deleted Year 9 strands");
         testVersion14 = false;
+        testVersion15 = true;
+        const combinedCard = seed.find((card) => card.id === "programming-and-algorithms");
+        const oldProgramming = { ...sample, id: "year-9-programming", title: "Edited Middle programming", summary: "Custom Middle summary" };
+        const editedCombined = { ...combinedCard, title: "Edited shared title", summary: "Custom shared summary", status: "planning",
+            yearLevel: "Junior DTECH", href: "/custom-programming" };
+        const middleUnit = { ...sample, id: "middle-unit", cardType: "unit", strand: "year-9-programming" };
+        stored = [sample, oldProgramming, editedCombined, middleUnit];
+        seedVersion = 14;
+        const sharedCards = await (await fetch(`${base}/learning-pathways/library.json`)).json();
+        assert.deepEqual(sharedCards, normalizeCards([sample, { ...editedCombined, yearLevel: combinedCard.yearLevel, href: combinedCard.href },
+            { ...middleUnit, strand: combinedCard.id }]),
+            "Version 15 removes the duplicate, preserves shared edits and order, and updates course coverage/link");
+        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), sharedCards, "Merge is idempotent");
+        stored = [sample, oldProgramming];
+        seedVersion = 14;
+        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(),
+            normalizeCards([sample, { ...oldProgramming, id: combinedCard.id, title: combinedCard.title,
+                area: combinedCard.area, yearLevel: combinedCard.yearLevel, href: combinedCard.href }]),
+            "When only Middle programming exists, reuse its metadata for the combined card");
+        stored = [sample];
+        seedVersion = 14;
+        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), normalizeCards([sample]),
+            "Merge does not restore deleted programming cards");
+        stored = [sample, { ...editedCombined, yearLevel: "Year 7 DTECH", href: "" }];
+        seedVersion = 15;
+        assert.deepEqual(await (await fetch(`${base}/learning-pathways/library.json`)).json(), normalizeCards(stored),
+            "Later admin course and link changes are not undone");
+        testVersion15 = false;
         const blankPiano = { ...lessons[0], href: "", title: "Edited piano" };
         stored = [sample, blankPiano];
         seedVersion = 9;
