@@ -56,7 +56,8 @@ function createDriveResumableUploader({ fetchRequest = fetch, chunkBytes = 8 * 1
         const probe = async () => {
           const response = await fetchRequest(session.url, {
             method: "PUT", headers: { ...headers, "Content-Range": `bytes */${bytes}` }, body: Buffer.alloc(0),
-            redirect: "error", signal: AbortSignal.timeout(30000)
+            // Drive's 308 Resume Incomplete can include Location; inspect it without following redirects.
+            redirect: "manual", signal: AbortSignal.timeout(30000)
           }).catch(() => { throw uploadError("Could not resume the Drive upload. Retry Google Drive save."); });
           return interpret(response);
         };
@@ -98,7 +99,7 @@ function createDriveResumableUploader({ fetchRequest = fetch, chunkBytes = 8 * 1
           try {
             response = await fetchRequest(session.url, {
               method: "PUT", headers: { ...headers, "Content-Type": mimeType, "Content-Range": `bytes ${offset}-${offset + length - 1}/${bytes}` },
-              body: buffer.subarray(0, length), redirect: "error", signal: AbortSignal.timeout(120000)
+              body: buffer.subarray(0, length), redirect: "manual", signal: AbortSignal.timeout(120000)
             });
           } catch (_error) {
             if (++recoveries > 2) throw uploadError("Drive upload was interrupted. Retry Google Drive save to resume.");

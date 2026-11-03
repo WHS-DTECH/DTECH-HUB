@@ -8,6 +8,7 @@ const { createHash } = require("node:crypto");
 const { parseOutcomeRepository, outcomeRepositories, createOutcomeArchiveStore, createGithubZipSizeReader } = require("../github-outcome");
 const { createDriveResumableUploader } = require("../drive-resumable-upload");
 const os = require("node:os");
+const http = require("node:http");
 
 const email = "student@westlandhigh.school.nz";
 const repositoryUrl = "https://github.com/student/outcome";
@@ -169,7 +170,7 @@ async function testResumableUpload() {
     let probes = 0;
     const upload = createDriveResumableUploader({ chunkBytes, fetchRequest: async (url, request) => {
       assert.equal(request.headers.Authorization, "Bearer student-token");
-      assert.equal(request.redirect, "error");
+      assert.equal(request.redirect, request.method === "PUT" ? "manual" : "error");
       if (request.method === "POST") {
         starts += 1;
         assert.equal(JSON.parse(request.body).parents[0], "folder");
@@ -211,6 +212,59 @@ async function testResumableUpload() {
     assert.equal(interrupted.stats().starts, 1, "User retry resumes the existing upload rather than creating a duplicate file");
     await assert.rejects(fixture({ badLocation: true }).upload.upload(options), /invalid upload session/);
     await assert.rejects(fixture({ badChecksum: true }).upload.upload(options), /did not match/);
+    // Real fetch must expose Drive's 308 plus Location rather than throw or follow it.
+    let received = 0;
+    let probes = 0;
+    let redirected = 0;
+    const server = http.createServer(async (request, response) => {
+      if (request.url === "/must-not-follow") {
+        redirected += 1;
+        response.writeHead(500).end();
+        return;
+      }
+      if (request.method === "POST") {
+        response.writeHead(200, { location: "https://www.googleapis.com/upload/drive/v3/files?upload_id=real-fetch" }).end();
+        return;
+      }
+      if (request.headers["content-range"] === `bytes */${bytes.length}`) {
+        probes += 1;
+        response.writeHead(308, { location: "/must-not-follow", range: `bytes=0-${received - 1}` }).end();
+        return;
+      }
+      const range = request.headers["content-range"].match(/^bytes (\d+)-(\d+)\/(\d+)$/);
+      assert.equal(Number(range[1]), received);
+      const chunks = [];
+      for await (const chunk of request) chunks.push(chunk);
+      const body = Buffer.concat(chunks);
+      assert.deepEqual(body, bytes.subarray(received, received + body.length));
+      received += body.length;
+      if (received === chunkBytes) {
+        request.socket.destroy();
+        return;
+      }
+      if (received < bytes.length) {
+        response.writeHead(308, { location: "/must-not-follow", range: `bytes=0-${received - 1}` }).end();
+      } else {
+        response.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify({
+          id: "real-fetch-zip", size: String(bytes.length), md5Checksum: options.md5Checksum
+        }));
+      }
+    });
+    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+    try {
+      const realFetchUpload = createDriveResumableUploader({
+        chunkBytes,
+        fetchRequest: (_url, request) => fetch(`http://127.0.0.1:${server.address().port}/upload`, request)
+      });
+      assert.equal((await realFetchUpload.upload(options)).id, "real-fetch-zip");
+      assert.equal(received, bytes.length, "Multi-chunk ZIP completes after a lost response and 308 probe");
+      assert.equal(probes, 1, "The accepted first chunk is recovered through the status probe");
+      assert.equal(redirected, 0, "Upload credentials and data are never sent to the Location target");
+      assert.equal(realFetchUpload.hasSession(options), false);
+    } finally {
+      server.closeAllConnections();
+      await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    }
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }

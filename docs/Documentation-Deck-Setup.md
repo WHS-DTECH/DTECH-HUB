@@ -166,8 +166,11 @@ obtains a Blob for its local download, so client disk/memory capacity also matte
 Google Drive uploads use resumable sessions and 8 MiB chunks, never multipart
 bodies containing the entire archive. A retry probes the server-acknowledged offset
 before continuing the same file, including when the response to an accepted chunk
-was lost. Completion requires a matching size and MD5 checksum. Session URLs are
-kept in bounded process memory, not sent to the browser or logged; OAuth tokens
+was lost. Completion requires a matching size and MD5 checksum. Chunk/status PUTs
+use manual redirect mode: Google's HTTP 308
+Resume Incomplete (including a Location header) is an upload acknowledgement,
+not a redirect to follow. Session creation and metadata requests still reject redirects.
+Session URLs are kept in bounded process memory, not sent to the browser or logged; OAuth tokens
 are supplied per request and are not stored in the session. A server restart loses
 prepared snapshots/sessions: download a fresh ZIP; completed Drive files are
 recognised by name and checksum rather than overwritten. Partial Google upload
