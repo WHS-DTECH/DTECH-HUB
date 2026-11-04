@@ -3424,14 +3424,14 @@ function renderHaparaDashboardLink() {
     const knownRole = access?.resolved && (access.isStaff || access.isStudent);
     link.hidden = !knownRole;
     status.textContent = knownRole
-        ? "Backup: if the submission link does not open, use your Hapara dashboard."
+        ? "Open your Hapara dashboard and select the correct assessment to submit your ZIP."
         : "Sign in with your school account to show your student or staff Hapara dashboard link.";
     if (!knownRole) {
         link.removeAttribute("href");
         return;
     }
     link.href = access.isStaff ? "https://app.hapara.com/" : "https://app.hapara.com/student/";
-    link.textContent = access.isStaff ? "Open Hapara Teacher Dashboard (backup)" : "Open Hapara Student Dashboard (backup)";
+    link.textContent = access.isStaff ? "Open Hapara Teacher Dashboard" : "Open Hapara Student Dashboard";
 }
 
 function renderSubmissionStage() {

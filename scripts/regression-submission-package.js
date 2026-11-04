@@ -323,11 +323,9 @@ async function testFrontend() {
   const checklistPosition = html.indexOf('<div class="task-list-main-column">', packagePosition);
   assert.ok(packagePosition >= 0 && haparaPosition > packagePosition && haparaPosition < checklistPosition,
     "Hapara hand-in instructions follow Final Package inside the shared senior final stages");
-  assert.match(html.slice(haparaPosition, checklistPosition),
-    /href="https:\/\/bit\.ly\/3us9mgd" target="_blank" rel="noopener noreferrer"/);
+  assert.ok(!html.includes("https://bit.ly/3us9mgd"), "The public-view link must not appear in the hand-in card");
   assert.match(html.slice(haparaPosition, checklistPosition), /does not submit your assessment/);
   const source = fs.readFileSync(path.join(__dirname, "..", "task-list.js"), "utf8");
-  assert.match(html, /class="task-list-hapara-link" href="https:\/\/bit\.ly\/3us9mgd"/);
   assert.match(html, /id="task-list-hapara-dashboard" class="task-list-hapara-link task-list-hapara-backup" target="_blank" rel="noopener noreferrer" hidden/);
   assert.match(source, /window\.addEventListener\("hub-auth-state-changed", renderHaparaDashboardLink\)/,
     "Dashboard link updates when sign-in or role state changes");
@@ -373,6 +371,8 @@ async function testFrontend() {
   assert.equal(dashboard.href, "https://app.hapara.com/student/");
   assert.equal(dashboard.hidden, false);
   assert.match(dashboard.textContent, /Student Dashboard/);
+  assert.ok(!dashboard.textContent.includes("backup"), "The dashboard is now the primary hand-in route");
+  assert.ok(!document.querySelector("#task-list-hapara-dashboard-status").textContent.includes("Backup"));
   context.hubAccessState = { resolved: true, isStaff: true, isStudent: true };
   context.renderHaparaDashboardLink();
   assert.equal(dashboard.href, "https://app.hapara.com/");

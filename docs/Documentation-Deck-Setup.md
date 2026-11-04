@@ -351,7 +351,7 @@ in Google Slides before exporting if their source content changed; the package
 check cannot verify content that was never refreshed into the documentation deck.
 
 For both Level 2 and Level 3, a **Submit to Hapara** card follows Final Package.
-It links to `https://bit.ly/3us9mgd` in a new tab and reminds students to submit the
+It opens the role-appropriate Hapara dashboard in a new tab and reminds students to submit the
 combined `Final-Submission` ZIP to the correct assessment, not the GitHub-only ZIP.
 Opening the link does not mark the assessment submitted; students must confirm
 their hand-in in Hapara.
@@ -360,8 +360,8 @@ Package checklist rows show a tick for ready, a cross for missing/needs-update, 
 neutral circle for unchecked, always alongside status words. Filenames are
 purple, normal messages blue-grey, confirmed successful checks/saves green,
 and failures red-brown. A saved prior ZIP is distinguished from current readiness.
-The Hapara hand-in card has a prominent purple submission button and a contrasting
-backup dashboard button underneath. The backup uses the Hub's resolved staff/student
+The public-view shortlink is deliberately omitted because students cannot submit
+through that view. The prominent blue dashboard button uses the Hub's resolved staff/student
 classification (not the currently selected teacher/student view): staff open
 `https://app.hapara.com/`, students open `https://app.hapara.com/student/`.
 Unknown roles show a sign-in explanation rather than guessing a dashboard.
