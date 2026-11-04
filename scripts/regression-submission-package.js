@@ -283,6 +283,15 @@ async function testEndpoints() {
 }
 
 async function testFrontend() {
+  const html = fs.readFileSync(path.join(__dirname, "..", "task-list.html"), "utf8");
+  const packagePosition = html.indexOf('<h2 id="task-list-submission-title">');
+  const haparaPosition = html.indexOf('<h2 id="task-list-hapara-title">Submit to Hapara</h2>');
+  const checklistPosition = html.indexOf('<div class="task-list-main-column">', packagePosition);
+  assert.ok(packagePosition >= 0 && haparaPosition > packagePosition && haparaPosition < checklistPosition,
+    "Hapara hand-in instructions follow Final Package inside the shared senior final stages");
+  assert.match(html.slice(haparaPosition, checklistPosition),
+    /href="https:\/\/bit\.ly\/3us9mgd" target="_blank" rel="noopener noreferrer"/);
+  assert.match(html.slice(haparaPosition, checklistPosition), /does not submit your assessment/);
   const source = fs.readFileSync(path.join(__dirname, "..", "task-list.js"), "utf8");
   const elements = new Map();
   const makeElement = () => ({ hidden: false, disabled: false, textContent: "", children: [], href: "",

@@ -343,6 +343,12 @@ or completion tick is automatically changed. Linked Slides must still be updated
 in Google Slides before exporting if their source content changed; the package
 check cannot verify content that was never refreshed into the documentation deck.
 
+For both Level 2 and Level 3, a **Submit to Hapara** card follows Final Package.
+It links to `https://bit.ly/3us9mgd` in a new tab and reminds students to submit the
+combined `Final-Submission` ZIP to the correct assessment, not the GitHub-only ZIP.
+Opening the link does not mark the assessment submitted; students must confirm
+their hand-in in Hapara.
+
 Run `node scripts/regression-submission-package.js` for readiness, staleness,
 exact archive entries, unchanged inner ZIP, corrupt-input rejection, authenticated
 endpoint, saved-state, upload retry and 170 MiB streaming-package checks. A live
