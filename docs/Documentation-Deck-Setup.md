@@ -301,7 +301,12 @@ file matches its generated checksum; older records without a checksum must have
 a saved timestamp proving the Drive file has not changed, or need regeneration.
 It also checks that each
 PDF belongs to the currently linked slideshow and matches that source's version
-and modified time. A partial/missing-evidence documentation merge is not ready.
+and modified time. Missing-topic lists are warnings, not PDF or package blockers:
+some topics may intentionally not apply to a student's assessment. Students can
+convert the available documentation slides to PDF; the enabled conversion button
+is solid blue. A partial merge (available source slides still waiting to be added)
+must finish before building the final package. Missing-topic warnings remain visible
+and do not mark the assessment evidence complete.
 The GitHub ZIP must belong to a saved assessment repository and match its current
 default-branch commit. The Trello report must belong to a linked board and be no
 older than its last activity. Trello comments or other board activity can therefore

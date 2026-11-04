@@ -2768,7 +2768,7 @@ function renderDocumentationDeckState(deck, message = "") {
         }
         if (missing.length) {
             const heading = document.createElement("p");
-            heading.textContent = "Missing evidence:";
+            heading.textContent = "Missing evidence (warning only; PDF conversion is available):";
             const list = document.createElement("ul");
             missing.forEach((topic) => {
                 const item = document.createElement("li");

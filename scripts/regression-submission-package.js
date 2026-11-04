@@ -69,6 +69,11 @@ async function testPlanAndArchive() {
   const data = await fixture();
   const plan = await data.inspect();
   assert.equal(plan.ready, true);
+  data.documentationSource.documentation = { mode: "linked", readyForStage3: false, missingTopics: ["Usability", "Aesthetics"], partial: false };
+  assert.equal((await data.inspect()).ready, true, "Expected missing topics do not prevent packaging a current documentation PDF");
+  data.documentationSource.documentation.partial = true;
+  assert.equal((await data.inspect()).ready, false, "A genuinely unfinished merge must still finish adding available slides");
+  data.documentationSource.documentation.partial = false;
   assert.equal(plan.manifest.length, 4);
   assert.equal(plan.components.find((entry) => entry.key === "additional-slideshows-answer").displayStatus, "No");
   assert.equal(plan.components.find((entry) => entry.key === "additional-slideshows-pdf").displayStatus, "Not needed");

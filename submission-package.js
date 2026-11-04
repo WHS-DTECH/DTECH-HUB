@@ -108,7 +108,7 @@ async function inspectSubmissionPackage({ context, documentationSource, folderId
         const deck = definition.key === "client" ? context.copies.find((copy) => copy?.templateId === "final-client-presentation") : documentationSource;
         const sourceId = documentationPresentationId(deck?.fileUrl);
         if (!sourceId || sourceId !== record.pdfExport?.sourcePresentationId) throw new Error("Convert the currently linked slideshow to PDF first.");
-        if (definition.key === "documentation" && (deck.documentation?.partial || deck.documentation?.missingTopics?.length)) throw new Error("Complete the documentation merge before building a submission package.");
+        if (definition.key === "documentation" && deck.documentation?.partial) throw new Error("Finish adding the available documentation slides before building a submission package.");
         const live = await metadata(sourceId);
         if (live.trashed || live.mimeType !== "application/vnd.google-apps.presentation") throw new Error("The source slideshow is unavailable.");
         if (!record.pdfExport?.sourceVersion || !record.pdfExport?.sourceModifiedTime

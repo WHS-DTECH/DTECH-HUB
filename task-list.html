@@ -183,6 +183,13 @@
             margin: 0;
         }
 
+        #task-list-documentation-pdf-convert:not(:disabled) {
+            background: #236b91;
+            color: #fff;
+            border-color: #236b91;
+            font-weight: 700;
+        }
+
         .task-list-submission-files {
             list-style: none;
             padding: 0;
@@ -1353,6 +1360,7 @@
                         <p class="section-kicker">STAGE 1</p>
                         <h2 id="task-list-documentation-title">Preparing for Final Submission</h2>
                         <h3>Merge documentation</h3>
+                        <p>Missing topics are warnings, not a PDF lock. You can convert the available slides even when some topics are not required for your work.</p>
                         <div class="task-list-documentation-actions">
                             <button type="button" class="task-list-sync-drive-btn" data-documentation-merge>Merge Documentation Deck</button>
                             <a id="task-list-documentation-open" target="_blank" rel="noopener noreferrer" hidden>Open documentation deck</a>
@@ -1487,6 +1495,6 @@
 
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="script.js"></script>
-    <script src="task-list.js?v=submission-status-hapara-1"></script>
+    <script src="task-list.js?v=documentation-missing-warning-1"></script>
 </body>
 </html>

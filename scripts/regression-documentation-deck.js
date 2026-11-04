@@ -91,7 +91,7 @@ documentationContext.renderDocumentationDeckState({
 const documentationStatus = documentationDocument.querySelector("#task-list-documentation-status");
 assert.equal(documentationStatus.children[0].textContent,
   "Slides added. Some slides remain. Use Add missing slides to continue.");
-assert.equal(documentationStatus.children[1].textContent, "Missing evidence:");
+assert.equal(documentationStatus.children[1].textContent, "Missing evidence (warning only; PDF conversion is available):");
 assert.equal(documentationStatus.children[2].tagName, "ul");
 assert.deepEqual(documentationStatus.children[2].children.map((item) => item.textContent), missingTopics,
   "Each missing topic is a separate text-only bullet; commas inside topic labels are preserved");
@@ -101,6 +101,23 @@ assert.equal(documentationStatus.children.length, 0, "Resolved evidence clears t
 documentationContext.renderDocumentationDeckState(null, "Checking saved documentation...");
 assert.equal(documentationStatus.children.length, 1);
 assert.equal(documentationStatus.children[0].textContent, "Checking saved documentation...");
+
+vm.runInContext(client.slice(renderingEnd, client.indexOf("\nfunction additionalSlideshowTemplateId(", renderingEnd)), documentationContext);
+documentationContext.taskListState.templateCopies = [];
+documentationContext.taskListState.slideshowPdfBusy = { documentation: false };
+documentationContext.renderDocumentationDeckState({
+  fileUrl: slideUrl("merged"), documentation: { mode: "linked", readyForStage3: false, missingTopics }
+});
+const pdfButton = documentationDocument.querySelector("#task-list-documentation-pdf-convert");
+assert.equal(pdfButton.disabled, false, "Missing topics do not disable PDF conversion");
+documentationContext.taskListState.slideshowPdfBusy.documentation = true;
+documentationContext.renderSlideshowPdfState("documentation", slideUrl("merged"));
+assert.equal(pdfButton.disabled, true, "An active PDF conversion cannot be started twice");
+documentationContext.taskListState.slideshowPdfBusy.documentation = false;
+documentationContext.renderSlideshowPdfState("documentation", slideUrl("merged"));
+assert.equal(pdfButton.disabled, false, "Conversion unlocks when the operation finishes");
+documentationContext.renderSlideshowPdfState("documentation", "");
+assert.equal(pdfButton.disabled, true, "A slideshow is still required for PDF export");
 
 const studentEmail = "student@westlandhigh.school.nz";
 const sourceSlides = new Map([
