@@ -375,6 +375,12 @@ GitHub-only ZIPs do not send this notification. A saved notification timestamp
 prevents ordinary retries of the same saved package from sending another email;
 a newly built package sends a new notification. If notification fails, the ZIP
 remains saved, the server logs the error and the student sees an explicit warning.
+Staff can send a missing notification for an existing saved ZIP with
+`POST /api/activities/:id/submission-package/notify` and a `studentEmail` body.
+This uses Teacher/Admin authentication and the same per-student save lock and
+notification timestamp as normal saves. It does not rebuild the ZIP or require
+student Drive permission. The email retains the original package build date;
+the send timestamp is the actual current time, not backdated.
 
 Run `node scripts/regression-submission-package.js` for readiness, staleness,
 exact archive entries, unchanged inner ZIP, corrupt-input rejection, authenticated

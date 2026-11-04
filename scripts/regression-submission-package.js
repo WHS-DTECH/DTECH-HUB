@@ -242,7 +242,12 @@ async function testEndpoints() {
     getResearchReportStudentDetails: async () => ({ studentName: "Student <Name>" }),
     sendConfiguredHubEmail: async (message) => { if (emailFails) throw new Error("SMTP unavailable"); emails.push(message); },
     createSubmissionZipResponse: (options) => submission.createSubmissionZipResponse({ ...options, fetchRequest: data.fetchBinary }),
-    app: { get: (url, handler) => handlers.set(`GET ${url}`, handler), post: (url, handler) => handlers.set(`POST ${url}`, handler) },
+    app: { get: (url, handler) => handlers.set(`GET ${url}`, handler), post: (url, ...chain) => handlers.set(`POST ${url}`, chain) },
+    requireActivityWriteAccess: (req, res, next) => req.staff ? next() : res.status(403).json({ error: "Teacher/Admin access is required." }),
+    normalizeEmail: (value) => String(value).trim().toLowerCase(),
+    isSchoolEmail: (value) => value.endsWith("@westlandhigh.school.nz"),
+    hasDatabase: true,
+    pool: { query: async (_sql, params) => ({ rows: params[1] === email ? [{ template_copies: data.context.copies }] : [] }) },
     loadFinalOutcomeContext: async (req) => { if (req.email !== email) throw Object.assign(new Error("School sign-in required"), { status: 401 }); return data.context; },
     resolveOwnedFinalPreparationFolder: async (student, token) => { assert.equal(student, email); assert.equal(token, "student-token"); return "folder"; },
     getDocumentationRecord: () => data.documentationSource,
@@ -264,7 +269,15 @@ async function testEndpoints() {
   vm.runInContext(server.slice(start, end), context);
   const request = async (method, body = {}, identity = email) => {
     const res = { statusCode: 200, status(code) { this.statusCode = code; return this; }, set() { return this; }, json(value) { this.body = value; return this; } };
-    await handlers.get(`${method} /api/activities/:id/submission-package`)({ email: identity, params: { id: "49" }, body }, res);
+    const handler = handlers.get(`${method} /api/activities/:id/submission-package`);
+    await (Array.isArray(handler) ? handler[0] : handler)({ email: identity, params: { id: "49" }, body }, res);
+    return res;
+  };
+  const notify = async (studentEmail, staff = true) => {
+    const res = { statusCode: 200, status(code) { this.statusCode = code; return this; }, set() { return this; }, json(value) { this.body = value; return this; } };
+    const chain = handlers.get("POST /api/activities/:id/submission-package/notify");
+    const req = { staff, params: { id: "49" }, body: { studentEmail } };
+    await chain[0](req, res, () => chain[1](req, res));
     return res;
   };
   try {
@@ -310,6 +323,16 @@ async function testEndpoints() {
     emailFails = false;
     assert.equal((await request("POST", { action: "save", snapshotId, driveAccessToken: "student-token" })).body.emailNotification.status, "sent");
     assert.equal(emails.length, 2, "A failed email can be retried on the same saved package");
+    assert.equal((await notify(email, false)).statusCode, 403, "Students cannot trigger staff catch-up emails");
+    assert.equal((await notify("invalid")).statusCode, 400);
+    assert.equal((await notify("missing@westlandhigh.school.nz")).statusCode, 404);
+    assert.equal((await notify(email)).body.emailNotification.status, "already_sent");
+    delete data.context.copies.find((copy) => copy.templateId === "final-submission-package").submissionPackage.notifiedAt;
+    const originalBuiltAt = saved.body.saved.submissionPackage.builtAt;
+    assert.equal((await notify(email)).body.emailNotification.status, "sent");
+    assert.equal(emails.length, 3, "Staff can send a missing notification without rebuilding the package");
+    assert.match(emails[2].html, new RegExp(originalBuiltAt.replace(/\./g, "\\.")));
+    assert.equal((await notify(email)).body.emailNotification.status, "already_sent");
     data.state.sha = "b".repeat(40);
     assert.equal((await request("POST", { action: "save", snapshotId, driveAccessToken: "student-token" })).statusCode, 409);
     assert.equal(uploads.length, 1, "A newly outdated package cannot be uploaded as current");

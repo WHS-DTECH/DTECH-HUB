@@ -18332,6 +18332,42 @@ async function notifyFinalSubmissionPackage(email, activityId, saved) {
   });
 }
 
+async function sendSavedPackageNotification(email, activityId, saved) {
+  if (saved.submissionPackage.notifiedAt) return { status: "already_sent" };
+  await notifyFinalSubmissionPackage(email, activityId, saved);
+  const notified = { ...saved, submissionPackage: { ...saved.submissionPackage, notifiedAt: new Date().toISOString() } };
+  await recordTemplateCopyInDb(activityId, email, notified);
+  saved.submissionPackage.notifiedAt = notified.submissionPackage.notifiedAt;
+  return { status: "sent" };
+}
+
+app.post("/api/activities/:id/submission-package/notify", requireActivityWriteAccess, async (req, res) => {
+  try {
+    const activityId = String(req.params.id || "");
+    const email = normalizeEmail(req.body?.studentEmail || "");
+    if (!/^[A-Za-z0-9_-]{1,100}$/.test(activityId) || !isSchoolEmail(email)) {
+      throw Object.assign(new Error("A valid assessment and school student email are required."), { status: 400 });
+    }
+    if (!hasDatabase) throw Object.assign(new Error("Saved package notifications require the assessment database."), { status: 503 });
+    const emailNotification = await withFinalOutcomeLock(`${email}:${activityId}:submission-package-save`, async () => {
+      const result = await pool.query(
+        "SELECT template_copies FROM project_interests WHERE project_id = $1 AND student_email = $2 LIMIT 1",
+        [activityId, email]
+      );
+      const saved = result.rows?.[0]?.template_copies?.find((copy) => copy?.templateId === "final-submission-package");
+      if (!saved?.submissionPackage?.builtAt || !Array.isArray(saved.submissionPackage.components)
+        || !/^https:\/\/drive\.google\.com\/file\/d\/[A-Za-z0-9_-]+\/view$/.test(String(saved.fileUrl || ""))) {
+        throw Object.assign(new Error("No saved Final Package was found for this student and assessment."), { status: 404 });
+      }
+      return sendSavedPackageNotification(email, activityId, saved);
+    });
+    res.set("Cache-Control", "no-store").json({ emailNotification });
+  } catch (error) {
+    console.error("[submission-package] Catch-up notification failed:", error);
+    res.status(error.status || 500).json({ error: error.message || "Could not send the saved package notification." });
+  }
+});
+
 function publicSubmissionPlan(plan) {
   return { ready: plan.ready, manifestHash: plan.manifestHash, checkedAt: plan.checkedAt,
     components: plan.components.map(({ key, label, entryName, displayStatus, status, message, bytes }) => ({ key, label, entryName, displayStatus, status, message, bytes })) };
@@ -18417,17 +18453,12 @@ app.post("/api/activities/:id/submission-package", async (req, res) => {
           saved.submissionPackage.notifiedAt = previous.submissionPackage.notifiedAt || "";
         }
         await recordTemplateCopyInDb(activityId, email, saved);
-        let emailNotification = { status: "already_sent" };
-        if (!saved.submissionPackage.notifiedAt) {
-          try {
-            await notifyFinalSubmissionPackage(email, activityId, saved);
-            saved.submissionPackage.notifiedAt = new Date().toISOString();
-            await recordTemplateCopyInDb(activityId, email, saved);
-            emailNotification = { status: "sent" };
-          } catch (error) {
-            console.error("[submission-package] Lead Teacher notification failed:", error);
-            emailNotification = { status: "failed" };
-          }
+        let emailNotification;
+        try {
+          emailNotification = await sendSavedPackageNotification(email, activityId, saved);
+        } catch (error) {
+          console.error("[submission-package] Lead Teacher notification failed:", error);
+          emailNotification = { status: "failed" };
         }
         return { saved, reused, emailNotification };
       });
