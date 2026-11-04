@@ -11305,12 +11305,23 @@ app.post("/api/activities/:id/documentation-deck", async (req, res) => {
           destinationId: saved?.documentation?.mode === "linked" ? documentationPresentationId(saved.fileUrl) : "", sources: plan.sources
         }] })
       });
-      const payload = await response.json().catch(() => ({}));
+      const payload = await response.json();
       if (!response.ok || payload.error) {
         throw new Error(payload?.error?.details?.[0]?.errorMessage || payload?.error?.message || "The linked merge could not run. Check Apps Script deployment and Google permissions.");
       }
       const merged = payload?.response?.result;
-      if (!documentationPresentationId(merged?.fileUrl)) throw new Error("The merger did not return a valid deck link. Retry to recover the same master.");
+      if (!documentationPresentationId(merged?.fileUrl)) {
+        console.error("[documentation-merge] Invalid execution result", {
+          done: payload?.done,
+          payloadKeys: Object.keys(payload || {}),
+          responseKeys: Object.keys(payload?.response || {}),
+          resultType: typeof merged,
+          resultKeys: merged && typeof merged === "object" ? Object.keys(merged) : [],
+          linkType: typeof merged?.fileUrl,
+          isGoogleOpenLink: /^https:\/\/docs\.google\.com\/open\?/.test(String(merged?.fileUrl || ""))
+        });
+        throw new Error("The merger did not return a valid deck link. Retry to recover the same master.");
+      }
       const entry = {
         templateId: DOCUMENTATION_TEMPLATE_ID, templateTitle: "Submission Documentation",
         fileUrl: merged.fileUrl, fileName: String(merged.fileName || "Submission Documentation"),
