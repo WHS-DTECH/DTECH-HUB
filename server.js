@@ -15,7 +15,7 @@ const { LEARNING_SITES_ID, getHuntProfile, gradeLearningSites, getCourseProgramm
 const { SEARCH_RESEARCH_REPORT_FILE_NAME, resolveResearchReportTemplateId, getResearchReportProgrammeFolder, buildResearchReportReplacements, applyResearchReportReplacements, gradeResearchReport } = require("./research-report");
 const { gradeLoginSites } = require("./practical-skills-assessment");
 const { validateLoginSites, publicLoginSites, visibleLoginSites } = require("./login-sites-config");
-const { DOCUMENTATION_TEMPLATE_ID, documentationPresentationId, buildDocumentationMergePlan } = require("./documentation-deck");
+const { DOCUMENTATION_TEMPLATE_ID, documentationPresentationId, normalizeDocumentationMergeUrl, buildDocumentationMergePlan } = require("./documentation-deck");
 const { outcomeRepositories, createOutcomeArchiveStore, createGithubZipSizeReader } = require("./github-outcome");
 const { createDriveResumableUploader } = require("./drive-resumable-upload");
 const { submissionSummary, inspectSubmissionPackage, createSubmissionZipResponse } = require("./submission-package");
@@ -11310,7 +11310,8 @@ app.post("/api/activities/:id/documentation-deck", async (req, res) => {
         throw new Error(payload?.error?.details?.[0]?.errorMessage || payload?.error?.message || "The linked merge could not run. Check Apps Script deployment and Google permissions.");
       }
       const merged = payload?.response?.result;
-      if (!documentationPresentationId(merged?.fileUrl)) {
+      const mergedFileUrl = normalizeDocumentationMergeUrl(merged?.fileUrl);
+      if (!mergedFileUrl) {
         console.error("[documentation-merge] Invalid execution result", {
           done: payload?.done,
           payloadKeys: Object.keys(payload || {}),
@@ -11324,7 +11325,7 @@ app.post("/api/activities/:id/documentation-deck", async (req, res) => {
       }
       const entry = {
         templateId: DOCUMENTATION_TEMPLATE_ID, templateTitle: "Submission Documentation",
-        fileUrl: merged.fileUrl, fileName: String(merged.fileName || "Submission Documentation"),
+        fileUrl: mergedFileUrl, fileName: String(merged.fileName || "Submission Documentation"),
         processAssessmentFolderUrl: buildDriveFolderUrlFromId(setup.processAssessmentFolderId),
         documentation: {
           mode: "linked", readyForStage3: !merged.partial && plan.missingTopics.length === 0,

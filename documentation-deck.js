@@ -12,6 +12,23 @@ function documentationPresentationId(value) {
   }
 }
 
+function normalizeDocumentationMergeUrl(value) {
+  const presentationId = documentationPresentationId(value);
+  if (presentationId) return `https://docs.google.com/presentation/d/${presentationId}/edit`;
+  try {
+    const url = new URL(String(value || ""));
+    const id = url.searchParams.get("id") || "";
+    if (url.protocol === "https:" && url.hostname === "docs.google.com"
+      && !url.port && !url.username && !url.password && url.pathname === "/open"
+      && url.searchParams.getAll("id").length === 1 && /^[A-Za-z0-9_-]+$/.test(id)) {
+      return `https://docs.google.com/presentation/d/${id}/edit`;
+    }
+  } catch (_error) {
+    return "";
+  }
+  return "";
+}
+
 function isDocumentationTemplateId(value) {
   return /^(?:digital-outcome-description|target-audience|development-steps|tools-and-techniques|use-of-tools-and-techniques|trialling-components|testing-functions(?:-[a-z0-9-]+)?|project-success-criteria|relevant-digimed-conventions|user-experience-principles|relevant-implications(?:-[a-z0-9-]+)?|video-(?:conventions|integrity-testing|ux-principles)|image-integrity-testing|project-management|decomposition-tasks)$/.test(String(value || ""));
 }
@@ -48,4 +65,4 @@ function buildDocumentationMergePlan({ topics = [], copies = [], files = [], exc
   return { sources, missingTopics };
 }
 
-module.exports = { DOCUMENTATION_TEMPLATE_ID, documentationPresentationId, buildDocumentationMergePlan };
+module.exports = { DOCUMENTATION_TEMPLATE_ID, documentationPresentationId, normalizeDocumentationMergeUrl, buildDocumentationMergePlan };

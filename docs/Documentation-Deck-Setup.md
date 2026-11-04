@@ -132,6 +132,10 @@ tokens are not stored in the documentation record or Apps Script properties.
 - The master is saved directly in Process Assessment. User properties retain
   its ID for recovery if the Hub loses a response. Native source-presentation
   and source-slide IDs prevent repeat imports.
+- The merger returns a canonical Google Slides URL. The Hub also normalises
+  Google's `https://docs.google.com/open?id=...` response format from earlier
+  deployments before saving the master, so a completed merge can be recovered
+  by retrying without creating a second deck.
 - Reopening a saved deck does not merge again. Add missing slides inserts only
   missing slides in the source order; it neither rewrites existing slides nor
   refreshes their content. Use Google Slides' linked-slide Update action to

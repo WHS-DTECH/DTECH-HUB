@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 const { randomUUID, createHash } = require("node:crypto");
-const { buildDocumentationMergePlan, documentationPresentationId } = require("../documentation-deck");
+const { buildDocumentationMergePlan, documentationPresentationId, normalizeDocumentationMergeUrl } = require("../documentation-deck");
 const { outcomeRepositories } = require("../github-outcome");
 
 const slideUrl = (id) => `https://docs.google.com/presentation/d/${id}/edit`;
@@ -40,6 +40,15 @@ assert.deepEqual(buildDocumentationMergePlan({ topics, files: [], copies }).sour
 assert.equal(documentationPresentationId(slideUrl("example")), "example");
 assert.equal(documentationPresentationId("https://docs.google.com.evil.test/presentation/d/example/edit"), "");
 assert.equal(documentationPresentationId("http://docs.google.com/presentation/d/example/edit"), "");
+assert.equal(normalizeDocumentationMergeUrl(slideUrl("example")), slideUrl("example"));
+assert.equal(normalizeDocumentationMergeUrl("https://docs.google.com/open?id=example"), slideUrl("example"),
+  "Google Apps Script open links are converted to canonical Slides links");
+for (const url of ["https://docs.google.com.evil.test/open?id=example", "http://docs.google.com/open?id=example",
+  "https://user@docs.google.com/open?id=example", "https://docs.google.com:444/open?id=example",
+  "https://docs.google.com/open?id=bad%2Fid", "https://docs.google.com/open", "https://docs.google.com/open?id=a&id=b",
+  "https://drive.google.com/open?id=example", "https://docs.google.com/document/d/example/edit"]) {
+  assert.equal(normalizeDocumentationMergeUrl(url), "", url);
+}
 
 const root = path.join(__dirname, "..");
 const client = fs.readFileSync(path.join(root, "task-list.js"), "utf8");
@@ -88,7 +97,7 @@ let createdDecks = 0;
 let imports = 0;
 let failNextImport = true;
 const target = {
-  getId: () => "merged", getUrl: () => slideUrl("merged"),
+  getId: () => "merged", getUrl: () => "https://docs.google.com/open?id=merged",
   getSlides: () => targetSlides,
   getSlideById: (id) => targetSlides.find((slide) => slide.getObjectId() === id),
   saveAndClose() {},
@@ -137,6 +146,7 @@ const firstMerge = scriptContext.mergeDocumentationDeck(request);
 assert.equal(firstMerge.addedSlides, 3);
 assert.equal(firstMerge.slideCount, 3);
 assert.equal(firstMerge.partial, false);
+assert.equal(firstMerge.fileUrl, slideUrl("merged"), "The script returns a canonical Slides link regardless of Google's getUrl format");
 assert.equal(createdDecks, 1, "Retry recovers the same master and removes its persisted starter slide");
 assert.equal(scriptContext.mergeDocumentationDeck(request).addedSlides, 0, "Repeated merges do not duplicate linked slides");
 sourceSlides.get("audience").push({ id: "audience-3" });
@@ -168,7 +178,7 @@ async function testDocumentationEndpoints() {
   const endpointContext = vm.createContext({
     hasDatabase: false, memoryDocumentationDecks: new Map(),
     DOCUMENTATION_TEMPLATE_ID: "submission-documentation-deck",
-    documentationPresentationId, buildDocumentationMergePlan,
+    documentationPresentationId, normalizeDocumentationMergeUrl, buildDocumentationMergePlan,
     SCHOOL_EMAIL_DOMAIN: "westlandhigh.school.nz", process: { env: {} },
     app: { get: (url, handler) => handlers.set(`GET ${url}`, handler), post: (url, handler) => handlers.set(`POST ${url}`, handler) },
     normalizeEmail: (value) => String(value || "").trim().toLowerCase(),
@@ -190,7 +200,7 @@ async function testDocumentationEndpoints() {
       mergeRequestUrl = url;
       mergeRequestBody = JSON.parse(options.body);
       return { ok: true, json: async () => ({ response: { result: {
-        fileUrl: slideUrl("merged"), fileName: "Submission Documentation", slideCount: 2, addedSlides: 2, partial: false
+        fileUrl: "https://docs.google.com/open?id=merged", fileName: "Submission Documentation", slideCount: 2, addedSlides: 2, partial: false
       } } }) };
     }
   });
@@ -221,6 +231,7 @@ async function testDocumentationEndpoints() {
   assert.equal((await requestEndpoint("GET")).body.mergeConfigured, true);
   const merged = await requestEndpoint("POST", { action: "merge", driveAccessToken: "student-token", topics: [topics[0]] });
   assert.equal(merged.code, 200);
+  assert.equal(merged.body.deck.fileUrl, slideUrl("merged"), "Existing deployments returning Google open links are saved canonically");
   assert.equal(mergeRequestUrl, "https://script.googleapis.com/v1/scripts/configured-deployment:run",
     "The execution API receives the executable deployment ID, not the project Script ID");
   assert.equal(merged.body.deck.documentation.readyForStage3, true);

@@ -116,7 +116,7 @@ function mergeDocumentationDeck(request) {
       properties.setProperty(blankPropertyKey, "");
     }
     const slideCount = destination.getSlides().length;
-    const fileUrl = destination.getUrl();
+    const fileUrl = `https://docs.google.com/presentation/d/${destinationId}/edit`;
     destination.saveAndClose();
     return {
       fileUrl,
