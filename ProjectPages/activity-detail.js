@@ -2353,6 +2353,8 @@ async function renderUseOfToolsTechniquesPanel(host, projectId, allocation) {
     }
 
     const detectedCount = labels.filter((label) => detected[label]).length;
+    const requiredCount = ["91893", "91903"].includes(projectTaskStandard)
+        && digitalMediaType.toLowerCase() === "video" ? 2 : 3;
     const mediaLabel = digitalMediaType ? digitalMediaType.toUpperCase() : "";
     slot.innerHTML = `
         <section class="task-topic-guide-block">
@@ -2362,7 +2364,7 @@ async function renderUseOfToolsTechniquesPanel(host, projectId, allocation) {
             <ul class="list task-topic-guide-list" style="list-style:none;padding-left:0">
                 ${labels.map((label) => `<li><input type="checkbox" tabindex="-1" aria-readonly="true" style="accent-color:#1d4ed8;pointer-events:none;width:1.05rem;height:1.05rem;vertical-align:middle" ${detected[label] ? "checked" : ""}> ${escapeHtml(label)}</li>`).join("")}
             </ul>
-            ${projectTaskStandard === "91893" ? `<p class="task-topic-submission-note">Complete any 3 or more categories.</p>` : ""}
+            ${["91893", "91903"].includes(projectTaskStandard) ? `<p class="task-topic-submission-note">Complete any ${requiredCount} or more categories.</p>` : ""}
             <p class="task-topic-submission-note">Auto-detected from your GitHub repo where possible. Click Sync from GitHub on the Task List to refresh these boxes.</p>
         </section>
     `;

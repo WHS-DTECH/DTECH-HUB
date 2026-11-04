@@ -350,6 +350,12 @@ or completion tick is automatically changed. Linked Slides must still be updated
 in Google Slides before exporting if their source content changed; the package
 check cannot verify content that was never refreshed into the documentation deck.
 
+For the Using Tools & Techniques criterion (91893/91903), Video allocations need
+any two technique categories plus use of the evidence template for the automatic
+tick. Web, Image and unspecified media retain the three-category requirement.
+The Task List instructions, tooltip and activity-page category guidance follow
+this rule; conventions, UX principles and efficient-tools requirements are unchanged.
+
 For both Level 2 and Level 3, a **Submit to Hapara** card follows Final Package.
 It opens the role-appropriate Hapara dashboard in a new tab and reminds students to submit the
 combined `Final-Submission` ZIP to the correct assessment, not the GitHub-only ZIP.

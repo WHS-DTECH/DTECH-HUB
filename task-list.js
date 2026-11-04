@@ -2114,6 +2114,11 @@ function isUseOfToolsTechniquesRequirementStep(standard, text) {
         && /^(?:using appropriate tools and techniques for the purpose and end users|applying appropriate tools and techniques to meet the purpose and end-user requirements)\.?$/.test(normalizedText);
 }
 
+function getToolsTechniquesRequiredCount(standard) {
+    return ["91893", "91903"].includes(String(standard || "").trim())
+        && String(getAllocatedDigitalMediaType(standard) || "").trim().toLowerCase() === "video" ? 2 : 3;
+}
+
 function autoTickUseOfToolsTechniquesRequirement(stateMap, templateCopies) {
     const hasUsedTemplate = (Array.isArray(templateCopies) ? templateCopies : [])
         .some((copy) => String(copy?.templateId || "").trim().toLowerCase() === "use-of-tools-and-techniques");
@@ -2129,7 +2134,7 @@ function autoTickUseOfToolsTechniquesRequirement(stateMap, templateCopies) {
             const match = String(step?.text || "").match(/^DIGIMED_TOOLS_TECHNIQUES_ACK\|(.+)\|true$/i);
             return match?.[1]?.trim() === label;
         })).length;
-        const shouldBeDone = hasUsedTemplate && detectedCount >= 3;
+        const shouldBeDone = hasUsedTemplate && detectedCount >= getToolsTechniquesRequiredCount(standard);
         const rows = Array.isArray(stateMap?.[standard]) ? stateMap[standard] : [];
         rows.forEach((row) => {
             if (!isUseOfToolsTechniquesRequirementStep(standard, row?.text || "")) return;
@@ -3872,6 +3877,7 @@ function renderChecklistCards(detail, allItems) {
                                     && /iterative improvement throughout the design, development and testing process/i.test(stepText);
                                 const digitalMediaType = getAllocatedDigitalMediaType(standard).toLowerCase();
                                 const isVideoMedia = digitalMediaType === "video";
+                                const toolsTechniquesRequiredWord = getToolsTechniquesRequiredCount(standard) === 2 ? "two" : "three";
                                 const isImageMedia = digitalMediaType === "image" || digitalMediaType === "graphics" || digitalMediaType === "vector";
                                 const toolsAndTechniquesLabel = isVideoMedia ? "Tools & Techniques (VIDEO)" : isImageMedia ? "Tools & Techniques (IMAGE)" : "Tools & Techniques (WEB)";
                                 const conventionsSubtask = is91893ConventionsRow ? getDigiMedConventionsSubtask(taskListState.fullEvidenceState, digitalMediaType) : null;
@@ -3912,7 +3918,7 @@ function renderChecklistCards(detail, allItems) {
                                 return `
                                 <div class="task-list-step-row ${isInformationalRow ? "is-informational" : ""} ${isLinkedRelevantImplicationsRow || isLinkedTestingImprovementRow || isApplyingRelevantConventionsRow || isNonTickableUXPrinciplesMeritRow ? "is-linked-relevant-implications" : ""} ${is91893EfficientToolsRow ? "is-linked-efficient-tools" : ""} ${needsEvidence ? "is-needs-evidence" : ""}">
                                     <label class="task-list-step-check-wrap">
-                                        ${isInformationalRow || isNonTickableRelevantImplicationsRow91893 || isApplyingRelevantConventionsRow || isNonTickableIntegrityTestingRow || isNonTickableUXPrinciplesMeritRow ? "" : `<input type="checkbox" class="${isUseOfToolsTechniquesRequirement || isUXPrinciplesRequirement || isWebConventionsRequirement || isWebIntegrityRequirement ? "is-auto-complete" : ""}" ${isRowChecked ? "checked" : ""} ${isUseOfToolsTechniquesRequirement ? "disabled title=\"Requires at least three checked subtasks and Use of Tools & Techniques template\"" : isUXPrinciplesRequirement ? "disabled title=\"Requires at least three UX principles to be identified and applied\"" : isWebConventionsRequirement ? "disabled title=\"Requires at least three conventions for your media type to be applied\"" : isWebIntegrityRequirement ? "disabled title=\"Automatically checked when the Integrity & Validation template has been used\"" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">`}
+                                        ${isInformationalRow || isNonTickableRelevantImplicationsRow91893 || isApplyingRelevantConventionsRow || isNonTickableIntegrityTestingRow || isNonTickableUXPrinciplesMeritRow ? "" : `<input type="checkbox" class="${isUseOfToolsTechniquesRequirement || isUXPrinciplesRequirement || isWebConventionsRequirement || isWebIntegrityRequirement ? "is-auto-complete" : ""}" ${isRowChecked ? "checked" : ""} ${isUseOfToolsTechniquesRequirement ? `disabled title="Requires at least ${toolsTechniquesRequiredWord} checked subtasks and Use of Tools &amp; Techniques template"` : isUXPrinciplesRequirement ? "disabled title=\"Requires at least three UX principles to be identified and applied\"" : isWebConventionsRequirement ? "disabled title=\"Requires at least three conventions for your media type to be applied\"" : isWebIntegrityRequirement ? "disabled title=\"Automatically checked when the Integrity & Validation template has been used\"" : ""} data-step-check="${escapeTaskListHtml(standard)}:${index}">`}
                                         ${rowText}
                                     </label>
                                     ${is91893ToolsAndTechniquesRow ? `
@@ -3933,7 +3939,7 @@ function renderChecklistCards(detail, allItems) {
                                                     </label>
                                                 `).join("")}
                                             </div>
-                                            ${String(standard) === "91893" || String(standard) === "91903" ? `<p class="task-list-achieved-note">You must include three of the items listed. (${toolsTechniquesSubtasksList.filter((subtask) => toolsTechniquesState[subtask]).length}/${toolsTechniquesSubtasksList.length} detected.)</p><p class="task-list-achieved-note">Auto-detected from your GitHub repo where possible \u2014 click Sync from GitHub above to check these boxes.</p>` : ""}
+                                            ${String(standard) === "91893" || String(standard) === "91903" ? `<p class="task-list-achieved-note">You must include ${toolsTechniquesRequiredWord} of the items listed. (${toolsTechniquesSubtasksList.filter((subtask) => toolsTechniquesState[subtask]).length}/${toolsTechniquesSubtasksList.length} detected.)</p><p class="task-list-achieved-note">Auto-detected from your GitHub repo where possible \u2014 click Sync from GitHub above to check these boxes.</p>` : ""}
                                         </div>
                                     ` : ""}
                                     ${is91893EfficientToolsRow ? `

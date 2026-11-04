@@ -16,6 +16,52 @@ const teacherStudentWork = fs.readFileSync(path.join(root, "teacher-student-work
 const standardCard = fs.readFileSync(path.join(root, "assessment-standard-card.js"), "utf8");
 
 {
+    const start = taskList.indexOf("function isUseOfToolsTechniquesRequirementStep(");
+    const end = taskList.indexOf("\nfunction ", taskList.indexOf("function autoTickUseOfToolsTechniquesRequirement(", start) + 1);
+    let mediaType = "video";
+    let local = {};
+    const labels = ["First", "Second", "Third", "Fourth"];
+    const context = vm.createContext({
+        taskListState: { selectedId: "49" },
+        getTaskListEmail: () => "student@example.test",
+        getAllocatedDigitalMediaType: () => mediaType,
+        stripStepLevel: (text) => text.replace(/^Achieved:\s*/, ""),
+        readDigiMedToolsTechniquesState: () => local,
+        DIGIMED_TOOLS_TECHNIQUES_EVIDENCE_STANDARD: "digimed-tools-techniques",
+        DIGIMED_TOOLS_TECHNIQUES_SUBTASKS: labels,
+        DIGIMED_L3_TOOLS_TECHNIQUES_SUBTASKS: labels
+    });
+    vm.runInContext(taskList.slice(start, end), context);
+    for (const standard of ["91893", "91903"]) {
+        for (const type of ["video", " Video ", "web", "image", "graphics", "", "audio"]) {
+            mediaType = type;
+            const required = type.trim().toLowerCase() === "video" ? 2 : 3;
+            assert.equal(context.getToolsTechniquesRequiredCount(standard), required);
+            for (const count of [1, 2, 3]) {
+                for (const databaseEvidence of [false, true]) {
+                    local = databaseEvidence ? {} : Object.fromEntries(labels.slice(0, count).map((label) => [label, true]));
+                    const row = { text: standard === "91893"
+                        ? "Achieved: Using appropriate tools and techniques for the purpose and end users."
+                        : "Achieved: Applying appropriate tools and techniques to meet the purpose and end-user requirements.", done: true };
+                    const state = { [standard]: [row], "digimed-tools-techniques": databaseEvidence
+                        ? labels.slice(0, count).map((label) => ({ text: `DIGIMED_TOOLS_TECHNIQUES_ACK|${label}|true` })) : [] };
+                    context.autoTickUseOfToolsTechniquesRequirement(state, [{ templateId: "use-of-tools-and-techniques" }]);
+                    assert.equal(row.done, count >= required, `${standard}/${type}/${count}, database=${databaseEvidence}`);
+                    context.autoTickUseOfToolsTechniquesRequirement(state, []);
+                    assert.equal(row.done, false, "The evidence template is still required");
+                }
+            }
+        }
+    }
+    mediaType = "video";
+    assert.equal(context.getToolsTechniquesRequiredCount("91897"), 3, "Other standards do not receive the video exception");
+    assert.match(taskList, /You must include \$\{toolsTechniquesRequiredWord\} of the items listed/);
+    assert.match(taskList, /Requires at least \$\{toolsTechniquesRequiredWord\} checked subtasks/);
+    assert.match(activityDetail, /digitalMediaType\.toLowerCase\(\) === "video" \? 2 : 3/);
+    assert.match(activityDetail, /Complete any \$\{requiredCount\} or more categories/);
+}
+
+{
     const extractFunction = (source, name) => {
         const start = source.indexOf(`function ${name}(`);
         const end = source.indexOf("\nfunction ", start + 1);
@@ -908,6 +954,7 @@ const useToolsContext = vm.createContext({
     DIGIMED_TOOLS_TECHNIQUES_SUBTASKS: ["one", "two", "three", "four"],
     DIGIMED_L3_TOOLS_TECHNIQUES_SUBTASKS: ["one", "two", "three", "four", "five", "six", "seven"],
     taskListState: useToolsTaskState,
+    getAllocatedDigitalMediaType: () => "web",
     getTaskListEmail: () => "student@example.test",
     readDigiMedToolsTechniquesState: () => useToolsState,
     stripStepLevel: (text) => String(text || "").replace(/^(Achieved|Merit|Excellence):\s*/i, "").trim(),
@@ -1289,6 +1336,8 @@ const renderContext = vm.createContext({
 const renderStart = taskList.indexOf("function renderChecklistCards(");
 const renderEnd = taskList.indexOf("function getStandardCodes(", renderStart);
 vm.runInContext(taskList.slice(renderStart, renderEnd), renderContext);
+vm.runInContext(taskList.slice(taskList.indexOf("function getToolsTechniquesRequiredCount("),
+    taskList.indexOf("function autoTickUseOfToolsTechniquesRequirement(")), renderContext);
 Object.assign(renderContext, {
     getStepLevel: context.getStepLevel,
     stripStepLevel: context.stripStepLevel,
