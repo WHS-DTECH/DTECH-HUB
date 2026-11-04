@@ -163,6 +163,7 @@ async function testDocumentationEndpoints() {
   const handlers = new Map();
   const driveCalls = [];
   let mergeRequestBody = null;
+  let mergeRequestUrl = "";
   let programme = "SeniorDTECH";
   const endpointContext = vm.createContext({
     hasDatabase: false, memoryDocumentationDecks: new Map(),
@@ -185,7 +186,8 @@ async function testDocumentationEndpoints() {
     driveListSlidesInProcessAssessmentTree: async () => [{ id: "audience", name: "Target Audience" }],
     inferTemplateCopyFromFileName: () => ({ templateId: "target-audience" }),
     buildDriveFolderUrlFromId: (id) => `https://drive.google.com/drive/folders/${id}`,
-    fetch: async (_url, options) => {
+    fetch: async (url, options) => {
+      mergeRequestUrl = url;
       mergeRequestBody = JSON.parse(options.body);
       return { ok: true, json: async () => ({ response: { result: {
         fileUrl: slideUrl("merged"), fileName: "Submission Documentation", slideCount: 2, addedSlides: 2, partial: false
@@ -214,8 +216,13 @@ async function testDocumentationEndpoints() {
   assert.equal((await requestEndpoint("POST", { action: "add", driveAccessToken: "student-token" })).code, 409,
     "Add missing slides never overwrites a manually assembled documentation deck");
   endpointContext.process.env.DOCUMENTATION_MERGE_SCRIPT_ID = "configured-script";
+  assert.equal(endpointContext.getDocumentationMergeDeploymentId(), "configured-script", "Legacy configuration remains supported");
+  endpointContext.process.env.DOCUMENTATION_MERGE_DEPLOYMENT_ID = "configured-deployment";
+  assert.equal((await requestEndpoint("GET")).body.mergeConfigured, true);
   const merged = await requestEndpoint("POST", { action: "merge", driveAccessToken: "student-token", topics: [topics[0]] });
   assert.equal(merged.code, 200);
+  assert.equal(mergeRequestUrl, "https://script.googleapis.com/v1/scripts/configured-deployment:run",
+    "The execution API receives the executable deployment ID, not the project Script ID");
   assert.equal(merged.body.deck.documentation.readyForStage3, true);
   assert.equal(merged.body.deck.documentation.mode, "linked");
   assert.equal(mergeRequestBody.parameters[0].destinationId, "", "The synced existing deck is never passed as a merge target");

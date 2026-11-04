@@ -104,9 +104,12 @@ It must execute as the student, not as a teacher or service account.
    authorised school users can execute that deployed version. This is not a
    public web app and must not run as its owner. The executing account must be
    able to access the script and its own source and destination Drive files.
-6. Set `DOCUMENTATION_MERGE_SCRIPT_ID` on Render to the project's **Script ID**
-   from Project Settings, not the deployment ID or a web-app URL. Restart or
-   redeploy the Hub. Future script changes also need a new deployed version.
+6. Set `DOCUMENTATION_MERGE_DEPLOYMENT_ID` on Render to the API executable's
+   **Deployment ID** from Deploy > Manage deployments, not the Script ID in
+   Project Settings or a web-app URL. Restart or redeploy the Hub. Future script
+   changes also need a new deployed version. The legacy environment variable
+   `DOCUMENTATION_MERGE_SCRIPT_ID` remains a fallback, but its value must also
+   be the executable deployment ID; the new variable takes precedence.
 7. Test with a school test-student account that owns a
    `SeniorDTECH/Process Assessment` folder. Approve the extra presentation
    permission when prompted by Merge Documentation Deck.

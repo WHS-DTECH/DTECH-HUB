@@ -11221,6 +11221,10 @@ async function saveDocumentationRecord(activityId, email, entry) {
   if (!hasDatabase) memoryDocumentationDecks.set(`${email}:${activityId}`, entry);
 }
 
+function getDocumentationMergeDeploymentId() {
+  return String(process.env.DOCUMENTATION_MERGE_DEPLOYMENT_ID || process.env.DOCUMENTATION_MERGE_SCRIPT_ID || "").trim();
+}
+
 app.get("/api/activities/:id/documentation-deck", async (req, res) => {
   const email = normalizeEmail(getRequestUserEmail(req));
   if (!email || !email.endsWith(`@${SCHOOL_EMAIL_DOMAIN}`)) { res.status(401).json({ error: "School sign-in required." }); return; }
@@ -11228,7 +11232,7 @@ app.get("/api/activities/:id/documentation-deck", async (req, res) => {
   if (!/^[A-Za-z0-9_-]+$/.test(activityId)) { res.status(400).json({ error: "A valid assessment ID is required." }); return; }
   try {
     if (await getStudentProgrammeFolder(email) !== "SeniorDTECH") { res.status(403).json({ error: "This stage is for SeniorDTECH." }); return; }
-    res.json({ deck: getDocumentationRecord(await loadDocumentationCopies(activityId, email)), mergeConfigured: Boolean(process.env.DOCUMENTATION_MERGE_SCRIPT_ID) });
+    res.json({ deck: getDocumentationRecord(await loadDocumentationCopies(activityId, email)), mergeConfigured: Boolean(getDocumentationMergeDeploymentId()) });
   } catch (error) {
     res.status(error.status || 500).json({ error: error.message || "Could not load your documentation deck." });
   }
@@ -11282,8 +11286,8 @@ app.post("/api/activities/:id/documentation-deck", async (req, res) => {
         return { deck: entry };
       }
 
-      const scriptId = String(process.env.DOCUMENTATION_MERGE_SCRIPT_ID || "").trim();
-      if (!scriptId) {
+      const deploymentId = getDocumentationMergeDeploymentId();
+      if (!deploymentId) {
         const error = new Error("Automatic linked merging needs the school Apps Script deployment. Google Sync an existing documentation deck is available meanwhile.");
         error.status = 503; throw error;
       }
@@ -11293,7 +11297,7 @@ app.post("/api/activities/:id/documentation-deck", async (req, res) => {
       const files = inventory.map((file) => ({ ...file, templateId: inferTemplateCopyFromFileName(file.name)?.templateId || "" }));
       const plan = buildDocumentationMergePlan({ topics: Array.isArray(req.body?.topics) ? req.body.topics : [], copies, files });
       if (!plan.sources.length) { const error = new Error("No matching written-evidence decks were found in your Process Assessment folder. Link an existing deck or sync your evidence first."); error.status = 400; throw error; }
-      const response = await fetch(`https://script.googleapis.com/v1/scripts/${encodeURIComponent(scriptId)}:run`, {
+      const response = await fetch(`https://script.googleapis.com/v1/scripts/${encodeURIComponent(deploymentId)}:run`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ function: "mergeDocumentationDeck", devMode: false, parameters: [{
