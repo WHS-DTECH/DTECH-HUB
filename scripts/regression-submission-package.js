@@ -230,10 +230,17 @@ async function testEndpoints() {
   const store = createOutcomeArchiveStore({});
   const handlers = new Map();
   const uploads = [];
+  const emails = [];
+  const notificationErrors = [];
+  let emailFails = false;
   let existing = null;
   const server = fs.readFileSync(path.join(__dirname, "..", "server.js"), "utf8");
   const context = vm.createContext({
     ...submission, ...data.dependencies, randomUUID, outcomeArchiveStore: store,
+    console: { error: (...args) => notificationErrors.push(args) },
+    getPracticalSkillsCertificateTeacherRecipients: async () => ["lead@school.test", email],
+    getResearchReportStudentDetails: async () => ({ studentName: "Student <Name>" }),
+    sendConfiguredHubEmail: async (message) => { if (emailFails) throw new Error("SMTP unavailable"); emails.push(message); },
     createSubmissionZipResponse: (options) => submission.createSubmissionZipResponse({ ...options, fetchRequest: data.fetchBinary }),
     app: { get: (url, handler) => handlers.set(`GET ${url}`, handler), post: (url, handler) => handlers.set(`POST ${url}`, handler) },
     loadFinalOutcomeContext: async (req) => { if (req.email !== email) throw Object.assign(new Error("School sign-in required"), { status: 401 }); return data.context; },
@@ -252,7 +259,7 @@ async function testEndpoints() {
     buildDriveFolderUrlFromId: (id) => `https://drive.google.com/drive/folders/${id}`,
     recordTemplateCopyInDb: async (_id, _email, entry) => { data.context.copies = data.context.copies.filter((copy) => copy.templateId !== entry.templateId).concat(entry); }
   });
-  const start = server.indexOf("function publicSubmissionPlan(");
+  const start = server.indexOf("async function notifyFinalSubmissionPackage(");
   const end = server.indexOf("const outcomeArchiveStore = ", start);
   vm.runInContext(server.slice(start, end), context);
   const request = async (method, body = {}, identity = email) => {
@@ -270,17 +277,39 @@ async function testEndpoints() {
     assert.equal((await request("POST", { action: "prepare", manifestHash: "old", driveAccessToken: "student-token" })).statusCode, 409);
     const prepared = await request("POST", { action: "prepare", manifestHash: checked.body.manifestHash, driveAccessToken: "student-token" });
     assert.equal(prepared.statusCode, 200);
+    assert.equal(emails.length, 0, "Checking and preparing never notify teachers");
     assert.match(prepared.body.snapshot.fileName, /^Final-Submission-student-Task-49-\d{4}-\d{2}-\d{2}T[\d-]+Z\.zip$/,
       "The combined package uses a student/task/date filename, not a UUID or GitHub outcome label");
     const snapshotId = prepared.body.snapshot.snapshotId;
     const saved = await request("POST", { action: "save", snapshotId, driveAccessToken: "student-token" });
     assert.equal(saved.statusCode, 200);
     assert.equal(saved.body.saved.submissionPackage.components.length, 4);
+    assert.equal(saved.body.emailNotification.status, "sent");
+    assert.ok(saved.body.saved.submissionPackage.notifiedAt);
+    assert.equal(emails.length, 1);
+    assert.deepEqual(Array.from(emails[0].to), ["lead@school.test"]);
+    assert.equal(emails[0].emailType, "final_submission_package");
+    assert.match(emails[0].html, /Student &lt;Name&gt;/);
+    assert.match(emails[0].html, /Task-List-Documentation.pdf/);
+    assert.match(emails[0].html, /not submission to Hapara/);
+    assert.match(emails[0].html, /https:\/\/drive.google.com\/file\/d\/submission-zip\/view/);
+    assert.equal(emails[0].attachment, undefined, "Email links to the ZIP, not a large attachment");
     assert.equal(uploads[0].folderId, "folder");
     assert.equal(uploads[0].buffer, undefined);
     assert.equal((await request("GET")).body.saved.fileUrl, fileUrl("submission-zip"));
     assert.equal((await request("POST", { action: "save", snapshotId, driveAccessToken: "student-token" })).body.reused, true);
     assert.equal(uploads.length, 1);
+    assert.equal(emails.length, 1, "Retrying the same saved package does not email again");
+    delete data.context.copies.find((copy) => copy.templateId === "final-submission-package").submissionPackage.notifiedAt;
+    emailFails = true;
+    const failedNotification = await request("POST", { action: "save", snapshotId, driveAccessToken: "student-token" });
+    assert.equal(failedNotification.statusCode, 200, "An email failure does not invalidate a saved ZIP");
+    assert.equal(failedNotification.body.emailNotification.status, "failed");
+    assert.equal(notificationErrors.length, 1, "Notification failure is logged");
+    assert.ok(!failedNotification.body.saved.submissionPackage.notifiedAt);
+    emailFails = false;
+    assert.equal((await request("POST", { action: "save", snapshotId, driveAccessToken: "student-token" })).body.emailNotification.status, "sent");
+    assert.equal(emails.length, 2, "A failed email can be retried on the same saved package");
     data.state.sha = "b".repeat(40);
     assert.equal((await request("POST", { action: "save", snapshotId, driveAccessToken: "student-token" })).statusCode, 409);
     assert.equal(uploads.length, 1, "A newly outdated package cannot be uploaded as current");
@@ -315,6 +344,7 @@ async function testFrontend() {
   const state = { selectedId: "49", allItems: [{ id: "49" }], submissionBusy: false };
   const actions = [];
   let failSave = false;
+  let emailNotificationFails = false;
   let outdated = false;
   let ready = true;
   const context = vm.createContext({
@@ -330,7 +360,9 @@ async function testFrontend() {
       if (body.action === "prepare") return { ok: true, json: async () => ({ snapshot: { snapshotId: "prepared", expiresAt: Date.now() + 3600000 } }) };
       assert.equal(body.snapshotId, "prepared");
       return { ok: !failSave && !outdated, status: outdated ? 409 : 503,
-        json: async () => outdated ? { error: "The final files changed. Check files again." } : failSave ? { error: "Drive unavailable" } : { saved } };
+        json: async () => outdated ? { error: "The final files changed. Check files again." } : failSave ? { error: "Drive unavailable" } : {
+          saved, emailNotification: { status: emailNotificationFails ? "failed" : "sent" }
+        } };
     }
   });
   const start = source.indexOf("function renderHaparaDashboardLink(");
@@ -399,6 +431,12 @@ async function testFrontend() {
   failSave = false;
   await context.handleSubmissionStageAction("retry");
   assert.deepEqual(actions, ["permission", "save"], "Retry saves the same package without rebuilding");
+  emailNotificationFails = true;
+  await context.handleSubmissionStageAction("build");
+  assert.match(state.submissionStage.message, /Your ZIP is saved, but the Lead Teacher email notification failed/);
+  assert.equal(document.querySelector("#task-list-submission-open").hidden, false, "Saved ZIP remains available when email fails");
+  assert.equal(document.querySelector("#task-list-submission-status").className, "is-error");
+  emailNotificationFails = false;
   outdated = true;
   await context.handleSubmissionStageAction("build");
   assert.equal(state.submissionStage.ready, false);

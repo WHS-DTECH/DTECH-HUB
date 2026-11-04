@@ -366,6 +366,16 @@ classification (not the currently selected teacher/student view): staff open
 `https://app.hapara.com/`, students open `https://app.hapara.com/student/`.
 Unknown roles show a sign-in explanation rather than guessing a dashboard.
 
+After a combined Final Package has been uploaded, rechecked and recorded, the
+Hub emails its existing DTECH-HUB Lead Teacher recipients using the configured
+SMTP service. The email identifies the student and assessment, lists the packaged
+files and links to the ZIP (without changing Drive sharing or attaching the ZIP).
+It explicitly does not confirm Hapara submission. Checks, preparation and
+GitHub-only ZIPs do not send this notification. A saved notification timestamp
+prevents ordinary retries of the same saved package from sending another email;
+a newly built package sends a new notification. If notification fails, the ZIP
+remains saved, the server logs the error and the student sees an explicit warning.
+
 Run `node scripts/regression-submission-package.js` for readiness, staleness,
 exact archive entries, unchanged inner ZIP, corrupt-input rejection, authenticated
 endpoint, saved-state, upload retry and 170 MiB streaming-package checks. A live

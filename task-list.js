@@ -3569,6 +3569,10 @@ async function handleSubmissionStageAction(action) {
         state.retryDriveSave = false;
         state.messageTone = "is-success";
         state.message = "Combined final submission ZIP saved in SeniorDTECH / Process Assessment. Use Open saved final submission ZIP (all files) to download it, not the Stage 2 GitHub-only ZIP. No assessment was submitted.";
+        if (saved.emailNotification?.status === "failed") {
+            state.messageTone = "is-error";
+            state.message += " Your ZIP is saved, but the Lead Teacher email notification failed. Please let your teacher know.";
+        }
     } catch (error) {
         state.messageTone = "is-error";
         if (error.status === 409 || error.status === 410) {

@@ -6490,6 +6490,7 @@ async function recordTemplateCopyInDb(projectId, studentEmail, entry) {
       submissionPackage: {
         manifestHash: String(entry?.submissionPackage?.manifestHash || ""),
         builtAt: String(entry?.submissionPackage?.builtAt || ""), bytes: Number(entry?.submissionPackage?.bytes || 0),
+        notifiedAt: String(entry?.submissionPackage?.notifiedAt || ""),
         components: (Array.isArray(entry?.submissionPackage?.components) ? entry.submissionPackage.components : []).map((component) => ({
           key: String(component.key || ""), entryName: String(component.entryName || ""), fileId: String(component.fileId || ""),
           bytes: Number(component.bytes || 0), md5Checksum: String(component.md5Checksum || ""), modifiedTime: String(component.modifiedTime || ""),
@@ -18314,6 +18315,23 @@ app.post("/api/activities/:id/trello-report", async (req, res) => {
   }
 });
 
+async function notifyFinalSubmissionPackage(email, activityId, saved) {
+  const recipients = (await getPracticalSkillsCertificateTeacherRecipients()).filter((recipient) => recipient !== email);
+  if (!recipients.length) throw new Error("No Hub Lead Teacher email recipients are configured.");
+  const { studentName } = await getResearchReportStudentDetails(email);
+  const safe = (value) => String(value || "").replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[character]));
+  const name = studentName || email;
+  const files = saved.submissionPackage.components.map((component) => `<li>${safe(component.entryName)}</li>`).join("");
+  await sendConfiguredHubEmail({
+    to: recipients,
+    subject: `[DTECH HUB] Final Package saved - ${name.replace(/[\r\n]+/g, " ")} - Task ${activityId}`,
+    html: `<div style="font-family:Arial,sans-serif"><h2>Final Submission Package saved</h2><p><strong>${safe(name)}</strong> (${safe(email)}) has built and saved their combined Final Package for assessment ${safe(activityId)}.</p><p>Package: ${safe(saved.fileName)}</p><p>Built: ${safe(saved.submissionPackage.builtAt)}</p><ul>${files}</ul><p><a href="${safe(saved.fileUrl)}">Open Final Package in Google Drive</a> (normal Drive permissions apply).</p><p>This confirms package creation only, not submission to Hapara.</p></div>`,
+    emailType: "final_submission_package"
+  });
+}
+
 function publicSubmissionPlan(plan) {
   return { ready: plan.ready, manifestHash: plan.manifestHash, checkedAt: plan.checkedAt,
     components: plan.components.map(({ key, label, entryName, displayStatus, status, message, bytes }) => ({ key, label, entryName, displayStatus, status, message, bytes })) };
@@ -18388,13 +18406,30 @@ app.post("/api/activities/:id/submission-package", async (req, res) => {
           }
         }
         if (!file) file = await outcomeDriveUploader.upload(uploadOptions);
-        const final = await checkSubmissionInputs(await loadFinalOutcomeContext(req), token);
+        const latestContext = await loadFinalOutcomeContext(req);
+        const final = await checkSubmissionInputs(latestContext, token);
         if (!final.plan.ready || final.plan.manifestHash !== archive.submission.manifestHash) throw Object.assign(new Error("The source files changed during upload. An older snapshot may be in Drive; check files and build a new package."), { status: 409 });
         const saved = { templateId: "final-submission-package", templateTitle: "Submission ZIP", fileName: archive.fileName,
           fileUrl: `https://drive.google.com/file/d/${encodeURIComponent(file.id)}/view`, processAssessmentFolderUrl: buildDriveFolderUrlFromId(folderId),
           submissionPackage: { ...archive.submission, bytes: archive.bytes } };
+        const previous = latestContext.copies.find((copy) => copy?.templateId === "final-submission-package");
+        if (previous?.fileUrl === saved.fileUrl && previous?.submissionPackage?.builtAt === saved.submissionPackage.builtAt) {
+          saved.submissionPackage.notifiedAt = previous.submissionPackage.notifiedAt || "";
+        }
         await recordTemplateCopyInDb(activityId, email, saved);
-        return { saved, reused };
+        let emailNotification = { status: "already_sent" };
+        if (!saved.submissionPackage.notifiedAt) {
+          try {
+            await notifyFinalSubmissionPackage(email, activityId, saved);
+            saved.submissionPackage.notifiedAt = new Date().toISOString();
+            await recordTemplateCopyInDb(activityId, email, saved);
+            emailNotification = { status: "sent" };
+          } catch (error) {
+            console.error("[submission-package] Lead Teacher notification failed:", error);
+            emailNotification = { status: "failed" };
+          }
+        }
+        return { saved, reused, emailNotification };
       });
     } finally { lease.release(); }
     res.set("Cache-Control", "no-store").json(result);
