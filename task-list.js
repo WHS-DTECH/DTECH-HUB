@@ -3416,6 +3416,24 @@ async function handleTrelloReportAction(action) {
     }
 }
 
+function renderHaparaDashboardLink() {
+    const link = document.querySelector("#task-list-hapara-dashboard");
+    const status = document.querySelector("#task-list-hapara-dashboard-status");
+    if (!link || !status) return;
+    const access = typeof hubAccessState === "undefined" ? null : hubAccessState;
+    const knownRole = access?.resolved && (access.isStaff || access.isStudent);
+    link.hidden = !knownRole;
+    status.textContent = knownRole
+        ? "Backup: if the submission link does not open, use your Hapara dashboard."
+        : "Sign in with your school account to show your student or staff Hapara dashboard link.";
+    if (!knownRole) {
+        link.removeAttribute("href");
+        return;
+    }
+    link.href = access.isStaff ? "https://app.hapara.com/" : "https://app.hapara.com/student/";
+    link.textContent = access.isStaff ? "Open Hapara Teacher Dashboard (backup)" : "Open Hapara Student Dashboard (backup)";
+}
+
 function renderSubmissionStage() {
     const state = taskListState.submissionStage;
     const list = document.querySelector("#task-list-submission-files");
@@ -3425,12 +3443,20 @@ function renderSubmissionStage() {
     state.components.forEach((component) => {
         const row = document.createElement("li");
         const label = document.createElement("span");
-        label.textContent = component.entryName ? `${component.label} (${component.entryName})` : component.label;
+        label.textContent = component.label;
         label.title = component.entryName || "";
         const status = document.createElement("span");
-        status.className = `task-list-submission-file-status${component.status === "ready" ? " is-ready" : component.status === "needs-update" ? " needs-update" : ""}`;
-        status.textContent = component.displayStatus || labels[component.status] || "Not checked";
+        const failed = component.status === "missing" || component.status === "needs-update";
+        const marker = component.status === "ready" ? "\u2713" : failed ? "\u2717" : "\u25cb";
+        status.className = `task-list-submission-file-status${component.status === "ready" ? " is-ready" : failed ? " needs-update" : ""}`;
+        status.textContent = `${marker} ${component.displayStatus || labels[component.status] || "Not checked"}`;
         row.append(label, status);
+        if (component.entryName) {
+            const filename = document.createElement("span");
+            filename.className = "task-list-submission-file-name";
+            filename.textContent = component.entryName;
+            row.append(filename);
+        }
         if (component.message && component.message !== "Ready") {
             const detail = document.createElement("span");
             detail.className = "task-list-submission-file-status";
@@ -3449,10 +3475,16 @@ function renderSubmissionStage() {
     link.hidden = !url;
     if (url) link.href = url;
     const date = new Date(state.saved?.submissionPackage?.builtAt || "");
-    document.querySelector("#task-list-submission-saved").textContent = url && Number.isFinite(date.getTime())
-        ? `Last saved final submission ZIP: ${state.saved.fileName || "Final submission"} / ${date.toLocaleString("en-NZ", { timeZone: "Pacific/Auckland" })}. Run Check files and build again after updating any inputs.`
-        : "No combined final submission ZIP has been saved yet.";
-    document.querySelector("#task-list-submission-status").textContent = state.message || "";
+    const savedStatus = document.querySelector("#task-list-submission-saved");
+    savedStatus.className = url ? "is-success" : "is-warning";
+    savedStatus.textContent = url
+        ? `\u2713 Last saved final submission ZIP: ${state.saved.fileName || "Final submission"}${Number.isFinite(date.getTime()) ? ` / ${date.toLocaleString("en-NZ", { timeZone: "Pacific/Auckland" })}` : ""}. Run Check files and build again after updating any inputs.`
+        : "\u2717 No combined final submission ZIP has been saved yet.";
+    const message = document.querySelector("#task-list-submission-status");
+    const tone = state.messageTone || "";
+    const marker = tone === "is-success" ? "\u2713 " : tone === "is-error" ? "\u2717 " : "";
+    message.className = tone;
+    message.textContent = state.message ? `${marker}${state.message}` : "";
 }
 
 async function loadSubmissionStage(item) {
@@ -3472,6 +3504,7 @@ async function loadSubmissionStage(item) {
         state.saved = payload.saved || null;
         state.message = "Files not yet verified.";
     } catch (error) {
+        state.messageTone = "is-error";
         state.message = error?.message || "Could not load the submission files.";
     }
     if (taskListState.submissionStage === state) renderSubmissionStage();
@@ -3484,6 +3517,7 @@ async function handleSubmissionStageAction(action) {
     if (action === "build" && !state.ready) return;
     const active = () => taskListState.submissionStage === state && taskListState.selectedId === state.activityId;
     taskListState.submissionBusy = true;
+    state.messageTone = "";
     state.message = "Connecting to Google Drive...";
     renderSubmissionStage();
     try {
@@ -3510,6 +3544,7 @@ async function handleSubmissionStageAction(action) {
             state.components = Array.isArray(checked.components) ? checked.components : state.components;
             state.manifestHash = String(checked.manifestHash || "");
             state.ready = Boolean(checked.ready && /^[a-f0-9]{64}$/.test(state.manifestHash));
+            state.messageTone = state.ready ? "is-success" : "is-error";
             const fileCount = state.components.filter((component) => component.entryName && component.status === "ready").length;
             state.message = state.ready
                 ? `${fileCount} files verified and ready to build. This check has not created a ZIP. Click Build final submission ZIP (all files), then open the saved final submission ZIP to download it.`
@@ -3532,8 +3567,10 @@ async function handleSubmissionStageAction(action) {
         if (!active()) return;
         state.saved = saved.saved;
         state.retryDriveSave = false;
+        state.messageTone = "is-success";
         state.message = "Combined final submission ZIP saved in SeniorDTECH / Process Assessment. Use Open saved final submission ZIP (all files) to download it, not the Stage 2 GitHub-only ZIP. No assessment was submitted.";
     } catch (error) {
+        state.messageTone = "is-error";
         if (error.status === 409 || error.status === 410) {
             state.ready = false;
             state.manifestHash = "";
@@ -5444,8 +5481,11 @@ async function runTaskListTrelloSync() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+    renderHaparaDashboardLink();
     void renderTaskListPage();
 });
+
+window.addEventListener("hub-auth-state-changed", renderHaparaDashboardLink);
 
 window.addEventListener("pageshow", (event) => {
     if (!event.persisted || !taskListState.selectedId) return;

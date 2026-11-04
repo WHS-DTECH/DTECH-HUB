@@ -293,9 +293,14 @@ async function testFrontend() {
     /href="https:\/\/bit\.ly\/3us9mgd" target="_blank" rel="noopener noreferrer"/);
   assert.match(html.slice(haparaPosition, checklistPosition), /does not submit your assessment/);
   const source = fs.readFileSync(path.join(__dirname, "..", "task-list.js"), "utf8");
+  assert.match(html, /class="task-list-hapara-link" href="https:\/\/bit\.ly\/3us9mgd"/);
+  assert.match(html, /id="task-list-hapara-dashboard" class="task-list-hapara-link task-list-hapara-backup" target="_blank" rel="noopener noreferrer" hidden/);
+  assert.match(source, /window\.addEventListener\("hub-auth-state-changed", renderHaparaDashboardLink\)/,
+    "Dashboard link updates when sign-in or role state changes");
   const elements = new Map();
   const makeElement = () => ({ hidden: false, disabled: false, textContent: "", children: [], href: "",
-    replaceChildren() { this.children = []; }, append(...children) { this.children.push(...children); } });
+    replaceChildren() { this.children = []; }, append(...children) { this.children.push(...children); },
+    removeAttribute(name) { if (name === "href") this.href = ""; } });
   const document = { createElement: makeElement, querySelector: (selector) => {
     if (!elements.has(selector)) elements.set(selector, makeElement());
     return elements.get(selector);
@@ -308,7 +313,8 @@ async function testFrontend() {
   let outdated = false;
   let ready = true;
   const context = vm.createContext({
-    document, taskListState: state, isSeniorSubmissionTask: () => true, buildTaskListHeaders: (headers) => headers,
+    document, taskListState: state, hubAccessState: { resolved: true, isStaff: false, isStudent: true },
+    isSeniorSubmissionTask: () => true, buildTaskListHeaders: (headers) => headers,
     loadJson: async () => ({ components: components.map((component) => ({ ...component, status: "unchecked" })), saved }),
     requestHubDriveAccessToken: async () => { actions.push("permission"); return { access_token: "student-token" }; },
     fetch: async (_url, options) => {
@@ -322,14 +328,39 @@ async function testFrontend() {
         json: async () => outdated ? { error: "The final files changed. Check files again." } : failSave ? { error: "Drive unavailable" } : { saved } };
     }
   });
-  const start = source.indexOf("function renderSubmissionStage(");
+  const start = source.indexOf("function renderHaparaDashboardLink(");
   const end = source.indexOf("async function fetchMyEvidence(", start);
   vm.runInContext(source.slice(start, end), context);
+  context.renderHaparaDashboardLink();
+  const dashboard = document.querySelector("#task-list-hapara-dashboard");
+  assert.equal(dashboard.href, "https://app.hapara.com/student/");
+  assert.equal(dashboard.hidden, false);
+  assert.match(dashboard.textContent, /Student Dashboard/);
+  context.hubAccessState = { resolved: true, isStaff: true, isStudent: true };
+  context.renderHaparaDashboardLink();
+  assert.equal(dashboard.href, "https://app.hapara.com/");
+  assert.match(dashboard.textContent, /Teacher Dashboard/);
+  context.hubAccessState = { resolved: false, isStaff: true };
+  context.renderHaparaDashboardLink();
+  assert.equal(dashboard.hidden, true);
+  assert.equal(dashboard.href, "");
+  assert.match(document.querySelector("#task-list-hapara-dashboard-status").textContent, /Sign in/);
+  delete context.hubAccessState;
+  context.renderHaparaDashboardLink();
+  assert.equal(dashboard.hidden, true, "No staff dashboard is guessed when access is unresolved or signed out");
   await context.loadSubmissionStage({ id: "49" });
   assert.equal(document.querySelector("#task-list-submission-files").children.length, 6);
   assert.equal(document.querySelector("#task-list-submission-build").disabled, true);
   assert.equal(document.querySelector("#task-list-submission-open").hidden, false, "Saved package link survives reload without claiming freshness");
   assert.match(document.querySelector("#task-list-submission-saved").textContent, /Last saved final submission ZIP/);
+  const fileRow = document.querySelector("#task-list-submission-files").children[0];
+  assert.equal(fileRow.children[1].textContent, "\u25cb Not checked", "Unverified files never receive a tick");
+  assert.equal(document.querySelector("#task-list-submission-status").className, "");
+  state.submissionStage.components = [{ label: "Missing PDF", entryName: "Missing.pdf", status: "missing" },
+    { label: "Old PDF", entryName: "Old.pdf", status: "needs-update" }];
+  context.renderSubmissionStage();
+  assert.equal(document.querySelector("#task-list-submission-files").children[0].children[1].textContent, "\u2717 Missing");
+  assert.equal(document.querySelector("#task-list-submission-files").children[1].children[1].textContent, "\u2717 Needs update");
   await context.handleSubmissionStageAction("build");
   assert.deepEqual(actions, [], "Unverified files cannot start a build");
   await context.handleSubmissionStageAction("check");
@@ -337,16 +368,27 @@ async function testFrontend() {
   assert.match(state.submissionStage.message, /^4 files verified and ready to build\./,
     "Ready counts actual archive files, not Yes/No or Not needed rows");
   assert.match(state.submissionStage.message, /has not created a ZIP/);
-  assert.match(document.querySelector("#task-list-submission-files").children[0].children[0].textContent, /Client-Presentation\.pdf/);
+  const firstFile = document.querySelector("#task-list-submission-files").children[0];
+  assert.equal(firstFile.children[0].textContent, "Client presentation PDF");
+  assert.equal(firstFile.children[1].textContent, "\u2713 Ready");
+  assert.equal(firstFile.children[2].textContent, "Client-Presentation.pdf");
+  assert.equal(firstFile.children[2].className, "task-list-submission-file-name");
+  assert.equal(document.querySelector("#task-list-submission-status").className, "is-success");
   actions.length = 0;
   await context.handleSubmissionStageAction("build");
   assert.deepEqual(actions, ["permission", "prepare", "save"]);
   assert.match(state.submissionStage.message, /No assessment was submitted/);
   assert.match(state.submissionStage.message, /not the Stage 2 GitHub-only ZIP/);
   assert.equal(document.querySelector("#task-list-submission-retry").hidden, true);
+  assert.equal(document.querySelector("#task-list-submission-status").className, "is-success");
   assert.ok(!JSON.stringify(state.submissionStage).includes("student-token"));
   failSave = true;
-  await context.handleSubmissionStageAction("build");
+  const pendingBuild = context.handleSubmissionStageAction("build");
+  assert.equal(document.querySelector("#task-list-submission-status").className, "",
+    "A new operation clears the previous success style before awaiting Drive");
+  await pendingBuild;
+  assert.equal(document.querySelector("#task-list-submission-status").className, "is-error");
+  assert.match(document.querySelector("#task-list-submission-status").textContent, /^\u2717 /);
   assert.equal(document.querySelector("#task-list-submission-retry").hidden, false);
   actions.length = 0;
   failSave = false;
@@ -362,6 +404,7 @@ async function testFrontend() {
   ready = false;
   await context.handleSubmissionStageAction("check");
   assert.equal(document.querySelector("#task-list-submission-build").disabled, true);
+  assert.equal(document.querySelector("#task-list-submission-status").className, "is-error");
 }
 
 async function main() {
