@@ -2755,11 +2755,29 @@ function renderDocumentationDeckState(deck, message = "") {
     if (add) add.hidden = !fileUrl || deck?.documentation?.mode !== "linked";
     if (input) input.value = fileUrl;
     const missing = Array.isArray(deck?.documentation?.missingTopics) ? deck.documentation.missingTopics : [];
-    if (status) status.textContent = [
-        message,
-        deck?.documentation?.partial ? "Some slides remain. Use Add missing slides to continue." : "",
-        missing.length ? `Missing evidence: ${missing.join(", ")}.` : ""
-    ].filter(Boolean).join(" ");
+    if (status) {
+        status.replaceChildren();
+        const statusMessage = [
+            message,
+            deck?.documentation?.partial ? "Some slides remain. Use Add missing slides to continue." : ""
+        ].filter(Boolean).join(" ");
+        if (statusMessage) {
+            const paragraph = document.createElement("p");
+            paragraph.textContent = statusMessage;
+            status.append(paragraph);
+        }
+        if (missing.length) {
+            const heading = document.createElement("p");
+            heading.textContent = "Missing evidence:";
+            const list = document.createElement("ul");
+            missing.forEach((topic) => {
+                const item = document.createElement("li");
+                item.textContent = topic;
+                list.append(item);
+            });
+            status.append(heading, list);
+        }
+    }
     renderSlideshowPdfState("documentation", fileUrl);
 }
 

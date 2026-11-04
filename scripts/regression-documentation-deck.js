@@ -67,6 +67,41 @@ assert.deepEqual(JSON.parse(JSON.stringify(uiOrder.map((topic) => topic.template
   "target-audience", "testing-functions-markup-validation", "relevant-digimed-conventions"
 ], "The UI derives ordering from displayed evidence links, including direct Google links");
 
+const documentationElements = new Map();
+const documentationDocument = {
+  createElement: (tagName) => ({
+    tagName, textContent: "", children: [],
+    append(...children) { this.children.push(...children); },
+    replaceChildren() { this.children = []; this.textContent = ""; }
+  }),
+  querySelector(selector) {
+    if (!documentationElements.has(selector)) documentationElements.set(selector, this.createElement("div"));
+    return documentationElements.get(selector);
+  }
+};
+const documentationContext = vm.createContext({
+  document: documentationDocument, taskListState: {}, renderSlideshowPdfState() {}
+});
+const renderingEnd = client.indexOf("\nfunction renderSlideshowPdfState(", orderingEnd);
+vm.runInContext(client.slice(orderingEnd, renderingEnd), documentationContext);
+const missingTopics = ["Target audience or end user", "Social, Cultural, Legal", "<b>Integrity testing</b>"];
+documentationContext.renderDocumentationDeckState({
+  fileUrl: slideUrl("merged"), documentation: { mode: "linked", partial: true, missingTopics }
+}, "Slides added.");
+const documentationStatus = documentationDocument.querySelector("#task-list-documentation-status");
+assert.equal(documentationStatus.children[0].textContent,
+  "Slides added. Some slides remain. Use Add missing slides to continue.");
+assert.equal(documentationStatus.children[1].textContent, "Missing evidence:");
+assert.equal(documentationStatus.children[2].tagName, "ul");
+assert.deepEqual(documentationStatus.children[2].children.map((item) => item.textContent), missingTopics,
+  "Each missing topic is a separate text-only bullet; commas inside topic labels are preserved");
+assert.ok(documentationStatus.children[2].children.every((item) => item.tagName === "li"));
+documentationContext.renderDocumentationDeckState({ fileUrl: slideUrl("merged"), documentation: { missingTopics: [] } });
+assert.equal(documentationStatus.children.length, 0, "Resolved evidence clears the old heading and bullet list");
+documentationContext.renderDocumentationDeckState(null, "Checking saved documentation...");
+assert.equal(documentationStatus.children.length, 1);
+assert.equal(documentationStatus.children[0].textContent, "Checking saved documentation...");
+
 const studentEmail = "student@westlandhigh.school.nz";
 const sourceSlides = new Map([
   ["audience", [{ id: "audience-1" }, { id: "audience-2" }]],

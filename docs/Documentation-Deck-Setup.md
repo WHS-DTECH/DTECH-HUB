@@ -123,6 +123,8 @@ tokens are not stored in the documentation record or Apps Script properties.
 
 - The Hub derives topic order from the selected Task List's rendered evidence
   links. Drive inventory order does not decide the documentation sequence.
+- Missing evidence is displayed as one bullet per Task List topic beneath
+  "Missing evidence", separately from merge progress and error messages.
 - Only matching evidence decks within the existing Process Assessment tree are
   considered. Unrelated decks, the client presentation, existing full slide
   sets, and the master deck are excluded. Each source deck is included once at
