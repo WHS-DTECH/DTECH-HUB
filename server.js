@@ -18351,8 +18351,9 @@ app.post("/api/activities/:id/submission-package", async (req, res) => {
       if (req.body?.manifestHash !== plan.manifestHash) throw Object.assign(new Error("The final files changed. Check files again before building."), { status: 409 });
       const snapshot = await withFinalOutcomeLock("final-outcome-archive-build", async () => {
         const builtAt = new Date().toISOString();
+        const studentName = email.split("@")[0].replace(/[^A-Za-z0-9_-]/g, "-").slice(0, 60);
         const prepared = await outcomeArchiveStore.prepareStream({ email, activityId,
-          metadata: { fileName: `Submission-${activityId}-${builtAt.replace(/[:.]/g, "-")}-${randomUUID()}.zip`,
+          metadata: { fileName: `Final-Submission-${studentName}-Task-${activityId}-${builtAt.replace(/[:.]/g, "-")}.zip`,
             submission: { manifestHash: plan.manifestHash, builtAt, components: plan.manifest } },
           open: () => createSubmissionZipResponse({ components: plan.components, token }) });
         try {

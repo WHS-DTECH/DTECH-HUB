@@ -80,7 +80,10 @@ async function testPlanAndArchive() {
   const response = await submission.createSubmissionZipResponse({ components: plan.components, token: "student-token", fetchRequest: data.fetchBinary });
   const archive = await JSZip.loadAsync(await response.arrayBuffer());
   assert.deepEqual(Object.keys(archive.files).sort(), plan.manifest.map((entry) => entry.entryName).sort(), "The submission contains exactly the files in the checked manifest");
-  assert.deepEqual(await archive.file("03-Digital-Outcome.zip").async("nodebuffer"), data.binaries.get("outcome-zip"), "The GitHub ZIP is kept intact, not unpacked or recompressed");
+  assert.deepEqual(Object.keys(archive.files).sort(), [
+    "Client-Presentation.pdf", "GitHub-Outcome.zip", "Task-List-Documentation.pdf", "Trello-Report.pdf"
+  ], "Core package files have readable names without internal identifiers");
+  assert.deepEqual(await archive.file("GitHub-Outcome.zip").async("nodebuffer"), data.binaries.get("outcome-zip"), "The GitHub ZIP is kept intact, not unpacked or recompressed");
   assert.equal((await data.inspect()).manifestHash, plan.manifestHash);
   const originalChecksum = data.files.get("outcome-zip").md5Checksum;
   data.files.get("outcome-zip").md5Checksum = "b".repeat(32);
@@ -143,11 +146,42 @@ async function testAdditionalSlideshowPackage() {
   const plan = await data.inspect();
   assert.equal(plan.ready, true);
   assert.equal(plan.manifest.length, 5);
-  assert.equal(plan.components.find((entry) => entry.key === `additional-${slideshowId}`).entryName, `05-Additional-Slideshow-${slideshowId}.pdf`);
+  assert.equal(plan.components.find((entry) => entry.key === `additional-${slideshowId}`).entryName, "Additional-Slideshow-1-Extra-evidence.pdf");
   const response = await submission.createSubmissionZipResponse({ components: plan.components, token: "student-token", fetchRequest: data.fetchBinary });
   const archive = await JSZip.loadAsync(await response.arrayBuffer());
   assert.deepEqual(Object.keys(archive.files).sort(), plan.manifest.map((entry) => entry.entryName).sort());
-  assert.deepEqual(await archive.file(`05-Additional-Slideshow-${slideshowId}.pdf`).async("nodebuffer"), pdfBytes);
+  assert.deepEqual(await archive.file("Additional-Slideshow-1-Extra-evidence.pdf").async("nodebuffer"), pdfBytes);
+  const secondId = "550e8400-e29b-41d4-a716-446655440001";
+  const secondPdfId = "second-additional-pdf";
+  const secondSourceId = "second-additional-slides";
+  const secondBytes = Buffer.from("%PDF-second additional slideshow");
+  data.binaries.set(secondPdfId, secondBytes);
+  data.files.set(secondSourceId, { ...data.files.get(sourceId), id: secondSourceId });
+  data.files.set(secondPdfId, { ...data.files.get(pdfId), id: secondPdfId, size: String(secondBytes.length), md5Checksum: md5(secondBytes) });
+  data.context.copies.push(
+    { templateId: additionalSlideshowTemplateId(secondId), fileName: "../Extra evidence.pdf", fileUrl: slideUrl(secondSourceId) },
+    { templateId: additionalSlideshowPdfTemplateId(secondId), fileUrl: fileUrl(secondPdfId),
+      pdfExport: { sourcePresentationId: secondSourceId, sourceVersion: "7", sourceModifiedTime: date,
+        bytes: secondBytes.length, md5Checksum: md5(secondBytes) } }
+  );
+  const twoSlideshows = await data.inspect();
+  assert.equal(twoSlideshows.ready, true);
+  assert.equal(twoSlideshows.manifest.length, 6);
+  const combined = await submission.createSubmissionZipResponse({ components: twoSlideshows.components, token: "student-token", fetchRequest: data.fetchBinary });
+  const combinedArchive = await JSZip.loadAsync(await combined.arrayBuffer());
+  assert.deepEqual(Object.keys(combinedArchive.files).sort(), [
+    "Additional-Slideshow-1-Extra-evidence.pdf", "Additional-Slideshow-2-Extra-evidence.pdf",
+    "Client-Presentation.pdf", "GitHub-Outcome.zip", "Task-List-Documentation.pdf", "Trello-Report.pdf"
+  ], "Both additional PDFs and every required file are included, with unique path-safe names");
+  for (const component of twoSlideshows.manifest) {
+    assert.deepEqual(await combinedArchive.file(component.entryName).async("nodebuffer"), data.binaries.get(component.fileId));
+  }
+  assert.deepEqual(submission.submissionSummary(data.context.copies).filter((entry) => entry.entryName).map((entry) => entry.entryName),
+    twoSlideshows.manifest.map((entry) => entry.entryName), "Displayed filenames match the archive");
+  const secondPdf = data.context.copies.find((copy) => copy.templateId === additionalSlideshowPdfTemplateId(secondId));
+  data.context.copies = data.context.copies.filter((copy) => copy !== secondPdf);
+  assert.equal((await data.inspect()).ready, false, "A second selected slideshow without its PDF cannot claim readiness");
+  data.context.copies.push(secondPdf);
   data.files.get(pdfId).md5Checksum = "b".repeat(32);
   assert.equal((await data.inspect()).ready, false, "A changed additional PDF blocks the package");
   data.files.get(pdfId).md5Checksum = md5(pdfBytes);
@@ -231,6 +265,8 @@ async function testEndpoints() {
     assert.equal((await request("POST", { action: "prepare", manifestHash: "old", driveAccessToken: "student-token" })).statusCode, 409);
     const prepared = await request("POST", { action: "prepare", manifestHash: checked.body.manifestHash, driveAccessToken: "student-token" });
     assert.equal(prepared.statusCode, 200);
+    assert.match(prepared.body.snapshot.fileName, /^Final-Submission-student-Task-49-\d{4}-\d{2}-\d{2}T[\d-]+Z\.zip$/,
+      "The combined package uses a student/task/date filename, not a UUID or GitHub outcome label");
     const snapshotId = prepared.body.snapshot.snapshotId;
     const saved = await request("POST", { action: "save", snapshotId, driveAccessToken: "student-token" });
     assert.equal(saved.statusCode, 200);
@@ -284,14 +320,20 @@ async function testFrontend() {
   assert.equal(document.querySelector("#task-list-submission-files").children.length, 6);
   assert.equal(document.querySelector("#task-list-submission-build").disabled, true);
   assert.equal(document.querySelector("#task-list-submission-open").hidden, false, "Saved package link survives reload without claiming freshness");
+  assert.match(document.querySelector("#task-list-submission-saved").textContent, /Last saved final submission ZIP/);
   await context.handleSubmissionStageAction("build");
   assert.deepEqual(actions, [], "Unverified files cannot start a build");
   await context.handleSubmissionStageAction("check");
   assert.equal(document.querySelector("#task-list-submission-build").disabled, false);
+  assert.match(state.submissionStage.message, /^4 files verified and ready to build\./,
+    "Ready counts actual archive files, not Yes/No or Not needed rows");
+  assert.match(state.submissionStage.message, /has not created a ZIP/);
+  assert.match(document.querySelector("#task-list-submission-files").children[0].children[0].textContent, /Client-Presentation\.pdf/);
   actions.length = 0;
   await context.handleSubmissionStageAction("build");
   assert.deepEqual(actions, ["permission", "prepare", "save"]);
   assert.match(state.submissionStage.message, /No assessment was submitted/);
+  assert.match(state.submissionStage.message, /not the Stage 2 GitHub-only ZIP/);
   assert.equal(document.querySelector("#task-list-submission-retry").hidden, true);
   assert.ok(!JSON.stringify(state.submissionStage).includes("student-token"));
   failSave = true;

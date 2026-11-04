@@ -121,7 +121,7 @@ function createOutcomeArchiveStore({ githubApiRequest, fetchArchive = fetch, now
       });
       details = { repositoryUrl: repository.url, branch, commitSha: sha,
         commitDate: String(commit.commit?.committer?.date || ""),
-        fileName: `Final-Outcome-${activityId}-${repository.owner}-${repository.repo}-${sha}.zip` };
+        fileName: `GitHub-Outcome-${repository.owner}-${repository.repo}-${sha.slice(0, 12)}.zip` };
       }
       if (!response.ok || !response.body) throw outcomeError("GitHub could not supply the ZIP. Try again later.", 502);
       const expectedBytes = Number(response.headers.get("content-length")) || 0;

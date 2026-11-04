@@ -60,6 +60,8 @@ async function testArchiveStore() {
   let clock = 1000;
   const { store, calls } = fixture({ now: () => clock, ttlMs: 10 });
   const snapshot = await store.prepare({ email, activityId: "49", repositoryUrl });
+  assert.equal(snapshot.fileName, `GitHub-Outcome-student-outcome-${sha.slice(0, 12)}.zip`,
+    "GitHub-only downloads are clearly named with a short version identifier");
   assert.equal(snapshot.commitSha, sha);
   assert.equal(snapshot.branch, "student-main");
   assert.equal(snapshot.buffer, undefined, "API metadata never exposes cached bytes or student email");

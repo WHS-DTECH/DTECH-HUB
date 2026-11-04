@@ -167,7 +167,7 @@ be configured for GitHub metadata requests. It is never sent to archive hosts.
 Drive save uses the student's existing Google Drive permission, independently of
 the Slides Apps Script deployment. No extra ZIP library or Apps Script is needed.
 
-Download latest ZIP requests Google Drive permission first, pins a commit,
+Download GitHub-only ZIP requests Google Drive permission first, pins a commit,
 validates its tree, and obtains GitHub's archive for that exact commit. The same
 action starts the browser download and automatically uploads those prepared bytes
 to the student's owned `SeniorDTECH/Process Assessment` folder, after checking
@@ -208,7 +208,7 @@ affinity. Monitor available ephemeral disk space, concurrent lease use, upload
 duration and host/proxy request timeouts for the deployment. The latest saved
 file link and full commit metadata persist in the
 assessment's template-copy record. Earlier ZIP files remain in Drive; deterministic
-repository/assessment/full-commit filenames make repeat saves reuse the same
+repository/short-commit filenames make repeat saves reuse the same
 version instead of replacing or duplicating it. Students should keep a repository
 and its assets reasonably sized and check their final downloaded outcome.
 
@@ -278,15 +278,17 @@ by mocked endpoint tests.
 
 ## Submission Stage
 
-The final Submission Stage card always packages these four required assessment artifacts:
+The Final Submission Package (all files) card always packages these four required assessment artifacts:
 
-1. `01-Client-Presentation.pdf`
-2. `02-Documentation.pdf`
-3. `03-Digital-Outcome.zip`
-4. `04-Trello-Report.pdf`
+1. `Client-Presentation.pdf`
+2. `Task-List-Documentation.pdf`
+3. `GitHub-Outcome.zip`
+4. `Trello-Report.pdf`
 
 It also includes every saved PDF from Stage 6 as a separate
-`05-Additional-Slideshow-<id>.pdf` entry. Stage 6 PDFs are optional, but when
+`Additional-Slideshow-<number>-<title>.pdf` entry. Titles are sanitised and
+numbering keeps identically named slideshows distinct without exposing UUIDs.
+Stage 6 PDFs are optional, but when
 present they are checked and included; an outdated or unverifiable saved PDF
 blocks the package until it is regenerated.
 
@@ -311,6 +313,17 @@ Drive into the ZIP with byte-count, file-signature and MD5 verification. The inn
 GitHub ZIP remains intact; all entries use ZIP store mode rather than
 recompressing already compressed files. No repository, board, slideshow or source
 artifact is modified by building a package.
+
+The Stage 2 **Download GitHub-only ZIP** action downloads only repository content;
+it never includes the report or PDFs. Its filename starts with `GitHub-Outcome-`
+and uses a 12-character commit reference; the full commit remains in saved metadata.
+The combined package starts with `Final-Submission-` and identifies the student,
+task and UTC build timestamp, without a UUID. Existing Drive files are not renamed.
+Check files reports the count of actual archive entries, excluding Yes/No and
+Not needed checklist rows, and explicitly says no ZIP has been created by checking.
+Students must build the combined package, then use **Open saved final submission
+ZIP (all files)** to download that file from Drive. A saved prior package is
+labelled separately and is not proof that updated inputs have been packaged.
 
 The streaming ZIP uses the same bounded temporary-file store and resumable Drive
 uploader as Stage 2, including its 512 MiB archive cap, shared 1 GiB per-process disk

@@ -1307,15 +1307,16 @@
                     <hr class="task-list-final-divider">
                     <aside class="task-list-documentation-card task-list-outcome-card" aria-labelledby="task-list-outcome-title">
                         <p class="section-kicker">STAGE 2</p>
-                        <h2 id="task-list-outcome-title">Final Digital Outcome</h2>
+                        <h2 id="task-list-outcome-title">GitHub Outcome ZIP (repository only)</h2>
+                        <p class="task-list-link-meta">This ZIP contains only your GitHub files. It does not contain your PDFs or Trello report. Build the combined ZIP in Final Submission Package below.</p>
                         <label for="task-list-outcome-repository">GitHub repository</label>
                         <select id="task-list-outcome-repository" disabled><option value="">Loading repositories...</option></select>
                         <p class="task-list-link-meta">The ZIP includes the entire repository at the latest commit on its default branch, even if your saved GitHub link points to a folder or another branch.</p>
                         <label class="task-list-outcome-confirm"><input id="task-list-outcome-pushed" type="checkbox">I have pushed my final changes to GitHub.</label>
                         <div class="task-list-documentation-actions">
-                            <button type="button" class="task-list-sync-drive-btn" id="task-list-outcome-download" disabled>Download latest ZIP</button>
+                            <button type="button" class="task-list-sync-drive-btn" id="task-list-outcome-download" disabled>Download GitHub-only ZIP</button>
                             <button type="button" class="task-list-sync-drive-btn" id="task-list-outcome-save" hidden disabled>Retry Google Drive save</button>
-                            <a id="task-list-outcome-open" target="_blank" rel="noopener noreferrer" hidden>Open saved ZIP in Google Drive</a>
+                            <a id="task-list-outcome-open" target="_blank" rel="noopener noreferrer" hidden>Open saved GitHub-only ZIP</a>
                         </div>
                         <p id="task-list-outcome-version"></p>
                         <p id="task-list-outcome-saved-version"></p>
@@ -1358,13 +1359,14 @@
                     <hr class="task-list-final-divider">
                     <aside class="task-list-documentation-card task-list-outcome-card" aria-labelledby="task-list-submission-title">
                         <p class="section-kicker">FINAL PACKAGE</p>
-                        <h2 id="task-list-submission-title">Submission Stage</h2>
+                        <h2 id="task-list-submission-title">Final Submission Package (all files)</h2>
+                        <p class="task-list-link-meta">Includes your client presentation PDF, Task List documentation PDF, GitHub outcome ZIP, Trello report PDF, and every additional slideshow PDF you selected. Check files only verifies the inputs; build the combined ZIP, then open the saved final submission ZIP to download it.</p>
                         <ul id="task-list-submission-files" class="task-list-submission-files" aria-label="Submission files"></ul>
                         <div class="task-list-documentation-actions">
                             <button type="button" class="task-list-sync-drive-btn" id="task-list-submission-check">Check files</button>
-                            <button type="button" class="task-list-sync-drive-btn" id="task-list-submission-build" disabled>Build submission ZIP</button>
+                            <button type="button" class="task-list-sync-drive-btn" id="task-list-submission-build" disabled>Build final submission ZIP (all files)</button>
                             <button type="button" class="task-list-sync-drive-btn" id="task-list-submission-retry" hidden disabled>Retry Google Drive save</button>
-                            <a id="task-list-submission-open" target="_blank" rel="noopener noreferrer" hidden>Open saved submission ZIP</a>
+                            <a id="task-list-submission-open" target="_blank" rel="noopener noreferrer" hidden>Open saved final submission ZIP (all files)</a>
                         </div>
                         <p id="task-list-submission-saved"></p>
                         <p id="task-list-submission-status" role="status" aria-live="polite"></p>
@@ -1405,6 +1407,6 @@
 
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="script.js"></script>
-    <script src="task-list.js?v=testing-user-counts-1"></script>
+    <script src="task-list.js?v=submission-package-clarity-1"></script>
 </body>
 </html>

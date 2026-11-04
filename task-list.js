@@ -3271,7 +3271,8 @@ async function handleFinalOutcomeAction(action) {
         state.retryDriveSave = false;
         state.message = `${downloadStarted ? "ZIP download started. " : ""}${payload.reused
             ? "This commit's ZIP is already in SeniorDTECH / Process Assessment. No duplicate was created."
-            : "ZIP saved to SeniorDTECH / Process Assessment. Earlier versions are unchanged."}`;
+            : "GitHub-only ZIP saved to SeniorDTECH / Process Assessment. Earlier versions are unchanged."}`;
+        state.message += " This is not the final submission package; build that in Final Submission Package below.";
         void loadSubmissionStage(selected);
     } catch (error) {
         if (downloadStarted) state.retryDriveSave = true;
@@ -3406,7 +3407,7 @@ function renderSubmissionStage() {
     state.components.forEach((component) => {
         const row = document.createElement("li");
         const label = document.createElement("span");
-        label.textContent = component.label;
+        label.textContent = component.entryName ? `${component.label} (${component.entryName})` : component.label;
         label.title = component.entryName || "";
         const status = document.createElement("span");
         status.className = `task-list-submission-file-status${component.status === "ready" ? " is-ready" : component.status === "needs-update" ? " needs-update" : ""}`;
@@ -3431,7 +3432,8 @@ function renderSubmissionStage() {
     if (url) link.href = url;
     const date = new Date(state.saved?.submissionPackage?.builtAt || "");
     document.querySelector("#task-list-submission-saved").textContent = url && Number.isFinite(date.getTime())
-        ? `Saved package: ${date.toLocaleString("en-NZ", { timeZone: "Pacific/Auckland" })}` : "";
+        ? `Last saved final submission ZIP: ${state.saved.fileName || "Final submission"} / ${date.toLocaleString("en-NZ", { timeZone: "Pacific/Auckland" })}. Run Check files and build again after updating any inputs.`
+        : "No combined final submission ZIP has been saved yet.";
     document.querySelector("#task-list-submission-status").textContent = state.message || "";
 }
 
@@ -3490,7 +3492,10 @@ async function handleSubmissionStageAction(action) {
             state.components = Array.isArray(checked.components) ? checked.components : state.components;
             state.manifestHash = String(checked.manifestHash || "");
             state.ready = Boolean(checked.ready && /^[a-f0-9]{64}$/.test(state.manifestHash));
-            state.message = state.ready ? `All ${state.components.length} files are ready to package.` : "Some files are missing or need updating.";
+            const fileCount = state.components.filter((component) => component.entryName && component.status === "ready").length;
+            state.message = state.ready
+                ? `${fileCount} files verified and ready to build. This check has not created a ZIP. Click Build final submission ZIP (all files), then open the saved final submission ZIP to download it.`
+                : "Some files are missing or need updating. A complete final submission ZIP cannot be built yet.";
             return;
         }
         if (action === "build") {
@@ -3509,7 +3514,7 @@ async function handleSubmissionStageAction(action) {
         if (!active()) return;
         state.saved = saved.saved;
         state.retryDriveSave = false;
-        state.message = "Submission ZIP saved in SeniorDTECH / Process Assessment. No assessment was submitted.";
+        state.message = "Combined final submission ZIP saved in SeniorDTECH / Process Assessment. Use Open saved final submission ZIP (all files) to download it, not the Stage 2 GitHub-only ZIP. No assessment was submitted.";
     } catch (error) {
         if (error.status === 409 || error.status === 410) {
             state.ready = false;

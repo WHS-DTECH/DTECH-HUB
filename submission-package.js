@@ -8,11 +8,17 @@ const { trelloReportSources, resolveReportBoards } = require("./trello-report");
 const { additionalSlideshowCopies, additionalSlideshowPdfs } = require("./submission-slideshows");
 
 const SUBMISSION_COMPONENTS = [
-  { key: "client", templateId: "client-presentation-pdf", label: "Client presentation PDF", entryName: "01-Client-Presentation.pdf", mimeType: "application/pdf" },
-  { key: "documentation", templateId: "submission-documentation-pdf", label: "Documentation PDF", entryName: "02-Documentation.pdf", mimeType: "application/pdf" },
-  { key: "outcome", templateId: "final-digital-outcome-zip", label: "GitHub outcome ZIP", entryName: "03-Digital-Outcome.zip", mimeType: "application/zip" },
-  { key: "trello", templateId: "submission-trello-report", label: "Trello report PDF", entryName: "04-Trello-Report.pdf", mimeType: "application/pdf" }
+  { key: "client", templateId: "client-presentation-pdf", label: "Client presentation PDF", entryName: "Client-Presentation.pdf", mimeType: "application/pdf" },
+  { key: "documentation", templateId: "submission-documentation-pdf", label: "Documentation PDF", entryName: "Task-List-Documentation.pdf", mimeType: "application/pdf" },
+  { key: "outcome", templateId: "final-digital-outcome-zip", label: "GitHub outcome ZIP", entryName: "GitHub-Outcome.zip", mimeType: "application/zip" },
+  { key: "trello", templateId: "submission-trello-report", label: "Trello report PDF", entryName: "Trello-Report.pdf", mimeType: "application/pdf" }
 ];
+
+function additionalSubmissionEntryName(name, index) {
+  const title = String(name || "Slideshow").replace(/\.pdf$/i, "")
+    .replace(/[^A-Za-z0-9 _-]/g, "-").replace(/[\s-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "Slideshow";
+  return `Additional-Slideshow-${index + 1}-${title}.pdf`;
+}
 
 function submissionDriveFileId(value) {
   try {
@@ -51,13 +57,13 @@ function submissionSummary(copies) {
       status: answer === "no" && !hasSources ? "ready" : "missing"
     });
   } else {
-    packagePdfs.forEach(({ id, source, pdf, expected }) => {
+    packagePdfs.forEach(({ id, source, pdf, expected }, index) => {
       const name = source?.fileName || pdf?.pdfExport?.sourceName || "additional slideshow";
       const label = `Additional Slideshows PDF - ${name}`;
       additional.push({
         key: `additional-${id}`,
         label,
-        entryName: `05-Additional-Slideshow-${id}.pdf`,
+        entryName: additionalSubmissionEntryName(name, index),
         displayStatus: !pdf ? "Missing" : answer === "no" || !expected ? "Needs update" : "Not checked",
         status: !pdf ? "missing" : answer === "no" || !expected ? "needs-update" : "unchecked"
       });
@@ -163,7 +169,7 @@ async function inspectSubmissionPackage({ context, documentationSource, folderId
   } else if (!additional.length && answer === "yes") {
     components.push({
       key: "additional-slideshows-pdf", label: "Additional Slideshows PDF",
-      entryName: "05-Additional-Slideshow.pdf", displayStatus: "Missing",
+      entryName: "Additional-Slideshow.pdf", displayStatus: "Missing",
       status: "missing", message: "Add at least one slideshow and save its PDF in Stage 6."
     });
   } else if (!additional.length) {
@@ -172,11 +178,11 @@ async function inspectSubmissionPackage({ context, documentationSource, folderId
       displayStatus: "Missing", status: "missing", message: "Choose Yes or No in Stage 6."
     });
   }
-  for (const { id, source: sourceRecord, pdf, expected } of additional) {
+  for (const [index, { id, source: sourceRecord, pdf, expected }] of additional.entries()) {
     const component = {
       key: `additional-${id}`,
       label: `Additional Slideshows PDF - ${String(sourceRecord?.fileName || pdf?.pdfExport?.sourceName || "Google Slides presentation")}`,
-      entryName: `05-Additional-Slideshow-${id}.pdf`,
+      entryName: additionalSubmissionEntryName(sourceRecord?.fileName || pdf?.pdfExport?.sourceName, index),
       mimeType: "application/pdf",
       status: "missing",
       message: "Create and save this PDF in Stage 6 first."
