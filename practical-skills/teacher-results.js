@@ -19,6 +19,7 @@
     const studentFilter = document.getElementById("class-student-filter");
     const kitFilter = document.getElementById("class-kit-filter");
     const statusFilter = document.getElementById("class-status-filter");
+    const chocolateFilter = document.getElementById("class-chocolate-filter");
     const classTab = document.getElementById("class-progress-tab");
     const studentTab = document.getElementById("student-review-tab");
     const classPanel = document.getElementById("class-progress-panel");
@@ -133,12 +134,14 @@
         const selectedHomeroom = homeroomFilter.value;
         const selectedKit = kitFilter.value;
         const selectedStatus = statusFilter.value;
+        const selectedChocolate = chocolateFilter.value;
         const query = studentFilter.value.trim().toLowerCase();
         return classData.students.filter((student) =>
             (!selectedCourse || courseKey(student.course) === selectedCourse)
             && (!selectedWhanau || student.whanau === selectedWhanau)
             && (!selectedHomeroom || student.homeroom === selectedHomeroom)
             && (!selectedKit || !selectedStatus || kitStatus(student.kitProgress?.[selectedKit]) === selectedStatus)
+            && (!selectedKit || !selectedChocolate || (student.chocolate?.[selectedKit] === true) === (selectedChocolate === "yes"))
             && (!query || `${student.name} ${student.email}`.toLowerCase().includes(query)))
             .sort((a, b) => a.name.localeCompare(b.name));
     }
@@ -269,6 +272,8 @@
     function updateStatusFilter() {
         statusFilter.disabled = !kitFilter.value;
         if (statusFilter.disabled) statusFilter.value = "";
+        chocolateFilter.disabled = !kitFilter.value;
+        if (chocolateFilter.disabled) chocolateFilter.value = "";
     }
     function populateKits(kits) {
         const previous = kitFilter.value;
@@ -359,7 +364,7 @@
         selected.focus();
     });
     document.getElementById("class-progress-refresh").addEventListener("click", loadClassProgress);
-    [courseFilter, whanauFilter, homeroomFilter, statusFilter].forEach((filter) => filter.addEventListener("change", renderClassProgress));
+    [courseFilter, whanauFilter, homeroomFilter, statusFilter, chocolateFilter].forEach((filter) => filter.addEventListener("change", renderClassProgress));
     kitFilter.addEventListener("change", () => {
         updateStatusFilter();
         renderClassProgress();
