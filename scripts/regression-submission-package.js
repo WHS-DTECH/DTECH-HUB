@@ -389,6 +389,11 @@ async function testFrontend() {
     "Dashboard link updates when sign-in or role state changes");
   const finalCard = html.slice(haparaPosition, checklistPosition);
   assert.match(finalCard, /type="checkbox" id="task-list-final-ready" disabled/);
+  assert.match(finalCard, /class="task-list-final-confirm-panel"/);
+  assert.match(finalCard, /1\. Tick here before you submit/);
+  assert.match(finalCard, /2\. Open Hapara and hand in your ZIP/);
+  assert.ok(finalCard.indexOf('id="task-list-final-ready"') < finalCard.indexOf('id="task-list-hapara-dashboard"'),
+    "The prominent confirmation comes before the dashboard button");
   assert.match(finalCard, /I have checked my Final Package and I am ready to submit/);
   assert.match(source, /handleFinalStepConfirmation\(event\.target\.checked\)/);
   assert.match(source, /#task-list-final-email-retry.*handleFinalStepConfirmation\(true\)/);

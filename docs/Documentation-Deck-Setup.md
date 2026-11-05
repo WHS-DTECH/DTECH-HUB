@@ -374,6 +374,9 @@ Unknown roles show a sign-in explanation rather than guessing a dashboard.
 
 Saving the combined Final Package no longer sends an email. In Final Step the
 student ticks **I have checked my Final Package and I am ready to submit**.
+This is highlighted in a yellow, purple-bordered **1. Tick here before you submit**
+panel with a larger checkbox and clickable label, above **2. Open Hapara and hand
+in your ZIP**. The visual emphasis does not change confirmation or email behaviour.
 The checkbox is enabled only with a saved combined ZIP. Readiness is persisted
 against that ZIP and triggers an email to the existing DTECH-HUB Lead Teachers.
 The email identifies the student, assessment, confirmation time and packaged
