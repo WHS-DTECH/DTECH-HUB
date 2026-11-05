@@ -11,6 +11,7 @@ DTECH Hub is a web application used in DTECH classes for project/activity access
 - **Submitted - synced**: DTECH-HUB successfully filed the linked drawing. Moving does not grant the teacher sharing access.
 - **Completed**: the teacher's review tick, independent of sync. Students can still use **Sync drawing** after a teacher tick if filing is outstanding.
 - Students can sync using Submit/Sync drawing in the activity or the sign-in filing reminder. The activity updates immediately after reminder filing; teachers use Refresh list.
+- Drawing activities show the school Google verification panel beside Submit. Same-account verification preserves pasted links; Submit requests Drive permission without clearing the current activity. Drawing submission and saved-status routes accept server-verified Google access tokens as well as ID tokens; email-only requests are still rejected.
 - `practical_skills_filed_drawings.synced` records actual success separately from reminder-resolved outcomes (`missing`, `not-owner`, `not-drawing`). Those outcomes remain Saved, with student guidance to correct the link.
 - Older filing markers did not distinguish success from those outcomes. They remain unconfirmed until a student-authorised filing retry checks the drawing; the filing helper leaves already-correct folders/names unchanged. Saved links, teacher ticks and email deduplication are preserved.
 

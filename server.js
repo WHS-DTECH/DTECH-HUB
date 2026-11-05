@@ -6218,6 +6218,8 @@ app.use(async (req, _res, next) => {
   const licenceAccessToken = bearerToken.split(".").length !== 3 && (
     (req.method === "GET" && /^\/api\/practical-skills\/blocks\/kit-[a-z0-9-]+\/\d+\/licences\/[a-zA-Z0-9_-]+$/.test(req.path)) ||
     (["GET", "POST"].includes(req.method) && req.path === "/api/practical-skills/drawing-filing") ||
+    (req.method === "GET" && /^\/api\/practical-skills\/blocks\/kit-[a-z0-9-]+\/\d+\/document-check$/.test(req.path)) ||
+    (req.method === "POST" && /^\/api\/practical-skills\/blocks\/kit-[a-z0-9-]+\/\d+\/submit$/.test(req.path)) ||
     (["GET", "PUT"].includes(req.method) && /^\/api\/admin\/kit-document-review\/kit-[a-z0-9-]+\/\d+$/.test(req.path))
   );
   let verification;

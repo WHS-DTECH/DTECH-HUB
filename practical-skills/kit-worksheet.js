@@ -311,18 +311,18 @@
         window.clearTimeout(state.blockSaveTimerId);
         window.clearTimeout(state.saveTimerId);
         state.documentCheckInProgress = true;
+        state.driveSetupInProgress = true;
         updateActivityCompleteBar();
         try {
             // Started before other awaits so the Google permission popup keeps the Submit click's user gesture.
-            const permission = getResearchReportDriveToken().catch(() => "");
+            const driveAccessToken = await getResearchReportDriveToken();
             await checkBlockAnswers(index);
             const revision = state.blockRevision;
-            const driveAccessToken = await permission;
             return await queueProgressWrite(async () => {
                 if (getSignedInEmail() !== email || revision !== state.blockRevision) throw new Error("Your account or answers changed. Press Submit again.");
                 showStatusMessage("Submitting your drawing to your teacher...");
                 const result = await loadJson(`${blockPath(index)}/submit`, {
-                    method: "POST", headers: withAuthHeaders({ "Content-Type": "application/json" }),
+                    method: "POST", headers: withAuthHeaders({ "Content-Type": "application/json" }, true),
                     body: JSON.stringify(driveAccessToken ? { driveAccessToken } : {})
                 });
                 if (getSignedInEmail() !== email || revision !== state.blockRevision) return result;
@@ -340,6 +340,7 @@
             });
         } finally {
             state.documentCheckInProgress = false;
+            state.driveSetupInProgress = false;
             updateActivityCompleteBar();
         }
     }
@@ -425,7 +426,7 @@
             return;
         }
         const email = state.email, revision = state.blockRevision;
-        loadJson(`${blockPath(index)}/document-check`, { headers: withAuthHeaders(), cache: "no-store" })
+        loadJson(`${blockPath(index)}/document-check`, { headers: withAuthHeaders({}, drawing), cache: "no-store" })
             .then((result) => {
                 if (!status.isConnected || email !== getSignedInEmail() || revision !== state.blockRevision) return;
                 if (drawing) {
@@ -725,7 +726,12 @@
         const verification = document.getElementById("worksheet-google-verification");
         if (verification) {
             host.after(verification);
-            verification.hidden = preview || !state.content.activities?.[activityIndex]?.identityLessonVersion;
+            const drawing = isTeacherReview(state.content.activities?.[activityIndex]);
+            verification.hidden = preview || !(drawing || state.content.activities?.[activityIndex]?.identityLessonVersion);
+            const help = document.getElementById("worksheet-google-verification-help");
+            if (help) help.textContent = drawing
+                ? "If Submit asks you to verify your school Google sign-in, use Sign in with Google here and choose the same school account. Your drawing link will stay in place. Then press Submit or Sync drawing below and allow Google Drive permission."
+                : "Choose the same school Google account you used for your answers above. Once you have verified it, click Check your answers below. Your typed answers will stay in place.";
         }
         if (worksheets.length && (activityIndex === null || !worksheets[activityIndex])) {
             window.KitWorksheetRender.renderKitOverview(host, state.content, {
@@ -1230,6 +1236,9 @@
             previousAuth = nextAuth;
             if (state.driveSetupInProgress && getSignedInEmail() === state.email) return;
             const identityDraft = {};
+            if (getSignedInEmail() === state.email && isTeacherReview(state.content?.activities?.[getCurrentActivityIndex()])) {
+                Object.assign(identityDraft, state.responses);
+            }
             if (getSignedInEmail() === state.email && state.kitId === "kit-google-search") {
                 for (const [key, value] of Object.entries(state.responses)) {
                     if (JSON.stringify(value) !== JSON.stringify(state.savedSearchResponses[key])) identityDraft[key] = value;

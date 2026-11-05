@@ -329,7 +329,8 @@ async function fixture(t) {
     ctx.documentVerification = verification;
     const app = express();
     app.use(express.json());
-    app.use((req, _res, next) => { req.auth_identity = { email: req.headers["x-user-email"] || email, verified: true }; next(); });
+    app.use((req, _res, next) => { req.auth_identity = { email: req.headers["x-identity-email"] || req.headers["x-user-email"] || email,
+        verified: req.headers["x-verified"] !== "no" }; next(); });
     verification.register(app);
     registerActivityBlocks(app, {
         ...deps, documentVerification: verification, getPracticalSkillsKitDefinition: () => true,
@@ -437,6 +438,126 @@ test("Saved becomes Submitted only after successful sync, for students and teach
     assert.ok((await f.pendingFiling()).data.pending.some((item) => item.index === 1), "Legacy marker can be rechecked");
     await f.fileAll({ driveAccessToken: "student-token" });
     assert.equal((await f.status(1)).data.filing.filed, true);
+});
+
+test("drawing submission and status still require a verified matching school account", async (t) => {
+    const f = await fixture(t);
+    for (const [path, method] of [
+        ["/api/practical-skills/blocks/kit-google-drawings/0/submit", "POST"],
+        ["/api/practical-skills/blocks/kit-google-drawings/0/document-check", "GET"]
+    ]) {
+        assert.equal((await f.request(path, method, undefined, { "x-verified": "no" })).status, 401);
+        assert.equal((await f.request(path, method, undefined, { "x-identity-email": "another@school.nz" })).status, 401);
+    }
+    assert.equal(f.notices.length, 0);
+    assert.equal(f.filings.length, 0);
+});
+
+test("Google access token verification is limited to the intended student and teacher routes", () => {
+    const start = source.indexOf("  const licenceAccessToken = ");
+    const end = source.indexOf("\n  let verification;", start);
+    assert.ok(start > 0 && end > start);
+    const classify = (path, method, token = "opaque") => {
+        const context = vm.createContext({ req: { path, method }, bearerToken: token });
+        return vm.runInContext(source.slice(start, end) + "\nlicenceAccessToken;", context);
+    };
+    assert.equal(classify("/api/practical-skills/blocks/kit-google-drawings/0/submit", "POST"), true);
+    assert.equal(classify("/api/practical-skills/blocks/kit-google-drawings/0/document-check", "GET"), true);
+    assert.equal(classify("/api/practical-skills/blocks/kit-google-drawings/0/document-check", "POST"), false);
+    assert.equal(classify("/api/practical-skills/blocks/kit-google-drawings/0/check", "POST"), false);
+    assert.equal(classify("/api/admin/kit-class-progress", "GET"), false);
+    assert.equal(classify("/api/practical-skills/blocks/kit-google-drawings/0/submit", "POST", "header.payload.signature"), false);
+    assert.match(source, /licenceAccessToken\s*\? await verifyGoogleAccessTokenAndExtractIdentity\(bearerToken\)/);
+});
+
+test("drawing verification panel is visible with appropriate help, while identity instructions are preserved", () => {
+    const controller = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "kit-worksheet.js"), "utf8");
+    const start = controller.indexOf('        const verification = document.getElementById("worksheet-google-verification");');
+    const end = controller.indexOf("\n        if (worksheets.length", start);
+    const panel = { hidden: true }, help = { textContent: "" };
+    const context = vm.createContext({
+        document: { getElementById: (id) => id === "worksheet-google-verification" ? panel : help },
+        host: { after() {} }, preview: false, activityIndex: 0,
+        state: { content: { activities: [{ documentCheck: POLICY }] } },
+        isTeacherReview: (activity) => activity?.documentCheck === POLICY
+    });
+    const render = () => vm.runInContext(`{ ${controller.slice(start, end)} }`, context);
+    render();
+    assert.equal(panel.hidden, false);
+    assert.match(help.textContent, /Sign in with Google here/);
+    assert.match(help.textContent, /drawing link will stay in place/);
+    context.state.content.activities[0] = { identityLessonVersion: 1 };
+    render();
+    assert.equal(panel.hidden, false);
+    assert.match(help.textContent, /Check your answers/);
+    context.state.content.activities[0] = {};
+    render();
+    assert.equal(panel.hidden, true);
+    context.state.content.activities[0] = { documentCheck: POLICY };
+    context.preview = true;
+    render();
+    assert.equal(panel.hidden, true);
+});
+
+test("drawing Submit requests permission before saving and sends a verifiable access bearer", async () => {
+    const controller = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "kit-worksheet.js"), "utf8");
+    const extract = (start, end) => controller.slice(controller.indexOf(start), controller.indexOf(end, controller.indexOf(start)));
+    const calls = [];
+    let error = "";
+    const state = { email: "student@school.nz", progressLoaded: true, blockRevision: 0, submissions: {}, drawingFiling: {} };
+    const context = vm.createContext({
+        state, preview: false, window: { clearTimeout() {}, getActiveHubBearerToken: () => "oauth-student" },
+        getStoredAuthRaw: () => JSON.stringify({ profile: { email: state.email }, accessToken: "oauth-student", expiresAt: Date.now() + 60000 }),
+        getSignedInEmail: () => state.email,
+        getResearchReportDriveToken: async () => {
+            assert.equal(state.driveSetupInProgress, true, "Same-account auth refresh must retain the activity");
+            calls.push("permission");
+            if (error) throw new Error(error);
+            return "oauth-student";
+        },
+        checkBlockAnswers: async () => calls.push("save"),
+        queueProgressWrite: async (fn) => fn(),
+        blockPath: () => "/api/practical-skills/blocks/kit-google-drawings/0",
+        updateActivityCompleteBar() {}, showStatusMessage() {}, showDocumentVerification() {},
+        loadJson: async (url, options) => {
+            calls.push("submit");
+            assert.equal(options.headers.Authorization, "Bearer oauth-student");
+            assert.equal(options.headers["x-user-email"], state.email);
+            assert.deepEqual(JSON.parse(options.body), { driveAccessToken: "oauth-student" });
+            return { submission: { documentKey: "google-file:ship" }, filing: { documentKey: "google-file:ship", filed: true } };
+        }
+    });
+
+    test("same-account verification preserves drawing drafts and account changes never carry them over", () => {
+        const controller = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "kit-worksheet.js"), "utf8");
+        const start = controller.indexOf("            const identityDraft = {};");
+        const end = controller.indexOf('            if (getSignedInEmail() === state.email && state.kitId === "kit-google-search")', start);
+        const context = vm.createContext({
+            state: { email: "student@school.nz", responses: { "2-blocks": { link: link(2) } }, content: { activities: [{ documentCheck: POLICY }] } },
+            getCurrentActivityIndex: () => 0,
+            getSignedInEmail: () => "student@school.nz",
+            isTeacherReview: (activity) => activity?.documentCheck === POLICY
+        });
+        const draft = () => vm.runInContext(`{ ${controller.slice(start, end)} JSON.stringify(identityDraft); }`, context);
+        assert.deepEqual(JSON.parse(draft()), { "2-blocks": { link: link(2) } });
+        context.getSignedInEmail = () => "another@school.nz";
+        assert.deepEqual(JSON.parse(draft()), {});
+        context.getSignedInEmail = () => "student@school.nz";
+        context.state.content.activities[0] = {};
+        assert.deepEqual(JSON.parse(draft()), {}, "Unrelated activities retain their existing behavior");
+    });
+    vm.runInContext(extract("    function withAuthHeaders(", "    function showStatusMessage(") +
+        extract("    async function submitForReview(", "    async function checkMyDocument("), context);
+    await context.submitForReview(0);
+    assert.deepEqual(calls, ["permission", "save", "submit"]);
+    assert.equal(state.driveSetupInProgress, false);
+    assert.equal(state.documentCheckInProgress, false);
+    calls.length = 0;
+    error = "Google sign-in was closed";
+    await assert.rejects(context.submitForReview(0), /sign-in was closed/);
+    assert.deepEqual(calls, ["permission"], "Permission failures are surfaced, never silently submitted");
+    assert.equal(state.driveSetupInProgress, false);
+    assert.equal(state.documentCheckInProgress, false);
 });
 
 test("drawing activity shows Saved, permits Sync after Completed, and updates after reminder sync", () => {
