@@ -60,6 +60,7 @@ async function fixture(t, options = {}) {
         schoolDomain: "school.nz",
         canManagePracticalSchedule: async (email) => email === teacher,
         certificates: options.certificates || null,
+        attendanceProvider: options.attendanceProvider,
         now: options.now
     });
     const server = await new Promise((resolve) => {
@@ -495,6 +496,42 @@ function certificateMock() {
     } };
 }
 
+test("Week 5 rules issue only for completed or excused weeks and preserve the Friday unlock", async (t) => {
+    let clock = new Date("2026-12-12T00:00:00Z");
+    let absent = false, unavailable = false;
+    const attendanceProvider = async (email, startDate) => {
+        assert.equal(email, student, "Attendance identity is verified, never taken from a client email claim");
+        return { active: true, status: unavailable ? "unavailable" : "available", weeks: unavailable ? [] :
+            Array.from({ length: 7 }, (_, index) => ({ weekStart: addDays(startDate, index * 7), confirmed: true, lessons: [
+                { date: addDays(startDate, index * 7 + 1), period: "p1", mark: absent ? "A" : "P" },
+                { date: addDays(startDate, index * 7 + 4), period: "p3", mark: absent ? "A" : "P" }
+            ] })) };
+    };
+    const certificates = certificateMock();
+    const f = await fixture(t, { attendanceProvider, certificates: certificates.api, now: () => clock });
+    const save = (week) => f.call("/attempts", { method: "POST", body: {
+        weekStart: addDays(DEFAULT_START_DATE, (week - 1) * 7), period: 2, submissionId: randomUUID(), resultUrl
+    } });
+    await save(1);
+    assert.equal((await f.call()).body.certificate, null, "An early result cannot satisfy Weeks 5-7");
+    await save(5);
+    await save(6);
+    assert.equal((await f.call()).body.certificate, null, "Missing attended Week 7 prevents issue");
+    unavailable = true;
+    assert.equal((await f.call()).body.certificate, null, "Unavailable attendance cannot excuse a missing week");
+    await save(7);
+    clock = new Date("2026-12-10T10:59:59Z");
+    assert.equal((await f.call()).body.certificate, null, "Still locked before NZ Friday");
+    clock = new Date("2026-12-12T00:00:00Z");
+    assert.ok((await f.call()).body.certificate, "Saved weekly results meet the requirement even with unknown attendance");
+    absent = true; unavailable = false;
+    const excusedCertificates = certificateMock();
+    const excused = await fixture(t, { attendanceProvider, certificates: excusedCertificates.api, now: () => clock });
+    const result = await excused.call();
+    assert.equal(result.body.weeklyProgress.excusedWeeks, 3);
+    assert.ok(result.body.certificate, "All three fully absent weeks are excused without making up tests");
+});
+
 test("certificate unlocks on Friday of Week 7 in NZ time, only with a result in the seven-week calendar", () => {
     assert.equal(certificateUnlockDate(DEFAULT_START_DATE), "2026-12-11");
     const attempt = [{ week_start: "2026-11-02" }];
@@ -554,7 +591,7 @@ test("Not Live teacher preview and certificate failures never issue a certificat
 test("dashboard explains the end-of-Week-7 certificate and shows an issued certificate only on the dashboard", async () => {
     const pending = frontend({ snapshot: { startDate: DEFAULT_START_DATE, canManage: false, attempts: [], certificateUnlockDate: "2026-12-11", certificate: null } });
     await settle();
-    assert.match(pending.get("typing-content").innerHTML, /issued at the end of Week 7 \(Friday 11 Dec 2026\)/);
+    assert.match(pending.get("typing-content").innerHTML, /unlocks at the end of Week 7 \(Friday 11 Dec 2026\) once its requirements are met/);
     assert.equal(pending.get("worksheet-certificate").hidden, true);
     const certificate = { studentName: "Student Name", detailText: "Seven-week typing practice log | 11 December 2026", issuer: "Westland High School | DTECH-HUB" };
     const issued = frontend({ snapshot: { startDate: DEFAULT_START_DATE, canManage: false, attempts: [], certificateUnlockDate: "2026-12-11", certificate, certificateEmailed: true } });

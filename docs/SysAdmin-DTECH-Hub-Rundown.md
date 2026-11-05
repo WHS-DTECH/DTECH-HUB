@@ -15,6 +15,19 @@ DTECH Hub is a web application used in DTECH classes for project/activity access
 - `practical_skills_filed_drawings.synced` records actual success separately from reminder-resolved outcomes (`missing`, `not-owner`, `not-drawing`). Those outcomes remain Saved, with student guidance to correct the link.
 - Older filing markers did not distinguish success from those outcomes. They remain unconfirmed until a student-authorised filing retry checks the drawing; the filing helper leaves already-correct folders/names unchanged. Saved links, teacher ticks and email deduplication are preserved.
 
+### Attendance-aware Typing Kit (Week 5 rollout)
+- The new requirement applies only to **Typing Kit Weeks 5-7**, not Planner term-week numbers. With the default Monday 26 October 2026 calendar, Week 5 starts **23 November 2026**.
+- One saved valid one-minute result in either typing slot satisfies that week. Weeks 1-4 have no new weekly requirement. A week with confirmed absence for every scheduled DTECH lesson is excused without catch-up; blank/missing/conflicting marks are not absences. Late counts as attendance.
+- Certificates retain the Friday of Week 7 unlock. Once the connector is enabled, all three required weeks must be completed or excused. Already-issued certificates are retained; attempts are never removed. Unknown attendance cannot excuse a missing result, but a saved result satisfies its week without attendance.
+- Both slots remain usable, including optional practice during an excused week. The daily page shows actual lesson dates and **school** periods separately from typing slots.
+- A read-only server connection uses only the authenticated student's school email. The Planner source fixes the register owner in server configuration and matches the email to a unique current KAMAR ID, saved automatic DTECH class tabs, the owner's private KAMAR timetable and school term/closure/holiday dates. No names, reasons, other students' marks or private timetable URLs are returned.
+- Configure Render in this order:
+  1. In **WHS_APPSystem**, set `DTECH_TYPING_ATTENDANCE_OWNER_EMAIL` to the school email of the teacher whose registers were selected, and `DTECH_TYPING_ATTENDANCE_KEY` to a new dedicated cryptographically random key of at least 32 characters.
+  2. In **DTECH-HUB**, set `TYPING_ATTENDANCE_URL=https://whs-appsystem.onrender.com/integrations/typing-attendance` and `TYPING_ATTENDANCE_KEY` to the same key. Never put the key in browser code, chat, source control or a student-facing setting.
+  3. Deploy both services and open a student Typing Kit. Confirm that the dashboard shows a current Teacher Planner check time and the expected lesson marks. Confirm a partial absence, a fully absent week and an unrecorded week before relying on excuses.
+- Without both DTECH-HUB settings, the connector/new certificate rule stays inactive and the dashboard explicitly says setup is pending; legacy certificate behavior remains. Partial/insecure configuration fails startup explicitly. Once configured, source outages show a warning and unconfirmed attendance rather than quietly awarding absence exemptions.
+- The source is `POST /integrations/typing-attendance`, protected by the dedicated server key and rate limiting. Its only request fields are `studentEmail` and `startDate`. Responses contain seven date-keyed weeks, scheduled lesson marks and a current fetch timestamp. No Planner mutations or database credentials are shared.
+
 ## 2) How Google Sign-In Is Set Up
 - Frontend uses Google Identity Services OAuth token flow.
 - User signs in with Google and the app fetches profile details from the Google userinfo API.

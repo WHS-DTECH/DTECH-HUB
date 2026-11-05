@@ -22,6 +22,7 @@ const { submissionSummary, inspectSubmissionPackage, createSubmissionZipResponse
 const { additionalSlideshowId, additionalSlideshowTemplateId, additionalSlideshowPdfTemplateId } = require("./submission-slideshows");
 const { trelloReportSources, resolveReportBoards, createTrelloReportPdf, createTrelloReportStore } = require("./trello-report");
 const { registerTypingKit, withTypingKitCard } = require("./practical-skills/typing-kit-store");
+const { createTypingAttendanceClient } = require("./practical-skills/typing-attendance");
 const { withKitCertificateEmailLock } = require("./practical-skills/certificate-catchup");
 
 const SEARCH_PENGUIN_MISSIONS_ID = "search-penguin-missions-v1";
@@ -6325,6 +6326,7 @@ require("./learning-pathways/comment-bank-store").registerCommentBank(app, {
 });
 registerTypingKit(app, {
   pool, hasDatabase, normalizeEmail, schoolDomain: SCHOOL_EMAIL_DOMAIN, canManagePracticalSchedule,
+  attendanceProvider: createTypingAttendanceClient(),
   verifyGoogleAccessTokenAndExtractIdentity,
   certificates: {
     // Records Typing Kit completion only when the store says Week 7 has ended; certificates are dated that Friday.

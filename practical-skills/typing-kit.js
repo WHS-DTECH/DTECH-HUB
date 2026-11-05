@@ -58,7 +58,32 @@
     function certificateNotice() {
         if (state.snapshot.certificate) return '<p class="typing-certificate-note"><strong>Certificate issued.</strong> Your Typing Kit certificate is below.</p>';
         const unlock = state.snapshot.certificateUnlockDate;
-        return unlock ? `<p class="typing-certificate-note">Your Typing Kit certificate is issued at the end of Week 7 (Friday ${dateLabel(unlock)}). It is not issued after each session.</p>` : "";
+        return unlock ? `<p class="typing-certificate-note">Your Typing Kit certificate unlocks at the end of Week 7 (Friday ${dateLabel(unlock)}) once its requirements are met. It is not issued after each session.</p>` : "";
+    }
+    function weeklyRulesNotice() {
+        const progress = state.snapshot.weeklyProgress;
+        if (!progress) return "";
+        const rule = "From Typing Kit Week 5, save at least one one-minute test each week you attend DTECH. Away for every scheduled DTECH class that week? The week is excused, with no catch-up required. Weeks 1-4 have no new requirement.";
+        if (!progress.active) return `<p class="typing-attendance-note">${rule} The attendance connection is being set up; the new certificate rule is not active yet.</p>`;
+        return `<p class="typing-attendance-note">${rule}</p>
+            <p><strong>Weeks 5-7: ${progress.completedWeeks} completed &middot; ${progress.excusedWeeks} excused</strong></p>
+            <p class="typing-note">Teacher Planner attendance (not the official KAMAR register). ${progress.fetchedAt ? `Checked ${escapeHtml(timeLabel(progress.fetchedAt))}.` : ""} Blank attendance is not treated as absent.</p>
+            ${progress.error ? `<p class="typing-attendance-warning" role="status">${escapeHtml(progress.error)}</p>` : ""}`;
+    }
+    function weekAttendance(weekStart) {
+        const progress = state.snapshot.weeklyProgress;
+        if (!progress?.active) return "";
+        const week = progress.weeks.find(week => week.weekStart === weekStart);
+        if (!week) return "";
+        const labels = { legacy: "Weeks 1-4: no new weekly requirement", future: "Upcoming week",
+            completed: "Weekly typing requirement met", excused: "Week excused - away for all DTECH classes. No catch-up needed.",
+            required: "One typing test needed this week", pending: "Attendance needs confirmation - not counted as absent" };
+        return `<div class="typing-attendance-note" data-week-status="${escapeHtml(week.status)}">
+            <strong>${labels[week.status]}</strong>
+            ${week.absentClasses ? `<p>Away for ${week.absentClasses} of ${week.scheduledClasses} scheduled DTECH classes.</p>` : ""}
+            ${week.lessons.length ? `<ul>${week.lessons.map(lesson => `<li>${dateLabel(lesson.date)} &middot; school ${lesson.period.toUpperCase()}:
+                ${lesson.date > progress.today ? "Not yet held" : lesson.mark === "A" ? "Absent" : ["P", "L"].includes(lesson.mark) ? "Attended" : "Not recorded"}</li>`).join("")}</ul>` : ""}
+        </div>`;
     }
     function weeks() {
         return Array.from({ length: 7 }, (_, index) => addDays(state.snapshot.startDate, index * 7));
@@ -94,6 +119,7 @@
                 <p>${dateLabel(starts[0])} &ndash; ${dateLabel(addDays(starts[6], 6))}</p>
                 <p><strong>${recorded} / 14 period records started</strong> &middot; All attempts are kept.</p>
                 ${certificateNotice()}
+                ${weeklyRulesNotice()}
                 <p>Open your week and period. Complete a one-minute test, paste the results link here, save it, then copy your saved result into your exercise book for your teacher to sign.</p>
                 <p class="typing-note">This is your electronic log, not an electronic sign-off. Scores are student-submitted. Submission dates do not verify when a test was taken.</p>
             </section>
@@ -109,6 +135,7 @@
             <section aria-labelledby="typing-weeks-heading"><h2 id="typing-weeks-heading">Your seven-week log</h2>
                 ${starts.map((start, index) => `<article class="typing-week">
                     <div class="typing-week-heading"><h3>Week ${index + 1}</h3><p>${dateLabel(start)} &ndash; ${dateLabel(addDays(start, 6))}</p></div>
+                    ${weekAttendance(start)}
                     <div class="typing-periods">${[1, 2].map((period) => {
                         const rows = periodAttempts(start, period);
                         const latest = rows[rows.length - 1];
@@ -134,6 +161,7 @@
                 const saved = await request("/settings", { method: "PUT", body: JSON.stringify({ startDate }) });
                 if (revision !== state.revision) return;
                 state.snapshot.startDate = saved.startDate;
+                state.snapshot = await request();
                 renderOverview();
                 message("Calendar saved. All existing attempts have been kept.");
             } catch (error) {
@@ -152,6 +180,7 @@
         content.innerHTML = `<a href="./typing-kit.html">&larr; Back to Typing Kit Dashboard</a>
             <section class="typing-daily">
                 <h2>${title}</h2><p>Week of ${dateLabel(weekStart)} &ndash; ${dateLabel(addDays(weekStart, 6))}</p>
+                ${weekAttendance(weekStart)}
                 ${index >= 0 ? `<ol>
                     <li>Launch and complete a one-minute typing test.</li>
                     <li>Copy the address of the results page and return here.</li>
@@ -244,6 +273,14 @@
                 const saved = await request("/attempts", { method: "POST", body: JSON.stringify({ weekStart, period, resultUrl, submissionId }) });
                 if (revision !== state.revision) return;
                 if (!state.snapshot.attempts.some((attempt) => attempt.id === saved.attempt.id)) state.snapshot.attempts.push(saved.attempt);
+                const progress = state.snapshot.weeklyProgress;
+                const week = progress?.weeks.find(week => week.weekStart === weekStart);
+                if (week && week.week >= progress.ruleStartWeek && week.weekStart <= progress.today) {
+                    week.recorded = true;
+                    week.status = "completed";
+                    progress.completedWeeks = progress.weeks.filter(week => week.week >= progress.ruleStartWeek && week.status === "completed").length;
+                    progress.excusedWeeks = progress.weeks.filter(week => week.week >= progress.ruleStartWeek && week.status === "excused").length;
+                }
                 state.submissionId = "";
                 state.pendingUrl = "";
                 renderDaily(weekStart, period);

@@ -1,4 +1,5 @@
 "use strict";
+const { weeklyTypingProgress } = require("./typing-attendance");
 
 const DEFAULT_START_DATE = "2026-10-26";
 const WEEK_COUNT = 7;
@@ -93,7 +94,7 @@ function parseTypingResult(value) {
 }
 
 function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomain, canManagePracticalSchedule, verifyGoogleAccessTokenAndExtractIdentity,
-    certificates = null, now = () => new Date() }) {
+    certificates = null, attendanceProvider = async () => ({ active: false, status: "not-configured", weeks: [] }), now = () => new Date() }) {
     let schemaReady;
     const certificateEmailCooldowns = new Map();
     async function ensureSchema() {
@@ -160,10 +161,12 @@ function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomai
         res.status(error.status || 500).json({ error: error.status ? error.message : "Could not access the typing log. Please try again; no results have been removed." });
     }
     // Issues the completion record only from Friday of Week 7; earlier log sessions never create a certificate.
-    async function certificateFor(req, email, startDate, attempts) {
+    async function certificateFor(req, email, startDate, attempts, weeklyProgress) {
         if (!certificates) return null;
+        const progress = weeklyProgress || weeklyTypingProgress(startDate, attempts, await attendanceProvider(email, startDate), nzDate(now()));
         return certificates.get(req, email, {
-            eligible: typingCertificateEligible(startDate, attempts, now()),
+            eligible: progress.active ? nzDate(now()) >= certificateUnlockDate(startDate) && progress.satisfied
+                : typingCertificateEligible(startDate, attempts, now()),
             issuedOn: certificateUnlockDate(startDate)
         });
     }
@@ -173,11 +176,15 @@ function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomai
     async function requiredCertificate(req, res, email) {
         await ensureSchema();
         const startDate = await settings();
-        const certificate = await certificateFor(req, email, startDate, await loadAttempts(email));
+        const attempts = await loadAttempts(email);
+        const progress = weeklyTypingProgress(startDate, attempts, await attendanceProvider(email, startDate), nzDate(now()));
+        const certificate = await certificateFor(req, email, startDate, attempts, progress);
         if (!certificate) {
             const unlock = new Intl.DateTimeFormat("en-NZ", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })
                 .format(new Date(`${certificateUnlockDate(startDate)}T00:00:00Z`));
-            res.status(409).json({ error: `Your Typing Kit certificate unlocks at the end of Week 7 (${unlock}) once you have saved a result.` });
+            res.status(409).json({ error: progress.active
+                ? `Your Typing Kit certificate unlocks at the end of Week 7 (${unlock}). From Week 5, save one test per attended week; confirmed fully absent weeks are excused. Unconfirmed attendance needs your teacher's help.`
+                : `Your Typing Kit certificate unlocks at the end of Week 7 (${unlock}) once you have saved a result.` });
         }
         return certificate;
     }
@@ -189,12 +196,13 @@ function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomai
         try {
             await ensureSchema();
             const [startDate, attempts, canManage] = await Promise.all([settings(), loadAttempts(email), canManagePracticalSchedule(email)]);
+            const weeklyProgress = weeklyTypingProgress(startDate, attempts, await attendanceProvider(email, startDate), nzDate(now()));
             const readOnly = res.locals.kitPreview === true;
             let certificate = null;
             let certificateEmailed = false;
             if (!readOnly) {
                 try {
-                    certificate = await certificateFor(req, email, startDate, attempts);
+                    certificate = await certificateFor(req, email, startDate, attempts, weeklyProgress);
                     if (certificate) certificateEmailed = await certificates.autoEmail(email, certificate);
                 } catch (error) {
                     console.error("[typing-kit] Certificate check failed; the log is still available:", error);
@@ -202,6 +210,7 @@ function registerTypingKit(app, { pool, hasDatabase, normalizeEmail, schoolDomai
             }
             res.json({ startDate, weekCount: WEEK_COUNT, periodsPerWeek: PERIOD_COUNT, canManage,
                 readOnly, attempts: attempts.map(shape),
+                weeklyProgress,
                 certificateUnlockDate: certificateUnlockDate(startDate), certificate, certificateEmailed });
         } catch (error) { failure(res, error); }
     });
