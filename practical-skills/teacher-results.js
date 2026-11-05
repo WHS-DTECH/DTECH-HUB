@@ -203,8 +203,8 @@
                         link.href = entry.url;
                         link.target = "_blank";
                         link.rel = "noopener noreferrer";
-                        node("div", entry.submittedAt ? `Submitted ${date(entry.submittedAt)}` : "Link saved, not submitted", linkCell,
-                            entry.submittedAt ? "submission-submitted" : "submission-note");
+                        node("div", `${entry.filed === true ? "Submitted - synced" : "Saved - sync needed"}${entry.submittedAt ? ` ${date(entry.submittedAt)}` : ""}`, linkCell,
+                            entry.filed === true ? "submission-submitted" : "submission-saved");
                     } else node("span", "No link", linkCell, "submission-note");
                     const tickCell = node("td", undefined, row, entry?.completed ? "class-progress-complete" : undefined);
                     const label = node("label", undefined, tickCell);

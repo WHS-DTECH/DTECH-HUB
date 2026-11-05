@@ -32,6 +32,8 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
             .then(() => pool.query(`CREATE TABLE IF NOT EXISTS practical_skills_filed_drawings (
                 student_email TEXT NOT NULL, document_key TEXT NOT NULL, filed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 PRIMARY KEY (student_email, document_key))`))
+            .then(() => pool.query("ALTER TABLE practical_skills_filed_drawings ADD COLUMN IF NOT EXISTS synced BOOLEAN NOT NULL DEFAULT FALSE"))
+            .then(() => pool.query("ALTER TABLE practical_skills_filed_drawings ADD COLUMN IF NOT EXISTS reason TEXT"))
             .catch((error) => { submissionSchema = null; throw error; });
         await submissionSchema;
     }
@@ -40,8 +42,9 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
     async function markFiled(student, kit, index, documentKey, filing) {
         if (!filing?.filed && !FILING_RESOLVED.has(filing?.reason)) return;
         await ensureSubmissionSchema();
-        await pool.query(`INSERT INTO practical_skills_filed_drawings (student_email, document_key) VALUES ($1,$2)
-            ON CONFLICT (student_email, document_key) DO NOTHING`, [student, documentKey]);
+        await pool.query(`INSERT INTO practical_skills_filed_drawings (student_email, document_key, synced, reason) VALUES ($1,$2,$3,$4)
+            ON CONFLICT (student_email, document_key) DO UPDATE SET synced = EXCLUDED.synced, reason = EXCLUDED.reason, filed_at = NOW()`,
+        [student, documentKey, filing.filed === true, filing.reason || null]);
         await pool.query(`UPDATE practical_skills_submissions SET filed_document_key = $4
             WHERE student_email = $1 AND kit_id = $2 AND activity_index = $3 AND document_key = $4`, [student, kit, index, documentKey]);
     }
@@ -51,9 +54,8 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
         const submitted = (await pool.query(`SELECT kit_id, activity_index, document_key, filed_document_key
             FROM practical_skills_submissions WHERE student_email = $1 AND document_key LIKE 'google-file:%'`, [student])).rows;
         const saved = (await pool.query("SELECT kit_id, responses FROM practical_skills_progress WHERE student_email = $1", [student])).rows;
-        const filed = new Set((await pool.query("SELECT document_key FROM practical_skills_filed_drawings WHERE student_email = $1",
-            [student])).rows.map((row) => row.document_key));
-        submitted.forEach((row) => { if (row.filed_document_key === row.document_key) filed.add(row.document_key); });
+        const filed = new Set((await pool.query("SELECT document_key, synced, reason FROM practical_skills_filed_drawings WHERE student_email = $1",
+            [student])).rows.filter((row) => row.synced === true || FILING_RESOLVED.has(row.reason)).map((row) => row.document_key));
         const contents = new Map();
         const content = async (kit) => {
             if (!contents.has(kit)) contents.set(kit, await loadContent(kit).catch(() => null));
@@ -83,6 +85,13 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
         return pending;
     }
     const publicPending = (items) => items.map(({ kitId, index, title }) => ({ kitId, index, title }));
+    async function getDrawingFiling(student, documentKey) {
+        if (!documentKey) return null;
+        await ensureSubmissionSchema();
+        const row = (await pool.query("SELECT document_key, synced, reason FROM practical_skills_filed_drawings WHERE student_email = $1 AND document_key = $2",
+            [student, documentKey])).rows[0];
+        return { documentKey, filed: row?.synced === true, reason: row?.reason || "" };
+    }
     // Submission for the student's current link only; a changed link means not yet submitted.
     async function getSubmission(student, kit, index, documentKey) {
         if (!documentKey) return null;
@@ -189,6 +198,7 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
             try {
                 const item = await load(req, email);
                 res.json({ verification: await get(email, item.kit, item.index, item.activity, item.row.responses),
+                    filing: TEACHER_ONLY.has(item.policy) ? await getDrawingFiling(email, item.documentKey) : null,
                     submission: TEACHER_ONLY.has(item.policy) ? await getSubmission(email, item.kit, item.index, item.documentKey) : null });
             } catch (error) { failure(res, error); }
         });
@@ -237,7 +247,8 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                         console.error("[kit-submission] Could not email teacher:", error.message);
                     }
                 }
-                res.json({ submission: await getSubmission(email, item.kit, item.index, item.documentKey), emailed, filing,
+                res.json({ submission: await getSubmission(email, item.kit, item.index, item.documentKey), emailed,
+                    filing: { ...filing, ...await getDrawingFiling(email, item.documentKey), reason: filing.reason || "" },
                     verification: await get(email, item.kit, item.index, item.activity, item.row.responses) });
             } catch (error) { failure(res, error); }
         });
@@ -269,7 +280,7 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                         filing = { filed: false, reason: "error" };
                     }
                     await markFiled(email, item.kitId, item.index, item.documentKey, filing);
-                    results.push({ kitId: item.kitId, index: item.index, title: item.title, filed: Boolean(filing.filed),
+                    results.push({ kitId: item.kitId, index: item.index, documentKey: item.documentKey, title: item.title, filed: Boolean(filing.filed),
                         reason: filing.reason || "", path: Array.isArray(filing.path) ? filing.path : null });
                 }
                 res.json({ results, pending: publicPending(await pendingFiling(email)) });
@@ -279,7 +290,10 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
             res.set("Cache-Control", "private, no-store");
             const kits = [...new Set(String(req.query.kits || "").split(","))].filter((kit) => /^kit-[a-z0-9-]{1,60}$/.test(kit)).slice(0, 40);
             try {
+                await ensureSubmissionSchema();
                 const result = [];
+                const filedDrawings = (await pool.query(`SELECT student_email, document_key, synced, reason FROM practical_skills_filed_drawings
+                    WHERE student_email IN (SELECT student_email FROM practical_skills_progress WHERE kit_id = ANY($1::text[]))`, [kits])).rows;
                 for (const kit of kits) {
                     const content = await loadContent(kit);
                     const activities = (content.worksheets || []).map((worksheet, index) => ({ worksheet, index, activity: content.activities?.[index] }))
@@ -303,6 +317,7 @@ function createDocumentVerification({ pool, getDefaultPracticalSkillsKitContent,
                                 Number(entry.activity_index) === index && entry.document_key === documentKey && documentKey);
                             const check = mine(checks.filter((entry) => entry.policy === activity.documentCheck));
                             return [index, { url: documentKey ? url : "", documentKey, submittedAt: mine(submissions)?.submitted_at || null,
+                                filed: filedDrawings.some((entry) => normalizeEmail(entry.student_email) === email && entry.document_key === documentKey && entry.synced === true),
                                 completed: check?.passed === true }];
                         }));
                     }

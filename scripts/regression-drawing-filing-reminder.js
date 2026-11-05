@@ -119,3 +119,39 @@ test("only Remind me later, Close or Escape mark the reminder as seen", () => {
     assert.match(show, /addEventListener\("cancel"[\s\S]*?sessionStorage\.setItem\(reminderKey/);
     assert.match(source, /hubCourseRedirecting = true;\s*window\.location\.replace\(destination\)/);
 });
+
+test("filing reminder emits real outcomes for the activity and never calls a failed move synced", async () => {
+    for (const filed of [true, false]) {
+        const elements = new Map(), events = [];
+        function element() {
+            return { textContent: "", events: {}, replaceChildren() {}, append() {}, setAttribute() {}, showModal() {},
+                addEventListener(name, handler) { this.events[name] = handler; },
+                querySelector(selector) {
+                    if (!elements.has(selector)) elements.set(selector, element());
+                    return elements.get(selector);
+                } };
+        }
+        const result = { documentKey: "google-file:ship", index: 0, kitId: "kit-google-drawings", filed,
+            reason: filed ? "" : "not-owner", path: filed ? ["WHS-DTECH", "JuniorDTECH", "KITS", "Google Drawings"] : null };
+        const context = vm.createContext({
+            document: { createElement: element, body: { appendChild() {} } },
+            window: { dispatchEvent: (event) => events.push(event) },
+            CustomEvent: function (name, options) { return { name, detail: options.detail }; },
+            hubAuthState: { profile: { email: "student@school.nz" } },
+            normalizeEmail: (email) => email,
+            requestHubDriveAccessToken: async () => ({ access_token: "student-token" }),
+            drawingFilingHeaders: (headers) => headers,
+            DRAWING_FILING_PATH: "/api/practical-skills/drawing-filing",
+            fetch: async () => ({ ok: true, json: async () => ({ results: [result], pending: [] }) })
+        });
+        vm.runInContext(slice("function showDrawingFilingReminder(", "\nlet INTERNAL_ASSESSMENT_DEADLINE"), context);
+        context.showDrawingFilingReminder("student@school.nz", [{ title: "Ship" }]);
+        await elements.get("[data-drawing-filing-move]").events.click();
+        assert.equal(events.length, 1);
+        assert.equal(events[0].name, "hub-drawings-filed");
+        assert.equal(events[0].detail.email, "student@school.nz");
+        assert.equal(events[0].detail.results[0].filed, filed);
+        const status = elements.get("[data-drawing-filing-status]").textContent;
+        assert.match(status, filed ? /All done! Your drawings are in/ : /Some links could not be synced/);
+    }
+});

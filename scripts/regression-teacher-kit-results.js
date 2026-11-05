@@ -507,7 +507,7 @@ test("submissions list follows the class filters, links drawings and saves teach
     const kits = [{ id: "kit-login", title: "Login Kit" }, { id: "kit-google-drawings", title: "Google Drawings Kit" }];
     const drawing = "https://docs.google.com/drawings/d/ana-ship/edit";
     const submissions = { kits: [{ id: "kit-google-drawings", activities: [{ index: 0, title: "Ship" }, { index: 1, title: "TV" }],
-        students: { "ana@school.nz": { 0: { url: drawing, documentKey: "google-file:ana-ship", submittedAt: "2026-05-01T00:00:00Z", completed: false },
+        students: { "ana@school.nz": { 0: { url: drawing, documentKey: "google-file:ana-ship", submittedAt: "2026-05-01T00:00:00Z", completed: false, filed: false },
             1: { url: "", documentKey: "", submittedAt: null, completed: false } } } }] };
     const puts = [];
     const auths = [];
@@ -553,7 +553,7 @@ test("submissions list follows the class filters, links drawings and saves teach
     const shipCell = rows()[0].children[2];
     assert.equal(shipCell.children[0].href, drawing);
     assert.equal(shipCell.children[0].target, "_blank");
-    assert.match(shipCell.children[1].textContent, /^Submitted /);
+    assert.match(shipCell.children[1].textContent, /^Saved - sync needed /);
     assert.equal(rows()[0].children[4].children[0].textContent, "No link");
     assert.equal(rows()[0].children[5].children[0].children[0].disabled, true, "Nothing to tick without a link");
     const tick = rows()[0].children[3].children[0].children[0];
@@ -573,6 +573,10 @@ test("submissions list follows the class filters, links drawings and saves teach
     assert.equal(rows()[0].children[3].children[0].children[0].checked, false,
         "Same-account token refresh keeps the current list and applies the saved result");
     assert.match(el("submission-status").textContent, /Removed Completed for Ana - Ship/);
+    submissions.kits[0].students["ana@school.nz"][0].filed = true;
+    el("class-homeroom-filter").events.change();
+    assert.match(rows()[0].children[2].children[1].textContent, /^Submitted - synced /,
+        "Teacher list distinguishes confirmed filing from a saved timestamp");
     el("class-kit-filter").value = "kit-login";
     el("class-kit-filter").events.change();
     assert.equal(host.children.length, 0, "Submissions follow the kit filter");

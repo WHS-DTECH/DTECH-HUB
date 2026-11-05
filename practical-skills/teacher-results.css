@@ -83,7 +83,8 @@
     margin: 22px 0 8px;
 }
 
-.submission-submitted {
+.submission-submitted,
+.submission-saved {
     display: inline-block;
     margin-top: 4px;
     padding: 2px 8px;
@@ -92,6 +93,11 @@
     color: #3b2300;
     font-size: 0.85em;
     font-weight: 700;
+}
+
+.submission-submitted {
+    background: #dcfce7;
+    color: #166534;
 }
 
 .submission-note {

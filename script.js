@@ -2903,11 +2903,15 @@ function showDrawingFilingReminder(email, pending, reminderKey = "") {
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok) throw new Error(data.error || "Your drawings could not be moved.");
+            window.dispatchEvent(new CustomEvent("hub-drawings-filed", { detail: { email, results: data.results || [] } }));
             const remaining = Array.isArray(data.pending) ? data.pending : [];
             if (!remaining.length) {
                 const path = (data.results || []).find((result) => Array.isArray(result.path))?.path;
                 renderList([]);
-                status.textContent = path ? `All done! Your drawings are in ${path.join(" > ")}.` : "All done! Your drawings are sorted.";
+                const unresolved = (data.results || []).some((result) => !result.filed);
+                status.textContent = unresolved
+                    ? "Some links could not be synced. Check that each link opens your own Google Drawing, then save and submit the correct link in the kit."
+                    : path ? `All done! Your drawings are in ${path.join(" > ")}.` : "All done! Your drawings are sorted.";
                 move.hidden = true;
                 dismiss.textContent = "Close";
                 return;

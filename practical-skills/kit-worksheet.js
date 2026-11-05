@@ -28,8 +28,20 @@
         certificate: null,
         driveSetupInProgress: false,
         documentCheckInProgress: false,
-        submissions: {}
+        submissions: {},
+        drawingFiling: {}
     };
+    window.addEventListener("hub-drawings-filed", (event) => {
+        if (normalizeEmail(event.detail?.email) !== normalizeEmail(state.email)) return;
+        for (const filing of event.detail.results || []) {
+            if (filing.documentKey) state.drawingFiling[filing.documentKey] = filing;
+        }
+        updateActivityCompleteBar();
+        const index = getCurrentActivityIndex();
+        if (index !== null && isTeacherReview(state.content?.activities?.[index])) {
+            showDocumentVerification(null, state.submissions[index]);
+        }
+    });
 
     function normalizeEmail(value) {
         return String(value || "").trim().toLowerCase();
@@ -198,9 +210,13 @@
         const currentKey = linkBlock ? window.ActivityBlocks.documentLinkKey(
             window.ActivityBlocks.savedAnswers(activity, index, state.responses)[linkBlock.id]) : "";
         const submitted = !preview && Boolean(currentKey) && state.submissions?.[index]?.documentKey === currentKey;
-        pill.textContent = completed ? autoBlocks && !teacherReview ? "Auto-Completed" : "Completed" : submitted ? "Submitted" : "Not Completed";
+        const filed = state.drawingFiling?.[currentKey]?.filed === true;
+        const drawingStatus = filed ? "Submitted - synced" : "Saved - sync needed";
+        pill.textContent = completed ? autoBlocks && !teacherReview ? "Auto-Completed" : "Completed"
+            : teacherReview && currentKey ? drawingStatus : "Not Completed";
         pill.classList.toggle("is-complete", completed);
-        pill.classList.toggle("is-submitted", !completed && submitted);
+        pill.classList.toggle("is-submitted", !completed && teacherReview && filed);
+        pill.classList.toggle("is-saved", !completed && teacherReview && Boolean(currentKey) && !filed);
         if (completed) {
             pill.setAttribute("href", `./kit-worksheet.html?kit=${encodeURIComponent(state.kitId)}`);
             pill.setAttribute("aria-label", "Completed - return to kit activity menu");
@@ -210,9 +226,9 @@
             pill.removeAttribute("aria-label");
             pill.removeAttribute("title");
         }
-        button.textContent = teacherReview ? submitted || completed ? "Submitted" : "Submit" : activity?.documentCheck ? "Check my document" : activity?.unityTestProjectVersion ? "Completed" : autoBlocks ? "Check & Save Activity" : completed ? "Undo Completion" : siteQuestions ? "Check Activity Completion" : "Mark Activity Complete";
+        button.textContent = teacherReview ? filed ? "Submitted - synced" : submitted || completed ? "Sync drawing" : "Submit" : activity?.documentCheck ? "Check my document" : activity?.unityTestProjectVersion ? "Completed" : autoBlocks ? "Check & Save Activity" : completed ? "Undo Completion" : siteQuestions ? "Check Activity Completion" : "Mark Activity Complete";
         button.classList.toggle("is-submit", teacherReview);
-        button.disabled = preview || !state.progressLoaded || Boolean(state.documentCheckInProgress) || (teacherReview && (submitted || completed));
+        button.disabled = preview || !state.progressLoaded || Boolean(state.documentCheckInProgress) || (teacherReview && filed);
         button.hidden = !preview && selfMarking && !siteQuestions && !completed;
     }
 
@@ -267,10 +283,20 @@
         if (!host) return;
         const when = (value) => new Date(value).toLocaleString("en-NZ");
         if (isTeacherReview(state.content?.activities?.[getCurrentActivityIndex()])) {
-            host.textContent = verification?.passed ? `Completed - your teacher marked this drawing Completed on ${when(verification.checkedAt)}.`
-                : submission ? `Submitted ${when(submission.submittedAt)}. Your teacher will review your drawing and tick Completed.`
+            const index = getCurrentActivityIndex();
+            const activity = state.content.activities[index];
+            const block = activity.blocks?.find((item) => item.kind === "studentlink");
+            const key = block ? window.ActivityBlocks.documentLinkKey(window.ActivityBlocks.savedAnswers(activity, index, state.responses)[block.id]) : "";
+            const filing = state.drawingFiling?.[key];
+            const sync = filing?.filed === true ? "Submitted - synced to your DTECH folder."
+                : key ? "Saved - sync needed. Press Submit or Sync drawing and allow Google permission to file it in your DTECH folder." : "";
+            const problem = filing?.reason === "not-owner" ? " This drawing belongs to another account. Save and submit a link to your own drawing."
+                : ["missing", "not-drawing"].includes(filing?.reason) ? " Check that your link opens your own Google Drawing, then save and submit the correct link." : "";
+            host.textContent = `${sync}${problem} ${verification?.passed ? `Completed - your teacher marked this drawing Completed on ${when(verification.checkedAt)}.`
+                : state.completedActivities[index] ? "Completed - your teacher marked this drawing Completed."
+                    : submission ? `Link received ${when(submission.submittedAt)}. Your teacher will review your drawing and tick Completed.`
                     : verification ? `${verification.feedback.message} (${when(verification.checkedAt)})`
-                        : "Not submitted yet. Save your Share Link, then press Submit.";
+                        : "Save your Share Link, then press Submit."}`.trim();
             return;
         }
         host.textContent = verification
@@ -301,13 +327,15 @@
                 });
                 if (getSignedInEmail() !== email || revision !== state.blockRevision) return result;
                 state.submissions[index] = result.submission;
+                if (result.filing?.documentKey) state.drawingFiling[result.filing.documentKey] = result.filing;
                 updateActivityCompleteBar();
                 showDocumentVerification(result.verification, result.submission);
                 const filing = result.filing || {};
-                const filed = filing.filed && Array.isArray(filing.path) ? ` Your drawing is saved in ${filing.path.join(" > ")}.`
+                const filed = filing.filed ? Array.isArray(filing.path) ? ` Your drawing is filed in ${filing.path.join(" > ")}.` : " Your drawing is filed in your DTECH folder."
                     : filing.reason === "not-owner" ? " This drawing belongs to someone else, so it wasn't moved to your folder."
-                        : " Your drawing couldn't be moved to your DTECH folder - you can move it yourself.";
-                showStatusMessage(`Submitted! Your teacher will review your drawing and tick Completed.${filed}`);
+                        : ["missing", "not-drawing"].includes(filing.reason) ? " Check that your link opens your own Google Drawing, then save and submit the correct link."
+                        : " Press Sync drawing and allow Google permission to move it into your DTECH folder.";
+                showStatusMessage(`${filing.filed ? "Submitted - synced!" : "Saved - sync needed."} Your teacher has your link for review.${filed}`);
                 return result;
             });
         } finally {
@@ -381,7 +409,7 @@
             : `Finish your ${state.content.worksheets?.[index]?.activity || "typed"} document`;
         const help = document.createElement("p");
         help.textContent = drawing
-            ? "Save your Google Drawing's sharing link, then press Submit below. Your teacher is emailed your link, reviews your drawing and ticks Completed."
+            ? "Save your Google Drawing's sharing link, then press Submit below and allow Google permission. Saved means sync is still needed; Submitted means your drawing has been filed in your DTECH folder. Your teacher receives your link and ticks Completed separately."
             : "Save your document and its sharing link, then use Check my document below. Google Docs and Word (.docx) files in Google Drive can be checked automatically. For other file types or OneDrive, ask your teacher to open the link and approve the completed text in Teacher Review.";
         const note = document.createElement("p");
         note.textContent = drawing
@@ -401,10 +429,12 @@
             .then((result) => {
                 if (!status.isConnected || email !== getSignedInEmail() || revision !== state.blockRevision) return;
                 if (drawing) {
+                    if (result.filing) state.drawingFiling[result.filing.documentKey] = result.filing;
                     if (result.submission) state.submissions[index] = result.submission;
                     else delete state.submissions[index];
                     updateActivityCompleteBar();
                 }
+
                 showDocumentVerification(result.verification, result.submission);
             })
             .catch((error) => {
@@ -1064,6 +1094,7 @@
                 const snapshot = await queueProgressWrite(() => resetKit(state.kitId));
                 state.completedActivities = {};
                 state.submissions = {};
+                state.drawingFiling = {};
                 state.certificate = null;
                 renderPage();
                 const kitEntry = (snapshot.kits || []).find((entry) => entry.id === state.kitId) || null;
@@ -1133,6 +1164,7 @@
             });
             state.completedActivities = progressPayload?.completedActivities || {};
             state.submissions = {};
+            state.drawingFiling = {};
             state.certificate = progressPayload?.certificate || null;
             state.progressLoaded = true;
             const currentActivity = state.content?.activities?.[getCurrentActivityIndex()];
@@ -1219,6 +1251,7 @@
             state.responses = {};
             state.completedActivities = {};
             state.submissions = {};
+            state.drawingFiling = {};
             state.driveSetup = null;
             state.huntProfile = null;
             state.certificate = null;

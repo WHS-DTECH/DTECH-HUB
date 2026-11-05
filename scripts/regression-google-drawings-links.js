@@ -231,23 +231,29 @@ async function fixture(t) {
     const kit = B.withFilesFoldersLinks(base()), email = "student@school.nz", kitId = "kit-google-drawings";
     const progress = { student_email: email, kit_id: kitId, completed: false, completed_activities: {}, started_at: null,
         responses: Object.fromEntries([0, 1, 2].map((i) => [`${i}-blocks`, answer(kit, i, link(i))])) };
-    const checks = new Map(), submissions = new Map(), notices = [], certificateEmails = [], filings = [], filedDrawings = new Set();
+    const checks = new Map(), submissions = new Map(), notices = [], certificateEmails = [], filings = [], filedDrawings = new Map();
     let tables = false, emailFails = false, fileFails = false, fileReason = "";
     const key = (params) => JSON.stringify([params[0], params[1], Number(params[2]), params[3], params[4]]);
     const subKey = (params) => JSON.stringify([params[0], params[1], Number(params[2])]);
     const pool = { async query(sql, params) {
         if (sql.startsWith("CREATE TABLE")) { tables = true; return { rows: [] }; }
-        if (sql.startsWith("ALTER TABLE practical_skills_submissions")) return { rows: [] };
+        if (sql.startsWith("ALTER TABLE practical_skills_")) return { rows: [] };
         if (sql.startsWith("SELECT kit_id, activity_index, document_key, filed_document_key")) {
             return { rows: [...submissions.values()].filter((row) => row.student_email === params[0] && row.document_key.startsWith("google-file:")) };
         }
         if (sql.startsWith("SELECT kit_id, responses FROM practical_skills_progress")) {
             return { rows: params[0] === email ? [{ kit_id: kitId, responses: structuredClone(progress.responses) }] : [] };
         }
-        if (sql.startsWith("SELECT document_key FROM practical_skills_filed_drawings")) {
-            return { rows: [...filedDrawings].filter((entry) => entry.startsWith(`${params[0]}|`)).map((entry) => ({ document_key: entry.slice(params[0].length + 1) })) };
+        if (sql.startsWith("SELECT document_key, synced, reason FROM practical_skills_filed_drawings")) {
+            return { rows: [...filedDrawings.values()].filter((row) => row.student_email === params[0] && (!params[1] || row.document_key === params[1])) };
         }
-        if (sql.startsWith("INSERT INTO practical_skills_filed_drawings")) { filedDrawings.add(`${params[0]}|${params[1]}`); return { rows: [] }; }
+        if (sql.startsWith("SELECT student_email, document_key, synced, reason FROM practical_skills_filed_drawings")) {
+            return { rows: [...filedDrawings.values()] };
+        }
+        if (sql.startsWith("INSERT INTO practical_skills_filed_drawings")) {
+            filedDrawings.set(`${params[0]}|${params[1]}`, { student_email: params[0], document_key: params[1], synced: params[2], reason: params[3] });
+            return { rows: [] };
+        }
         if (sql.startsWith("UPDATE practical_skills_submissions SET filed_document_key")) {
             const row = submissions.get(subKey(params));
             if (row?.document_key === params[3]) row.filed_document_key = params[3];
@@ -344,6 +350,10 @@ async function fixture(t) {
         kit, progress, sync, request, notices, certificateEmails, filings, failEmail: (value) => { emailFails = value; },
         failFiling: (value) => { fileFails = value; },
         filingReason: (value) => { fileReason = value; },
+        legacyFiled: (index) => {
+            const document_key = B.documentLinkKey(link(index));
+            filedDrawings.set(`${email}|${document_key}`, { student_email: email, document_key, synced: false, reason: null });
+        },
         pendingFiling: () => request("/api/practical-skills/drawing-filing"),
         fileAll: (body) => request("/api/practical-skills/drawing-filing", "POST", body),
         setLink: (i, url) => { progress.responses[`${i}-blocks`] = answer(kit, i, url); },
@@ -395,6 +405,93 @@ test("Submit records the current link and emails the teacher once per link witho
     assert.equal((await f.submit(1)).data.emailed, true, "A failed email is retried on the next Submit");
 });
 
+test("Saved becomes Submitted only after successful sync, for students and teachers", async (t) => {
+    const f = await fixture(t);
+    const teacherEntry = async (index) => (await f.list()).data.kits[0].students["student@school.nz"][index];
+    assert.equal((await f.status(0)).data.filing.filed, false, "A saved link is not synced");
+    await f.submit(0);
+    await f.approve(0);
+    assert.equal((await teacherEntry(0)).completed, true);
+    assert.equal((await teacherEntry(0)).filed, false, "Teacher completion is independent of filing");
+    f.failFiling(true);
+    await f.submit(0, { driveAccessToken: "student-token" });
+    assert.equal((await f.status(0)).data.filing.filed, false);
+    f.failFiling(false);
+    await f.fileAll({ driveAccessToken: "student-token" });
+    assert.equal((await f.status(0)).data.filing.filed, true, "Successful reminder sync persists");
+    assert.equal((await teacherEntry(0)).filed, true, "Teacher refresh sees the same sync result");
+    assert.equal((await teacherEntry(0)).completed, true, "Sync preserves the teacher tick");
+    assert.equal((await f.status(1)).data.submission, null);
+    assert.equal((await f.status(1)).data.filing.filed, true, "A filed saved link need not have an old Submit record");
+    f.setLink(0, link(8));
+    assert.equal((await f.status(0)).data.filing.filed, false, "Replacing the link resets its sync status");
+    assert.equal((await teacherEntry(0)).filed, false);
+    f.setLink(2, link(10));
+    f.filingReason("not-owner");
+    await f.submit(2, { driveAccessToken: "student-token" });
+    assert.equal((await f.status(2)).data.filing.reason, "not-owner");
+    assert.equal((await teacherEntry(2)).filed, false, "Resolved reminder does not mean successful sync");
+    f.filingReason("");
+    f.legacyFiled(1);
+    assert.equal((await f.status(1)).data.filing.filed, false, "Legacy markers are not falsely treated as sync success");
+    assert.ok((await f.pendingFiling()).data.pending.some((item) => item.index === 1), "Legacy marker can be rechecked");
+    await f.fileAll({ driveAccessToken: "student-token" });
+    assert.equal((await f.status(1)).data.filing.filed, true);
+});
+
+test("drawing activity shows Saved, permits Sync after Completed, and updates after reminder sync", () => {
+    const source = fs.readFileSync(path.join(__dirname, "..", "practical-skills", "kit-worksheet.js"), "utf8");
+    const kit = base();
+    kit.activities = [{ documentCheck: POLICY, blocks: [{ id: "link", kind: "studentlink" }] }];
+    const elements = new Map();
+    const el = (id) => {
+        if (!elements.has(id)) elements.set(id, { textContent: "", classList: { toggle() {} }, setAttribute() {}, removeAttribute() {} });
+        return elements.get(id);
+    };
+    const listeners = {};
+    const context = vm.createContext({
+        state: { email: "student@school.nz", kitId: "kit-google-drawings", content: kit, completedActivities: {}, submissions: {},
+            drawingFiling: {}, progressLoaded: true, responses: { "0-blocks": { link: link(0) } } },
+        preview: false,
+        getCurrentActivityIndex: () => 0,
+        isTeacherReview: () => true,
+        normalizeEmail: (value) => String(value || "").toLowerCase(),
+        document: { getElementById: el },
+        window: { ActivityBlocks: B, KitWorksheetRender: { visibleLoginSites: () => [] },
+            addEventListener: (name, handler) => { listeners[name] = handler; } }
+    });
+    const extract = (start, end) => source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start)));
+    vm.runInContext(extract("    function updateActivityCompleteBar()", "    function blockPath(") +
+        extract("    function showDocumentVerification(", "    async function submitForReview(") +
+        extract('    window.addEventListener("hub-drawings-filed"', "\n    function normalizeEmail("), context);
+    const state = context.state, key = B.documentLinkKey(link(0));
+    context.updateActivityCompleteBar();
+    assert.equal(el("worksheet-activity-status-pill").textContent, "Saved - sync needed");
+    state.submissions[0] = { documentKey: key, submittedAt: "2026-11-05T00:00:00Z" };
+    context.updateActivityCompleteBar();
+    assert.equal(el("worksheet-activity-complete-btn").textContent, "Sync drawing");
+    assert.equal(el("worksheet-activity-complete-btn").disabled, false);
+    state.completedActivities[0] = "teacher-tick";
+    context.updateActivityCompleteBar();
+    assert.equal(el("worksheet-activity-status-pill").textContent, "Completed");
+    assert.equal(el("worksheet-activity-complete-btn").disabled, false, "A teacher tick cannot block sync");
+    context.showDocumentVerification(null, state.submissions[0]);
+    assert.match(el("worksheet-document-check-status").textContent, /Saved - sync needed/);
+    listeners["hub-drawings-filed"]({ detail: { email: "someone@school.nz", results: [{ documentKey: key, filed: true }] } });
+    assert.equal(state.drawingFiling[key], undefined, "Other-account event cannot change this student");
+    listeners["hub-drawings-filed"]({ detail: { email: state.email, results: [{ documentKey: key, filed: true }] } });
+    assert.equal(el("worksheet-activity-complete-btn").textContent, "Submitted - synced");
+    assert.equal(el("worksheet-activity-complete-btn").disabled, true);
+    assert.match(el("worksheet-document-check-status").textContent, /Submitted - synced/);
+    delete state.completedActivities[0];
+    context.updateActivityCompleteBar();
+    assert.equal(el("worksheet-activity-status-pill").textContent, "Submitted - synced");
+    state.responses["0-blocks"].link = link(7);
+    context.updateActivityCompleteBar();
+    assert.equal(el("worksheet-activity-status-pill").textContent, "Saved - sync needed");
+    assert.equal(el("worksheet-activity-complete-btn").disabled, false);
+});
+
 test("Submit with Drive permission files the drawing, and a filing failure never blocks the submission", async (t) => {
     const f = await fixture(t);
     const none = await f.submit(0);
@@ -410,7 +507,8 @@ test("Submit with Drive permission files the drawing, and a filing failure never
     const failed = await f.submit(2, { driveAccessToken: "student-token" });
     assert.equal(failed.status, 200, "Drive problems never stop the teacher getting the submission");
     assert.equal(failed.data.emailed, true);
-    assert.deepEqual({ ...failed.data.filing }, { filed: false, reason: "error" });
+    assert.equal(failed.data.filing.filed, false);
+    assert.equal(failed.data.filing.reason, "error");
 });
 
 test("drawing filing helper moves only owned drawings into KITS > Google Drawings and renames them", async () => {
@@ -550,8 +648,11 @@ test("student and teacher pages use the teacher-ticked drawing policy, amber Sub
         assert.match(text, /google-drawing-teacher-v1/);
     }
     assert.match(worksheet, /\/submit`/);
-    assert.match(worksheet, /"Submitted" : "Submit"/);
-    assert.match(css, /\.worksheet-status-pill\.is-submitted[^}]*#f59e0b/);
+    assert.match(worksheet, /"Saved - sync needed"/);
+    assert.match(worksheet, /"Submitted - synced"/);
+    assert.match(worksheet, /"Sync drawing"/);
+    assert.match(css, /\.worksheet-status-pill\.is-saved[^}]*#f59e0b/);
+    assert.match(css, /\.worksheet-status-pill\.is-submitted[^}]*#dcfce7/);
     assert.match(css, /#worksheet-activity-complete-btn\.is-submit[^}]*#f59e0b/);
     assert.match(teacher, /\/api\/admin\/kit-submissions\?kits=/);
     assert.match(teacher, /\/api\/admin\/kit-document-review\//);

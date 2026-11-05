@@ -6,6 +6,14 @@ Audience: Westland High School System Administration
 ## 1) What This Website Is
 DTECH Hub is a web application used in DTECH classes for project/activity access, uploads, assessment resources, and teacher/admin workflows.
 
+### Google Drawings filing statuses
+- **Saved - sync needed**: a drawing link is saved, but successful filing in `WHS-DTECH > course > KITS > Google Drawings` has not been confirmed.
+- **Submitted - synced**: DTECH-HUB successfully filed the linked drawing. Moving does not grant the teacher sharing access.
+- **Completed**: the teacher's review tick, independent of sync. Students can still use **Sync drawing** after a teacher tick if filing is outstanding.
+- Students can sync using Submit/Sync drawing in the activity or the sign-in filing reminder. The activity updates immediately after reminder filing; teachers use Refresh list.
+- `practical_skills_filed_drawings.synced` records actual success separately from reminder-resolved outcomes (`missing`, `not-owner`, `not-drawing`). Those outcomes remain Saved, with student guidance to correct the link.
+- Older filing markers did not distinguish success from those outcomes. They remain unconfirmed until a student-authorised filing retry checks the drawing; the filing helper leaves already-correct folders/names unchanged. Saved links, teacher ticks and email deduplication are preserved.
+
 ## 2) How Google Sign-In Is Set Up
 - Frontend uses Google Identity Services OAuth token flow.
 - User signs in with Google and the app fetches profile details from the Google userinfo API.

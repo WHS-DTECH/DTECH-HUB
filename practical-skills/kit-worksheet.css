@@ -832,6 +832,11 @@ body.kit-worksheet-page {
 }
 
 .worksheet-status-pill.is-submitted {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.worksheet-status-pill.is-saved {
     background: #f59e0b;
     color: #3b2300;
 }
